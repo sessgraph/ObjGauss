@@ -58,6 +58,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可在本机提供 `segment-anything` 和 checkpoint 时生成 SAM automatic mask manifest。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
+  - 可机器检查 mask guidance 是否实际改变 Object Field hard labels。
 - 训练输出接入:
   - `objgauss training register-output` 可登记外部成熟 3DGS 训练器产出的 `.ply` / `.splat`。
   - 登记时可生成 viewer `.splat`、标准 Gaussian PLY、Object Field、mask 投票 summary 和 `object_id` PLY。
@@ -101,6 +102,7 @@ npm run build
 - MASK-002: `objgauss masks from-nerf-rgba-colors` 在 NeRF Lego 真实 RGBA 上生成 8 frames / 32 masks / 4 slots；独立 `vote-masks` 消费该 manifest，3423 个 Gaussian 被监督，projection loss 1.386294 -> 0.390825，并输出 `object_id` PLY。
 - TRAIN-002: `objgauss training register-output` 接入 Gaussian PLY smoke 通过，生成 viewer splat、Object Field 和 `object_id` PLY；使用真实 Lego color mask manifest 时 supervised_gaussians=4806，projection loss 1.386294 -> 0.375765。
 - SEG-002A: `objgauss masks from-nerf-sam --help` 可用；SAM manifest 生成逻辑由 fake generator 测试覆盖，输出 `sam-automatic-mask-generator` manifest 和 boolean `.npy` masks。
+- VERIFY-003: `npm run acceptance:demo` 已检查 `mask_guidance_changed_object_field`；Plush changed_gaussians=196457，Lego proxy changed_gaussians=4960，证明 mask supervision 实际改变 Object Field labels。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制

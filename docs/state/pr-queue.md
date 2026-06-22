@@ -35,6 +35,26 @@
 
 ## Done
 
+### VERIFY-003: 固化 mask guidance 改变 Object Field 的验收
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 让闭环验收不仅检查 loss 下降，还直接证明 2D mask guidance 改变了 Object Field 的 hard labels。
+- 实施:
+  - 新增 `object_field_label_delta`。
+  - Plush v1 closure、NeRF Lego proxy closure、training register-output manifest 写入 `object_field_delta`。
+  - `verify-v1-closure` 和 `verify-lego-alpha-closure` 增加 `mask_guidance_changed_object_field` 检查。
+- 范围外:
+  - 不改变 Object Field 文件格式。
+  - 不解决 SAM checkpoint / 真实 3DGS 训练产物缺口。
+- 验收:
+  - `npm run acceptance:demo` 输出并检查 changed_gaussians。
+- 验证:
+  - `uv run --extra dev pytest`: 19 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `npm run acceptance:demo`: passed；Plush changed_gaussians=196457，Lego proxy changed_gaussians=4960。
+- 完成 commit: `e5e5154`。
+
 ### SEG-002A: 接入可选 SAM automatic mask manifest 生成器
 
 - 状态: done

@@ -24,6 +24,11 @@
 
 ## Closed
 
+### ACTION-017: 固化 mask guidance 改变 Object Field 的验收
+
+- 完成 commit: `e5e5154`
+- 结果: `verify-v1-closure` 和 `verify-lego-alpha-closure` 现在检查 `mask_guidance_changed_object_field`；本地 `acceptance:demo` 证明 Plush 196457 个 Gaussian、Lego proxy 4960 个 Gaussian 的 hard label 被 mask guidance 改变。
+
 ### ACTION-016A: 接入可选 SAM automatic mask manifest 生成器
 
 - 完成 commit: `8c3c80e`
