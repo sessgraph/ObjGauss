@@ -139,6 +139,7 @@ outputs/assets/converted/nerf-synthetic-lego/training-manifest.json
 
 ```bash
 objgauss demo lego-alpha-closure
+objgauss demo verify-lego-alpha-closure
 ```
 
 默认输出：

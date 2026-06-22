@@ -14,6 +14,7 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
+from objgauss.lego_verify import verify_lego_alpha_closure_demo
 from objgauss.masks import build_nerf_alpha_mask_manifest
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
@@ -363,6 +364,24 @@ def _demo_lego_alpha_closure(args: argparse.Namespace) -> None:
     print(f"final_loss={result.final_loss:.6f}")
 
 
+def _demo_verify_lego_alpha_closure(args: argparse.Namespace) -> None:
+    result = verify_lego_alpha_closure_demo(
+        args.manifest,
+        asset_library_path=args.asset_library,
+        require_public_copy=not args.no_require_public_copy,
+        min_frames=args.min_frames,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"passed={str(result.passed).lower()}")
+    for key, value in result.summary.items():
+        print(f"{key}={value}")
+    for check in result.checks:
+        status = "pass" if check["passed"] else "fail"
+        print(f"check={check['name']} status={status} detail={check['detail']}")
+    if not result.passed:
+        raise ValueError("Lego alpha closure verification failed")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -598,6 +617,21 @@ def _build_parser() -> argparse.ArgumentParser:
     lego_alpha.add_argument("--iterations", type=int, default=160)
     lego_alpha.add_argument("--learning-rate", type=float, default=1.0)
     lego_alpha.set_defaults(handler=_demo_lego_alpha_closure)
+
+    verify_lego_alpha = demo_subparsers.add_parser(
+        "verify-lego-alpha-closure",
+        help="verify the generated NeRF Lego alpha closure proxy demo",
+    )
+    verify_lego_alpha.add_argument(
+        "manifest",
+        nargs="?",
+        type=Path,
+        default=Path("outputs/demos/lego-alpha-closure/lego-alpha-closure-manifest.json"),
+    )
+    verify_lego_alpha.add_argument("--asset-library", type=Path, default=Path("src/assetLibrary.js"))
+    verify_lego_alpha.add_argument("--no-require-public-copy", action="store_true")
+    verify_lego_alpha.add_argument("--min-frames", type=int, default=2)
+    verify_lego_alpha.set_defaults(handler=_demo_verify_lego_alpha_closure)
 
     return parser
 

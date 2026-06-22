@@ -520,6 +520,23 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     assert (public_dir / "lego_alpha_v1_objects.ply").exists()
     assert (public_dir / "lego_alpha_proxy.splat").exists()
 
+    assert (
+        main(
+            [
+                "demo",
+                "verify-lego-alpha-closure",
+                str(output_dir / "lego-alpha-closure-manifest.json"),
+                "--min-frames",
+                "1",
+            ]
+        )
+        == 0
+    )
+    verify_output = capsys.readouterr().out
+    assert "passed=true" in verify_output
+    assert "check=semantic_source_is_real_2d_masks status=pass" in verify_output
+    assert "check=viewer_ply_exports_object_id status=pass" in verify_output
+
 
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [

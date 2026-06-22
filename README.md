@@ -193,6 +193,7 @@ Build a NeRF Lego proxy closure demo from real multi-view RGBA images and
 ```bash
 objgauss assets pull nerf-synthetic-lego
 objgauss demo lego-alpha-closure
+objgauss demo verify-lego-alpha-closure
 ```
 
 This writes `outputs/demos/lego-alpha-closure/`, plus
