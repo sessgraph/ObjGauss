@@ -127,6 +127,22 @@ foreground projection supervision for `vote-masks`. It is a deterministic mask
 source for the Lego smoke dataset, not a replacement for SAM / CLIP instance
 segmentation.
 
+Build a multi-slot 2D color mask manifest from the same real NeRF Lego RGBA
+images:
+
+```bash
+objgauss masks from-nerf-rgba-colors outputs/assets/training/nerf-synthetic-lego \
+  --output outputs/masks/nerf-lego-rgba-colors/mask-manifest.json \
+  --split train \
+  --max-frames 8 \
+  --alpha-threshold 16
+```
+
+This writes four Lego color slots (`yellow`, `red`, `dark`, `other`) in the
+same manifest format consumed by `vote-masks`. The masks come from real 2D
+training images and are useful for v1 closure validation; they are still a
+deterministic color-rule source, not a SAM / CLIP model output.
+
 Apply precomputed SAM / CLIP / 2D masks as projection supervision:
 
 ```bash

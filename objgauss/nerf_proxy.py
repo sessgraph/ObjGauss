@@ -15,19 +15,18 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.masks import read_png_rgba
+from objgauss.masks import (
+    LEGO_COLOR_SLOTS,
+    build_nerf_rgba_color_mask_manifest,
+    classify_lego_rgba,
+    read_png_rgba,
+    resolve_nerf_image,
+    slot_count_summary,
+)
 from objgauss.object_field import ObjectField, save_object_field
 from objgauss.ply import write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 from objgauss.splat import write_splat
-
-
-LEGO_COLOR_SLOTS = (
-    {"slot": 0, "label": "yellow"},
-    {"slot": 1, "label": "red"},
-    {"slot": 2, "label": "dark"},
-    {"slot": 3, "label": "other"},
-)
 
 
 @dataclass(frozen=True)
@@ -69,9 +68,7 @@ def build_lego_alpha_closure_demo(
 
     dataset = Path(dataset)
     output_dir = Path(output_dir)
-    masks_dir = output_dir / "masks"
     output_dir.mkdir(parents=True, exist_ok=True)
-    masks_dir.mkdir(parents=True, exist_ok=True)
 
     transforms_path = dataset / f"transforms_{split}.json"
     if not transforms_path.exists():
@@ -87,7 +84,6 @@ def build_lego_alpha_closure_demo(
         frames=frames[:max_frames],
         split=split,
         camera_angle_x=camera_angle_x,
-        masks_dir=masks_dir,
         mask_manifest_path=output_dir / "mask-manifest.json",
         sample_stride=sample_stride,
         depth=depth,
@@ -203,22 +199,26 @@ def _build_proxy_cloud_and_masks(
     frames: list[Any],
     split: str,
     camera_angle_x: float,
-    masks_dir: Path,
     mask_manifest_path: Path,
     sample_stride: int,
     depth: float,
     alpha_threshold: int,
 ) -> tuple[GaussianCloud, dict[str, Any]]:
+    mask_result = build_nerf_rgba_color_mask_manifest(
+        dataset,
+        output=mask_manifest_path,
+        split=split,
+        max_frames=len(frames),
+        alpha_threshold=alpha_threshold,
+    )
     rows: list[np.ndarray] = []
-    manifest_frames: list[dict[str, Any]] = []
-    slot_pixel_counts = np.zeros(len(LEGO_COLOR_SLOTS), dtype=np.int64)
     sampled_slot_counts = np.zeros(len(LEGO_COLOR_SLOTS), dtype=np.int64)
     width = height = 0
 
     for frame_index, frame in enumerate(frames):
         if not isinstance(frame, dict):
             raise ValueError("NeRF frame entries must be objects")
-        image_path = _resolve_nerf_image(dataset, frame.get("file_path"))
+        image_path = resolve_nerf_image(dataset, frame.get("file_path"))
         transform = np.asarray(frame.get("transform_matrix"), dtype=np.float32)
         if transform.shape != (4, 4):
             raise ValueError("NeRF frame transform_matrix must be 4x4")
@@ -228,24 +228,8 @@ def _build_proxy_cloud_and_masks(
         elif rgba.shape[:2] != (height, width):
             raise ValueError(f"{image_path} shape does not match previous frames")
 
-        labels = _classify_lego_rgba(rgba)
+        labels = classify_lego_rgba(rgba)
         foreground = rgba[:, :, 3] >= alpha_threshold
-        masks: list[dict[str, Any]] = []
-        for slot in range(len(LEGO_COLOR_SLOTS)):
-            mask = foreground & (labels == slot)
-            count = int(np.count_nonzero(mask))
-            slot_pixel_counts[slot] += count
-            if count == 0:
-                continue
-            mask_path = masks_dir / f"{split}_{frame_index:04d}_slot_{slot}.npy"
-            np.save(mask_path, mask)
-            masks.append(
-                {
-                    "slot": slot,
-                    "label": LEGO_COLOR_SLOTS[slot]["label"],
-                    "mask_path": str(mask_path.relative_to(mask_manifest_path.parent)),
-                }
-            )
 
         sampled = _sample_mask(foreground, sample_stride=sample_stride)
         if np.any(sampled):
@@ -268,31 +252,9 @@ def _build_proxy_cloud_and_masks(
                     np.count_nonzero(sampled_labels == slot)
                 )
 
-        manifest_frames.append(
-            {
-                "name": f"{split}-{frame_index:04d}",
-                "image_path": str(image_path.relative_to(dataset)),
-                "transform_matrix": transform.tolist(),
-                "masks": masks,
-            }
-        )
-
     if not rows:
         raise ValueError("no foreground pixels were sampled from NeRF RGBA images")
     vertices = np.concatenate(rows)
-    manifest = {
-        "width": width,
-        "height": height,
-        "camera_angle_x": camera_angle_x,
-        "source": str(dataset),
-        "source_type": "nerf-rgba-color-masks",
-        "slots": list(LEGO_COLOR_SLOTS),
-        "frames": manifest_frames,
-    }
-    mask_manifest_path.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
     return (
         GaussianCloud(
             vertices=vertices,
@@ -300,12 +262,12 @@ def _build_proxy_cloud_and_masks(
             source_format="binary_little_endian",
         ),
         {
-            "frames": len(manifest_frames),
-            "masks": sum(len(frame["masks"]) for frame in manifest_frames),
+            "frames": mask_result.frames,
+            "masks": mask_result.masks,
             "width": width,
             "height": height,
-            "slot_pixel_counts": _slot_counts(slot_pixel_counts),
-            "sampled_slot_counts": _slot_counts(sampled_slot_counts),
+            "slot_pixel_counts": list(mask_result.slot_pixel_counts),
+            "sampled_slot_counts": slot_count_summary(sampled_slot_counts),
             "sampled_gaussians": int(vertices.shape[0]),
         },
     )
@@ -365,35 +327,7 @@ def _points_from_pixels(
     return vertices
 
 
-def _classify_lego_rgba(rgba: np.ndarray) -> np.ndarray:
-    red = rgba[:, :, 0]
-    green = rgba[:, :, 1]
-    blue = rgba[:, :, 2]
-    labels = np.full(red.shape, 3, dtype=np.int32)
-    labels[(red > 120) & (green > 100) & (blue < 120)] = 0
-    labels[(red > 120) & (green < 110) & (blue < 120)] = 1
-    labels[np.maximum.reduce((red, green, blue)) < 85] = 2
-    return labels
-
-
 def _sample_mask(mask: np.ndarray, *, sample_stride: int) -> np.ndarray:
     sampled = np.zeros(mask.shape, dtype=bool)
     sampled[::sample_stride, ::sample_stride] = True
     return sampled & mask
-
-
-def _slot_counts(counts: np.ndarray) -> list[dict[str, int | str]]:
-    return [
-        {"slot": int(slot["slot"]), "label": str(slot["label"]), "count": int(counts[index])}
-        for index, slot in enumerate(LEGO_COLOR_SLOTS)
-    ]
-
-
-def _resolve_nerf_image(dataset: Path, file_path: object) -> Path:
-    if not isinstance(file_path, str):
-        raise ValueError("NeRF frame is missing file_path")
-    raw = file_path[2:] if file_path.startswith("./") else file_path
-    candidate = dataset / raw
-    if candidate.suffix:
-        return candidate
-    return candidate.with_suffix(".png")

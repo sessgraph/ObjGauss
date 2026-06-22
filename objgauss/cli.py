@@ -15,7 +15,10 @@ from objgauss.mask_voting import (
     vote_masks_to_gaussians,
 )
 from objgauss.lego_verify import verify_lego_alpha_closure_demo
-from objgauss.masks import build_nerf_alpha_mask_manifest
+from objgauss.masks import (
+    build_nerf_alpha_mask_manifest,
+    build_nerf_rgba_color_mask_manifest,
+)
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
     attach_hard_labels,
@@ -293,6 +296,24 @@ def _masks_from_nerf_alpha(args: argparse.Namespace) -> None:
     print(f"foreground_pixels={result.foreground_pixels}")
 
 
+def _masks_from_nerf_rgba_colors(args: argparse.Namespace) -> None:
+    result = build_nerf_rgba_color_mask_manifest(
+        args.dataset,
+        output=args.output,
+        split=args.split,
+        max_frames=args.max_frames,
+        alpha_threshold=args.alpha_threshold,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"width={result.width}")
+    print(f"height={result.height}")
+    print(f"foreground_pixels={result.foreground_pixels}")
+    for slot in result.slot_pixel_counts:
+        print(f"slot={slot['slot']} label={slot['label']} pixels={slot['count']}")
+
+
 def _demo_v1_closure(args: argparse.Namespace) -> None:
     result = build_v1_closure_demo(
         input_ply=args.input,
@@ -565,6 +586,17 @@ def _build_parser() -> argparse.ArgumentParser:
     nerf_alpha.add_argument("--label", default="foreground")
     nerf_alpha.add_argument("--threshold", type=int, default=1)
     nerf_alpha.set_defaults(handler=_masks_from_nerf_alpha)
+
+    nerf_rgba_colors = masks_subparsers.add_parser(
+        "from-nerf-rgba-colors",
+        help="convert NeRF Synthetic Lego RGBA colors to multi-slot mask manifest files",
+    )
+    nerf_rgba_colors.add_argument("dataset", type=Path)
+    nerf_rgba_colors.add_argument("--output", "-o", required=True, type=Path)
+    nerf_rgba_colors.add_argument("--split", default="train")
+    nerf_rgba_colors.add_argument("--max-frames", type=int)
+    nerf_rgba_colors.add_argument("--alpha-threshold", type=int, default=16)
+    nerf_rgba_colors.set_defaults(handler=_masks_from_nerf_rgba_colors)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

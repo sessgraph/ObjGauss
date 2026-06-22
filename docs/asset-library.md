@@ -142,6 +142,16 @@ objgauss demo lego-alpha-closure
 objgauss demo verify-lego-alpha-closure
 ```
 
+独立生成真实 2D color mask manifest：
+
+```bash
+objgauss masks from-nerf-rgba-colors outputs/assets/training/nerf-synthetic-lego \
+  --output outputs/masks/nerf-lego-rgba-colors/mask-manifest.json \
+  --split train \
+  --max-frames 8 \
+  --alpha-threshold 16
+```
+
 默认输出：
 
 ```text

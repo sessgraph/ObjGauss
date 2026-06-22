@@ -334,6 +334,73 @@ def test_masks_from_nerf_alpha_cli_writes_manifest_and_npy(tmp_path, capsys):
     assert mask.tolist() == [[False, True], [True, False]]
 
 
+def test_masks_from_nerf_rgba_colors_cli_writes_multislot_manifest(tmp_path, capsys):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[220, 190, 20, 255], [210, 40, 30, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[230, 180, 25, 255], [30, 25, 20, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [160, 160, 150, 255], [150, 150, 140, 255]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [25, 25, 25, 255], [160, 160, 150, 255]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": 0.7,
+                "frames": [{"file_path": "./train/r_0", "transform_matrix": transform}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "masks" / "mask-manifest.json"
+
+    assert (
+        main(
+            [
+                "masks",
+                "from-nerf-rgba-colors",
+                str(dataset),
+                "--output",
+                str(manifest_path),
+                "--alpha-threshold",
+                "16",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    masks = manifest["frames"][0]["masks"]
+    loaded_masks = {
+        mask["label"]: np.load(manifest_path.parent / mask["mask_path"])
+        for mask in masks
+    }
+
+    assert "masks=4" in output
+    assert "slot=0 label=yellow pixels=2" in output
+    assert "slot=1 label=red pixels=1" in output
+    assert "slot=2 label=dark pixels=2" in output
+    assert "slot=3 label=other pixels=3" in output
+    assert manifest["source_type"] == "nerf-rgba-color-masks"
+    assert manifest["width"] == 4
+    assert manifest["height"] == 4
+    assert [slot["label"] for slot in manifest["slots"]] == ["yellow", "red", "dark", "other"]
+    assert {mask["slot"] for mask in masks} == {0, 1, 2, 3}
+    assert loaded_masks["yellow"].dtype == np.bool_
+    assert loaded_masks["yellow"].sum() == 2
+    assert loaded_masks["red"].sum() == 1
+    assert loaded_masks["dark"].sum() == 2
+    assert loaded_masks["other"].sum() == 3
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")

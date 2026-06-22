@@ -59,6 +59,12 @@
 - 输出沿用 `vote-masks` manifest 格式，保留相机 pose 和 `camera_angle_x`。
 - 用于 NeRF Lego 前景投影烟测，证明 mask manifest 可以从真实多视角图片生成。
 
+`MASK-002` 补充了一个多 slot 的真实 2D mask 来源：
+
+- `objgauss masks from-nerf-rgba-colors`: 从 NeRF Synthetic Lego RGBA 图片生成 `yellow`、`red`、`dark`、`other` 四类 color masks。
+- 输出仍沿用 `vote-masks` manifest 格式。
+- 用于证明同一真实多视角数据可以产生多对象/多部件的 2D 监督，并直接更新 Object Field logits。
+
 仍不在本仓库内运行 SAM / CLIP 模型；新增模型依赖和权重下载单独立项。
 
 ## 验收标准
