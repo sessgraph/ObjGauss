@@ -63,6 +63,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - 训练输出接入:
   - `objgauss training register-output` 可登记外部成熟 3DGS 训练器产出的 `.ply` / `.splat`。
   - 登记时可生成 viewer `.splat`、标准 Gaussian PLY、Object Field、mask 投票 summary 和 `object_id` PLY。
+  - 本机已验证 Nerfstudio Splatfacto 可读取 `nerf-synthetic-lego` 的 `blender-data` 格式，完成 100-step CUDA smoke 训练、导出 Gaussian PLY，并接入 Object Field / SAM mask voting。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
@@ -114,6 +115,9 @@ npm run acceptance:demo
 - AUDIT-001: `objgauss demo audit-v1-goal` 严格模式通过，当前证据为 unified，completion_blockers=`-`。
 - VERIFY-004: `objgauss object-field vote-masks` summary、闭环 demo manifest 和 verifier 已包含 mask vote quality audit；本地测试覆盖 per-slot coverage、conflict fraction、normalized target entropy 和 verifier 检查。
 - SEG-002: 真实 SAM checkpoint 小场景验收通过；`from-nerf-sam` 在 NeRF Lego 2 帧上生成 8 个 SAM masks，`vote-masks` 监督 5567 / 5696 个 Gaussian，supervised_fraction=0.977353，vote_conflict_fraction=0.064308，projection loss 3.902681 -> 0.120758，并输出带 `object_id` 的 PLY。
+- TRAIN-001: Nerfstudio Splatfacto smoke 训练通过。`ns-train splatfacto ... blender-data --data outputs/assets/training/nerf-synthetic-lego` 完成 100 iterations，checkpoint 为 `outputs/training/nerf-lego-splatfacto-smoke/lego-splatfacto-smoke/splatfacto/smoke-cuda/nerfstudio_models/step-000000099.ckpt`；`ns-export gaussian-splat` 导出 `outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply`，ObjGauss 读取为 50000 gaussians。
+- TRAIN-001 环境结论: 当前 RTX 5060 Ti / PyTorch `2.12.1+cu130` / CUDA 13.0 环境需要为 `gsplat` JIT 显式加入 `nvidia-cuda-nvcc==13.0.*`、`nvidia-cuda-cccl==13.0.*`、`nvidia-nvvm==13.0.*`、`nvidia-cuda-crt==13.0.*`；未对齐时会出现 no `nvcc`、CUDA 13.3 header/compiler mismatch、PTX version mismatch 或 `-lcudart` 链接失败。导出本地可信 checkpoint 时需设置 `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` 兼容 PyTorch 2.6+ 的 `torch.load` 默认行为。
+- TRAIN-001 Object Field smoke: 对导出的 `splat.ply` 执行 8-slot init 和 SAM mask vote，`supervised_gaussians=8887 / 50000`，`supervised_fraction=0.177740`，`vote_conflict_fraction=0.268707`，projection loss `4.384474 -> 0.308315`，最终 `outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/lego_splatfacto_sam_objects.ply` 含 `object_id` 和 RGB 字段。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
@@ -123,14 +127,14 @@ npm run acceptance:demo
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
-- NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。
-- 外部训练输出接入命令已完成，但本仓库尚未产出真实 NeRF Lego 训练 Gaussian PLY。
+- NeRF Lego 闭环代理样例仍是 posed RGBA 生成的轻量 Gaussian proxy；另有 Nerfstudio Splatfacto 100-step smoke 产物证明本机可产出真实 3DGS optimization PLY，但尚未作为前端公开样例固化。
+- 外部训练输出接入命令已完成，本机已产出真实 NeRF Lego Splatfacto smoke PLY；但该产物仍在 ignored `outputs/`，还不是固定发布样例，也尚未完成长训练质量验收、固定 runbook、`training register-output` 公共样例登记或浏览器 acceptance 纳入。
 - Poly Haven mesh Demo 还不能直接进入现有 3DGS viewer，需要后续 mesh 多视角渲染和 3DGS 训练。
-- 训练素材目录已接入 NeRF Lego，但还没有对应训练出的 Lego Gaussian PLY。
+- 训练素材目录已接入 NeRF Lego；当前只有短训练 smoke PLY，不代表高质量 Lego reconstruction。
 
 ## 下一步主线
 
-1. 执行 TRAIN-001: 训练 NeRF Lego 得到 Gaussian PLY，再跑 `training register-output` 和 `vote-masks` 验收真实训练数据。
+1. 固化 TRAIN-001 smoke 为可复现 runbook / script，并跑更长的 NeRF Lego Splatfacto 训练后用 `training register-output` 登记为前端公共样例。
 2. 建立 Poly Haven mesh -> 多视角渲染 -> 3DGS 训练的 Demo 转换链。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

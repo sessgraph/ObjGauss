@@ -10,17 +10,47 @@
 
 ## Ready
 
-### TRAIN-001: 训练 NeRF Lego Gaussian PLY
+### TRAIN-003: 固化 NeRF Lego Splatfacto 训练样例
 
 - 状态: ready-for-ADR-review
 - 类型: 重大变更
-- 目标: 基于 `nerf-synthetic-lego` 得到可供 Object Field / mask voting 使用的 Gaussian PLY。
-- 范围外: 不自研完整 3DGS trainer，优先封装成熟训练器。
+- 目标: 将 TRAIN-001 smoke 固化为可复现 runbook / script，跑更长的 Splatfacto 训练，并登记为前端 `NeRF Lego 训练输出样例`。
+- 范围外: 不自研完整 3DGS trainer；不把 checkpoint、SAM checkpoint 或大体积训练输出提交进 git。
 - 验收:
-  - 产出 Lego `gaussians.ply` 或 `.splat`。
-  - 可用 `objgauss object-field init` 和 `vote-masks` 跑通最小验收。
+  - 训练命令可由文档或脚本复现，并记录 CUDA / `gsplat` 环境要求。
+  - 长训练导出的 Lego `splat.ply` 可通过 `training register-output` 生成 viewer `.splat` 和 `object_id` PLY。
+  - 前端素材库卡片可加载训练输出样例并完成对象选择、隔离、删除预览。
 
 ## Done
+
+### TRAIN-001: 训练 NeRF Lego Gaussian PLY
+
+- 状态: done
+- 类型: 重大变更
+- 目标: 基于 `nerf-synthetic-lego` 得到可供 Object Field / mask voting 使用的 Gaussian PLY。
+- 实施:
+  - 使用 Nerfstudio `splatfacto` 和 `blender-data` dataparser 读取 `outputs/assets/training/nerf-synthetic-lego`。
+  - 在 RTX 5060 Ti / PyTorch `2.12.1+cu130` 上完成 100-step CUDA smoke 训练。
+  - 通过 `ns-export gaussian-splat` 导出 `outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply`。
+  - 使用 `objgauss object-field init` 和 `vote-masks` 消费真实 SAM mask manifest，导出带 `object_id` 的训练 PLY。
+- 环境结论:
+  - `gsplat` PyPI JIT 需要本地 `nvcc`；系统未安装 CUDA toolkit 时，可用 `uv --with` 临时加入 `nvidia-cuda-nvcc==13.0.*`、`nvidia-cuda-cccl==13.0.*`、`nvidia-nvvm==13.0.*`、`nvidia-cuda-crt==13.0.*`。
+  - 需要为 PyPI CUDA runtime 的 `libcudart.so.13` 提供临时 `libcudart.so` 链接路径。
+  - 导出本地可信 checkpoint 时需设置 `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` 兼容 PyTorch 2.6+ 默认 `weights_only=True`。
+- 范围外:
+  - 不提交 `outputs/` 训练产物、checkpoint、TensorBoard event 或 SAM checkpoint。
+  - 不声称 100-step smoke 是高质量 Lego reconstruction。
+  - 不在本项中固化 runbook/script 或前端公共样例；后续 TRAIN-003 处理。
+- 验收:
+  - 产出 Lego `splat.ply`。
+  - 可用 `objgauss object-field init` 和 `vote-masks` 跑通最小验收。
+- 验证:
+  - `ns-train splatfacto ... blender-data --data outputs/assets/training/nerf-synthetic-lego`: 100 iterations completed，checkpoint step `000000099`。
+  - `ns-export gaussian-splat ...`: 导出 `splat.ply`，`uv run objgauss stats` 读取为 50000 gaussians。
+  - `uv run objgauss object-field init ... --slots 8`: active_slots=8。
+  - `uv run objgauss object-field vote-masks ... --masks outputs/masks/nerf-lego-sam/mask-manifest.json`: supervised_gaussians=8887 / 50000，supervised_fraction=0.177740，vote_conflict_fraction=0.268707，loss 4.384474 -> 0.308315，active_slots=8。
+  - `uv run objgauss stats outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/lego_splatfacto_sam_objects.ply`: 50000 gaussians，包含 `object_id` 和 RGB 字段。
+- 完成 commit: `114f778`。
 
 ### SEG-002: 接入可选 SAM mask 生成器并完成 checkpoint 验收
 
