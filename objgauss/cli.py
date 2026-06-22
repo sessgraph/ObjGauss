@@ -8,6 +8,11 @@ import numpy as np
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.features import extract_features
+from objgauss.mask_voting import (
+    train_object_field_from_votes,
+    training_summary,
+    vote_masks_to_gaussians,
+)
 from objgauss.object_field import (
     attach_hard_labels,
     cloud_positions_for_metrics,
@@ -224,6 +229,48 @@ def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
         print(f"manifest={args.output}")
 
 
+def _object_field_vote_masks(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    field = load_object_field(args.field)
+    if field.gaussian_count != cloud.count:
+        raise ValueError(
+            f"field has {field.gaussian_count} gaussians for cloud with {cloud.count}"
+        )
+    votes = vote_masks_to_gaussians(
+        cloud,
+        args.masks,
+        slots=field.slots,
+        max_frames=args.max_frames,
+    )
+    result = train_object_field_from_votes(
+        field,
+        votes,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+    )
+    save_object_field(args.output, result.field)
+    print(f"object_field={args.output}")
+    print(f"frames={votes.frames}")
+    print(f"projected={votes.projected}")
+    print(f"matched={votes.matched}")
+    print(f"supervised_gaussians={result.supervised_gaussians}")
+    print(f"initial_loss={result.initial_loss:.6f}")
+    print(f"final_loss={result.final_loss:.6f}")
+    _print_metrics(object_field_metrics(result.field))
+    _print_summary(result.field.labels())
+
+    if args.summary_output:
+        write_json(args.summary_output, training_summary(result))
+        print(f"summary={args.summary_output}")
+
+    if args.ply_output:
+        labeled = attach_hard_labels(cloud, result.field)
+        if args.colorize:
+            labeled = apply_object_colors(labeled, rewrite_sh=args.rewrite_sh)
+        write_ply(args.ply_output, labeled, fmt=_output_format(args))
+        print(f"ply={args.ply_output}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -373,6 +420,24 @@ def _build_parser() -> argparse.ArgumentParser:
     field_nerf.add_argument("dataset", type=Path)
     field_nerf.add_argument("--output", "-o", type=Path)
     field_nerf.set_defaults(handler=_object_field_inspect_nerf)
+
+    field_vote = object_field_subparsers.add_parser(
+        "vote-masks",
+        help="project 2D masks to Gaussians and train object logits",
+    )
+    field_vote.add_argument("input", type=Path)
+    field_vote.add_argument("--field", required=True, type=Path)
+    field_vote.add_argument("--masks", required=True, type=Path)
+    field_vote.add_argument("--output", "-o", required=True, type=Path)
+    field_vote.add_argument("--summary-output", type=Path)
+    field_vote.add_argument("--ply-output", type=Path)
+    field_vote.add_argument("--iterations", type=int, default=100)
+    field_vote.add_argument("--learning-rate", type=float, default=0.5)
+    field_vote.add_argument("--max-frames", type=int)
+    field_vote.add_argument("--colorize", action="store_true")
+    field_vote.add_argument("--rewrite-sh", action="store_true")
+    field_vote.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    field_vote.set_defaults(handler=_object_field_vote_masks)
 
     return parser
 

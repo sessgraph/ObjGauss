@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import zipfile
 
 import numpy as np
@@ -10,7 +11,14 @@ from objgauss.cli import main
 from objgauss.clustering import cluster_features
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
-from objgauss.object_field import field_from_labels, load_object_field, object_field_metrics
+from objgauss.mask_voting import train_object_field_from_votes, vote_masks_to_gaussians
+from objgauss.object_field import (
+    ObjectField,
+    field_from_labels,
+    load_object_field,
+    object_field_metrics,
+    save_object_field,
+)
 from objgauss.ply import read_ply, write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids, filter_objects
 from objgauss.splat import read_splat
@@ -265,6 +273,71 @@ def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     assert manifest.exists()
 
 
+def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
+    cloud = _camera_cloud()
+    manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
+    field = ObjectField(np.zeros((cloud.count, 2), dtype=np.float32))
+
+    votes = vote_masks_to_gaussians(cloud, manifest, slots=2)
+    result = train_object_field_from_votes(field, votes, iterations=200, learning_rate=1.0)
+
+    assert votes.frames == 1
+    assert votes.projected == 4
+    assert votes.supervised_gaussians == 4
+    assert result.final_loss < result.initial_loss
+    assert np.array_equal(result.field.labels(), np.array([0, 0, 1, 1], dtype=np.int32))
+
+
+def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "camera_cloud.ply"
+    field_path = tmp_path / "field"
+    output_field = tmp_path / "field_trained"
+    output_ply = tmp_path / "field_trained.ply"
+    summary_path = tmp_path / "summary.json"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.zeros((cloud.count, 2), dtype=np.float32)))
+
+    assert (
+        main(
+            [
+                "object-field",
+                "vote-masks",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--masks",
+                str(masks_path),
+                "--output",
+                str(output_field),
+                "--summary-output",
+                str(summary_path),
+                "--ply-output",
+                str(output_ply),
+                "--iterations",
+                "200",
+                "--learning-rate",
+                "1.0",
+                "--colorize",
+                "--ascii",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    trained = load_object_field(output_field)
+    exported = read_ply(output_ply)
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "final_loss=" in output
+    assert trained.labels().tolist() == [0, 0, 1, 1]
+    assert {"object_id", "red", "green", "blue"}.issubset(exported.fields)
+    assert summary["final_loss"] < summary["initial_loss"]
+    assert summary["supervised_gaussians"] == 4
+
+
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [
         ("x", "f4"),
@@ -291,3 +364,47 @@ def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> G
         vertices["f_dc_1"] = 0.0
         vertices["f_dc_2"] = 0.0
     return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _camera_cloud() -> GaussianCloud:
+    vertices = np.zeros(
+        4,
+        dtype=np.dtype(
+            [
+                ("x", "f4"),
+                ("y", "f4"),
+                ("z", "f4"),
+                ("opacity", "f4"),
+                ("red", "u1"),
+                ("green", "u1"),
+                ("blue", "u1"),
+            ]
+        ),
+    )
+    vertices["x"] = np.array([-0.6, -0.3, 0.3, 0.6], dtype=np.float32)
+    vertices["y"] = 0.0
+    vertices["z"] = -2.0
+    vertices["opacity"] = 1.0
+    vertices["red"] = 128
+    vertices["green"] = 128
+    vertices["blue"] = 128
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _write_rect_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "frames": [
+            {
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {"slot": 0, "label": "left", "rect": [0, 0, 50, 100]},
+                    {"slot": 1, "label": "right", "rect": [50, 0, 100, 100]},
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path

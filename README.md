@@ -112,6 +112,40 @@ Check the NeRF Lego training smoke dataset before Object Field experiments:
 objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego
 ```
 
+Apply precomputed SAM / CLIP / 2D masks as projection supervision:
+
+```bash
+objgauss object-field vote-masks path/to/gaussians.ply \
+  --field outputs/plush_object_field.npz \
+  --masks path/to/masks.json \
+  --output outputs/plush_object_field_masked.npz \
+  --ply-output outputs/plush_object_field_masked.ply \
+  --colorize
+```
+
+Minimal mask manifest:
+
+```json
+{
+  "width": 100,
+  "height": 100,
+  "camera_angle_x": 1.5708,
+  "frames": [
+    {
+      "transform_matrix": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+      "masks": [
+        {"slot": 0, "label": "object-a", "rect": [0, 0, 50, 100]},
+        {"slot": 1, "label": "object-b", "mask_path": "frame_000_slot_1.npy"}
+      ]
+    }
+  ]
+}
+```
+
+`mask_path` points to a boolean `.npy` mask at image resolution. SAM / CLIP are
+treated as upstream mask producers; this repo consumes their masks without
+adding those model dependencies yet.
+
 ## Asset library
 
 素材库入口：

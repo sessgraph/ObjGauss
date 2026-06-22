@@ -45,6 +45,16 @@
 
 这一步降低了从 KMeans baseline 走向可学习对象分区的接口风险，但还没有解决语义分割质量问题。
 
+`SEG-001` / `OBJFIELD-002` 已实现第一条语义接入路径：
+
+- `objgauss object-field vote-masks`: 将预计算 2D masks 投影到 Gaussian。
+- mask manifest 支持 `rect` 和 boolean `.npy` mask，slot 由上游 SAM / CLIP / 人工标注结果指定。
+- 对同一个 Gaussian 聚合多视角 mask votes，形成 projection supervision。
+- 用 NumPy 训练循环更新 `object_logits`，以投影交叉熵降低为验收指标。
+- 可直接导出 hard `object_id` PLY 给现有 viewer 使用。
+
+仍不在本仓库内运行 SAM / CLIP 模型；新增模型依赖和权重下载单独立项。
+
 ## 验收标准
 
 - 输入同一个 scene，输出带 `object_id` 的 PLY。
@@ -60,5 +70,5 @@
 
 ## 后续任务
 
-- `SEG-001`: 建立语义级对象分组方案。
-- `OBJFIELD-002`: 引入 multi-view consistency / view projection loss 的实际训练循环。
+- `SEG-002`: 接入可选 SAM / CLIP mask 生成器，输出本 ADR 定义的 mask manifest。
+- `TRAIN-001`: 训练 NeRF Lego Gaussian PLY，用真实 3DGS 输出验收 mask voting。

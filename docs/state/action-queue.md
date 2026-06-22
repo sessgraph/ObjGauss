@@ -4,11 +4,11 @@
 
 ## Open
 
-### ACTION-005: 建立 Object Field 真实训练循环
+### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `OBJFIELD-001` 已有 soft slot 文件格式和指标，但仍是 KMeans warm start，没有 multi-view consistency / projection loss。
-- 推荐: 基于 `nerf-synthetic-lego` 先实现小规模 NumPy/PyTorch 训练 smoke，再决定是否引入完整 3DGS trainer。
-- 退出条件: Object Field logits 可通过多视角一致性或投影约束更新，并有固定验收命令。
+- 原因: `vote-masks` 已能消费 mask manifest，但仓库还不能自己从图像生成语义/实例 mask。
+- 推荐: 先做可选依赖和离线命令，不把模型权重放入仓库。
+- 退出条件: 小场景图片可生成 mask manifest，并被 `objgauss object-field vote-masks` 消费。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 
@@ -17,6 +17,11 @@
 - 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
 
 ## Closed
+
+### ACTION-005: 建立 Object Field 真实训练循环
+
+- 完成 commit: pending
+- 结果: 已通过 `objgauss object-field vote-masks` 实现 projection supervision 训练循环；完整 3DGS render loss 另行立项。
 
 ### ACTION-003: 选择首个训练数据最小子集
 

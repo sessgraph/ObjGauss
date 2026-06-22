@@ -10,19 +10,74 @@
 
 ## Ready
 
-### SEG-001: 建立语义级对象分组方案
+### SEG-002: 接入可选 SAM / CLIP mask 生成器
 
 - 状态: ready-for-ADR-review
-- 类型: 重大变更或标准 PR，取决于依赖选择
+- 类型: 重大变更或标准 PR，取决于依赖选择和模型权重策略
 - ADR: `docs/adr/0002-object-segmentation.md`
-- 目标: 在 Object Field v1-lite 接口上，从 KMeans warm start 走向语义/实例对象分组。
-- 范围外: 不在第一步追求全自动高质量分割。
+- 目标: 从图片生成当前 `vote-masks` 命令可消费的 mask manifest。
+- 范围外: 不改变 Object Field 文件格式；不把模型权重提交仓库。
 - 验收:
-  - 明确第一套验证数据。
-  - 输出仍为 ObjGauss PLY with `object_id`。
-  - 与 KMeans 基线可对比。
+  - 明确 SAM / CLIP 依赖、权重下载方式、许可和运行成本。
+  - 对一个小场景输出 mask manifest。
+  - `objgauss object-field vote-masks` 可消费该 manifest。
+
+### TRAIN-001: 训练 NeRF Lego Gaussian PLY
+
+- 状态: ready-for-ADR-review
+- 类型: 重大变更
+- 目标: 基于 `nerf-synthetic-lego` 得到可供 Object Field / mask voting 使用的 Gaussian PLY。
+- 范围外: 不自研完整 3DGS trainer，优先封装成熟训练器。
+- 验收:
+  - 产出 Lego `gaussians.ply` 或 `.splat`。
+  - 可用 `objgauss object-field init` 和 `vote-masks` 跑通最小验收。
 
 ## Done
+
+### SEG-001: 建立语义级对象分组方案
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 在 Object Field 接口上接入第一种语义/实例对象分组路径。
+- 实施:
+  - 新增预计算 2D mask manifest 接口。
+  - 支持 mask `rect` 和 boolean `.npy` mask。
+  - 通过相机 pose 将 Gaussian 投影到 2D mask，聚合多视角 votes。
+  - 输出仍为 Object Field，并可导出 ObjGauss PLY with `object_id`。
+- 范围外:
+  - 不在本 PR 中运行 SAM / CLIP 模型。
+  - 不新增模型权重或深度学习依赖。
+- 验收:
+  - 2D mask votes 能改变 Object Field labels。
+  - hard labels 可导出为现有 viewer 可读的 `object_id` PLY。
+- 验证:
+  - `uv run --extra dev pytest`: 12 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
+
+### OBJFIELD-002: 引入 projection loss 训练循环
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 让 Object Field logits 可以通过 2D mask projection supervision 实际更新。
+- 实施:
+  - 新增 `train_object_field_from_votes`。
+  - 使用 multi-view mask votes 生成 Gaussian-level targets。
+  - 用 NumPy softmax cross-entropy 更新 `object_logits`。
+  - CLI `objgauss object-field vote-masks` 输出训练后 field、summary 和可选 PLY。
+- 范围外:
+  - 不实现完整 differentiable 3DGS render loss。
+  - 不实现 NeRF Lego 的 3DGS 训练器。
+- 验收:
+  - projection loss 下降。
+  - Object Field labels 按 mask supervision 改变。
+- 验证:
+  - `uv run --extra dev pytest`: 12 passed。
+  - `uv run objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego`: 400 frames，缺图 0，无效 pose 0。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
 
 ### OBJFIELD-001: 建立 Object Field 最小训练骨架
 
