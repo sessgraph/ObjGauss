@@ -47,7 +47,7 @@
   - `uv run objgauss assets pull polyhaven-school-chair-1k`: 5 files。
   - `uv run objgauss assets pull nerf-synthetic-lego`: 805 files。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `9c88666`。
 
 ### RENDER-001: 评估并接入完整 3DGS renderer
 

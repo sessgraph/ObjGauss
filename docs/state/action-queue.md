@@ -14,12 +14,12 @@
 
 ### ACTION-003: 选择首个训练数据最小子集
 
-- 完成 commit: pending
+- 完成 commit: `9c88666`
 - 结果: 选择并接入 `nerf-synthetic-lego`，实际抽取 805 个文件到 `outputs/assets/training/nerf-synthetic-lego/`。
 
 ### ACTION-002: 确认公开 Demo 许可策略
 
-- 完成 commit: pending
+- 完成 commit: `9c88666`
 - 结果: 选择并接入 Poly Haven CC0 `SchoolChair_01` 作为首个许可干净 Demo 输入源；完整前端 Demo 仍需 ACTION-004。
 
 ### ACTION-001: 建立 baseline commit
