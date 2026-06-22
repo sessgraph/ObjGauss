@@ -34,6 +34,27 @@
 
 ## Done
 
+### UI-AUDIT-001: 固化闭环 demo 浏览器交互验收
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将“打开页面、看到闭环样例、选择/隔离/删除对象”的浏览器验证固化为可重复命令。
+- 实施:
+  - 新增 `npm run audit:demo`。
+  - 命令自动启动临时 Vite server，并用 Playwright 加载 `ObjGauss v1 闭环样例` 和 `NeRF Lego 闭环代理样例`。
+  - 检查页面身份、素材卡片、真实 splat canvas 非空、点云编辑 canvas 非空、对象选择、只看所选和预览删除状态。
+- 范围外:
+  - 不新增仓库内截图报告文件。
+  - 不替代 Python 侧 manifest verifier。
+- 验收:
+  - 两个闭环素材都能通过浏览器交互验证。
+- 验证:
+  - `npm run audit:demo`: passed，Plush splatPixels=38400 / editPixels=60294；Lego splatPixels=78043 / editPixels=55465；两个样例 delete preview 均更新为 1。
+  - 截图证据: `/tmp/objgauss-audit-plush-v1-closure-local.png`、`/tmp/objgauss-audit-nerf-lego-alpha-closure-local.png`。
+  - `uv run --extra dev pytest`: 15 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `f3e5c62`，截图输出补充 commit: `f1b1190`。
+
 ### VERIFY-002: 固化 NeRF Lego proxy 闭环验收检查器
 
 - 状态: done

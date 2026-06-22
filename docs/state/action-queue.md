@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-012: 固化闭环 demo 浏览器交互验收
+
+- 完成 commit: `f3e5c62`，截图输出补充 commit: `f1b1190`
+- 结果: `npm run audit:demo` 会启动临时 Vite 服务，加载 `ObjGauss v1 闭环样例` 和 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选和预览删除；本地验证 passed，并输出截图到 `/tmp/objgauss-audit-*.png`。
+
 ### ACTION-011: 固化 NeRF Lego proxy 闭环机器验收命令
 
 - 完成 commit: `7a250d9`

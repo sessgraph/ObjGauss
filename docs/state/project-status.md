@@ -25,6 +25,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 自身颜色 / 对象聚类色切换。
   - 对象列表、隔离、删除预览。
   - 素材库卡片和本地 Plush 样例加载。
+  - `npm run audit:demo` 可启动临时 Vite 服务并浏览器验收两个闭环样例。
 - 素材:
   - `plush-3dgs-local` 可自动拉取。
   - Plush `.splat` 用于真实 renderer，`plush_objects.ply` 用于对象级编辑。
@@ -72,6 +73,7 @@ npm run build
 - MASK-001: NeRF Lego 真实 RGBA 图片 alpha 生成 mask manifest，8 frames / 8 masks / 800x800 / 299242 foreground pixels。
 - LEGO-001: `objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120` 生成 5696 个 Gaussian proxy、4 个对象、12 个真实视角、48 个 2D color masks；projection loss 1.386294 -> 0.538856；浏览器验证可加载 `NeRF Lego 闭环代理样例` 并执行对象选择、隔离、删除预览。
 - VERIFY-002: `objgauss demo verify-lego-alpha-closure` 通过，17 项检查全部通过，包括源图像和 mask 文件存在、Object Field shape、loss 下降、`object_id` PLY、public assets 和前端素材注册。
+- UI-AUDIT-001: `npm run audit:demo` 通过，加载 `ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
