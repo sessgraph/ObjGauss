@@ -16,6 +16,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss stats`
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha`
+  - `objgauss demo v1-closure/verify-v1-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
   - 中文 UI。
@@ -39,6 +40,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可通过 projection loss 更新 Object Field logits。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
+  - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
   - 前端素材库已有 `ObjGauss v1 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
 - 流程:
   - `docs/development-flow.md` 已建立。
@@ -63,6 +65,7 @@ npm run build
 - OBJFIELD-001: Plush PLY 可初始化 6-slot Object Field；NeRF Lego 检查 400 frames、缺图 0、无效 pose 0。
 - SEG-001 / OBJFIELD-002: synthetic projection mask vote 可训练 Object Field，并输出 `object_id` PLY。
 - DEMO-001: Plush v1 闭环 demo 生成 281498 个 Gaussian、6 个对象、3 个投影视角、18 个 masks；projection loss 1.791760 -> 1.201637；浏览器验证可加载 `ObjGauss v1 闭环样例` 并执行对象选择、隔离、删除预览。
+- VERIFY-001: `objgauss demo verify-v1-closure` 通过，检查真实 splat、mask manifest、Object Field shape、loss 下降、`object_id` PLY、public copy 和前端素材注册。
 - MASK-001: NeRF Lego 真实 RGBA 图片 alpha 生成 mask manifest，8 frames / 8 masks / 800x800 / 299242 foreground pixels。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 

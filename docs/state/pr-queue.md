@@ -34,6 +34,28 @@
 
 ## Done
 
+### VERIFY-001: 固化 v1 闭环验收检查器
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 让当前阶段最终目标有可重复的机器验收命令，不再只依赖人工口头检查。
+- 实施:
+  - 新增 `objgauss demo verify-v1-closure`。
+  - 重新读取 `v1-closure-manifest.json`、真实 `.splat`、mask manifest、Object Field `.npz`、导出 PLY、public viewer copy 和 `src/assetLibrary.js`。
+  - 检查 Object Field shape 是否匹配 Gaussian 数量和对象数，projection loss 是否下降，导出 PLY 是否含 `object_id`。
+- 范围外:
+  - 不替代浏览器交互测试。
+  - 不声称 SAM / CLIP 已接入。
+- 验收:
+  - 真实 Plush v1 closure 产物 verifier 通过。
+  - 测试覆盖 verifier CLI。
+- 验证:
+  - `uv run objgauss demo v1-closure --iterations 80`: 281498 gaussians，6 objects，loss 1.791760 -> 1.201637。
+  - `uv run objgauss demo verify-v1-closure`: passed=true，13 项检查全部通过。
+  - `uv run --extra dev pytest`: 14 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `b6236bd`。
+
 ### MASK-001: 生成 NeRF Lego 真实图像 alpha mask manifest
 
 - 状态: done

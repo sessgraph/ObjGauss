@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-009: 固化 v1 闭环机器验收命令
+
+- 完成 commit: `b6236bd`
+- 结果: `objgauss demo verify-v1-closure` 会检查真实 `.splat`、mask manifest、Object Field `.npz`、loss 下降、`object_id` PLY、public copy 和前端素材注册；本地真实 Plush demo 验证 passed=true。
+
 ### ACTION-008: 生成 NeRF Lego 真实图片 alpha mask manifest
 
 - 完成 commit: `e96b024`
