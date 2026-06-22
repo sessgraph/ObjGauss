@@ -56,7 +56,7 @@
 - 验证:
   - `uv run --extra dev pytest`: 24 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: 待提交。
+- 完成 commit: `6a32018`。
 
 ### SEMANTIC-001: 生成真实 3DGS + 2D 语义 mask 统一闭环样例
 
