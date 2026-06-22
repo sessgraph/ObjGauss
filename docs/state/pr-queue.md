@@ -52,11 +52,12 @@
 
 ### BASE-001: MVP 原型与流程基线
 
-- 状态: pending-commit
+- 状态: done
 - 类型: 基线固化
 - 目标: 固化当前 CLI、前端、素材库、AI 流程和状态事实源。
+- 完成 commit: `c8dcef7`
 - 验收:
   - `uv run --extra dev pytest` 通过。
   - `npm run build` 通过。
   - 已创建 `docs/state/`。
-  - baseline commit 完成后回填 commit hash。
+  - baseline commit 已完成。

@@ -4,11 +4,6 @@
 
 ## Open
 
-### ACTION-001: 建立 baseline commit
-
-- 原因: 当前仓库历史为空，所有文件仍是未跟踪改动。
-- 退出条件: 创建第一个可运行 MVP commit，并在 `project-status.md` / `pr-queue.md` 回填。
-
 ### ACTION-002: 确认公开 Demo 许可策略
 
 - 原因: Plush 来源许可混合，只能本地测试；公开 Demo 需要许可更干净的素材。
@@ -23,4 +18,7 @@
 
 ## Closed
 
-- 暂无。
+### ACTION-001: 建立 baseline commit
+
+- 完成 commit: `c8dcef7`
+- 结果: 创建第一个可运行 MVP commit，并在 `project-status.md` / `pr-queue.md` 回填。

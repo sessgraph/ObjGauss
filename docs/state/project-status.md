@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-MVP 原型可运行，正在进入流程化基线阶段。
+MVP 原型可运行，已完成流程化基线提交。
 
 ## 已完成能力
 
@@ -27,6 +27,7 @@ MVP 原型可运行，正在进入流程化基线阶段。
 - 流程:
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
+  - baseline commit: `c8dcef7`.
 
 ## 最近验证
 
@@ -52,7 +53,6 @@ npm run build
 
 ## 下一步主线
 
-1. 固化 baseline commit。
-2. 执行 RENDER-001: 评估并接入真正 3DGS renderer。
-3. 执行 SEG-001: 建立语义对象分组方案和最小验证集。
-4. 执行 ASSET-001: 建立 Poly Haven / OmniObject3D / ARKitScenes 的最小转换管线。
+1. 执行 RENDER-001: 评估并接入真正 3DGS renderer。
+2. 执行 SEG-001: 建立语义对象分组方案和最小验证集。
+3. 执行 ASSET-001: 建立 Poly Haven / OmniObject3D / ARKitScenes 的最小转换管线。
