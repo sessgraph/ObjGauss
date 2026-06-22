@@ -30,7 +30,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss filter`
   - `objgauss stats`
   - `objgauss assets list/pull`
-  - `objgauss masks from-nerf-alpha`
+  - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors`
   - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
@@ -52,6 +52,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可从现有 Gaussian PLY warm start，并导出 hard `object_id` PLY 复用前端。
   - 可检查 NeRF-style `transforms_*.json` 训练素材完整性。
   - 可从 NeRF Synthetic RGBA alpha 通道生成真实图片 mask manifest。
+  - 可从 NeRF Synthetic Lego RGBA 颜色生成多 slot 真实 2D mask manifest。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
 - Demo:
@@ -91,12 +92,13 @@ npm run build
 - VERIFY-002: `objgauss demo verify-lego-alpha-closure` 通过，17 项检查全部通过，包括源图像和 mask 文件存在、Object Field shape、loss 下降、`object_id` PLY、public assets 和前端素材注册。
 - UI-AUDIT-001: `npm run audit:demo` 通过，加载 `ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
 - ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
+- MASK-002: `objgauss masks from-nerf-rgba-colors` 在 NeRF Lego 真实 RGBA 上生成 8 frames / 32 masks / 4 slots；独立 `vote-masks` 消费该 manifest，3423 个 Gaussian 被监督，projection loss 1.386294 -> 0.390825，并输出 `object_id` PLY。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
 
 - 对象聚类色、隐藏、隔离、删除预览仍通过点云编辑 fallback 完成，不是对象级 splat shader。
-- 当前 v1 闭环 demo 的 mask manifest 由已有对象标签派生，用于验收闭环；NeRF Lego alpha mask 已能从真实图片生成，但只是前景 mask，不等价于 SAM / CLIP 实例语义分割。
+- 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于验收闭环；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 仓库内还不运行 SAM / CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。

@@ -34,6 +34,30 @@
 
 ## Done
 
+### MASK-002: 生成 NeRF Lego 多 slot 真实 2D color mask manifest
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 将 Lego demo 内部的真实 2D color mask 生成逻辑提升为可复用 CLI，让语义线索生成不再只藏在 demo 命令里。
+- 实施:
+  - 新增 `objgauss masks from-nerf-rgba-colors`。
+  - 从 NeRF Synthetic Lego RGBA 图片生成 `yellow`、`red`、`dark`、`other` 四类 boolean `.npy` masks。
+  - 输出沿用现有 mask manifest，可直接被 `objgauss object-field vote-masks` 消费。
+  - `lego-alpha-closure` 复用同一 mask 生成逻辑。
+- 范围外:
+  - 不声称该规则等价于 SAM / CLIP 实例语义分割。
+  - 不改变 Object Field 文件格式。
+  - 不完成 NeRF Lego 的完整 3DGS optimization 训练。
+- 验收:
+  - 真实 NeRF Lego 多视角 RGBA 可生成多 slot mask manifest。
+  - 该 manifest 可直接监督 Object Field logits 并导出 `object_id` PLY。
+- 验证:
+  - `uv run objgauss masks from-nerf-rgba-colors outputs/assets/training/nerf-synthetic-lego --output outputs/masks/nerf-lego-rgba-colors/mask-manifest.json --split train --max-frames 8 --alpha-threshold 16`: 8 frames，32 masks，foreground_pixels=209891。
+  - `uv run objgauss object-field vote-masks outputs/demos/lego-rgba-cli-smoke/lego_proxy_raw.ply --field outputs/demos/lego-rgba-cli-smoke/object_field_initial.npz --masks outputs/masks/nerf-lego-rgba-colors/mask-manifest.json --output outputs/demos/lego-rgba-cli-smoke/object_field_cli_masks.npz --summary-output outputs/demos/lego-rgba-cli-smoke/cli-mask-training-summary.json --ply-output outputs/demos/lego-rgba-cli-smoke/lego_cli_mask_objects.ply --iterations 80 --learning-rate 1.0 --colorize`: supervised_gaussians=3423，loss 1.386294 -> 0.390825，active_slots=4。
+  - `uv run --extra dev pytest`: 16 passed。
+- 完成 commit: `5302cfe`。
+
 ### ACCEPT-001: 固化一键闭环总验收命令
 
 - 状态: done

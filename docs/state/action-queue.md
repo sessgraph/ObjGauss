@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-014: 固化 NeRF Lego 多 slot 真实 2D mask 生成入口
+
+- 完成 commit: `5302cfe`
+- 结果: `objgauss masks from-nerf-rgba-colors` 可从 NeRF Lego 真实 RGBA 图片生成 `yellow`、`red`、`dark`、`other` 四类 mask manifest；独立 `vote-masks` 已消费该 manifest 并输出带 `object_id` 的 PLY。
+
 ### ACTION-013: 固化一键闭环总验收命令
 
 - 完成 commit: `81f1d0b`
