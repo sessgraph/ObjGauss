@@ -53,7 +53,7 @@
   - `uv run --extra dev pytest`: 5 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
   - Playwright: 桌面 canvas `nonBackground=9422`，移动端 canvas `nonBackground=4559`。
-- 完成 commit: `e34b7de`。
+- 完成 commit: `f4aa2f1`。
 
 ### BASE-001: MVP 原型与流程基线
 
