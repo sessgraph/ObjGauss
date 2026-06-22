@@ -35,6 +35,35 @@
 
 ## Done
 
+### SEMANTIC-001: 生成真实 3DGS + 2D 语义 mask 统一闭环样例
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 把阶段目标压成一个统一真实 demo：真实 3DGS 场景、非 KMeans 2D mask guidance、Object Field、`object_id` 导出和前端对象级交互。
+- 实施:
+  - 新增 `objgauss demo plush-semantic-closure`。
+  - 新增 `objgauss demo verify-plush-semantic-closure`。
+  - 从原始 Plush Gaussian PLY 投影生成 `red-subject`、`straw-frame`、`dark-detail`、`other-surface` 四类 2D color masks。
+  - 训练 Object Field logits，导出保留原始颜色的 `plush_semantic_objects.ply`。
+  - 前端素材库新增 `Plush 2D 语义 Mask 闭环样例`。
+  - `npm run acceptance:demo` 和 `npm run audit:demo` 纳入该样例。
+  - `objgauss demo audit-v1-goal` 接受该 unified semantic demo 作为阶段目标完成证据。
+- 范围外:
+  - 不声称该颜色规则等价于 SAM / CLIP。
+  - 不产出 NeRF Lego 的真实 3DGS training output。
+  - 不实现对象级 splat shader；对象编辑仍走点云编辑 fallback。
+- 验收:
+  - 严格阶段审计通过，completion_blockers=`-`。
+  - 浏览器可加载新样例并执行对象选择、隔离、删除预览。
+- 验证:
+  - `uv run objgauss demo plush-semantic-closure --iterations 80`: 281498 gaussians，4 objects，supervised_gaussians=281498，loss 1.386294 -> 1.345684。
+  - `uv run objgauss demo verify-plush-semantic-closure`: passed=true，changed_gaussians=104403。
+  - `uv run objgauss demo audit-v1-goal`: passed=true，current_evidence=unified。
+  - `uv run --extra dev pytest`: 23 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `npm run acceptance:demo`: passed，浏览器审计 3 个闭环素材。
+- 完成 commit: `ae83594`。
+
 ### AUDIT-001: 固化 ObjGauss v1 阶段目标完成度审计
 
 - 状态: done
@@ -50,7 +79,8 @@
 - 验收:
   - 当前仓库能报告 split evidence 已满足哪些要求，并明确剩余 blocker。
 - 验证:
-  - `uv run objgauss demo audit-v1-goal --allow-incomplete`: passed=false，completion_blockers=`unified_real_3dgs_mask_demo_available`。
+  - 初始验证 `uv run objgauss demo audit-v1-goal --allow-incomplete`: passed=false，completion_blockers=`unified_real_3dgs_mask_demo_available`。
+  - `SEMANTIC-001` 后严格验证 `uv run objgauss demo audit-v1-goal`: passed=true，completion_blockers=`-`。
   - `uv run --extra dev pytest`: 21 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
   - `npm run acceptance:demo`: passed。

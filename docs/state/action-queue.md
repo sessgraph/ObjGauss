@@ -24,10 +24,15 @@
 
 ## Closed
 
+### ACTION-019: 生成真实 3DGS + 2D 语义 mask 统一闭环样例
+
+- 完成 commit: `ae83594`
+- 结果: `objgauss demo plush-semantic-closure` 可从真实 Plush `.splat` 和原始 Gaussian PLY 生成非 KMeans 的 2D color mask manifest，训练 Object Field，导出保留原色的 `object_id` PLY；`verify-plush-semantic-closure`、`audit-v1-goal` 和 `npm run acceptance:demo` 均通过。
+
 ### ACTION-018: 固化 ObjGauss v1 阶段目标完成度审计
 
 - 完成 commit: `85943d4`
-- 结果: `objgauss demo audit-v1-goal --allow-incomplete` 可审计五条阶段目标证据；当前输出 split evidence，并明确唯一 blocker 是缺少统一的真实训练 Gaussian demo manifest。
+- 结果: `objgauss demo audit-v1-goal` 可审计阶段目标证据；接入 `plush-semantic-closure` 后当前输出 unified evidence，completion_blockers=`-`。
 
 ### ACTION-017: 固化 mask guidance 改变 Object Field 的验收
 

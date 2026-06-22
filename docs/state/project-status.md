@@ -19,7 +19,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   -> 前端可选择、隔离、删除对象
 ```
 
-验收视角：一条命令能重新生成 Plush 与 NeRF Lego 两个闭环样例，机器检查产物，再打开浏览器验证真实 splat 外观和对象级交互。
+验收视角：一条命令能重新生成 Plush semantic、Plush v1 与 NeRF Lego 三个闭环样例，机器检查产物，再打开浏览器验证真实 splat 外观和对象级交互。
 
 ## 已完成能力
 
@@ -32,7 +32,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors/from-nerf-sam`
   - `objgauss training register-output`
-  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
+  - `objgauss demo v1-closure/verify-v1-closure/plush-semantic-closure/verify-plush-semantic-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
   - 中文 UI。
@@ -42,7 +42,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 对象列表、隔离、删除预览。
   - 素材库卡片和本地 Plush 样例加载。
   - `NeRF Lego 训练输出样例` 卡片已预留，外部训练产物登记到 `public/samples/nerf_lego_trained.*` 后可加载。
-  - `npm run audit:demo` 可启动临时 Vite 服务并浏览器验收两个闭环样例。
+  - `npm run audit:demo` 可启动临时 Vite 服务并浏览器验收三个闭环样例。
 - 素材:
   - `plush-3dgs-local` 可自动拉取。
   - Plush `.splat` 用于真实 renderer，`plush_objects.ply` 用于对象级编辑。
@@ -65,8 +65,11 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
+  - `objgauss demo plush-semantic-closure` 可在真实 Plush `.splat` 上生成非 KMeans 的 2D color mask manifest、训练 Object Field，并导出保留原色的 `object_id` PLY。
+  - `objgauss demo verify-plush-semantic-closure` 可检查真实 splat、2D color masks、Object Field、loss、`object_id` PLY、public assets 和前端素材注册。
   - `objgauss demo lego-alpha-closure` 可从 NeRF Lego 真实多视角 RGBA + pose 生成轻量 Gaussian proxy、2D color mask manifest 和 object-aware PLY。
   - `objgauss demo verify-lego-alpha-closure` 可检查 Lego proxy demo 的源图像、mask 文件、Object Field、loss、`object_id` PLY、public assets 和前端素材注册。
+  - 前端素材库已有 `Plush 2D 语义 Mask 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
   - 前端素材库已有 `ObjGauss v1 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
   - 前端素材库已有 `NeRF Lego 闭环代理样例`，运行 demo 命令后可加载 proxy splat 和对象 PLY。
 - 流程:
@@ -82,12 +85,14 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 uv run --extra dev pytest
+uv run objgauss demo audit-v1-goal
 npm run build
+npm run acceptance:demo
 ```
 
 结果：
 
-- Python 测试: 21 passed。
+- Python 测试: 23 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -98,19 +103,21 @@ npm run build
 - MASK-001: NeRF Lego 真实 RGBA 图片 alpha 生成 mask manifest，8 frames / 8 masks / 800x800 / 299242 foreground pixels。
 - LEGO-001: `objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120` 生成 5696 个 Gaussian proxy、4 个对象、12 个真实视角、48 个 2D color masks；projection loss 1.386294 -> 0.538856；浏览器验证可加载 `NeRF Lego 闭环代理样例` 并执行对象选择、隔离、删除预览。
 - VERIFY-002: `objgauss demo verify-lego-alpha-closure` 通过，17 项检查全部通过，包括源图像和 mask 文件存在、Object Field shape、loss 下降、`object_id` PLY、public assets 和前端素材注册。
-- UI-AUDIT-001: `npm run audit:demo` 通过，加载 `ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
-- ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
+- UI-AUDIT-001: `npm run audit:demo` 通过，加载 `Plush 2D 语义 Mask 闭环样例`、`ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
+- ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、Plush semantic closure、NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
 - MASK-002: `objgauss masks from-nerf-rgba-colors` 在 NeRF Lego 真实 RGBA 上生成 8 frames / 32 masks / 4 slots；独立 `vote-masks` 消费该 manifest，3423 个 Gaussian 被监督，projection loss 1.386294 -> 0.390825，并输出 `object_id` PLY。
 - TRAIN-002: `objgauss training register-output` 接入 Gaussian PLY smoke 通过，生成 viewer splat、Object Field 和 `object_id` PLY；使用真实 Lego color mask manifest 时 supervised_gaussians=4806，projection loss 1.386294 -> 0.375765。
 - SEG-002A: `objgauss masks from-nerf-sam --help` 可用；SAM manifest 生成逻辑由 fake generator 测试覆盖，输出 `sam-automatic-mask-generator` manifest 和 boolean `.npy` masks。
 - VERIFY-003: `npm run acceptance:demo` 已检查 `mask_guidance_changed_object_field`；Plush changed_gaussians=196457，Lego proxy changed_gaussians=4960，证明 mask supervision 实际改变 Object Field labels。
-- AUDIT-001: `objgauss demo audit-v1-goal --allow-incomplete` 输出 `passed=false`，当前证据为 split，唯一 completion blocker 是 `unified_real_3dgs_mask_demo_available`。
+- SEMANTIC-001: `objgauss demo plush-semantic-closure` 在真实 Plush 3DGS 上生成 3 views / 12 masks / 4 objects；281498 个 Gaussian 全部被监督，104403 个 hard labels 被 2D mask guidance 改变，projection loss 1.386294 -> 1.345684。
+- AUDIT-001: `objgauss demo audit-v1-goal` 严格模式通过，当前证据为 unified，completion_blockers=`-`。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
 
 - 对象聚类色、隐藏、隔离、删除预览仍通过点云编辑 fallback 完成，不是对象级 splat shader。
-- 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于验收闭环；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
+- `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
+- 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已接入为可选命令，但本机尚未用真实 checkpoint 跑小场景；仓库内还不运行 CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。
@@ -120,7 +127,7 @@ npm run build
 
 ## 下一步主线
 
-1. 执行 SEG-002: 接入可选 SAM / CLIP mask 生成器，输出当前 mask manifest。
-2. 执行 TRAIN-001: 训练 NeRF Lego 得到 Gaussian PLY，再跑 `vote-masks` 验收真实数据。
+1. 执行 SEG-002: 用真实 SAM checkpoint 跑小场景 mask manifest，并接 `vote-masks` 验收。
+2. 执行 TRAIN-001: 训练 NeRF Lego 得到 Gaussian PLY，再跑 `training register-output` 和 `vote-masks` 验收真实训练数据。
 3. 建立 Poly Haven mesh -> 多视角渲染 -> 3DGS 训练的 Demo 转换链。
 4. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
