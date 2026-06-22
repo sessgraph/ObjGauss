@@ -58,6 +58,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可在本机提供 `segment-anything` 和 checkpoint 时生成 SAM automatic mask manifest。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
+  - 可输出 mask vote quality audit，检查监督覆盖率、每槽覆盖、冲突比例、target entropy 和观测权重。
   - 可机器检查 mask guidance 是否实际改变 Object Field hard labels。
 - 训练输出接入:
   - `objgauss training register-output` 可登记外部成熟 3DGS 训练器产出的 `.ply` / `.splat`。
@@ -92,7 +93,7 @@ npm run acceptance:demo
 
 结果：
 
-- Python 测试: 23 passed。
+- Python 测试: 24 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -111,6 +112,7 @@ npm run acceptance:demo
 - VERIFY-003: `npm run acceptance:demo` 已检查 `mask_guidance_changed_object_field`；Plush changed_gaussians=196457，Lego proxy changed_gaussians=4960，证明 mask supervision 实际改变 Object Field labels。
 - SEMANTIC-001: `objgauss demo plush-semantic-closure` 在真实 Plush 3DGS 上生成 3 views / 12 masks / 4 objects；281498 个 Gaussian 全部被监督，104403 个 hard labels 被 2D mask guidance 改变，projection loss 1.386294 -> 1.345684。
 - AUDIT-001: `objgauss demo audit-v1-goal` 严格模式通过，当前证据为 unified，completion_blockers=`-`。
+- VERIFY-004: `objgauss object-field vote-masks` summary、闭环 demo manifest 和 verifier 已包含 mask vote quality audit；本地测试覆盖 per-slot coverage、conflict fraction、normalized target entropy 和 verifier 检查。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制

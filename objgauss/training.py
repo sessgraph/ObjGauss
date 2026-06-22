@@ -148,6 +148,7 @@ def register_training_output(
             "mask_votes_supervise_gaussians": (
                 training.supervised_gaussians > 0 if training is not None else False
             ),
+            "mask_vote_quality_audit_available": training is not None,
             "mask_guidance_changed_object_field": (
                 field_delta.changed_gaussians > 0 if field_delta is not None else False
             ),

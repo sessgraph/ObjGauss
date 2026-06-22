@@ -11,6 +11,7 @@ from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
+    mask_vote_quality_audit,
     train_object_field_from_votes,
     training_summary,
     vote_masks_to_gaussians,
@@ -268,6 +269,12 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
     print(f"projected={votes.projected}")
     print(f"matched={votes.matched}")
     print(f"supervised_gaussians={result.supervised_gaussians}")
+    vote_quality = mask_vote_quality_audit(votes)
+    conflict = vote_quality["vote_conflict"]
+    print(f"supervised_fraction={vote_quality['supervised_fraction']:.6f}")
+    print(f"vote_conflict_gaussians={conflict['gaussians']}")
+    print(f"vote_conflict_fraction={conflict['fraction']:.6f}")
+    print(f"vote_target_entropy={conflict['normalized_target_entropy']:.6f}")
     print(f"initial_loss={result.initial_loss:.6f}")
     print(f"final_loss={result.final_loss:.6f}")
     _print_metrics(object_field_metrics(result.field))

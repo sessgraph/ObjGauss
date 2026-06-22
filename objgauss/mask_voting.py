@@ -26,12 +26,13 @@ class MaskVoteResult:
     def supervised_gaussians(self) -> int:
         return int(np.count_nonzero(self.observations > 0))
 
-    def as_dict(self) -> dict[str, int]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "frames": self.frames,
             "projected": self.projected,
             "matched": self.matched,
             "supervised_gaussians": self.supervised_gaussians,
+            "vote_quality": mask_vote_quality_audit(self),
         }
 
 
@@ -221,6 +222,143 @@ def training_summary(result: MaskTrainingResult) -> dict[str, Any]:
         **result.as_dict(),
         "metrics": metrics,
     }
+
+
+def mask_vote_quality_audit(vote_result: MaskVoteResult) -> dict[str, Any]:
+    votes = np.asarray(vote_result.votes, dtype=np.float32)
+    if votes.ndim != 2:
+        raise ValueError("votes must be an NxK array")
+    gaussian_count, slots = votes.shape
+    vote_sum = votes.sum(axis=1)
+    supervised = vote_sum > 0
+    supervised_count = int(np.count_nonzero(supervised))
+    unsupervised_count = int(gaussian_count - supervised_count)
+    supervised_fraction = _safe_fraction(supervised_count, gaussian_count)
+
+    observations = np.asarray(vote_result.observations, dtype=np.float32)
+    observed_weights = (
+        observations[supervised]
+        if observations.shape == (gaussian_count,)
+        else vote_sum[supervised]
+    )
+    slot_support = votes > 0
+    support_counts = slot_support.sum(axis=1)
+    conflicted = supervised & (support_counts > 1)
+    conflict_count = int(np.count_nonzero(conflicted))
+
+    target_entropy = 0.0
+    normalized_target_entropy = 0.0
+    target_confidence_mean = 0.0
+    target_confidence_min = 0.0
+    winners = np.zeros(gaussian_count, dtype=np.int64)
+    targets = np.zeros_like(votes, dtype=np.float32)
+    if supervised_count > 0:
+        targets[supervised] = votes[supervised] / vote_sum[supervised, None]
+        entropy_per_gaussian = -np.sum(
+            targets[supervised] * np.log(np.clip(targets[supervised], _EPS, 1.0)),
+            axis=1,
+        )
+        target_entropy = float(np.mean(entropy_per_gaussian))
+        normalized_target_entropy = (
+            0.0 if slots <= 1 else _clamp_unit(float(target_entropy / np.log(slots)))
+        )
+        target_confidence = targets[supervised].max(axis=1)
+        target_confidence_mean = float(np.mean(target_confidence))
+        target_confidence_min = float(np.min(target_confidence))
+        winners = np.argmax(votes, axis=1)
+
+    return {
+        "gaussian_count": int(gaussian_count),
+        "slots": int(slots),
+        "supervised_gaussians": supervised_count,
+        "unsupervised_gaussians": unsupervised_count,
+        "supervised_fraction": supervised_fraction,
+        "projected": int(vote_result.projected),
+        "matched": int(vote_result.matched),
+        "matched_projected_fraction": _safe_fraction(
+            int(vote_result.matched),
+            int(vote_result.projected),
+        ),
+        "observation_weight": _weight_stats(observed_weights),
+        "vote_conflict": {
+            "gaussians": conflict_count,
+            "fraction": _safe_fraction(conflict_count, supervised_count),
+            "target_entropy": target_entropy,
+            "normalized_target_entropy": normalized_target_entropy,
+        },
+        "target_confidence": {
+            "mean": target_confidence_mean,
+            "min": target_confidence_min,
+        },
+        "per_slot": [
+            {
+                "slot": int(slot),
+                "vote_weight": float(np.sum(votes[:, slot])),
+                "supervised_gaussians": int(np.count_nonzero(slot_support[:, slot])),
+                "winner_gaussians": int(np.count_nonzero(supervised & (winners == slot))),
+                "supervised_fraction": _safe_fraction(
+                    int(np.count_nonzero(slot_support[:, slot])),
+                    gaussian_count,
+                ),
+                "winner_fraction": _safe_fraction(
+                    int(np.count_nonzero(supervised & (winners == slot))),
+                    supervised_count,
+                ),
+            }
+            for slot in range(slots)
+        ],
+    }
+
+
+def mask_vote_quality_check(
+    training: dict[str, Any],
+    *,
+    expected_slots: int | None = None,
+) -> tuple[bool, str]:
+    quality = training.get("vote_quality") if isinstance(training, dict) else None
+    if not isinstance(quality, dict):
+        return False, "missing vote_quality"
+    per_slot = quality.get("per_slot")
+    if not isinstance(per_slot, list) or not per_slot:
+        return False, "missing per_slot coverage"
+    if expected_slots is not None and len(per_slot) != expected_slots:
+        return False, f"per_slot={len(per_slot)} expected={expected_slots}"
+    supervised = int(quality.get("supervised_gaussians", 0) or 0)
+    supervised_fraction = float(quality.get("supervised_fraction", 0.0) or 0.0)
+    conflict = (
+        quality.get("vote_conflict")
+        if isinstance(quality.get("vote_conflict"), dict)
+        else {}
+    )
+    conflict_fraction = float(conflict.get("fraction", 0.0) or 0.0)
+    entropy = float(conflict.get("normalized_target_entropy", 0.0) or 0.0)
+    ok = supervised > 0 and supervised_fraction > 0.0
+    detail = (
+        f"supervised_gaussians={supervised} "
+        f"supervised_fraction={supervised_fraction:.6f} "
+        f"conflict_fraction={conflict_fraction:.6f} "
+        f"normalized_target_entropy={entropy:.6f} "
+        f"slots={len(per_slot)}"
+    )
+    return ok, detail
+
+
+def _weight_stats(values: np.ndarray) -> dict[str, float]:
+    if values.size == 0:
+        return {"min": 0.0, "mean": 0.0, "max": 0.0}
+    return {
+        "min": float(np.min(values)),
+        "mean": float(np.mean(values)),
+        "max": float(np.max(values)),
+    }
+
+
+def _safe_fraction(numerator: int, denominator: int) -> float:
+    return 0.0 if denominator <= 0 else float(numerator / denominator)
+
+
+def _clamp_unit(value: float) -> float:
+    return min(max(value, 0.0), 1.0)
 
 
 def _targets_from_votes(vote_result: MaskVoteResult) -> tuple[np.ndarray, np.ndarray]:

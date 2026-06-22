@@ -5,7 +5,7 @@
 | ID | 风险 | 影响 | 当前缓解 | 关闭条件 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | R-001 | 当前不是完整 3DGS renderer，只是高斯中心点云预览 | Demo 视觉效果和真实 3DGS 有差距 | 已接入 `@sparkjsdev/spark`，Plush `.splat` 已通过桌面和移动端浏览器验证 | 真实 splat renderer 接入并通过浏览器验证 | closed |
-| R-002 | 当前默认对象分组不是端到端语义级对象分割 | 对象边界和语义一致性不稳定 | 已落地 `SEMANTIC-001`：真实 Plush 3DGS + 非 KMeans 2D color masks + Object Field + `object_id` + 前端对象编辑统一闭环；`VERIFY-003` 已检查 mask guidance 实际改变 Object Field labels；`UI-AUDIT-001` / `ACCEPT-001` 已固化浏览器和一键总验收；默认 KMeans 仍保留为 baseline | 仓库内可对真实小场景生成 SAM / CLIP mask manifest，并与 KMeans / 2D color mask 基线对比 | open |
+| R-002 | 当前默认对象分组不是端到端语义级对象分割 | 对象边界和语义一致性不稳定 | 已落地 `SEMANTIC-001`：真实 Plush 3DGS + 非 KMeans 2D color masks + Object Field + `object_id` + 前端对象编辑统一闭环；`VERIFY-003` 已检查 mask guidance 实际改变 Object Field labels；`VERIFY-004` 已固化 mask vote quality audit，检查监督覆盖、每槽覆盖和投票冲突；`UI-AUDIT-001` / `ACCEPT-001` 已固化浏览器和一键总验收；默认 KMeans 仍保留为 baseline | 仓库内可对真实小场景生成 SAM / CLIP mask manifest，并与 KMeans / 2D color mask 基线对比 | open |
 | R-003 | 只有 Plush 自动拉取，其他素材无转换管线 | 训练和 Demo 数据不足 | 已接入 `polyhaven-school-chair-1k` 和 `nerf-synthetic-lego` 自动拉取管线 | 至少一个 Demo 源和一个训练源跑通转换 | closed |
 | R-004 | 仓库尚无 baseline commit | 进度不可追踪，后续 AI 会话难以协作 | 已创建 baseline commit `c8dcef7` 并回填状态文件 | baseline commit 存在且状态文件回填 | closed |
 | R-005 | Plush 来源许可混合 | 不适合公开发布或商用 Demo | `docs/asset-library.md` 已标明仅本地测试 | 首个公开 Demo 改用许可明确素材 | open |

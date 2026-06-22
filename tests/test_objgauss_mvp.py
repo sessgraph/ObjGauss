@@ -485,12 +485,45 @@ def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
 
     votes = vote_masks_to_gaussians(cloud, manifest, slots=2)
     result = train_object_field_from_votes(field, votes, iterations=200, learning_rate=1.0)
+    vote_quality = result.vote_summary.as_dict()["vote_quality"]
 
     assert votes.frames == 1
     assert votes.projected == 4
     assert votes.supervised_gaussians == 4
+    assert vote_quality["supervised_fraction"] == 1.0
+    assert vote_quality["vote_conflict"]["gaussians"] == 0
+    assert vote_quality["vote_conflict"]["normalized_target_entropy"] == 0.0
+    assert [slot["winner_gaussians"] for slot in vote_quality["per_slot"]] == [2, 2]
     assert result.final_loss < result.initial_loss
     assert np.array_equal(result.field.labels(), np.array([0, 0, 1, 1], dtype=np.int32))
+
+
+def test_mask_vote_quality_counts_conflicting_votes(tmp_path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "frames": [
+            {
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {"slot": 0, "label": "all-a", "rect": [0, 0, 100, 100]},
+                    {"slot": 1, "label": "all-b", "rect": [0, 0, 100, 100]},
+                ],
+            }
+        ],
+    }
+    manifest = tmp_path / "conflicting-masks.json"
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    votes = vote_masks_to_gaussians(_camera_cloud(), manifest, slots=2)
+    vote_quality = votes.as_dict()["vote_quality"]
+
+    assert vote_quality["supervised_gaussians"] == 4
+    assert vote_quality["vote_conflict"]["gaussians"] == 4
+    assert vote_quality["vote_conflict"]["fraction"] == 1.0
+    assert np.isclose(vote_quality["vote_conflict"]["normalized_target_entropy"], 1.0)
+    assert vote_quality["target_confidence"]["mean"] == 0.5
 
 
 def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
@@ -537,10 +570,14 @@ def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     assert "final_loss=" in output
+    assert "supervised_fraction=1.000000" in output
+    assert "vote_conflict_gaussians=0" in output
     assert trained.labels().tolist() == [0, 0, 1, 1]
     assert {"object_id", "red", "green", "blue"}.issubset(exported.fields)
     assert summary["final_loss"] < summary["initial_loss"]
     assert summary["supervised_gaussians"] == 4
+    assert summary["vote_quality"]["supervised_fraction"] == 1.0
+    assert summary["vote_quality"]["per_slot"][0]["winner_gaussians"] == 2
 
 
 def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp_path, capsys):
@@ -591,9 +628,11 @@ def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp
     assert manifest["acceptance"]["viewer_splat_available"] is True
     assert manifest["acceptance"]["object_field_trained"] is True
     assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["acceptance"]["mask_vote_quality_audit_available"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
     assert manifest["object_field_delta"]["changed_gaussians"] == 2
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
+    assert manifest["training"]["vote_quality"]["per_slot"][0]["winner_gaussians"] == 2
     assert registered.count == 4
     assert splat.count == 4
     assert set(np.unique(object_ply.vertices["object_id"])) == {0, 1}
@@ -638,10 +677,12 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     assert "manifest=" in output
     assert manifest["acceptance"]["real_3dgs_scene_can_render"] is True
     assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["acceptance"]["mask_vote_quality_audit_available"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
     assert manifest["object_field_delta"]["changed_gaussians"] == 2
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["supervised_gaussians"] == 4
+    assert manifest["training"]["vote_quality"]["supervised_fraction"] == 1.0
     assert (public_dir / "plush_v1_objects.ply").exists()
     assert set(np.unique(exported.vertices["object_id"])) == {0, 1}
 
@@ -649,6 +690,7 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     verify_output = capsys.readouterr().out
     assert "passed=true" in verify_output
     assert "check=real_3dgs_scene status=pass" in verify_output
+    assert "check=mask_vote_quality_audit_available status=pass" in verify_output
     assert "check=mask_guidance_changed_object_field status=pass" in verify_output
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
@@ -695,10 +737,12 @@ def test_demo_plush_semantic_closure_builds_real_splat_2d_mask_assets(tmp_path, 
     assert manifest["semantic_source"] == "projected_3dgs_color_masks"
     assert manifest["acceptance"]["real_3dgs_scene_can_render"] is True
     assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["acceptance"]["mask_vote_quality_audit_available"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
     assert manifest["object_field_delta"]["changed_gaussians"] > 0
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["supervised_gaussians"] == cloud.count
+    assert manifest["training"]["vote_quality"]["slots"] == 4
     assert set(np.unique(exported.vertices["object_id"])) == {0, 1, 2, 3}
     assert exported.vertices["red"].tolist() == cloud.vertices["red"].tolist()
     assert (public_dir / "plush_semantic_objects.ply").exists()
@@ -722,6 +766,7 @@ def test_demo_plush_semantic_closure_builds_real_splat_2d_mask_assets(tmp_path, 
     assert "passed=true" in verify_output
     assert "check=gaussian_source_is_real_3dgs status=pass" in verify_output
     assert "check=semantic_source_is_2d_color_masks status=pass" in verify_output
+    assert "check=mask_vote_quality_audit_available status=pass" in verify_output
     assert "check=mask_guidance_changed_object_field status=pass" in verify_output
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
@@ -791,9 +836,11 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     assert manifest["acceptance"]["gaussian_proxy_saved"] is True
     assert manifest["acceptance"]["real_mask_manifest_saved"] is True
     assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["acceptance"]["mask_vote_quality_audit_available"] is True
     assert manifest["object_field_delta"]["changed_gaussians"] > 0
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["supervised_gaussians"] == exported.count
+    assert manifest["training"]["vote_quality"]["slots"] == 4
     assert exported.count == 8
     assert splat.count == exported.count
     assert "object_id" in exported.fields
@@ -815,6 +862,7 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     verify_output = capsys.readouterr().out
     assert "passed=true" in verify_output
     assert "check=semantic_source_is_real_2d_masks status=pass" in verify_output
+    assert "check=mask_vote_quality_audit_available status=pass" in verify_output
     assert "check=mask_guidance_changed_object_field status=pass" in verify_output
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 

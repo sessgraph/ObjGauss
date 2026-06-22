@@ -35,6 +35,29 @@
 
 ## Done
 
+### VERIFY-004: 固化 mask vote quality audit
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 在不引入 mIoU、SAM 质量结论或渲染差分指标的前提下，把“2D mask 投票到底监督了什么”写入可机器检查的 summary 和 demo verifier。
+- 实施:
+  - `MaskVoteResult.as_dict()` 输出 `vote_quality`。
+  - `objgauss object-field vote-masks` CLI 打印监督覆盖率、冲突 Gaussian 数、冲突比例和 normalized target entropy。
+  - `training_summary()`、外部训练输出登记和三个闭环 demo manifest 自动包含 vote quality audit。
+  - `verify-v1-closure`、`verify-plush-semantic-closure`、`verify-lego-alpha-closure` 检查 `mask_vote_quality_audit_available`。
+  - 单测覆盖 per-slot coverage、重叠 mask conflict fraction、normalized target entropy 和 verifier 输出。
+- 范围外:
+  - 不声称 mIoU / pixel accuracy 已完成；当前没有统一 ground truth。
+  - 不评估 non-target object damage；当前对象编辑仍是点云 fallback，不是 splat shader 删除。
+  - 不改变 Object Field 文件格式或 mask voting 优化逻辑。
+- 验收:
+  - vote-masks summary 能解释 supervised fraction、per-slot coverage 和 vote conflict。
+  - 闭环 verifier 不只检查 loss 下降和 changed labels，还检查 vote quality audit 存在。
+- 验证:
+  - `uv run --extra dev pytest`: 24 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: 待提交。
+
 ### SEMANTIC-001: 生成真实 3DGS + 2D 语义 mask 统一闭环样例
 
 - 状态: done

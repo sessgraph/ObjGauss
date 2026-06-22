@@ -168,6 +168,7 @@ def build_lego_alpha_closure_demo(
             "gaussian_proxy_saved": raw_ply_path.exists() and splat_path.exists(),
             "real_mask_manifest_saved": (output_dir / "mask-manifest.json").exists(),
             "mask_votes_supervise_gaussians": training.supervised_gaussians > 0,
+            "mask_vote_quality_audit_available": True,
             "mask_guidance_changed_object_field": field_delta.changed_gaussians > 0,
             "projection_loss_decreased": training.final_loss < training.initial_loss,
             "viewer_ply_available": output_ply_path.exists(),

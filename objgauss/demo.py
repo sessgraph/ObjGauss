@@ -11,6 +11,7 @@ from objgauss.clustering import summarize_labels
 from objgauss.features import positions
 from objgauss.gaussians import GaussianCloud
 from objgauss.mask_voting import (
+    mask_vote_quality_check,
     project_points,
     train_object_field_from_votes,
     training_summary,
@@ -129,6 +130,7 @@ def build_v1_closure_demo(
             "real_3dgs_scene_can_render": splat_path.exists(),
             "object_field_saved": trained_field_path.exists(),
             "mask_votes_supervise_gaussians": training.supervised_gaussians > 0,
+            "mask_vote_quality_audit_available": True,
             "mask_guidance_changed_object_field": field_delta.changed_gaussians > 0,
             "projection_loss_decreased": training.final_loss < training.initial_loss,
             "viewer_ply_available": output_ply_path.exists(),
@@ -261,6 +263,11 @@ def verify_v1_closure_demo(
     final_loss = _optional_float(training.get("final_loss"))
     supervised = int(training.get("supervised_gaussians", 0) or 0)
     add("mask_votes_supervise_gaussians", supervised > 0, f"supervised_gaussians={supervised}")
+    quality_ok, quality_detail = mask_vote_quality_check(
+        training,
+        expected_slots=object_count,
+    )
+    add("mask_vote_quality_audit_available", quality_ok, quality_detail)
     add(
         "projection_loss_decreased",
         initial_loss is not None and final_loss is not None and final_loss < initial_loss,

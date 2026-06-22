@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from objgauss.mask_voting import mask_vote_quality_check
 from objgauss.object_field import (
     load_object_field,
     object_field_label_delta,
@@ -120,6 +121,11 @@ def verify_lego_alpha_closure_demo(
     final_loss = _optional_float(training.get("final_loss"))
     supervised = int(training.get("supervised_gaussians", 0) or 0)
     add("mask_votes_supervise_gaussians", supervised > 0, f"supervised_gaussians={supervised}")
+    quality_ok, quality_detail = mask_vote_quality_check(
+        training,
+        expected_slots=object_count,
+    )
+    add("mask_vote_quality_audit_available", quality_ok, quality_detail)
     add(
         "projection_loss_decreased",
         initial_loss is not None and final_loss is not None and final_loss < initial_loss,

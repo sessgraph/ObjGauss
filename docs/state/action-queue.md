@@ -24,6 +24,11 @@
 
 ## Closed
 
+### ACTION-020: 固化 mask vote quality audit
+
+- 完成 commit: 待提交
+- 结果: `objgauss object-field vote-masks` summary、外部训练输出登记和三个闭环 demo manifest 现在包含 `vote_quality`；verifier 会检查 `mask_vote_quality_audit_available`，覆盖监督比例、每槽覆盖、冲突比例、normalized target entropy 和观测权重统计。
+
 ### ACTION-019: 生成真实 3DGS + 2D 语义 mask 统一闭环样例
 
 - 完成 commit: `ae83594`
