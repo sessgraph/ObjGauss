@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-013: 固化一键闭环总验收命令
+
+- 完成 commit: `81f1d0b`
+- 结果: `npm run acceptance:demo` 会重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行 `npm run audit:demo` 浏览器闭环验收；本地验证输出 `acceptance_demo=passed`。
+
 ### ACTION-012: 固化闭环 demo 浏览器交互验收
 
 - 完成 commit: `f3e5c62`，截图输出补充 commit: `f1b1190`

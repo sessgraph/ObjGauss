@@ -6,6 +6,21 @@
 
 MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS splat renderer，并具备可复现的 ObjGauss v1 闭环验收 demo。
 
+## 阶段最终目标
+
+当前阶段的最终目标不是先追求完整科研级训练质量，而是把 ObjGauss v1 的最小闭环变成可重复验收的工程事实：
+
+```text
+多视角数据 / 3DGS 场景
+  -> Gaussian 场
+  -> 每个 Gaussian 的 Object Field 概率
+  -> 2D mask / 语义线索修正 object_logits
+  -> 导出 object_id
+  -> 前端可选择、隔离、删除对象
+```
+
+验收视角：一条命令能重新生成 Plush 与 NeRF Lego 两个闭环样例，机器检查产物，再打开浏览器验证真实 splat 外观和对象级交互。
+
 ## 已完成能力
 
 - Python CLI:
@@ -49,6 +64,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - 流程:
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
+  - `npm run acceptance:demo` 已固化为一键闭环总验收命令。
   - baseline commit: `c8dcef7`.
 
 ## 最近验证
@@ -74,6 +90,7 @@ npm run build
 - LEGO-001: `objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120` 生成 5696 个 Gaussian proxy、4 个对象、12 个真实视角、48 个 2D color masks；projection loss 1.386294 -> 0.538856；浏览器验证可加载 `NeRF Lego 闭环代理样例` 并执行对象选择、隔离、删除预览。
 - VERIFY-002: `objgauss demo verify-lego-alpha-closure` 通过，17 项检查全部通过，包括源图像和 mask 文件存在、Object Field shape、loss 下降、`object_id` PLY、public assets 和前端素材注册。
 - UI-AUDIT-001: `npm run audit:demo` 通过，加载 `ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
+- ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制

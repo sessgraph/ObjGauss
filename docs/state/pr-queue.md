@@ -34,6 +34,28 @@
 
 ## Done
 
+### ACCEPT-001: 固化一键闭环总验收命令
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 把当前阶段最终目标压成一个可重复运行的本地总验收命令。
+- 实施:
+  - 新增 `npm run acceptance:demo`。
+  - 命令重新生成并验证 Plush v1 closure。
+  - 命令重新生成并验证 NeRF Lego proxy closure。
+  - 命令最后执行 `npm run audit:demo`，用浏览器验收两个闭环素材卡片。
+- 范围外:
+  - 默认不下载素材；需要时通过 `npm run acceptance:demo -- --pull-assets` 显式拉取。
+  - 不声称 NeRF Lego proxy 是完整 3DGS optimization 输出。
+  - 不替代后续 SAM / CLIP 端到端语义分割。
+- 验收:
+  - 单条命令能重建、验证并浏览器审计两个闭环样例。
+- 验证:
+  - `npm run acceptance:demo`: passed，Plush loss 1.791760 -> 1.201637；Lego proxy loss 1.386294 -> 0.538856；浏览器审计两个素材均通过。
+  - `uv run --extra dev pytest`: 15 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `81f1d0b`。
+
 ### UI-AUDIT-001: 固化闭环 demo 浏览器交互验收
 
 - 状态: done
