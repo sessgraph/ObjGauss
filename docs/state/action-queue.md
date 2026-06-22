@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-010: 生成 NeRF Lego 闭环代理样例
+
+- 完成 commit: `db3441a`
+- 结果: `objgauss demo lego-alpha-closure` 可从 NeRF Lego 真实多视角 RGBA + pose 生成 `lego_proxy.splat`、真实 2D color mask manifest、Object Field 和 `lego_v1_objects.ply`；前端素材库可加载 `NeRF Lego 闭环代理样例` 并执行对象隔离/删除预览。
+
 ### ACTION-009: 固化 v1 闭环机器验收命令
 
 - 完成 commit: `b6236bd`

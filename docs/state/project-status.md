@@ -16,7 +16,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss stats`
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha`
-  - `objgauss demo v1-closure/verify-v1-closure`
+  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
   - 中文 UI。
@@ -41,7 +41,9 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
+  - `objgauss demo lego-alpha-closure` 可从 NeRF Lego 真实多视角 RGBA + pose 生成轻量 Gaussian proxy、2D color mask manifest 和 object-aware PLY。
   - 前端素材库已有 `ObjGauss v1 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
+  - 前端素材库已有 `NeRF Lego 闭环代理样例`，运行 demo 命令后可加载 proxy splat 和对象 PLY。
 - 流程:
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
@@ -58,7 +60,7 @@ npm run build
 
 结果：
 
-- Python 测试: 14 passed。
+- Python 测试: 15 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -67,6 +69,7 @@ npm run build
 - DEMO-001: Plush v1 闭环 demo 生成 281498 个 Gaussian、6 个对象、3 个投影视角、18 个 masks；projection loss 1.791760 -> 1.201637；浏览器验证可加载 `ObjGauss v1 闭环样例` 并执行对象选择、隔离、删除预览。
 - VERIFY-001: `objgauss demo verify-v1-closure` 通过，检查真实 splat、mask manifest、Object Field shape、loss 下降、`object_id` PLY、public copy 和前端素材注册。
 - MASK-001: NeRF Lego 真实 RGBA 图片 alpha 生成 mask manifest，8 frames / 8 masks / 800x800 / 299242 foreground pixels。
+- LEGO-001: `objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120` 生成 5696 个 Gaussian proxy、4 个对象、12 个真实视角、48 个 2D color masks；projection loss 1.386294 -> 0.538856；浏览器验证可加载 `NeRF Lego 闭环代理样例` 并执行对象选择、隔离、删除预览。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
@@ -75,6 +78,7 @@ npm run build
 - 当前 v1 闭环 demo 的 mask manifest 由已有对象标签派生，用于验收闭环；NeRF Lego alpha mask 已能从真实图片生成，但只是前景 mask，不等价于 SAM / CLIP 实例语义分割。
 - 仓库内还不运行 SAM / CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
+- NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。
 - Poly Haven mesh Demo 还不能直接进入现有 3DGS viewer，需要后续 mesh 多视角渲染和 3DGS 训练。
 - 训练素材目录已接入 NeRF Lego，但还没有对应训练出的 Lego Gaussian PLY。
 

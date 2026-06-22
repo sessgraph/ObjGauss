@@ -34,6 +34,32 @@
 
 ## Done
 
+### LEGO-001: 生成 NeRF Lego 闭环代理样例
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 把真实 NeRF Lego 多视角数据、真实 2D mask manifest、Object Field 投票和前端对象编辑压到同一个可加载样例里。
+- 实施:
+  - 新增 `objgauss demo lego-alpha-closure`。
+  - 从 NeRF Lego RGBA 图片和 camera pose 采样生成轻量 Gaussian proxy PLY。
+  - 写出 `lego_proxy.splat`，可走前端真实 Splat renderer。
+  - 基于真实 2D 图像颜色规则生成 4-slot color mask manifest，并通过 `vote-masks` 更新 Object Field。
+  - 导出 `lego_v1_objects.ply`，并复制到 `public/samples/lego_alpha_v1_objects.ply`。
+  - 前端素材库新增 `NeRF Lego 闭环代理样例`。
+- 范围外:
+  - 不声称完成 NeRF Lego 的完整 3DGS optimization 训练。
+  - 不声称 SAM / CLIP 已接入。
+- 验收:
+  - 同一个 Lego proxy scene 有 `.splat`、Object Field、真实 2D masks、`object_id` PLY。
+  - 前端可以加载新素材并执行对象选择、隔离、删除预览。
+- 验证:
+  - `uv run objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120`: 5696 gaussians，4 objects，12 frames，48 masks，loss 1.386294 -> 0.538856。
+  - `uv run objgauss stats public/samples/lego_alpha_v1_objects.ply`: object_id 0/1/2/3 counts = 736 / 581 / 1787 / 2592。
+  - Playwright + system Chrome: `NeRF Lego 闭环代理样例` 可加载，canvas nonBackground=78043，可执行只看所选和预览删除。
+  - `uv run --extra dev pytest`: 15 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `db3441a`。
+
 ### VERIFY-001: 固化 v1 闭环验收检查器
 
 - 状态: done
