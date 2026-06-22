@@ -16,7 +16,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss stats`
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha`
-  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure`
+  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
   - 中文 UI。
@@ -42,6 +42,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
   - `objgauss demo lego-alpha-closure` 可从 NeRF Lego 真实多视角 RGBA + pose 生成轻量 Gaussian proxy、2D color mask manifest 和 object-aware PLY。
+  - `objgauss demo verify-lego-alpha-closure` 可检查 Lego proxy demo 的源图像、mask 文件、Object Field、loss、`object_id` PLY、public assets 和前端素材注册。
   - 前端素材库已有 `ObjGauss v1 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
   - 前端素材库已有 `NeRF Lego 闭环代理样例`，运行 demo 命令后可加载 proxy splat 和对象 PLY。
 - 流程:
@@ -70,6 +71,7 @@ npm run build
 - VERIFY-001: `objgauss demo verify-v1-closure` 通过，检查真实 splat、mask manifest、Object Field shape、loss 下降、`object_id` PLY、public copy 和前端素材注册。
 - MASK-001: NeRF Lego 真实 RGBA 图片 alpha 生成 mask manifest，8 frames / 8 masks / 800x800 / 299242 foreground pixels。
 - LEGO-001: `objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120` 生成 5696 个 Gaussian proxy、4 个对象、12 个真实视角、48 个 2D color masks；projection loss 1.386294 -> 0.538856；浏览器验证可加载 `NeRF Lego 闭环代理样例` 并执行对象选择、隔离、删除预览。
+- VERIFY-002: `objgauss demo verify-lego-alpha-closure` 通过，17 项检查全部通过，包括源图像和 mask 文件存在、Object Field shape、loss 下降、`object_id` PLY、public assets 和前端素材注册。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制

@@ -34,6 +34,27 @@
 
 ## Done
 
+### VERIFY-002: 固化 NeRF Lego proxy 闭环验收检查器
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 让 `LEGO-001` 的“真实多视角数据 + 2D mask + Object Field + 前端对象编辑”有独立机器验收命令。
+- 实施:
+  - 新增 `objgauss demo verify-lego-alpha-closure`。
+  - 重新读取 `lego-alpha-closure-manifest.json`、NeRF 源图像、mask `.npy`、proxy `.splat`、Object Field `.npz`、导出 PLY、public assets 和 `src/assetLibrary.js`。
+  - 检查 mask manifest 至少使用多视角、Object Field shape 匹配、projection loss 下降、导出 PLY 含 `object_id`。
+- 范围外:
+  - 不声称 NeRF Lego proxy 是完整 3DGS optimization 结果。
+  - 不替代浏览器交互测试。
+- 验收:
+  - 真实 Lego proxy demo verifier 通过。
+  - 测试覆盖 verifier CLI。
+- 验证:
+  - `uv run objgauss demo verify-lego-alpha-closure`: passed=true，17 项检查全部通过。
+  - `uv run --extra dev pytest`: 15 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `7a250d9`。
+
 ### LEGO-001: 生成 NeRF Lego 闭环代理样例
 
 - 状态: done

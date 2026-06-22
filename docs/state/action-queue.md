@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-011: 固化 NeRF Lego proxy 闭环机器验收命令
+
+- 完成 commit: `7a250d9`
+- 结果: `objgauss demo verify-lego-alpha-closure` 会检查 NeRF 源图像、mask 文件、proxy `.splat`、Object Field `.npz`、loss 下降、`object_id` PLY、public assets 和前端素材注册；本地真实 Lego proxy demo 验证 passed=true。
+
 ### ACTION-010: 生成 NeRF Lego 闭环代理样例
 
 - 完成 commit: `db3441a`
