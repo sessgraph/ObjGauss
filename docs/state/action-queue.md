@@ -20,7 +20,7 @@
 
 ### ACTION-016: 用真实 SAM checkpoint 跑小场景 mask manifest
 
-- 完成 commit: 待提交
+- 完成 commit: `18ac234`
 - 结果: 本机使用 `segment-anything`、`torch 2.12.1+cu130`、RTX 5060 Ti 和本地 `sam_vit_b_01ec64.pth` 生成 NeRF Lego 2 帧真实 SAM manifest；`objgauss object-field vote-masks` 消费该 manifest，监督 5567 / 5696 个 Gaussian，loss 3.902681 -> 0.120758，并输出带 `object_id` 的 `outputs/demos/lego-sam-smoke/lego_sam_objects.ply`。
 
 ### ACTION-020: 固化 mask vote quality audit

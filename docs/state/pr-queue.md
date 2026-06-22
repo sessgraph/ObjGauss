@@ -45,7 +45,7 @@
   - `objgauss object-field vote-masks ... --iterations 80 --learning-rate 1.0`: supervised_gaussians=5567 / 5696，supervised_fraction=0.977353，vote_conflict_fraction=0.064308，loss 3.902681 -> 0.120758，active_slots=8。
   - `objgauss stats outputs/demos/lego-sam-smoke/lego_sam_objects.ply`: 5696 gaussians，`object_id` 8 slots。
 - 实现 commit: `8c3c80e`。
-- checkpoint 验收记录 commit: 待提交。
+- checkpoint 验收记录 commit: `18ac234`。
 
 ### VERIFY-004: 固化 mask vote quality audit
 
