@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "audit:demo": "node scripts/audit-demo.mjs"
+    "audit:demo": "node scripts/audit-demo.mjs",
+    "acceptance:demo": "node scripts/acceptance-demo.mjs"
   },
   "dependencies": {
     "@sparkjsdev/spark": "^2.1.0",

@@ -214,6 +214,17 @@ The audit starts a temporary Vite server, loads `ObjGauss v1 闭环样例` and
 `NeRF Lego 闭环代理样例`, checks that the splat and point-edit canvases are
 non-empty, and exercises object selection, isolation, and delete preview.
 
+Run the full local acceptance loop:
+
+```bash
+npm run acceptance:demo
+```
+
+This rebuilds the Plush v1 closure demo, verifies it, rebuilds the NeRF Lego
+proxy closure demo, verifies it, and then runs the browser audit. Use
+`npm run acceptance:demo -- --pull-assets` on a machine that still needs to
+download the local Plush and NeRF Lego assets.
+
 ## Asset library
 
 素材库入口：

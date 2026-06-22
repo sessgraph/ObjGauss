@@ -168,6 +168,15 @@ npm run audit:demo
 `NeRF Lego 闭环代理样例`，检查真实 splat / 点云编辑 canvas 非空，并执行
 对象选择、只看所选和预览删除。
 
+完整本地验收：
+
+```bash
+npm run acceptance:demo
+```
+
+该命令会重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy
+closure，然后执行浏览器闭环验收。
+
 ## 优先素材来源
 
 | 优先级 | 来源 | 类型 | 适合用途 | 入口 |
