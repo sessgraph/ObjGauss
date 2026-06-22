@@ -13,4 +13,5 @@ build/
 data/
 outputs/
 *.ply
+*.splat
 !tests/fixtures/*.ply

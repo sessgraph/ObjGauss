@@ -121,6 +121,8 @@ def _assets_pull(args: argparse.Namespace) -> None:
     print(f"raw={result.raw_path}")
     print(f"converted={result.converted_path}")
     print(f"viewer_sample={result.output_path}")
+    if result.raw_public_path:
+        print(f"viewer_splat={result.raw_public_path}")
     print(f"gaussians={result.gaussian_count}")
     for label, count in result.object_counts:
         print(f"object_id={label} count={count}")

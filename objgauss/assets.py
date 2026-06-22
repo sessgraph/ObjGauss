@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import copyfile
 from urllib.request import urlretrieve
 
 from objgauss.clustering import cluster_features, summarize_labels
@@ -24,6 +25,7 @@ class AssetSource:
     formats: tuple[str, ...]
     best_for: str
     local_path: str | None = None
+    splat_path: str | None = None
     download_url: str | None = None
     raw_file_name: str | None = None
     output_file_name: str | None = None
@@ -39,6 +41,7 @@ class PulledAsset:
     raw_path: Path
     converted_path: Path
     output_path: Path
+    raw_public_path: Path | None
     gaussian_count: int
     object_counts: tuple[tuple[int, int], ...]
 
@@ -57,6 +60,7 @@ ASSETS: tuple[AssetSource, ...] = (
         formats=(".splat", ".ply", "object_id"),
         best_for="快速验证高斯点云加载、对象聚类色、删除/隔离预览。",
         local_path="/samples/plush_objects.ply",
+        splat_path="/samples/plush.splat",
         raw_file_name="plush.splat",
         output_file_name="plush_objects.ply",
         default_clusters=6,
@@ -200,11 +204,17 @@ def pull_asset(
     raw_path = Path(raw_dir) / asset.raw_file_name
     converted_path = Path(converted_dir) / raw_path.with_suffix(".ply").name
     output_path = Path(public_dir) / asset.local_path.lstrip("/")
+    raw_public_path = (
+        Path(public_dir) / asset.splat_path.lstrip("/") if asset.splat_path else None
+    )
     k = clusters if clusters is not None else asset.default_clusters
     if k is None:
         raise ValueError(f"{asset.name} does not define a cluster count")
 
     _download(asset.download_url, raw_path, force=force)
+    if raw_public_path and (force or not raw_public_path.exists()):
+        raw_public_path.parent.mkdir(parents=True, exist_ok=True)
+        copyfile(raw_path, raw_public_path)
 
     cloud = read_splat(raw_path)
     if force or not converted_path.exists():
@@ -225,6 +235,7 @@ def pull_asset(
         raw_path=raw_path,
         converted_path=converted_path,
         output_path=output_path,
+        raw_public_path=raw_public_path,
         gaussian_count=labeled.count,
         object_counts=tuple(summarize_labels(result.labels)),
     )

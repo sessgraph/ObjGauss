@@ -65,6 +65,7 @@ def test_asset_registry_has_pullable_sample():
 
     assert asset.download_url
     assert asset.local_path == "/samples/plush_objects.ply"
+    assert asset.splat_path == "/samples/plush.splat"
     assert asset.pull_pipeline == "splat-to-objgauss-ply"
     assert asset.pipeline_stage == "Demo 可用"
     assert "Demo预览" in asset.use_cases

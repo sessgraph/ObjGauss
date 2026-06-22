@@ -27,6 +27,10 @@ export async function parsePlyFile(file) {
   return {
     name: file.name,
     points: cloud.points,
+    splatSource: {
+      fileBytes: buffer.slice(0),
+      fileName: file.name,
+    },
   };
 }
 

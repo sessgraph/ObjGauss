@@ -1,6 +1,6 @@
 # ADR 0001: 3DGS Renderer Strategy
 
-> 状态: Proposed
+> 状态: Accepted / Implemented
 > 日期: 2026-06-22
 
 ## 背景
@@ -31,6 +31,19 @@
 
 推荐顺序：先评估成熟 WebGL / Three.js renderer，避免自研透明排序和 splat shader。
 
+## 实施结果
+
+选择 `@sparkjsdev/spark` 2.1.0 作为前端真实 3DGS renderer，并将 `three` 升级到 0.180.0 以满足 peer dependency。
+
+落地策略：
+
+- Plush 示例真实渲染读取 `public/samples/plush.splat`。
+- 对象编辑 fallback 继续读取 `public/samples/plush_objects.ply`。
+- 默认优先使用“真实 Splat”；当用户切换到对象聚类色、对象隐藏、隔离或删除预览时，自动回落到“点云编辑”。
+- 用户上传 PLY 时保留原始 `ArrayBuffer` 副本，若格式被 Spark 支持可进入真实 renderer；否则仍可用点云预览。
+
+没有选择自研 renderer。没有把对象编辑、语义分割或训练 pipeline 混入本 PR。
+
 ## 验收标准
 
 - Plush 样例在新 renderer 下呈现 splat 外观，而非稀疏点云。
@@ -43,6 +56,7 @@
 - 引入外部 renderer 可能带来 bundle 增大和格式适配成本。
 - `.splat`、PLY、标准 3DGS PLY 字段可能需要多格式适配。
 - SH 渲染可能不是第一步必须项，应先跑通 ellipse splat + alpha。
+- 当前 ObjGauss RGB PLY 不是标准 `f_dc_0` 3DGS PLY，Spark 不能直接作为真实 renderer 输入；因此真实 renderer 读取 `.splat`，对象编辑读取带 `object_id` 的 PLY。
 
 ## 后续任务
 

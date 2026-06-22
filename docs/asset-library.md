@@ -9,19 +9,24 @@
 
 | 资产 | 来源 | 本地文件 | 用途 | 许可备注 |
 | --- | --- | --- | --- | --- |
-| Plush 3DGS 示例 | https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat | `public/samples/plush_objects.ply` | 快速验证高斯点云加载、对象聚类、删除/隔离预览 | 上游说明来源许可混合，只作为本地测试素材 |
+| Plush 3DGS 示例 | https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat | `public/samples/plush.splat` + `public/samples/plush_objects.ply` | 快速验证真实 splat 渲染、高斯点云加载、对象聚类、删除/隔离预览 | 上游说明来源许可混合，只作为本地测试素材 |
 
 处理链路：
 
 ```text
 plush.splat
+  -> public/samples/plush.splat
+  -> Spark 真实 3DGS renderer
+
+plush.splat
   -> objgauss convert-splat
   -> plush.ply
   -> objgauss cluster --clusters 6
   -> public/samples/plush_objects.ply
+  -> 点云编辑 fallback
 ```
 
-当前前端默认用 PLY 内部 `red/green/blue` 显示自身颜色，`object_id` 只用于对象列表和对象聚类色模式。
+当前前端默认优先用 `.splat` 进入真实 renderer；切换对象聚类色、隐藏、隔离或删除预览时，使用 PLY 内部 `red/green/blue` 与 `object_id` 进入点云编辑 fallback。
 
 一键拉取当前样例：
 
@@ -35,6 +40,7 @@ objgauss assets pull plush-3dgs-local
 ```text
 outputs/assets/raw/plush.splat
 outputs/assets/converted/plush.ply
+public/samples/plush.splat
 public/samples/plush_objects.ply
 ```
 
@@ -90,6 +96,7 @@ ObjGaussAsset
 ├── use_cases: list[str]
 ├── source_url
 ├── local_path: optional
+├── splat_path: optional
 ├── mesh: optional
 ├── point_cloud: optional
 ├── gaussians: optional

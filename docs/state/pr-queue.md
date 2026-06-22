@@ -10,18 +10,6 @@
 
 ## Ready
 
-### RENDER-001: 评估并接入完整 3DGS renderer
-
-- 状态: ready-for-ADR-review
-- 类型: 重大变更
-- ADR: `docs/adr/0001-3dgs-renderer.md`
-- 目标: 从点云预览升级到真实 3DGS splat 渲染，支持椭圆 splat、透明度合成、视角交互。
-- 范围外: 不同时实现训练 pipeline；不把语义分割混入 renderer PR。
-- 验收:
-  - 对同一 Plush 样例能展示比点云更接近 splat 的视觉效果。
-  - 浏览器验证桌面和移动端非空、无框架报错。
-  - 保留点云 fallback 或明确移除理由。
-
 ### SEG-001: 建立语义级对象分组方案
 
 - 状态: ready-for-ADR-review
@@ -49,6 +37,23 @@
   - Demo 样例可在前端加载或明确说明为何只作为训练输入。
 
 ## Done
+
+### RENDER-001: 评估并接入完整 3DGS renderer
+
+- 状态: done
+- 类型: 重大变更
+- ADR: `docs/adr/0001-3dgs-renderer.md`
+- 目标: 从点云预览升级到真实 3DGS splat 渲染，支持椭圆 splat、透明度合成、视角交互。
+- 范围外: 不同时实现训练 pipeline；不把语义分割混入 renderer PR。
+- 验收:
+  - Plush 样例使用 `@sparkjsdev/spark` 读取 `.splat` 并显示真实 splat 外观。
+  - 点云编辑 fallback 保留，用于对象聚类色、隐藏、隔离和删除预览。
+  - 桌面 1440x920 与移动端 390x844 浏览器验证均非空、无前端错误。
+- 验证:
+  - `uv run --extra dev pytest`: 5 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - Playwright: 桌面 canvas `nonBackground=9422`，移动端 canvas `nonBackground=4559`。
+- 完成 commit: `e34b7de`。
 
 ### BASE-001: MVP 原型与流程基线
 

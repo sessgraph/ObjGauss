@@ -20,12 +20,14 @@ import { parsePly, parsePlyFile } from "./ply.js";
 import PointCloudViewport from "./PointCloudViewport.jsx";
 import { rgbToCss } from "./palette.js";
 import { createSampleScene } from "./sampleScene.js";
+import SplatViewport from "./SplatViewport.jsx";
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
+  const [rendererKind, setRendererKind] = useState("splat");
   const [renderMode, setRenderMode] = useState("original");
   const [pointSize, setPointSize] = useState(0.018);
   const [showGrid, setShowGrid] = useState(true);
@@ -39,6 +41,18 @@ export default function App() {
 
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
+  const sceneObjectIds = useMemo(() => allIds(scene.points), [scene.points]);
+  const objectEditActive = useMemo(
+    () =>
+      removedIds.size > 0 ||
+      isolatedId !== null ||
+      sceneObjectIds.size !== visibleIds.size ||
+      [...sceneObjectIds].some((id) => !visibleIds.has(id)),
+    [isolatedId, removedIds, sceneObjectIds, visibleIds],
+  );
+  const canUseSplatRenderer = Boolean(scene.splatSource) && renderMode === "original" && !objectEditActive;
+  const useSplatRenderer = rendererKind === "splat" && canUseSplatRenderer;
+  const activeRendererText = useSplatRenderer ? "真实 Splat" : "点云编辑";
   const visibleCount = useMemo(
     () =>
       scene.points.filter(
@@ -86,6 +100,10 @@ export default function App() {
       applyScene({
         name: asset.fileName ?? asset.name,
         points: cloud.points,
+        splatSource: {
+          url: asset.splatPath ?? asset.localPath,
+          fileName: asset.fileName ?? asset.name,
+        },
       });
     } catch (loadError) {
       setError(loadError.message || "示例 PLY 加载失败");
@@ -156,6 +174,14 @@ export default function App() {
 
         <div className="topActions">
           <select
+            value={rendererKind}
+            onChange={(event) => setRendererKind(event.target.value)}
+            aria-label="渲染器"
+          >
+            <option value="splat">真实 Splat</option>
+            <option value="points">点云编辑</option>
+          </select>
+          <select
             value={renderMode}
             onChange={(event) => setRenderMode(event.target.value)}
             aria-label="渲染模式"
@@ -200,6 +226,15 @@ export default function App() {
 
           <section className="panelSection">
             <h2>场景</h2>
+            <ControlRow label="渲染器">
+              <select
+                value={rendererKind}
+                onChange={(event) => setRendererKind(event.target.value)}
+              >
+                <option value="splat">真实 Splat</option>
+                <option value="points">点云编辑</option>
+              </select>
+            </ControlRow>
             <ControlRow label="颜色模式">
               <select value={renderMode} onChange={(event) => setRenderMode(event.target.value)}>
                 <option value="original">自身颜色</option>
@@ -302,17 +337,27 @@ export default function App() {
           </section>
         </aside>
 
-        <PointCloudViewport
-          points={scene.points}
-          visibleIds={visibleIds}
-          removedIds={removedIds}
-          renderMode={renderMode}
-          pointSize={pointSize}
-          showGrid={showGrid}
-          showAxes={showAxes}
-          isolatedId={isolatedId}
-          renderModeLabel={renderModeText}
-        />
+        {useSplatRenderer ? (
+          <SplatViewport
+            source={scene.splatSource}
+            showGrid={showGrid}
+            showAxes={showAxes}
+            pointCount={scene.points.length}
+            rendererLabel={activeRendererText}
+          />
+        ) : (
+          <PointCloudViewport
+            points={scene.points}
+            visibleIds={visibleIds}
+            removedIds={removedIds}
+            renderMode={renderMode}
+            pointSize={pointSize}
+            showGrid={showGrid}
+            showAxes={showAxes}
+            isolatedId={isolatedId}
+            renderModeLabel={renderModeText}
+          />
+        )}
 
         <aside className="rightPanel">
           <section className="panelSection inspectorHead">
@@ -390,6 +435,7 @@ export default function App() {
 
           <section className="panelSection statePanel">
             <h2>渲染状态</h2>
+            <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />
             <StateRow label="已删除对象" value={removedIds.size} />
@@ -403,10 +449,10 @@ export default function App() {
 
       <footer className="statusBar">
         <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
+        <span>渲染器：{activeRendererText}</span>
         <span>高斯点：{scene.points.length.toLocaleString()}</span>
         <span>可见：{visibleCount.toLocaleString()}</span>
         <span>所选：{selectedId ?? "无"}</span>
-        <span>缩放：1.00x</span>
       </footer>
     </main>
   );

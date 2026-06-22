@@ -9,6 +9,7 @@ export const ASSET_LIBRARY = [
     pipelineStage: "Demo 可用",
     useCases: ["Demo预览", "管线烟测"],
     localPath: "/samples/plush_objects.ply",
+    splatPath: "/samples/plush.splat",
     fileName: "plush_objects.ply",
     sourceName: "cakewalk/splat-data",
     sourceUrl: "https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat",
