@@ -204,6 +204,16 @@ in one scene: NeRF images and camera poses create the Gaussian proxy, real 2D
 color masks supervise Object Field logits, and the exported PLY can be loaded
 from the `NeRF Lego 闭环代理样例` card.
 
+Run the browser audit for both closure cards:
+
+```bash
+npm run audit:demo
+```
+
+The audit starts a temporary Vite server, loads `ObjGauss v1 闭环样例` and
+`NeRF Lego 闭环代理样例`, checks that the splat and point-edit canvases are
+non-empty, and exercises object selection, isolation, and delete preview.
+
 ## Asset library
 
 素材库入口：

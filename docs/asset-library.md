@@ -158,6 +158,16 @@ public/samples/lego_alpha_v1_objects.ply
 再用 2D color masks 投票更新 Object Field。它用于把 v1 闭环压到同一个
 Lego 画面里验收，不等价于完整 3DGS 训练输出。
 
+浏览器闭环验收：
+
+```bash
+npm run audit:demo
+```
+
+该命令会启动临时 Vite 服务，分别加载 `ObjGauss v1 闭环样例` 和
+`NeRF Lego 闭环代理样例`，检查真实 splat / 点云编辑 canvas 非空，并执行
+对象选择、只看所选和预览删除。
+
 ## 优先素材来源
 
 | 优先级 | 来源 | 类型 | 适合用途 | 入口 |
