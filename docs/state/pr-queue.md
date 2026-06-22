@@ -34,6 +34,30 @@
 
 ## Done
 
+### DEMO-001: 固化 ObjGauss v1 闭环验收 demo
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 把当前阶段终点压成一个可复现结果画面：真实 3DGS 外观 + Object Field + mask 投票 + 前端对象隔离/删除。
+- 实施:
+  - 新增 `objgauss demo v1-closure`。
+  - 基于 Plush 真实 `.splat` 和 `plush_objects.ply` 生成闭环验收包。
+  - 自动生成 3 个投影视角、18 个 mask votes、训练后 Object Field 和 `plush_v1_objects.ply`。
+  - 前端素材库新增 `ObjGauss v1 闭环样例`。
+- 范围外:
+  - 不声称 SAM / CLIP 已在仓库内运行。
+  - 不声称 NeRF Lego 已训练出 Gaussian PLY。
+- 验收:
+  - `outputs/demos/v1-closure/v1-closure-manifest.json` 记录闭环证据。
+  - `public/samples/plush_v1_objects.ply` 可由前端加载。
+  - projection loss 下降，Object Field 输出 6 个 active object slots。
+- 验证:
+  - `uv run --extra dev pytest`: 13 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `uv run objgauss demo v1-closure --iterations 80`: 281498 gaussians，6 objects，loss 1.791760 -> 1.201637。
+  - Playwright + system Chrome: 素材库可见并可加载 `ObjGauss v1 闭环样例`，对象检查器和隔离/删除按钮可见。
+- 完成 commit: pending。
+
 ### SEG-001: 建立语义级对象分组方案
 
 - 状态: done

@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-007: 固化 v1 闭环验收 demo
+
+- 完成 commit: pending
+- 结果: `objgauss demo v1-closure` 可生成 `outputs/demos/v1-closure/` 和 `public/samples/plush_v1_objects.ply`，前端素材库可加载 `ObjGauss v1 闭环样例`。
+
 ### ACTION-005: 建立 Object Field 真实训练循环
 
 - 完成 commit: `af825f8`

@@ -18,6 +18,24 @@ export const ASSET_LIBRARY = [
     bestFor: "快速验证高斯点云加载、对象聚类色、删除/隔离预览。",
   },
   {
+    id: "plush-v1-closure-local",
+    name: "ObjGauss v1 闭环样例",
+    category: "本地验收",
+    sourceType: "gaussian",
+    status: "已接入",
+    priority: "P0",
+    pipelineStage: "v1闭环验收",
+    useCases: ["真实Splat", "ObjectField", "mask投票", "对象编辑"],
+    localPath: "/samples/plush_v1_objects.ply",
+    splatPath: "/samples/plush.splat",
+    fileName: "plush_v1_objects.ply",
+    sourceName: "ObjGauss demo v1-closure",
+    sourceUrl: "https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat",
+    license: "来源许可混合，仅用于本地测试",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "验证真实 3DGS 外观、Object Field、2D mask 投票和对象隔离/删除闭环。",
+  },
+  {
     id: "polyhaven-school-chair-1k",
     name: "Poly Haven School Chair 1K",
     category: "可商用展示",
@@ -156,6 +174,7 @@ export const ASSET_LIBRARY = [
 ];
 
 export const FEATURED_ASSET_IDS = [
+  "plush-v1-closure-local",
   "plush-3dgs-local",
   "polyhaven-school-chair-1k",
   "nerf-synthetic-lego",

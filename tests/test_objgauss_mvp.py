@@ -338,6 +338,49 @@ def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
     assert summary["supervised_gaussians"] == 4
 
 
+def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
+    input_path = tmp_path / "objects.ply"
+    splat_path = tmp_path / "scene.splat"
+    output_dir = tmp_path / "demo"
+    public_dir = tmp_path / "public"
+    write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
+    splat_path.write_bytes(b"splat")
+
+    assert (
+        main(
+            [
+                "demo",
+                "v1-closure",
+                "--input",
+                str(input_path),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(output_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "120",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "v1-closure-manifest.json").read_text(encoding="utf-8"))
+    exported = read_ply(output_dir / "plush_v1_objects.ply")
+
+    assert "manifest=" in output
+    assert manifest["acceptance"]["real_3dgs_scene_can_render"] is True
+    assert manifest["acceptance"]["projection_loss_decreased"] is True
+    assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
+    assert manifest["training"]["supervised_gaussians"] == 4
+    assert (public_dir / "plush_v1_objects.ply").exists()
+    assert set(np.unique(exported.vertices["object_id"])) == {0, 1}
+
+
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [
         ("x", "f4"),
@@ -388,6 +431,17 @@ def _camera_cloud() -> GaussianCloud:
     vertices["red"] = 128
     vertices["green"] = 128
     vertices["blue"] = 128
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _camera_cloud_with_object_ids() -> GaussianCloud:
+    cloud = _camera_cloud()
+    fields = list(cloud.vertices.dtype.descr)
+    fields.append(("object_id", "i4"))
+    vertices = np.empty(cloud.count, dtype=np.dtype(fields))
+    for name in cloud.fields:
+        vertices[name] = cloud.vertices[name]
+    vertices["object_id"] = np.array([0, 0, 1, 1], dtype=np.int32)
     return GaussianCloud(vertices=vertices, source_format="ascii")
 
 

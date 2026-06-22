@@ -146,6 +146,26 @@ Minimal mask manifest:
 treated as upstream mask producers; this repo consumes their masks without
 adding those model dependencies yet.
 
+Build the current v1 closed-loop acceptance demo:
+
+```bash
+objgauss assets pull plush-3dgs-local
+objgauss demo v1-closure
+```
+
+This writes:
+
+```text
+outputs/demos/v1-closure/v1-closure-manifest.json
+outputs/demos/v1-closure/object_field_trained.npz
+outputs/demos/v1-closure/plush_v1_objects.ply
+public/samples/plush_v1_objects.ply
+```
+
+Then open the viewer and load `ObjGauss v1 闭环样例` from the 素材库 panel.
+The real splat renderer shows the original 3DGS appearance; switching to object
+colors or using isolate/delete enters the object-editable point-cloud view.
+
 ## Asset library
 
 素材库入口：

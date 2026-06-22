@@ -7,6 +7,7 @@ import numpy as np
 
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
+from objgauss.demo import build_v1_closure_demo
 from objgauss.features import extract_features
 from objgauss.mask_voting import (
     train_object_field_from_votes,
@@ -271,6 +272,30 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
         print(f"ply={args.ply_output}")
 
 
+def _demo_v1_closure(args: argparse.Namespace) -> None:
+    result = build_v1_closure_demo(
+        input_ply=args.input,
+        splat_path=args.splat,
+        output_dir=args.output_dir,
+        public_dir=None if args.no_public_copy else args.public_dir,
+        image_size=args.image_size,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"mask_manifest={result.mask_manifest_path}")
+    print(f"initial_field={result.initial_field_path}")
+    print(f"trained_field={result.trained_field_path}")
+    print(f"output_ply={result.output_ply_path}")
+    if result.public_ply_path:
+        print(f"public_ply={result.public_ply_path}")
+    print(f"gaussians={result.gaussian_count}")
+    print(f"objects={result.object_count}")
+    print(f"supervised_gaussians={result.supervised_gaussians}")
+    print(f"initial_loss={result.initial_loss:.6f}")
+    print(f"final_loss={result.final_loss:.6f}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -438,6 +463,23 @@ def _build_parser() -> argparse.ArgumentParser:
     field_vote.add_argument("--rewrite-sh", action="store_true")
     field_vote.add_argument("--ascii", action="store_true", help="write ASCII PLY")
     field_vote.set_defaults(handler=_object_field_vote_masks)
+
+    demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
+    demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)
+
+    v1_closure = demo_subparsers.add_parser(
+        "v1-closure",
+        help="build the current ObjGauss v1 closed-loop acceptance demo",
+    )
+    v1_closure.add_argument("--input", type=Path, default=Path("public/samples/plush_objects.ply"))
+    v1_closure.add_argument("--splat", type=Path, default=Path("public/samples/plush.splat"))
+    v1_closure.add_argument("--output-dir", type=Path, default=Path("outputs/demos/v1-closure"))
+    v1_closure.add_argument("--public-dir", type=Path, default=Path("public/samples"))
+    v1_closure.add_argument("--no-public-copy", action="store_true")
+    v1_closure.add_argument("--image-size", type=int, default=512)
+    v1_closure.add_argument("--iterations", type=int, default=160)
+    v1_closure.add_argument("--learning-rate", type=float, default=1.0)
+    v1_closure.set_defaults(handler=_demo_v1_closure)
 
     return parser
 

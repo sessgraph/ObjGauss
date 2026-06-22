@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS splat renderer，并具备 Object Field + 2D mask 投票训练骨架。
+MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS splat renderer，并具备可复现的 ObjGauss v1 闭环验收 demo。
 
 ## 已完成能力
 
@@ -35,6 +35,9 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可检查 NeRF-style `transforms_*.json` 训练素材完整性。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
+- Demo:
+  - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
+  - 前端素材库已有 `ObjGauss v1 闭环样例`，加载后可查看真实 splat 外观并执行对象隔离/删除预览。
 - 流程:
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
@@ -57,12 +60,13 @@ npm run build
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
 - OBJFIELD-001: Plush PLY 可初始化 6-slot Object Field；NeRF Lego 检查 400 frames、缺图 0、无效 pose 0。
 - SEG-001 / OBJFIELD-002: synthetic projection mask vote 可训练 Object Field，并输出 `object_id` PLY。
+- DEMO-001: Plush v1 闭环 demo 生成 281498 个 Gaussian、6 个对象、3 个投影视角、18 个 masks；projection loss 1.791760 -> 1.201637；浏览器验证素材库可加载 `ObjGauss v1 闭环样例`。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
 
 - 对象聚类色、隐藏、隔离、删除预览仍通过点云编辑 fallback 完成，不是对象级 splat shader。
-- Object Field 可接收预计算 2D mask 语义监督，但仓库内还不运行 SAM / CLIP 模型。
+- 当前 v1 闭环 demo 的 mask manifest 由已有对象标签派生，用于验收闭环；仓库内还不运行 SAM / CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - Poly Haven mesh Demo 还不能直接进入现有 3DGS viewer，需要后续 mesh 多视角渲染和 3DGS 训练。
 - 训练素材目录已接入 NeRF Lego，但还没有对应训练出的 Lego Gaussian PLY。

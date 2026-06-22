@@ -199,10 +199,9 @@ def train_object_field_from_votes(
 
     logits = field.logits.astype(np.float32, copy=True)
     initial_loss = _projection_loss(logits, targets, weights)
-    normalizer = float(np.count_nonzero(supervised))
     for _ in range(iterations):
         probabilities = softmax(logits, axis=1)
-        gradient = (probabilities - targets) * weights[:, None] / normalizer
+        gradient = (probabilities - targets) * weights[:, None]
         logits -= learning_rate * gradient.astype(np.float32, copy=False)
     trained = ObjectField(logits)
     final_loss = _projection_loss(trained.logits, targets, weights)
