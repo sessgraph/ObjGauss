@@ -18,6 +18,11 @@
 
 ## Closed
 
+### ACTION-015: 固化外部 3DGS 训练输出接入命令
+
+- 完成 commit: `721ac49`
+- 结果: `objgauss training register-output` 可登记外部训练器产出的 Gaussian PLY / `.splat`，生成 viewer `.splat`，并在提供 mask manifest 时跑 Object Field 投票和导出 `object_id` PLY；真实 NeRF Lego 训练产物仍归 `TRAIN-001`。
+
 ### ACTION-014: 固化 NeRF Lego 多 slot 真实 2D mask 生成入口
 
 - 完成 commit: `5302cfe`

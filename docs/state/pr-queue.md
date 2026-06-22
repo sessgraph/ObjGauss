@@ -34,6 +34,29 @@
 
 ## Done
 
+### TRAIN-002: 固化外部 3DGS 训练输出接入
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 让成熟 3DGS 训练器产出的 `point_cloud.ply` / `.splat` 能直接进入 ObjGauss v1 闭环。
+- 实施:
+  - 新增 `objgauss training register-output`。
+  - 支持读取 `.ply` / `.splat`，写出标准 `gaussians.ply` 和 viewer `.splat`。
+  - 支持传入 mask manifest 后直接跑 Object Field projection supervision，输出 `object_field_trained.npz`、summary 和带 `object_id` 的 PLY。
+  - 前端素材库预留 `NeRF Lego 训练输出样例` 卡片，公共文件名为 `nerf_lego_trained.splat` / `nerf_lego_trained_objects.ply`。
+- 范围外:
+  - 不在本 PR 中自研或封装实际 3DGS trainer。
+  - 不声称 smoke 使用的 proxy PLY 是真实训练输出。
+  - 不替代 `TRAIN-001` 的真实 NeRF Lego 训练产物。
+- 验收:
+  - 外部 Gaussian PLY 可被登记为 ObjGauss 训练输出。
+  - 给定真实 mask manifest 后可导出 `object_id` PLY。
+- 验证:
+  - `uv run objgauss training register-output outputs/demos/lego-alpha-closure/lego_proxy_raw.ply --asset-id nerf-lego-trained-output-local --output-dir outputs/assets/gaussians/nerf-lego-register-smoke --dataset outputs/assets/training/nerf-synthetic-lego --masks outputs/masks/nerf-lego-rgba-colors/mask-manifest.json --public-name nerf_lego_trained --iterations 80 --learning-rate 1.0 --no-public-copy`: 5696 gaussians，slots=4，supervised_gaussians=4806，loss 1.386294 -> 0.375765。
+  - `uv run --extra dev pytest`: 17 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `721ac49`。
+
 ### MASK-002: 生成 NeRF Lego 多 slot 真实 2D color mask manifest
 
 - 状态: done

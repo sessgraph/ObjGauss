@@ -31,6 +31,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss stats`
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors`
+  - `objgauss training register-output`
   - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
@@ -40,6 +41,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 自身颜色 / 对象聚类色切换。
   - 对象列表、隔离、删除预览。
   - 素材库卡片和本地 Plush 样例加载。
+  - `NeRF Lego 训练输出样例` 卡片已预留，外部训练产物登记到 `public/samples/nerf_lego_trained.*` 后可加载。
   - `npm run audit:demo` 可启动临时 Vite 服务并浏览器验收两个闭环样例。
 - 素材:
   - `plush-3dgs-local` 可自动拉取。
@@ -55,6 +57,9 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可从 NeRF Synthetic Lego RGBA 颜色生成多 slot 真实 2D mask manifest。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
+- 训练输出接入:
+  - `objgauss training register-output` 可登记外部成熟 3DGS 训练器产出的 `.ply` / `.splat`。
+  - 登记时可生成 viewer `.splat`、标准 Gaussian PLY、Object Field、mask 投票 summary 和 `object_id` PLY。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
@@ -79,7 +84,7 @@ npm run build
 
 结果：
 
-- Python 测试: 15 passed。
+- Python 测试: 17 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -93,6 +98,7 @@ npm run build
 - UI-AUDIT-001: `npm run audit:demo` 通过，加载 `ObjGauss v1 闭环样例` 与 `NeRF Lego 闭环代理样例`，检查 splat / 点云编辑 canvas 非空，并执行对象选择、只看所选、预览删除。
 - ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
 - MASK-002: `objgauss masks from-nerf-rgba-colors` 在 NeRF Lego 真实 RGBA 上生成 8 frames / 32 masks / 4 slots；独立 `vote-masks` 消费该 manifest，3423 个 Gaussian 被监督，projection loss 1.386294 -> 0.390825，并输出 `object_id` PLY。
+- TRAIN-002: `objgauss training register-output` 接入 Gaussian PLY smoke 通过，生成 viewer splat、Object Field 和 `object_id` PLY；使用真实 Lego color mask manifest 时 supervised_gaussians=4806，projection loss 1.386294 -> 0.375765。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
@@ -102,6 +108,7 @@ npm run build
 - 仓库内还不运行 SAM / CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。
+- 外部训练输出接入命令已完成，但本仓库尚未产出真实 NeRF Lego 训练 Gaussian PLY。
 - Poly Haven mesh Demo 还不能直接进入现有 3DGS viewer，需要后续 mesh 多视角渲染和 3DGS 训练。
 - 训练素材目录已接入 NeRF Lego，但还没有对应训练出的 Lego Gaussian PLY。
 
