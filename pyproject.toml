@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "objgauss"
+version = "0.1.0"
+description = "Object-aware clustering tools for 3D Gaussian Splatting PLY exports."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.23",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+]
+sklearn = [
+  "scikit-learn>=1.2",
+]
+
+[project.scripts]
+objgauss = "objgauss.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["objgauss*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

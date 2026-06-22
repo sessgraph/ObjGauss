@@ -1,0 +1,125 @@
+# ObjGauss MVP
+
+ObjGauss is a minimal object-aware layer on top of a standard 3D Gaussian
+Splatting export. This repository intentionally does not fork a renderer or
+trainer. The MVP starts from a `gaussians.ply` file produced by an existing
+3DGS implementation and adds:
+
+- Gaussian feature extraction from position, color, and opacity.
+- K-means object clustering.
+- `object_id` attachment as a PLY vertex property.
+- Object-colored PLY exports for inspection.
+- Object removal and isolation exports.
+
+The goal is to validate whether Gaussian splats can be grouped into stable
+object-level clusters before investing in semantic guidance or renderer
+changes.
+
+## Development workflow
+
+AI coding sessions and human contributors should use the shared workflow in
+`docs/development-flow.md`. Codex reads `AGENTS.md`; Claude Code reads
+`CLAUDE.md`; both files point back to the same workflow to avoid duplicated
+process rules.
+
+Current project state lives in `docs/state/`. Start with
+`docs/state/project-status.md` and `docs/state/pr-queue.md`.
+
+## Install
+
+Recommended:
+
+```bash
+uv sync --extra dev
+```
+
+Plain Python:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+`scikit-learn` is optional. If it is installed, the CLI uses it for k-means.
+Otherwise ObjGauss uses a deterministic NumPy implementation.
+
+## MVP workflow
+
+1. Train a scene with a mature 3DGS implementation such as Inria 3DGS or
+   gsplat.
+2. Export the trained Gaussian cloud as `gaussians.ply`.
+3. Cluster the Gaussian cloud:
+
+```bash
+objgauss cluster path/to/gaussians.ply -o outputs/scene_objects.ply --clusters 6 --colorize
+```
+
+4. Inspect cluster sizes:
+
+```bash
+objgauss stats outputs/scene_objects.ply
+```
+
+5. Run the object removal test:
+
+```bash
+objgauss filter outputs/scene_objects.ply -o outputs/scene_without_2.ply --ids 2 --mode remove
+```
+
+6. Optionally create a PLY that rewrites the 3DGS DC color channels to object
+   colors for renderers that ignore generic `red`, `green`, and `blue`
+   properties:
+
+```bash
+objgauss colorize outputs/scene_objects.ply -o outputs/scene_object_colors.ply --rewrite-sh
+```
+
+If you only have an antimatter15/cakewalk `.splat` sample, convert it first:
+
+```bash
+objgauss convert-splat path/to/model.splat -o outputs/model.ply
+objgauss cluster outputs/model.ply -o outputs/model_objects.ply --clusters 6 --colorize
+```
+
+## Asset library
+
+素材库入口：
+
+- Frontend data: `src/assetLibrary.js`
+- Handoff docs: `docs/asset-library.md`
+- Local preview sample: `public/samples/plush_objects.ply`
+
+The viewer shows featured assets in the left-side 素材库 panel. Assets with
+`localPath` can be loaded directly; candidate sources link to their upstream
+dataset pages and should be downloaded outside the git repo.
+Asset entries also distinguish training sources from demo-ready samples so
+research datasets do not get mixed into public demos by accident.
+
+Pull the first localizable sample into the viewer:
+
+```bash
+objgauss assets list --pullable
+objgauss assets pull plush-3dgs-local
+```
+
+## Notes
+
+- The default feature vector is `[x, y, z, r, g, b, opacity]`.
+- Position, color, and opacity groups are normalized before clustering.
+- Standard 3DGS `f_dc_0`, `f_dc_1`, and `f_dc_2` fields are converted from
+  spherical-harmonic DC values into approximate RGB features.
+- Standard 3DGS raw opacity logits are sigmoid-activated before use.
+- PLY IO supports scalar ASCII, binary little-endian, and binary big-endian
+  vertex properties. It targets Gaussian PLY exports, not triangle meshes with
+  list properties.
+
+## Suggested experiment
+
+Use one desktop scene with a cup, phone, and a few small objects. Success for
+this MVP means:
+
+- The 3DGS baseline reconstructs normally.
+- The clustered PLY has an `object_id` for every Gaussian.
+- Object colors are visually separable.
+- Removing one `object_id` makes a coherent part of the scene disappear.
