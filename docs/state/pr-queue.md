@@ -50,7 +50,7 @@
   - `uv run objgauss object-field init ... --slots 8`: active_slots=8。
   - `uv run objgauss object-field vote-masks ... --masks outputs/masks/nerf-lego-sam/mask-manifest.json`: supervised_gaussians=8887 / 50000，supervised_fraction=0.177740，vote_conflict_fraction=0.268707，loss 4.384474 -> 0.308315，active_slots=8。
   - `uv run objgauss stats outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/lego_splatfacto_sam_objects.ply`: 50000 gaussians，包含 `object_id` 和 RGB 字段。
-- 完成 commit: `114f778`。
+- 完成记录 commit: `39d4f6c`。
 
 ### SEG-002: 接入可选 SAM mask 生成器并完成 checkpoint 验收
 
