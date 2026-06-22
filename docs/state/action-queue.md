@@ -6,7 +6,7 @@
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `vote-masks` 已能消费 mask manifest，但仓库还不能自己从图像生成语义/实例 mask。
+- 原因: `vote-masks` 已能消费 mask manifest，`MASK-001` 也能从 NeRF Lego alpha 生成前景 mask；但仓库还不能自己从图片生成 SAM / CLIP 语义或实例 mask。
 - 推荐: 先做可选依赖和离线命令，不把模型权重放入仓库。
 - 退出条件: 小场景图片可生成 mask manifest，并被 `objgauss object-field vote-masks` 消费。
 
@@ -17,6 +17,11 @@
 - 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
 
 ## Closed
+
+### ACTION-008: 生成 NeRF Lego 真实图片 alpha mask manifest
+
+- 完成 commit: `e96b024`
+- 结果: `objgauss masks from-nerf-alpha` 可从 NeRF Synthetic Lego RGBA alpha 通道生成 boolean `.npy` masks 和 `vote-masks` manifest；本地验证 8 frames / 8 masks / 800x800 / 299242 foreground pixels。
 
 ### ACTION-007: 固化 v1 闭环验收 demo
 

@@ -34,6 +34,28 @@
 
 ## Done
 
+### MASK-001: 生成 NeRF Lego 真实图像 alpha mask manifest
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 在不引入 SAM / CLIP 依赖的前提下，从 NeRF Synthetic Lego 真实 RGBA 图片生成 `vote-masks` 可消费的 mask manifest。
+- 实施:
+  - 新增 `objgauss masks from-nerf-alpha`。
+  - 直接解析 8-bit RGBA PNG alpha 通道，生成 boolean `.npy` mask。
+  - 输出沿用现有 mask manifest，保留 `transform_matrix`、`camera_angle_x`、width/height 和 mask path。
+- 范围外:
+  - 不实现 SAM / CLIP 模型推理。
+  - 不做实例级多对象分割；当前 alpha mask 是 Lego 前景监督。
+- 验收:
+  - NeRF Lego 真实图片可生成 mask manifest。
+  - 生成的 manifest 可作为 `objgauss object-field vote-masks` 的输入格式。
+- 验证:
+  - `uv run --extra dev pytest`: 14 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `uv run objgauss masks from-nerf-alpha outputs/assets/training/nerf-synthetic-lego --output outputs/masks/nerf-lego-alpha/mask-manifest.json --split train --max-frames 8 --threshold 1 --slot 0 --label foreground`: 8 frames，8 masks，800x800，299242 foreground pixels。
+- 完成 commit: `e96b024`。
+
 ### DEMO-001: 固化 ObjGauss v1 闭环验收 demo
 
 - 状态: done
