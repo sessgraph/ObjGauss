@@ -35,7 +35,8 @@ try {
     console.log(
       `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
         `splatPixels=${result.splatPixels} editPixels=${result.editPixels} ` +
-        `visibleAfterIsolate=${result.visibleAfterIsolate} deletedObjects=${result.deletedObjects}`,
+        `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
+        `deletedObjects=${result.deletedObjects} screenshot=${result.screenshotPath}`,
     );
   }
   console.log(`browser_audit=passed assets=${results.length} url=${baseUrl}`);
@@ -95,6 +96,8 @@ async function runAudit(url, assetsToCheck) {
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
+      const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
+      await page.screenshot({ path: screenshotPath, fullPage: false });
       results.push({
         assetId: asset.id,
         title,
@@ -102,6 +105,7 @@ async function runAudit(url, assetsToCheck) {
         editPixels,
         visibleAfterIsolate,
         deletedObjects,
+        screenshotPath,
       });
     }
     const relevantIssues = consoleIssues.filter(
