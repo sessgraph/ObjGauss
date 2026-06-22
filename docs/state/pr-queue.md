@@ -56,7 +56,7 @@
   - `npm run build`: 通过，仍有 bundle size warning。
   - `uv run objgauss demo v1-closure --iterations 80`: 281498 gaussians，6 objects，loss 1.791760 -> 1.201637。
   - Playwright + system Chrome: 素材库可见并可加载 `ObjGauss v1 闭环样例`，对象检查器和隔离/删除按钮可见。
-- 完成 commit: pending。
+- 完成 commit: `6802e7f`。
 
 ### SEG-001: 建立语义级对象分组方案
 
