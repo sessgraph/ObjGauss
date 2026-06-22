@@ -223,6 +223,21 @@ Then open the viewer and load `ObjGauss v1 闭环样例` from the 素材库 pane
 The real splat renderer shows the original 3DGS appearance; switching to object
 colors or using isolate/delete enters the object-editable point-cloud view.
 
+Build a unified real-3DGS semantic closure demo from projected 2D color masks:
+
+```bash
+objgauss demo plush-semantic-closure
+objgauss demo verify-plush-semantic-closure
+```
+
+This uses the real Plush `.splat` scene plus the raw converted Gaussian PLY,
+projects the scene into 2D views, builds color-semantic masks
+(`red-subject`, `straw-frame`, `dark-detail`, `other-surface`), trains Object
+Field logits from those masks, and exports
+`public/samples/plush_semantic_objects.ply` with `object_id`. It does not use
+KMeans labels, SAM, or CLIP, and it preserves the original Gaussian colors in
+the PLY.
+
 Build a NeRF Lego proxy closure demo from real multi-view RGBA images and
 2D color masks:
 
@@ -259,21 +274,28 @@ voting when `--masks` is supplied, and exports an object-aware PLY. With the
 `--public-name nerf_lego_trained` path above, the frontend card
 `NeRF Lego 训练输出样例` can load the registered output.
 
-Run the browser audit for both closure cards:
+Run the browser audit for the closure cards:
 
 ```bash
 npm run audit:demo
 ```
 
-The audit starts a temporary Vite server, loads `ObjGauss v1 闭环样例` and
-`NeRF Lego 闭环代理样例`, checks that the splat and point-edit canvases are
-non-empty, and exercises object selection, isolation, and delete preview.
+The audit starts a temporary Vite server, loads `Plush 2D 语义 Mask 闭环样例`,
+`ObjGauss v1 闭环样例`, and `NeRF Lego 闭环代理样例`, checks that the splat and
+point-edit canvases are non-empty, and exercises object selection, isolation,
+and delete preview.
 
 Run the full local acceptance loop:
 
 ```bash
 npm run acceptance:demo
 ```
+
+This rebuilds the Plush v1 closure demo, verifies it, rebuilds the Plush
+semantic closure demo, verifies it, rebuilds the NeRF Lego proxy closure demo,
+verifies it, and then runs the browser audit. Use
+`npm run acceptance:demo -- --pull-assets` on a machine that still needs to
+download the local Plush and NeRF Lego assets.
 
 Audit the current evidence against the phase goal:
 
@@ -283,13 +305,10 @@ objgauss demo audit-v1-goal --allow-incomplete
 
 The audit reports whether the current repository proves the full v1 goal. It is
 strict by default; `--allow-incomplete` prints the same checks without failing.
-Today the expected blocker is the missing unified trained Gaussian demo:
-`outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json`.
-
-This rebuilds the Plush v1 closure demo, verifies it, rebuilds the NeRF Lego
-proxy closure demo, verifies it, and then runs the browser audit. Use
-`npm run acceptance:demo -- --pull-assets` on a machine that still needs to
-download the local Plush and NeRF Lego assets.
+The current unified proof is the Plush semantic closure demo. A future trained
+NeRF Lego output can still be registered at
+`outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json`,
+but it is no longer the only accepted evidence for the phase goal.
 
 ## Asset library
 

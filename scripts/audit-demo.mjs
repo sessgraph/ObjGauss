@@ -7,6 +7,11 @@ import { chromium } from "playwright";
 const DEFAULT_PORT = 5180;
 const DEFAULT_ASSETS = [
   {
+    id: "plush-semantic-closure-local",
+    name: "Plush 2D 语义 Mask 闭环样例",
+    fileName: "plush_semantic_objects.ply",
+  },
+  {
     id: "plush-v1-closure-local",
     name: "ObjGauss v1 闭环样例",
     fileName: "plush_v1_objects.ply",

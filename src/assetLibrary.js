@@ -36,6 +36,24 @@ export const ASSET_LIBRARY = [
     bestFor: "验证真实 3DGS 外观、Object Field、2D mask 投票和对象隔离/删除闭环。",
   },
   {
+    id: "plush-semantic-closure-local",
+    name: "Plush 2D 语义 Mask 闭环样例",
+    category: "本地验收",
+    sourceType: "gaussian",
+    status: "生成后可用",
+    priority: "P0",
+    pipelineStage: "真实3DGS语义闭环",
+    useCases: ["真实Splat", "2D语义Mask", "ObjectField", "对象编辑"],
+    localPath: "/samples/plush_semantic_objects.ply",
+    splatPath: "/samples/plush_semantic.splat",
+    fileName: "plush_semantic_objects.ply",
+    sourceName: "ObjGauss demo plush-semantic-closure",
+    sourceUrl: "https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat",
+    license: "来源许可混合，仅用于本地测试",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "用真实 3DGS 场景和 2D 颜色语义 mask 验证对象级寻址、隔离和删除预览。",
+  },
+  {
     id: "polyhaven-school-chair-1k",
     name: "Poly Haven School Chair 1K",
     category: "可商用展示",
@@ -210,6 +228,7 @@ export const ASSET_LIBRARY = [
 ];
 
 export const FEATURED_ASSET_IDS = [
+  "plush-semantic-closure-local",
   "plush-v1-closure-local",
   "nerf-lego-alpha-closure-local",
   "nerf-lego-trained-output-local",

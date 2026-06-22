@@ -39,6 +39,10 @@ from objgauss.segment import (
     filter_objects,
     parse_object_ids,
 )
+from objgauss.semantic_demo import (
+    build_plush_semantic_closure_demo,
+    verify_plush_semantic_closure_demo,
+)
 from objgauss.splat import read_splat
 from objgauss.training import register_training_output
 
@@ -382,6 +386,51 @@ def _demo_verify_v1_closure(args: argparse.Namespace) -> None:
         raise ValueError("v1 closure verification failed")
 
 
+def _demo_plush_semantic_closure(args: argparse.Namespace) -> None:
+    result = build_plush_semantic_closure_demo(
+        input_ply=args.input,
+        splat_path=args.splat,
+        output_dir=args.output_dir,
+        public_dir=None if args.no_public_copy else args.public_dir,
+        image_size=args.image_size,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"mask_manifest={result.mask_manifest_path}")
+    print(f"initial_field={result.initial_field_path}")
+    print(f"trained_field={result.trained_field_path}")
+    print(f"output_ply={result.output_ply_path}")
+    if result.public_ply_path:
+        print(f"public_ply={result.public_ply_path}")
+    if result.public_splat_path:
+        print(f"public_splat={result.public_splat_path}")
+    print(f"gaussians={result.gaussian_count}")
+    print(f"slots={result.slot_count}")
+    print(f"objects={result.object_count}")
+    print(f"supervised_gaussians={result.supervised_gaussians}")
+    print(f"initial_loss={result.initial_loss:.6f}")
+    print(f"final_loss={result.final_loss:.6f}")
+
+
+def _demo_verify_plush_semantic_closure(args: argparse.Namespace) -> None:
+    result = verify_plush_semantic_closure_demo(
+        args.manifest,
+        asset_library_path=args.asset_library,
+        require_public_copy=not args.no_require_public_copy,
+        min_views=args.min_views,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"passed={str(result.passed).lower()}")
+    for key, value in result.summary.items():
+        print(f"{key}={value}")
+    for check in result.checks:
+        status = "pass" if check["passed"] else "fail"
+        print(f"check={check['name']} status={status} detail={check['detail']}")
+    if not result.passed:
+        raise ValueError("Plush semantic closure verification failed")
+
+
 def _demo_lego_alpha_closure(args: argparse.Namespace) -> None:
     result = build_lego_alpha_closure_demo(
         dataset=args.dataset,
@@ -434,6 +483,7 @@ def _demo_audit_v1_goal(args: argparse.Namespace) -> None:
     result = audit_v1_goal(
         v1_manifest=args.v1_manifest,
         lego_manifest=args.lego_manifest,
+        semantic_manifest=args.semantic_manifest,
         trained_manifest=args.trained_manifest,
         asset_library_path=args.asset_library,
     )
@@ -729,6 +779,43 @@ def _build_parser() -> argparse.ArgumentParser:
     verify_v1.add_argument("--no-require-public-copy", action="store_true")
     verify_v1.set_defaults(handler=_demo_verify_v1_closure)
 
+    plush_semantic = demo_subparsers.add_parser(
+        "plush-semantic-closure",
+        help="build a real Plush 3DGS closure demo from projected 2D color masks",
+    )
+    plush_semantic.add_argument(
+        "--input",
+        type=Path,
+        default=Path("outputs/assets/converted/plush.ply"),
+    )
+    plush_semantic.add_argument("--splat", type=Path, default=Path("public/samples/plush.splat"))
+    plush_semantic.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs/demos/plush-semantic-closure"),
+    )
+    plush_semantic.add_argument("--public-dir", type=Path, default=Path("public/samples"))
+    plush_semantic.add_argument("--no-public-copy", action="store_true")
+    plush_semantic.add_argument("--image-size", type=int, default=512)
+    plush_semantic.add_argument("--iterations", type=int, default=160)
+    plush_semantic.add_argument("--learning-rate", type=float, default=1.0)
+    plush_semantic.set_defaults(handler=_demo_plush_semantic_closure)
+
+    verify_plush_semantic = demo_subparsers.add_parser(
+        "verify-plush-semantic-closure",
+        help="verify the generated Plush semantic closure demo",
+    )
+    verify_plush_semantic.add_argument(
+        "manifest",
+        nargs="?",
+        type=Path,
+        default=Path("outputs/demos/plush-semantic-closure/plush-semantic-closure-manifest.json"),
+    )
+    verify_plush_semantic.add_argument("--asset-library", type=Path, default=Path("src/assetLibrary.js"))
+    verify_plush_semantic.add_argument("--no-require-public-copy", action="store_true")
+    verify_plush_semantic.add_argument("--min-views", type=int, default=2)
+    verify_plush_semantic.set_defaults(handler=_demo_verify_plush_semantic_closure)
+
     lego_alpha = demo_subparsers.add_parser(
         "lego-alpha-closure",
         help="build a NeRF Lego alpha/color-mask ObjGauss closure proxy demo",
@@ -778,6 +865,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--lego-manifest",
         type=Path,
         default=Path("outputs/demos/lego-alpha-closure/lego-alpha-closure-manifest.json"),
+    )
+    audit_goal.add_argument(
+        "--semantic-manifest",
+        type=Path,
+        default=Path("outputs/demos/plush-semantic-closure/plush-semantic-closure-manifest.json"),
     )
     audit_goal.add_argument(
         "--trained-manifest",

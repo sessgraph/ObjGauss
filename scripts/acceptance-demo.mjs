@@ -16,6 +16,14 @@ const steps = [
   ],
   ["Verify Plush v1 closure", ["uv", "run", "objgauss", "demo", "verify-v1-closure"]],
   [
+    "Build Plush semantic closure",
+    ["uv", "run", "objgauss", "demo", "plush-semantic-closure", "--iterations", "80"],
+  ],
+  [
+    "Verify Plush semantic closure",
+    ["uv", "run", "objgauss", "demo", "verify-plush-semantic-closure"],
+  ],
+  [
     "Build NeRF Lego alpha closure proxy",
     [
       "uv",

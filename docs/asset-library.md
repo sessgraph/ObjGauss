@@ -11,6 +11,7 @@
 | --- | --- | --- | --- | --- |
 | Plush 3DGS 示例 | https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat | `public/samples/plush.splat` + `public/samples/plush_objects.ply` | 快速验证真实 splat 渲染、高斯点云加载、对象聚类、删除/隔离预览 | 上游说明来源许可混合，只作为本地测试素材 |
 | ObjGauss v1 闭环样例 | Plush 3DGS 示例派生产物 | `public/samples/plush_v1_objects.ply` + `outputs/demos/v1-closure/` | 当前阶段闭环验收：真实 splat、Object Field、mask 投票、对象编辑 | 继承 Plush 来源限制，仅本地测试 |
+| Plush 2D 语义 Mask 闭环样例 | Plush 3DGS 示例派生产物 | `public/samples/plush_semantic.splat` + `public/samples/plush_semantic_objects.ply` + `outputs/demos/plush-semantic-closure/` | 统一验收：真实 3DGS、非 KMeans 的 2D color masks、Object Field、对象编辑 | 继承 Plush 来源限制，仅本地测试；不是 SAM/CLIP 输出 |
 | Poly Haven School Chair 1K | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/raw/polyhaven-school-chair-1k/` | 许可干净的单对象 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练 | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
 
@@ -58,6 +59,8 @@ objgauss assets pull plush-3dgs-local --force
 ```bash
 objgauss demo v1-closure
 objgauss demo verify-v1-closure
+objgauss demo plush-semantic-closure
+objgauss demo verify-plush-semantic-closure
 ```
 
 默认输出：
@@ -68,7 +71,16 @@ outputs/demos/v1-closure/mask-manifest.json
 outputs/demos/v1-closure/object_field_trained.npz
 outputs/demos/v1-closure/plush_v1_objects.ply
 public/samples/plush_v1_objects.ply
+public/samples/plush_semantic.splat
+public/samples/plush_semantic_objects.ply
 ```
+
+`plush-semantic-closure` 使用原始 `outputs/assets/converted/plush.ply`，
+不读取旧 KMeans `object_id`。它把真实 Plush 3DGS 场景投影成 2D 视图，
+按颜色语义生成 `red-subject`、`straw-frame`、`dark-detail`、
+`other-surface` 四类 mask，再训练 Object Field 并导出带 `object_id`
+的 PLY。这个样例用于证明“真实 3DGS 可被 2D mask 语义线索对象级寻址”，
+但不声称替代 SAM / CLIP。
 
 ### Poly Haven School Chair 1K
 

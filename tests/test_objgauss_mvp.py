@@ -653,6 +653,79 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
 
+def test_demo_plush_semantic_closure_builds_real_splat_2d_mask_assets(tmp_path, capsys):
+    input_path = tmp_path / "plush_raw.ply"
+    splat_path = tmp_path / "scene.splat"
+    output_dir = tmp_path / "demo"
+    public_dir = tmp_path / "public"
+    asset_library = tmp_path / "assetLibrary.js"
+    _write_test_asset_library(asset_library)
+    cloud = _camera_color_cloud()
+    write_ply(input_path, cloud, fmt="ascii")
+    splat_path.write_bytes(b"splat")
+
+    assert (
+        main(
+            [
+                "demo",
+                "plush-semantic-closure",
+                "--input",
+                str(input_path),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(output_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "120",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "plush-semantic-closure-manifest.json").read_text(encoding="utf-8"))
+    exported = read_ply(output_dir / "plush_semantic_objects.ply")
+
+    assert "manifest=" in output
+    assert manifest["gaussian_source"] == "external_3dgs_splat"
+    assert manifest["semantic_source"] == "projected_3dgs_color_masks"
+    assert manifest["acceptance"]["real_3dgs_scene_can_render"] is True
+    assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["acceptance"]["projection_loss_decreased"] is True
+    assert manifest["object_field_delta"]["changed_gaussians"] > 0
+    assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
+    assert manifest["training"]["supervised_gaussians"] == cloud.count
+    assert set(np.unique(exported.vertices["object_id"])) == {0, 1, 2, 3}
+    assert exported.vertices["red"].tolist() == cloud.vertices["red"].tolist()
+    assert (public_dir / "plush_semantic_objects.ply").exists()
+    assert (public_dir / "plush_semantic.splat").exists()
+
+    assert (
+        main(
+            [
+                "demo",
+                "verify-plush-semantic-closure",
+                str(output_dir / "plush-semantic-closure-manifest.json"),
+                "--asset-library",
+                str(asset_library),
+                "--min-views",
+                "1",
+            ]
+        )
+        == 0
+    )
+    verify_output = capsys.readouterr().out
+    assert "passed=true" in verify_output
+    assert "check=gaussian_source_is_real_3dgs status=pass" in verify_output
+    assert "check=semantic_source_is_2d_color_masks status=pass" in verify_output
+    assert "check=mask_guidance_changed_object_field status=pass" in verify_output
+    assert "check=viewer_ply_exports_object_id status=pass" in verify_output
+
+
 def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)
@@ -812,6 +885,8 @@ def test_goal_audit_reports_split_evidence_and_missing_unified_demo(tmp_path, ca
                 str(v1_dir / "v1-closure-manifest.json"),
                 "--lego-manifest",
                 str(lego_dir / "lego-alpha-closure-manifest.json"),
+                "--semantic-manifest",
+                str(tmp_path / "missing-semantic.json"),
                 "--trained-manifest",
                 str(tmp_path / "missing-training-output.json"),
                 "--asset-library",
@@ -909,11 +984,105 @@ def test_goal_audit_passes_when_unified_trained_manifest_exists(tmp_path):
     result = audit_v1_goal(
         v1_manifest=v1_dir / "v1-closure-manifest.json",
         lego_manifest=lego_dir / "lego-alpha-closure-manifest.json",
+        semantic_manifest=tmp_path / "missing-semantic.json",
         trained_manifest=trained_manifest,
         asset_library_path=asset_library,
     )
 
     assert result.passed is True
+    assert result.summary["completion_blockers"] == []
+
+
+def test_goal_audit_passes_with_unified_semantic_demo(tmp_path):
+    v1_dir = tmp_path / "v1"
+    lego_dir = tmp_path / "lego"
+    semantic_dir = tmp_path / "semantic"
+    public_dir = tmp_path / "public"
+    asset_library = _write_test_asset_library(tmp_path / "assetLibrary.js")
+    splat_path = tmp_path / "scene.splat"
+    splat_path.write_bytes(b"splat")
+    dataset = _write_small_lego_dataset(tmp_path / "nerf-synthetic-lego")
+    v1_input = tmp_path / "objects.ply"
+    semantic_input = tmp_path / "plush_raw.ply"
+    write_ply(v1_input, _camera_cloud_with_object_ids(), fmt="ascii")
+    write_ply(semantic_input, _camera_color_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "demo",
+                "v1-closure",
+                "--input",
+                str(v1_input),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(v1_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "demo",
+                "lego-alpha-closure",
+                "--dataset",
+                str(dataset),
+                "--output-dir",
+                str(lego_dir),
+                "--public-dir",
+                str(public_dir),
+                "--max-frames",
+                "1",
+                "--sample-stride",
+                "1",
+                "--depth",
+                "2.0",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "demo",
+                "plush-semantic-closure",
+                "--input",
+                str(semantic_input),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(semantic_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+
+    result = audit_v1_goal(
+        v1_manifest=v1_dir / "v1-closure-manifest.json",
+        lego_manifest=lego_dir / "lego-alpha-closure-manifest.json",
+        semantic_manifest=semantic_dir / "plush-semantic-closure-manifest.json",
+        trained_manifest=tmp_path / "missing-training-output.json",
+        asset_library_path=asset_library,
+    )
+
+    assert result.passed is True
+    assert result.summary["current_evidence"] == "unified"
     assert result.summary["completion_blockers"] == []
 
 
@@ -981,6 +1150,15 @@ def _camera_cloud_with_object_ids() -> GaussianCloud:
     return GaussianCloud(vertices=vertices, source_format="ascii")
 
 
+def _camera_color_cloud() -> GaussianCloud:
+    cloud = _camera_cloud()
+    vertices = cloud.vertices.copy()
+    vertices["red"] = np.array([220, 155, 30, 150], dtype=np.uint8)
+    vertices["green"] = np.array([30, 145, 25, 150], dtype=np.uint8)
+    vertices["blue"] = np.array([30, 75, 20, 150], dtype=np.uint8)
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
 def _write_small_lego_dataset(dataset):
     (dataset / "train").mkdir(parents=True)
     _write_rgba_png(
@@ -1018,6 +1196,9 @@ def _write_test_asset_library(path):
         plush-v1-closure-local
         /samples/plush_v1_objects.ply
         /samples/plush.splat
+        plush-semantic-closure-local
+        /samples/plush_semantic_objects.ply
+        /samples/plush_semantic.splat
         nerf-lego-alpha-closure-local
         /samples/lego_alpha_v1_objects.ply
         /samples/lego_alpha_proxy.splat

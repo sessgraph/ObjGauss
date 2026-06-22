@@ -7,6 +7,7 @@ from typing import Any
 
 from objgauss.demo import verify_v1_closure_demo
 from objgauss.lego_verify import verify_lego_alpha_closure_demo
+from objgauss.semantic_demo import verify_plush_semantic_closure_demo
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ def audit_v1_goal(
     *,
     v1_manifest: str | Path = "outputs/demos/v1-closure/v1-closure-manifest.json",
     lego_manifest: str | Path = "outputs/demos/lego-alpha-closure/lego-alpha-closure-manifest.json",
+    semantic_manifest: str | Path | None = "outputs/demos/plush-semantic-closure/plush-semantic-closure-manifest.json",
     trained_manifest: str | Path | None = "outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json",
     asset_library_path: str | Path = "src/assetLibrary.js",
 ) -> GoalAuditResult:
@@ -47,6 +49,10 @@ def audit_v1_goal(
 
     v1_result = _optional_v1_verification(v1_manifest, asset_library_path=asset_library_path)
     lego_result = _optional_lego_verification(lego_manifest, asset_library_path=asset_library_path)
+    semantic_result = _optional_semantic_verification(
+        semantic_manifest,
+        asset_library_path=asset_library_path,
+    )
     trained = _load_optional_manifest(trained_manifest)
 
     add(
@@ -59,25 +65,32 @@ def audit_v1_goal(
         bool(
             (v1_result and _check_passed(v1_result.checks, "mask_guidance_changed_object_field"))
             or (lego_result and _check_passed(lego_result.checks, "mask_guidance_changed_object_field"))
+            or (semantic_result and _check_passed(semantic_result.checks, "mask_guidance_changed_object_field"))
             or _training_acceptance(trained, "mask_guidance_changed_object_field")
         ),
-        _mask_guidance_detail(v1_result, lego_result, trained),
+        _mask_guidance_detail(v1_result, lego_result, semantic_result, trained),
     )
     add(
         "object_id_export_available",
         bool(
-            (v1_result and _check_passed(v1_result.checks, "viewer_ply_exports_object_id"))
-            and (lego_result and _check_passed(lego_result.checks, "viewer_ply_exports_object_id"))
+            (
+                (v1_result and _check_passed(v1_result.checks, "viewer_ply_exports_object_id"))
+                and (lego_result and _check_passed(lego_result.checks, "viewer_ply_exports_object_id"))
+            )
+            or (semantic_result and _check_passed(semantic_result.checks, "viewer_ply_exports_object_id"))
         ),
-        _object_id_detail(v1_result, lego_result),
+        _object_id_detail(v1_result, lego_result, semantic_result),
     )
     add(
         "frontend_object_interaction_registered",
         bool(
-            (v1_result and _check_passed(v1_result.checks, "frontend_asset_registered"))
-            and (lego_result and _check_passed(lego_result.checks, "frontend_asset_registered"))
+            (
+                (v1_result and _check_passed(v1_result.checks, "frontend_asset_registered"))
+                and (lego_result and _check_passed(lego_result.checks, "frontend_asset_registered"))
+            )
+            or (semantic_result and _check_passed(semantic_result.checks, "frontend_asset_registered"))
         ),
-        _frontend_detail(v1_result, lego_result),
+        _frontend_detail(v1_result, lego_result, semantic_result),
     )
     add(
         "fixed_reproducible_commands_exist",
@@ -85,7 +98,7 @@ def audit_v1_goal(
         "npm run acceptance:demo -> scripts/acceptance-demo.mjs",
     )
 
-    unified_passed, unified_detail = _unified_demo_check(trained)
+    unified_passed, unified_detail = _unified_demo_check(semantic_result, trained)
     add("unified_real_3dgs_mask_demo_available", unified_passed, unified_detail)
 
     passed = all(check.passed for check in checks)
@@ -95,6 +108,7 @@ def audit_v1_goal(
         summary={
             "v1_manifest": str(v1_manifest),
             "lego_manifest": str(lego_manifest),
+            "semantic_manifest": str(semantic_manifest) if semantic_manifest is not None else None,
             "trained_manifest": str(trained_manifest) if trained_manifest is not None else None,
             "current_evidence": (
                 "split" if not unified_passed else "unified"
@@ -118,6 +132,15 @@ def _optional_lego_verification(path: str | Path, *, asset_library_path: str | P
     if not path.exists():
         return None
     return verify_lego_alpha_closure_demo(path, asset_library_path=asset_library_path)
+
+
+def _optional_semantic_verification(path: str | Path | None, *, asset_library_path: str | Path):
+    if path is None:
+        return None
+    path = Path(path)
+    if not path.exists():
+        return None
+    return verify_plush_semantic_closure_demo(path, asset_library_path=asset_library_path)
 
 
 def _load_optional_manifest(path: str | Path | None) -> dict[str, Any] | None:
@@ -147,7 +170,7 @@ def _verification_detail(result, check_name: str, *, missing: str) -> str:
     return detail or f"{check_name} not found"
 
 
-def _mask_guidance_detail(v1_result, lego_result, trained: dict[str, Any] | None) -> str:
+def _mask_guidance_detail(v1_result, lego_result, semantic_result, trained: dict[str, Any] | None) -> str:
     parts: list[str] = []
     if v1_result is not None:
         parts.append(
@@ -159,6 +182,11 @@ def _mask_guidance_detail(v1_result, lego_result, trained: dict[str, Any] | None
             "lego_proxy="
             + (_check_detail(lego_result.checks, "mask_guidance_changed_object_field") or "missing")
         )
+    if semantic_result is not None:
+        parts.append(
+            "plush_semantic="
+            + (_check_detail(semantic_result.checks, "mask_guidance_changed_object_field") or "missing")
+        )
     if trained is not None:
         delta = trained.get("object_field_delta")
         if isinstance(delta, dict):
@@ -166,21 +194,25 @@ def _mask_guidance_detail(v1_result, lego_result, trained: dict[str, Any] | None
     return "; ".join(parts) if parts else "no mask guidance evidence"
 
 
-def _object_id_detail(v1_result, lego_result) -> str:
+def _object_id_detail(v1_result, lego_result, semantic_result) -> str:
     return (
         "plush="
         + _verification_detail(v1_result, "viewer_ply_exports_object_id", missing="v1")
         + "; lego_proxy="
         + _verification_detail(lego_result, "viewer_ply_exports_object_id", missing="lego")
+        + "; plush_semantic="
+        + _verification_detail(semantic_result, "viewer_ply_exports_object_id", missing="semantic")
     )
 
 
-def _frontend_detail(v1_result, lego_result) -> str:
+def _frontend_detail(v1_result, lego_result, semantic_result) -> str:
     return (
         "plush="
         + _verification_detail(v1_result, "frontend_asset_registered", missing="v1")
         + "; lego_proxy="
         + _verification_detail(lego_result, "frontend_asset_registered", missing="lego")
+        + "; plush_semantic="
+        + _verification_detail(semantic_result, "frontend_asset_registered", missing="semantic")
     )
 
 
@@ -191,11 +223,27 @@ def _training_acceptance(manifest: dict[str, Any] | None, key: str) -> bool:
     return isinstance(acceptance, dict) and bool(acceptance.get(key))
 
 
-def _unified_demo_check(manifest: dict[str, Any] | None) -> tuple[bool, str]:
+def _unified_demo_check(semantic_result, manifest: dict[str, Any] | None) -> tuple[bool, str]:
+    if semantic_result is not None:
+        real_splat = _check_passed(semantic_result.checks, "real_3dgs_scene")
+        semantic_masks = _check_passed(semantic_result.checks, "semantic_source_is_2d_color_masks")
+        object_ply = _check_passed(semantic_result.checks, "viewer_ply_exports_object_id")
+        frontend = _check_passed(semantic_result.checks, "frontend_asset_registered")
+        mask_changed = _check_passed(semantic_result.checks, "mask_guidance_changed_object_field")
+        loss_decreased = _check_passed(semantic_result.checks, "projection_loss_decreased")
+        passed = real_splat and semantic_masks and object_ply and frontend and mask_changed and loss_decreased
+        return (
+            passed,
+            (
+                f"semantic_demo={semantic_result.manifest_path} real_splat={real_splat} "
+                f"semantic_masks={semantic_masks} object_ply={object_ply} "
+                f"frontend={frontend} mask_changed={mask_changed} loss_decreased={loss_decreased}"
+            ),
+        )
     if manifest is None:
         return (
             False,
-            "missing registered trained Gaussian manifest; expected outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json",
+            "missing unified semantic demo or registered trained Gaussian manifest; expected outputs/demos/plush-semantic-closure/plush-semantic-closure-manifest.json or outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json",
         )
     gaussian_source_ok = manifest.get("gaussian_source") == "external_3dgs_training_output"
     object_ply = manifest.get("public_object_ply") or manifest.get("object_ply")
