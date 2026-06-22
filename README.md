@@ -275,6 +275,17 @@ Run the full local acceptance loop:
 npm run acceptance:demo
 ```
 
+Audit the current evidence against the phase goal:
+
+```bash
+objgauss demo audit-v1-goal --allow-incomplete
+```
+
+The audit reports whether the current repository proves the full v1 goal. It is
+strict by default; `--allow-incomplete` prints the same checks without failing.
+Today the expected blocker is the missing unified trained Gaussian demo:
+`outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json`.
+
 This rebuilds the Plush v1 closure demo, verifies it, rebuilds the NeRF Lego
 proxy closure demo, verifies it, and then runs the browser audit. Use
 `npm run acceptance:demo -- --pull-assets` on a machine that still needs to

@@ -9,6 +9,7 @@ from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
 from objgauss.features import extract_features
+from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
     train_object_field_from_votes,
     training_summary,
@@ -429,6 +430,26 @@ def _demo_verify_lego_alpha_closure(args: argparse.Namespace) -> None:
         raise ValueError("Lego alpha closure verification failed")
 
 
+def _demo_audit_v1_goal(args: argparse.Namespace) -> None:
+    result = audit_v1_goal(
+        v1_manifest=args.v1_manifest,
+        lego_manifest=args.lego_manifest,
+        trained_manifest=args.trained_manifest,
+        asset_library_path=args.asset_library,
+    )
+    print(f"passed={str(result.passed).lower()}")
+    for key, value in result.summary.items():
+        if isinstance(value, list):
+            print(f"{key}={','.join(str(item) for item in value) if value else '-'}")
+        else:
+            print(f"{key}={value}")
+    for check in result.checks:
+        status = "pass" if check.passed else "fail"
+        print(f"check={check.name} status={status} detail={check.detail}")
+    if not result.passed and not args.allow_incomplete:
+        raise ValueError("ObjGauss v1 goal audit is incomplete")
+
+
 def _training_register_output(args: argparse.Namespace) -> None:
     result = register_training_output(
         args.input,
@@ -743,6 +764,29 @@ def _build_parser() -> argparse.ArgumentParser:
     verify_lego_alpha.add_argument("--no-require-public-copy", action="store_true")
     verify_lego_alpha.add_argument("--min-frames", type=int, default=2)
     verify_lego_alpha.set_defaults(handler=_demo_verify_lego_alpha_closure)
+
+    audit_goal = demo_subparsers.add_parser(
+        "audit-v1-goal",
+        help="audit the current evidence against the ObjGauss v1 phase goal",
+    )
+    audit_goal.add_argument(
+        "--v1-manifest",
+        type=Path,
+        default=Path("outputs/demos/v1-closure/v1-closure-manifest.json"),
+    )
+    audit_goal.add_argument(
+        "--lego-manifest",
+        type=Path,
+        default=Path("outputs/demos/lego-alpha-closure/lego-alpha-closure-manifest.json"),
+    )
+    audit_goal.add_argument(
+        "--trained-manifest",
+        type=Path,
+        default=Path("outputs/assets/gaussians/nerf-lego-trained/training-output-manifest.json"),
+    )
+    audit_goal.add_argument("--asset-library", type=Path, default=Path("src/assetLibrary.js"))
+    audit_goal.add_argument("--allow-incomplete", action="store_true")
+    audit_goal.set_defaults(handler=_demo_audit_v1_goal)
 
     training = subparsers.add_parser(
         "training",

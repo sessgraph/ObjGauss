@@ -13,6 +13,7 @@ from objgauss.cli import main
 from objgauss.clustering import cluster_features
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
+from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import train_object_field_from_votes, vote_masks_to_gaussians
 from objgauss.masks import build_nerf_sam_mask_manifest
 from objgauss.object_field import (
@@ -745,6 +746,177 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
 
+def test_goal_audit_reports_split_evidence_and_missing_unified_demo(tmp_path, capsys):
+    v1_dir = tmp_path / "v1"
+    lego_dir = tmp_path / "lego"
+    public_dir = tmp_path / "public"
+    asset_library = _write_test_asset_library(tmp_path / "assetLibrary.js")
+    input_path = tmp_path / "objects.ply"
+    splat_path = tmp_path / "scene.splat"
+    write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
+    splat_path.write_bytes(b"splat")
+    dataset = _write_small_lego_dataset(tmp_path / "nerf-synthetic-lego")
+
+    assert (
+        main(
+            [
+                "demo",
+                "v1-closure",
+                "--input",
+                str(input_path),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(v1_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "demo",
+                "lego-alpha-closure",
+                "--dataset",
+                str(dataset),
+                "--output-dir",
+                str(lego_dir),
+                "--public-dir",
+                str(public_dir),
+                "--max-frames",
+                "1",
+                "--sample-stride",
+                "1",
+                "--depth",
+                "2.0",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "demo",
+                "audit-v1-goal",
+                "--v1-manifest",
+                str(v1_dir / "v1-closure-manifest.json"),
+                "--lego-manifest",
+                str(lego_dir / "lego-alpha-closure-manifest.json"),
+                "--trained-manifest",
+                str(tmp_path / "missing-training-output.json"),
+                "--asset-library",
+                str(asset_library),
+                "--allow-incomplete",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "passed=false" in output
+    assert "check=real_3dgs_scene_can_render status=pass" in output
+    assert "check=mask_guidance_influences_object_field status=pass" in output
+    assert "check=unified_real_3dgs_mask_demo_available status=fail" in output
+    assert "completion_blockers=unified_real_3dgs_mask_demo_available" in output
+
+
+def test_goal_audit_passes_when_unified_trained_manifest_exists(tmp_path):
+    v1_dir = tmp_path / "v1"
+    lego_dir = tmp_path / "lego"
+    public_dir = tmp_path / "public"
+    asset_library = _write_test_asset_library(tmp_path / "assetLibrary.js")
+    input_path = tmp_path / "objects.ply"
+    splat_path = tmp_path / "scene.splat"
+    write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
+    splat_path.write_bytes(b"splat")
+    dataset = _write_small_lego_dataset(tmp_path / "nerf-synthetic-lego")
+    assert (
+        main(
+            [
+                "demo",
+                "v1-closure",
+                "--input",
+                str(input_path),
+                "--splat",
+                str(splat_path),
+                "--output-dir",
+                str(v1_dir),
+                "--public-dir",
+                str(public_dir),
+                "--image-size",
+                "96",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "demo",
+                "lego-alpha-closure",
+                "--dataset",
+                str(dataset),
+                "--output-dir",
+                str(lego_dir),
+                "--public-dir",
+                str(public_dir),
+                "--max-frames",
+                "1",
+                "--sample-stride",
+                "1",
+                "--depth",
+                "2.0",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+    trained_manifest = tmp_path / "trained" / "training-output-manifest.json"
+    trained_manifest.parent.mkdir(parents=True)
+    trained_splat = trained_manifest.parent / "trained.splat"
+    trained_objects = trained_manifest.parent / "trained_objects.ply"
+    trained_splat.write_bytes(b"splat")
+    write_ply(trained_objects, _camera_cloud_with_object_ids(), fmt="ascii")
+    trained_manifest.write_text(
+        json.dumps(
+            {
+                "gaussian_source": "external_3dgs_training_output",
+                "splat_path": str(trained_splat),
+                "object_ply": str(trained_objects),
+                "object_field_delta": {"changed_gaussians": 2},
+                "acceptance": {
+                    "mask_guidance_changed_object_field": True,
+                    "projection_loss_decreased": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = audit_v1_goal(
+        v1_manifest=v1_dir / "v1-closure-manifest.json",
+        lego_manifest=lego_dir / "lego-alpha-closure-manifest.json",
+        trained_manifest=trained_manifest,
+        asset_library_path=asset_library,
+    )
+
+    assert result.passed is True
+    assert result.summary["completion_blockers"] == []
+
+
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [
         ("x", "f4"),
@@ -807,6 +979,52 @@ def _camera_cloud_with_object_ids() -> GaussianCloud:
         vertices[name] = cloud.vertices[name]
     vertices["object_id"] = np.array([0, 0, 1, 1], dtype=np.int32)
     return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _write_small_lego_dataset(dataset):
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[220, 190, 20, 255], [210, 40, 30, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[230, 180, 25, 255], [30, 25, 20, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [160, 160, 150, 255], [150, 150, 140, 255]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [25, 25, 25, 255], [160, 160, 150, 255]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": float(np.pi / 2.0),
+                "frames": [
+                    {
+                        "file_path": "./train/r_0",
+                        "transform_matrix": np.eye(4, dtype=float).tolist(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return dataset
+
+
+def _write_test_asset_library(path):
+    path.write_text(
+        """
+        plush-v1-closure-local
+        /samples/plush_v1_objects.ply
+        /samples/plush.splat
+        nerf-lego-alpha-closure-local
+        /samples/lego_alpha_v1_objects.ply
+        /samples/lego_alpha_proxy.splat
+        """,
+        encoding="utf-8",
+    )
+    return path
 
 
 def _write_rect_mask_manifest(path):
