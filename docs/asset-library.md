@@ -10,6 +10,8 @@
 | 资产 | 来源 | 本地文件 | 用途 | 许可备注 |
 | --- | --- | --- | --- | --- |
 | Plush 3DGS 示例 | https://huggingface.co/cakewalk/splat-data/blob/main/plush.splat | `public/samples/plush.splat` + `public/samples/plush_objects.ply` | 快速验证真实 splat 渲染、高斯点云加载、对象聚类、删除/隔离预览 | 上游说明来源许可混合，只作为本地测试素材 |
+| Poly Haven School Chair 1K | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/raw/polyhaven-school-chair-1k/` | 许可干净的单对象 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练 | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
+| NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
 
 处理链路：
 
@@ -50,11 +52,77 @@ public/samples/plush_objects.ply
 objgauss assets pull plush-3dgs-local --force
 ```
 
+### Poly Haven School Chair 1K
+
+处理链路：
+
+```text
+Poly Haven API: files/SchoolChair_01
+  -> glTF 1K entrypoint + .bin + textures
+  -> outputs/assets/raw/polyhaven-school-chair-1k/
+  -> outputs/assets/converted/polyhaven-school-chair-1k/asset-manifest.json
+```
+
+一键拉取：
+
+```bash
+objgauss assets pull polyhaven-school-chair-1k
+```
+
+默认输出：
+
+```text
+outputs/assets/raw/polyhaven-school-chair-1k/SchoolChair_01_1k.gltf
+outputs/assets/raw/polyhaven-school-chair-1k/SchoolChair_01.bin
+outputs/assets/raw/polyhaven-school-chair-1k/textures/
+outputs/assets/converted/polyhaven-school-chair-1k/asset-manifest.json
+```
+
+当前它是 mesh Demo 输入源，还不能直接进入现有 3DGS viewer。下一步转换链路是：
+
+```text
+glTF mesh
+  -> 多视角离线渲染
+  -> 3DGS 训练
+  -> point_cloud.ply / .splat
+  -> objgauss cluster
+  -> public/samples/<demo>_objects.ply
+```
+
+### NeRF Synthetic Lego
+
+处理链路：
+
+```text
+NeRF 官方 nerf_example_data.zip
+  -> 只抽取 nerf_synthetic/lego
+  -> outputs/assets/training/nerf-synthetic-lego/
+  -> outputs/assets/converted/nerf-synthetic-lego/training-manifest.json
+```
+
+一键拉取：
+
+```bash
+objgauss assets pull nerf-synthetic-lego
+```
+
+默认输出：
+
+```text
+outputs/assets/raw/nerf_example_data.zip
+outputs/assets/training/nerf-synthetic-lego/transforms_train.json
+outputs/assets/training/nerf-synthetic-lego/transforms_test.json
+outputs/assets/training/nerf-synthetic-lego/train/
+outputs/assets/training/nerf-synthetic-lego/test/
+outputs/assets/converted/nerf-synthetic-lego/training-manifest.json
+```
+
 ## 优先素材来源
 
 | 优先级 | 来源 | 类型 | 适合用途 | 入口 |
 | --- | --- | --- | --- | --- |
 | P0 | ARKitScenes | 真实室内 scan | 手机 LiDAR 房间、家具对象化、真实用户输入形态 | https://github.com/apple/ARKitScenes |
+| P0 | NeRF Synthetic Lego | 多视角合成图像 + pose | ObjGauss v1 Object Field 训练烟测 | https://github.com/bmild/nerf |
 | P0 | OmniObject3D | 对象级 scan / mesh / point cloud | 单个真实扫描物体，高质量对象编辑实验 | https://omniobject3d.github.io/ |
 | P0 | Poly Haven | CC0 mesh / texture / HDRI | 展示 demo、开源项目可复现素材 | https://polyhaven.com/models |
 | P1 | ScanNet | 真实室内 scan + 语义/实例标注 | 场景到对象分组验证 | https://www.scan-net.org/ |
@@ -78,6 +146,7 @@ objgauss assets pull plush-3dgs-local --force
 
 - **训练源**：ARKitScenes、ScanNet、OmniObject3D、Mip-NeRF 360 这类数据主要用于训练和评估，不默认进入公开 demo。
 - **Demo 素材**：Poly Haven 这类许可干净的资产优先用于可公开展示。
+- **v1 训练烟测**：NeRF Synthetic Lego 已自动抽取到训练目录，优先用于 Object Field 多视角一致性验证。
 - **Demo 可用**：当前 `Plush 3DGS 示例` 只作为本地 demo 和管线烟测，不作为商用或公开发布素材。
 - **训练输出**：即使模型是我们训练的，也要继承原始数据许可，不能自动视为可商用。
 
@@ -129,10 +198,20 @@ RGB-D / posed images / mesh
 
 ```text
 mesh + texture
+  -> asset-manifest.json
   -> 采样 point cloud
   -> 可选：多视角渲染 + 训练 3DGS
   -> objgauss cluster / 手工对象 id
   -> ObjGauss PLY
+```
+
+NeRF / 3DGS 训练图像：
+
+```text
+posed images + transforms_*.json
+  -> outputs/assets/training/<asset_id>/
+  -> 训练 3DGS / Object Field
+  -> point_cloud.ply / .splat
 ```
 
 已有 splat：
@@ -157,7 +236,7 @@ mesh + texture
 
 ## 新增一个可自动拉取素材
 
-1. 在 `objgauss/assets.py` 注册 `AssetSource`，至少填 `id`、`name`、`source_url`、`download_url`、`local_path`、`raw_file_name`、`output_file_name` 和 `pull_pipeline`。
+1. 在 `objgauss/assets.py` 注册 `AssetSource`，至少填 `id`、`name`、`source_url`、`download_url`、`raw_file_name`、`output_file_name` 和 `pull_pipeline`；viewer 样例再填 `local_path` / `splat_path`。
 2. 在 `src/assetLibrary.js` 增加对应前端卡片。
 3. 如果是 `.splat`，优先复用 `splat-to-objgauss-ply` 管线。
 4. 如果是 mesh / RGB-D / COLMAP 数据，先写转换脚本，再把管线挂到 `objgauss assets pull`。

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import copyfile
-from urllib.request import urlretrieve
+from shutil import copyfile, copyfileobj
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.features import extract_features
@@ -33,17 +36,23 @@ class AssetSource:
     pull_pipeline: str | None = None
     pipeline_stage: str = "来源登记"
     use_cases: tuple[str, ...] = ()
+    polyhaven_id: str | None = None
+    resolution: str | None = None
+    training_subdir: str | None = None
 
 
 @dataclass(frozen=True)
 class PulledAsset:
     asset: AssetSource
     raw_path: Path
-    converted_path: Path
-    output_path: Path
-    raw_public_path: Path | None
-    gaussian_count: int
-    object_counts: tuple[tuple[int, int], ...]
+    converted_path: Path | None = None
+    output_path: Path | None = None
+    raw_public_path: Path | None = None
+    training_path: Path | None = None
+    manifest_path: Path | None = None
+    gaussian_count: int | None = None
+    object_counts: tuple[tuple[int, int], ...] = ()
+    downloaded_files: tuple[Path, ...] = ()
 
 
 ASSETS: tuple[AssetSource, ...] = (
@@ -67,6 +76,48 @@ ASSETS: tuple[AssetSource, ...] = (
         pull_pipeline="splat-to-objgauss-ply",
         pipeline_stage="Demo 可用",
         use_cases=("Demo预览", "管线烟测"),
+    ),
+    AssetSource(
+        id="polyhaven-school-chair-1k",
+        name="Poly Haven School Chair 1K",
+        category="可商用展示",
+        source_type="mesh",
+        status="已接入",
+        priority="P0",
+        source_url="https://polyhaven.com/a/SchoolChair_01",
+        download_url="https://api.polyhaven.com/files/SchoolChair_01",
+        license="CC0；API 仅用于非商用/研究拉取，需带 User-Agent",
+        formats=(".gltf", ".bin", ".jpg", "CC0"),
+        best_for="许可干净的单对象家具 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练。",
+        raw_file_name="polyhaven-school-chair-1k",
+        output_file_name="asset-manifest.json",
+        pull_pipeline="polyhaven-gltf",
+        pipeline_stage="Demo 素材已自动化",
+        use_cases=("展示Demo", "可商用样例", "mesh转3DGS"),
+        polyhaven_id="SchoolChair_01",
+        resolution="1k",
+    ),
+    AssetSource(
+        id="nerf-synthetic-lego",
+        name="NeRF Synthetic Lego 示例训练集",
+        category="3DGS 训练集",
+        source_type="images",
+        status="已接入",
+        priority="P0",
+        source_url="https://github.com/bmild/nerf",
+        download_url=(
+            "http://cseweb.ucsd.edu/~viscomp/projects/LF/papers/"
+            "ECCV20/nerf/nerf_example_data.zip"
+        ),
+        license="NeRF 官方示例数据；仅作为训练/研究素材使用",
+        formats=("images", "transforms_train.json", "transforms_test.json"),
+        best_for="ObjGauss v1 Object Field 的多视角训练烟测和跨视角一致性验证。",
+        raw_file_name="nerf_example_data.zip",
+        output_file_name="training-manifest.json",
+        pull_pipeline="nerf-example-data",
+        pipeline_stage="训练源已自动化",
+        use_cases=("3DGS训练", "ObjectField烟测"),
+        training_subdir="nerf_synthetic/lego",
     ),
     AssetSource(
         id="arkitscenes",
@@ -190,14 +241,47 @@ def pull_asset(
     raw_dir: str | Path = "outputs/assets/raw",
     converted_dir: str | Path = "outputs/assets/converted",
     public_dir: str | Path = "public",
+    training_dir: str | Path = "outputs/assets/training",
     clusters: int | None = None,
     force: bool = False,
 ) -> PulledAsset:
     asset = get_asset(asset_id)
-    if asset.pull_pipeline != "splat-to-objgauss-ply":
-        raise ValueError(
-            f"{asset.name} is not automated yet; download from {asset.source_url}"
+    if asset.pull_pipeline == "splat-to-objgauss-ply":
+        return _pull_splat_asset(
+            asset,
+            raw_dir=raw_dir,
+            converted_dir=converted_dir,
+            public_dir=public_dir,
+            clusters=clusters,
+            force=force,
         )
+    if asset.pull_pipeline == "polyhaven-gltf":
+        return _pull_polyhaven_gltf(
+            asset,
+            raw_dir=raw_dir,
+            converted_dir=converted_dir,
+            force=force,
+        )
+    if asset.pull_pipeline == "nerf-example-data":
+        return _pull_nerf_example_data(
+            asset,
+            raw_dir=raw_dir,
+            training_dir=training_dir,
+            converted_dir=converted_dir,
+            force=force,
+        )
+    raise ValueError(f"{asset.name} is not automated yet; download from {asset.source_url}")
+
+
+def _pull_splat_asset(
+    asset: AssetSource,
+    *,
+    raw_dir: str | Path,
+    converted_dir: str | Path,
+    public_dir: str | Path,
+    clusters: int | None,
+    force: bool,
+) -> PulledAsset:
     if not asset.download_url or not asset.raw_file_name or not asset.local_path:
         raise ValueError(f"{asset.name} is missing pull metadata")
 
@@ -241,8 +325,173 @@ def pull_asset(
     )
 
 
+def _pull_polyhaven_gltf(
+    asset: AssetSource,
+    *,
+    raw_dir: str | Path,
+    converted_dir: str | Path,
+    force: bool,
+) -> PulledAsset:
+    if not asset.download_url or not asset.raw_file_name or not asset.output_file_name:
+        raise ValueError(f"{asset.name} is missing pull metadata")
+    if not asset.polyhaven_id or not asset.resolution:
+        raise ValueError(f"{asset.name} is missing Poly Haven metadata")
+
+    files = _fetch_json(asset.download_url)
+    gltf_record = files["gltf"][asset.resolution]["gltf"]
+    root = Path(raw_dir) / asset.raw_file_name
+    downloaded = [_download_record(gltf_record, root, force=force)]
+    entrypoint = downloaded[0]
+    for relative_path, record in gltf_record.get("include", {}).items():
+        downloaded.append(_download_record(record, root / relative_path, force=force))
+
+    manifest_path = Path(converted_dir) / asset.id / asset.output_file_name
+    manifest = {
+        "asset_id": asset.id,
+        "source": asset.source_url,
+        "license": asset.license,
+        "pipeline": asset.pull_pipeline,
+        "polyhaven_id": asset.polyhaven_id,
+        "resolution": asset.resolution,
+        "root": str(root),
+        "entrypoint": str(entrypoint),
+        "files": [
+            {
+                "path": str(path),
+                "size": path.stat().st_size if path.exists() else None,
+            }
+            for path in downloaded
+        ],
+    }
+    _write_json(manifest_path, manifest)
+    return PulledAsset(
+        asset=asset,
+        raw_path=root,
+        converted_path=manifest_path,
+        output_path=entrypoint,
+        raw_public_path=None,
+        manifest_path=manifest_path,
+        object_counts=(),
+        downloaded_files=tuple(downloaded),
+    )
+
+
+def _pull_nerf_example_data(
+    asset: AssetSource,
+    *,
+    raw_dir: str | Path,
+    training_dir: str | Path,
+    converted_dir: str | Path,
+    force: bool,
+) -> PulledAsset:
+    if not asset.download_url or not asset.raw_file_name or not asset.training_subdir:
+        raise ValueError(f"{asset.name} is missing training pull metadata")
+
+    raw_path = Path(raw_dir) / asset.raw_file_name
+    _download(asset.download_url, raw_path, force=force)
+
+    output_path = Path(training_dir) / asset.id
+    extracted = _extract_zip_prefix(raw_path, asset.training_subdir, output_path, force=force)
+    manifest_path = Path(converted_dir) / asset.id / (asset.output_file_name or "manifest.json")
+    manifest = {
+        "asset_id": asset.id,
+        "source": asset.source_url,
+        "license": asset.license,
+        "pipeline": asset.pull_pipeline,
+        "zip_path": str(raw_path),
+        "training_path": str(output_path),
+        "source_subdir": asset.training_subdir,
+        "files": sorted(str(path.relative_to(output_path)) for path in extracted),
+    }
+    _write_json(manifest_path, manifest)
+    return PulledAsset(
+        asset=asset,
+        raw_path=raw_path,
+        converted_path=manifest_path,
+        output_path=output_path,
+        raw_public_path=None,
+        training_path=output_path,
+        manifest_path=manifest_path,
+        object_counts=(),
+        downloaded_files=tuple(extracted),
+    )
+
+
 def _download(url: str, path: Path, *, force: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and not force:
         return
-    urlretrieve(url, path)
+    request = Request(url, headers={"User-Agent": "ObjGauss/0.1 asset pipeline"})
+    with urlopen(request, timeout=300) as response, path.open("wb") as output:
+        copyfileobj(response, output)
+
+
+def _download_record(record: dict[str, object], path: Path, *, force: bool) -> Path:
+    url = record.get("url")
+    if not isinstance(url, str):
+        raise ValueError("download record is missing url")
+    if path.suffix == "":
+        path = path / _download_file_name(url)
+    _download(url, path, force=force)
+    return path
+
+
+def _download_file_name(url: str) -> str:
+    file_name = Path(urlparse(url).path).name
+    if not file_name:
+        raise ValueError(f"download url is missing a file name: {url}")
+    return file_name
+
+
+def _fetch_json(url: str) -> dict[str, object]:
+    request = Request(
+        url,
+        headers={"User-Agent": "ObjGauss/0.1 ASSET-001 research pipeline"},
+    )
+    with urlopen(request, timeout=60) as response:
+        return json.load(response)
+
+
+def _extract_zip_prefix(
+    zip_path: Path,
+    prefix: str,
+    output_path: Path,
+    *,
+    force: bool,
+) -> tuple[Path, ...]:
+    extracted: list[Path] = []
+    prefix_parts = tuple(Path(prefix).parts)
+    with zipfile.ZipFile(zip_path) as archive:
+        for member in archive.infolist():
+            member_path = Path(member.filename)
+            prefix_index = _find_parts(member_path.parts, prefix_parts)
+            if member.is_dir() or prefix_index is None:
+                continue
+            relative_parts = member_path.parts[prefix_index + len(prefix_parts) :]
+            if not relative_parts or any(part in {"", ".", ".."} for part in relative_parts):
+                continue
+            target = output_path.joinpath(*relative_parts)
+            if target.exists() and not force:
+                extracted.append(target)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(member) as source, target.open("wb") as destination:
+                copyfileobj(source, destination)
+            extracted.append(target)
+    if not extracted:
+        raise ValueError(f"no files under {prefix!r} in {zip_path}")
+    return tuple(extracted)
+
+
+def _find_parts(parts: tuple[str, ...], needle: tuple[str, ...]) -> int | None:
+    if not needle:
+        return None
+    for index in range(0, len(parts) - len(needle) + 1):
+        if parts[index : index + len(needle)] == needle:
+            return index
+    return None
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

@@ -114,16 +114,26 @@ def _assets_pull(args: argparse.Namespace) -> None:
         raw_dir=args.raw_dir,
         converted_dir=args.converted_dir,
         public_dir=args.public_dir,
+        training_dir=args.training_dir,
         clusters=args.clusters,
         force=args.force,
     )
     print(f"asset={result.asset.id} name={result.asset.name}")
     print(f"raw={result.raw_path}")
-    print(f"converted={result.converted_path}")
-    print(f"viewer_sample={result.output_path}")
+    if result.converted_path:
+        print(f"converted={result.converted_path}")
+    if result.output_path:
+        print(f"output={result.output_path}")
     if result.raw_public_path:
         print(f"viewer_splat={result.raw_public_path}")
-    print(f"gaussians={result.gaussian_count}")
+    if result.training_path:
+        print(f"training={result.training_path}")
+    if result.manifest_path:
+        print(f"manifest={result.manifest_path}")
+    if result.downloaded_files:
+        print(f"files={len(result.downloaded_files)}")
+    if result.gaussian_count is not None:
+        print(f"gaussians={result.gaussian_count}")
     for label, count in result.object_counts:
         print(f"object_id={label} count={count}")
 
@@ -200,6 +210,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Path("outputs/assets/converted"),
     )
     assets_pull.add_argument("--public-dir", type=Path, default=Path("public"))
+    assets_pull.add_argument(
+        "--training-dir",
+        type=Path,
+        default=Path("outputs/assets/training"),
+    )
     assets_pull.add_argument("--clusters", type=int)
     assets_pull.add_argument("--force", action="store_true")
     assets_pull.set_defaults(handler=_assets_pull)

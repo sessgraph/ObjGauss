@@ -96,12 +96,19 @@ dataset pages and should be downloaded outside the git repo.
 Asset entries also distinguish training sources from demo-ready samples so
 research datasets do not get mixed into public demos by accident.
 
-Pull the first localizable sample into the viewer:
+Pull localizable samples and training inputs:
 
 ```bash
 objgauss assets list --pullable
 objgauss assets pull plush-3dgs-local
+objgauss assets pull polyhaven-school-chair-1k
+objgauss assets pull nerf-synthetic-lego
 ```
+
+`polyhaven-school-chair-1k` is a CC0 mesh demo input. It is not rendered by the
+current 3DGS viewer until the mesh -> multiview render -> 3DGS conversion chain
+is added. `nerf-synthetic-lego` is the first multi-view training smoke dataset
+for Object Field work.
 
 ## Notes
 

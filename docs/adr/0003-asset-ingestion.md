@@ -1,6 +1,6 @@
 # ADR 0003: Asset Ingestion Strategy
 
-> 状态: Proposed
+> 状态: Accepted / Implemented
 > 日期: 2026-06-22
 
 ## 背景
@@ -34,6 +34,22 @@ ObjGauss 后续需要两类素材：
 2. 对象训练: OmniObject3D 最小子集。
 3. 室内训练: ARKitScenes 单房间子集。
 
+## 实施结果
+
+ASSET-001 先落地两条最小自动管线：
+
+1. `polyhaven-school-chair-1k`
+   - 来源: Poly Haven `SchoolChair_01`
+   - 用途: 许可干净的单对象 Demo 输入。
+   - 管线: Poly Haven API `files/SchoolChair_01` -> glTF 1K + `.bin` + textures -> `outputs/assets/raw/polyhaven-school-chair-1k/` -> manifest。
+   - 说明: 当前还是 mesh 输入源，不能直接进入 3DGS viewer；下一步需要 mesh 多视角渲染和 3DGS 训练。
+2. `nerf-synthetic-lego`
+   - 来源: `bmild/nerf` 官方示例数据。
+   - 用途: ObjGauss v1 Object Field 的多视角训练烟测。
+   - 管线: `nerf_example_data.zip` -> 只抽取 `nerf_synthetic/lego` -> `outputs/assets/training/nerf-synthetic-lego/` -> manifest。
+
+保留 `plush-3dgs-local` 作为现有 3DGS viewer 和对象编辑 smoke test。
+
 ## 验收标准
 
 - 新素材记录来源、许可、下载方式、转换命令。
@@ -46,6 +62,8 @@ ObjGauss 后续需要两类素材：
 - 大数据集下载成本高，不适合一次拉全量。
 - 研究数据许可可能限制公开演示。
 - Mesh / RGB-D / COLMAP / 3DGS 输出格式差异大，转换管线需要分阶段实现。
+- Poly Haven API 只用于非商用/研究拉取并要求 User-Agent；公开发布包不能依赖运行时 API 批量抓取。
+- NeRF 官方示例 zip 约 370MB；当前管线只抽取 Lego 子目录，但下载仍是整包。
 
 ## 后续任务
 

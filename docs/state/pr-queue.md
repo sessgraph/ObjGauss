@@ -22,21 +22,32 @@
   - 输出仍为 ObjGauss PLY with `object_id`。
   - 与 KMeans 基线可对比。
 
+## Done
+
 ### ASSET-001: 建立 Demo/训练素材转换管线
 
-- 状态: ready
+- 状态: done
 - 类型: 标准 PR
 - ADR: `docs/adr/0003-asset-ingestion.md`
 - 目标: 将至少一个 Demo 素材源和一个训练素材源拉通到本地目录规范。
-- 首选:
-  - Demo: Poly Haven 小模型。
-  - 训练: OmniObject3D 或 ARKitScenes 最小子集。
+- 实施:
+  - Demo: `polyhaven-school-chair-1k`，Poly Haven CC0 School Chair 1K glTF。
+  - 训练: `nerf-synthetic-lego`，NeRF 官方示例 Lego 多视角数据。
+- 范围外:
+  - 不在本 PR 中实现 mesh -> 多视角渲染 -> 3DGS 训练。
+  - 不提交下载后的大素材。
 - 验收:
-  - `objgauss assets list` 能看到 pipeline stage 和 use cases。
-  - 新素材记录来源、许可、下载命令、转换命令。
-  - Demo 样例可在前端加载或明确说明为何只作为训练输入。
-
-## Done
+  - `objgauss assets list --pullable` 能看到 Plush、Poly Haven School Chair、NeRF Synthetic Lego。
+  - Poly Haven 拉取输出 glTF、bin、textures 和 manifest。
+  - NeRF 拉取输出 `outputs/assets/training/nerf-synthetic-lego/` 和 manifest。
+  - Demo 样例当前明确为 mesh 输入源，尚不能直接由现有 3DGS viewer 打开。
+- 验证:
+  - `uv run --extra dev pytest`: 7 passed。
+  - `uv run objgauss assets list --pullable`: 通过。
+  - `uv run objgauss assets pull polyhaven-school-chair-1k`: 5 files。
+  - `uv run objgauss assets pull nerf-synthetic-lego`: 805 files。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
 
 ### RENDER-001: 评估并接入完整 3DGS renderer
 

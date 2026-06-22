@@ -4,19 +4,23 @@
 
 ## Open
 
-### ACTION-002: 确认公开 Demo 许可策略
+### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 
-- 原因: Plush 来源许可混合，只能本地测试；公开 Demo 需要许可更干净的素材。
-- 推荐: 优先用 Poly Haven CC0 素材做公开展示样例。
-- 退出条件: `docs/asset-library.md` 标明首个可公开 Demo 素材和转换链路。
+- 原因: `polyhaven-school-chair-1k` 已可拉取，但仍是 glTF mesh，不能直接进入 3DGS viewer。
+- 推荐: 先做 Blender/Three 离线多视角渲染，再接 3DGS 训练。
+- 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
+
+## Closed
 
 ### ACTION-003: 选择首个训练数据最小子集
 
-- 原因: ARKitScenes / OmniObject3D / ScanNet 规模较大，不能盲目下载全量数据。
-- 推荐: 先选 OmniObject3D 单对象或 ARKitScenes 单房间子集。
-- 退出条件: 新建任务文档，明确下载规模、许可、转换命令、验收标准。
+- 完成 commit: pending
+- 结果: 选择并接入 `nerf-synthetic-lego`，实际抽取 805 个文件到 `outputs/assets/training/nerf-synthetic-lego/`。
 
-## Closed
+### ACTION-002: 确认公开 Demo 许可策略
+
+- 完成 commit: pending
+- 结果: 选择并接入 Poly Haven CC0 `SchoolChair_01` 作为首个许可干净 Demo 输入源；完整前端 Demo 仍需 ACTION-004。
 
 ### ACTION-001: 建立 baseline commit
 

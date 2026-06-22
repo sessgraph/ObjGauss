@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import zipfile
+
 import numpy as np
 
+import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
 from objgauss.cli import main
 from objgauss.clustering import cluster_features
@@ -62,6 +65,8 @@ def test_read_splat_as_gaussian_cloud(tmp_path):
 
 def test_asset_registry_has_pullable_sample():
     asset = get_asset("plush-3dgs-local")
+    demo = get_asset("polyhaven-school-chair-1k")
+    training = get_asset("nerf-synthetic-lego")
 
     assert asset.download_url
     assert asset.local_path == "/samples/plush_objects.ply"
@@ -70,6 +75,11 @@ def test_asset_registry_has_pullable_sample():
     assert asset.pipeline_stage == "Demo 可用"
     assert "Demo预览" in asset.use_cases
     assert asset in list_assets()
+    assert demo.pull_pipeline == "polyhaven-gltf"
+    assert demo.polyhaven_id == "SchoolChair_01"
+    assert demo.license.startswith("CC0")
+    assert training.pull_pipeline == "nerf-example-data"
+    assert training.training_subdir == "nerf_synthetic/lego"
 
 
 def test_assets_list_cli_reports_pullable_sample(capsys):
@@ -77,8 +87,80 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
 
     output = capsys.readouterr().out
     assert "plush-3dgs-local" in output
+    assert "polyhaven-school-chair-1k" in output
+    assert "nerf-synthetic-lego" in output
     assert "Demo 可用" in output
     assert "pull" in output
+
+
+def test_polyhaven_pull_writes_gltf_manifest(tmp_path, monkeypatch):
+    def fake_fetch_json(_url):
+        return {
+            "gltf": {
+                "1k": {
+                    "gltf": {
+                        "url": "https://example.invalid/SchoolChair_01_1k.gltf",
+                        "size": 10,
+                        "include": {
+                            "SchoolChair_01.bin": {
+                                "url": "https://example.invalid/SchoolChair_01.bin",
+                                "size": 4,
+                            },
+                            "textures/SchoolChair_01_diff_1k.jpg": {
+                                "url": "https://example.invalid/SchoolChair_01_diff_1k.jpg",
+                                "size": 6,
+                            },
+                        },
+                    }
+                }
+            }
+        }
+
+    def fake_download(_url, path, *, force):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if force or not path.exists():
+            path.write_bytes(b"asset")
+
+    monkeypatch.setattr(asset_module, "_fetch_json", fake_fetch_json)
+    monkeypatch.setattr(asset_module, "_download", fake_download)
+
+    result = asset_module.pull_asset(
+        "polyhaven-school-chair-1k",
+        raw_dir=tmp_path / "raw",
+        converted_dir=tmp_path / "converted",
+    )
+
+    assert result.output_path and result.output_path.name == "SchoolChair_01_1k.gltf"
+    assert result.manifest_path and result.manifest_path.exists()
+    assert (result.raw_path / "SchoolChair_01.bin").exists()
+    assert (result.raw_path / "textures" / "SchoolChair_01_diff_1k.jpg").exists()
+    assert len(result.downloaded_files) == 3
+
+
+def test_nerf_pull_extracts_training_subset(tmp_path, monkeypatch):
+    def fake_download(_url, path, *, force):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and not force:
+            return
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("nerf_example_data/nerf_synthetic/lego/transforms_train.json", "{}")
+            archive.writestr("nerf_example_data/nerf_synthetic/lego/train/r_0.png", b"png")
+            archive.writestr("nerf_example_data/nerf_synthetic/chair/transforms_train.json", "{}")
+
+    monkeypatch.setattr(asset_module, "_download", fake_download)
+
+    result = asset_module.pull_asset(
+        "nerf-synthetic-lego",
+        raw_dir=tmp_path / "raw",
+        converted_dir=tmp_path / "converted",
+        training_dir=tmp_path / "training",
+    )
+
+    assert result.training_path and result.training_path.name == "nerf-synthetic-lego"
+    assert (result.training_path / "transforms_train.json").exists()
+    assert (result.training_path / "train" / "r_0.png").exists()
+    assert not (tmp_path / "training" / "chair").exists()
+    assert result.manifest_path and result.manifest_path.exists()
 
 
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
