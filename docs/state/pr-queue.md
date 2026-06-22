@@ -47,7 +47,7 @@
   - `uv run --extra dev pytest`: 10 passed。
   - `uv run objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego`: 400 frames，缺图 0，无效 pose 0。
   - `uv run objgauss object-field init public/samples/plush_objects.ply --output /tmp/plush_object_field.npz --slots 6 --smoothness`: 281498 gaussians，6 active slots。
-- 完成 commit: pending。
+- 完成 commit: `2962af4`。
 
 ### ASSET-001: 建立 Demo/训练素材转换管线
 
