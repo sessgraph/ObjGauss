@@ -18,6 +18,7 @@ from objgauss.lego_verify import verify_lego_alpha_closure_demo
 from objgauss.masks import (
     build_nerf_alpha_mask_manifest,
     build_nerf_rgba_color_mask_manifest,
+    build_nerf_sam_mask_manifest,
 )
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
@@ -313,6 +314,30 @@ def _masks_from_nerf_rgba_colors(args: argparse.Namespace) -> None:
     print(f"foreground_pixels={result.foreground_pixels}")
     for slot in result.slot_pixel_counts:
         print(f"slot={slot['slot']} label={slot['label']} pixels={slot['count']}")
+
+
+def _masks_from_nerf_sam(args: argparse.Namespace) -> None:
+    result = build_nerf_sam_mask_manifest(
+        args.dataset,
+        output=args.output,
+        checkpoint=args.checkpoint,
+        model_type=args.model_type,
+        device=args.device,
+        split=args.split,
+        max_frames=args.max_frames,
+        max_masks_per_frame=args.max_masks_per_frame,
+        min_area=args.min_area,
+        points_per_side=args.points_per_side,
+        pred_iou_thresh=args.pred_iou_thresh,
+        stability_score_thresh=args.stability_score_thresh,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"width={result.width}")
+    print(f"height={result.height}")
+    print(f"mask_pixels={result.mask_pixels}")
+    print(f"slots={result.slots}")
 
 
 def _demo_v1_closure(args: argparse.Namespace) -> None:
@@ -633,6 +658,24 @@ def _build_parser() -> argparse.ArgumentParser:
     nerf_rgba_colors.add_argument("--max-frames", type=int)
     nerf_rgba_colors.add_argument("--alpha-threshold", type=int, default=16)
     nerf_rgba_colors.set_defaults(handler=_masks_from_nerf_rgba_colors)
+
+    nerf_sam = masks_subparsers.add_parser(
+        "from-nerf-sam",
+        help="run optional Segment Anything automatic masks on NeRF-style images",
+    )
+    nerf_sam.add_argument("dataset", type=Path)
+    nerf_sam.add_argument("--output", "-o", required=True, type=Path)
+    nerf_sam.add_argument("--checkpoint", required=True, type=Path)
+    nerf_sam.add_argument("--model-type", default="vit_b")
+    nerf_sam.add_argument("--device", default="cpu")
+    nerf_sam.add_argument("--split", default="train")
+    nerf_sam.add_argument("--max-frames", type=int)
+    nerf_sam.add_argument("--max-masks-per-frame", type=int, default=8)
+    nerf_sam.add_argument("--min-area", type=int, default=1)
+    nerf_sam.add_argument("--points-per-side", type=int, default=32)
+    nerf_sam.add_argument("--pred-iou-thresh", type=float, default=0.88)
+    nerf_sam.add_argument("--stability-score-thresh", type=float, default=0.95)
+    nerf_sam.set_defaults(handler=_masks_from_nerf_sam)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

@@ -143,6 +143,26 @@ same manifest format consumed by `vote-masks`. The masks come from real 2D
 training images and are useful for v1 closure validation; they are still a
 deterministic color-rule source, not a SAM / CLIP model output.
 
+Build a SAM automatic mask manifest when a local SAM environment and checkpoint
+are available:
+
+```bash
+objgauss masks from-nerf-sam outputs/assets/training/nerf-synthetic-lego \
+  --output outputs/masks/nerf-lego-sam/mask-manifest.json \
+  --checkpoint path/to/sam_vit_b.pth \
+  --model-type vit_b \
+  --device cuda \
+  --split train \
+  --max-frames 8 \
+  --max-masks-per-frame 8 \
+  --min-area 64
+```
+
+SAM is optional: ObjGauss does not install model dependencies or download
+weights by default. The command expects `segment-anything` and the chosen
+checkpoint to already exist in the local environment, then writes the same mask
+manifest format consumed by `vote-masks`.
+
 Apply precomputed SAM / CLIP / 2D masks as projection supervision:
 
 ```bash

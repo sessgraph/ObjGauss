@@ -14,6 +14,7 @@ from objgauss.clustering import cluster_features
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.mask_voting import train_object_field_from_votes, vote_masks_to_gaussians
+from objgauss.masks import build_nerf_sam_mask_manifest
 from objgauss.object_field import (
     ObjectField,
     field_from_labels,
@@ -401,6 +402,67 @@ def test_masks_from_nerf_rgba_colors_cli_writes_multislot_manifest(tmp_path, cap
     assert loaded_masks["other"].sum() == 3
 
 
+def test_masks_from_nerf_sam_writes_manifest_with_fake_generator(tmp_path):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[220, 190, 20, 255], [210, 40, 30, 255], [0, 0, 0, 255]],
+                [[230, 180, 25, 255], [30, 25, 20, 255], [0, 0, 0, 255]],
+                [[0, 0, 0, 255], [0, 0, 0, 255], [160, 160, 150, 255]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": 0.7,
+                "frames": [{"file_path": "./train/r_0", "transform_matrix": transform}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "sam-masks" / "mask-manifest.json"
+
+    result = build_nerf_sam_mask_manifest(
+        dataset,
+        output=manifest_path,
+        checkpoint="not-used-by-fake-generator.pt",
+        max_masks_per_frame=2,
+        min_area=2,
+        generator=_FakeSamGenerator(),
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    masks = manifest["frames"][0]["masks"]
+    first = np.load(manifest_path.parent / masks[0]["mask_path"])
+    second = np.load(manifest_path.parent / masks[1]["mask_path"])
+
+    assert result.frames == 1
+    assert result.masks == 2
+    assert result.mask_pixels == 6
+    assert manifest["source_type"] == "sam-automatic-mask-generator"
+    assert manifest["sam"]["model_type"] == "vit_b"
+    assert manifest["slots"] == [
+        {"slot": 0, "label": "sam-area-rank-0"},
+        {"slot": 1, "label": "sam-area-rank-1"},
+    ]
+    assert masks[0]["slot"] == 0
+    assert masks[0]["label"] == "sam-area-rank-0"
+    assert masks[0]["area"] == 4
+    assert masks[0]["confidence"] == 0.91
+    assert masks[0]["bbox"] == [0.0, 0.0, 2.0, 2.0]
+    assert masks[1]["slot"] == 1
+    assert masks[1]["area"] == 2
+    assert first.dtype == np.bool_
+    assert int(first.sum()) == 4
+    assert int(second.sum()) == 2
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -742,6 +804,43 @@ def _write_rect_mask_manifest(path):
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+class _FakeSamGenerator:
+    def generate(self, image: np.ndarray):
+        assert image.shape == (3, 3, 3)
+        large = np.array(
+            [[True, True, False], [True, True, False], [False, False, False]],
+            dtype=bool,
+        )
+        medium = np.array(
+            [[False, False, False], [False, False, False], [True, True, False]],
+            dtype=bool,
+        )
+        tiny = np.array(
+            [[False, False, True], [False, False, False], [False, False, False]],
+            dtype=bool,
+        )
+        return [
+            {
+                "segmentation": medium,
+                "area": 2,
+                "predicted_iou": 0.82,
+                "bbox": [0, 2, 2, 1],
+            },
+            {
+                "segmentation": tiny,
+                "area": 1,
+                "predicted_iou": 0.99,
+                "bbox": [2, 0, 1, 1],
+            },
+            {
+                "segmentation": large,
+                "area": 4,
+                "predicted_iou": 0.91,
+                "bbox": [0, 0, 2, 2],
+            },
+        ]
 
 
 def _write_rgba_png(path, pixels: np.ndarray) -> None:

@@ -5,7 +5,7 @@ import struct
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -29,6 +29,17 @@ class ColorMaskManifestResult:
     height: int
     foreground_pixels: int
     slot_pixel_counts: tuple[dict[str, int | str], ...]
+
+
+@dataclass(frozen=True)
+class SamMaskManifestResult:
+    manifest_path: Path
+    frames: int
+    masks: int
+    width: int
+    height: int
+    mask_pixels: int
+    slots: int
 
 
 LEGO_COLOR_SLOTS = (
@@ -224,6 +235,143 @@ def build_nerf_rgba_color_mask_manifest(
     )
 
 
+def build_nerf_sam_mask_manifest(
+    dataset: str | Path,
+    *,
+    output: str | Path,
+    checkpoint: str | Path | None = None,
+    model_type: str = "vit_b",
+    device: str = "cpu",
+    split: str = "train",
+    max_frames: int | None = None,
+    max_masks_per_frame: int = 8,
+    min_area: int = 1,
+    points_per_side: int = 32,
+    pred_iou_thresh: float = 0.88,
+    stability_score_thresh: float = 0.95,
+    generator: Any | Callable[[np.ndarray], list[dict[str, Any]]] | None = None,
+) -> SamMaskManifestResult:
+    if max_frames is not None and max_frames < 1:
+        raise ValueError("max_frames must be >= 1")
+    if max_masks_per_frame < 1:
+        raise ValueError("max_masks_per_frame must be >= 1")
+    if min_area < 1:
+        raise ValueError("min_area must be >= 1")
+
+    dataset = Path(dataset)
+    output = Path(output)
+    transforms_path = dataset / f"transforms_{split}.json"
+    if not transforms_path.exists():
+        raise ValueError(f"missing NeRF transforms file: {transforms_path}")
+    payload = json.loads(transforms_path.read_text(encoding="utf-8"))
+    camera_angle_x = payload.get("camera_angle_x")
+    frames = payload.get("frames")
+    if not isinstance(frames, list) or not frames:
+        raise ValueError(f"{transforms_path} must contain a non-empty frames list")
+    if camera_angle_x is None:
+        raise ValueError(f"{transforms_path} is missing camera_angle_x")
+
+    generator = generator or _create_sam_generator(
+        checkpoint=checkpoint,
+        model_type=model_type,
+        device=device,
+        points_per_side=points_per_side,
+        pred_iou_thresh=pred_iou_thresh,
+        stability_score_thresh=stability_score_thresh,
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    masks_dir = output.parent / "masks"
+    masks_dir.mkdir(parents=True, exist_ok=True)
+    manifest_frames: list[dict[str, Any]] = []
+    width = 0
+    height = 0
+    mask_count = 0
+    mask_pixels = 0
+
+    for frame_index, frame in enumerate(frames[:max_frames]):
+        if not isinstance(frame, dict):
+            raise ValueError("NeRF frame entries must be objects")
+        image_path = resolve_nerf_image(dataset, frame.get("file_path"))
+        rgba = read_png_rgba(image_path)
+        if width == 0:
+            height, width = rgba.shape[:2]
+        elif rgba.shape[:2] != (height, width):
+            raise ValueError(f"{image_path} shape does not match {height}x{width}")
+
+        generated_masks = _generate_sam_masks(generator, rgba[:, :, :3])
+        selected_masks = _select_sam_masks(
+            generated_masks,
+            height=height,
+            width=width,
+            min_area=min_area,
+            max_masks=max_masks_per_frame,
+        )
+        masks: list[dict[str, Any]] = []
+        for slot, sam_mask in enumerate(selected_masks):
+            segmentation = np.asarray(sam_mask["segmentation"], dtype=bool)
+            area = int(np.count_nonzero(segmentation))
+            mask_pixels += area
+            mask_path = masks_dir / f"{split}_{frame_index:04d}_sam_slot_{slot}.npy"
+            np.save(mask_path, segmentation)
+            masks.append(
+                {
+                    "slot": slot,
+                    "label": f"sam-area-rank-{slot}",
+                    "mask_path": str(mask_path.relative_to(output.parent)),
+                    "confidence": _sam_confidence(sam_mask),
+                    "area": area,
+                    "bbox": _sam_bbox(sam_mask),
+                }
+            )
+            mask_count += 1
+        if masks:
+            manifest_frames.append(
+                {
+                    "name": f"{split}-{frame_index:04d}",
+                    "image_path": str(image_path.relative_to(dataset)),
+                    "transform_matrix": frame.get("transform_matrix"),
+                    "masks": masks,
+                }
+            )
+
+    if mask_count == 0:
+        raise ValueError("SAM did not produce any masks after filtering")
+
+    manifest = {
+        "width": width,
+        "height": height,
+        "camera_angle_x": float(camera_angle_x),
+        "source": str(dataset),
+        "source_type": "sam-automatic-mask-generator",
+        "split": split,
+        "slots": [
+            {"slot": slot, "label": f"sam-area-rank-{slot}"}
+            for slot in range(max_masks_per_frame)
+        ],
+        "sam": {
+            "model_type": model_type,
+            "checkpoint": str(checkpoint) if checkpoint is not None else None,
+            "device": device,
+            "points_per_side": points_per_side,
+            "pred_iou_thresh": pred_iou_thresh,
+            "stability_score_thresh": stability_score_thresh,
+            "min_area": min_area,
+            "max_masks_per_frame": max_masks_per_frame,
+        },
+        "frames": manifest_frames,
+    }
+    output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return SamMaskManifestResult(
+        manifest_path=output,
+        frames=len(manifest_frames),
+        masks=mask_count,
+        width=width,
+        height=height,
+        mask_pixels=mask_pixels,
+        slots=max_masks_per_frame,
+    )
+
+
 def read_png_alpha(path: str | Path) -> np.ndarray:
     return read_png_rgba(path)[:, :, 3]
 
@@ -323,6 +471,93 @@ def slot_count_summary(counts: np.ndarray) -> list[dict[str, int | str]]:
         {"slot": int(slot["slot"]), "label": str(slot["label"]), "count": int(counts[index])}
         for index, slot in enumerate(LEGO_COLOR_SLOTS)
     ]
+
+
+def _create_sam_generator(
+    *,
+    checkpoint: str | Path | None,
+    model_type: str,
+    device: str,
+    points_per_side: int,
+    pred_iou_thresh: float,
+    stability_score_thresh: float,
+):
+    if checkpoint is None:
+        raise ValueError("SAM checkpoint is required")
+    checkpoint = Path(checkpoint)
+    if not checkpoint.exists():
+        raise ValueError(f"missing SAM checkpoint: {checkpoint}")
+    try:
+        from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
+    except ImportError as exc:
+        raise ValueError(
+            "SAM mask generation requires optional dependency 'segment-anything' "
+            "and a local checkpoint; install it outside ObjGauss and pass --checkpoint"
+        ) from exc
+
+    if model_type not in sam_model_registry:
+        available = ", ".join(sorted(sam_model_registry))
+        raise ValueError(f"unknown SAM model_type {model_type!r}; available: {available}")
+    model = sam_model_registry[model_type](checkpoint=str(checkpoint))
+    model.to(device=device)
+    return SamAutomaticMaskGenerator(
+        model,
+        points_per_side=points_per_side,
+        pred_iou_thresh=pred_iou_thresh,
+        stability_score_thresh=stability_score_thresh,
+    )
+
+
+def _generate_sam_masks(generator: Any, image_rgb: np.ndarray) -> list[dict[str, Any]]:
+    if hasattr(generator, "generate"):
+        masks = generator.generate(image_rgb)
+    else:
+        masks = generator(image_rgb)
+    if not isinstance(masks, list):
+        raise ValueError("SAM generator must return a list of mask dictionaries")
+    return masks
+
+
+def _select_sam_masks(
+    masks: list[dict[str, Any]],
+    *,
+    height: int,
+    width: int,
+    min_area: int,
+    max_masks: int,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for mask in masks:
+        if not isinstance(mask, dict) or "segmentation" not in mask:
+            continue
+        segmentation = np.asarray(mask["segmentation"], dtype=bool)
+        if segmentation.shape != (height, width):
+            raise ValueError(
+                f"SAM mask shape {segmentation.shape} does not match {height}x{width}"
+            )
+        area = int(mask.get("area", np.count_nonzero(segmentation)))
+        if area >= min_area:
+            selected.append(mask)
+    selected.sort(
+        key=lambda mask: int(mask.get("area", np.count_nonzero(mask["segmentation"]))),
+        reverse=True,
+    )
+    return selected[:max_masks]
+
+
+def _sam_confidence(mask: dict[str, Any]) -> float:
+    if "predicted_iou" in mask:
+        return float(mask["predicted_iou"])
+    if "stability_score" in mask:
+        return float(mask["stability_score"])
+    return 1.0
+
+
+def _sam_bbox(mask: dict[str, Any]) -> list[float] | None:
+    bbox = mask.get("bbox")
+    if not isinstance(bbox, list | tuple) or len(bbox) != 4:
+        return None
+    return [float(value) for value in bbox]
 
 
 def resolve_nerf_image(dataset: Path, file_path: object) -> Path:

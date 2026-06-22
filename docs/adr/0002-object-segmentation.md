@@ -65,7 +65,13 @@
 - 输出仍沿用 `vote-masks` manifest 格式。
 - 用于证明同一真实多视角数据可以产生多对象/多部件的 2D 监督，并直接更新 Object Field logits。
 
-仍不在本仓库内运行 SAM / CLIP 模型；新增模型依赖和权重下载单独立项。
+`SEG-002A` 补充了可选 SAM 适配器：
+
+- `objgauss masks from-nerf-sam`: 在本机已经安装 `segment-anything` 且提供 checkpoint 时，对 NeRF-style 图片运行 SAM automatic mask generator。
+- 输出仍沿用 `vote-masks` manifest 格式，slot 按单帧 mask 面积排序分配为 `sam-area-rank-*`。
+- 仓库不提交模型权重，不默认安装深度学习依赖，也不在没有 checkpoint 的环境里伪造 SAM 结果。
+
+CLIP 语义打标、SAM/CLIP 跨视角 slot 对齐、真实 checkpoint 小场景验收仍需后续任务。
 
 ## 验收标准
 
