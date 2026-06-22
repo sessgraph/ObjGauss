@@ -20,7 +20,7 @@
 
 ### ACTION-005: 建立 Object Field 真实训练循环
 
-- 完成 commit: pending
+- 完成 commit: `af825f8`
 - 结果: 已通过 `objgauss object-field vote-masks` 实现 projection supervision 训练循环；完整 3DGS render loss 另行立项。
 
 ### ACTION-003: 选择首个训练数据最小子集

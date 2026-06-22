@@ -54,7 +54,7 @@
 - 验证:
   - `uv run --extra dev pytest`: 12 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `af825f8`。
 
 ### OBJFIELD-002: 引入 projection loss 训练循环
 
@@ -77,7 +77,7 @@
   - `uv run --extra dev pytest`: 12 passed。
   - `uv run objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego`: 400 frames，缺图 0，无效 pose 0。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `af825f8`。
 
 ### OBJFIELD-001: 建立 Object Field 最小训练骨架
 
