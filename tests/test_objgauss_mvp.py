@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import struct
 import zipfile
+import zlib
 
 import numpy as np
 
@@ -273,6 +275,65 @@ def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     assert manifest.exists()
 
 
+def test_masks_from_nerf_alpha_cli_writes_manifest_and_npy(tmp_path, capsys):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[10, 20, 30, 0], [40, 50, 60, 255]],
+                [[70, 80, 90, 128], [100, 110, 120, 0]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": 0.7,
+                "frames": [{"file_path": "./train/r_0", "transform_matrix": transform}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "masks" / "mask-manifest.json"
+
+    assert (
+        main(
+            [
+                "masks",
+                "from-nerf-alpha",
+                str(dataset),
+                "--output",
+                str(manifest_path),
+                "--threshold",
+                "128",
+                "--slot",
+                "2",
+                "--label",
+                "lego",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    mask = np.load(manifest_path.parent / manifest["frames"][0]["masks"][0]["mask_path"])
+
+    assert "foreground_pixels=2" in output
+    assert manifest["source_type"] == "nerf-alpha"
+    assert manifest["width"] == 2
+    assert manifest["height"] == 2
+    assert manifest["frames"][0]["image_path"] == "train/r_0.png"
+    assert manifest["frames"][0]["masks"][0]["slot"] == 2
+    assert manifest["frames"][0]["masks"][0]["label"] == "lego"
+    assert mask.dtype == np.bool_
+    assert mask.tolist() == [[False, True], [True, False]]
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -462,3 +523,23 @@ def _write_rect_mask_manifest(path):
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+def _write_rgba_png(path, pixels: np.ndarray) -> None:
+    if pixels.ndim != 3 or pixels.shape[2] != 4 or pixels.dtype != np.uint8:
+        raise ValueError("pixels must be uint8 RGBA")
+    height, width, _channels = pixels.shape
+    raw = b"".join(b"\x00" + pixels[row].tobytes() for row in range(height))
+    png = b"\x89PNG\r\n\x1a\n"
+    png += _png_chunk(
+        b"IHDR",
+        struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0),
+    )
+    png += _png_chunk(b"IDAT", zlib.compress(raw))
+    png += _png_chunk(b"IEND", b"")
+    path.write_bytes(png)
+
+
+def _png_chunk(kind: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)

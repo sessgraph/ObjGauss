@@ -14,6 +14,7 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
+from objgauss.masks import build_nerf_alpha_mask_manifest
 from objgauss.object_field import (
     attach_hard_labels,
     cloud_positions_for_metrics,
@@ -272,6 +273,24 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
         print(f"ply={args.ply_output}")
 
 
+def _masks_from_nerf_alpha(args: argparse.Namespace) -> None:
+    result = build_nerf_alpha_mask_manifest(
+        args.dataset,
+        output=args.output,
+        split=args.split,
+        max_frames=args.max_frames,
+        slot=args.slot,
+        label=args.label,
+        threshold=args.threshold,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"width={result.width}")
+    print(f"height={result.height}")
+    print(f"foreground_pixels={result.foreground_pixels}")
+
+
 def _demo_v1_closure(args: argparse.Namespace) -> None:
     result = build_v1_closure_demo(
         input_ply=args.input,
@@ -463,6 +482,22 @@ def _build_parser() -> argparse.ArgumentParser:
     field_vote.add_argument("--rewrite-sh", action="store_true")
     field_vote.add_argument("--ascii", action="store_true", help="write ASCII PLY")
     field_vote.set_defaults(handler=_object_field_vote_masks)
+
+    masks = subparsers.add_parser("masks", help="build mask manifests for Object Field voting")
+    masks_subparsers = masks.add_subparsers(dest="masks_command", required=True)
+
+    nerf_alpha = masks_subparsers.add_parser(
+        "from-nerf-alpha",
+        help="convert NeRF Synthetic RGBA alpha channels to mask manifest files",
+    )
+    nerf_alpha.add_argument("dataset", type=Path)
+    nerf_alpha.add_argument("--output", "-o", required=True, type=Path)
+    nerf_alpha.add_argument("--split", default="train")
+    nerf_alpha.add_argument("--max-frames", type=int)
+    nerf_alpha.add_argument("--slot", type=int, default=0)
+    nerf_alpha.add_argument("--label", default="foreground")
+    nerf_alpha.add_argument("--threshold", type=int, default=1)
+    nerf_alpha.set_defaults(handler=_masks_from_nerf_alpha)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

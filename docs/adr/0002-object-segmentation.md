@@ -53,6 +53,12 @@
 - 用 NumPy 训练循环更新 `object_logits`，以投影交叉熵降低为验收指标。
 - 可直接导出 hard `object_id` PLY 给现有 viewer 使用。
 
+`MASK-001` 补充了一个无模型依赖的真实图像 mask 来源：
+
+- `objgauss masks from-nerf-alpha`: 从 NeRF Synthetic RGBA 图片 alpha 通道生成 boolean `.npy` masks。
+- 输出沿用 `vote-masks` manifest 格式，保留相机 pose 和 `camera_angle_x`。
+- 用于 NeRF Lego 前景投影烟测，证明 mask manifest 可以从真实多视角图片生成。
+
 仍不在本仓库内运行 SAM / CLIP 模型；新增模型依赖和权重下载单独立项。
 
 ## 验收标准

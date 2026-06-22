@@ -112,6 +112,21 @@ Check the NeRF Lego training smoke dataset before Object Field experiments:
 objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego
 ```
 
+Build a real image-derived mask manifest from NeRF Synthetic RGBA alpha
+channels:
+
+```bash
+objgauss masks from-nerf-alpha outputs/assets/training/nerf-synthetic-lego \
+  --output outputs/masks/nerf-lego-alpha/mask-manifest.json \
+  --split train \
+  --max-frames 8
+```
+
+This creates boolean `.npy` masks next to the manifest and can be used as
+foreground projection supervision for `vote-masks`. It is a deterministic mask
+source for the Lego smoke dataset, not a replacement for SAM / CLIP instance
+segmentation.
+
 Apply precomputed SAM / CLIP / 2D masks as projection supervision:
 
 ```bash
