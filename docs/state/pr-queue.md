@@ -15,7 +15,7 @@
 - 状态: ready-for-ADR-review
 - 类型: 重大变更或标准 PR，取决于依赖选择
 - ADR: `docs/adr/0002-object-segmentation.md`
-- 目标: 从 KMeans MVP 走向语义/实例对象分组。
+- 目标: 在 Object Field v1-lite 接口上，从 KMeans warm start 走向语义/实例对象分组。
 - 范围外: 不在第一步追求全自动高质量分割。
 - 验收:
   - 明确第一套验证数据。
@@ -23,6 +23,31 @@
   - 与 KMeans 基线可对比。
 
 ## Done
+
+### OBJFIELD-001: 建立 Object Field 最小训练骨架
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 基于 NeRF Lego 和现有 Gaussian PLY，建立 soft object-slot 的文件格式、指标和 CLI 骨架。
+- 实施:
+  - 新增 `ObjectField`，保存 `object_logits: (N, K)`。
+  - 支持从 KMeans baseline warm start 为软 object-slot 分布。
+  - 支持导出 hard `object_id` PLY，继续复用前端对象预览。
+  - 支持检查 NeRF-style `transforms_*.json`、图像引用和 pose 矩阵。
+- 范围外:
+  - 不实现 SAM / CLIP / Gaussian Grouping。
+  - 不实现真实 3DGS / Object Field 联合训练。
+  - 不把 object-slot 控制接入 Spark shader。
+- 验收:
+  - `objgauss object-field init` 能从 Gaussian PLY 生成 `.npz` soft field。
+  - `objgauss object-field export` 能输出带 `object_id` 的 PLY。
+  - `objgauss object-field inspect-nerf` 能检查 NeRF Lego 训练输入。
+- 验证:
+  - `uv run --extra dev pytest`: 10 passed。
+  - `uv run objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego`: 400 frames，缺图 0，无效 pose 0。
+  - `uv run objgauss object-field init public/samples/plush_objects.ply --output /tmp/plush_object_field.npz --slots 6 --smoothness`: 281498 gaussians，6 active slots。
+- 完成 commit: pending。
 
 ### ASSET-001: 建立 Demo/训练素材转换管线
 

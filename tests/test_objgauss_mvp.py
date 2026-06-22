@@ -10,6 +10,7 @@ from objgauss.cli import main
 from objgauss.clustering import cluster_features
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
+from objgauss.object_field import field_from_labels, load_object_field, object_field_metrics
 from objgauss.ply import read_ply, write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids, filter_objects
 from objgauss.splat import read_splat
@@ -161,6 +162,107 @@ def test_nerf_pull_extracts_training_subset(tmp_path, monkeypatch):
     assert (result.training_path / "train" / "r_0.png").exists()
     assert not (tmp_path / "training" / "chair").exists()
     assert result.manifest_path and result.manifest_path.exists()
+
+
+def test_object_field_from_labels_has_soft_slots():
+    field = field_from_labels(np.array([0, 1, 1, 0], dtype=np.int32), slots=2, confidence=0.9)
+    probabilities = field.probabilities()
+    metrics = object_field_metrics(field)
+
+    assert probabilities.shape == (4, 2)
+    assert np.allclose(probabilities.sum(axis=1), 1.0)
+    assert np.array_equal(field.labels(), np.array([0, 1, 1, 0], dtype=np.int32))
+    assert 0.0 < metrics.entropy < np.log(2.0)
+    assert metrics.active_slots == 2
+
+
+def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
+    input_path = tmp_path / "gaussians.ply"
+    field_path = tmp_path / "object_field"
+    initialized_path = tmp_path / "initialized_objects.ply"
+    exported_path = tmp_path / "exported_objects.ply"
+    write_ply(input_path, _synthetic_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "object-field",
+                "init",
+                str(input_path),
+                "--output",
+                str(field_path),
+                "--slots",
+                "2",
+                "--ply-output",
+                str(initialized_path),
+                "--colorize",
+                "--smoothness",
+                "--ascii",
+            ]
+        )
+        == 0
+    )
+
+    init_output = capsys.readouterr().out
+    field = load_object_field(field_path)
+    initialized = read_ply(initialized_path)
+    assert field.gaussian_count == 4
+    assert field.slots == 2
+    assert "entropy=" in init_output
+    assert "smoothness=" in init_output
+    assert {"object_id", "red", "green", "blue"}.issubset(initialized.fields)
+
+    assert (
+        main(
+            [
+                "object-field",
+                "export",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--output",
+                str(exported_path),
+                "--colorize",
+                "--ascii",
+            ]
+        )
+        == 0
+    )
+    exported = read_ply(exported_path)
+    assert "object_id" in exported.fields
+
+    assert main(["object-field", "stats", str(field_path)]) == 0
+    stats_output = capsys.readouterr().out
+    assert "gaussians=4" in stats_output
+    assert "slots=2" in stats_output
+    assert "active_slots=2" in stats_output
+
+
+def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    (dataset / "train" / "r_0.png").write_bytes(b"png")
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        (
+            "{"
+            '"camera_angle_x": 0.7,'
+            '"frames": [{"file_path": "./train/r_0", "transform_matrix": '
+            f"{transform}"
+            "}]"
+            "}"
+        ),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "nerf-summary.json"
+
+    assert main(["object-field", "inspect-nerf", str(dataset), "--output", str(manifest)]) == 0
+
+    output = capsys.readouterr().out
+    assert "frames=1" in output
+    assert "missing_images=0" in output
+    assert "invalid_transforms=0" in output
+    assert manifest.exists()
 
 
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:

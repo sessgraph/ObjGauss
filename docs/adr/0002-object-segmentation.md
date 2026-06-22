@@ -1,6 +1,6 @@
 # ADR 0002: Object Segmentation Strategy
 
-> 状态: Proposed
+> 状态: Accepted / v1-lite implemented
 > 日期: 2026-06-22
 
 ## 背景
@@ -17,6 +17,14 @@
 
 保留 KMeans 作为 baseline；语义级对象分组作为独立能力推进，输出仍统一为 ObjGauss PLY with `object_id`。
 
+在引入 SAM / CLIP / Gaussian Grouping 之前，先落地 `Object Field v1-lite`：
+
+- 每个 Gaussian 维护 `object_logits: (N, K)`。
+- 当前用 KMeans 结果 warm start 成软 object-slot 分布。
+- CLI 保存 `.npz` Object Field，并可导出 hard `object_id` PLY 供现有前端复用。
+- NeRF Synthetic Lego 作为第一套多视角训练烟测数据，先验证 transforms 和图像完整性。
+- 不新增深度学习依赖；完整 optimizer / view consistency / semantic guidance 后续单独 PR。
+
 候选路线：
 
 1. 图像侧 2D segmentation + 多视角投票到 Gaussian。
@@ -25,6 +33,17 @@
 4. 使用带实例标注的数据集做监督或评估。
 
 推荐第一步：选一个小验证集，建立 KMeans baseline 与语义分组输出对比，不直接追求全自动最优。
+
+## 实施结果
+
+`OBJFIELD-001` 已实现最小训练骨架：
+
+- `objgauss object-field init`: 从 Gaussian PLY 初始化软 Object Field。
+- `objgauss object-field stats`: 输出 entropy、normalized entropy、sharpness、active slots。
+- `objgauss object-field export`: 将软分布导出为现有 viewer 可用的 `object_id` PLY。
+- `objgauss object-field inspect-nerf`: 检查 NeRF-style `transforms_*.json`、图像引用和 4x4 pose。
+
+这一步降低了从 KMeans baseline 走向可学习对象分区的接口风险，但还没有解决语义分割质量问题。
 
 ## 验收标准
 
@@ -42,3 +61,4 @@
 ## 后续任务
 
 - `SEG-001`: 建立语义级对象分组方案。
+- `OBJFIELD-002`: 引入 multi-view consistency / view projection loss 的实际训练循环。

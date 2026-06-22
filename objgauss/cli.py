@@ -8,6 +8,16 @@ import numpy as np
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.features import extract_features
+from objgauss.object_field import (
+    attach_hard_labels,
+    cloud_positions_for_metrics,
+    initialize_object_field,
+    inspect_nerf_dataset,
+    load_object_field,
+    object_field_metrics,
+    save_object_field,
+    write_json,
+)
 from objgauss.ply import read_ply, write_ply
 from objgauss.segment import (
     apply_object_colors,
@@ -138,9 +148,94 @@ def _assets_pull(args: argparse.Namespace) -> None:
         print(f"object_id={label} count={count}")
 
 
+def _object_field_init(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    result = initialize_object_field(
+        cloud,
+        slots=args.slots,
+        seed=args.seed,
+        max_iter=args.max_iter,
+        confidence=args.confidence,
+        spatial_weight=args.spatial_weight,
+        color_weight=args.color_weight,
+        opacity_weight=args.opacity_weight,
+        normalize=not args.no_normalize,
+    )
+    save_object_field(args.output, result.field)
+    metrics = object_field_metrics(
+        result.field,
+        positions_xyz=cloud_positions_for_metrics(cloud) if args.smoothness else None,
+        neighbors=args.neighbors,
+        max_smooth_points=args.max_smooth_points,
+    )
+
+    print(f"object_field={args.output}")
+    print(f"gaussians={result.field.gaussian_count} slots={result.field.slots}")
+    print(f"backend={result.clustering.backend} inertia={result.clustering.inertia:.4f}")
+    _print_metrics(metrics)
+    _print_summary(result.field.labels())
+
+    if args.ply_output:
+        labeled = attach_hard_labels(cloud, result.field)
+        if args.colorize:
+            labeled = apply_object_colors(labeled, rewrite_sh=args.rewrite_sh)
+        write_ply(args.ply_output, labeled, fmt=_output_format(args))
+        print(f"ply={args.ply_output}")
+
+
+def _object_field_export(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    field = load_object_field(args.field)
+    labeled = attach_hard_labels(cloud, field, object_id_field=args.object_id_field)
+    if args.colorize:
+        labeled = apply_object_colors(
+            labeled,
+            object_id_field=args.object_id_field,
+            rewrite_sh=args.rewrite_sh,
+        )
+    write_ply(args.output, labeled, fmt=_output_format(args))
+    print(f"exported {cloud.count} gaussians from {args.field} to {args.output}")
+    _print_summary(field.labels())
+
+
+def _object_field_stats(args: argparse.Namespace) -> None:
+    field = load_object_field(args.field)
+    metrics = object_field_metrics(field)
+    print(f"gaussians={field.gaussian_count}")
+    print(f"slots={field.slots}")
+    _print_metrics(metrics)
+    _print_summary(field.labels())
+
+
+def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
+    summary = inspect_nerf_dataset(args.dataset)
+    print(f"dataset={summary.root}")
+    print(f"frames={summary.total_frames}")
+    print(f"missing_images={summary.missing_images}")
+    print(f"invalid_transforms={summary.invalid_transforms}")
+    for split in summary.splits:
+        print(
+            f"split={split.name} frames={split.frames} "
+            f"missing_images={split.missing_images} "
+            f"invalid_transforms={split.invalid_transforms}"
+        )
+    if args.output:
+        write_json(args.output, summary.as_dict())
+        print(f"manifest={args.output}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
+
+
+def _print_metrics(metrics) -> None:
+    print(f"entropy={metrics.entropy:.6f}")
+    print(f"normalized_entropy={metrics.normalized_entropy:.6f}")
+    print(f"sharpness={metrics.sharpness:.6f}")
+    print(f"active_slots={metrics.active_slots}")
+    if metrics.smoothness is not None:
+        print(f"smoothness={metrics.smoothness:.6f}")
 
 
 def _output_format(args: argparse.Namespace) -> str | None:
@@ -218,6 +313,66 @@ def _build_parser() -> argparse.ArgumentParser:
     assets_pull.add_argument("--clusters", type=int)
     assets_pull.add_argument("--force", action="store_true")
     assets_pull.set_defaults(handler=_assets_pull)
+
+    object_field = subparsers.add_parser(
+        "object-field",
+        help="initialize and inspect soft object-slot fields",
+    )
+    object_field_subparsers = object_field.add_subparsers(
+        dest="object_field_command",
+        required=True,
+    )
+
+    field_init = object_field_subparsers.add_parser(
+        "init",
+        help="warm-start a soft object field from Gaussian features",
+    )
+    field_init.add_argument("input", type=Path)
+    field_init.add_argument("--output", "-o", required=True, type=Path)
+    field_init.add_argument("--slots", "-k", type=int, required=True)
+    field_init.add_argument("--ply-output", type=Path)
+    field_init.add_argument("--seed", type=int, default=0)
+    field_init.add_argument("--max-iter", type=int, default=100)
+    field_init.add_argument("--confidence", type=float, default=0.92)
+    field_init.add_argument("--spatial-weight", type=float, default=1.0)
+    field_init.add_argument("--color-weight", type=float, default=0.5)
+    field_init.add_argument("--opacity-weight", type=float, default=0.2)
+    field_init.add_argument("--no-normalize", action="store_true")
+    field_init.add_argument("--smoothness", action="store_true")
+    field_init.add_argument("--neighbors", type=int, default=4)
+    field_init.add_argument("--max-smooth-points", type=int, default=1024)
+    field_init.add_argument("--colorize", action="store_true")
+    field_init.add_argument("--rewrite-sh", action="store_true")
+    field_init.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    field_init.set_defaults(handler=_object_field_init)
+
+    field_export = object_field_subparsers.add_parser(
+        "export",
+        help="export hard object_id labels from an object field",
+    )
+    field_export.add_argument("input", type=Path)
+    field_export.add_argument("--field", required=True, type=Path)
+    field_export.add_argument("--output", "-o", required=True, type=Path)
+    field_export.add_argument("--object-id-field", default="object_id")
+    field_export.add_argument("--colorize", action="store_true")
+    field_export.add_argument("--rewrite-sh", action="store_true")
+    field_export.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    field_export.set_defaults(handler=_object_field_export)
+
+    field_stats = object_field_subparsers.add_parser(
+        "stats",
+        help="print object field metrics",
+    )
+    field_stats.add_argument("field", type=Path)
+    field_stats.set_defaults(handler=_object_field_stats)
+
+    field_nerf = object_field_subparsers.add_parser(
+        "inspect-nerf",
+        help="inspect a NeRF-style posed image dataset",
+    )
+    field_nerf.add_argument("dataset", type=Path)
+    field_nerf.add_argument("--output", "-o", type=Path)
+    field_nerf.set_defaults(handler=_object_field_inspect_nerf)
 
     return parser
 

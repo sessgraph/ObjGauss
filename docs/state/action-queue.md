@@ -4,6 +4,12 @@
 
 ## Open
 
+### ACTION-005: 建立 Object Field 真实训练循环
+
+- 原因: `OBJFIELD-001` 已有 soft slot 文件格式和指标，但仍是 KMeans warm start，没有 multi-view consistency / projection loss。
+- 推荐: 基于 `nerf-synthetic-lego` 先实现小规模 NumPy/PyTorch 训练 smoke，再决定是否引入完整 3DGS trainer。
+- 退出条件: Object Field logits 可通过多视角一致性或投影约束更新，并有固定验收命令。
+
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 
 - 原因: `polyhaven-school-chair-1k` 已可拉取，但仍是 glTF mesh，不能直接进入 3DGS viewer。

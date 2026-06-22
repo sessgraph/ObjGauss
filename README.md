@@ -10,6 +10,7 @@ trainer. The MVP starts from a `gaussians.ply` file produced by an existing
 - `object_id` attachment as a PLY vertex property.
 - Object-colored PLY exports for inspection.
 - Object removal and isolation exports.
+- Soft Object Field initialization for object-slot experiments.
 
 The goal is to validate whether Gaussian splats can be grouped into stable
 object-level clusters before investing in semantic guidance or renderer
@@ -80,6 +81,35 @@ If you only have an antimatter15/cakewalk `.splat` sample, convert it first:
 ```bash
 objgauss convert-splat path/to/model.splat -o outputs/model.ply
 objgauss cluster outputs/model.ply -o outputs/model_objects.ply --clusters 6 --colorize
+```
+
+## Object Field v1-lite
+
+Object Field keeps a soft `N x K` object-slot distribution for each Gaussian and
+exports hard `object_id` labels only at the handoff boundary. The current
+implementation is a NumPy warm start from the existing feature clustering. It is
+not semantic segmentation yet.
+
+Initialize a soft field and optionally export a viewer-compatible PLY:
+
+```bash
+objgauss object-field init public/samples/plush_objects.ply \
+  --output outputs/plush_object_field.npz \
+  --slots 6 \
+  --ply-output outputs/plush_object_field.ply \
+  --colorize
+```
+
+Inspect Object Field metrics:
+
+```bash
+objgauss object-field stats outputs/plush_object_field.npz
+```
+
+Check the NeRF Lego training smoke dataset before Object Field experiments:
+
+```bash
+objgauss object-field inspect-nerf outputs/assets/training/nerf-synthetic-lego
 ```
 
 ## Asset library
