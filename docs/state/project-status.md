@@ -32,7 +32,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss assets list/pull`
   - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors/from-nerf-sam`
   - `objgauss training register-output`
-  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure`
+  - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
 - 前端:
   - 中文 UI。
@@ -73,6 +73,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
   - `npm run acceptance:demo` 已固化为一键闭环总验收命令。
+  - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
 
 ## 最近验证
@@ -86,7 +87,7 @@ npm run build
 
 结果：
 
-- Python 测试: 18 passed。
+- Python 测试: 21 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -103,6 +104,7 @@ npm run build
 - TRAIN-002: `objgauss training register-output` 接入 Gaussian PLY smoke 通过，生成 viewer splat、Object Field 和 `object_id` PLY；使用真实 Lego color mask manifest 时 supervised_gaussians=4806，projection loss 1.386294 -> 0.375765。
 - SEG-002A: `objgauss masks from-nerf-sam --help` 可用；SAM manifest 生成逻辑由 fake generator 测试覆盖，输出 `sam-automatic-mask-generator` manifest 和 boolean `.npy` masks。
 - VERIFY-003: `npm run acceptance:demo` 已检查 `mask_guidance_changed_object_field`；Plush changed_gaussians=196457，Lego proxy changed_gaussians=4960，证明 mask supervision 实际改变 Object Field labels。
+- AUDIT-001: `objgauss demo audit-v1-goal --allow-incomplete` 输出 `passed=false`，当前证据为 split，唯一 completion blocker 是 `unified_real_3dgs_mask_demo_available`。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制

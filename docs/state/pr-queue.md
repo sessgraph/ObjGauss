@@ -35,6 +35,27 @@
 
 ## Done
 
+### AUDIT-001: 固化 ObjGauss v1 阶段目标完成度审计
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 用机器检查把“当前是否已经证明 ObjGauss v1 闭环成立”说清楚，避免把 proxy 或分散证据误报为最终完成。
+- 实施:
+  - 新增 `objgauss demo audit-v1-goal`。
+  - 审计真实 3DGS splat、mask guidance、`object_id` 导出、前端素材注册、固定复现命令和统一真实训练 demo。
+  - 默认严格模式未完成会失败；`--allow-incomplete` 用于输出当前证据报告。
+- 范围外:
+  - 不生成真实 SAM checkpoint 结果。
+  - 不生成真实 NeRF Lego 训练 Gaussian。
+- 验收:
+  - 当前仓库能报告 split evidence 已满足哪些要求，并明确剩余 blocker。
+- 验证:
+  - `uv run objgauss demo audit-v1-goal --allow-incomplete`: passed=false，completion_blockers=`unified_real_3dgs_mask_demo_available`。
+  - `uv run --extra dev pytest`: 21 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `npm run acceptance:demo`: passed。
+- 完成 commit: `85943d4`。
+
 ### VERIFY-003: 固化 mask guidance 改变 Object Field 的验收
 
 - 状态: done

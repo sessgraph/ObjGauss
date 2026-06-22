@@ -24,6 +24,11 @@
 
 ## Closed
 
+### ACTION-018: 固化 ObjGauss v1 阶段目标完成度审计
+
+- 完成 commit: `85943d4`
+- 结果: `objgauss demo audit-v1-goal --allow-incomplete` 可审计五条阶段目标证据；当前输出 split evidence，并明确唯一 blocker 是缺少统一的真实训练 Gaussian demo manifest。
+
 ### ACTION-017: 固化 mask guidance 改变 Object Field 的验收
 
 - 完成 commit: `e5e5154`
