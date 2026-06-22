@@ -10,19 +10,6 @@
 
 ## Ready
 
-### SEG-002: 接入可选 SAM / CLIP mask 生成器
-
-- 状态: ready-for-checkpoint-validation
-- 类型: 重大变更或标准 PR，取决于依赖选择和模型权重策略
-- ADR: `docs/adr/0002-object-segmentation.md`
-- 目标: 从图片生成当前 `vote-masks` 命令可消费的 mask manifest。
-- 范围外: 不改变 Object Field 文件格式；不把模型权重提交仓库。
-- 当前进展: `SEG-002A` 已接入可选 SAM automatic mask generator CLI；还没用真实 SAM checkpoint 跑小场景验收。
-- 验收:
-  - 明确 SAM / CLIP 依赖、权重下载方式、许可和运行成本。
-  - 对一个小场景输出 mask manifest。
-  - `objgauss object-field vote-masks` 可消费该 manifest。
-
 ### TRAIN-001: 训练 NeRF Lego Gaussian PLY
 
 - 状态: ready-for-ADR-review
@@ -34,6 +21,31 @@
   - 可用 `objgauss object-field init` 和 `vote-masks` 跑通最小验收。
 
 ## Done
+
+### SEG-002: 接入可选 SAM mask 生成器并完成 checkpoint 验收
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 从真实 NeRF Lego 图片生成当前 `vote-masks` 命令可消费的 SAM mask manifest，并证明 Object Field 能消费真实 SAM 输出。
+- 实施:
+  - `SEG-002A` 已新增 `objgauss masks from-nerf-sam`，运行时动态加载 `segment-anything`，不提交模型权重。
+  - 使用本地 `sam_vit_b_01ec64.pth` / `vit_b` checkpoint 和 CUDA 生成 NeRF Lego 2 帧 SAM manifest。
+  - 使用 8-slot Object Field 消费 SAM manifest，导出 `outputs/demos/lego-sam-smoke/lego_sam_objects.ply`。
+- 范围外:
+  - 不提交 checkpoint、torch 环境或 `outputs/` 产物。
+  - 不声称 SAM 输出等价于高质量实例语义分割。
+  - 不实现 CLIP 语义命名或跨视角 SAM slot 对齐；这些另行立项。
+- 验收:
+  - `objgauss masks from-nerf-sam` 输出真实 SAM manifest。
+  - `objgauss object-field vote-masks` 可消费该 manifest，并输出带 `object_id` 的 PLY。
+- 验证:
+  - `segment_anything=ok`，`torch 2.12.1+cu130`，GPU: NVIDIA GeForce RTX 5060 Ti。
+  - `objgauss masks from-nerf-sam ... --max-frames 2 --max-masks-per-frame 8 --min-area 64`: frames=2，masks=8，width=800，height=800，mask_pixels=1199536，slots=8。
+  - `objgauss object-field vote-masks ... --iterations 80 --learning-rate 1.0`: supervised_gaussians=5567 / 5696，supervised_fraction=0.977353，vote_conflict_fraction=0.064308，loss 3.902681 -> 0.120758，active_slots=8。
+  - `objgauss stats outputs/demos/lego-sam-smoke/lego_sam_objects.ply`: 5696 gaussians，`object_id` 8 slots。
+- 实现 commit: `8c3c80e`。
+- checkpoint 验收记录 commit: 待提交。
 
 ### VERIFY-004: 固化 mask vote quality audit
 
