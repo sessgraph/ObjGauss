@@ -4,11 +4,17 @@
 
 ## Open
 
+### ACTION-016: 用真实 SAM checkpoint 跑小场景 mask manifest
+
+- 原因: `SEG-002A` 已有可选 SAM CLI，但本机尚未提供 SAM checkpoint，因此还没有真实模型输出的 mask manifest 作为验收证据。
+- 推荐: Owner 提供本地 checkpoint 路径，或单独确认下载策略；然后对 NeRF Lego 小帧数运行 `objgauss masks from-nerf-sam` 并接 `vote-masks`。
+- 退出条件: 一个真实 SAM manifest 被 `objgauss object-field vote-masks` 消费并输出 `object_id` PLY。
+
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `vote-masks` 已能消费 mask manifest，`MASK-001` 也能从 NeRF Lego alpha 生成前景 mask；但仓库还不能自己从图片生成 SAM / CLIP 语义或实例 mask。
-- 推荐: 先做可选依赖和离线命令，不把模型权重放入仓库。
-- 退出条件: 小场景图片可生成 mask manifest，并被 `objgauss object-field vote-masks` 消费。
+- 原因: `SEG-002A` 已接入可选 SAM manifest 生成入口，但还缺真实 checkpoint 小场景验收、CLIP 语义命名和跨视角 slot 对齐。
+- 推荐: 不把模型权重放入仓库；先用 Owner 提供的本地 SAM checkpoint 跑 NeRF Lego 小帧数，再决定是否接 CLIP。
+- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被 `objgauss object-field vote-masks` 消费，并输出对象级 PLY。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 
@@ -17,6 +23,11 @@
 - 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
 
 ## Closed
+
+### ACTION-016A: 接入可选 SAM automatic mask manifest 生成器
+
+- 完成 commit: `8c3c80e`
+- 结果: `objgauss masks from-nerf-sam` 已接入，可在本地具备 `segment-anything` 和 checkpoint 时输出 `vote-masks` manifest；fake generator 测试已覆盖 manifest 和 `.npy` 写出逻辑。
 
 ### ACTION-015: 固化外部 3DGS 训练输出接入命令
 

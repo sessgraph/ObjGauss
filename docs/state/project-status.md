@@ -30,7 +30,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss filter`
   - `objgauss stats`
   - `objgauss assets list/pull`
-  - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors`
+  - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors/from-nerf-sam`
   - `objgauss training register-output`
   - `objgauss demo v1-closure/verify-v1-closure/lego-alpha-closure/verify-lego-alpha-closure`
   - `objgauss object-field init/export/stats/inspect-nerf/vote-masks`
@@ -55,6 +55,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可检查 NeRF-style `transforms_*.json` 训练素材完整性。
   - 可从 NeRF Synthetic RGBA alpha 通道生成真实图片 mask manifest。
   - 可从 NeRF Synthetic Lego RGBA 颜色生成多 slot 真实 2D mask manifest。
+  - 可在本机提供 `segment-anything` 和 checkpoint 时生成 SAM automatic mask manifest。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
 - 训练输出接入:
@@ -84,7 +85,7 @@ npm run build
 
 结果：
 
-- Python 测试: 17 passed。
+- Python 测试: 18 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
@@ -99,13 +100,14 @@ npm run build
 - ACCEPT-001: `npm run acceptance:demo` 通过，重新生成并验证 Plush v1 closure、重新生成并验证 NeRF Lego proxy closure，然后执行浏览器闭环验收；输出 `acceptance_demo=passed`。
 - MASK-002: `objgauss masks from-nerf-rgba-colors` 在 NeRF Lego 真实 RGBA 上生成 8 frames / 32 masks / 4 slots；独立 `vote-masks` 消费该 manifest，3423 个 Gaussian 被监督，projection loss 1.386294 -> 0.390825，并输出 `object_id` PLY。
 - TRAIN-002: `objgauss training register-output` 接入 Gaussian PLY smoke 通过，生成 viewer splat、Object Field 和 `object_id` PLY；使用真实 Lego color mask manifest 时 supervised_gaussians=4806，projection loss 1.386294 -> 0.375765。
+- SEG-002A: `objgauss masks from-nerf-sam --help` 可用；SAM manifest 生成逻辑由 fake generator 测试覆盖，输出 `sam-automatic-mask-generator` manifest 和 boolean `.npy` masks。
 - 已知提示: Vite 报 Spark / Three.js chunk 超过 500KB，不影响当前预览。
 
 ## 当前限制
 
 - 对象聚类色、隐藏、隔离、删除预览仍通过点云编辑 fallback 完成，不是对象级 splat shader。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于验收闭环；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
-- 仓库内还不运行 SAM / CLIP 模型。
+- SAM 入口已接入为可选命令，但本机尚未用真实 checkpoint 跑小场景；仓库内还不运行 CLIP 模型。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环样例是 posed RGBA 生成的轻量 Gaussian proxy，不是完整 3DGS optimization 输出。
 - 外部训练输出接入命令已完成，但本仓库尚未产出真实 NeRF Lego 训练 Gaussian PLY。

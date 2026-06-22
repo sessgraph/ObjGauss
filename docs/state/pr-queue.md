@@ -12,11 +12,12 @@
 
 ### SEG-002: 接入可选 SAM / CLIP mask 生成器
 
-- 状态: ready-for-ADR-review
+- 状态: ready-for-checkpoint-validation
 - 类型: 重大变更或标准 PR，取决于依赖选择和模型权重策略
 - ADR: `docs/adr/0002-object-segmentation.md`
 - 目标: 从图片生成当前 `vote-masks` 命令可消费的 mask manifest。
 - 范围外: 不改变 Object Field 文件格式；不把模型权重提交仓库。
+- 当前进展: `SEG-002A` 已接入可选 SAM automatic mask generator CLI；还没用真实 SAM checkpoint 跑小场景验收。
 - 验收:
   - 明确 SAM / CLIP 依赖、权重下载方式、许可和运行成本。
   - 对一个小场景输出 mask manifest。
@@ -33,6 +34,32 @@
   - 可用 `objgauss object-field init` 和 `vote-masks` 跑通最小验收。
 
 ## Done
+
+### SEG-002A: 接入可选 SAM automatic mask manifest 生成器
+
+- 状态: done
+- 类型: 标准 PR
+- ADR: `docs/adr/0002-object-segmentation.md`
+- 目标: 在不提交模型权重、不强制安装深度学习依赖的前提下，提供仓库内 SAM mask manifest 生成入口。
+- 实施:
+  - 新增 `objgauss masks from-nerf-sam`。
+  - 运行时动态加载 `segment-anything`，要求用户显式提供本地 checkpoint。
+  - 对 NeRF-style RGBA 图片运行 SAM automatic mask generator，并输出现有 `vote-masks` manifest。
+  - slot 按单帧 mask 面积排序为 `sam-area-rank-*`，每个 mask 写为 boolean `.npy`。
+- 范围外:
+  - 不提交或下载 SAM 权重。
+  - 不默认安装 `segment-anything` / torch。
+  - 不实现 CLIP 语义命名或跨视角 SAM slot 对齐。
+  - 未在本机用真实 SAM checkpoint 跑小场景。
+- 验收:
+  - 命令可发现，且无 checkpoint 时不会伪造结果。
+  - manifest 生成逻辑有 fake SAM generator 测试覆盖。
+- 验证:
+  - `uv run objgauss masks from-nerf-sam --help`: passed。
+  - `uv run --extra dev pytest`: 18 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `npm run acceptance:demo`: passed。
+- 完成 commit: `8c3c80e`。
 
 ### TRAIN-002: 固化外部 3DGS 训练输出接入
 
