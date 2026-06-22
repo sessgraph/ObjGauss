@@ -220,6 +220,25 @@ in one scene: NeRF images and camera poses create the Gaussian proxy, real 2D
 color masks supervise Object Field logits, and the exported PLY can be loaded
 from the `NeRF Lego 闭环代理样例` card.
 
+Register an output produced by an external 3DGS trainer:
+
+```bash
+objgauss training register-output path/to/point_cloud.ply \
+  --asset-id nerf-lego-trained-output-local \
+  --output-dir outputs/assets/gaussians/nerf-lego-trained \
+  --dataset outputs/assets/training/nerf-synthetic-lego \
+  --masks outputs/masks/nerf-lego-rgba-colors/mask-manifest.json \
+  --public-name nerf_lego_trained \
+  --iterations 120 \
+  --learning-rate 1.0
+```
+
+This command does not train 3DGS inside ObjGauss. It registers a trained
+Gaussian PLY or `.splat`, writes a viewer `.splat`, runs Object Field mask
+voting when `--masks` is supplied, and exports an object-aware PLY. With the
+`--public-name nerf_lego_trained` path above, the frontend card
+`NeRF Lego 训练输出样例` can load the registered output.
+
 Run the browser audit for both closure cards:
 
 ```bash

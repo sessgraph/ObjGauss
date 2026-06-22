@@ -152,6 +152,23 @@ objgauss masks from-nerf-rgba-colors outputs/assets/training/nerf-synthetic-lego
   --alpha-threshold 16
 ```
 
+登记外部 3DGS 训练器输出：
+
+```bash
+objgauss training register-output path/to/point_cloud.ply \
+  --asset-id nerf-lego-trained-output-local \
+  --output-dir outputs/assets/gaussians/nerf-lego-trained \
+  --dataset outputs/assets/training/nerf-synthetic-lego \
+  --masks outputs/masks/nerf-lego-rgba-colors/mask-manifest.json \
+  --public-name nerf_lego_trained \
+  --iterations 120 \
+  --learning-rate 1.0
+```
+
+该命令只负责接入成熟训练器产物，不在 ObjGauss 内部训练 3DGS。
+默认会生成 viewer `.splat`、Object Field、带 `object_id` 的 PLY 和
+`training-output-manifest.json`。
+
 默认输出：
 
 ```text

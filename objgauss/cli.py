@@ -38,6 +38,7 @@ from objgauss.segment import (
     parse_object_ids,
 )
 from objgauss.splat import read_splat
+from objgauss.training import register_training_output
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -403,6 +404,41 @@ def _demo_verify_lego_alpha_closure(args: argparse.Namespace) -> None:
         raise ValueError("Lego alpha closure verification failed")
 
 
+def _training_register_output(args: argparse.Namespace) -> None:
+    result = register_training_output(
+        args.input,
+        output_dir=args.output_dir,
+        asset_id=args.asset_id,
+        dataset=args.dataset,
+        masks=args.masks,
+        slots=args.slots,
+        public_dir=None if args.no_public_copy else args.public_dir,
+        public_name=args.public_name,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        colorize=not args.no_colorize,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"gaussian_ply={result.gaussian_ply_path}")
+    print(f"splat={result.splat_path}")
+    if result.object_field_path:
+        print(f"object_field={result.object_field_path}")
+    if result.object_ply_path:
+        print(f"object_ply={result.object_ply_path}")
+    if result.public_splat_path:
+        print(f"public_splat={result.public_splat_path}")
+    if result.public_object_ply_path:
+        print(f"public_object_ply={result.public_object_ply_path}")
+    print(f"gaussians={result.gaussian_count}")
+    if result.slots is not None:
+        print(f"slots={result.slots}")
+    if result.supervised_gaussians is not None:
+        print(f"supervised_gaussians={result.supervised_gaussians}")
+    if result.initial_loss is not None and result.final_loss is not None:
+        print(f"initial_loss={result.initial_loss:.6f}")
+        print(f"final_loss={result.final_loss:.6f}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -664,6 +700,29 @@ def _build_parser() -> argparse.ArgumentParser:
     verify_lego_alpha.add_argument("--no-require-public-copy", action="store_true")
     verify_lego_alpha.add_argument("--min-frames", type=int, default=2)
     verify_lego_alpha.set_defaults(handler=_demo_verify_lego_alpha_closure)
+
+    training = subparsers.add_parser(
+        "training",
+        help="register external 3DGS training outputs for ObjGauss",
+    )
+    training_subparsers = training.add_subparsers(dest="training_command", required=True)
+    register_output = training_subparsers.add_parser(
+        "register-output",
+        help="ingest a trained Gaussian PLY or splat and optionally run mask voting",
+    )
+    register_output.add_argument("input", type=Path)
+    register_output.add_argument("--asset-id", required=True)
+    register_output.add_argument("--output-dir", required=True, type=Path)
+    register_output.add_argument("--dataset", type=Path)
+    register_output.add_argument("--masks", type=Path)
+    register_output.add_argument("--slots", type=int)
+    register_output.add_argument("--public-dir", type=Path, default=Path("public/samples"))
+    register_output.add_argument("--public-name")
+    register_output.add_argument("--no-public-copy", action="store_true")
+    register_output.add_argument("--iterations", type=int, default=100)
+    register_output.add_argument("--learning-rate", type=float, default=0.5)
+    register_output.add_argument("--no-colorize", action="store_true")
+    register_output.set_defaults(handler=_training_register_output)
 
     return parser
 

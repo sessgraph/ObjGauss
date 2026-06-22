@@ -466,6 +466,62 @@ def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
     assert summary["supervised_gaussians"] == 4
 
 
+def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp_path, capsys):
+    input_path = tmp_path / "external_trainer" / "point_cloud.ply"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    output_dir = tmp_path / "registered"
+    public_dir = tmp_path / "public"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "training",
+                "register-output",
+                str(input_path),
+                "--asset-id",
+                "nerf-lego-trained-output-local",
+                "--output-dir",
+                str(output_dir),
+                "--dataset",
+                str(tmp_path / "nerf-synthetic-lego"),
+                "--masks",
+                str(masks_path),
+                "--public-dir",
+                str(public_dir),
+                "--public-name",
+                "nerf_lego_trained",
+                "--iterations",
+                "120",
+                "--learning-rate",
+                "1.0",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "training-output-manifest.json").read_text(encoding="utf-8"))
+    registered = read_ply(output_dir / "gaussians.ply")
+    splat = read_splat(output_dir / "gaussians.splat")
+    object_ply = read_ply(output_dir / "object_aware_gaussians.ply")
+
+    assert "manifest=" in output
+    assert manifest["gaussian_source"] == "external_3dgs_training_output"
+    assert manifest["input_format"] == "ply"
+    assert manifest["asset_id"] == "nerf-lego-trained-output-local"
+    assert manifest["acceptance"]["external_gaussian_loaded"] is True
+    assert manifest["acceptance"]["viewer_splat_available"] is True
+    assert manifest["acceptance"]["object_field_trained"] is True
+    assert manifest["acceptance"]["projection_loss_decreased"] is True
+    assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
+    assert registered.count == 4
+    assert splat.count == 4
+    assert set(np.unique(object_ply.vertices["object_id"])) == {0, 1}
+    assert (public_dir / "nerf_lego_trained.splat").exists()
+    assert (public_dir / "nerf_lego_trained_objects.ply").exists()
+
+
 def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     input_path = tmp_path / "objects.ply"
     splat_path = tmp_path / "scene.splat"
