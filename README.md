@@ -166,6 +166,7 @@ Build the current v1 closed-loop acceptance demo:
 ```bash
 objgauss assets pull plush-3dgs-local
 objgauss demo v1-closure
+objgauss demo verify-v1-closure
 ```
 
 This writes:
@@ -176,6 +177,11 @@ outputs/demos/v1-closure/object_field_trained.npz
 outputs/demos/v1-closure/plush_v1_objects.ply
 public/samples/plush_v1_objects.ply
 ```
+
+`verify-v1-closure` re-reads the generated manifest, splat, mask manifest,
+Object Field `.npz`, exported PLY, public viewer copy, and frontend asset
+registration. It fails if any required v1 closure artifact is missing or if
+projection supervision did not reduce loss.
 
 Then open the viewer and load `ObjGauss v1 闭环样例` from the 素材库 panel.
 The real splat renderer shows the original 3DGS appearance; switching to object

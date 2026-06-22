@@ -7,7 +7,7 @@ import numpy as np
 
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
-from objgauss.demo import build_v1_closure_demo
+from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
 from objgauss.features import extract_features
 from objgauss.mask_voting import (
     train_object_field_from_votes,
@@ -315,6 +315,23 @@ def _demo_v1_closure(args: argparse.Namespace) -> None:
     print(f"final_loss={result.final_loss:.6f}")
 
 
+def _demo_verify_v1_closure(args: argparse.Namespace) -> None:
+    result = verify_v1_closure_demo(
+        args.manifest,
+        asset_library_path=args.asset_library,
+        require_public_copy=not args.no_require_public_copy,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"passed={str(result.passed).lower()}")
+    for key, value in result.summary.items():
+        print(f"{key}={value}")
+    for check in result.checks:
+        status = "pass" if check["passed"] else "fail"
+        print(f"check={check['name']} status={status} detail={check['detail']}")
+    if not result.passed:
+        raise ValueError("v1 closure verification failed")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -515,6 +532,20 @@ def _build_parser() -> argparse.ArgumentParser:
     v1_closure.add_argument("--iterations", type=int, default=160)
     v1_closure.add_argument("--learning-rate", type=float, default=1.0)
     v1_closure.set_defaults(handler=_demo_v1_closure)
+
+    verify_v1 = demo_subparsers.add_parser(
+        "verify-v1-closure",
+        help="verify the generated ObjGauss v1 closed-loop acceptance demo",
+    )
+    verify_v1.add_argument(
+        "manifest",
+        nargs="?",
+        type=Path,
+        default=Path("outputs/demos/v1-closure/v1-closure-manifest.json"),
+    )
+    verify_v1.add_argument("--asset-library", type=Path, default=Path("src/assetLibrary.js"))
+    verify_v1.add_argument("--no-require-public-copy", action="store_true")
+    verify_v1.set_defaults(handler=_demo_verify_v1_closure)
 
     return parser
 

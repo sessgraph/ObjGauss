@@ -57,6 +57,7 @@ objgauss assets pull plush-3dgs-local --force
 
 ```bash
 objgauss demo v1-closure
+objgauss demo verify-v1-closure
 ```
 
 默认输出：

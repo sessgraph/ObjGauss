@@ -16,7 +16,12 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import ObjectField, save_object_field
+from objgauss.object_field import (
+    ObjectField,
+    load_object_field,
+    object_field_metrics,
+    save_object_field,
+)
 from objgauss.ply import read_ply, write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 
@@ -34,6 +39,14 @@ class V1ClosureDemoResult:
     supervised_gaussians: int
     initial_loss: float
     final_loss: float
+
+
+@dataclass(frozen=True)
+class V1ClosureVerification:
+    manifest_path: Path
+    passed: bool
+    checks: tuple[dict[str, object], ...]
+    summary: dict[str, object]
 
 
 def build_v1_closure_demo(
@@ -142,6 +155,162 @@ def build_v1_closure_demo(
     )
 
 
+def verify_v1_closure_demo(
+    manifest_path: str | Path = "outputs/demos/v1-closure/v1-closure-manifest.json",
+    *,
+    asset_library_path: str | Path = "src/assetLibrary.js",
+    require_public_copy: bool = True,
+) -> V1ClosureVerification:
+    manifest_path = Path(manifest_path)
+    if not manifest_path.exists():
+        raise ValueError(f"v1 closure manifest does not exist: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    checks: list[dict[str, object]] = []
+
+    def add(name: str, passed: bool, detail: str) -> None:
+        checks.append({"name": name, "passed": bool(passed), "detail": detail})
+
+    gaussian_count = int(manifest.get("gaussian_count", 0))
+    object_count = int(manifest.get("object_count", 0))
+    splat_path = _resolve_manifest_path(manifest.get("splat_path"), manifest_path)
+    mask_manifest_path = _resolve_manifest_path(manifest.get("mask_manifest"), manifest_path)
+    trained_field_path = _resolve_manifest_path(manifest.get("trained_field"), manifest_path)
+    output_ply_path = _resolve_manifest_path(manifest.get("output_ply"), manifest_path)
+    public_ply_raw = manifest.get("public_ply")
+    public_ply_path = (
+        _resolve_manifest_path(public_ply_raw, manifest_path) if public_ply_raw else None
+    )
+
+    add(
+        "real_3dgs_scene",
+        splat_path.exists() and splat_path.stat().st_size > 0,
+        str(splat_path),
+    )
+
+    if mask_manifest_path.exists():
+        mask_payload = json.loads(mask_manifest_path.read_text(encoding="utf-8"))
+        frames = mask_payload.get("frames")
+        frame_count = len(frames) if isinstance(frames, list) else 0
+        mask_count = (
+            sum(
+                len(frame.get("masks", []))
+                for frame in frames
+                if isinstance(frame, dict) and isinstance(frame.get("masks"), list)
+            )
+            if isinstance(frames, list)
+            else 0
+        )
+        add("mask_manifest_exists", True, str(mask_manifest_path))
+        add(
+            "mask_manifest_has_views",
+            frame_count > 0 and mask_count > 0,
+            f"{frame_count} frames / {mask_count} masks",
+        )
+    else:
+        frame_count = 0
+        mask_count = 0
+        add("mask_manifest_exists", False, str(mask_manifest_path))
+        add("mask_manifest_has_views", False, "missing manifest")
+
+    field_shape = None
+    active_slots = 0
+    if trained_field_path.exists():
+        field = load_object_field(trained_field_path)
+        metrics = object_field_metrics(field)
+        field_shape = tuple(int(value) for value in field.logits.shape)
+        active_slots = metrics.active_slots
+        add("object_field_saved", True, str(trained_field_path))
+        add(
+            "object_field_shape_matches_scene",
+            field.gaussian_count == gaussian_count and field.slots == object_count,
+            f"logits={field_shape} scene=({gaussian_count}, {object_count})",
+        )
+        add(
+            "object_field_has_active_slots",
+            active_slots >= min(object_count, 2),
+            f"active_slots={active_slots}",
+        )
+    else:
+        add("object_field_saved", False, str(trained_field_path))
+        add("object_field_shape_matches_scene", False, "missing field")
+        add("object_field_has_active_slots", False, "missing field")
+
+    training = manifest.get("training") if isinstance(manifest.get("training"), dict) else {}
+    initial_loss = _optional_float(training.get("initial_loss"))
+    final_loss = _optional_float(training.get("final_loss"))
+    supervised = int(training.get("supervised_gaussians", 0) or 0)
+    add("mask_votes_supervise_gaussians", supervised > 0, f"supervised_gaussians={supervised}")
+    add(
+        "projection_loss_decreased",
+        initial_loss is not None and final_loss is not None and final_loss < initial_loss,
+        f"{initial_loss} -> {final_loss}",
+    )
+
+    exported_object_count = 0
+    exported_gaussian_count = 0
+    if output_ply_path.exists():
+        exported = read_ply(output_ply_path)
+        exported_gaussian_count = exported.count
+        has_object_id = "object_id" in exported.fields
+        exported_object_count = (
+            len(np.unique(exported.vertices["object_id"])) if has_object_id else 0
+        )
+        add("viewer_ply_available", True, str(output_ply_path))
+        add(
+            "viewer_ply_exports_object_id",
+            has_object_id
+            and exported.count == gaussian_count
+            and exported_object_count == object_count,
+            f"gaussians={exported.count} objects={exported_object_count}",
+        )
+    else:
+        add("viewer_ply_available", False, str(output_ply_path))
+        add("viewer_ply_exports_object_id", False, "missing PLY")
+
+    if require_public_copy:
+        public_ok = public_ply_path is not None and public_ply_path.exists()
+        add("public_viewer_ply_available", public_ok, str(public_ply_path))
+    else:
+        public_ok = True
+
+    asset_library = Path(asset_library_path)
+    if asset_library.exists():
+        asset_text = asset_library.read_text(encoding="utf-8")
+        registered = (
+            "plush-v1-closure-local" in asset_text
+            and "/samples/plush_v1_objects.ply" in asset_text
+            and "/samples/plush.splat" in asset_text
+        )
+        add("frontend_asset_registered", registered, str(asset_library))
+    else:
+        add("frontend_asset_registered", False, str(asset_library))
+
+    viewer_steps = manifest.get("viewer_steps")
+    step_count = len(viewer_steps) if isinstance(viewer_steps, list) else 0
+    add("viewer_steps_documented", step_count >= 5, f"steps={step_count}")
+
+    passed = all(bool(check["passed"]) for check in checks)
+    return V1ClosureVerification(
+        manifest_path=manifest_path,
+        passed=passed,
+        checks=tuple(checks),
+        summary={
+            "gaussians": gaussian_count,
+            "objects": object_count,
+            "mask_frames": frame_count,
+            "masks": mask_count,
+            "field_shape": field_shape,
+            "active_slots": active_slots,
+            "supervised_gaussians": supervised,
+            "initial_loss": initial_loss,
+            "final_loss": final_loss,
+            "exported_gaussians": exported_gaussian_count,
+            "exported_objects": exported_object_count,
+            "public_copy": public_ok,
+        },
+    )
+
+
 def _write_projection_mask_manifest(
     *,
     cloud: GaussianCloud,
@@ -244,3 +413,21 @@ def _compact_labels(labels: np.ndarray) -> np.ndarray:
     unique = sorted(int(value) for value in np.unique(labels))
     mapping = {value: index for index, value in enumerate(unique)}
     return np.array([mapping[int(value)] for value in labels], dtype=np.int32)
+
+
+def _resolve_manifest_path(value: object, manifest_path: Path) -> Path:
+    if not isinstance(value, str) or not value:
+        return manifest_path.parent / "__missing__"
+    path = Path(value)
+    if path.is_absolute() or path.exists():
+        return path
+    candidate = manifest_path.parent / path
+    if candidate.exists():
+        return candidate
+    return path
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)

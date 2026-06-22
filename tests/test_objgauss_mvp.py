@@ -441,6 +441,12 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     assert (public_dir / "plush_v1_objects.ply").exists()
     assert set(np.unique(exported.vertices["object_id"])) == {0, 1}
 
+    assert main(["demo", "verify-v1-closure", str(output_dir / "v1-closure-manifest.json")]) == 0
+    verify_output = capsys.readouterr().out
+    assert "passed=true" in verify_output
+    assert "check=real_3dgs_scene status=pass" in verify_output
+    assert "check=viewer_ply_exports_object_id status=pass" in verify_output
+
 
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [
