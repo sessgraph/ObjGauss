@@ -448,6 +448,79 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
 
+def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[220, 190, 20, 255], [210, 40, 30, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[230, 180, 25, 255], [30, 25, 20, 255], [0, 0, 0, 0], [0, 0, 0, 0]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [160, 160, 150, 255], [150, 150, 140, 255]],
+                [[0, 0, 0, 0], [0, 0, 0, 0], [25, 25, 25, 255], [160, 160, 150, 255]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": float(np.pi / 2.0),
+                "frames": [
+                    {
+                        "file_path": "./train/r_0",
+                        "transform_matrix": np.eye(4, dtype=float).tolist(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "demo"
+    public_dir = tmp_path / "public"
+
+    assert (
+        main(
+            [
+                "demo",
+                "lego-alpha-closure",
+                "--dataset",
+                str(dataset),
+                "--output-dir",
+                str(output_dir),
+                "--public-dir",
+                str(public_dir),
+                "--max-frames",
+                "1",
+                "--sample-stride",
+                "1",
+                "--depth",
+                "2.0",
+                "--iterations",
+                "80",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "lego-alpha-closure-manifest.json").read_text(encoding="utf-8"))
+    exported = read_ply(output_dir / "lego_v1_objects.ply")
+    splat = read_splat(output_dir / "lego_proxy.splat")
+
+    assert "manifest=" in output
+    assert manifest["acceptance"]["gaussian_proxy_saved"] is True
+    assert manifest["acceptance"]["real_mask_manifest_saved"] is True
+    assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
+    assert manifest["training"]["supervised_gaussians"] == exported.count
+    assert exported.count == 8
+    assert splat.count == exported.count
+    assert "object_id" in exported.fields
+    assert (public_dir / "lego_alpha_v1_objects.ply").exists()
+    assert (public_dir / "lego_alpha_proxy.splat").exists()
+
+
 def _synthetic_cloud(*, include_rgb: bool = True, include_sh: bool = False) -> GaussianCloud:
     fields: list[tuple[str, str]] = [
         ("x", "f4"),

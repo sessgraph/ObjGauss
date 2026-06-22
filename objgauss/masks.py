@@ -107,6 +107,10 @@ def build_nerf_alpha_mask_manifest(
 
 
 def read_png_alpha(path: str | Path) -> np.ndarray:
+    return read_png_rgba(path)[:, :, 3]
+
+
+def read_png_rgba(path: str | Path) -> np.ndarray:
     path = Path(path)
     data = path.read_bytes()
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -137,8 +141,7 @@ def read_png_alpha(path: str | Path) -> np.ndarray:
     if width is None or height is None:
         raise ValueError(f"{path} has no PNG IHDR")
     raw = zlib.decompress(bytes(compressed))
-    rgba = _decode_png_scanlines(raw, width=width, height=height, channels=4)
-    return rgba[:, :, 3]
+    return _decode_png_scanlines(raw, width=width, height=height, channels=4)
 
 
 def _decode_png_scanlines(raw: bytes, *, width: int, height: int, channels: int) -> np.ndarray:

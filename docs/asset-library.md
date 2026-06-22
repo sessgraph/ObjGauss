@@ -135,6 +135,28 @@ outputs/assets/training/nerf-synthetic-lego/test/
 outputs/assets/converted/nerf-synthetic-lego/training-manifest.json
 ```
 
+闭环代理验收：
+
+```bash
+objgauss demo lego-alpha-closure
+```
+
+默认输出：
+
+```text
+outputs/demos/lego-alpha-closure/lego-alpha-closure-manifest.json
+outputs/demos/lego-alpha-closure/mask-manifest.json
+outputs/demos/lego-alpha-closure/object_field_trained.npz
+outputs/demos/lego-alpha-closure/lego_proxy.splat
+outputs/demos/lego-alpha-closure/lego_v1_objects.ply
+public/samples/lego_alpha_proxy.splat
+public/samples/lego_alpha_v1_objects.ply
+```
+
+该链路从 NeRF Lego 真实多视角 RGBA 和 pose 生成轻量 Gaussian proxy，
+再用 2D color masks 投票更新 Object Field。它用于把 v1 闭环压到同一个
+Lego 画面里验收，不等价于完整 3DGS 训练输出。
+
 ## 优先素材来源
 
 | 优先级 | 来源 | 类型 | 适合用途 | 入口 |

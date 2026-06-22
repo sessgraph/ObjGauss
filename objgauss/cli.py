@@ -15,6 +15,7 @@ from objgauss.mask_voting import (
     vote_masks_to_gaussians,
 )
 from objgauss.masks import build_nerf_alpha_mask_manifest
+from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
     attach_hard_labels,
     cloud_positions_for_metrics,
@@ -332,6 +333,36 @@ def _demo_verify_v1_closure(args: argparse.Namespace) -> None:
         raise ValueError("v1 closure verification failed")
 
 
+def _demo_lego_alpha_closure(args: argparse.Namespace) -> None:
+    result = build_lego_alpha_closure_demo(
+        dataset=args.dataset,
+        output_dir=args.output_dir,
+        public_dir=None if args.no_public_copy else args.public_dir,
+        split=args.split,
+        max_frames=args.max_frames,
+        sample_stride=args.sample_stride,
+        depth=args.depth,
+        alpha_threshold=args.alpha_threshold,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"mask_manifest={result.mask_manifest_path}")
+    print(f"raw_ply={result.raw_ply_path}")
+    print(f"splat={result.splat_path}")
+    print(f"trained_field={result.trained_field_path}")
+    print(f"output_ply={result.output_ply_path}")
+    if result.public_ply_path:
+        print(f"public_ply={result.public_ply_path}")
+    if result.public_splat_path:
+        print(f"public_splat={result.public_splat_path}")
+    print(f"gaussians={result.gaussian_count}")
+    print(f"objects={result.object_count}")
+    print(f"supervised_gaussians={result.supervised_gaussians}")
+    print(f"initial_loss={result.initial_loss:.6f}")
+    print(f"final_loss={result.final_loss:.6f}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -546,6 +577,27 @@ def _build_parser() -> argparse.ArgumentParser:
     verify_v1.add_argument("--asset-library", type=Path, default=Path("src/assetLibrary.js"))
     verify_v1.add_argument("--no-require-public-copy", action="store_true")
     verify_v1.set_defaults(handler=_demo_verify_v1_closure)
+
+    lego_alpha = demo_subparsers.add_parser(
+        "lego-alpha-closure",
+        help="build a NeRF Lego alpha/color-mask ObjGauss closure proxy demo",
+    )
+    lego_alpha.add_argument(
+        "--dataset",
+        type=Path,
+        default=Path("outputs/assets/training/nerf-synthetic-lego"),
+    )
+    lego_alpha.add_argument("--output-dir", type=Path, default=Path("outputs/demos/lego-alpha-closure"))
+    lego_alpha.add_argument("--public-dir", type=Path, default=Path("public/samples"))
+    lego_alpha.add_argument("--no-public-copy", action="store_true")
+    lego_alpha.add_argument("--split", default="train")
+    lego_alpha.add_argument("--max-frames", type=int, default=12)
+    lego_alpha.add_argument("--sample-stride", type=int, default=8)
+    lego_alpha.add_argument("--depth", type=float, default=4.0)
+    lego_alpha.add_argument("--alpha-threshold", type=int, default=16)
+    lego_alpha.add_argument("--iterations", type=int, default=160)
+    lego_alpha.add_argument("--learning-rate", type=float, default=1.0)
+    lego_alpha.set_defaults(handler=_demo_lego_alpha_closure)
 
     return parser
 

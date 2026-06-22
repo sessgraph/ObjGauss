@@ -187,6 +187,22 @@ Then open the viewer and load `ObjGauss v1 闭环样例` from the 素材库 pane
 The real splat renderer shows the original 3DGS appearance; switching to object
 colors or using isolate/delete enters the object-editable point-cloud view.
 
+Build a NeRF Lego proxy closure demo from real multi-view RGBA images and
+2D color masks:
+
+```bash
+objgauss assets pull nerf-synthetic-lego
+objgauss demo lego-alpha-closure
+```
+
+This writes `outputs/demos/lego-alpha-closure/`, plus
+`public/samples/lego_alpha_proxy.splat` and
+`public/samples/lego_alpha_v1_objects.ply`. It is a lightweight Gaussian proxy
+from posed RGBA images, not full 3DGS optimization, but it keeps the v1 closure
+in one scene: NeRF images and camera poses create the Gaussian proxy, real 2D
+color masks supervise Object Field logits, and the exported PLY can be loaded
+from the `NeRF Lego 闭环代理样例` card.
+
 ## Asset library
 
 素材库入口：

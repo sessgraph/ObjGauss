@@ -66,6 +66,24 @@ export const ASSET_LIBRARY = [
     bestFor: "ObjGauss v1 Object Field 的多视角训练烟测和跨视角一致性验证。",
   },
   {
+    id: "nerf-lego-alpha-closure-local",
+    name: "NeRF Lego 闭环代理样例",
+    category: "本地验收",
+    sourceType: "gaussian",
+    status: "生成后可用",
+    priority: "P0",
+    pipelineStage: "v1闭环代理",
+    useCases: ["多视角数据", "真实2D mask", "ObjectField", "对象编辑"],
+    localPath: "/samples/lego_alpha_v1_objects.ply",
+    splatPath: "/samples/lego_alpha_proxy.splat",
+    fileName: "lego_alpha_v1_objects.ply",
+    sourceName: "NeRF Synthetic Lego",
+    sourceUrl: "https://github.com/bmild/nerf",
+    license: "NeRF 官方示例数据，仅训练/研究使用",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "把 NeRF Lego 多视角 RGBA、2D color mask 投票和对象编辑压到同一个本地验收画面。",
+  },
+  {
     id: "arkitscenes",
     name: "ARKitScenes",
     category: "真实室内场景",
@@ -175,6 +193,7 @@ export const ASSET_LIBRARY = [
 
 export const FEATURED_ASSET_IDS = [
   "plush-v1-closure-local",
+  "nerf-lego-alpha-closure-local",
   "plush-3dgs-local",
   "polyhaven-school-chair-1k",
   "nerf-synthetic-lego",
