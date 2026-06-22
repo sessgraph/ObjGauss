@@ -72,6 +72,22 @@ class ObjectFieldMetrics:
 
 
 @dataclass(frozen=True)
+class ObjectFieldLabelDelta:
+    changed_gaussians: int
+    changed_fraction: float
+    initial_active_slots: int
+    trained_active_slots: int
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "changed_gaussians": self.changed_gaussians,
+            "changed_fraction": self.changed_fraction,
+            "initial_active_slots": self.initial_active_slots,
+            "trained_active_slots": self.trained_active_slots,
+        }
+
+
+@dataclass(frozen=True)
 class NerfSplitSummary:
     name: str
     frames: int
@@ -218,6 +234,25 @@ def object_field_metrics(
         sharpness=sharpness,
         active_slots=active_slots,
         smoothness=smoothness,
+    )
+
+
+def object_field_label_delta(
+    initial: ObjectField,
+    trained: ObjectField,
+) -> ObjectFieldLabelDelta:
+    if initial.logits.shape != trained.logits.shape:
+        raise ValueError(
+            f"object field shapes differ: {initial.logits.shape} vs {trained.logits.shape}"
+        )
+    initial_labels = initial.labels()
+    trained_labels = trained.labels()
+    changed = int(np.count_nonzero(initial_labels != trained_labels))
+    return ObjectFieldLabelDelta(
+        changed_gaussians=changed,
+        changed_fraction=float(changed / max(initial.gaussian_count, 1)),
+        initial_active_slots=len(summarize_labels(initial_labels)),
+        trained_active_slots=len(summarize_labels(trained_labels)),
     )
 
 

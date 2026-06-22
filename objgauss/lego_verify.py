@@ -7,7 +7,11 @@ from typing import Any
 
 import numpy as np
 
-from objgauss.object_field import load_object_field, object_field_metrics
+from objgauss.object_field import (
+    load_object_field,
+    object_field_label_delta,
+    object_field_metrics,
+)
 from objgauss.ply import read_ply
 
 
@@ -38,6 +42,7 @@ def verify_lego_alpha_closure_demo(
     dataset = _resolve_manifest_path(manifest.get("dataset"), manifest_path)
     splat_path = _resolve_manifest_path(manifest.get("splat_path"), manifest_path)
     mask_manifest_path = _resolve_manifest_path(manifest.get("mask_manifest"), manifest_path)
+    initial_field_path = _resolve_manifest_path(manifest.get("initial_field"), manifest_path)
     trained_field_path = _resolve_manifest_path(manifest.get("trained_field"), manifest_path)
     output_ply_path = _resolve_manifest_path(manifest.get("output_ply"), manifest_path)
     public_ply_path = _optional_manifest_path(manifest.get("public_ply"), manifest_path)
@@ -77,6 +82,8 @@ def verify_lego_alpha_closure_demo(
 
     field_shape = None
     active_slots = 0
+    changed_gaussians = 0
+    changed_fraction = 0.0
     if trained_field_path.exists():
         field = load_object_field(trained_field_path)
         metrics = object_field_metrics(field)
@@ -93,6 +100,20 @@ def verify_lego_alpha_closure_demo(
         add("object_field_saved", False, str(trained_field_path))
         add("object_field_shape_matches_scene", False, "missing field")
         add("object_field_has_active_slots", False, "missing field")
+
+    if initial_field_path.exists() and trained_field_path.exists():
+        initial_field = load_object_field(initial_field_path)
+        trained_field = load_object_field(trained_field_path)
+        field_delta = object_field_label_delta(initial_field, trained_field)
+        changed_gaussians = field_delta.changed_gaussians
+        changed_fraction = field_delta.changed_fraction
+        add(
+            "mask_guidance_changed_object_field",
+            changed_gaussians > 0,
+            f"changed_gaussians={changed_gaussians} fraction={changed_fraction:.6f}",
+        )
+    else:
+        add("mask_guidance_changed_object_field", False, "missing initial/trained field")
 
     training = manifest.get("training") if isinstance(manifest.get("training"), dict) else {}
     initial_loss = _optional_float(training.get("initial_loss"))
@@ -136,6 +157,8 @@ def verify_lego_alpha_closure_demo(
             "masks": mask_count,
             "field_shape": field_shape,
             "active_slots": active_slots,
+            "changed_gaussians": changed_gaussians,
+            "changed_fraction": changed_fraction,
             "supervised_gaussians": supervised,
             "initial_loss": initial_loss,
             "final_loss": final_loss,

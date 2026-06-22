@@ -19,6 +19,7 @@ from objgauss.object_field import (
     ObjectField,
     field_from_labels,
     load_object_field,
+    object_field_label_delta,
     object_field_metrics,
     save_object_field,
 )
@@ -185,6 +186,19 @@ def test_object_field_from_labels_has_soft_slots():
     assert np.array_equal(field.labels(), np.array([0, 1, 1, 0], dtype=np.int32))
     assert 0.0 < metrics.entropy < np.log(2.0)
     assert metrics.active_slots == 2
+
+
+def test_object_field_label_delta_counts_mask_guidance_changes():
+    initial = ObjectField(np.zeros((4, 2), dtype=np.float32))
+    trained = field_from_labels(np.array([0, 1, 1, 0], dtype=np.int32), slots=2)
+
+    delta = object_field_label_delta(initial, trained)
+
+    assert delta.changed_gaussians == 2
+    assert delta.changed_fraction == 0.5
+    assert delta.initial_active_slots == 1
+    assert delta.trained_active_slots == 2
+    assert delta.as_dict()["changed_gaussians"] == 2
 
 
 def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
@@ -575,7 +589,9 @@ def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp
     assert manifest["acceptance"]["external_gaussian_loaded"] is True
     assert manifest["acceptance"]["viewer_splat_available"] is True
     assert manifest["acceptance"]["object_field_trained"] is True
+    assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
+    assert manifest["object_field_delta"]["changed_gaussians"] == 2
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert registered.count == 4
     assert splat.count == 4
@@ -620,7 +636,9 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
 
     assert "manifest=" in output
     assert manifest["acceptance"]["real_3dgs_scene_can_render"] is True
+    assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
+    assert manifest["object_field_delta"]["changed_gaussians"] == 2
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["supervised_gaussians"] == 4
     assert (public_dir / "plush_v1_objects.ply").exists()
@@ -630,6 +648,7 @@ def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
     verify_output = capsys.readouterr().out
     assert "passed=true" in verify_output
     assert "check=real_3dgs_scene status=pass" in verify_output
+    assert "check=mask_guidance_changed_object_field status=pass" in verify_output
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
 
@@ -697,6 +716,8 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     assert "manifest=" in output
     assert manifest["acceptance"]["gaussian_proxy_saved"] is True
     assert manifest["acceptance"]["real_mask_manifest_saved"] is True
+    assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
+    assert manifest["object_field_delta"]["changed_gaussians"] > 0
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["supervised_gaussians"] == exported.count
     assert exported.count == 8
@@ -720,6 +741,7 @@ def test_demo_lego_alpha_closure_builds_proxy_assets(tmp_path, capsys):
     verify_output = capsys.readouterr().out
     assert "passed=true" in verify_output
     assert "check=semantic_source_is_real_2d_masks status=pass" in verify_output
+    assert "check=mask_guidance_changed_object_field status=pass" in verify_output
     assert "check=viewer_ply_exports_object_id status=pass" in verify_output
 
 

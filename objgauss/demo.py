@@ -19,6 +19,7 @@ from objgauss.mask_voting import (
 from objgauss.object_field import (
     ObjectField,
     load_object_field,
+    object_field_label_delta,
     object_field_metrics,
     save_object_field,
 )
@@ -88,6 +89,7 @@ def build_v1_closure_demo(
         iterations=iterations,
         learning_rate=learning_rate,
     )
+    field_delta = object_field_label_delta(field, training.field)
 
     initial_field_path = output_dir / "object_field_initial.npz"
     trained_field_path = output_dir / "object_field_trained.npz"
@@ -122,10 +124,12 @@ def build_v1_closure_demo(
         "trained_object_counts": summarize_labels(training.field.labels()),
         "mask_summary": mask_summary,
         "training": training_summary(training),
+        "object_field_delta": field_delta.as_dict(),
         "acceptance": {
             "real_3dgs_scene_can_render": splat_path.exists(),
             "object_field_saved": trained_field_path.exists(),
             "mask_votes_supervise_gaussians": training.supervised_gaussians > 0,
+            "mask_guidance_changed_object_field": field_delta.changed_gaussians > 0,
             "projection_loss_decreased": training.final_loss < training.initial_loss,
             "viewer_ply_available": output_ply_path.exists(),
             "public_viewer_ply_available": public_ply_path.exists() if public_ply_path else False,
@@ -174,6 +178,7 @@ def verify_v1_closure_demo(
     object_count = int(manifest.get("object_count", 0))
     splat_path = _resolve_manifest_path(manifest.get("splat_path"), manifest_path)
     mask_manifest_path = _resolve_manifest_path(manifest.get("mask_manifest"), manifest_path)
+    initial_field_path = _resolve_manifest_path(manifest.get("initial_field"), manifest_path)
     trained_field_path = _resolve_manifest_path(manifest.get("trained_field"), manifest_path)
     output_ply_path = _resolve_manifest_path(manifest.get("output_ply"), manifest_path)
     public_ply_raw = manifest.get("public_ply")
@@ -214,6 +219,8 @@ def verify_v1_closure_demo(
 
     field_shape = None
     active_slots = 0
+    changed_gaussians = 0
+    changed_fraction = 0.0
     if trained_field_path.exists():
         field = load_object_field(trained_field_path)
         metrics = object_field_metrics(field)
@@ -234,6 +241,20 @@ def verify_v1_closure_demo(
         add("object_field_saved", False, str(trained_field_path))
         add("object_field_shape_matches_scene", False, "missing field")
         add("object_field_has_active_slots", False, "missing field")
+
+    if initial_field_path.exists() and trained_field_path.exists():
+        initial_field = load_object_field(initial_field_path)
+        trained_field = load_object_field(trained_field_path)
+        field_delta = object_field_label_delta(initial_field, trained_field)
+        changed_gaussians = field_delta.changed_gaussians
+        changed_fraction = field_delta.changed_fraction
+        add(
+            "mask_guidance_changed_object_field",
+            changed_gaussians > 0,
+            f"changed_gaussians={changed_gaussians} fraction={changed_fraction:.6f}",
+        )
+    else:
+        add("mask_guidance_changed_object_field", False, "missing initial/trained field")
 
     training = manifest.get("training") if isinstance(manifest.get("training"), dict) else {}
     initial_loss = _optional_float(training.get("initial_loss"))
@@ -301,6 +322,8 @@ def verify_v1_closure_demo(
             "masks": mask_count,
             "field_shape": field_shape,
             "active_slots": active_slots,
+            "changed_gaussians": changed_gaussians,
+            "changed_fraction": changed_fraction,
             "supervised_gaussians": supervised,
             "initial_loss": initial_loss,
             "final_loss": final_loss,

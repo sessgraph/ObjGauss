@@ -15,7 +15,7 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import ObjectField, save_object_field
+from objgauss.object_field import ObjectField, object_field_label_delta, save_object_field
 from objgauss.ply import append_or_replace_property, read_ply, write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 from objgauss.splat import read_splat, write_splat
@@ -76,6 +76,7 @@ def register_training_output(
     object_field_path = None
     object_ply_path = None
     training = None
+    field_delta = None
     inferred_slots = slots
     if masks is not None:
         masks = Path(masks)
@@ -91,6 +92,7 @@ def register_training_output(
             iterations=iterations,
             learning_rate=learning_rate,
         )
+        field_delta = object_field_label_delta(field, training.field)
         save_object_field(object_field_path, training.field)
         labeled = assign_object_ids(cloud, training.field.labels())
         if colorize:
@@ -138,12 +140,16 @@ def register_training_output(
         "public_splat": str(public_splat_path) if public_splat_path else None,
         "public_object_ply": str(public_object_ply_path) if public_object_ply_path else None,
         "training": training_summary(training) if training is not None else None,
+        "object_field_delta": field_delta.as_dict() if field_delta is not None else None,
         "acceptance": {
             "external_gaussian_loaded": cloud.count > 0,
             "viewer_splat_available": splat_path.exists(),
             "object_field_trained": training is not None,
             "mask_votes_supervise_gaussians": (
                 training.supervised_gaussians > 0 if training is not None else False
+            ),
+            "mask_guidance_changed_object_field": (
+                field_delta.changed_gaussians > 0 if field_delta is not None else False
             ),
             "projection_loss_decreased": (
                 training.final_loss < training.initial_loss if training is not None else False

@@ -23,7 +23,7 @@ from objgauss.masks import (
     resolve_nerf_image,
     slot_count_summary,
 )
-from objgauss.object_field import ObjectField, save_object_field
+from objgauss.object_field import ObjectField, object_field_label_delta, save_object_field
 from objgauss.ply import write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 from objgauss.splat import write_splat
@@ -113,6 +113,7 @@ def build_lego_alpha_closure_demo(
         iterations=iterations,
         learning_rate=learning_rate,
     )
+    field_delta = object_field_label_delta(field, training.field)
     save_object_field(trained_field_path, training.field)
 
     labeled = assign_object_ids(cloud, training.field.labels())
@@ -161,11 +162,13 @@ def build_lego_alpha_closure_demo(
         "mask_summary": mask_summary,
         "trained_object_counts": summarize_labels(training.field.labels()),
         "training": training_summary(training),
+        "object_field_delta": field_delta.as_dict(),
         "acceptance": {
             "multiview_images_used": mask_summary["frames"] > 0,
             "gaussian_proxy_saved": raw_ply_path.exists() and splat_path.exists(),
             "real_mask_manifest_saved": (output_dir / "mask-manifest.json").exists(),
             "mask_votes_supervise_gaussians": training.supervised_gaussians > 0,
+            "mask_guidance_changed_object_field": field_delta.changed_gaussians > 0,
             "projection_loss_decreased": training.final_loss < training.initial_loss,
             "viewer_ply_available": output_ply_path.exists(),
             "public_assets_available": public_assets,
