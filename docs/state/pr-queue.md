@@ -10,25 +10,43 @@
 
 ## Ready
 
-### SEMANTIC-003C: Add third real Splatfacto scene and close paper gate
+当前无 ready 项；下一步应从三场景 smoke suite 的质量提升或 slot 对齐实验中拆分新 PR。
 
-- 状态: ready
+## Done
+
+### SEMANTIC-003C: Add third Splatfacto-trained scene and close paper gate
+
+- 状态: done
 - 类型: 标准 PR / 训练实验
-- 目标: 为 cross-scene paper gate 补齐第 3 个真实 Splatfacto scene row 和第 3 个 held-out mask eval row。
-- 当前进展:
-  - 现有 2 个真实 Splatfacto scene 已接入 train / held-out SAM manifest split。
-  - Lego safe-2000: train 6 frames / held-out 2 frames，held-out supervised_gaussians=459，held-out projection_loss=2.301630，held-out render=0.197505。
-  - Fern smoke: train 3 frames / held-out 1 frame，held-out supervised_gaussians=1011，held-out projection_loss=0.670722，held-out render=0.233851。
-  - cross-scene paper gate 当前为 `real_splatfacto_scenes=2/3`、`heldout_eval_rows=2/3`。
-- 范围:
-  - 新增第三个真实 Splatfacto scene，优先使用许可和下载路径清楚的数据源。
-  - 为第三个 scene 生成 train / held-out mask manifests，并启用 held-out summary / threshold checks。
-  - 重新跑 `npm run benchmark:cross-scene -- --run`，使 `stage_gate=paper passed=true` 成为可验收目标。
+- 目标: 为 cross-scene paper gate 补齐第 3 个 Splatfacto-trained scene row 和第 3 个 held-out mask eval row。
 - 范围外:
   - 不提交 `outputs/`、checkpoint、SAM checkpoint 或训练产物。
   - 不把当前 `scale_aware_cpu_splat_l1` 误称为完整 covariance-aware `gsplat` renderer。
-
-## Done
+  - 不把 Poly Haven Chair smoke 误称为真实相机采集场景；它是 CC0 mesh-derived NeRF-style render set。
+- 实施:
+  - 新增 `polyhaven-school-chair-nerf` 自动素材源，从 Poly Haven School Chair glTF 生成 16-frame NeRF-style RGBA orbit dataset。
+  - 新增 `objgauss.mesh_nerf` 纯 Python/NumPy glTF rasterizer，写出 `train/*.png` 与 `transforms_train/val/test.json`。
+  - 将 `chair-splatfacto-smoke` 加入 `docs/benchmarks/splatfacto-scenes.json`，并配置 SAM、train/held-out split、Object Field benchmark 参数和 prepare 命令。
+  - 更新素材库、前端素材登记、benchmark runbook 和状态文档。
+- 验收:
+  - Chair asset pull 生成 `outputs/assets/training/polyhaven-school-chair-nerf/transforms_train.json`。
+  - Chair 100-step Splatfacto smoke 导出 `outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda/splat.ply`，50000 Gaussians。
+  - Chair SAM smoke 生成 8 frames / 48 masks；scene split 为 train 6 frames / held-out 2 frames。
+  - Chair scene row: ARI=0.614363、curve OES=0.757609、render=0.248716、held-out projection_loss=2.284750、held-out render=0.224084。
+  - Scene suite summary 含 3 scenes：Lego safe-2000、LLFF Fern smoke、Poly Haven Chair smoke。
+  - Cross-scene summary 含 9 rows：3 semantic smoke + 3 Splatfacto scene rows + 3 Lego variants。
+  - Cross-scene stage gates 为 smoke=true、candidate=true、paper=true；failure report 显示 `Paper gate passed`。
+- 验证:
+  - `uv run objgauss assets pull polyhaven-school-chair-nerf`: passed。
+  - `npm run train:splatfacto:smoke -- --run --asset-id polyhaven-school-chair-nerf ... --skip-benchmark`: passed。
+  - `node scripts/benchmark-splatfacto-scenes.mjs --run --skip-sam --sam-checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth`: passed，scenes=3。
+  - `node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-scenes --skip-variants`: passed，rows=9，stage gates smoke=true / candidate=true / paper=true。
+  - `node scripts/benchmark-splatfacto-scenes.mjs --status`: `status=ready missing=0`。
+  - `node scripts/benchmark-cross-scene.mjs --status`: `status=ready missing=0`。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "asset_registry or assets_list or polyhaven_nerf or splatfacto_scene or cross_scene" -q`: 5 passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+- 完成 commit: `6bf95d2`。
 
 ### SEMANTIC-003A/003D/003E: Scale-aware renderer occlusion, stage gates, and failure reports
 
