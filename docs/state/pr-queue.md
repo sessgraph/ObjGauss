@@ -23,6 +23,30 @@
 
 ## Done
 
+### SEMANTIC-003: Object emergence benchmark curves
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 SEMANTIC-002 的单点观测指标扩展为随 mask-vote training iteration 变化的 benchmark 曲线。
+- 实施:
+  - 新增 `objgauss object-field emergence-curve` CLI。
+  - 曲线采样 projection loss、assignment confidence、mean normalized entropy、effective slots、ARI to initial、ARI to previous、spatial compactness 和 mask-proxy occlusion delta。
+  - 输出 JSON 曲线，并可选输出 CSV，便于后续画图。
+  - `mask_vote_targets` 和 `projection_loss` 提升为公共 helper，保证曲线和 `vote-masks` 使用同一监督目标。
+- 范围外:
+  - 当前 occlusion delta 是 `mask_proxy_projection_loss`，不是 3DGS renderer 重渲染遮挡差分。
+  - 不实现 gradient coherence probe。
+  - 不新增图表 artifact 或前端可视化。
+- 验收:
+  - CLI 能从 Gaussian PLY、初始 Object Field 和 mask manifest 生成曲线 JSON。
+  - CSV 至少包含 step、loss、entropy、ARI、compactness 和 mask-proxy occlusion delta。
+  - 曲线训练后 projection loss 下降，occlusion proxy 可观测。
+- 验证:
+  - `uv run --extra dev pytest`: 28 passed。
+  - `uv run objgauss object-field emergence-curve outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --field outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --masks outputs/masks/nerf-lego-sam/mask-manifest.json --output /tmp/objgauss-lego-splatfacto-emergence-curve.json --csv-output /tmp/objgauss-lego-splatfacto-emergence-curve.csv --iterations 80 --learning-rate 1.0 --eval-every 20`: points=5，projection_loss 4.384474 -> 0.308315，mask_proxy_occlusion_mean_delta_loss 1.428752 -> 1.927487。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
+
 ### SEMANTIC-002: Object Emergence observability metrics
 
 - 状态: done

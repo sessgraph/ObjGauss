@@ -8,7 +8,11 @@ import numpy as np
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
-from objgauss.emergence import object_emergence_metrics
+from objgauss.emergence import (
+    object_emergence_curve,
+    object_emergence_metrics,
+    write_emergence_curve_csv,
+)
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
@@ -273,6 +277,50 @@ def _object_field_emergence(args: argparse.Namespace) -> None:
     if args.output:
         write_json(args.output, metrics)
         print(f"summary={args.output}")
+
+
+def _object_field_emergence_curve(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    field = load_object_field(args.field)
+    if field.gaussian_count != cloud.count:
+        raise ValueError(
+            f"field has {field.gaussian_count} gaussians for cloud with {cloud.count}"
+        )
+    votes = vote_masks_to_gaussians(
+        cloud,
+        args.masks,
+        slots=field.slots,
+        max_frames=args.max_frames,
+    )
+    curve = object_emergence_curve(
+        field,
+        votes,
+        positions_xyz=cloud_positions_for_metrics(cloud),
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        eval_every=args.eval_every,
+    )
+    write_json(args.output, curve)
+    if args.csv_output:
+        write_emergence_curve_csv(args.csv_output, curve)
+
+    points = curve["points"]
+    first = points[0]
+    final = points[-1]
+    final_occlusion = final["mask_proxy_occlusion_delta"]
+    print(f"curve={args.output}")
+    if args.csv_output:
+        print(f"csv={args.csv_output}")
+    print(f"points={len(points)}")
+    print(f"initial_projection_loss={first['projection_loss']:.6f}")
+    print(f"final_projection_loss={final['projection_loss']:.6f}")
+    print(f"final_assignment_confidence={final['assignment_confidence']:.6f}")
+    print(f"final_ari_to_initial={final['ari_to_initial']:.6f}")
+    print(f"final_spatial_compactness_score={final['spatial_compactness_score']:.6f}")
+    print(
+        "final_mask_proxy_occlusion_mean_delta_loss="
+        f"{final_occlusion['mean_delta_loss']:.6f}"
+    )
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -741,6 +789,21 @@ def _build_parser() -> argparse.ArgumentParser:
     field_emergence.add_argument("--reference", type=Path, help="reference Object Field for stability")
     field_emergence.add_argument("--output", "-o", type=Path)
     field_emergence.set_defaults(handler=_object_field_emergence)
+
+    field_emergence_curve = object_field_subparsers.add_parser(
+        "emergence-curve",
+        help="benchmark emergence metrics over mask-vote training iterations",
+    )
+    field_emergence_curve.add_argument("input", type=Path)
+    field_emergence_curve.add_argument("--field", required=True, type=Path)
+    field_emergence_curve.add_argument("--masks", required=True, type=Path)
+    field_emergence_curve.add_argument("--output", "-o", required=True, type=Path)
+    field_emergence_curve.add_argument("--csv-output", type=Path)
+    field_emergence_curve.add_argument("--iterations", type=int, default=100)
+    field_emergence_curve.add_argument("--learning-rate", type=float, default=0.5)
+    field_emergence_curve.add_argument("--eval-every", type=int, default=10)
+    field_emergence_curve.add_argument("--max-frames", type=int)
+    field_emergence_curve.set_defaults(handler=_object_field_emergence_curve)
 
     field_nerf = object_field_subparsers.add_parser(
         "inspect-nerf",

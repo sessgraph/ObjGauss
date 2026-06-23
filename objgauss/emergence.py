@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import csv
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from objgauss.clustering import summarize_labels
-from objgauss.object_field import ObjectField
+from objgauss.mask_voting import MaskVoteResult, mask_vote_targets, projection_loss
+from objgauss.object_field import ObjectField, softmax
 
 _EPS = 1e-8
 
@@ -43,6 +46,137 @@ def object_emergence_metrics(
     }
 
 
+def object_emergence_curve(
+    field: ObjectField,
+    vote_result: MaskVoteResult,
+    *,
+    positions_xyz: np.ndarray | None = None,
+    iterations: int = 100,
+    learning_rate: float = 0.5,
+    eval_every: int = 10,
+) -> dict[str, Any]:
+    if vote_result.votes.shape != field.logits.shape:
+        raise ValueError(
+            f"votes shape {vote_result.votes.shape} does not match field shape {field.logits.shape}"
+        )
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
+    if learning_rate <= 0:
+        raise ValueError("learning_rate must be > 0")
+    if eval_every < 1:
+        raise ValueError("eval_every must be >= 1")
+
+    targets, weights = mask_vote_targets(vote_result)
+    if not np.any(weights > 0):
+        raise ValueError("mask votes did not supervise any Gaussian")
+
+    logits = field.logits.astype(np.float32, copy=True)
+    initial_labels = field.labels()
+    previous_snapshot: ObjectField | None = None
+    points: list[dict[str, Any]] = []
+
+    def record(step: int) -> None:
+        nonlocal previous_snapshot
+        current = ObjectField(logits.copy())
+        metrics = object_emergence_metrics(
+            current,
+            positions_xyz=positions_xyz,
+            reference=previous_snapshot,
+        )
+        labels = current.labels()
+        point = _curve_point(
+            step=step,
+            field=current,
+            metrics=metrics,
+            projection_loss_value=projection_loss(current.logits, targets, weights),
+            mask_proxy_occlusion=mask_proxy_occlusion_delta(current, targets, weights),
+            initial_labels=initial_labels,
+            ari_to_initial=adjusted_rand_index(initial_labels, labels),
+            ari_to_previous=(
+                None
+                if previous_snapshot is None
+                else adjusted_rand_index(previous_snapshot.labels(), labels)
+            ),
+        )
+        points.append(point)
+        previous_snapshot = current
+
+    record(0)
+    for step in range(1, iterations + 1):
+        probabilities = softmax(logits, axis=1)
+        gradient = (probabilities - targets) * weights[:, None]
+        logits -= learning_rate * gradient.astype(np.float32, copy=False)
+        if step % eval_every == 0 or step == iterations:
+            record(step)
+
+    return {
+        "kind": "object_emergence_curve",
+        "occlusion_delta_kind": "mask_proxy_projection_loss",
+        "iterations": iterations,
+        "learning_rate": learning_rate,
+        "eval_every": eval_every,
+        "gaussians": field.gaussian_count,
+        "slots": field.slots,
+        "vote_summary": vote_result.as_dict(),
+        "points": points,
+    }
+
+
+def mask_proxy_occlusion_delta(
+    field: ObjectField,
+    targets: np.ndarray,
+    weights: np.ndarray,
+) -> dict[str, Any]:
+    probabilities = field.probabilities()
+    base_loss = _projection_loss_from_probabilities(probabilities, targets, weights)
+    per_slot: list[dict[str, float | int]] = []
+    deltas: list[float] = []
+    for slot in range(field.slots):
+        masked = probabilities.copy()
+        masked[:, slot] = _EPS
+        masked /= np.sum(masked, axis=1, keepdims=True)
+        masked_loss = _projection_loss_from_probabilities(masked, targets, weights)
+        delta = float(masked_loss - base_loss)
+        deltas.append(delta)
+        per_slot.append(
+            {
+                "slot": slot,
+                "delta_loss": delta,
+                "relative_delta": float(delta / max(base_loss, _EPS)),
+            }
+        )
+    return {
+        "base_projection_loss": base_loss,
+        "mean_delta_loss": float(np.mean(deltas)) if deltas else 0.0,
+        "max_delta_loss": float(np.max(deltas)) if deltas else 0.0,
+        "min_delta_loss": float(np.min(deltas)) if deltas else 0.0,
+        "per_slot": per_slot,
+    }
+
+
+def write_emergence_curve_csv(path: str | Path, curve: dict[str, Any]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [_curve_csv_row(point) for point in curve.get("points", [])]
+    fieldnames = [
+        "step",
+        "projection_loss",
+        "assignment_confidence",
+        "mean_normalized_entropy",
+        "effective_slots",
+        "spatial_compactness_score",
+        "ari_to_initial",
+        "ari_to_previous",
+        "mask_proxy_occlusion_mean_delta_loss",
+        "mask_proxy_occlusion_max_delta_loss",
+        "object_emergence_score",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def adjusted_rand_index(labels_a: np.ndarray, labels_b: np.ndarray) -> float:
     labels_a = np.asarray(labels_a, dtype=np.int64)
     labels_b = np.asarray(labels_b, dtype=np.int64)
@@ -73,6 +207,38 @@ def adjusted_rand_index(labels_a: np.ndarray, labels_b: np.ndarray) -> float:
     return float((sum_comb - expected) / denominator)
 
 
+def _curve_point(
+    *,
+    step: int,
+    field: ObjectField,
+    metrics: dict[str, Any],
+    projection_loss_value: float,
+    mask_proxy_occlusion: dict[str, Any],
+    initial_labels: np.ndarray,
+    ari_to_initial: float,
+    ari_to_previous: float | None,
+) -> dict[str, Any]:
+    assignment = metrics["assignment"]
+    spatial = metrics["spatial"]
+    score = metrics["object_emergence_score"]
+    return {
+        "step": step,
+        "projection_loss": projection_loss_value,
+        "assignment_confidence": assignment["assignment_confidence"],
+        "mean_normalized_entropy": assignment["mean_normalized_entropy"],
+        "effective_slots": assignment["effective_slots"],
+        "active_slots": assignment["active_slots"],
+        "spatial_compactness_score": spatial["compactness_score"] if spatial else None,
+        "ari_to_initial": ari_to_initial,
+        "ari_to_previous": ari_to_previous,
+        "mask_proxy_occlusion_delta": mask_proxy_occlusion,
+        "object_emergence_score": score,
+        "labels_changed_from_initial_fraction": float(
+            np.count_nonzero(field.labels() != initial_labels) / max(field.gaussian_count, 1)
+        ),
+    }
+
+
 def _assignment_metrics(probabilities: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
     slots = probabilities.shape[1]
     entropy_per_gaussian = -np.sum(
@@ -97,6 +263,36 @@ def _assignment_metrics(probabilities: np.ndarray, labels: np.ndarray) -> dict[s
         "slot_mass": [float(value) for value in slot_mass],
         "hard_slot_counts": [int(value) for value in hard_counts],
         "active_slots": len(summarize_labels(labels)),
+    }
+
+
+def _projection_loss_from_probabilities(
+    probabilities: np.ndarray,
+    targets: np.ndarray,
+    weights: np.ndarray,
+) -> float:
+    supervised = weights > 0
+    if not np.any(supervised):
+        raise ValueError("weights must supervise at least one Gaussian")
+    cross_entropy = -np.sum(targets * np.log(np.clip(probabilities, _EPS, 1.0)), axis=1)
+    return float(np.sum(cross_entropy[supervised] * weights[supervised]) / np.sum(weights[supervised]))
+
+
+def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
+    occlusion = point["mask_proxy_occlusion_delta"]
+    score = point["object_emergence_score"]
+    return {
+        "step": int(point["step"]),
+        "projection_loss": float(point["projection_loss"]),
+        "assignment_confidence": float(point["assignment_confidence"]),
+        "mean_normalized_entropy": float(point["mean_normalized_entropy"]),
+        "effective_slots": float(point["effective_slots"]),
+        "spatial_compactness_score": _optional_float(point.get("spatial_compactness_score")),
+        "ari_to_initial": float(point["ari_to_initial"]),
+        "ari_to_previous": _optional_float(point.get("ari_to_previous")),
+        "mask_proxy_occlusion_mean_delta_loss": float(occlusion["mean_delta_loss"]),
+        "mask_proxy_occlusion_max_delta_loss": float(occlusion["max_delta_loss"]),
+        "object_emergence_score": _optional_float(score.get("score")),
     }
 
 
@@ -246,3 +442,7 @@ def _comb2(values: np.ndarray) -> np.ndarray:
 
 def _safe_fraction(numerator: int, denominator: int) -> float:
     return float(numerator / denominator) if denominator else 0.0
+
+
+def _optional_float(value: object) -> float | None:
+    return None if value is None else float(value)

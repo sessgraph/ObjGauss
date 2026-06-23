@@ -11,7 +11,7 @@ import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
 from objgauss.cli import main
 from objgauss.clustering import cluster_features
-from objgauss.emergence import object_emergence_metrics
+from objgauss.emergence import object_emergence_curve, object_emergence_metrics
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.goal_audit import audit_v1_goal
@@ -223,6 +223,33 @@ def test_object_emergence_metrics_track_assignment_spatial_and_stability():
     assert "occlusion_effect" in metrics["object_emergence_score"]["missing_components"]
 
 
+def test_object_emergence_curve_tracks_training_phase_metrics(tmp_path):
+    cloud = _camera_cloud()
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    votes = vote_masks_to_gaussians(cloud, masks_path, slots=2)
+    field = ObjectField(np.zeros((cloud.count, 2), dtype=np.float32))
+    positions = np.stack([cloud.vertices["x"], cloud.vertices["y"], cloud.vertices["z"]], axis=1)
+
+    curve = object_emergence_curve(
+        field,
+        votes,
+        positions_xyz=positions,
+        iterations=20,
+        learning_rate=1.0,
+        eval_every=5,
+    )
+
+    points = curve["points"]
+    assert [point["step"] for point in points] == [0, 5, 10, 15, 20]
+    assert points[-1]["projection_loss"] < points[0]["projection_loss"]
+    assert points[-1]["assignment_confidence"] > points[0]["assignment_confidence"]
+    assert points[-1]["ari_to_initial"] == 0.0
+    assert points[-1]["ari_to_previous"] == 1.0
+    assert points[-1]["spatial_compactness_score"] > 0.9
+    assert points[-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
+    assert curve["occlusion_delta_kind"] == "mask_proxy_projection_loss"
+
+
 def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
     input_path = tmp_path / "gaussians.ply"
     field_path = tmp_path / "object_field"
@@ -325,6 +352,53 @@ def test_object_field_emergence_cli_outputs_partial_oes(tmp_path, capsys):
     assert "missing_components=occlusion_effect" in output
     assert summary["stability"]["adjusted_rand_index"] == 1.0
     assert summary["object_emergence_score"]["complete"] is False
+
+
+def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "camera_cloud.ply"
+    field_path = tmp_path / "field.npz"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    output_path = tmp_path / "curve.json"
+    csv_path = tmp_path / "curve.csv"
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.zeros((cloud.count, 2), dtype=np.float32)))
+
+    assert (
+        main(
+            [
+                "object-field",
+                "emergence-curve",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--masks",
+                str(masks_path),
+                "--output",
+                str(output_path),
+                "--csv-output",
+                str(csv_path),
+                "--iterations",
+                "20",
+                "--learning-rate",
+                "1.0",
+                "--eval-every",
+                "10",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    curve = json.loads(output_path.read_text(encoding="utf-8"))
+    csv_text = csv_path.read_text(encoding="utf-8")
+
+    assert "final_projection_loss=" in output
+    assert "final_mask_proxy_occlusion_mean_delta_loss=" in output
+    assert [point["step"] for point in curve["points"]] == [0, 10, 20]
+    assert curve["points"][-1]["projection_loss"] < curve["points"][0]["projection_loss"]
+    assert curve["points"][-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
+    assert "mask_proxy_occlusion_mean_delta_loss" in csv_text
 
 
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):

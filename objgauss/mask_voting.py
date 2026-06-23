@@ -193,19 +193,19 @@ def train_object_field_from_votes(
         raise ValueError("iterations must be >= 1")
     if learning_rate <= 0:
         raise ValueError("learning_rate must be > 0")
-    targets, weights = _targets_from_votes(vote_result)
+    targets, weights = mask_vote_targets(vote_result)
     supervised = weights > 0
     if not np.any(supervised):
         raise ValueError("mask votes did not supervise any Gaussian")
 
     logits = field.logits.astype(np.float32, copy=True)
-    initial_loss = _projection_loss(logits, targets, weights)
+    initial_loss = projection_loss(logits, targets, weights)
     for _ in range(iterations):
         probabilities = softmax(logits, axis=1)
         gradient = (probabilities - targets) * weights[:, None]
         logits -= learning_rate * gradient.astype(np.float32, copy=False)
     trained = ObjectField(logits)
-    final_loss = _projection_loss(trained.logits, targets, weights)
+    final_loss = projection_loss(trained.logits, targets, weights)
     return MaskTrainingResult(
         field=trained,
         initial_loss=initial_loss,
@@ -361,7 +361,7 @@ def _clamp_unit(value: float) -> float:
     return min(max(value, 0.0), 1.0)
 
 
-def _targets_from_votes(vote_result: MaskVoteResult) -> tuple[np.ndarray, np.ndarray]:
+def mask_vote_targets(vote_result: MaskVoteResult) -> tuple[np.ndarray, np.ndarray]:
     vote_sum = vote_result.votes.sum(axis=1)
     supervised = vote_sum > 0
     targets = np.zeros_like(vote_result.votes, dtype=np.float32)
@@ -371,7 +371,7 @@ def _targets_from_votes(vote_result: MaskVoteResult) -> tuple[np.ndarray, np.nda
     return targets, weights
 
 
-def _projection_loss(logits: np.ndarray, targets: np.ndarray, weights: np.ndarray) -> float:
+def projection_loss(logits: np.ndarray, targets: np.ndarray, weights: np.ndarray) -> float:
     supervised = weights > 0
     probabilities = softmax(logits, axis=1)
     cross_entropy = -np.sum(targets * np.log(np.clip(probabilities, _EPS, 1.0)), axis=1)
