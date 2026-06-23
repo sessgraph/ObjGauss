@@ -69,6 +69,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-D 已完成 WebGPU front-weighted OIT depth contract：WebGPU Tile 编辑预览现在会记录 edit-camera depth range，并在 tile accumulation / per-pixel resolve 中使用 `front-weighted-oit-v1`，减少纯 weighted OIT 把前后层 Gaussian 直接混色的问题。
   - RENDER-005T-E 已完成 WebGPU camera-Jacobian screen covariance：前端 PLY parser 保留三轴 scale / quaternion，WebGPU Tile 按 edit-camera projection Jacobian 将 3D covariance 投影成 screen-space ellipse，并以 4:1 anisotropy clamp 降低低分辨率 tile preview 的针状 streak。
   - RENDER-005T-F 已完成 WebGPU adaptive runtime quality：默认 full runtime 从固定 256px 输出升级为按场景规模和显示比例自适应，小场景可到 `adaptive-high-512`，Plush 级大场景走 `adaptive-medium-384`，并通过 audit 暴露质量档和 pixel budget。
+  - RENDER-005T-G 已完成 WebGPU source-color fidelity audit：前端 PLY parser 保留 RGB / SH DC / fallback 颜色来源，WebGPU Tile 暴露 `source-color-fidelity-v1`，browser audit 证明 Plush 与 Lego 删除预览后均回到 100% RGB 原始颜色而非对象调试色或 fallback 色。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -148,6 +149,8 @@ npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5252
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5253 --probes full
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5254 --probes full
 npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5255 --probes full
+npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5256 --probes full
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5257 --probes full
 ```
 
 2026-06-23:

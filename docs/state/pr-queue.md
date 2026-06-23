@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-G`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先做原始颜色/SH fidelity、真实排序或更强 front-to-back 近似，而不是继续单纯堆内部输出分辨率。
+  - `RENDER-005T-H`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先做真实排序 / 更强 front-to-back 近似和 view-dependent SH 差距，而不是继续怀疑 RGB 原始颜色源。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,31 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-G: WebGPU source-color fidelity audit
+
+- 状态: done / source-color-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 回应“自身颜色为啥还是不像高斯”的问题，先把 WebGPU Tile 编辑预览的颜色来源做成可审计事实，区分 RGB/SH source 丢失、fallback 默认色、对象调试色和后续合成/排序问题。
+- 已实施:
+  - PLY parser 在生成 `point.color` 时同步保留 `colorSource`：`rgb`、`sh-dc` 或 `fallback`；内置 sample scene 标记为 `rgb`。
+  - `webgpuTileSmoke` 增加 `source-color-fidelity-v1` telemetry，统计 `rgb/sh-dc/fallback/object-palette` Gaussian 数量和 opacity mean。
+  - `WebGpuTileViewport` / renderer contract / browser audit 暴露并验证颜色来源；audit 起点允许对象色模式全量走 `object-palette`，但删除预览切回 `原始颜色（编辑预览）` 后必须命中 RGB/SH source 且无 fallback/object 色。
+- 结论:
+  - Plush semantic audit 起点是对象色：`object=281498`；删除预览后切回原始色：`rgb=281498`、`shDc=0`、`fallback=0`、`object=0`。
+  - NeRF Lego proxy audit 起点是对象色：`object=5696`；删除预览后切回原始色：`rgb=5696`、`shDc=0`、`fallback=0`、`object=0`。
+  - 因此当前“原始颜色不像 Spark”的主要剩余差距不再是 RGB/SH source 丢失，而更可能来自 alpha/depth compositing、view-dependent SH 项和 Spark renderer 的排序/抗锯齿差异。
+- 验证:
+  - `node --check src/ply.js`: passed。
+  - `node --check src/sampleScene.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`colorFidelity=source-color-fidelity-v1:5800/0/0/0:0.955`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5256 --probes full`: passed；`colorAfterDelete=281498/0/0/0`。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5257 --probes full`: passed；`colorAfterDelete=5696/0/0/0`。
 
 ### RENDER-005T-F: WebGPU adaptive runtime quality
 

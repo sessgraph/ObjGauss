@@ -89,6 +89,8 @@ try {
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
+        `colorFidelity=${JSON.stringify(result.webGpuColorFidelityMode)}:${result.webGpuColorSourceRgbGaussians}/${result.webGpuColorSourceShDcGaussians}/${result.webGpuColorSourceFallbackGaussians}/${result.webGpuColorSourceObjectGaussians}:${result.webGpuColorOpacityMean} ` +
+        `colorAfterDelete=${result.webGpuColorSourceRgbGaussiansAfterDelete}/${result.webGpuColorSourceShDcGaussiansAfterDelete}/${result.webGpuColorSourceFallbackGaussiansAfterDelete}/${result.webGpuColorSourceObjectGaussiansAfterDelete} ` +
         `screenCovariance=${JSON.stringify(result.webGpuScreenCovarianceMode)}:${result.webGpuScreenCovarianceGaussians}/${result.webGpuScreenCovarianceFallbackGaussians}/${result.webGpuScreenCovarianceClampedGaussians}:${result.webGpuScreenCovarianceMaxAnisotropy}:${result.webGpuScreenCovarianceSigmaMean} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
@@ -322,6 +324,12 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuProjectionDepthMin = Number(await viewport.getAttribute("data-webgpu-projection-depth-min") ?? "0");
       const webGpuProjectionDepthMax = Number(await viewport.getAttribute("data-webgpu-projection-depth-max") ?? "0");
       const webGpuProjectionDepthSpan = Number(await viewport.getAttribute("data-webgpu-projection-depth-span") ?? "0");
+      const webGpuColorFidelityMode = await viewport.getAttribute("data-webgpu-color-fidelity-mode");
+      const webGpuColorSourceRgbGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
+      const webGpuColorSourceShDcGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
+      const webGpuColorSourceFallbackGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
+      const webGpuColorSourceObjectGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-object-gaussians") ?? "0");
+      const webGpuColorOpacityMean = Number(await viewport.getAttribute("data-webgpu-color-opacity-mean") ?? "0");
       const webGpuScreenCovarianceMode = await viewport.getAttribute("data-webgpu-screen-covariance-mode");
       const webGpuScreenCovarianceGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-gaussians") ?? "0");
       const webGpuScreenCovarianceFallbackGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-fallback-gaussians") ?? "0");
@@ -431,6 +439,31 @@ async function runAudit(url, assetsToCheck, options) {
         ) {
           throw new Error(
             `${asset.id} WebGPU depth weighting did not expose a valid front-weighted OIT contract: mode=${webGpuDepthWeightMode} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
+          );
+        }
+        if (
+          webGpuColorFidelityMode !== "source-color-fidelity-v1" ||
+          webGpuColorSourceRgbGaussians +
+            webGpuColorSourceShDcGaussians +
+            webGpuColorSourceFallbackGaussians +
+            webGpuColorSourceObjectGaussians !==
+            packedGaussians ||
+          webGpuColorOpacityMean <= 0 ||
+          webGpuColorOpacityMean > 1
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU color fidelity contract is invalid: mode=${webGpuColorFidelityMode} rgb=${webGpuColorSourceRgbGaussians} shDc=${webGpuColorSourceShDcGaussians} fallback=${webGpuColorSourceFallbackGaussians} object=${webGpuColorSourceObjectGaussians} packed=${packedGaussians} opacityMean=${webGpuColorOpacityMean}`,
+          );
+        }
+        if (
+          webGpuColorSourceObjectGaussians > 0 &&
+          (webGpuColorSourceObjectGaussians !== packedGaussians ||
+            webGpuColorSourceRgbGaussians !== 0 ||
+            webGpuColorSourceShDcGaussians !== 0 ||
+            webGpuColorSourceFallbackGaussians !== 0)
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU object-color mode mixed source colors unexpectedly: rgb=${webGpuColorSourceRgbGaussians} shDc=${webGpuColorSourceShDcGaussians} fallback=${webGpuColorSourceFallbackGaussians} object=${webGpuColorSourceObjectGaussians} packed=${packedGaussians}`,
           );
         }
         if (
@@ -663,6 +696,16 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuProjectionDepthMin,
             webGpuProjectionDepthMax,
             webGpuProjectionDepthSpan,
+            webGpuColorFidelityMode,
+            webGpuColorSourceRgbGaussians,
+            webGpuColorSourceShDcGaussians,
+            webGpuColorSourceFallbackGaussians,
+            webGpuColorSourceObjectGaussians,
+            webGpuColorOpacityMean,
+            webGpuColorSourceRgbGaussiansAfterDelete: "probe-skipped",
+            webGpuColorSourceShDcGaussiansAfterDelete: "probe-skipped",
+            webGpuColorSourceFallbackGaussiansAfterDelete: "probe-skipped",
+            webGpuColorSourceObjectGaussiansAfterDelete: "probe-skipped",
             webGpuScreenCovarianceMode,
             webGpuScreenCovarianceGaussians,
             webGpuScreenCovarianceFallbackGaussians,
@@ -807,6 +850,10 @@ async function runAudit(url, assetsToCheck, options) {
       const objectStateRemovedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
       const objectStateIsolatedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
       const webGpuStorageChecksumAfterDelete = await viewport.getAttribute("data-webgpu-storage-checksum");
+      const webGpuColorSourceRgbGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
+      const webGpuColorSourceShDcGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
+      const webGpuColorSourceFallbackGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
+      const webGpuColorSourceObjectGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-object-gaussians") ?? "0");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
@@ -815,6 +862,17 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (renderModeAfterDelete !== "原始颜色（编辑预览）") {
         throw new Error(`${asset.id} delete preview did not restore edit-preview original colors`);
+      }
+      if (
+        webGpuColorSourceRgbGaussiansAfterDelete +
+          webGpuColorSourceShDcGaussiansAfterDelete <=
+          0 ||
+        webGpuColorSourceFallbackGaussiansAfterDelete !== 0 ||
+        webGpuColorSourceObjectGaussiansAfterDelete !== 0
+      ) {
+        throw new Error(
+          `${asset.id} delete preview did not return to source original colors: rgb=${webGpuColorSourceRgbGaussiansAfterDelete} shDc=${webGpuColorSourceShDcGaussiansAfterDelete} fallback=${webGpuColorSourceFallbackGaussiansAfterDelete} object=${webGpuColorSourceObjectGaussiansAfterDelete}`,
+        );
       }
       if (
         objectStateChecksumAfterDelete === objectStateChecksumAfterIsolate ||
@@ -863,6 +921,16 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuProjectionDepthMin,
         webGpuProjectionDepthMax,
         webGpuProjectionDepthSpan,
+        webGpuColorFidelityMode,
+        webGpuColorSourceRgbGaussians,
+        webGpuColorSourceShDcGaussians,
+        webGpuColorSourceFallbackGaussians,
+        webGpuColorSourceObjectGaussians,
+        webGpuColorOpacityMean,
+        webGpuColorSourceRgbGaussiansAfterDelete,
+        webGpuColorSourceShDcGaussiansAfterDelete,
+        webGpuColorSourceFallbackGaussiansAfterDelete,
+        webGpuColorSourceObjectGaussiansAfterDelete,
         webGpuScreenCovarianceMode,
         webGpuScreenCovarianceGaussians,
         webGpuScreenCovarianceFallbackGaussians,

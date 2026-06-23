@@ -167,7 +167,7 @@ function vertexToPoint(vertex) {
         ? Math.trunc(vertex.label)
         : 0;
 
-  const color = originalColor(vertex);
+  const original = originalColor(vertex);
   const scale3 = gaussianScale3(vertex);
   const rotationQuaternion = gaussianRotationQuaternion(vertex);
   return {
@@ -180,7 +180,8 @@ function vertexToPoint(vertex) {
     rotation: gaussianRotation(rotationQuaternion),
     rotationQuaternion,
     objectId,
-    color,
+    color: original.rgb,
+    colorSource: original.source,
     objectColor: colorForObject(objectId),
   };
 }
@@ -191,11 +192,14 @@ function originalColor(vertex) {
     vertex.green !== undefined &&
     vertex.blue !== undefined
   ) {
-    return [
-      normalizeRgb(vertex.red),
-      normalizeRgb(vertex.green),
-      normalizeRgb(vertex.blue),
-    ];
+    return {
+      rgb: [
+        normalizeRgb(vertex.red),
+        normalizeRgb(vertex.green),
+        normalizeRgb(vertex.blue),
+      ],
+      source: "rgb",
+    };
   }
 
   if (
@@ -203,14 +207,17 @@ function originalColor(vertex) {
     vertex.f_dc_1 !== undefined &&
     vertex.f_dc_2 !== undefined
   ) {
-    return [
-      shToRgb(vertex.f_dc_0),
-      shToRgb(vertex.f_dc_1),
-      shToRgb(vertex.f_dc_2),
-    ];
+    return {
+      rgb: [
+        shToRgb(vertex.f_dc_0),
+        shToRgb(vertex.f_dc_1),
+        shToRgb(vertex.f_dc_2),
+      ],
+      source: "sh-dc",
+    };
   }
 
-  return [198, 207, 217];
+  return { rgb: [198, 207, 217], source: "fallback" };
 }
 
 function normalizeRgb(value) {

@@ -22,6 +22,7 @@ import {
   buildWebGpuTileSmoke,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+  WEBGPU_TILE_COLOR_FIDELITY_MODE,
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
   WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
@@ -183,6 +184,13 @@ assert.ok(Number.isFinite(base.projectionDepthMin));
 assert.ok(Number.isFinite(base.projectionDepthMax));
 assert.ok(base.projectionDepthMax > base.projectionDepthMin);
 assert.ok(base.projectionDepthSpan > 0);
+assert.equal(base.colorFidelityMode, WEBGPU_TILE_COLOR_FIDELITY_MODE);
+assert.equal(base.colorSourceRgbGaussians, base.packedGaussians);
+assert.equal(base.colorSourceShDcGaussians, 0);
+assert.equal(base.colorSourceFallbackGaussians, 0);
+assert.equal(base.colorSourceObjectGaussians, 0);
+assert.ok(base.colorOpacityMean > 0);
+assert.ok(base.colorOpacityMean <= 1);
 assert.equal(base.screenCovarianceMode, WEBGPU_TILE_SCREEN_COVARIANCE_MODE);
 assert.equal(base.screenCovarianceGaussians, base.packedGaussians);
 assert.equal(base.screenCovarianceFallbackGaussians, 0);
@@ -544,6 +552,7 @@ console.log(
     `boundsFit=${base.boundsFitMode}:${base.boundsWorldAspect.toFixed(3)}/${base.boundsViewportAspect.toFixed(3)} ` +
     `projection=${base.projectionMode}:${base.projectionCameraFovDegrees} ` +
     `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
+    `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +

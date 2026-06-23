@@ -10,6 +10,7 @@ export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
 export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
+export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -88,6 +89,11 @@ export function buildWebGpuTileSmoke({
   let screenCovarianceFallbackGaussians = 0;
   let screenCovarianceClampedGaussians = 0;
   let screenCovarianceSigmaSum = 0;
+  let rgbColorGaussians = 0;
+  let shDcColorGaussians = 0;
+  let fallbackColorGaussians = 0;
+  let objectColorGaussians = 0;
+  let opacitySum = 0;
 
   points.forEach((point, index) => {
     const objectDenseIndex = objectIndex.objectIndexById.get(point.objectId) ?? 0;
@@ -110,6 +116,17 @@ export function buildWebGpuTileSmoke({
       screenCovarianceClampedGaussians += 1;
     }
     screenCovarianceSigmaSum += screenCovariance.sigmaMajor;
+    const colorSource = renderColorSource(point, renderMode);
+    if (colorSource === "rgb") {
+      rgbColorGaussians += 1;
+    } else if (colorSource === "sh-dc") {
+      shDcColorGaussians += 1;
+    } else if (colorSource === "object-palette") {
+      objectColorGaussians += 1;
+    } else {
+      fallbackColorGaussians += 1;
+    }
+    opacitySum += clampNumber(point.opacity ?? 1, 0, 1);
     const radiusPixels = pointRadiusPixels({
       screen,
       screenCovariance,
@@ -247,6 +264,12 @@ export function buildWebGpuTileSmoke({
     projectionDepthSpan: bounds.depthSpan,
     depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
     screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
+    colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
+    colorSourceRgbGaussians: rgbColorGaussians,
+    colorSourceShDcGaussians: shDcColorGaussians,
+    colorSourceFallbackGaussians: fallbackColorGaussians,
+    colorSourceObjectGaussians: objectColorGaussians,
+    colorOpacityMean: points.length > 0 ? opacitySum / points.length : 0,
     screenCovarianceGaussians,
     screenCovarianceFallbackGaussians,
     screenCovarianceClampedGaussians,
@@ -961,6 +984,12 @@ function packGaussian({
   scaleRotation[vec4Offset + 2] = screenCovariance.rotation;
   scaleRotation[vec4Offset + 3] = 0;
   objectIndices[index] = objectDenseIndex;
+}
+
+function renderColorSource(point, renderMode) {
+  if (renderMode !== "original") return "object-palette";
+  const source = String(point.colorSource ?? "fallback");
+  return ["rgb", "sh-dc", "fallback"].includes(source) ? source : "fallback";
 }
 
 function projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight }) {

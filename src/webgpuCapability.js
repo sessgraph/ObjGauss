@@ -2,6 +2,7 @@ import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_PROJECTION_MODE,
+  WEBGPU_TILE_COLOR_FIDELITY_MODE,
   WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
 } from "./webgpuTileSmoke.js";
 
@@ -37,6 +38,12 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   projectionDepthMax: 1,
   projectionDepthSpan: 1,
   depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+  colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
+  colorSourceRgbGaussians: 0,
+  colorSourceShDcGaussians: 0,
+  colorSourceFallbackGaussians: 0,
+  colorSourceObjectGaussians: 0,
+  colorOpacityMean: 0,
   screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
   screenCovarianceGaussians: 0,
   screenCovarianceFallbackGaussians: 0,
@@ -170,6 +177,12 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     projectionDepthMax: smoke.projectionDepthMax,
     projectionDepthSpan: smoke.projectionDepthSpan,
     depthWeightMode: smoke.depthWeightMode,
+    colorFidelityMode: smoke.colorFidelityMode,
+    colorSourceRgbGaussians: smoke.colorSourceRgbGaussians,
+    colorSourceShDcGaussians: smoke.colorSourceShDcGaussians,
+    colorSourceFallbackGaussians: smoke.colorSourceFallbackGaussians,
+    colorSourceObjectGaussians: smoke.colorSourceObjectGaussians,
+    colorOpacityMean: smoke.colorOpacityMean,
     screenCovarianceMode: smoke.screenCovarianceMode,
     screenCovarianceGaussians: smoke.screenCovarianceGaussians,
     screenCovarianceFallbackGaussians: smoke.screenCovarianceFallbackGaussians,
