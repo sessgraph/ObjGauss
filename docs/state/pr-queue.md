@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-V`: 基于 SH-view 已显著降低 trained Lego luma/chroma residual、但 coverage ratio 仍约 `31x` 的事实，继续治理编辑 renderer 的 footprint / alpha / presentation 膨胀，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-W`: 基于 SH-view coverage sweep 已证明 footprint tightening 会降低 coverage 但显著恶化 luma 的事实，继续治理 presentation coverage threshold / alpha path，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,24 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-V: WebGPU SH-view coverage sweep
+
+- 状态: done / sh-view-coverage-sweep-audited
+- 类型: 标准 PR / 前端渲染质量诊断
+- 目标: 在 SH-view 已显著降低 trained Lego luma/chroma residual 后，把 coverage sweep 扩展到 `webgpu-color-mode=sh-view`，判断颜色已修正后 footprint / anisotropy 收紧是否能解决颗粒感 / 膨胀感。
+- 已实施:
+  - `audit-webgpu-coverage-sweep` 新增 `--webgpu-color-mode source|sh-view` 透传到 headed desktop WebGPU audit。
+  - Sweep parser 记录 `colorMode`、`shViewGaussians` 和 `shViewAfterDelete`，并写入 `summary.json` / `summary.md` rows。
+  - `docs/benchmarks/webgpu-coverage-sweep.md` 新增 SH-view coverage sweep 用法和当前 trained Lego 结果表。
+- 结论:
+  - trained Lego SH-view baseline: coverage ratio=`31.205176`、luma/chroma=`0.034507/0.055774`、`shViewAfterDelete=255794`。
+  - compact: coverage ratio=`25.958842`，但 luma delta 恶化到 `0.070796`。
+  - tight: coverage ratio=`23.164633`、tile refs 降到 `525755`，但 luma delta 恶化到 `0.093626`，约为 baseline 的 `2.71x`。
+  - 因此 footprint tightening 只能作为诊断轴，不能作为默认修复；“有颗粒感 / 不像高斯”的下一步应看 presentation coverage threshold、alpha path，或 Spark renderer object filter feasibility。
+- 验证:
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `npm run audit:webgpu-coverage-sweep -- --asset nerf-lego-trained-output-local --port 5289 --webgpu-color-mode sh-view --output-dir /tmp/objgauss-webgpu-coverage-trained-sh-view`: passed，headed desktop WebGPU 3 variants。
 
 ### RENDER-005T-U: WebGPU SH-view color diagnostic
 

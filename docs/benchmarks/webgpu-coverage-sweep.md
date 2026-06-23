@@ -22,6 +22,36 @@ Camera framing can be fixed for a run with
 diagnostic knob for separating camera coverage residual from alpha / SH /
 renderer-compositing residual.
 
+Color mode can be fixed for a run with `--webgpu-color-mode source|sh-view`.
+The default is `source`. Use `sh-view` when measuring trained outputs that carry
+`f_dc_*` and `f_rest_*`, so coverage experiments are not confounded by static
+RGB color residual.
+
+## SH-View Coverage Sweep
+
+Use this when the asset has full SH rest coefficients and you want to compare
+footprint / anisotropy variants after view-dependent color has already been
+enabled:
+
+```bash
+npm run audit:webgpu-coverage-sweep -- \
+  --asset nerf-lego-trained-output-local \
+  --webgpu-color-mode sh-view \
+  --output-dir /tmp/objgauss-webgpu-coverage-trained-sh-view
+```
+
+Current trained Lego result:
+
+| Variant | Coverage ratio | Luma delta | Chroma delta | SH-view after delete | Tile refs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| baseline | 31.205176 | 0.034507 | 0.055774 | 255794 | 581933 |
+| compact | 25.958842 | 0.070796 | 0.054231 | 255794 | 540496 |
+| tight | 23.164633 | 0.093626 | 0.053189 | 255794 | 525755 |
+
+`tight` wins coverage and tile-reference cost, but luma is `2.71x` the
+baseline. Therefore footprint tightening alone should remain diagnostic for the
+trained output; it does not justify changing the default renderer parameters.
+
 ## Depth-Bin Sweep
 
 Use the depth sweep when comparing sorted-alpha approximations while holding the

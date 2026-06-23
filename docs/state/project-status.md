@@ -84,6 +84,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-S 已完成 WebGPU front-top-k sorted-alpha diagnostic：`runtime-depth-sort-tuning-v1` 新增 URL / audit 参数 `webgpu-depth-alpha-mode=depth-binned|front-top-k`，默认仍保持 `depth-binned`；`front-top-k` 每像素保留最近 K 个 contributor 并前到后 alpha composite，K 复用 `webgpu-depth-bins`。Lego K=8 将 coverage ratio 从 `3.784251` 降到 `3.583371`，但 luma/chroma 恶化到 `0.208595/0.127958`；K=16 coverage 接近 baseline 但 luma/chroma 仍弱于 baseline；Plush K=8 大场景也通过但 luma/chroma 明显变差。因此 per-pixel sorted-alpha 诊断路径可运行，但当前不是默认候选。
   - RENDER-005T-T 已完成 WebGPU SH-rest presence audit：前端 PLY parser 记录 `f_rest_*` 系数数量与推断 SH degree，WebGPU Tile / Gaussian OIT fallback contract 暴露 `shRest=count/maxCoeffs/maxDegree`，browser audit 验证该 telemetry 合法且不改变默认 RGB/SH-DC 渲染路径；本机 `NeRF Lego 训练输出样例` headed WebGPU full audit 显示 `shRest=255794/45/3`，删除预览后仍回到 `colorAfterDelete=255794/0/0/0` RGB 原始色，证明 trained sample 存在完整 degree-3 view-dependent SH 但当前编辑预览尚未利用。
   - RENDER-005T-U 已完成 WebGPU SH-view color diagnostic：前端 PLY parser 在保留 RGB 原始色的同时保存 raw `f_dc`，并把 `f_rest_*` 系数打包为 typed array；WebGPU Tile 新增 URL / audit 参数 `webgpu-color-mode=source|sh-view`，默认仍是 `source`。`sh-view` 按 edit camera 方向评估 degree-3 SH，仅在“原始颜色（编辑预览）”路径生效，不影响对象调试色；headed WebGPU audit 证明本机 trained Lego 删除预览后 `shViewAfterDelete=255794`，luma/chroma residual 从 source 的 `0.090165/0.071164` 降到 `0.034507/0.055774`，但 coverage ratio 仍约 `31x`，说明“自身颜色不像高斯”的颜色主因已被确认并部分缓解，剩余颗粒/膨胀主要来自编辑 renderer 的 footprint / alpha / presentation 与 Spark 真实 splat 合成差距。
+  - RENDER-005T-V 已完成 WebGPU SH-view coverage sweep：`audit:webgpu-coverage-sweep` 支持 `--webgpu-color-mode source|sh-view` 并在 report 中记录 `colorMode` / `shViewAfterDelete`，可以在 view-dependent color 生效后继续比较 footprint / anisotropy variants；trained Lego SH-view sweep 显示 baseline 仍是 best Pareto，tight 可将 coverage ratio 从 `31.205176` 降到 `23.164633` 并降低 tile refs，但 luma delta 从 `0.034507` 恶化到 `0.093626`。因此 footprint 收紧只能作为诊断，不能作为默认修复；下一步应优先看 presentation coverage threshold / alpha path 或 Spark object filter feasibility。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -152,6 +153,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-webgpu-coverage-sweep.mjs
+npm run audit:webgpu-coverage-sweep -- --asset nerf-lego-trained-output-local --port 5289 --webgpu-color-mode sh-view --output-dir /tmp/objgauss-webgpu-coverage-trained-sh-view
 node --check src/ply.js
 node --check src/webgpuTileSmoke.js
 node --check src/webgpuCapability.js

@@ -39,6 +39,7 @@ const webGpuDepthAlphaMode = optionalString(
   args.webGpuDepthAlphaMode ?? args["webgpu-depth-alpha-mode"],
 );
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
+const webGpuColorMode = optionalString(args.webGpuColorMode ?? args["webgpu-color-mode"]);
 let server = null;
 
 try {
@@ -65,6 +66,7 @@ try {
         webGpuDepthBins,
         webGpuDepthAlphaMode,
         webGpuCameraMode,
+        webGpuColorMode,
       });
       process.stdout.write(result.output);
       process.stderr.write(result.errorOutput);
@@ -77,6 +79,8 @@ try {
           `coverageRatio=${metrics.coverageRatio ?? "unknown"} ` +
           `lumaDelta=${metrics.lumaDelta ?? "unknown"} ` +
           `chromaDelta=${metrics.chromaDelta ?? "unknown"} ` +
+          `colorMode=${JSON.stringify(metrics.colorMode ?? webGpuColorMode ?? "source")} ` +
+          `shViewAfterDelete=${metrics.shViewAfterDelete ?? "unknown"} ` +
           `tileReferences=${metrics.tileReferenceCount ?? "unknown"}`,
       );
       if (result.exitCode !== 0 && !allowFailures) {
@@ -171,6 +175,7 @@ try {
     bestPareto,
     bestCoverage,
     bestMeanPareto,
+    webGpuColorMode,
     gate,
   });
   if (outputDir) {
@@ -192,6 +197,7 @@ try {
       `gate=${gate.enabled ? (gate.passed ? "passed" : "failed") : "disabled"} ` +
       `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
+      `webGpuColorMode=${JSON.stringify(webGpuColorMode ?? "default")} ` +
       `url=${baseUrl}`,
   );
   if (gate.enabled && !gate.passed && !allowFailures) {
@@ -211,6 +217,7 @@ async function runVariant({
   webGpuDepthBins,
   webGpuDepthAlphaMode,
   webGpuCameraMode,
+  webGpuColorMode,
 }) {
   const commandArgs = [
     "scripts/audit-webgpu-desktop.mjs",
@@ -241,6 +248,9 @@ async function runVariant({
   if (webGpuCameraMode) {
     commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
   }
+  if (webGpuColorMode) {
+    commandArgs.push("--webgpu-color-mode", webGpuColorMode);
+  }
   return runProcess(process.execPath, commandArgs);
 }
 
@@ -255,6 +265,8 @@ function parseVariantMetrics(output) {
     /screenCovariance="([^"]+)":[0-9]+\/[0-9]+\/[0-9]+:([0-9.]+):([0-9.]+)/,
   );
   const tileReferences = output.match(/tileReferences=([0-9]+)/);
+  const colorTuning = output.match(/colorTuning="([^"]+)":"([^"]+)":([0-9]+)/);
+  const shViewAfterDelete = output.match(/shViewAfterDelete=([0-9]+)/);
   return {
     sparkCoverage: residual ? Number(residual[1]) : null,
     editCoverage: residual ? Number(residual[2]) : null,
@@ -267,6 +279,10 @@ function parseVariantMetrics(output) {
     footprintScale: pixelCoverage ? Number(pixelCoverage[4]) : null,
     maxAnisotropy: screenCovariance ? Number(screenCovariance[2]) : null,
     sigmaMean: screenCovariance ? Number(screenCovariance[3]) : null,
+    colorTuningMode: colorTuning?.[1] ?? "",
+    colorMode: colorTuning?.[2] ?? "",
+    shViewGaussians: colorTuning ? Number(colorTuning[3]) : null,
+    shViewAfterDelete: shViewAfterDelete ? Number(shViewAfterDelete[1]) : null,
     tileReferenceCount: tileReferences ? Number(tileReferences[1]) : null,
   };
 }
@@ -546,6 +562,7 @@ function buildSummary({
   bestPareto,
   bestCoverage,
   bestMeanPareto,
+  webGpuColorMode,
   gate,
 }) {
   return {
@@ -554,6 +571,7 @@ function buildSummary({
     passed: suitePassed && (!gate.enabled || gate.passed),
     suitePassed,
     url: baseUrl,
+    webGpuColorMode: webGpuColorMode ?? "source",
     assets,
     variants,
     scoreWeights: SCORE_WEIGHTS,
@@ -604,6 +622,7 @@ function renderMarkdown(summary) {
   lines.push(`- Status: ${summary.passed ? "passed" : "failed"}`);
   lines.push(`- Suite: ${summary.suitePassed ? "passed" : "partial"}`);
   lines.push(`- URL: ${summary.url}`);
+  lines.push(`- WebGPU color mode: ${summary.webGpuColorMode}`);
   lines.push(`- Assets: ${summary.assets.join(", ")}`);
   lines.push(`- Weights: coverage=${SCORE_WEIGHTS.coverage}, luma=${SCORE_WEIGHTS.luma}, chroma=${SCORE_WEIGHTS.chroma}, tileReferences=${SCORE_WEIGHTS.tileReferences}`);
   lines.push(`- Best mean Pareto variant: ${summary.bestMeanParetoVariant?.id ?? "none"} (${summary.bestMeanParetoVariant?.meanParetoScore ?? "unknown"})`);
@@ -647,11 +666,11 @@ function renderMarkdown(summary) {
   lines.push("");
   lines.push("## Rows");
   lines.push("");
-  lines.push("| Asset | Variant | Passed | Score | Coverage ratio | Luma delta | Chroma delta | Tile refs |");
-  lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |");
+  lines.push("| Asset | Variant | Passed | Score | Coverage ratio | Luma delta | Chroma delta | Color mode | SH-view after delete | Tile refs |");
+  lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |");
   for (const row of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(row.asset)} | ${escapeMarkdown(row.id)} | ${row.passed ? "yes" : "no"} | ${formatReportValue(row.paretoScore)} | ${formatReportValue(row.coverageRatio)} | ${formatReportValue(row.lumaDelta)} | ${formatReportValue(row.chromaDelta)} | ${formatReportValue(row.tileReferenceCount)} |`,
+      `| ${escapeMarkdown(row.asset)} | ${escapeMarkdown(row.id)} | ${row.passed ? "yes" : "no"} | ${formatReportValue(row.paretoScore)} | ${formatReportValue(row.coverageRatio)} | ${formatReportValue(row.lumaDelta)} | ${formatReportValue(row.chromaDelta)} | ${escapeMarkdown(row.colorMode || "unknown")} | ${formatReportValue(row.shViewAfterDelete)} | ${formatReportValue(row.tileReferenceCount)} |`,
     );
   }
   lines.push("");
