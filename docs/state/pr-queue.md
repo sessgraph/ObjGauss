@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-I`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先审计 view-dependent SH / Spark visual residual，或设计真正的 per-pixel sorted / layered resolve，而不是继续怀疑 RGB 原始颜色源。
+  - `RENDER-005T-J`: 基于 `spark-edit-visual-residual-v1` 的覆盖率 / luma / chroma 差距，优先校准 WebGPU Tile 原始色编辑预览的 alpha footprint / coverage，或继续拆 view-dependent SH 残差。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-I: Spark vs edit visual residual audit
+
+- 状态: done / visual-residual-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在确认 RGB source 未丢失、并加入 front-depth gate 后，把“为什么编辑预览仍不像 Spark 真实 `.splat`”从主观观感变成可审计残差，支撑后续 SH / sorting / footprint 校准。
+- 已实施:
+  - `audit-demo` 新增 `spark-edit-visual-residual-v1`，对 Spark canvas 和“对象编辑 / 原始颜色”canvas 做无依赖 PNG screenshot 解析，输出 coverage、luma、chroma、checksum 和 Spark-vs-edit residual。
+  - Browser audit 流程调整为：加载 Spark 真实查看 -> 采集 Spark visual stats -> 进入对象编辑原始色 -> 采集 edit visual stats -> 再切对象色继续原有选择 / 隔离 / 删除验收。
+  - `PointCloudViewport` fallback 也暴露 color-source telemetry，避免非 WebGPU 环境下 after-delete source-color audit 误读为 0。
+  - `pixel-compute-only` probe 的 expected pixel source 改为跟随 `WEBGPU_PIXEL_RESOLVE_SOURCE`，避免 T-H 后旧字符串导致诊断 probe 误报。
+- 结论:
+  - NeRF Lego fallback audit 显示 Spark coverage=0.121827、原始色 Gaussian OIT 编辑 coverage=0.218147，coverage ratio=1.790629，luma delta=0.040493，chroma delta=0.054075。
+  - NeRF Lego headed WebGPU full audit 显示 Spark coverage=0.121799、原始色 WebGPU Tile 编辑 coverage=0.544371，coverage ratio=4.469421，luma delta=0.152456，chroma delta=0.111168。
+  - 因此当前最大可观测残差更像 WebGPU Tile 原始色编辑预览 coverage / alpha footprint 过铺开，而不是单纯“自身颜色没回来”；下一步应优先校准 coverage/alpha 或继续拆 SH 残差。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `node scripts/audit-demo.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server`: passed；fallback visual residual ratio=1.790629。
+  - `node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server --probes full`: passed；WebGPU full visual residual ratio=4.469421。
+  - `node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server --probes pixel-compute-only --allow-device-lost-probes`: passed；pixel source=`webgpu-compute-front-depth-pixel-accumulation-v1`。
 
 ### RENDER-005T-H: WebGPU front-depth gated pixel resolve
 

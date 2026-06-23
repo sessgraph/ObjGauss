@@ -71,6 +71,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-F 已完成 WebGPU adaptive runtime quality：默认 full runtime 从固定 256px 输出升级为按场景规模和显示比例自适应，小场景可到 `adaptive-high-512`，Plush 级大场景走 `adaptive-medium-384`，并通过 audit 暴露质量档和 pixel budget。
   - RENDER-005T-G 已完成 WebGPU source-color fidelity audit：前端 PLY parser 保留 RGB / SH DC / fallback 颜色来源，WebGPU Tile 暴露 `source-color-fidelity-v1`，browser audit 证明 Plush 与 Lego 删除预览后均回到 100% RGB 原始颜色而非对象调试色或 fallback 色。
   - RENDER-005T-H 已完成 WebGPU front-depth gated pixel resolve：per-pixel resolve 现在先找每像素最近有效 Gaussian contributor，再用 `front-depth-gated-oit-v1` 抑制后层 contributor 混入；这是比纯 front-weighted OIT 更强的遮挡近似，但仍不是完整 per-pixel sorted alpha 或 Spark 真实 `.splat` 重渲染。
+  - RENDER-005T-I 已完成 Spark vs edit visual residual audit：browser audit 会采集 Spark canvas 与“对象编辑 / 原始颜色”canvas 的 coverage、luma、chroma 和 checksum，并输出 `spark-edit-visual-residual-v1`；NeRF Lego WebGPU full audit 当前显示编辑预览 coverage 是 Spark 的约 4.47x，说明下一步应优先校准 alpha / footprint coverage 或继续拆 view-dependent SH 差距。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -138,6 +139,13 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-demo.mjs
+npm run audit:webgpu-tile-smoke
+npm run build
+uv run --extra dev pytest
+node scripts/audit-demo.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server
+node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server --probes full
+node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5260/ --no-server --probes pixel-compute-only --allow-device-lost-probes
 node --check src/webgpuTileComputeShader.js
 node --check src/webgpuTileSmoke.js
 node --check src/webgpuCapability.js
