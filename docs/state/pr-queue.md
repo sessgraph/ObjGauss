@@ -47,7 +47,7 @@
 - 验证:
   - `uv run --extra dev pytest`: 26 passed。
   - `uv run objgauss object-field emergence outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_sam.npz --cloud outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --reference outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --output /tmp/objgauss-lego-splatfacto-emergence.json`: assignment_confidence=0.797826，effective_slots=7.323355，spatial_compactness_score=0.968811，stability_ari=0.642209，matched_label_agreement=0.825040，partial OES=0.772490。
-- 完成 commit: pending。
+- 完成 commit: `d217d81`。
 
 ### TRAIN-001: 训练 NeRF Lego Gaussian PLY
 
