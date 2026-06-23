@@ -602,6 +602,24 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
+.bannerAction {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 6px;
+  color: #f4fbfc;
+  background: rgb(21 154 165 / 24%);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.bannerAction:hover {
+  background: rgb(21 154 165 / 36%);
+}
+
 .viewport {
   position: relative;
   min-width: 0;
@@ -895,7 +913,7 @@ input[type="checkbox"] {
     max-width: none;
     align-items: flex-start;
     flex-direction: column;
-    gap: 3px;
+    gap: 6px;
   }
 
   .statusBar {

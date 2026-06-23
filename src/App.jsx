@@ -268,7 +268,7 @@ export default function App() {
             type="button"
             onClick={enterViewMode}
             disabled={!hasSplatRenderer}
-            title="查看真实 splat 外观"
+            title={objectEditActive ? "清除编辑预览并查看真实 splat 外观" : "查看真实 splat 外观"}
           >
             <Rotate3D size={17} />
             <span>真实查看</span>
@@ -290,8 +290,8 @@ export default function App() {
             onChange={(event) => setEditRenderMode(event.target.value)}
             aria-label="渲染模式"
           >
-            <option value="original">自身颜色</option>
-            <option value="clustered">对象聚类色</option>
+            <option value="original">原始颜色（编辑）</option>
+            <option value="clustered">对象色（编辑）</option>
           </select>
           <button className="iconButton" type="button" onClick={resetDemo} title="重置演示">
             <RefreshCw size={17} />
@@ -337,6 +337,7 @@ export default function App() {
                   type="button"
                   onClick={enterViewMode}
                   disabled={!hasSplatRenderer}
+                  title={objectEditActive ? "清除编辑预览并查看真实 splat 外观" : "查看真实 splat 外观"}
                 >
                   真实查看
                 </button>
@@ -351,8 +352,8 @@ export default function App() {
             </ControlRow>
             <ControlRow label="颜色模式">
               <select value={renderMode} onChange={(event) => setEditRenderMode(event.target.value)}>
-                <option value="original">自身颜色</option>
-                <option value="clustered">对象聚类色</option>
+                <option value="original">原始颜色（编辑）</option>
+                <option value="clustered">对象色（编辑）</option>
               </select>
             </ControlRow>
             <ControlRow label="点大小">
@@ -465,7 +466,13 @@ export default function App() {
           {!useSplatRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
-              <span>点击 Gaussian 预览或右侧列表选择对象；隔离、隐藏、删除在这里预览。</span>
+              <span>{renderModeText} / {editRenderer.rendererLabel}</span>
+              {hasSplatRenderer && objectEditActive ? (
+                <button className="bannerAction" type="button" onClick={enterViewMode}>
+                  <Rotate3D size={15} />
+                  真实 Splat
+                </button>
+              ) : null}
             </div>
           )}
           {useSplatRenderer ? (
@@ -703,8 +710,8 @@ function allIds(points) {
 }
 
 function renderModeLabel(mode) {
-  if (mode === "original") return "自身颜色";
-  return "对象聚类色";
+  if (mode === "original") return "原始颜色（编辑预览）";
+  return "对象色（编辑预览）";
 }
 
 function summarize(points) {

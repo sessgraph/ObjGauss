@@ -12,7 +12,7 @@ ObjGauss 当前前端已经有两条渲染路径：
 
 这个中间态已经能验收对象绑定，但仍不是终局 renderer：
 
-- 删除后的 `自身颜色` 仍是 PLY 原色编辑预览，不是完整 3DGS 重渲染。
+- 删除后的 `原始颜色（编辑预览）` 仍是 PLY 原色编辑预览，不是完整 3DGS 重渲染。
 - 当前 shader 用 `THREE.Points` + `gl_PointCoord`，受 point-size、屏幕 sprite 和 WebGL blending 约束。
 - 没有真正的 per-tile Gaussian binning / accumulation。
 - 没有为 100k 到 1M Gaussians 设计稳定的数据布局、溢出处理和性能 telemetry。
@@ -164,7 +164,7 @@ RENDER-004 完成必须满足：
 - DOM 暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
 - 画布非空，且 browser audit 能检测到 edit pixels。
 - 对象列表选择、画布选中、隔离、删除预览仍工作。
-- 删除预览后使用 `自身颜色` 显示剩余整体场景。
+- 删除预览后使用 `原始颜色（编辑预览）` 显示剩余整体场景。
 - `visibleCount` 与 object-state 更新一致。
 - `tileOverflowCount` 被记录；如果大于 0，audit 不应无条件通过高质量 gate。
 - 不支持 WebGPU 的浏览器明确 fallback 到 `Gaussian OIT 编辑`，现有 demo audit 仍通过。

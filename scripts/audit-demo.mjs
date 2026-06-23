@@ -357,8 +357,8 @@ async function runAudit(url, assetsToCheck) {
       if (numericValue(visibleAfterDelete) <= 0) {
         throw new Error(`${asset.id} delete preview did not show remaining scene`);
       }
-      if (renderModeAfterDelete !== "自身颜色") {
-        throw new Error(`${asset.id} delete preview did not restore original colors`);
+      if (renderModeAfterDelete !== "原始颜色（编辑预览）") {
+        throw new Error(`${asset.id} delete preview did not restore edit-preview original colors`);
       }
       if (
         objectStateChecksumAfterDelete === objectStateChecksumAfterIsolate ||
