@@ -38,7 +38,7 @@
   - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "cross_scene or splatfacto_variant or splatfacto_balanced or splatfacto_smoke" -q`: 4 passed。
   - `uv run --extra dev pytest`: 36 passed。
   - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
-- 完成 commit: 待提交。
+- 完成 commit: `05f40d0`.
 
 ### BENCH-002: Safe-2000 mask variant comparison suite
 
