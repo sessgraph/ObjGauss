@@ -28,7 +28,7 @@
   - 无 `.splat` 的内置/PLY 场景默认对象编辑；带 `.splat` 样例加载后默认真实查看。
   - 对象选择会进入对象编辑模式，并在点云 viewport 中用高亮层显示选中对象。
   - 点云编辑 viewport 支持点击画布选择最近 Gaussian 对应的 object，避免只能通过右侧列表选中。
-  - 修复“隔离后删除当前对象导致可见数反跳”的状态机；删除隔离对象后可见数保持为 0。
+  - 删除预览会退出 `只看所选` 隔离并切回 `自身颜色`，显示删除后的剩余整体场景。
   - 对象行拆成独立选择按钮和可见性按钮，去掉按钮内嵌 switch 的可访问性问题。
   - 素材库只展示可加载样例，并新增 Benchmark tab 显示 SEMANTIC-003 gates 与三场景指标。
   - 移动端布局改为 viewport 优先的纵向堆叠。
@@ -37,16 +37,17 @@
   - `ObjGauss v1 闭环样例` 加载后显示真实查看 / 真实 Splat。
   - 点击对象行后切入对象编辑并显示编辑预览 banner。
   - 在点云编辑画布中点击可直接选中 object，并继续执行隔离/删除预览。
-  - 隔离 object 0 后删除，visible 从 85041 变为 0。
+  - 隔离 object 后删除，显示删除后的剩余整体场景，并回到 `自身颜色`。
   - Benchmark tab 显示 smoke/candidate/paper pass 和 Lego/Fern/Chair 行。
   - Web 素材库不再显示 Poly Haven School Chair 1K 这类不能直接渲染的 source-only 卡片。
 - 验证:
   - `npm run build`: passed，仍有 Spark / Three bundle size warning。
   - `npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5190/`: passed。
-  - `npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5191/`: passed，包含 `canvasSelectedObject=1` 画布点选断言。
+  - `npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5191/`: passed，包含 `canvasSelectedObject=1`、`visibleAfterDelete=230,581` 和 `renderModeAfterDelete="自身颜色"` 断言。
   - Targeted Playwright QA: passed，截图和状态日志位于 `/tmp/objgauss-web001-qa/`。
 - 完成 commit: `b8b0fe3`.
 - Follow-up commit: `cbf1b7b`.
+- Follow-up commit: `0cccd1a`.
 
 ### SEMANTIC-003C: Add third Splatfacto-trained scene and close paper gate
 
