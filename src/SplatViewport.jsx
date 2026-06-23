@@ -127,7 +127,7 @@ export default function SplatViewport({
       .then(() => {
         if (disposed) return;
         setStatus("就绪");
-        frameSplat(splat, camera, controls);
+        frameSplat(splat, camera, controls, scene);
       })
       .catch((error) => {
         if (disposed) return;
@@ -175,7 +175,7 @@ export default function SplatViewport({
   );
 }
 
-function frameSplat(splat, camera, controls) {
+function frameSplat(splat, camera, controls, scene) {
   const box = splat.getBoundingBox(true);
   if (!box || box.isEmpty()) return;
 
@@ -190,6 +190,10 @@ function frameSplat(splat, camera, controls) {
   camera.near = Math.max(maxDim / 120, 0.001);
   camera.far = maxDim * 120;
   camera.updateProjectionMatrix();
+  if (scene?.fog) {
+    scene.fog.near = Math.max(distance * 1.4, maxDim * 2);
+    scene.fog.far = Math.max(distance * 4, maxDim * 10);
+  }
   controls.target.copy(center);
   controls.update();
 }

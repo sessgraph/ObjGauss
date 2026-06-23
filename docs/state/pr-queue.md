@@ -10,18 +10,51 @@
 
 ## Ready
 
-### TRAIN-003C: Higher-quality NeRF Lego Splatfacto candidate
+### SEG-003: Multi-view SAM supervision for Splatfacto candidates
 
 - 状态: ready-for-owner-confirmation
 - 类型: 重大变更
+- 目标: 为 safe-2000 Splatfacto candidate 生成更多 NeRF Lego SAM views，并补 slot balancing / 多视角一致性检查，降低 2-frame supervision 导致的 object slot 不平衡。
+- 范围外: 不继续盲目增加 Splatfacto 训练步数；不提交 SAM checkpoint、训练 checkpoint 或大体积训练输出。
+- 验收:
+  - 生成 8-12 frame SAM manifest，记录 frames、masks、mask_pixels、slots。
+  - safe-2000 上 `training register-output` 的 object_id 分布不再出现接近空槽。
+  - 与 2-frame SAM baseline 比较 supervised_gaussians、effective_slots、ARI、render_occlusion_effect_score 和浏览器对象交互。
+
+## Done
+
+### TRAIN-003C: Higher-quality NeRF Lego Splatfacto candidate
+
+- 状态: done
+- 类型: 重大变更
 - 目标: 在不影响本机交互的资源窗口内，将 safe-500 candidate 推进到更高质量 NeRF Lego Splatfacto 训练结果，并形成质量验收记录。
-- 范围外: 不自研完整 3DGS trainer；不把 checkpoint、SAM checkpoint 或大体积训练输出提交进 git。
+- 实施:
+  - 使用 Nerfstudio Splatfacto 2000 iterations、`vis=tensorboard`、CPU image cache、0.5 camera scale 和 `MAX_JOBS=2` 完成 resource-safe candidate。
+  - 复用 `/tmp/objgauss-cuda13` CUDA wrapper 和已有 `gsplat` JIT cache，避免重新触发长时间编译。
+  - 导出 `outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply`，255794 / 255795 Gaussian 通过 opacity filter。
+  - 使用 `training register-output` 将 safe-2000 登记为本机 ignored `NeRF Lego 训练输出样例` public sample。
+  - 生成 safe-500 vs safe-2000 emergence report：`/tmp/objgauss-lego-splatfacto-safe-500-vs-2000-report.html`。
+  - 修正 `SplatViewport` 的 fog 为随 splat bounding box 自适应，避免 denser / larger Splatfacto sample 在真实 splat 模式下被固定 fog 盖成背景。
+- 范围外:
+  - 不提交 `outputs/`、`public/samples/*.ply`、`public/samples/*.splat`、checkpoint、SAM checkpoint 或训练日志。
+  - 不声称 safe-2000 已经是最终语义样例。
+  - 不把该本机样例纳入默认 CI/public benchmark。
 - 验收:
   - 记录训练配置、GPU 占用、耗时、输出路径和失败/恢复策略。
   - 导出的 Lego `splat.ply` 有可比较的 Gaussian 数、opacity filter 结果和前端外观截图。
   - 与 safe-500 candidate 比较 Object Field vote loss、emergence curve 和浏览器对象交互表现。
-
-## Done
+- 验证:
+  - Splatfacto train: final train loss=0.022640，train PSNR=25.625683，gaussian_count=255795，TensorBoard GPU memory=941.883MB，train total time=18.331932s。
+  - `ns-export gaussian-splat`: exported 255794 / 255795 Gaussian，PLY 大小约 61MB。
+  - `training register-output`: `gaussians=255794`，`slots=8`，`supervised_gaussians=85349`，projection loss `4.467615 -> 0.288167`。
+  - `objgauss stats public/samples/nerf_lego_trained_objects.ply`: object_id counts `84464/64455/111/14821/27910/23159/15867/25007`。
+  - `objgauss object-field emergence`: assignment_confidence=0.819222，effective_slots=5.996345，spatial_compactness_score=0.980746，stability_ari=0.388430，partial OES=0.671132。
+  - `objgauss object-field emergence-curve`: final projection loss=0.302584，render_occlusion_effect_score=0.123359。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --port 5186`: passed，splatPixels=3256，editPixels=74388，visibleAfterIsolate=84464，deletedObjects=1。
+  - `npm run audit:demo -- --port 5187`: passed，默认 3 个闭环样例仍可加载和交互。
+  - `uv run --extra dev pytest`: 32 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `<pending>`.
 
 ### TRAIN-003B: NeRF Lego Splatfacto public training sample
 

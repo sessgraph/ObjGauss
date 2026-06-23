@@ -51,6 +51,61 @@ browser_asset=nerf-lego-trained-output-local passed
 This completes the "registered frontend training-output sample" handoff, but it
 is still a safe candidate, not the final high-quality long training result.
 
+## TRAIN-003C Higher-Quality Candidate
+
+TRAIN-003C ran a 2000 iteration candidate with the same resource-safe settings:
+
+```text
+iterations=2000
+vis=tensorboard
+cache_images=cpu
+camera_res_scale_factor=0.5
+MAX_JOBS=2
+```
+
+Validated local outputs:
+
+```text
+outputs/training/nerf-lego-splatfacto-long/lego-splatfacto-safe/splatfacto/safe-2000-cpu-cache-v1/config.yml
+outputs/training/nerf-lego-splatfacto-long/lego-splatfacto-safe/splatfacto/safe-2000-cpu-cache-v1/nerfstudio_models/step-000001999.ckpt
+outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply
+outputs/assets/gaussians/nerf-lego-trained-safe-2000-cpu-cache-v1-warmstart/training-output-manifest.json
+```
+
+The 2000-step candidate is a better geometry/rendering candidate than safe-500:
+
+```text
+exported_gaussians=255794 / 255795
+train_loss=0.022640
+train_psnr=25.625683
+train_gaussian_count=255795
+tensorboard_gpu_memory_mb=941.883301
+train_total_time_seconds=18.331932
+browser_splat_pixels=3256
+```
+
+The ObjGauss registration also gained much more mask coverage:
+
+```text
+slots=8
+supervised_gaussians=85349
+projection_loss=4.467615 -> 0.288167
+```
+
+However, this is not yet a final semantic sample. With the existing 2-frame SAM
+manifest, object slots became less balanced:
+
+```text
+object_id_counts=84464/64455/111/14821/27910/23159/15867/25007
+effective_slots=5.996345
+stability_ari=0.388430
+object_emergence_score=0.671132
+render_occlusion_effect_score=0.123359
+```
+
+The correct next step is not just more Splatfacto iterations. It is better
+multi-view mask supervision and slot balancing for this denser training output.
+
 ## One Command
 
 Preview the command sequence without running training:
