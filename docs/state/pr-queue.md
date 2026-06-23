@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-M`: 继续分线治理 Spark/edit 残差。coverage 线应进入更实质的 footprint / covariance / alpha threshold sweep，而不是只加 presentation gate；shading 线评估 view-dependent SH 或 Spark edit handoff。
+  - `RENDER-005T-N`: 基于 T-M 的 sweep 基座，增加 Pareto scoring / multi-scene sweep，把 coverage、luma、chroma 和 tile reference cost 合成可比较表；避免只按单一 coverage ratio 选择会牺牲 shading 的参数。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-M: WebGPU coverage tuning sweep
+
+- 状态: done / coverage-sweep-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 T-L 证明低 alpha halo 只解释一部分 coverage 残差后，把 footprint / covariance 调参从“手改常量”推进成可复用 browser audit sweep。
+- 已实施:
+  - `buildWebGpuTileSmoke` 新增 `runtime-coverage-tuning-v1`，支持 runtime `footprintScale` 与 `maxAnisotropy`，默认仍为 `2.2 / 4`。
+  - `App.jsx` 从 URL 读取 `webgpu-footprint-scale` 与 `webgpu-covariance-max-anisotropy`，并传入 base smoke 与 runtime smoke，保证 gate telemetry 和真实 WebGPU 渲染一致。
+  - `audit-demo` 和 `audit-webgpu-desktop` 支持同名参数，并校验浏览器 telemetry 命中 requested tuning。
+  - 新增 `npm run audit:webgpu-coverage-sweep`，默认跑 baseline / compact / tight 三组 Lego headed desktop WebGPU full audits，并输出 coverage / luma / chroma。
+- 结论:
+  - baseline `2.2 / 4`: coverage ratio=`3.784251`，luma/chroma=`0.106079/0.086537`。
+  - compact `1.9 / 3`: coverage ratio=`3.536942`，luma/chroma=`0.127400/0.096173`。
+  - tight `1.7 / 2.5`: coverage ratio=`3.346752`，luma/chroma=`0.142279/0.102668`。
+  - 收紧 footprint / anisotropy 可以稳定降低 coverage ratio，但会牺牲 luma / chroma；因此不应直接把 tight 设为默认，下一步需要 Pareto scoring 或 multi-scene sweep。
+- 验证:
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`pixelCoverage=footprint-weight-floor-calibrated-v1:runtime-coverage-tuning-v1:0.004:2.2`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-coverage-sweep -- --port 5266`: passed；best coverage variant=`tight:3.346752`，but luma/chroma tradeoff worsened versus baseline。
 
 ### RENDER-005T-L: WebGPU alpha presentation edge gate
 

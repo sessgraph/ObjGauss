@@ -28,12 +28,17 @@ const DEPTH_WEIGHT_FLOOR = 0.22;
 const FRONT_DEPTH_GATE_STRENGTH = 12;
 const FRONT_DEPTH_GATE_FLOOR = 0.06;
 const PIXEL_DEPTH_BIN_COUNT = 8;
-const SCREEN_COVARIANCE_MAX_ANISOTROPY = 4;
+export const WEBGPU_COVERAGE_TUNING_MODE = "runtime-coverage-tuning-v1";
+export const WEBGPU_COVERAGE_TUNING_DEFAULTS = Object.freeze({
+  footprintScale: 2.2,
+  maxAnisotropy: 4,
+});
+const SCREEN_COVARIANCE_MAX_ANISOTROPY = WEBGPU_COVERAGE_TUNING_DEFAULTS.maxAnisotropy;
 const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
 const EDIT_CAMERA_UP = Object.freeze([0, 1, 0]);
 const EDIT_CAMERA_FOV_DEGREES = 52;
-const EDIT_SPLAT_SIZE_SCALE = 2.2;
+const EDIT_SPLAT_SIZE_SCALE = WEBGPU_COVERAGE_TUNING_DEFAULTS.footprintScale;
 const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, -0.25],
   [0.25, -0.25],
@@ -57,7 +62,9 @@ export function buildWebGpuTileSmoke({
   includeTileEntries = false,
   includePixelOutput = false,
   computePixelReference = includePixelOutput,
+  coverageTuning = null,
 }) {
+  const resolvedCoverageTuning = normalizeWebGpuCoverageTuning(coverageTuning);
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
     objectIdsByIndex: objectIndex.objectIdsByIndex,
@@ -112,6 +119,7 @@ export function buildWebGpuTileSmoke({
       bounds,
       viewportWidth,
       viewportHeight,
+      coverageTuning: resolvedCoverageTuning,
     });
     if (screenCovariance.mode === "full") {
       screenCovarianceGaussians += 1;
@@ -137,6 +145,7 @@ export function buildWebGpuTileSmoke({
       screen,
       screenCovariance,
       pointSize,
+      coverageTuning: resolvedCoverageTuning,
     });
     packGaussian({
       point,
@@ -206,6 +215,7 @@ export function buildWebGpuTileSmoke({
       tileColumns,
       tileRows,
       pointSize,
+      coverageTuning: resolvedCoverageTuning,
       tileOffsets,
       tileEntries,
     });
@@ -275,7 +285,8 @@ export function buildWebGpuTileSmoke({
     pixelDepthBinCount: PIXEL_DEPTH_BIN_COUNT,
     pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
     pixelCoverageWeightFloor: PIXEL_COVERAGE_WEIGHT_FLOOR,
-    pixelCoverageFootprintScale: EDIT_SPLAT_SIZE_SCALE,
+    pixelCoverageFootprintScale: resolvedCoverageTuning.footprintScale,
+    pixelCoverageTuningMode: WEBGPU_COVERAGE_TUNING_MODE,
     screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
     colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
     colorSourceRgbGaussians: rgbColorGaussians,
@@ -286,7 +297,7 @@ export function buildWebGpuTileSmoke({
     screenCovarianceGaussians,
     screenCovarianceFallbackGaussians,
     screenCovarianceClampedGaussians,
-    screenCovarianceMaxAnisotropy: SCREEN_COVARIANCE_MAX_ANISOTROPY,
+    screenCovarianceMaxAnisotropy: resolvedCoverageTuning.maxAnisotropy,
     screenCovarianceSigmaMean:
       points.length > 0 ? screenCovarianceSigmaSum / points.length : 0,
     tileColumns,
@@ -341,6 +352,22 @@ export function buildWebGpuTileSmoke({
       pixelResolvedRgba: pixelResolve?.pixelResolvedRgba ?? null,
       tileEntries,
     },
+  };
+}
+
+export function normalizeWebGpuCoverageTuning(tuning = null) {
+  return {
+    mode: WEBGPU_COVERAGE_TUNING_MODE,
+    footprintScale: clampNumber(
+      Number(tuning?.footprintScale ?? WEBGPU_COVERAGE_TUNING_DEFAULTS.footprintScale),
+      1.2,
+      4.8,
+    ),
+    maxAnisotropy: clampNumber(
+      Number(tuning?.maxAnisotropy ?? WEBGPU_COVERAGE_TUNING_DEFAULTS.maxAnisotropy),
+      1.5,
+      8,
+    ),
   };
 }
 
@@ -401,6 +428,7 @@ function populateCompactTileEntries({
   tileColumns,
   tileRows,
   pointSize,
+  coverageTuning,
   tileOffsets,
   tileEntries,
 }) {
@@ -417,11 +445,13 @@ function populateCompactTileEntries({
       bounds,
       viewportWidth,
       viewportHeight,
+      coverageTuning,
     });
     const radiusPixels = pointRadiusPixels({
       screen,
       screenCovariance,
       pointSize,
+      coverageTuning,
     });
     if (!screenInfluencesViewport({ screen, radiusPixels, viewportWidth, viewportHeight })) return;
     const minTileX = clampInt(Math.floor((screen.x - radiusPixels) / tileSize), 0, tileColumns - 1);
@@ -1076,11 +1106,12 @@ function projectPointScreenCovariance({
   bounds,
   viewportWidth,
   viewportHeight,
+  coverageTuning,
 }) {
   const scale3 = pointScale3(point);
   const rotationQuaternion = pointRotationQuaternion(point);
   if (!scale3 || !rotationQuaternion) {
-    return legacyScreenCovariance({ point, scale, screen });
+    return legacyScreenCovariance({ point, scale, screen, coverageTuning });
   }
 
   const rows = screenJacobianRows({ screen, bounds, viewportWidth, viewportHeight });
@@ -1094,7 +1125,7 @@ function projectPointScreenCovariance({
   let covarianceYy = 0;
 
   for (let axisIndex = 0; axisIndex < axes.length; axisIndex += 1) {
-    const sigmaWorld = scale3[axisIndex] * EDIT_SPLAT_SIZE_SCALE / 3;
+    const sigmaWorld = scale3[axisIndex] * coverageTuning.footprintScale / 3;
     const axis = axes[axisIndex];
     const projectedX = dot3(rows.x, axis) * sigmaWorld;
     const projectedY = dot3(rows.y, axis) * sigmaWorld;
@@ -1103,13 +1134,19 @@ function projectPointScreenCovariance({
     covarianceYy += projectedY * projectedY;
   }
 
-  return ellipseFromCovariance(covarianceXx, covarianceXy, covarianceYy, "full");
+  return ellipseFromCovariance(
+    covarianceXx,
+    covarianceXy,
+    covarianceYy,
+    "full",
+    coverageTuning,
+  );
 }
 
-function legacyScreenCovariance({ point, scale, screen }) {
+function legacyScreenCovariance({ point, scale, screen, coverageTuning }) {
   return {
-    sigmaMajor: Math.max((scale[0] * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE) / 3, 0.0001),
-    sigmaMinor: Math.max((scale[1] * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE) / 3, 0.0001),
+    sigmaMajor: Math.max((scale[0] * screen.pixelsPerWorldUnit * coverageTuning.footprintScale) / 3, 0.0001),
+    sigmaMinor: Math.max((scale[1] * screen.pixelsPerWorldUnit * coverageTuning.footprintScale) / 3, 0.0001),
     rotation: Number.isFinite(point.rotation) ? point.rotation : 0,
     clamped: false,
     mode: "fallback",
@@ -1139,7 +1176,7 @@ function screenJacobianRows({ screen, bounds, viewportWidth, viewportHeight }) {
   return { x: rowX, y: rowY };
 }
 
-function ellipseFromCovariance(covarianceXx, covarianceXy, covarianceYy, mode) {
+function ellipseFromCovariance(covarianceXx, covarianceXy, covarianceYy, mode, coverageTuning) {
   const trace = (covarianceXx + covarianceYy) * 0.5;
   const spread = Math.hypot((covarianceXx - covarianceYy) * 0.5, covarianceXy);
   const lambdaMajor = Math.max(trace + spread, 0.000001);
@@ -1148,7 +1185,7 @@ function ellipseFromCovariance(covarianceXx, covarianceXy, covarianceYy, mode) {
   const rawSigmaMajor = Math.sqrt(lambdaMajor);
   const sigmaMajor = Math.min(
     rawSigmaMajor,
-    Math.max(sigmaMinor * SCREEN_COVARIANCE_MAX_ANISOTROPY, sigmaMinor),
+    Math.max(sigmaMinor * coverageTuning.maxAnisotropy, sigmaMinor),
   );
   return {
     sigmaMajor,
@@ -1200,8 +1237,8 @@ function frontDepthGate(depth, nearestDepth, depthSpan) {
   );
 }
 
-function pointRadiusPixels({ screen, screenCovariance, pointSize }) {
-  const pointSizeRadius = pointSize * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE;
+function pointRadiusPixels({ screen, screenCovariance, pointSize, coverageTuning }) {
+  const pointSizeRadius = pointSize * screen.pixelsPerWorldUnit * coverageTuning.footprintScale;
   return clampNumber(Math.max(screenCovariance.sigmaMajor * 3, pointSizeRadius), 1.5, 96);
 }
 

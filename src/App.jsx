@@ -30,7 +30,10 @@ import {
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
   WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
 } from "./webgpuRuntimeProbe.js";
-import { buildWebGpuTileSmoke } from "./webgpuTileSmoke.js";
+import {
+  buildWebGpuTileSmoke,
+  normalizeWebGpuCoverageTuning,
+} from "./webgpuTileSmoke.js";
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
@@ -103,6 +106,7 @@ export default function App() {
 
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
+  const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -113,8 +117,9 @@ export default function App() {
         selectedId,
         renderMode,
         pointSize,
+        coverageTuning: webGpuCoverageTuning,
       }),
-    [scene.points, visibleIds, removedIds, isolatedId, selectedId, renderMode, pointSize],
+    [scene.points, visibleIds, removedIds, isolatedId, selectedId, renderMode, pointSize, webGpuCoverageTuning],
   );
   const editRenderer = useMemo(
     () => editRendererContract(webGpuCapability, webGpuTileSmoke),
@@ -170,6 +175,7 @@ export default function App() {
       includePixelOutput: true,
       computePixelReference: false,
       maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
+      coverageTuning: webGpuCoverageTuning,
     });
   }, [
     scene.points,
@@ -182,6 +188,7 @@ export default function App() {
     useWebGpuTileRenderer,
     webGpuRuntimeViewport,
     webGpuTileSmoke,
+    webGpuCoverageTuning,
   ]);
   const activeEditRenderer = useMemo(
     () =>
@@ -854,6 +861,17 @@ function readWebGpuRuntimeViewportRequest() {
     ),
     explicit: true,
   };
+}
+
+function readWebGpuCoverageTuning() {
+  if (typeof window === "undefined") {
+    return normalizeWebGpuCoverageTuning();
+  }
+  const params = new URLSearchParams(window.location.search);
+  return normalizeWebGpuCoverageTuning({
+    footprintScale: params.get("webgpu-footprint-scale"),
+    maxAnisotropy: params.get("webgpu-covariance-max-anisotropy"),
+  });
 }
 
 function buildWebGpuRuntimeViewport({ probe, request, displaySize, gaussianCount }) {

@@ -75,6 +75,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-J 已完成 WebGPU footprint coverage calibration：WebGPU Tile 编辑预览暴露 `footprint-weight-floor-calibrated-v1`，pixel resolve 使用 `0.004` 权重 floor，footprint scale 校准到 `2.2`；NeRF Lego Spark/edit coverage ratio 从 `4.469421` 降到 `3.271989`，但 luma / chroma 未同步改善，说明“自身颜色不像真实高斯”的剩余主因是排序 alpha / SH / Spark 合成路径差距，而不是 RGB 原色丢失。
   - RENDER-005T-K 已完成 WebGPU depth-binned alpha compositing：pixel resolve 升级为 `depth-binned-alpha-composite-v1`，每像素固定 8 个 depth bins 做 front-to-back alpha compositing；NeRF Lego luma / chroma delta 从 T-J 的 `0.207570 / 0.133965` 降到 `0.109000 / 0.087808`，Plush 大场景也通过 desktop WebGPU full audit，但 coverage ratio 未同步改善，说明后续需把 coverage 和 shading 分线治理。
   - RENDER-005T-L 已完成 WebGPU alpha presentation edge gate：fullscreen storage resolve 新增 `alpha-edge-gated-presentation-v1:0.035`，只在最终显示阶段压掉低 alpha halo，不改 compute resolve buffer；NeRF Lego coverage ratio 从 T-K 的 `3.856920` 小幅降到 `3.784251`，Plush 从 `6.680406` 降到 `6.448639`，说明 halo 有贡献但 coverage 主问题仍需 footprint / covariance / threshold sweep。
+  - RENDER-005T-M 已完成 WebGPU coverage tuning sweep：WebGPU Tile 支持 runtime `webgpu-footprint-scale` / `webgpu-covariance-max-anisotropy`，新增 `npm run audit:webgpu-coverage-sweep`；Lego sweep 显示 coverage 可从 baseline `3.784251` 降到 tight `3.346752`，但 luma / chroma 从 `0.106079 / 0.086537` 恶化到 `0.142279 / 0.102668`，下一步需 Pareto scoring / multi-scene sweep。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -142,6 +143,15 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check src/webgpuTileSmoke.js
+node --check scripts/audit-demo.mjs
+node --check scripts/audit-webgpu-desktop.mjs
+node --check scripts/audit-webgpu-coverage-sweep.mjs
+node --check scripts/audit-webgpu-tile-smoke.mjs
+npm run audit:webgpu-tile-smoke
+npm run build
+uv run --extra dev pytest
+npm run audit:webgpu-coverage-sweep -- --port 5266
 node --check src/webgpuTileResolveShader.js
 node --check scripts/audit-demo.mjs
 node --check scripts/audit-webgpu-tile-smoke.mjs

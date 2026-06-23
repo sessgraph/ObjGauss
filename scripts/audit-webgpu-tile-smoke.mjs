@@ -20,6 +20,7 @@ import {
 } from "../src/webgpuTileComputeShader.js";
 import {
   buildWebGpuTileSmoke,
+  WEBGPU_COVERAGE_TUNING_MODE,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
   WEBGPU_PIXEL_COVERAGE_MODE,
@@ -189,6 +190,7 @@ assert.equal(base.pixelDepthGateStrength, 12);
 assert.equal(base.pixelDepthGateFloor, 0.06);
 assert.equal(base.pixelDepthBinCount, 8);
 assert.equal(base.pixelCoverageMode, WEBGPU_PIXEL_COVERAGE_MODE);
+assert.equal(base.pixelCoverageTuningMode, WEBGPU_COVERAGE_TUNING_MODE);
 assert.equal(base.pixelCoverageWeightFloor, 0.004);
 assert.equal(base.pixelCoverageFootprintScale, 2.2);
 assert.ok(Number.isFinite(base.projectionDepthMin));
@@ -216,6 +218,27 @@ assert.ok(base.resolveAlphaMean > 0);
 assert.ok(base.resolveLumaMean > 0);
 assert.match(base.resolveChecksum, /^[0-9a-f]{8}$/);
 assert.match(base.pixelResolveChecksum, /^[0-9a-f]{8}$/);
+
+const tunedCoverage = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  coverageTuning: {
+    footprintScale: 1.7,
+    maxAnisotropy: 2.5,
+  },
+});
+assert.equal(tunedCoverage.pixelCoverageTuningMode, WEBGPU_COVERAGE_TUNING_MODE);
+assert.equal(tunedCoverage.pixelCoverageFootprintScale, 1.7);
+assert.equal(tunedCoverage.screenCovarianceMaxAnisotropy, 2.5);
+assert.notEqual(tunedCoverage.tileReferenceCount, base.tileReferenceCount);
+assert.notEqual(tunedCoverage.screenCovarianceSigmaMean, base.screenCovarianceSigmaMean);
 
 const wideViewport = buildWebGpuTileSmoke({
   points: scene.points,
@@ -574,7 +597,7 @@ console.log(
     `projection=${base.projectionMode}:${base.projectionCameraFovDegrees} ` +
     `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
     `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor}:${base.pixelDepthBinCount} ` +
-    `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
+    `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageTuningMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
     `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +

@@ -26,6 +26,12 @@ const slowMo = optionalString(args.slowMo ?? args["slow-mo"]);
 const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
 );
+const webGpuFootprintScale = optionalFiniteNumber(
+  args.webGpuFootprintScale ?? args["webgpu-footprint-scale"],
+);
+const webGpuCovarianceMaxAnisotropy = optionalFiniteNumber(
+  args.webGpuCovarianceMaxAnisotropy ?? args["webgpu-covariance-max-anisotropy"],
+);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 let server = null;
 
@@ -51,6 +57,8 @@ try {
       executablePath,
       slowMo,
       webGpuViewportSize,
+      webGpuFootprintScale,
+      webGpuCovarianceMaxAnisotropy,
     });
     results.push(result);
     process.stdout.write(result.output);
@@ -69,6 +77,8 @@ try {
       `asset=${JSON.stringify(asset)} url=${baseUrl} headed=${headed} ` +
       `webGpuFlags=${JSON.stringify(webGpuFlags)} probes=${JSON.stringify(probes)} ` +
       `webGpuViewportSize=${webGpuViewportSize ?? "default"} ` +
+      `webGpuFootprintScale=${webGpuFootprintScale ?? "default"} ` +
+      `webGpuCovarianceMaxAnisotropy=${webGpuCovarianceMaxAnisotropy ?? "default"} ` +
       `classification=${JSON.stringify(classification)}`,
   );
   if (failed.length > 0 && !allowFailures) {
@@ -89,6 +99,8 @@ async function runProbe({
   executablePath,
   slowMo,
   webGpuViewportSize,
+  webGpuFootprintScale,
+  webGpuCovarianceMaxAnisotropy,
 }) {
   const commandArgs = [
     "scripts/audit-demo.mjs",
@@ -111,6 +123,12 @@ async function runProbe({
   if (slowMo) commandArgs.push("--slow-mo", slowMo);
   if (webGpuViewportSize) {
     commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
+  }
+  if (Number.isFinite(webGpuFootprintScale)) {
+    commandArgs.push("--webgpu-footprint-scale", String(webGpuFootprintScale));
+  }
+  if (Number.isFinite(webGpuCovarianceMaxAnisotropy)) {
+    commandArgs.push("--webgpu-covariance-max-anisotropy", String(webGpuCovarianceMaxAnisotropy));
   }
 
   const result = await runProcess(process.execPath, commandArgs);
@@ -238,4 +256,12 @@ function optionalPositiveInteger(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
   return Math.round(parsed);
+}
+
+function optionalFiniteNumber(value) {
+  if (value === undefined || value === null || value === true || value === false || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
