@@ -37,7 +37,7 @@
   - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "splatfacto_variant or splatfacto_balanced or splatfacto_smoke" -q`: 3 passed。
   - `uv run --extra dev pytest`: 35 passed。
   - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
-- 完成 commit: 待提交。
+- 完成 commit: `192cd3a`.
 
 ### BENCH-001: Stabilize safe-2000 balanced benchmark
 
