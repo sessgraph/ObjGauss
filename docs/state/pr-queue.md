@@ -17,7 +17,6 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-004C`: tile accumulation + fullscreen resolve。
   - `RENDER-004D`: object-state buffer 接入隐藏 / 隔离 / 删除。
   - `RENDER-004E`: browser audit、overflow telemetry 和 fallback hardening。
 - 验收底线:
@@ -26,6 +25,31 @@
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
+
+### RENDER-004C: WebGPU tile accumulation and resolve smoke
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在真实 WebGPU tile renderer 前，先把 tile binning 结果推进到 deterministic tile-center accumulation / resolve smoke contract，并暴露可审计的 resolve telemetry。
+- 范围外:
+  - 不创建 WebGPU compute/render pipeline。
+  - 不把实际编辑 renderer 从 `Gaussian OIT 编辑` 切到 WebGPU。
+  - 不声明删除后的自身颜色已经是完整 3DGS 重渲染。
+- 实施:
+  - `src/webgpuTileSmoke.js` 新增 `webgpu-tile-resolve-v1`，对每个 active tile 做 tile-center weighted OIT accumulation，并生成 resolved RGBA、resolved tile count、weight sum、alpha/luma mean 和 checksum。
+  - `src/webgpuCapability.js`、`src/App.jsx` 和 `src/PointCloudViewport.jsx` 将 resolve layout / mode / telemetry 暴露到状态面板和 `data-webgpu-resolve-*` DOM contract。
+  - `scripts/audit-webgpu-tile-smoke.mjs` 校验 tile accumulation / resolved RGBA buffer shape、positive resolve telemetry，以及隔离 / 删除后 checksum 变化。
+  - `scripts/audit-demo.mjs` 校验三样例浏览器 DOM 中的 resolve layout、mode、resolved tile count、weight、alpha/luma 和 checksum。
+- 验收:
+  - 三个默认闭环样例均暴露 `resolveLayout="webgpu-tile-resolve-v1"` 和 `resolveMode="tile-center-weighted-oit"`。
+  - resolved tile count、resolve weight、alpha/luma mean 为正，checksum 为 8 位 hex。
+  - 当前 headless WebGPU 不可用时仍明确 fallback 到 `Gaussian OIT 编辑`，对象选择、隔离和删除预览保持通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，内置 sample packed=5800、tiles=2362/4096、refs=157323、resolved=2301、checksum=c8567887。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5201/`: passed，assets=3；Plush semantic resolvedTiles=3051 / checksum=9feb3736，Plush v1 resolvedTiles=3051 / checksum=4e86df13，Lego resolvedTiles=3881 / checksum=2b4d3d8e。
+- 完成 commit: `359d930`.
 
 ### RENDER-004B: WebGPU tile smoke packing and binning contract
 
