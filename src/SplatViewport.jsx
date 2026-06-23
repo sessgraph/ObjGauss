@@ -151,7 +151,12 @@ export default function SplatViewport({
   }, [showAxes]);
 
   return (
-    <div className="viewport splatViewport" ref={containerRef}>
+    <div
+      className="viewport splatViewport"
+      data-renderer="spark-splat"
+      data-object-filter="none"
+      ref={containerRef}
+    >
       <div className="viewportHud">
         <div>
           <span className="hudLabel">SPLAT</span>

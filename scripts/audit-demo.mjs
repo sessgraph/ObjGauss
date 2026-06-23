@@ -47,7 +47,13 @@ try {
   for (const result of results) {
     console.log(
         `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
-        `splatPixels=${result.splatPixels} editRenderer=${JSON.stringify(result.editRenderer)} ` +
+        `splatPixels=${result.splatPixels} splatRendererId=${JSON.stringify(result.splatRendererId)} ` +
+        `editRenderer=${JSON.stringify(result.editRenderer)} ` +
+        `editRendererId=${JSON.stringify(result.editRendererId)} ` +
+        `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
+        `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
+        `fallbackReason=${JSON.stringify(result.fallbackReason)} ` +
+        `tileOverflowCount=${result.tileOverflowCount} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
@@ -97,13 +103,39 @@ async function runAudit(url, assetsToCheck) {
       if (splatPixels <= 0) {
         throw new Error(`${asset.id} splat canvas appears blank: ${splatPixels}`);
       }
+      const splatRendererId = await page.locator(".splatViewport").first().getAttribute("data-renderer");
+      if (splatRendererId !== "spark-splat") {
+        throw new Error(`${asset.id} did not expose Spark renderer id: ${splatRendererId}`);
+      }
 
       await page.getByLabel("渲染模式").selectOption("clustered");
       const editRenderer = await labeledValue(page, "渲染器");
       if (editRenderer !== "Gaussian OIT 编辑") {
         throw new Error(`${asset.id} did not enter Gaussian OIT edit renderer: ${editRenderer}`);
       }
-      const objectFilter = await page.locator(".viewport").first().getAttribute("data-object-filter");
+      await page.waitForFunction(() => {
+        const viewport = document.querySelector(".viewport");
+        return viewport?.getAttribute("data-webgpu-status") !== "pending";
+      }, undefined, { timeout: 15000 });
+      const viewport = page.locator(".viewport").first();
+      const editRendererId = await viewport.getAttribute("data-renderer");
+      if (editRendererId !== "gaussian-oit") {
+        throw new Error(`${asset.id} did not expose Gaussian OIT fallback renderer id: ${editRendererId}`);
+      }
+      const rendererTarget = await viewport.getAttribute("data-renderer-target");
+      if (rendererTarget !== "webgpu-tile") {
+        throw new Error(`${asset.id} did not expose WebGPU tile target: ${rendererTarget}`);
+      }
+      const webgpuStatus = await viewport.getAttribute("data-webgpu-status");
+      if (!["available", "unavailable"].includes(webgpuStatus)) {
+        throw new Error(`${asset.id} WebGPU capability status was not resolved: ${webgpuStatus}`);
+      }
+      const fallbackReason = await viewport.getAttribute("data-renderer-fallback-reason");
+      if (!fallbackReason) {
+        throw new Error(`${asset.id} did not expose a renderer fallback reason`);
+      }
+      const tileOverflowCount = numericValue(await viewport.getAttribute("data-tile-overflow-count") ?? "0");
+      const objectFilter = await viewport.getAttribute("data-object-filter");
       if (objectFilter !== "gpu-object-state-texture") {
         throw new Error(`${asset.id} did not expose GPU object-state filtering: ${objectFilter}`);
       }
@@ -135,8 +167,14 @@ async function runAudit(url, assetsToCheck) {
         assetId: asset.id,
         title,
         splatPixels,
+        splatRendererId,
         editPixels,
         editRenderer,
+        editRendererId,
+        rendererTarget,
+        webgpuStatus,
+        fallbackReason,
+        tileOverflowCount,
         objectFilter,
         canvasSelectedObject,
         visibleAfterIsolate,
@@ -149,7 +187,8 @@ async function runAudit(url, assetsToCheck) {
     const relevantIssues = consoleIssues.filter(
       (issue) =>
         !issue.includes("THREE.WebGLRenderer") &&
-        !issue.includes("GPU stall due to ReadPixels"),
+        !issue.includes("GPU stall due to ReadPixels") &&
+        !issue.includes("No available adapters."),
     );
     if (relevantIssues.length > 0) {
       throw new Error(`browser console issues:\n${relevantIssues.join("\n")}`);

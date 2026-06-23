@@ -11,7 +11,7 @@ import {
   Scissors,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ASSET_LIBRARY, featuredAssets } from "./assetLibrary.js";
 import { parsePly, parsePlyFile } from "./ply.js";
@@ -19,6 +19,11 @@ import PointCloudViewport from "./PointCloudViewport.jsx";
 import { rgbToCss } from "./palette.js";
 import { createSampleScene } from "./sampleScene.js";
 import SplatViewport from "./SplatViewport.jsx";
+import {
+  detectWebGpuCapability,
+  editRendererContract,
+  INITIAL_WEBGPU_CAPABILITY,
+} from "./webgpuCapability.js";
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
@@ -66,11 +71,26 @@ export default function App() {
   const [removedIds, setRemovedIds] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [isolatedId, setIsolatedId] = useState(null);
+  const [webGpuCapability, setWebGpuCapability] = useState(INITIAL_WEBGPU_CAPABILITY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    let cancelled = false;
+    detectWebGpuCapability().then((capability) => {
+      if (!cancelled) setWebGpuCapability(capability);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
+  const editRenderer = useMemo(
+    () => editRendererContract(webGpuCapability),
+    [webGpuCapability],
+  );
   const sceneObjectIds = useMemo(() => allIds(scene.points), [scene.points]);
   const hasSplatRenderer = Boolean(scene.splatSource);
   const objectEditActive = useMemo(
@@ -83,7 +103,7 @@ export default function App() {
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
-  const activeRendererText = useSplatRenderer ? "真实 Splat" : "Gaussian OIT 编辑";
+  const activeRendererText = useSplatRenderer ? "真实 Splat" : editRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>
@@ -420,7 +440,7 @@ export default function App() {
               重置演示
             </button>
             <div className="hintText">
-              当前：{modeText} / {activeRendererText}。对象操作会进入点云编辑预览。
+              当前：{modeText} / {activeRendererText}。目标：{editRenderer.targetRendererLabel}。
             </div>
           </section>
         </aside>
@@ -453,6 +473,7 @@ export default function App() {
               selectedId={selectedId}
               onSelectObject={selectObject}
               renderModeLabel={renderModeText}
+              rendererContract={editRenderer}
             />
           )}
         </section>
@@ -538,6 +559,10 @@ export default function App() {
             <h2>渲染状态</h2>
             <StateRow label="工作模式" value={modeText} />
             <StateRow label="渲染器" value={activeRendererText} />
+            <StateRow label="目标渲染器" value={editRenderer.targetRendererLabel} />
+            <StateRow label="WebGPU" value={editRenderer.webGpuLabel} />
+            <StateRow label="回退原因" value={editRenderer.fallbackReason} />
+            <StateRow label="Tile overflow" value={editRenderer.tileOverflowCount} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />
             <StateRow label="已删除对象" value={removedIds.size} />
@@ -553,6 +578,7 @@ export default function App() {
         <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
         <span>模式：{modeText}</span>
         <span>渲染器：{activeRendererText}</span>
+        <span>WebGPU：{editRenderer.webGpuLabel}</span>
         <span>高斯点：{scene.points.length.toLocaleString()}</span>
         <span>可见：{visibleCount.toLocaleString()}</span>
         <span>所选：{selectedId ?? "无"}</span>

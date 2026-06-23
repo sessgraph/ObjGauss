@@ -134,6 +134,7 @@ export default function PointCloudViewport({
   selectedId,
   onSelectObject,
   renderModeLabel,
+  rendererContract,
 }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -418,7 +419,12 @@ export default function PointCloudViewport({
   return (
     <div
       className="viewport"
-      data-object-filter="gpu-object-state-texture"
+      data-renderer={rendererContract?.rendererId ?? "gaussian-oit"}
+      data-renderer-target={rendererContract?.targetRendererId ?? "webgpu-tile"}
+      data-renderer-fallback-reason={rendererContract?.fallbackReason ?? ""}
+      data-webgpu-status={rendererContract?.webGpuStatus ?? "unknown"}
+      data-object-filter={rendererContract?.objectFilter ?? "gpu-object-state-texture"}
+      data-tile-overflow-count={rendererContract?.tileOverflowCount ?? 0}
       data-visible-count={objectFilter.visibleCount}
       ref={containerRef}
     >
