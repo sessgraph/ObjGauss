@@ -1,8 +1,15 @@
 export const WEBGPU_TILE_SMOKE_LAYOUT_VERSION = "webgpu-tile-smoke-v1";
 export const WEBGPU_TILE_RESOLVE_VERSION = "webgpu-tile-resolve-v1";
+export const WEBGPU_OBJECT_STATE_LAYOUT_VERSION = "webgpu-object-state-v1";
 export const WEBGPU_TILE_SIZE = 16;
 export const WEBGPU_TILE_MAX_ENTRIES = 8192;
 export const WEBGPU_TILE_VIEWPORT = Object.freeze({ width: 1024, height: 1024 });
+export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
+const OBJECT_STATE_VISIBLE = 1 << 0;
+const OBJECT_STATE_SELECTED = 1 << 1;
+const OBJECT_STATE_REMOVED = 1 << 2;
+const OBJECT_STATE_ISOLATED = 1 << 3;
+const OBJECT_STATE_ENABLED = 1 << 4;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13;
@@ -12,6 +19,7 @@ export function buildWebGpuTileSmoke({
   visibleIds,
   removedIds,
   isolatedId,
+  selectedId = null,
   renderMode,
   pointSize,
   viewportWidth = WEBGPU_TILE_VIEWPORT.width,
@@ -21,12 +29,15 @@ export function buildWebGpuTileSmoke({
   includeTileEntries = false,
 }) {
   const objectIndex = buildObjectIndex(points);
-  const objectState = buildObjectState({
+  const objectStateContract = buildObjectState({
     objectIdsByIndex: objectIndex.objectIdsByIndex,
+    objectCountsByIndex: objectIndex.objectCountsByIndex,
     visibleIds,
     removedIds,
     isolatedId,
+    selectedId,
   });
+  const objectState = objectStateContract.buffer;
   const bounds = sceneBounds(points);
   const tileColumns = Math.max(1, Math.ceil(viewportWidth / tileSize));
   const tileRows = Math.max(1, Math.ceil(viewportHeight / tileSize));
@@ -73,7 +84,7 @@ export function buildWebGpuTileSmoke({
       objectIndices,
     });
 
-    if (objectState[objectDenseIndex] !== 1) return;
+    if (!objectIsVisible(objectState, objectDenseIndex)) return;
     visibleGaussians += 1;
 
     const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
@@ -138,12 +149,21 @@ export function buildWebGpuTileSmoke({
     resolveChecksum: resolve.resolveChecksum,
     tileEntryCapacity: tileCount * maxEntriesPerTile,
     objectCount: objectIndex.objectIdsByIndex.length,
+    objectStateLayoutVersion: objectStateContract.layoutVersion,
+    objectStateStrideUint32: objectStateContract.strideUint32,
+    objectStateVisibleObjects: objectStateContract.visibleObjects,
+    objectStateHiddenObjects: objectStateContract.hiddenObjects,
+    objectStateRemovedObjects: objectStateContract.removedObjects,
+    objectStateSelectedObjects: objectStateContract.selectedObjects,
+    objectStateIsolatedObjects: objectStateContract.isolatedObjects,
+    objectStateChecksum: objectStateContract.checksum,
     buffers: {
       positionRadius,
       colorOpacity,
       scaleRotation,
       objectIndices,
       objectState,
+      objectIds: objectStateContract.objectIds,
       tileCounts,
       tileAccumulation,
       tileResolvedRgba: resolve.tileResolvedRgba,
@@ -251,26 +271,108 @@ function checksumValue(checksum, red, green, blue, alpha, weight) {
 }
 
 function buildObjectIndex(points) {
-  const ids = new Set();
+  const counts = new Map();
   for (const point of points) {
-    ids.add(point.objectId);
+    counts.set(point.objectId, (counts.get(point.objectId) ?? 0) + 1);
   }
-  const objectIdsByIndex = [...ids].sort((left, right) => left - right);
+  const objectIdsByIndex = [...counts.keys()].sort((left, right) => left - right);
   const objectIndexById = new Map(objectIdsByIndex.map((id, index) => [id, index]));
-  return { objectIdsByIndex, objectIndexById };
+  const objectCountsByIndex = objectIdsByIndex.map((id) => counts.get(id) ?? 0);
+  return { objectIdsByIndex, objectCountsByIndex, objectIndexById };
 }
 
-function buildObjectState({ objectIdsByIndex, visibleIds, removedIds, isolatedId }) {
-  const objectState = new Uint32Array(Math.max(objectIdsByIndex.length, 1));
+function buildObjectState({
+  objectIdsByIndex,
+  objectCountsByIndex,
+  visibleIds,
+  removedIds,
+  isolatedId,
+  selectedId,
+}) {
+  const objectCount = objectIdsByIndex.length;
+  const buffer = new Uint32Array(Math.max(objectCount, 1) * WEBGPU_OBJECT_STATE_STRIDE_UINT32);
+  const objectIds = new Int32Array(objectCount);
+  let visibleObjects = 0;
+  let hiddenObjects = 0;
+  let removedObjects = 0;
+  let selectedObjects = 0;
+  let isolatedObjects = 0;
+
   objectIdsByIndex.forEach((objectId, index) => {
+    const enabled = visibleIds.has(objectId);
+    const removed = removedIds.has(objectId);
+    const selected = selectedId !== null && objectId === selectedId;
+    const isolated = isolatedId !== null && objectId === isolatedId;
     const visible =
-      visibleIds.has(objectId) &&
-      !removedIds.has(objectId) &&
+      enabled &&
+      !removed &&
       (isolatedId === null || objectId === isolatedId);
-    objectState[index] = visible ? 1 : 0;
+
+    let flags = 0;
+    if (visible) flags |= OBJECT_STATE_VISIBLE;
+    if (selected) flags |= OBJECT_STATE_SELECTED;
+    if (removed) flags |= OBJECT_STATE_REMOVED;
+    if (isolated) flags |= OBJECT_STATE_ISOLATED;
+    if (enabled) flags |= OBJECT_STATE_ENABLED;
+
+    const offset = index * WEBGPU_OBJECT_STATE_STRIDE_UINT32;
+    buffer[offset] = flags;
+    buffer[offset + 1] = index;
+    buffer[offset + 2] = objectCountsByIndex[index] ?? 0;
+    buffer[offset + 3] = 0;
+    objectIds[index] = objectId;
+
+    if (visible) visibleObjects += 1;
+    else hiddenObjects += 1;
+    if (removed) removedObjects += 1;
+    if (selected) selectedObjects += 1;
+    if (isolated) isolatedObjects += 1;
   });
-  if (objectIdsByIndex.length === 0) objectState[0] = 1;
-  return objectState;
+
+  if (objectCount === 0) {
+    buffer[0] = OBJECT_STATE_VISIBLE | OBJECT_STATE_ENABLED;
+  }
+
+  return {
+    layoutVersion: WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
+    strideUint32: WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+    buffer,
+    objectIds,
+    visibleObjects,
+    hiddenObjects,
+    removedObjects,
+    selectedObjects,
+    isolatedObjects,
+    checksum: checksumObjectState(buffer, objectIds),
+  };
+}
+
+function objectIsVisible(objectState, objectDenseIndex) {
+  const offset = objectDenseIndex * WEBGPU_OBJECT_STATE_STRIDE_UINT32;
+  return (objectState[offset] & OBJECT_STATE_VISIBLE) !== 0;
+}
+
+function checksumObjectState(buffer, objectIds) {
+  let checksum = 2166136261;
+  for (const value of buffer) {
+    checksum = checksumUint32(checksum, value);
+  }
+  for (const value of objectIds) {
+    checksum = checksumUint32(checksum, value >>> 0);
+  }
+  return checksum.toString(16).padStart(8, "0");
+}
+
+function checksumUint32(checksum, value) {
+  let next = checksum;
+  next ^= value & 0xff;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= (value >>> 8) & 0xff;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= (value >>> 16) & 0xff;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= (value >>> 24) & 0xff;
+  return Math.imul(next, 16777619) >>> 0;
 }
 
 function sceneBounds(points) {

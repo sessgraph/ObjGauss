@@ -442,6 +442,14 @@ export default function PointCloudViewport({
       data-webgpu-resolve-alpha-mean={rendererContract?.resolveAlphaMean ?? 0}
       data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
       data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
+      data-webgpu-object-state-layout={rendererContract?.objectStateLayoutVersion ?? ""}
+      data-webgpu-object-state-stride={rendererContract?.objectStateStrideUint32 ?? 0}
+      data-webgpu-object-state-visible-objects={rendererContract?.objectStateVisibleObjects ?? 0}
+      data-webgpu-object-state-hidden-objects={rendererContract?.objectStateHiddenObjects ?? 0}
+      data-webgpu-object-state-removed-objects={rendererContract?.objectStateRemovedObjects ?? 0}
+      data-webgpu-object-state-selected-objects={rendererContract?.objectStateSelectedObjects ?? 0}
+      data-webgpu-object-state-isolated-objects={rendererContract?.objectStateIsolatedObjects ?? 0}
+      data-webgpu-object-state-checksum={rendererContract?.objectStateChecksum ?? ""}
       data-visible-count={objectFilter.visibleCount}
       ref={containerRef}
     >

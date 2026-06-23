@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 
 import { createSampleScene } from "../src/sampleScene.js";
-import { buildWebGpuTileSmoke, WEBGPU_TILE_SMOKE_LAYOUT_VERSION } from "../src/webgpuTileSmoke.js";
+import {
+  buildWebGpuTileSmoke,
+  WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
+  WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+  WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
+} from "../src/webgpuTileSmoke.js";
 
 const scene = createSampleScene();
 const allObjectIds = new Set(scene.points.map((point) => point.objectId));
@@ -24,7 +29,8 @@ assert.equal(base.buffers.positionRadius.length, scene.points.length * 4);
 assert.equal(base.buffers.colorOpacity.length, scene.points.length * 4);
 assert.equal(base.buffers.scaleRotation.length, scene.points.length * 4);
 assert.equal(base.buffers.objectIndices.length, scene.points.length);
-assert.equal(base.buffers.objectState.length, allObjectIds.size);
+assert.equal(base.buffers.objectState.length, allObjectIds.size * WEBGPU_OBJECT_STATE_STRIDE_UINT32);
+assert.equal(base.buffers.objectIds.length, allObjectIds.size);
 assert.equal(base.buffers.tileCounts.length, base.tileCount);
 assert.equal(base.buffers.tileAccumulation.length, base.tileCount * 4);
 assert.equal(base.buffers.tileResolvedRgba.length, base.tileCount * 4);
@@ -40,12 +46,21 @@ assert.ok(base.resolveWeightSum > 0);
 assert.ok(base.resolveAlphaMean > 0);
 assert.ok(base.resolveLumaMean > 0);
 assert.match(base.resolveChecksum, /^[0-9a-f]{8}$/);
+assert.equal(base.objectStateLayoutVersion, WEBGPU_OBJECT_STATE_LAYOUT_VERSION);
+assert.equal(base.objectStateStrideUint32, WEBGPU_OBJECT_STATE_STRIDE_UINT32);
+assert.equal(base.objectStateVisibleObjects, allObjectIds.size);
+assert.equal(base.objectStateHiddenObjects, 0);
+assert.equal(base.objectStateRemovedObjects, 0);
+assert.equal(base.objectStateSelectedObjects, 0);
+assert.equal(base.objectStateIsolatedObjects, 0);
+assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
 
 const isolated = buildWebGpuTileSmoke({
   points: scene.points,
   visibleIds: allObjectIds,
   removedIds: new Set(),
   isolatedId: firstObjectId,
+  selectedId: firstObjectId,
   renderMode: "clustered",
   pointSize: 0.018,
 });
@@ -55,6 +70,11 @@ assert.ok(isolated.binnedGaussians < base.binnedGaussians);
 assert.ok(isolated.tileReferenceCount <= base.tileReferenceCount);
 assert.ok(isolated.resolvedTileCount <= base.resolvedTileCount);
 assert.notEqual(isolated.resolveChecksum, base.resolveChecksum);
+assert.equal(isolated.objectStateVisibleObjects, 1);
+assert.equal(isolated.objectStateHiddenObjects, allObjectIds.size - 1);
+assert.equal(isolated.objectStateSelectedObjects, 1);
+assert.equal(isolated.objectStateIsolatedObjects, 1);
+assert.notEqual(isolated.objectStateChecksum, base.objectStateChecksum);
 
 const removed = buildWebGpuTileSmoke({
   points: scene.points,
@@ -68,10 +88,14 @@ const removed = buildWebGpuTileSmoke({
 assert.ok(removed.visibleGaussians < base.visibleGaussians);
 assert.equal(removed.packedGaussians, base.packedGaussians);
 assert.notEqual(removed.resolveChecksum, base.resolveChecksum);
+assert.equal(removed.objectStateVisibleObjects, allObjectIds.size - 1);
+assert.equal(removed.objectStateRemovedObjects, 1);
+assert.notEqual(removed.objectStateChecksum, base.objectStateChecksum);
 
 console.log(
   `webgpu_tile_smoke=passed packed=${base.packedGaussians} ` +
     `objects=${base.objectCount} tiles=${base.activeTileCount}/${base.tileCount} ` +
     `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
-    `checksum=${base.resolveChecksum} overflow=${base.tileOverflowCount}`,
+    `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
+    `overflow=${base.tileOverflowCount}`,
 );

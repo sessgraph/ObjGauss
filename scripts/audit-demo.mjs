@@ -62,6 +62,8 @@ try {
         `resolveLayout=${JSON.stringify(result.resolveLayout)} ` +
         `resolvedTiles=${result.resolvedTileCount} ` +
         `resolveChecksum=${JSON.stringify(result.resolveChecksum)} ` +
+        `objectState=${JSON.stringify(result.objectStateLayout)}:${JSON.stringify(result.objectStateChecksum)} ` +
+        `objectStateAfterDelete=${JSON.stringify(result.objectStateChecksumAfterDelete)} ` +
         `tileOverflowCount=${result.tileOverflowCount} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
         `objectFilterTarget=${JSON.stringify(result.objectFilterTarget)} ` +
@@ -204,6 +206,28 @@ async function runAudit(url, assetsToCheck) {
       if (objectFilterTarget !== "gpu-object-state-buffer") {
         throw new Error(`${asset.id} did not expose WebGPU object-state buffer target: ${objectFilterTarget}`);
       }
+      const objectStateLayout = await viewport.getAttribute("data-webgpu-object-state-layout");
+      const objectStateStride = numericValue(await viewport.getAttribute("data-webgpu-object-state-stride") ?? "0");
+      const objectStateVisibleObjects = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
+      const objectStateHiddenObjects = numericValue(await viewport.getAttribute("data-webgpu-object-state-hidden-objects") ?? "0");
+      const objectStateRemovedObjects = numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
+      const objectStateSelectedObjects = numericValue(await viewport.getAttribute("data-webgpu-object-state-selected-objects") ?? "0");
+      const objectStateIsolatedObjects = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const objectStateChecksum = await viewport.getAttribute("data-webgpu-object-state-checksum");
+      if (
+        objectStateLayout !== "webgpu-object-state-v1" ||
+        objectStateStride !== 4 ||
+        objectStateVisibleObjects <= 0 ||
+        objectStateHiddenObjects !== 0 ||
+        objectStateRemovedObjects !== 0 ||
+        objectStateSelectedObjects !== 0 ||
+        objectStateIsolatedObjects !== 0 ||
+        !/^[0-9a-f]{8}$/.test(objectStateChecksum ?? "")
+      ) {
+        throw new Error(
+          `${asset.id} invalid initial WebGPU object-state buffer: layout=${objectStateLayout} stride=${objectStateStride} visible=${objectStateVisibleObjects} hidden=${objectStateHiddenObjects} removed=${objectStateRemovedObjects} selected=${objectStateSelectedObjects} isolated=${objectStateIsolatedObjects} checksum=${objectStateChecksum}`,
+        );
+      }
       const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
@@ -212,11 +236,31 @@ async function runAudit(url, assetsToCheck) {
       await page.getByRole("button", { name: "只看所选" }).click();
       await page.waitForTimeout(300);
       const visibleAfterIsolate = await labeledValue(page, "可见");
+      const objectStateChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-object-state-checksum");
+      const objectStateVisibleAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
+      const objectStateHiddenAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-hidden-objects") ?? "0");
+      const objectStateSelectedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-selected-objects") ?? "0");
+      const objectStateIsolatedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      if (
+        objectStateChecksumAfterIsolate === objectStateChecksum ||
+        objectStateVisibleAfterIsolate !== 1 ||
+        objectStateHiddenAfterIsolate <= 0 ||
+        objectStateSelectedAfterIsolate !== 1 ||
+        objectStateIsolatedAfterIsolate !== 1
+      ) {
+        throw new Error(
+          `${asset.id} isolate did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterIsolate} visible=${objectStateVisibleAfterIsolate} hidden=${objectStateHiddenAfterIsolate} selected=${objectStateSelectedAfterIsolate} isolated=${objectStateIsolatedAfterIsolate}`,
+        );
+      }
       await page.getByRole("button", { name: "预览删除" }).click();
       await page.waitForTimeout(300);
       const deletedObjects = await labeledValue(page, "已删除对象");
       const visibleAfterDelete = await labeledValue(page, "可见");
       const renderModeAfterDelete = await labeledValue(page, "模式");
+      const objectStateChecksumAfterDelete = await viewport.getAttribute("data-webgpu-object-state-checksum");
+      const objectStateVisibleAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
+      const objectStateRemovedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
+      const objectStateIsolatedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
@@ -225,6 +269,16 @@ async function runAudit(url, assetsToCheck) {
       }
       if (renderModeAfterDelete !== "自身颜色") {
         throw new Error(`${asset.id} delete preview did not restore original colors`);
+      }
+      if (
+        objectStateChecksumAfterDelete === objectStateChecksumAfterIsolate ||
+        objectStateVisibleAfterDelete !== objectStateVisibleObjects - 1 ||
+        objectStateRemovedAfterDelete !== 1 ||
+        objectStateIsolatedAfterDelete !== 0
+      ) {
+        throw new Error(
+          `${asset.id} delete did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterDelete} visible=${objectStateVisibleAfterDelete} removed=${objectStateRemovedAfterDelete} isolated=${objectStateIsolatedAfterDelete}`,
+        );
       }
       const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -258,6 +312,16 @@ async function runAudit(url, assetsToCheck) {
         tileOverflowCount,
         objectFilter,
         objectFilterTarget,
+        objectStateLayout,
+        objectStateStride,
+        objectStateVisibleObjects,
+        objectStateHiddenObjects,
+        objectStateRemovedObjects,
+        objectStateSelectedObjects,
+        objectStateIsolatedObjects,
+        objectStateChecksum,
+        objectStateChecksumAfterIsolate,
+        objectStateChecksumAfterDelete,
         canvasSelectedObject,
         visibleAfterIsolate,
         visibleAfterDelete,

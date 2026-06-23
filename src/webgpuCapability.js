@@ -28,6 +28,14 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   resolveLumaMean: 0,
   resolveChecksum: "00000000",
   objectCount: 0,
+  objectStateLayoutVersion: "webgpu-object-state-v1",
+  objectStateStrideUint32: 4,
+  objectStateVisibleObjects: 0,
+  objectStateHiddenObjects: 0,
+  objectStateRemovedObjects: 0,
+  objectStateSelectedObjects: 0,
+  objectStateIsolatedObjects: 0,
+  objectStateChecksum: "00000000",
 });
 
 export async function detectWebGpuCapability() {
@@ -111,6 +119,14 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     resolveLumaMean: smoke.resolveLumaMean,
     resolveChecksum: smoke.resolveChecksum,
     objectCount: smoke.objectCount,
+    objectStateLayoutVersion: smoke.objectStateLayoutVersion,
+    objectStateStrideUint32: smoke.objectStateStrideUint32,
+    objectStateVisibleObjects: smoke.objectStateVisibleObjects,
+    objectStateHiddenObjects: smoke.objectStateHiddenObjects,
+    objectStateRemovedObjects: smoke.objectStateRemovedObjects,
+    objectStateSelectedObjects: smoke.objectStateSelectedObjects,
+    objectStateIsolatedObjects: smoke.objectStateIsolatedObjects,
+    objectStateChecksum: smoke.objectStateChecksum,
   };
 }
 

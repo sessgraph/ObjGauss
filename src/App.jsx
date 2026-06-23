@@ -95,10 +95,11 @@ export default function App() {
         visibleIds,
         removedIds,
         isolatedId,
+        selectedId,
         renderMode,
         pointSize,
       }),
-    [scene.points, visibleIds, removedIds, isolatedId, renderMode, pointSize],
+    [scene.points, visibleIds, removedIds, isolatedId, selectedId, renderMode, pointSize],
   );
   const editRenderer = useMemo(
     () => editRendererContract(webGpuCapability, webGpuTileSmoke),
@@ -586,6 +587,10 @@ export default function App() {
             <StateRow
               label="Tile resolve"
               value={`${editRenderer.resolvedTileCount.toLocaleString()} / ${editRenderer.resolveChecksum}`}
+            />
+            <StateRow
+              label="Object state"
+              value={`${editRenderer.objectStateVisibleObjects.toLocaleString()} / ${editRenderer.objectStateChecksum}`}
             />
             <StateRow label="Tile overflow" value={editRenderer.tileOverflowCount} />
             <StateRow label="模式" value={renderModeText} />
