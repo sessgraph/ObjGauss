@@ -43,7 +43,7 @@
   - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "asset_registry or nerf_pull or fern_pull or splatfacto_scene or cross_scene or splatfacto_variant or splatfacto_balanced or splatfacto_smoke or nerf_sam" -q`: 10 passed。
   - `uv run --extra dev pytest`: 39 passed。
   - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
-- 完成 commit: pending.
+- 完成 commit: `3536197`.
 
 ### BENCH-003: Cross-scene emergence benchmark table
 
