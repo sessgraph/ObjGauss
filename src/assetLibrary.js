@@ -263,17 +263,9 @@ export const FEATURED_ASSET_IDS = [
   "nerf-lego-alpha-closure-local",
   "nerf-lego-trained-output-local",
   "plush-3dgs-local",
-  "polyhaven-school-chair-1k",
-  "nerf-synthetic-lego",
-  "nerf-llff-fern",
-  "polyhaven-school-chair-nerf",
-  "arkitscenes",
-  "omniobject3d",
-  "mipnerf360",
-  "google-scanned-objects",
 ];
 
 export function featuredAssets() {
   const ids = new Set(FEATURED_ASSET_IDS);
-  return ASSET_LIBRARY.filter((asset) => ids.has(asset.id));
+  return ASSET_LIBRARY.filter((asset) => ids.has(asset.id) && asset.localPath);
 }
