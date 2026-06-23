@@ -39,6 +39,16 @@ assert.ok(base.visibleGaussians > 0);
 assert.ok(base.binnedGaussians > 0);
 assert.ok(base.activeTileCount > 0);
 assert.ok(base.tileReferenceCount >= base.binnedGaussians);
+assert.equal(base.tileCapacityMode, "fixed-cap-smoke");
+assert.equal(base.tileCapacityStatus, "overflow");
+assert.equal(base.tileCapacityGate, "blocked");
+assert.ok(base.tileOverflowCount > 0);
+assert.ok(base.tileOverflowTileCount > 0);
+assert.ok(base.tileOverflowRatio > 0);
+assert.ok(base.tileOverflowMaxExcess > 0);
+assert.equal(base.tileEntryStoredCount, base.tileReferenceCount - base.tileOverflowCount);
+assert.equal(base.tileEntryCapacity, base.tileCount * base.maxEntriesPerTile);
+assert.ok(base.tileEntryUtilization > 0 && base.tileEntryUtilization <= 1);
 assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
 assert.equal(base.resolveMode, "tile-center-weighted-oit");
 assert.ok(base.resolvedTileCount > 0);
@@ -54,6 +64,25 @@ assert.equal(base.objectStateRemovedObjects, 0);
 assert.equal(base.objectStateSelectedObjects, 0);
 assert.equal(base.objectStateIsolatedObjects, 0);
 assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
+
+const roomy = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  maxEntriesPerTile: 100000,
+});
+
+assert.equal(roomy.tileCapacityMode, "fixed-cap-smoke");
+assert.equal(roomy.tileCapacityStatus, "ok");
+assert.equal(roomy.tileCapacityGate, "pass");
+assert.equal(roomy.tileOverflowCount, 0);
+assert.equal(roomy.tileOverflowTileCount, 0);
+assert.equal(roomy.tileOverflowRatio, 0);
+assert.equal(roomy.tileOverflowMaxExcess, 0);
+assert.equal(roomy.tileEntryStoredCount, roomy.tileReferenceCount);
 
 const isolated = buildWebGpuTileSmoke({
   points: scene.points,
@@ -97,5 +126,6 @@ console.log(
     `objects=${base.objectCount} tiles=${base.activeTileCount}/${base.tileCount} ` +
     `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
-    `overflow=${base.tileOverflowCount}`,
+    `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
+    `capacity=${base.tileCapacityGate}`,
 );

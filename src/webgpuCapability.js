@@ -19,6 +19,15 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   activeTileCount: 0,
   tileReferenceCount: 0,
   tileOverflowCount: 0,
+  tileOverflowTileCount: 0,
+  tileOverflowRatio: 0,
+  tileOverflowMaxExcess: 0,
+  tileEntryStoredCount: 0,
+  tileEntryCapacity: 0,
+  tileEntryUtilization: 0,
+  tileCapacityMode: "fixed-cap-smoke",
+  tileCapacityStatus: "ok",
+  tileCapacityGate: "pass",
   maxTileOccupancy: 0,
   resolveVersion: "webgpu-tile-resolve-v1",
   resolveMode: "tile-center-weighted-oit",
@@ -91,6 +100,7 @@ export async function detectWebGpuCapability() {
 
 export function editRendererContract(webGpuCapability, tileSmoke) {
   const smoke = tileSmoke ?? EMPTY_TILE_SMOKE;
+  const targetGate = webGpuTileTargetGate(webGpuCapability, smoke);
   return {
     rendererId: GAUSSIAN_OIT_RENDERER_ID,
     rendererLabel: GAUSSIAN_OIT_RENDERER_LABEL,
@@ -100,7 +110,10 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     targetObjectFilter: "gpu-object-state-buffer",
     webGpuStatus: webGpuCapability.status,
     webGpuLabel: webGpuCapability.label,
-    fallbackReason: fallbackReason(webGpuCapability),
+    fallbackReason: fallbackReason(webGpuCapability, smoke),
+    targetGate: targetGate.gate,
+    targetGateReason: targetGate.reason,
+    targetGateBlocker: targetGate.blocker,
     tileSmokeLayout: smoke.layoutVersion,
     tileSize: smoke.tileSize,
     packedGaussians: smoke.packedGaussians,
@@ -110,6 +123,15 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     activeTileCount: smoke.activeTileCount,
     tileReferenceCount: smoke.tileReferenceCount,
     tileOverflowCount: smoke.tileOverflowCount,
+    tileOverflowTileCount: smoke.tileOverflowTileCount,
+    tileOverflowRatio: smoke.tileOverflowRatio,
+    tileOverflowMaxExcess: smoke.tileOverflowMaxExcess,
+    tileEntryStoredCount: smoke.tileEntryStoredCount,
+    tileEntryCapacity: smoke.tileEntryCapacity,
+    tileEntryUtilization: smoke.tileEntryUtilization,
+    tileCapacityMode: smoke.tileCapacityMode,
+    tileCapacityStatus: smoke.tileCapacityStatus,
+    tileCapacityGate: smoke.tileCapacityGate,
     maxTileOccupancy: smoke.maxTileOccupancy,
     resolveVersion: smoke.resolveVersion,
     resolveMode: smoke.resolveMode,
@@ -130,9 +152,34 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
   };
 }
 
-function fallbackReason(webGpuCapability) {
+function fallbackReason(webGpuCapability, tileSmoke) {
   if (webGpuCapability.status === "available") {
+    if (tileSmoke?.tileCapacityGate === "blocked") {
+      return "webgpu-tile-overflow";
+    }
     return "webgpu-tile-renderer-not-implemented";
   }
   return webGpuCapability.reason;
+}
+
+function webGpuTileTargetGate(webGpuCapability, tileSmoke) {
+  if (webGpuCapability.status !== "available") {
+    return {
+      gate: "blocked",
+      reason: webGpuCapability.reason,
+      blocker: "webgpu-capability",
+    };
+  }
+  if (tileSmoke?.tileCapacityGate === "blocked") {
+    return {
+      gate: "blocked",
+      reason: "webgpu-tile-overflow",
+      blocker: "tile-overflow",
+    };
+  }
+  return {
+    gate: "blocked",
+    reason: "webgpu-tile-renderer-not-implemented",
+    blocker: "renderer-not-implemented",
+  };
 }

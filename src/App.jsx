@@ -574,6 +574,7 @@ export default function App() {
             <StateRow label="工作模式" value={modeText} />
             <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="目标渲染器" value={editRenderer.targetRendererLabel} />
+            <StateRow label="目标状态" value={`${editRenderer.targetGate} / ${editRenderer.targetGateReason}`} />
             <StateRow label="WebGPU" value={editRenderer.webGpuLabel} />
             <StateRow label="回退原因" value={editRenderer.fallbackReason} />
             <StateRow
@@ -583,6 +584,10 @@ export default function App() {
             <StateRow
               label="Tile bins"
               value={`${editRenderer.activeTileCount.toLocaleString()} / ${editRenderer.tileCount.toLocaleString()}`}
+            />
+            <StateRow
+              label="Tile capacity"
+              value={`${editRenderer.tileCapacityStatus} / ${editRenderer.tileOverflowTileCount.toLocaleString()} tiles`}
             />
             <StateRow
               label="Tile resolve"

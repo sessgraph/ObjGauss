@@ -51,6 +51,7 @@ try {
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
+        `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
         `fallbackReason=${JSON.stringify(result.fallbackReason)} ` +
         `tileSmokeLayout=${JSON.stringify(result.tileSmokeLayout)} ` +
@@ -59,6 +60,7 @@ try {
         `activeTiles=${result.activeTileCount}/${result.tileCount} ` +
         `tileReferences=${result.tileReferenceCount} ` +
         `maxTileOccupancy=${result.maxTileOccupancy} ` +
+        `tileCapacity=${JSON.stringify(result.tileCapacityStatus)}:${result.tileOverflowTileCount} ` +
         `resolveLayout=${JSON.stringify(result.resolveLayout)} ` +
         `resolvedTiles=${result.resolvedTileCount} ` +
         `resolveChecksum=${JSON.stringify(result.resolveChecksum)} ` +
@@ -138,6 +140,9 @@ async function runAudit(url, assetsToCheck) {
       if (rendererTarget !== "webgpu-tile") {
         throw new Error(`${asset.id} did not expose WebGPU tile target: ${rendererTarget}`);
       }
+      const targetGate = await viewport.getAttribute("data-webgpu-target-gate");
+      const targetGateReason = await viewport.getAttribute("data-webgpu-target-gate-reason");
+      const targetGateBlocker = await viewport.getAttribute("data-webgpu-target-gate-blocker");
       const webgpuStatus = await viewport.getAttribute("data-webgpu-status");
       if (!["available", "unavailable"].includes(webgpuStatus)) {
         throw new Error(`${asset.id} WebGPU capability status was not resolved: ${webgpuStatus}`);
@@ -145,6 +150,16 @@ async function runAudit(url, assetsToCheck) {
       const fallbackReason = await viewport.getAttribute("data-renderer-fallback-reason");
       if (!fallbackReason) {
         throw new Error(`${asset.id} did not expose a renderer fallback reason`);
+      }
+      if (targetGate !== "blocked" || !targetGateReason || !targetGateBlocker) {
+        throw new Error(
+          `${asset.id} did not expose hardened WebGPU target gate: gate=${targetGate} reason=${targetGateReason} blocker=${targetGateBlocker}`,
+        );
+      }
+      if (webgpuStatus !== "available" && targetGateBlocker !== "webgpu-capability") {
+        throw new Error(
+          `${asset.id} WebGPU unavailable but target gate was not capability-blocked: status=${webgpuStatus} blocker=${targetGateBlocker}`,
+        );
       }
       const tileSmokeLayout = await viewport.getAttribute("data-webgpu-pack-layout");
       if (tileSmokeLayout !== "webgpu-tile-smoke-v1") {
@@ -158,6 +173,15 @@ async function runAudit(url, assetsToCheck) {
       const activeTileCount = numericValue(await viewport.getAttribute("data-webgpu-active-tile-count") ?? "0");
       const tileReferenceCount = numericValue(await viewport.getAttribute("data-webgpu-tile-reference-count") ?? "0");
       const tileOverflowCount = numericValue(await viewport.getAttribute("data-tile-overflow-count") ?? "0");
+      const tileOverflowTileCount = numericValue(await viewport.getAttribute("data-webgpu-tile-overflow-tile-count") ?? "0");
+      const tileOverflowRatio = Number(await viewport.getAttribute("data-webgpu-tile-overflow-ratio") ?? "0");
+      const tileOverflowMaxExcess = numericValue(await viewport.getAttribute("data-webgpu-tile-overflow-max-excess") ?? "0");
+      const tileEntryStoredCount = numericValue(await viewport.getAttribute("data-webgpu-tile-entry-stored-count") ?? "0");
+      const tileEntryCapacity = numericValue(await viewport.getAttribute("data-webgpu-tile-entry-capacity") ?? "0");
+      const tileEntryUtilization = Number(await viewport.getAttribute("data-webgpu-tile-entry-utilization") ?? "0");
+      const tileCapacityMode = await viewport.getAttribute("data-webgpu-tile-capacity-mode");
+      const tileCapacityStatus = await viewport.getAttribute("data-webgpu-tile-capacity-status");
+      const tileCapacityGate = await viewport.getAttribute("data-webgpu-tile-capacity-gate");
       const maxTileOccupancy = numericValue(await viewport.getAttribute("data-webgpu-max-tile-occupancy") ?? "0");
       const resolveLayout = await viewport.getAttribute("data-webgpu-resolve-layout");
       const resolveMode = await viewport.getAttribute("data-webgpu-resolve-mode");
@@ -181,6 +205,45 @@ async function runAudit(url, assetsToCheck) {
       }
       if (maxTileOccupancy <= 0) {
         throw new Error(`${asset.id} did not expose positive max tile occupancy: ${maxTileOccupancy}`);
+      }
+      if (
+        tileCapacityMode !== "fixed-cap-smoke" ||
+        !["ok", "overflow"].includes(tileCapacityStatus ?? "") ||
+        !["pass", "blocked"].includes(tileCapacityGate ?? "") ||
+        tileEntryStoredCount <= 0 ||
+        tileEntryCapacity <= 0 ||
+        tileEntryUtilization <= 0 ||
+        tileEntryUtilization > 1
+      ) {
+        throw new Error(
+          `${asset.id} invalid tile capacity telemetry: mode=${tileCapacityMode} status=${tileCapacityStatus} gate=${tileCapacityGate} stored=${tileEntryStoredCount} capacity=${tileEntryCapacity} utilization=${tileEntryUtilization}`,
+        );
+      }
+      if (tileOverflowCount > 0) {
+        if (
+          tileCapacityStatus !== "overflow" ||
+          tileCapacityGate !== "blocked" ||
+          tileOverflowTileCount <= 0 ||
+          tileOverflowRatio <= 0 ||
+          tileOverflowMaxExcess <= 0
+        ) {
+          throw new Error(
+            `${asset.id} overflow telemetry did not block tile capacity: overflow=${tileOverflowCount} overflowTiles=${tileOverflowTileCount} ratio=${tileOverflowRatio} maxExcess=${tileOverflowMaxExcess} status=${tileCapacityStatus} gate=${tileCapacityGate}`,
+          );
+        }
+        if (webgpuStatus === "available" && targetGateBlocker !== "tile-overflow") {
+          throw new Error(`${asset.id} WebGPU available with overflow but target gate blocker was ${targetGateBlocker}`);
+        }
+      } else if (
+        tileCapacityStatus !== "ok" ||
+        tileCapacityGate !== "pass" ||
+        tileOverflowTileCount !== 0 ||
+        tileOverflowRatio !== 0 ||
+        tileOverflowMaxExcess !== 0
+      ) {
+        throw new Error(
+          `${asset.id} non-overflow telemetry was not pass/ok: overflowTiles=${tileOverflowTileCount} ratio=${tileOverflowRatio} maxExcess=${tileOverflowMaxExcess} status=${tileCapacityStatus} gate=${tileCapacityGate}`,
+        );
       }
       if (resolveLayout !== "webgpu-tile-resolve-v1" || resolveMode !== "tile-center-weighted-oit") {
         throw new Error(
@@ -291,6 +354,9 @@ async function runAudit(url, assetsToCheck) {
         editRenderer,
         editRendererId,
         rendererTarget,
+        targetGate,
+        targetGateReason,
+        targetGateBlocker,
         webgpuStatus,
         fallbackReason,
         tileSmokeLayout,
@@ -302,6 +368,15 @@ async function runAudit(url, assetsToCheck) {
         activeTileCount,
         tileReferenceCount,
         maxTileOccupancy,
+        tileOverflowTileCount,
+        tileOverflowRatio,
+        tileOverflowMaxExcess,
+        tileEntryStoredCount,
+        tileEntryCapacity,
+        tileEntryUtilization,
+        tileCapacityMode,
+        tileCapacityStatus,
+        tileCapacityGate,
         resolveLayout,
         resolveMode,
         resolvedTileCount,

@@ -123,6 +123,13 @@ export function buildWebGpuTileSmoke({
   });
 
   const activeTileCount = countActiveTiles(tileCounts);
+  const capacity = summarizeTileCapacity({
+    tileCounts,
+    tileReferenceCount,
+    tileOverflowCount,
+    tileCount,
+    maxEntriesPerTile,
+  });
   const resolve = resolveTileAccumulation(tileAccumulation);
   return {
     layoutVersion: WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
@@ -141,13 +148,21 @@ export function buildWebGpuTileSmoke({
     activeTileCount,
     tileReferenceCount,
     tileOverflowCount,
+    tileOverflowTileCount: capacity.overflowTileCount,
+    tileOverflowRatio: capacity.overflowRatio,
+    tileOverflowMaxExcess: capacity.maxExcess,
+    tileEntryStoredCount: capacity.storedReferenceCount,
+    tileEntryCapacity: capacity.entryCapacity,
+    tileEntryUtilization: capacity.entryUtilization,
+    tileCapacityMode: capacity.mode,
+    tileCapacityStatus: capacity.status,
+    tileCapacityGate: capacity.gate,
     maxTileOccupancy,
     resolvedTileCount: resolve.resolvedTileCount,
     resolveWeightSum: resolve.resolveWeightSum,
     resolveAlphaMean: resolve.resolveAlphaMean,
     resolveLumaMean: resolve.resolveLumaMean,
     resolveChecksum: resolve.resolveChecksum,
-    tileEntryCapacity: tileCount * maxEntriesPerTile,
     objectCount: objectIndex.objectIdsByIndex.length,
     objectStateLayoutVersion: objectStateContract.layoutVersion,
     objectStateStrideUint32: objectStateContract.strideUint32,
@@ -471,6 +486,43 @@ function countActiveTiles(tileCounts) {
     if (count > 0) active += 1;
   }
   return active;
+}
+
+function summarizeTileCapacity({
+  tileCounts,
+  tileReferenceCount,
+  tileOverflowCount,
+  tileCount,
+  maxEntriesPerTile,
+}) {
+  let overflowTileCount = 0;
+  let maxExcess = 0;
+  for (const count of tileCounts) {
+    const excess = Math.max(0, count - maxEntriesPerTile);
+    if (excess > 0) {
+      overflowTileCount += 1;
+      maxExcess = Math.max(maxExcess, excess);
+    }
+  }
+
+  const entryCapacity = tileCount * maxEntriesPerTile;
+  const storedReferenceCount = Math.max(0, tileReferenceCount - tileOverflowCount);
+  const overflowRatio =
+    tileReferenceCount > 0 ? tileOverflowCount / tileReferenceCount : 0;
+  const entryUtilization =
+    entryCapacity > 0 ? Math.min(1, storedReferenceCount / entryCapacity) : 0;
+  const hasOverflow = tileOverflowCount > 0 || overflowTileCount > 0;
+  return {
+    mode: "fixed-cap-smoke",
+    status: hasOverflow ? "overflow" : "ok",
+    gate: hasOverflow ? "blocked" : "pass",
+    overflowTileCount,
+    overflowRatio,
+    maxExcess,
+    storedReferenceCount,
+    entryCapacity,
+    entryUtilization,
+  };
 }
 
 function clampInt(value, min, max) {

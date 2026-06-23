@@ -422,6 +422,9 @@ export default function PointCloudViewport({
       data-renderer={rendererContract?.rendererId ?? "gaussian-oit"}
       data-renderer-target={rendererContract?.targetRendererId ?? "webgpu-tile"}
       data-renderer-fallback-reason={rendererContract?.fallbackReason ?? ""}
+      data-webgpu-target-gate={rendererContract?.targetGate ?? ""}
+      data-webgpu-target-gate-reason={rendererContract?.targetGateReason ?? ""}
+      data-webgpu-target-gate-blocker={rendererContract?.targetGateBlocker ?? ""}
       data-webgpu-status={rendererContract?.webGpuStatus ?? "unknown"}
       data-object-filter={rendererContract?.objectFilter ?? "gpu-object-state-texture"}
       data-webgpu-object-filter-target={rendererContract?.targetObjectFilter ?? "gpu-object-state-buffer"}
@@ -434,6 +437,15 @@ export default function PointCloudViewport({
       data-webgpu-active-tile-count={rendererContract?.activeTileCount ?? 0}
       data-webgpu-tile-reference-count={rendererContract?.tileReferenceCount ?? 0}
       data-tile-overflow-count={rendererContract?.tileOverflowCount ?? 0}
+      data-webgpu-tile-overflow-tile-count={rendererContract?.tileOverflowTileCount ?? 0}
+      data-webgpu-tile-overflow-ratio={rendererContract?.tileOverflowRatio ?? 0}
+      data-webgpu-tile-overflow-max-excess={rendererContract?.tileOverflowMaxExcess ?? 0}
+      data-webgpu-tile-entry-stored-count={rendererContract?.tileEntryStoredCount ?? 0}
+      data-webgpu-tile-entry-capacity={rendererContract?.tileEntryCapacity ?? 0}
+      data-webgpu-tile-entry-utilization={rendererContract?.tileEntryUtilization ?? 0}
+      data-webgpu-tile-capacity-mode={rendererContract?.tileCapacityMode ?? ""}
+      data-webgpu-tile-capacity-status={rendererContract?.tileCapacityStatus ?? ""}
+      data-webgpu-tile-capacity-gate={rendererContract?.tileCapacityGate ?? ""}
       data-webgpu-max-tile-occupancy={rendererContract?.maxTileOccupancy ?? 0}
       data-webgpu-resolve-layout={rendererContract?.resolveVersion ?? ""}
       data-webgpu-resolve-mode={rendererContract?.resolveMode ?? ""}
