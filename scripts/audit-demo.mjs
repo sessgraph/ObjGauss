@@ -59,6 +59,9 @@ try {
         `activeTiles=${result.activeTileCount}/${result.tileCount} ` +
         `tileReferences=${result.tileReferenceCount} ` +
         `maxTileOccupancy=${result.maxTileOccupancy} ` +
+        `resolveLayout=${JSON.stringify(result.resolveLayout)} ` +
+        `resolvedTiles=${result.resolvedTileCount} ` +
+        `resolveChecksum=${JSON.stringify(result.resolveChecksum)} ` +
         `tileOverflowCount=${result.tileOverflowCount} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
         `objectFilterTarget=${JSON.stringify(result.objectFilterTarget)} ` +
@@ -154,6 +157,13 @@ async function runAudit(url, assetsToCheck) {
       const tileReferenceCount = numericValue(await viewport.getAttribute("data-webgpu-tile-reference-count") ?? "0");
       const tileOverflowCount = numericValue(await viewport.getAttribute("data-tile-overflow-count") ?? "0");
       const maxTileOccupancy = numericValue(await viewport.getAttribute("data-webgpu-max-tile-occupancy") ?? "0");
+      const resolveLayout = await viewport.getAttribute("data-webgpu-resolve-layout");
+      const resolveMode = await viewport.getAttribute("data-webgpu-resolve-mode");
+      const resolvedTileCount = numericValue(await viewport.getAttribute("data-webgpu-resolved-tile-count") ?? "0");
+      const resolveWeightSum = Number(await viewport.getAttribute("data-webgpu-resolve-weight-sum") ?? "0");
+      const resolveAlphaMean = Number(await viewport.getAttribute("data-webgpu-resolve-alpha-mean") ?? "0");
+      const resolveLumaMean = Number(await viewport.getAttribute("data-webgpu-resolve-luma-mean") ?? "0");
+      const resolveChecksum = await viewport.getAttribute("data-webgpu-resolve-checksum");
       if (tileSize !== 16) {
         throw new Error(`${asset.id} unexpected WebGPU tile size: ${tileSize}`);
       }
@@ -169,6 +179,22 @@ async function runAudit(url, assetsToCheck) {
       }
       if (maxTileOccupancy <= 0) {
         throw new Error(`${asset.id} did not expose positive max tile occupancy: ${maxTileOccupancy}`);
+      }
+      if (resolveLayout !== "webgpu-tile-resolve-v1" || resolveMode !== "tile-center-weighted-oit") {
+        throw new Error(
+          `${asset.id} did not expose WebGPU tile resolve contract: layout=${resolveLayout} mode=${resolveMode}`,
+        );
+      }
+      if (
+        resolvedTileCount <= 0 ||
+        resolveWeightSum <= 0 ||
+        resolveAlphaMean <= 0 ||
+        resolveLumaMean <= 0 ||
+        !/^[0-9a-f]{8}$/.test(resolveChecksum ?? "")
+      ) {
+        throw new Error(
+          `${asset.id} invalid WebGPU tile resolve telemetry: resolved=${resolvedTileCount} weight=${resolveWeightSum} alpha=${resolveAlphaMean} luma=${resolveLumaMean} checksum=${resolveChecksum}`,
+        );
       }
       const objectFilter = await viewport.getAttribute("data-object-filter");
       if (objectFilter !== "gpu-object-state-texture") {
@@ -222,6 +248,13 @@ async function runAudit(url, assetsToCheck) {
         activeTileCount,
         tileReferenceCount,
         maxTileOccupancy,
+        resolveLayout,
+        resolveMode,
+        resolvedTileCount,
+        resolveWeightSum,
+        resolveAlphaMean,
+        resolveLumaMean,
+        resolveChecksum,
         tileOverflowCount,
         objectFilter,
         objectFilterTarget,

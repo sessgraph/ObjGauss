@@ -435,6 +435,13 @@ export default function PointCloudViewport({
       data-webgpu-tile-reference-count={rendererContract?.tileReferenceCount ?? 0}
       data-tile-overflow-count={rendererContract?.tileOverflowCount ?? 0}
       data-webgpu-max-tile-occupancy={rendererContract?.maxTileOccupancy ?? 0}
+      data-webgpu-resolve-layout={rendererContract?.resolveVersion ?? ""}
+      data-webgpu-resolve-mode={rendererContract?.resolveMode ?? ""}
+      data-webgpu-resolved-tile-count={rendererContract?.resolvedTileCount ?? 0}
+      data-webgpu-resolve-weight-sum={rendererContract?.resolveWeightSum ?? 0}
+      data-webgpu-resolve-alpha-mean={rendererContract?.resolveAlphaMean ?? 0}
+      data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
+      data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
       data-visible-count={objectFilter.visibleCount}
       ref={containerRef}
     >

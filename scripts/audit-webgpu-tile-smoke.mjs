@@ -26,11 +26,20 @@ assert.equal(base.buffers.scaleRotation.length, scene.points.length * 4);
 assert.equal(base.buffers.objectIndices.length, scene.points.length);
 assert.equal(base.buffers.objectState.length, allObjectIds.size);
 assert.equal(base.buffers.tileCounts.length, base.tileCount);
+assert.equal(base.buffers.tileAccumulation.length, base.tileCount * 4);
+assert.equal(base.buffers.tileResolvedRgba.length, base.tileCount * 4);
 assert.equal(base.buffers.tileEntries.length, base.tileEntryCapacity);
 assert.ok(base.visibleGaussians > 0);
 assert.ok(base.binnedGaussians > 0);
 assert.ok(base.activeTileCount > 0);
 assert.ok(base.tileReferenceCount >= base.binnedGaussians);
+assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
+assert.equal(base.resolveMode, "tile-center-weighted-oit");
+assert.ok(base.resolvedTileCount > 0);
+assert.ok(base.resolveWeightSum > 0);
+assert.ok(base.resolveAlphaMean > 0);
+assert.ok(base.resolveLumaMean > 0);
+assert.match(base.resolveChecksum, /^[0-9a-f]{8}$/);
 
 const isolated = buildWebGpuTileSmoke({
   points: scene.points,
@@ -44,6 +53,8 @@ const isolated = buildWebGpuTileSmoke({
 assert.ok(isolated.visibleGaussians < base.visibleGaussians);
 assert.ok(isolated.binnedGaussians < base.binnedGaussians);
 assert.ok(isolated.tileReferenceCount <= base.tileReferenceCount);
+assert.ok(isolated.resolvedTileCount <= base.resolvedTileCount);
+assert.notEqual(isolated.resolveChecksum, base.resolveChecksum);
 
 const removed = buildWebGpuTileSmoke({
   points: scene.points,
@@ -56,9 +67,11 @@ const removed = buildWebGpuTileSmoke({
 
 assert.ok(removed.visibleGaussians < base.visibleGaussians);
 assert.equal(removed.packedGaussians, base.packedGaussians);
+assert.notEqual(removed.resolveChecksum, base.resolveChecksum);
 
 console.log(
   `webgpu_tile_smoke=passed packed=${base.packedGaussians} ` +
     `objects=${base.objectCount} tiles=${base.activeTileCount}/${base.tileCount} ` +
-    `refs=${base.tileReferenceCount} overflow=${base.tileOverflowCount}`,
+    `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
+    `checksum=${base.resolveChecksum} overflow=${base.tileOverflowCount}`,
 );

@@ -583,6 +583,10 @@ export default function App() {
               label="Tile bins"
               value={`${editRenderer.activeTileCount.toLocaleString()} / ${editRenderer.tileCount.toLocaleString()}`}
             />
+            <StateRow
+              label="Tile resolve"
+              value={`${editRenderer.resolvedTileCount.toLocaleString()} / ${editRenderer.resolveChecksum}`}
+            />
             <StateRow label="Tile overflow" value={editRenderer.tileOverflowCount} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />

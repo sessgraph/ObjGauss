@@ -20,6 +20,13 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   tileReferenceCount: 0,
   tileOverflowCount: 0,
   maxTileOccupancy: 0,
+  resolveVersion: "webgpu-tile-resolve-v1",
+  resolveMode: "tile-center-weighted-oit",
+  resolvedTileCount: 0,
+  resolveWeightSum: 0,
+  resolveAlphaMean: 0,
+  resolveLumaMean: 0,
+  resolveChecksum: "00000000",
   objectCount: 0,
 });
 
@@ -96,6 +103,13 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     tileReferenceCount: smoke.tileReferenceCount,
     tileOverflowCount: smoke.tileOverflowCount,
     maxTileOccupancy: smoke.maxTileOccupancy,
+    resolveVersion: smoke.resolveVersion,
+    resolveMode: smoke.resolveMode,
+    resolvedTileCount: smoke.resolvedTileCount,
+    resolveWeightSum: smoke.resolveWeightSum,
+    resolveAlphaMean: smoke.resolveAlphaMean,
+    resolveLumaMean: smoke.resolveLumaMean,
+    resolveChecksum: smoke.resolveChecksum,
     objectCount: smoke.objectCount,
   };
 }

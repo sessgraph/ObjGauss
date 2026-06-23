@@ -1,7 +1,11 @@
 export const WEBGPU_TILE_SMOKE_LAYOUT_VERSION = "webgpu-tile-smoke-v1";
+export const WEBGPU_TILE_RESOLVE_VERSION = "webgpu-tile-resolve-v1";
 export const WEBGPU_TILE_SIZE = 16;
 export const WEBGPU_TILE_MAX_ENTRIES = 8192;
 export const WEBGPU_TILE_VIEWPORT = Object.freeze({ width: 1024, height: 1024 });
+const RESOLVE_ALPHA_SCALE = 0.18;
+const RESOLVE_ALPHA_GAIN = 0.78;
+const RESOLVE_KERNEL_CUTOFF = 13;
 
 export function buildWebGpuTileSmoke({
   points,
@@ -28,6 +32,8 @@ export function buildWebGpuTileSmoke({
   const tileRows = Math.max(1, Math.ceil(viewportHeight / tileSize));
   const tileCount = tileColumns * tileRows;
   const tileCounts = new Uint32Array(tileCount);
+  const tileCenters = buildTileCenters({ tileColumns, tileRows, tileSize });
+  const tileAccumulation = new Float32Array(tileCount * 4);
   const tileEntries = includeTileEntries
     ? new Uint32Array(tileCount * maxEntriesPerTile)
     : null;
@@ -92,13 +98,25 @@ export function buildWebGpuTileSmoke({
         if (nextOccupancy > maxTileOccupancy) {
           maxTileOccupancy = nextOccupancy;
         }
+        accumulateTileResolve({
+          tileIndex,
+          tileCenters,
+          screen,
+          radiusPixels,
+          gaussianIndex: index,
+          colorOpacity,
+          tileAccumulation,
+        });
       }
     }
   });
 
   const activeTileCount = countActiveTiles(tileCounts);
+  const resolve = resolveTileAccumulation(tileAccumulation);
   return {
     layoutVersion: WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
+    resolveVersion: WEBGPU_TILE_RESOLVE_VERSION,
+    resolveMode: "tile-center-weighted-oit",
     tileSize,
     viewportWidth,
     viewportHeight,
@@ -113,6 +131,11 @@ export function buildWebGpuTileSmoke({
     tileReferenceCount,
     tileOverflowCount,
     maxTileOccupancy,
+    resolvedTileCount: resolve.resolvedTileCount,
+    resolveWeightSum: resolve.resolveWeightSum,
+    resolveAlphaMean: resolve.resolveAlphaMean,
+    resolveLumaMean: resolve.resolveLumaMean,
+    resolveChecksum: resolve.resolveChecksum,
     tileEntryCapacity: tileCount * maxEntriesPerTile,
     objectCount: objectIndex.objectIdsByIndex.length,
     buffers: {
@@ -122,9 +145,109 @@ export function buildWebGpuTileSmoke({
       objectIndices,
       objectState,
       tileCounts,
+      tileAccumulation,
+      tileResolvedRgba: resolve.tileResolvedRgba,
       tileEntries,
     },
   };
+}
+
+function buildTileCenters({ tileColumns, tileRows, tileSize }) {
+  const centersX = new Float32Array(tileColumns);
+  const centersY = new Float32Array(tileRows);
+  for (let tileX = 0; tileX < tileColumns; tileX += 1) {
+    centersX[tileX] = tileX * tileSize + tileSize * 0.5;
+  }
+  for (let tileY = 0; tileY < tileRows; tileY += 1) {
+    centersY[tileY] = tileY * tileSize + tileSize * 0.5;
+  }
+  return { centersX, centersY, tileColumns };
+}
+
+function accumulateTileResolve({
+  tileIndex,
+  tileCenters,
+  screen,
+  radiusPixels,
+  gaussianIndex,
+  colorOpacity,
+  tileAccumulation,
+}) {
+  const tileX = tileIndex % tileCenters.tileColumns;
+  const tileY = Math.floor(tileIndex / tileCenters.tileColumns);
+  const dx = tileCenters.centersX[tileX] - screen.x;
+  const dy = tileCenters.centersY[tileY] - screen.y;
+  const sigma = Math.max(radiusPixels / 3, 0.0001);
+  const d = (dx * dx + dy * dy) / (sigma * sigma);
+  if (d > RESOLVE_KERNEL_CUTOFF) return;
+
+  const gaussianOffset = gaussianIndex * 4;
+  const weight =
+    Math.exp(-0.5 * d) *
+    colorOpacity[gaussianOffset + 3] *
+    RESOLVE_ALPHA_GAIN;
+  if (weight <= 0.0001) return;
+
+  const tileOffset = tileIndex * 4;
+  tileAccumulation[tileOffset] += colorOpacity[gaussianOffset] * weight;
+  tileAccumulation[tileOffset + 1] += colorOpacity[gaussianOffset + 1] * weight;
+  tileAccumulation[tileOffset + 2] += colorOpacity[gaussianOffset + 2] * weight;
+  tileAccumulation[tileOffset + 3] += weight;
+}
+
+function resolveTileAccumulation(tileAccumulation) {
+  const tileResolvedRgba = new Float32Array(tileAccumulation.length);
+  let resolvedTileCount = 0;
+  let resolveWeightSum = 0;
+  let alphaSum = 0;
+  let lumaSum = 0;
+  let checksum = 2166136261;
+
+  for (let tileOffset = 0; tileOffset < tileAccumulation.length; tileOffset += 4) {
+    const weight = tileAccumulation[tileOffset + 3];
+    if (weight <= 0.0001) continue;
+
+    const red = tileAccumulation[tileOffset] / weight;
+    const green = tileAccumulation[tileOffset + 1] / weight;
+    const blue = tileAccumulation[tileOffset + 2] / weight;
+    const alpha = clampNumber(1 - Math.exp(-weight * RESOLVE_ALPHA_SCALE), 0, 0.98);
+    const luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+
+    tileResolvedRgba[tileOffset] = red;
+    tileResolvedRgba[tileOffset + 1] = green;
+    tileResolvedRgba[tileOffset + 2] = blue;
+    tileResolvedRgba[tileOffset + 3] = alpha;
+    resolvedTileCount += 1;
+    resolveWeightSum += weight;
+    alphaSum += alpha;
+    lumaSum += luma;
+    checksum = checksumValue(checksum, red, green, blue, alpha, weight);
+  }
+
+  return {
+    tileResolvedRgba,
+    resolvedTileCount,
+    resolveWeightSum,
+    resolveAlphaMean: resolvedTileCount > 0 ? alphaSum / resolvedTileCount : 0,
+    resolveLumaMean: resolvedTileCount > 0 ? lumaSum / resolvedTileCount : 0,
+    resolveChecksum: checksum.toString(16).padStart(8, "0"),
+  };
+}
+
+function checksumValue(checksum, red, green, blue, alpha, weight) {
+  const values = [
+    Math.round(clampNumber(red, 0, 1) * 255),
+    Math.round(clampNumber(green, 0, 1) * 255),
+    Math.round(clampNumber(blue, 0, 1) * 255),
+    Math.round(clampNumber(alpha, 0, 1) * 255),
+    Math.round(clampNumber(weight, 0, 65535)),
+  ];
+  let next = checksum;
+  for (const value of values) {
+    next ^= value;
+    next = Math.imul(next, 16777619) >>> 0;
+  }
+  return next;
 }
 
 function buildObjectIndex(points) {
