@@ -6,6 +6,10 @@ import { inflateSync } from "node:zlib";
 import { chromium } from "playwright";
 import { WEBGPU_PIXEL_RESOLVE_SOURCE } from "../src/webgpuTileComputeShader.js";
 import {
+  WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+  WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
+} from "../src/webgpuTileResolveShader.js";
+import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
   WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
@@ -104,7 +108,7 @@ try {
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
-        `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)} ` +
+        `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)}:${JSON.stringify(result.webGpuAlphaPresentationMode)}:${result.webGpuAlphaPresentationFloor} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
@@ -619,6 +623,8 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
       const webGpuResolveFilter = await viewport.getAttribute("data-webgpu-resolve-filter");
+      const webGpuAlphaPresentationMode = await viewport.getAttribute("data-webgpu-alpha-presentation-mode");
+      const webGpuAlphaPresentationFloor = Number(await viewport.getAttribute("data-webgpu-alpha-presentation-floor") ?? "0");
       const webGpuRuntimeProbe = await viewport.getAttribute("data-webgpu-runtime-probe");
       const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
       const webGpuDeviceLostReason = await viewport.getAttribute("data-webgpu-device-lost-reason");
@@ -673,6 +679,8 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuFirstFrameChecksum,
           webGpuResolveSource,
           webGpuResolveFilter,
+          webGpuAlphaPresentationMode,
+          webGpuAlphaPresentationFloor,
         });
         if (webGpuDeviceLostStatus === "lost" && !options.allowWebGpuDeviceLost) {
           throw new Error(
@@ -710,6 +718,8 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuFirstFrameChecksum,
             webGpuResolveSource,
             webGpuResolveFilter,
+            webGpuAlphaPresentationMode,
+            webGpuAlphaPresentationFloor,
             webGpuRuntimeProbe,
             webGpuViewportWidth,
             webGpuViewportHeight,
@@ -943,6 +953,8 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuFirstFrameChecksum,
         webGpuResolveSource,
         webGpuResolveFilter,
+        webGpuAlphaPresentationMode,
+        webGpuAlphaPresentationFloor,
         webGpuRuntimeProbe,
         webGpuViewportWidth,
         webGpuViewportHeight,
@@ -1118,9 +1130,22 @@ function validateWebGpuRuntimeProbe({
   webGpuFirstFrameChecksum,
   webGpuResolveSource,
   webGpuResolveFilter,
+  webGpuAlphaPresentationMode,
+  webGpuAlphaPresentationFloor,
 }) {
   if (actualProbe !== expectedProbe) {
     throw new Error(`${assetId} WebGPU runtime probe mismatch: expected=${expectedProbe} actual=${actualProbe}`);
+  }
+  if (
+    webGpuResolveSource === "webgpu-pixel-storage-resolve-v1" &&
+    (
+      webGpuAlphaPresentationMode !== WEBGPU_TILE_ALPHA_PRESENTATION_MODE ||
+      Math.abs(webGpuAlphaPresentationFloor - WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR) > 0.000001
+    )
+  ) {
+    throw new Error(
+      `${assetId} WebGPU storage resolve did not expose alpha presentation gate: mode=${webGpuAlphaPresentationMode} floor=${webGpuAlphaPresentationFloor}`,
+    );
   }
 
   const stageState = {

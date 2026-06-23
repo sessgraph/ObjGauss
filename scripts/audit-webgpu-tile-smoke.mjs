@@ -40,6 +40,8 @@ import {
 } from "../src/webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
+  WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+  WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
   WEBGPU_TILE_RESOLVE_FILTER,
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
@@ -319,11 +321,15 @@ assert.deepEqual([...resolveMeta], [base.viewportWidth, base.viewportHeight, 0, 
 assert.equal(resolveMeta.byteLength, 16);
 assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-pixel-storage-resolve-v1");
 assert.equal(WEBGPU_TILE_RESOLVE_FILTER, "bilinear-storage");
+assert.equal(WEBGPU_TILE_ALPHA_PRESENTATION_MODE, "alpha-edge-gated-presentation-v1");
+assert.equal(WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR, 0.035);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /fn\s+samplePixel/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /fract\(pixelPosition\)/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /mix\(/);
+assert.match(WEBGPU_TILE_RESOLVE_SHADER, /ALPHA_PRESENTATION_FLOOR/);
+assert.match(WEBGPU_TILE_RESOLVE_SHADER, /alpha\s*<\s*ALPHA_PRESENTATION_FLOOR/);
 assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
 assert.equal(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE, "webgpu-sampled-texture-resolve-v1");
 assert.match(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER, /texture_2d<f32>/);
@@ -576,7 +582,7 @@ console.log(
     `accumulation=${WEBGPU_TILE_ACCUMULATION_SOURCE}:${webGpuAccumulationWorkgroups(base)} ` +
     `compute=${WEBGPU_TILE_COMPUTE_SOURCE}:${webGpuComputeWorkgroups(base)} ` +
     `pixel=${WEBGPU_PIXEL_RESOLVE_SOURCE}:${webGpuPixelResolveWorkgroups(base)} ` +
-    `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}:${WEBGPU_TILE_RESOLVE_FILTER}`,
+    `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}:${WEBGPU_TILE_RESOLVE_FILTER}:${WEBGPU_TILE_ALPHA_PRESENTATION_MODE}:${WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR}`,
 );
 
 function createFakeDevice() {

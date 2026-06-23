@@ -1,7 +1,11 @@
 export const WEBGPU_TILE_RESOLVE_SOURCE = "webgpu-pixel-storage-resolve-v1";
 export const WEBGPU_TILE_RESOLVE_FILTER = "bilinear-storage";
+export const WEBGPU_TILE_ALPHA_PRESENTATION_MODE = "alpha-edge-gated-presentation-v1";
+export const WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR = 0.035;
 
 export const WEBGPU_TILE_RESOLVE_SHADER = `
+const ALPHA_PRESENTATION_FLOOR = 0.035;
+
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
@@ -58,7 +62,10 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   );
   let pixel = mix(top, bottom, blend.y);
   let background = vec3f(0.0627, 0.0745, 0.0863);
-  let alpha = clamp(pixel.a, 0.0, 0.98);
+  var alpha = clamp(pixel.a, 0.0, 0.98);
+  if (alpha < ALPHA_PRESENTATION_FLOOR) {
+    alpha = 0.0;
+  }
   let rgb = background * (1.0 - alpha) + clamp(pixel.rgb, vec3f(0.0), vec3f(1.0)) * alpha;
   return vec4f(rgb, 1.0);
 }

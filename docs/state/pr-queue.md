@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-L`: 基于 T-K 的结论，把 Spark/edit 残差拆成 coverage 与 shading 两条线：coverage 继续做 footprint / alpha threshold 校准；shading 评估 view-dependent SH 或 Spark edit handoff，避免再把两类误差混在一个“颗粒感”指标里。
+  - `RENDER-005T-M`: 继续分线治理 Spark/edit 残差。coverage 线应进入更实质的 footprint / covariance / alpha threshold sweep，而不是只加 presentation gate；shading 线评估 view-dependent SH 或 Spark edit handoff。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-L: WebGPU alpha presentation edge gate
+
+- 状态: done / alpha-presentation-gated
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 T-K 已证明 depth-binned alpha 能改善 luma / chroma、但 coverage ratio 仍偏大后，把 coverage 残差从 shading 残差里拆出来，先对最终显示阶段的低 alpha halo 做窄门控。
+- 已实施:
+  - `webgpu-pixel-storage-resolve-v1` fullscreen display shader 新增 `alpha-edge-gated-presentation-v1`，对 `alpha < 0.035` 的最终显示像素直接回落到背景色。
+  - 该门控只影响 presentation，不修改 compute resolve 的 straight RGB / alpha buffer，保留后续排序 / SH / debug 的底层数据。
+  - `WebGpuTileViewport` 暴露 `data-webgpu-alpha-presentation-mode` 与 `data-webgpu-alpha-presentation-floor`。
+  - `audit-demo` 和 tile smoke audit 校验 storage resolve 使用 `alpha-edge-gated-presentation-v1:0.035`。
+- 结论:
+  - NeRF Lego desktop WebGPU full audit 通过；相对 T-K，coverage ratio 从 `3.856920` 降到 `3.784251`，luma / chroma delta 从 `0.109000 / 0.087808` 小幅降到 `0.106079 / 0.086537`。
+  - Plush semantic desktop WebGPU full audit 通过；coverage ratio 从 `6.680406` 降到 `6.448639`，luma delta 从 `0.119591` 降到 `0.112667`，chroma delta 从 `0.007786` 到 `0.010651`。
+  - 这证明低 alpha halo 确实贡献了一部分 coverage 残差，但幅度有限；下一步 coverage 线应做 footprint / covariance / threshold sweep，不能把 T-L 当作覆盖问题完成。
+- 验证:
+  - `node --check src/webgpuTileResolveShader.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`resolveSource=webgpu-pixel-storage-resolve-v1:bilinear-storage:alpha-edge-gated-presentation-v1:0.035`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5264/ --no-server --probes full`: passed；coverage ratio=`3.784251`、luma/chroma=`0.106079/0.086537`。
+  - `node scripts/audit-webgpu-desktop.mjs --asset plush-semantic-closure-local --url http://127.0.0.1:5264/ --no-server --probes full`: passed；coverage ratio=`6.448639`、luma/chroma=`0.112667/0.010651`。
 
 ### RENDER-005T-K: WebGPU depth-binned alpha compositing
 

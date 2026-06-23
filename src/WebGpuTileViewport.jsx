@@ -18,6 +18,8 @@ import { WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE } from "./webgpuC
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
+  WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+  WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
   WEBGPU_TILE_RESOLVE_FILTER,
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
@@ -547,6 +549,8 @@ export default function WebGpuTileViewport({
       data-webgpu-resolve-alpha-mean={rendererContract?.resolveAlphaMean ?? 0}
       data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
       data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
+      data-webgpu-alpha-presentation-mode={WEBGPU_TILE_ALPHA_PRESENTATION_MODE}
+      data-webgpu-alpha-presentation-floor={WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR}
       data-webgpu-object-state-layout={rendererContract?.objectStateLayoutVersion ?? ""}
       data-webgpu-object-state-stride={rendererContract?.objectStateStrideUint32 ?? 0}
       data-webgpu-object-state-visible-objects={rendererContract?.objectStateVisibleObjects ?? 0}
