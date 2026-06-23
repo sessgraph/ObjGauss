@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005D`: 在 storage-buffer resolve shader 基础上推进 WebGPU compute accumulation shader。
+  - `RENDER-005E`: 在 compute resolve 基础上推进 per-tile / per-Gaussian compute accumulation shader。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,31 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005D: WebGPU compute resolve shader
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 WebGPU route 从“CPU 写好 `tileResolvedRgba` 后直接显示”推进到“GPU compute 从 `tileAccumulation` 写 `tileResolvedRgba`，再由 storage-buffer resolve shader 显示”。
+- 范围外:
+  - 不实现 per-Gaussian tile traversal。
+  - 不实现 tile list 上的完整 per-pixel accumulation。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - 新增 `src/webgpuTileComputeShader.js`，定义 `webgpu-compute-resolve-v1` WGSL compute shader：读取 `tileAccumulation`，按 weighted OIT resolve 规则写入 `tileResolvedRgba`。
+  - `WebGpuTileViewport` 创建 compute pipeline，并在同一个 command encoder 中先 dispatch compute，再执行 fullscreen storage-buffer resolve render pass。
+  - WebGPU viewport 新增 `data-webgpu-compute-*` DOM contract：source、status、reason 和 workgroup count。
+  - `audit-webgpu-tile-smoke` 验证 compute shader contract、16-byte compute meta 和 workgroup 计算。
+  - `audit-demo` 的 WebGPU route 现在要求 compute 已 dispatch，且 first frame 仍来自 `webgpu-storage-resolve-v1`。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 compute resolve contract。
+  - WebGPU 可用环境中，`webgpu-tile` route 的 first frame 必须经过 `webgpu-compute-resolve-v1`。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `compute=webgpu-compute-resolve-v1:64`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5209/`: passed，assets=3；当前仍 fallback，`compute=null:null:0` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-005C: WebGPU storage-buffer resolve shader
 

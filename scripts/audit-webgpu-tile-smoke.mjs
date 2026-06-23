@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 
 import { createSampleScene } from "../src/sampleScene.js";
 import {
+  createWebGpuComputeMeta,
+  webGpuComputeWorkgroups,
+  WEBGPU_TILE_COMPUTE_SHADER,
+  WEBGPU_TILE_COMPUTE_SOURCE,
+  WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE,
+} from "../src/webgpuTileComputeShader.js";
+import {
   buildWebGpuTileSmoke,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
@@ -130,6 +137,17 @@ assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+tileResolvedRgb
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
 assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
 
+const computeMeta = createWebGpuComputeMeta(base);
+assert.deepEqual([...computeMeta], [base.tileCount, 0, 0, 0]);
+assert.equal(computeMeta.byteLength, 16);
+assert.equal(WEBGPU_TILE_COMPUTE_SOURCE, "webgpu-compute-resolve-v1");
+assert.equal(WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE, 64);
+assert.equal(webGpuComputeWorkgroups(base), Math.ceil(base.tileCount / WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE));
+assert.match(WEBGPU_TILE_COMPUTE_SHADER, /@compute\s+@workgroup_size\(64\)/);
+assert.match(WEBGPU_TILE_COMPUTE_SHADER, /var<storage,\s*read>\s+tileAccumulation/);
+assert.match(WEBGPU_TILE_COMPUTE_SHADER, /var<storage,\s*read_write>\s+tileResolvedRgba/);
+assert.match(WEBGPU_TILE_COMPUTE_SHADER, /tileResolvedRgba\[tileIndex\]/);
+
 const roomy = buildWebGpuTileSmoke({
   points: scene.points,
   visibleIds: allObjectIds,
@@ -214,6 +232,7 @@ console.log(
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +
+    `compute=${WEBGPU_TILE_COMPUTE_SOURCE}:${webGpuComputeWorkgroups(base)} ` +
     `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}`,
 );
 

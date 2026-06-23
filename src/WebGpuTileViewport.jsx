@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  createWebGpuComputeMeta,
+  webGpuComputeWorkgroups,
+  WEBGPU_TILE_COMPUTE_SHADER,
+  WEBGPU_TILE_COMPUTE_SOURCE,
+} from "./webgpuTileComputeShader.js";
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
@@ -28,6 +34,12 @@ export default function WebGpuTileViewport({
     checksum: "",
     pixels: 0,
     source: "",
+  });
+  const [compute, setCompute] = useState({
+    status: "pending",
+    reason: "webgpu-compute-pending",
+    source: "",
+    workgroups: 0,
   });
   const [storage, setStorage] = useState({
     status: "pending",
@@ -69,6 +81,12 @@ export default function WebGpuTileViewport({
         byteLength: 0,
         tileEntriesIncluded: false,
       });
+      setCompute({
+        status: "failed",
+        reason: "navigator-gpu-unavailable",
+        source: "",
+        workgroups: 0,
+      });
       return undefined;
     }
 
@@ -85,18 +103,23 @@ export default function WebGpuTileViewport({
         const context = canvas.getContext("webgpu");
         if (!context) throw new Error("webgpu-context-unavailable");
         const format = navigator.gpu.getPreferredCanvasFormat();
-        const module = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
+        const resolveModule = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
+        const computeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
+        const computePipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module: computeModule, entryPoint: "computeMain" },
+        });
         const pipeline = device.createRenderPipeline({
           layout: "auto",
-          vertex: { module, entryPoint: "vertexMain" },
+          vertex: { module: resolveModule, entryPoint: "vertexMain" },
           fragment: {
-            module,
+            module: resolveModule,
             entryPoint: "fragmentMain",
             targets: [{ format }],
           },
           primitive: { topology: "triangle-list" },
         });
-        runtimeRef.current = { device, context, format, pipeline };
+        runtimeRef.current = { device, context, format, pipeline, computePipeline };
         device.lost.then((info) => {
           if (cancelled) return;
           setFrame({
@@ -113,6 +136,7 @@ export default function WebGpuTileViewport({
           tileSmoke,
           setFrame,
           setStorage,
+          setCompute,
         });
       } catch (error) {
         if (cancelled) return;
@@ -132,12 +156,19 @@ export default function WebGpuTileViewport({
           byteLength: 0,
           tileEntriesIncluded: false,
         });
+        setCompute({
+          status: "failed",
+          reason: error?.message || "webgpu-compute-unavailable",
+          source: "",
+          workgroups: 0,
+        });
       }
     }
 
     init();
     return () => {
       cancelled = true;
+      destroyTransientBuffers(runtimeRef.current);
       runtimeRef.current?.storageBundle?.destroy?.();
       runtimeRef.current?.device?.destroy();
       runtimeRef.current = null;
@@ -148,7 +179,7 @@ export default function WebGpuTileViewport({
     const runtime = runtimeRef.current;
     const canvas = canvasRef.current;
     if (!runtime || !canvas) return;
-    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage });
+    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage, setCompute });
   }, [tileSmoke]);
 
   useEffect(() => {
@@ -224,6 +255,10 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
       data-webgpu-resolve-source={frame.source}
+      data-webgpu-compute-source={compute.source}
+      data-webgpu-compute-status={compute.status}
+      data-webgpu-compute-reason={compute.reason}
+      data-webgpu-compute-workgroups={compute.workgroups}
       data-webgpu-storage-layout={storage.layoutVersion}
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
@@ -253,10 +288,11 @@ export default function WebGpuTileViewport({
   );
 }
 
-function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
-  const { device, context, format, pipeline } = runtime;
+function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage, setCompute }) {
+  const { device, context, format, pipeline, computePipeline } = runtime;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
+  destroyTransientBuffers(runtime);
 
   let storageBundle = null;
   try {
@@ -289,46 +325,104 @@ function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
       pixels: 0,
       source: "",
     });
+    setCompute({
+      status: "failed",
+      reason: error?.message || "webgpu-storage-upload-failed",
+      source: "",
+      workgroups: 0,
+    });
     return;
   }
 
-  const resolveMetaBuffer = createResolveMetaBuffer(device, tileSmoke);
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
-      { binding: 1, resource: { buffer: resolveMetaBuffer } },
-    ],
-  });
-  const encoder = device.createCommandEncoder();
-  const pass = encoder.beginRenderPass({
-    colorAttachments: [
-      {
-        view: context.getCurrentTexture().createView(),
-        clearValue: {
-          r: BACKGROUND_RGB[0] / 255,
-          g: BACKGROUND_RGB[1] / 255,
-          b: BACKGROUND_RGB[2] / 255,
-          a: 1,
+  try {
+    const computeMetaBuffer = createComputeMetaBuffer(device, tileSmoke);
+    const resolveMetaBuffer = createResolveMetaBuffer(device, tileSmoke);
+    runtime.transientBuffers = [computeMetaBuffer, resolveMetaBuffer];
+    const computeBindGroup = device.createBindGroup({
+      layout: computePipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
+        { binding: 1, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+        { binding: 2, resource: { buffer: computeMetaBuffer } },
+      ],
+    });
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+        { binding: 1, resource: { buffer: resolveMetaBuffer } },
+      ],
+    });
+    const encoder = device.createCommandEncoder();
+    const computePass = encoder.beginComputePass();
+    const workgroups = webGpuComputeWorkgroups(tileSmoke);
+    computePass.setPipeline(computePipeline);
+    computePass.setBindGroup(0, computeBindGroup);
+    computePass.dispatchWorkgroups(workgroups);
+    computePass.end();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: context.getCurrentTexture().createView(),
+          clearValue: {
+            r: BACKGROUND_RGB[0] / 255,
+            g: BACKGROUND_RGB[1] / 255,
+            b: BACKGROUND_RGB[2] / 255,
+            a: 1,
+          },
+          loadOp: "clear",
+          storeOp: "store",
         },
-        loadOp: "clear",
-        storeOp: "store",
-      },
-    ],
+      ],
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    setCompute({
+      status: "dispatched",
+      reason: "webgpu-compute-resolve-dispatched",
+      source: WEBGPU_TILE_COMPUTE_SOURCE,
+      workgroups,
+    });
+    setFrame({
+      status: "rendered",
+      reason: "webgpu-storage-resolve-rendered",
+      checksum: tileSmoke.resolveChecksum,
+      pixels: tileSmoke.resolvedTileCount,
+      source: WEBGPU_TILE_RESOLVE_SOURCE,
+    });
+  } catch (error) {
+    setCompute({
+      status: "failed",
+      reason: error?.message || "webgpu-compute-resolve-failed",
+      source: "",
+      workgroups: 0,
+    });
+    setFrame({
+      status: "failed",
+      reason: error?.message || "webgpu-compute-resolve-failed",
+      checksum: "",
+      pixels: 0,
+      source: "",
+    });
+  }
+}
+
+function createComputeMetaBuffer(device, tileSmoke) {
+  const data = createWebGpuComputeMeta(tileSmoke);
+  const usage = globalThis.GPUBufferUsage ?? {
+    COPY_DST: 0x0008,
+    UNIFORM: 0x0040,
+  };
+  const buffer = device.createBuffer({
+    label: "objgauss-compute-meta",
+    size: data.byteLength,
+    usage: usage.UNIFORM | usage.COPY_DST,
   });
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
-  pass.draw(3);
-  pass.end();
-  device.queue.submit([encoder.finish()]);
-  resolveMetaBuffer.destroy();
-  setFrame({
-    status: "rendered",
-    reason: "webgpu-storage-resolve-rendered",
-    checksum: tileSmoke.resolveChecksum,
-    pixels: tileSmoke.resolvedTileCount,
-    source: WEBGPU_TILE_RESOLVE_SOURCE,
-  });
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
 }
 
 function createResolveMetaBuffer(device, tileSmoke) {
@@ -344,6 +438,14 @@ function createResolveMetaBuffer(device, tileSmoke) {
   });
   device.queue.writeBuffer(buffer, 0, data);
   return buffer;
+}
+
+function destroyTransientBuffers(runtime) {
+  if (!runtime?.transientBuffers) return;
+  for (const buffer of runtime.transientBuffers) {
+    buffer?.destroy?.();
+  }
+  runtime.transientBuffers = [];
 }
 
 function pickObjectFromTileFrame({
