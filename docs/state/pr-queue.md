@@ -37,7 +37,7 @@
   - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "splatfacto_balanced or splatfacto_smoke" -q`: 2 passed。
   - `uv run --extra dev pytest`: 34 passed。
   - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
-- 完成 commit: `69cb156`.
+- 完成 commit: `b4d34da`.
 
 ### ACCEPT-002: Browser audit for balanced Splatfacto sample
 
