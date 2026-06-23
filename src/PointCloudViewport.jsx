@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
+const EDIT_SPLAT_SIZE_SCALE = 4.4;
+const SELECTED_SPLAT_SIZE_SCALE = 6.2;
+let softPointTexture = null;
+
 export default function PointCloudViewport({
   points,
   visibleIds,
@@ -131,12 +135,15 @@ export default function PointCloudViewport({
     geometry.setAttribute("position", new THREE.BufferAttribute(buffers.positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(buffers.colors, 3));
     geometry.computeBoundingSphere();
+    const splatTexture = getSoftPointTexture();
 
     const material = new THREE.PointsMaterial({
-      size: pointSize,
+      size: pointSize * EDIT_SPLAT_SIZE_SCALE,
+      map: splatTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.94,
+      opacity: 0.58,
+      alphaTest: 0.006,
       sizeAttenuation: true,
       depthWrite: false,
     });
@@ -151,10 +158,12 @@ export default function PointCloudViewport({
         new THREE.BufferAttribute(buffers.selectedPositions, 3),
       );
       const selectedMaterial = new THREE.PointsMaterial({
-        size: pointSize * 1.85,
+        size: pointSize * SELECTED_SPLAT_SIZE_SCALE,
+        map: splatTexture,
         color: 0xfff0a8,
         transparent: true,
-        opacity: 0.86,
+        opacity: 0.6,
+        alphaTest: 0.006,
         sizeAttenuation: true,
         depthWrite: false,
         depthTest: false,
@@ -171,10 +180,10 @@ export default function PointCloudViewport({
 
   useEffect(() => {
     if (pointsObjectRef.current) {
-      pointsObjectRef.current.material.size = pointSize;
+      pointsObjectRef.current.material.size = pointSize * EDIT_SPLAT_SIZE_SCALE;
     }
     if (selectedObjectRef.current) {
-      selectedObjectRef.current.material.size = pointSize * 1.85;
+      selectedObjectRef.current.material.size = pointSize * SELECTED_SPLAT_SIZE_SCALE;
     }
   }, [pointSize]);
 
@@ -302,6 +311,32 @@ function buildBuffers({
     selectedPositions,
     visibleCount: selected.length,
   };
+}
+
+function getSoftPointTexture() {
+  if (softPointTexture) return softPointTexture;
+
+  const size = 64;
+  const center = size / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+  gradient.addColorStop(0, "rgba(255, 255, 255, 0.98)");
+  gradient.addColorStop(0.42, "rgba(255, 255, 255, 0.68)");
+  gradient.addColorStop(0.78, "rgba(255, 255, 255, 0.16)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+
+  softPointTexture = new THREE.CanvasTexture(canvas);
+  softPointTexture.minFilter = THREE.LinearFilter;
+  softPointTexture.magFilter = THREE.LinearFilter;
+  softPointTexture.wrapS = THREE.ClampToEdgeWrapping;
+  softPointTexture.wrapT = THREE.ClampToEdgeWrapping;
+  return softPointTexture;
 }
 
 function frameGeometry(geometry, camera, controls, scene) {
