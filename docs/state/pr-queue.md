@@ -17,7 +17,6 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-004D`: object-state buffer 接入隐藏 / 隔离 / 删除。
   - `RENDER-004E`: browser audit、overflow telemetry 和 fallback hardening。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -25,6 +24,33 @@
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
+
+### RENDER-004D: WebGPU object-state buffer smoke
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 WebGPU tile smoke 的对象可见性从隐含 0/1 数组升级为可审计的 storage-buffer contract，使隐藏、隔离、删除和选中状态都能进入 future WebGPU renderer。
+- 范围外:
+  - 不创建 WebGPU compute/render pipeline。
+  - 不把实际编辑 renderer 从 `Gaussian OIT 编辑` 切到 WebGPU。
+  - 不声明 Spark `.splat` 真实查看已支持 object-state 过滤。
+- 实施:
+  - `src/webgpuTileSmoke.js` 新增 `webgpu-object-state-v1`，使用 `vec4u`-style stride 4 buffer：flags、dense object index、Gaussian count、reserved。
+  - object-state flags 覆盖 visible、selected、removed、isolated 和 enabled，并输出 dense object id mapping、visible/hidden/removed/selected/isolated object counts 与 checksum。
+  - `App` 将 `selectedId` 输入 WebGPU tile smoke，并在渲染状态面板展示 Object state。
+  - `PointCloudViewport` 暴露 `data-webgpu-object-state-*` DOM contract。
+  - `audit-webgpu-tile-smoke` 和 `audit-demo` 校验 object-state layout、stride、checksum，以及隔离 / 删除后的状态变更。
+- 验收:
+  - 初始样例暴露 `objectStateLayout="webgpu-object-state-v1"`、stride=4、visible objects 为正、hidden/removed/selected/isolated 均为 0。
+  - 画布选中后点击 `只看所选`，object-state checksum 变化，visible objects=1，selected/isolated objects=1。
+  - 点击 `预览删除` 后 checksum 再次变化，removed objects=1，isolated objects=0，visible objects 减 1。
+  - 当前 headless WebGPU 不可用时仍明确 fallback 到 `Gaussian OIT 编辑`，浏览器交互仍通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，内置 sample packed=5800、tiles=2362/4096、refs=157323、resolved=2301、objectState=72aeff5e。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5202/`: passed，assets=3；Plush semantic objectState 362760d7 -> 637142bc，Plush v1 e1cdb2e4 -> b0b19f1f，Lego 7243475b -> 7ca4643c。
+- 完成 commit: `9c1c0a2`.
 
 ### RENDER-004C: WebGPU tile accumulation and resolve smoke
 

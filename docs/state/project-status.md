@@ -43,7 +43,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 对象列表、点击 Gaussian OIT 画布选中对象、隔离、删除预览；选中对象在 shader 编辑模式下有高亮层，删除预览会退出隔离并切回自身颜色显示剩余整体场景。
   - 对象编辑 renderer 已从 `PointsMaterial` 升级为 screen-space Gaussian kernel `ShaderMaterial`，消费 PLY `scale_0/1/2`、`rot_0..3` 和 `opacity` attributes，并通过 RGBA half-float accumulation / fullscreen resolve 实现 weighted blended OIT。
   - 对象过滤已进入 shader 路径：每个 Gaussian 上传 dense object index attribute，隐藏 / 隔离 / 删除通过 GPU object-state `DataTexture` 控制；WebGPU tile renderer 仍是后续任务。
-  - RENDER-004 WebGPU tile renderer 已补 ADR 设计入口；RENDER-004A capability detection / renderer boundary、RENDER-004B buffer packing / binning smoke contract 与 RENDER-004C tile accumulation / resolve smoke contract 已完成，当前 Gaussian OIT 明确作为 WebGPU fallback，下一步是 RENDER-004D object-state buffer。
+  - RENDER-004 WebGPU tile renderer 已补 ADR 设计入口；RENDER-004A capability detection / renderer boundary、RENDER-004B buffer packing / binning smoke contract、RENDER-004C tile accumulation / resolve smoke contract 与 RENDER-004D object-state buffer smoke contract 已完成，当前 Gaussian OIT 明确作为 WebGPU fallback，下一步是 RENDER-004E browser audit / overflow hardening。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -192,10 +192,16 @@ npm run audit:webgpu-tile-smoke
 uv run --extra dev pytest
 npm run build
 npm run audit:demo -- --url http://127.0.0.1:5201/
+npm run audit:webgpu-tile-smoke
+uv run --extra dev pytest
+npm run build
+npm run audit:demo -- --url http://127.0.0.1:5202/
 ```
 
 结果：
 
+- RENDER-004D object-state buffer smoke: `src/webgpuTileSmoke.js` 现在输出 `webgpu-object-state-v1`，用 stride=4 的 `vec4u`-style buffer 编码 object flags、dense object index、Gaussian count 和 reserved slot；flags 覆盖 visible、selected、removed、isolated 和 enabled，并生成 visible/hidden/removed/selected/isolated object counts 与 checksum。`PointCloudViewport` 暴露 `data-webgpu-object-state-*`，浏览器 audit 会检查隔离 / 删除后的 checksum 和计数变化。
+- RENDER-004D validation: `npm run audit:webgpu-tile-smoke` 通过，内置 sample packed=5800、tiles=2362/4096、refs=157323、resolved=2301、objectState=72aeff5e；`uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5202/` 三样例通过。Plush semantic objectState 362760d7 -> 637142bc，Plush v1 e1cdb2e4 -> b0b19f1f，Lego 7243475b -> 7ca4643c。
 - RENDER-004C tile resolve smoke: `src/webgpuTileSmoke.js` 现在在 16x16 tile binning 后执行 deterministic tile-center weighted OIT accumulation / resolve，输出 resolved RGBA buffer、resolved tile count、resolve weight、alpha/luma mean 和 checksum；前端状态面板与 DOM contract 暴露 `webgpu-tile-resolve-v1` / `tile-center-weighted-oit`。
 - RENDER-004C validation: `npm run audit:webgpu-tile-smoke` 通过，内置 sample packed=5800、tiles=2362/4096、refs=157323、resolved=2301、checksum=c8567887；`uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5201/` 三样例通过并检查 resolve contract。Plush semantic resolvedTiles=3051 / checksum=9feb3736，Plush v1 resolvedTiles=3051 / checksum=4e86df13，Lego resolvedTiles=3881 / checksum=2b4d3d8e。
 - RENDER-004B tile smoke packing: 新增 `src/webgpuTileSmoke.js`，把当前 ObjGauss scene 打包成 future WebGPU storage-buffer layout，包括 `positionRadius`、`colorOpacity`、`scaleRotation`、`objectIndices`、`objectState`、`tileCounts` 和可选 `tileEntries` typed arrays；同时生成 deterministic 16x16 tile occupancy、tile references、max occupancy 和 overflow telemetry。
@@ -203,7 +209,7 @@ npm run audit:demo -- --url http://127.0.0.1:5201/
 - RENDER-004A renderer boundary: 前端现在检测 `navigator.gpu` / adapter / device capability，状态面板显示目标 renderer、WebGPU 状态、fallback reason 和 tile overflow；Spark 真实查看暴露 `data-renderer="spark-splat"`，编辑 fallback 暴露 `data-renderer="gaussian-oit"`、`data-renderer-target="webgpu-tile"`、`data-renderer-fallback-reason`、`data-webgpu-status` 和 `data-tile-overflow-count`。
 - RENDER-004A validation: `uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5197/` 三样例通过，当前 headless Chrome 为 `webgpuStatus="unavailable"`、`fallbackReason="webgpu-adapter-unavailable"`、`tileOverflowCount=0`，并继续通过画布选中、隔离和删除预览。
 - RENDER-003 object-state filtering: Gaussian OIT 编辑 renderer 现在保留全量 Gaussian geometry，使用 dense object index GPU attribute + `gpu-object-state-texture` 控制对象隐藏、隔离和删除；画布拾取会跳过当前 object-state 不可见对象。
-- RENDER-004 design: `docs/adr/0005-webgpu-tile-renderer.md` 已定义 WebGPU tile renderer 的 staged delivery、data contract、tile binning、per-tile accumulation、object-state buffer、fallback contract 和验收标准；当前下一步是 `RENDER-004D` object-state buffer 接入隐藏 / 隔离 / 删除。
+- RENDER-004 design: `docs/adr/0005-webgpu-tile-renderer.md` 已定义 WebGPU tile renderer 的 staged delivery、data contract、tile binning、per-tile accumulation、object-state buffer、fallback contract 和验收标准；当前下一步是 `RENDER-004E` browser audit、overflow telemetry 和 fallback hardening。
 - RENDER-003 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5194/` 三样例通过并检查 `objectFilter="gpu-object-state-texture"`；targeted Playwright QA 保存到 `/tmp/objgauss-gpu-filter-*.png`，验证 `initialVisible=281498 -> isolatedVisible=48066 -> deletedVisible=233432`，且无 shader/framebuffer/texture console error。
 - RENDER-002 Weighted OIT: 对象编辑 renderer 现在使用 RGBA half-float accumulation render target；RGB 累加 `sum(w*c)`，Alpha 累加 `sum(w)`，fullscreen resolve 后混回基础 grid / axes 场景。Phase 3 WebGPU tile renderer 尚未完成。
 - RENDER-002 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5193/` 三样例通过，分别检查 `editRenderer="Gaussian OIT 编辑"`、画布点选、隔离、删除后 `renderModeAfterDelete="自身颜色"`；targeted Playwright QA 保存到 `/tmp/objgauss-oit-edit-*.png`，断言真实 Splat -> Gaussian OIT 编辑 -> 画布选中 -> 删除预览全链路，过滤已知 Spark `Worker terminate` 噪声后无 shader/framebuffer/render target console error。
