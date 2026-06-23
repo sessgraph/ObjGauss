@@ -49,7 +49,7 @@
   - `npm run acceptance:demo`: passed，输出 `acceptance_demo=passed`，并包含 SEMANTIC benchmark suite。
   - `uv run --extra dev pytest`: 31 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `c88f4ad`。
 
 ### SEMANTIC-006: Reproducible emergence benchmark suite
 
