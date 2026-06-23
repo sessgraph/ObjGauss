@@ -651,6 +651,36 @@ def test_splatfacto_balanced_benchmark_script_dry_run_reports_pipeline():
     assert "dry_run=passed" in result.stdout
 
 
+def test_splatfacto_variant_benchmark_script_dry_run_reports_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/benchmark-splatfacto-variants.mjs",
+            "--dry-run",
+            "--sam-checkpoint",
+            "/tmp/sam-vit-b.pth",
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode=dry-run" in result.stdout
+    assert "variants=sam2f-slots8,sam8f-slots8-unfiltered,sam8f-slots4-balanced03" in result.stdout
+    assert "scripts/benchmark-splatfacto-balanced.mjs" in result.stdout
+    assert "--sam-manifest outputs/masks/nerf-lego-sam/mask-manifest.json" in result.stdout
+    assert "--sam-manifest outputs/masks/nerf-lego-sam-8f/mask-manifest.json" in result.stdout
+    assert "--sam-manifest outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json" in result.stdout
+    assert "--sam-max-area-fraction 0.3" in result.stdout
+    assert "--slots 4" in result.stdout
+    assert "/tmp/sam-vit-b.pth" in result.stdout
+    assert "dry_run=passed" in result.stdout
+
+
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)

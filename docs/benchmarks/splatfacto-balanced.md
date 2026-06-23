@@ -122,3 +122,16 @@ This is a benchmark candidate, not a final quality claim. It fixes the earlier
 near-empty slot failure and produces a stronger render occlusion signal, but it
 still needs broader scene coverage and better slot-consistency analysis before
 being treated as a paper-grade result.
+
+## Compare Mask Variants
+
+Use the variant suite when comparing this balanced candidate against earlier
+safe-2000 mask policies:
+
+```bash
+npm run benchmark:splatfacto:variants -- --run --skip-sam
+```
+
+The variant runbook is `docs/benchmarks/splatfacto-variants.md`. It compares the
+2-frame / 8-slot SAM baseline, the unfiltered 8-frame / 8-slot SAM run, and this
+8-frame / 4-slot `max_area_fraction=0.3` candidate on the same safe-2000 PLY.

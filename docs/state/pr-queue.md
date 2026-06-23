@@ -14,6 +14,31 @@
 
 ## Done
 
+### BENCH-002: Safe-2000 mask variant comparison suite
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 safe-2000 balanced benchmark 扩展成同一 Splatfacto PLY 上的多 mask / slot policy 对比表，为后续多 scene 实验表格打基础。
+- 范围外: 不重新训练 Splatfacto；不新增外部数据源；不提交 `outputs/`、SAM checkpoint、训练 checkpoint 或 benchmark 产物。
+- 实施:
+  - 新增 `scripts/benchmark-splatfacto-variants.mjs`，编排 `sam2f-slots8`、`sam8f-slots8-unfiltered`、`sam8f-slots4-balanced03` 三个变体。
+  - 新增 `npm run benchmark:splatfacto:variants`。
+  - 新增 `docs/benchmarks/splatfacto-variants.md`，记录变体定义、输入、输出和解释边界。
+  - 变体 suite 复用 BENCH-001 的单变体 benchmark 脚本，输出 suite-level `summary.json`、`summary.csv`、`summary.md` 和 3-curve HTML report。
+- 验收:
+  - 一条命令可重跑三组 mask policy 的 register-output、emergence metrics、emergence curve 和 comparison report。
+  - suite summary 记录每个变体的 frames、masks、slots、supervised_gaussians、object_id_counts、ARI、OES 和 render occlusion effect。
+  - `--status` 可检查三组 manifest、per-variant summary 和 suite summary 是否齐全。
+- 验证:
+  - `npm run benchmark:splatfacto:variants -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth`: passed。
+  - `node scripts/benchmark-splatfacto-variants.mjs --run --skip-sam`: passed。
+  - `node scripts/benchmark-splatfacto-variants.mjs --status`: `status=ready missing=0`。
+  - suite summary: `sam8f-slots4-balanced03` 在 ARI=0.468745、OES=0.693888、render_occlusion_effect_score=0.195308 三项中均为当前最佳。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "splatfacto_variant or splatfacto_balanced or splatfacto_smoke" -q`: 3 passed。
+  - `uv run --extra dev pytest`: 35 passed。
+  - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
+- 完成 commit: 待提交。
+
 ### BENCH-001: Stabilize safe-2000 balanced benchmark
 
 - 状态: done
