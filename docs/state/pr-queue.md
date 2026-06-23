@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-X`: 基于 alpha presentation floor 在 trained Lego 上同时改善 coverage 和 luma 的事实，扩展到 Plush / proxy 等多场景 alpha-floor gate，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-Y`: 评估把 object filter 接入 Spark renderer 的可行性，或设计 chroma-aware alpha presentation 策略；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,24 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-X: WebGPU alpha floor multi-scene candidate gate
+
+- 状态: done / alpha-floor-multiscene-gate-audited
+- 类型: 标准 PR / 前端渲染质量诊断
+- 目标: 基于 RENDER-005T-W 里 `alpha10` 在 trained Lego 上同时改善 coverage 和 luma 的事实，把 alpha presentation floor 候选扩展到稳定的 NeRF Lego proxy + Plush semantic 多场景 gate，判断是否可作为默认候选。
+- 已实施:
+  - 新增 `npm run audit:webgpu-alpha-floor-sweep`，固定两场景、四个 alpha floor variants 和报告输出目录 `/tmp/objgauss-webgpu-alpha-floor-sweep`。
+  - 新增 `npm run audit:webgpu-alpha-floor-candidate-gate`，以 `alpha10` 为 strict candidate gate，并要求 mean / per-scene pareto、luma、chroma 全部不劣于 baseline。
+  - `docs/benchmarks/webgpu-coverage-sweep.md` 新增 alpha floor multi-scene gate 用法、当前结果表和失败解释。
+- 结论:
+  - NeRF Lego proxy `alpha10`: coverage ratio `3.190749`、luma/chroma `0.079933/0.075462`、Pareto `0.851494`，优于 baseline `3.784251`、`0.106079/0.086537`。
+  - Plush semantic `alpha10`: coverage ratio `6.082743`、luma `0.102588` 优于 baseline `6.448639`、`0.112667`，但 chroma 从 `0.010651` 恶化到 `0.015819`。
+  - `alpha10` 是 best mean Pareto variant (`0.965287`)，但 strict gate 失败：mean chroma norm=`1.178616`、Plush per-scene Pareto=`1.07908`、Plush chroma norm=`1.485213`。
+  - 因此 alpha presentation floor 仍是候选/诊断轴，默认 `0.035` 不变；下一步应转向 Spark renderer object filter feasibility 或 chroma-aware alpha presentation。
+- 验证:
+  - `npm run audit:webgpu-coverage-sweep -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --port 5291 --variants baseline:2.2:4:0.035,alpha05:2.2:4:0.05,alpha075:2.2:4:0.075,alpha10:2.2:4:0.1 --output-dir /tmp/objgauss-webgpu-alpha-floor-multiscene --gate-variant alpha10 --max-mean-pareto-score 1 --max-mean-luma-norm 1 --max-mean-chroma-norm 1 --max-scene-pareto-score 1 --max-scene-luma-norm 1 --max-scene-chroma-norm 1 --allow-failures`: completed，suite passed，strict gate failed as expected，headed desktop WebGPU 2 scenes x 4 variants。
+  - `npm run audit:webgpu-alpha-floor-candidate-gate -- --port 5292 --allow-failures`: completed，复现同一 strict gate failure，报告写入 `/tmp/objgauss-webgpu-alpha-floor-candidate-gate/summary.*`。
 
 ### RENDER-005T-W: WebGPU alpha presentation floor diagnostic
 

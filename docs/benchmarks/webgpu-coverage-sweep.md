@@ -58,6 +58,43 @@ and luma together on this trained scene, with chroma nearly unchanged. This is a
 stronger candidate axis, but it is still single-scene evidence and should not
 become the default before passing the multi-scene coverage gate.
 
+## Alpha Presentation Floor Multi-Scene Gate
+
+Use the reusable sweep when comparing the alpha floor candidate on the stable
+two-scene WebGPU coverage gate set:
+
+```bash
+npm run audit:webgpu-alpha-floor-sweep
+```
+
+To run the strict candidate gate for `alpha10`, use:
+
+```bash
+npm run audit:webgpu-alpha-floor-candidate-gate
+```
+
+The strict gate is allowed to fail while evaluating the candidate. Use
+`-- --allow-failures` when you need the report artifact without a non-zero exit:
+
+```bash
+npm run audit:webgpu-alpha-floor-candidate-gate -- --allow-failures
+```
+
+Current local result:
+
+| Scene | Variant | Coverage ratio | Luma delta | Chroma delta | Score |
+| --- | --- | ---: | ---: | ---: | ---: |
+| NeRF Lego proxy | baseline | 3.784251 | 0.106079 | 0.086537 | 1 |
+| NeRF Lego proxy | alpha10 | 3.190749 | 0.079933 | 0.075462 | 0.851494 |
+| Plush semantic | baseline | 6.448639 | 0.112667 | 0.010651 | 1 |
+| Plush semantic | alpha10 | 6.082743 | 0.102588 | 0.015819 | 1.07908 |
+
+`alpha10` is the best mean Pareto variant (`0.965287`) and improves coverage
+and luma on both scenes, but it fails the strict gate because Plush chroma
+worsens (`1.485213x` baseline) and Plush per-scene Pareto score is above
+baseline (`1.07908`). Therefore the alpha presentation floor remains a
+diagnostic/candidate axis and must not become the default renderer setting yet.
+
 ## SH-View Coverage Sweep
 
 Use this when the asset has full SH rest coefficients and you want to compare
