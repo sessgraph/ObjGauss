@@ -46,7 +46,7 @@
   - `uv run objgauss object-field emergence-report /tmp/objgauss-benchmark-plush-semantic.json /tmp/objgauss-benchmark-lego-alpha.json /tmp/objgauss-benchmark-lego-splatfacto.json --label plush-semantic --label lego-alpha-proxy --label lego-splatfacto-smoke --output /tmp/objgauss-emergence-benchmark-report.html --title "ObjGauss Emergence Benchmark Smoke"`: curves=3，charts=7。
   - `uv run --extra dev pytest`: 29 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `e42e66f`。
 
 ### SEMANTIC-004: Render occlusion delta probe
 
