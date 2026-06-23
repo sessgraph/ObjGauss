@@ -53,8 +53,15 @@ try {
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
         `fallbackReason=${JSON.stringify(result.fallbackReason)} ` +
+        `tileSmokeLayout=${JSON.stringify(result.tileSmokeLayout)} ` +
+        `packedGaussians=${result.packedGaussians} ` +
+        `binnedGaussians=${result.binnedGaussians} ` +
+        `activeTiles=${result.activeTileCount}/${result.tileCount} ` +
+        `tileReferences=${result.tileReferenceCount} ` +
+        `maxTileOccupancy=${result.maxTileOccupancy} ` +
         `tileOverflowCount=${result.tileOverflowCount} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
+        `objectFilterTarget=${JSON.stringify(result.objectFilterTarget)} ` +
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
@@ -134,10 +141,42 @@ async function runAudit(url, assetsToCheck) {
       if (!fallbackReason) {
         throw new Error(`${asset.id} did not expose a renderer fallback reason`);
       }
+      const tileSmokeLayout = await viewport.getAttribute("data-webgpu-pack-layout");
+      if (tileSmokeLayout !== "webgpu-tile-smoke-v1") {
+        throw new Error(`${asset.id} did not expose WebGPU tile smoke layout: ${tileSmokeLayout}`);
+      }
+      const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
+      const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
+      const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
+      const tileSize = numericValue(await viewport.getAttribute("data-webgpu-tile-size") ?? "0");
+      const tileCount = numericValue(await viewport.getAttribute("data-webgpu-tile-count") ?? "0");
+      const activeTileCount = numericValue(await viewport.getAttribute("data-webgpu-active-tile-count") ?? "0");
+      const tileReferenceCount = numericValue(await viewport.getAttribute("data-webgpu-tile-reference-count") ?? "0");
       const tileOverflowCount = numericValue(await viewport.getAttribute("data-tile-overflow-count") ?? "0");
+      const maxTileOccupancy = numericValue(await viewport.getAttribute("data-webgpu-max-tile-occupancy") ?? "0");
+      if (tileSize !== 16) {
+        throw new Error(`${asset.id} unexpected WebGPU tile size: ${tileSize}`);
+      }
+      if (packedGaussians <= 0 || binnedGaussians <= 0 || visibleGaussians <= 0) {
+        throw new Error(
+          `${asset.id} did not expose positive WebGPU pack/bin counts: packed=${packedGaussians} visible=${visibleGaussians} binned=${binnedGaussians}`,
+        );
+      }
+      if (tileCount <= 0 || activeTileCount <= 0 || tileReferenceCount < binnedGaussians) {
+        throw new Error(
+          `${asset.id} invalid WebGPU tile occupancy: tiles=${activeTileCount}/${tileCount} refs=${tileReferenceCount} binned=${binnedGaussians}`,
+        );
+      }
+      if (maxTileOccupancy <= 0) {
+        throw new Error(`${asset.id} did not expose positive max tile occupancy: ${maxTileOccupancy}`);
+      }
       const objectFilter = await viewport.getAttribute("data-object-filter");
       if (objectFilter !== "gpu-object-state-texture") {
         throw new Error(`${asset.id} did not expose GPU object-state filtering: ${objectFilter}`);
+      }
+      const objectFilterTarget = await viewport.getAttribute("data-webgpu-object-filter-target");
+      if (objectFilterTarget !== "gpu-object-state-buffer") {
+        throw new Error(`${asset.id} did not expose WebGPU object-state buffer target: ${objectFilterTarget}`);
       }
       const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {
@@ -174,8 +213,18 @@ async function runAudit(url, assetsToCheck) {
         rendererTarget,
         webgpuStatus,
         fallbackReason,
+        tileSmokeLayout,
+        packedGaussians,
+        visibleGaussians,
+        binnedGaussians,
+        tileSize,
+        tileCount,
+        activeTileCount,
+        tileReferenceCount,
+        maxTileOccupancy,
         tileOverflowCount,
         objectFilter,
+        objectFilterTarget,
         canvasSelectedObject,
         visibleAfterIsolate,
         visibleAfterDelete,

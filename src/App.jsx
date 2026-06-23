@@ -24,6 +24,7 @@ import {
   editRendererContract,
   INITIAL_WEBGPU_CAPABILITY,
 } from "./webgpuCapability.js";
+import { buildWebGpuTileSmoke } from "./webgpuTileSmoke.js";
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
@@ -87,9 +88,21 @@ export default function App() {
 
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
+  const webGpuTileSmoke = useMemo(
+    () =>
+      buildWebGpuTileSmoke({
+        points: scene.points,
+        visibleIds,
+        removedIds,
+        isolatedId,
+        renderMode,
+        pointSize,
+      }),
+    [scene.points, visibleIds, removedIds, isolatedId, renderMode, pointSize],
+  );
   const editRenderer = useMemo(
-    () => editRendererContract(webGpuCapability),
-    [webGpuCapability],
+    () => editRendererContract(webGpuCapability, webGpuTileSmoke),
+    [webGpuCapability, webGpuTileSmoke],
   );
   const sceneObjectIds = useMemo(() => allIds(scene.points), [scene.points]);
   const hasSplatRenderer = Boolean(scene.splatSource);
@@ -562,6 +575,14 @@ export default function App() {
             <StateRow label="目标渲染器" value={editRenderer.targetRendererLabel} />
             <StateRow label="WebGPU" value={editRenderer.webGpuLabel} />
             <StateRow label="回退原因" value={editRenderer.fallbackReason} />
+            <StateRow
+              label="WebGPU pack"
+              value={`${editRenderer.packedGaussians.toLocaleString()} / ${editRenderer.objectCount}`}
+            />
+            <StateRow
+              label="Tile bins"
+              value={`${editRenderer.activeTileCount.toLocaleString()} / ${editRenderer.tileCount.toLocaleString()}`}
+            />
             <StateRow label="Tile overflow" value={editRenderer.tileOverflowCount} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />

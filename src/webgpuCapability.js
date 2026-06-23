@@ -9,6 +9,19 @@ export const INITIAL_WEBGPU_CAPABILITY = Object.freeze({
   reason: "webgpu-capability-detecting",
   label: "检测中",
 });
+const EMPTY_TILE_SMOKE = Object.freeze({
+  layoutVersion: "webgpu-tile-smoke-v1",
+  tileSize: 16,
+  packedGaussians: 0,
+  binnedGaussians: 0,
+  visibleGaussians: 0,
+  tileCount: 0,
+  activeTileCount: 0,
+  tileReferenceCount: 0,
+  tileOverflowCount: 0,
+  maxTileOccupancy: 0,
+  objectCount: 0,
+});
 
 export async function detectWebGpuCapability() {
   if (typeof navigator === "undefined" || !("gpu" in navigator)) {
@@ -61,17 +74,29 @@ export async function detectWebGpuCapability() {
   };
 }
 
-export function editRendererContract(webGpuCapability) {
+export function editRendererContract(webGpuCapability, tileSmoke) {
+  const smoke = tileSmoke ?? EMPTY_TILE_SMOKE;
   return {
     rendererId: GAUSSIAN_OIT_RENDERER_ID,
     rendererLabel: GAUSSIAN_OIT_RENDERER_LABEL,
     targetRendererId: WEBGPU_TILE_RENDERER_ID,
     targetRendererLabel: WEBGPU_TILE_RENDERER_LABEL,
     objectFilter: GAUSSIAN_OIT_OBJECT_FILTER,
+    targetObjectFilter: "gpu-object-state-buffer",
     webGpuStatus: webGpuCapability.status,
     webGpuLabel: webGpuCapability.label,
     fallbackReason: fallbackReason(webGpuCapability),
-    tileOverflowCount: 0,
+    tileSmokeLayout: smoke.layoutVersion,
+    tileSize: smoke.tileSize,
+    packedGaussians: smoke.packedGaussians,
+    binnedGaussians: smoke.binnedGaussians,
+    visibleGaussians: smoke.visibleGaussians,
+    tileCount: smoke.tileCount,
+    activeTileCount: smoke.activeTileCount,
+    tileReferenceCount: smoke.tileReferenceCount,
+    tileOverflowCount: smoke.tileOverflowCount,
+    maxTileOccupancy: smoke.maxTileOccupancy,
+    objectCount: smoke.objectCount,
   };
 }
 
