@@ -170,6 +170,9 @@ assert.equal(base.pixelOutputMode, "viewport-storage-rgba-direct-gaussian");
 assert.equal(base.pixelOutputIncluded, true);
 assert.equal(base.pixelReferenceIncluded, true);
 assert.equal(base.pixelCount, base.viewportWidth * base.viewportHeight);
+assert.equal(base.boundsFitMode, "aspect-fit-padding");
+assert.equal(base.boundsPaddingRatio, 0.08);
+assert.ok(Math.abs(base.boundsWorldAspect - base.boundsViewportAspect) < 0.02);
 assert.ok(base.resolvedTileCount > 0);
 assert.ok(base.pixelResolvedCount > 0);
 assert.ok(base.pixelResolvedCount > base.resolvedTileCount);
@@ -178,6 +181,23 @@ assert.ok(base.resolveAlphaMean > 0);
 assert.ok(base.resolveLumaMean > 0);
 assert.match(base.resolveChecksum, /^[0-9a-f]{8}$/);
 assert.match(base.pixelResolveChecksum, /^[0-9a-f]{8}$/);
+
+const wideViewport = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  selectedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  viewportWidth: 384,
+  viewportHeight: 192,
+  includeTileEntries: true,
+  includePixelOutput: false,
+});
+assert.equal(wideViewport.boundsFitMode, "aspect-fit-padding");
+assert.ok(Math.abs(wideViewport.boundsViewportAspect - 2) < 0.001);
+assert.ok(Math.abs(wideViewport.boundsWorldAspect - wideViewport.boundsViewportAspect) < 0.02);
 assert.equal(base.objectStateLayoutVersion, WEBGPU_OBJECT_STATE_LAYOUT_VERSION);
 assert.equal(base.objectStateStrideUint32, WEBGPU_OBJECT_STATE_STRIDE_UINT32);
 assert.equal(base.objectStateVisibleObjects, allObjectIds.size);
@@ -497,6 +517,7 @@ console.log(
     `objects=${base.objectCount} tiles=${base.activeTileCount}/${base.tileCount} ` +
     `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
+    `boundsFit=${base.boundsFitMode}:${base.boundsWorldAspect.toFixed(3)}/${base.boundsViewportAspect.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +
     `accumulation=${WEBGPU_TILE_ACCUMULATION_SOURCE}:${webGpuAccumulationWorkgroups(base)} ` +

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-B`: 将 WebGPU Tile 编辑从平滑的低分辨率正交 blob 推进到更接近 Spark 真实查看的相机匹配 / 视觉一致性路径，重点处理用户可见的“过度平滑、不像真实 3DGS”问题。
+  - `RENDER-005T-C`: 将 WebGPU Tile 编辑从 aspect-fit 正交 blob 推进到更接近 Spark 真实查看的相机 / depth / alpha-order 视觉一致性路径，重点处理用户可见的“过度平滑、不像真实 3DGS”问题。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-B: WebGPU aspect-fit runtime viewport
+
+- 状态: done / aspect-fit-viewport
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 bilinear storage resolve 后，减少 WebGPU Tile 编辑因为固定方形 viewport 和 x/z 独立拉伸导致的比例偏差、撑满画布和过度正交感。
+- 已实施:
+  - 默认 WebGPU full runtime 根据实际 viewer 显示尺寸计算 area-preserving internal viewport；显式 `--webgpu-viewport-size` 仍保留 square override，`tiny-pixel-output` 仍保留 32px。
+  - `webgpuTileSmoke` 的 projection bounds 改为 `aspect-fit-padding`：按 viewport aspect 扩展短轴，并加入 8% 单边留白。
+  - `WebGpuTileViewport` 暴露 display size、viewport aspect mode 和 bounds-fit telemetry；`audit-demo` 会检查 `display-aspect-area`、`aspect-fit-padding` 和 bounds world aspect / viewport aspect 一致。
+- 结论:
+  - 这一步把 WebGPU 编辑视图从“方形低分辨率正交 blob”推进到“按显示区域比例 fit 的平滑正交 blob”，减少对象贴边和非等比拉伸。
+  - 它仍不是 Spark 真实相机 / depth-order / 3D covariance 的对象级重渲染；下一步应处理真实 camera transform、depth / alpha order 和 screen-space covariance。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；Node smoke 覆盖 1:1 和 2:1 viewport bounds fit。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5244 --probes full`: passed；`webgpuViewport=256x256:65536:"display-aspect-area"`、`display=784x812`、`boundsFit="aspect-fit-padding":1/1`、device active、queue done。
 
 ### RENDER-005T-A: WebGPU pixel-storage bilinear resolve
 

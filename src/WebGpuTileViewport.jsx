@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   createWebGpuAccumulationMeta,
@@ -54,6 +54,8 @@ export default function WebGpuTileViewport({
   rendererContract,
   onSelectObject,
   renderModeLabel,
+  runtimeViewportAspectMode = "default-square",
+  onDisplaySizeChange,
 }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -111,6 +113,7 @@ export default function WebGpuTileViewport({
     tileOffsetsIncluded: false,
     pixelOutputIncluded: false,
   });
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
   const visibleCount = useMemo(
     () =>
       points.filter(
@@ -121,6 +124,39 @@ export default function WebGpuTileViewport({
       ).length,
     [isolatedId, points, removedIds, visibleIds],
   );
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    let animationFrame = 0;
+    const reportSize = () => {
+      const next = {
+        width: Math.max(1, Math.floor(container.clientWidth)),
+        height: Math.max(1, Math.floor(container.clientHeight)),
+      };
+      setDisplaySize((current) =>
+        current.width === next.width && current.height === next.height ? current : next,
+      );
+      onDisplaySizeChange?.(next);
+    };
+    reportSize();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = requestAnimationFrame(reportSize);
+      });
+      observer.observe(container);
+      return () => {
+        cancelAnimationFrame(animationFrame);
+        observer.disconnect();
+      };
+    }
+    window.addEventListener("resize", reportSize);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", reportSize);
+    };
+  }, [onDisplaySizeChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -443,6 +479,13 @@ export default function WebGpuTileViewport({
       data-webgpu-viewport-width={rendererContract?.viewportWidth ?? tileSmoke?.viewportWidth ?? 0}
       data-webgpu-viewport-height={rendererContract?.viewportHeight ?? tileSmoke?.viewportHeight ?? 0}
       data-webgpu-pixel-count={tileSmoke?.pixelCount ?? 0}
+      data-webgpu-viewport-aspect-mode={runtimeViewportAspectMode}
+      data-webgpu-display-width={displaySize.width}
+      data-webgpu-display-height={displaySize.height}
+      data-webgpu-bounds-fit-mode={rendererContract?.boundsFitMode ?? ""}
+      data-webgpu-bounds-padding-ratio={rendererContract?.boundsPaddingRatio ?? 0}
+      data-webgpu-bounds-viewport-aspect={rendererContract?.boundsViewportAspect ?? 0}
+      data-webgpu-bounds-world-aspect={rendererContract?.boundsWorldAspect ?? 0}
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}

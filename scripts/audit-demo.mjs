@@ -85,7 +85,8 @@ try {
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
-        `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount} ` +
+        `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)} ` +
+        `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
         `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
@@ -303,6 +304,13 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuViewportWidth = numericValue(await viewport.getAttribute("data-webgpu-viewport-width") ?? "0");
       const webGpuViewportHeight = numericValue(await viewport.getAttribute("data-webgpu-viewport-height") ?? "0");
       const webGpuPixelCount = numericValue(await viewport.getAttribute("data-webgpu-pixel-count") ?? "0");
+      const webGpuViewportAspectMode = await viewport.getAttribute("data-webgpu-viewport-aspect-mode");
+      const webGpuDisplayWidth = numericValue(await viewport.getAttribute("data-webgpu-display-width") ?? "0");
+      const webGpuDisplayHeight = numericValue(await viewport.getAttribute("data-webgpu-display-height") ?? "0");
+      const webGpuBoundsFitMode = await viewport.getAttribute("data-webgpu-bounds-fit-mode");
+      const webGpuBoundsPaddingRatio = Number(await viewport.getAttribute("data-webgpu-bounds-padding-ratio") ?? "0");
+      const webGpuBoundsViewportAspect = Number(await viewport.getAttribute("data-webgpu-bounds-viewport-aspect") ?? "0");
+      const webGpuBoundsWorldAspect = Number(await viewport.getAttribute("data-webgpu-bounds-world-aspect") ?? "0");
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
@@ -334,27 +342,52 @@ async function runAudit(url, assetsToCheck, options) {
         throw new Error(`${asset.id} unexpected WebGPU tile size: ${tileSize}`);
       }
       if (editRendererId === "webgpu-tile") {
+        if (webGpuDisplayWidth <= 0 || webGpuDisplayHeight <= 0) {
+          throw new Error(
+            `${asset.id} WebGPU display size was not measured: ${webGpuDisplayWidth}x${webGpuDisplayHeight}`,
+          );
+        }
         if (options.webGpuViewportSize) {
           if (
             webGpuViewportWidth !== options.webGpuViewportSize ||
-            webGpuViewportHeight !== options.webGpuViewportSize
+            webGpuViewportHeight !== options.webGpuViewportSize ||
+            webGpuViewportAspectMode !== "explicit-square"
           ) {
             throw new Error(
-              `${asset.id} WebGPU viewport did not honor requested size: requested=${options.webGpuViewportSize} actual=${webGpuViewportWidth}x${webGpuViewportHeight}`,
+              `${asset.id} WebGPU viewport did not honor requested size: requested=${options.webGpuViewportSize} actual=${webGpuViewportWidth}x${webGpuViewportHeight} mode=${webGpuViewportAspectMode}`,
             );
           }
         } else if (
           options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL &&
-          (webGpuViewportWidth < DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE ||
-            webGpuViewportHeight < DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE)
+          webGpuPixelCount <
+            DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE *
+              DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE
         ) {
           throw new Error(
-            `${asset.id} WebGPU full runtime viewport is below visual audit floor: ${webGpuViewportWidth}x${webGpuViewportHeight}`,
+            `${asset.id} WebGPU full runtime pixel budget is below visual audit floor: ${webGpuViewportWidth}x${webGpuViewportHeight}:${webGpuPixelCount}`,
+          );
+        }
+        if (
+          !options.webGpuViewportSize &&
+          options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL &&
+          webGpuViewportAspectMode !== "display-aspect-area"
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU full runtime viewport did not use display aspect matching: ${webGpuViewportAspectMode}`,
           );
         }
         if (webGpuPixelCount !== webGpuViewportWidth * webGpuViewportHeight) {
           throw new Error(
             `${asset.id} WebGPU pixel count does not match viewport: ${webGpuPixelCount} vs ${webGpuViewportWidth}x${webGpuViewportHeight}`,
+          );
+        }
+        if (
+          webGpuBoundsFitMode !== "aspect-fit-padding" ||
+          webGpuBoundsPaddingRatio < 0.079 ||
+          Math.abs(webGpuBoundsWorldAspect - webGpuBoundsViewportAspect) > 0.02
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU bounds were not aspect-fit with padding: mode=${webGpuBoundsFitMode} padding=${webGpuBoundsPaddingRatio} worldAspect=${webGpuBoundsWorldAspect} viewportAspect=${webGpuBoundsViewportAspect}`,
           );
         }
       }
@@ -561,6 +594,13 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuViewportWidth,
             webGpuViewportHeight,
             webGpuPixelCount,
+            webGpuViewportAspectMode,
+            webGpuDisplayWidth,
+            webGpuDisplayHeight,
+            webGpuBoundsFitMode,
+            webGpuBoundsPaddingRatio,
+            webGpuBoundsViewportAspect,
+            webGpuBoundsWorldAspect,
             webGpuDeviceLostStatus,
             webGpuDeviceLostReason,
             webGpuDeviceLostMessage,
@@ -740,6 +780,13 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuViewportWidth,
         webGpuViewportHeight,
         webGpuPixelCount,
+        webGpuViewportAspectMode,
+        webGpuDisplayWidth,
+        webGpuDisplayHeight,
+        webGpuBoundsFitMode,
+        webGpuBoundsPaddingRatio,
+        webGpuBoundsViewportAspect,
+        webGpuBoundsWorldAspect,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,

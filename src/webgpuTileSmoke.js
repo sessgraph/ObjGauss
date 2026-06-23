@@ -15,6 +15,7 @@ const OBJECT_STATE_ENABLED = 1 << 4;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13;
+const VIEWPORT_FIT_PADDING_RATIO = 0.08;
 const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, -0.25],
   [0.25, -0.25],
@@ -49,7 +50,7 @@ export function buildWebGpuTileSmoke({
     selectedId,
   });
   const objectState = objectStateContract.buffer;
-  const bounds = sceneBounds(points);
+  const bounds = sceneBounds(points, viewportWidth, viewportHeight);
   const tileColumns = Math.max(1, Math.ceil(viewportWidth / tileSize));
   const tileRows = Math.max(1, Math.ceil(viewportHeight / tileSize));
   const tileCount = tileColumns * tileRows;
@@ -204,6 +205,10 @@ export function buildWebGpuTileSmoke({
     boundsMinZ: bounds.minZ,
     boundsSpanX: bounds.spanX,
     boundsSpanZ: bounds.spanZ,
+    boundsFitMode: bounds.fitMode,
+    boundsPaddingRatio: bounds.paddingRatio,
+    boundsViewportAspect: bounds.viewportAspect,
+    boundsWorldAspect: bounds.worldAspect,
     tileColumns,
     tileRows,
     tileCount,
@@ -700,7 +705,7 @@ function checksumUint32(checksum, value) {
   return Math.imul(next, 16777619) >>> 0;
 }
 
-function sceneBounds(points) {
+function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
   if (points.length === 0) {
     return {
       minX: -1,
@@ -709,6 +714,10 @@ function sceneBounds(points) {
       maxZ: 1,
       spanX: 2,
       spanZ: 2,
+      fitMode: "empty-default",
+      paddingRatio: 0,
+      viewportAspect: 1,
+      worldAspect: 1,
     };
   }
 
@@ -723,9 +732,45 @@ function sceneBounds(points) {
     maxZ = Math.max(maxZ, point.z);
   }
 
-  const spanX = Math.max(maxX - minX, 0.0001);
-  const spanZ = Math.max(maxZ - minZ, 0.0001);
-  return { minX, maxX, minZ, maxZ, spanX, spanZ };
+  return fitBoundsToViewport({
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    viewportWidth,
+    viewportHeight,
+  });
+}
+
+function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHeight }) {
+  let spanX = Math.max(maxX - minX, 0.0001);
+  let spanZ = Math.max(maxZ - minZ, 0.0001);
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const viewportAspect = Math.min(
+    4,
+    Math.max(0.25, Math.max(1, viewportWidth) / Math.max(1, viewportHeight)),
+  );
+  const currentAspect = spanX / spanZ;
+  if (currentAspect < viewportAspect) {
+    spanX = spanZ * viewportAspect;
+  } else {
+    spanZ = spanX / viewportAspect;
+  }
+  spanX *= 1 + VIEWPORT_FIT_PADDING_RATIO * 2;
+  spanZ *= 1 + VIEWPORT_FIT_PADDING_RATIO * 2;
+  return {
+    minX: centerX - spanX * 0.5,
+    maxX: centerX + spanX * 0.5,
+    minZ: centerZ - spanZ * 0.5,
+    maxZ: centerZ + spanZ * 0.5,
+    spanX,
+    spanZ,
+    fitMode: "aspect-fit-padding",
+    paddingRatio: VIEWPORT_FIT_PADDING_RATIO,
+    viewportAspect,
+    worldAspect: spanX / spanZ,
+  };
 }
 
 function packGaussian({

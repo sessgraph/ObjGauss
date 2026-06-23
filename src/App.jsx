@@ -11,7 +11,7 @@ import {
   Scissors,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ASSET_LIBRARY, featuredAssets } from "./assetLibrary.js";
 import { parsePly, parsePlyFile } from "./ply.js";
@@ -68,6 +68,7 @@ const BENCHMARK_SCENES = [
 const WEBGPU_RUNTIME_VIEWPORT_SIZE = 256;
 const WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE = 64;
 const WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE = 512;
+const WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE = 16;
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
@@ -129,11 +130,24 @@ export default function App() {
   const waitForEditRenderer = !useSplatRenderer && webGpuCapability.status === "pending";
   const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
   const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
-  const requestedWebGpuRuntimeViewportSize = useMemo(readWebGpuRuntimeViewportSize, []);
-  const webGpuRuntimeViewportSize =
-    webGpuRuntimeProbe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT
-      ? WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE
-      : requestedWebGpuRuntimeViewportSize;
+  const webGpuRuntimeViewportRequest = useMemo(readWebGpuRuntimeViewportRequest, []);
+  const [webGpuRuntimeDisplaySize, setWebGpuRuntimeDisplaySize] = useState({ width: 0, height: 0 });
+  const updateWebGpuRuntimeDisplaySize = useCallback((nextSize) => {
+    const width = Math.max(0, Math.round(Number(nextSize?.width) || 0));
+    const height = Math.max(0, Math.round(Number(nextSize?.height) || 0));
+    setWebGpuRuntimeDisplaySize((current) =>
+      current.width === width && current.height === height ? current : { width, height },
+    );
+  }, []);
+  const webGpuRuntimeViewport = useMemo(
+    () =>
+      buildWebGpuRuntimeViewport({
+        probe: webGpuRuntimeProbe,
+        request: webGpuRuntimeViewportRequest,
+        displaySize: webGpuRuntimeDisplaySize,
+      }),
+    [webGpuRuntimeDisplaySize, webGpuRuntimeProbe, webGpuRuntimeViewportRequest],
+  );
   const webGpuRuntimeTileSmoke = useMemo(() => {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
     return buildWebGpuTileSmoke({
@@ -144,8 +158,8 @@ export default function App() {
       selectedId,
       renderMode,
       pointSize,
-      viewportWidth: webGpuRuntimeViewportSize,
-      viewportHeight: webGpuRuntimeViewportSize,
+      viewportWidth: webGpuRuntimeViewport.width,
+      viewportHeight: webGpuRuntimeViewport.height,
       includeTileEntries: true,
       includePixelOutput: true,
       computePixelReference: false,
@@ -160,7 +174,7 @@ export default function App() {
     renderMode,
     pointSize,
     useWebGpuTileRenderer,
-    webGpuRuntimeViewportSize,
+    webGpuRuntimeViewport,
     webGpuTileSmoke,
   ]);
   const activeEditRenderer = useMemo(
@@ -550,6 +564,8 @@ export default function App() {
               rendererContract={activeEditRenderer}
               onSelectObject={selectObject}
               renderModeLabel={renderModeText}
+              runtimeViewportAspectMode={webGpuRuntimeViewport.aspectMode}
+              onDisplaySizeChange={updateWebGpuRuntimeDisplaySize}
             />
           ) : (
             <PointCloudViewport
@@ -813,15 +829,69 @@ function readWebGpuRuntimeProbe() {
   );
 }
 
-function readWebGpuRuntimeViewportSize() {
-  if (typeof window === "undefined") return WEBGPU_RUNTIME_VIEWPORT_SIZE;
+function readWebGpuRuntimeViewportRequest() {
+  if (typeof window === "undefined") {
+    return { size: WEBGPU_RUNTIME_VIEWPORT_SIZE, explicit: false };
+  }
   const value = Number(
     new URLSearchParams(window.location.search).get("webgpu-viewport-size"),
   );
-  if (!Number.isFinite(value) || value <= 0) return WEBGPU_RUNTIME_VIEWPORT_SIZE;
+  if (!Number.isFinite(value) || value <= 0) {
+    return { size: WEBGPU_RUNTIME_VIEWPORT_SIZE, explicit: false };
+  }
+  return {
+    size: Math.min(
+      WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE,
+      Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, Math.round(value)),
+    ),
+    explicit: true,
+  };
+}
+
+function buildWebGpuRuntimeViewport({ probe, request, displaySize }) {
+  if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
+    return {
+      width: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
+      height: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
+      aspectMode: "tiny-square",
+    };
+  }
+  if (request.explicit) {
+    return {
+      width: request.size,
+      height: request.size,
+      aspectMode: "explicit-square",
+    };
+  }
+  const displayWidth = Number(displaySize?.width) || 0;
+  const displayHeight = Number(displaySize?.height) || 0;
+  if (displayWidth <= 0 || displayHeight <= 0) {
+    return {
+      width: request.size,
+      height: request.size,
+      aspectMode: "default-square",
+    };
+  }
+  const aspect = Math.min(4, Math.max(0.25, displayWidth / displayHeight));
+  const area = request.size * request.size;
+  return {
+    width: clampViewportSize(roundToViewportTile(Math.sqrt(area * aspect))),
+    height: clampViewportSize(roundToViewportTile(Math.sqrt(area / aspect))),
+    aspectMode: "display-aspect-area",
+  };
+}
+
+function roundToViewportTile(value) {
+  return Math.max(
+    WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE,
+    Math.round(value / WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE) * WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE,
+  );
+}
+
+function clampViewportSize(value) {
   return Math.min(
     WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE,
-    Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, Math.round(value)),
+    Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, value),
   );
 }
 
