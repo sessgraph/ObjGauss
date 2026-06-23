@@ -97,3 +97,13 @@ table should make that visible:
 Treat the winner as a local benchmark candidate, not as a final object
 emergence claim. The next real scaling step is the same suite across additional
 scenes or stronger mask sources.
+
+## Cross-Scene Table
+
+Aggregate this variant suite with the broader semantic smoke scenes:
+
+```bash
+npm run benchmark:cross-scene -- --run
+```
+
+The cross-scene runbook is `docs/benchmarks/cross-scene.md`.

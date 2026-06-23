@@ -12,7 +12,8 @@
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",
     "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs",
     "benchmark:splatfacto:balanced": "node scripts/benchmark-splatfacto-balanced.mjs",
-    "benchmark:splatfacto:variants": "node scripts/benchmark-splatfacto-variants.mjs"
+    "benchmark:splatfacto:variants": "node scripts/benchmark-splatfacto-variants.mjs",
+    "benchmark:cross-scene": "node scripts/benchmark-cross-scene.mjs"
   },
   "dependencies": {
     "@sparkjsdev/spark": "^2.1.0",

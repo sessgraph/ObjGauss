@@ -681,6 +681,34 @@ def test_splatfacto_variant_benchmark_script_dry_run_reports_pipeline():
     assert "dry_run=passed" in result.stdout
 
 
+def test_cross_scene_benchmark_script_dry_run_reports_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/benchmark-cross-scene.mjs",
+            "--dry-run",
+            "--sam-checkpoint",
+            "/tmp/sam-vit-b.pth",
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode=dry-run" in result.stdout
+    assert "acceptance:semantic" in result.stdout
+    assert "--manifest docs/benchmarks/semantic-smoke.json" in result.stdout
+    assert "benchmark:splatfacto:variants" in result.stdout
+    assert "--suite-output-dir /tmp/objgauss-splatfacto-safe-2000-variant-suite" in result.stdout
+    assert "--skip-sam" in result.stdout
+    assert "/tmp/sam-vit-b.pth" in result.stdout
+    assert "dry_run=passed" in result.stdout
+
+
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)

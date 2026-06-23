@@ -91,6 +91,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
   - `npm run benchmark:splatfacto:balanced` 已固化为 safe-2000 balanced candidate 的一键本地 benchmark 入口，可重跑 balanced SAM、`training register-output`、emergence metrics、curve、report 和 summary。
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
+  - `npm run benchmark:cross-scene` 已固化为跨场景 / 跨变体汇总入口，可聚合 semantic smoke suite 和 safe-2000 variant suite 到同一张表。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
 
@@ -99,6 +100,11 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-23:
 
 ```bash
+npm run benchmark:cross-scene -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth
+node scripts/benchmark-cross-scene.mjs --run
+node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-variants
+node scripts/benchmark-cross-scene.mjs --status
+uv run --extra dev pytest tests/test_objgauss_mvp.py -k "cross_scene or splatfacto_variant or splatfacto_balanced or splatfacto_smoke" -q
 npm run benchmark:splatfacto:variants -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth
 node scripts/benchmark-splatfacto-variants.mjs --run --skip-sam
 node scripts/benchmark-splatfacto-variants.mjs --status
@@ -148,6 +154,11 @@ npm run build
 
 结果：
 
+- BENCH-003 cross-scene suite: 新增 `scripts/benchmark-cross-scene.mjs` 和 `npm run benchmark:cross-scene`，聚合 semantic smoke 三场景与 safe-2000 三 mask variants 到统一 summary / CSV / Markdown / HTML 表。
+- BENCH-003 runbook: 新增 `docs/benchmarks/cross-scene.md`；semantic-smoke 和 splatfacto-variants runbooks 均已链接到 cross-scene 入口。
+- BENCH-003 validation: `node scripts/benchmark-cross-scene.mjs --run` 重新跑 semantic smoke suite 和 safe-2000 variant suite，生成 `/tmp/objgauss-cross-scene-benchmark/summary.json`，rows=6；`--status` 输出 `status=ready missing=0`。
+- BENCH-003 result: semantic rows 为 Plush semantic、Lego alpha proxy、Lego Splatfacto smoke；safe-2000 rows 为 `sam2f-slots8`、`sam8f-slots8-unfiltered`、`sam8f-slots4-balanced03`。全表 best render 当前为 `lego-alpha-proxy/default` 0.236530；safe-2000 内最佳仍为 `sam8f-slots4-balanced03`，ARI=0.468745、OES=0.775560、render=0.195308。
+- BENCH-003 tests: focused script tests 4 passed；full Python suite 36 passed；`npm run build` 通过，仍有 Spark / Three bundle size warning。
 - BENCH-002 variant suite: 新增 `scripts/benchmark-splatfacto-variants.mjs` 和 `npm run benchmark:splatfacto:variants`，编排 `sam2f-slots8`、`sam8f-slots8-unfiltered`、`sam8f-slots4-balanced03` 三个 safe-2000 mask policy 变体。
 - BENCH-002 runbook: 新增 `docs/benchmarks/splatfacto-variants.md`；BENCH-001 runbook 已链接到 variant suite。
 - BENCH-002 validation: `node scripts/benchmark-splatfacto-variants.mjs --run --skip-sam` 复用已有 SAM manifests，重新登记三组 Object Field、生成三条 emergence curve、三变体 HTML report、suite summary / CSV / Markdown；`--status` 输出 `status=ready missing=0`。
@@ -248,7 +259,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 将 safe-2000 variant suite 扩展到更多 scene，形成跨场景实验表格。
+1. 向 cross-scene benchmark 增加更多真实 Splatfacto scene，形成跨场景实验表格。
 2. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 3. 建立 Poly Haven mesh -> 多视角渲染 -> 3DGS 训练的 Demo 转换链。
 4. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

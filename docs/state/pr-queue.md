@@ -14,6 +14,32 @@
 
 ## Done
 
+### BENCH-003: Cross-scene emergence benchmark table
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 semantic smoke 多场景 suite 与 safe-2000 mask variant suite 聚合成同一张跨场景 / 跨变体实验表。
+- 范围外: 不训练新场景；不新增外部数据源；不提交 `/tmp`、`outputs/`、SAM checkpoint 或训练产物；不把 point-splat render probe 升级为真实 gsplat renderer。
+- 实施:
+  - 新增 `scripts/benchmark-cross-scene.mjs`，支持 `--dry-run`、`--status`、`--run`、`--skip-semantic`、`--skip-variants` 和 `--refresh-sam`。
+  - 新增 `npm run benchmark:cross-scene`。
+  - 新增 `docs/benchmarks/cross-scene.md`，记录输入 suite、输出表格和解释边界。
+  - 聚合 `semantic-smoke` 三个 scene 与 `splatfacto-safe2000-variants` 三个 variant，输出统一 `summary.json`、`summary.csv`、`summary.md` 和 `summary.html`。
+- 验收:
+  - 一条命令可重跑 semantic smoke suite、safe-2000 variant suite，并生成 6 行统一表。
+  - summary 统一记录 suite、scene_id、variant_id、frames、masks、gaussians、slots、supervised_gaussians、object_id_counts、ARI、OES 和 render occlusion effect。
+  - `--status` 可检查 semantic summary、variant summary 和 cross-scene 表是否齐全。
+- 验证:
+  - `npm run benchmark:cross-scene -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth`: passed。
+  - `node scripts/benchmark-cross-scene.mjs --run`: passed，rows=6。
+  - `node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-variants`: passed。
+  - `node scripts/benchmark-cross-scene.mjs --status`: `status=ready missing=0`。
+  - cross-scene summary: semantic smoke rows=3，safe-2000 variant rows=3；best render row 当前为 `lego-alpha-proxy/default`，safe-2000 内最佳仍为 `sam8f-slots4-balanced03`。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "cross_scene or splatfacto_variant or splatfacto_balanced or splatfacto_smoke" -q`: 4 passed。
+  - `uv run --extra dev pytest`: 36 passed。
+  - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
+- 完成 commit: 待提交。
+
 ### BENCH-002: Safe-2000 mask variant comparison suite
 
 - 状态: done

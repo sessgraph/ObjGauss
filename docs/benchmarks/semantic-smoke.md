@@ -96,6 +96,17 @@ Field handoff, writes emergence metrics and curves, and produces
 `/tmp/objgauss-splatfacto-balanced-benchmark/summary.json`. The runbook is
 `docs/benchmarks/splatfacto-balanced.md`.
 
+## Cross-Scene Table
+
+To aggregate this three-scene smoke suite and the safe-2000 mask variants into
+one table:
+
+```bash
+npm run benchmark:cross-scene -- --run
+```
+
+The runbook is `docs/benchmarks/cross-scene.md`.
+
 ## Acceptance Integration
 
 `npm run acceptance:demo` runs this benchmark by default after rebuilding the
