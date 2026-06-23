@@ -76,6 +76,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-K 已完成 WebGPU depth-binned alpha compositing：pixel resolve 升级为 `depth-binned-alpha-composite-v1`，每像素固定 8 个 depth bins 做 front-to-back alpha compositing；NeRF Lego luma / chroma delta 从 T-J 的 `0.207570 / 0.133965` 降到 `0.109000 / 0.087808`，Plush 大场景也通过 desktop WebGPU full audit，但 coverage ratio 未同步改善，说明后续需把 coverage 和 shading 分线治理。
   - RENDER-005T-L 已完成 WebGPU alpha presentation edge gate：fullscreen storage resolve 新增 `alpha-edge-gated-presentation-v1:0.035`，只在最终显示阶段压掉低 alpha halo，不改 compute resolve buffer；NeRF Lego coverage ratio 从 T-K 的 `3.856920` 小幅降到 `3.784251`，Plush 从 `6.680406` 降到 `6.448639`，说明 halo 有贡献但 coverage 主问题仍需 footprint / covariance / threshold sweep。
   - RENDER-005T-M 已完成 WebGPU coverage tuning sweep：WebGPU Tile 支持 runtime `webgpu-footprint-scale` / `webgpu-covariance-max-anisotropy`，新增 `npm run audit:webgpu-coverage-sweep`；Lego sweep 显示 coverage 可从 baseline `3.784251` 降到 tight `3.346752`，但 luma / chroma 从 `0.106079 / 0.086537` 恶化到 `0.142279 / 0.102668`，下一步需 Pareto scoring / multi-scene sweep。
+  - RENDER-005T-N 已完成 WebGPU coverage Pareto multi-scene sweep：`npm run audit:webgpu-coverage-sweep` 支持 `--assets` 多场景、解析 `tileReferences`，并按 coverage / luma / chroma / tile reference cost 的 `0.35 / 0.25 / 0.25 / 0.15` 权重输出每场景和跨场景 variant score；Lego best Pareto 仍是 baseline，Plush best Pareto 是 compact，tight 只在 coverage / cost 上最好但 luma 代价明显，因此默认渲染参数暂不切到 tight。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -143,6 +144,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-webgpu-coverage-sweep.mjs
+npm run audit:webgpu-coverage-sweep -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --port 5268
 node --check src/webgpuTileSmoke.js
 node --check scripts/audit-demo.mjs
 node --check scripts/audit-webgpu-desktop.mjs
@@ -491,7 +494,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. RENDER-005T-C: 继续处理 WebGPU Tile 编辑和 Spark 真实查看之间的视觉一致性：真实 camera transform、screen-space covariance、alpha/depth/order 策略，以及删除后剩余场景的真实感。
+1. RENDER-005T-O: 将 WebGPU visual sweep 固化为可持久化 report / threshold gate，并继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认参数变更必须先通过多场景 score 和 luma/chroma 阈值。
 2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

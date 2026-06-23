@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-N`: 基于 T-M 的 sweep 基座，增加 Pareto scoring / multi-scene sweep，把 coverage、luma、chroma 和 tile reference cost 合成可比较表；避免只按单一 coverage ratio 选择会牺牲 shading 的参数。
+  - `RENDER-005T-O`: 将 T-N 的多场景 Pareto sweep 固化为可持久化 report / threshold gate，并继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认参数变更必须先通过多场景 score 和 luma/chroma 阈值。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,23 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-N: WebGPU coverage Pareto multi-scene sweep
+
+- 状态: done / pareto-multi-scene-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 基于 T-M 的 runtime tuning sweep，把 coverage、luma、chroma 和 tile reference cost 合成可比较的多场景表，避免只按单一 coverage ratio 选择牺牲 shading 的参数。
+- 已实施:
+  - `audit-webgpu-coverage-sweep` 支持 `--assets` 多场景输入，默认仍保持 Lego 单场景以控制日常审计耗时。
+  - Sweep 解析 `visualResidual` 与 `tileReferences`，对每个 scene 按 baseline 归一化，并用 coverage / luma / chroma / tile reference cost 的 `0.35 / 0.25 / 0.25 / 0.15` 权重输出 `paretoScore`。
+  - 输出每场景 winner、coverage winner、luma / chroma winner、lowest-cost winner，以及跨场景 variant summary 的 mean score / mean normalized metrics。
+- 结论:
+  - Lego: best Pareto=`baseline:1`，best coverage=`tight:3.346752`，lowest cost=`tight:29641`；tight 降低 coverage / cost，但 luma/chroma 明显恶化。
+  - Plush: best Pareto=`compact:0.813147`，best coverage=`tight:6.015767`，lowest cost=`tight:926251`；compact 的 chroma 和 cost 改善拉低综合 score，但 luma 仍比 baseline 差。
+  - 跨场景 mean Pareto: baseline=`1`，compact=`0.921829`，tight=`1.072299`。由于 scene winner 不一致且 compact / tight 都牺牲 luma，默认渲染参数暂不切换；下一步需要持久化 report、阈值 gate 和继续拆 alpha / SH / camera 残差。
+- 验证:
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `npm run audit:webgpu-coverage-sweep -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --port 5268`: passed；2 scenes x 3 variants headed desktop WebGPU full audit，Lego / Plush 均进入 `WebGPU Tile 编辑`，删除后均回到 RGB 原始色。
 
 ### RENDER-005T-M: WebGPU coverage tuning sweep
 
