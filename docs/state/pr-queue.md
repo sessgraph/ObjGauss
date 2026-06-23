@@ -17,11 +17,34 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005A`: WebGPU device-backed renderer skeleton + nonblank first frame on zero-overflow scene。
+  - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
+
+## In Progress
+
+### RENDER-005A: WebGPU device-backed renderer skeleton
+
+- 状态: implementation-landed / browser-webgpu-pending
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在 zero-overflow scene 上进入真实 WebGPU device-backed renderer，并渲染非空 first frame。
+- 已实施:
+  - 新增 `src/WebGpuTileViewport.jsx`，在 WebGPU route 中创建 adapter/device/context/pipeline，把 `tileResolvedRgba` 上传为 WebGPU texture，并用 fullscreen triangle 画出第一帧。
+  - WebGPU route 只在 `webGpuStatus=available` 且 `tileCapacityGate=pass` 时启用；Plush overflow 场景继续 fallback 到 `Gaussian OIT 编辑`。
+  - `editRendererContract` 现在在 zero-overflow + WebGPU available 时切到 `rendererId="webgpu-tile"` 和 `objectFilter="gpu-object-state-buffer"`。
+  - `audit-demo` 已支持 WebGPU Tile / Gaussian OIT 双路径；WebGPU 路径会检查 `data-webgpu-first-frame-status="rendered"`、positive first-frame pixels 和 checksum。
+  - `audit-webgpu-tile-smoke` 已用模拟 `webgpu-device-ready` capability 验证 zero-overflow contract 切到 `webgpu-tile`，overflow contract 仍 blocked 于 `tile-overflow`。
+- 当前阻塞:
+  - 当前 headless Chrome 常规 audit 返回 `webgpu-adapter-unavailable`，所以真实 WebGPU first frame 没有在本环境执行。
+  - 带 `--enable-unsafe-webgpu` / Vulkan flags 的 Playwright probe 在当前容器中 SIGTRAP 退出，不能作为 runtime 证据。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，包含 simulated available + roomy no-overflow contract。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5204/`: passed，assets=3；当前仍全量 fallback，三者 `targetGate="blocked":"webgpu-capability"`。
+- 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
 
