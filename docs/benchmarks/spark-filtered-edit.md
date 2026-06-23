@@ -26,6 +26,16 @@ editing is active and the color mode is source/original, the app can reconstruct
 a filtered Spark `SplatMesh` from the object-aware PLY instead of falling back
 to the WebGPU / Gaussian OIT edit renderer.
 
+RENDER-005T-Z adds a direct residual gate for the same reconstruction path:
+
+```text
+full .splat Spark render
+        -> screenshot coverage / luma / chroma
+object-aware PLY reconstructed Spark render
+        -> screenshot coverage / luma / chroma
+        -> residual gate
+```
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -45,6 +55,15 @@ data-object-filter="spark-filtered-ply-reconstruct"
 data-spark-filter-mode="ply-reconstruct"
 data-spark-visible-gaussians="..."
 data-spark-removed-objects="..."
+```
+
+The full-scene reconstruction probe is intentionally URL-gated so normal UI
+behavior is unchanged:
+
+```text
+?spark-reconstruct-probe=1
+data-object-filter="spark-ply-reconstruct"
+data-spark-filtered-gaussians="0"
 ```
 
 ## Validation
@@ -74,12 +93,47 @@ This proves the delete preview can now return to a Spark renderer path for the
 remaining original-color scene instead of staying on the approximate edit
 renderer.
 
+Run the direct full `.splat` versus PLY-reconstructed Spark residual gate:
+
+```bash
+npm run build
+npm run audit:spark-reconstruct-residual
+```
+
+Current default local result:
+
+```text
+spark_reconstruct_residual=passed
+asset="nerf-lego-alpha-closure-local"
+coverageRatio=1.170841
+lumaDelta=0.029762
+chromaDelta=0.028407
+objectFilter="spark-ply-reconstruct"
+visibleGaussians=5696
+filteredGaussians=0
+```
+
+The optional multiscene check includes Plush semantic and is slower because it
+reconstructs 281k Gaussians through Spark:
+
+```bash
+npm run audit:spark-reconstruct-residual-multiscene
+```
+
+Current Plush local result:
+
+```text
+asset="plush-semantic-closure-local"
+coverageRatio=1.303149
+lumaDelta=0.049406
+chromaDelta=0.002846
+visibleGaussians=281498
+```
+
 ## Remaining Gaps
 
 - Preserve full SH rest / view-dependent color in the Spark reconstructed path.
-- Add a visual residual gate comparing full `.splat` Spark against
-  PLY-reconstructed Spark before enabling this route for trained SH-heavy
-  samples by default.
+- Add a stricter SH-preserving residual gate for trained SH-heavy samples.
 - Add Spark-side selection / raycast-to-object mapping if viewport click
   selection should stay in Spark.
 - Avoid full SplatMesh rebuilds for high-frequency edits; this is acceptable for

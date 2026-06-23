@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-Z`: 给 Spark filtered edit 增加 SH-preserving / residual gate，比较 full `.splat` Spark 与 PLY-reconstructed Spark 的 luma/chroma/coverage 差距；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
+  - `RENDER-005T-AA`: 给 Spark PLY reconstruction 增加 SH-rest preservation 方案，或把大场景 filtered edit 从 full rebuild 推进到可复用 packed splats / object mask 路线；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-Z: Spark PLY reconstruction residual gate
+
+- 状态: done / spark-reconstruct-residual-audited
+- 类型: 标准 PR / 前端渲染质量与验收
+- 目标: 把 full `.splat` Spark 与 object-aware PLY reconstructed Spark 的视觉差距变成可重复、可阈值化的 browser gate，避免凭主观观感判断 filtered Spark 路线是否可继续扩大。
+- 已实施:
+  - 新增 URL probe `spark-reconstruct-probe=1`，只在显式 probe 下让 `对象编辑 / 原始颜色` 进入全量 PLY reconstructed Spark；正常用户路径不变。
+  - `SplatViewport` 区分 `data-object-filter="spark-ply-reconstruct"` 和 `spark-filtered-ply-reconstruct`，全量重建时要求 `filteredGaussians=0`。
+  - 新增共享 `scripts/lib/visual-stats.mjs`，让 `audit-demo` 和 Spark reconstruction gate 共用同一套 PNG coverage / luma / chroma 统计。
+  - 新增 `scripts/audit-spark-reconstruct-residual.mjs`、`npm run audit:spark-reconstruct-residual` 和可选 `npm run audit:spark-reconstruct-residual-multiscene`，输出 `/tmp/objgauss-spark-reconstruct-residual*/summary.*`。
+- 结论:
+  - Lego proxy 默认 gate 通过：`coverageRatio=1.170841`、`lumaDelta=0.029762`、`chromaDelta=0.028407`、`objectFilter="spark-ply-reconstruct"`、`visibleGaussians=5696`。
+  - Plush semantic 可选复查也通过：`coverageRatio=1.303149`、`lumaDelta=0.049406`、`chromaDelta=0.002846`、`visibleGaussians=281498`，但耗时约 70 秒，说明大场景 full rebuild 不应成为高频交互路径。
+  - 当前 filtered Spark 路线已具备 residual gate；下一步主要缺口是 SH-rest preservation 和大场景重建性能。
+- 验证:
+  - `node --check scripts/lib/visual-stats.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-spark-reconstruct-residual.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:spark-reconstruct-residual-multiscene`: passed。
 
 ### RENDER-005T-Y: Spark filtered edit feasibility implementation
 

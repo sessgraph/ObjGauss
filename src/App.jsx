@@ -113,6 +113,7 @@ export default function App() {
   const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
   const webGpuCameraTuning = useMemo(readWebGpuCameraTuning, []);
   const webGpuColorTuning = useMemo(readWebGpuColorTuning, []);
+  const sparkReconstructProbe = useMemo(readSparkReconstructProbe, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -164,7 +165,7 @@ export default function App() {
   const canUseSparkFilteredRenderer =
     hasSplatRenderer &&
     renderMode === "original" &&
-    objectEditActive &&
+    (objectEditActive || sparkReconstructProbe) &&
     webGpuColorTuning.colorMode === "source";
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
   const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
@@ -243,7 +244,9 @@ export default function App() {
   const activeRendererText = useSplatRenderer
     ? "真实 Splat"
     : useSparkFilteredRenderer
-      ? "Spark 过滤 Splat"
+      ? objectEditActive
+        ? "Spark 过滤 Splat"
+        : "Spark PLY 重建"
       : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
@@ -594,7 +597,7 @@ export default function App() {
           {!useSplatRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
-              <span>{renderModeText} / {activeEditRenderer.rendererLabel}</span>
+              <span>{renderModeText} / {activeRendererText}</span>
               {hasSplatRenderer && objectEditActive ? (
                 <button className="bannerAction" type="button" onClick={enterViewMode}>
                   <Rotate3D size={15} />
@@ -959,6 +962,12 @@ function readWebGpuColorTuning() {
   return normalizeWebGpuColorTuning({
     colorMode: params.get("webgpu-color-mode"),
   });
+}
+
+function readSparkReconstructProbe() {
+  if (typeof window === "undefined") return false;
+  const value = new URLSearchParams(window.location.search).get("spark-reconstruct-probe");
+  return ["1", "true", "yes", "on"].includes(String(value ?? "").toLowerCase());
 }
 
 function buildWebGpuRuntimeViewport({ probe, request, displaySize, gaussianCount }) {

@@ -64,6 +64,7 @@ export default function SplatViewport({
           },
     [filtered, isolatedId, points, removedIds, renderMode, visibleIds],
   );
+  const objectFilter = filtered ? filteredStats.objectFilter : "none";
 
   useEffect(() => {
     const container = containerRef.current;
@@ -212,7 +213,7 @@ export default function SplatViewport({
     <div
       className="viewport splatViewport"
       data-renderer="spark-splat"
-      data-object-filter={filtered ? "spark-filtered-ply-reconstruct" : "none"}
+      data-object-filter={objectFilter}
       data-spark-filter-mode={filtered ? "ply-reconstruct" : "none"}
       data-spark-filter-status={status === "就绪" ? "ready" : "pending"}
       data-spark-visible-gaussians={filteredStats.visibleGaussians}
@@ -268,6 +269,7 @@ function buildFilteredSplatStats({
   }
   return {
     mode: "ply-reconstruct",
+    objectFilter: hiddenObjectIds.size > 0 ? "spark-filtered-ply-reconstruct" : "spark-ply-reconstruct",
     visibleGaussians,
     filteredGaussians: Math.max(0, (points?.length ?? 0) - visibleGaussians),
     hiddenObjects: hiddenObjectIds.size,
