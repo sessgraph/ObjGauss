@@ -11,6 +11,7 @@ export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
+export const WEBGPU_PIXEL_DEPTH_SORT_MODE = "front-depth-gated-oit-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -22,6 +23,8 @@ const RESOLVE_KERNEL_CUTOFF = 13;
 const VIEWPORT_FIT_PADDING_RATIO = 0.08;
 const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
+const FRONT_DEPTH_GATE_STRENGTH = 12;
+const FRONT_DEPTH_GATE_FLOOR = 0.06;
 const SCREEN_COVARIANCE_MAX_ANISOTROPY = 4;
 const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
@@ -263,6 +266,9 @@ export function buildWebGpuTileSmoke({
     projectionDepthMax: bounds.depthMax,
     projectionDepthSpan: bounds.depthSpan,
     depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+    pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
+    pixelDepthGateStrength: FRONT_DEPTH_GATE_STRENGTH,
+    pixelDepthGateFloor: FRONT_DEPTH_GATE_FLOOR,
     screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
     colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
     colorSourceRgbGaussians: rgbColorGaussians,
@@ -574,6 +580,31 @@ function resolvePixelOutput({
           : Math.min(tileCounts[tileIndex], maxEntriesPerTile);
       const entryBase = tileOffsets[tileIndex];
       const pixelOffset = (y * viewportWidth + x) * 4;
+      let nearestDepth = depthMin + depthSpan + 1;
+      let candidateCount = 0;
+
+      for (let entryOffset = 0; entryOffset < storedCount; entryOffset += 1) {
+        const gaussianIndex = tileEntries[entryBase + entryOffset];
+        const objectDenseIndex = objectIndices[gaussianIndex];
+        if (!objectIsVisible(objectState, objectDenseIndex)) continue;
+
+        const d = pixelGaussianDistance({
+          x,
+          y,
+          gaussianIndex,
+          projection,
+        });
+        if (d > RESOLVE_KERNEL_CUTOFF) continue;
+
+        const gaussianOffset = gaussianIndex * 4;
+        const candidateWeight = Math.exp(-0.5 * d) * colorOpacity[gaussianOffset + 3];
+        if (candidateWeight <= 0.0001) continue;
+        nearestDepth = Math.min(nearestDepth, projection.depth[gaussianIndex]);
+        candidateCount += 1;
+      }
+
+      if (candidateCount <= 0) continue;
+
       let accumulatedRed = 0;
       let accumulatedGreen = 0;
       let accumulatedBlue = 0;
@@ -584,22 +615,21 @@ function resolvePixelOutput({
         const objectDenseIndex = objectIndices[gaussianIndex];
         if (!objectIsVisible(objectState, objectDenseIndex)) continue;
 
-        const dx = x + 0.5 - projection.screenX[gaussianIndex];
-        const dy = y + 0.5 - projection.screenY[gaussianIndex];
-        const cosine = projection.cosine[gaussianIndex];
-        const sine = projection.sine[gaussianIndex];
-        const rotatedX = cosine * dx - sine * dy;
-        const rotatedY = sine * dx + cosine * dy;
-        const d =
-          (rotatedX * rotatedX) / projection.sigmaXSquared[gaussianIndex] +
-          (rotatedY * rotatedY) / projection.sigmaYSquared[gaussianIndex];
+        const d = pixelGaussianDistance({
+          x,
+          y,
+          gaussianIndex,
+          projection,
+        });
         if (d > RESOLVE_KERNEL_CUTOFF) continue;
 
         const gaussianOffset = gaussianIndex * 4;
+        const frontGate = frontDepthGate(projection.depth[gaussianIndex], nearestDepth, depthSpan);
         const weight =
           Math.exp(-0.5 * d) *
           colorOpacity[gaussianOffset + 3] *
           projection.depthWeight[gaussianIndex] *
+          frontGate *
           RESOLVE_ALPHA_GAIN;
         if (weight <= 0.0001) continue;
         accumulatedRed += colorOpacity[gaussianOffset] * weight;
@@ -642,6 +672,7 @@ function buildPixelProjection({
   const screenY = new Float32Array(gaussianCount);
   const sigmaXSquared = new Float32Array(gaussianCount);
   const sigmaYSquared = new Float32Array(gaussianCount);
+  const depth = new Float32Array(gaussianCount);
   const depthWeight = new Float32Array(gaussianCount);
   const cosine = new Float32Array(gaussianCount);
   const sine = new Float32Array(gaussianCount);
@@ -654,13 +685,27 @@ function buildPixelProjection({
     const sigmaY = Math.max(scaleRotation[offset + 1], 0.0001);
     sigmaXSquared[index] = sigmaX * sigmaX;
     sigmaYSquared[index] = sigmaY * sigmaY;
-    depthWeight[index] = frontWeightedOitDepth(positionRadius[offset + 2], depthMin, depthSpan);
+    depth[index] = positionRadius[offset + 2];
+    depthWeight[index] = frontWeightedOitDepth(depth[index], depthMin, depthSpan);
     const rotation = scaleRotation[offset + 2];
     cosine[index] = Math.cos(rotation);
     sine[index] = Math.sin(rotation);
   }
 
-  return { screenX, screenY, sigmaXSquared, sigmaYSquared, depthWeight, cosine, sine };
+  return { screenX, screenY, sigmaXSquared, sigmaYSquared, depth, depthWeight, cosine, sine };
+}
+
+function pixelGaussianDistance({ x, y, gaussianIndex, projection }) {
+  const dx = x + 0.5 - projection.screenX[gaussianIndex];
+  const dy = y + 0.5 - projection.screenY[gaussianIndex];
+  const cosine = projection.cosine[gaussianIndex];
+  const sine = projection.sine[gaussianIndex];
+  const rotatedX = cosine * dx - sine * dy;
+  const rotatedY = sine * dx + cosine * dy;
+  return (
+    (rotatedX * rotatedX) / projection.sigmaXSquared[gaussianIndex] +
+    (rotatedY * rotatedY) / projection.sigmaYSquared[gaussianIndex]
+  );
 }
 
 function checksumValue(checksum, red, green, blue, alpha, weight) {
@@ -1125,6 +1170,17 @@ function frontWeightedOitDepth(depth, depthMin, depthSpan) {
   return clampNumber(
     DEPTH_WEIGHT_FLOOR + (1 - DEPTH_WEIGHT_FLOOR) * Math.exp(-DEPTH_WEIGHT_STRENGTH * normalizedDepth),
     DEPTH_WEIGHT_FLOOR,
+    1,
+  );
+}
+
+function frontDepthGate(depth, nearestDepth, depthSpan) {
+  const depthDelta = Math.max(depth - nearestDepth, 0);
+  return clampNumber(
+    FRONT_DEPTH_GATE_FLOOR +
+      (1 - FRONT_DEPTH_GATE_FLOOR) *
+        Math.exp(-FRONT_DEPTH_GATE_STRENGTH * depthDelta / Math.max(depthSpan, 0.0001)),
+    FRONT_DEPTH_GATE_FLOOR,
     1,
   );
 }

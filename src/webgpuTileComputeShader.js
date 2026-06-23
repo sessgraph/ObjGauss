@@ -2,7 +2,7 @@ export const WEBGPU_TILE_COMPUTE_SOURCE = "webgpu-compute-resolve-v1";
 export const WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE = 64;
 export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-covariance-accumulation-v1";
 export const WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE = 64;
-export const WEBGPU_PIXEL_RESOLVE_SOURCE = "webgpu-compute-pixel-accumulation-v1";
+export const WEBGPU_PIXEL_RESOLVE_SOURCE = "webgpu-compute-front-depth-pixel-accumulation-v1";
 export const WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE = 64;
 
 export const WEBGPU_TILE_ACCUMULATION_SHADER = `
@@ -152,6 +152,8 @@ const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13.0;
 const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
+const FRONT_DEPTH_GATE_STRENGTH = 12.0;
+const FRONT_DEPTH_GATE_FLOOR = 0.06;
 
 struct PixelResolveMeta {
   pixelCount: f32,
@@ -197,8 +199,48 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   let storedCount = tileCounts[tileIndex];
   let entryBase = tileOffsets[tileIndex];
   let pixelCenter = vec2f(f32(pixelX) + 0.5, f32(pixelY) + 0.5);
-  var accumulation = vec4f(0.0);
+  var nearestDepth = pixelResolveMeta.depthMin + pixelResolveMeta.depthSpan + 1.0;
+  var candidateCount = 0u;
 
+  for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
+    let gaussianIndex = tileEntries[entryBase + entryOffset];
+    let objectIndex = objectIndices[gaussianIndex];
+    if ((objectState[objectIndex].x & OBJECT_STATE_VISIBLE) == 0u) {
+      continue;
+    }
+
+    let centerRadius = positionRadius[gaussianIndex];
+    let screen = centerRadius.xy;
+    let gaussianScale = scaleRotation[gaussianIndex];
+    let sigma = max(gaussianScale.xy, vec2f(0.0001));
+    let cosine = cos(gaussianScale.z);
+    let sine = sin(gaussianScale.z);
+    let delta = pixelCenter - screen;
+    let rotated = vec2f(
+      cosine * delta.x - sine * delta.y,
+      sine * delta.x + cosine * delta.y
+    );
+    let normalized = rotated / sigma;
+    let d = dot(normalized, normalized);
+    if (d > RESOLVE_KERNEL_CUTOFF) {
+      continue;
+    }
+
+    let color = colorOpacity[gaussianIndex];
+    let candidateWeight = exp(-0.5 * d) * color.a;
+    if (candidateWeight <= 0.0001) {
+      continue;
+    }
+    nearestDepth = min(nearestDepth, centerRadius.z);
+    candidateCount = candidateCount + 1u;
+  }
+
+  if (candidateCount == 0u) {
+    pixelResolvedRgba[pixelIndex] = vec4f(0.0);
+    return;
+  }
+
+  var accumulation = vec4f(0.0);
   for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
     let gaussianIndex = tileEntries[entryBase + entryOffset];
     let objectIndex = objectIndices[gaussianIndex];
@@ -218,6 +260,14 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
       DEPTH_WEIGHT_FLOOR,
       1.0
     );
+    let depthDelta = max(centerRadius.z - nearestDepth, 0.0);
+    let frontDepthGate = clamp(
+      FRONT_DEPTH_GATE_FLOOR +
+        (1.0 - FRONT_DEPTH_GATE_FLOOR) *
+          exp(-FRONT_DEPTH_GATE_STRENGTH * depthDelta / max(pixelResolveMeta.depthSpan, 0.0001)),
+      FRONT_DEPTH_GATE_FLOOR,
+      1.0
+    );
     let gaussianScale = scaleRotation[gaussianIndex];
     let sigma = max(gaussianScale.xy, vec2f(0.0001));
     let cosine = cos(gaussianScale.z);
@@ -234,7 +284,7 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
     }
 
     let color = colorOpacity[gaussianIndex];
-    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * frontWeight;
+    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * frontWeight * frontDepthGate;
     if (weight <= 0.0001) {
       continue;
     }

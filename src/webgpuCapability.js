@@ -1,6 +1,7 @@
 import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+  WEBGPU_PIXEL_DEPTH_SORT_MODE,
   WEBGPU_TILE_PROJECTION_MODE,
   WEBGPU_TILE_COLOR_FIDELITY_MODE,
   WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
@@ -38,6 +39,9 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   projectionDepthMax: 1,
   projectionDepthSpan: 1,
   depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+  pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
+  pixelDepthGateStrength: 12,
+  pixelDepthGateFloor: 0.06,
   colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
   colorSourceRgbGaussians: 0,
   colorSourceShDcGaussians: 0,
@@ -177,6 +181,9 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     projectionDepthMax: smoke.projectionDepthMax,
     projectionDepthSpan: smoke.projectionDepthSpan,
     depthWeightMode: smoke.depthWeightMode,
+    pixelDepthSortMode: smoke.pixelDepthSortMode,
+    pixelDepthGateStrength: smoke.pixelDepthGateStrength,
+    pixelDepthGateFloor: smoke.pixelDepthGateFloor,
     colorFidelityMode: smoke.colorFidelityMode,
     colorSourceRgbGaussians: smoke.colorSourceRgbGaussians,
     colorSourceShDcGaussians: smoke.colorSourceShDcGaussians,

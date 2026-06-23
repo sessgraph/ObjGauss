@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-H`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先做真实排序 / 更强 front-to-back 近似和 view-dependent SH 差距，而不是继续怀疑 RGB 原始颜色源。
+  - `RENDER-005T-I`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先审计 view-dependent SH / Spark visual residual，或设计真正的 per-pixel sorted / layered resolve，而不是继续怀疑 RGB 原始颜色源。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-H: WebGPU front-depth gated pixel resolve
+
+- 状态: done / front-depth-gated-oit-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 回应“自身颜色有颗粒感、不像高斯”的后续合成问题，在已确认 RGB source 未丢失后，把 WebGPU Tile per-pixel resolve 从纯 front-weighted weighted OIT 推进到每像素最近深度门控，降低前后层 Gaussian 混色。
+- 已实施:
+  - `webgpu-compute-pixel-accumulation-v1` 升级为 `webgpu-compute-front-depth-pixel-accumulation-v1`。
+  - Pixel resolve shader 对每个像素先扫描 tile Gaussian entries，找出 visible / in-kernel / non-trivial alpha contributor 的 nearest depth，再在第二遍 weighted accumulation 中叠加 `frontDepthGate`。
+  - CPU smoke reference 与 WGSL contract 同步，新增 `front-depth-gated-oit-v1`、gate strength / floor telemetry。
+  - `WebGpuTileViewport`、renderer contract 和 browser audit 暴露并校验 pixel depth gate contract。
+- 结论:
+  - 这一步是比上一版 `front-weighted-oit-v1` 更强的 GPU-friendly 前层遮挡近似，目标是减少编辑预览的后层颜色透混和颗粒感。
+  - 它仍不是完整 per-pixel sorted alpha，不是 Spark 真实 `.splat` renderer，也没有解决 view-dependent SH 视觉差距；下一步应进入 Spark visual residual / SH 或真正排序设计。
+- 验证:
+  - `node --check src/webgpuTileComputeShader.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`pixelDepthSort=front-depth-gated-oit-v1:12/0.06`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5258 --probes full`: passed；`pixel="dispatched":"webgpu-compute-front-depth-pixel-accumulation-v1":2304`、`colorAfterDelete=281498/0/0/0`。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5259 --probes full`: passed；`pixel="dispatched":"webgpu-compute-front-depth-pixel-accumulation-v1":3968`、`colorAfterDelete=5696/0/0/0`。
 
 ### RENDER-005T-G: WebGPU source-color fidelity audit
 

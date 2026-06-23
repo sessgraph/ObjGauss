@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
+import { WEBGPU_PIXEL_RESOLVE_SOURCE } from "../src/webgpuTileComputeShader.js";
 import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
@@ -89,6 +90,7 @@ try {
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
+        `pixelDepthSort=${JSON.stringify(result.webGpuPixelDepthSortMode)}:${result.webGpuPixelDepthGateStrength}/${result.webGpuPixelDepthGateFloor} ` +
         `colorFidelity=${JSON.stringify(result.webGpuColorFidelityMode)}:${result.webGpuColorSourceRgbGaussians}/${result.webGpuColorSourceShDcGaussians}/${result.webGpuColorSourceFallbackGaussians}/${result.webGpuColorSourceObjectGaussians}:${result.webGpuColorOpacityMean} ` +
         `colorAfterDelete=${result.webGpuColorSourceRgbGaussiansAfterDelete}/${result.webGpuColorSourceShDcGaussiansAfterDelete}/${result.webGpuColorSourceFallbackGaussiansAfterDelete}/${result.webGpuColorSourceObjectGaussiansAfterDelete} ` +
         `screenCovariance=${JSON.stringify(result.webGpuScreenCovarianceMode)}:${result.webGpuScreenCovarianceGaussians}/${result.webGpuScreenCovarianceFallbackGaussians}/${result.webGpuScreenCovarianceClampedGaussians}:${result.webGpuScreenCovarianceMaxAnisotropy}:${result.webGpuScreenCovarianceSigmaMean} ` +
@@ -321,6 +323,9 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuProjectionMode = await viewport.getAttribute("data-webgpu-projection-mode");
       const webGpuProjectionCameraFov = Number(await viewport.getAttribute("data-webgpu-projection-camera-fov") ?? "0");
       const webGpuDepthWeightMode = await viewport.getAttribute("data-webgpu-depth-weight-mode");
+      const webGpuPixelDepthSortMode = await viewport.getAttribute("data-webgpu-pixel-depth-sort-mode");
+      const webGpuPixelDepthGateStrength = Number(await viewport.getAttribute("data-webgpu-pixel-depth-gate-strength") ?? "0");
+      const webGpuPixelDepthGateFloor = Number(await viewport.getAttribute("data-webgpu-pixel-depth-gate-floor") ?? "0");
       const webGpuProjectionDepthMin = Number(await viewport.getAttribute("data-webgpu-projection-depth-min") ?? "0");
       const webGpuProjectionDepthMax = Number(await viewport.getAttribute("data-webgpu-projection-depth-max") ?? "0");
       const webGpuProjectionDepthSpan = Number(await viewport.getAttribute("data-webgpu-projection-depth-span") ?? "0");
@@ -434,11 +439,15 @@ async function runAudit(url, assetsToCheck, options) {
         }
         if (
           webGpuDepthWeightMode !== "front-weighted-oit-v1" ||
+          webGpuPixelDepthSortMode !== "front-depth-gated-oit-v1" ||
+          webGpuPixelDepthGateStrength <= 1 ||
+          webGpuPixelDepthGateFloor <= 0 ||
+          webGpuPixelDepthGateFloor >= 1 ||
           webGpuProjectionDepthSpan <= 0 ||
           webGpuProjectionDepthMax <= webGpuProjectionDepthMin
         ) {
           throw new Error(
-            `${asset.id} WebGPU depth weighting did not expose a valid front-weighted OIT contract: mode=${webGpuDepthWeightMode} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
+            `${asset.id} WebGPU depth weighting did not expose a valid front-depth gated OIT contract: mode=${webGpuDepthWeightMode} pixelSort=${webGpuPixelDepthSortMode} strength=${webGpuPixelDepthGateStrength} floor=${webGpuPixelDepthGateFloor} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
           );
         }
         if (
@@ -693,6 +702,9 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuProjectionMode,
             webGpuProjectionCameraFov,
             webGpuDepthWeightMode,
+            webGpuPixelDepthSortMode,
+            webGpuPixelDepthGateStrength,
+            webGpuPixelDepthGateFloor,
             webGpuProjectionDepthMin,
             webGpuProjectionDepthMax,
             webGpuProjectionDepthSpan,
@@ -918,6 +930,9 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuProjectionMode,
         webGpuProjectionCameraFov,
         webGpuDepthWeightMode,
+        webGpuPixelDepthSortMode,
+        webGpuPixelDepthGateStrength,
+        webGpuPixelDepthGateFloor,
         webGpuProjectionDepthMin,
         webGpuProjectionDepthMax,
         webGpuProjectionDepthSpan,
@@ -1094,7 +1109,7 @@ function validateWebGpuRuntimeProbe({
       status: webGpuPixelStatus,
       source: webGpuPixelSource,
       workgroups: webGpuPixelWorkgroups,
-      expectedSource: "webgpu-compute-pixel-accumulation-v1",
+      expectedSource: WEBGPU_PIXEL_RESOLVE_SOURCE,
       reason: webGpuPixelReason,
     },
   };
