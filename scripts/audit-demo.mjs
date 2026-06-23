@@ -77,6 +77,7 @@ const KNOWN_ASSETS = [
 ];
 const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
+const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -205,6 +206,8 @@ try {
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
+        `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
+        `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")} ` +
         `screenshot=${result.screenshotPath}`,
     );
   }
@@ -1115,6 +1118,27 @@ async function runAudit(url, assetsToCheck, options) {
       const sparkColorObjectGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-color-object-gaussians") ?? "0")
         : 0;
+      const sparkReconstructSourceAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-reconstruct-source")
+        : "";
+      const sparkPackedBaseGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-packed-base-gaussians") ?? "0")
+        : 0;
+      const sparkPackedVisibleIndicesAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-packed-visible-indices") ?? "0")
+        : 0;
+      const sparkPackedBaseBuildMsAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-packed-base-build-ms") ?? "0")
+        : 0;
+      const sparkPackedExtractMsAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-packed-extract-ms") ?? "0")
+        : 0;
+      const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
+        : 0;
+      const sparkShRestPreservedAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-sh-rest-preserved")
+        : "";
       const objectStateChecksumAfterDelete = sparkFilteredAfterDelete
         ? "spark-filtered-ply-reconstruct"
         : await viewport.getAttribute("data-webgpu-object-state-checksum");
@@ -1160,10 +1184,16 @@ async function runAudit(url, assetsToCheck, options) {
           sparkRemovedObjectsAfterDelete !== 1 ||
           sparkColorModeAfterDelete !== "original" ||
           sparkColorSourceGaussiansAfterDelete <= 0 ||
-          sparkColorObjectGaussiansAfterDelete !== 0)
+          sparkColorObjectGaussiansAfterDelete !== 0 ||
+          sparkReconstructSourceAfterDelete !== SPARK_RECONSTRUCT_SOURCE ||
+          sparkPackedBaseGaussiansAfterDelete <= 0 ||
+          sparkPackedVisibleIndicesAfterDelete !== sparkVisibleGaussiansAfterDelete ||
+          !Number.isFinite(sparkPackedBaseBuildMsAfterDelete) ||
+          !Number.isFinite(sparkPackedExtractMsAfterDelete) ||
+          sparkShRestPreservedAfterDelete !== "false")
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}`,
         );
       }
       if (
@@ -1385,6 +1415,13 @@ async function runAudit(url, assetsToCheck, options) {
         postDeleteRendererId,
         postDeleteObjectFilter,
         sparkFilteredGaussiansAfterDelete: sparkVisibleGaussiansAfterDelete,
+        sparkReconstructSourceAfterDelete,
+        sparkPackedBaseGaussiansAfterDelete,
+        sparkPackedVisibleIndicesAfterDelete,
+        sparkPackedBaseBuildMsAfterDelete,
+        sparkPackedExtractMsAfterDelete,
+        sparkShRestSourceGaussiansAfterDelete,
+        sparkShRestPreservedAfterDelete,
         screenshotPath,
       });
     }
@@ -1947,6 +1984,11 @@ async function labeledValue(page, label) {
 
 function numericValue(value) {
   return Number(value.replace(/[^\d]/g, ""));
+}
+
+function finiteNumericValue(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : Number.NaN;
 }
 
 async function selectObjectFromCanvas(page, assetId) {

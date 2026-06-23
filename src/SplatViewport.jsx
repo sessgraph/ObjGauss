@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+import { PackedSplats, SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+const PACKED_EXTRACT_ROUTE = "packed-extract-v1";
+const SH_REST_PRESERVED = false;
 
 export default function SplatViewport({
   source,
@@ -23,6 +26,7 @@ export default function SplatViewport({
   const gridRef = useRef(null);
   const axesRef = useRef(null);
   const [status, setStatus] = useState("加载中");
+  const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
 
   const sourceKey = useMemo(() => {
     if (filtered) {
@@ -65,6 +69,17 @@ export default function SplatViewport({
     [filtered, isolatedId, points, removedIds, renderMode, visibleIds],
   );
   const objectFilter = filtered ? filteredStats.objectFilter : "none";
+
+  const packedCache = useMemo(() => {
+    if (!filtered) return null;
+    return buildPackedSplatCache({ points, renderMode });
+  }, [filtered, points, renderMode]);
+
+  useEffect(() => {
+    return () => {
+      packedCache?.packedSplats?.dispose();
+    };
+  }, [packedCache]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -149,20 +164,32 @@ export default function SplatViewport({
 
     let disposed = false;
     setStatus(filtered ? "构建中" : "加载中");
+    setPackedStats(filtered ? pendingPackedStats(packedCache) : emptyPackedStats());
+
+    let displayPackedSplats = null;
+    if (filtered && packedCache?.packedSplats) {
+      const extractStartedAt = performance.now();
+      const visibleIndices = visiblePointIndices({
+        points,
+        visibleIds,
+        removedIds,
+        isolatedId,
+      });
+      displayPackedSplats = packedCache.packedSplats.extractSplats(visibleIndices, false);
+      setPackedStats({
+        route: PACKED_EXTRACT_ROUTE,
+        baseGaussians: packedCache.baseGaussians,
+        visibleIndices: visibleIndices.length,
+        baseBuildMs: packedCache.baseBuildMs,
+        extractMs: performance.now() - extractStartedAt,
+        shRestSourceGaussians: packedCache.shRestSourceGaussians,
+        shRestPreserved: SH_REST_PRESERVED,
+      });
+    }
 
     const splat = filtered
       ? new SplatMesh({
-          maxSplats: Math.max(1, filteredStats.visibleGaussians),
-          constructSplats: (splats) => {
-            pushFilteredSplats({
-              splats,
-              points,
-              visibleIds,
-              removedIds,
-              isolatedId,
-              renderMode,
-            });
-          },
+          packedSplats: displayPackedSplats,
           onLoad: () => {
             if (!disposed) setStatus("就绪");
           },
@@ -199,7 +226,7 @@ export default function SplatViewport({
       scene.remove(splat);
       splat.dispose();
     };
-  }, [filtered, filteredStats.visibleGaussians, isolatedId, points, removedIds, renderMode, source, sourceKey, visibleIds]);
+  }, [filtered, isolatedId, packedCache, points, removedIds, renderMode, source, sourceKey, visibleIds]);
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.visible = showGrid;
@@ -224,6 +251,13 @@ export default function SplatViewport({
       data-spark-color-mode={renderMode}
       data-spark-color-source-gaussians={filteredStats.colorSourceGaussians}
       data-spark-color-object-gaussians={filteredStats.objectColorGaussians}
+      data-spark-reconstruct-source={packedStats.route}
+      data-spark-packed-base-gaussians={packedStats.baseGaussians}
+      data-spark-packed-visible-indices={packedStats.visibleIndices}
+      data-spark-packed-base-build-ms={formatMillis(packedStats.baseBuildMs)}
+      data-spark-packed-extract-ms={formatMillis(packedStats.extractMs)}
+      data-spark-sh-rest-source-gaussians={packedStats.shRestSourceGaussians}
+      data-spark-sh-rest-preserved={String(packedStats.shRestPreserved)}
       ref={containerRef}
     >
       <div className="viewportHud">
@@ -281,20 +315,18 @@ function buildFilteredSplatStats({
   };
 }
 
-function pushFilteredSplats({
-  splats,
-  points,
-  visibleIds,
-  removedIds,
-  isolatedId,
-  renderMode,
-}) {
+function buildPackedSplatCache({ points, renderMode }) {
+  const startedAt = performance.now();
+  const packedSplats = new PackedSplats({ maxSplats: Math.max(1, points?.length ?? 0) });
+  let shRestSourceGaussians = 0;
   for (const point of points ?? []) {
-    if (!pointVisible(point, visibleIds, removedIds, isolatedId)) continue;
+    if (Number(point?.shRestCoefficientCount) > 0) {
+      shRestSourceGaussians += 1;
+    }
     const scale = pointScale3(point);
     const quaternion = pointQuaternion(point);
     const color = pointColor(point, renderMode);
-    splats.pushSplat(
+    packedSplats.pushSplat(
       new THREE.Vector3(Number(point.x) || 0, Number(point.y) || 0, Number(point.z) || 0),
       new THREE.Vector3(scale[0], scale[1], scale[2]),
       quaternion,
@@ -302,6 +334,27 @@ function pushFilteredSplats({
       color,
     );
   }
+  return {
+    packedSplats,
+    baseGaussians: packedSplats.getNumSplats(),
+    baseBuildMs: performance.now() - startedAt,
+    shRestSourceGaussians,
+  };
+}
+
+function visiblePointIndices({
+  points,
+  visibleIds,
+  removedIds,
+  isolatedId,
+}) {
+  const indices = [];
+  for (let index = 0; index < (points?.length ?? 0); index += 1) {
+    if (pointVisible(points[index], visibleIds, removedIds, isolatedId)) {
+      indices.push(index);
+    }
+  }
+  return new Uint32Array(indices);
 }
 
 function pointVisible(point, visibleIds, removedIds, isolatedId) {
@@ -355,6 +408,35 @@ function clampFinite(value, min, max, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.min(Math.max(numeric, min), max);
+}
+
+function emptyPackedStats() {
+  return {
+    route: "none",
+    baseGaussians: 0,
+    visibleIndices: 0,
+    baseBuildMs: 0,
+    extractMs: 0,
+    shRestSourceGaussians: 0,
+    shRestPreserved: false,
+  };
+}
+
+function pendingPackedStats(cache) {
+  return {
+    route: cache ? PACKED_EXTRACT_ROUTE : "none",
+    baseGaussians: cache?.baseGaussians ?? 0,
+    visibleIndices: 0,
+    baseBuildMs: cache?.baseBuildMs ?? 0,
+    extractMs: 0,
+    shRestSourceGaussians: cache?.shRestSourceGaussians ?? 0,
+    shRestPreserved: SH_REST_PRESERVED,
+  };
+}
+
+function formatMillis(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(3) : "0.000";
 }
 
 function frameSplat(splat, camera, controls, scene) {

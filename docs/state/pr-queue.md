@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AA`: 给 Spark PLY reconstruction 增加 SH-rest preservation 方案，或把大场景 filtered edit 从 full rebuild 推进到可复用 packed splats / object mask 路线；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AB`: 给 Spark PLY reconstruction 增加 SH-rest preservation，或把 Spark object filter 从 `PackedSplats.extractSplats` 过渡层推进到原始 `.splat` / packed source 上的 native object mask；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AA: Spark packed extract reconstruction route
+
+- 状态: done / packed-extract-audited
+- 类型: 标准 PR / 前端渲染性能与验收
+- 目标: 把 Spark filtered edit 从每次 raw object-aware PLY `constructSplats` 重建推进到可复用 `PackedSplats` base + visible-index extraction 的过渡层，并把 SH-rest 未保留事实暴露成 browser contract。
+- 已实施:
+  - `SplatViewport` 在 filtered Spark 路径中构建 base `PackedSplats` cache，再用 `visibleIndices -> PackedSplats.extractSplats(...)` 创建当前显示用 `SplatMesh(packedSplats)`。
+  - 新增 runtime telemetry：`data-spark-reconstruct-source="packed-extract-v1"`、base Gaussian 数、visible index 数、base build / extract 毫秒，以及 `data-spark-sh-rest-preserved="false"`。
+  - `audit-demo` 删除预览验收现在要求 Spark filtered route 命中 `packed-extract-v1`，并校验 visible indices、timing 和 SH preservation contract。
+  - `audit-spark-reconstruct-residual` 的 full PLY reconstruction gate 也要求 `packed-extract-v1`，并把 packed / SH telemetry 写入 summary report。
+  - `docs/benchmarks/spark-filtered-edit.md` 更新当前 runtime contract、验证结果和剩余 gap。
+- 结论:
+  - Lego proxy full reconstruct gate 继续通过：`coverageRatio=1.170841`、`lumaDelta=0.029762`、`chromaDelta=0.028407`，且 `reconstructSource="packed-extract-v1"`、`packed=5696/5696:4.2/2.7`、`shRest=0:false`。
+  - Lego delete preview 通过静态 preview browser audit：`postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909`，`sparkPacked="packed-extract-v1":5696/3909:3.9/1.9`。
+  - 这一步解决 raw rebuild contract，但仍不是原始 `.splat` 内部 object mask；`PackedSplats.extractSplats` 仍不保留 SH rest，所以 trained SH-heavy sample 的商业展示级外观还需要 RENDER-005T-AB。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-spark-reconstruct-residual.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server`: passed；默认 dev-server audit 因系统 watcher `ENOSPC` 失败，改用 built static preview 复查通过。
 
 ### RENDER-005T-Z: Spark PLY reconstruction residual gate
 

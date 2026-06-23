@@ -36,6 +36,22 @@ object-aware PLY reconstructed Spark render
         -> residual gate
 ```
 
+RENDER-005T-AA changes the construction surface from per-state raw PLY
+`constructSplats` loops to a reusable Spark `PackedSplats` base plus
+`extractSplats` for each visible object set:
+
+```text
+object-aware PLY points
+        -> base PackedSplats cache
+        -> visible index Uint32Array
+        -> PackedSplats.extractSplats(...)
+        -> Spark SplatMesh(packedSplats)
+```
+
+This is still a PLY reconstruction path, not a native object mask inside the
+original `.splat`, but it removes the raw rebuild contract from browser-visible
+runtime behavior and exposes timing / SH-preservation facts.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -44,8 +60,10 @@ object-aware PLY reconstructed Spark render
   colors and does not preserve full SH rest coefficients.
 - Object-color mode and canvas click selection continue to use the existing
   edit renderer path.
-- The filtered Spark route rebuilds a `SplatMesh` when visible / removed /
-  isolated object state changes.
+- The filtered Spark route reuses a base `PackedSplats` cache and extracts a
+  display `PackedSplats` when visible / removed / isolated object state changes.
+- The current `PackedSplats.extractSplats` route does not preserve full SH rest
+  coefficients. This is exposed as `data-spark-sh-rest-preserved="false"`.
 
 Runtime DOM evidence:
 
@@ -55,6 +73,12 @@ data-object-filter="spark-filtered-ply-reconstruct"
 data-spark-filter-mode="ply-reconstruct"
 data-spark-visible-gaussians="..."
 data-spark-removed-objects="..."
+data-spark-reconstruct-source="packed-extract-v1"
+data-spark-packed-base-gaussians="..."
+data-spark-packed-visible-indices="..."
+data-spark-packed-base-build-ms="..."
+data-spark-packed-extract-ms="..."
+data-spark-sh-rest-preserved="false"
 ```
 
 The full-scene reconstruction probe is intentionally URL-gated so normal UI
@@ -84,6 +108,8 @@ Current local result:
 ```text
 browser_audit=passed
 postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909
+sparkPacked="packed-extract-v1":5696/3909:3.9/1.9
+sparkShRest=0:"false"
 renderModeAfterDelete="原始颜色（编辑预览）"
 visibleAfterDelete=3,909
 deletedObjects=1
@@ -109,8 +135,11 @@ coverageRatio=1.170841
 lumaDelta=0.029762
 chromaDelta=0.028407
 objectFilter="spark-ply-reconstruct"
+reconstructSource="packed-extract-v1"
 visibleGaussians=5696
 filteredGaussians=0
+packed=5696/5696:4.2/2.7
+shRest=0:false
 ```
 
 The optional multiscene check includes Plush semantic and is slower because it
@@ -132,9 +161,12 @@ visibleGaussians=281498
 
 ## Remaining Gaps
 
-- Preserve full SH rest / view-dependent color in the Spark reconstructed path.
+- Preserve full SH rest / view-dependent color in the Spark reconstructed path,
+  or replace reconstruction with a Spark-side object mask over the original
+  packed `.splat` source.
 - Add a stricter SH-preserving residual gate for trained SH-heavy samples.
 - Add Spark-side selection / raycast-to-object mapping if viewport click
   selection should stay in Spark.
-- Avoid full SplatMesh rebuilds for high-frequency edits; this is acceptable for
-  delete / isolate preview but not for continuous brushing.
+- Avoid per-edit extracted `SplatMesh` allocation for high-frequency brushing;
+  the packed extract route is a safer intermediate layer, but native object
+  masks remain the terminal architecture.
