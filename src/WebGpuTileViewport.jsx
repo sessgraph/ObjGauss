@@ -4,10 +4,10 @@ import {
   createWebGpuAccumulationMeta,
   createWebGpuComputeMeta,
   createWebGpuPixelResolveMeta,
+  createWebGpuPixelResolveShader,
   webGpuAccumulationWorkgroups,
   webGpuComputeWorkgroups,
   webGpuPixelResolveWorkgroups,
-  WEBGPU_PIXEL_RESOLVE_SHADER,
   WEBGPU_PIXEL_RESOLVE_SOURCE,
   WEBGPU_TILE_ACCUMULATION_SHADER,
   WEBGPU_TILE_ACCUMULATION_SOURCE,
@@ -266,7 +266,11 @@ export default function WebGpuTileViewport({
         const sampledTextureModule = device.createShaderModule({ code: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER });
         const floatTextureModule = device.createShaderModule({ code: WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER });
         const resolveComputeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
-        const pixelResolveModule = device.createShaderModule({ code: WEBGPU_PIXEL_RESOLVE_SHADER });
+        const pixelResolveModule = device.createShaderModule({
+          code: createWebGpuPixelResolveShader({
+            pixelDepthBinCount: tileSmoke?.pixelDepthBinCount,
+          }),
+        });
         const accumulationModule = device.createShaderModule({ code: WEBGPU_TILE_ACCUMULATION_SHADER });
         const accumulationPipeline = device.createComputePipeline({
           layout: "auto",
@@ -501,6 +505,7 @@ export default function WebGpuTileViewport({
       data-webgpu-projection-camera-fov={rendererContract?.projectionCameraFovDegrees ?? 0}
       data-webgpu-depth-weight-mode={rendererContract?.depthWeightMode ?? ""}
       data-webgpu-pixel-depth-sort-mode={rendererContract?.pixelDepthSortMode ?? ""}
+      data-webgpu-pixel-depth-tuning-mode={rendererContract?.pixelDepthTuningMode ?? ""}
       data-webgpu-pixel-depth-gate-strength={rendererContract?.pixelDepthGateStrength ?? 0}
       data-webgpu-pixel-depth-gate-floor={rendererContract?.pixelDepthGateFloor ?? 0}
       data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}

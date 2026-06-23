@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-P`: 继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认 coverage 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-Q`: 基于 `runtime-depth-sort-tuning-v1` 做 depth-bin sweep（4 / 8 / 12 / 16）并继续拆 Spark vs edit 残差中的 SH 颜色和真实 camera 对齐问题；默认 coverage / depth 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-P: WebGPU runtime depth-bin tuning
+
+- 状态: done / depth-bin-tunable
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 将 WebGPU Tile 的 depth-binned alpha composite 从硬编码 8 bins 推进成 runtime-tunable contract，为后续 sorted-alpha 近似 sweep 提供可复现入口，同时保持默认视觉参数不变。
+- 已实施:
+  - 新增 `runtime-depth-sort-tuning-v1`，统一 normalize `webgpu-depth-bins`，合法范围为 4-16，默认 8。
+  - `buildWebGpuTileSmoke`、CPU pixel reference 和 WebGPU pixel resolve shader 共用同一 depth-bin count。
+  - `WebGpuTileViewport` 改为按 runtime smoke 生成 pixel resolve WGSL shader，解决 WGSL array length 必须是编译期常量的问题。
+  - `audit-demo` / `audit-webgpu-desktop` / `audit-webgpu-coverage-sweep` 支持 `--webgpu-depth-bins`，并校验 DOM telemetry 命中 requested tuning。
+  - DOM renderer contract 暴露 `data-webgpu-pixel-depth-tuning-mode` 和 `data-webgpu-pixel-depth-bin-count`。
+- 结论:
+  - 12-bin Lego headed WebGPU full audit 通过，日志显示 `pixelDepthSort="depth-binned-alpha-composite-v1":"runtime-depth-sort-tuning-v1":12/0.06:12`，说明 tuned shader 进入真实 runtime。
+  - 默认 baseline coverage gate 通过，Lego / Plush 全部默认显示 `bins=8`；默认参数没有被切到 12 或其他值。
+  - 一次中间 gate 抓到 `URLSearchParams.get()` 缺失值被 `Number(null)` 解释为 0 并 clamp 到 4 的 bug，已修复为 `null` / `undefined` / `""` 回到默认 8。
+- 验证:
+  - `node --check src/webgpuDepthTuning.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5274 --probes full --webgpu-depth-bins 12`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-coverage-gate -- --port 5275`: passed，2 scenes x 3 variants headed desktop WebGPU gate。
 
 ### RENDER-005T-O: WebGPU coverage report and threshold gate
 

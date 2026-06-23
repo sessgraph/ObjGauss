@@ -1,3 +1,9 @@
+import {
+  normalizeWebGpuDepthSortTuning,
+  WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+  WEBGPU_DEPTH_SORT_TUNING_MODE,
+} from "./webgpuDepthTuning.js";
+
 export const WEBGPU_TILE_SMOKE_LAYOUT_VERSION = "webgpu-tile-smoke-v1";
 export const WEBGPU_TILE_RESOLVE_VERSION = "webgpu-tile-resolve-v1";
 export const WEBGPU_OBJECT_STATE_LAYOUT_VERSION = "webgpu-object-state-v1";
@@ -27,7 +33,6 @@ const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
 const FRONT_DEPTH_GATE_STRENGTH = 12;
 const FRONT_DEPTH_GATE_FLOOR = 0.06;
-const PIXEL_DEPTH_BIN_COUNT = 8;
 export const WEBGPU_COVERAGE_TUNING_MODE = "runtime-coverage-tuning-v1";
 export const WEBGPU_COVERAGE_TUNING_DEFAULTS = Object.freeze({
   footprintScale: 2.2,
@@ -63,8 +68,11 @@ export function buildWebGpuTileSmoke({
   includePixelOutput = false,
   computePixelReference = includePixelOutput,
   coverageTuning = null,
+  depthSortTuning = null,
 }) {
   const resolvedCoverageTuning = normalizeWebGpuCoverageTuning(coverageTuning);
+  const resolvedDepthSortTuning = normalizeWebGpuDepthSortTuning(depthSortTuning);
+  const pixelDepthBinCount = resolvedDepthSortTuning.pixelDepthBinCount;
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
     objectIdsByIndex: objectIndex.objectIdsByIndex,
@@ -250,6 +258,7 @@ export function buildWebGpuTileSmoke({
         tileSize,
         viewportWidth,
         viewportHeight,
+        pixelDepthBinCount,
       })
     : null;
   return {
@@ -280,9 +289,10 @@ export function buildWebGpuTileSmoke({
     projectionDepthSpan: bounds.depthSpan,
     depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
     pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
+    pixelDepthTuningMode: WEBGPU_DEPTH_SORT_TUNING_MODE,
     pixelDepthGateStrength: FRONT_DEPTH_GATE_STRENGTH,
     pixelDepthGateFloor: FRONT_DEPTH_GATE_FLOOR,
-    pixelDepthBinCount: PIXEL_DEPTH_BIN_COUNT,
+    pixelDepthBinCount,
     pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
     pixelCoverageWeightFloor: PIXEL_COVERAGE_WEIGHT_FLOOR,
     pixelCoverageFootprintScale: resolvedCoverageTuning.footprintScale,
@@ -370,6 +380,12 @@ export function normalizeWebGpuCoverageTuning(tuning = null) {
     ),
   };
 }
+
+export {
+  normalizeWebGpuDepthSortTuning,
+  WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+  WEBGPU_DEPTH_SORT_TUNING_MODE,
+};
 
 export function buildWebGpuTileProjectionBounds(
   points,
@@ -585,6 +601,7 @@ function resolvePixelOutput({
   tileSize,
   viewportWidth,
   viewportHeight,
+  pixelDepthBinCount = WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
 }) {
   const pixelCount = viewportWidth * viewportHeight;
   const pixelResolvedRgba = new Float32Array(pixelCount * 4);
@@ -605,10 +622,10 @@ function resolvePixelOutput({
   });
   let pixelResolvedCount = 0;
   let checksum = 2166136261;
-  const binRed = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
-  const binGreen = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
-  const binBlue = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
-  const binWeight = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
+  const binRed = new Float32Array(pixelDepthBinCount);
+  const binGreen = new Float32Array(pixelDepthBinCount);
+  const binBlue = new Float32Array(pixelDepthBinCount);
+  const binWeight = new Float32Array(pixelDepthBinCount);
 
   for (let y = 0; y < viewportHeight; y += 1) {
     const tileY = Math.floor(y / tileSize);
@@ -650,8 +667,8 @@ function resolvePixelOutput({
           0.999999,
         );
         const depthBin = Math.min(
-          PIXEL_DEPTH_BIN_COUNT - 1,
-          Math.floor(normalizedDepth * PIXEL_DEPTH_BIN_COUNT),
+          pixelDepthBinCount - 1,
+          Math.floor(normalizedDepth * pixelDepthBinCount),
         );
         binRed[depthBin] += colorOpacity[gaussianOffset] * candidateWeight;
         binGreen[depthBin] += colorOpacity[gaussianOffset + 1] * candidateWeight;
@@ -667,7 +684,7 @@ function resolvePixelOutput({
       let outputBluePremultiplied = 0;
       let outputAlpha = 0;
       let totalWeight = 0;
-      for (let depthBin = 0; depthBin < PIXEL_DEPTH_BIN_COUNT; depthBin += 1) {
+      for (let depthBin = 0; depthBin < pixelDepthBinCount; depthBin += 1) {
         const weight = binWeight[depthBin];
         if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
         const red = binRed[depthBin] / weight;

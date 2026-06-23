@@ -34,6 +34,7 @@ const thresholds = parseThresholds(args);
 const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
 );
+const webGpuDepthBins = optionalFiniteNumber(args.webGpuDepthBins ?? args["webgpu-depth-bins"]);
 let server = null;
 
 try {
@@ -50,7 +51,15 @@ try {
   sweep:
   for (const asset of assets) {
     for (const variant of variants) {
-      const result = await runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpuViewportSize });
+      const result = await runVariant({
+        variant,
+        asset,
+        baseUrl,
+        webGpuFlags,
+        headed,
+        webGpuViewportSize,
+        webGpuDepthBins,
+      });
       process.stdout.write(result.output);
       process.stderr.write(result.errorOutput);
       const metrics = parseVariantMetrics(result.output);
@@ -184,7 +193,7 @@ try {
   if (server) stopPreviewServer(server);
 }
 
-async function runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpuViewportSize }) {
+async function runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpuViewportSize, webGpuDepthBins }) {
   const commandArgs = [
     "scripts/audit-webgpu-desktop.mjs",
     "--asset",
@@ -204,6 +213,9 @@ async function runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpu
   if (!headed) commandArgs.push("--headless");
   if (webGpuViewportSize) {
     commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
+  }
+  if (Number.isFinite(webGpuDepthBins)) {
+    commandArgs.push("--webgpu-depth-bins", String(webGpuDepthBins));
   }
   return runProcess(process.execPath, commandArgs);
 }

@@ -1,5 +1,9 @@
 import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
+  WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+  WEBGPU_DEPTH_SORT_TUNING_MODE,
+} from "./webgpuDepthTuning.js";
+import {
   WEBGPU_PIXEL_COVERAGE_MODE,
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_PIXEL_DEPTH_SORT_MODE,
@@ -41,9 +45,10 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   projectionDepthSpan: 1,
   depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
+  pixelDepthTuningMode: WEBGPU_DEPTH_SORT_TUNING_MODE,
   pixelDepthGateStrength: 12,
   pixelDepthGateFloor: 0.06,
-  pixelDepthBinCount: 8,
+  pixelDepthBinCount: WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
   pixelCoverageWeightFloor: 0.004,
   pixelCoverageFootprintScale: 2.2,
@@ -188,6 +193,7 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     projectionDepthSpan: smoke.projectionDepthSpan,
     depthWeightMode: smoke.depthWeightMode,
     pixelDepthSortMode: smoke.pixelDepthSortMode,
+    pixelDepthTuningMode: smoke.pixelDepthTuningMode,
     pixelDepthGateStrength: smoke.pixelDepthGateStrength,
     pixelDepthGateFloor: smoke.pixelDepthGateFloor,
     pixelDepthBinCount: smoke.pixelDepthBinCount,

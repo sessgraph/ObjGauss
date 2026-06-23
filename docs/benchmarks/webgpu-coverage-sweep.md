@@ -6,6 +6,11 @@ Spark `.splat` view using the existing browser audit visual residual metrics.
 It is for renderer-quality decisions only. It does not change the default
 renderer parameters by itself.
 
+Depth-bin alpha compositing can be fixed for a run with
+`--webgpu-depth-bins <4-16>`. This is a runtime tuning knob for comparing sorted
+alpha approximations; it does not change the default 8-bin baseline unless a
+candidate passes the same gate.
+
 ## Smoke Sweep
 
 ```bash

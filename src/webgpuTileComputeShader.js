@@ -1,3 +1,8 @@
+import {
+  normalizeWebGpuPixelDepthBinCount,
+  WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+} from "./webgpuDepthTuning.js";
+
 export const WEBGPU_TILE_COMPUTE_SOURCE = "webgpu-compute-resolve-v1";
 export const WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE = 64;
 export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-covariance-accumulation-v1";
@@ -145,7 +150,9 @@ fn computeMain(@builtin(global_invocation_id) globalId: vec3u) {
 }
 `;
 
-export const WEBGPU_PIXEL_RESOLVE_SHADER = `
+export function createWebGpuPixelResolveShader({ pixelDepthBinCount = WEBGPU_DEPTH_BIN_COUNT_DEFAULT } = {}) {
+  const resolvedPixelDepthBinCount = normalizeWebGpuPixelDepthBinCount(pixelDepthBinCount);
+  return `
 const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
@@ -155,7 +162,7 @@ const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
 const FRONT_DEPTH_GATE_STRENGTH = 12.0;
 const FRONT_DEPTH_GATE_FLOOR = 0.06;
-const PIXEL_DEPTH_BIN_COUNT = 8;
+const PIXEL_DEPTH_BIN_COUNT = ${resolvedPixelDepthBinCount};
 
 struct PixelResolveMeta {
   pixelCount: f32,
@@ -284,6 +291,9 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   pixelResolvedRgba[pixelIndex] = vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), clamp(outputAlpha, 0.0, 0.98));
 }
 `;
+}
+
+export const WEBGPU_PIXEL_RESOLVE_SHADER = createWebGpuPixelResolveShader();
 
 export function createWebGpuComputeMeta(tileSmoke) {
   return new Uint32Array([

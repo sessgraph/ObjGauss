@@ -33,6 +33,7 @@ import {
 import {
   buildWebGpuTileSmoke,
   normalizeWebGpuCoverageTuning,
+  normalizeWebGpuDepthSortTuning,
 } from "./webgpuTileSmoke.js";
 
 const FEATURED_ASSETS = featuredAssets();
@@ -107,6 +108,7 @@ export default function App() {
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
   const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
+  const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -118,8 +120,19 @@ export default function App() {
         renderMode,
         pointSize,
         coverageTuning: webGpuCoverageTuning,
+        depthSortTuning: webGpuDepthSortTuning,
       }),
-    [scene.points, visibleIds, removedIds, isolatedId, selectedId, renderMode, pointSize, webGpuCoverageTuning],
+    [
+      scene.points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+      selectedId,
+      renderMode,
+      pointSize,
+      webGpuCoverageTuning,
+      webGpuDepthSortTuning,
+    ],
   );
   const editRenderer = useMemo(
     () => editRendererContract(webGpuCapability, webGpuTileSmoke),
@@ -176,6 +189,7 @@ export default function App() {
       computePixelReference: false,
       maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
       coverageTuning: webGpuCoverageTuning,
+      depthSortTuning: webGpuDepthSortTuning,
     });
   }, [
     scene.points,
@@ -189,6 +203,7 @@ export default function App() {
     webGpuRuntimeViewport,
     webGpuTileSmoke,
     webGpuCoverageTuning,
+    webGpuDepthSortTuning,
   ]);
   const activeEditRenderer = useMemo(
     () =>
@@ -871,6 +886,16 @@ function readWebGpuCoverageTuning() {
   return normalizeWebGpuCoverageTuning({
     footprintScale: params.get("webgpu-footprint-scale"),
     maxAnisotropy: params.get("webgpu-covariance-max-anisotropy"),
+  });
+}
+
+function readWebGpuDepthSortTuning() {
+  if (typeof window === "undefined") {
+    return normalizeWebGpuDepthSortTuning();
+  }
+  const params = new URLSearchParams(window.location.search);
+  return normalizeWebGpuDepthSortTuning({
+    depthBins: params.get("webgpu-depth-bins"),
   });
 }
 
