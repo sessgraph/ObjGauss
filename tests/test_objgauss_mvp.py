@@ -620,6 +620,37 @@ def test_splatfacto_smoke_script_dry_run_reports_pipeline():
     assert "dry_run=passed" in result.stdout
 
 
+def test_splatfacto_balanced_benchmark_script_dry_run_reports_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/benchmark-splatfacto-balanced.mjs",
+            "--dry-run",
+            "--sam-checkpoint",
+            "/tmp/sam-vit-b.pth",
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode=dry-run" in result.stdout
+    assert "masks from-nerf-sam" in result.stdout
+    assert "--max-area-fraction 0.3" in result.stdout
+    assert "training register-output" in result.stdout
+    assert "--no-public-copy" in result.stdout
+    assert "object-field emergence" in result.stdout
+    assert "object-field emergence-curve" in result.stdout
+    assert "object-field emergence-report" in result.stdout
+    assert "objgauss stats" in result.stdout
+    assert "/tmp/sam-vit-b.pth" in result.stdout
+    assert "dry_run=passed" in result.stdout
+
+
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)

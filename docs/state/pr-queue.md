@@ -10,18 +10,34 @@
 
 ## Ready
 
+当前无已确认的 ready PR。
+
+## Done
+
 ### BENCH-001: Stabilize safe-2000 balanced benchmark
 
-- 状态: ready-for-owner-confirmation
+- 状态: done
 - 类型: 标准 PR
 - 目标: 将 safe-2000 balanced 8-frame / 4-slot SAM candidate 纳入可复现 benchmark/runbook，减少手工命令和 ignored outputs 依赖。
 - 范围外: 不重新训练 Splatfacto；不提交 checkpoint、SAM checkpoint 或大体积训练输出。
+- 实施:
+  - 新增 `scripts/benchmark-splatfacto-balanced.mjs`，支持 `--dry-run`、`--status`、`--run`、`--skip-sam` 和显式 `--publish`。
+  - 新增 `npm run benchmark:splatfacto:balanced`。
+  - 新增 `docs/benchmarks/splatfacto-balanced.md`，记录输入、固定参数、输出 contract、summary 字段和缺失输入处理。
+  - 默认使用 `--no-public-copy`，避免 benchmark run 覆盖 `public/samples/nerf_lego_trained.*`。
 - 验收:
-  - 一条命令或 manifest 可重跑 balanced SAM -> register-output -> emergence curve。
-  - benchmark summary 记录 frames、masks、object_id counts、ARI、OES 和 render occlusion effect。
-  - 失败时输出缺失输入和生成命令。
-
-## Done
+  - `node scripts/benchmark-splatfacto-balanced.mjs --run` 重新生成 balanced SAM -> `training register-output` -> emergence metrics -> emergence curve -> HTML report -> summary。
+  - `summary.json` 记录 frames=8、masks=27、object_id counts=126686/40747/34682/53679、ARI=0.468745、OES=0.693888、render_occlusion_effect_score=0.195308。
+  - `node scripts/benchmark-splatfacto-balanced.mjs --status` 输出 `status=ready missing=0`；缺失项会打印对应 prepare 命令。
+- 验证:
+  - `npm run benchmark:splatfacto:balanced -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth`: passed。
+  - `node scripts/benchmark-splatfacto-balanced.mjs --run`: passed。
+  - `node scripts/benchmark-splatfacto-balanced.mjs --run --skip-sam`: passed。
+  - `node scripts/benchmark-splatfacto-balanced.mjs --status`: `status=ready missing=0`。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "splatfacto_balanced or splatfacto_smoke" -q`: 2 passed。
+  - `uv run --extra dev pytest`: 34 passed。
+  - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
+- 完成 commit: `69cb156`.
 
 ### ACCEPT-002: Browser audit for balanced Splatfacto sample
 

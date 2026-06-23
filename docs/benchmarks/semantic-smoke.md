@@ -80,6 +80,22 @@ The benchmark still treats `outputs/` as local ignored state. Missing Splatfacto
 outputs now have a reproducible generation entrypoint instead of a hand-written
 handoff.
 
+## Safe-2000 Balanced Benchmark
+
+The SEMANTIC smoke suite above still uses the short Splatfacto smoke scene. The
+current higher-quality NeRF Lego candidate has its own reproducible local
+benchmark:
+
+```bash
+npm run benchmark:splatfacto:balanced -- --run
+```
+
+That command starts from the ignored safe-2000 Splatfacto PLY, regenerates the
+8-frame / 4-slot / `max_area_fraction=0.3` SAM manifest, registers the Object
+Field handoff, writes emergence metrics and curves, and produces
+`/tmp/objgauss-splatfacto-balanced-benchmark/summary.json`. The runbook is
+`docs/benchmarks/splatfacto-balanced.md`.
+
 ## Acceptance Integration
 
 `npm run acceptance:demo` runs this benchmark by default after rebuilding the
