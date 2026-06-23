@@ -489,6 +489,9 @@ export default function PointCloudViewport({
       data-webgpu-color-source-sh-dc-gaussians={rendererContract?.colorSourceShDcGaussians ?? 0}
       data-webgpu-color-source-fallback-gaussians={rendererContract?.colorSourceFallbackGaussians ?? 0}
       data-webgpu-color-source-object-gaussians={rendererContract?.colorSourceObjectGaussians ?? 0}
+      data-webgpu-color-sh-rest-gaussians={rendererContract?.colorShRestGaussians ?? 0}
+      data-webgpu-color-sh-rest-coefficient-max={rendererContract?.colorShRestCoefficientMax ?? 0}
+      data-webgpu-color-sh-degree-max={rendererContract?.colorShDegreeMax ?? 0}
       data-webgpu-color-opacity-mean={rendererContract?.colorOpacityMean ?? 0}
       data-webgpu-object-state-layout={rendererContract?.objectStateLayoutVersion ?? ""}
       data-webgpu-object-state-stride={rendererContract?.objectStateStrideUint32 ?? 0}

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-T`: 在 front-top-k sorted-alpha 诊断证明真实 per-pixel 排序路径可运行但 luma/chroma 变差后，继续拆 SH / view-dependent color，或评估把 object filter 接入 Spark renderer；默认 coverage / depth / camera / alpha 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-U`: 基于 SH-rest presence audit 已证明 trained Lego 带完整 degree-3 SH 的事实，增加可切换的 `sh-view-color` 诊断模式，或评估 Spark renderer object filter 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-T: WebGPU SH-rest presence audit
+
+- 状态: done / sh-rest-presence-audited
+- 类型: 标准 PR / 前端渲染质量诊断
+- 目标: 在 front-top-k sorted-alpha 证明 per-pixel 排序路径可运行但不是默认候选后，把 “原始颜色（编辑预览）不像 Spark” 的 SH / view-dependent color 假设变成可审计事实，先判断当前素材是否含有未使用的 SH rest 信息。
+- 已实施:
+  - 前端 PLY parser 解析 `f_rest_*` presence 元数据，为每个 point 记录 `shRestCoefficientCount` 和推断 `shDegree`；为避免 255k+ Gaussian 场景额外内存膨胀，本切片不把完整 SH rest 系数复制到 per-point JS array。
+  - `buildWebGpuTileSmoke` / renderer contract 暴露 `colorShRestGaussians`、`colorShRestCoefficientMax` 和 `colorShDegreeMax`，并保持 RGB / SH-DC / fallback / object-palette 色源统计不变。
+  - `WebGpuTileViewport` 与 `PointCloudViewport` 均暴露 `data-webgpu-color-sh-rest-*`，确保 WebGPU route 和 Gaussian OIT fallback audit 口径一致。
+  - `audit-demo` 日志新增 `shRest=count/maxCoeffs/maxDegree`，并校验该 telemetry 与 packed Gaussian 数一致。
+  - `audit:webgpu-tile-smoke` 新增内存 PLY parser smoke 和合成 SH-rest point smoke，验证 `9 -> degree 1` 与 `45 -> degree 3` 两条路径。
+- 结论:
+  - 默认 sample smoke 仍为 `shRest=0/0/0`，说明新增 telemetry 不改变默认渲染输出。
+  - 本机 `NeRF Lego 训练输出样例` headed WebGPU full audit 显示 `shRest=255794/45/3`，而删除预览后 `colorAfterDelete=255794/0/0/0`；因此该 trained sample 确实带完整 degree-3 view-dependent SH，但当前编辑预览仍只使用 RGB / SH-DC 派生颜色。
+  - 当前“自身颜色编辑预览不像 Spark”的下一步应优先做 `sh-view-color` 诊断模式或 Spark object filter feasibility，而不是继续盲目调 footprint/depth bins。
+- 验证:
+  - `node --check src/ply.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；输出 `shRest=0/0/0`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local --port 5286 --probes full`: passed，headed desktop WebGPU full runtime；输出 `shRest=255794/45/3`、`colorAfterDelete=255794/0/0/0`。
 
 ### RENDER-005T-S: WebGPU front-top-k sorted-alpha diagnostic
 

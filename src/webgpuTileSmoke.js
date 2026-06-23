@@ -132,6 +132,9 @@ export function buildWebGpuTileSmoke({
   let shDcColorGaussians = 0;
   let fallbackColorGaussians = 0;
   let objectColorGaussians = 0;
+  let shRestGaussians = 0;
+  let shRestCoefficientMax = 0;
+  let shDegreeMax = 0;
   let opacitySum = 0;
 
   points.forEach((point, index) => {
@@ -165,6 +168,12 @@ export function buildWebGpuTileSmoke({
       objectColorGaussians += 1;
     } else {
       fallbackColorGaussians += 1;
+    }
+    const shRestCoefficientCount = pointShRestCoefficientCount(point);
+    if (shRestCoefficientCount > 0) {
+      shRestGaussians += 1;
+      shRestCoefficientMax = Math.max(shRestCoefficientMax, shRestCoefficientCount);
+      shDegreeMax = Math.max(shDegreeMax, pointShDegree(point, shRestCoefficientCount));
     }
     opacitySum += clampNumber(point.opacity ?? 1, 0, 1);
     const radiusPixels = pointRadiusPixels({
@@ -327,6 +336,9 @@ export function buildWebGpuTileSmoke({
     colorSourceShDcGaussians: shDcColorGaussians,
     colorSourceFallbackGaussians: fallbackColorGaussians,
     colorSourceObjectGaussians: objectColorGaussians,
+    colorShRestGaussians: shRestGaussians,
+    colorShRestCoefficientMax: shRestCoefficientMax,
+    colorShDegreeMax: shDegreeMax,
     colorOpacityMean: points.length > 0 ? opacitySum / points.length : 0,
     screenCovarianceGaussians,
     screenCovarianceFallbackGaussians,
@@ -1278,6 +1290,23 @@ function renderColorSource(point, renderMode) {
   if (renderMode !== "original") return "object-palette";
   const source = String(point.colorSource ?? "fallback");
   return ["rgb", "sh-dc", "fallback"].includes(source) ? source : "fallback";
+}
+
+function pointShRestCoefficientCount(point) {
+  const count = Number(point.shRestCoefficientCount ?? 0);
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  return Math.trunc(count);
+}
+
+function pointShDegree(point, coefficientCount) {
+  const explicit = Number(point.shDegree ?? 0);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return Math.trunc(explicit);
+  }
+  if (coefficientCount >= 45) return 3;
+  if (coefficientCount >= 24) return 2;
+  if (coefficientCount >= 9) return 1;
+  return 0;
 }
 
 function projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight }) {

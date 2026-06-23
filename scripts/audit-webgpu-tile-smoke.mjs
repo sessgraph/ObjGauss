@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { parsePly } from "../src/ply.js";
 import { createSampleScene } from "../src/sampleScene.js";
 import {
   createWebGpuAccumulationMeta,
@@ -82,6 +83,27 @@ import { editRendererContract } from "../src/webgpuCapability.js";
 const scene = createSampleScene();
 const allObjectIds = new Set(scene.points.map((point) => point.objectId));
 const firstObjectId = Math.min(...allObjectIds);
+const parsedShRestPly = parsePly(
+  new TextEncoder().encode(
+    [
+      "ply",
+      "format ascii 1.0",
+      "element vertex 1",
+      "property float x",
+      "property float y",
+      "property float z",
+      "property float f_dc_0",
+      "property float f_dc_1",
+      "property float f_dc_2",
+      ...Array.from({ length: 9 }, (_, index) => `property float f_rest_${index}`),
+      "end_header",
+      `0 0 0 0.1 0.2 0.3 ${Array.from({ length: 9 }, (_, index) => index * 0.01).join(" ")}`,
+    ].join("\n"),
+  ).buffer,
+);
+assert.equal(parsedShRestPly.points[0].colorSource, "sh-dc");
+assert.equal(parsedShRestPly.points[0].shRestCoefficientCount, 9);
+assert.equal(parsedShRestPly.points[0].shDegree, 1);
 
 assert.deepEqual(WEBGPU_RUNTIME_PROBE_MODES, [
   WEBGPU_RUNTIME_PROBE_FULL,
@@ -219,6 +241,9 @@ assert.equal(base.colorSourceRgbGaussians, base.packedGaussians);
 assert.equal(base.colorSourceShDcGaussians, 0);
 assert.equal(base.colorSourceFallbackGaussians, 0);
 assert.equal(base.colorSourceObjectGaussians, 0);
+assert.equal(base.colorShRestGaussians, 0);
+assert.equal(base.colorShRestCoefficientMax, 0);
+assert.equal(base.colorShDegreeMax, 0);
 assert.ok(base.colorOpacityMean > 0);
 assert.ok(base.colorOpacityMean <= 1);
 assert.equal(base.screenCovarianceMode, WEBGPU_TILE_SCREEN_COVARIANCE_MODE);
@@ -227,6 +252,30 @@ assert.equal(base.screenCovarianceFallbackGaussians, 0);
 assert.ok(base.screenCovarianceClampedGaussians >= 0);
 assert.equal(base.screenCovarianceMaxAnisotropy, 4);
 assert.ok(base.screenCovarianceSigmaMean > 0);
+
+const shRestScenePoints = scene.points.map((point, index) =>
+  index === 0
+    ? {
+        ...point,
+        colorSource: "sh-dc",
+        shRestCoefficientCount: 45,
+        shDegree: 3,
+      }
+    : point,
+);
+const shRestMetadata = buildWebGpuTileSmoke({
+  points: shRestScenePoints,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+});
+assert.equal(shRestMetadata.colorSourceRgbGaussians, base.packedGaussians - 1);
+assert.equal(shRestMetadata.colorSourceShDcGaussians, 1);
+assert.equal(shRestMetadata.colorShRestGaussians, 1);
+assert.equal(shRestMetadata.colorShRestCoefficientMax, 45);
+assert.equal(shRestMetadata.colorShDegreeMax, 3);
 
 const sparkFrameCamera = buildWebGpuTileSmoke({
   points: scene.points,
@@ -688,6 +737,7 @@ console.log(
     `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthTuningMode}:${base.pixelDepthAlphaMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor}:${base.pixelDepthBinCount} ` +
     `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageTuningMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
     `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
+    `shRest=${base.colorShRestGaussians}/${base.colorShRestCoefficientMax}/${base.colorShDegreeMax} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +

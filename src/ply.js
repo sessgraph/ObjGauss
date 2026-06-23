@@ -170,6 +170,7 @@ function vertexToPoint(vertex) {
   const original = originalColor(vertex);
   const scale3 = gaussianScale3(vertex);
   const rotationQuaternion = gaussianRotationQuaternion(vertex);
+  const shRest = shRestMetadata(vertex);
   return {
     x: Number(vertex.x ?? 0),
     y: Number(vertex.y ?? 0),
@@ -182,6 +183,8 @@ function vertexToPoint(vertex) {
     objectId,
     color: original.rgb,
     colorSource: original.source,
+    shRestCoefficientCount: shRest.coefficientCount,
+    shDegree: shRest.degree,
     objectColor: colorForObject(objectId),
   };
 }
@@ -229,6 +232,29 @@ function normalizeRgb(value) {
 
 function shToRgb(value) {
   return Math.round(clamp(value * SH_C0 + 0.5, 0, 1) * 255);
+}
+
+function shRestMetadata(vertex) {
+  let coefficientCount = 0;
+  for (const [name, value] of Object.entries(vertex)) {
+    if (!name.startsWith("f_rest_")) continue;
+    const coefficientIndex = Number(name.slice(7));
+    if (!Number.isInteger(coefficientIndex) || coefficientIndex < 0) continue;
+    if (Number.isFinite(Number(value))) {
+      coefficientCount += 1;
+    }
+  }
+  return {
+    coefficientCount,
+    degree: shDegreeFromRestCoefficientCount(coefficientCount),
+  };
+}
+
+function shDegreeFromRestCoefficientCount(count) {
+  if (count >= 45) return 3;
+  if (count >= 24) return 2;
+  if (count >= 9) return 1;
+  return 0;
 }
 
 function opacityValue(value) {

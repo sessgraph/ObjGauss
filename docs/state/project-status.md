@@ -82,6 +82,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-Q 已完成 WebGPU depth-bin sweep：新增 `npm run audit:webgpu-depth-sweep`，可对 `4/8/12/16` bins 跑同一套 headed desktop WebGPU full-runtime visual residual audit，并输出 `summary.json` / `summary.md`；Lego sweep 显示 8 bins 仍是 best Pareto，12 bins 只让 coverage ratio 从 `3.784251` 微降到 `3.784235` 但 chroma 变差，因此单纯提高 bin 数不是当前 Spark/edit 残差主因。
   - RENDER-005T-R 已完成 WebGPU runtime camera framing diagnostic：新增 `runtime-camera-tuning-v1` 和 URL / audit 参数 `webgpu-camera-mode=edit-fixed|spark-frame`，默认仍保持 `edit-fixed`；`spark-frame` 对齐 Spark viewer 的 58° FOV、scene-center target 和 `distance=maxDim*1.7` framing。Lego `spark-frame` headed audit 将 coverage ratio 从 `3.784251` 降到 `3.766657`、luma 从 `0.106079` 降到 `0.102396` 但 chroma 从 `0.086537` 略升到 `0.087290`；Plush `spark-frame` 大场景 audit 也通过并把 coverage ratio 降到 `4.713926`，但 luma/chroma 未同步改善。因此 camera alignment 是 coverage 残差项之一，不是“原始颜色编辑预览不像 Spark”的完整主因。
   - RENDER-005T-S 已完成 WebGPU front-top-k sorted-alpha diagnostic：`runtime-depth-sort-tuning-v1` 新增 URL / audit 参数 `webgpu-depth-alpha-mode=depth-binned|front-top-k`，默认仍保持 `depth-binned`；`front-top-k` 每像素保留最近 K 个 contributor 并前到后 alpha composite，K 复用 `webgpu-depth-bins`。Lego K=8 将 coverage ratio 从 `3.784251` 降到 `3.583371`，但 luma/chroma 恶化到 `0.208595/0.127958`；K=16 coverage 接近 baseline 但 luma/chroma 仍弱于 baseline；Plush K=8 大场景也通过但 luma/chroma 明显变差。因此 per-pixel sorted-alpha 诊断路径可运行，但当前不是默认候选。
+  - RENDER-005T-T 已完成 WebGPU SH-rest presence audit：前端 PLY parser 记录 `f_rest_*` 系数数量与推断 SH degree，WebGPU Tile / Gaussian OIT fallback contract 暴露 `shRest=count/maxCoeffs/maxDegree`，browser audit 验证该 telemetry 合法且不改变默认 RGB/SH-DC 渲染路径；本机 `NeRF Lego 训练输出样例` headed WebGPU full audit 显示 `shRest=255794/45/3`，删除预览后仍回到 `colorAfterDelete=255794/0/0/0` RGB 原始色，证明 trained sample 存在完整 degree-3 view-dependent SH 但当前编辑预览尚未利用。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -150,6 +151,15 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check src/ply.js
+node --check src/webgpuTileSmoke.js
+node --check src/webgpuCapability.js
+node --check scripts/audit-demo.mjs
+node --check scripts/audit-webgpu-tile-smoke.mjs
+npm run audit:webgpu-tile-smoke
+npm run build
+uv run --extra dev pytest
+npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local --port 5286 --probes full
 node --check src/webgpuCameraTuning.js
 node --check src/webgpuDepthTuning.js
 node --check src/webgpuTileComputeShader.js
