@@ -119,7 +119,38 @@ export default function App() {
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
   const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
-  const activeRendererText = useSplatRenderer ? "真实 Splat" : editRenderer.rendererLabel;
+  const webGpuRuntimeTileSmoke = useMemo(() => {
+    if (!useWebGpuTileRenderer) return webGpuTileSmoke;
+    return buildWebGpuTileSmoke({
+      points: scene.points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+      selectedId,
+      renderMode,
+      pointSize,
+      includeTileEntries: true,
+      maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
+    });
+  }, [
+    scene.points,
+    visibleIds,
+    removedIds,
+    isolatedId,
+    selectedId,
+    renderMode,
+    pointSize,
+    useWebGpuTileRenderer,
+    webGpuTileSmoke,
+  ]);
+  const activeEditRenderer = useMemo(
+    () =>
+      useWebGpuTileRenderer
+        ? editRendererContract(webGpuCapability, webGpuRuntimeTileSmoke)
+        : editRenderer,
+    [editRenderer, useWebGpuTileRenderer, webGpuCapability, webGpuRuntimeTileSmoke],
+  );
+  const activeRendererText = useSplatRenderer ? "真实 Splat" : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>
@@ -457,7 +488,7 @@ export default function App() {
               重置演示
             </button>
             <div className="hintText">
-              当前：{modeText} / {activeRendererText}。目标：{editRenderer.targetRendererLabel}。
+              当前：{modeText} / {activeRendererText}。目标：{activeEditRenderer.targetRendererLabel}。
             </div>
           </section>
         </aside>
@@ -466,7 +497,7 @@ export default function App() {
           {!useSplatRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
-              <span>{renderModeText} / {editRenderer.rendererLabel}</span>
+              <span>{renderModeText} / {activeEditRenderer.rendererLabel}</span>
               {hasSplatRenderer && objectEditActive ? (
                 <button className="bannerAction" type="button" onClick={enterViewMode}>
                   <Rotate3D size={15} />
@@ -489,8 +520,8 @@ export default function App() {
               visibleIds={visibleIds}
               removedIds={removedIds}
               isolatedId={isolatedId}
-              tileSmoke={webGpuTileSmoke}
-              rendererContract={editRenderer}
+              tileSmoke={webGpuRuntimeTileSmoke}
+              rendererContract={activeEditRenderer}
               onSelectObject={selectObject}
               renderModeLabel={renderModeText}
             />
@@ -507,7 +538,7 @@ export default function App() {
               selectedId={selectedId}
               onSelectObject={selectObject}
               renderModeLabel={renderModeText}
-              rendererContract={editRenderer}
+              rendererContract={activeEditRenderer}
             />
           )}
         </section>
@@ -593,31 +624,31 @@ export default function App() {
             <h2>渲染状态</h2>
             <StateRow label="工作模式" value={modeText} />
             <StateRow label="渲染器" value={activeRendererText} />
-            <StateRow label="目标渲染器" value={editRenderer.targetRendererLabel} />
-            <StateRow label="目标状态" value={`${editRenderer.targetGate} / ${editRenderer.targetGateReason}`} />
-            <StateRow label="WebGPU" value={editRenderer.webGpuLabel} />
-            <StateRow label="回退原因" value={editRenderer.fallbackReason} />
+            <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
+            <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
+            <StateRow label="WebGPU" value={activeEditRenderer.webGpuLabel} />
+            <StateRow label="回退原因" value={activeEditRenderer.fallbackReason} />
             <StateRow
               label="WebGPU pack"
-              value={`${editRenderer.packedGaussians.toLocaleString()} / ${editRenderer.objectCount}`}
+              value={`${activeEditRenderer.packedGaussians.toLocaleString()} / ${activeEditRenderer.objectCount}`}
             />
             <StateRow
               label="Tile bins"
-              value={`${editRenderer.activeTileCount.toLocaleString()} / ${editRenderer.tileCount.toLocaleString()}`}
+              value={`${activeEditRenderer.activeTileCount.toLocaleString()} / ${activeEditRenderer.tileCount.toLocaleString()}`}
             />
             <StateRow
               label="Tile capacity"
-              value={`${editRenderer.tileCapacityStatus} / ${editRenderer.tileOverflowTileCount.toLocaleString()} tiles`}
+              value={`${activeEditRenderer.tileCapacityStatus} / ${activeEditRenderer.tileOverflowTileCount.toLocaleString()} tiles`}
             />
             <StateRow
               label="Tile resolve"
-              value={`${editRenderer.resolvedTileCount.toLocaleString()} / ${editRenderer.resolveChecksum}`}
+              value={`${activeEditRenderer.resolvedTileCount.toLocaleString()} / ${activeEditRenderer.resolveChecksum}`}
             />
             <StateRow
               label="Object state"
-              value={`${editRenderer.objectStateVisibleObjects.toLocaleString()} / ${editRenderer.objectStateChecksum}`}
+              value={`${activeEditRenderer.objectStateVisibleObjects.toLocaleString()} / ${activeEditRenderer.objectStateChecksum}`}
             />
-            <StateRow label="Tile overflow" value={editRenderer.tileOverflowCount} />
+            <StateRow label="Tile overflow" value={activeEditRenderer.tileOverflowCount} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />
             <StateRow label="已删除对象" value={removedIds.size} />
@@ -633,7 +664,7 @@ export default function App() {
         <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
         <span>模式：{modeText}</span>
         <span>渲染器：{activeRendererText}</span>
-        <span>WebGPU：{editRenderer.webGpuLabel}</span>
+        <span>WebGPU：{activeEditRenderer.webGpuLabel}</span>
         <span>高斯点：{scene.points.length.toLocaleString()}</span>
         <span>可见：{visibleCount.toLocaleString()}</span>
         <span>所选：{selectedId ?? "无"}</span>

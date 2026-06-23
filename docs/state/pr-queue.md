@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005E`: 在 compute resolve 基础上推进 per-tile / per-Gaussian compute accumulation shader。
+  - `RENDER-005F`: 在 tile-center accumulation 基础上推进 per-pixel / covariance-aware tile traversal。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,31 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005E: WebGPU per-tile Gaussian accumulation shader
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 WebGPU route 从“CPU 生成 `tileAccumulation` 后 GPU resolve”推进到“GPU compute 读取 tile entries 与 Gaussian/object storage buffers，按 tile-center weighted OIT 写出 `tileAccumulation`”。
+- 范围外:
+  - 不实现完整 per-pixel tile traversal。
+  - 不实现 covariance-aware elliptical footprint rasterization。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - `src/webgpuTileComputeShader.js` 新增 `webgpu-compute-accumulation-v1` WGSL compute shader：读取 `positionRadius`、`colorOpacity`、`objectIndices`、`objectState`、`tileCounts` 与 `tileEntries`，每个 tile 遍历 stored Gaussian list 并写入 `tileAccumulation`。
+  - `WebGpuTileViewport` 创建 accumulation compute pipeline，并在 resolve compute 前 dispatch accumulation pass；WebGPU DOM contract 新增 `data-webgpu-accumulation-*`。
+  - `App` 在真正进入 `webgpu-tile` route 时生成带 `tileEntries` 的 runtime tile smoke，并使用紧凑的 `maxEntriesPerTile=maxTileOccupancy`，避免 fallback 场景无意义分配大型 tile-entry buffer。
+  - `audit-webgpu-tile-smoke` 验证 accumulation shader bindings、48-byte accumulation meta、workgroup 计算和 shader 写入 contract。
+  - `audit-demo` 的 WebGPU route 现在要求 accumulation dispatch、resolve compute dispatch、storage tile entries 和 storage-buffer fullscreen resolve 同时成立。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 accumulation compute contract。
+  - WebGPU 可用且 zero-overflow 的环境中，`webgpu-tile` first frame 必须经过 `webgpu-compute-accumulation-v1` -> `webgpu-compute-resolve-v1` -> `webgpu-storage-resolve-v1`。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `accumulation=webgpu-compute-accumulation-v1:64`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5212/ --no-server`: passed，assets=3；当前仍 fallback，`accumulation=null:null:0` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-005D: WebGPU compute resolve shader
 
