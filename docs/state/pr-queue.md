@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-F`: 将 WebGPU Tile 编辑从 256px full runtime 推进到更高内部输出分辨率 / adaptive runtime quality，并继续处理真实排序与 Spark 视觉差距。
+  - `RENDER-005T-G`: 继续处理 WebGPU Tile 编辑与 Spark 真实 `.splat` 的视觉差距，优先做原始颜色/SH fidelity、真实排序或更强 front-to-back 近似，而不是继续单纯堆内部输出分辨率。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-F: WebGPU adaptive runtime quality
+
+- 状态: done / adaptive-quality-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 回应“原始颜色（编辑预览）颗粒感强”的问题，把 WebGPU Tile full runtime 从固定 256px 内部输出推进到可审计的自适应内部分辨率，同时保留大场景资源安全。
+- 已实施:
+  - `App.jsx` 新增 WebGPU runtime quality policy：小场景走 `adaptive-high-512`，中等 / 大场景走 `adaptive-medium-384`，超大场景保守走 `adaptive-safe-320`；显式 `--webgpu-viewport-size` 和 `tiny-pixel-output` 诊断 probe 不变。
+  - 默认 full runtime 继续匹配 viewer display aspect，但 aspect mode 从固定面积 `display-aspect-area` 升级为 `display-aspect-adaptive`，并按质量档暴露 `viewportQuality` / `pixelBudget`。
+  - `WebGpuTileViewport` 暴露 `data-webgpu-viewport-quality` 与 `data-webgpu-viewport-pixel-budget`，`audit-demo` 将默认 WebGPU full runtime 视觉验收地板从 256px 提升到 320px，并要求 adaptive quality contract。
+- 结论:
+  - NeRF Lego proxy 5696 Gaussian 在 desktop WebGPU full runtime 下使用 `496x512` 输出，quality=`adaptive-high-512`，first frame、queue、device 和对象选择 / 隔离 / 删除预览通过。
+  - Plush semantic 281498 Gaussian 在 desktop WebGPU full runtime 下使用 `384x384` 输出，quality=`adaptive-medium-384`，first frame、queue、device 和对象选择 / 隔离 / 删除预览通过。
+  - 这一步降低的是低内部分辨率放大造成的颗粒 / 格子感；仍不是 Spark 真实 `.splat` 的 SH 颜色、严格 alpha 排序或完整高质量 3DGS renderer。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5254 --probes full`: passed；`webgpuViewport=496x512:253952:"display-aspect-adaptive":"adaptive-high-512"`、device active、queue done。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5255 --probes full`: passed；`webgpuViewport=384x384:147456:"display-aspect-adaptive":"adaptive-medium-384"`、device active、queue done。
 
 ### RENDER-005T-E: WebGPU camera-Jacobian screen covariance
 

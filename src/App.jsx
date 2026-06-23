@@ -69,6 +69,11 @@ const WEBGPU_RUNTIME_VIEWPORT_SIZE = 256;
 const WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE = 64;
 const WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE = 512;
 const WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE = 16;
+const WEBGPU_RUNTIME_HIGH_MAX_GAUSSIANS = 50_000;
+const WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS = 300_000;
+const WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE = 512;
+const WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE = 384;
+const WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE = 320;
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
@@ -145,8 +150,9 @@ export default function App() {
         probe: webGpuRuntimeProbe,
         request: webGpuRuntimeViewportRequest,
         displaySize: webGpuRuntimeDisplaySize,
+        gaussianCount: scene.points.length,
       }),
-    [webGpuRuntimeDisplaySize, webGpuRuntimeProbe, webGpuRuntimeViewportRequest],
+    [scene.points.length, webGpuRuntimeDisplaySize, webGpuRuntimeProbe, webGpuRuntimeViewportRequest],
   );
   const webGpuRuntimeTileSmoke = useMemo(() => {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
@@ -565,6 +571,8 @@ export default function App() {
               onSelectObject={selectObject}
               renderModeLabel={renderModeText}
               runtimeViewportAspectMode={webGpuRuntimeViewport.aspectMode}
+              runtimeViewportQuality={webGpuRuntimeViewport.quality}
+              runtimeViewportPixelBudget={webGpuRuntimeViewport.pixelBudget}
               onDisplaySizeChange={updateWebGpuRuntimeDisplaySize}
             />
           ) : (
@@ -848,12 +856,14 @@ function readWebGpuRuntimeViewportRequest() {
   };
 }
 
-function buildWebGpuRuntimeViewport({ probe, request, displaySize }) {
+function buildWebGpuRuntimeViewport({ probe, request, displaySize, gaussianCount }) {
   if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
     return {
       width: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
       height: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
       aspectMode: "tiny-square",
+      quality: "diagnostic-tiny",
+      pixelBudget: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE ** 2,
     };
   }
   if (request.explicit) {
@@ -861,23 +871,57 @@ function buildWebGpuRuntimeViewport({ probe, request, displaySize }) {
       width: request.size,
       height: request.size,
       aspectMode: "explicit-square",
+      quality: "explicit-square",
+      pixelBudget: request.size ** 2,
     };
   }
+  const quality = webGpuRuntimeQuality(gaussianCount);
   const displayWidth = Number(displaySize?.width) || 0;
   const displayHeight = Number(displaySize?.height) || 0;
   if (displayWidth <= 0 || displayHeight <= 0) {
     return {
-      width: request.size,
-      height: request.size,
-      aspectMode: "default-square",
+      width: quality.size,
+      height: quality.size,
+      aspectMode: "adaptive-square-pending-display",
+      quality: quality.label,
+      pixelBudget: quality.pixelBudget,
     };
   }
   const aspect = Math.min(4, Math.max(0.25, displayWidth / displayHeight));
-  const area = request.size * request.size;
+  const displayArea = Math.max(
+    WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE ** 2,
+    displayWidth * displayHeight,
+  );
+  const area = Math.min(quality.pixelBudget, displayArea);
   return {
     width: clampViewportSize(roundToViewportTile(Math.sqrt(area * aspect))),
     height: clampViewportSize(roundToViewportTile(Math.sqrt(area / aspect))),
-    aspectMode: "display-aspect-area",
+    aspectMode: "display-aspect-adaptive",
+    quality: quality.label,
+    pixelBudget: quality.pixelBudget,
+  };
+}
+
+function webGpuRuntimeQuality(gaussianCount) {
+  const count = Math.max(0, Number(gaussianCount) || 0);
+  if (count <= WEBGPU_RUNTIME_HIGH_MAX_GAUSSIANS) {
+    return {
+      label: "adaptive-high-512",
+      size: WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE,
+      pixelBudget: WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE ** 2,
+    };
+  }
+  if (count <= WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS) {
+    return {
+      label: "adaptive-medium-384",
+      size: WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE,
+      pixelBudget: WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE ** 2,
+    };
+  }
+  return {
+    label: "adaptive-safe-320",
+    size: WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE,
+    pixelBudget: WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE ** 2,
   };
 }
 

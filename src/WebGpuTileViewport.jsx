@@ -59,6 +59,8 @@ export default function WebGpuTileViewport({
   onSelectObject,
   renderModeLabel,
   runtimeViewportAspectMode = "default-square",
+  runtimeViewportQuality = "unknown",
+  runtimeViewportPixelBudget = 0,
   onDisplaySizeChange,
 }) {
   const containerRef = useRef(null);
@@ -485,6 +487,8 @@ export default function WebGpuTileViewport({
       data-webgpu-viewport-height={rendererContract?.viewportHeight ?? tileSmoke?.viewportHeight ?? 0}
       data-webgpu-pixel-count={tileSmoke?.pixelCount ?? 0}
       data-webgpu-viewport-aspect-mode={runtimeViewportAspectMode}
+      data-webgpu-viewport-quality={runtimeViewportQuality}
+      data-webgpu-viewport-pixel-budget={runtimeViewportPixelBudget}
       data-webgpu-display-width={displaySize.width}
       data-webgpu-display-height={displaySize.height}
       data-webgpu-bounds-fit-mode={rendererContract?.boundsFitMode ?? ""}

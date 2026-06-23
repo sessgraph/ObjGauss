@@ -43,7 +43,7 @@ const KNOWN_ASSETS = [
     fileName: "nerf_lego_trained_objects.ply",
   },
 ];
-const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 256;
+const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -85,7 +85,7 @@ try {
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
-        `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)} ` +
+        `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)}:${JSON.stringify(result.webGpuViewportQuality)}:${result.webGpuViewportPixelBudget} ` +
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
@@ -308,6 +308,8 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuViewportHeight = numericValue(await viewport.getAttribute("data-webgpu-viewport-height") ?? "0");
       const webGpuPixelCount = numericValue(await viewport.getAttribute("data-webgpu-pixel-count") ?? "0");
       const webGpuViewportAspectMode = await viewport.getAttribute("data-webgpu-viewport-aspect-mode");
+      const webGpuViewportQuality = await viewport.getAttribute("data-webgpu-viewport-quality");
+      const webGpuViewportPixelBudget = numericValue(await viewport.getAttribute("data-webgpu-viewport-pixel-budget") ?? "0");
       const webGpuDisplayWidth = numericValue(await viewport.getAttribute("data-webgpu-display-width") ?? "0");
       const webGpuDisplayHeight = numericValue(await viewport.getAttribute("data-webgpu-display-height") ?? "0");
       const webGpuBoundsFitMode = await viewport.getAttribute("data-webgpu-bounds-fit-mode");
@@ -385,10 +387,22 @@ async function runAudit(url, assetsToCheck, options) {
         if (
           !options.webGpuViewportSize &&
           options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL &&
-          webGpuViewportAspectMode !== "display-aspect-area"
+          webGpuViewportAspectMode !== "display-aspect-adaptive"
         ) {
           throw new Error(
-            `${asset.id} WebGPU full runtime viewport did not use display aspect matching: ${webGpuViewportAspectMode}`,
+            `${asset.id} WebGPU full runtime viewport did not use adaptive display aspect matching: ${webGpuViewportAspectMode}`,
+          );
+        }
+        if (
+          !options.webGpuViewportSize &&
+          options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL &&
+          (!String(webGpuViewportQuality ?? "").startsWith("adaptive-") ||
+            webGpuViewportPixelBudget <
+              DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE *
+                DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE)
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU full runtime did not expose an adaptive quality budget: quality=${webGpuViewportQuality} budget=${webGpuViewportPixelBudget}`,
           );
         }
         if (webGpuPixelCount !== webGpuViewportWidth * webGpuViewportHeight) {
@@ -635,6 +649,8 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuViewportHeight,
             webGpuPixelCount,
             webGpuViewportAspectMode,
+            webGpuViewportQuality,
+            webGpuViewportPixelBudget,
             webGpuDisplayWidth,
             webGpuDisplayHeight,
             webGpuBoundsFitMode,
@@ -833,6 +849,8 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuViewportHeight,
         webGpuPixelCount,
         webGpuViewportAspectMode,
+        webGpuViewportQuality,
+        webGpuViewportPixelBudget,
         webGpuDisplayWidth,
         webGpuDisplayHeight,
         webGpuBoundsFitMode,
