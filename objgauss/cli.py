@@ -386,6 +386,7 @@ def _object_field_emergence_benchmark(args: argparse.Namespace) -> None:
     print(f"output_dir={summary['output_dir']}")
     print(f"summary={summary['summary_path']}")
     print(f"report={summary['report']['output']}")
+    print(f"failure_report={summary['failure_report']}")
     print(f"scenes={len(summary['scenes'])}")
     print(f"passed={str(summary['passed']).lower()}")
     for scene in summary["scenes"]:
@@ -395,6 +396,17 @@ def _object_field_emergence_benchmark(args: argparse.Namespace) -> None:
             f"projection_loss={scene['initial_projection_loss']:.6f}->{scene['final_projection_loss']:.6f} "
             f"render_occlusion_effect={scene['final_render_occlusion_effect_score']:.6f}"
         )
+        heldout = scene.get("heldout")
+        if isinstance(heldout, dict):
+            initial = heldout.get("initial_projection_loss")
+            final = heldout.get("final_projection_loss")
+            effect = heldout.get("render_occlusion_effect_score")
+            print(
+                f"heldout_scene={scene['id']} "
+                f"supervised_gaussians={heldout['supervised_gaussians']} "
+                f"projection_loss={_format_optional_float(initial)}->{_format_optional_float(final)} "
+                f"render_occlusion_effect={_format_optional_float(effect)}"
+            )
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -1163,6 +1175,10 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("input", type=Path)
     parser.add_argument("--output", "-o", required=True, type=Path)
     parser.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+
+
+def _format_optional_float(value: object) -> str:
+    return "-" if value is None else f"{float(value):.6f}"
 
 
 if __name__ == "__main__":

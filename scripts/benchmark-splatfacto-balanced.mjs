@@ -449,6 +449,8 @@ function collectSummary(statsOutput) {
     },
     curve: {
       points: curve.points?.length ?? 0,
+      render_occlusion_kind:
+        finalPoint.render_occlusion_delta?.kind ?? curve.render_occlusion_delta_kind ?? null,
       initial_projection_loss: curve.points?.[0]?.projection_loss ?? null,
       final_projection_loss: finalPoint.projection_loss ?? null,
       final_assignment_confidence: finalPoint.assignment_confidence ?? null,
@@ -459,6 +461,12 @@ function collectSummary(statsOutput) {
       final_render_occlusion_mean_delta_l1: finalPoint.render_occlusion_delta?.mean_delta_l1 ?? null,
       final_render_occlusion_mean_relative_delta_l1:
         finalPoint.render_occlusion_delta?.mean_relative_delta_l1 ?? null,
+      final_render_occlusion_mean_target_delta_l1:
+        finalPoint.render_occlusion_delta?.mean_target_delta_l1 ?? null,
+      final_render_occlusion_mean_non_target_delta_l1:
+        finalPoint.render_occlusion_delta?.mean_non_target_delta_l1 ?? null,
+      final_render_occlusion_mean_locality_score:
+        finalPoint.render_occlusion_delta?.mean_locality_score ?? null,
       final_render_occlusion_effect_score:
         finalPoint.render_occlusion_delta?.occlusion_effect_score ??
         finalPoint.render_occlusion_delta?.mean_relative_delta_l1 ??

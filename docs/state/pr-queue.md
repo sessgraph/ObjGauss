@@ -10,9 +10,47 @@
 
 ## Ready
 
-当前无已确认的 ready PR。
+### SEMANTIC-003B/C: Populate held-out rows and third real Splatfacto scene
+
+- 状态: ready
+- 类型: 标准 PR / 训练实验
+- 目标: 为 cross-scene paper gate 补齐至少 3 个真实 Splatfacto scene rows 和 held-out mask eval rows。
+- 范围:
+  - 新增第三个真实 Splatfacto scene，优先使用许可和下载路径清楚的数据源。
+  - 为至少 3 个 scene 生成 held-out mask manifests，并启用 `heldout_masks` threshold checks。
+  - 重新跑 `npm run benchmark:cross-scene -- --run`，使 `stage_gate=paper passed=true` 成为可验收目标。
+- 范围外:
+  - 不提交 `outputs/`、checkpoint、SAM checkpoint 或训练产物。
+  - 不把当前 `scale_aware_cpu_splat_l1` 误称为完整 covariance-aware `gsplat` renderer。
 
 ## Done
+
+### SEMANTIC-003A/003D/003E: Scale-aware renderer occlusion, stage gates, and failure reports
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 SEMANTIC benchmark 从旧 point/depth render probe 推进到 scale-aware image-space occlusion contract，并补 stage gates 与 failure report。
+- 范围外:
+  - 不引入新的 `gsplat` runtime renderer。
+  - 不伪造第三个真实 Splatfacto scene。
+  - 不提交本地 `/tmp`、`outputs/`、SAM checkpoint 或训练产物。
+- 实施:
+  - `objgauss.render_probe.render_occlusion_delta` 升级为 `scale_aware_cpu_splat_l1`，使用 Gaussian scale / opacity rasterize CPU splat footprint，再比较 full-vs-object-removed RGBA delta。
+  - render occlusion summary 增加 target delta、non-target delta 和 locality score。
+  - `emergence-benchmark` 支持可选 `heldout_masks` / `heldout` 配置，能在最终 Object Field 上评估 held-out projection loss、supervision 和 render occlusion。
+  - `emergence-benchmark` 输出 `failure-report.md`。
+  - `benchmark-cross-scene.mjs` 输出 smoke / candidate / paper stage gates 与 cross-scene failure report。
+- 验收:
+  - semantic smoke acceptance 使用 `scale_aware_cpu_splat_l1` 通过。
+  - Splatfacto scene suite 与 safe-2000 variant suite 均用新 renderer 重跑通过。
+  - cross-scene summary rows=8，smoke/candidate gate 通过，paper gate 明确因第三 scene 和 held-out rows 缺失而失败。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "emergence" -q`: 7 passed。
+  - `npm run acceptance:semantic`: passed。
+  - `node scripts/benchmark-splatfacto-scenes.mjs --run --skip-sam --sam-checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth`: passed。
+  - `node scripts/benchmark-splatfacto-variants.mjs --run --skip-sam`: passed。
+  - `node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-scenes --skip-variants`: passed，rows=8，stage gates smoke=true / candidate=true / paper=false。
+- 完成 commit: pending。
 
 ### BENCH-004: Real Splatfacto cross-scene suite with LLFF Fern
 

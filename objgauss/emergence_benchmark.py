@@ -6,10 +6,15 @@ from typing import Any
 
 from objgauss.emergence import object_emergence_curve, write_emergence_curve_csv
 from objgauss.emergence_report import EmergenceCurveInput, write_emergence_curve_report
-from objgauss.mask_voting import vote_masks_to_gaussians
+from objgauss.mask_voting import (
+    mask_vote_targets,
+    projection_loss,
+    train_object_field_from_votes,
+    vote_masks_to_gaussians,
+)
 from objgauss.object_field import cloud_positions_for_metrics, load_object_field
 from objgauss.ply import read_ply
-from objgauss.render_probe import load_render_probe_frames
+from objgauss.render_probe import load_render_probe_frames, render_occlusion_delta
 
 
 def run_emergence_benchmark(
@@ -29,6 +34,7 @@ def run_emergence_benchmark(
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = Path(report_path) if report_path else output_dir / "report.html"
     summary_path = Path(summary_path) if summary_path else output_dir / "summary.json"
+    failure_report_path = output_dir / "failure-report.md"
 
     root = _benchmark_root(manifest_path, manifest)
     defaults = _dict(manifest.get("defaults"))
@@ -65,9 +71,11 @@ def run_emergence_benchmark(
         "manifest": str(manifest_path),
         "output_dir": str(output_dir),
         "report": report,
+        "failure_report": str(failure_report_path),
         "scenes": scene_summaries,
         "passed": passed,
     }
+    _write_failure_report(failure_report_path, summary)
     _write_json(summary_path, summary)
     summary["summary_path"] = str(summary_path)
 
@@ -97,10 +105,19 @@ def _run_scene(
     input_path = _resolve(root, _required_str(scene, "input"))
     field_path = _resolve(root, _required_str(scene, "field"))
     masks_path = _resolve(root, _required_str(scene, "masks"))
+    heldout_masks_path = _heldout_masks_path(scene, root)
     prepare = [*global_prepare, *_string_list(scene.get("prepare"))]
     _require_existing_path(input_path, scene_id=scene_id, kind="input", prepare=prepare, help_path=help_path)
     _require_existing_path(field_path, scene_id=scene_id, kind="field", prepare=prepare, help_path=help_path)
     _require_existing_path(masks_path, scene_id=scene_id, kind="masks", prepare=prepare, help_path=help_path)
+    if heldout_masks_path is not None:
+        _require_existing_path(
+            heldout_masks_path,
+            scene_id=scene_id,
+            kind="heldout masks",
+            prepare=prepare,
+            help_path=help_path,
+        )
     cloud = read_ply(input_path)
     field = load_object_field(field_path)
     if cloud.count != field.gaussian_count:
@@ -111,6 +128,16 @@ def _run_scene(
     iterations = _int_setting(scene, defaults, "iterations", 100)
     learning_rate = _float_setting(scene, defaults, "learning_rate", 0.5)
     eval_every = _int_setting(scene, defaults, "eval_every", 10)
+    heldout_settings = _dict(scene.get("heldout"))
+    heldout_max_frames = _optional_int(
+        heldout_settings.get("max_frames", scene.get("heldout_max_frames", defaults.get("heldout_max_frames")))
+    )
+    heldout_render_size = int(
+        heldout_settings.get(
+            "render_size",
+            scene.get("heldout_render_size", defaults.get("heldout_render_size", render_size)),
+        )
+    )
 
     votes = vote_masks_to_gaussians(
         cloud,
@@ -141,8 +168,28 @@ def _run_scene(
 
     first = curve["points"][0]
     final = curve["points"][-1]
+    heldout = (
+        _evaluate_heldout(
+            cloud=cloud,
+            field=field,
+            votes=votes,
+            masks_path=heldout_masks_path,
+            iterations=iterations,
+            learning_rate=learning_rate,
+            max_frames=heldout_max_frames,
+            render_size=heldout_render_size,
+        )
+        if heldout_masks_path is not None
+        else None
+    )
     thresholds = {**global_thresholds, **_dict(scene.get("thresholds"))}
-    checks = _evaluate_thresholds(first, final, points=len(curve["points"]), thresholds=thresholds)
+    checks = _evaluate_thresholds(
+        first,
+        final,
+        points=len(curve["points"]),
+        thresholds=thresholds,
+        heldout=heldout,
+    )
     scene_summary = {
         "id": scene_id,
         "label": label,
@@ -159,9 +206,61 @@ def _run_scene(
         "final_spatial_compactness_score": _optional_float(final.get("spatial_compactness_score")),
         "final_render_occlusion_effect_score": _render_effect(final),
         "final_object_emergence_score": _score(final),
+        "heldout": heldout,
         "checks": checks,
     }
     return scene_summary, curve
+
+
+def _evaluate_heldout(
+    *,
+    cloud: Any,
+    field: Any,
+    votes: Any,
+    masks_path: Path,
+    iterations: int,
+    learning_rate: float,
+    max_frames: int | None,
+    render_size: int,
+) -> dict[str, Any]:
+    trained = train_object_field_from_votes(
+        field,
+        votes,
+        iterations=iterations,
+        learning_rate=learning_rate,
+    ).field
+    heldout_votes = vote_masks_to_gaussians(
+        cloud,
+        masks_path,
+        slots=field.slots,
+        max_frames=max_frames,
+    )
+    targets, weights = mask_vote_targets(heldout_votes)
+    supervised = int((weights > 0).sum())
+    if supervised > 0:
+        initial_loss = projection_loss(field.logits, targets, weights)
+        final_loss = projection_loss(trained.logits, targets, weights)
+    else:
+        initial_loss = None
+        final_loss = None
+    render_frames = load_render_probe_frames(
+        masks_path,
+        max_frames=max_frames,
+        max_size=render_size,
+    )
+    render = render_occlusion_delta(cloud, trained, render_frames)
+    return {
+        "masks": str(masks_path),
+        "frames": heldout_votes.frames,
+        "projected": heldout_votes.projected,
+        "matched": heldout_votes.matched,
+        "supervised_gaussians": heldout_votes.supervised_gaussians,
+        "initial_projection_loss": initial_loss,
+        "final_projection_loss": final_loss,
+        "render_occlusion_effect_score": render.get("occlusion_effect_score"),
+        "render_occlusion_delta": render,
+        "vote_quality": heldout_votes.as_dict().get("vote_quality"),
+    }
 
 
 def _evaluate_thresholds(
@@ -170,6 +269,7 @@ def _evaluate_thresholds(
     *,
     points: int,
     thresholds: dict[str, Any],
+    heldout: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     initial_loss = float(first["projection_loss"])
@@ -229,6 +329,48 @@ def _evaluate_thresholds(
                 expected=f">= {minimum:.6f}",
             )
         )
+    if bool(thresholds.get("require_heldout", False)):
+        checks.append(
+            _check(
+                "heldout_present",
+                heldout is not None,
+                actual=heldout is not None,
+                expected="true",
+            )
+        )
+    if "min_heldout_supervised_gaussians" in thresholds:
+        minimum = int(thresholds["min_heldout_supervised_gaussians"])
+        actual = None if heldout is None else int(heldout.get("supervised_gaussians") or 0)
+        checks.append(
+            _check(
+                "min_heldout_supervised_gaussians",
+                actual is not None and actual >= minimum,
+                actual=actual,
+                expected=f">= {minimum}",
+            )
+        )
+    if "max_heldout_projection_loss" in thresholds:
+        maximum = float(thresholds["max_heldout_projection_loss"])
+        actual = None if heldout is None else _optional_float(heldout.get("final_projection_loss"))
+        checks.append(
+            _check(
+                "max_heldout_projection_loss",
+                actual is not None and actual <= maximum,
+                actual=actual,
+                expected=f"<= {maximum:.6f}",
+            )
+        )
+    if "min_heldout_render_occlusion_effect_score" in thresholds:
+        minimum = float(thresholds["min_heldout_render_occlusion_effect_score"])
+        actual = None if heldout is None else _optional_float(heldout.get("render_occlusion_effect_score"))
+        checks.append(
+            _check(
+                "min_heldout_render_occlusion_effect_score",
+                actual is not None and actual >= minimum,
+                actual=actual,
+                expected=f">= {minimum:.6f}",
+            )
+        )
     return checks
 
 
@@ -254,6 +396,18 @@ def _resolve(root: Path, value: str) -> Path:
     if not path.is_absolute():
         path = root / path
     return path
+
+
+def _heldout_masks_path(scene: dict[str, Any], root: Path) -> Path | None:
+    value = scene.get("heldout_masks")
+    heldout = scene.get("heldout")
+    if value is None and isinstance(heldout, dict):
+        value = heldout.get("masks")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError("heldout masks path must be a non-empty string")
+    return _resolve(root, value)
 
 
 def _require_existing_path(
@@ -339,3 +493,58 @@ def _write_json(path: str | Path, payload: dict[str, Any]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_failure_report(path: str | Path, summary: dict[str, Any]) -> None:
+    lines = [
+        "# Object Emergence Benchmark Failure Report",
+        "",
+        f"Manifest: `{summary.get('manifest')}`",
+        f"Passed: `{str(summary.get('passed')).lower()}`",
+        "",
+    ]
+    for scene in summary.get("scenes", []):
+        lines.extend(
+            [
+                f"## {scene.get('id')}",
+                "",
+                f"Passed: `{str(scene.get('passed')).lower()}`",
+                f"Curve: `{scene.get('curve')}`",
+                f"Final projection loss: `{_format_metric(scene.get('final_projection_loss'))}`",
+                f"Final OES: `{_format_metric(scene.get('final_object_emergence_score'))}`",
+                f"Render effect: `{_format_metric(scene.get('final_render_occlusion_effect_score'))}`",
+            ]
+        )
+        heldout = scene.get("heldout")
+        if isinstance(heldout, dict):
+            lines.extend(
+                [
+                    f"Held-out masks: `{heldout.get('masks')}`",
+                    f"Held-out final projection loss: `{_format_metric(heldout.get('final_projection_loss'))}`",
+                    f"Held-out supervised Gaussians: `{heldout.get('supervised_gaussians')}`",
+                    f"Held-out render effect: `{_format_metric(heldout.get('render_occlusion_effect_score'))}`",
+                ]
+            )
+        failed_checks = [check for check in scene.get("checks", []) if not check.get("passed")]
+        if failed_checks:
+            lines.append("")
+            lines.append("| Check | Actual | Expected |")
+            lines.append("| --- | ---: | --- |")
+            for check in failed_checks:
+                lines.append(
+                    f"| {check.get('name')} | `{_format_metric(check.get('actual'))}` | `{check.get('expected')}` |"
+                )
+        else:
+            lines.append("Failed checks: `-`")
+        lines.append("")
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _format_metric(value: object) -> str:
+    if isinstance(value, float):
+        return f"{value:.6f}"
+    if value is None:
+        return "-"
+    return str(value)

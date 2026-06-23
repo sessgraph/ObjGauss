@@ -13,6 +13,7 @@ from objgauss.object_field import ObjectField, softmax
 from objgauss.render_probe import RenderProbeFrame, render_occlusion_delta
 
 _EPS = 1e-8
+_RENDER_OCCLUSION_KIND = "scale_aware_cpu_splat_l1"
 
 
 def object_emergence_metrics(
@@ -122,13 +123,13 @@ def object_emergence_curve(
     return {
         "kind": "object_emergence_curve",
         "occlusion_delta_kind": (
-            "point_splat_render_l1"
+            _RENDER_OCCLUSION_KIND
             if cloud is not None and render_frames
             else "mask_proxy_projection_loss"
         ),
         "mask_proxy_occlusion_delta_kind": "mask_proxy_projection_loss",
         "render_occlusion_delta_kind": (
-            "point_splat_render_l1" if cloud is not None and render_frames else None
+            _RENDER_OCCLUSION_KIND if cloud is not None and render_frames else None
         ),
         "iterations": iterations,
         "learning_rate": learning_rate,
@@ -190,6 +191,9 @@ def write_emergence_curve_csv(path: str | Path, curve: dict[str, Any]) -> None:
         "render_occlusion_mean_delta_l1",
         "render_occlusion_mean_relative_delta_l1",
         "render_occlusion_mean_affected_fraction",
+        "render_occlusion_mean_target_delta_l1",
+        "render_occlusion_mean_non_target_delta_l1",
+        "render_occlusion_mean_locality_score",
         "render_occlusion_effect_score",
         "object_emergence_score",
     ]
@@ -336,6 +340,15 @@ def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
             None
             if render_occlusion is None
             else float(render_occlusion["mean_affected_fraction"])
+        ),
+        "render_occlusion_mean_target_delta_l1": (
+            None if render_occlusion is None else float(render_occlusion["mean_target_delta_l1"])
+        ),
+        "render_occlusion_mean_non_target_delta_l1": (
+            None if render_occlusion is None else float(render_occlusion["mean_non_target_delta_l1"])
+        ),
+        "render_occlusion_mean_locality_score": (
+            None if render_occlusion is None else float(render_occlusion["mean_locality_score"])
         ),
         "render_occlusion_effect_score": (
             None

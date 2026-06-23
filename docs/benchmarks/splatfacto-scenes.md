@@ -44,6 +44,20 @@ Outputs:
 Each per-scene run delegates to `scripts/benchmark-splatfacto-balanced.mjs`
 with scene-specific paths and SAM settings.
 
+The render occlusion probe currently uses the ObjGauss deterministic
+`scale_aware_cpu_splat_l1` renderer. It projects Gaussian centers into the
+mask-manifest cameras, uses Gaussian scale and opacity to rasterize a small CPU
+splat footprint, removes each hard object slot, and compares full-vs-removed
+RGBA images. This is stronger than the earlier center-point probe, but still not
+a full covariance-aware `gsplat` training renderer.
+
+Current local result after refreshing with the scale-aware probe:
+
+| Scene | ARI | Curve OES | Render effect |
+| --- | ---: | ---: | ---: |
+| `lego-splatfacto-safe-2000` | 0.468745 | 0.780806 | 0.221535 |
+| `fern-splatfacto-smoke` | 0.783070 | 0.780819 | 0.235091 |
+
 ## Fern Preparation
 
 Fern comes from the same NeRF example zip but uses LLFF/COLMAP data instead of
@@ -105,3 +119,7 @@ This suite is a reproducible experiment base, not a final quality claim.
 Fern is currently a smoke-level scene. The important regression is whether the
 same Object Field metrics, curve generation, and render occlusion probe can run
 across more than one real Splatfacto scene.
+
+The next paper-readiness gap is not another Lego mask policy. It is adding a
+third real Splatfacto scene and held-out view masks so the cross-scene `paper`
+gate can move beyond smoke/candidate status.

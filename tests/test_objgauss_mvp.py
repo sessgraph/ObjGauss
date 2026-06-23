@@ -298,8 +298,9 @@ def test_object_emergence_curve_tracks_training_phase_metrics(tmp_path):
     assert points[-1]["spatial_compactness_score"] > 0.9
     assert points[-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
     assert points[-1]["render_occlusion_delta"]["mean_delta_l1"] > 0.0
+    assert points[-1]["render_occlusion_delta"]["mean_locality_score"] >= 0.0
     assert points[-1]["object_emergence_score"]["components"]["occlusion_effect"] > 0.0
-    assert curve["occlusion_delta_kind"] == "point_splat_render_l1"
+    assert curve["occlusion_delta_kind"] == "scale_aware_cpu_splat_l1"
 
 
 def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
@@ -452,8 +453,10 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
     assert curve["points"][-1]["projection_loss"] < curve["points"][0]["projection_loss"]
     assert curve["points"][-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
     assert curve["points"][-1]["render_occlusion_delta"]["mean_delta_l1"] > 0.0
+    assert curve["points"][-1]["render_occlusion_delta"]["kind"] == "scale_aware_cpu_splat_l1"
     assert "mask_proxy_occlusion_mean_delta_loss" in csv_text
     assert "render_occlusion_mean_delta_l1" in csv_text
+    assert "render_occlusion_mean_locality_score" in csv_text
 
 
 def test_object_field_emergence_report_cli_writes_html(tmp_path, capsys):
@@ -547,6 +550,9 @@ def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, caps
                     "require_projection_loss_decrease": True,
                     "min_points": 2,
                     "min_render_occlusion_effect_score": 0.001,
+                    "require_heldout": True,
+                    "min_heldout_supervised_gaussians": 1,
+                    "min_heldout_render_occlusion_effect_score": 0.001,
                 },
                 "scenes": [
                     {
@@ -555,6 +561,7 @@ def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, caps
                         "input": input_path.name,
                         "field": field_path.name,
                         "masks": masks_path.name,
+                        "heldout_masks": masks_path.name,
                     }
                 ],
             }
@@ -579,15 +586,21 @@ def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, caps
     output = capsys.readouterr().out
     summary_path = output_dir / "summary.json"
     report_path = output_dir / "report.html"
+    failure_report_path = output_dir / "failure-report.md"
     curve_path = output_dir / "camera-scene" / "curve.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     assert "passed=true" in output
     assert "scene=camera-scene passed=true" in output
+    assert "failure_report=" in output
+    assert "heldout_scene=camera-scene" in output
     assert summary["passed"] is True
     assert summary["scenes"][0]["passed"] is True
+    assert summary["scenes"][0]["heldout"]["supervised_gaussians"] == 4
+    assert summary["scenes"][0]["heldout"]["final_projection_loss"] < summary["scenes"][0]["heldout"]["initial_projection_loss"]
     assert summary["scenes"][0]["checks"]
     assert report_path.exists()
+    assert failure_report_path.exists()
     assert curve_path.exists()
 
 

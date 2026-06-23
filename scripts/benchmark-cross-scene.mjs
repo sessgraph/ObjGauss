@@ -27,6 +27,7 @@ const summaryJson = `${paths.outputDir}/summary.json`;
 const summaryCsv = `${paths.outputDir}/summary.csv`;
 const summaryMd = `${paths.outputDir}/summary.md`;
 const summaryHtml = `${paths.outputDir}/summary.html`;
+const failureReport = `${paths.outputDir}/failure-report.md`;
 
 const semanticSummaryJson = `${paths.semanticOutputDir}/summary.json`;
 const sceneSummaryJson = `${paths.sceneOutputDir}/summary.json`;
@@ -127,6 +128,7 @@ if (mode === "dry-run") {
   writeFileSync(summaryCsv, renderCsv(summary.rows), "utf-8");
   writeFileSync(summaryMd, renderMarkdown(summary), "utf-8");
   writeFileSync(summaryHtml, renderHtml(summary), "utf-8");
+  writeFileSync(failureReport, renderFailureReport(summary), "utf-8");
   printSummary(summary);
   console.log(`\ncross_scene_benchmark=${summary.passed ? "passed" : "failed"}`);
   if (!summary.passed) {
@@ -213,6 +215,11 @@ function printStatus() {
       path: summaryHtml,
       prepare: "npm run benchmark:cross-scene -- --run",
     },
+    {
+      label: "cross-scene failure report",
+      path: failureReport,
+      prepare: "npm run benchmark:cross-scene -- --run",
+    },
   ];
   let missing = 0;
   for (const check of checks) {
@@ -282,6 +289,7 @@ function buildCrossSceneSummary() {
       csv: summaryCsv,
       markdown: summaryMd,
       html: summaryHtml,
+      failure_report: failureReport,
       semantic_report: reportPath(semanticSummary.report, `${paths.semanticOutputDir}/report.html`),
       scene_report: sceneSummary.paths?.report ?? `${paths.sceneOutputDir}/report.html`,
       variant_report: variantSummary.paths?.report ?? `${paths.variantOutputDir}/report.html`,
@@ -294,6 +302,7 @@ function buildCrossSceneSummary() {
     },
   };
   summary.best_by_scene = bestByScene(rows, "render_occlusion_effect_score");
+  summary.stage_gates = evaluateStageGates(rows);
   return summary;
 }
 
@@ -323,6 +332,9 @@ function flattenSceneRows(summary) {
     final_object_emergence_score:
       scene.curve_object_emergence_score ?? scene.object_emergence_score ?? null,
     render_occlusion_effect_score: scene.render_occlusion_effect_score ?? null,
+    heldout_final_projection_loss: scene.heldout?.final_projection_loss ?? null,
+    heldout_supervised_gaussians: scene.heldout?.supervised_gaussians ?? null,
+    heldout_render_occlusion_effect_score: scene.heldout?.render_occlusion_effect_score ?? null,
   }));
 }
 
@@ -359,6 +371,9 @@ function flattenSemanticRows(summary, manifestPath) {
       final_spatial_compactness_score: scene.final_spatial_compactness_score ?? null,
       final_object_emergence_score: scene.final_object_emergence_score ?? null,
       render_occlusion_effect_score: scene.final_render_occlusion_effect_score ?? null,
+      heldout_final_projection_loss: scene.heldout?.final_projection_loss ?? null,
+      heldout_supervised_gaussians: scene.heldout?.supervised_gaussians ?? null,
+      heldout_render_occlusion_effect_score: scene.heldout?.render_occlusion_effect_score ?? null,
     };
   });
 }
@@ -391,8 +406,50 @@ function flattenVariantRows(summary) {
       final_spatial_compactness_score: perVariantSummary?.emergence?.spatial_compactness_score ?? null,
       final_object_emergence_score: variant.curve_object_emergence_score ?? variant.object_emergence_score ?? null,
       render_occlusion_effect_score: variant.render_occlusion_effect_score ?? null,
+      heldout_final_projection_loss: null,
+      heldout_supervised_gaussians: null,
+      heldout_render_occlusion_effect_score: null,
     };
   });
+}
+
+function evaluateStageGates(rows) {
+  const splatfactoScenes = new Set(
+    rows.filter((row) => row.suite === "splatfacto-scenes").map((row) => row.scene_id),
+  );
+  const renderRows = rows.filter((row) => numberValue(row.render_occlusion_effect_score) > Number.NEGATIVE_INFINITY);
+  const heldoutRows = rows.filter((row) => row.heldout_final_projection_loss !== null && row.heldout_final_projection_loss !== undefined);
+  const bestRender = renderRows.reduce(
+    (best, row) => Math.max(best, numberValue(row.render_occlusion_effect_score)),
+    Number.NEGATIVE_INFINITY,
+  );
+  return {
+    smoke: gate([
+      check("rows_present", rows.length >= 3, rows.length, ">= 3"),
+      check("all_rows_passed", rows.every((row) => row.passed !== false), rows.filter((row) => row.passed === false).length, "0 failed rows"),
+      check("render_metric_rows", renderRows.length >= 3, renderRows.length, ">= 3"),
+    ]),
+    candidate: gate([
+      check("real_splatfacto_scenes", splatfactoScenes.size >= 2, splatfactoScenes.size, ">= 2"),
+      check("best_render_effect", bestRender >= 0.1, bestRender, ">= 0.100000"),
+    ]),
+    paper: gate([
+      check("real_splatfacto_scenes", splatfactoScenes.size >= 3, splatfactoScenes.size, ">= 3"),
+      check("heldout_eval_rows", heldoutRows.length >= 3, heldoutRows.length, ">= 3"),
+      check("failure_report_available", true, failureReport, "written"),
+    ]),
+  };
+}
+
+function gate(checks) {
+  return {
+    passed: checks.every((item) => item.passed),
+    checks,
+  };
+}
+
+function check(name, passed, actual, expected) {
+  return { name, passed: Boolean(passed), actual, expected };
 }
 
 function semanticMaskPolicy(sceneId) {
@@ -479,6 +536,9 @@ function renderCsv(rows) {
     "final_ari_to_initial",
     "final_object_emergence_score",
     "render_occlusion_effect_score",
+    "heldout_final_projection_loss",
+    "heldout_supervised_gaussians",
+    "heldout_render_occlusion_effect_score",
   ];
   const lines = [headers.join(",")];
   for (const row of rows) {
@@ -506,6 +566,16 @@ function renderMarkdown(summary) {
     lines.push(`Scene report: ${summary.paths.scene_report}`);
   }
   lines.push(`Variant report: ${summary.paths.variant_report}`);
+  lines.push(`Failure report: ${summary.paths.failure_report}`);
+  lines.push("");
+  lines.push("## Stage Gates");
+  lines.push("");
+  lines.push("| Gate | Passed | Failed checks |");
+  lines.push("| --- | --- | --- |");
+  for (const [name, gateValue] of Object.entries(summary.stage_gates ?? {})) {
+    const failed = gateValue.checks.filter((item) => !item.passed).map((item) => item.name).join(", ") || "-";
+    lines.push(`| ${name} | ${gateValue.passed ? "yes" : "no"} | ${failed} |`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -541,9 +611,51 @@ ${rows}
   <p>Semantic report: ${escapeHtml(summary.paths.semantic_report)}</p>
   ${summary.paths.scene_report ? `<p>Scene report: ${escapeHtml(summary.paths.scene_report)}</p>` : ""}
   <p>Variant report: ${escapeHtml(summary.paths.variant_report)}</p>
+  <p>Failure report: ${escapeHtml(summary.paths.failure_report)}</p>
 </body>
 </html>
 `;
+}
+
+function renderFailureReport(summary) {
+  const lines = [
+    "# ObjGauss Cross-Scene Failure Report",
+    "",
+    `Generated: ${summary.generated_at}`,
+    `Overall passed: \`${String(summary.passed)}\``,
+    "",
+    "## Stage Gates",
+    "",
+    "| Gate | Passed | Check | Actual | Expected |",
+    "| --- | --- | --- | ---: | --- |",
+  ];
+  for (const [gateName, gateValue] of Object.entries(summary.stage_gates ?? {})) {
+    for (const item of gateValue.checks) {
+      lines.push(
+        `| ${gateName} | ${item.passed ? "yes" : "no"} | ${item.name} | ${escapeMarkdown(String(formatReportValue(item.actual)))} | ${escapeMarkdown(String(item.expected))} |`,
+      );
+    }
+  }
+  lines.push("", "## Failed Rows", "");
+  const failedRows = summary.rows.filter((row) => row.passed === false);
+  if (failedRows.length === 0) {
+    lines.push("No failed smoke rows.");
+  } else {
+    for (const row of failedRows) {
+      lines.push(`- ${row.suite}/${row.scene_id}/${row.variant_id}`);
+    }
+  }
+  lines.push("", "## Paper-Readiness Gap", "");
+  const paper = summary.stage_gates?.paper;
+  const failedPaper = paper?.checks?.filter((item) => !item.passed) ?? [];
+  if (failedPaper.length === 0) {
+    lines.push("Paper gate passed.");
+  } else {
+    for (const item of failedPaper) {
+      lines.push(`- ${item.name}: actual ${formatReportValue(item.actual)}, expected ${item.expected}`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 function printSummary(summary) {
@@ -561,6 +673,9 @@ function printSummary(summary) {
     );
   }
   console.log(`summary_status=${summary.passed ? "passed" : "failed"}`);
+  for (const [name, gateValue] of Object.entries(summary.stage_gates ?? {})) {
+    console.log(`stage_gate=${name} passed=${gateValue.passed ? "true" : "false"}`);
+  }
 }
 
 function cellValue(row, field) {
@@ -634,10 +749,18 @@ function formatNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(6) : "";
 }
 
+function formatReportValue(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(6) : value;
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
   });
+}
+
+function escapeMarkdown(value) {
+  return value.replaceAll("|", "\\|");
 }
 
 function run(command) {

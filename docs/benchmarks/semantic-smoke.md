@@ -21,6 +21,7 @@ The suite writes ignored local outputs only:
 ```text
 /tmp/objgauss-semantic-smoke-suite/summary.json
 /tmp/objgauss-semantic-smoke-suite/report.html
+/tmp/objgauss-semantic-smoke-suite/failure-report.md
 /tmp/objgauss-semantic-smoke-suite/<scene>/curve.json
 /tmp/objgauss-semantic-smoke-suite/<scene>/curve.csv
 ```
@@ -34,6 +35,31 @@ The manifest currently checks three local smoke scenes:
 | `plush-semantic` | `outputs/assets/converted/plush.ply`, `outputs/demos/plush-semantic-closure/object_field_initial.npz`, `outputs/demos/plush-semantic-closure/mask-manifest.json` | Real Plush 3DGS plus deterministic 2D color semantic masks |
 | `lego-alpha-proxy` | `outputs/demos/lego-alpha-closure/lego_proxy_raw.ply`, `outputs/demos/lego-alpha-closure/object_field_initial.npz`, `outputs/demos/lego-alpha-closure/mask-manifest.json` | NeRF Lego posed RGBA proxy plus 2D color masks |
 | `lego-splatfacto-smoke` | `outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply`, `outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz`, `outputs/masks/nerf-lego-sam/mask-manifest.json` | Real Splatfacto smoke PLY plus SAM masks |
+
+The curve renderer is `scale_aware_cpu_splat_l1`: it uses Gaussian scale and
+opacity to rasterize a small deterministic CPU splat footprint for object
+removal probes. It is the current real image-space occlusion delta used by the
+benchmark, but it is still not a full covariance-aware training renderer.
+
+Manifest scenes may optionally include `heldout_masks` or a `heldout` object:
+
+```json
+{
+  "id": "example",
+  "input": "scene/splat.ply",
+  "field": "scene/object_field_initial.npz",
+  "masks": "scene/train-mask-manifest.json",
+  "heldout_masks": "scene/heldout-mask-manifest.json",
+  "thresholds": {
+    "require_heldout": true,
+    "min_heldout_supervised_gaussians": 1
+  }
+}
+```
+
+When present, the benchmark trains the final Object Field with the training
+masks, evaluates projection loss and render occlusion on the held-out masks, and
+writes the result into `summary.json` and `failure-report.md`.
 
 ## Generate Missing Inputs
 

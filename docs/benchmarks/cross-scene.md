@@ -67,6 +67,7 @@ The wrapper writes ignored local outputs only:
 /tmp/objgauss-cross-scene-benchmark/summary.csv
 /tmp/objgauss-cross-scene-benchmark/summary.md
 /tmp/objgauss-cross-scene-benchmark/summary.html
+/tmp/objgauss-cross-scene-benchmark/failure-report.md
 ```
 
 The unified rows include:
@@ -85,6 +86,27 @@ projection loss
 ARI
 Object Emergence Score
 render_occlusion_effect_score
+heldout_final_projection_loss
+heldout_supervised_gaussians
+heldout_render_occlusion_effect_score
+```
+
+`summary.json` also records stage gates:
+
+| Gate | Meaning |
+| --- | --- |
+| `smoke` | The aggregate table exists, all rows pass their local smoke checks, and render metrics are present. |
+| `candidate` | At least two real Splatfacto scene rows are present and the best render occlusion effect is above the current candidate floor. |
+| `paper` | Requires at least three real Splatfacto scene rows, held-out eval rows, and a failure report. |
+
+As of the current local run, `smoke` and `candidate` pass, while `paper` fails
+because only two real Splatfacto scenes are available and held-out rows are not
+yet populated:
+
+```text
+stage_gate=smoke passed=true
+stage_gate=candidate passed=true
+stage_gate=paper passed=false
 ```
 
 ## Interpretation Boundary
@@ -101,3 +123,7 @@ make the current evidence comparable across scenes and mask policies:
 
 The scene suite is the place to add new real Splatfacto scenes. The variant
 suite remains an ablation table for mask and slot policy on a single scene.
+
+The failure report is intentionally generated even when the smoke benchmark
+passes. It records the remaining paper-readiness gap instead of hiding it behind
+a single pass/fail bit.
