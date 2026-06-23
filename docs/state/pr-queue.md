@@ -10,9 +10,54 @@
 
 ## Ready
 
-当前无 ready 项；下一步应从三场景 smoke suite 的质量提升或 slot 对齐实验中拆分新 PR。
+### RENDER-002: Weighted blended OIT for object edit renderer
+
+- 状态: ready
+- 类型: 标准 PR / 前端渲染
+- 目标: 在 `Gaussian Shader 编辑` renderer 上增加 weighted blended accumulation，降低当前普通透明混合带来的排序伪影。
+- 范围外: 不引入 WebGPU tile renderer；不替换 Spark 真实查看 renderer。
+
+### RENDER-003: Object-aware splat filtering path
+
+- 状态: ready
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 设计并接入 object-id filtering，使真实 splat 或 shader preview 能按对象隐藏/删除，而不是只靠 PLY edit fallback。
+- 范围外: 不要求一次完成 WebGPU compute pipeline。
+
+### RENDER-004: WebGPU tile-based Gaussian renderer
+
+- 状态: ready
+- 类型: 重大变更 / 渲染器
+- 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
+- 要求: 先补设计文档 / ADR 细化，再进入实现。
 
 ## Done
+
+### WEB-002: Gaussian shader edit renderer phase 1
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染
+- 目标: 按 B -> C 路线完成 Phase 1，把对象编辑 renderer 从 `PointsMaterial` / soft sprite 升级为 screen-space Gaussian kernel shader。
+- 范围外:
+  - 不实现 weighted blended OIT。
+  - 不实现 WebGPU tile renderer。
+  - 不实现完整 3D covariance projection、SH view-dependent color 或真实 splat shader 内对象删除。
+- 实施:
+  - 新增 ADR 0004，明确 `ShaderMaterial` -> Weighted OIT -> WebGPU tile renderer 的渐进路线。
+  - `src/ply.js` 解析 `scale_0/1/2`、`rot_0..3` 和 `opacity`，生成前端 Gaussian scale / rotation / opacity 字段。
+  - `src/PointCloudViewport.jsx` 使用 `ShaderMaterial`，通过 `gl_PointCoord` 计算椭圆 Gaussian kernel alpha。
+  - `src/sampleScene.js` 为内置 demo 提供 scale / rotation fallback。
+  - `scripts/audit-demo.mjs` 增加 `editRenderer="Gaussian Shader 编辑"` 断言。
+- 验收:
+  - 三个默认 Web demo 样例均能进入 `Gaussian Shader 编辑`。
+  - 画布点选 object、隔离和删除预览仍工作。
+  - 删除后回到 `自身颜色` 并显示剩余整体场景。
+  - 定向 Playwright QA 无 shader compile/link console error。
+- 验证:
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5192/`: passed，assets=3。
+  - Targeted Playwright QA: passed，截图位于 `/tmp/objgauss-shader-edit-*.png`。
+- 完成 commit: `8465e4a`.
 
 ### WEB-001: Make viewer interaction coherent
 
