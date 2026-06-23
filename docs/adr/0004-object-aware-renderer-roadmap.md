@@ -78,4 +78,4 @@ Phase 2 验收标准：
 
 ## 后续任务
 
-- `RENDER-004`: WebGPU tile-based object-aware Gaussian renderer.
+- `RENDER-004`: WebGPU tile-based object-aware Gaussian renderer，设计详见 `docs/adr/0005-webgpu-tile-renderer.md`。

@@ -15,7 +15,17 @@
 - 状态: ready
 - 类型: 重大变更 / 渲染器
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
-- 要求: 先补设计文档 / ADR 细化，再进入实现。
+- 设计: `docs/adr/0005-webgpu-tile-renderer.md`
+- 下一步:
+  - `RENDER-004A`: WebGPU capability detection、renderer boundary 和 audit contract。
+  - `RENDER-004B`: Gaussian WebGPU buffer packing、clear/project/bin smoke path。
+  - `RENDER-004C`: tile accumulation + fullscreen resolve。
+  - `RENDER-004D`: object-state buffer 接入隐藏 / 隔离 / 删除。
+  - `RENDER-004E`: browser audit、overflow telemetry 和 fallback hardening。
+- 验收底线:
+  - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
+  - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
+  - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
 
