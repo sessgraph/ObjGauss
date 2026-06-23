@@ -33,6 +33,7 @@ export function buildWebGpuTileSmoke({
   tileSize = WEBGPU_TILE_SIZE,
   maxEntriesPerTile = WEBGPU_TILE_MAX_ENTRIES,
   includeTileEntries = false,
+  includePixelOutput = false,
 }) {
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
@@ -142,6 +143,15 @@ export function buildWebGpuTileSmoke({
     maxEntriesPerTile,
   });
   const resolve = resolveTileAccumulation(tileAccumulation);
+  const pixelResolve = includePixelOutput
+    ? resolvePixelOutput({
+        tileResolvedRgba: resolve.tileResolvedRgba,
+        tileColumns,
+        tileSize,
+        viewportWidth,
+        viewportHeight,
+      })
+    : null;
   return {
     layoutVersion: WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
     resolveVersion: WEBGPU_TILE_RESOLVE_VERSION,
@@ -149,6 +159,9 @@ export function buildWebGpuTileSmoke({
     tileSize,
     viewportWidth,
     viewportHeight,
+    pixelCount: viewportWidth * viewportHeight,
+    pixelOutputMode: includePixelOutput ? "viewport-storage-rgba-from-tile-resolve" : "not-allocated",
+    pixelOutputIncluded: Boolean(pixelResolve),
     boundsMinX: bounds.minX,
     boundsMinZ: bounds.minZ,
     boundsSpanX: bounds.spanX,
@@ -178,6 +191,8 @@ export function buildWebGpuTileSmoke({
     resolveAlphaMean: resolve.resolveAlphaMean,
     resolveLumaMean: resolve.resolveLumaMean,
     resolveChecksum: resolve.resolveChecksum,
+    pixelResolvedCount: pixelResolve?.pixelResolvedCount ?? 0,
+    pixelResolveChecksum: pixelResolve?.pixelResolveChecksum ?? "",
     objectCount: objectIndex.objectIdsByIndex.length,
     objectStateLayoutVersion: objectStateContract.layoutVersion,
     objectStateStrideUint32: objectStateContract.strideUint32,
@@ -197,6 +212,7 @@ export function buildWebGpuTileSmoke({
       tileCounts,
       tileAccumulation,
       tileResolvedRgba: resolve.tileResolvedRgba,
+      pixelResolvedRgba: pixelResolve?.pixelResolvedRgba ?? null,
       tileEntries,
     },
   };
@@ -313,6 +329,45 @@ function resolveTileAccumulation(tileAccumulation) {
     resolveAlphaMean: resolvedTileCount > 0 ? alphaSum / resolvedTileCount : 0,
     resolveLumaMean: resolvedTileCount > 0 ? lumaSum / resolvedTileCount : 0,
     resolveChecksum: checksum.toString(16).padStart(8, "0"),
+  };
+}
+
+function resolvePixelOutput({
+  tileResolvedRgba,
+  tileColumns,
+  tileSize,
+  viewportWidth,
+  viewportHeight,
+}) {
+  const pixelCount = viewportWidth * viewportHeight;
+  const pixelResolvedRgba = new Float32Array(pixelCount * 4);
+  let pixelResolvedCount = 0;
+  let checksum = 2166136261;
+
+  for (let y = 0; y < viewportHeight; y += 1) {
+    const tileY = Math.floor(y / tileSize);
+    for (let x = 0; x < viewportWidth; x += 1) {
+      const tileX = Math.min(Math.floor(x / tileSize), tileColumns - 1);
+      const tileOffset = (tileY * tileColumns + tileX) * 4;
+      const pixelOffset = (y * viewportWidth + x) * 4;
+      const red = tileResolvedRgba[tileOffset];
+      const green = tileResolvedRgba[tileOffset + 1];
+      const blue = tileResolvedRgba[tileOffset + 2];
+      const alpha = tileResolvedRgba[tileOffset + 3];
+      pixelResolvedRgba[pixelOffset] = red;
+      pixelResolvedRgba[pixelOffset + 1] = green;
+      pixelResolvedRgba[pixelOffset + 2] = blue;
+      pixelResolvedRgba[pixelOffset + 3] = alpha;
+      if (alpha <= 0.0001) continue;
+      pixelResolvedCount += 1;
+      checksum = checksumValue(checksum, red, green, blue, alpha, alpha);
+    }
+  }
+
+  return {
+    pixelResolvedRgba,
+    pixelResolvedCount,
+    pixelResolveChecksum: checksum.toString(16).padStart(8, "0"),
   };
 }
 

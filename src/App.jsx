@@ -130,6 +130,7 @@ export default function App() {
       renderMode,
       pointSize,
       includeTileEntries: true,
+      includePixelOutput: true,
       maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
     });
   }, [

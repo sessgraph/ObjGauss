@@ -3,8 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createWebGpuAccumulationMeta,
   createWebGpuComputeMeta,
+  createWebGpuPixelResolveMeta,
   webGpuAccumulationWorkgroups,
   webGpuComputeWorkgroups,
+  webGpuPixelResolveWorkgroups,
+  WEBGPU_PIXEL_RESOLVE_SHADER,
+  WEBGPU_PIXEL_RESOLVE_SOURCE,
   WEBGPU_TILE_ACCUMULATION_SHADER,
   WEBGPU_TILE_ACCUMULATION_SOURCE,
   WEBGPU_TILE_COMPUTE_SHADER,
@@ -45,6 +49,12 @@ export default function WebGpuTileViewport({
     source: "",
     workgroups: 0,
   });
+  const [pixel, setPixel] = useState({
+    status: "pending",
+    reason: "webgpu-pixel-resolve-pending",
+    source: "",
+    workgroups: 0,
+  });
   const [accumulation, setAccumulation] = useState({
     status: "pending",
     reason: "webgpu-accumulation-pending",
@@ -59,6 +69,7 @@ export default function WebGpuTileViewport({
     bufferCount: 0,
     byteLength: 0,
     tileEntriesIncluded: false,
+    pixelOutputIncluded: false,
   });
   const visibleCount = useMemo(
     () =>
@@ -90,8 +101,15 @@ export default function WebGpuTileViewport({
         bufferCount: 0,
         byteLength: 0,
         tileEntriesIncluded: false,
+        pixelOutputIncluded: false,
       });
       setCompute({
+        status: "failed",
+        reason: "navigator-gpu-unavailable",
+        source: "",
+        workgroups: 0,
+      });
+      setPixel({
         status: "failed",
         reason: "navigator-gpu-unavailable",
         source: "",
@@ -121,6 +139,7 @@ export default function WebGpuTileViewport({
         const format = navigator.gpu.getPreferredCanvasFormat();
         const resolveModule = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
         const resolveComputeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
+        const pixelResolveModule = device.createShaderModule({ code: WEBGPU_PIXEL_RESOLVE_SHADER });
         const accumulationModule = device.createShaderModule({ code: WEBGPU_TILE_ACCUMULATION_SHADER });
         const accumulationPipeline = device.createComputePipeline({
           layout: "auto",
@@ -129,6 +148,10 @@ export default function WebGpuTileViewport({
         const computePipeline = device.createComputePipeline({
           layout: "auto",
           compute: { module: resolveComputeModule, entryPoint: "computeMain" },
+        });
+        const pixelComputePipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module: pixelResolveModule, entryPoint: "pixelResolveMain" },
         });
         const pipeline = device.createRenderPipeline({
           layout: "auto",
@@ -147,6 +170,7 @@ export default function WebGpuTileViewport({
           pipeline,
           accumulationPipeline,
           computePipeline,
+          pixelComputePipeline,
         };
         device.lost.then((info) => {
           if (cancelled) return;
@@ -165,6 +189,7 @@ export default function WebGpuTileViewport({
           setFrame,
           setStorage,
           setCompute,
+          setPixel,
           setAccumulation,
         });
       } catch (error) {
@@ -184,10 +209,17 @@ export default function WebGpuTileViewport({
           bufferCount: 0,
           byteLength: 0,
           tileEntriesIncluded: false,
+          pixelOutputIncluded: false,
         });
         setCompute({
           status: "failed",
           reason: error?.message || "webgpu-compute-unavailable",
+          source: "",
+          workgroups: 0,
+        });
+        setPixel({
+          status: "failed",
+          reason: error?.message || "webgpu-pixel-resolve-unavailable",
           source: "",
           workgroups: 0,
         });
@@ -214,7 +246,7 @@ export default function WebGpuTileViewport({
     const runtime = runtimeRef.current;
     const canvas = canvasRef.current;
     if (!runtime || !canvas) return;
-    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage, setCompute, setAccumulation });
+    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage, setCompute, setPixel, setAccumulation });
   }, [tileSmoke]);
 
   useEffect(() => {
@@ -298,6 +330,10 @@ export default function WebGpuTileViewport({
       data-webgpu-compute-status={compute.status}
       data-webgpu-compute-reason={compute.reason}
       data-webgpu-compute-workgroups={compute.workgroups}
+      data-webgpu-pixel-source={pixel.source}
+      data-webgpu-pixel-status={pixel.status}
+      data-webgpu-pixel-reason={pixel.reason}
+      data-webgpu-pixel-workgroups={pixel.workgroups}
       data-webgpu-storage-layout={storage.layoutVersion}
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
@@ -305,6 +341,7 @@ export default function WebGpuTileViewport({
       data-webgpu-storage-byte-size={storage.byteLength}
       data-webgpu-storage-checksum={storage.checksum}
       data-webgpu-storage-tile-entries={storage.tileEntriesIncluded ? "true" : "false"}
+      data-webgpu-storage-pixel-output={storage.pixelOutputIncluded ? "true" : "false"}
       data-visible-count={visibleCount}
       ref={containerRef}
     >
@@ -334,9 +371,18 @@ function renderFrame({
   setFrame,
   setStorage,
   setCompute,
+  setPixel,
   setAccumulation,
 }) {
-  const { device, context, format, pipeline, accumulationPipeline, computePipeline } = runtime;
+  const {
+    device,
+    context,
+    format,
+    pipeline,
+    accumulationPipeline,
+    computePipeline,
+    pixelComputePipeline,
+  } = runtime;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
   destroyTransientBuffers(runtime);
@@ -354,6 +400,7 @@ function renderFrame({
       bufferCount: storageBundle.bufferCount,
       byteLength: storageBundle.totalByteLength,
       tileEntriesIncluded: storageBundle.tileEntriesIncluded,
+      pixelOutputIncluded: storageBundle.pixelOutputIncluded,
     });
   } catch (error) {
     setStorage({
@@ -364,6 +411,7 @@ function renderFrame({
       bufferCount: 0,
       byteLength: 0,
       tileEntriesIncluded: false,
+      pixelOutputIncluded: false,
     });
     setFrame({
       status: "failed",
@@ -373,6 +421,12 @@ function renderFrame({
       source: "",
     });
     setCompute({
+      status: "failed",
+      reason: error?.message || "webgpu-storage-upload-failed",
+      source: "",
+      workgroups: 0,
+    });
+    setPixel({
       status: "failed",
       reason: error?.message || "webgpu-storage-upload-failed",
       source: "",
@@ -390,8 +444,14 @@ function renderFrame({
   try {
     const accumulationMetaBuffer = createAccumulationMetaBuffer(device, tileSmoke);
     const computeMetaBuffer = createComputeMetaBuffer(device, tileSmoke);
+    const pixelMetaBuffer = createPixelMetaBuffer(device, tileSmoke);
     const resolveMetaBuffer = createResolveMetaBuffer(device, tileSmoke);
-    runtime.transientBuffers = [accumulationMetaBuffer, computeMetaBuffer, resolveMetaBuffer];
+    runtime.transientBuffers = [
+      accumulationMetaBuffer,
+      computeMetaBuffer,
+      pixelMetaBuffer,
+      resolveMetaBuffer,
+    ];
     const accumulationBindGroup = device.createBindGroup({
       layout: accumulationPipeline.getBindGroupLayout(0),
       entries: [
@@ -414,10 +474,18 @@ function renderFrame({
         { binding: 2, resource: { buffer: computeMetaBuffer } },
       ],
     });
+    const pixelBindGroup = device.createBindGroup({
+      layout: pixelComputePipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+        { binding: 1, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
+        { binding: 2, resource: { buffer: pixelMetaBuffer } },
+      ],
+    });
     const bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+        { binding: 0, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
         { binding: 1, resource: { buffer: resolveMetaBuffer } },
       ],
     });
@@ -425,12 +493,16 @@ function renderFrame({
     const computePass = encoder.beginComputePass();
     const accumulationWorkgroups = webGpuAccumulationWorkgroups(tileSmoke);
     const workgroups = webGpuComputeWorkgroups(tileSmoke);
+    const pixelWorkgroups = webGpuPixelResolveWorkgroups(tileSmoke);
     computePass.setPipeline(accumulationPipeline);
     computePass.setBindGroup(0, accumulationBindGroup);
     computePass.dispatchWorkgroups(accumulationWorkgroups);
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, computeBindGroup);
     computePass.dispatchWorkgroups(workgroups);
+    computePass.setPipeline(pixelComputePipeline);
+    computePass.setBindGroup(0, pixelBindGroup);
+    computePass.dispatchWorkgroups(pixelWorkgroups);
     computePass.end();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
@@ -464,11 +536,17 @@ function renderFrame({
       source: WEBGPU_TILE_COMPUTE_SOURCE,
       workgroups,
     });
+    setPixel({
+      status: "dispatched",
+      reason: "webgpu-pixel-resolve-dispatched",
+      source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+      workgroups: pixelWorkgroups,
+    });
     setFrame({
       status: "rendered",
-      reason: "webgpu-storage-resolve-rendered",
-      checksum: tileSmoke.resolveChecksum,
-      pixels: tileSmoke.resolvedTileCount,
+      reason: "webgpu-pixel-storage-resolve-rendered",
+      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
       source: WEBGPU_TILE_RESOLVE_SOURCE,
     });
   } catch (error) {
@@ -484,9 +562,15 @@ function renderFrame({
       source: "",
       workgroups: 0,
     });
+    setPixel({
+      status: "failed",
+      reason: error?.message || "webgpu-pixel-resolve-failed",
+      source: "",
+      workgroups: 0,
+    });
     setFrame({
       status: "failed",
-      reason: error?.message || "webgpu-compute-resolve-failed",
+      reason: error?.message || "webgpu-pixel-resolve-failed",
       checksum: "",
       pixels: 0,
       source: "",
@@ -517,6 +601,21 @@ function createComputeMetaBuffer(device, tileSmoke) {
   };
   const buffer = device.createBuffer({
     label: "objgauss-compute-meta",
+    size: data.byteLength,
+    usage: usage.UNIFORM | usage.COPY_DST,
+  });
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
+}
+
+function createPixelMetaBuffer(device, tileSmoke) {
+  const data = createWebGpuPixelResolveMeta(tileSmoke);
+  const usage = globalThis.GPUBufferUsage ?? {
+    COPY_DST: 0x0008,
+    UNIFORM: 0x0040,
+  };
+  const buffer = device.createBuffer({
+    label: "objgauss-pixel-resolve-meta",
     size: data.byteLength,
     usage: usage.UNIFORM | usage.COPY_DST,
   });

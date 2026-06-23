@@ -2,6 +2,8 @@ export const WEBGPU_TILE_COMPUTE_SOURCE = "webgpu-compute-resolve-v1";
 export const WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE = 64;
 export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-covariance-accumulation-v1";
 export const WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE = 64;
+export const WEBGPU_PIXEL_RESOLVE_SOURCE = "webgpu-compute-pixel-resolve-v1";
+export const WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE = 64;
 
 export const WEBGPU_TILE_ACCUMULATION_SHADER = `
 const OBJECT_STATE_VISIBLE = 1u;
@@ -140,6 +142,37 @@ fn computeMain(@builtin(global_invocation_id) globalId: vec3u) {
 }
 `;
 
+export const WEBGPU_PIXEL_RESOLVE_SHADER = `
+struct PixelResolveMeta {
+  pixelCount: u32,
+  viewportWidth: u32,
+  tileSize: u32,
+  tileColumns: u32,
+};
+
+@group(0) @binding(0) var<storage, read> tileResolvedRgba: array<vec4f>;
+@group(0) @binding(1) var<storage, read_write> pixelResolvedRgba: array<vec4f>;
+@group(0) @binding(2) var<uniform> pixelResolveMeta: PixelResolveMeta;
+
+@compute @workgroup_size(${WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE})
+fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
+  let pixelIndex = globalId.x;
+  if (pixelIndex >= pixelResolveMeta.pixelCount) {
+    return;
+  }
+
+  let viewportWidth = max(pixelResolveMeta.viewportWidth, 1u);
+  let tileSize = max(pixelResolveMeta.tileSize, 1u);
+  let tileColumns = max(pixelResolveMeta.tileColumns, 1u);
+  let pixelX = pixelIndex % viewportWidth;
+  let pixelY = pixelIndex / viewportWidth;
+  let tileX = min(pixelX / tileSize, tileColumns - 1u);
+  let tileY = pixelY / tileSize;
+  let tileIndex = tileY * tileColumns + tileX;
+  pixelResolvedRgba[pixelIndex] = tileResolvedRgba[tileIndex];
+}
+`;
+
 export function createWebGpuComputeMeta(tileSmoke) {
   return new Uint32Array([
     Math.max(1, tileSmoke?.tileCount ?? 1),
@@ -174,4 +207,27 @@ export function createWebGpuAccumulationMeta(tileSmoke) {
 export function webGpuAccumulationWorkgroups(tileSmoke) {
   const tileCount = Math.max(1, tileSmoke?.tileCount ?? 1);
   return Math.ceil(tileCount / WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE);
+}
+
+export function createWebGpuPixelResolveMeta(tileSmoke) {
+  const pixelCount = Math.max(
+    1,
+    tileSmoke?.pixelCount ??
+      Math.max(1, tileSmoke?.viewportWidth ?? 1) * Math.max(1, tileSmoke?.viewportHeight ?? 1),
+  );
+  return new Uint32Array([
+    pixelCount,
+    Math.max(1, tileSmoke?.viewportWidth ?? 1),
+    Math.max(1, tileSmoke?.tileSize ?? 1),
+    Math.max(1, tileSmoke?.tileColumns ?? 1),
+  ]);
+}
+
+export function webGpuPixelResolveWorkgroups(tileSmoke) {
+  const pixelCount = Math.max(
+    1,
+    tileSmoke?.pixelCount ??
+      Math.max(1, tileSmoke?.viewportWidth ?? 1) * Math.max(1, tileSmoke?.viewportHeight ?? 1),
+  );
+  return Math.ceil(pixelCount / WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE);
 }

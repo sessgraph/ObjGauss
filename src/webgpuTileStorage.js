@@ -50,6 +50,13 @@ const STORAGE_BUFFER_DEFINITIONS = Object.freeze([
     role: "tile-resolve-output",
   },
   {
+    key: "pixelResolvedRgba",
+    label: "pixel-resolved-rgba",
+    elementType: "float32",
+    role: "viewport-pixel-resolve-output",
+    optional: true,
+  },
+  {
     key: "tileEntries",
     label: "tile-entries",
     elementType: "uint32",
@@ -78,6 +85,7 @@ export function describeWebGpuTileStorage(tileSmoke) {
     totalByteLength,
     checksum: checksum.toString(16).padStart(8, "0"),
     tileEntriesIncluded: descriptors.some((descriptor) => descriptor.key === "tileEntries"),
+    pixelOutputIncluded: descriptors.some((descriptor) => descriptor.key === "pixelResolvedRgba"),
     descriptors: descriptors.map(({ source, ...descriptor }) => descriptor),
   };
 }

@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005G`: 在 covariance-aware tile sampling 基础上推进 per-pixel output / viewport-sized accumulation。
+  - `RENDER-005H`: 将 pixel output 的来源从 tile resolve 展开升级为逐像素 Gaussian accumulation。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,32 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005G: WebGPU viewport pixel output contract
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在 covariance-aware tile sampling 基础上，增加 viewport-sized pixel output buffer，使 WebGPU display path 从 tile storage resolve 推进到 pixel storage resolve。
+- 范围外:
+  - 不实现最终逐像素 Gaussian accumulation；当前 pixel buffer 仍由 tile resolved color 展开生成。
+  - 不实现完整 3D covariance 投影和深度排序。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - `src/webgpuTileComputeShader.js` 新增 `webgpu-compute-pixel-resolve-v1` WGSL compute shader，把 `tileResolvedRgba` 展开到 viewport-sized `pixelResolvedRgba`。
+  - `src/webgpuTileResolveShader.js` 升级为 `webgpu-pixel-storage-resolve-v1`，fullscreen fragment shader 直接读取 `pixelResolvedRgba`。
+  - `src/webgpuTileStorage.js` 新增可选 `pixelResolvedRgba` storage buffer，WebGPU runtime route 现在包含 `positionRadius`、`colorOpacity`、`scaleRotation`、`objectIndices`、`objectState`、`tileCounts`、`tileAccumulation`、`tileResolvedRgba`、`pixelResolvedRgba` 和 `tileEntries` 共 10 个 buffers。
+  - `WebGpuTileViewport` 在 accumulation 和 tile compute resolve 后 dispatch pixel resolve，并暴露 `data-webgpu-pixel-*` 与 `data-webgpu-storage-pixel-output` DOM contract。
+  - `App` 只在实际进入 `webgpu-tile` route 时分配 pixel output buffer，fallback 状态不分配 viewport-sized pixel payload。
+  - `audit-webgpu-tile-smoke` 和 `audit-demo` 更新为 pixel resolve route contract。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 10-buffer storage contract、pixel resolve shader、pixel workgroups 和 pixel-storage fullscreen resolve source。
+  - WebGPU 可用且 zero-overflow 的环境中，`webgpu-tile` first frame 必须经过 `webgpu-compute-covariance-accumulation-v1 -> webgpu-compute-resolve-v1 -> webgpu-compute-pixel-resolve-v1 -> webgpu-pixel-storage-resolve-v1`。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `storage=5561b7fd:10 pixel=webgpu-compute-pixel-resolve-v1:16384 resolveSource=webgpu-pixel-storage-resolve-v1`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5214/ --no-server`: passed，assets=3；当前 headless Chrome 仍 fallback，`pixel=null:null:0` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-005F: WebGPU covariance-aware tile sampling
 

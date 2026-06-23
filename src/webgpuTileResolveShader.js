@@ -1,4 +1,4 @@
-export const WEBGPU_TILE_RESOLVE_SOURCE = "webgpu-storage-resolve-v1";
+export const WEBGPU_TILE_RESOLVE_SOURCE = "webgpu-pixel-storage-resolve-v1";
 
 export const WEBGPU_TILE_RESOLVE_SHADER = `
 struct VertexOutput {
@@ -7,13 +7,13 @@ struct VertexOutput {
 };
 
 struct ResolveMeta {
-  tileColumns: u32,
-  tileRows: u32,
+  viewportWidth: u32,
+  viewportHeight: u32,
   reserved0: u32,
   reserved1: u32,
 };
 
-@group(0) @binding(0) var<storage, read> tileResolvedRgba: array<vec4f>;
+@group(0) @binding(0) var<storage, read> pixelResolvedRgba: array<vec4f>;
 @group(0) @binding(1) var<uniform> resolveMeta: ResolveMeta;
 
 @vertex
@@ -32,24 +32,24 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  let safeColumns = max(resolveMeta.tileColumns, 1u);
-  let safeRows = max(resolveMeta.tileRows, 1u);
+  let safeWidth = max(resolveMeta.viewportWidth, 1u);
+  let safeHeight = max(resolveMeta.viewportHeight, 1u);
   let uv = clamp(input.uv, vec2f(0.0), vec2f(0.999999));
-  let tileX = min(u32(floor(uv.x * f32(safeColumns))), safeColumns - 1u);
-  let tileY = min(u32(floor(uv.y * f32(safeRows))), safeRows - 1u);
-  let tileIndex = tileY * safeColumns + tileX;
-  let tile = tileResolvedRgba[tileIndex];
+  let pixelX = min(u32(floor(uv.x * f32(safeWidth))), safeWidth - 1u);
+  let pixelY = min(u32(floor(uv.y * f32(safeHeight))), safeHeight - 1u);
+  let pixelIndex = pixelY * safeWidth + pixelX;
+  let pixel = pixelResolvedRgba[pixelIndex];
   let background = vec3f(0.0627, 0.0745, 0.0863);
-  let alpha = clamp(tile.a, 0.0, 0.98);
-  let rgb = background * (1.0 - alpha) + clamp(tile.rgb, vec3f(0.0), vec3f(1.0)) * alpha;
+  let alpha = clamp(pixel.a, 0.0, 0.98);
+  let rgb = background * (1.0 - alpha) + clamp(pixel.rgb, vec3f(0.0), vec3f(1.0)) * alpha;
   return vec4f(rgb, 1.0);
 }
 `;
 
 export function createWebGpuResolveMeta(tileSmoke) {
   return new Uint32Array([
-    Math.max(1, tileSmoke?.tileColumns ?? 1),
-    Math.max(1, tileSmoke?.tileRows ?? 1),
+    Math.max(1, tileSmoke?.viewportWidth ?? 1),
+    Math.max(1, tileSmoke?.viewportHeight ?? 1),
     0,
     0,
   ]);

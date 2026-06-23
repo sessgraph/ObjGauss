@@ -4,8 +4,13 @@ import { createSampleScene } from "../src/sampleScene.js";
 import {
   createWebGpuAccumulationMeta,
   createWebGpuComputeMeta,
+  createWebGpuPixelResolveMeta,
   webGpuAccumulationWorkgroups,
   webGpuComputeWorkgroups,
+  webGpuPixelResolveWorkgroups,
+  WEBGPU_PIXEL_RESOLVE_SHADER,
+  WEBGPU_PIXEL_RESOLVE_SOURCE,
+  WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE,
   WEBGPU_TILE_ACCUMULATION_SHADER,
   WEBGPU_TILE_ACCUMULATION_SOURCE,
   WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE,
@@ -43,6 +48,7 @@ const base = buildWebGpuTileSmoke({
   renderMode: "original",
   pointSize: 0.018,
   includeTileEntries: true,
+  includePixelOutput: true,
   maxEntriesPerTile: 64,
 });
 
@@ -61,6 +67,7 @@ assert.equal(base.buffers.objectIds.length, allObjectIds.size);
 assert.equal(base.buffers.tileCounts.length, base.tileCount);
 assert.equal(base.buffers.tileAccumulation.length, base.tileCount * 4);
 assert.equal(base.buffers.tileResolvedRgba.length, base.tileCount * 4);
+assert.equal(base.buffers.pixelResolvedRgba.length, base.pixelCount * 4);
 assert.equal(base.buffers.tileEntries.length, base.tileEntryCapacity);
 assert.ok(base.visibleGaussians > 0);
 assert.ok(base.binnedGaussians > 0);
@@ -78,11 +85,16 @@ assert.equal(base.tileEntryCapacity, base.tileCount * base.maxEntriesPerTile);
 assert.ok(base.tileEntryUtilization > 0 && base.tileEntryUtilization <= 1);
 assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
 assert.equal(base.resolveMode, "tile-2x2-covariance-weighted-oit");
+assert.equal(base.pixelOutputMode, "viewport-storage-rgba-from-tile-resolve");
+assert.equal(base.pixelOutputIncluded, true);
+assert.equal(base.pixelCount, base.viewportWidth * base.viewportHeight);
 assert.ok(base.resolvedTileCount > 0);
+assert.ok(base.pixelResolvedCount > 0);
 assert.ok(base.resolveWeightSum > 0);
 assert.ok(base.resolveAlphaMean > 0);
 assert.ok(base.resolveLumaMean > 0);
 assert.match(base.resolveChecksum, /^[0-9a-f]{8}$/);
+assert.match(base.pixelResolveChecksum, /^[0-9a-f]{8}$/);
 assert.equal(base.objectStateLayoutVersion, WEBGPU_OBJECT_STATE_LAYOUT_VERSION);
 assert.equal(base.objectStateStrideUint32, WEBGPU_OBJECT_STATE_STRIDE_UINT32);
 assert.equal(base.objectStateVisibleObjects, allObjectIds.size);
@@ -94,10 +106,11 @@ assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
 
 const storage = describeWebGpuTileStorage(base);
 assert.equal(storage.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
-assert.equal(storage.bufferCount, 9);
+assert.equal(storage.bufferCount, 10);
 assert.ok(storage.totalByteLength > 0);
 assert.match(storage.checksum, /^[0-9a-f]{8}$/);
 assert.equal(storage.tileEntriesIncluded, true);
+assert.equal(storage.pixelOutputIncluded, true);
 assert.deepEqual(
   storage.descriptors.map((descriptor) => descriptor.key),
   [
@@ -109,6 +122,7 @@ assert.deepEqual(
     "tileCounts",
     "tileAccumulation",
     "tileResolvedRgba",
+    "pixelResolvedRgba",
     "tileEntries",
   ],
 );
@@ -128,6 +142,10 @@ assert.equal(
   storageBundle.getBuffer("tileResolvedRgba").byteLength,
   base.buffers.tileResolvedRgba.byteLength,
 );
+assert.equal(
+  storageBundle.getBuffer("pixelResolvedRgba").byteLength,
+  base.buffers.pixelResolvedRgba.byteLength,
+);
 assert.equal(storageBundle.getBuffer("objectState").byteLength, base.buffers.objectState.byteLength);
 assert.equal(fakeDevice.created.length, storage.bufferCount);
 assert.equal(fakeDevice.writes.length, storage.bufferCount);
@@ -139,10 +157,10 @@ storageBundle.destroy();
 assert.ok(fakeDevice.created.every((buffer) => buffer.destroyed));
 
 const resolveMeta = createWebGpuResolveMeta(base);
-assert.deepEqual([...resolveMeta], [base.tileColumns, base.tileRows, 0, 0]);
+assert.deepEqual([...resolveMeta], [base.viewportWidth, base.viewportHeight, 0, 0]);
 assert.equal(resolveMeta.byteLength, 16);
-assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-storage-resolve-v1");
-assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+tileResolvedRgba/);
+assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-pixel-storage-resolve-v1");
+assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
 assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
 
@@ -156,6 +174,20 @@ assert.match(WEBGPU_TILE_COMPUTE_SHADER, /@compute\s+@workgroup_size\(64\)/);
 assert.match(WEBGPU_TILE_COMPUTE_SHADER, /var<storage,\s*read>\s+tileAccumulation/);
 assert.match(WEBGPU_TILE_COMPUTE_SHADER, /var<storage,\s*read_write>\s+tileResolvedRgba/);
 assert.match(WEBGPU_TILE_COMPUTE_SHADER, /tileResolvedRgba\[tileIndex\]/);
+
+const pixelMeta = createWebGpuPixelResolveMeta(base);
+assert.deepEqual([...pixelMeta], [base.pixelCount, base.viewportWidth, base.tileSize, base.tileColumns]);
+assert.equal(pixelMeta.byteLength, 16);
+assert.equal(WEBGPU_PIXEL_RESOLVE_SOURCE, "webgpu-compute-pixel-resolve-v1");
+assert.equal(WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE, 64);
+assert.equal(
+  webGpuPixelResolveWorkgroups(base),
+  Math.ceil(base.pixelCount / WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE),
+);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /@compute\s+@workgroup_size\(64\)/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+tileResolvedRgba/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read_write>\s+pixelResolvedRgba/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /pixelResolvedRgba\[pixelIndex\]/);
 
 const accumulationMeta = createWebGpuAccumulationMeta(base);
 assert.equal(accumulationMeta.byteLength, 48);
@@ -273,6 +305,7 @@ console.log(
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +
     `accumulation=${WEBGPU_TILE_ACCUMULATION_SOURCE}:${webGpuAccumulationWorkgroups(base)} ` +
     `compute=${WEBGPU_TILE_COMPUTE_SOURCE}:${webGpuComputeWorkgroups(base)} ` +
+    `pixel=${WEBGPU_PIXEL_RESOLVE_SOURCE}:${webGpuPixelResolveWorkgroups(base)} ` +
     `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}`,
 );
 

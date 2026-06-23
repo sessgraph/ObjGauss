@@ -53,6 +53,7 @@ try {
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
+        `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
@@ -322,12 +323,16 @@ async function runAudit(url, assetsToCheck) {
       const webGpuComputeSource = await viewport.getAttribute("data-webgpu-compute-source");
       const webGpuComputeStatus = await viewport.getAttribute("data-webgpu-compute-status");
       const webGpuComputeWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-compute-workgroups") ?? "0");
+      const webGpuPixelSource = await viewport.getAttribute("data-webgpu-pixel-source");
+      const webGpuPixelStatus = await viewport.getAttribute("data-webgpu-pixel-status");
+      const webGpuPixelWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-pixel-workgroups") ?? "0");
       const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
       const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
       const webGpuStorageChecksum = await viewport.getAttribute("data-webgpu-storage-checksum");
       const webGpuStorageTileEntries = await viewport.getAttribute("data-webgpu-storage-tile-entries");
+      const webGpuStoragePixelOutput = await viewport.getAttribute("data-webgpu-storage-pixel-output");
       if (editRendererId === "webgpu-tile") {
         if (
           webGpuAccumulationSource !== "webgpu-compute-covariance-accumulation-v1" ||
@@ -336,25 +341,29 @@ async function runAudit(url, assetsToCheck) {
           webGpuComputeSource !== "webgpu-compute-resolve-v1" ||
           webGpuComputeStatus !== "dispatched" ||
           webGpuComputeWorkgroups <= 0 ||
+          webGpuPixelSource !== "webgpu-compute-pixel-resolve-v1" ||
+          webGpuPixelStatus !== "dispatched" ||
+          webGpuPixelWorkgroups <= 0 ||
           webGpuFirstFrameStatus !== "rendered" ||
           webGpuFirstFramePixels <= 0 ||
           !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
-          webGpuResolveSource !== "webgpu-storage-resolve-v1"
+          webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
         ) {
           throw new Error(
-            `${asset.id} WebGPU first frame did not render through accumulation/compute/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups} status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+            `${asset.id} WebGPU first frame did not render through accumulation/compute/pixel/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups} pixel=${webGpuPixelStatus}:${webGpuPixelSource}:${webGpuPixelWorkgroups} status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
           );
         }
         if (
           webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
           webGpuStorageStatus !== "uploaded" ||
-          webGpuStorageBufferCount < 9 ||
+          webGpuStorageBufferCount < 10 ||
           webGpuStorageByteSize <= 0 ||
           webGpuStorageTileEntries !== "true" ||
+          webGpuStoragePixelOutput !== "true" ||
           !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
         ) {
           throw new Error(
-            `${asset.id} WebGPU storage buffers were not uploaded with tile entries: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} checksum=${webGpuStorageChecksum}`,
+            `${asset.id} WebGPU storage buffers were not uploaded with tile entries and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
       }
@@ -434,11 +443,15 @@ async function runAudit(url, assetsToCheck) {
         webGpuComputeSource,
         webGpuComputeStatus,
         webGpuComputeWorkgroups,
+        webGpuPixelSource,
+        webGpuPixelStatus,
+        webGpuPixelWorkgroups,
         webGpuStorageLayout,
         webGpuStorageStatus,
         webGpuStorageBufferCount,
         webGpuStorageByteSize,
         webGpuStorageTileEntries,
+        webGpuStoragePixelOutput,
         webGpuStorageChecksum,
         webGpuStorageChecksumAfterIsolate,
         webGpuStorageChecksumAfterDelete,
