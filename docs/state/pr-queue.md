@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005Q`: 用 `npm run audit:webgpu-desktop` 在 WebGPU-capable 桌面 Chrome 中重跑 clear-only / texture-display / full runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless unsafe WebGPU presentation limitation。
+  - `RENDER-005R`: 将 desktop WebGPU runtime audit 扩展到 Plush / Splatfacto 级 100k+ Gaussian 场景，验证 compact tile list、storage gate 和对象编辑交互在大场景上的稳定性。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -26,27 +26,43 @@
 
 ## In Progress
 
+### RENDER-005R: Large-scene desktop WebGPU runtime audit
+
+- 状态: ready
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 在 WebGPU-capable 桌面 Chrome 中把强制 WebGPU runtime audit 从 NeRF Lego proxy 扩展到 Plush / Splatfacto 级 100k+ Gaussian 场景，验证 C 路线在大场景上的对象编辑稳定性。
+- 待验证:
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local`
+  - `npm run audit:webgpu-desktop -- --asset plush-v1-closure-local`
+  - 若本机 public sample 可用，再跑 `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local`
+- 验收底线:
+  - `data-renderer="webgpu-tile"`、`targetGate="pass"`、`storageLimit="pass"`。
+  - `full` probe 中 accumulation / resolve / pixel stages 均 dispatched，queue done，device active。
+  - 对象选择、隔离、删除预览仍能更新 object-state checksum 和 visible counts。
+
+## Done
+
 ### RENDER-005Q: Desktop WebGPU presentation audit
 
-- 状态: runbook-landed / desktop-run-pending
+- 状态: done / desktop-runtime-passed
 - 类型: 标准 PR / 前端渲染验收
 - 目标: 在 WebGPU-capable 桌面 Chrome 中重跑 `clear-only`、`texture-display-only` 和 `full` runtime audit，判断当前 failure 是否只属于 headless unsafe WebGPU presentation backend。
 - 已实施:
   - `scripts/audit-demo.mjs` 新增 `--headed`、`--browser-channel`、`--executable-path` 和 `--slow-mo`，使同一套 WebGPU runtime audit 可在系统 Chrome / headed desktop session 中运行。
   - 新增 `scripts/audit-webgpu-desktop.mjs` 和 `npm run audit:webgpu-desktop`，默认启动 built `dist/` 的 `vite preview`，依次运行 `clear-only`、`texture-display-only`、`full` 三个 probe，并输出 suite classification。
   - 新增 `docs/rendering/webgpu-desktop-audit.md`，记录桌面 audit 命令、浏览器选择参数、headless diagnostic 参数和结果解释。
-- 当前结论:
+- 结论:
   - 本机 headless diagnostic 运行 `npm run audit:webgpu-desktop -- --headless --allow-failures --port 5232` 可完整跑完三项，并分类为 `desktop-webgpu-presentation-backend-loss`。
-  - 这不是桌面 Chrome pass 证据；仍需在真实桌面 Chrome/WebGPU presentation 环境中运行默认 headed 命令。
-- 待验证:
-  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local`
-  - 如需指定 Chrome: `npm run audit:webgpu-desktop -- --browser-channel chrome`
+  - headed desktop Chrome/WebGPU 运行 `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5235` 严格通过，classification=`desktop-webgpu-runtime-passed`。
+  - 因此当前 headless unsafe WebGPU failure 正式归类为 presentation backend limitation；不再视为 ObjGauss WebGPU compute/storage/display shader 的 runtime blocker。
 - 验证:
   - `git diff --check`: passed。
   - `node --check scripts/audit-demo.mjs`: passed。
   - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
   - `npm run audit:webgpu-desktop -- --headless --allow-failures --port 5232`: expected failed probes collected；`clear-only`、`texture-display-only`、`full` 均分类为 `webgpu-presentation-or-backend-loss`，suite classification=`desktop-webgpu-presentation-backend-loss`。
   - preview server start path fix 后，`npm run audit:webgpu-desktop -- --headless --allow-failures --probes clear-only --port 5233` 复跑通过分类收集。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5234 --allow-failures`: passed；`clear-only` / `texture-display-only` queue done、device active；`full` accumulation / compute / pixel dispatched，queue done，device active，对象选择 / 隔离 / 删除通过。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5235`: strict passed；classification=`desktop-webgpu-runtime-passed`，`allowWebGpuDeviceLost=false`。
   - `npm run audit:webgpu-tile-smoke`: passed。
   - `npm run build`: passed，仍有 Spark / Three bundle size warning。
   - `uv run --extra dev pytest`: 41 passed。
@@ -93,8 +109,6 @@
   - `npm run build`: passed，仍有 Spark / Three bundle size warning。
   - `npm run audit:demo -- --url http://127.0.0.1:5204/`: passed，assets=3；当前仍全量 fallback，三者 `targetGate="blocked":"webgpu-capability"`。
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
-
-## Done
 
 ### RENDER-005P: WebGPU texture-backed display probes
 
