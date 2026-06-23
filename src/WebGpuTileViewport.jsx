@@ -24,9 +24,12 @@ import {
 import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
 } from "./webgpuRuntimeProbe.js";
 
 const BACKGROUND_RGB = [16, 19, 22];
@@ -547,10 +550,14 @@ function renderFrame({
     probe === WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY;
   const runPixel =
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
-    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY;
+    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT;
   const runDisplay =
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
-    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY;
+    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
   destroyTransientBuffers(runtime);
@@ -685,23 +692,25 @@ function renderFrame({
     const accumulationWorkgroups = webGpuAccumulationWorkgroups(tileSmoke);
     const workgroups = webGpuComputeWorkgroups(tileSmoke);
     const pixelWorkgroups = webGpuPixelResolveWorkgroups(tileSmoke);
-    const computePass = encoder.beginComputePass();
-    if (runAccumulation) {
-      computePass.setPipeline(accumulationPipeline);
-      computePass.setBindGroup(0, accumulationBindGroup);
-      computePass.dispatchWorkgroups(accumulationWorkgroups);
+    if (runAccumulation || runResolve || runPixel) {
+      const computePass = encoder.beginComputePass();
+      if (runAccumulation) {
+        computePass.setPipeline(accumulationPipeline);
+        computePass.setBindGroup(0, accumulationBindGroup);
+        computePass.dispatchWorkgroups(accumulationWorkgroups);
+      }
+      if (runResolve) {
+        computePass.setPipeline(computePipeline);
+        computePass.setBindGroup(0, computeBindGroup);
+        computePass.dispatchWorkgroups(workgroups);
+      }
+      if (runPixel) {
+        computePass.setPipeline(pixelComputePipeline);
+        computePass.setBindGroup(0, pixelBindGroup);
+        computePass.dispatchWorkgroups(pixelWorkgroups);
+      }
+      computePass.end();
     }
-    if (runResolve) {
-      computePass.setPipeline(computePipeline);
-      computePass.setBindGroup(0, computeBindGroup);
-      computePass.dispatchWorkgroups(workgroups);
-    }
-    if (runPixel) {
-      computePass.setPipeline(pixelComputePipeline);
-      computePass.setBindGroup(0, pixelBindGroup);
-      computePass.dispatchWorkgroups(pixelWorkgroups);
-    }
-    computePass.end();
     if (runDisplay) {
       const pass = encoder.beginRenderPass({
         colorAttachments: [
@@ -825,10 +834,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
   if (runDisplay) {
     return {
       status: "rendered",
-      reason:
-        probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY
-          ? "webgpu-pixel-output-only-probe-rendered"
-          : "webgpu-pixel-storage-resolve-rendered",
+      reason: renderedFrameReason(probe),
       checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
       pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
       source: WEBGPU_TILE_RESOLVE_SOURCE,
@@ -852,6 +858,15 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
       source: WEBGPU_TILE_COMPUTE_SOURCE,
     };
   }
+  if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
+    return {
+      status: "probed",
+      reason: "webgpu-pixel-compute-only-probe-submitted",
+      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
+      source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+    };
+  }
   return {
     status: "probed",
     reason: "webgpu-runtime-probe-submitted",
@@ -859,6 +874,19 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
     pixels: tileSmoke.resolvedTileCount,
     source: "",
   };
+}
+
+function renderedFrameReason(probe) {
+  if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY) {
+    return "webgpu-pixel-output-only-probe-rendered";
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY) {
+    return "webgpu-display-only-probe-rendered";
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
+    return "webgpu-tiny-pixel-output-probe-rendered";
+  }
+  return "webgpu-pixel-storage-resolve-rendered";
 }
 
 function createAccumulationMetaBuffer(device, tileSmoke) {

@@ -6,9 +6,12 @@ import { chromium } from "playwright";
 import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
 } from "../src/webgpuRuntimeProbe.js";
 
 const DEFAULT_PORT = 5180;
@@ -175,6 +178,7 @@ async function runAudit(url, assetsToCheck, options) {
           const activeViewport = document.querySelector(".viewport");
           return activeViewport?.getAttribute("data-webgpu-first-frame-status") !== "pending";
         }, undefined, { timeout: 15000 });
+        await waitForWebGpuQueueTelemetry(page);
       }
       const rendererTarget = await viewport.getAttribute("data-renderer-target");
       if (rendererTarget !== "webgpu-tile") {
@@ -863,7 +867,12 @@ function validateWebGpuRuntimeProbe({
     }
   }
 
-  if (expectedProbe === WEBGPU_RUNTIME_PROBE_FULL) {
+  if (
+    expectedProbe === WEBGPU_RUNTIME_PROBE_FULL ||
+    expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
+    expectedProbe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY ||
+    expectedProbe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT
+  ) {
     if (
       webGpuFirstFrameStatus !== "rendered" ||
       webGpuFirstFramePixels <= 0 ||
@@ -871,18 +880,18 @@ function validateWebGpuRuntimeProbe({
       webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
     ) {
       throw new Error(
-        `${assetId} WebGPU full route did not render through pixel storage resolve: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+        `${assetId} WebGPU ${expectedProbe} route did not render through pixel storage resolve: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
       );
     }
-  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY) {
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
     if (
-      webGpuFirstFrameStatus !== "rendered" ||
+      webGpuFirstFrameStatus !== "probed" ||
       webGpuFirstFramePixels <= 0 ||
       !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
-      webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
+      webGpuResolveSource !== "webgpu-compute-pixel-accumulation-v1"
     ) {
       throw new Error(
-        `${assetId} WebGPU pixel-output-only probe did not render pixel output: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+        `${assetId} WebGPU pixel-compute-only probe did not submit pixel compute: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
       );
     }
   } else if (
@@ -904,6 +913,15 @@ function expectedProbeStages(probe) {
     return { dispatched: new Set(["compute"]) };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY) {
+    return { dispatched: new Set(["pixel"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
+    return { dispatched: new Set(["pixel"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY) {
+    return { dispatched: new Set() };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
     return { dispatched: new Set(["pixel"]) };
   }
   return { dispatched: new Set(["accumulation", "compute", "pixel"]) };
@@ -1034,6 +1052,20 @@ async function waitForNonBackgroundPixels(page, timeoutMs = 10000) {
     await page.waitForTimeout(250);
   }
   return pixels;
+}
+
+async function waitForWebGpuQueueTelemetry(page, timeoutMs = 8000) {
+  await page.waitForFunction(() => {
+    const viewport = document.querySelector(".viewport");
+    const queueStatus = viewport?.getAttribute("data-webgpu-queue-status");
+    const deviceLostStatus = viewport?.getAttribute("data-webgpu-device-lost-status");
+    return (
+      queueStatus === "done" ||
+      queueStatus === "failed" ||
+      queueStatus === "unavailable" ||
+      deviceLostStatus === "lost"
+    );
+  }, undefined, { timeout: timeoutMs }).catch(() => {});
 }
 
 async function labeledValue(page, label) {

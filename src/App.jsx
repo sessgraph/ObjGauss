@@ -25,6 +25,11 @@ import {
   editRendererContract,
   INITIAL_WEBGPU_CAPABILITY,
 } from "./webgpuCapability.js";
+import {
+  normalizeWebGpuRuntimeProbe,
+  WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
+  WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
+} from "./webgpuRuntimeProbe.js";
 import { buildWebGpuTileSmoke } from "./webgpuTileSmoke.js";
 
 const FEATURED_ASSETS = featuredAssets();
@@ -121,6 +126,11 @@ export default function App() {
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
   const waitForEditRenderer = !useSplatRenderer && webGpuCapability.status === "pending";
   const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
+  const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
+  const webGpuRuntimeViewportSize =
+    webGpuRuntimeProbe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT
+      ? WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE
+      : WEBGPU_RUNTIME_VIEWPORT_SIZE;
   const webGpuRuntimeTileSmoke = useMemo(() => {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
     return buildWebGpuTileSmoke({
@@ -131,8 +141,8 @@ export default function App() {
       selectedId,
       renderMode,
       pointSize,
-      viewportWidth: WEBGPU_RUNTIME_VIEWPORT_SIZE,
-      viewportHeight: WEBGPU_RUNTIME_VIEWPORT_SIZE,
+      viewportWidth: webGpuRuntimeViewportSize,
+      viewportHeight: webGpuRuntimeViewportSize,
       includeTileEntries: true,
       includePixelOutput: true,
       computePixelReference: false,
@@ -147,6 +157,7 @@ export default function App() {
     renderMode,
     pointSize,
     useWebGpuTileRenderer,
+    webGpuRuntimeViewportSize,
     webGpuTileSmoke,
   ]);
   const activeEditRenderer = useMemo(
@@ -790,6 +801,13 @@ function allIds(points) {
 function renderModeLabel(mode) {
   if (mode === "original") return "原始颜色（编辑预览）";
   return "对象色（编辑预览）";
+}
+
+function readWebGpuRuntimeProbe() {
+  if (typeof window === "undefined") return "full";
+  return normalizeWebGpuRuntimeProbe(
+    new URLSearchParams(window.location.search).get("webgpu-probe"),
+  );
 }
 
 function formatBytes(value) {

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005O`: 将 `pixel-output-only` 继续拆成 pixel-compute-only / display-only / tiny-pixel-output probes，区分 pixel shader、pixel buffer 写入和 fullscreen display pass。
+  - `RENDER-005P`: 将 fullscreen pixel-storage display pass 替换/对照为 texture-backed display probes，区分 storage-buffer fragment read、buffer-to-texture copy 和 sampled-texture presentation。
   - 在 WebGPU-capable 桌面 Chrome 中重跑 Plush / Lego first-frame runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless backend limitation。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -70,6 +70,37 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005O: WebGPU pixel output sub-probes
+
+- 状态: done / display-pass-backend-loss-isolated
+- 类型: 标准 PR / 前端渲染诊断
+- 目标: 将 `pixel-output-only` 继续拆成 pixel-compute-only / display-only / tiny-pixel-output probes，区分 pixel accumulation shader、pixel storage write、fullscreen display pass 和 workload size。
+- 范围外:
+  - 不声明 full WebGPU tile renderer 已稳定通过。
+  - 不改变默认 `npm run audit:webgpu-runtime` 的严格失败语义。
+  - 不把 headless unsafe WebGPU probe 结果等同于桌面 Chrome / production WebGPU 结果。
+- 实施:
+  - `src/webgpuRuntimeProbe.js` 新增 `pixel-compute-only`、`display-only`、`tiny-pixel-output` 和 32px tiny viewport constant。
+  - `App` 在 `tiny-pixel-output` URL probe 下生成 32px WebGPU runtime smoke，用于降低 pixel output workload。
+  - `WebGpuTileViewport` 可独立运行 pixel compute、独立运行 fullscreen display，且 display-only 不再创建空 compute pass。
+  - `scripts/audit-demo.mjs` 的 WebGPU route 在读取 telemetry 前等待 queue done/failed 或 device lost，并验证新增 probe 的 dispatched/skipped stage contract。
+  - Node smoke audit 覆盖新增 probe modes 和 normalize 行为。
+- 诊断结论:
+  - `pixel-compute-only`: pixel accumulation compute / storage write queue done，device active。
+  - `display-only`: 无 compute dispatch，仅 fullscreen pixel-storage display pass 后 device lost、queue failed。
+  - `tiny-pixel-output`: 32px viewport / 16 pixel workgroups 仍 device lost、queue failed，说明问题不是普通 viewport workload size。
+  - 当前 blocker 已收敛到 fullscreen pixel-storage resolve/display path；下一步应对照 texture-backed display，而不是继续拆 pixel compute。
+- 验证:
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5224/ --no-server`: passed，Browser plugin absent，使用 Playwright fallback + built `dist/` static server。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5224/ --no-server --webgpu-probe pixel-compute-only`: passed，`queue=done`、`deviceLost=active`、`pixel=dispatched`。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5224/ --no-server --webgpu-probe display-only`: passed with allowed device lost，`queue=failed`、`deviceLost=lost`、all compute stages skipped。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5224/ --no-server --webgpu-probe tiny-pixel-output`: passed with allowed device lost，`queue=failed`、`deviceLost=lost`、`pixelWorkgroups=16`。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5224/ --no-server`: expected failed，仍报告 `probe=full` 和 `A valid external Instance reference no longer exists`。
 
 ### RENDER-005N: WebGPU runtime pass probes
 
