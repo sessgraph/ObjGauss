@@ -431,6 +431,8 @@ export default function PointCloudViewport({
       data-webgpu-storage-limit-blocker={rendererContract?.storageLimitBlocker ?? ""}
       data-webgpu-storage-limit-max-buffer-size={rendererContract?.storageLimitMaxBufferSize ?? ""}
       data-webgpu-storage-limit-max-binding-size={rendererContract?.storageLimitMaxStorageBufferBindingSize ?? ""}
+      data-webgpu-storage-limit-max-storage-buffers-per-stage={rendererContract?.storageLimitMaxStorageBuffersPerShaderStage ?? ""}
+      data-webgpu-storage-limit-required-storage-buffers-per-stage={rendererContract?.storageLimitRequiredStorageBuffersPerShaderStage ?? ""}
       data-webgpu-storage-limit-effective-max-buffer-size={rendererContract?.storageLimitEffectiveMaxBufferByteLength ?? ""}
       data-webgpu-storage-estimated-layout={rendererContract?.storageEstimatedLayout ?? ""}
       data-webgpu-storage-estimated-buffer-count={rendererContract?.storageEstimatedBufferCount ?? 0}

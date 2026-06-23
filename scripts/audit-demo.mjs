@@ -56,12 +56,14 @@ try {
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
+        `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
+        `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
-        `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize} ` +
+        `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
@@ -152,6 +154,12 @@ async function runAudit(url, assetsToCheck, options) {
       if (!["gaussian-oit", "webgpu-tile"].includes(editRendererId ?? "")) {
         throw new Error(`${asset.id} did not expose a known edit renderer id: ${editRendererId}`);
       }
+      if (editRendererId === "webgpu-tile") {
+        await page.waitForFunction(() => {
+          const activeViewport = document.querySelector(".viewport");
+          return activeViewport?.getAttribute("data-webgpu-first-frame-status") !== "pending";
+        }, undefined, { timeout: 15000 });
+      }
       const rendererTarget = await viewport.getAttribute("data-renderer-target");
       if (rendererTarget !== "webgpu-tile") {
         throw new Error(`${asset.id} did not expose WebGPU tile target: ${rendererTarget}`);
@@ -165,6 +173,8 @@ async function runAudit(url, assetsToCheck, options) {
       const storageLimitBlocker = await viewport.getAttribute("data-webgpu-storage-limit-blocker");
       const storageLimitMaxBufferSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-max-buffer-size") ?? "0");
       const storageLimitMaxBindingSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-max-binding-size") ?? "0");
+      const storageLimitMaxStorageBuffersPerStage = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-max-storage-buffers-per-stage") ?? "0");
+      const storageLimitRequiredStorageBuffersPerStage = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-required-storage-buffers-per-stage") ?? "0");
       const storageLimitEffectiveMaxBufferSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-effective-max-buffer-size") ?? "0");
       const storageEstimatedLayout = await viewport.getAttribute("data-webgpu-storage-estimated-layout");
       const storageEstimatedBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-estimated-buffer-count") ?? "0");
@@ -218,10 +228,11 @@ async function runAudit(url, assetsToCheck, options) {
         storageEstimatedBufferCount < 11 ||
         storageEstimatedByteSize <= 0 ||
         storageEstimatedMaxBufferByteSize <= 0 ||
-        !storageEstimatedMaxBufferKey
+        !storageEstimatedMaxBufferKey ||
+        storageLimitRequiredStorageBuffersPerStage <= 0
       ) {
         throw new Error(
-          `${asset.id} invalid WebGPU storage limit telemetry: gate=${storageLimitGate} reason=${storageLimitReason} blocker=${storageLimitBlocker} layout=${storageEstimatedLayout} buffers=${storageEstimatedBufferCount} bytes=${storageEstimatedByteSize} max=${storageEstimatedMaxBufferKey}:${storageEstimatedMaxBufferByteSize}`,
+          `${asset.id} invalid WebGPU storage limit telemetry: gate=${storageLimitGate} reason=${storageLimitReason} blocker=${storageLimitBlocker} layout=${storageEstimatedLayout} buffers=${storageEstimatedBufferCount} bytes=${storageEstimatedByteSize} max=${storageEstimatedMaxBufferKey}:${storageEstimatedMaxBufferByteSize} storageBuffersPerStage=${storageLimitRequiredStorageBuffersPerStage}/${storageLimitMaxStorageBuffersPerStage}`,
         );
       }
       if (webgpuStatus !== "available") {
@@ -231,13 +242,24 @@ async function runAudit(url, assetsToCheck, options) {
           );
         }
       } else if (storageLimitGate === "blocked") {
-        if (targetGate !== "blocked" || targetGateBlocker !== "webgpu-buffer-limit" || fallbackReason !== "webgpu-buffer-limit") {
+        if (
+          targetGate !== "blocked" ||
+          !["webgpu-buffer-limit", "webgpu-binding-limit"].includes(targetGateBlocker ?? "") ||
+          fallbackReason !== targetGateBlocker
+        ) {
           throw new Error(
             `${asset.id} storage limit blocked but target gate/fallback did not expose buffer-limit: gate=${targetGate} blocker=${targetGateBlocker} fallback=${fallbackReason}`,
           );
         }
       } else if (storageLimitGate !== "pass") {
         throw new Error(`${asset.id} unexpected WebGPU storage limit gate for available device: ${storageLimitGate}`);
+      } else if (
+        storageLimitMaxStorageBuffersPerStage > 0 &&
+        storageLimitMaxStorageBuffersPerStage < storageLimitRequiredStorageBuffersPerStage
+      ) {
+        throw new Error(
+          `${asset.id} WebGPU available but storage buffers per stage are below renderer requirement: ${storageLimitRequiredStorageBuffersPerStage}/${storageLimitMaxStorageBuffersPerStage}`,
+        );
       }
       const tileSmokeLayout = await viewport.getAttribute("data-webgpu-pack-layout");
       if (tileSmokeLayout !== "webgpu-tile-smoke-v1") {
@@ -384,6 +406,12 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
       const webGpuDeviceLostReason = await viewport.getAttribute("data-webgpu-device-lost-reason");
       const webGpuDeviceLostMessage = await viewport.getAttribute("data-webgpu-device-lost-message");
+      const webGpuDeviceErrorStatus = await viewport.getAttribute("data-webgpu-device-error-status");
+      const webGpuDeviceErrorType = await viewport.getAttribute("data-webgpu-device-error-type");
+      const webGpuDeviceErrorMessage = await viewport.getAttribute("data-webgpu-device-error-message");
+      const webGpuQueueStatus = await viewport.getAttribute("data-webgpu-queue-status");
+      const webGpuQueueReason = await viewport.getAttribute("data-webgpu-queue-reason");
+      const webGpuQueueMessage = await viewport.getAttribute("data-webgpu-queue-message");
       const webGpuAccumulationSource = await viewport.getAttribute("data-webgpu-accumulation-source");
       const webGpuAccumulationStatus = await viewport.getAttribute("data-webgpu-accumulation-status");
       const webGpuAccumulationReason = await viewport.getAttribute("data-webgpu-accumulation-reason");
@@ -427,7 +455,7 @@ async function runAudit(url, assetsToCheck, options) {
         }
         if (webGpuDeviceLostStatus === "lost") {
           throw new Error(
-            `${asset.id} WebGPU device was lost after first-frame submission: reason=${webGpuDeviceLostReason} message=${webGpuDeviceLostMessage}`,
+            `${asset.id} WebGPU device was lost after first-frame submission: reason=${webGpuDeviceLostReason} message=${webGpuDeviceLostMessage} deviceError=${webGpuDeviceErrorStatus}:${webGpuDeviceErrorType}:${webGpuDeviceErrorMessage} queue=${webGpuQueueStatus}:${webGpuQueueReason}:${webGpuQueueMessage}`,
           );
         }
         if (
@@ -525,6 +553,12 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,
+        webGpuDeviceErrorStatus,
+        webGpuDeviceErrorType,
+        webGpuDeviceErrorMessage,
+        webGpuQueueStatus,
+        webGpuQueueReason,
+        webGpuQueueMessage,
         webGpuAccumulationSource,
         webGpuAccumulationStatus,
         webGpuAccumulationWorkgroups,
@@ -549,6 +583,8 @@ async function runAudit(url, assetsToCheck, options) {
         storageLimitBlocker,
         storageLimitMaxBufferSize,
         storageLimitMaxBindingSize,
+        storageLimitMaxStorageBuffersPerStage,
+        storageLimitRequiredStorageBuffersPerStage,
         storageLimitEffectiveMaxBufferSize,
         storageEstimatedLayout,
         storageEstimatedBufferCount,

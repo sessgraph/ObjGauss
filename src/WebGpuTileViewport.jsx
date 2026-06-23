@@ -14,6 +14,7 @@ import {
   WEBGPU_TILE_COMPUTE_SHADER,
   WEBGPU_TILE_COMPUTE_SOURCE,
 } from "./webgpuTileComputeShader.js";
+import { WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE } from "./webgpuCapability.js";
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
@@ -22,6 +23,7 @@ import {
 } from "./webgpuTileResolveShader.js";
 
 const BACKGROUND_RGB = [16, 19, 22];
+const WEBGPU_DEVICE_INIT_DELAY_MS = 500;
 
 export default function WebGpuTileViewport({
   points,
@@ -46,6 +48,16 @@ export default function WebGpuTileViewport({
   const [deviceLost, setDeviceLost] = useState({
     status: "active",
     reason: "webgpu-device-active",
+    message: "",
+  });
+  const [deviceError, setDeviceError] = useState({
+    status: "none",
+    type: "",
+    message: "",
+  });
+  const [queue, setQueue] = useState({
+    status: "pending",
+    reason: "webgpu-queue-pending",
     message: "",
   });
   const [compute, setCompute] = useState({
@@ -90,10 +102,21 @@ export default function WebGpuTileViewport({
 
   useEffect(() => {
     let cancelled = false;
+    let ownedRuntime = null;
     const canvas = canvasRef.current;
     setDeviceLost({
       status: "active",
       reason: "webgpu-device-active",
+      message: "",
+    });
+    setDeviceError({
+      status: "none",
+      type: "",
+      message: "",
+    });
+    setQueue({
+      status: "pending",
+      reason: "webgpu-queue-pending",
       message: "",
     });
     if (!canvas || typeof navigator === "undefined" || !navigator.gpu) {
@@ -138,6 +161,16 @@ export default function WebGpuTileViewport({
         reason: "navigator-gpu-unavailable",
         message: "",
       });
+      setDeviceError({
+        status: "unavailable",
+        type: "",
+        message: "navigator-gpu-unavailable",
+      });
+      setQueue({
+        status: "unavailable",
+        reason: "navigator-gpu-unavailable",
+        message: "",
+      });
       return undefined;
     }
 
@@ -145,11 +178,19 @@ export default function WebGpuTileViewport({
       try {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error("webgpu-adapter-unavailable");
-        const device = await adapter.requestDevice();
+        const device = await requestWebGpuTileDevice(adapter);
         if (cancelled) {
-          device.destroy();
           return;
         }
+        device.addEventListener("uncapturederror", (event) => {
+          if (cancelled) return;
+          const error = event.error;
+          setDeviceError({
+            status: "error",
+            type: error?.constructor?.name || error?.name || "GPUError",
+            message: error?.message || String(error || ""),
+          });
+        });
 
         const context = canvas.getContext("webgpu");
         if (!context) throw new Error("webgpu-context-unavailable");
@@ -180,7 +221,7 @@ export default function WebGpuTileViewport({
           },
           primitive: { topology: "triangle-list" },
         });
-        runtimeRef.current = {
+        const runtime = {
           device,
           context,
           format,
@@ -189,6 +230,8 @@ export default function WebGpuTileViewport({
           computePipeline,
           pixelComputePipeline,
         };
+        ownedRuntime = runtime;
+        runtimeRef.current = runtime;
         device.lost.then((info) => {
           if (cancelled) return;
           setDeviceLost({
@@ -198,7 +241,7 @@ export default function WebGpuTileViewport({
           });
         });
         renderFrame({
-          runtime: runtimeRef.current,
+          runtime,
           canvas,
           tileSmoke,
           setFrame,
@@ -206,6 +249,7 @@ export default function WebGpuTileViewport({
           setCompute,
           setPixel,
           setAccumulation,
+          setQueue,
         });
       } catch (error) {
         if (cancelled) return;
@@ -250,16 +294,34 @@ export default function WebGpuTileViewport({
           reason: error?.message || "webgpu-device-unavailable",
           message: "",
         });
+        setDeviceError({
+          status: "unavailable",
+          type: error?.constructor?.name || error?.name || "Error",
+          message: error?.message || "webgpu-device-unavailable",
+        });
+        setQueue({
+          status: "failed",
+          reason: error?.message || "webgpu-queue-unavailable",
+          message: "",
+        });
       }
     }
 
-    init();
+    const initTimer =
+      typeof globalThis.setTimeout === "function"
+        ? globalThis.setTimeout(init, WEBGPU_DEVICE_INIT_DELAY_MS)
+        : null;
+    if (initTimer === null) init();
     return () => {
       cancelled = true;
-      destroyTransientBuffers(runtimeRef.current);
-      runtimeRef.current?.storageBundle?.destroy?.();
-      runtimeRef.current?.device?.destroy();
-      runtimeRef.current = null;
+      if (initTimer !== null && typeof globalThis.clearTimeout === "function") {
+        globalThis.clearTimeout(initTimer);
+      }
+      destroyTransientBuffers(ownedRuntime);
+      ownedRuntime?.storageBundle?.destroy?.();
+      if (runtimeRef.current === ownedRuntime) {
+        runtimeRef.current = null;
+      }
     };
   }, []);
 
@@ -267,7 +329,17 @@ export default function WebGpuTileViewport({
     const runtime = runtimeRef.current;
     const canvas = canvasRef.current;
     if (!runtime || !canvas) return;
-    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage, setCompute, setPixel, setAccumulation });
+    renderFrame({
+      runtime,
+      canvas,
+      tileSmoke,
+      setFrame,
+      setStorage,
+      setCompute,
+      setPixel,
+      setAccumulation,
+      setQueue,
+    });
   }, [tileSmoke]);
 
   useEffect(() => {
@@ -307,6 +379,8 @@ export default function WebGpuTileViewport({
       data-webgpu-storage-limit-blocker={rendererContract?.storageLimitBlocker ?? ""}
       data-webgpu-storage-limit-max-buffer-size={rendererContract?.storageLimitMaxBufferSize ?? ""}
       data-webgpu-storage-limit-max-binding-size={rendererContract?.storageLimitMaxStorageBufferBindingSize ?? ""}
+      data-webgpu-storage-limit-max-storage-buffers-per-stage={rendererContract?.storageLimitMaxStorageBuffersPerShaderStage ?? ""}
+      data-webgpu-storage-limit-required-storage-buffers-per-stage={rendererContract?.storageLimitRequiredStorageBuffersPerShaderStage ?? ""}
       data-webgpu-storage-limit-effective-max-buffer-size={rendererContract?.storageLimitEffectiveMaxBufferByteLength ?? ""}
       data-webgpu-storage-estimated-layout={rendererContract?.storageEstimatedLayout ?? ""}
       data-webgpu-storage-estimated-buffer-count={rendererContract?.storageEstimatedBufferCount ?? 0}
@@ -359,6 +433,12 @@ export default function WebGpuTileViewport({
       data-webgpu-device-lost-status={deviceLost.status}
       data-webgpu-device-lost-reason={deviceLost.reason}
       data-webgpu-device-lost-message={deviceLost.message}
+      data-webgpu-device-error-status={deviceError.status}
+      data-webgpu-device-error-type={deviceError.type}
+      data-webgpu-device-error-message={deviceError.message}
+      data-webgpu-queue-status={queue.status}
+      data-webgpu-queue-reason={queue.reason}
+      data-webgpu-queue-message={queue.message}
       data-webgpu-accumulation-source={accumulation.source}
       data-webgpu-accumulation-status={accumulation.status}
       data-webgpu-accumulation-reason={accumulation.reason}
@@ -402,6 +482,23 @@ export default function WebGpuTileViewport({
   );
 }
 
+async function requestWebGpuTileDevice(adapter) {
+  const supportedStorageBuffersPerStage =
+    adapter.limits?.maxStorageBuffersPerShaderStage ?? 0;
+  if (
+    supportedStorageBuffersPerStage <
+    WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE
+  ) {
+    throw new Error("webgpu-storage-buffer-bindings-too-many");
+  }
+  return adapter.requestDevice({
+    requiredLimits: {
+      maxStorageBuffersPerShaderStage:
+        WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE,
+    },
+  });
+}
+
 function renderFrame({
   runtime,
   canvas,
@@ -411,6 +508,7 @@ function renderFrame({
   setCompute,
   setPixel,
   setAccumulation,
+  setQueue,
 }) {
   const {
     device,
@@ -572,6 +670,25 @@ function renderFrame({
     pass.draw(3);
     pass.end();
     device.queue.submit([encoder.finish()]);
+    setQueue({
+      status: "submitted",
+      reason: "webgpu-queue-submitted",
+      message: "",
+    });
+    device.queue.onSubmittedWorkDone().then(
+      () =>
+        setQueue({
+          status: "done",
+          reason: "webgpu-queue-submitted-work-done",
+          message: "",
+        }),
+      (error) =>
+        setQueue({
+          status: "failed",
+          reason: "webgpu-queue-submitted-work-failed",
+          message: error?.message || String(error || ""),
+        }),
+    );
     setAccumulation({
       status: "dispatched",
       reason: "webgpu-tile-accumulation-dispatched",
@@ -622,6 +739,11 @@ function renderFrame({
       checksum: "",
       pixels: 0,
       source: "",
+    });
+    setQueue({
+      status: "failed",
+      reason: error?.message || "webgpu-queue-submit-failed",
+      message: "",
     });
   }
 }

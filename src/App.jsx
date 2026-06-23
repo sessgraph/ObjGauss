@@ -60,6 +60,7 @@ const BENCHMARK_SCENES = [
     heldout: 0.224084,
   },
 ];
+const WEBGPU_RUNTIME_VIEWPORT_SIZE = 128;
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
@@ -118,6 +119,7 @@ export default function App() {
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
+  const waitForEditRenderer = !useSplatRenderer && webGpuCapability.status === "pending";
   const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
   const webGpuRuntimeTileSmoke = useMemo(() => {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
@@ -129,6 +131,8 @@ export default function App() {
       selectedId,
       renderMode,
       pointSize,
+      viewportWidth: WEBGPU_RUNTIME_VIEWPORT_SIZE,
+      viewportHeight: WEBGPU_RUNTIME_VIEWPORT_SIZE,
       includeTileEntries: true,
       includePixelOutput: true,
       computePixelReference: false,
@@ -516,6 +520,12 @@ export default function App() {
               pointCount={scene.points.length}
               rendererLabel={activeRendererText}
             />
+          ) : waitForEditRenderer ? (
+            <RendererPendingViewport
+              rendererContract={activeEditRenderer}
+              visibleCount={visibleCount}
+              renderModeLabel={renderModeText}
+            />
           ) : useWebGpuTileRenderer ? (
             <WebGpuTileViewport
               points={scene.points}
@@ -676,6 +686,37 @@ export default function App() {
         <span>所选：{selectedId ?? "无"}</span>
       </footer>
     </main>
+  );
+}
+
+function RendererPendingViewport({ rendererContract, visibleCount, renderModeLabel }) {
+  return (
+    <div
+      className="viewport"
+      data-renderer="renderer-pending"
+      data-renderer-target={rendererContract?.targetRendererId ?? "webgpu-tile"}
+      data-renderer-fallback-reason=""
+      data-webgpu-target-gate={rendererContract?.targetGate ?? "blocked"}
+      data-webgpu-target-gate-reason={rendererContract?.targetGateReason ?? "webgpu-capability-detecting"}
+      data-webgpu-target-gate-blocker={rendererContract?.targetGateBlocker ?? "webgpu-capability"}
+      data-webgpu-status="pending"
+      data-visible-count={visibleCount}
+    >
+      <div className="viewportHud">
+        <div>
+          <span className="hudLabel">可见</span>
+          <strong>{visibleCount.toLocaleString()}</strong>
+        </div>
+        <div>
+          <span className="hudLabel">模式</span>
+          <strong>{renderModeLabel}</strong>
+        </div>
+        <div>
+          <span className="hudLabel">WebGPU</span>
+          <strong>pending</strong>
+        </div>
+      </div>
+    </div>
   );
 }
 

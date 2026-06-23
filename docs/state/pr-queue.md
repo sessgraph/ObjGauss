@@ -17,8 +17,8 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005K`: 在 WebGPU-capable 浏览器里重跑 Plush / Lego first-frame runtime audit；若 device-limit gate 阻断，再拆 progressive buffer chunking / lower-resolution viewport output。
+  - `RENDER-005N`: 将 WebGPU runtime path 拆成 accumulation-only / resolve-only / pixel-output-only probes，隔离当前 headless unsafe WebGPU 的 queue backend loss。
+  - 在 WebGPU-capable 桌面 Chrome 中重跑 Plush / Lego first-frame runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless backend limitation。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -70,6 +70,38 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005M: WebGPU required-limit and backend-loss diagnostics
+
+- 状态: done / browser-webgpu-still-pending
+- 类型: 标准 PR / 前端渲染诊断
+- 目标: 消除 WebGPU route 中已知的 storage-buffer binding limit 和 JS cleanup 干扰项，并把当前 runtime blocker 定位到更具体的 queue/backend failure。
+- 范围外:
+  - 不声明 WebGPU tile renderer 已在浏览器 runtime 稳定通过。
+  - 不实现最终 depth-sort / 真实 3D covariance 投影。
+  - 不把编辑态 `原始颜色（编辑预览）` 伪装为 Spark / gsplat 真实对象级重渲染。
+- 实施:
+  - `detectWebGpuCapability()` 改为 adapter-only capability detection，不再创建并销毁 probe `GPUDevice`，避免 capability probe 自身污染 `device.lost` 诊断。
+  - WebGPU tile runtime 在 `requestDevice()` 时显式请求 `requiredLimits.maxStorageBuffersPerShaderStage=9`；shader 当前需要 9 个 storage buffers/stage，当前 adapter 报告可支持 10。
+  - `editRendererContract` 和 DOM contract 新增 storage-buffer binding limit telemetry；低于 9 时 blocked 于 `webgpu-binding-limit`。
+  - `WebGpuTileViewport` cleanup 不再显式调用 `GPUDevice.destroy()`；只销毁 transient/storage buffers，并保留 device-lost 由浏览器 runtime 报告。
+  - WebGPU init 增加短延迟，并在 capability pending 时渲染无 WebGL canvas 的 pending viewport，避免 fallback WebGL context 与 WebGPU 初始化交叉。
+  - 强制 runtime audit 新增 `uncapturederror`、queue submit / `onSubmittedWorkDone()` telemetry；browser route 的内部 viewport output 暂降为 128，用于降低 headless runtime gate 负载，Node smoke 仍覆盖 1024 contract。
+- 诊断结论:
+  - 最小 localhost WebGPU 空提交可稳定 requestAdapter / requestDevice / submit / `onSubmittedWorkDone()`。
+  - ObjGauss WebGPU route 已消除 “storage buffers 9 > default per-stage limit 8” warning，也不再由显式 JS `device.destroy()` 触发 lost。
+  - 当前强制 runtime audit 仍在 first-frame submission 后失败为 `webgpu-device-lost-destroyed`；`deviceError=none`，queue telemetry 为 `webgpu-queue-submitted-work-failed: A valid external Instance reference no longer exists`。
+- 验收:
+  - WebGPU available 时必须请求 renderer 所需 storage-buffer per-stage limit。
+  - storage-buffer per-stage limit 不足时必须明确 fallback 为 `webgpu-binding-limit`。
+  - device-lost failure 必须同时报告 `deviceError` 和 queue state，便于区分 WGSL validation error、JS cleanup、queue/backend loss。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5222/ --no-server`: passed，assets=1，Browser plugin absent，使用 Playwright fallback + built `dist/` static server；覆盖 Spark 真实查看、Gaussian OIT 编辑、画布选择、隔离、删除预览和 `原始颜色（编辑预览）`。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5222/ --no-server`: expected failed；当前 headless unsafe WebGPU 报告 `deviceError=none:: queue=failed:webgpu-queue-submitted-work-failed:A valid external Instance reference no longer exists`。
+  - `npm run audit:demo -- --url http://127.0.0.1:5222/ --no-server`: attempted；本轮全量 3-asset audit 在 Plush/Spark 大场景的 headless SwiftShader GPU process 上长时间满载，已中止，未作为 005M 验收证据。
 
 ### RENDER-005L: WebGPU device-lost telemetry split
 

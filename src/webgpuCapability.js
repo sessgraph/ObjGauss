@@ -6,6 +6,7 @@ export const WEBGPU_TILE_OBJECT_FILTER = "gpu-object-state-buffer";
 export const GAUSSIAN_OIT_RENDERER_ID = "gaussian-oit";
 export const GAUSSIAN_OIT_RENDERER_LABEL = "Gaussian OIT 编辑";
 export const GAUSSIAN_OIT_OBJECT_FILTER = "gpu-object-state-texture";
+export const WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE = 9;
 
 export const INITIAL_WEBGPU_CAPABILITY = Object.freeze({
   status: "pending",
@@ -86,26 +87,14 @@ export async function detectWebGpuCapability() {
     };
   }
 
-  let device = null;
-  try {
-    device = await adapter.requestDevice();
-  } catch {
-    return {
-      status: "unavailable",
-      reason: "webgpu-device-request-failed",
-      label: "不可用",
-    };
-  } finally {
-    device?.destroy?.();
-  }
-
-  const limits = adapter.limits ?? device?.limits;
+  const limits = adapter.limits;
   return {
     status: "available",
-    reason: "webgpu-device-ready",
+    reason: "webgpu-adapter-ready",
     label: "可用",
     maxBufferSize: limits?.maxBufferSize ?? null,
     maxStorageBufferBindingSize: limits?.maxStorageBufferBindingSize ?? null,
+    maxStorageBuffersPerShaderStage: limits?.maxStorageBuffersPerShaderStage ?? null,
   };
 }
 
@@ -133,6 +122,9 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     storageLimitBlocker: storageLimit.blocker,
     storageLimitMaxBufferSize: storageLimit.maxBufferSize,
     storageLimitMaxStorageBufferBindingSize: storageLimit.maxStorageBufferBindingSize,
+    storageLimitMaxStorageBuffersPerShaderStage: storageLimit.maxStorageBuffersPerShaderStage,
+    storageLimitRequiredStorageBuffersPerShaderStage:
+      WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE,
     storageLimitEffectiveMaxBufferByteLength: storageLimit.effectiveMaxBufferByteLength,
     storageEstimatedLayout: storageEstimate.layoutVersion,
     storageEstimatedBufferCount: storageEstimate.bufferCount,
@@ -189,6 +181,7 @@ function fallbackReason(webGpuCapability, targetGate) {
   if (targetGate.gate === "pass") return "";
   if (targetGate.blocker === "tile-overflow") return "webgpu-tile-overflow";
   if (targetGate.blocker === "webgpu-buffer-limit") return "webgpu-buffer-limit";
+  if (targetGate.blocker === "webgpu-binding-limit") return "webgpu-binding-limit";
   if (targetGate.blocker === "webgpu-capability") return webGpuCapability.reason;
   if (webGpuCapability.status === "available") {
     return "webgpu-tile-renderer-not-implemented";
@@ -230,6 +223,9 @@ function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
   const maxStorageBufferBindingSize = positiveLimit(
     webGpuCapability?.maxStorageBufferBindingSize,
   );
+  const maxStorageBuffersPerShaderStage = positiveLimit(
+    webGpuCapability?.maxStorageBuffersPerShaderStage,
+  );
   const effectiveMaxBufferByteLength = Math.min(
     maxBufferSize ?? Number.POSITIVE_INFINITY,
     maxStorageBufferBindingSize ?? Number.POSITIVE_INFINITY,
@@ -242,6 +238,22 @@ function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
       blocker: "webgpu-capability",
       maxBufferSize,
       maxStorageBufferBindingSize,
+      maxStorageBuffersPerShaderStage,
+      effectiveMaxBufferByteLength: finiteOrNull(effectiveMaxBufferByteLength),
+    };
+  }
+
+  if (
+    maxStorageBuffersPerShaderStage !== null &&
+    maxStorageBuffersPerShaderStage < WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE
+  ) {
+    return {
+      gate: "blocked",
+      reason: "webgpu-storage-buffer-bindings-too-many",
+      blocker: "webgpu-binding-limit",
+      maxBufferSize,
+      maxStorageBufferBindingSize,
+      maxStorageBuffersPerShaderStage,
       effectiveMaxBufferByteLength: finiteOrNull(effectiveMaxBufferByteLength),
     };
   }
@@ -253,6 +265,7 @@ function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
       blocker: "",
       maxBufferSize,
       maxStorageBufferBindingSize,
+      maxStorageBuffersPerShaderStage,
       effectiveMaxBufferByteLength: null,
     };
   }
@@ -264,6 +277,7 @@ function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
       blocker: "webgpu-buffer-limit",
       maxBufferSize,
       maxStorageBufferBindingSize,
+      maxStorageBuffersPerShaderStage,
       effectiveMaxBufferByteLength,
     };
   }
@@ -274,6 +288,7 @@ function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
     blocker: "",
     maxBufferSize,
     maxStorageBufferBindingSize,
+    maxStorageBuffersPerShaderStage,
     effectiveMaxBufferByteLength,
   };
 }
