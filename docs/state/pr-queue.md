@@ -17,7 +17,6 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-004B`: Gaussian WebGPU buffer packing、clear/project/bin smoke path。
   - `RENDER-004C`: tile accumulation + fullscreen resolve。
   - `RENDER-004D`: object-state buffer 接入隐藏 / 隔离 / 删除。
   - `RENDER-004E`: browser audit、overflow telemetry 和 fallback hardening。
@@ -27,6 +26,34 @@
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
+
+### RENDER-004B: WebGPU tile smoke packing and binning contract
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在实现 WebGPU accumulation shader 前，先把 ObjGauss Gaussian scene 打包为 future WebGPU storage-buffer layout，并生成 deterministic tile occupancy / overflow telemetry。
+- 范围外:
+  - 不创建 WebGPU compute/render pipeline。
+  - 不把实际编辑 renderer 从 `Gaussian OIT 编辑` 切到 WebGPU。
+  - 不隐藏 fixed-capacity tile list 的 overflow 风险。
+- 实施:
+  - 新增 `src/webgpuTileSmoke.js`，输出 `positionRadius`、`colorOpacity`、`scaleRotation`、`objectIndices`、`objectState`、`tileCounts` 和可选 `tileEntries` typed arrays。
+  - 使用 `16x16` tile、orthographic smoke projection 和 fixed-capacity tile entry cap 生成 pack/binning telemetry。
+  - `App` 将当前 scene、颜色模式、可见 / 隔离 / 删除 object-state 输入 smoke builder，并在状态面板展示 pack、tile bins 和 overflow。
+  - `PointCloudViewport` 暴露 `data-webgpu-pack-layout`、packed / visible / binned Gaussian counts、tile size/count、active tiles、tile references、max tile occupancy、overflow 和目标 object-state buffer。
+  - `audit-demo` 校验三样例的 WebGPU tile smoke DOM contract。
+  - 新增 `npm run audit:webgpu-tile-smoke`，验证 typed array layout 和隔离 / 删除时 binning 计数跟随 object-state 变化。
+- 验收:
+  - 三个默认闭环样例均暴露 `tileSmokeLayout="webgpu-tile-smoke-v1"`。
+  - `packedGaussians`、`binnedGaussians`、active tiles 和 tile references 为正。
+  - `objectFilterTarget="gpu-object-state-buffer"` 已作为 RENDER-004D 目标 contract 暴露。
+  - 当前 headless WebGPU 不可用时仍明确 fallback 到 `Gaussian OIT 编辑`。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，内置 sample packed=5800、tiles=2362/4096、refs=157323。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5199/`: passed，assets=3；Plush packed=281498、activeTiles=3119/4096、tileReferences=10513313、maxTileOccupancy=11026、tileOverflowCount=196038。
+- 完成 commit: `5a98ba8`.
 
 ### RENDER-004A: WebGPU renderer boundary and capability contract
 
