@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import struct
 import zlib
 from dataclasses import dataclass
@@ -42,12 +43,94 @@ class SamMaskManifestResult:
     slots: int
 
 
+@dataclass(frozen=True)
+class MaskManifestSplitResult:
+    train_manifest_path: Path
+    heldout_manifest_path: Path
+    source_frames: int
+    train_frames: int
+    heldout_frames: int
+    train_masks: int
+    heldout_masks: int
+
+
 LEGO_COLOR_SLOTS = (
     {"slot": 0, "label": "yellow"},
     {"slot": 1, "label": "red"},
     {"slot": 2, "label": "dark"},
     {"slot": 3, "label": "other"},
 )
+
+
+def split_mask_manifest(
+    source: str | Path,
+    *,
+    train_output: str | Path,
+    heldout_output: str | Path,
+    heldout_every: int = 4,
+    heldout_offset: int | None = None,
+) -> MaskManifestSplitResult:
+    if heldout_every < 2:
+        raise ValueError("heldout_every must be >= 2")
+    if heldout_offset is None:
+        heldout_offset = heldout_every - 1
+    if heldout_offset < 0 or heldout_offset >= heldout_every:
+        raise ValueError("heldout_offset must be in [0, heldout_every)")
+
+    source = Path(source)
+    train_output = Path(train_output)
+    heldout_output = Path(heldout_output)
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    frames = payload.get("frames")
+    if not isinstance(frames, list) or len(frames) < 2:
+        raise ValueError("mask manifest split requires at least two frames")
+
+    train_frames: list[dict[str, Any]] = []
+    heldout_frames: list[dict[str, Any]] = []
+    for index, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            raise ValueError("each mask frame must be an object")
+        if index % heldout_every == heldout_offset:
+            heldout_frames.append(
+                _rewrite_manifest_frame_paths(frame, source.parent, heldout_output.parent)
+            )
+        else:
+            train_frames.append(
+                _rewrite_manifest_frame_paths(frame, source.parent, train_output.parent)
+            )
+
+    if not train_frames:
+        raise ValueError("mask manifest split produced no train frames")
+    if not heldout_frames:
+        raise ValueError("mask manifest split produced no held-out frames")
+
+    train_manifest = _subset_mask_manifest(
+        payload,
+        source=source,
+        split_kind="train",
+        frames=train_frames,
+        heldout_every=heldout_every,
+        heldout_offset=heldout_offset,
+    )
+    heldout_manifest = _subset_mask_manifest(
+        payload,
+        source=source,
+        split_kind="heldout",
+        frames=heldout_frames,
+        heldout_every=heldout_every,
+        heldout_offset=heldout_offset,
+    )
+    _write_manifest_json(train_output, train_manifest)
+    _write_manifest_json(heldout_output, heldout_manifest)
+    return MaskManifestSplitResult(
+        train_manifest_path=train_output,
+        heldout_manifest_path=heldout_output,
+        source_frames=len(frames),
+        train_frames=len(train_frames),
+        heldout_frames=len(heldout_frames),
+        train_masks=_count_manifest_masks(train_frames),
+        heldout_masks=_count_manifest_masks(heldout_frames),
+    )
 
 
 def build_nerf_alpha_mask_manifest(
@@ -512,6 +595,64 @@ def slot_count_summary(counts: np.ndarray) -> list[dict[str, int | str]]:
         {"slot": int(slot["slot"]), "label": str(slot["label"]), "count": int(counts[index])}
         for index, slot in enumerate(LEGO_COLOR_SLOTS)
     ]
+
+
+def _subset_mask_manifest(
+    payload: dict[str, Any],
+    *,
+    source: Path,
+    split_kind: str,
+    frames: list[dict[str, Any]],
+    heldout_every: int,
+    heldout_offset: int,
+) -> dict[str, Any]:
+    output = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"frames", "split_manifest"}
+    }
+    output["frames"] = frames
+    output["split_manifest"] = {
+        "source": str(source),
+        "kind": split_kind,
+        "heldout_every": int(heldout_every),
+        "heldout_offset": int(heldout_offset),
+        "source_frames": len(payload.get("frames") or []),
+        "frames": len(frames),
+    }
+    return output
+
+
+def _rewrite_manifest_frame_paths(
+    frame: dict[str, Any],
+    source_root: Path,
+    target_root: Path,
+) -> dict[str, Any]:
+    rewritten = json.loads(json.dumps(frame))
+    masks = rewritten.get("masks")
+    if not isinstance(masks, list):
+        return rewritten
+    for mask in masks:
+        if not isinstance(mask, dict):
+            continue
+        mask_path = mask.get("mask_path")
+        if not isinstance(mask_path, str) or not mask_path:
+            continue
+        path = Path(mask_path)
+        if path.is_absolute():
+            continue
+        absolute = (source_root / path).resolve()
+        mask["mask_path"] = os.path.relpath(absolute, target_root.resolve())
+    return rewritten
+
+
+def _count_manifest_masks(frames: list[dict[str, Any]]) -> int:
+    return sum(len(frame.get("masks") or []) for frame in frames)
+
+
+def _write_manifest_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def _create_sam_generator(

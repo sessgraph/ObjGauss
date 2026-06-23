@@ -10,14 +10,19 @@
 
 ## Ready
 
-### SEMANTIC-003B/C: Populate held-out rows and third real Splatfacto scene
+### SEMANTIC-003C: Add third real Splatfacto scene and close paper gate
 
 - 状态: ready
 - 类型: 标准 PR / 训练实验
-- 目标: 为 cross-scene paper gate 补齐至少 3 个真实 Splatfacto scene rows 和 held-out mask eval rows。
+- 目标: 为 cross-scene paper gate 补齐第 3 个真实 Splatfacto scene row 和第 3 个 held-out mask eval row。
+- 当前进展:
+  - 现有 2 个真实 Splatfacto scene 已接入 train / held-out SAM manifest split。
+  - Lego safe-2000: train 6 frames / held-out 2 frames，held-out supervised_gaussians=459，held-out projection_loss=2.301630，held-out render=0.197505。
+  - Fern smoke: train 3 frames / held-out 1 frame，held-out supervised_gaussians=1011，held-out projection_loss=0.670722，held-out render=0.233851。
+  - cross-scene paper gate 当前为 `real_splatfacto_scenes=2/3`、`heldout_eval_rows=2/3`。
 - 范围:
   - 新增第三个真实 Splatfacto scene，优先使用许可和下载路径清楚的数据源。
-  - 为至少 3 个 scene 生成 held-out mask manifests，并启用 `heldout_masks` threshold checks。
+  - 为第三个 scene 生成 train / held-out mask manifests，并启用 held-out summary / threshold checks。
   - 重新跑 `npm run benchmark:cross-scene -- --run`，使 `stage_gate=paper passed=true` 成为可验收目标。
 - 范围外:
   - 不提交 `outputs/`、checkpoint、SAM checkpoint 或训练产物。

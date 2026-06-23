@@ -332,9 +332,14 @@ function flattenSceneRows(summary) {
     final_object_emergence_score:
       scene.curve_object_emergence_score ?? scene.object_emergence_score ?? null,
     render_occlusion_effect_score: scene.render_occlusion_effect_score ?? null,
-    heldout_final_projection_loss: scene.heldout?.final_projection_loss ?? null,
-    heldout_supervised_gaussians: scene.heldout?.supervised_gaussians ?? null,
-    heldout_render_occlusion_effect_score: scene.heldout?.render_occlusion_effect_score ?? null,
+    heldout_final_projection_loss:
+      scene.heldout_projection_loss ?? scene.heldout?.final_projection_loss ?? null,
+    heldout_supervised_gaussians:
+      scene.heldout_supervised_gaussians ?? scene.heldout?.supervised_gaussians ?? null,
+    heldout_render_occlusion_effect_score:
+      scene.heldout_render_occlusion_effect_score ??
+      scene.heldout?.render_occlusion_effect_score ??
+      null,
   }));
 }
 
@@ -406,9 +411,18 @@ function flattenVariantRows(summary) {
       final_spatial_compactness_score: perVariantSummary?.emergence?.spatial_compactness_score ?? null,
       final_object_emergence_score: variant.curve_object_emergence_score ?? variant.object_emergence_score ?? null,
       render_occlusion_effect_score: variant.render_occlusion_effect_score ?? null,
-      heldout_final_projection_loss: null,
-      heldout_supervised_gaussians: null,
-      heldout_render_occlusion_effect_score: null,
+      heldout_final_projection_loss:
+        variant.heldout_projection_loss ??
+        perVariantSummary?.curve?.final_heldout_projection_loss ??
+        null,
+      heldout_supervised_gaussians:
+        variant.heldout_supervised_gaussians ??
+        perVariantSummary?.curve?.final_heldout_supervised_gaussians ??
+        null,
+      heldout_render_occlusion_effect_score:
+        variant.heldout_render_occlusion_effect_score ??
+        perVariantSummary?.curve?.final_heldout_render_occlusion_effect_score ??
+        null,
     };
   });
 }
@@ -553,12 +567,12 @@ function renderMarkdown(summary) {
     "",
     `Generated: ${summary.generated_at}`,
     "",
-    "| Suite | Scene | Variant | Frames | Masks | Slots | Supervised | Object IDs | ARI | OES | Render effect |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |",
+    "| Suite | Scene | Variant | Frames | Masks | Slots | Supervised | Object IDs | ARI | OES | Render effect | Held-out loss |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |",
   ];
   for (const row of summary.rows) {
     lines.push(
-      `| ${row.suite} | ${row.scene_id} | ${row.variant_id} | ${empty(row.frames)} | ${empty(row.masks)} | ${empty(row.slots)} | ${empty(row.supervised_gaussians)} | ${objectCounts(row.object_id_counts)} | ${formatNumber(row.final_ari_to_initial)} | ${formatNumber(row.final_object_emergence_score)} | ${formatNumber(row.render_occlusion_effect_score)} |`,
+      `| ${row.suite} | ${row.scene_id} | ${row.variant_id} | ${empty(row.frames)} | ${empty(row.masks)} | ${empty(row.slots)} | ${empty(row.supervised_gaussians)} | ${objectCounts(row.object_id_counts)} | ${formatNumber(row.final_ari_to_initial)} | ${formatNumber(row.final_object_emergence_score)} | ${formatNumber(row.render_occlusion_effect_score)} | ${formatNumber(row.heldout_final_projection_loss)} |`,
     );
   }
   lines.push("", `Semantic report: ${summary.paths.semantic_report}`);
@@ -582,7 +596,7 @@ function renderMarkdown(summary) {
 function renderHtml(summary) {
   const rows = summary.rows
     .map(
-      (row) => `<tr><td>${escapeHtml(row.suite)}</td><td>${escapeHtml(row.scene_id)}</td><td>${escapeHtml(row.variant_id)}</td><td>${empty(row.frames)}</td><td>${empty(row.masks)}</td><td>${empty(row.slots)}</td><td>${empty(row.supervised_gaussians)}</td><td>${escapeHtml(objectCounts(row.object_id_counts))}</td><td>${formatNumber(row.final_ari_to_initial)}</td><td>${formatNumber(row.final_object_emergence_score)}</td><td>${formatNumber(row.render_occlusion_effect_score)}</td></tr>`,
+      (row) => `<tr><td>${escapeHtml(row.suite)}</td><td>${escapeHtml(row.scene_id)}</td><td>${escapeHtml(row.variant_id)}</td><td>${empty(row.frames)}</td><td>${empty(row.masks)}</td><td>${empty(row.slots)}</td><td>${empty(row.supervised_gaussians)}</td><td>${escapeHtml(objectCounts(row.object_id_counts))}</td><td>${formatNumber(row.final_ari_to_initial)}</td><td>${formatNumber(row.final_object_emergence_score)}</td><td>${formatNumber(row.render_occlusion_effect_score)}</td><td>${formatNumber(row.heldout_final_projection_loss)}</td></tr>`,
     )
     .join("\n");
   return `<!doctype html>
@@ -603,7 +617,7 @@ function renderHtml(summary) {
   <h1>ObjGauss Cross-Scene Emergence Benchmark</h1>
   <p>Generated: ${escapeHtml(summary.generated_at)}</p>
   <table>
-    <thead><tr><th>Suite</th><th>Scene</th><th>Variant</th><th>Frames</th><th>Masks</th><th>Slots</th><th>Supervised</th><th>Object IDs</th><th>ARI</th><th>OES</th><th>Render effect</th></tr></thead>
+    <thead><tr><th>Suite</th><th>Scene</th><th>Variant</th><th>Frames</th><th>Masks</th><th>Slots</th><th>Supervised</th><th>Object IDs</th><th>ARI</th><th>OES</th><th>Render effect</th><th>Held-out loss</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>

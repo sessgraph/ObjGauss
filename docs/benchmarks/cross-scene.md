@@ -100,13 +100,16 @@ heldout_render_occlusion_effect_score
 | `paper` | Requires at least three real Splatfacto scene rows, held-out eval rows, and a failure report. |
 
 As of the current local run, `smoke` and `candidate` pass, while `paper` fails
-because only two real Splatfacto scenes are available and held-out rows are not
-yet populated:
+because only two real Splatfacto scenes are available. Those two scene rows now
+have held-out eval, so the remaining paper-gate gap is one additional real
+Splatfacto scene with the same held-out contract:
 
 ```text
 stage_gate=smoke passed=true
 stage_gate=candidate passed=true
 stage_gate=paper passed=false
+paper.real_splatfacto_scenes actual=2 expected=>=3
+paper.heldout_eval_rows actual=2 expected=>=3
 ```
 
 ## Interpretation Boundary

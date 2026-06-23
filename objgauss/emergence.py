@@ -56,6 +56,8 @@ def object_emergence_curve(
     positions_xyz: np.ndarray | None = None,
     cloud: GaussianCloud | None = None,
     render_frames: list[RenderProbeFrame] | None = None,
+    heldout_vote_result: MaskVoteResult | None = None,
+    heldout_render_frames: list[RenderProbeFrame] | None = None,
     iterations: int = 100,
     learning_rate: float = 0.5,
     eval_every: int = 10,
@@ -74,6 +76,14 @@ def object_emergence_curve(
     targets, weights = mask_vote_targets(vote_result)
     if not np.any(weights > 0):
         raise ValueError("mask votes did not supervise any Gaussian")
+    heldout_targets = None
+    heldout_weights = None
+    if heldout_vote_result is not None:
+        if heldout_vote_result.votes.shape != field.logits.shape:
+            raise ValueError(
+                f"heldout votes shape {heldout_vote_result.votes.shape} does not match field shape {field.logits.shape}"
+            )
+        heldout_targets, heldout_weights = mask_vote_targets(heldout_vote_result)
 
     logits = field.logits.astype(np.float32, copy=True)
     initial_labels = field.labels()
@@ -101,6 +111,14 @@ def object_emergence_curve(
             projection_loss_value=projection_loss(current.logits, targets, weights),
             mask_proxy_occlusion=mask_proxy_occlusion_delta(current, targets, weights),
             render_occlusion=render_occlusion,
+            heldout=_heldout_curve_eval(
+                current,
+                vote_result=heldout_vote_result,
+                targets=heldout_targets,
+                weights=heldout_weights,
+                cloud=cloud,
+                render_frames=heldout_render_frames,
+            ),
             initial_labels=initial_labels,
             ari_to_initial=adjusted_rand_index(initial_labels, labels),
             ari_to_previous=(
@@ -131,6 +149,7 @@ def object_emergence_curve(
         "render_occlusion_delta_kind": (
             _RENDER_OCCLUSION_KIND if cloud is not None and render_frames else None
         ),
+        "heldout": None if heldout_vote_result is None else heldout_vote_result.as_dict(),
         "iterations": iterations,
         "learning_rate": learning_rate,
         "eval_every": eval_every,
@@ -173,6 +192,34 @@ def mask_proxy_occlusion_delta(
     }
 
 
+def _heldout_curve_eval(
+    field: ObjectField,
+    *,
+    vote_result: MaskVoteResult | None,
+    targets: np.ndarray | None,
+    weights: np.ndarray | None,
+    cloud: GaussianCloud | None,
+    render_frames: list[RenderProbeFrame] | None,
+) -> dict[str, Any] | None:
+    if vote_result is None or targets is None or weights is None:
+        return None
+    supervised = weights > 0
+    loss = projection_loss(field.logits, targets, weights) if np.any(supervised) else None
+    render_occlusion = (
+        render_occlusion_delta(cloud, field, render_frames)
+        if cloud is not None and render_frames
+        else None
+    )
+    return {
+        "projection_loss": loss,
+        "frames": vote_result.frames,
+        "projected": vote_result.projected,
+        "matched": vote_result.matched,
+        "supervised_gaussians": vote_result.supervised_gaussians,
+        "render_occlusion_delta": render_occlusion,
+    }
+
+
 def write_emergence_curve_csv(path: str | Path, curve: dict[str, Any]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -195,6 +242,9 @@ def write_emergence_curve_csv(path: str | Path, curve: dict[str, Any]) -> None:
         "render_occlusion_mean_non_target_delta_l1",
         "render_occlusion_mean_locality_score",
         "render_occlusion_effect_score",
+        "heldout_projection_loss",
+        "heldout_supervised_gaussians",
+        "heldout_render_occlusion_effect_score",
         "object_emergence_score",
     ]
     with path.open("w", encoding="utf-8", newline="") as file:
@@ -241,6 +291,7 @@ def _curve_point(
     projection_loss_value: float,
     mask_proxy_occlusion: dict[str, Any],
     render_occlusion: dict[str, Any] | None,
+    heldout: dict[str, Any] | None,
     initial_labels: np.ndarray,
     ari_to_initial: float,
     ari_to_previous: float | None,
@@ -267,6 +318,7 @@ def _curve_point(
         "ari_to_previous": ari_to_previous,
         "mask_proxy_occlusion_delta": mask_proxy_occlusion,
         "render_occlusion_delta": render_occlusion,
+        "heldout": heldout,
         "object_emergence_score": score,
         "labels_changed_from_initial_fraction": float(
             np.count_nonzero(field.labels() != initial_labels) / max(field.gaussian_count, 1)
@@ -316,6 +368,8 @@ def _projection_loss_from_probabilities(
 def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
     occlusion = point["mask_proxy_occlusion_delta"]
     render_occlusion = point.get("render_occlusion_delta")
+    heldout = point.get("heldout")
+    heldout_render = heldout.get("render_occlusion_delta") if isinstance(heldout, dict) else None
     score = point["object_emergence_score"]
     return {
         "step": int(point["step"]),
@@ -354,6 +408,17 @@ def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
             None
             if render_occlusion is None
             else float(render_occlusion["occlusion_effect_score"])
+        ),
+        "heldout_projection_loss": (
+            None if not isinstance(heldout, dict) else _optional_float(heldout.get("projection_loss"))
+        ),
+        "heldout_supervised_gaussians": (
+            None if not isinstance(heldout, dict) else int(heldout["supervised_gaussians"])
+        ),
+        "heldout_render_occlusion_effect_score": (
+            None
+            if not isinstance(heldout_render, dict)
+            else float(heldout_render["occlusion_effect_score"])
         ),
         "object_emergence_score": _optional_float(score.get("score")),
     }

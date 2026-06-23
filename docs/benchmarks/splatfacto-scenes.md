@@ -44,6 +44,20 @@ Outputs:
 Each per-scene run delegates to `scripts/benchmark-splatfacto-balanced.mjs`
 with scene-specific paths and SAM settings.
 
+If a scene declares `train_sam_manifest` and `heldout_manifest`, the per-scene
+run first splits the source SAM manifest with `objgauss masks split-manifest`.
+The split writes lightweight JSON manifests only and keeps the original mask
+arrays in place. The current default split holds out every fourth frame:
+
+```json
+{
+  "heldout": {
+    "every": 4,
+    "offset": 3
+  }
+}
+```
+
 The render occlusion probe currently uses the ObjGauss deterministic
 `scale_aware_cpu_splat_l1` renderer. It projects Gaussian centers into the
 mask-manifest cameras, uses Gaussian scale and opacity to rasterize a small CPU
@@ -51,12 +65,13 @@ splat footprint, removes each hard object slot, and compares full-vs-removed
 RGBA images. This is stronger than the earlier center-point probe, but still not
 a full covariance-aware `gsplat` training renderer.
 
-Current local result after refreshing with the scale-aware probe:
+Current local result after refreshing with train/held-out splits and the
+scale-aware probe:
 
-| Scene | ARI | Curve OES | Render effect |
-| --- | ---: | ---: | ---: |
-| `lego-splatfacto-safe-2000` | 0.468745 | 0.780806 | 0.221535 |
-| `fern-splatfacto-smoke` | 0.783070 | 0.780819 | 0.235091 |
+| Scene | Train frames | Held-out frames | ARI | Curve OES | Render effect | Held-out loss | Held-out render |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lego-splatfacto-safe-2000` | 6 | 2 | 0.469787 | 0.784051 | 0.229397 | 2.301630 | 0.197505 |
+| `fern-splatfacto-smoke` | 3 | 1 | 0.790636 | 0.780132 | 0.235029 | 0.670722 | 0.233851 |
 
 ## Fern Preparation
 
@@ -121,5 +136,5 @@ same Object Field metrics, curve generation, and render occlusion probe can run
 across more than one real Splatfacto scene.
 
 The next paper-readiness gap is not another Lego mask policy. It is adding a
-third real Splatfacto scene and held-out view masks so the cross-scene `paper`
-gate can move beyond smoke/candidate status.
+third real Splatfacto scene with the same train/held-out contract so the
+cross-scene `paper` gate can move beyond smoke/candidate status.

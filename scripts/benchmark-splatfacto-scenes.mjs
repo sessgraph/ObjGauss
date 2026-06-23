@@ -76,6 +76,10 @@ function normalizeScene(scene) {
     dataset: resolveManifestPath(scene.dataset),
     inputPly: resolveManifestPath(scene.input_ply),
     samManifest: resolveManifestPath(scene.sam_manifest),
+    trainSamManifest: scene.train_sam_manifest
+      ? resolveManifestPath(scene.train_sam_manifest)
+      : undefined,
+    heldoutManifest: scene.heldout_manifest ? resolveManifestPath(scene.heldout_manifest) : undefined,
     outputDir: resolveManifestPath(scene.output_dir),
     benchmarkOutputDir:
       scene.benchmark_output_dir ??
@@ -92,6 +96,8 @@ function normalizeScene(scene) {
     samMinArea: String(sam.min_area ?? 64),
     samMaxAreaFraction: String(sam.max_area_fraction ?? 1.0),
     samMaxImageSize: sam.max_image_size === undefined ? undefined : String(sam.max_image_size),
+    heldoutEvery: scene.heldout?.every === undefined ? undefined : String(scene.heldout.every),
+    heldoutOffset: scene.heldout?.offset === undefined ? undefined : String(scene.heldout.offset),
     objectIterations: String(benchmark.object_iterations ?? 160),
     curveIterations: String(benchmark.curve_iterations ?? 80),
     evalEvery: String(benchmark.eval_every ?? 20),
@@ -116,6 +122,10 @@ function buildSceneCommand(scene, modeFlag) {
     scene.samManifest,
     "--sam-checkpoint",
     paths.samCheckpoint,
+    ...optionalPair("--train-sam-manifest", scene.trainSamManifest),
+    ...optionalPair("--heldout-manifest", scene.heldoutManifest),
+    ...optionalPair("--heldout-every", scene.heldoutEvery),
+    ...optionalPair("--heldout-offset", scene.heldoutOffset),
     "--output-dir",
     scene.outputDir,
     "--benchmark-output-dir",
@@ -172,6 +182,20 @@ function printStatus() {
         path: scene.samManifest,
         prepare: formatCommand(buildSceneCommand(scene, "--dry-run")),
       },
+      ...(scene.trainSamManifest && scene.heldoutManifest
+        ? [
+            {
+              label: `${scene.id} train SAM manifest`,
+              path: scene.trainSamManifest,
+              prepare: formatCommand(buildSceneCommand(scene, "--run")),
+            },
+            {
+              label: `${scene.id} held-out SAM manifest`,
+              path: scene.heldoutManifest,
+              prepare: formatCommand(buildSceneCommand(scene, "--run")),
+            },
+          ]
+        : []),
       ...(scene.dataparserTransform
         ? [
             {
@@ -341,6 +365,10 @@ function flattenSceneSummary(scene, summary) {
       dataset: scene.dataset,
       input_ply: scene.inputPly,
       sam_manifest: scene.samManifest,
+      train_sam_manifest: scene.trainSamManifest ?? summary.paths.train_sam_manifest ?? null,
+      benchmark_sam_manifest:
+        summary.paths.benchmark_sam_manifest ?? scene.trainSamManifest ?? scene.samManifest,
+      heldout_manifest: scene.heldoutManifest ?? summary.paths.heldout_manifest ?? null,
       output_dir: scene.outputDir,
       curve: summary.paths.curve,
       summary: summary.paths.summary,
@@ -348,6 +376,11 @@ function flattenSceneSummary(scene, summary) {
     frames: summary.sam.frames,
     masks: summary.sam.masks,
     mask_pixels: summary.sam.mask_pixels,
+    source_frames: summary.sam.source_frames ?? null,
+    source_masks: summary.sam.source_masks ?? null,
+    heldout_frames: summary.sam.heldout_frames ?? null,
+    heldout_masks: summary.sam.heldout_masks ?? null,
+    heldout_mask_pixels: summary.sam.heldout_mask_pixels ?? null,
     slots: summary.registration.slots,
     gaussians: summary.registration.gaussians,
     supervised_gaussians: summary.registration.supervised_gaussians,
@@ -361,6 +394,10 @@ function flattenSceneSummary(scene, summary) {
     curve_object_emergence_score: summary.curve.final_object_emergence_score,
     render_occlusion_effect_score: summary.curve.final_render_occlusion_effect_score,
     final_projection_loss: summary.curve.final_projection_loss,
+    heldout_projection_loss: summary.curve.final_heldout_projection_loss,
+    heldout_supervised_gaussians: summary.curve.final_heldout_supervised_gaussians,
+    heldout_render_occlusion_effect_score:
+      summary.curve.final_heldout_render_occlusion_effect_score,
   };
 }
 
@@ -371,6 +408,8 @@ function renderCsv(rows) {
     "frames",
     "masks",
     "mask_pixels",
+    "heldout_frames",
+    "heldout_masks",
     "gaussians",
     "slots",
     "supervised_gaussians",
@@ -381,6 +420,9 @@ function renderCsv(rows) {
     "object_emergence_score",
     "curve_object_emergence_score",
     "render_occlusion_effect_score",
+    "heldout_projection_loss",
+    "heldout_supervised_gaussians",
+    "heldout_render_occlusion_effect_score",
   ];
   const lines = [headers.join(",")];
   for (const row of rows) {
@@ -402,12 +444,12 @@ function renderMarkdown(summary) {
     "",
     `Generated: ${summary.generated_at}`,
     "",
-    "| Scene | Frames | Masks | Gaussians | Slots | Supervised | Object IDs | ARI | OES | Curve OES | Render effect |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |",
+    "| Scene | Train frames | Held-out frames | Masks | Gaussians | Slots | Supervised | Object IDs | ARI | OES | Curve OES | Render effect | Held-out loss |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const item of summary.scenes) {
     rows.push(
-      `| ${item.id} | ${item.frames} | ${item.masks} | ${item.gaussians} | ${item.slots} | ${item.supervised_gaussians} | ${item.object_id_counts.join("/")} | ${formatNumber(item.stability_ari)} | ${formatNumber(item.object_emergence_score)} | ${formatNumber(item.curve_object_emergence_score)} | ${formatNumber(item.render_occlusion_effect_score)} |`,
+      `| ${item.id} | ${item.frames} | ${empty(item.heldout_frames)} | ${item.masks} | ${item.gaussians} | ${item.slots} | ${item.supervised_gaussians} | ${item.object_id_counts.join("/")} | ${formatNumber(item.stability_ari)} | ${formatNumber(item.object_emergence_score)} | ${formatNumber(item.curve_object_emergence_score)} | ${formatNumber(item.render_occlusion_effect_score)} | ${formatNumber(item.heldout_projection_loss)} |`,
     );
   }
   rows.push("", `Report: ${summary.paths.report}`, "");
@@ -422,6 +464,11 @@ function printSuiteSummary(summary) {
     console.log(
       `scene=${item.id} frames=${item.frames} masks=${item.masks} slots=${item.slots} object_id_counts=${item.object_id_counts.join("/")} ari=${formatNumber(item.stability_ari)} oes=${formatNumber(item.object_emergence_score)} render=${formatNumber(item.render_occlusion_effect_score)}`,
     );
+    if (item.heldout_frames !== null && item.heldout_frames !== undefined) {
+      console.log(
+        `heldout_scene=${item.id} frames=${item.heldout_frames} masks=${item.heldout_masks} loss=${formatNumber(item.heldout_projection_loss)} render=${formatNumber(item.heldout_render_occlusion_effect_score)}`,
+      );
+    }
   }
   const topRender = summary.rankings?.by_render_occlusion_effect_score?.[0];
   if (topRender) {
@@ -476,6 +523,10 @@ function toArray(value) {
 
 function numberValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+}
+
+function empty(value) {
+  return value === null || value === undefined ? "" : String(value);
 }
 
 function csvCell(value) {

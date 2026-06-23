@@ -8,6 +8,8 @@
       "dataset": "outputs/assets/training/nerf-synthetic-lego",
       "input_ply": "outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply",
       "sam_manifest": "outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json",
+      "train_sam_manifest": "outputs/masks/nerf-lego-sam-8f-balanced03-slots4/train-mask-manifest.json",
+      "heldout_manifest": "outputs/masks/nerf-lego-sam-8f-balanced03-slots4/heldout-mask-manifest.json",
       "output_dir": "outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-scene-benchmark",
       "benchmark_output_dir": "/tmp/objgauss-splatfacto-scene-suite/lego-splatfacto-safe-2000",
       "asset_id": "nerf-lego-splatfacto-safe-2000-sam8f-balanced03-slots4-scene-benchmark",
@@ -18,6 +20,10 @@
         "max_masks_per_frame": 4,
         "min_area": 64,
         "max_area_fraction": 0.3
+      },
+      "heldout": {
+        "every": 4,
+        "offset": 3
       },
       "benchmark": {
         "object_iterations": 160,
@@ -38,6 +44,8 @@
       "dataset": "outputs/assets/training/nerf-llff-fern",
       "input_ply": "outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply",
       "sam_manifest": "outputs/masks/nerf-fern-sam-smoke/mask-manifest.json",
+      "train_sam_manifest": "outputs/masks/nerf-fern-sam-smoke/train-mask-manifest.json",
+      "heldout_manifest": "outputs/masks/nerf-fern-sam-smoke/heldout-mask-manifest.json",
       "output_dir": "outputs/assets/gaussians/nerf-fern-splatfacto-smoke-sam4f-slots6-benchmark",
       "benchmark_output_dir": "/tmp/objgauss-splatfacto-scene-suite/fern-splatfacto-smoke",
       "dataparser_transform": "outputs/training/nerf-fern-splatfacto-smoke/fern-splatfacto-smoke/splatfacto/smoke-cuda/dataparser_transforms.json",
@@ -50,6 +58,10 @@
         "min_area": 256,
         "max_area_fraction": 0.35,
         "max_image_size": 768
+      },
+      "heldout": {
+        "every": 4,
+        "offset": 3
       },
       "benchmark": {
         "object_iterations": 120,

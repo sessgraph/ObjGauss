@@ -412,6 +412,8 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
     input_path = tmp_path / "camera_cloud.ply"
     field_path = tmp_path / "field.npz"
     masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    (tmp_path / "heldout").mkdir()
+    heldout_masks_path = _write_rect_mask_manifest(tmp_path / "heldout" / "masks.json")
     output_path = tmp_path / "curve.json"
     csv_path = tmp_path / "curve.csv"
     write_ply(input_path, cloud, fmt="ascii")
@@ -427,6 +429,8 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
                 str(field_path),
                 "--masks",
                 str(masks_path),
+                "--heldout-masks",
+                str(heldout_masks_path),
                 "--output",
                 str(output_path),
                 "--csv-output",
@@ -454,9 +458,13 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
     assert curve["points"][-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
     assert curve["points"][-1]["render_occlusion_delta"]["mean_delta_l1"] > 0.0
     assert curve["points"][-1]["render_occlusion_delta"]["kind"] == "scale_aware_cpu_splat_l1"
+    assert curve["points"][-1]["heldout"]["projection_loss"] < curve["points"][0]["heldout"]["projection_loss"]
+    assert curve["points"][-1]["heldout"]["supervised_gaussians"] == 4
+    assert "final_heldout_projection_loss=" in output
     assert "mask_proxy_occlusion_mean_delta_loss" in csv_text
     assert "render_occlusion_mean_delta_l1" in csv_text
     assert "render_occlusion_mean_locality_score" in csv_text
+    assert "heldout_projection_loss" in csv_text
 
 
 def test_object_field_emergence_report_cli_writes_html(tmp_path, capsys):
@@ -523,6 +531,76 @@ def test_object_field_emergence_report_cli_writes_html(tmp_path, capsys):
     assert "Projection loss" in html_text
     assert "Render occlusion effect" in html_text
     assert "<svg" in html_text
+
+
+def test_masks_split_manifest_cli_writes_train_and_heldout_manifests(tmp_path, capsys):
+    source = tmp_path / "source" / "mask-manifest.json"
+    source.parent.mkdir(parents=True)
+    masks_dir = source.parent / "masks"
+    masks_dir.mkdir()
+    for index in range(4):
+        np.save(masks_dir / f"mask_{index}.npy", np.ones((2, 2), dtype=np.bool_))
+    source.write_text(
+        json.dumps(
+            {
+                "width": 2,
+                "height": 2,
+                "camera_angle_x": 0.7,
+                "slots": [{"slot": 0, "label": "object"}],
+                "frames": [
+                    {
+                        "name": f"frame-{index}",
+                        "transform_matrix": np.eye(4, dtype=float).tolist(),
+                        "masks": [
+                            {
+                                "slot": 0,
+                                "label": "object",
+                                "mask_path": f"masks/mask_{index}.npy",
+                            }
+                        ],
+                    }
+                    for index in range(4)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    train = tmp_path / "split" / "train-mask-manifest.json"
+    heldout = tmp_path / "split" / "heldout-mask-manifest.json"
+
+    assert (
+        main(
+            [
+                "masks",
+                "split-manifest",
+                str(source),
+                "--train-output",
+                str(train),
+                "--heldout-output",
+                str(heldout),
+                "--heldout-every",
+                "2",
+                "--heldout-offset",
+                "1",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    train_payload = json.loads(train.read_text(encoding="utf-8"))
+    heldout_payload = json.loads(heldout.read_text(encoding="utf-8"))
+    train_mask_path = train.parent / train_payload["frames"][0]["masks"][0]["mask_path"]
+    heldout_mask_path = heldout.parent / heldout_payload["frames"][0]["masks"][0]["mask_path"]
+
+    assert "train_frames=2" in output
+    assert "heldout_frames=2" in output
+    assert train_payload["split_manifest"]["kind"] == "train"
+    assert heldout_payload["split_manifest"]["kind"] == "heldout"
+    assert [frame["name"] for frame in train_payload["frames"]] == ["frame-0", "frame-2"]
+    assert [frame["name"] for frame in heldout_payload["frames"]] == ["frame-1", "frame-3"]
+    assert train_mask_path.exists()
+    assert heldout_mask_path.exists()
 
 
 def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, capsys):
@@ -761,6 +839,10 @@ def test_splatfacto_scene_benchmark_script_dry_run_reports_pipeline():
     assert "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke" in result.stdout
     assert "scripts/benchmark-splatfacto-balanced.mjs" in result.stdout
     assert "nerf-fern-sam-smoke/mask-manifest.json" in result.stdout
+    assert "--train-sam-manifest" in result.stdout
+    assert "--heldout-manifest" in result.stdout
+    assert "--heldout-every 4" in result.stdout
+    assert "--heldout-offset 3" in result.stdout
     assert "--sam-max-area-fraction 0.35" in result.stdout
     assert "--slots 6" in result.stdout
     assert "/tmp/sam-vit-b.pth" in result.stdout

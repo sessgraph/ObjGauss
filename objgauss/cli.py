@@ -31,6 +31,7 @@ from objgauss.masks import (
     build_nerf_alpha_mask_manifest,
     build_nerf_rgba_color_mask_manifest,
     build_nerf_sam_mask_manifest,
+    split_mask_manifest,
 )
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
@@ -298,19 +299,36 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
         slots=field.slots,
         max_frames=args.max_frames,
     )
+    heldout_votes = None
+    if args.heldout_masks:
+        heldout_votes = vote_masks_to_gaussians(
+            cloud,
+            args.heldout_masks,
+            slots=field.slots,
+            max_frames=args.heldout_max_frames,
+        )
     render_frames = None
+    heldout_render_frames = None
     if not args.no_render_occlusion:
         render_frames = load_render_probe_frames(
             args.masks,
             max_frames=args.max_frames,
             max_size=args.render_size,
         )
+        if args.heldout_masks:
+            heldout_render_frames = load_render_probe_frames(
+                args.heldout_masks,
+                max_frames=args.heldout_max_frames,
+                max_size=args.render_size,
+            )
     curve = object_emergence_curve(
         field,
         votes,
         positions_xyz=cloud_positions_for_metrics(cloud),
         cloud=cloud,
         render_frames=render_frames,
+        heldout_vote_result=heldout_votes,
+        heldout_render_frames=heldout_render_frames,
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         eval_every=args.eval_every,
@@ -324,6 +342,7 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
     final = points[-1]
     final_occlusion = final["mask_proxy_occlusion_delta"]
     final_render_occlusion = final.get("render_occlusion_delta")
+    final_heldout = final.get("heldout")
     print(f"curve={args.output}")
     if args.csv_output:
         print(f"csv={args.csv_output}")
@@ -351,6 +370,18 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
             "final_render_occlusion_effect_score="
             f"{final_render_occlusion['occlusion_effect_score']:.6f}"
         )
+    if isinstance(final_heldout, dict):
+        print(
+            "final_heldout_projection_loss="
+            f"{_format_optional_float(final_heldout.get('projection_loss'))}"
+        )
+        print(f"final_heldout_supervised_gaussians={final_heldout['supervised_gaussians']}")
+        heldout_render = final_heldout.get("render_occlusion_delta")
+        if isinstance(heldout_render, dict):
+            print(
+                "final_heldout_render_occlusion_effect_score="
+                f"{heldout_render['occlusion_effect_score']:.6f}"
+            )
 
 
 def _object_field_emergence_report(args: argparse.Namespace) -> None:
@@ -534,6 +565,23 @@ def _masks_from_nerf_sam(args: argparse.Namespace) -> None:
     print(f"height={result.height}")
     print(f"mask_pixels={result.mask_pixels}")
     print(f"slots={result.slots}")
+
+
+def _masks_split_manifest(args: argparse.Namespace) -> None:
+    result = split_mask_manifest(
+        args.source,
+        train_output=args.train_output,
+        heldout_output=args.heldout_output,
+        heldout_every=args.heldout_every,
+        heldout_offset=args.heldout_offset,
+    )
+    print(f"train_manifest={result.train_manifest_path}")
+    print(f"heldout_manifest={result.heldout_manifest_path}")
+    print(f"source_frames={result.source_frames}")
+    print(f"train_frames={result.train_frames}")
+    print(f"heldout_frames={result.heldout_frames}")
+    print(f"train_masks={result.train_masks}")
+    print(f"heldout_masks={result.heldout_masks}")
 
 
 def _demo_v1_closure(args: argparse.Namespace) -> None:
@@ -885,12 +933,14 @@ def _build_parser() -> argparse.ArgumentParser:
     field_emergence_curve.add_argument("input", type=Path)
     field_emergence_curve.add_argument("--field", required=True, type=Path)
     field_emergence_curve.add_argument("--masks", required=True, type=Path)
+    field_emergence_curve.add_argument("--heldout-masks", type=Path)
     field_emergence_curve.add_argument("--output", "-o", required=True, type=Path)
     field_emergence_curve.add_argument("--csv-output", type=Path)
     field_emergence_curve.add_argument("--iterations", type=int, default=100)
     field_emergence_curve.add_argument("--learning-rate", type=float, default=0.5)
     field_emergence_curve.add_argument("--eval-every", type=int, default=10)
     field_emergence_curve.add_argument("--max-frames", type=int)
+    field_emergence_curve.add_argument("--heldout-max-frames", type=int)
     field_emergence_curve.add_argument(
         "--render-size",
         type=int,
@@ -1012,6 +1062,17 @@ def _build_parser() -> argparse.ArgumentParser:
     nerf_sam.add_argument("--pred-iou-thresh", type=float, default=0.88)
     nerf_sam.add_argument("--stability-score-thresh", type=float, default=0.95)
     nerf_sam.set_defaults(handler=_masks_from_nerf_sam)
+
+    split_manifest = masks_subparsers.add_parser(
+        "split-manifest",
+        help="split an existing mask manifest into train and held-out frame manifests",
+    )
+    split_manifest.add_argument("source", type=Path)
+    split_manifest.add_argument("--train-output", required=True, type=Path)
+    split_manifest.add_argument("--heldout-output", required=True, type=Path)
+    split_manifest.add_argument("--heldout-every", type=int, default=4)
+    split_manifest.add_argument("--heldout-offset", type=int)
+    split_manifest.set_defaults(handler=_masks_split_manifest)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

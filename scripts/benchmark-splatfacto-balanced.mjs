@@ -40,6 +40,11 @@ const assetId =
   options.assetId ?? "nerf-lego-splatfacto-safe-2000-sam8f-balanced03-slots4-benchmark";
 const publicName = options.publicName ?? "nerf_lego_trained";
 const dataparserTransform = options.dataparserTransform;
+const trainSamManifest = options.trainSamManifest;
+const heldoutManifest = options.heldoutManifest;
+const heldoutEvery = options.heldoutEvery ?? "4";
+const heldoutOffset = options.heldoutOffset;
+const benchmarkSamManifest = trainSamManifest ?? paths.samManifest;
 
 const trainingManifest = `${paths.outputDir}/training-output-manifest.json`;
 const maskTrainingSummary = `${paths.outputDir}/mask-training-summary.json`;
@@ -107,6 +112,25 @@ const steps = [
     ],
   },
   {
+    label: "Split SAM manifest into train and held-out frames",
+    skip: !trainSamManifest || !heldoutManifest,
+    command: [
+      "uv",
+      "run",
+      "objgauss",
+      "masks",
+      "split-manifest",
+      paths.samManifest,
+      "--train-output",
+      trainSamManifest,
+      "--heldout-output",
+      heldoutManifest,
+      "--heldout-every",
+      heldoutEvery,
+      ...optionalPair("--heldout-offset", heldoutOffset),
+    ],
+  },
+  {
     label: "Register safe-2000 balanced Object Field",
     command: [
       "uv",
@@ -122,7 +146,7 @@ const steps = [
       "--dataset",
       paths.dataset,
       "--masks",
-      paths.samManifest,
+      benchmarkSamManifest,
       "--slots",
       slots,
       "--iterations",
@@ -161,7 +185,8 @@ const steps = [
       "--field",
       initialField,
       "--masks",
-      paths.samManifest,
+      benchmarkSamManifest,
+      ...optionalPair("--heldout-masks", heldoutManifest),
       "--output",
       curveJson,
       "--csv-output",
@@ -209,6 +234,12 @@ console.log(`mode=${mode}`);
 console.log(`dataset=${paths.dataset}`);
 console.log(`input_ply=${paths.inputPly}`);
 console.log(`sam_manifest=${paths.samManifest}`);
+if (trainSamManifest) {
+  console.log(`train_sam_manifest=${trainSamManifest}`);
+}
+if (heldoutManifest) {
+  console.log(`heldout_manifest=${heldoutManifest}`);
+}
 console.log(`sam_checkpoint=${paths.samCheckpoint}`);
 console.log(`output_dir=${paths.outputDir}`);
 console.log(`benchmark_output_dir=${paths.benchmarkOutputDir}`);
@@ -271,45 +302,59 @@ function printStatus() {
       path: paths.samManifest,
       prepare: formatCommand(steps[0].command),
     },
+    ...(trainSamManifest && heldoutManifest
+      ? [
+          {
+            label: "train SAM manifest",
+            path: trainSamManifest,
+            prepare: formatCommand(steps[2].command),
+          },
+          {
+            label: "held-out SAM manifest",
+            path: heldoutManifest,
+            prepare: formatCommand(steps[2].command),
+          },
+        ]
+      : []),
     {
       label: "registration manifest",
       path: trainingManifest,
-      prepare: formatCommand(steps[1].command),
+      prepare: formatCommand(steps[3].command),
     },
     {
       label: "mask training summary",
       path: maskTrainingSummary,
-      prepare: formatCommand(steps[1].command),
+      prepare: formatCommand(steps[3].command),
     },
     {
       label: "initial Object Field",
       path: initialField,
-      prepare: formatCommand(steps[1].command),
+      prepare: formatCommand(steps[3].command),
     },
     {
       label: "trained Object Field",
       path: trainedField,
-      prepare: formatCommand(steps[1].command),
+      prepare: formatCommand(steps[3].command),
     },
     {
       label: "object-aware PLY",
       path: objectPly,
-      prepare: formatCommand(steps[1].command),
+      prepare: formatCommand(steps[3].command),
     },
     {
       label: "emergence metrics",
       path: emergenceJson,
-      prepare: formatCommand(steps[2].command),
+      prepare: formatCommand(steps[4].command),
     },
     {
       label: "emergence curve",
       path: curveJson,
-      prepare: formatCommand(steps[3].command),
+      prepare: formatCommand(steps[5].command),
     },
     {
       label: "benchmark report",
       path: reportHtml,
-      prepare: formatCommand(steps[4].command),
+      prepare: formatCommand(steps[6].command),
     },
     {
       label: "benchmark summary",
@@ -381,17 +426,27 @@ function printMissing(missing) {
 }
 
 function collectSummary(statsOutput) {
-  const maskManifest = readJson(paths.samManifest);
+  const sourceMaskManifest = readJson(paths.samManifest);
+  const maskManifest = readJson(benchmarkSamManifest);
+  const heldoutMaskManifest =
+    heldoutManifest && existsSync(heldoutManifest) ? readJson(heldoutManifest) : null;
   const trainingManifestData = readJson(trainingManifest);
   const emergence = readJson(emergenceJson);
   const curve = readJson(curveJson);
   const objectCounts = parseObjectCounts(statsOutput);
   const finalPoint = curve.points?.[curve.points.length - 1] ?? {};
   const maskStats = summarizeMaskManifest(maskManifest);
+  const sourceMaskStats = summarizeMaskManifest(sourceMaskManifest);
+  const heldoutStats = heldoutMaskManifest ? summarizeMaskManifest(heldoutMaskManifest) : null;
   const training = trainingManifestData.training ?? {};
   const checks = {
-    frames_at_least_requested: maskStats.frames >= Number.parseInt(samMaxFrames, 10),
+    frames_at_least_requested: sourceMaskStats.frames >= Number.parseInt(samMaxFrames, 10),
+    train_frames_present: maskStats.frames > 0,
     masks_present: maskStats.masks > 0,
+    heldout_recorded:
+      !heldoutManifest ||
+      (typeof finalPoint.heldout?.projection_loss === "number" &&
+        Number(finalPoint.heldout?.supervised_gaussians ?? 0) > 0),
     object_slots_nonempty: objectCounts.length === Number.parseInt(slots, 10) && objectCounts.every((item) => item.count > 0),
     projection_loss_decreased: Number(training.final_loss) < Number(training.initial_loss),
     ari_recorded: typeof emergence.stability?.adjusted_rand_index === "number",
@@ -410,6 +465,9 @@ function collectSummary(statsOutput) {
       dataset: paths.dataset,
       input_ply: paths.inputPly,
       sam_manifest: paths.samManifest,
+      train_sam_manifest: trainSamManifest ?? null,
+      benchmark_sam_manifest: benchmarkSamManifest,
+      heldout_manifest: heldoutManifest ?? null,
       output_dir: paths.outputDir,
       training_manifest: trainingManifest,
       object_ply: objectPly,
@@ -424,8 +482,14 @@ function collectSummary(statsOutput) {
       masks: maskStats.masks,
       mask_pixels: maskStats.mask_pixels,
       slots: maskStats.slots,
-      max_area_fraction: maskManifest.sam?.max_area_fraction ?? null,
-      max_masks_per_frame: maskManifest.sam?.max_masks_per_frame ?? null,
+      source_frames: sourceMaskStats.frames,
+      source_masks: sourceMaskStats.masks,
+      source_mask_pixels: sourceMaskStats.mask_pixels,
+      heldout_frames: heldoutStats?.frames ?? null,
+      heldout_masks: heldoutStats?.masks ?? null,
+      heldout_mask_pixels: heldoutStats?.mask_pixels ?? null,
+      max_area_fraction: sourceMaskManifest.sam?.max_area_fraction ?? maskManifest.sam?.max_area_fraction ?? null,
+      max_masks_per_frame: sourceMaskManifest.sam?.max_masks_per_frame ?? maskManifest.sam?.max_masks_per_frame ?? null,
     },
     registration: {
       gaussians: trainingManifestData.gaussian_count,
@@ -471,6 +535,10 @@ function collectSummary(statsOutput) {
         finalPoint.render_occlusion_delta?.occlusion_effect_score ??
         finalPoint.render_occlusion_delta?.mean_relative_delta_l1 ??
         null,
+      final_heldout_projection_loss: finalPoint.heldout?.projection_loss ?? null,
+      final_heldout_supervised_gaussians: finalPoint.heldout?.supervised_gaussians ?? null,
+      final_heldout_render_occlusion_effect_score:
+        finalPoint.heldout?.render_occlusion_delta?.occlusion_effect_score ?? null,
       final_object_emergence_score: finalPoint.object_emergence_score?.score ?? null,
     },
     checks,
