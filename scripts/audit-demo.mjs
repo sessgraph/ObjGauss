@@ -35,6 +35,10 @@ const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
 const assets = args.asset ? KNOWN_ASSETS.filter((asset) => asset.id === args.asset) : DEFAULT_ASSETS;
+const auditOptions = {
+  requireWebGpu: Boolean(args.requireWebgpu ?? args["require-webgpu"]),
+  webGpuFlags: String(args.webgpuFlags ?? args["webgpu-flags"] ?? process.env.OBJGAUSS_WEBGPU_FLAGS ?? "none"),
+};
 
 if (assets.length === 0) {
   throw new Error(`unknown asset id: ${args.asset}`);
@@ -43,7 +47,7 @@ if (assets.length === 0) {
 const server = args.url || args.noServer ? null : startDevServer(port);
 try {
   await waitForApp(baseUrl);
-  const results = await runAudit(baseUrl, assets);
+  const results = await runAudit(baseUrl, assets, auditOptions);
   for (const result of results) {
     console.log(
         `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
@@ -85,15 +89,18 @@ try {
         `deletedObjects=${result.deletedObjects} screenshot=${result.screenshotPath}`,
     );
   }
-  console.log(`browser_audit=passed assets=${results.length} url=${baseUrl}`);
+  console.log(
+    `browser_audit=passed assets=${results.length} url=${baseUrl} ` +
+      `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)}`,
+  );
 } finally {
   if (server) {
     stopDevServer(server);
   }
 }
 
-async function runAudit(url, assetsToCheck) {
-  const browser = await chromium.launch(launchOptions());
+async function runAudit(url, assetsToCheck, options) {
+  const browser = await chromium.launch(launchOptions(options));
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
   const consoleIssues = [];
   page.on("console", (message) => {
@@ -189,6 +196,19 @@ async function runAudit(url, assetsToCheck) {
         throw new Error(
           `${asset.id} WebGPU unavailable but target gate was not capability-blocked: status=${webgpuStatus} blocker=${targetGateBlocker}`,
         );
+      }
+      if (options.requireWebGpu) {
+        if (
+          webgpuStatus !== "available" ||
+          editRendererId !== "webgpu-tile" ||
+          targetGate !== "pass" ||
+          targetGateBlocker ||
+          fallbackReason
+        ) {
+          throw new Error(
+            `${asset.id} did not satisfy required WebGPU runtime route: status=${webgpuStatus} renderer=${editRendererId} gate=${targetGate} blocker=${targetGateBlocker} fallback=${fallbackReason} flags=${options.webGpuFlags}`,
+          );
+        }
       }
       if (
         !["unknown", "pass", "blocked"].includes(storageLimitGate ?? "") ||
@@ -355,25 +375,26 @@ async function runAudit(url, assetsToCheck) {
           `${asset.id} invalid initial WebGPU object-state buffer: layout=${objectStateLayout} stride=${objectStateStride} visible=${objectStateVisibleObjects} hidden=${objectStateHiddenObjects} removed=${objectStateRemovedObjects} selected=${objectStateSelectedObjects} isolated=${objectStateIsolatedObjects} checksum=${objectStateChecksum}`,
         );
       }
-      const editPixels = await waitForNonBackgroundPixels(page);
-      if (editPixels <= 0) {
-        throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
-      }
       const webGpuFirstFrameStatus = await viewport.getAttribute("data-webgpu-first-frame-status");
+      const webGpuFirstFrameReason = await viewport.getAttribute("data-webgpu-first-frame-reason");
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
       const webGpuAccumulationSource = await viewport.getAttribute("data-webgpu-accumulation-source");
       const webGpuAccumulationStatus = await viewport.getAttribute("data-webgpu-accumulation-status");
+      const webGpuAccumulationReason = await viewport.getAttribute("data-webgpu-accumulation-reason");
       const webGpuAccumulationWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-accumulation-workgroups") ?? "0");
       const webGpuComputeSource = await viewport.getAttribute("data-webgpu-compute-source");
       const webGpuComputeStatus = await viewport.getAttribute("data-webgpu-compute-status");
+      const webGpuComputeReason = await viewport.getAttribute("data-webgpu-compute-reason");
       const webGpuComputeWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-compute-workgroups") ?? "0");
       const webGpuPixelSource = await viewport.getAttribute("data-webgpu-pixel-source");
       const webGpuPixelStatus = await viewport.getAttribute("data-webgpu-pixel-status");
+      const webGpuPixelReason = await viewport.getAttribute("data-webgpu-pixel-reason");
       const webGpuPixelWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-pixel-workgroups") ?? "0");
       const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
+      const webGpuStorageReason = await viewport.getAttribute("data-webgpu-storage-reason");
       const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
       const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
       const webGpuStorageChecksum = await viewport.getAttribute("data-webgpu-storage-checksum");
@@ -397,7 +418,7 @@ async function runAudit(url, assetsToCheck) {
           webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
         ) {
           throw new Error(
-            `${asset.id} WebGPU first frame did not render through accumulation/compute/pixel/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups} pixel=${webGpuPixelStatus}:${webGpuPixelSource}:${webGpuPixelWorkgroups} status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+            `${asset.id} WebGPU first frame did not render through accumulation/compute/pixel/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups}:${webGpuAccumulationReason} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups}:${webGpuComputeReason} pixel=${webGpuPixelStatus}:${webGpuPixelSource}:${webGpuPixelWorkgroups}:${webGpuPixelReason} frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
           );
         }
         if (
@@ -411,9 +432,16 @@ async function runAudit(url, assetsToCheck) {
           !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
         ) {
           throw new Error(
-            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
+            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
+      }
+      const editPixels =
+        editRendererId === "webgpu-tile"
+          ? webGpuFirstFramePixels
+          : await waitForNonBackgroundPixels(page);
+      if (editPixels <= 0) {
+        throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
       }
       const canvasSelectedObject = await selectObjectFromCanvas(page, asset.id);
       await page.getByRole("button", { name: "只看所选" }).click();
@@ -584,13 +612,30 @@ async function runAudit(url, assetsToCheck) {
   }
 }
 
-function launchOptions() {
+function launchOptions(options = {}) {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? firstExisting([
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
   ]);
-  return executablePath ? { executablePath, args: ["--no-sandbox"] } : {};
+  const args = ["--no-sandbox", ...webGpuLaunchArgs(options.webGpuFlags)];
+  return executablePath ? { executablePath, args } : { args };
+}
+
+function webGpuLaunchArgs(mode) {
+  if (mode === "none" || mode === "false" || mode === "") return [];
+  if (mode === "unsafe") {
+    return ["--enable-unsafe-webgpu", "--ignore-gpu-blocklist"];
+  }
+  if (mode === "vulkan") {
+    return [
+      "--enable-unsafe-webgpu",
+      "--ignore-gpu-blocklist",
+      "--enable-features=Vulkan,DefaultANGLEVulkan,WebGPUDeveloperFeatures",
+      "--use-angle=vulkan",
+    ];
+  }
+  throw new Error(`unsupported WebGPU launch flags mode: ${mode}`);
 }
 
 function firstExisting(paths) {

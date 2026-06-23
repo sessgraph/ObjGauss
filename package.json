@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "audit:demo": "node scripts/audit-demo.mjs",
+    "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-tile-smoke": "node scripts/audit-webgpu-tile-smoke.mjs",
     "acceptance:demo": "node scripts/acceptance-demo.mjs",
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",

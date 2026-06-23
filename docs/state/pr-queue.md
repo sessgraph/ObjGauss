@@ -26,6 +26,28 @@
 
 ## In Progress
 
+### RENDER-005K: WebGPU runtime audit entry
+
+- 状态: audit-entry-landed / browser-webgpu-pending
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 固化一条强制 WebGPU runtime route 的浏览器 audit 命令，用于在 WebGPU-capable 浏览器中证明 Plush / Lego first frame 真进入 `webgpu-tile`。
+- 已实施:
+  - `scripts/audit-demo.mjs` 新增 `--require-webgpu`，显式要求 `webgpuStatus=available`、`data-renderer="webgpu-tile"`、target gate pass、无 fallback reason。
+  - `scripts/audit-demo.mjs` 新增 `--webgpu-flags none|unsafe|vulkan`，默认不影响常规 fallback audit；runtime audit 可用 `unsafe` 或 `vulkan` flags 启动 Chromium。
+  - `package.json` 新增 `npm run audit:webgpu-runtime`，默认使用 `--require-webgpu --webgpu-flags unsafe`。
+- 当前阻塞:
+  - 常规 headless Chrome 仍返回 `webgpu-adapter-unavailable`。
+  - 使用 `--webgpu-flags unsafe` 时，NeRF Lego proxy 可进入 WebGPU route，accumulation / resolve / pixel compute 均 dispatch，但 first frame 随后变为 `webgpu-device-lost-destroyed`；这不是最终 runtime pass 证据。
+- 待验证:
+  - 在 WebGPU-capable 浏览器 / 桌面 Chrome 环境中运行 Plush / Lego first-frame runtime audit。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5218/ --no-server`: passed，assets=3，常规 fallback audit 未回归。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5218/ --no-server`: passed，修改后的 audit ordering 在 fallback 单样例上通过。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5218/ --no-server`: expected failed；当前 headless Chrome + unsafe WebGPU flags 下 compute stages dispatched，但 first frame 为 `webgpu-device-lost-destroyed`。
+
 ### RENDER-005A: WebGPU device-backed renderer skeleton
 
 - 状态: implementation-landed / browser-webgpu-pending
