@@ -35,6 +35,7 @@ const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
 );
 const webGpuDepthBins = optionalFiniteNumber(args.webGpuDepthBins ?? args["webgpu-depth-bins"]);
+const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 let server = null;
 
 try {
@@ -59,6 +60,7 @@ try {
         headed,
         webGpuViewportSize,
         webGpuDepthBins,
+        webGpuCameraMode,
       });
       process.stdout.write(result.output);
       process.stderr.write(result.errorOutput);
@@ -184,6 +186,7 @@ try {
       `bestPareto=${JSON.stringify(bestPareto?.asset ?? "none")}/${JSON.stringify(bestPareto?.id ?? "none")}:${bestPareto?.paretoScore ?? "unknown"} ` +
       `bestCoverage=${JSON.stringify(bestCoverage?.asset ?? "none")}/${JSON.stringify(bestCoverage?.id ?? "none")}:${bestCoverage?.coverageRatio ?? "unknown"} ` +
       `gate=${gate.enabled ? (gate.passed ? "passed" : "failed") : "disabled"} ` +
+      `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `url=${baseUrl}`,
   );
   if (gate.enabled && !gate.passed && !allowFailures) {
@@ -193,7 +196,16 @@ try {
   if (server) stopPreviewServer(server);
 }
 
-async function runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpuViewportSize, webGpuDepthBins }) {
+async function runVariant({
+  variant,
+  asset,
+  baseUrl,
+  webGpuFlags,
+  headed,
+  webGpuViewportSize,
+  webGpuDepthBins,
+  webGpuCameraMode,
+}) {
   const commandArgs = [
     "scripts/audit-webgpu-desktop.mjs",
     "--asset",
@@ -216,6 +228,9 @@ async function runVariant({ variant, asset, baseUrl, webGpuFlags, headed, webGpu
   }
   if (Number.isFinite(webGpuDepthBins)) {
     commandArgs.push("--webgpu-depth-bins", String(webGpuDepthBins));
+  }
+  if (webGpuCameraMode) {
+    commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
   }
   return runProcess(process.execPath, commandArgs);
 }

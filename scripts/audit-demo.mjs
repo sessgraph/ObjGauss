@@ -8,6 +8,12 @@ import {
   normalizeWebGpuPixelDepthBinCount,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
 } from "../src/webgpuDepthTuning.js";
+import {
+  normalizeWebGpuCameraTuning,
+  WEBGPU_CAMERA_MODE_EDIT_FIXED,
+  WEBGPU_CAMERA_MODE_SPARK_FRAME,
+  WEBGPU_CAMERA_TUNING_MODE,
+} from "../src/webgpuCameraTuning.js";
 import { WEBGPU_PIXEL_RESOLVE_SOURCE } from "../src/webgpuTileComputeShader.js";
 import {
   WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
@@ -90,6 +96,12 @@ const auditOptions = {
       args["webgpu-depth-bins"] ??
       process.env.OBJGAUSS_WEBGPU_DEPTH_BINS,
   ),
+  webGpuCameraTuning: normalizeWebGpuCameraTuning({
+    cameraMode:
+      args.webGpuCameraMode ??
+      args["webgpu-camera-mode"] ??
+      process.env.OBJGAUSS_WEBGPU_CAMERA_MODE,
+  }),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
   ),
@@ -114,7 +126,7 @@ try {
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)}:${JSON.stringify(result.webGpuViewportQuality)}:${result.webGpuViewportPixelBudget} ` +
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
-        `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
+        `projection=${JSON.stringify(result.webGpuProjectionMode)}:${JSON.stringify(result.webGpuProjectionCameraTuningMode)}:${JSON.stringify(result.webGpuProjectionCameraMode)}:${result.webGpuProjectionCameraFov}:${result.webGpuProjectionCameraDistance} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
         `pixelDepthSort=${JSON.stringify(result.webGpuPixelDepthSortMode)}:${JSON.stringify(result.webGpuPixelDepthTuningMode)}:${result.webGpuPixelDepthGateStrength}/${result.webGpuPixelDepthGateFloor}:${result.webGpuPixelDepthBinCount} ` +
         `pixelCoverage=${JSON.stringify(result.webGpuPixelCoverageMode)}:${JSON.stringify(result.webGpuPixelCoverageTuningMode)}:${result.webGpuPixelCoverageWeightFloor}:${result.webGpuPixelCoverageFootprintScale} ` +
@@ -357,7 +369,13 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuBoundsViewportAspect = Number(await viewport.getAttribute("data-webgpu-bounds-viewport-aspect") ?? "0");
       const webGpuBoundsWorldAspect = Number(await viewport.getAttribute("data-webgpu-bounds-world-aspect") ?? "0");
       const webGpuProjectionMode = await viewport.getAttribute("data-webgpu-projection-mode");
+      const webGpuProjectionCameraTuningMode = await viewport.getAttribute("data-webgpu-projection-camera-tuning-mode");
+      const webGpuProjectionCameraMode = await viewport.getAttribute("data-webgpu-projection-camera-mode");
       const webGpuProjectionCameraFov = Number(await viewport.getAttribute("data-webgpu-projection-camera-fov") ?? "0");
+      const webGpuProjectionCameraPosition = await viewport.getAttribute("data-webgpu-projection-camera-position");
+      const webGpuProjectionCameraTarget = await viewport.getAttribute("data-webgpu-projection-camera-target");
+      const webGpuProjectionCameraDistance = Number(await viewport.getAttribute("data-webgpu-projection-camera-distance") ?? "0");
+      const webGpuProjectionCameraFrameMaxDim = Number(await viewport.getAttribute("data-webgpu-projection-camera-frame-max-dim") ?? "0");
       const webGpuDepthWeightMode = await viewport.getAttribute("data-webgpu-depth-weight-mode");
       const webGpuPixelDepthSortMode = await viewport.getAttribute("data-webgpu-pixel-depth-sort-mode");
       const webGpuPixelDepthTuningMode = await viewport.getAttribute("data-webgpu-pixel-depth-tuning-mode");
@@ -474,9 +492,36 @@ async function runAudit(url, assetsToCheck, options) {
             `${asset.id} WebGPU bounds were not aspect-fit with padding: mode=${webGpuBoundsFitMode} padding=${webGpuBoundsPaddingRatio} worldAspect=${webGpuBoundsWorldAspect} viewportAspect=${webGpuBoundsViewportAspect}`,
           );
         }
-        if (webGpuProjectionMode !== "edit-perspective-camera-v1" || Math.abs(webGpuProjectionCameraFov - 52) > 0.001) {
+        const expectedCameraMode = options.webGpuCameraTuning.cameraMode;
+        const expectedProjection =
+          expectedCameraMode === WEBGPU_CAMERA_MODE_SPARK_FRAME
+            ? {
+                mode: "spark-framed-perspective-camera-v1",
+                fov: 58,
+              }
+            : {
+                mode: "edit-perspective-camera-v1",
+                fov: 52,
+              };
+        if (
+          webGpuProjectionMode !== expectedProjection.mode ||
+          webGpuProjectionCameraTuningMode !== WEBGPU_CAMERA_TUNING_MODE ||
+          webGpuProjectionCameraMode !== expectedCameraMode ||
+          Math.abs(webGpuProjectionCameraFov - expectedProjection.fov) > 0.001 ||
+          webGpuProjectionCameraDistance <= 0 ||
+          !validVectorAttribute(webGpuProjectionCameraPosition) ||
+          !validVectorAttribute(webGpuProjectionCameraTarget)
+        ) {
           throw new Error(
-            `${asset.id} WebGPU projection did not use edit perspective camera: mode=${webGpuProjectionMode} fov=${webGpuProjectionCameraFov}`,
+            `${asset.id} WebGPU projection did not use requested camera contract: expected=${expectedProjection.mode}/${expectedCameraMode}/${expectedProjection.fov} actual=${webGpuProjectionMode}/${webGpuProjectionCameraTuningMode}/${webGpuProjectionCameraMode}/${webGpuProjectionCameraFov} distance=${webGpuProjectionCameraDistance} position=${webGpuProjectionCameraPosition} target=${webGpuProjectionCameraTarget}`,
+          );
+        }
+        if (
+          expectedCameraMode === WEBGPU_CAMERA_MODE_SPARK_FRAME &&
+          webGpuProjectionCameraFrameMaxDim <= 0
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU spark-frame camera did not expose a positive frame max dimension: ${webGpuProjectionCameraFrameMaxDim}`,
           );
         }
         if (
@@ -781,7 +826,13 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuBoundsViewportAspect,
             webGpuBoundsWorldAspect,
             webGpuProjectionMode,
+            webGpuProjectionCameraTuningMode,
+            webGpuProjectionCameraMode,
             webGpuProjectionCameraFov,
+            webGpuProjectionCameraPosition,
+            webGpuProjectionCameraTarget,
+            webGpuProjectionCameraDistance,
+            webGpuProjectionCameraFrameMaxDim,
             webGpuDepthWeightMode,
             webGpuPixelDepthSortMode,
             webGpuPixelDepthTuningMode,
@@ -1018,7 +1069,13 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuBoundsViewportAspect,
         webGpuBoundsWorldAspect,
         webGpuProjectionMode,
+        webGpuProjectionCameraTuningMode,
+        webGpuProjectionCameraMode,
         webGpuProjectionCameraFov,
+        webGpuProjectionCameraPosition,
+        webGpuProjectionCameraTarget,
+        webGpuProjectionCameraDistance,
+        webGpuProjectionCameraFrameMaxDim,
         webGpuDepthWeightMode,
         webGpuPixelDepthSortMode,
         webGpuPixelDepthTuningMode,
@@ -1411,7 +1468,8 @@ function urlWithWebGpuOptions(url, options) {
     !options.webGpuViewportSize &&
     !Number.isFinite(options.webGpuFootprintScale) &&
     !Number.isFinite(options.webGpuCovarianceMaxAnisotropy) &&
-    !Number.isFinite(options.webGpuDepthBins)
+    !Number.isFinite(options.webGpuDepthBins) &&
+    options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED
   ) {
     return url;
   }
@@ -1430,6 +1488,9 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (Number.isFinite(options.webGpuDepthBins)) {
     parsed.searchParams.set("webgpu-depth-bins", String(options.webGpuDepthBins));
+  }
+  if (options.webGpuCameraTuning.cameraMode !== WEBGPU_CAMERA_MODE_EDIT_FIXED) {
+    parsed.searchParams.set("webgpu-camera-mode", options.webGpuCameraTuning.cameraMode);
   }
   return parsed.toString();
 }
@@ -1482,6 +1543,13 @@ function optionalFiniteNumber(value) {
 function clampNumber(value, min, max) {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+function validVectorAttribute(value) {
+  const parts = String(value ?? "")
+    .split(",")
+    .map((entry) => Number(entry));
+  return parts.length === 3 && parts.every((entry) => Number.isFinite(entry));
 }
 
 function startDevServer(port) {

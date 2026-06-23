@@ -39,6 +39,7 @@ const footprintScale =
 const maxAnisotropy =
   optionalFiniteNumber(args.webGpuCovarianceMaxAnisotropy ?? args["webgpu-covariance-max-anisotropy"]) ??
   DEFAULT_MAX_ANISOTROPY;
+const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 let server = null;
 
 try {
@@ -64,6 +65,7 @@ try {
         webGpuViewportSize,
         footprintScale,
         maxAnisotropy,
+        webGpuCameraMode,
       });
       process.stdout.write(result.output);
       process.stderr.write(result.errorOutput);
@@ -171,6 +173,7 @@ try {
     `webgpu_depth_sweep=${overallStatus} ` +
       `assets=${JSON.stringify(assets)} scenes=${assets.length} bins=${JSON.stringify(bins)} ` +
       `footprintScale=${footprintScale} maxAnisotropy=${maxAnisotropy} ` +
+      `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `scoreWeights=${JSON.stringify(SCORE_WEIGHTS)} ` +
       `bestMeanParetoVariant=${JSON.stringify(bestMeanPareto?.id ?? "none")}:${bestMeanPareto?.meanParetoScore ?? "unknown"} ` +
       `bestPareto=${JSON.stringify(bestPareto?.asset ?? "none")}/${JSON.stringify(bestPareto?.id ?? "none")}:${bestPareto?.paretoScore ?? "unknown"} ` +
@@ -190,6 +193,7 @@ async function runDepthVariant({
   webGpuViewportSize,
   footprintScale,
   maxAnisotropy,
+  webGpuCameraMode,
 }) {
   const commandArgs = [
     "scripts/audit-webgpu-desktop.mjs",
@@ -212,6 +216,9 @@ async function runDepthVariant({
   if (!headed) commandArgs.push("--headless");
   if (webGpuViewportSize) {
     commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
+  }
+  if (webGpuCameraMode) {
+    commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
   }
   return runProcess(process.execPath, commandArgs);
 }

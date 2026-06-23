@@ -3,6 +3,12 @@ import {
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
 } from "./webgpuDepthTuning.js";
+import {
+  normalizeWebGpuCameraTuning,
+  WEBGPU_CAMERA_MODE_EDIT_FIXED,
+  WEBGPU_CAMERA_MODE_SPARK_FRAME,
+  WEBGPU_CAMERA_TUNING_MODE,
+} from "./webgpuCameraTuning.js";
 
 export const WEBGPU_TILE_SMOKE_LAYOUT_VERSION = "webgpu-tile-smoke-v1";
 export const WEBGPU_TILE_RESOLVE_VERSION = "webgpu-tile-resolve-v1";
@@ -14,6 +20,7 @@ export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
 export const WEBGPU_TILE_ENTRY_LAYOUT_COMPACT = "compact-offset-list";
 export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
 export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
+export const WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE = "spark-framed-perspective-camera-v1";
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
@@ -43,6 +50,9 @@ const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
 const EDIT_CAMERA_UP = Object.freeze([0, 1, 0]);
 const EDIT_CAMERA_FOV_DEGREES = 52;
+const SPARK_FRAME_CAMERA_FOV_DEGREES = 58;
+const SPARK_FRAME_DISTANCE_MULTIPLIER = 1.7;
+const SPARK_FRAME_HEIGHT_MULTIPLIER = 0.58;
 const EDIT_SPLAT_SIZE_SCALE = WEBGPU_COVERAGE_TUNING_DEFAULTS.footprintScale;
 const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, -0.25],
@@ -69,9 +79,11 @@ export function buildWebGpuTileSmoke({
   computePixelReference = includePixelOutput,
   coverageTuning = null,
   depthSortTuning = null,
+  cameraTuning = null,
 }) {
   const resolvedCoverageTuning = normalizeWebGpuCoverageTuning(coverageTuning);
   const resolvedDepthSortTuning = normalizeWebGpuDepthSortTuning(depthSortTuning);
+  const resolvedCameraTuning = normalizeWebGpuCameraTuning(cameraTuning);
   const pixelDepthBinCount = resolvedDepthSortTuning.pixelDepthBinCount;
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
@@ -83,7 +95,7 @@ export function buildWebGpuTileSmoke({
     selectedId,
   });
   const objectState = objectStateContract.buffer;
-  const bounds = sceneBounds(points, viewportWidth, viewportHeight);
+  const bounds = sceneBounds(points, viewportWidth, viewportHeight, resolvedCameraTuning);
   const tileColumns = Math.max(1, Math.ceil(viewportWidth / tileSize));
   const tileRows = Math.max(1, Math.ceil(viewportHeight / tileSize));
   const tileCount = tileColumns * tileRows;
@@ -281,9 +293,13 @@ export function buildWebGpuTileSmoke({
     boundsViewportAspect: bounds.viewportAspect,
     boundsWorldAspect: bounds.worldAspect,
     projectionMode: bounds.projectionMode,
+    projectionCameraTuningMode: bounds.cameraTuningMode,
+    projectionCameraMode: bounds.cameraMode,
     projectionCameraFovDegrees: bounds.cameraFovDegrees,
     projectionCameraPosition: bounds.cameraPosition,
     projectionCameraTarget: bounds.cameraTarget,
+    projectionCameraDistance: bounds.cameraDistance,
+    projectionCameraFrameMaxDim: bounds.cameraFrameMaxDim,
     projectionDepthMin: bounds.depthMin,
     projectionDepthMax: bounds.depthMax,
     projectionDepthSpan: bounds.depthSpan,
@@ -382,6 +398,10 @@ export function normalizeWebGpuCoverageTuning(tuning = null) {
 }
 
 export {
+  normalizeWebGpuCameraTuning,
+  WEBGPU_CAMERA_MODE_EDIT_FIXED,
+  WEBGPU_CAMERA_MODE_SPARK_FRAME,
+  WEBGPU_CAMERA_TUNING_MODE,
   normalizeWebGpuDepthSortTuning,
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
@@ -391,8 +411,14 @@ export function buildWebGpuTileProjectionBounds(
   points,
   viewportWidth = WEBGPU_TILE_VIEWPORT.width,
   viewportHeight = WEBGPU_TILE_VIEWPORT.height,
+  cameraTuning = null,
 ) {
-  return sceneBounds(points, viewportWidth, viewportHeight);
+  return sceneBounds(
+    points,
+    viewportWidth,
+    viewportHeight,
+    normalizeWebGpuCameraTuning(cameraTuning),
+  );
 }
 
 export function projectPointToWebGpuTileViewport({
@@ -891,8 +917,10 @@ function checksumUint32(checksum, value) {
   return Math.imul(next, 16777619) >>> 0;
 }
 
-function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
-  const cameraProjection = editCameraProjection(viewportWidth, viewportHeight);
+function sceneBounds(points, viewportWidth = 1, viewportHeight = 1, cameraTuning = null) {
+  const resolvedCameraTuning = normalizeWebGpuCameraTuning(cameraTuning);
+  const cameraFrame = cameraFrameForPoints(points, resolvedCameraTuning);
+  const cameraProjection = editCameraProjection(viewportWidth, viewportHeight, cameraFrame);
   if (points.length === 0) {
     return {
       minX: 0,
@@ -905,10 +933,14 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
       paddingRatio: 0,
       viewportAspect: cameraProjection.viewportAspect,
       worldAspect: cameraProjection.viewportAspect,
-      projectionMode: WEBGPU_TILE_PROJECTION_MODE,
-      cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
-      cameraPosition: EDIT_CAMERA_POSITION,
-      cameraTarget: EDIT_CAMERA_TARGET,
+      projectionMode: cameraFrame.projectionMode,
+      cameraTuningMode: WEBGPU_CAMERA_TUNING_MODE,
+      cameraMode: cameraFrame.cameraMode,
+      cameraFovDegrees: cameraFrame.fovDegrees,
+      cameraPosition: cameraFrame.eye,
+      cameraTarget: cameraFrame.target,
+      cameraDistance: cameraFrame.distance,
+      cameraFrameMaxDim: cameraFrame.frameMaxDim,
       depthMin: 0,
       depthMax: 1,
       depthSpan: 1,
@@ -983,10 +1015,14 @@ function fitBoundsToViewport({
     paddingRatio: VIEWPORT_FIT_PADDING_RATIO,
     viewportAspect,
     worldAspect: spanX / spanZ,
-    projectionMode: WEBGPU_TILE_PROJECTION_MODE,
-    cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
-    cameraPosition: EDIT_CAMERA_POSITION,
-    cameraTarget: EDIT_CAMERA_TARGET,
+    projectionMode: cameraProjection.projectionMode,
+    cameraTuningMode: cameraProjection.cameraTuningMode,
+    cameraMode: cameraProjection.cameraMode,
+    cameraFovDegrees: cameraProjection.fovDegrees,
+    cameraPosition: cameraProjection.eye,
+    cameraTarget: cameraProjection.target,
+    cameraDistance: cameraProjection.distance,
+    cameraFrameMaxDim: cameraProjection.frameMaxDim,
     depthMin,
     depthMax,
     depthSpan: Math.max(depthMax - depthMin, 0.0001),
@@ -994,9 +1030,71 @@ function fitBoundsToViewport({
   };
 }
 
-function editCameraProjection(viewportWidth, viewportHeight) {
-  const eye = EDIT_CAMERA_POSITION;
-  const target = EDIT_CAMERA_TARGET;
+function cameraFrameForPoints(points, cameraTuning) {
+  if (cameraTuning.cameraMode === WEBGPU_CAMERA_MODE_SPARK_FRAME && points.length > 0) {
+    return sparkFrameCamera(points);
+  }
+  return {
+    cameraMode: WEBGPU_CAMERA_MODE_EDIT_FIXED,
+    projectionMode: WEBGPU_TILE_PROJECTION_MODE,
+    eye: EDIT_CAMERA_POSITION,
+    target: EDIT_CAMERA_TARGET,
+    fovDegrees: EDIT_CAMERA_FOV_DEGREES,
+    distance: Math.hypot(
+      EDIT_CAMERA_POSITION[0] - EDIT_CAMERA_TARGET[0],
+      EDIT_CAMERA_POSITION[1] - EDIT_CAMERA_TARGET[1],
+      EDIT_CAMERA_POSITION[2] - EDIT_CAMERA_TARGET[2],
+    ),
+    frameMaxDim: 0,
+  };
+}
+
+function sparkFrameCamera(points) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const point of points) {
+    const world = pointRenderWorld(point);
+    minX = Math.min(minX, world[0]);
+    minY = Math.min(minY, world[1]);
+    minZ = Math.min(minZ, world[2]);
+    maxX = Math.max(maxX, world[0]);
+    maxY = Math.max(maxY, world[1]);
+    maxZ = Math.max(maxZ, world[2]);
+  }
+  const center = [
+    (minX + maxX) * 0.5,
+    (minY + maxY) * 0.5,
+    (minZ + maxZ) * 0.5,
+  ];
+  const size = [
+    Math.max(maxX - minX, 0),
+    Math.max(maxY - minY, 0),
+    Math.max(maxZ - minZ, 0),
+  ];
+  const frameMaxDim = Math.max(size[0], size[1], size[2], 0.5);
+  const distance = frameMaxDim * SPARK_FRAME_DISTANCE_MULTIPLIER;
+  return {
+    cameraMode: WEBGPU_CAMERA_MODE_SPARK_FRAME,
+    projectionMode: WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE,
+    eye: [
+      center[0] + distance,
+      center[1] + distance * SPARK_FRAME_HEIGHT_MULTIPLIER,
+      center[2] + distance,
+    ],
+    target: center,
+    fovDegrees: SPARK_FRAME_CAMERA_FOV_DEGREES,
+    distance,
+    frameMaxDim,
+  };
+}
+
+function editCameraProjection(viewportWidth, viewportHeight, cameraFrame) {
+  const eye = cameraFrame.eye;
+  const target = cameraFrame.target;
   const forward = normalize3(subtract3(target, eye));
   const right = normalize3(cross3(forward, EDIT_CAMERA_UP));
   const up = normalize3(cross3(right, forward));
@@ -1006,18 +1104,25 @@ function editCameraProjection(viewportWidth, viewportHeight) {
   );
   return {
     eye,
+    target,
     forward,
     right,
     up,
     viewportWidth: Math.max(1, viewportWidth),
     viewportHeight: Math.max(1, viewportHeight),
     viewportAspect,
-    tanHalfFovY: Math.tan((EDIT_CAMERA_FOV_DEGREES * Math.PI) / 360),
+    tanHalfFovY: Math.tan((cameraFrame.fovDegrees * Math.PI) / 360),
+    projectionMode: cameraFrame.projectionMode,
+    cameraTuningMode: WEBGPU_CAMERA_TUNING_MODE,
+    cameraMode: cameraFrame.cameraMode,
+    fovDegrees: cameraFrame.fovDegrees,
+    distance: cameraFrame.distance,
+    frameMaxDim: cameraFrame.frameMaxDim,
   };
 }
 
 function projectPointWithCamera(point, cameraProjection) {
-  const world = [point.x, point.z, point.y];
+  const world = pointRenderWorld(point);
   const cameraDelta = subtract3(world, cameraProjection.eye);
   const depth = Math.max(0.01, dot3(cameraDelta, cameraProjection.forward));
   const viewX = dot3(cameraDelta, cameraProjection.right);
@@ -1034,6 +1139,10 @@ function projectPointWithCamera(point, cameraProjection) {
     viewY,
     pixelsPerWorldUnit: viewportHeight * 0.5 / (cameraProjection.tanHalfFovY * depth),
   };
+}
+
+function pointRenderWorld(point) {
+  return [point.x, point.z, point.y];
 }
 
 function subtract3(left, right) {

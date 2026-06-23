@@ -1,5 +1,9 @@
 import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
+  WEBGPU_CAMERA_MODE_DEFAULT,
+  WEBGPU_CAMERA_TUNING_MODE,
+} from "./webgpuCameraTuning.js";
+import {
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
 } from "./webgpuDepthTuning.js";
@@ -39,7 +43,13 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   boundsViewportAspect: 1,
   boundsWorldAspect: 1,
   projectionMode: WEBGPU_TILE_PROJECTION_MODE,
+  projectionCameraTuningMode: WEBGPU_CAMERA_TUNING_MODE,
+  projectionCameraMode: WEBGPU_CAMERA_MODE_DEFAULT,
   projectionCameraFovDegrees: 52,
+  projectionCameraPosition: [3.6, 2.8, 3.4],
+  projectionCameraTarget: [0, 0, 0.25],
+  projectionCameraDistance: 5.542788,
+  projectionCameraFrameMaxDim: 0,
   projectionDepthMin: 0,
   projectionDepthMax: 1,
   projectionDepthSpan: 1,
@@ -187,7 +197,13 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     boundsViewportAspect: smoke.boundsViewportAspect,
     boundsWorldAspect: smoke.boundsWorldAspect,
     projectionMode: smoke.projectionMode,
+    projectionCameraTuningMode: smoke.projectionCameraTuningMode,
+    projectionCameraMode: smoke.projectionCameraMode,
     projectionCameraFovDegrees: smoke.projectionCameraFovDegrees,
+    projectionCameraPosition: smoke.projectionCameraPosition,
+    projectionCameraTarget: smoke.projectionCameraTarget,
+    projectionCameraDistance: smoke.projectionCameraDistance,
+    projectionCameraFrameMaxDim: smoke.projectionCameraFrameMaxDim,
     projectionDepthMin: smoke.projectionDepthMin,
     projectionDepthMax: smoke.projectionDepthMax,
     projectionDepthSpan: smoke.projectionDepthSpan,

@@ -32,6 +32,7 @@ import {
 } from "./webgpuRuntimeProbe.js";
 import {
   buildWebGpuTileSmoke,
+  normalizeWebGpuCameraTuning,
   normalizeWebGpuCoverageTuning,
   normalizeWebGpuDepthSortTuning,
 } from "./webgpuTileSmoke.js";
@@ -109,6 +110,7 @@ export default function App() {
   const renderModeText = renderModeLabel(renderMode);
   const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
   const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
+  const webGpuCameraTuning = useMemo(readWebGpuCameraTuning, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -121,6 +123,7 @@ export default function App() {
         pointSize,
         coverageTuning: webGpuCoverageTuning,
         depthSortTuning: webGpuDepthSortTuning,
+        cameraTuning: webGpuCameraTuning,
       }),
     [
       scene.points,
@@ -132,6 +135,7 @@ export default function App() {
       pointSize,
       webGpuCoverageTuning,
       webGpuDepthSortTuning,
+      webGpuCameraTuning,
     ],
   );
   const editRenderer = useMemo(
@@ -190,6 +194,7 @@ export default function App() {
       maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
       coverageTuning: webGpuCoverageTuning,
       depthSortTuning: webGpuDepthSortTuning,
+      cameraTuning: webGpuCameraTuning,
     });
   }, [
     scene.points,
@@ -204,6 +209,7 @@ export default function App() {
     webGpuTileSmoke,
     webGpuCoverageTuning,
     webGpuDepthSortTuning,
+    webGpuCameraTuning,
   ]);
   const activeEditRenderer = useMemo(
     () =>
@@ -896,6 +902,16 @@ function readWebGpuDepthSortTuning() {
   const params = new URLSearchParams(window.location.search);
   return normalizeWebGpuDepthSortTuning({
     depthBins: params.get("webgpu-depth-bins"),
+  });
+}
+
+function readWebGpuCameraTuning() {
+  if (typeof window === "undefined") {
+    return normalizeWebGpuCameraTuning();
+  }
+  const params = new URLSearchParams(window.location.search);
+  return normalizeWebGpuCameraTuning({
+    cameraMode: params.get("webgpu-camera-mode"),
   });
 }
 

@@ -502,7 +502,13 @@ export default function WebGpuTileViewport({
       data-webgpu-bounds-viewport-aspect={rendererContract?.boundsViewportAspect ?? 0}
       data-webgpu-bounds-world-aspect={rendererContract?.boundsWorldAspect ?? 0}
       data-webgpu-projection-mode={rendererContract?.projectionMode ?? ""}
+      data-webgpu-projection-camera-tuning-mode={rendererContract?.projectionCameraTuningMode ?? ""}
+      data-webgpu-projection-camera-mode={rendererContract?.projectionCameraMode ?? ""}
       data-webgpu-projection-camera-fov={rendererContract?.projectionCameraFovDegrees ?? 0}
+      data-webgpu-projection-camera-position={vectorAttribute(rendererContract?.projectionCameraPosition)}
+      data-webgpu-projection-camera-target={vectorAttribute(rendererContract?.projectionCameraTarget)}
+      data-webgpu-projection-camera-distance={rendererContract?.projectionCameraDistance ?? 0}
+      data-webgpu-projection-camera-frame-max-dim={rendererContract?.projectionCameraFrameMaxDim ?? 0}
       data-webgpu-depth-weight-mode={rendererContract?.depthWeightMode ?? ""}
       data-webgpu-pixel-depth-sort-mode={rendererContract?.pixelDepthSortMode ?? ""}
       data-webgpu-pixel-depth-tuning-mode={rendererContract?.pixelDepthTuningMode ?? ""}
@@ -622,6 +628,14 @@ export default function WebGpuTileViewport({
       </div>
     </div>
   );
+}
+
+function vectorAttribute(value) {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((entry) => Number(entry))
+    .map((entry) => (Number.isFinite(entry) ? entry.toFixed(6) : "0.000000"))
+    .join(",");
 }
 
 function readWebGpuRuntimeProbe() {

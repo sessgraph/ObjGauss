@@ -21,6 +21,9 @@ import {
 } from "../src/webgpuTileComputeShader.js";
 import {
   buildWebGpuTileSmoke,
+  WEBGPU_CAMERA_MODE_EDIT_FIXED,
+  WEBGPU_CAMERA_MODE_SPARK_FRAME,
+  WEBGPU_CAMERA_TUNING_MODE,
   WEBGPU_COVERAGE_TUNING_MODE,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
@@ -33,6 +36,7 @@ import {
   WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
   WEBGPU_TILE_PROJECTION_MODE,
   WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
+  WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE,
   WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
 } from "../src/webgpuTileSmoke.js";
 import {
@@ -185,7 +189,13 @@ assert.equal(base.boundsFitMode, "aspect-fit-padding");
 assert.equal(base.boundsPaddingRatio, 0.08);
 assert.ok(Math.abs(base.boundsWorldAspect - base.boundsViewportAspect) < 0.02);
 assert.equal(base.projectionMode, WEBGPU_TILE_PROJECTION_MODE);
+assert.equal(base.projectionCameraTuningMode, WEBGPU_CAMERA_TUNING_MODE);
+assert.equal(base.projectionCameraMode, WEBGPU_CAMERA_MODE_EDIT_FIXED);
 assert.equal(base.projectionCameraFovDegrees, 52);
+assert.deepEqual(base.projectionCameraPosition, [3.6, 2.8, 3.4]);
+assert.deepEqual(base.projectionCameraTarget, [0, 0, 0.25]);
+assert.ok(base.projectionCameraDistance > 5);
+assert.equal(base.projectionCameraFrameMaxDim, 0);
 assert.equal(base.depthWeightMode, WEBGPU_TILE_DEPTH_WEIGHT_MODE);
 assert.equal(base.pixelDepthSortMode, WEBGPU_PIXEL_DEPTH_SORT_MODE);
 assert.equal(base.pixelDepthTuningMode, WEBGPU_DEPTH_SORT_TUNING_MODE);
@@ -213,6 +223,31 @@ assert.equal(base.screenCovarianceFallbackGaussians, 0);
 assert.ok(base.screenCovarianceClampedGaussians >= 0);
 assert.equal(base.screenCovarianceMaxAnisotropy, 4);
 assert.ok(base.screenCovarianceSigmaMean > 0);
+
+const sparkFrameCamera = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  cameraTuning: { cameraMode: WEBGPU_CAMERA_MODE_SPARK_FRAME },
+});
+assert.equal(sparkFrameCamera.projectionMode, WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE);
+assert.equal(sparkFrameCamera.projectionCameraTuningMode, WEBGPU_CAMERA_TUNING_MODE);
+assert.equal(sparkFrameCamera.projectionCameraMode, WEBGPU_CAMERA_MODE_SPARK_FRAME);
+assert.equal(sparkFrameCamera.projectionCameraFovDegrees, 58);
+assert.ok(Array.isArray(sparkFrameCamera.projectionCameraPosition));
+assert.ok(Array.isArray(sparkFrameCamera.projectionCameraTarget));
+assert.equal(sparkFrameCamera.projectionCameraPosition.length, 3);
+assert.equal(sparkFrameCamera.projectionCameraTarget.length, 3);
+assert.ok(sparkFrameCamera.projectionCameraDistance > 0);
+assert.ok(sparkFrameCamera.projectionCameraFrameMaxDim > 0);
+assert.notDeepEqual(sparkFrameCamera.projectionCameraPosition, base.projectionCameraPosition);
+
 assert.ok(base.resolvedTileCount > 0);
 assert.ok(base.pixelResolvedCount > 0);
 assert.ok(base.pixelResolvedCount > base.resolvedTileCount);

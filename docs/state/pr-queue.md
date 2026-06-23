@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-R`: 在 depth-bin sweep 已显示单纯提高 bins 不是 Lego 主因后，继续拆 Spark vs edit 残差中的 SH / view-dependent color 和真实 camera 对齐问题；默认 coverage / depth 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-S`: 在 camera-mode 诊断显示 Spark-frame 主要改善 coverage 但未解决 luma/chroma 后，继续拆 Spark vs edit 残差中的 SH / view-dependent color、真实 per-pixel sorted alpha 或 Spark renderer object filter；默认 coverage / depth / camera 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,37 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-R: WebGPU runtime camera framing diagnostic
+
+- 状态: done / camera-framing-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 depth-bin sweep 已显示单纯提高 bins 不是 Lego 主因后，把 Spark vs edit 残差中的真实 camera alignment 拆成 runtime-tunable contract，避免继续凭主观观感调参数。
+- 已实施:
+  - 新增 `runtime-camera-tuning-v1` 和 URL / audit 参数 `webgpu-camera-mode=edit-fixed|spark-frame`；默认仍保持 `edit-fixed`。
+  - `spark-frame` 使用和 Spark viewer `frameSplat` 一致的 framing 常量：FOV 58、distance=maxDim*1.7、height multiplier 0.58、target=scene center。
+  - `buildWebGpuTileSmoke`、runtime WebGPU smoke、projection bounds、click hit projection 和 storage contract 共用同一 camera tuning。
+  - `WebGpuTileViewport` / `PointCloudViewport` DOM 暴露 camera tuning mode、camera mode、projection mode、fov、position、target、distance 和 frame max dimension。
+  - `audit-demo` / `audit-webgpu-desktop` / coverage sweep / depth sweep 支持 `--webgpu-camera-mode`，并校验 DOM telemetry 命中 requested camera contract。
+- 结论:
+  - 默认 Lego headed WebGPU full audit 保持 `edit-fixed`：coverage ratio=`3.784251`、luma/chroma=`0.106079/0.086537`。
+  - Lego `spark-frame` 通过 headed WebGPU full audit：coverage ratio=`3.766657`、luma/chroma=`0.102396/0.087290`，coverage/luma 小幅改善但 chroma 略差。
+  - Plush semantic `spark-frame` 通过大场景 headed WebGPU full audit：coverage ratio=`4.713926`、luma/chroma=`0.117382/0.016269`；相对历史 baseline coverage 有明显改善，但颜色 delta 不同步改善。
+  - 因此 camera alignment 是“自身颜色编辑预览不像 Spark”的 coverage 贡献项之一，但不是完整主因；下一步应转向 SH/view-dependent color、真实 per-pixel sorted alpha，或把 object filter 接入 Spark renderer。
+- 验证:
+  - `node --check src/webgpuCameraTuning.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `node --check scripts/audit-webgpu-depth-sweep.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5278 --probes full`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5279 --probes full --webgpu-camera-mode spark-frame`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5280 --probes full --webgpu-camera-mode spark-frame`: passed，headed desktop WebGPU full runtime。
 
 ### RENDER-005T-Q: WebGPU depth-bin sweep
 

@@ -35,6 +35,7 @@ const webGpuCovarianceMaxAnisotropy = optionalFiniteNumber(
 const webGpuDepthBins = optionalFiniteNumber(
   args.webGpuDepthBins ?? args["webgpu-depth-bins"],
 );
+const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 let server = null;
 
@@ -63,6 +64,7 @@ try {
       webGpuFootprintScale,
       webGpuCovarianceMaxAnisotropy,
       webGpuDepthBins,
+      webGpuCameraMode,
     });
     results.push(result);
     process.stdout.write(result.output);
@@ -84,6 +86,7 @@ try {
       `webGpuFootprintScale=${webGpuFootprintScale ?? "default"} ` +
       `webGpuCovarianceMaxAnisotropy=${webGpuCovarianceMaxAnisotropy ?? "default"} ` +
       `webGpuDepthBins=${webGpuDepthBins ?? "default"} ` +
+      `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `classification=${JSON.stringify(classification)}`,
   );
   if (failed.length > 0 && !allowFailures) {
@@ -107,6 +110,7 @@ async function runProbe({
   webGpuFootprintScale,
   webGpuCovarianceMaxAnisotropy,
   webGpuDepthBins,
+  webGpuCameraMode,
 }) {
   const commandArgs = [
     "scripts/audit-demo.mjs",
@@ -138,6 +142,9 @@ async function runProbe({
   }
   if (Number.isFinite(webGpuDepthBins)) {
     commandArgs.push("--webgpu-depth-bins", String(webGpuDepthBins));
+  }
+  if (webGpuCameraMode) {
+    commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
   }
 
   const result = await runProcess(process.execPath, commandArgs);

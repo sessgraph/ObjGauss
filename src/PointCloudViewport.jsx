@@ -469,6 +469,14 @@ export default function PointCloudViewport({
       data-webgpu-resolve-alpha-mean={rendererContract?.resolveAlphaMean ?? 0}
       data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
       data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
+      data-webgpu-projection-mode={rendererContract?.projectionMode ?? ""}
+      data-webgpu-projection-camera-tuning-mode={rendererContract?.projectionCameraTuningMode ?? ""}
+      data-webgpu-projection-camera-mode={rendererContract?.projectionCameraMode ?? ""}
+      data-webgpu-projection-camera-fov={rendererContract?.projectionCameraFovDegrees ?? 0}
+      data-webgpu-projection-camera-position={vectorAttribute(rendererContract?.projectionCameraPosition)}
+      data-webgpu-projection-camera-target={vectorAttribute(rendererContract?.projectionCameraTarget)}
+      data-webgpu-projection-camera-distance={rendererContract?.projectionCameraDistance ?? 0}
+      data-webgpu-projection-camera-frame-max-dim={rendererContract?.projectionCameraFrameMaxDim ?? 0}
       data-webgpu-pixel-depth-tuning-mode={rendererContract?.pixelDepthTuningMode ?? ""}
       data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}
       data-webgpu-pixel-coverage-mode={rendererContract?.pixelCoverageMode ?? ""}
@@ -513,6 +521,14 @@ export default function PointCloudViewport({
       </div>
     </div>
   );
+}
+
+function vectorAttribute(value) {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((entry) => Number(entry))
+    .map((entry) => (Number.isFinite(entry) ? entry.toFixed(6) : "0.000000"))
+    .join(",");
 }
 
 function buildBuffers({

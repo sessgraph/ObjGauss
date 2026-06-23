@@ -11,6 +11,12 @@ Depth-bin alpha compositing can be fixed for a run with
 alpha approximations; it does not change the default 8-bin baseline unless a
 candidate passes the same gate.
 
+Camera framing can be fixed for a run with
+`--webgpu-camera-mode edit-fixed|spark-frame`. The default is `edit-fixed`.
+`spark-frame` matches the Spark viewer framing constants more closely and is a
+diagnostic knob for separating camera coverage residual from alpha / SH /
+renderer-compositing residual.
+
 ## Depth-Bin Sweep
 
 Use the depth sweep when comparing sorted-alpha approximations while holding the
@@ -35,6 +41,31 @@ Current Lego result: 8 bins remains the best Pareto variant; 12 bins gives the
 lowest coverage ratio by a tiny margin but worsens chroma. That means simply
 raising the bin count does not currently explain the Spark/edit visual residual
 on Lego.
+
+## Camera Mode Diagnostic
+
+Use the camera mode knob when comparing fixed edit-camera framing against
+Spark-style scene framing:
+
+```bash
+npm run audit:webgpu-desktop -- \
+  --asset nerf-lego-alpha-closure-local \
+  --probes full \
+  --webgpu-camera-mode spark-frame
+```
+
+Current local result:
+
+| Scene | Camera mode | Coverage ratio | Luma delta | Chroma delta |
+| --- | --- | ---: | ---: | ---: |
+| NeRF Lego | edit-fixed | 3.784251 | 0.106079 | 0.086537 |
+| NeRF Lego | spark-frame | 3.766657 | 0.102396 | 0.087290 |
+| Plush semantic | spark-frame | 4.713926 | 0.117382 | 0.016269 |
+
+`spark-frame` slightly improves Lego coverage/luma and substantially improves
+Plush coverage relative to the last baseline coverage gate, but it worsens some
+color deltas. This makes camera framing a useful diagnostic axis, not enough by
+itself to make the edit renderer visually equivalent to Spark.
 
 ## Smoke Sweep
 
