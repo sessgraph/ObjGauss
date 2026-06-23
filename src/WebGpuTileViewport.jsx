@@ -269,6 +269,7 @@ export default function WebGpuTileViewport({
         const pixelResolveModule = device.createShaderModule({
           code: createWebGpuPixelResolveShader({
             pixelDepthBinCount: tileSmoke?.pixelDepthBinCount,
+            pixelDepthAlphaMode: tileSmoke?.pixelDepthAlphaMode,
           }),
         });
         const accumulationModule = device.createShaderModule({ code: WEBGPU_TILE_ACCUMULATION_SHADER });
@@ -512,6 +513,7 @@ export default function WebGpuTileViewport({
       data-webgpu-depth-weight-mode={rendererContract?.depthWeightMode ?? ""}
       data-webgpu-pixel-depth-sort-mode={rendererContract?.pixelDepthSortMode ?? ""}
       data-webgpu-pixel-depth-tuning-mode={rendererContract?.pixelDepthTuningMode ?? ""}
+      data-webgpu-pixel-depth-alpha-mode={rendererContract?.pixelDepthAlphaMode ?? ""}
       data-webgpu-pixel-depth-gate-strength={rendererContract?.pixelDepthGateStrength ?? 0}
       data-webgpu-pixel-depth-gate-floor={rendererContract?.pixelDepthGateFloor ?? 0}
       data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}

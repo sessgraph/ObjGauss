@@ -1,5 +1,7 @@
 import {
+  normalizeWebGpuDepthAlphaMode,
   normalizeWebGpuPixelDepthBinCount,
+  WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
 } from "./webgpuDepthTuning.js";
 
@@ -150,8 +152,13 @@ fn computeMain(@builtin(global_invocation_id) globalId: vec3u) {
 }
 `;
 
-export function createWebGpuPixelResolveShader({ pixelDepthBinCount = WEBGPU_DEPTH_BIN_COUNT_DEFAULT } = {}) {
+export function createWebGpuPixelResolveShader({
+  pixelDepthBinCount = WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+  pixelDepthAlphaMode = null,
+} = {}) {
   const resolvedPixelDepthBinCount = normalizeWebGpuPixelDepthBinCount(pixelDepthBinCount);
+  const resolvedPixelDepthAlphaMode = normalizeWebGpuDepthAlphaMode(pixelDepthAlphaMode);
+  const useFrontTopKAlpha = resolvedPixelDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K;
   return `
 const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_SCALE = 0.18;
@@ -163,6 +170,7 @@ const DEPTH_WEIGHT_FLOOR = 0.22;
 const FRONT_DEPTH_GATE_STRENGTH = 12.0;
 const FRONT_DEPTH_GATE_FLOOR = 0.06;
 const PIXEL_DEPTH_BIN_COUNT = ${resolvedPixelDepthBinCount};
+const USE_FRONT_TOP_K_ALPHA = ${useFrontTopKAlpha ? "true" : "false"};
 
 struct PixelResolveMeta {
   pixelCount: f32,
@@ -209,10 +217,14 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   let entryBase = tileOffsets[tileIndex];
   let pixelCenter = vec2f(f32(pixelX) + 0.5, f32(pixelY) + 0.5);
   var binAccumulation: array<vec4f, PIXEL_DEPTH_BIN_COUNT>;
+  var topDepth: array<f32, PIXEL_DEPTH_BIN_COUNT>;
+  var topAccumulation: array<vec4f, PIXEL_DEPTH_BIN_COUNT>;
   var candidateCount = 0u;
 
   for (var binIndex = 0u; binIndex < u32(PIXEL_DEPTH_BIN_COUNT); binIndex = binIndex + 1u) {
     binAccumulation[binIndex] = vec4f(0.0);
+    topDepth[binIndex] = 1.0e9;
+    topAccumulation[binIndex] = vec4f(0.0);
   }
 
   for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
@@ -249,11 +261,27 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
       0.0,
       0.999999
     );
-    let depthBin = min(
-      u32(floor(normalizedDepth * f32(PIXEL_DEPTH_BIN_COUNT))),
-      u32(PIXEL_DEPTH_BIN_COUNT - 1)
-    );
-    binAccumulation[depthBin] = binAccumulation[depthBin] + vec4f(color.rgb * candidateWeight, candidateWeight);
+    let candidateAccumulation = vec4f(color.rgb * candidateWeight, candidateWeight);
+    if (USE_FRONT_TOP_K_ALPHA) {
+      var insertDepth = normalizedDepth;
+      var insertAccumulation = candidateAccumulation;
+      for (var sortIndex = 0u; sortIndex < u32(PIXEL_DEPTH_BIN_COUNT); sortIndex = sortIndex + 1u) {
+        if (insertDepth < topDepth[sortIndex]) {
+          let previousDepth = topDepth[sortIndex];
+          let previousAccumulation = topAccumulation[sortIndex];
+          topDepth[sortIndex] = insertDepth;
+          topAccumulation[sortIndex] = insertAccumulation;
+          insertDepth = previousDepth;
+          insertAccumulation = previousAccumulation;
+        }
+      }
+    } else {
+      let depthBin = min(
+        u32(floor(normalizedDepth * f32(PIXEL_DEPTH_BIN_COUNT))),
+        u32(PIXEL_DEPTH_BIN_COUNT - 1)
+      );
+      binAccumulation[depthBin] = binAccumulation[depthBin] + candidateAccumulation;
+    }
     candidateCount = candidateCount + 1u;
   }
 
@@ -265,20 +293,39 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   var outputRgbPremultiplied = vec3f(0.0);
   var outputAlpha = 0.0;
   var totalWeight = 0.0;
-  for (var binIndex = 0u; binIndex < u32(PIXEL_DEPTH_BIN_COUNT); binIndex = binIndex + 1u) {
-    let bin = binAccumulation[binIndex];
-    let weight = bin.a;
-    if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) {
-      continue;
+  if (USE_FRONT_TOP_K_ALPHA) {
+    for (var slotIndex = 0u; slotIndex < u32(PIXEL_DEPTH_BIN_COUNT); slotIndex = slotIndex + 1u) {
+      let candidate = topAccumulation[slotIndex];
+      let weight = candidate.a;
+      if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) {
+        continue;
+      }
+      let color = candidate.rgb / max(weight, 0.0001);
+      let alpha = clamp(1.0 - exp(-weight * RESOLVE_ALPHA_SCALE), 0.0, 0.98);
+      let visibility = 1.0 - outputAlpha;
+      outputRgbPremultiplied = outputRgbPremultiplied + visibility * color * alpha;
+      outputAlpha = outputAlpha + visibility * alpha;
+      totalWeight = totalWeight + weight;
+      if (outputAlpha >= 0.995) {
+        break;
+      }
     }
-    let color = bin.rgb / max(weight, 0.0001);
-    let alpha = clamp(1.0 - exp(-weight * RESOLVE_ALPHA_SCALE), 0.0, 0.98);
-    let visibility = 1.0 - outputAlpha;
-    outputRgbPremultiplied = outputRgbPremultiplied + visibility * color * alpha;
-    outputAlpha = outputAlpha + visibility * alpha;
-    totalWeight = totalWeight + weight;
-    if (outputAlpha >= 0.995) {
-      break;
+  } else {
+    for (var binIndex = 0u; binIndex < u32(PIXEL_DEPTH_BIN_COUNT); binIndex = binIndex + 1u) {
+      let bin = binAccumulation[binIndex];
+      let weight = bin.a;
+      if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) {
+        continue;
+      }
+      let color = bin.rgb / max(weight, 0.0001);
+      let alpha = clamp(1.0 - exp(-weight * RESOLVE_ALPHA_SCALE), 0.0, 0.98);
+      let visibility = 1.0 - outputAlpha;
+      outputRgbPremultiplied = outputRgbPremultiplied + visibility * color * alpha;
+      outputAlpha = outputAlpha + visibility * alpha;
+      totalWeight = totalWeight + weight;
+      if (outputAlpha >= 0.995) {
+        break;
+      }
     }
   }
 

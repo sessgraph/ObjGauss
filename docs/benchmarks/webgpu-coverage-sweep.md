@@ -11,6 +11,11 @@ Depth-bin alpha compositing can be fixed for a run with
 alpha approximations; it does not change the default 8-bin baseline unless a
 candidate passes the same gate.
 
+Depth alpha mode can be fixed for a run with
+`--webgpu-depth-alpha-mode depth-binned|front-top-k`. The default is
+`depth-binned`. `front-top-k` keeps the closest K pixel contributors, where K is
+controlled by `--webgpu-depth-bins`, then composites them front-to-back.
+
 Camera framing can be fixed for a run with
 `--webgpu-camera-mode edit-fixed|spark-frame`. The default is `edit-fixed`.
 `spark-frame` matches the Spark viewer framing constants more closely and is a
@@ -66,6 +71,32 @@ Current local result:
 Plush coverage relative to the last baseline coverage gate, but it worsens some
 color deltas. This makes camera framing a useful diagnostic axis, not enough by
 itself to make the edit renderer visually equivalent to Spark.
+
+## Depth Alpha Mode Diagnostic
+
+Use the alpha mode knob when comparing depth-bin compositing against a closer
+front-to-back approximation:
+
+```bash
+npm run audit:webgpu-desktop -- \
+  --asset nerf-lego-alpha-closure-local \
+  --probes full \
+  --webgpu-depth-alpha-mode front-top-k
+```
+
+Current local result:
+
+| Scene | Alpha mode | K | Coverage ratio | Luma delta | Chroma delta |
+| --- | --- | ---: | ---: | ---: | ---: |
+| NeRF Lego | depth-binned | 8 | 3.784251 | 0.106079 | 0.086537 |
+| NeRF Lego | front-top-k | 8 | 3.583371 | 0.208595 | 0.127958 |
+| NeRF Lego | front-top-k | 16 | 3.778381 | 0.173505 | 0.113605 |
+| Plush semantic | front-top-k | 8 | 6.115472 | 0.245489 | 0.077452 |
+
+`front-top-k` proves a real per-pixel sorted-alpha diagnostic path can run in
+the WebGPU tile renderer, but it currently trades lower coverage for worse color
+residual. It should remain a diagnostic mode until a later compositing strategy
+beats the baseline gate on coverage, luma, and chroma together.
 
 ## Smoke Sweep
 

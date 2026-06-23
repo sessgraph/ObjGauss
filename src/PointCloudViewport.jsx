@@ -478,6 +478,7 @@ export default function PointCloudViewport({
       data-webgpu-projection-camera-distance={rendererContract?.projectionCameraDistance ?? 0}
       data-webgpu-projection-camera-frame-max-dim={rendererContract?.projectionCameraFrameMaxDim ?? 0}
       data-webgpu-pixel-depth-tuning-mode={rendererContract?.pixelDepthTuningMode ?? ""}
+      data-webgpu-pixel-depth-alpha-mode={rendererContract?.pixelDepthAlphaMode ?? ""}
       data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}
       data-webgpu-pixel-coverage-mode={rendererContract?.pixelCoverageMode ?? ""}
       data-webgpu-pixel-coverage-tuning-mode={rendererContract?.pixelCoverageTuningMode ?? ""}

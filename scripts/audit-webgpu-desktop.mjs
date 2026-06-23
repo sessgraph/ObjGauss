@@ -35,6 +35,9 @@ const webGpuCovarianceMaxAnisotropy = optionalFiniteNumber(
 const webGpuDepthBins = optionalFiniteNumber(
   args.webGpuDepthBins ?? args["webgpu-depth-bins"],
 );
+const webGpuDepthAlphaMode = optionalString(
+  args.webGpuDepthAlphaMode ?? args["webgpu-depth-alpha-mode"],
+);
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 let server = null;
@@ -64,6 +67,7 @@ try {
       webGpuFootprintScale,
       webGpuCovarianceMaxAnisotropy,
       webGpuDepthBins,
+      webGpuDepthAlphaMode,
       webGpuCameraMode,
     });
     results.push(result);
@@ -86,6 +90,7 @@ try {
       `webGpuFootprintScale=${webGpuFootprintScale ?? "default"} ` +
       `webGpuCovarianceMaxAnisotropy=${webGpuCovarianceMaxAnisotropy ?? "default"} ` +
       `webGpuDepthBins=${webGpuDepthBins ?? "default"} ` +
+      `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `classification=${JSON.stringify(classification)}`,
   );
@@ -110,6 +115,7 @@ async function runProbe({
   webGpuFootprintScale,
   webGpuCovarianceMaxAnisotropy,
   webGpuDepthBins,
+  webGpuDepthAlphaMode,
   webGpuCameraMode,
 }) {
   const commandArgs = [
@@ -142,6 +148,9 @@ async function runProbe({
   }
   if (Number.isFinite(webGpuDepthBins)) {
     commandArgs.push("--webgpu-depth-bins", String(webGpuDepthBins));
+  }
+  if (webGpuDepthAlphaMode) {
+    commandArgs.push("--webgpu-depth-alpha-mode", webGpuDepthAlphaMode);
   }
   if (webGpuCameraMode) {
     commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);

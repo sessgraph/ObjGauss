@@ -902,6 +902,7 @@ function readWebGpuDepthSortTuning() {
   const params = new URLSearchParams(window.location.search);
   return normalizeWebGpuDepthSortTuning({
     depthBins: params.get("webgpu-depth-bins"),
+    depthAlphaMode: params.get("webgpu-depth-alpha-mode"),
   });
 }
 

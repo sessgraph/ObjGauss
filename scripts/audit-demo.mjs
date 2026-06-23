@@ -5,7 +5,11 @@ import { inflateSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import {
+  normalizeWebGpuDepthAlphaMode,
   normalizeWebGpuPixelDepthBinCount,
+  WEBGPU_DEPTH_ALPHA_MODE_DEFAULT,
+  WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
+  WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
 } from "../src/webgpuDepthTuning.js";
 import {
@@ -96,6 +100,11 @@ const auditOptions = {
       args["webgpu-depth-bins"] ??
       process.env.OBJGAUSS_WEBGPU_DEPTH_BINS,
   ),
+  webGpuDepthAlphaMode: normalizeWebGpuDepthAlphaMode(
+    args.webGpuDepthAlphaMode ??
+      args["webgpu-depth-alpha-mode"] ??
+      process.env.OBJGAUSS_WEBGPU_DEPTH_ALPHA_MODE,
+  ),
   webGpuCameraTuning: normalizeWebGpuCameraTuning({
     cameraMode:
       args.webGpuCameraMode ??
@@ -128,7 +137,7 @@ try {
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${JSON.stringify(result.webGpuProjectionCameraTuningMode)}:${JSON.stringify(result.webGpuProjectionCameraMode)}:${result.webGpuProjectionCameraFov}:${result.webGpuProjectionCameraDistance} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
-        `pixelDepthSort=${JSON.stringify(result.webGpuPixelDepthSortMode)}:${JSON.stringify(result.webGpuPixelDepthTuningMode)}:${result.webGpuPixelDepthGateStrength}/${result.webGpuPixelDepthGateFloor}:${result.webGpuPixelDepthBinCount} ` +
+        `pixelDepthSort=${JSON.stringify(result.webGpuPixelDepthSortMode)}:${JSON.stringify(result.webGpuPixelDepthTuningMode)}:${JSON.stringify(result.webGpuPixelDepthAlphaMode)}:${result.webGpuPixelDepthGateStrength}/${result.webGpuPixelDepthGateFloor}:${result.webGpuPixelDepthBinCount} ` +
         `pixelCoverage=${JSON.stringify(result.webGpuPixelCoverageMode)}:${JSON.stringify(result.webGpuPixelCoverageTuningMode)}:${result.webGpuPixelCoverageWeightFloor}:${result.webGpuPixelCoverageFootprintScale} ` +
         `colorFidelity=${JSON.stringify(result.webGpuColorFidelityMode)}:${result.webGpuColorSourceRgbGaussians}/${result.webGpuColorSourceShDcGaussians}/${result.webGpuColorSourceFallbackGaussians}/${result.webGpuColorSourceObjectGaussians}:${result.webGpuColorOpacityMean} ` +
         `colorAfterDelete=${result.webGpuColorSourceRgbGaussiansAfterDelete}/${result.webGpuColorSourceShDcGaussiansAfterDelete}/${result.webGpuColorSourceFallbackGaussiansAfterDelete}/${result.webGpuColorSourceObjectGaussiansAfterDelete} ` +
@@ -379,6 +388,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuDepthWeightMode = await viewport.getAttribute("data-webgpu-depth-weight-mode");
       const webGpuPixelDepthSortMode = await viewport.getAttribute("data-webgpu-pixel-depth-sort-mode");
       const webGpuPixelDepthTuningMode = await viewport.getAttribute("data-webgpu-pixel-depth-tuning-mode");
+      const webGpuPixelDepthAlphaMode = await viewport.getAttribute("data-webgpu-pixel-depth-alpha-mode");
       const webGpuPixelDepthGateStrength = Number(await viewport.getAttribute("data-webgpu-pixel-depth-gate-strength") ?? "0");
       const webGpuPixelDepthGateFloor = Number(await viewport.getAttribute("data-webgpu-pixel-depth-gate-floor") ?? "0");
       const webGpuPixelDepthBinCount = Number(await viewport.getAttribute("data-webgpu-pixel-depth-bin-count") ?? "0");
@@ -525,9 +535,17 @@ async function runAudit(url, assetsToCheck, options) {
           );
         }
         if (
+          ![
+            "depth-binned-alpha-composite-v1",
+            "front-top-k-alpha-composite-v1",
+          ].includes(webGpuPixelDepthSortMode ?? "") ||
           webGpuDepthWeightMode !== "front-weighted-oit-v1" ||
-          webGpuPixelDepthSortMode !== "depth-binned-alpha-composite-v1" ||
           webGpuPixelDepthTuningMode !== WEBGPU_DEPTH_SORT_TUNING_MODE ||
+          webGpuPixelDepthAlphaMode !== options.webGpuDepthAlphaMode ||
+          (webGpuPixelDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED &&
+            webGpuPixelDepthSortMode !== "depth-binned-alpha-composite-v1") ||
+          (webGpuPixelDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K &&
+            webGpuPixelDepthSortMode !== "front-top-k-alpha-composite-v1") ||
           webGpuPixelDepthGateStrength <= 1 ||
           webGpuPixelDepthGateFloor <= 0 ||
           webGpuPixelDepthGateFloor >= 1 ||
@@ -542,7 +560,7 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuProjectionDepthMax <= webGpuProjectionDepthMin
         ) {
           throw new Error(
-            `${asset.id} WebGPU depth/coverage weighting did not expose a valid depth-binned alpha contract: mode=${webGpuDepthWeightMode} pixelSort=${webGpuPixelDepthSortMode}:${webGpuPixelDepthTuningMode} strength=${webGpuPixelDepthGateStrength} floor=${webGpuPixelDepthGateFloor} bins=${webGpuPixelDepthBinCount} coverage=${webGpuPixelCoverageMode}:${webGpuPixelCoverageTuningMode}:${webGpuPixelCoverageWeightFloor}:${webGpuPixelCoverageFootprintScale} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
+            `${asset.id} WebGPU depth/coverage weighting did not expose a valid alpha contract: mode=${webGpuDepthWeightMode} pixelSort=${webGpuPixelDepthSortMode}:${webGpuPixelDepthTuningMode}:${webGpuPixelDepthAlphaMode} strength=${webGpuPixelDepthGateStrength} floor=${webGpuPixelDepthGateFloor} bins=${webGpuPixelDepthBinCount} coverage=${webGpuPixelCoverageMode}:${webGpuPixelCoverageTuningMode}:${webGpuPixelCoverageWeightFloor}:${webGpuPixelCoverageFootprintScale} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
           );
         }
         if (
@@ -836,6 +854,7 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuDepthWeightMode,
             webGpuPixelDepthSortMode,
             webGpuPixelDepthTuningMode,
+            webGpuPixelDepthAlphaMode,
             webGpuPixelDepthGateStrength,
             webGpuPixelDepthGateFloor,
             webGpuPixelDepthBinCount,
@@ -1079,6 +1098,7 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuDepthWeightMode,
         webGpuPixelDepthSortMode,
         webGpuPixelDepthTuningMode,
+        webGpuPixelDepthAlphaMode,
         webGpuPixelDepthGateStrength,
         webGpuPixelDepthGateFloor,
         webGpuPixelDepthBinCount,
@@ -1469,6 +1489,7 @@ function urlWithWebGpuOptions(url, options) {
     !Number.isFinite(options.webGpuFootprintScale) &&
     !Number.isFinite(options.webGpuCovarianceMaxAnisotropy) &&
     !Number.isFinite(options.webGpuDepthBins) &&
+    options.webGpuDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_DEFAULT &&
     options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED
   ) {
     return url;
@@ -1488,6 +1509,9 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (Number.isFinite(options.webGpuDepthBins)) {
     parsed.searchParams.set("webgpu-depth-bins", String(options.webGpuDepthBins));
+  }
+  if (options.webGpuDepthAlphaMode !== WEBGPU_DEPTH_ALPHA_MODE_DEFAULT) {
+    parsed.searchParams.set("webgpu-depth-alpha-mode", options.webGpuDepthAlphaMode);
   }
   if (options.webGpuCameraTuning.cameraMode !== WEBGPU_CAMERA_MODE_EDIT_FIXED) {
     parsed.searchParams.set("webgpu-camera-mode", options.webGpuCameraTuning.cameraMode);

@@ -25,11 +25,14 @@ import {
   WEBGPU_CAMERA_MODE_SPARK_FRAME,
   WEBGPU_CAMERA_TUNING_MODE,
   WEBGPU_COVERAGE_TUNING_MODE,
+  WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
+  WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
   WEBGPU_PIXEL_COVERAGE_MODE,
   WEBGPU_PIXEL_DEPTH_SORT_MODE,
+  WEBGPU_PIXEL_DEPTH_SORT_MODE_FRONT_TOP_K,
   WEBGPU_TILE_COLOR_FIDELITY_MODE,
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
@@ -199,6 +202,7 @@ assert.equal(base.projectionCameraFrameMaxDim, 0);
 assert.equal(base.depthWeightMode, WEBGPU_TILE_DEPTH_WEIGHT_MODE);
 assert.equal(base.pixelDepthSortMode, WEBGPU_PIXEL_DEPTH_SORT_MODE);
 assert.equal(base.pixelDepthTuningMode, WEBGPU_DEPTH_SORT_TUNING_MODE);
+assert.equal(base.pixelDepthAlphaMode, WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED);
 assert.equal(base.pixelDepthGateStrength, 12);
 assert.equal(base.pixelDepthGateFloor, 0.06);
 assert.equal(base.pixelDepthBinCount, 8);
@@ -295,6 +299,27 @@ const tunedDepthSort = buildWebGpuTileSmoke({
 assert.equal(tunedDepthSort.pixelDepthTuningMode, WEBGPU_DEPTH_SORT_TUNING_MODE);
 assert.equal(tunedDepthSort.pixelDepthBinCount, 12);
 assert.notEqual(tunedDepthSort.pixelResolveChecksum, base.pixelResolveChecksum);
+
+const frontTopKDepthSort = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  depthSortTuning: {
+    depthAlphaMode: WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
+    depthBins: 12,
+  },
+});
+assert.equal(frontTopKDepthSort.pixelDepthSortMode, WEBGPU_PIXEL_DEPTH_SORT_MODE_FRONT_TOP_K);
+assert.equal(frontTopKDepthSort.pixelDepthAlphaMode, WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K);
+assert.equal(frontTopKDepthSort.pixelDepthBinCount, 12);
+assert.ok(frontTopKDepthSort.pixelResolvedCount > 0);
+assert.notEqual(frontTopKDepthSort.pixelResolveChecksum, base.pixelResolveChecksum);
 
 const wideViewport = buildWebGpuTileSmoke({
   points: scene.points,
@@ -472,7 +497,13 @@ assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /let\s+screen\s*=\s*centerRadius\.xy/)
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /PIXEL_DEPTH_BIN_COUNT/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /const PIXEL_DEPTH_BIN_COUNT = 8;/);
 assert.match(createWebGpuPixelResolveShader({ pixelDepthBinCount: 12 }), /const PIXEL_DEPTH_BIN_COUNT = 12;/);
+assert.match(
+  createWebGpuPixelResolveShader({ pixelDepthAlphaMode: WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K }),
+  /const USE_FRONT_TOP_K_ALPHA = true;/,
+);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var\s+binAccumulation/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var\s+topDepth/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /insertDepth\s*<\s*topDepth/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /normalizedDepth\s*\*\s*f32\(PIXEL_DEPTH_BIN_COUNT\)/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /candidateCount\s*==\s*0u/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var\s+outputRgbPremultiplied/);
@@ -654,7 +685,7 @@ console.log(
     `boundsFit=${base.boundsFitMode}:${base.boundsWorldAspect.toFixed(3)}/${base.boundsViewportAspect.toFixed(3)} ` +
     `projection=${base.projectionMode}:${base.projectionCameraFovDegrees} ` +
     `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
-    `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthTuningMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor}:${base.pixelDepthBinCount} ` +
+    `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthTuningMode}:${base.pixelDepthAlphaMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor}:${base.pixelDepthBinCount} ` +
     `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageTuningMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
     `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +

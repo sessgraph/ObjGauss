@@ -1,4 +1,6 @@
 import {
+  WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
+  WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
   normalizeWebGpuDepthSortTuning,
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
@@ -24,7 +26,9 @@ export const WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE = "spark-framed-perspective
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
-export const WEBGPU_PIXEL_DEPTH_SORT_MODE = "depth-binned-alpha-composite-v1";
+export const WEBGPU_PIXEL_DEPTH_SORT_MODE_DEPTH_BINNED = "depth-binned-alpha-composite-v1";
+export const WEBGPU_PIXEL_DEPTH_SORT_MODE_FRONT_TOP_K = "front-top-k-alpha-composite-v1";
+export const WEBGPU_PIXEL_DEPTH_SORT_MODE = WEBGPU_PIXEL_DEPTH_SORT_MODE_DEPTH_BINNED;
 export const WEBGPU_PIXEL_COVERAGE_MODE = "footprint-weight-floor-calibrated-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
@@ -85,6 +89,8 @@ export function buildWebGpuTileSmoke({
   const resolvedDepthSortTuning = normalizeWebGpuDepthSortTuning(depthSortTuning);
   const resolvedCameraTuning = normalizeWebGpuCameraTuning(cameraTuning);
   const pixelDepthBinCount = resolvedDepthSortTuning.pixelDepthBinCount;
+  const pixelDepthAlphaMode = resolvedDepthSortTuning.pixelDepthAlphaMode;
+  const pixelDepthSortMode = pixelDepthSortModeForAlphaMode(pixelDepthAlphaMode);
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
     objectIdsByIndex: objectIndex.objectIdsByIndex,
@@ -271,6 +277,7 @@ export function buildWebGpuTileSmoke({
         viewportWidth,
         viewportHeight,
         pixelDepthBinCount,
+        pixelDepthAlphaMode,
       })
     : null;
   return {
@@ -304,8 +311,9 @@ export function buildWebGpuTileSmoke({
     projectionDepthMax: bounds.depthMax,
     projectionDepthSpan: bounds.depthSpan,
     depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
-    pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
+    pixelDepthSortMode,
     pixelDepthTuningMode: WEBGPU_DEPTH_SORT_TUNING_MODE,
+    pixelDepthAlphaMode,
     pixelDepthGateStrength: FRONT_DEPTH_GATE_STRENGTH,
     pixelDepthGateFloor: FRONT_DEPTH_GATE_FLOOR,
     pixelDepthBinCount,
@@ -402,6 +410,8 @@ export {
   WEBGPU_CAMERA_MODE_EDIT_FIXED,
   WEBGPU_CAMERA_MODE_SPARK_FRAME,
   WEBGPU_CAMERA_TUNING_MODE,
+  WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
+  WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
   normalizeWebGpuDepthSortTuning,
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
@@ -428,6 +438,12 @@ export function projectPointToWebGpuTileViewport({
   viewportHeight = WEBGPU_TILE_VIEWPORT.height,
 }) {
   return projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
+}
+
+function pixelDepthSortModeForAlphaMode(pixelDepthAlphaMode) {
+  return pixelDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K
+    ? WEBGPU_PIXEL_DEPTH_SORT_MODE_FRONT_TOP_K
+    : WEBGPU_PIXEL_DEPTH_SORT_MODE_DEPTH_BINNED;
 }
 
 function buildTileCenters({ tileColumns, tileRows, tileSize }) {
@@ -628,6 +644,7 @@ function resolvePixelOutput({
   viewportWidth,
   viewportHeight,
   pixelDepthBinCount = WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
+  pixelDepthAlphaMode = WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
 }) {
   const pixelCount = viewportWidth * viewportHeight;
   const pixelResolvedRgba = new Float32Array(pixelCount * 4);
@@ -652,6 +669,12 @@ function resolvePixelOutput({
   const binGreen = new Float32Array(pixelDepthBinCount);
   const binBlue = new Float32Array(pixelDepthBinCount);
   const binWeight = new Float32Array(pixelDepthBinCount);
+  const topDepth = new Float32Array(pixelDepthBinCount);
+  const topRed = new Float32Array(pixelDepthBinCount);
+  const topGreen = new Float32Array(pixelDepthBinCount);
+  const topBlue = new Float32Array(pixelDepthBinCount);
+  const topWeight = new Float32Array(pixelDepthBinCount);
+  const useFrontTopKAlpha = pixelDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K;
 
   for (let y = 0; y < viewportHeight; y += 1) {
     const tileY = Math.floor(y / tileSize);
@@ -669,6 +692,11 @@ function resolvePixelOutput({
       binGreen.fill(0);
       binBlue.fill(0);
       binWeight.fill(0);
+      topDepth.fill(Number.POSITIVE_INFINITY);
+      topRed.fill(0);
+      topGreen.fill(0);
+      topBlue.fill(0);
+      topWeight.fill(0);
 
       for (let entryOffset = 0; entryOffset < storedCount; entryOffset += 1) {
         const gaussianIndex = tileEntries[entryBase + entryOffset];
@@ -692,14 +720,40 @@ function resolvePixelOutput({
           0,
           0.999999,
         );
-        const depthBin = Math.min(
-          pixelDepthBinCount - 1,
-          Math.floor(normalizedDepth * pixelDepthBinCount),
-        );
-        binRed[depthBin] += colorOpacity[gaussianOffset] * candidateWeight;
-        binGreen[depthBin] += colorOpacity[gaussianOffset + 1] * candidateWeight;
-        binBlue[depthBin] += colorOpacity[gaussianOffset + 2] * candidateWeight;
-        binWeight[depthBin] += candidateWeight;
+        if (useFrontTopKAlpha) {
+          let insertDepth = normalizedDepth;
+          let insertRed = colorOpacity[gaussianOffset] * candidateWeight;
+          let insertGreen = colorOpacity[gaussianOffset + 1] * candidateWeight;
+          let insertBlue = colorOpacity[gaussianOffset + 2] * candidateWeight;
+          let insertWeight = candidateWeight;
+          for (let slot = 0; slot < pixelDepthBinCount; slot += 1) {
+            if (insertDepth >= topDepth[slot]) continue;
+            const previousDepth = topDepth[slot];
+            const previousRed = topRed[slot];
+            const previousGreen = topGreen[slot];
+            const previousBlue = topBlue[slot];
+            const previousWeight = topWeight[slot];
+            topDepth[slot] = insertDepth;
+            topRed[slot] = insertRed;
+            topGreen[slot] = insertGreen;
+            topBlue[slot] = insertBlue;
+            topWeight[slot] = insertWeight;
+            insertDepth = previousDepth;
+            insertRed = previousRed;
+            insertGreen = previousGreen;
+            insertBlue = previousBlue;
+            insertWeight = previousWeight;
+          }
+        } else {
+          const depthBin = Math.min(
+            pixelDepthBinCount - 1,
+            Math.floor(normalizedDepth * pixelDepthBinCount),
+          );
+          binRed[depthBin] += colorOpacity[gaussianOffset] * candidateWeight;
+          binGreen[depthBin] += colorOpacity[gaussianOffset + 1] * candidateWeight;
+          binBlue[depthBin] += colorOpacity[gaussianOffset + 2] * candidateWeight;
+          binWeight[depthBin] += candidateWeight;
+        }
         candidateCount += 1;
       }
 
@@ -710,20 +764,38 @@ function resolvePixelOutput({
       let outputBluePremultiplied = 0;
       let outputAlpha = 0;
       let totalWeight = 0;
-      for (let depthBin = 0; depthBin < pixelDepthBinCount; depthBin += 1) {
-        const weight = binWeight[depthBin];
-        if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
-        const red = binRed[depthBin] / weight;
-        const green = binGreen[depthBin] / weight;
-        const blue = binBlue[depthBin] / weight;
-        const alpha = clampNumber(1 - Math.exp(-weight * RESOLVE_ALPHA_SCALE), 0, 0.98);
-        const visibility = 1 - outputAlpha;
-        outputRedPremultiplied += visibility * red * alpha;
-        outputGreenPremultiplied += visibility * green * alpha;
-        outputBluePremultiplied += visibility * blue * alpha;
-        outputAlpha += visibility * alpha;
-        totalWeight += weight;
-        if (outputAlpha >= 0.995) break;
+      if (useFrontTopKAlpha) {
+        for (let slot = 0; slot < pixelDepthBinCount; slot += 1) {
+          const weight = topWeight[slot];
+          if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
+          const red = topRed[slot] / weight;
+          const green = topGreen[slot] / weight;
+          const blue = topBlue[slot] / weight;
+          const alpha = clampNumber(1 - Math.exp(-weight * RESOLVE_ALPHA_SCALE), 0, 0.98);
+          const visibility = 1 - outputAlpha;
+          outputRedPremultiplied += visibility * red * alpha;
+          outputGreenPremultiplied += visibility * green * alpha;
+          outputBluePremultiplied += visibility * blue * alpha;
+          outputAlpha += visibility * alpha;
+          totalWeight += weight;
+          if (outputAlpha >= 0.995) break;
+        }
+      } else {
+        for (let depthBin = 0; depthBin < pixelDepthBinCount; depthBin += 1) {
+          const weight = binWeight[depthBin];
+          if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
+          const red = binRed[depthBin] / weight;
+          const green = binGreen[depthBin] / weight;
+          const blue = binBlue[depthBin] / weight;
+          const alpha = clampNumber(1 - Math.exp(-weight * RESOLVE_ALPHA_SCALE), 0, 0.98);
+          const visibility = 1 - outputAlpha;
+          outputRedPremultiplied += visibility * red * alpha;
+          outputGreenPremultiplied += visibility * green * alpha;
+          outputBluePremultiplied += visibility * blue * alpha;
+          outputAlpha += visibility * alpha;
+          totalWeight += weight;
+          if (outputAlpha >= 0.995) break;
+        }
       }
 
       if (outputAlpha <= 0.0001 || totalWeight <= 0.0001) continue;

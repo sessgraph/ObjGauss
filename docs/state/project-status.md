@@ -81,6 +81,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-P 已完成 WebGPU runtime depth-bin tuning：WebGPU Tile 的 depth-binned alpha composite 不再把 8 bins 硬编码在 shader / smoke / audit 三处，新增 `runtime-depth-sort-tuning-v1` 和 URL / audit 参数 `webgpu-depth-bins`，运行时可在 4-16 bins 间调参；默认仍保持 8 bins，coverage gate 证明 baseline 未变化，12-bin headed WebGPU audit 证明 tuned shader 可真实进入 runtime。
   - RENDER-005T-Q 已完成 WebGPU depth-bin sweep：新增 `npm run audit:webgpu-depth-sweep`，可对 `4/8/12/16` bins 跑同一套 headed desktop WebGPU full-runtime visual residual audit，并输出 `summary.json` / `summary.md`；Lego sweep 显示 8 bins 仍是 best Pareto，12 bins 只让 coverage ratio 从 `3.784251` 微降到 `3.784235` 但 chroma 变差，因此单纯提高 bin 数不是当前 Spark/edit 残差主因。
   - RENDER-005T-R 已完成 WebGPU runtime camera framing diagnostic：新增 `runtime-camera-tuning-v1` 和 URL / audit 参数 `webgpu-camera-mode=edit-fixed|spark-frame`，默认仍保持 `edit-fixed`；`spark-frame` 对齐 Spark viewer 的 58° FOV、scene-center target 和 `distance=maxDim*1.7` framing。Lego `spark-frame` headed audit 将 coverage ratio 从 `3.784251` 降到 `3.766657`、luma 从 `0.106079` 降到 `0.102396` 但 chroma 从 `0.086537` 略升到 `0.087290`；Plush `spark-frame` 大场景 audit 也通过并把 coverage ratio 降到 `4.713926`，但 luma/chroma 未同步改善。因此 camera alignment 是 coverage 残差项之一，不是“原始颜色编辑预览不像 Spark”的完整主因。
+  - RENDER-005T-S 已完成 WebGPU front-top-k sorted-alpha diagnostic：`runtime-depth-sort-tuning-v1` 新增 URL / audit 参数 `webgpu-depth-alpha-mode=depth-binned|front-top-k`，默认仍保持 `depth-binned`；`front-top-k` 每像素保留最近 K 个 contributor 并前到后 alpha composite，K 复用 `webgpu-depth-bins`。Lego K=8 将 coverage ratio 从 `3.784251` 降到 `3.583371`，但 luma/chroma 恶化到 `0.208595/0.127958`；K=16 coverage 接近 baseline 但 luma/chroma 仍弱于 baseline；Plush K=8 大场景也通过但 luma/chroma 明显变差。因此 per-pixel sorted-alpha 诊断路径可运行，但当前不是默认候选。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -150,13 +151,22 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 node --check src/webgpuCameraTuning.js
+node --check src/webgpuDepthTuning.js
+node --check src/webgpuTileComputeShader.js
 node --check src/webgpuTileSmoke.js
 node --check src/webgpuCapability.js
 node --check scripts/audit-demo.mjs
 node --check scripts/audit-webgpu-desktop.mjs
 node --check scripts/audit-webgpu-coverage-sweep.mjs
 node --check scripts/audit-webgpu-depth-sweep.mjs
+node --check scripts/audit-webgpu-tile-smoke.mjs
 npm run audit:webgpu-tile-smoke
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5281 --probes full
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5282 --probes full --webgpu-depth-alpha-mode front-top-k
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5283 --probes full --webgpu-depth-alpha-mode front-top-k --webgpu-depth-bins 16
+npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5284 --probes full --webgpu-depth-alpha-mode front-top-k
+npm run build
+uv run --extra dev pytest
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5278 --probes full
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5279 --probes full --webgpu-camera-mode spark-frame
 npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5280 --probes full --webgpu-camera-mode spark-frame
@@ -513,7 +523,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- 对象聚类色、隐藏、隔离、删除预览当前仍通过 `Gaussian OIT 编辑` fallback 或 WebGPU tile route 完成，不是 Spark / gsplat 真实 renderer 内的对象级重渲染；`原始颜色（编辑预览）` 只使用 PLY RGB / SH DC 颜色和近似 screen-space Gaussian kernel。WebGPU full runtime 内部输出已从 128px 提到 256px，fullscreen display 已从最近邻放大改为 bilinear storage resolve，并已加入 display-aspect viewport / aspect-fit bounds / 8% 留白、camera-Jacobian covariance、depth-binned alpha composite 和可诊断的 Spark-frame camera mode，因此颗粒、格子、贴边、非等比拉伸和固定相机 coverage mismatch 均有所降低；剩余视觉差距主要表现为过度平滑、真实 per-pixel sorted alpha / Spark 合成路径不匹配、view-dependent SH 颜色未接入、近似 covariance / blending 和未接入 Spark 的真实对象级重渲染，而不是 Object Field 颜色本身。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
+- 对象聚类色、隐藏、隔离、删除预览当前仍通过 `Gaussian OIT 编辑` fallback 或 WebGPU tile route 完成，不是 Spark / gsplat 真实 renderer 内的对象级重渲染；`原始颜色（编辑预览）` 只使用 PLY RGB / SH DC 颜色和近似 screen-space Gaussian kernel。WebGPU full runtime 内部输出已从 128px 提到 256px，fullscreen display 已从最近邻放大改为 bilinear storage resolve，并已加入 display-aspect viewport / aspect-fit bounds / 8% 留白、camera-Jacobian covariance、depth-binned alpha composite、可诊断的 Spark-frame camera mode 和 front-top-k sorted-alpha mode，因此颗粒、格子、贴边、非等比拉伸、固定相机 coverage mismatch 和排序近似问题均已有可审计切分；剩余视觉差距主要表现为过度平滑、Spark 合成路径不匹配、view-dependent SH 颜色未接入、近似 covariance / blending 和未接入 Spark 的真实对象级重渲染，而不是 Object Field 颜色本身。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。
@@ -526,7 +536,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. RENDER-005T-S: 继续拆 Spark vs edit 残差中的 SH / view-dependent color、真实 per-pixel sorted alpha，或把 object filter 接入 Spark renderer；默认 coverage / depth / camera 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+1. RENDER-005T-T: 继续拆 Spark vs edit 残差中的 SH / view-dependent color，或评估把 object filter 接入 Spark renderer；默认 coverage / depth / camera / alpha 参数变更必须先通过 `audit:webgpu-coverage-gate`。
 2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

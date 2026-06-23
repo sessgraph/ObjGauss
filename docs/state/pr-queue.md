@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-S`: 在 camera-mode 诊断显示 Spark-frame 主要改善 coverage 但未解决 luma/chroma 后，继续拆 Spark vs edit 残差中的 SH / view-dependent color、真实 per-pixel sorted alpha 或 Spark renderer object filter；默认 coverage / depth / camera 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-T`: 在 front-top-k sorted-alpha 诊断证明真实 per-pixel 排序路径可运行但 luma/chroma 变差后，继续拆 SH / view-dependent color，或评估把 object filter 接入 Spark renderer；默认 coverage / depth / camera / alpha 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,41 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-S: WebGPU front-top-k sorted-alpha diagnostic
+
+- 状态: done / sorted-alpha-diagnostic-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 camera-mode 诊断显示 Spark-frame 主要改善 coverage 但未解决 luma/chroma 后，把真实 per-pixel sorted alpha 推进成可审计 WebGPU runtime mode，判断排序方向是否能解释 “原始颜色（编辑预览）不像 Spark”。
+- 已实施:
+  - `runtime-depth-sort-tuning-v1` 新增 `depthAlphaMode=depth-binned|front-top-k`，URL / audit 参数为 `webgpu-depth-alpha-mode`；默认仍保持 `depth-binned`。
+  - `front-top-k` 在每个像素扫描 tile entries 后，保留最近 K 个有效 Gaussian contributor，并按前到后 alpha compositing；K 复用 `webgpu-depth-bins`，合法范围仍为 4-16。
+  - WebGPU WGSL pixel resolve 与 CPU smoke reference 使用同一 top-K 插入排序逻辑，`buildWebGpuTileSmoke` 暴露 `pixelDepthAlphaMode` 和 `front-top-k-alpha-composite-v1` contract。
+  - `WebGpuTileViewport` / `PointCloudViewport` DOM 暴露 `data-webgpu-pixel-depth-alpha-mode`。
+  - `audit-demo` / `audit-webgpu-desktop` / coverage sweep / depth sweep 支持 `--webgpu-depth-alpha-mode`，并校验 DOM telemetry 命中 requested alpha mode。
+- 结论:
+  - 默认 Lego headed WebGPU full audit 保持 baseline：coverage ratio=`3.784251`、luma/chroma=`0.106079/0.086537`。
+  - Lego `front-top-k` K=8 通过 headed WebGPU full audit：coverage ratio=`3.583371`，但 luma/chroma 恶化到 `0.208595/0.127958`。
+  - Lego `front-top-k` K=16 通过 headed WebGPU full audit：coverage ratio=`3.778381`，luma/chroma=`0.173505/0.113605`，仍弱于 baseline。
+  - Plush semantic `front-top-k` K=8 通过大场景 headed WebGPU full audit：coverage ratio=`6.115472`，luma/chroma=`0.245489/0.077452`。
+  - 因此 front-top-k sorted alpha 是可运行诊断路径，但当前不是默认候选；“自身颜色编辑预览不像 Spark”的下一主因更可能在 SH/view-dependent color、Spark 合成路径差异或 object filter 未接入 Spark renderer。
+- 验证:
+  - `node --check src/webgpuDepthTuning.js`: passed。
+  - `node --check src/webgpuTileComputeShader.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `node --check scripts/audit-webgpu-depth-sweep.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5281 --probes full`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5282 --probes full --webgpu-depth-alpha-mode front-top-k`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5283 --probes full --webgpu-depth-alpha-mode front-top-k --webgpu-depth-bins 16`: passed，headed desktop WebGPU full runtime。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5284 --probes full --webgpu-depth-alpha-mode front-top-k`: passed，headed desktop WebGPU full runtime。
 
 ### RENDER-005T-R: WebGPU runtime camera framing diagnostic
 

@@ -35,6 +35,9 @@ const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
 );
 const webGpuDepthBins = optionalFiniteNumber(args.webGpuDepthBins ?? args["webgpu-depth-bins"]);
+const webGpuDepthAlphaMode = optionalString(
+  args.webGpuDepthAlphaMode ?? args["webgpu-depth-alpha-mode"],
+);
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 let server = null;
 
@@ -60,6 +63,7 @@ try {
         headed,
         webGpuViewportSize,
         webGpuDepthBins,
+        webGpuDepthAlphaMode,
         webGpuCameraMode,
       });
       process.stdout.write(result.output);
@@ -186,6 +190,7 @@ try {
       `bestPareto=${JSON.stringify(bestPareto?.asset ?? "none")}/${JSON.stringify(bestPareto?.id ?? "none")}:${bestPareto?.paretoScore ?? "unknown"} ` +
       `bestCoverage=${JSON.stringify(bestCoverage?.asset ?? "none")}/${JSON.stringify(bestCoverage?.id ?? "none")}:${bestCoverage?.coverageRatio ?? "unknown"} ` +
       `gate=${gate.enabled ? (gate.passed ? "passed" : "failed") : "disabled"} ` +
+      `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `url=${baseUrl}`,
   );
@@ -204,6 +209,7 @@ async function runVariant({
   headed,
   webGpuViewportSize,
   webGpuDepthBins,
+  webGpuDepthAlphaMode,
   webGpuCameraMode,
 }) {
   const commandArgs = [
@@ -228,6 +234,9 @@ async function runVariant({
   }
   if (Number.isFinite(webGpuDepthBins)) {
     commandArgs.push("--webgpu-depth-bins", String(webGpuDepthBins));
+  }
+  if (webGpuDepthAlphaMode) {
+    commandArgs.push("--webgpu-depth-alpha-mode", webGpuDepthAlphaMode);
   }
   if (webGpuCameraMode) {
     commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);

@@ -4,6 +4,7 @@ import {
   WEBGPU_CAMERA_TUNING_MODE,
 } from "./webgpuCameraTuning.js";
 import {
+  WEBGPU_DEPTH_ALPHA_MODE_DEFAULT,
   WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
   WEBGPU_DEPTH_SORT_TUNING_MODE,
 } from "./webgpuDepthTuning.js";
@@ -56,6 +57,7 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
   pixelDepthTuningMode: WEBGPU_DEPTH_SORT_TUNING_MODE,
+  pixelDepthAlphaMode: WEBGPU_DEPTH_ALPHA_MODE_DEFAULT,
   pixelDepthGateStrength: 12,
   pixelDepthGateFloor: 0.06,
   pixelDepthBinCount: WEBGPU_DEPTH_BIN_COUNT_DEFAULT,
@@ -210,6 +212,7 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     depthWeightMode: smoke.depthWeightMode,
     pixelDepthSortMode: smoke.pixelDepthSortMode,
     pixelDepthTuningMode: smoke.pixelDepthTuningMode,
+    pixelDepthAlphaMode: smoke.pixelDepthAlphaMode,
     pixelDepthGateStrength: smoke.pixelDepthGateStrength,
     pixelDepthGateFloor: smoke.pixelDepthGateFloor,
     pixelDepthBinCount: smoke.pixelDepthBinCount,

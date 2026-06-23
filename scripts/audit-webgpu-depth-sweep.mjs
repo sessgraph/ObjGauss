@@ -39,6 +39,9 @@ const footprintScale =
 const maxAnisotropy =
   optionalFiniteNumber(args.webGpuCovarianceMaxAnisotropy ?? args["webgpu-covariance-max-anisotropy"]) ??
   DEFAULT_MAX_ANISOTROPY;
+const webGpuDepthAlphaMode = optionalString(
+  args.webGpuDepthAlphaMode ?? args["webgpu-depth-alpha-mode"],
+);
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 let server = null;
 
@@ -65,6 +68,7 @@ try {
         webGpuViewportSize,
         footprintScale,
         maxAnisotropy,
+        webGpuDepthAlphaMode,
         webGpuCameraMode,
       });
       process.stdout.write(result.output);
@@ -173,6 +177,7 @@ try {
     `webgpu_depth_sweep=${overallStatus} ` +
       `assets=${JSON.stringify(assets)} scenes=${assets.length} bins=${JSON.stringify(bins)} ` +
       `footprintScale=${footprintScale} maxAnisotropy=${maxAnisotropy} ` +
+      `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `scoreWeights=${JSON.stringify(SCORE_WEIGHTS)} ` +
       `bestMeanParetoVariant=${JSON.stringify(bestMeanPareto?.id ?? "none")}:${bestMeanPareto?.meanParetoScore ?? "unknown"} ` +
@@ -193,6 +198,7 @@ async function runDepthVariant({
   webGpuViewportSize,
   footprintScale,
   maxAnisotropy,
+  webGpuDepthAlphaMode,
   webGpuCameraMode,
 }) {
   const commandArgs = [
@@ -217,6 +223,9 @@ async function runDepthVariant({
   if (webGpuViewportSize) {
     commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
   }
+  if (webGpuDepthAlphaMode) {
+    commandArgs.push("--webgpu-depth-alpha-mode", webGpuDepthAlphaMode);
+  }
   if (webGpuCameraMode) {
     commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
   }
@@ -228,7 +237,7 @@ function parseVariantMetrics(output) {
     /visualResidual="spark-edit-visual-residual-v1":([0-9.]+)\/([0-9.]+):([0-9.]+):([0-9.]+):([0-9.]+)/,
   );
   const pixelDepth = output.match(
-    /pixelDepthSort="([^"]+)":"([^"]+)":([0-9.]+)\/([0-9.]+):([0-9]+)/,
+    /pixelDepthSort="([^"]+)":"([^"]+)":"([^"]+)":([0-9.]+)\/([0-9.]+):([0-9]+)/,
   );
   const pixelCoverage = output.match(
     /pixelCoverage="([^"]+)":"([^"]+)":([0-9.]+):([0-9.]+)/,
@@ -245,9 +254,10 @@ function parseVariantMetrics(output) {
     chromaDelta: residual ? Number(residual[5]) : null,
     depthSortMode: pixelDepth?.[1] ?? "",
     depthTuningMode: pixelDepth?.[2] ?? "",
-    depthGateStrength: pixelDepth ? Number(pixelDepth[3]) : null,
-    depthGateFloor: pixelDepth ? Number(pixelDepth[4]) : null,
-    depthBinCount: pixelDepth ? Number(pixelDepth[5]) : null,
+    depthAlphaMode: pixelDepth?.[3] ?? "",
+    depthGateStrength: pixelDepth ? Number(pixelDepth[4]) : null,
+    depthGateFloor: pixelDepth ? Number(pixelDepth[5]) : null,
+    depthBinCount: pixelDepth ? Number(pixelDepth[6]) : null,
     coverageMode: pixelCoverage?.[1] ?? "",
     coverageTuningMode: pixelCoverage?.[2] ?? "",
     coverageWeightFloor: pixelCoverage ? Number(pixelCoverage[3]) : null,
