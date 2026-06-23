@@ -10,6 +10,7 @@
     "audit:demo": "node scripts/audit-demo.mjs",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
+    "audit:webgpu-desktop": "node scripts/audit-webgpu-desktop.mjs",
     "audit:webgpu-tile-smoke": "node scripts/audit-webgpu-tile-smoke.mjs",
     "acceptance:demo": "node scripts/acceptance-demo.mjs",
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",

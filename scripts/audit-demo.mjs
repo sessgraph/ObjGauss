@@ -51,6 +51,10 @@ const assets = args.asset ? KNOWN_ASSETS.filter((asset) => asset.id === args.ass
 const auditOptions = {
   requireWebGpu: Boolean(args.requireWebgpu ?? args["require-webgpu"]),
   webGpuFlags: String(args.webgpuFlags ?? args["webgpu-flags"] ?? process.env.OBJGAUSS_WEBGPU_FLAGS ?? "none"),
+  headed: flagEnabled(args.headed ?? args.headful ?? process.env.OBJGAUSS_PLAYWRIGHT_HEADED),
+  browserChannel: optionalString(args.browserChannel ?? args["browser-channel"] ?? process.env.PLAYWRIGHT_BROWSER_CHANNEL),
+  executablePath: optionalString(args.executablePath ?? args["executable-path"] ?? process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE),
+  slowMo: Number(args.slowMo ?? args["slow-mo"] ?? 0),
   webGpuProbe: normalizeWebGpuRuntimeProbe(
     args.webgpuProbe ?? args["webgpu-probe"] ?? process.env.OBJGAUSS_WEBGPU_PROBE,
   ),
@@ -995,13 +999,27 @@ function expectedProbeStages(probe) {
 }
 
 function launchOptions(options = {}) {
-  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? firstExisting([
+  const executablePath = options.executablePath ?? firstExisting([
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
   ]);
   const args = ["--no-sandbox", ...webGpuLaunchArgs(options.webGpuFlags)];
-  return executablePath ? { executablePath, args } : { args };
+  const launch = {
+    args,
+    headless: !options.headed,
+  };
+  if (Number.isFinite(options.slowMo) && options.slowMo > 0) {
+    launch.slowMo = options.slowMo;
+  }
+  if (options.browserChannel) {
+    launch.channel = options.browserChannel;
+    return launch;
+  }
+  if (executablePath) {
+    launch.executablePath = executablePath;
+  }
+  return launch;
 }
 
 function urlWithWebGpuProbe(url, probe) {
@@ -1029,6 +1047,18 @@ function webGpuLaunchArgs(mode) {
 
 function firstExisting(paths) {
   return paths.find((path) => existsSync(path));
+}
+
+function flagEnabled(value) {
+  if (value === true) return true;
+  if (value === false || value === undefined || value === null) return false;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === true || value === false) return undefined;
+  const text = String(value).trim();
+  return text ? text : undefined;
 }
 
 function startDevServer(port) {
