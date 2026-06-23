@@ -10,13 +10,6 @@
 
 ## Ready
 
-### RENDER-003: Object-aware splat filtering path
-
-- 状态: ready
-- 类型: 标准 PR / 前端渲染架构
-- 目标: 设计并接入 object-id filtering，使真实 splat 或 shader preview 能按对象隐藏/删除，而不是只靠 PLY edit fallback。
-- 范围外: 不要求一次完成 WebGPU compute pipeline。
-
 ### RENDER-004: WebGPU tile-based Gaussian renderer
 
 - 状态: ready
@@ -25,6 +18,33 @@
 - 要求: 先补设计文档 / ADR 细化，再进入实现。
 
 ## Done
+
+### RENDER-003: GPU object-state filtering for edit renderer
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 接入 object-id filtering，使 shader preview 能按对象隐藏、隔离和删除，而不是只靠 React 先过滤 PLY 点数组。
+- 范围外:
+  - 不要求一次完成 WebGPU compute pipeline。
+  - 不替换 Spark `.splat` 真实查看 renderer。
+  - 不实现真实 Spark splat shader 内对象过滤。
+- 实施:
+  - `PointCloudViewport` 保留全量 Gaussian geometry 常驻 GPU。
+  - 每个 Gaussian 上传 dense object index attribute。
+  - `buildObjectFilter` 将可见 / 删除 / 隔离状态编码为 object-state `DataTexture`。
+  - Gaussian fragment shader 通过 `uObjectState` texture 判断 object 是否可见，不可见则 `discard`。
+  - 画布 raycast 会跳过当前 object-state 不可见的 object。
+  - Audit 增加 `objectFilter="gpu-object-state-texture"` contract。
+- 验收:
+  - 三个默认 Web demo 样例均暴露 `gpu-object-state-texture` object filter。
+  - 隔离和删除只更新 object-state，可见计数与画面状态一致。
+  - 画布点选、隔离、删除预览仍工作。
+  - 定向 Playwright QA 无 shader / framebuffer / texture console error。
+- 验证:
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5194/`: passed，assets=3。
+  - Targeted Playwright QA: passed，`281498 -> 48066 -> 233432` 可见计数链路成立，截图位于 `/tmp/objgauss-gpu-filter-*.png`。
+- 完成 commit: `de45d90`.
 
 ### RENDER-002: Weighted blended OIT for object edit renderer
 
