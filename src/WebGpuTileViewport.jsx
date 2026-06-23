@@ -284,6 +284,17 @@ export default function WebGpuTileViewport({
       data-webgpu-target-gate-reason={rendererContract?.targetGateReason ?? ""}
       data-webgpu-target-gate-blocker={rendererContract?.targetGateBlocker ?? ""}
       data-webgpu-status={rendererContract?.webGpuStatus ?? "available"}
+      data-webgpu-storage-limit-gate={rendererContract?.storageLimitGate ?? ""}
+      data-webgpu-storage-limit-reason={rendererContract?.storageLimitReason ?? ""}
+      data-webgpu-storage-limit-blocker={rendererContract?.storageLimitBlocker ?? ""}
+      data-webgpu-storage-limit-max-buffer-size={rendererContract?.storageLimitMaxBufferSize ?? ""}
+      data-webgpu-storage-limit-max-binding-size={rendererContract?.storageLimitMaxStorageBufferBindingSize ?? ""}
+      data-webgpu-storage-limit-effective-max-buffer-size={rendererContract?.storageLimitEffectiveMaxBufferByteLength ?? ""}
+      data-webgpu-storage-estimated-layout={rendererContract?.storageEstimatedLayout ?? ""}
+      data-webgpu-storage-estimated-buffer-count={rendererContract?.storageEstimatedBufferCount ?? 0}
+      data-webgpu-storage-estimated-byte-size={rendererContract?.storageEstimatedByteSize ?? 0}
+      data-webgpu-storage-estimated-max-buffer-byte-size={rendererContract?.storageEstimatedMaxBufferByteSize ?? 0}
+      data-webgpu-storage-estimated-max-buffer-key={rendererContract?.storageEstimatedMaxBufferKey ?? ""}
       data-object-filter={rendererContract?.objectFilter ?? "gpu-object-state-buffer"}
       data-webgpu-object-filter-target={rendererContract?.targetObjectFilter ?? "gpu-object-state-buffer"}
       data-webgpu-pack-layout={rendererContract?.tileSmokeLayout ?? ""}

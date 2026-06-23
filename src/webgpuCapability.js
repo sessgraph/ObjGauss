@@ -1,3 +1,5 @@
+import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
+
 export const WEBGPU_TILE_RENDERER_ID = "webgpu-tile";
 export const WEBGPU_TILE_RENDERER_LABEL = "WebGPU Tile 编辑";
 export const WEBGPU_TILE_OBJECT_FILTER = "gpu-object-state-buffer";
@@ -109,7 +111,9 @@ export async function detectWebGpuCapability() {
 
 export function editRendererContract(webGpuCapability, tileSmoke) {
   const smoke = tileSmoke ?? EMPTY_TILE_SMOKE;
-  const targetGate = webGpuTileTargetGate(webGpuCapability, smoke);
+  const storageEstimate = estimateWebGpuTileRuntimeStorage(smoke);
+  const storageLimit = webGpuStorageLimitGate(webGpuCapability, storageEstimate);
+  const targetGate = webGpuTileTargetGate(webGpuCapability, smoke, storageLimit);
   const useWebGpuTile = targetGate.gate === "pass";
   return {
     rendererId: useWebGpuTile ? WEBGPU_TILE_RENDERER_ID : GAUSSIAN_OIT_RENDERER_ID,
@@ -120,10 +124,21 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     targetObjectFilter: WEBGPU_TILE_OBJECT_FILTER,
     webGpuStatus: webGpuCapability.status,
     webGpuLabel: webGpuCapability.label,
-    fallbackReason: fallbackReason(webGpuCapability, smoke),
+    fallbackReason: fallbackReason(webGpuCapability, targetGate),
     targetGate: targetGate.gate,
     targetGateReason: targetGate.reason,
     targetGateBlocker: targetGate.blocker,
+    storageLimitGate: storageLimit.gate,
+    storageLimitReason: storageLimit.reason,
+    storageLimitBlocker: storageLimit.blocker,
+    storageLimitMaxBufferSize: storageLimit.maxBufferSize,
+    storageLimitMaxStorageBufferBindingSize: storageLimit.maxStorageBufferBindingSize,
+    storageLimitEffectiveMaxBufferByteLength: storageLimit.effectiveMaxBufferByteLength,
+    storageEstimatedLayout: storageEstimate.layoutVersion,
+    storageEstimatedBufferCount: storageEstimate.bufferCount,
+    storageEstimatedByteSize: storageEstimate.totalByteLength,
+    storageEstimatedMaxBufferByteSize: storageEstimate.maxBufferByteLength,
+    storageEstimatedMaxBufferKey: storageEstimate.maxBufferKey,
     tileSmokeLayout: smoke.layoutVersion,
     tileSize: smoke.tileSize,
     viewportWidth: smoke.viewportWidth,
@@ -170,20 +185,18 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
   };
 }
 
-function fallbackReason(webGpuCapability, tileSmoke) {
+function fallbackReason(webGpuCapability, targetGate) {
+  if (targetGate.gate === "pass") return "";
+  if (targetGate.blocker === "tile-overflow") return "webgpu-tile-overflow";
+  if (targetGate.blocker === "webgpu-buffer-limit") return "webgpu-buffer-limit";
+  if (targetGate.blocker === "webgpu-capability") return webGpuCapability.reason;
   if (webGpuCapability.status === "available") {
-    if (tileSmoke?.tileCapacityGate === "pass") {
-      return "";
-    }
-    if (tileSmoke?.tileCapacityGate === "blocked") {
-      return "webgpu-tile-overflow";
-    }
     return "webgpu-tile-renderer-not-implemented";
   }
   return webGpuCapability.reason;
 }
 
-function webGpuTileTargetGate(webGpuCapability, tileSmoke) {
+function webGpuTileTargetGate(webGpuCapability, tileSmoke, storageLimit) {
   if (webGpuCapability.status !== "available") {
     return {
       gate: "blocked",
@@ -198,9 +211,79 @@ function webGpuTileTargetGate(webGpuCapability, tileSmoke) {
       blocker: "tile-overflow",
     };
   }
+  if (storageLimit.gate === "blocked") {
+    return {
+      gate: "blocked",
+      reason: storageLimit.reason,
+      blocker: storageLimit.blocker,
+    };
+  }
   return {
     gate: "pass",
     reason: "webgpu-tile-first-frame-ready",
     blocker: "",
   };
+}
+
+function webGpuStorageLimitGate(webGpuCapability, storageEstimate) {
+  const maxBufferSize = positiveLimit(webGpuCapability?.maxBufferSize);
+  const maxStorageBufferBindingSize = positiveLimit(
+    webGpuCapability?.maxStorageBufferBindingSize,
+  );
+  const effectiveMaxBufferByteLength = Math.min(
+    maxBufferSize ?? Number.POSITIVE_INFINITY,
+    maxStorageBufferBindingSize ?? Number.POSITIVE_INFINITY,
+  );
+
+  if (webGpuCapability.status !== "available") {
+    return {
+      gate: "unknown",
+      reason: webGpuCapability.reason,
+      blocker: "webgpu-capability",
+      maxBufferSize,
+      maxStorageBufferBindingSize,
+      effectiveMaxBufferByteLength: finiteOrNull(effectiveMaxBufferByteLength),
+    };
+  }
+
+  if (!Number.isFinite(effectiveMaxBufferByteLength)) {
+    return {
+      gate: "pass",
+      reason: "webgpu-storage-limits-unreported",
+      blocker: "",
+      maxBufferSize,
+      maxStorageBufferBindingSize,
+      effectiveMaxBufferByteLength: null,
+    };
+  }
+
+  if (storageEstimate.maxBufferByteLength > effectiveMaxBufferByteLength) {
+    return {
+      gate: "blocked",
+      reason: "webgpu-storage-buffer-too-large",
+      blocker: "webgpu-buffer-limit",
+      maxBufferSize,
+      maxStorageBufferBindingSize,
+      effectiveMaxBufferByteLength,
+    };
+  }
+
+  return {
+    gate: "pass",
+    reason: "webgpu-storage-buffer-limits-pass",
+    blocker: "",
+    maxBufferSize,
+    maxStorageBufferBindingSize,
+    effectiveMaxBufferByteLength,
+  };
+}
+
+function positiveLimit(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return Math.floor(numeric);
+}
+
+function finiteOrNull(value) {
+  return Number.isFinite(value) ? value : null;
 }

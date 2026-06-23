@@ -53,6 +53,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005G 已落地 WebGPU viewport pixel output contract：WebGPU route 会把 tile accumulation resolve 到 `tileResolvedRgba`，再写入 viewport-sized `pixelResolvedRgba`，最后由 `webgpu-pixel-storage-resolve-v1` fullscreen shader 显示。
   - RENDER-005H 已落地 WebGPU per-pixel Gaussian accumulation：`webgpu-compute-pixel-accumulation-v1` 不再复制 `tileResolvedRgba`，而是每个像素读取所属 tile 的 Gaussian entries、object state、scale / rotation 和 color / opacity，直接计算椭圆高斯 weighted OIT 并写入 `pixelResolvedRgba`。
   - RENDER-005I 已落地 WebGPU compact tile entry list：tile entry storage 从 fixed-cap stride 推进到 `compact-offset-list`，新增 `tileOffsets` buffer；Plush 级大场景不再因为 fixed-cap tile overflow 被 capacity gate 阻塞，后续 WebGPU 可用时会进入真实 tile renderer 路径。
+  - RENDER-005J 已落地 WebGPU storage/device-limit gate：WebGPU route 进入前会预测 runtime 11-buffer storage 规模，并用 `maxBufferSize` / `maxStorageBufferBindingSize` 阻断超限场景；当前 headless Chrome 仍无 WebGPU adapter，真实 runtime audit 继续 pending。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -235,6 +236,8 @@ npm run audit:demo -- --url http://127.0.0.1:5204/
 - RENDER-005H validation: `npm run audit:webgpu-tile-smoke` 通过，输出 `storage=243af027:10 pixel=webgpu-compute-pixel-accumulation-v1:16384 resolveSource=webgpu-pixel-storage-resolve-v1`；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；`npm run audit:demo -- --url http://127.0.0.1:5215/ --no-server` 三样例通过。当前 headless Chrome 仍为 `webgpu-adapter-unavailable`，所以 browser audit 是 fallback 验收，不宣称真实 WebGPU runtime 证据。
 - RENDER-005I compact tile list: `src/webgpuTileSmoke.js` 默认使用 `compact-offset-list` capacity strategy，新增 per-tile `tileOffsets` prefix offsets 和 compact `tileEntries`；fixed-cap layout 仍保留为 audit 对照。`src/webgpuTileComputeShader.js` 的 tile accumulation / pixel accumulation shader 改为从 `tileOffsets[tileIndex]` 读取 entry base，不再假设 `tileIndex * maxEntriesPerTile` stride。
 - RENDER-005I validation: `npm run audit:webgpu-tile-smoke` 通过，输出 `storage=de5eaf8f:11 capacity=pass pixel=webgpu-compute-pixel-accumulation-v1:16384`；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；`npm run audit:demo -- --url http://127.0.0.1:5216/ --no-server` 三样例通过，Plush semantic / Plush v1 均为 `tileCapacity="compact-offset-list":"ok":0`。当前 headless Chrome 仍为 `webgpu-adapter-unavailable`，所以 browser audit 是 fallback 验收，不宣称真实 WebGPU runtime 证据。
+- RENDER-005J storage/device-limit gate: `src/webgpuTileStorage.js` 新增 WebGPU runtime 11-buffer storage estimate；`src/webgpuCapability.js` 在 target gate 中加入 `maxBufferSize` / `maxStorageBufferBindingSize` 检查，超限时 fallback 为 `webgpu-buffer-limit`；两个 viewport 和 `audit-demo` 暴露/检查 `data-webgpu-storage-limit-*` 与 estimated storage telemetry。
+- RENDER-005J validation: `npm run audit:webgpu-tile-smoke` 通过，覆盖 compact pass、fixed overflow block 和模拟小 binding 的 `webgpu-buffer-limit` block；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；`npm run audit:demo -- --url http://127.0.0.1:5217/ --no-server` 三样例通过。当前 headless Chrome 仍为 `webgpu-adapter-unavailable`，所以 storage gate 为 `unknown:webgpu-capability`；Plush estimated max buffer 为 `tileEntries:42053252`，Lego estimated max buffer 为 `pixelResolvedRgba:16777216`。
 - RENDER-004E overflow gate / fallback hardening: fixed-capacity tile smoke 现在输出 overflow tile count、overflow ratio、max excess、stored references、entry capacity/utilization、capacity mode/status/gate；WebGPU target gate 区分 `webgpu-capability`、`tile-overflow` 和 `renderer-not-implemented`。Browser audit 不再只检查 `tileOverflowCount`，而是验证 overflow 场景被 blocked，非 overflow 场景为 pass/ok。
 - RENDER-004E validation: `npm run audit:webgpu-tile-smoke` 通过，内置 sample packed=5800、refs=157323、resolved=2301、overflow=40114、overflowTiles=1056、capacity=blocked；`uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5203/` 三样例通过。Plush semantic / Plush v1 为 `tileCapacity="overflow":169`，Lego 为 `tileCapacity="ok":0`，三者 targetGate 均为 `blocked:webgpu-capability`。
 - RENDER-004D object-state buffer smoke: `src/webgpuTileSmoke.js` 现在输出 `webgpu-object-state-v1`，用 stride=4 的 `vec4u`-style buffer 编码 object flags、dense object index、Gaussian count 和 reserved slot；flags 覆盖 visible、selected、removed、isolated 和 enabled，并生成 visible/hidden/removed/selected/isolated object counts 与 checksum。`PointCloudViewport` 暴露 `data-webgpu-object-state-*`，浏览器 audit 会检查隔离 / 删除后的 checksum 和计数变化。
@@ -364,7 +367,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- 对象聚类色、隐藏、隔离、删除预览仍通过点云编辑 fallback 完成，不是对象级 splat shader。
+- 对象聚类色、隐藏、隔离、删除预览当前仍通过 `Gaussian OIT 编辑` fallback 或 pending 的 WebGPU tile route 完成，不是 Spark / gsplat 真实 renderer 内的对象级重渲染；`原始颜色（编辑预览）` 只使用 PLY RGB / SH DC 颜色和近似 screen-space Gaussian kernel，因此会比真实 `.splat` 外观更颗粒。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。
@@ -377,7 +380,8 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
-2. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
-3. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
-4. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
+1. RENDER-005K: 在 WebGPU-capable 浏览器中重跑 Plush / Lego first-frame runtime audit；若 storage/device gate 阻断，再拆 buffer chunking 或 viewport output 降级。
+2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
+3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
+4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
+5. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

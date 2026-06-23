@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005J`: 增加 WebGPU buffer-size/device-limit gate，并在 WebGPU-capable 浏览器里重跑 Plush / Lego first-frame runtime audit。
+  - `RENDER-005K`: 在 WebGPU-capable 浏览器里重跑 Plush / Lego first-frame runtime audit；若 device-limit gate 阻断，再拆 progressive buffer chunking / lower-resolution viewport output。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,32 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005J: WebGPU storage/device-limit gate
+
+- 状态: done / browser-webgpu-pending
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在进入 WebGPU tile renderer 前预测 runtime storage buffer 分配规模，并用 adapter/device limits 阻断超过 `maxBufferSize` / `maxStorageBufferBindingSize` 的场景。
+- 范围外:
+  - 不实现 GPU-side binning / prefix-sum。
+  - 不实现 buffer chunking 或 viewport 分辨率降级。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - `src/webgpuTileStorage.js` 新增 runtime storage estimate，按 WebGPU route 的 11 个 buffers 估算 `positionRadius`、`colorOpacity`、`scaleRotation`、`objectIndices`、`objectState`、`tileCounts`、`tileOffsets`、`tileAccumulation`、`tileResolvedRgba`、`pixelResolvedRgba` 和 `tileEntries`。
+  - `src/webgpuCapability.js` 将 storage estimate 接入 `editRendererContract`，在 WebGPU available 且 tile capacity pass 后检查最大单 buffer 是否超过设备限制；超过时 fallback reason 为 `webgpu-buffer-limit`，target blocker 为 `webgpu-buffer-limit`。
+  - `PointCloudViewport` 与 `WebGpuTileViewport` 暴露 storage-limit DOM telemetry；状态面板新增 `存储门禁`。
+  - `audit-webgpu-tile-smoke` 覆盖 roomy pass、fixed overflow block、compact pass 和模拟小 binding 的 `webgpu-buffer-limit` block。
+  - `audit-demo` 读取并验证 storage-limit telemetry；当前 WebGPU unavailable 时必须表现为 `unknown / webgpu-capability`。
+- 验收:
+  - Node smoke audit 必须证明 estimated runtime storage 与实际 11-buffer storage contract 一致。
+  - 模拟小设备限制必须 blocked 于 `webgpu-buffer-limit`，不能进入 `webgpu-tile`。
+  - 当前 headless Chrome 无 WebGPU adapter 时仍明确 fallback 到 `Gaussian OIT 编辑`，并暴露 capability blocker。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，覆盖 compact pass、fixed overflow block 和模拟小 binding 的 `webgpu-buffer-limit` block。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5217/ --no-server`: passed，assets=3；当前 headless Chrome 仍为 `webgpu-adapter-unavailable`，storage gate 为 `unknown:webgpu-capability`。
+- 完成 commit: 本次提交。
 
 ### RENDER-005I: WebGPU compact tile entry list
 

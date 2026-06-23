@@ -628,6 +628,10 @@ export default function App() {
             <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
             <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
+            <StateRow
+              label="存储门禁"
+              value={`${activeEditRenderer.storageLimitGate} / ${activeEditRenderer.storageEstimatedMaxBufferKey || "none"} ${formatBytes(activeEditRenderer.storageEstimatedMaxBufferByteSize)}`}
+            />
             <StateRow label="WebGPU" value={activeEditRenderer.webGpuLabel} />
             <StateRow label="回退原因" value={activeEditRenderer.fallbackReason} />
             <StateRow
@@ -745,6 +749,14 @@ function allIds(points) {
 function renderModeLabel(mode) {
   if (mode === "original") return "原始颜色（编辑预览）";
   return "对象色（编辑预览）";
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${Math.round(bytes)} B`;
 }
 
 function summarize(points) {

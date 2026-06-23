@@ -98,6 +98,44 @@ export function describeWebGpuTileStorage(tileSmoke) {
   };
 }
 
+export function estimateWebGpuTileRuntimeStorage(tileSmoke) {
+  const descriptors = STORAGE_BUFFER_DEFINITIONS.map((definition) => {
+    const elementCount = estimatedElementCount(definition.key, tileSmoke);
+    const byteLength = elementCount * elementByteLength(definition.elementType);
+    return {
+      key: definition.key,
+      label: definition.label,
+      role: definition.role,
+      elementType: definition.elementType,
+      elementCount,
+      byteLength,
+      allocatedByteLength: alignedByteLength(byteLength),
+      usage: "storage|copy-dst|copy-src",
+    };
+  });
+  const totalByteLength = descriptors.reduce(
+    (total, descriptor) => total + descriptor.allocatedByteLength,
+    0,
+  );
+  const largest = descriptors.reduce(
+    (current, descriptor) =>
+      descriptor.allocatedByteLength > current.allocatedByteLength ? descriptor : current,
+    { key: "", allocatedByteLength: 0 },
+  );
+
+  return {
+    layoutVersion: WEBGPU_TILE_STORAGE_LAYOUT_VERSION,
+    bufferCount: descriptors.length,
+    totalByteLength,
+    maxBufferByteLength: largest.allocatedByteLength,
+    maxBufferKey: largest.key,
+    tileEntriesIncluded: true,
+    tileOffsetsIncluded: true,
+    pixelOutputIncluded: true,
+    descriptors,
+  };
+}
+
 export function createWebGpuTileStorageBuffers(device, tileSmoke) {
   const descriptors = storageBufferDescriptors(tileSmoke);
   const description = describeWebGpuTileStorage(tileSmoke);
@@ -172,6 +210,57 @@ function storageBufferUsage() {
 
 function alignedByteLength(byteLength) {
   return Math.max(4, Math.ceil(byteLength / 4) * 4);
+}
+
+function estimatedElementCount(key, tileSmoke) {
+  const packedGaussians = safeCount(tileSmoke?.packedGaussians);
+  const tileCount = safeCount(tileSmoke?.tileCount);
+  const objectStateStride = safeCount(tileSmoke?.objectStateStrideUint32, 4);
+  const objectCount = Math.max(safeCount(tileSmoke?.objectCount), 1);
+  const pixelCount = safeCount(
+    tileSmoke?.pixelCount,
+    safeCount(tileSmoke?.viewportWidth) * safeCount(tileSmoke?.viewportHeight),
+  );
+  const tileEntryCapacity = safeCount(
+    tileSmoke?.tileEntryCapacity,
+    safeCount(tileSmoke?.tileReferenceCount),
+  );
+
+  switch (key) {
+    case "positionRadius":
+    case "colorOpacity":
+    case "scaleRotation":
+      return packedGaussians * 4;
+    case "objectIndices":
+      return packedGaussians;
+    case "objectState":
+      return objectCount * objectStateStride;
+    case "tileCounts":
+    case "tileOffsets":
+      return tileCount;
+    case "tileAccumulation":
+    case "tileResolvedRgba":
+      return tileCount * 4;
+    case "pixelResolvedRgba":
+      return pixelCount * 4;
+    case "tileEntries":
+      return tileEntryCapacity;
+    default:
+      return 0;
+  }
+}
+
+function safeCount(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return fallback;
+  return Math.floor(numeric);
+}
+
+function elementByteLength(elementType) {
+  if (elementType === "float32" || elementType === "uint32" || elementType === "int32") {
+    return 4;
+  }
+  throw new Error(`unsupported WebGPU storage element type: ${elementType}`);
 }
 
 function isTypedArray(value) {

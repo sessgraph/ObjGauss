@@ -56,6 +56,7 @@ try {
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
+        `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
@@ -151,6 +152,17 @@ async function runAudit(url, assetsToCheck) {
       const targetGateReason = await viewport.getAttribute("data-webgpu-target-gate-reason");
       const targetGateBlocker = await viewport.getAttribute("data-webgpu-target-gate-blocker");
       const webgpuStatus = await viewport.getAttribute("data-webgpu-status");
+      const storageLimitGate = await viewport.getAttribute("data-webgpu-storage-limit-gate");
+      const storageLimitReason = await viewport.getAttribute("data-webgpu-storage-limit-reason");
+      const storageLimitBlocker = await viewport.getAttribute("data-webgpu-storage-limit-blocker");
+      const storageLimitMaxBufferSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-max-buffer-size") ?? "0");
+      const storageLimitMaxBindingSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-max-binding-size") ?? "0");
+      const storageLimitEffectiveMaxBufferSize = numericValue(await viewport.getAttribute("data-webgpu-storage-limit-effective-max-buffer-size") ?? "0");
+      const storageEstimatedLayout = await viewport.getAttribute("data-webgpu-storage-estimated-layout");
+      const storageEstimatedBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-estimated-buffer-count") ?? "0");
+      const storageEstimatedByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-estimated-byte-size") ?? "0");
+      const storageEstimatedMaxBufferByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-estimated-max-buffer-byte-size") ?? "0");
+      const storageEstimatedMaxBufferKey = await viewport.getAttribute("data-webgpu-storage-estimated-max-buffer-key");
       if (!["available", "unavailable"].includes(webgpuStatus)) {
         throw new Error(`${asset.id} WebGPU capability status was not resolved: ${webgpuStatus}`);
       }
@@ -177,6 +189,34 @@ async function runAudit(url, assetsToCheck) {
         throw new Error(
           `${asset.id} WebGPU unavailable but target gate was not capability-blocked: status=${webgpuStatus} blocker=${targetGateBlocker}`,
         );
+      }
+      if (
+        !["unknown", "pass", "blocked"].includes(storageLimitGate ?? "") ||
+        !storageLimitReason ||
+        storageEstimatedLayout !== "webgpu-tile-storage-v1" ||
+        storageEstimatedBufferCount < 11 ||
+        storageEstimatedByteSize <= 0 ||
+        storageEstimatedMaxBufferByteSize <= 0 ||
+        !storageEstimatedMaxBufferKey
+      ) {
+        throw new Error(
+          `${asset.id} invalid WebGPU storage limit telemetry: gate=${storageLimitGate} reason=${storageLimitReason} blocker=${storageLimitBlocker} layout=${storageEstimatedLayout} buffers=${storageEstimatedBufferCount} bytes=${storageEstimatedByteSize} max=${storageEstimatedMaxBufferKey}:${storageEstimatedMaxBufferByteSize}`,
+        );
+      }
+      if (webgpuStatus !== "available") {
+        if (storageLimitGate !== "unknown" || storageLimitBlocker !== "webgpu-capability") {
+          throw new Error(
+            `${asset.id} WebGPU unavailable but storage limit gate was not capability-unknown: gate=${storageLimitGate} blocker=${storageLimitBlocker}`,
+          );
+        }
+      } else if (storageLimitGate === "blocked") {
+        if (targetGate !== "blocked" || targetGateBlocker !== "webgpu-buffer-limit" || fallbackReason !== "webgpu-buffer-limit") {
+          throw new Error(
+            `${asset.id} storage limit blocked but target gate/fallback did not expose buffer-limit: gate=${targetGate} blocker=${targetGateBlocker} fallback=${fallbackReason}`,
+          );
+        }
+      } else if (storageLimitGate !== "pass") {
+        throw new Error(`${asset.id} unexpected WebGPU storage limit gate for available device: ${storageLimitGate}`);
       }
       const tileSmokeLayout = await viewport.getAttribute("data-webgpu-pack-layout");
       if (tileSmokeLayout !== "webgpu-tile-smoke-v1") {
@@ -464,6 +504,17 @@ async function runAudit(url, assetsToCheck) {
         webGpuStorageChecksum,
         webGpuStorageChecksumAfterIsolate,
         webGpuStorageChecksumAfterDelete,
+        storageLimitGate,
+        storageLimitReason,
+        storageLimitBlocker,
+        storageLimitMaxBufferSize,
+        storageLimitMaxBindingSize,
+        storageLimitEffectiveMaxBufferSize,
+        storageEstimatedLayout,
+        storageEstimatedBufferCount,
+        storageEstimatedByteSize,
+        storageEstimatedMaxBufferByteSize,
+        storageEstimatedMaxBufferKey,
         rendererTarget,
         targetGate,
         targetGateReason,

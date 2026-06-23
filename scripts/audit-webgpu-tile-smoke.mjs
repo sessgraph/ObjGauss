@@ -29,6 +29,7 @@ import {
 import {
   createWebGpuTileStorageBuffers,
   describeWebGpuTileStorage,
+  estimateWebGpuTileRuntimeStorage,
   WEBGPU_TILE_STORAGE_LAYOUT_VERSION,
 } from "../src/webgpuTileStorage.js";
 import {
@@ -113,6 +114,7 @@ assert.equal(base.objectStateIsolatedObjects, 0);
 assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
 
 const storage = describeWebGpuTileStorage(base);
+const storageEstimate = estimateWebGpuTileRuntimeStorage(base);
 assert.equal(storage.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
 assert.equal(storage.bufferCount, 11);
 assert.ok(storage.totalByteLength > 0);
@@ -139,6 +141,21 @@ assert.deepEqual(
 assert.equal(
   storage.totalByteLength,
   storage.descriptors.reduce((total, descriptor) => total + descriptor.allocatedByteLength, 0),
+);
+assert.equal(storageEstimate.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
+assert.equal(storageEstimate.bufferCount, 11);
+assert.equal(storageEstimate.totalByteLength, storage.totalByteLength);
+assert.equal(storageEstimate.maxBufferKey, "pixelResolvedRgba");
+assert.equal(
+  storageEstimate.maxBufferByteLength,
+  storage.descriptors.find((descriptor) => descriptor.key === "pixelResolvedRgba").allocatedByteLength,
+);
+assert.equal(storageEstimate.tileEntriesIncluded, true);
+assert.equal(storageEstimate.tileOffsetsIncluded, true);
+assert.equal(storageEstimate.pixelOutputIncluded, true);
+assert.deepEqual(
+  storageEstimate.descriptors.map((descriptor) => descriptor.key),
+  storage.descriptors.map((descriptor) => descriptor.key),
 );
 
 const fakeDevice = createFakeDevice();
@@ -280,6 +297,8 @@ const readyCapability = {
   status: "available",
   reason: "webgpu-device-ready",
   label: "可用",
+  maxBufferSize: 4 * 1024 * 1024 * 1024,
+  maxStorageBufferBindingSize: 4 * 1024 * 1024 * 1024,
 };
 const roomyContract = editRendererContract(readyCapability, roomy);
 assert.equal(roomyContract.rendererId, "webgpu-tile");
@@ -312,7 +331,31 @@ assert.equal(fixedOverflow.tileEntryCapacity, fixedOverflow.tileCount * fixedOve
 const compactContract = editRendererContract(readyCapability, base);
 assert.equal(compactContract.rendererId, "webgpu-tile");
 assert.equal(compactContract.targetGate, "pass");
+assert.equal(compactContract.storageLimitGate, "pass");
+assert.equal(compactContract.storageLimitReason, "webgpu-storage-buffer-limits-pass");
+assert.equal(compactContract.storageLimitBlocker, "");
+assert.equal(compactContract.storageEstimatedBufferCount, storageEstimate.bufferCount);
+assert.equal(compactContract.storageEstimatedByteSize, storageEstimate.totalByteLength);
+assert.equal(compactContract.storageEstimatedMaxBufferByteSize, storageEstimate.maxBufferByteLength);
+assert.equal(compactContract.storageEstimatedMaxBufferKey, storageEstimate.maxBufferKey);
 assert.equal(compactContract.fallbackReason, "");
+
+const limitedCapability = {
+  status: "available",
+  reason: "webgpu-device-ready",
+  label: "可用",
+  maxBufferSize: storageEstimate.maxBufferByteLength - 4,
+  maxStorageBufferBindingSize: storageEstimate.maxBufferByteLength - 4,
+};
+const limitedContract = editRendererContract(limitedCapability, base);
+assert.equal(limitedContract.rendererId, "gaussian-oit");
+assert.equal(limitedContract.targetGate, "blocked");
+assert.equal(limitedContract.targetGateReason, "webgpu-storage-buffer-too-large");
+assert.equal(limitedContract.targetGateBlocker, "webgpu-buffer-limit");
+assert.equal(limitedContract.storageLimitGate, "blocked");
+assert.equal(limitedContract.storageLimitReason, "webgpu-storage-buffer-too-large");
+assert.equal(limitedContract.storageLimitBlocker, "webgpu-buffer-limit");
+assert.equal(limitedContract.fallbackReason, "webgpu-buffer-limit");
 
 const overflowContract = editRendererContract(readyCapability, fixedOverflow);
 assert.equal(overflowContract.rendererId, "gaussian-oit");
