@@ -14,6 +14,36 @@
 
 ## Done
 
+### WEB-001: Make viewer interaction coherent
+
+- 状态: done
+- 类型: 标准 PR / 前端交互修复
+- 目标: 修复 Web 查看器“工程验收能跑但交互模型断裂”的问题，使对象级查看/编辑路径更清楚可用。
+- 范围外:
+  - 不实现真实 splat shader 内对象删除；对象级编辑仍是点云编辑预览。
+  - 不新增后端服务或提交 benchmark `/tmp` 报告产物。
+  - 不把训练素材或 source-only assets 放回 Web 素材卡片。
+- 实施:
+  - 顶部 `旋转 / 框选 / 聚焦` 假工具替换为真实 `真实查看` / `对象编辑` 工作模式。
+  - 无 `.splat` 的内置/PLY 场景默认对象编辑；带 `.splat` 样例加载后默认真实查看。
+  - 对象选择会进入对象编辑模式，并在点云 viewport 中用高亮层显示选中对象。
+  - 修复“隔离后删除当前对象导致可见数反跳”的状态机；删除隔离对象后可见数保持为 0。
+  - 对象行拆成独立选择按钮和可见性按钮，去掉按钮内嵌 switch 的可访问性问题。
+  - 素材库只展示可加载样例，并新增 Benchmark tab 显示 SEMANTIC-003 gates 与三场景指标。
+  - 移动端布局改为 viewport 优先的纵向堆叠。
+- 验收:
+  - 初始内置场景显示对象编辑 / 点云编辑。
+  - `ObjGauss v1 闭环样例` 加载后显示真实查看 / 真实 Splat。
+  - 点击对象行后切入对象编辑并显示编辑预览 banner。
+  - 隔离 object 0 后删除，visible 从 85041 变为 0。
+  - Benchmark tab 显示 smoke/candidate/paper pass 和 Lego/Fern/Chair 行。
+  - Web 素材库不再显示 Poly Haven School Chair 1K 这类不能直接渲染的 source-only 卡片。
+- 验证:
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5190/`: passed。
+  - Targeted Playwright QA: passed，截图和状态日志位于 `/tmp/objgauss-web001-qa/`。
+- 完成 commit: `b8b0fe3`.
+
 ### SEMANTIC-003C: Add third Splatfacto-trained scene and close paper gate
 
 - 状态: done
