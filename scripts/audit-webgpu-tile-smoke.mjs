@@ -22,6 +22,7 @@ import {
   buildWebGpuTileSmoke,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+  WEBGPU_PIXEL_COVERAGE_MODE,
   WEBGPU_PIXEL_DEPTH_SORT_MODE,
   WEBGPU_TILE_COLOR_FIDELITY_MODE,
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
@@ -184,6 +185,9 @@ assert.equal(base.depthWeightMode, WEBGPU_TILE_DEPTH_WEIGHT_MODE);
 assert.equal(base.pixelDepthSortMode, WEBGPU_PIXEL_DEPTH_SORT_MODE);
 assert.equal(base.pixelDepthGateStrength, 12);
 assert.equal(base.pixelDepthGateFloor, 0.06);
+assert.equal(base.pixelCoverageMode, WEBGPU_PIXEL_COVERAGE_MODE);
+assert.equal(base.pixelCoverageWeightFloor, 0.004);
+assert.equal(base.pixelCoverageFootprintScale, 2.2);
 assert.ok(Number.isFinite(base.projectionDepthMin));
 assert.ok(Number.isFinite(base.projectionDepthMax));
 assert.ok(base.projectionDepthMax > base.projectionDepthMin);
@@ -384,7 +388,9 @@ assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /candidateCount\s*==\s*0u/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /let\s+frontWeight\s*=\s*clamp/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /let\s+frontDepthGate\s*=\s*clamp/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /FRONT_DEPTH_GATE_STRENGTH/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /PIXEL_COVERAGE_WEIGHT_FLOOR/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /RESOLVE_ALPHA_GAIN\s*\*\s*frontWeight\s*\*\s*frontDepthGate/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /weight\s*<=\s*PIXEL_COVERAGE_WEIGHT_FLOOR/);
 
 const accumulationMeta = createWebGpuAccumulationMeta(base);
 assert.equal(accumulationMeta.byteLength, 48);
@@ -561,6 +567,7 @@ console.log(
     `projection=${base.projectionMode}:${base.projectionCameraFovDegrees} ` +
     `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
     `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor} ` +
+    `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
     `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +

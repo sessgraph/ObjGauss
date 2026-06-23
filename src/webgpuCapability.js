@@ -1,5 +1,6 @@
 import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
+  WEBGPU_PIXEL_COVERAGE_MODE,
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_PIXEL_DEPTH_SORT_MODE,
   WEBGPU_TILE_PROJECTION_MODE,
@@ -42,6 +43,9 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
   pixelDepthGateStrength: 12,
   pixelDepthGateFloor: 0.06,
+  pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
+  pixelCoverageWeightFloor: 0.004,
+  pixelCoverageFootprintScale: 2.2,
   colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
   colorSourceRgbGaussians: 0,
   colorSourceShDcGaussians: 0,
@@ -184,6 +188,9 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     pixelDepthSortMode: smoke.pixelDepthSortMode,
     pixelDepthGateStrength: smoke.pixelDepthGateStrength,
     pixelDepthGateFloor: smoke.pixelDepthGateFloor,
+    pixelCoverageMode: smoke.pixelCoverageMode,
+    pixelCoverageWeightFloor: smoke.pixelCoverageWeightFloor,
+    pixelCoverageFootprintScale: smoke.pixelCoverageFootprintScale,
     colorFidelityMode: smoke.colorFidelityMode,
     colorSourceRgbGaussians: smoke.colorSourceRgbGaussians,
     colorSourceShDcGaussians: smoke.colorSourceShDcGaussians,

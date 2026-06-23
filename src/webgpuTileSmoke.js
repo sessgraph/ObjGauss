@@ -12,6 +12,7 @@ export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
 export const WEBGPU_PIXEL_DEPTH_SORT_MODE = "front-depth-gated-oit-v1";
+export const WEBGPU_PIXEL_COVERAGE_MODE = "footprint-weight-floor-calibrated-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -19,6 +20,7 @@ const OBJECT_STATE_ISOLATED = 1 << 3;
 const OBJECT_STATE_ENABLED = 1 << 4;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
+const PIXEL_COVERAGE_WEIGHT_FLOOR = 0.004;
 const RESOLVE_KERNEL_CUTOFF = 13;
 const VIEWPORT_FIT_PADDING_RATIO = 0.08;
 const DEPTH_WEIGHT_STRENGTH = 1.45;
@@ -30,7 +32,7 @@ const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
 const EDIT_CAMERA_UP = Object.freeze([0, 1, 0]);
 const EDIT_CAMERA_FOV_DEGREES = 52;
-const EDIT_SPLAT_SIZE_SCALE = 4.8;
+const EDIT_SPLAT_SIZE_SCALE = 2.2;
 const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, -0.25],
   [0.25, -0.25],
@@ -269,6 +271,9 @@ export function buildWebGpuTileSmoke({
     pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
     pixelDepthGateStrength: FRONT_DEPTH_GATE_STRENGTH,
     pixelDepthGateFloor: FRONT_DEPTH_GATE_FLOOR,
+    pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
+    pixelCoverageWeightFloor: PIXEL_COVERAGE_WEIGHT_FLOOR,
+    pixelCoverageFootprintScale: EDIT_SPLAT_SIZE_SCALE,
     screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
     colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
     colorSourceRgbGaussians: rgbColorGaussians,
@@ -597,8 +602,9 @@ function resolvePixelOutput({
         if (d > RESOLVE_KERNEL_CUTOFF) continue;
 
         const gaussianOffset = gaussianIndex * 4;
-        const candidateWeight = Math.exp(-0.5 * d) * colorOpacity[gaussianOffset + 3];
-        if (candidateWeight <= 0.0001) continue;
+        const candidateWeight =
+          Math.exp(-0.5 * d) * colorOpacity[gaussianOffset + 3] * RESOLVE_ALPHA_GAIN;
+        if (candidateWeight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
         nearestDepth = Math.min(nearestDepth, projection.depth[gaussianIndex]);
         candidateCount += 1;
       }
@@ -631,7 +637,7 @@ function resolvePixelOutput({
           projection.depthWeight[gaussianIndex] *
           frontGate *
           RESOLVE_ALPHA_GAIN;
-        if (weight <= 0.0001) continue;
+        if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
         accumulatedRed += colorOpacity[gaussianOffset] * weight;
         accumulatedGreen += colorOpacity[gaussianOffset + 1] * weight;
         accumulatedBlue += colorOpacity[gaussianOffset + 2] * weight;

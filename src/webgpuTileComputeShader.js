@@ -149,6 +149,7 @@ export const WEBGPU_PIXEL_RESOLVE_SHADER = `
 const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
+const PIXEL_COVERAGE_WEIGHT_FLOOR = 0.004;
 const RESOLVE_KERNEL_CUTOFF = 13.0;
 const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
@@ -227,8 +228,8 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
     }
 
     let color = colorOpacity[gaussianIndex];
-    let candidateWeight = exp(-0.5 * d) * color.a;
-    if (candidateWeight <= 0.0001) {
+    let candidateWeight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN;
+    if (candidateWeight <= PIXEL_COVERAGE_WEIGHT_FLOOR) {
       continue;
     }
     nearestDepth = min(nearestDepth, centerRadius.z);
@@ -285,7 +286,7 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
 
     let color = colorOpacity[gaussianIndex];
     let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * frontWeight * frontDepthGate;
-    if (weight <= 0.0001) {
+    if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) {
       continue;
     }
     accumulation = accumulation + vec4f(color.rgb * weight, weight);
