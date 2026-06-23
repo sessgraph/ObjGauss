@@ -23,6 +23,34 @@
 
 ## Done
 
+### SEMANTIC-007: Acceptance integration and missing-output runbook
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 SEMANTIC-006 benchmark suite 接入 acceptance，并为缺失 ignored `outputs/` 的环境提供明确生成命令。
+- 实施:
+  - 新增 `scripts/acceptance-semantic-benchmark.mjs` 和 `npm run acceptance:semantic`。
+  - `npm run acceptance:demo` 默认在闭环 demo 生成、verify 和浏览器 audit 后执行 SEMANTIC benchmark suite。
+  - `acceptance:demo` 新增 `--skip-semantic-benchmark`，用于只跑 demo/UI 闭环验收。
+  - `docs/benchmarks/semantic-smoke.json` 增加 `help` 和 per-scene `prepare` 命令。
+  - `objgauss.emergence_benchmark` 对缺失输入输出 scene、缺失路径、prepare 命令和 runbook 路径。
+  - 新增 `docs/benchmarks/semantic-smoke.md`，记录三场景输入、输出目录、缺失输入生成命令和 Splatfacto smoke 边界。
+- 范围外:
+  - 不把 `/tmp`、`outputs/`、checkpoint 或训练产物提交进 git。
+  - 不把 Splatfacto 训练过程完全固化为 TRAIN-003；这里只记录 SEMANTIC benchmark 所需的本地 handoff。
+  - 不替换 point-splat render probe 为 covariance-aware 3DGS / gsplat renderer。
+- 验收:
+  - `npm run acceptance:semantic` 能一键跑 strict semantic benchmark suite。
+  - `npm run acceptance:demo` 默认包含 SEMANTIC benchmark suite。
+  - 缺失 benchmark 输入时，CLI 错误信息包含 prepare 命令和 runbook。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "emergence_benchmark"`: 2 passed。
+  - `npm run acceptance:semantic`: passed，输出 `acceptance_semantic_benchmark=passed`。
+  - `npm run acceptance:demo`: passed，输出 `acceptance_demo=passed`，并包含 SEMANTIC benchmark suite。
+  - `uv run --extra dev pytest`: 31 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
+
 ### SEMANTIC-006: Reproducible emergence benchmark suite
 
 - 状态: done

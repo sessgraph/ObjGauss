@@ -293,9 +293,34 @@ npm run acceptance:demo
 
 This rebuilds the Plush v1 closure demo, verifies it, rebuilds the Plush
 semantic closure demo, verifies it, rebuilds the NeRF Lego proxy closure demo,
-verifies it, and then runs the browser audit. Use
+verifies it, runs the browser audit, and then runs the semantic emergence
+benchmark suite. Use
 `npm run acceptance:demo -- --pull-assets` on a machine that still needs to
 download the local Plush and NeRF Lego assets.
+
+The semantic benchmark acceptance target can also be run directly:
+
+```bash
+npm run acceptance:semantic
+```
+
+It executes:
+
+```bash
+uv run objgauss object-field emergence-benchmark \
+  docs/benchmarks/semantic-smoke.json \
+  --output-dir /tmp/objgauss-semantic-smoke-suite \
+  --strict
+```
+
+That manifest expects local ignored outputs for Plush semantic, Lego alpha
+proxy, and Lego Splatfacto smoke. If a machine does not yet have the Splatfacto
+smoke output, follow `docs/benchmarks/semantic-smoke.md`. For the older
+demo-only loop:
+
+```bash
+npm run acceptance:demo -- --skip-semantic-benchmark
+```
 
 Audit the current evidence against the phase goal:
 

@@ -6,6 +6,7 @@ import zipfile
 import zlib
 
 import numpy as np
+import pytest
 
 import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
@@ -542,6 +543,49 @@ def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, caps
     assert summary["scenes"][0]["checks"]
     assert report_path.exists()
     assert curve_path.exists()
+
+
+def test_object_field_emergence_benchmark_reports_prepare_steps_for_missing_inputs(tmp_path, capsys):
+    field_path = tmp_path / "field.npz"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    manifest_path = tmp_path / "benchmark.json"
+    save_object_field(field_path, ObjectField(np.zeros((4, 2), dtype=np.float32)))
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "kind": "object_emergence_benchmark",
+                "root": ".",
+                "help": "docs/benchmarks/semantic-smoke.md",
+                "scenes": [
+                    {
+                        "id": "missing-scene",
+                        "input": "missing.ply",
+                        "field": field_path.name,
+                        "masks": masks_path.name,
+                        "prepare": ["uv run objgauss demo missing-scene"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "object-field",
+                "emergence-benchmark",
+                str(manifest_path),
+                "--output-dir",
+                str(tmp_path / "benchmark-output"),
+            ]
+        )
+    assert exc.value.code == 2
+
+    error = capsys.readouterr().err
+    assert "scene missing-scene: missing input path:" in error
+    assert "uv run objgauss demo missing-scene" in error
+    assert "docs/benchmarks/semantic-smoke.md" in error
 
 
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):

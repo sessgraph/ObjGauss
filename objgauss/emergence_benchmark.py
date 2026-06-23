@@ -33,6 +33,8 @@ def run_emergence_benchmark(
     root = _benchmark_root(manifest_path, manifest)
     defaults = _dict(manifest.get("defaults"))
     global_thresholds = _dict(manifest.get("thresholds"))
+    global_prepare = _string_list(manifest.get("prepare"))
+    help_path = manifest.get("help")
     scenes = manifest.get("scenes")
     if not isinstance(scenes, list) or not scenes:
         raise ValueError("benchmark manifest must contain a non-empty scenes list")
@@ -46,6 +48,8 @@ def run_emergence_benchmark(
             output_dir=output_dir,
             defaults=defaults,
             global_thresholds=global_thresholds,
+            global_prepare=global_prepare,
+            help_path=str(help_path) if help_path else None,
         )
         scene_summaries.append(scene_summary)
         curve_inputs.append(EmergenceCurveInput(label=scene_summary["label"], curve=curve))
@@ -80,6 +84,8 @@ def _run_scene(
     output_dir: Path,
     defaults: dict[str, Any],
     global_thresholds: dict[str, Any],
+    global_prepare: list[str],
+    help_path: str | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(scene, dict):
         raise ValueError("benchmark scene entries must be objects")
@@ -91,6 +97,10 @@ def _run_scene(
     input_path = _resolve(root, _required_str(scene, "input"))
     field_path = _resolve(root, _required_str(scene, "field"))
     masks_path = _resolve(root, _required_str(scene, "masks"))
+    prepare = [*global_prepare, *_string_list(scene.get("prepare"))]
+    _require_existing_path(input_path, scene_id=scene_id, kind="input", prepare=prepare, help_path=help_path)
+    _require_existing_path(field_path, scene_id=scene_id, kind="field", prepare=prepare, help_path=help_path)
+    _require_existing_path(masks_path, scene_id=scene_id, kind="masks", prepare=prepare, help_path=help_path)
     cloud = read_ply(input_path)
     field = load_object_field(field_path)
     if cloud.count != field.gaussian_count:
@@ -246,6 +256,25 @@ def _resolve(root: Path, value: str) -> Path:
     return path
 
 
+def _require_existing_path(
+    path: Path,
+    *,
+    scene_id: str,
+    kind: str,
+    prepare: list[str],
+    help_path: str | None,
+) -> None:
+    if path.exists():
+        return
+    lines = [f"scene {scene_id}: missing {kind} path: {path}"]
+    if prepare:
+        lines.append("Generate required outputs first:")
+        lines.extend(f"  - {command}" for command in prepare)
+    if help_path:
+        lines.append(f"Runbook: {help_path}")
+    raise FileNotFoundError("\n".join(lines))
+
+
 def _required_id(scene: dict[str, Any]) -> str:
     value = _required_str(scene, "id")
     if "/" in value or "\\" in value or value in {"", ".", ".."}:
@@ -296,6 +325,14 @@ def _dict(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("benchmark manifest settings must be objects")
     return dict(value)
+
+
+def _string_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError("benchmark prepare entries must be a list of strings")
+    return list(value)
 
 
 def _write_json(path: str | Path, payload: dict[str, Any]) -> None:

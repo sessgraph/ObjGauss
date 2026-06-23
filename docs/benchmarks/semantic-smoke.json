@@ -2,6 +2,7 @@
   "kind": "object_emergence_benchmark",
   "title": "ObjGauss Semantic Smoke Benchmark",
   "root": "../..",
+  "help": "docs/benchmarks/semantic-smoke.md",
   "defaults": {
     "iterations": 40,
     "learning_rate": 1.0,
@@ -19,7 +20,11 @@
       "label": "Plush semantic",
       "input": "outputs/assets/converted/plush.ply",
       "field": "outputs/demos/plush-semantic-closure/object_field_initial.npz",
-      "masks": "outputs/demos/plush-semantic-closure/mask-manifest.json"
+      "masks": "outputs/demos/plush-semantic-closure/mask-manifest.json",
+      "prepare": [
+        "uv run objgauss assets pull plush-3dgs-local",
+        "uv run objgauss demo plush-semantic-closure --iterations 80"
+      ]
     },
     {
       "id": "lego-alpha-proxy",
@@ -27,14 +32,25 @@
       "input": "outputs/demos/lego-alpha-closure/lego_proxy_raw.ply",
       "field": "outputs/demos/lego-alpha-closure/object_field_initial.npz",
       "masks": "outputs/demos/lego-alpha-closure/mask-manifest.json",
-      "max_frames": 4
+      "max_frames": 4,
+      "prepare": [
+        "uv run objgauss assets pull nerf-synthetic-lego",
+        "uv run objgauss demo lego-alpha-closure --max-frames 12 --sample-stride 8 --iterations 120"
+      ]
     },
     {
       "id": "lego-splatfacto-smoke",
       "label": "Lego Splatfacto smoke",
       "input": "outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply",
       "field": "outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz",
-      "masks": "outputs/masks/nerf-lego-sam/mask-manifest.json"
+      "masks": "outputs/masks/nerf-lego-sam/mask-manifest.json",
+      "prepare": [
+        "uv run objgauss assets pull nerf-synthetic-lego",
+        "uv run --with torch --with torchvision --with \"segment-anything @ git+https://github.com/facebookresearch/segment-anything.git\" objgauss masks from-nerf-sam outputs/assets/training/nerf-synthetic-lego --output outputs/masks/nerf-lego-sam/mask-manifest.json --checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth --model-type vit_b --device cuda --split train --max-frames 2 --max-masks-per-frame 8 --min-area 64",
+        "Produce outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply with Nerfstudio Splatfacto as described in docs/benchmarks/semantic-smoke.md",
+        "uv run objgauss object-field init outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --slots 8",
+        "uv run objgauss object-field vote-masks outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --field outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --masks outputs/masks/nerf-lego-sam/mask-manifest.json --output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_sam.npz --ply-output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/lego_splatfacto_sam_objects.ply --iterations 80 --learning-rate 1.0 --colorize"
+      ]
     }
   ]
 }

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 
 const args = new Set(process.argv.slice(2));
 const pullAssets = args.has("--pull-assets");
+const skipSemanticBenchmark = args.has("--skip-semantic-benchmark");
 
 const steps = [
   ...(pullAssets
@@ -44,6 +45,9 @@ const steps = [
     ["uv", "run", "objgauss", "demo", "verify-lego-alpha-closure"],
   ],
   ["Browser audit for closure cards", ["npm", "run", "audit:demo"]],
+  ...(!skipSemanticBenchmark
+    ? [["Semantic emergence benchmark suite", ["npm", "run", "acceptance:semantic"]]]
+    : []),
 ];
 
 for (const [label, command] of steps) {
