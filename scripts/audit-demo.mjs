@@ -99,8 +99,8 @@ async function runAudit(url, assetsToCheck) {
 
       await page.getByLabel("渲染模式").selectOption("clustered");
       const editRenderer = await labeledValue(page, "渲染器");
-      if (editRenderer !== "Gaussian Shader 编辑") {
-        throw new Error(`${asset.id} did not enter Gaussian shader edit renderer: ${editRenderer}`);
+      if (editRenderer !== "Gaussian OIT 编辑") {
+        throw new Error(`${asset.id} did not enter Gaussian OIT edit renderer: ${editRenderer}`);
       }
       const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {

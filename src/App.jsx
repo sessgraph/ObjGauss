@@ -83,7 +83,7 @@ export default function App() {
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
-  const activeRendererText = useSplatRenderer ? "真实 Splat" : "Gaussian Shader 编辑";
+  const activeRendererText = useSplatRenderer ? "真实 Splat" : "Gaussian OIT 编辑";
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>

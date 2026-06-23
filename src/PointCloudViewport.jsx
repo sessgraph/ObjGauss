@@ -5,6 +5,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 const DEFAULT_POINT_SIZE = 0.018;
 const EDIT_SPLAT_SIZE_SCALE = 4.8;
 const SELECTED_SPLAT_SIZE_SCALE = 7.0;
+const OIT_CLEAR_COLOR = new THREE.Color(0x000000);
+const SCENE_CLEAR_COLOR = new THREE.Color(0x101316);
 const EDIT_VERTEX_SHADER = `
 attribute vec3 color;
 attribute vec2 gaussianScale;
@@ -71,11 +73,40 @@ void main() {
     discard;
   }
 
-  float alpha = exp(-0.5 * d) * vOpacity * uAlphaScale;
-  if (alpha < 0.004) {
+  float weight = exp(-0.5 * d) * vOpacity * uAlphaScale;
+  if (weight < 0.004) {
     discard;
   }
-  gl_FragColor = vec4(vColor, alpha);
+  gl_FragColor = vec4(vColor * weight, weight);
+}
+`;
+
+const RESOLVE_VERTEX_SHADER = `
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+const RESOLVE_FRAGMENT_SHADER = `
+precision highp float;
+
+uniform sampler2D uAccumulation;
+uniform float uOpacityScale;
+varying vec2 vUv;
+
+void main() {
+  vec4 accumulation = texture2D(uAccumulation, vUv);
+  float weight = accumulation.a;
+  if (weight <= 0.0001) {
+    discard;
+  }
+
+  vec3 color = accumulation.rgb / max(weight, 0.0001);
+  float alpha = clamp(1.0 - exp(-weight * uOpacityScale), 0.0, 0.98);
+  gl_FragColor = vec4(color, alpha);
 }
 `;
 
@@ -102,6 +133,10 @@ export default function PointCloudViewport({
   const gridRef = useRef(null);
   const axesRef = useRef(null);
   const pickStartRef = useRef(null);
+  const accumulationTargetRef = useRef(null);
+  const resolveSceneRef = useRef(null);
+  const resolveCameraRef = useRef(null);
+  const resolveMaterialRef = useRef(null);
 
   const buffers = useMemo(
     () =>
@@ -131,9 +166,13 @@ export default function PointCloudViewport({
       preserveDrawingBuffer: true,
       powerPreference: "high-performance",
     });
+    renderer.autoClear = false;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
+    const accumulationTarget = createAccumulationTarget(renderer);
+    const { resolveScene, resolveCamera, resolveMaterial } =
+      createResolvePass(accumulationTarget);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -157,6 +196,10 @@ export default function PointCloudViewport({
     controlsRef.current = controls;
     gridRef.current = grid;
     axesRef.current = axes;
+    accumulationTargetRef.current = accumulationTarget;
+    resolveSceneRef.current = resolveScene;
+    resolveCameraRef.current = resolveCamera;
+    resolveMaterialRef.current = resolveMaterial;
 
     const resize = () => {
       const width = container.clientWidth;
@@ -164,8 +207,11 @@ export default function PointCloudViewport({
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
-      updateMaterialViewport(pointsObjectRef.current?.material, width, height);
-      updateMaterialViewport(selectedObjectRef.current?.material, width, height);
+      const drawingSize = rendererDrawingSize(renderer);
+      accumulationTarget.setSize(drawingSize.x, drawingSize.y);
+      updateResolveTexture(resolveMaterial, accumulationTarget);
+      updateMaterialViewport(pointsObjectRef.current?.material, drawingSize.x, drawingSize.y);
+      updateMaterialViewport(selectedObjectRef.current?.material, drawingSize.x, drawingSize.y);
     };
 
     const observer = new ResizeObserver(resize);
@@ -176,7 +222,16 @@ export default function PointCloudViewport({
     const render = () => {
       animationId = window.requestAnimationFrame(render);
       controls.update();
-      renderer.render(scene, camera);
+      renderWeightedOitFrame({
+        renderer,
+        scene,
+        camera,
+        accumulationTarget,
+        resolveScene,
+        resolveCamera,
+        clouds: [pointsObjectRef.current, selectedObjectRef.current],
+        baseObjects: [gridRef.current, axesRef.current],
+      });
     };
     render();
 
@@ -184,6 +239,8 @@ export default function PointCloudViewport({
       window.cancelAnimationFrame(animationId);
       observer.disconnect();
       controls.dispose();
+      accumulationTarget.dispose();
+      disposeResolvePass(resolveScene);
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -431,6 +488,98 @@ function createEditGeometry({ positions, colors, scales, opacities, rotations })
   return geometry;
 }
 
+function createAccumulationTarget(renderer) {
+  const size = rendererDrawingSize(renderer);
+  const target = new THREE.WebGLRenderTarget(size.x, size.y, {
+    format: THREE.RGBAFormat,
+    type: THREE.HalfFloatType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    depthBuffer: false,
+    stencilBuffer: false,
+  });
+  target.texture.name = "ObjGauss weighted OIT accumulation";
+  return target;
+}
+
+function createResolvePass(accumulationTarget) {
+  const resolveScene = new THREE.Scene();
+  const resolveCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const resolveMaterial = new THREE.ShaderMaterial({
+    vertexShader: RESOLVE_VERTEX_SHADER,
+    fragmentShader: RESOLVE_FRAGMENT_SHADER,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uAccumulation: { value: accumulationTarget.texture },
+      uOpacityScale: { value: 0.18 },
+    },
+  });
+  const resolveQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), resolveMaterial);
+  resolveQuad.frustumCulled = false;
+  resolveScene.add(resolveQuad);
+  return { resolveScene, resolveCamera, resolveMaterial };
+}
+
+function disposeResolvePass(resolveScene) {
+  for (const child of resolveScene.children) {
+    child.geometry?.dispose();
+    child.material?.dispose();
+  }
+}
+
+function renderWeightedOitFrame({
+  renderer,
+  scene,
+  camera,
+  accumulationTarget,
+  resolveScene,
+  resolveCamera,
+  clouds,
+  baseObjects,
+}) {
+  const activeClouds = clouds.filter(Boolean);
+  const visibleBaseObjects = baseObjects.filter(Boolean);
+
+  const cloudVisibility = setVisibility(activeClouds, false);
+  renderer.setRenderTarget(null);
+  renderer.setClearColor(SCENE_CLEAR_COLOR, 1);
+  renderer.clear(true, true, true);
+  renderer.render(scene, camera);
+
+  const previousBackground = scene.background;
+  scene.background = null;
+  const baseVisibility = setVisibility(visibleBaseObjects, false);
+  setVisibility(activeClouds, true);
+  renderer.setRenderTarget(accumulationTarget);
+  renderer.setClearColor(OIT_CLEAR_COLOR, 0);
+  renderer.clear(true, true, true);
+  renderer.render(scene, camera);
+
+  scene.background = previousBackground;
+  restoreVisibility(visibleBaseObjects, baseVisibility);
+  restoreVisibility(activeClouds, cloudVisibility);
+  renderer.setRenderTarget(null);
+  renderer.render(resolveScene, resolveCamera);
+}
+
+function setVisibility(objects, visible) {
+  const previous = [];
+  for (const object of objects) {
+    previous.push(object.visible);
+    object.visible = visible;
+  }
+  return previous;
+}
+
+function restoreVisibility(objects, previous) {
+  objects.forEach((object, index) => {
+    object.visible = previous[index] ?? object.visible;
+  });
+}
+
 function createGaussianSplatMaterial({
   pointSize,
   sizeScale,
@@ -445,7 +594,13 @@ function createGaussianSplatMaterial({
     transparent: true,
     depthWrite: false,
     depthTest,
-    blending: THREE.NormalBlending,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneFactor,
+    blendEquationAlpha: THREE.AddEquation,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneFactor,
     uniforms: {
       uViewport: { value: viewport.clone() },
       uSizeScale: { value: pointSizeScale(pointSize, sizeScale) },
@@ -461,9 +616,20 @@ function createGaussianSplatMaterial({
 }
 
 function rendererViewport(renderer) {
+  return rendererDrawingSize(renderer);
+}
+
+function rendererDrawingSize(renderer) {
   const size = new THREE.Vector2(1, 1);
-  renderer?.getSize(size);
+  renderer?.getDrawingBufferSize(size);
+  size.x = Math.max(size.x, 1);
+  size.y = Math.max(size.y, 1);
   return size;
+}
+
+function updateResolveTexture(material, accumulationTarget) {
+  if (!material?.uniforms?.uAccumulation) return;
+  material.uniforms.uAccumulation.value = accumulationTarget.texture;
 }
 
 function updateMaterialViewport(material, width, height) {
