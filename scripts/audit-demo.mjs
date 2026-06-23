@@ -98,7 +98,7 @@ async function runAudit(url, assetsToCheck) {
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
       }
-      await page.locator(".objectRow").first().click();
+      await page.locator(".objectSelectButton").first().click();
       await page.getByRole("button", { name: "只看所选" }).click();
       await page.waitForTimeout(300);
       const visibleAfterIsolate = await labeledValue(page, "可见");

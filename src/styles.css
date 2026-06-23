@@ -85,7 +85,7 @@ button:disabled {
   line-height: 1.2;
 }
 
-.toolStrip {
+.modeTabs {
   display: flex;
   align-items: stretch;
   height: 100%;
@@ -93,7 +93,7 @@ button:disabled {
   border-right: 1px solid #2b343d;
 }
 
-.toolButton {
+.modeTab {
   display: grid;
   min-width: 70px;
   place-items: center;
@@ -105,12 +105,12 @@ button:disabled {
   background: transparent;
 }
 
-.toolButton span {
+.modeTab span {
   font-size: 11px;
 }
 
-.toolButton.active,
-.toolButton:hover {
+.modeTab.active,
+.modeTab:hover {
   color: #f4fbfc;
   background: #173338;
 }
@@ -279,6 +279,37 @@ select {
   width: 100%;
 }
 
+.modeToggle,
+.panelTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #33404a;
+  border-radius: 6px;
+  background: #11161a;
+}
+
+.modeToggle button,
+.panelTabs button {
+  min-height: 34px;
+  border: 0;
+  color: #b8c5ce;
+  background: transparent;
+  font-size: 12px;
+}
+
+.modeToggle button + button,
+.panelTabs button + button {
+  border-left: 1px solid #33404a;
+}
+
+.modeToggle button.active,
+.panelTabs button.active {
+  color: #f5feff;
+  background: #163137;
+}
+
 input[type="range"] {
   width: 100%;
   accent-color: #28bbc5;
@@ -439,8 +470,7 @@ input[type="checkbox"] {
   color: #69d8a1;
 }
 
-.assetActionButton,
-.assetLink {
+.assetActionButton {
   display: inline-flex;
   min-height: 28px;
   align-items: center;
@@ -455,9 +485,121 @@ input[type="checkbox"] {
   text-decoration: none;
 }
 
-.assetActionButton:hover,
-.assetLink:hover {
+.assetActionButton:hover {
   background: #1d252c;
+}
+
+.benchmarkPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.benchmarkGates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.benchmarkGate {
+  display: grid;
+  gap: 4px;
+  padding: 9px 8px;
+  border: 1px solid #26524a;
+  border-radius: 6px;
+  background: #10251f;
+}
+
+.benchmarkGate span,
+.benchmarkFootnote {
+  color: #91a0a8;
+  font-size: 11px;
+}
+
+.benchmarkGate strong {
+  color: #75e0a3;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.benchmarkStatLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d3e1e8;
+  font-size: 12px;
+}
+
+.benchmarkTable {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #33404a;
+  border-radius: 6px;
+}
+
+.benchmarkTableHead,
+.benchmarkRow {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) 42px 46px 48px;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 7px;
+  border-bottom: 1px solid #28323a;
+  font-size: 11px;
+}
+
+.benchmarkTableHead {
+  color: #8e9aa4;
+  background: #11161a;
+}
+
+.benchmarkRow:last-child {
+  border-bottom: 0;
+}
+
+.benchmarkRow strong {
+  overflow: hidden;
+  color: #edf3f6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.benchmarkRow span {
+  color: #bdd4d7;
+}
+
+.viewerStage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.viewerStage > .viewport {
+  width: 100%;
+  height: 100%;
+}
+
+.viewportBanner {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  display: flex;
+  max-width: min(520px, calc(100% - 36px));
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgb(40 187 197 / 35%);
+  border-radius: 8px;
+  color: #cbe4e7;
+  background: rgb(16 31 35 / 82%);
+  backdrop-filter: blur(10px);
+  font-size: 12px;
+}
+
+.viewportBanner strong {
+  color: #f0fcfd;
+  white-space: nowrap;
 }
 
 .viewport {
@@ -586,21 +728,35 @@ input[type="checkbox"] {
 .objectRow {
   width: 100%;
   min-height: 42px;
-  border: 0;
   border-top: 1px solid #28323a;
   color: #d7e0e6;
   background: transparent;
   font-size: 13px;
+}
+
+.objectSelectButton {
+  display: grid;
+  grid-column: 1 / 4;
+  grid-template-columns: 74px 58px minmax(86px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 0;
+  color: inherit;
+  background: transparent;
   text-align: left;
 }
 
-.objectRow:hover,
-.objectRow.selected {
+.objectRow:hover .objectSelectButton,
+.objectRow.selected .objectSelectButton {
   background: #1b232a;
 }
 
 .objectRow.removed {
   color: #78848e;
+}
+
+.objectRow.removed .objectSelectButton {
   text-decoration: line-through;
 }
 
@@ -620,8 +776,10 @@ input[type="checkbox"] {
   width: 30px;
   height: 30px;
   place-items: center;
+  border: 0;
   border-radius: 5px;
   color: #bdc8d1;
+  background: transparent;
 }
 
 .eyeButton:hover {
@@ -659,7 +817,7 @@ input[type="checkbox"] {
 
 .statusBar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, max-content));
+  grid-template-columns: repeat(6, minmax(0, max-content));
   align-items: center;
   gap: 26px;
   padding: 0 18px;
@@ -705,14 +863,15 @@ input[type="checkbox"] {
     padding: 0;
   }
 
-  .toolStrip {
+  .modeTabs {
     min-height: 58px;
     overflow-x: auto;
     border: 1px solid #2b343d;
   }
 
   .workspace {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
   }
 
   .leftPanel,
@@ -721,9 +880,18 @@ input[type="checkbox"] {
     border-bottom: 1px solid #2b343d;
   }
 
-  .viewport {
+  .viewerStage {
     order: -1;
     min-height: 520px;
+  }
+
+  .viewportBanner {
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
   }
 
   .statusBar {

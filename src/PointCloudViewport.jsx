@@ -11,6 +11,7 @@ export default function PointCloudViewport({
   showGrid,
   showAxes,
   isolatedId,
+  selectedId,
   renderModeLabel,
 }) {
   const containerRef = useRef(null);
@@ -19,6 +20,7 @@ export default function PointCloudViewport({
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
   const pointsObjectRef = useRef(null);
+  const selectedObjectRef = useRef(null);
   const gridRef = useRef(null);
   const axesRef = useRef(null);
 
@@ -30,8 +32,9 @@ export default function PointCloudViewport({
         removedIds,
         renderMode,
         isolatedId,
+        selectedId,
       }),
-    [points, visibleIds, removedIds, renderMode, isolatedId],
+    [points, visibleIds, removedIds, renderMode, isolatedId, selectedId],
   );
 
   useEffect(() => {
@@ -115,6 +118,12 @@ export default function PointCloudViewport({
       pointsObjectRef.current.material.dispose();
       pointsObjectRef.current = null;
     }
+    if (selectedObjectRef.current) {
+      scene.remove(selectedObjectRef.current);
+      selectedObjectRef.current.geometry.dispose();
+      selectedObjectRef.current.material.dispose();
+      selectedObjectRef.current = null;
+    }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(buffers.positions, 3));
@@ -133,6 +142,26 @@ export default function PointCloudViewport({
     scene.add(cloud);
     pointsObjectRef.current = cloud;
 
+    if (buffers.selectedPositions.length > 0) {
+      const selectedGeometry = new THREE.BufferGeometry();
+      selectedGeometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(buffers.selectedPositions, 3),
+      );
+      const selectedMaterial = new THREE.PointsMaterial({
+        size: pointSize * 1.85,
+        color: 0xfff0a8,
+        transparent: true,
+        opacity: 0.86,
+        sizeAttenuation: true,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const selectedCloud = new THREE.Points(selectedGeometry, selectedMaterial);
+      scene.add(selectedCloud);
+      selectedObjectRef.current = selectedCloud;
+    }
+
     if (buffers.positions.length > 0) {
       frameGeometry(geometry, cameraRef.current, controlsRef.current, scene);
     }
@@ -141,6 +170,9 @@ export default function PointCloudViewport({
   useEffect(() => {
     if (pointsObjectRef.current) {
       pointsObjectRef.current.material.size = pointSize;
+    }
+    if (selectedObjectRef.current) {
+      selectedObjectRef.current.material.size = pointSize * 1.85;
     }
   }, [pointSize]);
 
@@ -163,6 +195,10 @@ export default function PointCloudViewport({
           <span className="hudLabel">模式</span>
           <strong>{renderModeLabel}</strong>
         </div>
+        <div>
+          <span className="hudLabel">所选</span>
+          <strong>{selectedId ?? "无"}</strong>
+        </div>
       </div>
       <div className="axisLegend">
         <span className="axis x">X</span>
@@ -179,6 +215,7 @@ function buildBuffers({
   removedIds,
   renderMode,
   isolatedId,
+  selectedId,
 }) {
   const selected = points.filter((point) => {
     if (removedIds.has(point.objectId)) return false;
@@ -187,6 +224,8 @@ function buildBuffers({
   });
   const positions = new Float32Array(selected.length * 3);
   const colors = new Float32Array(selected.length * 3);
+  const selectedHighlight = selected.filter((point) => point.objectId === selectedId);
+  const selectedPositions = new Float32Array(selectedHighlight.length * 3);
 
   selected.forEach((point, index) => {
     const offset = index * 3;
@@ -198,10 +237,17 @@ function buildBuffers({
     colors[offset + 1] = rgb[1] / 255;
     colors[offset + 2] = rgb[2] / 255;
   });
+  selectedHighlight.forEach((point, index) => {
+    const offset = index * 3;
+    selectedPositions[offset] = point.x;
+    selectedPositions[offset + 1] = point.z;
+    selectedPositions[offset + 2] = point.y;
+  });
 
   return {
     positions,
     colors,
+    selectedPositions,
     visibleCount: selected.length,
   };
 }

@@ -1,11 +1,9 @@
 import {
-  BoxSelect,
+  BarChart3,
   Database,
   Eye,
   EyeOff,
-  ExternalLink,
   FileUp,
-  Focus,
   Layers3,
   LoaderCircle,
   RefreshCw,
@@ -24,10 +22,42 @@ import SplatViewport from "./SplatViewport.jsx";
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
+const BENCHMARK_GATES = [
+  { label: "Smoke", value: "pass" },
+  { label: "Candidate", value: "pass" },
+  { label: "Paper", value: "pass" },
+];
+const BENCHMARK_SCENES = [
+  {
+    id: "lego-safe-2000",
+    label: "Lego safe-2000",
+    ari: 0.469787,
+    oes: 0.784051,
+    render: 0.229397,
+    heldout: 0.197505,
+  },
+  {
+    id: "fern-smoke",
+    label: "Fern smoke",
+    ari: 0.790636,
+    oes: 0.780132,
+    render: 0.235029,
+    heldout: 0.233851,
+  },
+  {
+    id: "chair-smoke",
+    label: "Chair smoke",
+    ari: 0.614363,
+    oes: 0.757609,
+    render: 0.248716,
+    heldout: 0.224084,
+  },
+];
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
-  const [rendererKind, setRendererKind] = useState("splat");
+  const [viewMode, setViewMode] = useState("edit");
+  const [sideTab, setSideTab] = useState("samples");
   const [renderMode, setRenderMode] = useState("original");
   const [pointSize, setPointSize] = useState(0.018);
   const [showGrid, setShowGrid] = useState(true);
@@ -42,6 +72,7 @@ export default function App() {
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
   const sceneObjectIds = useMemo(() => allIds(scene.points), [scene.points]);
+  const hasSplatRenderer = Boolean(scene.splatSource);
   const objectEditActive = useMemo(
     () =>
       removedIds.size > 0 ||
@@ -50,9 +81,10 @@ export default function App() {
       [...sceneObjectIds].some((id) => !visibleIds.has(id)),
     [isolatedId, removedIds, sceneObjectIds, visibleIds],
   );
-  const canUseSplatRenderer = Boolean(scene.splatSource) && renderMode === "original" && !objectEditActive;
-  const useSplatRenderer = rendererKind === "splat" && canUseSplatRenderer;
+  const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
+  const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
   const activeRendererText = useSplatRenderer ? "真实 Splat" : "点云编辑";
+  const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>
       scene.points.filter(
@@ -69,8 +101,10 @@ export default function App() {
     const ids = allIds(next.points);
     setVisibleIds(ids);
     setRemovedIds(new Set());
-    setSelectedId(ids.values().next().value ?? null);
+    setSelectedId(null);
     setIsolatedId(null);
+    setViewMode(next.splatSource ? "view" : "edit");
+    setRenderMode("original");
   };
 
   const loadFile = async (file) => {
@@ -121,11 +155,38 @@ export default function App() {
     setRemovedIds(new Set());
     setSelectedId(null);
     setIsolatedId(null);
+    setViewMode("edit");
     setRenderMode("original");
     setError("");
   };
 
+  const enterViewMode = () => {
+    if (!hasSplatRenderer) return;
+    setVisibleIds(new Set(sceneObjectIds));
+    setRemovedIds(new Set());
+    setIsolatedId(null);
+    setRenderMode("original");
+    setViewMode("view");
+  };
+
+  const enterEditMode = () => {
+    setViewMode("edit");
+  };
+
+  const setEditRenderMode = (mode) => {
+    setRenderMode(mode);
+    if (mode === "clustered") {
+      setViewMode("edit");
+    }
+  };
+
+  const selectObject = (id) => {
+    setSelectedId(id);
+    setViewMode("edit");
+  };
+
   const toggleVisible = (id) => {
+    setViewMode("edit");
     setVisibleIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -136,12 +197,18 @@ export default function App() {
 
   const removeSelected = () => {
     if (selectedId === null) return;
+    setViewMode("edit");
     setRemovedIds((current) => new Set([...current, selectedId]));
-    if (isolatedId === selectedId) setIsolatedId(null);
   };
 
   const restoreRemoved = () => {
     setRemovedIds(new Set());
+  };
+
+  const isolateSelected = () => {
+    if (selectedId === null) return;
+    setViewMode("edit");
+    setIsolatedId(selectedId);
   };
 
   return (
@@ -157,33 +224,32 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="toolStrip" aria-label="查看器工具">
-          <button className="toolButton active" type="button" title="旋转视图">
+        <nav className="modeTabs" aria-label="工作模式">
+          <button
+            className={`modeTab ${viewMode === "view" ? "active" : ""}`}
+            type="button"
+            onClick={enterViewMode}
+            disabled={!hasSplatRenderer}
+            title="查看真实 splat 外观"
+          >
             <Rotate3D size={17} />
-            <span>旋转</span>
+            <span>真实查看</span>
           </button>
-          <button className="toolButton" type="button" title="框选对象">
-            <BoxSelect size={17} />
-            <span>框选</span>
-          </button>
-          <button className="toolButton" type="button" title="聚焦所选">
-            <Focus size={17} />
-            <span>聚焦</span>
+          <button
+            className={`modeTab ${viewMode === "edit" ? "active" : ""}`}
+            type="button"
+            onClick={enterEditMode}
+            title="对象操作使用点云编辑预览"
+          >
+            <Scissors size={17} />
+            <span>对象编辑</span>
           </button>
         </nav>
 
         <div className="topActions">
           <select
-            value={rendererKind}
-            onChange={(event) => setRendererKind(event.target.value)}
-            aria-label="渲染器"
-          >
-            <option value="splat">真实 Splat</option>
-            <option value="points">点云编辑</option>
-          </select>
-          <select
             value={renderMode}
-            onChange={(event) => setRenderMode(event.target.value)}
+            onChange={(event) => setEditRenderMode(event.target.value)}
             aria-label="渲染模式"
           >
             <option value="original">自身颜色</option>
@@ -226,17 +292,27 @@ export default function App() {
 
           <section className="panelSection">
             <h2>场景</h2>
-            <ControlRow label="渲染器">
-              <select
-                value={rendererKind}
-                onChange={(event) => setRendererKind(event.target.value)}
-              >
-                <option value="splat">真实 Splat</option>
-                <option value="points">点云编辑</option>
-              </select>
+            <ControlRow label="工作模式">
+              <div className="modeToggle" role="group" aria-label="工作模式">
+                <button
+                  className={viewMode === "view" ? "active" : ""}
+                  type="button"
+                  onClick={enterViewMode}
+                  disabled={!hasSplatRenderer}
+                >
+                  真实查看
+                </button>
+                <button
+                  className={viewMode === "edit" ? "active" : ""}
+                  type="button"
+                  onClick={enterEditMode}
+                >
+                  对象编辑
+                </button>
+              </div>
             </ControlRow>
             <ControlRow label="颜色模式">
-              <select value={renderMode} onChange={(event) => setRenderMode(event.target.value)}>
+              <select value={renderMode} onChange={(event) => setEditRenderMode(event.target.value)}>
                 <option value="original">自身颜色</option>
                 <option value="clustered">对象聚类色</option>
               </select>
@@ -273,33 +349,51 @@ export default function App() {
           <section className="panelSection assetLibraryPanel">
             <div className="sectionTitleRow">
               <h2>素材库</h2>
-              <span>{ASSET_LIBRARY.length} 个来源</span>
+              <span>{FEATURED_ASSETS.length} 个可加载样例</span>
             </div>
-            <div className="assetCards">
-              {FEATURED_ASSETS.map((asset) => (
-                <article className="assetCard" key={asset.id}>
-                  <div className="assetMeta">
-                    <span>{asset.category}</span>
-                    <span>{asset.pipelineStage}</span>
-                    <span>{asset.priority}</span>
-                  </div>
-                  <strong>{asset.name}</strong>
-                  <p>{asset.bestFor}</p>
-                  <div className="assetUseCases" aria-label={`${asset.name} 用途`}>
-                    {asset.useCases.map((useCase) => (
-                      <span key={useCase}>{useCase}</span>
-                    ))}
-                  </div>
-                  <div className="assetTags" aria-label={`${asset.name} 格式`}>
-                    {asset.formats.slice(0, 3).map((format) => (
-                      <span key={format}>{format}</span>
-                    ))}
-                  </div>
-                  <div className="assetFooter">
-                    <span className={asset.localPath ? "assetStatus ready" : "assetStatus"}>
-                      {asset.status}
-                    </span>
-                    {asset.localPath ? (
+            <div className="panelTabs" role="tablist" aria-label="素材库视图">
+              <button
+                className={sideTab === "samples" ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={sideTab === "samples"}
+                onClick={() => setSideTab("samples")}
+              >
+                可打开样例
+              </button>
+              <button
+                className={sideTab === "benchmark" ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={sideTab === "benchmark"}
+                onClick={() => setSideTab("benchmark")}
+              >
+                Benchmark
+              </button>
+            </div>
+            {sideTab === "samples" ? (
+              <div className="assetCards">
+                {FEATURED_ASSETS.map((asset) => (
+                  <article className="assetCard" key={asset.id}>
+                    <div className="assetMeta">
+                      <span>{asset.category}</span>
+                      <span>{asset.pipelineStage}</span>
+                      <span>{asset.priority}</span>
+                    </div>
+                    <strong>{asset.name}</strong>
+                    <p>{asset.bestFor}</p>
+                    <div className="assetUseCases" aria-label={`${asset.name} 用途`}>
+                      {asset.useCases.map((useCase) => (
+                        <span key={useCase}>{useCase}</span>
+                      ))}
+                    </div>
+                    <div className="assetTags" aria-label={`${asset.name} 格式`}>
+                      {asset.formats.slice(0, 3).map((format) => (
+                        <span key={format}>{format}</span>
+                      ))}
+                    </div>
+                    <div className="assetFooter">
+                      <span className="assetStatus ready">{asset.status}</span>
                       <button
                         className="assetActionButton"
                         type="button"
@@ -308,21 +402,13 @@ export default function App() {
                       >
                         加载
                       </button>
-                    ) : (
-                      <a
-                        className="assetLink"
-                        href={asset.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        来源
-                        <ExternalLink size={13} />
-                      </a>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <BenchmarkPanel />
+            )}
           </section>
 
           <section className="panelSection">
@@ -332,32 +418,41 @@ export default function App() {
               重置演示
             </button>
             <div className="hintText">
-              鼠标拖拽旋转，滚轮缩放。默认显示高斯自身颜色，也可以切换到对象聚类色查看分割结果。
+              当前：{modeText} / {activeRendererText}。对象操作会进入点云编辑预览。
             </div>
           </section>
         </aside>
 
-        {useSplatRenderer ? (
-          <SplatViewport
-            source={scene.splatSource}
-            showGrid={showGrid}
-            showAxes={showAxes}
-            pointCount={scene.points.length}
-            rendererLabel={activeRendererText}
-          />
-        ) : (
-          <PointCloudViewport
-            points={scene.points}
-            visibleIds={visibleIds}
-            removedIds={removedIds}
-            renderMode={renderMode}
-            pointSize={pointSize}
-            showGrid={showGrid}
-            showAxes={showAxes}
-            isolatedId={isolatedId}
-            renderModeLabel={renderModeText}
-          />
-        )}
+        <section className="viewerStage" aria-label="3D 视图">
+          {!useSplatRenderer && (
+            <div className="viewportBanner">
+              <strong>对象编辑预览</strong>
+              <span>隔离、隐藏、删除和对象色在点云模式下显示。</span>
+            </div>
+          )}
+          {useSplatRenderer ? (
+            <SplatViewport
+              source={scene.splatSource}
+              showGrid={showGrid}
+              showAxes={showAxes}
+              pointCount={scene.points.length}
+              rendererLabel={activeRendererText}
+            />
+          ) : (
+            <PointCloudViewport
+              points={scene.points}
+              visibleIds={visibleIds}
+              removedIds={removedIds}
+              renderMode={renderMode}
+              pointSize={pointSize}
+              showGrid={showGrid}
+              showAxes={showAxes}
+              isolatedId={isolatedId}
+              selectedId={selectedId}
+              renderModeLabel={renderModeText}
+            />
+          )}
+        </section>
 
         <aside className="rightPanel">
           <section className="panelSection inspectorHead">
@@ -377,33 +472,36 @@ export default function App() {
               <span>可见</span>
             </div>
             {summary.map((item) => (
-              <button
+              <div
                 key={item.id}
                 className={`objectRow ${selectedId === item.id ? "selected" : ""} ${
                   removedIds.has(item.id) ? "removed" : ""
                 }`}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
               >
-                <span className="idCell">{item.id}</span>
-                <span
-                  className="swatch"
-                  style={{ backgroundColor: rgbToCss(item.color) }}
-                  aria-hidden="true"
-                />
-                <span>{item.count.toLocaleString()}</span>
-                <span
+                <button
+                  className="objectSelectButton"
+                  type="button"
+                  aria-pressed={selectedId === item.id}
+                  onClick={() => selectObject(item.id)}
+                >
+                  <span className="idCell">{item.id}</span>
+                  <span
+                    className="swatch"
+                    style={{ backgroundColor: rgbToCss(item.color) }}
+                    aria-hidden="true"
+                  />
+                  <span>{item.count.toLocaleString()}</span>
+                </button>
+                <button
                   className="eyeButton"
-                  role="switch"
-                  aria-checked={visibleIds.has(item.id)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleVisible(item.id);
-                  }}
+                  type="button"
+                  aria-pressed={visibleIds.has(item.id)}
+                  aria-label={`${visibleIds.has(item.id) ? "隐藏" : "显示"}对象 ${item.id}`}
+                  onClick={() => toggleVisible(item.id)}
                 >
                   {visibleIds.has(item.id) ? <Eye size={16} /> : <EyeOff size={16} />}
-                </span>
-              </button>
+                </button>
+              </div>
             ))}
           </section>
 
@@ -413,7 +511,7 @@ export default function App() {
               className="accentButton"
               type="button"
               disabled={selectedId === null}
-              onClick={() => setIsolatedId(selectedId)}
+              onClick={isolateSelected}
             >
               <Scissors size={16} />
               只看所选
@@ -425,7 +523,7 @@ export default function App() {
             <button
               className="dangerButton"
               type="button"
-              disabled={selectedId === null}
+              disabled={selectedId === null || removedIds.has(selectedId)}
               onClick={removeSelected}
             >
               <Trash2 size={16} />
@@ -435,6 +533,7 @@ export default function App() {
 
           <section className="panelSection statePanel">
             <h2>渲染状态</h2>
+            <StateRow label="工作模式" value={modeText} />
             <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="模式" value={renderModeText} />
             <StateRow label="所选对象" value={selectedId ?? "无"} />
@@ -449,12 +548,49 @@ export default function App() {
 
       <footer className="statusBar">
         <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
+        <span>模式：{modeText}</span>
         <span>渲染器：{activeRendererText}</span>
         <span>高斯点：{scene.points.length.toLocaleString()}</span>
         <span>可见：{visibleCount.toLocaleString()}</span>
         <span>所选：{selectedId ?? "无"}</span>
       </footer>
     </main>
+  );
+}
+
+function BenchmarkPanel() {
+  return (
+    <div className="benchmarkPanel">
+      <div className="benchmarkGates" aria-label="SEMANTIC benchmark gates">
+        {BENCHMARK_GATES.map((gate) => (
+          <div className="benchmarkGate" key={gate.label}>
+            <span>{gate.label}</span>
+            <strong>{gate.value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="benchmarkStatLine">
+        <BarChart3 size={15} />
+        <span>Cross-scene rows: 9</span>
+      </div>
+      <div className="benchmarkTable" aria-label="Splatfacto scene benchmark">
+        <div className="benchmarkTableHead">
+          <span>Scene</span>
+          <span>ARI</span>
+          <span>Render</span>
+          <span>Held</span>
+        </div>
+        {BENCHMARK_SCENES.map((scene) => (
+          <div className="benchmarkRow" key={scene.id}>
+            <strong>{scene.label}</strong>
+            <span>{scene.ari.toFixed(3)}</span>
+            <span>{scene.render.toFixed(3)}</span>
+            <span>{scene.heldout.toFixed(3)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="benchmarkFootnote">SEMANTIC-003 / paper gate passed</div>
+    </div>
   );
 }
 
