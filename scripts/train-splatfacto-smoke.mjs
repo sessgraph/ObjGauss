@@ -18,6 +18,8 @@ const paths = {
     options.samCheckpoint ?? process.env.SAM_CHECKPOINT ?? "/home/ljy/models/sam/sam_vit_b_01ec64.pth",
 };
 
+const assetId = options.assetId ?? "nerf-synthetic-lego";
+const dataParser = options.dataParser ?? "blender-data";
 const iterations = options.iterations ?? "100";
 const objectIterations = options.objectIterations ?? "80";
 const device = options.device ?? "cuda";
@@ -26,14 +28,32 @@ const samModelType = options.samModelType ?? "vit_b";
 const samMaxFrames = options.samMaxFrames ?? "2";
 const samMaxMasksPerFrame = options.samMaxMasksPerFrame ?? "8";
 const samMinArea = options.samMinArea ?? "64";
+const samMaxAreaFraction = options.samMaxAreaFraction;
+const samMaxImageSize = options.samMaxImageSize;
 const checkpointStep = options.checkpointStep ?? formatCheckpointStep(iterations);
+const sceneSlug =
+  options.sceneSlug ??
+  assetId
+    .replace(/^nerf-/, "")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+const legoDefault = assetId === "nerf-synthetic-lego" && !options.sceneSlug;
 
 const trainConfig = `${paths.outputRoot}/${paths.experiment}/splatfacto/${paths.timestamp}/config.yml`;
 const checkpoint = `${paths.outputRoot}/${paths.experiment}/splatfacto/${paths.timestamp}/nerfstudio_models/step-${checkpointStep}.ckpt`;
 const splatPly = `${paths.exportDir}/splat.ply`;
 const initialField = `${paths.objectFieldDir}/object_field_initial.npz`;
 const trainedField = `${paths.objectFieldDir}/object_field_sam.npz`;
-const objectPly = `${paths.objectFieldDir}/lego_splatfacto_sam_objects.ply`;
+const initialObjectPly =
+  options.initialObjectPly ??
+  (legoDefault
+    ? `${paths.objectFieldDir}/lego_splatfacto_sam_initial_objects.ply`
+    : `${paths.objectFieldDir}/${sceneSlug}_splatfacto_sam_initial_objects.ply`);
+const objectPly =
+  options.objectPly ??
+  (legoDefault
+    ? `${paths.objectFieldDir}/lego_splatfacto_sam_objects.ply`
+    : `${paths.objectFieldDir}/${sceneSlug}_splatfacto_sam_objects.ply`);
 
 const uvNerfstudioPrefix = [
   "uv",
@@ -58,31 +78,38 @@ const uvNerfstudioPrefix = [
 
 const steps = [
   {
-    label: "Pull NeRF Synthetic Lego dataset",
-    command: ["uv", "run", "objgauss", "assets", "pull", "nerf-synthetic-lego"],
+    label: `Pull ${assetId} dataset`,
+    command: ["uv", "run", "objgauss", "assets", "pull", assetId],
+    skip: options.skipPull,
   },
   {
     label: "Train Splatfacto smoke",
+    env: cudaEnv(),
     command: [
       ...uvNerfstudioPrefix,
       "ns-train",
       "splatfacto",
       "--max-num-iterations",
       iterations,
+      ...optionalPair("--steps-per-save", options.stepsPerSave),
       "--output-dir",
       paths.outputRoot,
       "--experiment-name",
       paths.experiment,
       "--timestamp",
       paths.timestamp,
-      "blender-data",
-      "--data",
-      paths.dataset,
+      ...optionalPair("--vis", options.vis),
+      ...optionalPair("--pipeline.datamanager.cache-images", options.cacheImages),
+      ...optionalPair(
+        "--pipeline.datamanager.camera-res-scale-factor",
+        options.cameraResScaleFactor,
+      ),
+      ...dataParserCommand(),
     ],
   },
   {
     label: "Export Gaussian PLY",
-    env: { TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD: "1" },
+    env: { ...cudaEnv(), TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD: "1" },
     command: [
       ...uvNerfstudioPrefix,
       "ns-export",
@@ -124,6 +151,21 @@ const steps = [
       samMaxMasksPerFrame,
       "--min-area",
       samMinArea,
+      ...optionalPair("--max-area-fraction", samMaxAreaFraction),
+      ...optionalPair("--max-image-size", samMaxImageSize),
+    ],
+  },
+  {
+    label: "Apply dataparser transform to SAM mask manifest",
+    skip: !options.dataparserTransform,
+    command: [
+      "node",
+      "scripts/apply-mask-dataparser-transform.mjs",
+      paths.samManifest,
+      "--dataparser-transform",
+      options.dataparserTransform,
+      "--output",
+      paths.samManifest,
     ],
   },
   {
@@ -140,7 +182,7 @@ const steps = [
       "--slots",
       slots,
       "--ply-output",
-      `${paths.objectFieldDir}/lego_splatfacto_sam_initial_objects.ply`,
+      initialObjectPly,
       "--colorize",
     ],
   },
@@ -187,7 +229,9 @@ if (mode === "status") {
 }
 
 console.log(`mode=${mode}`);
+console.log(`asset_id=${assetId}`);
 console.log(`dataset=${paths.dataset}`);
+console.log(`data_parser=${dataParser}`);
 console.log(`output_root=${paths.outputRoot}`);
 console.log(`train_config=${trainConfig}`);
 console.log(`exported_ply=${splatPly}`);
@@ -229,6 +273,48 @@ function printStatus() {
     console.log(`check=${label} status=${ok ? "present" : "missing"} path=${path}`);
   }
   console.log(`status=${missing === 0 ? "ready" : "incomplete"} missing=${missing}`);
+}
+
+function dataParserCommand() {
+  if (dataParser === "colmap") {
+    return [
+      "colmap",
+      "--data",
+      paths.dataset,
+      ...optionalPair("--downscale-factor", options.downscaleFactor),
+      "--images-path",
+      options.imagesPath ?? "images",
+      "--colmap-path",
+      options.colmapPath ?? "sparse/0",
+      "--orientation-method",
+      options.orientationMethod ?? "none",
+      "--center-method",
+      options.centerMethod ?? "none",
+      "--auto-scale-poses",
+      options.autoScalePoses ?? "False",
+    ];
+  }
+  return [dataParser, "--data", paths.dataset];
+}
+
+function cudaEnv() {
+  const cudaHome = options.cudaHome ?? process.env.CUDA_HOME;
+  const env = {};
+  if (cudaHome) {
+    env.CUDA_HOME = cudaHome;
+    env.PATH = `${cudaHome}/bin:${process.env.PATH ?? ""}`;
+    env.LD_LIBRARY_PATH = `${cudaHome}/lib:${process.env.LD_LIBRARY_PATH ?? ""}`;
+    env.LIBRARY_PATH = `${cudaHome}/lib:${process.env.LIBRARY_PATH ?? ""}`;
+  }
+  const maxJobs = options.maxJobs ?? process.env.MAX_JOBS;
+  if (maxJobs) {
+    env.MAX_JOBS = String(maxJobs);
+  }
+  return env;
+}
+
+function optionalPair(flag, value) {
+  return value === undefined || value === null ? [] : [flag, String(value)];
 }
 
 function parseArgs(values) {

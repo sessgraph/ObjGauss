@@ -86,6 +86,7 @@ def test_asset_registry_has_pullable_sample():
     asset = get_asset("plush-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
     training = get_asset("nerf-synthetic-lego")
+    fern = get_asset("nerf-llff-fern")
 
     assert asset.download_url
     assert asset.local_path == "/samples/plush_objects.ply"
@@ -99,6 +100,8 @@ def test_asset_registry_has_pullable_sample():
     assert demo.license.startswith("CC0")
     assert training.pull_pipeline == "nerf-example-data"
     assert training.training_subdir == "nerf_synthetic/lego"
+    assert fern.pull_pipeline == "nerf-example-data"
+    assert fern.training_subdir == "nerf_llff_data/fern"
 
 
 def test_assets_list_cli_reports_pullable_sample(capsys):
@@ -108,6 +111,7 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
     assert "plush-3dgs-local" in output
     assert "polyhaven-school-chair-1k" in output
     assert "nerf-synthetic-lego" in output
+    assert "nerf-llff-fern" in output
     assert "Demo 可用" in output
     assert "pull" in output
 
@@ -180,6 +184,46 @@ def test_nerf_pull_extracts_training_subset(tmp_path, monkeypatch):
     assert (result.training_path / "train" / "r_0.png").exists()
     assert not (tmp_path / "training" / "chair").exists()
     assert result.manifest_path and result.manifest_path.exists()
+
+
+def test_nerf_fern_pull_writes_colmap_transforms(tmp_path, monkeypatch):
+    def fake_download(_url, path, *, force):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and not force:
+            return
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("nerf_example_data/nerf_llff_data/fern/images/IMG_0001.JPG", b"jpg")
+            archive.writestr(
+                "nerf_example_data/nerf_llff_data/fern/sparse/0/cameras.bin",
+                _colmap_cameras_bin(),
+            )
+            archive.writestr(
+                "nerf_example_data/nerf_llff_data/fern/sparse/0/images.bin",
+                _colmap_images_bin(),
+            )
+            archive.writestr("nerf_example_data/nerf_synthetic/lego/transforms_train.json", "{}")
+
+    monkeypatch.setattr(asset_module, "_download", fake_download)
+
+    result = asset_module.pull_asset(
+        "nerf-llff-fern",
+        raw_dir=tmp_path / "raw",
+        converted_dir=tmp_path / "converted",
+        training_dir=tmp_path / "training",
+    )
+
+    assert result.training_path and result.training_path.name == "nerf-llff-fern"
+    transforms = result.training_path / "transforms_train.json"
+    assert transforms.exists()
+    payload = json.loads(transforms.read_text(encoding="utf-8"))
+    assert payload["source_type"] == "colmap-to-nerf-transforms"
+    assert payload["frames"][0]["file_path"] == "images/IMG_0001.JPG"
+    assert np.isclose(payload["camera_angle_x"], 2.0 * np.arctan(100.0 / 100.0))
+    matrix = np.asarray(payload["frames"][0]["transform_matrix"], dtype=float)
+    assert np.allclose(matrix[:3, :3], np.diag([1.0, -1.0, -1.0]))
+    assert result.manifest_path and "transforms_train.json" in result.manifest_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_object_field_from_labels_has_soft_slots():
@@ -681,6 +725,89 @@ def test_splatfacto_variant_benchmark_script_dry_run_reports_pipeline():
     assert "dry_run=passed" in result.stdout
 
 
+def test_splatfacto_scene_benchmark_script_dry_run_reports_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/benchmark-splatfacto-scenes.mjs",
+            "--dry-run",
+            "--sam-checkpoint",
+            "/tmp/sam-vit-b.pth",
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode=dry-run" in result.stdout
+    assert "manifest=docs/benchmarks/splatfacto-scenes.json" in result.stdout
+    assert "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke" in result.stdout
+    assert "scripts/benchmark-splatfacto-balanced.mjs" in result.stdout
+    assert "nerf-fern-sam-smoke/mask-manifest.json" in result.stdout
+    assert "--sam-max-area-fraction 0.35" in result.stdout
+    assert "--slots 6" in result.stdout
+    assert "/tmp/sam-vit-b.pth" in result.stdout
+    assert "dry_run=passed" in result.stdout
+
+
+def test_apply_mask_dataparser_transform_script_updates_manifest(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    manifest = tmp_path / "mask-manifest.json"
+    dataparser = tmp_path / "dataparser_transforms.json"
+    output = tmp_path / "mask-manifest-transformed.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "width": 8,
+                "height": 8,
+                "camera_angle_x": 0.7,
+                "frames": [{"transform_matrix": np.eye(4, dtype=float).tolist(), "masks": []}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    dataparser.write_text(
+        json.dumps({"transform": [[1, 0, 0, 2], [0, 0, 1, 3], [0, -1, 0, 4]], "scale": 2.0}),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/apply-mask-dataparser-transform.mjs",
+            str(manifest),
+            "--dataparser-transform",
+            str(dataparser),
+            "--output",
+            str(output),
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    matrix = np.asarray(payload["frames"][0]["transform_matrix"], dtype=float)
+    assert np.allclose(
+        matrix,
+        np.array(
+            [
+                [2.0, 0.0, 0.0, 4.0],
+                [0.0, 0.0, 2.0, 6.0],
+                [0.0, -2.0, 0.0, 8.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        ),
+    )
+    assert payload["dataparser_transform"]["source"] == str(dataparser)
+
+
 def test_cross_scene_benchmark_script_dry_run_reports_pipeline():
     repo_root = Path(__file__).resolve().parents[1]
 
@@ -702,6 +829,9 @@ def test_cross_scene_benchmark_script_dry_run_reports_pipeline():
     assert "mode=dry-run" in result.stdout
     assert "acceptance:semantic" in result.stdout
     assert "--manifest docs/benchmarks/semantic-smoke.json" in result.stdout
+    assert "benchmark:splatfacto:scenes" in result.stdout
+    assert "--manifest docs/benchmarks/splatfacto-scenes.json" in result.stdout
+    assert "--suite-output-dir /tmp/objgauss-splatfacto-scene-suite" in result.stdout
     assert "benchmark:splatfacto:variants" in result.stdout
     assert "--suite-output-dir /tmp/objgauss-splatfacto-safe-2000-variant-suite" in result.stdout
     assert "--skip-sam" in result.stdout
@@ -1817,3 +1947,23 @@ def _write_rgba_png(path, pixels: np.ndarray) -> None:
 def _png_chunk(kind: bytes, data: bytes) -> bytes:
     checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)
+
+
+def _colmap_cameras_bin() -> bytes:
+    payload = bytearray()
+    payload.extend(struct.pack("<Q", 1))
+    payload.extend(struct.pack("<iiQQ", 1, 1, 100, 80))
+    payload.extend(struct.pack("<4d", 50.0, 50.0, 50.0, 40.0))
+    return bytes(payload)
+
+
+def _colmap_images_bin() -> bytes:
+    payload = bytearray()
+    payload.extend(struct.pack("<Q", 1))
+    payload.extend(struct.pack("<i", 1))
+    payload.extend(struct.pack("<4d", 1.0, 0.0, 0.0, 0.0))
+    payload.extend(struct.pack("<3d", 0.0, 0.0, 0.0))
+    payload.extend(struct.pack("<i", 1))
+    payload.extend(b"IMG_0001.JPG\x00")
+    payload.extend(struct.pack("<Q", 0))
+    return bytes(payload)

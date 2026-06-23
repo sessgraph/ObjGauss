@@ -14,6 +14,7 @@
 | Plush 2D 语义 Mask 闭环样例 | Plush 3DGS 示例派生产物 | `public/samples/plush_semantic.splat` + `public/samples/plush_semantic_objects.ply` + `outputs/demos/plush-semantic-closure/` | 统一验收：真实 3DGS、非 KMeans 的 2D color masks、Object Field、对象编辑 | 继承 Plush 来源限制，仅本地测试；不是 SAM/CLIP 输出 |
 | Poly Haven School Chair 1K | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/raw/polyhaven-school-chair-1k/` | 许可干净的单对象 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练 | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
+| NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
 
 处理链路：
 
@@ -197,6 +198,38 @@ public/samples/lego_alpha_v1_objects.ply
 再用 2D color masks 投票更新 Object Field。它用于把 v1 闭环压到同一个
 Lego 画面里验收，不等价于完整 3DGS 训练输出。
 
+### NeRF LLFF Fern
+
+处理链路：
+
+```text
+NeRF 官方 nerf_example_data.zip
+  -> 抽取 nerf_llff_data/fern
+  -> outputs/assets/training/nerf-llff-fern/
+  -> 从 COLMAP sparse/0 生成 transforms_train.json
+  -> Nerfstudio Splatfacto colmap dataparser
+  -> Object Field / SAM benchmark
+```
+
+一键拉取：
+
+```bash
+objgauss assets pull nerf-llff-fern
+```
+
+默认输出：
+
+```text
+outputs/assets/training/nerf-llff-fern/images/
+outputs/assets/training/nerf-llff-fern/sparse/0/
+outputs/assets/training/nerf-llff-fern/transforms_train.json
+outputs/assets/converted/nerf-llff-fern/training-manifest.json
+```
+
+Fern 不是前端 public sample；它用于 `docs/benchmarks/splatfacto-scenes.json`
+里的第二个真实 Splatfacto scene。训练和 benchmark 命令见
+`docs/benchmarks/splatfacto-scenes.md`。
+
 浏览器闭环验收：
 
 ```bash
@@ -222,6 +255,7 @@ closure，然后执行浏览器闭环验收。
 | --- | --- | --- | --- | --- |
 | P0 | ARKitScenes | 真实室内 scan | 手机 LiDAR 房间、家具对象化、真实用户输入形态 | https://github.com/apple/ARKitScenes |
 | P0 | NeRF Synthetic Lego | 多视角合成图像 + pose | ObjGauss v1 Object Field 训练烟测 | https://github.com/bmild/nerf |
+| P0 | NeRF LLFF Fern | 真实多视角图像 + COLMAP | 跨真实 Splatfacto scene benchmark | https://github.com/bmild/nerf |
 | P0 | OmniObject3D | 对象级 scan / mesh / point cloud | 单个真实扫描物体，高质量对象编辑实验 | https://omniobject3d.github.io/ |
 | P0 | Poly Haven | CC0 mesh / texture / HDRI | 展示 demo、开源项目可复现素材 | https://polyhaven.com/models |
 | P1 | ScanNet | 真实室内 scan + 语义/实例标注 | 场景到对象分组验证 | https://www.scan-net.org/ |

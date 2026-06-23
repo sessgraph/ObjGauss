@@ -510,6 +510,7 @@ def _masks_from_nerf_sam(args: argparse.Namespace) -> None:
         max_masks_per_frame=args.max_masks_per_frame,
         min_area=args.min_area,
         max_area_fraction=args.max_area_fraction,
+        max_image_size=args.max_image_size,
         points_per_side=args.points_per_side,
         pred_iou_thresh=args.pred_iou_thresh,
         stability_score_thresh=args.stability_score_thresh,
@@ -994,6 +995,7 @@ def _build_parser() -> argparse.ArgumentParser:
     nerf_sam.add_argument("--max-masks-per-frame", type=int, default=8)
     nerf_sam.add_argument("--min-area", type=int, default=1)
     nerf_sam.add_argument("--max-area-fraction", type=float, default=1.0)
+    nerf_sam.add_argument("--max-image-size", type=int)
     nerf_sam.add_argument("--points-per-side", type=int, default=32)
     nerf_sam.add_argument("--pred-iou-thresh", type=float, default=0.88)
     nerf_sam.add_argument("--stability-score-thresh", type=float, default=0.95)

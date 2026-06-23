@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import struct
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,6 +120,28 @@ ASSETS: tuple[AssetSource, ...] = (
         pipeline_stage="训练源已自动化",
         use_cases=("3DGS训练", "ObjectField烟测"),
         training_subdir="nerf_synthetic/lego",
+    ),
+    AssetSource(
+        id="nerf-llff-fern",
+        name="NeRF LLFF Fern 示例训练集",
+        category="3DGS 训练集",
+        source_type="images",
+        status="已接入",
+        priority="P0",
+        source_url="https://github.com/bmild/nerf",
+        download_url=(
+            "http://cseweb.ucsd.edu/~viscomp/projects/LF/papers/"
+            "ECCV20/nerf/nerf_example_data.zip"
+        ),
+        license="NeRF 官方示例数据；仅作为训练/研究素材使用",
+        formats=("images", "COLMAP", "transforms_train.json"),
+        best_for="第二个真实多视角/COLMAP Splatfacto 场景，用于跨场景 benchmark。",
+        raw_file_name="nerf_example_data.zip",
+        output_file_name="training-manifest.json",
+        pull_pipeline="nerf-example-data",
+        pipeline_stage="训练源已自动化",
+        use_cases=("3DGS训练", "跨场景benchmark"),
+        training_subdir="nerf_llff_data/fern",
     ),
     AssetSource(
         id="arkitscenes",
@@ -392,6 +416,8 @@ def _pull_nerf_example_data(
 
     output_path = Path(training_dir) / asset.id
     extracted = _extract_zip_prefix(raw_path, asset.training_subdir, output_path, force=force)
+    generated = _maybe_write_colmap_nerf_transforms(output_path, force=force)
+    all_files = tuple(sorted({*extracted, *generated}))
     manifest_path = Path(converted_dir) / asset.id / (asset.output_file_name or "manifest.json")
     manifest = {
         "asset_id": asset.id,
@@ -401,7 +427,7 @@ def _pull_nerf_example_data(
         "zip_path": str(raw_path),
         "training_path": str(output_path),
         "source_subdir": asset.training_subdir,
-        "files": sorted(str(path.relative_to(output_path)) for path in extracted),
+        "files": sorted(str(path.relative_to(output_path)) for path in all_files),
     }
     _write_json(manifest_path, manifest)
     return PulledAsset(
@@ -413,7 +439,7 @@ def _pull_nerf_example_data(
         training_path=output_path,
         manifest_path=manifest_path,
         object_counts=(),
-        downloaded_files=tuple(extracted),
+        downloaded_files=all_files,
     )
 
 
@@ -495,3 +521,195 @@ def _find_parts(parts: tuple[str, ...], needle: tuple[str, ...]) -> int | None:
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _maybe_write_colmap_nerf_transforms(output_path: Path, *, force: bool) -> tuple[Path, ...]:
+    sparse_dir = output_path / "sparse" / "0"
+    cameras_path = sparse_dir / "cameras.bin"
+    images_path = sparse_dir / "images.bin"
+    transforms_path = output_path / "transforms_train.json"
+    if not cameras_path.exists() or not images_path.exists():
+        return ()
+    if transforms_path.exists() and not force:
+        return (transforms_path,)
+
+    cameras = _read_colmap_cameras(cameras_path)
+    images = _read_colmap_images(images_path)
+    if not cameras:
+        raise ValueError(f"no COLMAP cameras in {cameras_path}")
+    if not images:
+        raise ValueError(f"no COLMAP images in {images_path}")
+
+    frames = []
+    first_camera = cameras[images[0]["camera_id"]]
+    intrinsics = _colmap_intrinsics(first_camera)
+    for image in sorted(images, key=lambda item: str(item["name"])):
+        image_path = output_path / "images" / str(image["name"])
+        if not image_path.exists():
+            continue
+        c2w = _colmap_image_c2w(image)
+        frames.append(
+            {
+                "file_path": str(image_path.relative_to(output_path)),
+                "transform_matrix": c2w.tolist(),
+                "colmap_image_id": int(image["image_id"]),
+            }
+        )
+
+    if not frames:
+        raise ValueError(f"COLMAP images did not match files under {output_path / 'images'}")
+
+    camera_angle_x = 2.0 * math.atan(float(first_camera["width"]) / (2.0 * intrinsics["fl_x"]))
+    camera_angle_y = 2.0 * math.atan(float(first_camera["height"]) / (2.0 * intrinsics["fl_y"]))
+    payload = {
+        "camera_model": str(first_camera["model"]),
+        "camera_angle_x": camera_angle_x,
+        "camera_angle_y": camera_angle_y,
+        "fl_x": intrinsics["fl_x"],
+        "fl_y": intrinsics["fl_y"],
+        "cx": intrinsics["cx"],
+        "cy": intrinsics["cy"],
+        "w": int(first_camera["width"]),
+        "h": int(first_camera["height"]),
+        "source_type": "colmap-to-nerf-transforms",
+        "frames": frames,
+    }
+    _write_json(transforms_path, payload)
+    return (transforms_path,)
+
+
+_COLMAP_CAMERA_MODELS: dict[int, tuple[str, int]] = {
+    0: ("SIMPLE_PINHOLE", 3),
+    1: ("PINHOLE", 4),
+    2: ("SIMPLE_RADIAL", 4),
+    3: ("RADIAL", 5),
+    4: ("OPENCV", 8),
+    5: ("OPENCV_FISHEYE", 8),
+    6: ("FULL_OPENCV", 12),
+    7: ("FOV", 5),
+    8: ("SIMPLE_RADIAL_FISHEYE", 4),
+    9: ("RADIAL_FISHEYE", 5),
+    10: ("THIN_PRISM_FISHEYE", 12),
+}
+
+
+def _read_colmap_cameras(path: Path) -> dict[int, dict[str, object]]:
+    data = path.read_bytes()
+    offset = 0
+    (count,) = struct.unpack_from("<Q", data, offset)
+    offset += 8
+    cameras: dict[int, dict[str, object]] = {}
+    for _ in range(count):
+        camera_id, model_id, width, height = struct.unpack_from("<iiQQ", data, offset)
+        offset += struct.calcsize("<iiQQ")
+        if model_id not in _COLMAP_CAMERA_MODELS:
+            raise ValueError(f"unsupported COLMAP camera model id {model_id} in {path}")
+        model, param_count = _COLMAP_CAMERA_MODELS[model_id]
+        params = struct.unpack_from(f"<{param_count}d", data, offset)
+        offset += struct.calcsize(f"<{param_count}d")
+        cameras[int(camera_id)] = {
+            "camera_id": int(camera_id),
+            "model": model,
+            "width": int(width),
+            "height": int(height),
+            "params": tuple(float(value) for value in params),
+        }
+    return cameras
+
+
+def _read_colmap_images(path: Path) -> list[dict[str, object]]:
+    data = path.read_bytes()
+    offset = 0
+    (count,) = struct.unpack_from("<Q", data, offset)
+    offset += 8
+    images: list[dict[str, object]] = []
+    for _ in range(count):
+        image_id = struct.unpack_from("<i", data, offset)[0]
+        offset += 4
+        qvec = struct.unpack_from("<4d", data, offset)
+        offset += struct.calcsize("<4d")
+        tvec = struct.unpack_from("<3d", data, offset)
+        offset += struct.calcsize("<3d")
+        camera_id = struct.unpack_from("<i", data, offset)[0]
+        offset += 4
+        name, offset = _read_colmap_string(data, offset)
+        points_count = struct.unpack_from("<Q", data, offset)[0]
+        offset += 8 + int(points_count) * struct.calcsize("<ddq")
+        images.append(
+            {
+                "image_id": int(image_id),
+                "qvec": tuple(float(value) for value in qvec),
+                "tvec": tuple(float(value) for value in tvec),
+                "camera_id": int(camera_id),
+                "name": name,
+            }
+        )
+    return images
+
+
+def _read_colmap_string(data: bytes, offset: int) -> tuple[str, int]:
+    end = data.find(b"\x00", offset)
+    if end < 0:
+        raise ValueError("unterminated COLMAP image name")
+    return data[offset:end].decode("utf-8"), end + 1
+
+
+def _colmap_intrinsics(camera: dict[str, object]) -> dict[str, float]:
+    params = tuple(float(value) for value in camera["params"])  # type: ignore[index]
+    model = str(camera["model"])
+    width = float(camera["width"])
+    height = float(camera["height"])
+    if model in {"SIMPLE_PINHOLE", "SIMPLE_RADIAL", "RADIAL", "SIMPLE_RADIAL_FISHEYE", "RADIAL_FISHEYE"}:
+        fl_x = fl_y = params[0]
+        cx = params[1]
+        cy = params[2]
+    else:
+        fl_x = params[0]
+        fl_y = params[1]
+        cx = params[2]
+        cy = params[3]
+    return {
+        "fl_x": float(fl_x),
+        "fl_y": float(fl_y),
+        "cx": float(cx if cx else width * 0.5),
+        "cy": float(cy if cy else height * 0.5),
+    }
+
+
+def _colmap_image_c2w(image: dict[str, object]) -> "np.ndarray":
+    import numpy as np
+
+    qvec = np.asarray(image["qvec"], dtype=np.float64)
+    tvec = np.asarray(image["tvec"], dtype=np.float64)
+    rotation = _qvec_to_rotmat(qvec)
+    c2w = np.eye(4, dtype=np.float64)
+    c2w[:3, :3] = rotation.T
+    c2w[:3, 3] = -rotation.T @ tvec
+    opengl_from_colmap_camera = np.diag([1.0, -1.0, -1.0, 1.0])
+    return c2w @ opengl_from_colmap_camera
+
+
+def _qvec_to_rotmat(qvec: "np.ndarray") -> "np.ndarray":
+    import numpy as np
+
+    qw, qx, qy, qz = qvec
+    return np.asarray(
+        [
+            [
+                1.0 - 2.0 * qy * qy - 2.0 * qz * qz,
+                2.0 * qx * qy - 2.0 * qw * qz,
+                2.0 * qz * qx + 2.0 * qw * qy,
+            ],
+            [
+                2.0 * qx * qy + 2.0 * qw * qz,
+                1.0 - 2.0 * qx * qx - 2.0 * qz * qz,
+                2.0 * qy * qz - 2.0 * qw * qx,
+            ],
+            [
+                2.0 * qz * qx - 2.0 * qw * qy,
+                2.0 * qy * qz + 2.0 * qw * qx,
+                1.0 - 2.0 * qx * qx - 2.0 * qy * qy,
+            ],
+        ],
+        dtype=np.float64,
+    )

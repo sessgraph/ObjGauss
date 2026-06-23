@@ -14,6 +14,37 @@
 
 ## Done
 
+### BENCH-004: Real Splatfacto cross-scene suite with LLFF Fern
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 cross-scene 表从 “Lego 单场景 + mask policy variants” 推进到真实 Splatfacto scene suite，新增 LLFF Fern 作为第二个真实 Splatfacto 场景。
+- 范围外: 不提交 `outputs/`、`/tmp`、SAM checkpoint、Nerfstudio checkpoint 或训练产物；不声称 Fern smoke 是高质量 reconstruction；不替代 covariance-aware 3DGS renderer occlusion。
+- 实施:
+  - 新增 `nerf-llff-fern` 自动素材源，从 NeRF example zip 抽取 `nerf_llff_data/fern`，并从 COLMAP `sparse/0` 生成 `transforms_train.json`。
+  - `objgauss masks from-nerf-sam` 支持 JPEG 输入和 `--max-image-size`，用于大图 CPU/GPU 资源安全 SAM smoke。
+  - `scripts/train-splatfacto-smoke.mjs` 支持 `--asset-id`、`--data-parser colmap`、`--downscale-factor`、`--cuda-home`、`--max-jobs` 和 `--dataparser-transform`。
+  - 新增 `scripts/apply-mask-dataparser-transform.mjs`，将 Nerfstudio `dataparser_transforms.json` 乘进 mask manifest camera transforms，使 COLMAP scene masks 与导出 PLY 坐标对齐。
+  - 新增 `scripts/benchmark-splatfacto-scenes.mjs`、`npm run benchmark:splatfacto:scenes` 和 `docs/benchmarks/splatfacto-scenes.json`，定义 Lego safe-2000 与 Fern smoke 两个真实 Splatfacto scene。
+  - `scripts/benchmark-cross-scene.mjs` 聚合 semantic smoke、Splatfacto scene suite 和 safe-2000 variant suite，cross-scene 表从 6 行扩展为 8 行。
+- 验收:
+  - Fern asset pull 生成 `outputs/assets/training/nerf-llff-fern/transforms_train.json`。
+  - Fern 100-step Splatfacto smoke 导出 `outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply`，10091 Gaussians。
+  - Fern SAM smoke 使用 CPU + `max_image_size=768` 生成 4 frames / 24 masks。
+  - dataparser transform 后，Fern Object Field register-output 监督 1247 Gaussians，projection loss `3.778366 -> 0.670971`。
+  - scene suite summary 含 2 scenes：Lego safe-2000 与 Fern smoke。
+  - cross-scene summary 含 8 rows：3 semantic smoke + 2 real Splatfacto scenes + 3 Lego variants。
+- 验证:
+  - `node scripts/benchmark-splatfacto-scenes.mjs --run --scene fern-splatfacto-smoke --skip-sam --sam-checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth`: passed。
+  - `node scripts/benchmark-splatfacto-scenes.mjs --run --skip-sam --sam-checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth`: passed，scenes=2。
+  - `node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-scenes --skip-variants`: passed，rows=8。
+  - `node scripts/benchmark-splatfacto-scenes.mjs --status`: `status=ready missing=0`。
+  - `node scripts/benchmark-cross-scene.mjs --status`: `status=ready missing=0`。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "asset_registry or nerf_pull or fern_pull or splatfacto_scene or cross_scene or splatfacto_variant or splatfacto_balanced or splatfacto_smoke or nerf_sam" -q`: 10 passed。
+  - `uv run --extra dev pytest`: 39 passed。
+  - `npm run build`: 通过，仍有 Spark / Three bundle size warning。
+- 完成 commit: pending.
+
 ### BENCH-003: Cross-scene emergence benchmark table
 
 - 状态: done

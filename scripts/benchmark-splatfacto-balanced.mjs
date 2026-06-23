@@ -30,6 +30,7 @@ const samMaxFrames = options.samMaxFrames ?? "8";
 const samMaxMasksPerFrame = options.samMaxMasksPerFrame ?? "4";
 const samMinArea = options.samMinArea ?? "64";
 const samMaxAreaFraction = options.samMaxAreaFraction ?? "0.3";
+const samMaxImageSize = options.samMaxImageSize;
 const objectIterations = options.objectIterations ?? "160";
 const curveIterations = options.curveIterations ?? "80";
 const evalEvery = options.evalEvery ?? "20";
@@ -38,6 +39,7 @@ const learningRate = options.learningRate ?? "1.0";
 const assetId =
   options.assetId ?? "nerf-lego-splatfacto-safe-2000-sam8f-balanced03-slots4-benchmark";
 const publicName = options.publicName ?? "nerf_lego_trained";
+const dataparserTransform = options.dataparserTransform;
 
 const trainingManifest = `${paths.outputDir}/training-output-manifest.json`;
 const maskTrainingSummary = `${paths.outputDir}/mask-training-summary.json`;
@@ -88,6 +90,20 @@ const steps = [
       samMinArea,
       "--max-area-fraction",
       samMaxAreaFraction,
+      ...optionalPair("--max-image-size", samMaxImageSize),
+    ],
+  },
+  {
+    label: "Apply dataparser transform to SAM mask manifest",
+    skip: skipSam || !dataparserTransform,
+    command: [
+      "node",
+      "scripts/apply-mask-dataparser-transform.mjs",
+      paths.samManifest,
+      "--dataparser-transform",
+      dataparserTransform,
+      "--output",
+      paths.samManifest,
     ],
   },
   {
@@ -329,6 +345,13 @@ function collectMissingForRun() {
       prepare: "see docs/training/splatfacto-smoke.md#train-003c-higher-quality-candidate",
     },
   ];
+  if (!skipSam && dataparserTransform) {
+    required.push({
+      label: "dataparser transform",
+      path: dataparserTransform,
+      prepare: "run the matching Nerfstudio Splatfacto training/export first",
+    });
+  }
   if (skipSam) {
     required.push({
       label: "balanced SAM manifest",
@@ -343,6 +366,10 @@ function collectMissingForRun() {
     });
   }
   return required.filter((item) => !existsSync(item.path));
+}
+
+function optionalPair(flag, value) {
+  return value === undefined || value === null ? [] : [flag, String(value)];
 }
 
 function printMissing(missing) {

@@ -1,0 +1,68 @@
+{
+  "kind": "splatfacto_scene_benchmark_manifest",
+  "root": "../..",
+  "scenes": [
+    {
+      "id": "lego-splatfacto-safe-2000",
+      "label": "NeRF Lego Splatfacto safe-2000",
+      "dataset": "outputs/assets/training/nerf-synthetic-lego",
+      "input_ply": "outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply",
+      "sam_manifest": "outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json",
+      "output_dir": "outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-scene-benchmark",
+      "benchmark_output_dir": "/tmp/objgauss-splatfacto-scene-suite/lego-splatfacto-safe-2000",
+      "asset_id": "nerf-lego-splatfacto-safe-2000-sam8f-balanced03-slots4-scene-benchmark",
+      "slots": 4,
+      "mask_policy": "SAM 8 frames, 4 masks per frame, max_area_fraction=0.3",
+      "sam": {
+        "max_frames": 8,
+        "max_masks_per_frame": 4,
+        "min_area": 64,
+        "max_area_fraction": 0.3
+      },
+      "benchmark": {
+        "object_iterations": 160,
+        "curve_iterations": 80,
+        "eval_every": 20,
+        "render_size": 96,
+        "learning_rate": 1.0,
+        "device": "cuda"
+      },
+      "prepare": [
+        "uv run objgauss assets pull nerf-synthetic-lego",
+        "see docs/training/splatfacto-smoke.md#train-003c-higher-quality-candidate"
+      ]
+    },
+    {
+      "id": "fern-splatfacto-smoke",
+      "label": "LLFF Fern Splatfacto smoke",
+      "dataset": "outputs/assets/training/nerf-llff-fern",
+      "input_ply": "outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply",
+      "sam_manifest": "outputs/masks/nerf-fern-sam-smoke/mask-manifest.json",
+      "output_dir": "outputs/assets/gaussians/nerf-fern-splatfacto-smoke-sam4f-slots6-benchmark",
+      "benchmark_output_dir": "/tmp/objgauss-splatfacto-scene-suite/fern-splatfacto-smoke",
+      "dataparser_transform": "outputs/training/nerf-fern-splatfacto-smoke/fern-splatfacto-smoke/splatfacto/smoke-cuda/dataparser_transforms.json",
+      "asset_id": "nerf-fern-splatfacto-smoke-sam4f-slots6-benchmark",
+      "slots": 6,
+      "mask_policy": "SAM 4 frames, 6 masks per frame, max_area_fraction=0.35",
+      "sam": {
+        "max_frames": 4,
+        "max_masks_per_frame": 6,
+        "min_area": 256,
+        "max_area_fraction": 0.35,
+        "max_image_size": 768
+      },
+      "benchmark": {
+        "object_iterations": 120,
+        "curve_iterations": 60,
+        "eval_every": 20,
+        "render_size": 96,
+        "learning_rate": 1.0,
+        "device": "cpu"
+      },
+      "prepare": [
+        "uv run objgauss assets pull nerf-llff-fern",
+        "npm run train:splatfacto:smoke -- --run --asset-id nerf-llff-fern --dataset outputs/assets/training/nerf-llff-fern --output-root outputs/training/nerf-fern-splatfacto-smoke --experiment fern-splatfacto-smoke --timestamp smoke-cuda --export-dir outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda --object-field-dir outputs/training/nerf-fern-splatfacto-smoke/object-field-sam --sam-manifest outputs/masks/nerf-fern-sam-smoke/mask-manifest.json --dataparser-transform outputs/training/nerf-fern-splatfacto-smoke/fern-splatfacto-smoke/splatfacto/smoke-cuda/dataparser_transforms.json --data-parser colmap --downscale-factor 1 --images-path images --colmap-path sparse/0 --iterations 100 --steps-per-save 100 --vis tensorboard --cache-images cpu --camera-res-scale-factor 0.25 --cuda-home /tmp/objgauss-cuda13 --max-jobs 2 --device cpu --sam-max-frames 4 --sam-max-masks-per-frame 6 --sam-min-area 256 --sam-max-area-fraction 0.35 --sam-max-image-size 768 --slots 6 --object-iterations 80 --skip-benchmark"
+      ]
+    }
+  ]
+}

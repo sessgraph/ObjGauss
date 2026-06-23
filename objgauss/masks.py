@@ -176,7 +176,7 @@ def build_nerf_rgba_color_mask_manifest(
         if not isinstance(frame, dict):
             raise ValueError("NeRF frame entries must be objects")
         image_path = resolve_nerf_image(dataset, frame.get("file_path"))
-        rgba = read_png_rgba(image_path)
+        rgba = read_image_rgba(image_path)
         if width == 0:
             height, width = rgba.shape[:2]
         elif rgba.shape[:2] != (height, width):
@@ -247,6 +247,7 @@ def build_nerf_sam_mask_manifest(
     max_masks_per_frame: int = 8,
     min_area: int = 1,
     max_area_fraction: float = 1.0,
+    max_image_size: int | None = None,
     points_per_side: int = 32,
     pred_iou_thresh: float = 0.88,
     stability_score_thresh: float = 0.95,
@@ -260,6 +261,8 @@ def build_nerf_sam_mask_manifest(
         raise ValueError("min_area must be >= 1")
     if not 0.0 < max_area_fraction <= 1.0:
         raise ValueError("max_area_fraction must be in (0, 1]")
+    if max_image_size is not None and max_image_size < 8:
+        raise ValueError("max_image_size must be >= 8")
 
     dataset = Path(dataset)
     output = Path(output)
@@ -295,7 +298,9 @@ def build_nerf_sam_mask_manifest(
         if not isinstance(frame, dict):
             raise ValueError("NeRF frame entries must be objects")
         image_path = resolve_nerf_image(dataset, frame.get("file_path"))
-        rgba = read_png_rgba(image_path)
+        rgba = read_image_rgba(image_path)
+        if max_image_size is not None:
+            rgba = resize_rgba_max_size(rgba, max_image_size)
         if width == 0:
             height, width = rgba.shape[:2]
         elif rgba.shape[:2] != (height, width):
@@ -361,6 +366,7 @@ def build_nerf_sam_mask_manifest(
             "stability_score_thresh": stability_score_thresh,
             "min_area": min_area,
             "max_area_fraction": max_area_fraction,
+            "max_image_size": max_image_size,
             "max_masks_per_frame": max_masks_per_frame,
         },
         "frames": manifest_frames,
@@ -379,6 +385,36 @@ def build_nerf_sam_mask_manifest(
 
 def read_png_alpha(path: str | Path) -> np.ndarray:
     return read_png_rgba(path)[:, :, 3]
+
+
+def read_image_rgba(path: str | Path) -> np.ndarray:
+    path = Path(path)
+    if path.suffix.lower() == ".png":
+        return read_png_rgba(path)
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise ValueError(
+            f"{path} is not a PNG file; reading JPEG or other image formats "
+            "requires optional dependency 'Pillow'"
+        ) from exc
+    with Image.open(path) as image:
+        return np.asarray(image.convert("RGBA"), dtype=np.uint8)
+
+
+def resize_rgba_max_size(rgba: np.ndarray, max_size: int) -> np.ndarray:
+    if max(rgba.shape[:2]) <= max_size:
+        return rgba
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise ValueError("resizing SAM input images requires optional dependency 'Pillow'") from exc
+    height, width = rgba.shape[:2]
+    scale = float(max_size) / float(max(height, width))
+    target = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+    image = Image.fromarray(rgba, mode="RGBA")
+    resized = image.resize(target, Image.Resampling.BILINEAR)
+    return np.asarray(resized, dtype=np.uint8)
 
 
 def read_png_rgba(path: str | Path) -> np.ndarray:

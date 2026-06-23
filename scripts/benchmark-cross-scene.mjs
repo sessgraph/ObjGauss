@@ -9,6 +9,8 @@ const mode = options.run ? "run" : options.status ? "status" : "dry-run";
 const paths = {
   semanticManifest: options.semanticManifest ?? "docs/benchmarks/semantic-smoke.json",
   semanticOutputDir: options.semanticOutputDir ?? "/tmp/objgauss-semantic-smoke-suite",
+  sceneManifest: options.sceneManifest ?? "docs/benchmarks/splatfacto-scenes.json",
+  sceneOutputDir: options.sceneOutputDir ?? "/tmp/objgauss-splatfacto-scene-suite",
   variantOutputDir:
     options.variantOutputDir ?? "/tmp/objgauss-splatfacto-safe-2000-variant-suite",
   outputDir: options.outputDir ?? "/tmp/objgauss-cross-scene-benchmark",
@@ -17,6 +19,7 @@ const paths = {
 };
 
 const skipSemantic = Boolean(options.skipSemantic);
+const skipScenes = Boolean(options.skipScenes);
 const skipVariants = Boolean(options.skipVariants);
 const refreshSam = Boolean(options.refreshSam);
 
@@ -26,6 +29,7 @@ const summaryMd = `${paths.outputDir}/summary.md`;
 const summaryHtml = `${paths.outputDir}/summary.html`;
 
 const semanticSummaryJson = `${paths.semanticOutputDir}/summary.json`;
+const sceneSummaryJson = `${paths.sceneOutputDir}/summary.json`;
 const variantSummaryJson = `${paths.variantOutputDir}/summary.json`;
 
 const semanticCommand = [
@@ -52,6 +56,21 @@ const variantCommand = [
   ...(refreshSam ? [] : ["--skip-sam"]),
 ];
 
+const sceneCommand = [
+  "npm",
+  "run",
+  "benchmark:splatfacto:scenes",
+  "--",
+  "--run",
+  "--manifest",
+  paths.sceneManifest,
+  "--suite-output-dir",
+  paths.sceneOutputDir,
+  "--sam-checkpoint",
+  paths.samCheckpoint,
+  ...(refreshSam ? [] : ["--skip-sam"]),
+];
+
 if (mode === "status") {
   printStatus();
   process.exit(0);
@@ -60,10 +79,13 @@ if (mode === "status") {
 console.log(`mode=${mode}`);
 console.log(`semantic_manifest=${paths.semanticManifest}`);
 console.log(`semantic_output_dir=${paths.semanticOutputDir}`);
+console.log(`scene_manifest=${paths.sceneManifest}`);
+console.log(`scene_output_dir=${paths.sceneOutputDir}`);
 console.log(`variant_output_dir=${paths.variantOutputDir}`);
 console.log(`output_dir=${paths.outputDir}`);
 console.log(`sam_checkpoint=${paths.samCheckpoint}`);
 console.log(`skip_semantic=${skipSemantic ? "true" : "false"}`);
+console.log(`skip_scenes=${skipScenes ? "true" : "false"}`);
 console.log(`skip_variants=${skipVariants ? "true" : "false"}`);
 console.log(`refresh_sam=${refreshSam ? "true" : "false"}`);
 
@@ -72,6 +94,14 @@ if (!skipSemantic) {
   console.log(formatCommand(mode === "run" ? semanticCommand : dryRunSemanticCommand()));
   if (mode === "run") {
     await run(semanticCommand);
+  }
+}
+
+if (!skipScenes) {
+  console.log("\n=== Splatfacto scene suite ===");
+  console.log(formatCommand(mode === "run" ? sceneCommand : dryRunSceneCommand()));
+  if (mode === "run") {
+    await run(sceneCommand);
   }
 }
 
@@ -126,12 +156,37 @@ function dryRunVariantCommand() {
   return command;
 }
 
+function dryRunSceneCommand() {
+  const command = [
+    "npm",
+    "run",
+    "benchmark:splatfacto:scenes",
+    "--",
+    "--dry-run",
+    "--manifest",
+    paths.sceneManifest,
+    "--suite-output-dir",
+    paths.sceneOutputDir,
+    "--sam-checkpoint",
+    paths.samCheckpoint,
+  ];
+  if (!refreshSam) {
+    command.push("--skip-sam");
+  }
+  return command;
+}
+
 function printStatus() {
   const checks = [
     {
       label: "semantic summary",
       path: semanticSummaryJson,
       prepare: formatCommand(semanticCommand),
+    },
+    {
+      label: "scene summary",
+      path: sceneSummaryJson,
+      prepare: formatCommand(sceneCommand),
     },
     {
       label: "variant summary",
@@ -184,6 +239,11 @@ function collectMissingForAggregate() {
       prepare: formatCommand(semanticCommand),
     },
     {
+      label: "scene summary",
+      path: sceneSummaryJson,
+      prepare: formatCommand(sceneCommand),
+    },
+    {
       label: "variant summary",
       path: variantSummaryJson,
       prepare: formatCommand(variantCommand),
@@ -201,10 +261,12 @@ function printMissing(missing) {
 
 function buildCrossSceneSummary() {
   const semanticSummary = readJson(semanticSummaryJson);
+  const sceneSummary = readJson(sceneSummaryJson);
   const variantSummary = readJson(variantSummaryJson);
   const semanticRows = flattenSemanticRows(semanticSummary, paths.semanticManifest);
+  const sceneRows = flattenSceneRows(sceneSummary);
   const variantRows = flattenVariantRows(variantSummary);
-  const rows = [...semanticRows, ...variantRows];
+  const rows = [...semanticRows, ...sceneRows, ...variantRows];
   const summary = {
     kind: "object_emergence_cross_scene_benchmark",
     passed: rows.length > 0 && rows.every((row) => row.passed !== false),
@@ -212,6 +274,8 @@ function buildCrossSceneSummary() {
     paths: {
       semantic_manifest: paths.semanticManifest,
       semantic_summary: semanticSummaryJson,
+      scene_manifest: paths.sceneManifest,
+      scene_summary: sceneSummaryJson,
       variant_summary: variantSummaryJson,
       output_dir: paths.outputDir,
       summary: summaryJson,
@@ -219,6 +283,7 @@ function buildCrossSceneSummary() {
       markdown: summaryMd,
       html: summaryHtml,
       semantic_report: reportPath(semanticSummary.report, `${paths.semanticOutputDir}/report.html`),
+      scene_report: sceneSummary.paths?.report ?? `${paths.sceneOutputDir}/report.html`,
       variant_report: variantSummary.paths?.report ?? `${paths.variantOutputDir}/report.html`,
     },
     rows,
@@ -230,6 +295,35 @@ function buildCrossSceneSummary() {
   };
   summary.best_by_scene = bestByScene(rows, "render_occlusion_effect_score");
   return summary;
+}
+
+function flattenSceneRows(summary) {
+  return (summary.scenes ?? []).map((scene) => ({
+    suite: "splatfacto-scenes",
+    scene_id: scene.id,
+    scene_label: scene.label,
+    variant_id: "default",
+    variant_label: "default",
+    mask_policy: scene.mask_policy,
+    source_summary: scene.paths?.summary ?? sceneSummaryJson,
+    curve: scene.paths?.curve ?? null,
+    passed: scene.passed,
+    gaussians: scene.gaussians ?? null,
+    slots: scene.slots ?? null,
+    frames: scene.frames ?? null,
+    masks: scene.masks ?? null,
+    mask_pixels: scene.mask_pixels ?? null,
+    supervised_gaussians: scene.supervised_gaussians ?? null,
+    object_id_counts: scene.object_id_counts ?? null,
+    initial_projection_loss: scene.registration_initial_loss ?? null,
+    final_projection_loss: scene.final_projection_loss ?? null,
+    final_assignment_confidence: scene.assignment_confidence ?? null,
+    final_ari_to_initial: scene.stability_ari ?? null,
+    final_spatial_compactness_score: null,
+    final_object_emergence_score:
+      scene.curve_object_emergence_score ?? scene.object_emergence_score ?? null,
+    render_occlusion_effect_score: scene.render_occlusion_effect_score ?? null,
+  }));
 }
 
 function flattenSemanticRows(summary, manifestPath) {
@@ -408,6 +502,9 @@ function renderMarkdown(summary) {
     );
   }
   lines.push("", `Semantic report: ${summary.paths.semantic_report}`);
+  if (summary.paths.scene_report) {
+    lines.push(`Scene report: ${summary.paths.scene_report}`);
+  }
   lines.push(`Variant report: ${summary.paths.variant_report}`);
   return `${lines.join("\n")}\n`;
 }
@@ -442,6 +539,7 @@ ${rows}
     </tbody>
   </table>
   <p>Semantic report: ${escapeHtml(summary.paths.semantic_report)}</p>
+  ${summary.paths.scene_report ? `<p>Scene report: ${escapeHtml(summary.paths.scene_report)}</p>` : ""}
   <p>Variant report: ${escapeHtml(summary.paths.variant_report)}</p>
 </body>
 </html>
@@ -496,6 +594,7 @@ function parseArgs(values) {
     else if (value === "--dry-run") parsed.run = false;
     else if (value === "--status") parsed.status = true;
     else if (value === "--skip-semantic") parsed.skipSemantic = true;
+    else if (value === "--skip-scenes") parsed.skipScenes = true;
     else if (value === "--skip-variants") parsed.skipVariants = true;
     else if (value === "--refresh-sam") parsed.refreshSam = true;
     else if (value.startsWith("--")) {

@@ -13,6 +13,7 @@
     "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs",
     "benchmark:splatfacto:balanced": "node scripts/benchmark-splatfacto-balanced.mjs",
     "benchmark:splatfacto:variants": "node scripts/benchmark-splatfacto-variants.mjs",
+    "benchmark:splatfacto:scenes": "node scripts/benchmark-splatfacto-scenes.mjs",
     "benchmark:cross-scene": "node scripts/benchmark-cross-scene.mjs"
   },
   "dependencies": {
