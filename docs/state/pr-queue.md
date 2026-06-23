@@ -45,7 +45,7 @@
   - `uv run --extra dev pytest`: 28 passed。
   - `uv run objgauss object-field emergence-curve outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --field outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --masks outputs/masks/nerf-lego-sam/mask-manifest.json --output /tmp/objgauss-lego-splatfacto-render-emergence-curve.json --csv-output /tmp/objgauss-lego-splatfacto-render-emergence-curve.csv --iterations 80 --learning-rate 1.0 --eval-every 20 --render-size 128`: points=5，projection_loss 4.384474 -> 0.308315，render_occlusion_mean_relative_delta_l1=0.124603，render_occlusion_effect_score=0.124603。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: `940bb6b`。
+- 完成 commit: `073adcf`。
 
 ### SEMANTIC-003: Object emergence benchmark curves
 
