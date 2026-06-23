@@ -50,7 +50,7 @@
   - `uv run --extra dev pytest`: 32 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
   - `npm run acceptance:semantic`: passed，输出 `acceptance_semantic_benchmark=passed`。
-- 完成 commit: pending。
+- 完成 commit: `1647fa3`。
 
 ### SEMANTIC-007: Acceptance integration and missing-output runbook
 
