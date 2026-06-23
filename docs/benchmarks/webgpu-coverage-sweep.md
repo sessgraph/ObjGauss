@@ -11,6 +11,31 @@ Depth-bin alpha compositing can be fixed for a run with
 alpha approximations; it does not change the default 8-bin baseline unless a
 candidate passes the same gate.
 
+## Depth-Bin Sweep
+
+Use the depth sweep when comparing sorted-alpha approximations while holding the
+coverage tuning fixed:
+
+```bash
+npm run audit:webgpu-depth-sweep -- \
+  --asset nerf-lego-alpha-closure-local \
+  --bins 4,8,12,16 \
+  --output-dir /tmp/objgauss-webgpu-depth-sweep
+```
+
+The sweep runs the same headed desktop WebGPU full-runtime audit as the coverage
+sweep and writes:
+
+```text
+/tmp/objgauss-webgpu-depth-sweep/summary.json
+/tmp/objgauss-webgpu-depth-sweep/summary.md
+```
+
+Current Lego result: 8 bins remains the best Pareto variant; 12 bins gives the
+lowest coverage ratio by a tiny margin but worsens chroma. That means simply
+raising the bin count does not currently explain the Spark/edit visual residual
+on Lego.
+
 ## Smoke Sweep
 
 ```bash

@@ -13,6 +13,7 @@
     "audit:webgpu-desktop": "node scripts/audit-webgpu-desktop.mjs",
     "audit:webgpu-coverage-sweep": "node scripts/audit-webgpu-coverage-sweep.mjs",
     "audit:webgpu-coverage-gate": "node scripts/audit-webgpu-coverage-sweep.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --output-dir /tmp/objgauss-webgpu-coverage-sweep-gate --gate-variant baseline --max-mean-pareto-score 1 --max-mean-luma-norm 1 --max-mean-chroma-norm 1 --max-scene-pareto-score 1 --max-scene-luma-norm 1 --max-scene-chroma-norm 1",
+    "audit:webgpu-depth-sweep": "node scripts/audit-webgpu-depth-sweep.mjs",
     "audit:webgpu-tile-smoke": "node scripts/audit-webgpu-tile-smoke.mjs",
     "acceptance:demo": "node scripts/acceptance-demo.mjs",
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",

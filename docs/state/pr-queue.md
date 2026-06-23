@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-Q`: 基于 `runtime-depth-sort-tuning-v1` 做 depth-bin sweep（4 / 8 / 12 / 16）并继续拆 Spark vs edit 残差中的 SH 颜色和真实 camera 对齐问题；默认 coverage / depth 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-R`: 在 depth-bin sweep 已显示单纯提高 bins 不是 Lego 主因后，继续拆 Spark vs edit 残差中的 SH / view-dependent color 和真实 camera 对齐问题；默认 coverage / depth 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-Q: WebGPU depth-bin sweep
+
+- 状态: done / depth-bin-sweep-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 基于 T-P 的 runtime depth-bin tuning，把 4 / 8 / 12 / 16 bins 变成一键可复现 browser audit sweep，判断单纯提高 alpha depth bins 是否能解释 “原始颜色（编辑预览）不像 Spark”。
+- 已实施:
+  - 新增 `npm run audit:webgpu-depth-sweep`，默认使用 headed desktop WebGPU full-runtime audit。
+  - Sweep 固定 coverage tuning，逐个传入 `--webgpu-depth-bins`，并校验实际 DOM telemetry 命中 requested bins。
+  - 输出每个 depth-bin variant 的 coverage ratio、luma delta、chroma delta、tile reference count 和 normalized Pareto score。
+  - 支持 `--assets`、`--bins`、`--output-dir`、`--webgpu-viewport-size`、`--webgpu-footprint-scale`、`--webgpu-covariance-max-anisotropy`。
+  - `summary.json` / `summary.md` 报告和 `docs/benchmarks/webgpu-coverage-sweep.md` 已记录用法。
+- 结论:
+  - Lego 4 / 8 / 12 / 16 bins 全部通过 headed desktop WebGPU full runtime。
+  - 8 bins 仍是 best Pareto：score=`1`、luma=`0.106079`、chroma=`0.086537`。
+  - 12 bins 的 coverage ratio 仅从 `3.784251` 微降到 `3.784235`，但 chroma 变差到 `0.086874`；16 bins 也没有实质改善。
+  - 因此当前 Lego 上继续提高 depth bins 不是高优先级修复方向，下一步应转向 SH / view-dependent color 或真实 camera alignment。
+- 验证:
+  - `node --check scripts/audit-webgpu-depth-sweep.mjs`: passed。
+  - `npm run audit:webgpu-depth-sweep -- --asset nerf-lego-alpha-closure-local --bins 4,8,12,16 --port 5276 --output-dir /tmp/objgauss-webgpu-depth-sweep`: passed；报告写入 `/tmp/objgauss-webgpu-depth-sweep/summary.json` 和 `summary.md`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
 
 ### RENDER-005T-P: WebGPU runtime depth-bin tuning
 
