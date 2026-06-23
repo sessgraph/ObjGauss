@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-06-23
+> 最近更新: 2026-06-24
 
 ## 当前阶段
 
@@ -55,6 +55,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005I 已落地 WebGPU compact tile entry list：tile entry storage 从 fixed-cap stride 推进到 `compact-offset-list`，新增 `tileOffsets` buffer；Plush 级大场景不再因为 fixed-cap tile overflow 被 capacity gate 阻塞，后续 WebGPU 可用时会进入真实 tile renderer 路径。
   - RENDER-005J 已落地 WebGPU storage/device-limit gate：WebGPU route 进入前会预测 runtime 11-buffer storage 规模，并用 `maxBufferSize` / `maxStorageBufferBindingSize` 阻断超限场景；当前 headless Chrome 仍无 WebGPU adapter，真实 runtime audit 继续 pending。
   - RENDER-005K 已落地强制 WebGPU runtime audit 入口：`npm run audit:webgpu-runtime` 会要求浏览器真实进入 `webgpu-tile`，常规 `audit:demo` 仍保留 fallback 验收。
+  - RENDER-005L 已落地 WebGPU device-lost telemetry split：first-frame submission / accumulation / compute / pixel dispatch 与 `device.lost` 作为独立 runtime facts 暴露，强制 audit 可区分“已提交渲染命令”和“提交后 device lost”。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -241,6 +242,8 @@ npm run audit:demo -- --url http://127.0.0.1:5204/
 - RENDER-005J validation: `npm run audit:webgpu-tile-smoke` 通过，覆盖 compact pass、fixed overflow block 和模拟小 binding 的 `webgpu-buffer-limit` block；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；`npm run audit:demo -- --url http://127.0.0.1:5217/ --no-server` 三样例通过。当前 headless Chrome 仍为 `webgpu-adapter-unavailable`，所以 storage gate 为 `unknown:webgpu-capability`；Plush estimated max buffer 为 `tileEntries:42053252`，Lego estimated max buffer 为 `pixelResolvedRgba:16777216`。
 - RENDER-005K runtime audit entry: `scripts/audit-demo.mjs` 新增 `--require-webgpu` 和 `--webgpu-flags none|unsafe|vulkan`；`package.json` 新增 `npm run audit:webgpu-runtime`。常规 fallback audit 默认不加 WebGPU flags；强制 runtime audit 要求 `data-renderer="webgpu-tile"`、target gate pass、无 fallback、first frame 经过 accumulation / compute / pixel / storage resolve。
 - RENDER-005K validation: `npm run audit:webgpu-tile-smoke` 通过；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；`npm run audit:demo -- --url http://127.0.0.1:5218/ --no-server` 三样例通过；`npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5218/ --no-server` 单样例通过。`npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5218/ --no-server` 在当前 headless Chrome + `--webgpu-flags unsafe` 下进入 WebGPU route，`accumulation=dispatched`、`compute=dispatched`、`pixel=dispatched`，但 first frame 失败为 `webgpu-device-lost-destroyed`；因此真实 WebGPU runtime audit 仍 pending。
+- RENDER-005L device-lost telemetry split: `WebGpuTileViewport` 新增 `data-webgpu-device-lost-status/reason/message`，`device.lost` 不再覆盖 `data-webgpu-first-frame-status`；`audit-demo` 先验 first-frame accumulation / compute / pixel / storage resolve，再单独以 device-lost blocker 失败。
+- RENDER-005L validation: `npm run audit:webgpu-tile-smoke` 通过；`npm run build` 通过，仍有 Spark / Three bundle size warning；`uv run --extra dev pytest` 41 passed；Browser plugin absent，使用 Playwright fallback + built `dist/` static server，`npm run audit:demo -- --url http://127.0.0.1:5221/ --no-server` 三样例通过；`npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5221/ --no-server` 在当前 headless unsafe WebGPU 下 expected failed，并明确报告 `WebGPU device was lost after first-frame submission: reason=webgpu-device-lost-destroyed`。
 - RENDER-004E overflow gate / fallback hardening: fixed-capacity tile smoke 现在输出 overflow tile count、overflow ratio、max excess、stored references、entry capacity/utilization、capacity mode/status/gate；WebGPU target gate 区分 `webgpu-capability`、`tile-overflow` 和 `renderer-not-implemented`。Browser audit 不再只检查 `tileOverflowCount`，而是验证 overflow 场景被 blocked，非 overflow 场景为 pass/ok。
 - RENDER-004E validation: `npm run audit:webgpu-tile-smoke` 通过，内置 sample packed=5800、refs=157323、resolved=2301、overflow=40114、overflowTiles=1056、capacity=blocked；`uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5203/` 三样例通过。Plush semantic / Plush v1 为 `tileCapacity="overflow":169`，Lego 为 `tileCapacity="ok":0`，三者 targetGate 均为 `blocked:webgpu-capability`。
 - RENDER-004D object-state buffer smoke: `src/webgpuTileSmoke.js` 现在输出 `webgpu-object-state-v1`，用 stride=4 的 `vec4u`-style buffer 编码 object flags、dense object index、Gaussian count 和 reserved slot；flags 覆盖 visible、selected、removed、isolated 和 enabled，并生成 visible/hidden/removed/selected/isolated object counts 与 checksum。`PointCloudViewport` 暴露 `data-webgpu-object-state-*`，浏览器 audit 会检查隔离 / 删除后的 checksum 和计数变化。
@@ -252,7 +255,7 @@ npm run audit:demo -- --url http://127.0.0.1:5204/
 - RENDER-004A renderer boundary: 前端现在检测 `navigator.gpu` / adapter / device capability，状态面板显示目标 renderer、WebGPU 状态、fallback reason 和 tile overflow；Spark 真实查看暴露 `data-renderer="spark-splat"`，编辑 fallback 暴露 `data-renderer="gaussian-oit"`、`data-renderer-target="webgpu-tile"`、`data-renderer-fallback-reason`、`data-webgpu-status` 和 `data-tile-overflow-count`。
 - RENDER-004A validation: `uv run --extra dev pytest` 41 passed；`npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5197/` 三样例通过，当前 headless Chrome 为 `webgpuStatus="unavailable"`、`fallbackReason="webgpu-adapter-unavailable"`、`tileOverflowCount=0`，并继续通过画布选中、隔离和删除预览。
 - RENDER-003 object-state filtering: Gaussian OIT 编辑 renderer 现在保留全量 Gaussian geometry，使用 dense object index GPU attribute + `gpu-object-state-texture` 控制对象隐藏、隔离和删除；画布拾取会跳过当前 object-state 不可见对象。
-- RENDER-004/005 design: `docs/adr/0005-webgpu-tile-renderer.md` 已定义 WebGPU tile renderer 的 staged delivery、data contract、tile binning、per-tile accumulation、object-state buffer、fallback contract 和验收标准；当前下一步是在 WebGPU-capable 浏览器中重跑 `RENDER-005A` first-frame runtime audit。
+- RENDER-004/005 design: `docs/adr/0005-webgpu-tile-renderer.md` 已定义 WebGPU tile renderer 的 staged delivery、data contract、tile binning、per-tile accumulation、object-state buffer、fallback contract 和验收标准；当前下一步是诊断 `webgpu-device-lost-destroyed`，或在真实桌面 WebGPU 浏览器中重跑 runtime audit。
 - RENDER-003 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5194/` 三样例通过并检查 `objectFilter="gpu-object-state-texture"`；targeted Playwright QA 保存到 `/tmp/objgauss-gpu-filter-*.png`，验证 `initialVisible=281498 -> isolatedVisible=48066 -> deletedVisible=233432`，且无 shader/framebuffer/texture console error。
 - RENDER-002 Weighted OIT: 对象编辑 renderer 现在使用 RGBA half-float accumulation render target；RGB 累加 `sum(w*c)`，Alpha 累加 `sum(w)`，fullscreen resolve 后混回基础 grid / axes 场景。Phase 3 WebGPU tile renderer 尚未完成。
 - RENDER-002 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5193/` 三样例通过，分别检查 `editRenderer="Gaussian OIT 编辑"`、画布点选、隔离、删除后 `renderModeAfterDelete="自身颜色"`；targeted Playwright QA 保存到 `/tmp/objgauss-oit-edit-*.png`，断言真实 Splat -> Gaussian OIT 编辑 -> 画布选中 -> 删除预览全链路，过滤已知 Spark `Worker terminate` 噪声后无 shader/framebuffer/render target console error。
@@ -383,7 +386,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. RENDER-005K: 在 WebGPU-capable 浏览器中重跑 Plush / Lego first-frame runtime audit；若 storage/device gate 阻断，再拆 buffer chunking 或 viewport output 降级。
+1. RENDER-005M: 诊断当前 headless unsafe WebGPU 下的 `webgpu-device-lost-destroyed`，并在 WebGPU-capable 桌面浏览器中重跑 Plush / Lego first-frame runtime audit；若 device-limit gate 阻断，再拆 buffer chunking 或 viewport output 降级。
 2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

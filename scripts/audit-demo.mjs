@@ -55,6 +55,7 @@ try {
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
+        `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
@@ -380,6 +381,9 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
+      const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
+      const webGpuDeviceLostReason = await viewport.getAttribute("data-webgpu-device-lost-reason");
+      const webGpuDeviceLostMessage = await viewport.getAttribute("data-webgpu-device-lost-message");
       const webGpuAccumulationSource = await viewport.getAttribute("data-webgpu-accumulation-source");
       const webGpuAccumulationStatus = await viewport.getAttribute("data-webgpu-accumulation-status");
       const webGpuAccumulationReason = await viewport.getAttribute("data-webgpu-accumulation-reason");
@@ -419,6 +423,11 @@ async function runAudit(url, assetsToCheck, options) {
         ) {
           throw new Error(
             `${asset.id} WebGPU first frame did not render through accumulation/compute/pixel/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups}:${webGpuAccumulationReason} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups}:${webGpuComputeReason} pixel=${webGpuPixelStatus}:${webGpuPixelSource}:${webGpuPixelWorkgroups}:${webGpuPixelReason} frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+          );
+        }
+        if (webGpuDeviceLostStatus === "lost") {
+          throw new Error(
+            `${asset.id} WebGPU device was lost after first-frame submission: reason=${webGpuDeviceLostReason} message=${webGpuDeviceLostMessage}`,
           );
         }
         if (
@@ -513,6 +522,9 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
         webGpuResolveSource,
+        webGpuDeviceLostStatus,
+        webGpuDeviceLostReason,
+        webGpuDeviceLostMessage,
         webGpuAccumulationSource,
         webGpuAccumulationStatus,
         webGpuAccumulationWorkgroups,

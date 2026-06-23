@@ -37,7 +37,7 @@
   - `package.json` 新增 `npm run audit:webgpu-runtime`，默认使用 `--require-webgpu --webgpu-flags unsafe`。
 - 当前阻塞:
   - 常规 headless Chrome 仍返回 `webgpu-adapter-unavailable`。
-  - 使用 `--webgpu-flags unsafe` 时，NeRF Lego proxy 可进入 WebGPU route，accumulation / resolve / pixel compute 均 dispatch，但 first frame 随后变为 `webgpu-device-lost-destroyed`；这不是最终 runtime pass 证据。
+  - 使用 `--webgpu-flags unsafe` 时，NeRF Lego proxy 可进入 WebGPU route，accumulation / resolve / pixel compute 均 dispatch，first-frame submission 已记录；但 device 随后变为 `webgpu-device-lost-destroyed`，这不是最终 runtime pass 证据。
 - 待验证:
   - 在 WebGPU-capable 浏览器 / 桌面 Chrome 环境中运行 Plush / Lego first-frame runtime audit。
 - 验证:
@@ -70,6 +70,25 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005L: WebGPU device-lost telemetry split
+
+- 状态: done / browser-webgpu-pending
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 将 WebGPU first-frame submission telemetry 与 `device.lost` telemetry 分离，避免 device loss 覆盖已完成的 accumulation / compute / pixel dispatch 证据。
+- 实施:
+  - `WebGpuTileViewport` 新增 `data-webgpu-device-lost-status`、`data-webgpu-device-lost-reason` 和 `data-webgpu-device-lost-message`。
+  - `device.lost` 不再覆盖 `data-webgpu-first-frame-status`；first-frame 和 device-lost 作为两个独立 runtime facts 暴露。
+  - `audit-demo` 的 WebGPU route 先检查 first-frame accumulation / compute / pixel / storage resolve，再单独阻断 `deviceLost=lost`。
+- 验收:
+  - 常规 fallback audit 不受 device-lost telemetry 影响。
+  - 强制 WebGPU runtime audit 在当前 headless unsafe WebGPU 下必须报告 `WebGPU device was lost after first-frame submission`，而不是误报 first-frame blank。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5221/ --no-server`: passed，assets=3，Browser plugin absent，使用 Playwright fallback + built `dist/` static server。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5221/ --no-server`: expected failed with `webgpu-device-lost-destroyed`.
 
 ### RENDER-005J: WebGPU storage/device-limit gate
 

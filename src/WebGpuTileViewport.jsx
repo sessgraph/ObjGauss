@@ -43,6 +43,11 @@ export default function WebGpuTileViewport({
     pixels: 0,
     source: "",
   });
+  const [deviceLost, setDeviceLost] = useState({
+    status: "active",
+    reason: "webgpu-device-active",
+    message: "",
+  });
   const [compute, setCompute] = useState({
     status: "pending",
     reason: "webgpu-compute-pending",
@@ -86,6 +91,11 @@ export default function WebGpuTileViewport({
   useEffect(() => {
     let cancelled = false;
     const canvas = canvasRef.current;
+    setDeviceLost({
+      status: "active",
+      reason: "webgpu-device-active",
+      message: "",
+    });
     if (!canvas || typeof navigator === "undefined" || !navigator.gpu) {
       setFrame({
         status: "failed",
@@ -122,6 +132,11 @@ export default function WebGpuTileViewport({
         reason: "navigator-gpu-unavailable",
         source: "",
         workgroups: 0,
+      });
+      setDeviceLost({
+        status: "unavailable",
+        reason: "navigator-gpu-unavailable",
+        message: "",
       });
       return undefined;
     }
@@ -176,12 +191,10 @@ export default function WebGpuTileViewport({
         };
         device.lost.then((info) => {
           if (cancelled) return;
-          setFrame({
-            status: "failed",
+          setDeviceLost({
+            status: "lost",
             reason: `webgpu-device-lost-${info.reason || "unknown"}`,
-            checksum: "",
-            pixels: 0,
-            source: "",
+            message: info.message || "",
           });
         });
         renderFrame({
@@ -231,6 +244,11 @@ export default function WebGpuTileViewport({
           reason: error?.message || "webgpu-accumulation-unavailable",
           source: "",
           workgroups: 0,
+        });
+        setDeviceLost({
+          status: "unavailable",
+          reason: error?.message || "webgpu-device-unavailable",
+          message: "",
         });
       }
     }
@@ -338,6 +356,9 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
       data-webgpu-resolve-source={frame.source}
+      data-webgpu-device-lost-status={deviceLost.status}
+      data-webgpu-device-lost-reason={deviceLost.reason}
+      data-webgpu-device-lost-message={deviceLost.message}
       data-webgpu-accumulation-source={accumulation.source}
       data-webgpu-accumulation-status={accumulation.status}
       data-webgpu-accumulation-reason={accumulation.reason}
