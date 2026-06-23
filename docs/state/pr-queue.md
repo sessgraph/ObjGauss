@@ -46,7 +46,7 @@
   - `uv run objgauss object-field emergence-benchmark docs/benchmarks/semantic-smoke.json --output-dir /tmp/objgauss-semantic-smoke-suite --strict`: passed=true，scenes=3；Plush semantic loss 1.386294 -> 1.346402，Lego alpha proxy loss 1.386294 -> 0.235765，Lego Splatfacto smoke loss 4.384474 -> 0.339695。
   - `uv run --extra dev pytest`: 30 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: pending。
+- 完成 commit: `1d9aa23`。
 
 ### SEMANTIC-005: Emergence benchmark report artifact
 
