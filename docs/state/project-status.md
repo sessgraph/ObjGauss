@@ -77,6 +77,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-L 已完成 WebGPU alpha presentation edge gate：fullscreen storage resolve 新增 `alpha-edge-gated-presentation-v1:0.035`，只在最终显示阶段压掉低 alpha halo，不改 compute resolve buffer；NeRF Lego coverage ratio 从 T-K 的 `3.856920` 小幅降到 `3.784251`，Plush 从 `6.680406` 降到 `6.448639`，说明 halo 有贡献但 coverage 主问题仍需 footprint / covariance / threshold sweep。
   - RENDER-005T-M 已完成 WebGPU coverage tuning sweep：WebGPU Tile 支持 runtime `webgpu-footprint-scale` / `webgpu-covariance-max-anisotropy`，新增 `npm run audit:webgpu-coverage-sweep`；Lego sweep 显示 coverage 可从 baseline `3.784251` 降到 tight `3.346752`，但 luma / chroma 从 `0.106079 / 0.086537` 恶化到 `0.142279 / 0.102668`，下一步需 Pareto scoring / multi-scene sweep。
   - RENDER-005T-N 已完成 WebGPU coverage Pareto multi-scene sweep：`npm run audit:webgpu-coverage-sweep` 支持 `--assets` 多场景、解析 `tileReferences`，并按 coverage / luma / chroma / tile reference cost 的 `0.35 / 0.25 / 0.25 / 0.15` 权重输出每场景和跨场景 variant score；Lego best Pareto 仍是 baseline，Plush best Pareto 是 compact，tight 只在 coverage / cost 上最好但 luma 代价明显，因此默认渲染参数暂不切到 tight。
+  - RENDER-005T-O 已完成 WebGPU coverage report / threshold gate：`audit:webgpu-coverage-sweep` 支持 `--output-dir` 写 `summary.json` / `summary.md`，并支持 `--gate-variant` 与 mean / per-scene pareto、luma、chroma、tile-reference 阈值；新增 `npm run audit:webgpu-coverage-gate` 作为默认参数变更前的 baseline gate，当前 2-scene headed WebGPU gate 通过并写出 `/tmp/objgauss-webgpu-coverage-sweep-gate/summary.*`。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -136,6 +137,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
   - `npm run benchmark:splatfacto:scenes` 已固化为 Splatfacto-trained scene suite，可比较 Lego safe-2000、LLFF Fern smoke 与 Poly Haven Chair smoke 三个 scene rows，并支持 train / held-out SAM manifest split。
   - `npm run benchmark:cross-scene` 已固化为跨场景 / 跨变体汇总入口，可聚合 semantic smoke suite、Splatfacto scene suite 和 safe-2000 variant suite 到同一张表，并输出 smoke / candidate / paper stage gates。
+  - `npm run audit:webgpu-coverage-gate` 已固化为 WebGPU 编辑预览 coverage/luma/chroma/cost 的多场景 baseline gate，并输出可复查 summary report。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
 
@@ -145,6 +147,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 node --check scripts/audit-webgpu-coverage-sweep.mjs
+npm run audit:webgpu-coverage-gate -- --port 5270
 npm run audit:webgpu-coverage-sweep -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --port 5268
 node --check src/webgpuTileSmoke.js
 node --check scripts/audit-demo.mjs
@@ -494,7 +497,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. RENDER-005T-O: 将 WebGPU visual sweep 固化为可持久化 report / threshold gate，并继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认参数变更必须先通过多场景 score 和 luma/chroma 阈值。
+1. RENDER-005T-P: 继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认 coverage 参数变更必须先通过 `audit:webgpu-coverage-gate`。
 2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

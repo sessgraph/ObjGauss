@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-O`: 将 T-N 的多场景 Pareto sweep 固化为可持久化 report / threshold gate，并继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认参数变更必须先通过多场景 score 和 luma/chroma 阈值。
+  - `RENDER-005T-P`: 继续拆 Spark vs edit 残差中的 sorted alpha、SH 颜色和真实 camera 对齐问题；默认 coverage 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-O: WebGPU coverage report and threshold gate
+
+- 状态: done / report-gated
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 将 T-N 的多场景 Pareto sweep 固化为可持久化 report / threshold gate，让默认 coverage 参数变更必须先通过多场景 score 和 luma/chroma 门禁。
+- 已实施:
+  - `audit-webgpu-coverage-sweep` 新增 `--output-dir`，写出 `summary.json` 和 `summary.md`。
+  - Sweep summary 记录 mode、assets、variants、score weights、best mean Pareto、scene summaries、variant summaries、raw rows 和 gate result。
+  - 新增 `--gate-variant` 与 mean / per-scene pareto、luma、chroma、tile-reference norm 阈值；gate 失败会让命令失败，除非显式 `--allow-failures`。
+  - 新增 `npm run audit:webgpu-coverage-gate`，默认用 Lego + Plush 多场景 baseline gate，输出到 `/tmp/objgauss-webgpu-coverage-sweep-gate`。
+  - 新增 `docs/benchmarks/webgpu-coverage-sweep.md`，记录 smoke sweep、gate 用法、输出文件和当前本地结论。
+- 结论:
+  - 当前 baseline gate 9 项通过：mean pareto/luma/chroma 均为 `1`，Lego 和 Plush per-scene pareto/luma/chroma 均为 `1`。
+  - Report 再次显示 compact mean Pareto=`0.921829` 但 mean luma norm=`1.271571`，tight mean luma norm=`1.465639`；因此默认参数仍保持 baseline。
+  - 后续任何默认参数替换都应先跑 gate，并在 report 中说明 luma/chroma tradeoff。
+- 验证:
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `npm run audit:webgpu-coverage-gate -- --port 5270`: passed；2 scenes x 3 variants headed desktop WebGPU full audit，`webgpu_coverage_sweep_gate=passed`，报告写入 `/tmp/objgauss-webgpu-coverage-sweep-gate/summary.json` 和 `summary.md`。
 
 ### RENDER-005T-N: WebGPU coverage Pareto multi-scene sweep
 

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const DEFAULT_PORT = 5265;
@@ -28,6 +28,9 @@ const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 const webGpuFlags = String(args.webgpuFlags ?? args["webgpu-flags"] ?? "unsafe");
 const headed = !flagEnabled(args.headless);
 const allowFailures = flagEnabled(args.allowFailures ?? args["allow-failures"]);
+const outputDir = optionalString(args.outputDir ?? args["output-dir"]);
+const gateVariantId = optionalString(args.gateVariant ?? args["gate-variant"]);
+const thresholds = parseThresholds(args);
 const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
 );
@@ -109,6 +112,27 @@ try {
     );
   }
 
+  const gate = evaluateThresholdGate({
+    rankedResults,
+    variantSummaries,
+    gateVariantId,
+    thresholds,
+  });
+  if (gate.enabled) {
+    for (const check of gate.checks) {
+      console.log(
+        `webgpu_coverage_sweep_gate_check=${check.passed ? "passed" : "failed"} ` +
+          `variant=${JSON.stringify(gate.variant ?? "none")} ` +
+          `metric=${JSON.stringify(check.metric)} actual=${check.actual ?? "unknown"} ` +
+          `expected=${check.operator}${check.expected}`,
+      );
+    }
+    console.log(
+      `webgpu_coverage_sweep_gate=${gate.passed ? "passed" : "failed"} ` +
+        `variant=${JSON.stringify(gate.variant ?? "none")} checks=${gate.checks.length}`,
+    );
+  }
+
   const passed = rankedResults.filter((result) => isScorable(result));
   const bestPareto = passed
     .slice()
@@ -120,15 +144,42 @@ try {
     .filter((summary) => Number.isFinite(summary.meanParetoScore))
     .slice()
     .sort((left, right) => left.meanParetoScore - right.meanParetoScore)[0];
+  const suitePassed = !stoppedEarly && sceneSummaries.every((summary) => summary.complete);
+  const summary = buildSummary({
+    suitePassed,
+    assets,
+    variants,
+    baseUrl,
+    rankedResults,
+    sceneSummaries,
+    variantSummaries,
+    bestPareto,
+    bestCoverage,
+    bestMeanPareto,
+    gate,
+  });
+  if (outputDir) {
+    writeReportFiles(outputDir, summary);
+    console.log(
+      `webgpu_coverage_sweep_report=written outputDir=${JSON.stringify(outputDir)} ` +
+        `summaryJson=${JSON.stringify(`${outputDir}/summary.json`)} ` +
+        `summaryMd=${JSON.stringify(`${outputDir}/summary.md`)}`,
+    );
+  }
+  const overallStatus = summary.passed ? "passed" : suitePassed ? "failed" : "partial";
   console.log(
-    `webgpu_coverage_sweep=${!stoppedEarly && sceneSummaries.every((summary) => summary.complete) ? "passed" : "partial"} ` +
+    `webgpu_coverage_sweep=${overallStatus} ` +
       `assets=${JSON.stringify(assets)} scenes=${assets.length} variants=${variants.length} ` +
       `scoreWeights=${JSON.stringify(SCORE_WEIGHTS)} ` +
       `bestMeanParetoVariant=${JSON.stringify(bestMeanPareto?.id ?? "none")}:${bestMeanPareto?.meanParetoScore ?? "unknown"} ` +
       `bestPareto=${JSON.stringify(bestPareto?.asset ?? "none")}/${JSON.stringify(bestPareto?.id ?? "none")}:${bestPareto?.paretoScore ?? "unknown"} ` +
       `bestCoverage=${JSON.stringify(bestCoverage?.asset ?? "none")}/${JSON.stringify(bestCoverage?.id ?? "none")}:${bestCoverage?.coverageRatio ?? "unknown"} ` +
+      `gate=${gate.enabled ? (gate.passed ? "passed" : "failed") : "disabled"} ` +
       `url=${baseUrl}`,
   );
+  if (gate.enabled && !gate.passed && !allowFailures) {
+    process.exitCode = 1;
+  }
 } finally {
   if (server) stopPreviewServer(server);
 }
@@ -190,6 +241,35 @@ function parseAssets(value) {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return parsed.length > 0 ? parsed : DEFAULT_ASSETS;
+}
+
+function parseThresholds(parsedArgs) {
+  return {
+    maxMeanParetoScore: optionalFiniteNumber(
+      parsedArgs.maxMeanParetoScore ?? parsedArgs["max-mean-pareto-score"],
+    ),
+    maxMeanLumaNorm: optionalFiniteNumber(parsedArgs.maxMeanLumaNorm ?? parsedArgs["max-mean-luma-norm"]),
+    maxMeanChromaNorm: optionalFiniteNumber(
+      parsedArgs.maxMeanChromaNorm ?? parsedArgs["max-mean-chroma-norm"],
+    ),
+    maxMeanTileReferenceNorm: optionalFiniteNumber(
+      parsedArgs.maxMeanTileReferenceNorm ?? parsedArgs["max-mean-tile-reference-norm"],
+    ),
+    maxSceneParetoScore: optionalFiniteNumber(
+      parsedArgs.maxSceneParetoScore ?? parsedArgs["max-scene-pareto-score"],
+    ),
+    maxSceneLumaNorm: optionalFiniteNumber(parsedArgs.maxSceneLumaNorm ?? parsedArgs["max-scene-luma-norm"]),
+    maxSceneChromaNorm: optionalFiniteNumber(
+      parsedArgs.maxSceneChromaNorm ?? parsedArgs["max-scene-chroma-norm"],
+    ),
+    maxSceneTileReferenceNorm: optionalFiniteNumber(
+      parsedArgs.maxSceneTileReferenceNorm ?? parsedArgs["max-scene-tile-reference-norm"],
+    ),
+  };
+}
+
+function hasThresholds(thresholdsValue) {
+  return Object.values(thresholdsValue).some(Number.isFinite);
 }
 
 function parseVariants(value) {
@@ -337,6 +417,225 @@ function summarizeVariants(results, sceneCount) {
   }));
 }
 
+function evaluateThresholdGate({ rankedResults, variantSummaries, gateVariantId, thresholds: thresholdsValue }) {
+  const enabled = hasThresholds(thresholdsValue);
+  const selectedVariant =
+    (gateVariantId
+      ? variantSummaries.find((summary) => summary.id === gateVariantId)
+      : variantSummaries
+          .filter((summary) => Number.isFinite(summary.meanParetoScore))
+          .slice()
+          .sort((left, right) => left.meanParetoScore - right.meanParetoScore)[0]) ?? null;
+  if (!enabled) {
+    return {
+      enabled: false,
+      passed: true,
+      variant: selectedVariant?.id ?? gateVariantId ?? null,
+      thresholds: thresholdsValue,
+      checks: [],
+    };
+  }
+  if (!selectedVariant) {
+    return {
+      enabled: true,
+      passed: false,
+      variant: gateVariantId ?? null,
+      thresholds: thresholdsValue,
+      checks: [
+        {
+          metric: "gateVariant",
+          actual: null,
+          operator: "exists:",
+          expected: gateVariantId ?? "best-mean-pareto",
+          passed: false,
+        },
+      ],
+    };
+  }
+  const selectedRows = rankedResults.filter((result) => result.id === selectedVariant.id && isScorable(result));
+  const checks = [];
+  addMaxCheck(checks, "meanParetoScore", selectedVariant.meanParetoScore, thresholdsValue.maxMeanParetoScore);
+  addMaxCheck(checks, "meanLumaNorm", selectedVariant.meanLumaNorm, thresholdsValue.maxMeanLumaNorm);
+  addMaxCheck(checks, "meanChromaNorm", selectedVariant.meanChromaNorm, thresholdsValue.maxMeanChromaNorm);
+  addMaxCheck(
+    checks,
+    "meanTileReferenceNorm",
+    selectedVariant.meanTileReferenceNorm,
+    thresholdsValue.maxMeanTileReferenceNorm,
+  );
+  for (const result of selectedRows) {
+    addMaxCheck(
+      checks,
+      `${result.asset}:paretoScore`,
+      result.paretoScore,
+      thresholdsValue.maxSceneParetoScore,
+    );
+    addMaxCheck(checks, `${result.asset}:lumaNorm`, result.lumaNorm, thresholdsValue.maxSceneLumaNorm);
+    addMaxCheck(checks, `${result.asset}:chromaNorm`, result.chromaNorm, thresholdsValue.maxSceneChromaNorm);
+    addMaxCheck(
+      checks,
+      `${result.asset}:tileReferenceNorm`,
+      result.tileReferenceNorm,
+      thresholdsValue.maxSceneTileReferenceNorm,
+    );
+  }
+  return {
+    enabled: true,
+    passed: checks.length > 0 && checks.every((check) => check.passed),
+    variant: selectedVariant.id,
+    thresholds: thresholdsValue,
+    checks,
+  };
+}
+
+function addMaxCheck(checks, metric, actual, expected) {
+  if (!Number.isFinite(expected)) return;
+  checks.push({
+    metric,
+    actual: Number.isFinite(actual) ? actual : null,
+    operator: "<=",
+    expected,
+    passed: Number.isFinite(actual) && actual <= expected + 0.000001,
+  });
+}
+
+function buildSummary({
+  suitePassed,
+  assets,
+  variants,
+  baseUrl,
+  rankedResults,
+  sceneSummaries,
+  variantSummaries,
+  bestPareto,
+  bestCoverage,
+  bestMeanPareto,
+  gate,
+}) {
+  return {
+    mode: "webgpu-coverage-pareto-sweep-v1",
+    generatedAt: new Date().toISOString(),
+    passed: suitePassed && (!gate.enabled || gate.passed),
+    suitePassed,
+    url: baseUrl,
+    assets,
+    variants,
+    scoreWeights: SCORE_WEIGHTS,
+    bestMeanParetoVariant: bestMeanPareto
+      ? { id: bestMeanPareto.id, meanParetoScore: bestMeanPareto.meanParetoScore }
+      : null,
+    bestPareto: bestPareto
+      ? { asset: bestPareto.asset, id: bestPareto.id, paretoScore: bestPareto.paretoScore }
+      : null,
+    bestCoverage: bestCoverage
+      ? { asset: bestCoverage.asset, id: bestCoverage.id, coverageRatio: bestCoverage.coverageRatio }
+      : null,
+    gate,
+    sceneSummaries: sceneSummaries.map(summarizeSceneForReport),
+    variantSummaries,
+    results: rankedResults,
+  };
+}
+
+function summarizeSceneForReport(summary) {
+  return {
+    asset: summary.asset,
+    resultCount: summary.resultCount,
+    complete: summary.complete,
+    bestPareto: summarizeResult(summary.bestPareto, ["id", "paretoScore"]),
+    bestCoverage: summarizeResult(summary.bestCoverage, ["id", "coverageRatio"]),
+    bestLuma: summarizeResult(summary.bestLuma, ["id", "lumaDelta"]),
+    bestChroma: summarizeResult(summary.bestChroma, ["id", "chromaDelta"]),
+    lowestCost: summarizeResult(summary.lowestCost, ["id", "tileReferenceCount"]),
+  };
+}
+
+function summarizeResult(result, keys) {
+  if (!result) return null;
+  return Object.fromEntries(keys.map((key) => [key, result[key]]));
+}
+
+function writeReportFiles(directory, summary) {
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(`${directory}/summary.json`, `${JSON.stringify(summary, null, 2)}\n`, "utf-8");
+  writeFileSync(`${directory}/summary.md`, renderMarkdown(summary), "utf-8");
+}
+
+function renderMarkdown(summary) {
+  const lines = [];
+  lines.push("# WebGPU Coverage Pareto Sweep");
+  lines.push("");
+  lines.push(`- Status: ${summary.passed ? "passed" : "failed"}`);
+  lines.push(`- Suite: ${summary.suitePassed ? "passed" : "partial"}`);
+  lines.push(`- URL: ${summary.url}`);
+  lines.push(`- Assets: ${summary.assets.join(", ")}`);
+  lines.push(`- Weights: coverage=${SCORE_WEIGHTS.coverage}, luma=${SCORE_WEIGHTS.luma}, chroma=${SCORE_WEIGHTS.chroma}, tileReferences=${SCORE_WEIGHTS.tileReferences}`);
+  lines.push(`- Best mean Pareto variant: ${summary.bestMeanParetoVariant?.id ?? "none"} (${summary.bestMeanParetoVariant?.meanParetoScore ?? "unknown"})`);
+  lines.push("");
+  lines.push("## Variant Summary");
+  lines.push("");
+  lines.push("| Variant | Scenes | Mean score | Coverage norm | Luma norm | Chroma norm | Tile refs norm |");
+  lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+  for (const row of summary.variantSummaries) {
+    lines.push(
+      `| ${escapeMarkdown(row.id)} | ${row.sceneCount} | ${formatReportValue(row.meanParetoScore)} | ${formatReportValue(row.meanCoverageNorm)} | ${formatReportValue(row.meanLumaNorm)} | ${formatReportValue(row.meanChromaNorm)} | ${formatReportValue(row.meanTileReferenceNorm)} |`,
+    );
+  }
+  lines.push("");
+  lines.push("## Scene Summary");
+  lines.push("");
+  lines.push("| Asset | Complete | Best Pareto | Best coverage | Best luma | Best chroma | Lowest cost |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- |");
+  for (const row of summary.sceneSummaries) {
+    lines.push(
+      `| ${escapeMarkdown(row.asset)} | ${row.complete ? "yes" : "no"} | ${formatWinner(row.bestPareto, "paretoScore")} | ${formatWinner(row.bestCoverage, "coverageRatio")} | ${formatWinner(row.bestLuma, "lumaDelta")} | ${formatWinner(row.bestChroma, "chromaDelta")} | ${formatWinner(row.lowestCost, "tileReferenceCount")} |`,
+    );
+  }
+  lines.push("");
+  lines.push("## Threshold Gate");
+  lines.push("");
+  if (!summary.gate.enabled) {
+    lines.push("Gate disabled.");
+  } else {
+    lines.push(`Gate variant: ${summary.gate.variant ?? "none"}`);
+    lines.push(`Gate status: ${summary.gate.passed ? "passed" : "failed"}`);
+    lines.push("");
+    lines.push("| Check | Actual | Expected | Passed |");
+    lines.push("| --- | ---: | ---: | --- |");
+    for (const check of summary.gate.checks) {
+      lines.push(
+        `| ${escapeMarkdown(check.metric)} | ${formatReportValue(check.actual)} | ${check.operator}${formatReportValue(check.expected)} | ${check.passed ? "yes" : "no"} |`,
+      );
+    }
+  }
+  lines.push("");
+  lines.push("## Rows");
+  lines.push("");
+  lines.push("| Asset | Variant | Passed | Score | Coverage ratio | Luma delta | Chroma delta | Tile refs |");
+  lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |");
+  for (const row of summary.results) {
+    lines.push(
+      `| ${escapeMarkdown(row.asset)} | ${escapeMarkdown(row.id)} | ${row.passed ? "yes" : "no"} | ${formatReportValue(row.paretoScore)} | ${formatReportValue(row.coverageRatio)} | ${formatReportValue(row.lumaDelta)} | ${formatReportValue(row.chromaDelta)} | ${formatReportValue(row.tileReferenceCount)} |`,
+    );
+  }
+  lines.push("");
+  return `${lines.join("\n")}\n`;
+}
+
+function formatWinner(value, metric) {
+  if (!value) return "none";
+  return `${value.id}:${formatReportValue(value[metric])}`;
+}
+
+function formatReportValue(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "unknown";
+  return String(value);
+}
+
+function escapeMarkdown(value) {
+  return String(value ?? "").replaceAll("|", "\\|");
+}
+
 function meanMetric(results, key) {
   const values = results.map((result) => result[key]).filter(Number.isFinite);
   if (values.length === 0) return null;
@@ -405,6 +704,18 @@ function optionalPositiveInteger(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
   return Math.round(parsed);
+}
+
+function optionalFiniteNumber(value) {
+  if (value === undefined || value === null || value === true || value === false) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === true || value === false) return undefined;
+  const text = String(value).trim();
+  return text ? text : undefined;
 }
 
 function flagEnabled(value) {
