@@ -19,6 +19,7 @@ import PointCloudViewport from "./PointCloudViewport.jsx";
 import { rgbToCss } from "./palette.js";
 import { createSampleScene } from "./sampleScene.js";
 import SplatViewport from "./SplatViewport.jsx";
+import WebGpuTileViewport from "./WebGpuTileViewport.jsx";
 import {
   detectWebGpuCapability,
   editRendererContract,
@@ -117,6 +118,7 @@ export default function App() {
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
+  const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
   const activeRendererText = useSplatRenderer ? "真实 Splat" : editRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
@@ -473,6 +475,17 @@ export default function App() {
               showAxes={showAxes}
               pointCount={scene.points.length}
               rendererLabel={activeRendererText}
+            />
+          ) : useWebGpuTileRenderer ? (
+            <WebGpuTileViewport
+              points={scene.points}
+              visibleIds={visibleIds}
+              removedIds={removedIds}
+              isolatedId={isolatedId}
+              tileSmoke={webGpuTileSmoke}
+              rendererContract={editRenderer}
+              onSelectObject={selectObject}
+              renderModeLabel={renderModeText}
             />
           ) : (
             <PointCloudViewport

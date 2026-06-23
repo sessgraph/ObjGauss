@@ -7,6 +7,7 @@ import {
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
   WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
 } from "../src/webgpuTileSmoke.js";
+import { editRendererContract } from "../src/webgpuCapability.js";
 
 const scene = createSampleScene();
 const allObjectIds = new Set(scene.points.map((point) => point.objectId));
@@ -83,6 +84,23 @@ assert.equal(roomy.tileOverflowTileCount, 0);
 assert.equal(roomy.tileOverflowRatio, 0);
 assert.equal(roomy.tileOverflowMaxExcess, 0);
 assert.equal(roomy.tileEntryStoredCount, roomy.tileReferenceCount);
+const readyCapability = {
+  status: "available",
+  reason: "webgpu-device-ready",
+  label: "可用",
+};
+const roomyContract = editRendererContract(readyCapability, roomy);
+assert.equal(roomyContract.rendererId, "webgpu-tile");
+assert.equal(roomyContract.objectFilter, "gpu-object-state-buffer");
+assert.equal(roomyContract.targetGate, "pass");
+assert.equal(roomyContract.targetGateReason, "webgpu-tile-first-frame-ready");
+assert.equal(roomyContract.fallbackReason, "");
+
+const overflowContract = editRendererContract(readyCapability, base);
+assert.equal(overflowContract.rendererId, "gaussian-oit");
+assert.equal(overflowContract.targetGate, "blocked");
+assert.equal(overflowContract.targetGateBlocker, "tile-overflow");
+assert.equal(overflowContract.fallbackReason, "webgpu-tile-overflow");
 
 const isolated = buildWebGpuTileSmoke({
   points: scene.points,

@@ -1,5 +1,6 @@
 export const WEBGPU_TILE_RENDERER_ID = "webgpu-tile";
 export const WEBGPU_TILE_RENDERER_LABEL = "WebGPU Tile 编辑";
+export const WEBGPU_TILE_OBJECT_FILTER = "gpu-object-state-buffer";
 export const GAUSSIAN_OIT_RENDERER_ID = "gaussian-oit";
 export const GAUSSIAN_OIT_RENDERER_LABEL = "Gaussian OIT 编辑";
 export const GAUSSIAN_OIT_OBJECT_FILTER = "gpu-object-state-texture";
@@ -101,13 +102,14 @@ export async function detectWebGpuCapability() {
 export function editRendererContract(webGpuCapability, tileSmoke) {
   const smoke = tileSmoke ?? EMPTY_TILE_SMOKE;
   const targetGate = webGpuTileTargetGate(webGpuCapability, smoke);
+  const useWebGpuTile = targetGate.gate === "pass";
   return {
-    rendererId: GAUSSIAN_OIT_RENDERER_ID,
-    rendererLabel: GAUSSIAN_OIT_RENDERER_LABEL,
+    rendererId: useWebGpuTile ? WEBGPU_TILE_RENDERER_ID : GAUSSIAN_OIT_RENDERER_ID,
+    rendererLabel: useWebGpuTile ? WEBGPU_TILE_RENDERER_LABEL : GAUSSIAN_OIT_RENDERER_LABEL,
     targetRendererId: WEBGPU_TILE_RENDERER_ID,
     targetRendererLabel: WEBGPU_TILE_RENDERER_LABEL,
-    objectFilter: GAUSSIAN_OIT_OBJECT_FILTER,
-    targetObjectFilter: "gpu-object-state-buffer",
+    objectFilter: useWebGpuTile ? WEBGPU_TILE_OBJECT_FILTER : GAUSSIAN_OIT_OBJECT_FILTER,
+    targetObjectFilter: WEBGPU_TILE_OBJECT_FILTER,
     webGpuStatus: webGpuCapability.status,
     webGpuLabel: webGpuCapability.label,
     fallbackReason: fallbackReason(webGpuCapability, smoke),
@@ -154,6 +156,9 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
 
 function fallbackReason(webGpuCapability, tileSmoke) {
   if (webGpuCapability.status === "available") {
+    if (tileSmoke?.tileCapacityGate === "pass") {
+      return "";
+    }
     if (tileSmoke?.tileCapacityGate === "blocked") {
       return "webgpu-tile-overflow";
     }
@@ -178,8 +183,8 @@ function webGpuTileTargetGate(webGpuCapability, tileSmoke) {
     };
   }
   return {
-    gate: "blocked",
-    reason: "webgpu-tile-renderer-not-implemented",
-    blocker: "renderer-not-implemented",
+    gate: "pass",
+    reason: "webgpu-tile-first-frame-ready",
+    blocker: "",
   };
 }

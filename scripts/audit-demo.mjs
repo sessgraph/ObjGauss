@@ -50,6 +50,7 @@ try {
         `splatPixels=${result.splatPixels} splatRendererId=${JSON.stringify(result.splatRendererId)} ` +
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
+        `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
@@ -124,8 +125,8 @@ async function runAudit(url, assetsToCheck) {
 
       await page.getByLabel("渲染模式").selectOption("clustered");
       const editRenderer = await labeledValue(page, "渲染器");
-      if (editRenderer !== "Gaussian OIT 编辑") {
-        throw new Error(`${asset.id} did not enter Gaussian OIT edit renderer: ${editRenderer}`);
+      if (!["Gaussian OIT 编辑", "WebGPU Tile 编辑"].includes(editRenderer)) {
+        throw new Error(`${asset.id} did not enter a known edit renderer: ${editRenderer}`);
       }
       await page.waitForFunction(() => {
         const viewport = document.querySelector(".viewport");
@@ -133,8 +134,8 @@ async function runAudit(url, assetsToCheck) {
       }, undefined, { timeout: 15000 });
       const viewport = page.locator(".viewport").first();
       const editRendererId = await viewport.getAttribute("data-renderer");
-      if (editRendererId !== "gaussian-oit") {
-        throw new Error(`${asset.id} did not expose Gaussian OIT fallback renderer id: ${editRendererId}`);
+      if (!["gaussian-oit", "webgpu-tile"].includes(editRendererId ?? "")) {
+        throw new Error(`${asset.id} did not expose a known edit renderer id: ${editRendererId}`);
       }
       const rendererTarget = await viewport.getAttribute("data-renderer-target");
       if (rendererTarget !== "webgpu-tile") {
@@ -148,12 +149,22 @@ async function runAudit(url, assetsToCheck) {
         throw new Error(`${asset.id} WebGPU capability status was not resolved: ${webgpuStatus}`);
       }
       const fallbackReason = await viewport.getAttribute("data-renderer-fallback-reason");
-      if (!fallbackReason) {
+      if (editRendererId !== "webgpu-tile" && !fallbackReason) {
         throw new Error(`${asset.id} did not expose a renderer fallback reason`);
       }
-      if (targetGate !== "blocked" || !targetGateReason || !targetGateBlocker) {
+      if (!["blocked", "pass"].includes(targetGate ?? "") || !targetGateReason) {
         throw new Error(
           `${asset.id} did not expose hardened WebGPU target gate: gate=${targetGate} reason=${targetGateReason} blocker=${targetGateBlocker}`,
+        );
+      }
+      if (editRendererId === "webgpu-tile" && (targetGate !== "pass" || targetGateBlocker)) {
+        throw new Error(
+          `${asset.id} entered WebGPU renderer without a pass gate: gate=${targetGate} blocker=${targetGateBlocker}`,
+        );
+      }
+      if (editRendererId !== "webgpu-tile" && (targetGate !== "blocked" || !targetGateBlocker)) {
+        throw new Error(
+          `${asset.id} fallback renderer did not expose blocked gate: gate=${targetGate} blocker=${targetGateBlocker}`,
         );
       }
       if (webgpuStatus !== "available" && targetGateBlocker !== "webgpu-capability") {
@@ -262,8 +273,10 @@ async function runAudit(url, assetsToCheck) {
         );
       }
       const objectFilter = await viewport.getAttribute("data-object-filter");
-      if (objectFilter !== "gpu-object-state-texture") {
-        throw new Error(`${asset.id} did not expose GPU object-state filtering: ${objectFilter}`);
+      const expectedObjectFilter =
+        editRendererId === "webgpu-tile" ? "gpu-object-state-buffer" : "gpu-object-state-texture";
+      if (objectFilter !== expectedObjectFilter) {
+        throw new Error(`${asset.id} did not expose expected object filtering: ${objectFilter}`);
       }
       const objectFilterTarget = await viewport.getAttribute("data-webgpu-object-filter-target");
       if (objectFilterTarget !== "gpu-object-state-buffer") {
@@ -294,6 +307,20 @@ async function runAudit(url, assetsToCheck) {
       const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
+      }
+      const webGpuFirstFrameStatus = await viewport.getAttribute("data-webgpu-first-frame-status");
+      const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
+      const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
+      if (editRendererId === "webgpu-tile") {
+        if (
+          webGpuFirstFrameStatus !== "rendered" ||
+          webGpuFirstFramePixels <= 0 ||
+          !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "")
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU first frame did not render: status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum}`,
+          );
+        }
       }
       const canvasSelectedObject = await selectObjectFromCanvas(page, asset.id);
       await page.getByRole("button", { name: "只看所选" }).click();
@@ -353,6 +380,9 @@ async function runAudit(url, assetsToCheck) {
         editPixels,
         editRenderer,
         editRendererId,
+        webGpuFirstFrameStatus,
+        webGpuFirstFramePixels,
+        webGpuFirstFrameChecksum,
         rendererTarget,
         targetGate,
         targetGateReason,
@@ -483,6 +513,12 @@ async function expectNoFrameworkOverlay(page) {
 }
 
 async function nonBackgroundPixels(page) {
+  const webGpuPixels = await page.locator(".viewport").first().evaluate((viewport) => {
+    if (viewport?.getAttribute("data-renderer") !== "webgpu-tile") return 0;
+    return Number(viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
+  }).catch(() => 0);
+  if (webGpuPixels > 0) return webGpuPixels;
+
   return page.locator("canvas").evaluateAll((canvases) => {
     let maxCount = -1;
     for (const canvas of canvases) {
