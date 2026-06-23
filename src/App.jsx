@@ -65,7 +65,9 @@ const BENCHMARK_SCENES = [
     heldout: 0.224084,
   },
 ];
-const WEBGPU_RUNTIME_VIEWPORT_SIZE = 128;
+const WEBGPU_RUNTIME_VIEWPORT_SIZE = 256;
+const WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE = 64;
+const WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE = 512;
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
@@ -127,10 +129,11 @@ export default function App() {
   const waitForEditRenderer = !useSplatRenderer && webGpuCapability.status === "pending";
   const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
   const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
+  const requestedWebGpuRuntimeViewportSize = useMemo(readWebGpuRuntimeViewportSize, []);
   const webGpuRuntimeViewportSize =
     webGpuRuntimeProbe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT
       ? WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE
-      : WEBGPU_RUNTIME_VIEWPORT_SIZE;
+      : requestedWebGpuRuntimeViewportSize;
   const webGpuRuntimeTileSmoke = useMemo(() => {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
     return buildWebGpuTileSmoke({
@@ -807,6 +810,18 @@ function readWebGpuRuntimeProbe() {
   if (typeof window === "undefined") return "full";
   return normalizeWebGpuRuntimeProbe(
     new URLSearchParams(window.location.search).get("webgpu-probe"),
+  );
+}
+
+function readWebGpuRuntimeViewportSize() {
+  if (typeof window === "undefined") return WEBGPU_RUNTIME_VIEWPORT_SIZE;
+  const value = Number(
+    new URLSearchParams(window.location.search).get("webgpu-viewport-size"),
+  );
+  if (!Number.isFinite(value) || value <= 0) return WEBGPU_RUNTIME_VIEWPORT_SIZE;
+  return Math.min(
+    WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE,
+    Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, Math.round(value)),
   );
 }
 

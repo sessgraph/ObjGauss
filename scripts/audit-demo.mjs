@@ -43,6 +43,7 @@ const KNOWN_ASSETS = [
     fileName: "nerf_lego_trained_objects.ply",
   },
 ];
+const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 256;
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -57,6 +58,11 @@ const auditOptions = {
   slowMo: Number(args.slowMo ?? args["slow-mo"] ?? 0),
   webGpuProbe: normalizeWebGpuRuntimeProbe(
     args.webgpuProbe ?? args["webgpu-probe"] ?? process.env.OBJGAUSS_WEBGPU_PROBE,
+  ),
+  webGpuViewportSize: optionalPositiveInteger(
+    args.webgpuViewportSize ??
+      args["webgpu-viewport-size"] ??
+      process.env.OBJGAUSS_WEBGPU_VIEWPORT_SIZE,
   ),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
@@ -79,6 +85,7 @@ try {
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
+        `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
         `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
@@ -119,7 +126,8 @@ try {
   console.log(
     `browser_audit=passed assets=${results.length} url=${baseUrl} ` +
       `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
-      `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
+      `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
+      `allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
   );
 } finally {
   if (server) {
@@ -130,7 +138,7 @@ try {
 async function runAudit(url, assetsToCheck, options) {
   const browser = await chromium.launch(launchOptions(options));
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
-  const auditUrl = urlWithWebGpuProbe(url, options.webGpuProbe);
+  const auditUrl = urlWithWebGpuOptions(url, options);
   const consoleIssues = [];
   page.on("console", (message) => {
     if (["error", "warning"].includes(message.type())) {
@@ -292,6 +300,9 @@ async function runAudit(url, assetsToCheck, options) {
       if (tileSmokeLayout !== "webgpu-tile-smoke-v1") {
         throw new Error(`${asset.id} did not expose WebGPU tile smoke layout: ${tileSmokeLayout}`);
       }
+      const webGpuViewportWidth = numericValue(await viewport.getAttribute("data-webgpu-viewport-width") ?? "0");
+      const webGpuViewportHeight = numericValue(await viewport.getAttribute("data-webgpu-viewport-height") ?? "0");
+      const webGpuPixelCount = numericValue(await viewport.getAttribute("data-webgpu-pixel-count") ?? "0");
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
@@ -321,6 +332,31 @@ async function runAudit(url, assetsToCheck, options) {
       const resolveChecksum = await viewport.getAttribute("data-webgpu-resolve-checksum");
       if (tileSize !== 16) {
         throw new Error(`${asset.id} unexpected WebGPU tile size: ${tileSize}`);
+      }
+      if (editRendererId === "webgpu-tile") {
+        if (options.webGpuViewportSize) {
+          if (
+            webGpuViewportWidth !== options.webGpuViewportSize ||
+            webGpuViewportHeight !== options.webGpuViewportSize
+          ) {
+            throw new Error(
+              `${asset.id} WebGPU viewport did not honor requested size: requested=${options.webGpuViewportSize} actual=${webGpuViewportWidth}x${webGpuViewportHeight}`,
+            );
+          }
+        } else if (
+          options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL &&
+          (webGpuViewportWidth < DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE ||
+            webGpuViewportHeight < DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE)
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU full runtime viewport is below visual audit floor: ${webGpuViewportWidth}x${webGpuViewportHeight}`,
+          );
+        }
+        if (webGpuPixelCount !== webGpuViewportWidth * webGpuViewportHeight) {
+          throw new Error(
+            `${asset.id} WebGPU pixel count does not match viewport: ${webGpuPixelCount} vs ${webGpuViewportWidth}x${webGpuViewportHeight}`,
+          );
+        }
       }
       if (packedGaussians <= 0 || binnedGaussians <= 0 || visibleGaussians <= 0) {
         throw new Error(
@@ -519,6 +555,9 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuFirstFrameChecksum,
             webGpuResolveSource,
             webGpuRuntimeProbe,
+            webGpuViewportWidth,
+            webGpuViewportHeight,
+            webGpuPixelCount,
             webGpuDeviceLostStatus,
             webGpuDeviceLostReason,
             webGpuDeviceLostMessage,
@@ -694,6 +733,9 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuFirstFrameChecksum,
         webGpuResolveSource,
         webGpuRuntimeProbe,
+        webGpuViewportWidth,
+        webGpuViewportHeight,
+        webGpuPixelCount,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,
@@ -1022,10 +1064,17 @@ function launchOptions(options = {}) {
   return launch;
 }
 
-function urlWithWebGpuProbe(url, probe) {
-  if (probe === WEBGPU_RUNTIME_PROBE_FULL) return url;
+function urlWithWebGpuOptions(url, options) {
+  if (options.webGpuProbe === WEBGPU_RUNTIME_PROBE_FULL && !options.webGpuViewportSize) {
+    return url;
+  }
   const parsed = new URL(url);
-  parsed.searchParams.set("webgpu-probe", probe);
+  if (options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL) {
+    parsed.searchParams.set("webgpu-probe", options.webGpuProbe);
+  }
+  if (options.webGpuViewportSize) {
+    parsed.searchParams.set("webgpu-viewport-size", String(options.webGpuViewportSize));
+  }
   return parsed.toString();
 }
 
@@ -1059,6 +1108,13 @@ function optionalString(value) {
   if (value === undefined || value === null || value === true || value === false) return undefined;
   const text = String(value).trim();
   return text ? text : undefined;
+}
+
+function optionalPositiveInteger(value) {
+  if (value === undefined || value === null || value === true || value === false) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return Math.round(parsed);
 }
 
 function startDevServer(port) {

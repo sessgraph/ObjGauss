@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005S`: 提升 WebGPU tile runtime 的显示分辨率 / 视觉质量审计，从低分辨率 runtime probe 推进到更接近用户可用的编辑视图。
+  - `RENDER-005T`: 将 WebGPU Tile 编辑从低分辨率正交近似推进到更接近 Spark 真实查看的相机匹配 / 视觉一致性路径，重点处理用户可见的“颗粒感、不像真实高斯”问题。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -26,17 +26,31 @@
 
 ## In Progress
 
-### RENDER-005S: WebGPU runtime visual fidelity audit
-
-- 状态: ready
-- 类型: 标准 PR / 前端渲染质量
-- 目标: 在 desktop WebGPU runtime 已通过大场景后，提升和审计 WebGPU tile 编辑视图的显示分辨率、非空像素覆盖和用户可感知视觉质量。
-- 待验证:
-  - 对比 `Gaussian OIT 编辑` 与 `WebGPU Tile 编辑` 的 same-scene screenshot / pixel coverage。
-  - 评估当前 128px runtime probe 输出是否应提升为 adaptive viewport scale。
-  - 保持 storage gate / queue / device telemetry 可解释，避免把视觉质量问题误判为 runtime failure。
+当前无进行中 PR。
 
 ## Done
+
+### RENDER-005S: WebGPU runtime visual fidelity audit
+
+- 状态: done / viewport-resolution-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 desktop WebGPU runtime 已通过大场景后，提升和审计 WebGPU tile 编辑视图的显示分辨率、非空像素覆盖和用户可感知视觉质量。
+- 已实施:
+  - WebGPU full runtime 的默认内部 pixel output 从 `128x128` 提升到 `256x256`，`tiny-pixel-output` 诊断 probe 继续保持 `32x32`。
+  - 新增 `?webgpu-viewport-size=<n>`、`OBJGAUSS_WEBGPU_VIEWPORT_SIZE` 和 `--webgpu-viewport-size` audit 参数，用于对比不同内部输出分辨率。
+  - `WebGpuTileViewport` 暴露 `data-webgpu-viewport-width`、`data-webgpu-viewport-height` 和 `data-webgpu-pixel-count`，`audit-demo` / `audit-webgpu-desktop` 会输出并检查 full runtime 默认不低于 256。
+- 结论:
+  - 256px full runtime 在 NeRF Lego proxy 和 Plush semantic 大场景上通过 headed desktop Chrome/WebGPU audit，且对象选择、隔离、删除预览仍更新 object-state buffer。
+  - 当前“原始颜色（编辑预览）”仍不是 Spark 真实 splat 的对象级重渲染；剩余视觉差距主要来自正交简化投影、近似 covariance / blending 和未匹配真实查看相机，而不是 Object Field 颜色本身。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5241 --probes full`: passed；`webgpuViewport=256x256:65536`、pixel workgroups=1024、firstFrame=65536。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5242 --probes full`: passed；281498 Gaussians、`webgpuViewport=256x256:65536`、tileReferences=1458084、maxTileOccupancy=21717、visibleAfterIsolate=98770、visibleAfterDelete=182728。
 
 ### RENDER-005R: Large-scene desktop WebGPU runtime audit
 

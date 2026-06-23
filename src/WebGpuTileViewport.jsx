@@ -436,6 +436,9 @@ export default function WebGpuTileViewport({
       data-object-filter={rendererContract?.objectFilter ?? "gpu-object-state-buffer"}
       data-webgpu-object-filter-target={rendererContract?.targetObjectFilter ?? "gpu-object-state-buffer"}
       data-webgpu-pack-layout={rendererContract?.tileSmokeLayout ?? ""}
+      data-webgpu-viewport-width={rendererContract?.viewportWidth ?? tileSmoke?.viewportWidth ?? 0}
+      data-webgpu-viewport-height={rendererContract?.viewportHeight ?? tileSmoke?.viewportHeight ?? 0}
+      data-webgpu-pixel-count={tileSmoke?.pixelCount ?? 0}
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}
@@ -1030,7 +1033,7 @@ function textureDisplayFrameTelemetry(probe, tileSmoke) {
   }
   return {
     checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
-    pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
+    pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
     source: WEBGPU_TILE_RESOLVE_SOURCE,
   };
 }

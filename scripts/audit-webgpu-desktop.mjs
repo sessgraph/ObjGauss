@@ -23,6 +23,9 @@ const allowFailures = flagEnabled(args.allowFailures ?? args["allow-failures"]);
 const browserChannel = optionalString(args.browserChannel ?? args["browser-channel"]);
 const executablePath = optionalString(args.executablePath ?? args["executable-path"]);
 const slowMo = optionalString(args.slowMo ?? args["slow-mo"]);
+const webGpuViewportSize = optionalPositiveInteger(
+  args.webGpuViewportSize ?? args["webgpu-viewport-size"],
+);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 let server = null;
 
@@ -47,6 +50,7 @@ try {
       browserChannel,
       executablePath,
       slowMo,
+      webGpuViewportSize,
     });
     results.push(result);
     process.stdout.write(result.output);
@@ -64,6 +68,7 @@ try {
     `webgpu_desktop_audit=${failed.length === 0 ? "passed" : "failed"} ` +
       `asset=${JSON.stringify(asset)} url=${baseUrl} headed=${headed} ` +
       `webGpuFlags=${JSON.stringify(webGpuFlags)} probes=${JSON.stringify(probes)} ` +
+      `webGpuViewportSize=${webGpuViewportSize ?? "default"} ` +
       `classification=${JSON.stringify(classification)}`,
   );
   if (failed.length > 0 && !allowFailures) {
@@ -83,6 +88,7 @@ async function runProbe({
   browserChannel,
   executablePath,
   slowMo,
+  webGpuViewportSize,
 }) {
   const commandArgs = [
     "scripts/audit-demo.mjs",
@@ -103,6 +109,9 @@ async function runProbe({
   if (browserChannel) commandArgs.push("--browser-channel", browserChannel);
   if (executablePath) commandArgs.push("--executable-path", executablePath);
   if (slowMo) commandArgs.push("--slow-mo", slowMo);
+  if (webGpuViewportSize) {
+    commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
+  }
 
   const result = await runProcess(process.execPath, commandArgs);
   return {
@@ -222,4 +231,11 @@ function optionalString(value) {
   if (value === undefined || value === null || value === true || value === false) return undefined;
   const text = String(value).trim();
   return text ? text : undefined;
+}
+
+function optionalPositiveInteger(value) {
+  if (value === undefined || value === null || value === true || value === false) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return Math.round(parsed);
 }
