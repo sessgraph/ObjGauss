@@ -10,6 +10,47 @@ Nerfstudio Splatfacto Gaussian PLY, export it, attach ObjGauss Object Field
 slots with SAM masks, and feed the SEMANTIC benchmark suite. It is not a
 quality reconstruction target and it is not the final public Lego sample.
 
+## TRAIN-003B Resource-Safe Public Sample Candidate
+
+TRAIN-003B used the same handoff, but ran a resource-safe 500 iteration Lego
+Splatfacto candidate instead of the 100 iteration smoke:
+
+```text
+iterations=500
+vis=tensorboard
+cache_images=cpu
+camera_res_scale_factor=0.5
+MAX_JOBS=2
+```
+
+This keeps the run usable while reserving most of the GPU for the desktop. The
+validated local output is:
+
+```text
+outputs/training/nerf-lego-splatfacto-long/lego-splatfacto-safe/splatfacto/safe-500-cpu-cache-v2/config.yml
+outputs/training/nerf-lego-splatfacto-long/lego-splatfacto-safe/splatfacto/safe-500-cpu-cache-v2/nerfstudio_models/step-000000499.ckpt
+outputs/training/nerf-lego-splatfacto-long/export-safe-500-cpu-cache-v2/splat.ply
+outputs/assets/gaussians/nerf-lego-trained-safe-500-cpu-cache-v2-warmstart/training-output-manifest.json
+public/samples/nerf_lego_trained.splat
+public/samples/nerf_lego_trained_objects.ply
+```
+
+The public files are local ignored artifacts. Do not commit them unless the
+license and size policy are explicitly changed.
+
+Current TRAIN-003B validation:
+
+```text
+exported_gaussians=47168
+slots=8
+supervised_gaussians=7676
+projection_loss=3.047123 -> 0.321066
+browser_asset=nerf-lego-trained-output-local passed
+```
+
+This completes the "registered frontend training-output sample" handoff, but it
+is still a safe candidate, not the final high-quality long training result.
+
 ## One Command
 
 Preview the command sequence without running training:
@@ -143,6 +184,21 @@ mismatch, or `-lcudart` link errors, first re-run the dry-run command and verify
 that the command includes the CUDA 13.0 packages above. If the package set is
 present but linking still fails, check the local CUDA runtime library path before
 changing ObjGauss code.
+
+On this machine, `uv --with nvidia-cuda-nvcc` exposed the CUDA 13.0 toolkit but
+did not provide an unversioned `libcudart.so`. A temporary wrapper directory in
+`/tmp/objgauss-cuda13` was used for the TRAIN-003B run:
+
+```text
+CUDA_HOME=/tmp/objgauss-cuda13
+PATH=/tmp/objgauss-cuda13/bin:$PATH
+LD_LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LD_LIBRARY_PATH
+LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LIBRARY_PATH
+```
+
+The wrapper only adds symlinks to the uv CUDA wheel files, including
+`libcudart.so -> libcudart.so.13`; it should not modify the system CUDA install
+or the uv cache.
 
 ## Verification
 

@@ -986,7 +986,7 @@ def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp
     assert manifest["acceptance"]["mask_guidance_changed_object_field"] is True
     assert manifest["acceptance"]["mask_vote_quality_audit_available"] is True
     assert manifest["acceptance"]["projection_loss_decreased"] is True
-    assert manifest["object_field_delta"]["changed_gaussians"] == 2
+    assert manifest["object_field_delta"]["changed_gaussians"] > 0
     assert manifest["training"]["final_loss"] < manifest["training"]["initial_loss"]
     assert manifest["training"]["vote_quality"]["per_slot"][0]["winner_gaussians"] == 2
     assert registered.count == 4

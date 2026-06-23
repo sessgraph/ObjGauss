@@ -15,7 +15,7 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import ObjectField, object_field_label_delta, save_object_field
+from objgauss.object_field import initialize_object_field, object_field_label_delta, save_object_field
 from objgauss.ply import append_or_replace_property, read_ply, write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 from objgauss.splat import read_splat, write_splat
@@ -81,7 +81,8 @@ def register_training_output(
     if masks is not None:
         masks = Path(masks)
         inferred_slots = slots or _slots_from_mask_manifest(masks)
-        field = ObjectField(np.zeros((cloud.count, inferred_slots), dtype=np.float32))
+        init = initialize_object_field(cloud, slots=inferred_slots)
+        field = init.field
         object_field_initial_path = output_dir / "object_field_initial.npz"
         object_field_path = output_dir / "object_field_trained.npz"
         save_object_field(object_field_initial_path, field)

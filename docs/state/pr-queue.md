@@ -10,18 +10,48 @@
 
 ## Ready
 
-### TRAIN-003B: NeRF Lego Splatfacto public training sample
+### TRAIN-003C: Higher-quality NeRF Lego Splatfacto candidate
 
 - 状态: ready-for-owner-confirmation
 - 类型: 重大变更
-- 目标: 基于 TRAIN-003A runbook 跑更长的 Splatfacto 训练，并登记为前端 `NeRF Lego 训练输出样例`。
+- 目标: 在不影响本机交互的资源窗口内，将 safe-500 candidate 推进到更高质量 NeRF Lego Splatfacto 训练结果，并形成质量验收记录。
 - 范围外: 不自研完整 3DGS trainer；不把 checkpoint、SAM checkpoint 或大体积训练输出提交进 git。
 - 验收:
-  - 选择比 100-step smoke 更有质量意义的训练配置，并记录训练耗时与输出路径。
-  - 长训练导出的 Lego `splat.ply` 可通过 `training register-output` 生成 viewer `.splat` 和 `object_id` PLY。
-  - 前端素材库卡片可加载训练输出样例并完成对象选择、隔离、删除预览。
+  - 记录训练配置、GPU 占用、耗时、输出路径和失败/恢复策略。
+  - 导出的 Lego `splat.ply` 有可比较的 Gaussian 数、opacity filter 结果和前端外观截图。
+  - 与 safe-500 candidate 比较 Object Field vote loss、emergence curve 和浏览器对象交互表现。
 
 ## Done
+
+### TRAIN-003B: NeRF Lego Splatfacto public training sample
+
+- 状态: done
+- 类型: 重大变更
+- 目标: 基于 TRAIN-003A runbook 跑一个比 100-step smoke 更有意义、但仍可在本机安全资源预算内完成的 Splatfacto 训练样例，并登记为前端 `NeRF Lego 训练输出样例`。
+- 实施:
+  - 使用 Nerfstudio Splatfacto 500 iterations、`vis=tensorboard`、CPU image cache、0.5 camera scale 和 `MAX_JOBS=2` 完成 resource-safe candidate。
+  - 使用临时 `/tmp/objgauss-cuda13` CUDA wrapper 解决 uv CUDA wheel 只提供 `libcudart.so.13`、`gsplat` JIT 链接需要 `libcudart.so` 的问题。
+  - 导出 `outputs/training/nerf-lego-splatfacto-long/export-safe-500-cpu-cache-v2/splat.ply`，47168 / 50000 Gaussian 通过 opacity filter。
+  - 修正 `training register-output` 的 mask 分支，从 Gaussian 几何 warm start Object Field，避免全零 logits 在稀疏 mask vote 下坍缩到少数对象槽。
+  - 登记 safe-500 PLY 到 `outputs/assets/gaussians/nerf-lego-trained-safe-500-cpu-cache-v2-warmstart/`，并生成本机 ignored public sample `public/samples/nerf_lego_trained.*`。
+  - 扩展 `scripts/audit-demo.mjs`，允许单独验收 `nerf-lego-trained-output-local`，并等待 WebGL canvas 出现非背景像素。
+  - 修正点云编辑视口 fog 为随点云尺度自适应，避免训练输出尺度较大时被固定 6-14 fog 完全盖成背景。
+- 范围外:
+  - 不提交 `outputs/`、`public/samples/*.ply`、`public/samples/*.splat`、checkpoint、SAM checkpoint 或训练日志。
+  - 不声称 safe-500 是最终高质量 Lego reconstruction。
+  - 不把该本机样例纳入默认 CI/public benchmark。
+- 验收:
+  - safe-500 Splatfacto candidate 导出 PLY 可被 ObjGauss 读取。
+  - `training register-output` 生成 viewer `.splat`、Object Field、mask summary 和 8-slot `object_id` PLY。
+  - 前端素材库卡片可加载训练输出样例并完成对象选择、隔离、删除预览。
+- 验证:
+  - `uv run objgauss training register-output ... --public-name nerf_lego_trained --iterations 160 --learning-rate 1.0`: `gaussians=47168`，`slots=8`，`supervised_gaussians=7676`，projection loss `3.047123 -> 0.321066`。
+  - `uv run objgauss stats public/samples/nerf_lego_trained_objects.ply`: object_id counts `9127/5528/5661/5815/6073/3923/5995/5046`。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --port 5182`: passed，splatPixels=408，editPixels=86577，visibleAfterIsolate=9127，deletedObjects=1。
+  - `npm run audit:demo -- --port 5183`: passed，默认 3 个闭环样例仍可加载和交互。
+  - `uv run --extra dev pytest`: 32 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `<pending>`.
 
 ### TRAIN-003A: Splatfacto smoke runbook and script
 

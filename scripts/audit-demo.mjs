@@ -22,11 +22,19 @@ const DEFAULT_ASSETS = [
     fileName: "lego_alpha_v1_objects.ply",
   },
 ];
+const KNOWN_ASSETS = [
+  ...DEFAULT_ASSETS,
+  {
+    id: "nerf-lego-trained-output-local",
+    name: "NeRF Lego 训练输出样例",
+    fileName: "nerf_lego_trained_objects.ply",
+  },
+];
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
-const assets = args.asset ? DEFAULT_ASSETS.filter((asset) => asset.id === args.asset) : DEFAULT_ASSETS;
+const assets = args.asset ? KNOWN_ASSETS.filter((asset) => asset.id === args.asset) : DEFAULT_ASSETS;
 
 if (assets.length === 0) {
   throw new Error(`unknown asset id: ${args.asset}`);
@@ -80,14 +88,13 @@ async function runAudit(url, assetsToCheck) {
         { timeout: 15000 },
       );
       await page.waitForTimeout(1800);
-      const splatPixels = await nonBackgroundPixels(page);
+      const splatPixels = await waitForNonBackgroundPixels(page);
       if (splatPixels <= 0) {
         throw new Error(`${asset.id} splat canvas appears blank: ${splatPixels}`);
       }
 
       await page.getByLabel("渲染模式").selectOption("clustered");
-      await page.waitForTimeout(700);
-      const editPixels = await nonBackgroundPixels(page);
+      const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
       }
@@ -190,21 +197,38 @@ async function expectNoFrameworkOverlay(page) {
 }
 
 async function nonBackgroundPixels(page) {
-  return page.locator("canvas").first().evaluate((canvas) => {
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-    if (!gl) return -1;
-    const width = canvas.width;
-    const height = canvas.height;
-    const pixels = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    let count = 0;
-    for (let index = 0; index < pixels.length; index += 4) {
-      if (pixels[index] !== 16 || pixels[index + 1] !== 19 || pixels[index + 2] !== 22) {
-        count += 1;
+  return page.locator("canvas").evaluateAll((canvases) => {
+    let maxCount = -1;
+    for (const canvas of canvases) {
+      const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+      if (!gl) continue;
+      const width = canvas.width;
+      const height = canvas.height;
+      const pixels = new Uint8Array(width * height * 4);
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let count = 0;
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] !== 16 || pixels[index + 1] !== 19 || pixels[index + 2] !== 22) {
+          count += 1;
+        }
       }
+      maxCount = Math.max(maxCount, count);
     }
-    return count;
+    return maxCount;
   });
+}
+
+async function waitForNonBackgroundPixels(page, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let pixels = 0;
+  while (Date.now() < deadline) {
+    pixels = await nonBackgroundPixels(page);
+    if (pixels > 0) {
+      return pixels;
+    }
+    await page.waitForTimeout(250);
+  }
+  return pixels;
 }
 
 async function labeledValue(page, label) {

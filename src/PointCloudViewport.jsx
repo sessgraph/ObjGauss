@@ -134,7 +134,7 @@ export default function PointCloudViewport({
     pointsObjectRef.current = cloud;
 
     if (buffers.positions.length > 0) {
-      frameGeometry(geometry, cameraRef.current, controlsRef.current);
+      frameGeometry(geometry, cameraRef.current, controlsRef.current, scene);
     }
   }, [buffers, pointSize]);
 
@@ -206,7 +206,7 @@ function buildBuffers({
   };
 }
 
-function frameGeometry(geometry, camera, controls) {
+function frameGeometry(geometry, camera, controls, scene) {
   geometry.computeBoundingBox();
   const box = geometry.boundingBox;
   if (!box || !camera || !controls) return;
@@ -221,6 +221,10 @@ function frameGeometry(geometry, camera, controls) {
   camera.near = Math.max(maxDim / 100, 0.001);
   camera.far = maxDim * 100;
   camera.updateProjectionMatrix();
+  if (scene?.fog) {
+    scene.fog.near = Math.max(distance * 1.4, maxDim * 2);
+    scene.fog.far = Math.max(distance * 4, maxDim * 10);
+  }
   controls.target.copy(center);
   controls.update();
 }
