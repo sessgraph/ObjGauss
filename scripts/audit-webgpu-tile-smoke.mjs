@@ -22,6 +22,8 @@ import {
   buildWebGpuTileSmoke,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+  WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
+  WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
   WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
 } from "../src/webgpuTileSmoke.js";
 import {
@@ -65,24 +67,28 @@ assert.equal(base.buffers.objectIndices.length, scene.points.length);
 assert.equal(base.buffers.objectState.length, allObjectIds.size * WEBGPU_OBJECT_STATE_STRIDE_UINT32);
 assert.equal(base.buffers.objectIds.length, allObjectIds.size);
 assert.equal(base.buffers.tileCounts.length, base.tileCount);
+assert.equal(base.buffers.tileOffsets.length, base.tileCount);
 assert.equal(base.buffers.tileAccumulation.length, base.tileCount * 4);
 assert.equal(base.buffers.tileResolvedRgba.length, base.tileCount * 4);
 assert.equal(base.buffers.pixelResolvedRgba.length, base.pixelCount * 4);
 assert.equal(base.buffers.tileEntries.length, base.tileEntryCapacity);
+assert.equal(base.buffers.tileEntries.length, base.tileReferenceCount);
 assert.ok(base.visibleGaussians > 0);
 assert.ok(base.binnedGaussians > 0);
 assert.ok(base.activeTileCount > 0);
 assert.ok(base.tileReferenceCount >= base.binnedGaussians);
-assert.equal(base.tileCapacityMode, "fixed-cap-smoke");
-assert.equal(base.tileCapacityStatus, "overflow");
-assert.equal(base.tileCapacityGate, "blocked");
-assert.ok(base.tileOverflowCount > 0);
-assert.ok(base.tileOverflowTileCount > 0);
-assert.ok(base.tileOverflowRatio > 0);
-assert.ok(base.tileOverflowMaxExcess > 0);
-assert.equal(base.tileEntryStoredCount, base.tileReferenceCount - base.tileOverflowCount);
-assert.equal(base.tileEntryCapacity, base.tileCount * base.maxEntriesPerTile);
-assert.ok(base.tileEntryUtilization > 0 && base.tileEntryUtilization <= 1);
+assert.equal(base.tileEntryLayout, WEBGPU_TILE_ENTRY_LAYOUT_COMPACT);
+assert.equal(base.tileEntryOffsetCount, base.tileCount);
+assert.equal(base.tileCapacityMode, WEBGPU_TILE_ENTRY_LAYOUT_COMPACT);
+assert.equal(base.tileCapacityStatus, "ok");
+assert.equal(base.tileCapacityGate, "pass");
+assert.equal(base.tileOverflowCount, 0);
+assert.equal(base.tileOverflowTileCount, 0);
+assert.equal(base.tileOverflowRatio, 0);
+assert.equal(base.tileOverflowMaxExcess, 0);
+assert.equal(base.tileEntryStoredCount, base.tileReferenceCount);
+assert.equal(base.tileEntryCapacity, base.tileReferenceCount);
+assert.equal(base.tileEntryUtilization, 1);
 assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
 assert.equal(base.resolveMode, "tile-2x2-covariance-weighted-oit");
 assert.equal(base.pixelOutputMode, "viewport-storage-rgba-direct-gaussian");
@@ -108,10 +114,11 @@ assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
 
 const storage = describeWebGpuTileStorage(base);
 assert.equal(storage.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
-assert.equal(storage.bufferCount, 10);
+assert.equal(storage.bufferCount, 11);
 assert.ok(storage.totalByteLength > 0);
 assert.match(storage.checksum, /^[0-9a-f]{8}$/);
 assert.equal(storage.tileEntriesIncluded, true);
+assert.equal(storage.tileOffsetsIncluded, true);
 assert.equal(storage.pixelOutputIncluded, true);
 assert.deepEqual(
   storage.descriptors.map((descriptor) => descriptor.key),
@@ -122,6 +129,7 @@ assert.deepEqual(
     "objectIndices",
     "objectState",
     "tileCounts",
+    "tileOffsets",
     "tileAccumulation",
     "tileResolvedRgba",
     "pixelResolvedRgba",
@@ -143,6 +151,10 @@ assert.equal(storageBundle.buffers.length, storage.bufferCount);
 assert.equal(
   storageBundle.getBuffer("tileResolvedRgba").byteLength,
   base.buffers.tileResolvedRgba.byteLength,
+);
+assert.equal(
+  storageBundle.getBuffer("tileOffsets").byteLength,
+  base.buffers.tileOffsets.byteLength,
 );
 assert.equal(
   storageBundle.getBuffer("pixelResolvedRgba").byteLength,
@@ -209,6 +221,7 @@ assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+colorOpacity/)
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+objectState/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+tileEntries/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+scaleRotation/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+tileOffsets/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read_write>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /pixelResolvedRgba\[pixelIndex\]/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /colorOpacity\[gaussianIndex\]/);
@@ -238,6 +251,7 @@ assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+colorOpaci
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+scaleRotation/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+objectState/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+tileEntries/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+tileOffsets/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read_write>\s+tileAccumulation/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /sampleIndex\s*<\s*4u/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /gaussianScale\.xy/);
@@ -250,10 +264,11 @@ const roomy = buildWebGpuTileSmoke({
   isolatedId: null,
   renderMode: "original",
   pointSize: 0.018,
+  tileEntryLayout: WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
   maxEntriesPerTile: 100000,
 });
 
-assert.equal(roomy.tileCapacityMode, "fixed-cap-smoke");
+assert.equal(roomy.tileCapacityMode, WEBGPU_TILE_ENTRY_LAYOUT_FIXED);
 assert.equal(roomy.tileCapacityStatus, "ok");
 assert.equal(roomy.tileCapacityGate, "pass");
 assert.equal(roomy.tileOverflowCount, 0);
@@ -273,7 +288,33 @@ assert.equal(roomyContract.targetGate, "pass");
 assert.equal(roomyContract.targetGateReason, "webgpu-tile-first-frame-ready");
 assert.equal(roomyContract.fallbackReason, "");
 
-const overflowContract = editRendererContract(readyCapability, base);
+const fixedOverflow = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  tileEntryLayout: WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
+  includeTileEntries: true,
+  maxEntriesPerTile: 64,
+});
+assert.equal(fixedOverflow.tileCapacityMode, WEBGPU_TILE_ENTRY_LAYOUT_FIXED);
+assert.equal(fixedOverflow.tileCapacityStatus, "overflow");
+assert.equal(fixedOverflow.tileCapacityGate, "blocked");
+assert.ok(fixedOverflow.tileOverflowCount > 0);
+assert.ok(fixedOverflow.tileOverflowTileCount > 0);
+assert.ok(fixedOverflow.tileOverflowRatio > 0);
+assert.ok(fixedOverflow.tileOverflowMaxExcess > 0);
+assert.equal(fixedOverflow.tileEntryStoredCount, fixedOverflow.tileReferenceCount - fixedOverflow.tileOverflowCount);
+assert.equal(fixedOverflow.tileEntryCapacity, fixedOverflow.tileCount * fixedOverflow.maxEntriesPerTile);
+
+const compactContract = editRendererContract(readyCapability, base);
+assert.equal(compactContract.rendererId, "webgpu-tile");
+assert.equal(compactContract.targetGate, "pass");
+assert.equal(compactContract.fallbackReason, "");
+
+const overflowContract = editRendererContract(readyCapability, fixedOverflow);
 assert.equal(overflowContract.rendererId, "gaussian-oit");
 assert.equal(overflowContract.targetGate, "blocked");
 assert.equal(overflowContract.targetGateBlocker, "tile-overflow");

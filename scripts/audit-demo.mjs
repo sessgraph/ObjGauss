@@ -66,7 +66,8 @@ try {
         `activeTiles=${result.activeTileCount}/${result.tileCount} ` +
         `tileReferences=${result.tileReferenceCount} ` +
         `maxTileOccupancy=${result.maxTileOccupancy} ` +
-        `tileCapacity=${JSON.stringify(result.tileCapacityStatus)}:${result.tileOverflowTileCount} ` +
+        `tileCapacity=${JSON.stringify(result.tileCapacityMode)}:${JSON.stringify(result.tileCapacityStatus)}:${result.tileOverflowTileCount} ` +
+        `tileEntryLayout=${JSON.stringify(result.tileEntryLayout)}:${result.tileEntryOffsetCount} ` +
         `resolveLayout=${JSON.stringify(result.resolveLayout)} ` +
         `resolvedTiles=${result.resolvedTileCount} ` +
         `resolveChecksum=${JSON.stringify(result.resolveChecksum)} ` +
@@ -195,6 +196,8 @@ async function runAudit(url, assetsToCheck) {
       const tileEntryStoredCount = numericValue(await viewport.getAttribute("data-webgpu-tile-entry-stored-count") ?? "0");
       const tileEntryCapacity = numericValue(await viewport.getAttribute("data-webgpu-tile-entry-capacity") ?? "0");
       const tileEntryUtilization = Number(await viewport.getAttribute("data-webgpu-tile-entry-utilization") ?? "0");
+      const tileEntryLayout = await viewport.getAttribute("data-webgpu-tile-entry-layout");
+      const tileEntryOffsetCount = numericValue(await viewport.getAttribute("data-webgpu-tile-entry-offset-count") ?? "0");
       const tileCapacityMode = await viewport.getAttribute("data-webgpu-tile-capacity-mode");
       const tileCapacityStatus = await viewport.getAttribute("data-webgpu-tile-capacity-status");
       const tileCapacityGate = await viewport.getAttribute("data-webgpu-tile-capacity-gate");
@@ -223,16 +226,19 @@ async function runAudit(url, assetsToCheck) {
         throw new Error(`${asset.id} did not expose positive max tile occupancy: ${maxTileOccupancy}`);
       }
       if (
-        tileCapacityMode !== "fixed-cap-smoke" ||
+        !["compact-offset-list", "fixed-cap-smoke"].includes(tileCapacityMode ?? "") ||
+        !["compact-offset-list", "fixed-cap-smoke"].includes(tileEntryLayout ?? "") ||
         !["ok", "overflow"].includes(tileCapacityStatus ?? "") ||
         !["pass", "blocked"].includes(tileCapacityGate ?? "") ||
         tileEntryStoredCount <= 0 ||
         tileEntryCapacity <= 0 ||
+        (tileEntryLayout === "compact-offset-list" && tileEntryStoredCount !== tileEntryCapacity) ||
+        (tileEntryLayout === "compact-offset-list" && tileEntryOffsetCount !== 0 && tileEntryOffsetCount !== tileCount) ||
         tileEntryUtilization <= 0 ||
         tileEntryUtilization > 1
       ) {
         throw new Error(
-          `${asset.id} invalid tile capacity telemetry: mode=${tileCapacityMode} status=${tileCapacityStatus} gate=${tileCapacityGate} stored=${tileEntryStoredCount} capacity=${tileEntryCapacity} utilization=${tileEntryUtilization}`,
+          `${asset.id} invalid tile capacity telemetry: mode=${tileCapacityMode} layout=${tileEntryLayout} offsets=${tileEntryOffsetCount} status=${tileCapacityStatus} gate=${tileCapacityGate} stored=${tileEntryStoredCount} capacity=${tileEntryCapacity} utilization=${tileEntryUtilization}`,
         );
       }
       if (tileOverflowCount > 0) {
@@ -332,6 +338,7 @@ async function runAudit(url, assetsToCheck) {
       const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
       const webGpuStorageChecksum = await viewport.getAttribute("data-webgpu-storage-checksum");
       const webGpuStorageTileEntries = await viewport.getAttribute("data-webgpu-storage-tile-entries");
+      const webGpuStorageTileOffsets = await viewport.getAttribute("data-webgpu-storage-tile-offsets");
       const webGpuStoragePixelOutput = await viewport.getAttribute("data-webgpu-storage-pixel-output");
       if (editRendererId === "webgpu-tile") {
         if (
@@ -356,14 +363,15 @@ async function runAudit(url, assetsToCheck) {
         if (
           webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
           webGpuStorageStatus !== "uploaded" ||
-          webGpuStorageBufferCount < 10 ||
+          webGpuStorageBufferCount < 11 ||
           webGpuStorageByteSize <= 0 ||
           webGpuStorageTileEntries !== "true" ||
+          webGpuStorageTileOffsets !== "true" ||
           webGpuStoragePixelOutput !== "true" ||
           !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
         ) {
           throw new Error(
-            `${asset.id} WebGPU storage buffers were not uploaded with tile entries and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
+            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
       }
@@ -451,6 +459,7 @@ async function runAudit(url, assetsToCheck) {
         webGpuStorageBufferCount,
         webGpuStorageByteSize,
         webGpuStorageTileEntries,
+        webGpuStorageTileOffsets,
         webGpuStoragePixelOutput,
         webGpuStorageChecksum,
         webGpuStorageChecksumAfterIsolate,
@@ -476,6 +485,8 @@ async function runAudit(url, assetsToCheck) {
         tileEntryStoredCount,
         tileEntryCapacity,
         tileEntryUtilization,
+        tileEntryLayout,
+        tileEntryOffsetCount,
         tileCapacityMode,
         tileCapacityStatus,
         tileCapacityGate,

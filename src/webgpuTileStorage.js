@@ -38,6 +38,13 @@ const STORAGE_BUFFER_DEFINITIONS = Object.freeze([
     role: "tile-reference-counts",
   },
   {
+    key: "tileOffsets",
+    label: "tile-offsets",
+    elementType: "uint32",
+    role: "tile-entry-offsets",
+    optional: true,
+  },
+  {
     key: "tileAccumulation",
     label: "tile-accumulation",
     elementType: "float32",
@@ -85,6 +92,7 @@ export function describeWebGpuTileStorage(tileSmoke) {
     totalByteLength,
     checksum: checksum.toString(16).padStart(8, "0"),
     tileEntriesIncluded: descriptors.some((descriptor) => descriptor.key === "tileEntries"),
+    tileOffsetsIncluded: descriptors.some((descriptor) => descriptor.key === "tileOffsets"),
     pixelOutputIncluded: descriptors.some((descriptor) => descriptor.key === "pixelResolvedRgba"),
     descriptors: descriptors.map(({ source, ...descriptor }) => descriptor),
   };

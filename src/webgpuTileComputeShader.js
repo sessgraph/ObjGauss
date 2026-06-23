@@ -35,6 +35,7 @@ struct AccumulationMeta {
 @group(0) @binding(6) var<storage, read_write> tileAccumulation: array<vec4f>;
 @group(0) @binding(7) var<uniform> accumulationMeta: AccumulationMeta;
 @group(0) @binding(8) var<storage, read> scaleRotation: array<vec4f>;
+@group(0) @binding(9) var<storage, read> tileOffsets: array<u32>;
 
 @compute @workgroup_size(${WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE})
 fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
@@ -44,7 +45,6 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
     return;
   }
 
-  let maxEntriesPerTile = u32(accumulationMeta.maxEntriesPerTile);
   let tileColumns = max(1u, u32(accumulationMeta.tileColumns));
   let tileX = tileIndex % tileColumns;
   let tileY = tileIndex / tileColumns;
@@ -52,8 +52,8 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
     (f32(tileX) + 0.5) * accumulationMeta.tileSize,
     (f32(tileY) + 0.5) * accumulationMeta.tileSize
   );
-  let storedCount = min(tileCounts[tileIndex], maxEntriesPerTile);
-  let entryBase = tileIndex * maxEntriesPerTile;
+  let storedCount = tileCounts[tileIndex];
+  let entryBase = tileOffsets[tileIndex];
   var accumulation = vec4f(0.0);
 
   for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
@@ -172,6 +172,7 @@ struct PixelResolveMeta {
 @group(0) @binding(6) var<storage, read_write> pixelResolvedRgba: array<vec4f>;
 @group(0) @binding(7) var<uniform> pixelResolveMeta: PixelResolveMeta;
 @group(0) @binding(8) var<storage, read> scaleRotation: array<vec4f>;
+@group(0) @binding(9) var<storage, read> tileOffsets: array<u32>;
 
 @compute @workgroup_size(${WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE})
 fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
@@ -183,14 +184,13 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   let viewportWidth = max(u32(pixelResolveMeta.viewportWidth), 1u);
   let tileSize = max(u32(pixelResolveMeta.tileSize), 1u);
   let tileColumns = max(u32(pixelResolveMeta.tileColumns), 1u);
-  let maxEntriesPerTile = max(u32(pixelResolveMeta.maxEntriesPerTile), 1u);
   let pixelX = pixelIndex % viewportWidth;
   let pixelY = pixelIndex / viewportWidth;
   let tileX = min(pixelX / tileSize, tileColumns - 1u);
   let tileY = pixelY / tileSize;
   let tileIndex = tileY * tileColumns + tileX;
-  let storedCount = min(tileCounts[tileIndex], maxEntriesPerTile);
-  let entryBase = tileIndex * maxEntriesPerTile;
+  let storedCount = tileCounts[tileIndex];
+  let entryBase = tileOffsets[tileIndex];
   let pixelCenter = vec2f(f32(pixelX) + 0.5, f32(pixelY) + 0.5);
   let pixelsPerWorldUnit = min(
     pixelResolveMeta.viewportWidth / max(pixelResolveMeta.boundsSpanX, 0.0001),

@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005I`: 将 fixed-cap tile entries 推进到 overflow-safe compact tile list / capacity strategy，让 Plush 级大场景不被 smoke cap 长期阻塞。
+  - `RENDER-005J`: 增加 WebGPU buffer-size/device-limit gate，并在 WebGPU-capable 浏览器里重跑 Plush / Lego first-frame runtime audit。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,32 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005I: WebGPU compact tile entry list
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 tile entries 从 fixed-cap per-tile stride 推进到 compact offset list，消除 Plush 级大场景因 fixed-cap overflow 被 capacity gate 长期阻塞的问题。
+- 范围外:
+  - 不实现 GPU-side binning / prefix-sum；当前 compact list 仍由 CPU smoke/runtime builder 生成后上传 WebGPU。
+  - 不实现 depth-sorted compositing。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - `src/webgpuTileSmoke.js` 新增 `compact-offset-list` 默认 capacity strategy，使用 `tileOffsets[tileIndex]` 作为 compact `tileEntries` 起点，`tileEntryCapacity=tileReferenceCount`，capacity gate 为 pass。
+  - fixed-cap layout 仍保留为 `fixed-cap-smoke`，并在 smoke audit 中继续验证 overflow 会被 gate blocked，避免隐藏旧风险。
+  - `src/webgpuTileStorage.js` 新增可选 `tileOffsets` storage buffer；WebGPU runtime route 现在上传 11 个 buffers。
+  - `src/webgpuTileComputeShader.js` 的 tile accumulation 和 pixel accumulation shader 都从 `tileOffsets` 读取 entry base，不再依赖 `tileIndex * maxEntriesPerTile`。
+  - `WebGpuTileViewport` bind group 新增 `tileOffsets`，并暴露 `data-webgpu-storage-tile-offsets`；两个 viewport 均暴露 `data-webgpu-tile-entry-layout` / `data-webgpu-tile-entry-offset-count`。
+  - `audit-demo` 接受 `compact-offset-list` capacity telemetry，并要求真实 WebGPU route 上传 tile entries、tile offsets 和 pixel output。
+- 验收:
+  - Node smoke audit 默认 compact layout 必须 `capacity=pass`、`tileOverflowCount=0`、`tileEntryStoredCount=tileEntryCapacity=tileReferenceCount`。
+  - Node smoke audit 的 fixed-cap 对照必须仍然 overflow/block。
+  - WebGPU 可用环境中 Plush 级大场景不再因为 tile overflow 被 target gate blocked；若仍 fallback，必须是 capability 或 future device-limit blocker。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `storage=de5eaf8f:11 capacity=pass pixel=webgpu-compute-pixel-accumulation-v1:16384`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5216/ --no-server`: passed，assets=3；Plush semantic / Plush v1 均为 `tileCapacity="compact-offset-list":"ok":0`。当前 headless Chrome 仍 fallback，`targetGate="blocked":"webgpu-capability"` 是预期。
 
 ### RENDER-005H: WebGPU per-pixel Gaussian accumulation
 

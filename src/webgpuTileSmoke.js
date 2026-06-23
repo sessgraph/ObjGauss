@@ -5,6 +5,8 @@ export const WEBGPU_TILE_SIZE = 16;
 export const WEBGPU_TILE_MAX_ENTRIES = 8192;
 export const WEBGPU_TILE_VIEWPORT = Object.freeze({ width: 1024, height: 1024 });
 export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
+export const WEBGPU_TILE_ENTRY_LAYOUT_COMPACT = "compact-offset-list";
+export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -32,6 +34,7 @@ export function buildWebGpuTileSmoke({
   viewportHeight = WEBGPU_TILE_VIEWPORT.height,
   tileSize = WEBGPU_TILE_SIZE,
   maxEntriesPerTile = WEBGPU_TILE_MAX_ENTRIES,
+  tileEntryLayout = WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
   includeTileEntries = false,
   includePixelOutput = false,
   computePixelReference = includePixelOutput,
@@ -53,7 +56,9 @@ export function buildWebGpuTileSmoke({
   const tileCounts = new Uint32Array(tileCount);
   const tileCenters = buildTileCenters({ tileColumns, tileRows, tileSize });
   const tileAccumulation = new Float32Array(tileCount * 4);
-  const tileEntries = includeTileEntries
+  const compactTileEntries = tileEntryLayout === WEBGPU_TILE_ENTRY_LAYOUT_COMPACT;
+  let tileOffsets = includeTileEntries ? buildTileOffsets({ tileCounts, maxEntriesPerTile, compact: false }) : null;
+  let tileEntries = includeTileEntries && !compactTileEntries
     ? new Uint32Array(tileCount * maxEntriesPerTile)
     : null;
 
@@ -108,7 +113,7 @@ export function buildWebGpuTileSmoke({
         const occupancy = tileCounts[tileIndex];
         if (tileEntries && occupancy < maxEntriesPerTile) {
           tileEntries[tileIndex * maxEntriesPerTile + occupancy] = index;
-        } else if (occupancy >= maxEntriesPerTile) {
+        } else if (!compactTileEntries && occupancy >= maxEntriesPerTile) {
           tileOverflowCount += 1;
         }
         const nextOccupancy = occupancy + 1;
@@ -135,6 +140,25 @@ export function buildWebGpuTileSmoke({
     }
   });
 
+  if (includeTileEntries && compactTileEntries) {
+    tileOffsets = buildTileOffsets({ tileCounts, maxEntriesPerTile, compact: true });
+    tileEntries = new Uint32Array(tileReferenceCount);
+    populateCompactTileEntries({
+      points,
+      objectIndex,
+      objectState,
+      bounds,
+      viewportWidth,
+      viewportHeight,
+      tileSize,
+      tileColumns,
+      tileRows,
+      pointSize,
+      tileOffsets,
+      tileEntries,
+    });
+  }
+
   const activeTileCount = countActiveTiles(tileCounts);
   const capacity = summarizeTileCapacity({
     tileCounts,
@@ -142,6 +166,7 @@ export function buildWebGpuTileSmoke({
     tileOverflowCount,
     tileCount,
     maxEntriesPerTile,
+    tileEntryLayout,
   });
   const resolve = resolveTileAccumulation(tileAccumulation);
   const pixelResolve = includePixelOutput
@@ -154,7 +179,9 @@ export function buildWebGpuTileSmoke({
         objectState,
         tileCounts,
         tileEntries,
+        tileOffsets,
         maxEntriesPerTile,
+        tileEntryLayout,
         bounds,
         tileColumns,
         tileSize,
@@ -181,6 +208,8 @@ export function buildWebGpuTileSmoke({
     tileRows,
     tileCount,
     maxEntriesPerTile,
+    tileEntryLayout,
+    tileEntryOffsetCount: tileOffsets?.length ?? 0,
     packedGaussians: points.length,
     visibleGaussians,
     binnedGaussians,
@@ -221,6 +250,7 @@ export function buildWebGpuTileSmoke({
       objectState,
       objectIds: objectStateContract.objectIds,
       tileCounts,
+      tileOffsets,
       tileAccumulation,
       tileResolvedRgba: resolve.tileResolvedRgba,
       pixelResolvedRgba: pixelResolve?.pixelResolvedRgba ?? null,
@@ -239,6 +269,67 @@ function buildTileCenters({ tileColumns, tileRows, tileSize }) {
     centersY[tileY] = tileY * tileSize + tileSize * 0.5;
   }
   return { centersX, centersY, tileColumns };
+}
+
+function buildTileOffsets({ tileCounts, maxEntriesPerTile, compact }) {
+  const tileOffsets = new Uint32Array(tileCounts.length);
+  if (!compact) {
+    for (let tileIndex = 0; tileIndex < tileCounts.length; tileIndex += 1) {
+      tileOffsets[tileIndex] = tileIndex * maxEntriesPerTile;
+    }
+    return tileOffsets;
+  }
+
+  let cursor = 0;
+  for (let tileIndex = 0; tileIndex < tileCounts.length; tileIndex += 1) {
+    tileOffsets[tileIndex] = cursor;
+    cursor += tileCounts[tileIndex];
+  }
+  return tileOffsets;
+}
+
+function populateCompactTileEntries({
+  points,
+  objectIndex,
+  objectState,
+  bounds,
+  viewportWidth,
+  viewportHeight,
+  tileSize,
+  tileColumns,
+  tileRows,
+  pointSize,
+  tileOffsets,
+  tileEntries,
+}) {
+  const cursors = new Uint32Array(tileOffsets);
+  points.forEach((point, index) => {
+    const objectDenseIndex = objectIndex.objectIndexById.get(point.objectId) ?? 0;
+    if (!objectIsVisible(objectState, objectDenseIndex)) return;
+    const scale = pointScale(point);
+    const radiusPixels = pointRadiusPixels({
+      point,
+      scale,
+      bounds,
+      viewportWidth,
+      viewportHeight,
+      pointSize,
+    });
+    const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
+    const minTileX = clampInt(Math.floor((screen.x - radiusPixels) / tileSize), 0, tileColumns - 1);
+    const maxTileX = clampInt(Math.floor((screen.x + radiusPixels) / tileSize), 0, tileColumns - 1);
+    const minTileY = clampInt(Math.floor((screen.y - radiusPixels) / tileSize), 0, tileRows - 1);
+    const maxTileY = clampInt(Math.floor((screen.y + radiusPixels) / tileSize), 0, tileRows - 1);
+
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+        const tileIndex = tileY * tileColumns + tileX;
+        const cursor = cursors[tileIndex];
+        tileEntries[cursor] = index;
+        cursors[tileIndex] = cursor + 1;
+      }
+    }
+  });
 }
 
 function accumulateTileResolve({
@@ -352,7 +443,9 @@ function resolvePixelOutput({
   objectState,
   tileCounts,
   tileEntries,
+  tileOffsets,
   maxEntriesPerTile,
+  tileEntryLayout,
   bounds,
   tileColumns,
   tileSize,
@@ -361,7 +454,7 @@ function resolvePixelOutput({
 }) {
   const pixelCount = viewportWidth * viewportHeight;
   const pixelResolvedRgba = new Float32Array(pixelCount * 4);
-  if (!computePixelReference || !tileEntries) {
+  if (!computePixelReference || !tileEntries || !tileOffsets) {
     return {
       pixelResolvedRgba,
       pixelResolvedCount: 0,
@@ -385,8 +478,11 @@ function resolvePixelOutput({
     for (let x = 0; x < viewportWidth; x += 1) {
       const tileX = Math.min(Math.floor(x / tileSize), tileColumns - 1);
       const tileIndex = tileY * tileColumns + tileX;
-      const storedCount = Math.min(tileCounts[tileIndex], maxEntriesPerTile);
-      const entryBase = tileIndex * maxEntriesPerTile;
+      const storedCount =
+        tileEntryLayout === WEBGPU_TILE_ENTRY_LAYOUT_COMPACT
+          ? tileCounts[tileIndex]
+          : Math.min(tileCounts[tileIndex], maxEntriesPerTile);
+      const entryBase = tileOffsets[tileIndex];
       const pixelOffset = (y * viewportWidth + x) * 4;
       let accumulatedRed = 0;
       let accumulatedGreen = 0;
@@ -708,7 +804,22 @@ function summarizeTileCapacity({
   tileOverflowCount,
   tileCount,
   maxEntriesPerTile,
+  tileEntryLayout,
 }) {
+  if (tileEntryLayout === WEBGPU_TILE_ENTRY_LAYOUT_COMPACT) {
+    return {
+      mode: WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
+      status: "ok",
+      gate: "pass",
+      overflowTileCount: 0,
+      overflowRatio: 0,
+      maxExcess: 0,
+      storedReferenceCount: tileReferenceCount,
+      entryCapacity: tileReferenceCount,
+      entryUtilization: tileReferenceCount > 0 ? 1 : 0,
+    };
+  }
+
   let overflowTileCount = 0;
   let maxExcess = 0;
   for (const count of tileCounts) {
@@ -727,7 +838,7 @@ function summarizeTileCapacity({
     entryCapacity > 0 ? Math.min(1, storedReferenceCount / entryCapacity) : 0;
   const hasOverflow = tileOverflowCount > 0 || overflowTileCount > 0;
   return {
-    mode: "fixed-cap-smoke",
+    mode: WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
     status: hasOverflow ? "overflow" : "ok",
     gate: hasOverflow ? "blocked" : "pass",
     overflowTileCount,

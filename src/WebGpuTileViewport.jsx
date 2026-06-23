@@ -69,6 +69,7 @@ export default function WebGpuTileViewport({
     bufferCount: 0,
     byteLength: 0,
     tileEntriesIncluded: false,
+    tileOffsetsIncluded: false,
     pixelOutputIncluded: false,
   });
   const visibleCount = useMemo(
@@ -101,6 +102,7 @@ export default function WebGpuTileViewport({
         bufferCount: 0,
         byteLength: 0,
         tileEntriesIncluded: false,
+        tileOffsetsIncluded: false,
         pixelOutputIncluded: false,
       });
       setCompute({
@@ -209,6 +211,7 @@ export default function WebGpuTileViewport({
           bufferCount: 0,
           byteLength: 0,
           tileEntriesIncluded: false,
+          tileOffsetsIncluded: false,
           pixelOutputIncluded: false,
         });
         setCompute({
@@ -298,6 +301,8 @@ export default function WebGpuTileViewport({
       data-webgpu-tile-entry-stored-count={rendererContract?.tileEntryStoredCount ?? 0}
       data-webgpu-tile-entry-capacity={rendererContract?.tileEntryCapacity ?? 0}
       data-webgpu-tile-entry-utilization={rendererContract?.tileEntryUtilization ?? 0}
+      data-webgpu-tile-entry-layout={rendererContract?.tileEntryLayout ?? ""}
+      data-webgpu-tile-entry-offset-count={rendererContract?.tileEntryOffsetCount ?? 0}
       data-webgpu-tile-capacity-mode={rendererContract?.tileCapacityMode ?? ""}
       data-webgpu-tile-capacity-status={rendererContract?.tileCapacityStatus ?? ""}
       data-webgpu-tile-capacity-gate={rendererContract?.tileCapacityGate ?? ""}
@@ -341,6 +346,7 @@ export default function WebGpuTileViewport({
       data-webgpu-storage-byte-size={storage.byteLength}
       data-webgpu-storage-checksum={storage.checksum}
       data-webgpu-storage-tile-entries={storage.tileEntriesIncluded ? "true" : "false"}
+      data-webgpu-storage-tile-offsets={storage.tileOffsetsIncluded ? "true" : "false"}
       data-webgpu-storage-pixel-output={storage.pixelOutputIncluded ? "true" : "false"}
       data-visible-count={visibleCount}
       ref={containerRef}
@@ -400,6 +406,7 @@ function renderFrame({
       bufferCount: storageBundle.bufferCount,
       byteLength: storageBundle.totalByteLength,
       tileEntriesIncluded: storageBundle.tileEntriesIncluded,
+      tileOffsetsIncluded: storageBundle.tileOffsetsIncluded,
       pixelOutputIncluded: storageBundle.pixelOutputIncluded,
     });
   } catch (error) {
@@ -411,6 +418,7 @@ function renderFrame({
       bufferCount: 0,
       byteLength: 0,
       tileEntriesIncluded: false,
+      tileOffsetsIncluded: false,
       pixelOutputIncluded: false,
     });
     setFrame({
@@ -464,6 +472,7 @@ function renderFrame({
         { binding: 6, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
         { binding: 7, resource: { buffer: accumulationMetaBuffer } },
         { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
+        { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
       ],
     });
     const computeBindGroup = device.createBindGroup({
@@ -486,6 +495,7 @@ function renderFrame({
         { binding: 6, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
         { binding: 7, resource: { buffer: pixelMetaBuffer } },
         { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
+        { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
       ],
     });
     const bindGroup = device.createBindGroup({

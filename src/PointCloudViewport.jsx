@@ -443,6 +443,8 @@ export default function PointCloudViewport({
       data-webgpu-tile-entry-stored-count={rendererContract?.tileEntryStoredCount ?? 0}
       data-webgpu-tile-entry-capacity={rendererContract?.tileEntryCapacity ?? 0}
       data-webgpu-tile-entry-utilization={rendererContract?.tileEntryUtilization ?? 0}
+      data-webgpu-tile-entry-layout={rendererContract?.tileEntryLayout ?? ""}
+      data-webgpu-tile-entry-offset-count={rendererContract?.tileEntryOffsetCount ?? 0}
       data-webgpu-tile-capacity-mode={rendererContract?.tileCapacityMode ?? ""}
       data-webgpu-tile-capacity-status={rendererContract?.tileCapacityStatus ?? ""}
       data-webgpu-tile-capacity-gate={rendererContract?.tileCapacityGate ?? ""}
