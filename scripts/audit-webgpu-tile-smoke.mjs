@@ -7,6 +7,11 @@ import {
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
   WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
 } from "../src/webgpuTileSmoke.js";
+import {
+  createWebGpuTileStorageBuffers,
+  describeWebGpuTileStorage,
+  WEBGPU_TILE_STORAGE_LAYOUT_VERSION,
+} from "../src/webgpuTileStorage.js";
 import { editRendererContract } from "../src/webgpuCapability.js";
 
 const scene = createSampleScene();
@@ -66,6 +71,47 @@ assert.equal(base.objectStateSelectedObjects, 0);
 assert.equal(base.objectStateIsolatedObjects, 0);
 assert.match(base.objectStateChecksum, /^[0-9a-f]{8}$/);
 
+const storage = describeWebGpuTileStorage(base);
+assert.equal(storage.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
+assert.equal(storage.bufferCount, 9);
+assert.ok(storage.totalByteLength > 0);
+assert.match(storage.checksum, /^[0-9a-f]{8}$/);
+assert.equal(storage.tileEntriesIncluded, true);
+assert.deepEqual(
+  storage.descriptors.map((descriptor) => descriptor.key),
+  [
+    "positionRadius",
+    "colorOpacity",
+    "scaleRotation",
+    "objectIndices",
+    "objectState",
+    "tileCounts",
+    "tileAccumulation",
+    "tileResolvedRgba",
+    "tileEntries",
+  ],
+);
+assert.equal(
+  storage.totalByteLength,
+  storage.descriptors.reduce((total, descriptor) => total + descriptor.allocatedByteLength, 0),
+);
+
+const fakeDevice = createFakeDevice();
+const storageBundle = createWebGpuTileStorageBuffers(fakeDevice, base);
+assert.equal(storageBundle.layoutVersion, WEBGPU_TILE_STORAGE_LAYOUT_VERSION);
+assert.equal(storageBundle.bufferCount, storage.bufferCount);
+assert.equal(storageBundle.totalByteLength, storage.totalByteLength);
+assert.equal(storageBundle.checksum, storage.checksum);
+assert.equal(storageBundle.buffers.length, storage.bufferCount);
+assert.equal(fakeDevice.created.length, storage.bufferCount);
+assert.equal(fakeDevice.writes.length, storage.bufferCount);
+assert.ok(fakeDevice.created.every((buffer) => buffer.descriptor.usage > 0));
+assert.ok(
+  fakeDevice.writes.every((write, index) => write.byteLength === storage.descriptors[index].byteLength),
+);
+storageBundle.destroy();
+assert.ok(fakeDevice.created.every((buffer) => buffer.destroyed));
+
 const roomy = buildWebGpuTileSmoke({
   points: scene.points,
   visibleIds: allObjectIds,
@@ -122,6 +168,8 @@ assert.equal(isolated.objectStateHiddenObjects, allObjectIds.size - 1);
 assert.equal(isolated.objectStateSelectedObjects, 1);
 assert.equal(isolated.objectStateIsolatedObjects, 1);
 assert.notEqual(isolated.objectStateChecksum, base.objectStateChecksum);
+const isolatedStorage = describeWebGpuTileStorage(isolated);
+assert.notEqual(isolatedStorage.checksum, storage.checksum);
 
 const removed = buildWebGpuTileSmoke({
   points: scene.points,
@@ -138,6 +186,8 @@ assert.notEqual(removed.resolveChecksum, base.resolveChecksum);
 assert.equal(removed.objectStateVisibleObjects, allObjectIds.size - 1);
 assert.equal(removed.objectStateRemovedObjects, 1);
 assert.notEqual(removed.objectStateChecksum, base.objectStateChecksum);
+const removedStorage = describeWebGpuTileStorage(removed);
+assert.notEqual(removedStorage.checksum, storage.checksum);
 
 console.log(
   `webgpu_tile_smoke=passed packed=${base.packedGaussians} ` +
@@ -145,5 +195,34 @@ console.log(
     `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
-    `capacity=${base.tileCapacityGate}`,
+    `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount}`,
 );
+
+function createFakeDevice() {
+  const created = [];
+  const writes = [];
+  return {
+    created,
+    writes,
+    createBuffer(descriptor) {
+      const buffer = {
+        descriptor,
+        destroyed: false,
+        destroy() {
+          this.destroyed = true;
+        },
+      };
+      created.push(buffer);
+      return buffer;
+    },
+    queue: {
+      writeBuffer(buffer, offset, data) {
+        writes.push({
+          label: buffer.descriptor.label,
+          offset,
+          byteLength: data.byteLength,
+        });
+      },
+    },
+  };
+}

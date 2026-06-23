@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
+
 const BACKGROUND_RGB = [16, 19, 22];
 const FULLSCREEN_SHADER = `
 struct VertexOutput {
@@ -53,6 +55,15 @@ export default function WebGpuTileViewport({
     checksum: "",
     pixels: 0,
   });
+  const [storage, setStorage] = useState({
+    status: "pending",
+    reason: "webgpu-storage-pending",
+    layoutVersion: "",
+    checksum: "",
+    bufferCount: 0,
+    byteLength: 0,
+    tileEntriesIncluded: false,
+  });
   const visibleCount = useMemo(
     () =>
       points.filter(
@@ -73,6 +84,15 @@ export default function WebGpuTileViewport({
         reason: "navigator-gpu-unavailable",
         checksum: "",
         pixels: 0,
+      });
+      setStorage({
+        status: "failed",
+        reason: "navigator-gpu-unavailable",
+        layoutVersion: "",
+        checksum: "",
+        bufferCount: 0,
+        byteLength: 0,
+        tileEntriesIncluded: false,
       });
       return undefined;
     }
@@ -121,6 +141,7 @@ export default function WebGpuTileViewport({
           canvas,
           tileSmoke,
           setFrame,
+          setStorage,
         });
       } catch (error) {
         if (cancelled) return;
@@ -130,12 +151,22 @@ export default function WebGpuTileViewport({
           checksum: "",
           pixels: 0,
         });
+        setStorage({
+          status: "failed",
+          reason: error?.message || "webgpu-storage-unavailable",
+          layoutVersion: "",
+          checksum: "",
+          bufferCount: 0,
+          byteLength: 0,
+          tileEntriesIncluded: false,
+        });
       }
     }
 
     init();
     return () => {
       cancelled = true;
+      runtimeRef.current?.storageBundle?.destroy?.();
       runtimeRef.current?.device?.destroy();
       runtimeRef.current = null;
     };
@@ -145,7 +176,7 @@ export default function WebGpuTileViewport({
     const runtime = runtimeRef.current;
     const canvas = canvasRef.current;
     if (!runtime || !canvas) return;
-    renderFrame({ runtime, canvas, tileSmoke, setFrame });
+    renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage });
   }, [tileSmoke]);
 
   useEffect(() => {
@@ -220,6 +251,13 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-reason={frame.reason}
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
+      data-webgpu-storage-layout={storage.layoutVersion}
+      data-webgpu-storage-status={storage.status}
+      data-webgpu-storage-reason={storage.reason}
+      data-webgpu-storage-buffer-count={storage.bufferCount}
+      data-webgpu-storage-byte-size={storage.byteLength}
+      data-webgpu-storage-checksum={storage.checksum}
+      data-webgpu-storage-tile-entries={storage.tileEntriesIncluded ? "true" : "false"}
       data-visible-count={visibleCount}
       ref={containerRef}
     >
@@ -242,10 +280,43 @@ export default function WebGpuTileViewport({
   );
 }
 
-function renderFrame({ runtime, canvas, tileSmoke, setFrame }) {
+function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
   const { device, context, format, pipeline, sampler } = runtime;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
+
+  let storageBundle = null;
+  try {
+    storageBundle = createWebGpuTileStorageBuffers(device, tileSmoke);
+    runtime.storageBundle?.destroy?.();
+    runtime.storageBundle = storageBundle;
+    setStorage({
+      status: "uploaded",
+      reason: "webgpu-storage-uploaded",
+      layoutVersion: storageBundle.layoutVersion,
+      checksum: storageBundle.checksum,
+      bufferCount: storageBundle.bufferCount,
+      byteLength: storageBundle.totalByteLength,
+      tileEntriesIncluded: storageBundle.tileEntriesIncluded,
+    });
+  } catch (error) {
+    setStorage({
+      status: "failed",
+      reason: error?.message || "webgpu-storage-upload-failed",
+      layoutVersion: "",
+      checksum: "",
+      bufferCount: 0,
+      byteLength: 0,
+      tileEntriesIncluded: false,
+    });
+    setFrame({
+      status: "failed",
+      reason: error?.message || "webgpu-storage-upload-failed",
+      checksum: "",
+      pixels: 0,
+    });
+    return;
+  }
 
   const texture = createTileTexture(device, tileSmoke);
   const bindGroup = device.createBindGroup({

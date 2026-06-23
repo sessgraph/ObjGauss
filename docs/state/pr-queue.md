@@ -18,6 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
+  - `RENDER-005C`: 在 storage-buffer upload contract 基础上推进 WebGPU compute accumulation / resolve shader。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -47,6 +48,31 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005B: WebGPU storage-buffer upload contract
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 WebGPU device-backed skeleton 从“只上传 CPU resolved texture”推进到真实创建并写入 tile/object storage buffers，使 final tile renderer 的核心数据布局进入 WebGPU runtime 边界。
+- 范围外:
+  - 不实现 WebGPU compute accumulation shader。
+  - 不替换 CPU tile-center resolve texture 的 first-frame display path。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - 新增 `src/webgpuTileStorage.js`，定义 `webgpu-tile-storage-v1` storage contract，覆盖 `positionRadius`、`colorOpacity`、`scaleRotation`、`objectIndices`、`objectState`、`tileCounts`、`tileAccumulation`、`tileResolvedRgba` 和可选 `tileEntries`。
+  - `WebGpuTileViewport` 在 first-frame / tileSmoke update path 中创建 WebGPU storage buffers、写入 typed-array payload、保留 bundle 并在下一次更新/卸载时销毁。
+  - WebGPU viewport 暴露 `data-webgpu-storage-*` DOM contract：layout、status、reason、buffer count、byte size、checksum 和 tileEntries presence。
+  - `audit-webgpu-tile-smoke` 使用 fake WebGPU device 验证 buffer descriptors、writeBuffer 调用、byte size、checksum、destroy 行为，以及隔离/删除后 storage checksum 变化。
+  - `audit-demo` 的 WebGPU route 增加 storage upload 断言：真实进入 `webgpu-tile` 时必须有 `storageStatus="uploaded"`、positive byte size 和 8 位 checksum，并要求隔离/删除更新 checksum。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 storage contract。
+  - WebGPU 可用环境中，`webgpu-tile` route 不仅要 first-frame rendered，还必须上传 storage buffers。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `storage=86cb35c1:9`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5207/`: passed，assets=3；当前仍 fallback，`storage=null:null` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-004E: WebGPU overflow gate and fallback hardening
 

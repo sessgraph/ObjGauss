@@ -51,6 +51,7 @@ try {
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
+        `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
         `webgpuStatus=${JSON.stringify(result.webgpuStatus)} ` +
@@ -311,6 +312,11 @@ async function runAudit(url, assetsToCheck) {
       const webGpuFirstFrameStatus = await viewport.getAttribute("data-webgpu-first-frame-status");
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
+      const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
+      const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
+      const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
+      const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
+      const webGpuStorageChecksum = await viewport.getAttribute("data-webgpu-storage-checksum");
       if (editRendererId === "webgpu-tile") {
         if (
           webGpuFirstFrameStatus !== "rendered" ||
@@ -319,6 +325,17 @@ async function runAudit(url, assetsToCheck) {
         ) {
           throw new Error(
             `${asset.id} WebGPU first frame did not render: status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum}`,
+          );
+        }
+        if (
+          webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
+          webGpuStorageStatus !== "uploaded" ||
+          webGpuStorageBufferCount < 8 ||
+          webGpuStorageByteSize <= 0 ||
+          !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU storage buffers were not uploaded: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} checksum=${webGpuStorageChecksum}`,
           );
         }
       }
@@ -331,6 +348,7 @@ async function runAudit(url, assetsToCheck) {
       const objectStateHiddenAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-hidden-objects") ?? "0");
       const objectStateSelectedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-selected-objects") ?? "0");
       const objectStateIsolatedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const webGpuStorageChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-storage-checksum");
       if (
         objectStateChecksumAfterIsolate === objectStateChecksum ||
         objectStateVisibleAfterIsolate !== 1 ||
@@ -342,6 +360,9 @@ async function runAudit(url, assetsToCheck) {
           `${asset.id} isolate did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterIsolate} visible=${objectStateVisibleAfterIsolate} hidden=${objectStateHiddenAfterIsolate} selected=${objectStateSelectedAfterIsolate} isolated=${objectStateIsolatedAfterIsolate}`,
         );
       }
+      if (editRendererId === "webgpu-tile" && webGpuStorageChecksumAfterIsolate === webGpuStorageChecksum) {
+        throw new Error(`${asset.id} isolate did not update WebGPU storage checksum`);
+      }
       await page.getByRole("button", { name: "预览删除" }).click();
       await page.waitForTimeout(300);
       const deletedObjects = await labeledValue(page, "已删除对象");
@@ -351,6 +372,7 @@ async function runAudit(url, assetsToCheck) {
       const objectStateVisibleAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
       const objectStateRemovedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
       const objectStateIsolatedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const webGpuStorageChecksumAfterDelete = await viewport.getAttribute("data-webgpu-storage-checksum");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
@@ -370,6 +392,9 @@ async function runAudit(url, assetsToCheck) {
           `${asset.id} delete did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterDelete} visible=${objectStateVisibleAfterDelete} removed=${objectStateRemovedAfterDelete} isolated=${objectStateIsolatedAfterDelete}`,
         );
       }
+      if (editRendererId === "webgpu-tile" && webGpuStorageChecksumAfterDelete === webGpuStorageChecksumAfterIsolate) {
+        throw new Error(`${asset.id} delete did not update WebGPU storage checksum`);
+      }
       const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: false });
       results.push({
@@ -383,6 +408,13 @@ async function runAudit(url, assetsToCheck) {
         webGpuFirstFrameStatus,
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
+        webGpuStorageLayout,
+        webGpuStorageStatus,
+        webGpuStorageBufferCount,
+        webGpuStorageByteSize,
+        webGpuStorageChecksum,
+        webGpuStorageChecksumAfterIsolate,
+        webGpuStorageChecksumAfterDelete,
         rendererTarget,
         targetGate,
         targetGateReason,
