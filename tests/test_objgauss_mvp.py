@@ -19,7 +19,7 @@ from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import train_object_field_from_votes, vote_masks_to_gaussians
-from objgauss.masks import build_nerf_sam_mask_manifest
+from objgauss.masks import build_nerf_sam_mask_manifest, read_png_rgba
 from objgauss.object_field import (
     ObjectField,
     field_from_labels,
@@ -85,6 +85,7 @@ def test_read_splat_as_gaussian_cloud(tmp_path):
 def test_asset_registry_has_pullable_sample():
     asset = get_asset("plush-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
+    chair_nerf = get_asset("polyhaven-school-chair-nerf")
     training = get_asset("nerf-synthetic-lego")
     fern = get_asset("nerf-llff-fern")
 
@@ -98,6 +99,8 @@ def test_asset_registry_has_pullable_sample():
     assert demo.pull_pipeline == "polyhaven-gltf"
     assert demo.polyhaven_id == "SchoolChair_01"
     assert demo.license.startswith("CC0")
+    assert chair_nerf.pull_pipeline == "polyhaven-nerf-render"
+    assert chair_nerf.polyhaven_id == "SchoolChair_01"
     assert training.pull_pipeline == "nerf-example-data"
     assert training.training_subdir == "nerf_synthetic/lego"
     assert fern.pull_pipeline == "nerf-example-data"
@@ -110,6 +113,7 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
     output = capsys.readouterr().out
     assert "plush-3dgs-local" in output
     assert "polyhaven-school-chair-1k" in output
+    assert "polyhaven-school-chair-nerf" in output
     assert "nerf-synthetic-lego" in output
     assert "nerf-llff-fern" in output
     assert "Demo 可用" in output
@@ -158,6 +162,59 @@ def test_polyhaven_pull_writes_gltf_manifest(tmp_path, monkeypatch):
     assert (result.raw_path / "SchoolChair_01.bin").exists()
     assert (result.raw_path / "textures" / "SchoolChair_01_diff_1k.jpg").exists()
     assert len(result.downloaded_files) == 3
+
+
+def test_polyhaven_nerf_pull_renders_training_dataset(tmp_path, monkeypatch):
+    def fake_fetch_json(_url):
+        return {
+            "gltf": {
+                "1k": {
+                    "gltf": {
+                        "url": "https://example.invalid/tiny.gltf",
+                        "include": {
+                            "tiny.bin": {
+                                "url": "https://example.invalid/tiny.bin",
+                            },
+                        },
+                    }
+                }
+            }
+        }
+
+    def fake_download(_url, path, *, force):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and not force:
+            return
+        if path.suffix == ".gltf":
+            path.write_text(json.dumps(_tiny_gltf_manifest()), encoding="utf-8")
+        elif path.suffix == ".bin":
+            path.write_bytes(_tiny_gltf_bin())
+        else:
+            path.write_bytes(b"asset")
+
+    monkeypatch.setattr(asset_module, "_fetch_json", fake_fetch_json)
+    monkeypatch.setattr(asset_module, "_download", fake_download)
+
+    result = asset_module.pull_asset(
+        "polyhaven-school-chair-nerf",
+        raw_dir=tmp_path / "raw",
+        converted_dir=tmp_path / "converted",
+        training_dir=tmp_path / "training",
+    )
+
+    assert result.training_path and result.training_path.name == "polyhaven-school-chair-nerf"
+    assert result.output_path and result.output_path.name == "transforms_train.json"
+    assert (result.training_path / "transforms_val.json").exists()
+    assert (result.training_path / "transforms_test.json").exists()
+    transforms = json.loads(result.output_path.read_text(encoding="utf-8"))
+    assert transforms["source_type"] == "gltf-orbit-render"
+    assert len(transforms["frames"]) == 16
+    rgba = read_png_rgba(result.training_path / "train" / "r_0.png")
+    assert rgba.shape == (256, 256, 4)
+    assert int(np.count_nonzero(rgba[:, :, 3])) > 0
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["triangles"] == 1
+    assert "transforms_train.json" in manifest["files"]
 
 
 def test_nerf_pull_extracts_training_subset(tmp_path, monkeypatch):
@@ -836,9 +893,11 @@ def test_splatfacto_scene_benchmark_script_dry_run_reports_pipeline():
     assert result.returncode == 0, result.stderr
     assert "mode=dry-run" in result.stdout
     assert "manifest=docs/benchmarks/splatfacto-scenes.json" in result.stdout
-    assert "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke" in result.stdout
+    assert "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke,chair-splatfacto-smoke" in result.stdout
     assert "scripts/benchmark-splatfacto-balanced.mjs" in result.stdout
     assert "nerf-fern-sam-smoke/mask-manifest.json" in result.stdout
+    assert "polyhaven-school-chair-nerf" in result.stdout
+    assert "polyhaven-chair-sam-smoke/mask-manifest.json" in result.stdout
     assert "--train-sam-manifest" in result.stdout
     assert "--heldout-manifest" in result.stdout
     assert "--heldout-every 4" in result.stdout
@@ -2042,6 +2101,70 @@ def _write_rgba_png(path, pixels: np.ndarray) -> None:
 def _png_chunk(kind: bytes, data: bytes) -> bytes:
     checksum = zlib.crc32(kind + data) & 0xFFFFFFFF
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", checksum)
+
+
+def _tiny_gltf_bin() -> bytes:
+    positions = np.array(
+        [
+            [-0.4, 0.0, 0.0],
+            [0.4, 0.0, 0.0],
+            [0.0, 0.7, 0.0],
+        ],
+        dtype="<f4",
+    )
+    normals = np.array([[0.0, 0.0, 1.0]] * 3, dtype="<f4")
+    indices = np.array([0, 1, 2], dtype="<u2")
+    return positions.tobytes() + normals.tobytes() + indices.tobytes()
+
+
+def _tiny_gltf_manifest() -> dict:
+    positions_len = 3 * 3 * 4
+    normals_offset = positions_len
+    normals_len = 3 * 3 * 4
+    indices_offset = normals_offset + normals_len
+    indices_len = 3 * 2
+    return {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0}],
+        "meshes": [
+            {
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": 0, "NORMAL": 1},
+                        "indices": 2,
+                    }
+                ]
+            }
+        ],
+        "accessors": [
+            {
+                "bufferView": 0,
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+            },
+            {
+                "bufferView": 1,
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+            },
+            {
+                "bufferView": 2,
+                "componentType": 5123,
+                "count": 3,
+                "type": "SCALAR",
+            },
+        ],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": positions_len},
+            {"buffer": 0, "byteOffset": normals_offset, "byteLength": normals_len},
+            {"buffer": 0, "byteOffset": indices_offset, "byteLength": indices_len},
+        ],
+        "buffers": [{"uri": "tiny.bin", "byteLength": positions_len + normals_len + indices_len}],
+    }
 
 
 def _colmap_cameras_bin() -> bytes:

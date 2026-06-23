@@ -1,6 +1,6 @@
 # Splatfacto Cross-Scene Benchmark
 
-This suite compares real Splatfacto scene outputs. It is separate from
+This suite compares Splatfacto-trained scene outputs. It is separate from
 `splatfacto-variants`, which compares mask policies on one Lego PLY.
 
 Run all configured scenes:
@@ -28,7 +28,8 @@ The manifest is `docs/benchmarks/splatfacto-scenes.json`.
 | Scene | Input | Mask policy | Purpose |
 | --- | --- | --- | --- |
 | `lego-splatfacto-safe-2000` | `outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply` | 8 SAM frames, 4 masks per frame, max area 0.3 | Current stronger Lego geometry baseline |
-| `fern-splatfacto-smoke` | `outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply` | 4 SAM frames, 6 masks per frame, max area 0.35, max image size 768 | Second real Splatfacto scene from LLFF/COLMAP Fern |
+| `fern-splatfacto-smoke` | `outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply` | 4 SAM frames, 6 masks per frame, max area 0.35, max image size 768 | Second Splatfacto-trained scene from LLFF/COLMAP Fern |
+| `chair-splatfacto-smoke` | `outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda/splat.ply` | 8 SAM frames, 6 masks per frame, max area 0.75 | Third Splatfacto-trained scene from a CC0 Poly Haven mesh-derived NeRF render set |
 
 Outputs:
 
@@ -72,6 +73,7 @@ scale-aware probe:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `lego-splatfacto-safe-2000` | 6 | 2 | 0.469787 | 0.784051 | 0.229397 | 2.301630 | 0.197505 |
 | `fern-splatfacto-smoke` | 3 | 1 | 0.790636 | 0.780132 | 0.235029 | 0.670722 | 0.233851 |
+| `chair-splatfacto-smoke` | 6 | 2 | 0.614363 | 0.757609 | 0.248716 | 2.284750 | 0.224084 |
 
 ## Fern Preparation
 
@@ -128,13 +130,65 @@ npm run benchmark:splatfacto:scenes -- --run --skip-sam
 
 Use `--skip-sam` only when the SAM manifests already exist.
 
+## Chair Preparation
+
+The chair scene starts from the CC0 Poly Haven School Chair glTF and uses
+`objgauss.mesh_nerf` to render a deterministic NeRF-style RGBA orbit dataset.
+It is a reproducible third Splatfacto-trained row, not a real camera-captured
+multi-view scene.
+
+Generate the training input:
+
+```bash
+uv run objgauss assets pull polyhaven-school-chair-nerf
+```
+
+Run the resource-safe Splatfacto smoke:
+
+```bash
+npm run train:splatfacto:smoke -- \
+  --run \
+  --asset-id polyhaven-school-chair-nerf \
+  --dataset outputs/assets/training/polyhaven-school-chair-nerf \
+  --output-root outputs/training/polyhaven-chair-splatfacto-smoke \
+  --experiment chair-splatfacto-smoke \
+  --timestamp smoke-cuda \
+  --export-dir outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda \
+  --object-field-dir outputs/training/polyhaven-chair-splatfacto-smoke/object-field-sam \
+  --sam-manifest outputs/masks/polyhaven-chair-sam-smoke/mask-manifest.json \
+  --data-parser blender-data \
+  --iterations 100 \
+  --steps-per-save 100 \
+  --vis tensorboard \
+  --cache-images cpu \
+  --camera-res-scale-factor 0.5 \
+  --cuda-home /tmp/objgauss-cuda13 \
+  --max-jobs 2 \
+  --device cuda \
+  --sam-max-frames 8 \
+  --sam-max-masks-per-frame 6 \
+  --sam-min-area 64 \
+  --sam-max-area-fraction 0.75 \
+  --slots 6 \
+  --object-iterations 80 \
+  --skip-benchmark
+```
+
+Then refresh the scene suite:
+
+```bash
+npm run benchmark:splatfacto:scenes -- --run --skip-sam
+```
+
 ## Interpretation Boundary
 
 This suite is a reproducible experiment base, not a final quality claim.
-Fern is currently a smoke-level scene. The important regression is whether the
-same Object Field metrics, curve generation, and render occlusion probe can run
-across more than one real Splatfacto scene.
+Fern and Chair are currently smoke-level scenes. The important regression is
+whether the same Object Field metrics, curve generation, held-out evaluation,
+and render occlusion probe can run across multiple Splatfacto-trained scene
+rows.
 
-The next paper-readiness gap is not another Lego mask policy. It is adding a
-third real Splatfacto scene with the same train/held-out contract so the
-cross-scene `paper` gate can move beyond smoke/candidate status.
+The current scene suite closes the previous paper-gate count gap: three
+Splatfacto-trained scene rows and three held-out eval rows are present. The next
+gap is quality depth, not table shape: longer or higher-quality reconstructions,
+more realistic scenes, and stronger renderer-backed occlusion checks.

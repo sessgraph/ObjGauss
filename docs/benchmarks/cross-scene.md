@@ -4,7 +4,7 @@ This benchmark aggregates the current ObjGauss emergence evidence into one
 table. It combines:
 
 - the three-scene semantic smoke suite from `docs/benchmarks/semantic-smoke.json`;
-- the real Splatfacto scene suite from
+- the Splatfacto-trained scene suite from
   `docs/benchmarks/splatfacto-scenes.json`;
 - the safe-2000 Splatfacto mask variant suite from
   `docs/benchmarks/splatfacto-variants.md`.
@@ -96,20 +96,19 @@ heldout_render_occlusion_effect_score
 | Gate | Meaning |
 | --- | --- |
 | `smoke` | The aggregate table exists, all rows pass their local smoke checks, and render metrics are present. |
-| `candidate` | At least two real Splatfacto scene rows are present and the best render occlusion effect is above the current candidate floor. |
-| `paper` | Requires at least three real Splatfacto scene rows, held-out eval rows, and a failure report. |
+| `candidate` | At least two Splatfacto-trained scene rows are present and the best render occlusion effect is above the current candidate floor. |
+| `paper` | Requires at least three Splatfacto-trained scene rows, held-out eval rows, and a failure report. |
 
-As of the current local run, `smoke` and `candidate` pass, while `paper` fails
-because only two real Splatfacto scenes are available. Those two scene rows now
-have held-out eval, so the remaining paper-gate gap is one additional real
-Splatfacto scene with the same held-out contract:
+As of the current local run, all three gates pass. The Splatfacto scene suite
+now contributes Lego safe-2000, LLFF Fern smoke, and Poly Haven Chair smoke
+rows, each with the same train / held-out contract:
 
 ```text
 stage_gate=smoke passed=true
 stage_gate=candidate passed=true
-stage_gate=paper passed=false
-paper.real_splatfacto_scenes actual=2 expected=>=3
-paper.heldout_eval_rows actual=2 expected=>=3
+stage_gate=paper passed=true
+paper.real_splatfacto_scenes actual=3 expected=>=3
+paper.heldout_eval_rows actual=3 expected=>=3
 ```
 
 ## Interpretation Boundary
@@ -119,14 +118,15 @@ make the current evidence comparable across scenes and mask policies:
 
 - `semantic-smoke` rows show the existing Plush semantic, Lego alpha proxy, and
   Splatfacto smoke scenes.
-- `splatfacto-scenes` rows compare real Splatfacto scene outputs such as Lego
-  safe-2000 and LLFF Fern smoke.
+- `splatfacto-scenes` rows compare Splatfacto-trained scene outputs such as
+  Lego safe-2000, LLFF Fern smoke, and Poly Haven Chair smoke.
 - `splatfacto-safe2000-variants` rows show mask policy changes on one stronger
   Splatfacto reconstruction.
 
-The scene suite is the place to add new real Splatfacto scenes. The variant
+The scene suite is the place to add new Splatfacto-trained scenes. The variant
 suite remains an ablation table for mask and slot policy on a single scene.
 
 The failure report is intentionally generated even when the smoke benchmark
-passes. It records the remaining paper-readiness gap instead of hiding it behind
-a single pass/fail bit.
+passes. When a gate fails, it records the paper-readiness gap instead of hiding
+it behind a single pass/fail bit; when all gates pass, it still records the gate
+evidence.

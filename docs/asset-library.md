@@ -14,7 +14,8 @@
 | Plush 2D 语义 Mask 闭环样例 | Plush 3DGS 示例派生产物 | `public/samples/plush_semantic.splat` + `public/samples/plush_semantic_objects.ply` + `outputs/demos/plush-semantic-closure/` | 统一验收：真实 3DGS、非 KMeans 的 2D color masks、Object Field、对象编辑 | 继承 Plush 来源限制，仅本地测试；不是 SAM/CLIP 输出 |
 | Poly Haven School Chair 1K | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/raw/polyhaven-school-chair-1k/` | 许可干净的单对象 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练 | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
-| NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
+| NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实多视角 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
+| Poly Haven School Chair NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf/` | 第三个 Splatfacto-trained benchmark scene，由 CC0 glTF mesh 离线渲染多视角 RGBA | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 
 处理链路：
 
@@ -227,8 +228,40 @@ outputs/assets/converted/nerf-llff-fern/training-manifest.json
 ```
 
 Fern 不是前端 public sample；它用于 `docs/benchmarks/splatfacto-scenes.json`
-里的第二个真实 Splatfacto scene。训练和 benchmark 命令见
+里的第二个真实多视角 Splatfacto scene。训练和 benchmark 命令见
 `docs/benchmarks/splatfacto-scenes.md`。
+
+### Poly Haven School Chair NeRF Render Set
+
+处理链路：
+
+```text
+Poly Haven School Chair glTF
+  -> objgauss.mesh_nerf 纯 Python/NumPy 离线 rasterizer
+  -> outputs/assets/training/polyhaven-school-chair-nerf/train/*.png
+  -> outputs/assets/training/polyhaven-school-chair-nerf/transforms_train.json
+  -> Nerfstudio Splatfacto blender-data dataparser
+  -> Object Field / SAM benchmark
+```
+
+一键生成训练输入：
+
+```bash
+objgauss assets pull polyhaven-school-chair-nerf
+```
+
+默认输出：
+
+```text
+outputs/assets/training/polyhaven-school-chair-nerf/train/
+outputs/assets/training/polyhaven-school-chair-nerf/transforms_train.json
+outputs/assets/converted/polyhaven-school-chair-nerf/training-manifest.json
+```
+
+该数据集不是前端 public sample；它用于 `docs/benchmarks/splatfacto-scenes.json`
+里的第三个 Splatfacto-trained scene row。当前 renderer 是确定性 mesh
+rasterizer，用于生成可复现训练图像；它不是现实相机采集数据，也不替代
+真实 3DGS / Spark renderer。
 
 浏览器闭环验收：
 
@@ -255,7 +288,8 @@ closure，然后执行浏览器闭环验收。
 | --- | --- | --- | --- | --- |
 | P0 | ARKitScenes | 真实室内 scan | 手机 LiDAR 房间、家具对象化、真实用户输入形态 | https://github.com/apple/ARKitScenes |
 | P0 | NeRF Synthetic Lego | 多视角合成图像 + pose | ObjGauss v1 Object Field 训练烟测 | https://github.com/bmild/nerf |
-| P0 | NeRF LLFF Fern | 真实多视角图像 + COLMAP | 跨真实 Splatfacto scene benchmark | https://github.com/bmild/nerf |
+| P0 | NeRF LLFF Fern | 真实多视角图像 + COLMAP | 跨 Splatfacto scene benchmark | https://github.com/bmild/nerf |
+| P0 | Poly Haven School Chair NeRF render set | CC0 mesh 派生多视角图像 + pose | 第三个 Splatfacto scene benchmark | https://polyhaven.com/a/SchoolChair_01 |
 | P0 | OmniObject3D | 对象级 scan / mesh / point cloud | 单个真实扫描物体，高质量对象编辑实验 | https://omniobject3d.github.io/ |
 | P0 | Poly Haven | CC0 mesh / texture / HDRI | 展示 demo、开源项目可复现素材 | https://polyhaven.com/models |
 | P1 | ScanNet | 真实室内 scan + 语义/实例标注 | 场景到对象分组验证 | https://www.scan-net.org/ |

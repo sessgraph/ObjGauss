@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.features import extract_features
+from objgauss.mesh_nerf import render_gltf_nerf_dataset
 from objgauss.ply import write_ply
 from objgauss.segment import assign_object_ids
 from objgauss.splat import read_splat
@@ -96,6 +97,26 @@ ASSETS: tuple[AssetSource, ...] = (
         pull_pipeline="polyhaven-gltf",
         pipeline_stage="Demo 素材已自动化",
         use_cases=("展示Demo", "可商用样例", "mesh转3DGS"),
+        polyhaven_id="SchoolChair_01",
+        resolution="1k",
+    ),
+    AssetSource(
+        id="polyhaven-school-chair-nerf",
+        name="Poly Haven School Chair NeRF render set",
+        category="3DGS 训练集",
+        source_type="images",
+        status="已接入",
+        priority="P0",
+        source_url="https://polyhaven.com/a/SchoolChair_01",
+        download_url="https://api.polyhaven.com/files/SchoolChair_01",
+        license="CC0；API 仅用于非商用/研究拉取，需带 User-Agent",
+        formats=("images", "transforms_train.json", "CC0"),
+        best_for="第三个 Splatfacto-trained benchmark scene：由 CC0 chair mesh 离线渲染多视角 RGBA，用于 paper gate smoke。",
+        raw_file_name="polyhaven-school-chair-1k",
+        output_file_name="training-manifest.json",
+        pull_pipeline="polyhaven-nerf-render",
+        pipeline_stage="训练源已自动化",
+        use_cases=("3DGS训练", "跨场景benchmark"),
         polyhaven_id="SchoolChair_01",
         resolution="1k",
     ),
@@ -286,6 +307,14 @@ def pull_asset(
             converted_dir=converted_dir,
             force=force,
         )
+    if asset.pull_pipeline == "polyhaven-nerf-render":
+        return _pull_polyhaven_nerf_render(
+            asset,
+            raw_dir=raw_dir,
+            converted_dir=converted_dir,
+            training_dir=training_dir,
+            force=force,
+        )
     if asset.pull_pipeline == "nerf-example-data":
         return _pull_nerf_example_data(
             asset,
@@ -361,13 +390,11 @@ def _pull_polyhaven_gltf(
     if not asset.polyhaven_id or not asset.resolution:
         raise ValueError(f"{asset.name} is missing Poly Haven metadata")
 
-    files = _fetch_json(asset.download_url)
-    gltf_record = files["gltf"][asset.resolution]["gltf"]
-    root = Path(raw_dir) / asset.raw_file_name
-    downloaded = [_download_record(gltf_record, root, force=force)]
-    entrypoint = downloaded[0]
-    for relative_path, record in gltf_record.get("include", {}).items():
-        downloaded.append(_download_record(record, root / relative_path, force=force))
+    root, entrypoint, downloaded = _download_polyhaven_gltf_files(
+        asset,
+        raw_dir=raw_dir,
+        force=force,
+    )
 
     manifest_path = Path(converted_dir) / asset.id / asset.output_file_name
     manifest = {
@@ -394,6 +421,61 @@ def _pull_polyhaven_gltf(
         converted_path=manifest_path,
         output_path=entrypoint,
         raw_public_path=None,
+        manifest_path=manifest_path,
+        object_counts=(),
+        downloaded_files=tuple(downloaded),
+    )
+
+
+def _pull_polyhaven_nerf_render(
+    asset: AssetSource,
+    *,
+    raw_dir: str | Path,
+    converted_dir: str | Path,
+    training_dir: str | Path,
+    force: bool,
+) -> PulledAsset:
+    if not asset.download_url or not asset.raw_file_name or not asset.output_file_name:
+        raise ValueError(f"{asset.name} is missing pull metadata")
+    if not asset.polyhaven_id or not asset.resolution:
+        raise ValueError(f"{asset.name} is missing Poly Haven metadata")
+
+    root, entrypoint, downloaded = _download_polyhaven_gltf_files(
+        asset,
+        raw_dir=raw_dir,
+        force=force,
+    )
+    output_path = Path(training_dir) / asset.id
+    result = render_gltf_nerf_dataset(entrypoint, output_path, frames=16, image_size=256)
+    manifest_path = Path(converted_dir) / asset.id / asset.output_file_name
+    files = sorted(
+        str(path.relative_to(output_path))
+        for path in output_path.rglob("*")
+        if path.is_file()
+    )
+    manifest = {
+        "asset_id": asset.id,
+        "source": asset.source_url,
+        "license": asset.license,
+        "pipeline": asset.pull_pipeline,
+        "polyhaven_id": asset.polyhaven_id,
+        "resolution": asset.resolution,
+        "raw_root": str(root),
+        "gltf": str(entrypoint),
+        "training_path": str(output_path),
+        "frames": result.frames,
+        "image_size": result.image_size,
+        "triangles": result.triangles,
+        "files": files,
+    }
+    _write_json(manifest_path, manifest)
+    return PulledAsset(
+        asset=asset,
+        raw_path=root,
+        converted_path=manifest_path,
+        output_path=result.transforms_train_path,
+        raw_public_path=None,
+        training_path=output_path,
         manifest_path=manifest_path,
         object_counts=(),
         downloaded_files=tuple(downloaded),
@@ -441,6 +523,39 @@ def _pull_nerf_example_data(
         object_counts=(),
         downloaded_files=all_files,
     )
+
+
+def _download_polyhaven_gltf_files(
+    asset: AssetSource,
+    *,
+    raw_dir: str | Path,
+    force: bool,
+) -> tuple[Path, Path, list[Path]]:
+    if not asset.download_url or not asset.raw_file_name:
+        raise ValueError(f"{asset.name} is missing Poly Haven pull metadata")
+    if not asset.resolution:
+        raise ValueError(f"{asset.name} is missing Poly Haven resolution")
+    root = Path(raw_dir) / asset.raw_file_name
+    existing = _existing_polyhaven_gltf_files(root)
+    if existing and not force:
+        return root, existing[0], existing
+
+    files = _fetch_json(asset.download_url)
+    gltf_record = files["gltf"][asset.resolution]["gltf"]
+    downloaded = [_download_record(gltf_record, root, force=force)]
+    entrypoint = downloaded[0]
+    for relative_path, record in gltf_record.get("include", {}).items():
+        downloaded.append(_download_record(record, root / relative_path, force=force))
+    return root, entrypoint, downloaded
+
+
+def _existing_polyhaven_gltf_files(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    gltf_files = sorted(root.glob("*.gltf"))
+    if not gltf_files:
+        return []
+    return [gltf_files[0], *sorted(path for path in root.rglob("*") if path.is_file() and path != gltf_files[0])]
 
 
 def _download(url: str, path: Path, *, force: bool) -> None:

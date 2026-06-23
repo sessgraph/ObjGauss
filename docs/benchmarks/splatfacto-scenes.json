@@ -75,6 +75,42 @@
         "uv run objgauss assets pull nerf-llff-fern",
         "npm run train:splatfacto:smoke -- --run --asset-id nerf-llff-fern --dataset outputs/assets/training/nerf-llff-fern --output-root outputs/training/nerf-fern-splatfacto-smoke --experiment fern-splatfacto-smoke --timestamp smoke-cuda --export-dir outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda --object-field-dir outputs/training/nerf-fern-splatfacto-smoke/object-field-sam --sam-manifest outputs/masks/nerf-fern-sam-smoke/mask-manifest.json --dataparser-transform outputs/training/nerf-fern-splatfacto-smoke/fern-splatfacto-smoke/splatfacto/smoke-cuda/dataparser_transforms.json --data-parser colmap --downscale-factor 1 --images-path images --colmap-path sparse/0 --iterations 100 --steps-per-save 100 --vis tensorboard --cache-images cpu --camera-res-scale-factor 0.25 --cuda-home /tmp/objgauss-cuda13 --max-jobs 2 --device cpu --sam-max-frames 4 --sam-max-masks-per-frame 6 --sam-min-area 256 --sam-max-area-fraction 0.35 --sam-max-image-size 768 --slots 6 --object-iterations 80 --skip-benchmark"
       ]
+    },
+    {
+      "id": "chair-splatfacto-smoke",
+      "label": "Poly Haven Chair Splatfacto smoke",
+      "dataset": "outputs/assets/training/polyhaven-school-chair-nerf",
+      "input_ply": "outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda/splat.ply",
+      "sam_manifest": "outputs/masks/polyhaven-chair-sam-smoke/mask-manifest.json",
+      "train_sam_manifest": "outputs/masks/polyhaven-chair-sam-smoke/train-mask-manifest.json",
+      "heldout_manifest": "outputs/masks/polyhaven-chair-sam-smoke/heldout-mask-manifest.json",
+      "output_dir": "outputs/assets/gaussians/polyhaven-chair-splatfacto-smoke-sam8f-slots6-benchmark",
+      "benchmark_output_dir": "/tmp/objgauss-splatfacto-scene-suite/chair-splatfacto-smoke",
+      "asset_id": "polyhaven-chair-splatfacto-smoke-sam8f-slots6-benchmark",
+      "slots": 6,
+      "mask_policy": "SAM 8 frames, 6 masks per frame, max_area_fraction=0.75",
+      "sam": {
+        "max_frames": 8,
+        "max_masks_per_frame": 6,
+        "min_area": 64,
+        "max_area_fraction": 0.75
+      },
+      "heldout": {
+        "every": 4,
+        "offset": 3
+      },
+      "benchmark": {
+        "object_iterations": 120,
+        "curve_iterations": 60,
+        "eval_every": 20,
+        "render_size": 96,
+        "learning_rate": 1.0,
+        "device": "cuda"
+      },
+      "prepare": [
+        "uv run objgauss assets pull polyhaven-school-chair-nerf",
+        "npm run train:splatfacto:smoke -- --run --asset-id polyhaven-school-chair-nerf --dataset outputs/assets/training/polyhaven-school-chair-nerf --output-root outputs/training/polyhaven-chair-splatfacto-smoke --experiment chair-splatfacto-smoke --timestamp smoke-cuda --export-dir outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda --object-field-dir outputs/training/polyhaven-chair-splatfacto-smoke/object-field-sam --sam-manifest outputs/masks/polyhaven-chair-sam-smoke/mask-manifest.json --data-parser blender-data --iterations 100 --steps-per-save 100 --vis tensorboard --cache-images cpu --camera-res-scale-factor 0.5 --cuda-home /tmp/objgauss-cuda13 --max-jobs 2 --device cuda --sam-max-frames 8 --sam-max-masks-per-frame 6 --sam-min-area 64 --sam-max-area-fraction 0.75 --slots 6 --object-iterations 80 --skip-benchmark"
+      ]
     }
   ]
 }
