@@ -103,10 +103,16 @@ export function createWebGpuTileStorageBuffers(device, tileSmoke) {
       buffer,
     };
   });
+  const bufferMap = new Map(buffers.map((entry) => [entry.key, entry]));
 
   return {
     ...description,
     buffers,
+    getBuffer(key) {
+      const entry = bufferMap.get(key);
+      if (!entry) throw new Error(`missing WebGPU storage buffer entry: ${key}`);
+      return entry;
+    },
     destroy() {
       for (const entry of buffers) {
         entry.buffer?.destroy?.();

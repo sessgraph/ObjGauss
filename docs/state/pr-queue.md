@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005C`: 在 storage-buffer upload contract 基础上推进 WebGPU compute accumulation / resolve shader。
+  - `RENDER-005D`: 在 storage-buffer resolve shader 基础上推进 WebGPU compute accumulation shader。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,31 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005C: WebGPU storage-buffer resolve shader
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 WebGPU first-frame display path 从 CPU resolved texture sampling 推进到从 `tileResolvedRgba` storage buffer 直接 fullscreen resolve，为后续 compute accumulation 输出接入同一个 buffer 铺路。
+- 范围外:
+  - 不实现 WebGPU compute accumulation shader。
+  - 不实现 per-pixel tile traversal；当前 `tileResolvedRgba` 内容仍来自 CPU tile-center smoke resolve。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - 新增 `src/webgpuTileResolveShader.js`，定义 `webgpu-storage-resolve-v1` WGSL：fragment shader 读取 `var<storage, read> tileResolvedRgba: array<vec4f>` 和 `ResolveMeta` uniform，不再依赖 sampled texture。
+  - `WebGpuTileViewport` 使用 storage-buffer resolve shader 创建 render pipeline，bind `tileResolvedRgba` storage buffer 与 16-byte resolve meta uniform 后绘制 fullscreen triangle。
+  - WebGPU viewport 新增 `data-webgpu-resolve-source`，真实 WebGPU route 会暴露 `webgpu-storage-resolve-v1`。
+  - `audit-webgpu-tile-smoke` 验证 resolve shader contract、16-byte resolve meta、storage bundle `getBuffer("tileResolvedRgba")` 和无 `textureSample` 依赖。
+  - `audit-demo` 的 WebGPU route 现在要求 first frame 来自 `webgpu-storage-resolve-v1`。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 storage-buffer resolve contract。
+  - WebGPU 可用环境中，`webgpu-tile` route 的 first frame 必须来自 storage-buffer resolve shader。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `resolveSource=webgpu-storage-resolve-v1`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5208/`: passed，assets=3；当前仍 fallback，`resolveSource=null` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-005B: WebGPU storage-buffer upload contract
 

@@ -51,6 +51,7 @@ try {
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
+        `resolveSource=${JSON.stringify(result.webGpuResolveSource)} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
@@ -312,6 +313,7 @@ async function runAudit(url, assetsToCheck) {
       const webGpuFirstFrameStatus = await viewport.getAttribute("data-webgpu-first-frame-status");
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
+      const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
       const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
@@ -321,10 +323,11 @@ async function runAudit(url, assetsToCheck) {
         if (
           webGpuFirstFrameStatus !== "rendered" ||
           webGpuFirstFramePixels <= 0 ||
-          !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "")
+          !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
+          webGpuResolveSource !== "webgpu-storage-resolve-v1"
         ) {
           throw new Error(
-            `${asset.id} WebGPU first frame did not render: status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum}`,
+            `${asset.id} WebGPU first frame did not render through storage resolve: status=${webGpuFirstFrameStatus} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
           );
         }
         if (
@@ -408,6 +411,7 @@ async function runAudit(url, assetsToCheck) {
         webGpuFirstFrameStatus,
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
+        webGpuResolveSource,
         webGpuStorageLayout,
         webGpuStorageStatus,
         webGpuStorageBufferCount,

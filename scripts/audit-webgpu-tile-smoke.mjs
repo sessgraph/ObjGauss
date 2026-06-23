@@ -12,6 +12,11 @@ import {
   describeWebGpuTileStorage,
   WEBGPU_TILE_STORAGE_LAYOUT_VERSION,
 } from "../src/webgpuTileStorage.js";
+import {
+  createWebGpuResolveMeta,
+  WEBGPU_TILE_RESOLVE_SHADER,
+  WEBGPU_TILE_RESOLVE_SOURCE,
+} from "../src/webgpuTileResolveShader.js";
 import { editRendererContract } from "../src/webgpuCapability.js";
 
 const scene = createSampleScene();
@@ -103,6 +108,11 @@ assert.equal(storageBundle.bufferCount, storage.bufferCount);
 assert.equal(storageBundle.totalByteLength, storage.totalByteLength);
 assert.equal(storageBundle.checksum, storage.checksum);
 assert.equal(storageBundle.buffers.length, storage.bufferCount);
+assert.equal(
+  storageBundle.getBuffer("tileResolvedRgba").byteLength,
+  base.buffers.tileResolvedRgba.byteLength,
+);
+assert.equal(storageBundle.getBuffer("objectState").byteLength, base.buffers.objectState.byteLength);
 assert.equal(fakeDevice.created.length, storage.bufferCount);
 assert.equal(fakeDevice.writes.length, storage.bufferCount);
 assert.ok(fakeDevice.created.every((buffer) => buffer.descriptor.usage > 0));
@@ -111,6 +121,14 @@ assert.ok(
 );
 storageBundle.destroy();
 assert.ok(fakeDevice.created.every((buffer) => buffer.destroyed));
+
+const resolveMeta = createWebGpuResolveMeta(base);
+assert.deepEqual([...resolveMeta], [base.tileColumns, base.tileRows, 0, 0]);
+assert.equal(resolveMeta.byteLength, 16);
+assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-storage-resolve-v1");
+assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+tileResolvedRgba/);
+assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
+assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
 
 const roomy = buildWebGpuTileSmoke({
   points: scene.points,
@@ -195,7 +213,8 @@ console.log(
     `refs=${base.tileReferenceCount} resolved=${base.resolvedTileCount} ` +
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
-    `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount}`,
+    `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +
+    `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}`,
 );
 
 function createFakeDevice() {

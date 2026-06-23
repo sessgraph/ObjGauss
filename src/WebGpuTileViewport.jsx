@@ -1,40 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
+import {
+  createWebGpuResolveMeta,
+  WEBGPU_TILE_RESOLVE_SHADER,
+  WEBGPU_TILE_RESOLVE_SOURCE,
+} from "./webgpuTileResolveShader.js";
 
 const BACKGROUND_RGB = [16, 19, 22];
-const FULLSCREEN_SHADER = `
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-};
-
-@group(0) @binding(0) var tileSampler: sampler;
-@group(0) @binding(1) var tileTexture: texture_2d<f32>;
-
-@vertex
-fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-  var positions = array<vec2f, 3>(
-    vec2f(-1.0, -1.0),
-    vec2f(3.0, -1.0),
-    vec2f(-1.0, 3.0)
-  );
-  let position = positions[vertexIndex];
-  var output: VertexOutput;
-  output.position = vec4f(position, 0.0, 1.0);
-  output.uv = position * 0.5 + vec2f(0.5);
-  return output;
-}
-
-@fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  let uv = clamp(input.uv, vec2f(0.0), vec2f(1.0));
-  let tile = textureSample(tileTexture, tileSampler, uv);
-  let background = vec3f(0.0627, 0.0745, 0.0863);
-  let rgb = background * (1.0 - tile.a) + tile.rgb * tile.a;
-  return vec4f(rgb, 1.0);
-}
-`;
 
 export default function WebGpuTileViewport({
   points,
@@ -54,6 +27,7 @@ export default function WebGpuTileViewport({
     reason: "webgpu-runtime-initializing",
     checksum: "",
     pixels: 0,
+    source: "",
   });
   const [storage, setStorage] = useState({
     status: "pending",
@@ -84,6 +58,7 @@ export default function WebGpuTileViewport({
         reason: "navigator-gpu-unavailable",
         checksum: "",
         pixels: 0,
+        source: "",
       });
       setStorage({
         status: "failed",
@@ -110,7 +85,7 @@ export default function WebGpuTileViewport({
         const context = canvas.getContext("webgpu");
         if (!context) throw new Error("webgpu-context-unavailable");
         const format = navigator.gpu.getPreferredCanvasFormat();
-        const module = device.createShaderModule({ code: FULLSCREEN_SHADER });
+        const module = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
         const pipeline = device.createRenderPipeline({
           layout: "auto",
           vertex: { module, entryPoint: "vertexMain" },
@@ -121,12 +96,7 @@ export default function WebGpuTileViewport({
           },
           primitive: { topology: "triangle-list" },
         });
-        const sampler = device.createSampler({
-          magFilter: "nearest",
-          minFilter: "nearest",
-        });
-
-        runtimeRef.current = { device, context, format, pipeline, sampler };
+        runtimeRef.current = { device, context, format, pipeline };
         device.lost.then((info) => {
           if (cancelled) return;
           setFrame({
@@ -134,6 +104,7 @@ export default function WebGpuTileViewport({
             reason: `webgpu-device-lost-${info.reason || "unknown"}`,
             checksum: "",
             pixels: 0,
+            source: "",
           });
         });
         renderFrame({
@@ -150,6 +121,7 @@ export default function WebGpuTileViewport({
           reason: error?.message || "webgpu-first-frame-failed",
           checksum: "",
           pixels: 0,
+          source: "",
         });
         setStorage({
           status: "failed",
@@ -251,6 +223,7 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-reason={frame.reason}
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
+      data-webgpu-resolve-source={frame.source}
       data-webgpu-storage-layout={storage.layoutVersion}
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
@@ -281,7 +254,7 @@ export default function WebGpuTileViewport({
 }
 
 function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
-  const { device, context, format, pipeline, sampler } = runtime;
+  const { device, context, format, pipeline } = runtime;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
 
@@ -314,16 +287,17 @@ function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
       reason: error?.message || "webgpu-storage-upload-failed",
       checksum: "",
       pixels: 0,
+      source: "",
     });
     return;
   }
 
-  const texture = createTileTexture(device, tileSmoke);
+  const resolveMetaBuffer = createResolveMetaBuffer(device, tileSmoke);
   const bindGroup = device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: sampler },
-      { binding: 1, resource: texture.createView() },
+      { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+      { binding: 1, resource: { buffer: resolveMetaBuffer } },
     ],
   });
   const encoder = device.createCommandEncoder();
@@ -347,41 +321,29 @@ function renderFrame({ runtime, canvas, tileSmoke, setFrame, setStorage }) {
   pass.draw(3);
   pass.end();
   device.queue.submit([encoder.finish()]);
-  texture.destroy();
+  resolveMetaBuffer.destroy();
   setFrame({
     status: "rendered",
-    reason: "webgpu-tile-first-frame-rendered",
+    reason: "webgpu-storage-resolve-rendered",
     checksum: tileSmoke.resolveChecksum,
     pixels: tileSmoke.resolvedTileCount,
+    source: WEBGPU_TILE_RESOLVE_SOURCE,
   });
 }
 
-function createTileTexture(device, tileSmoke) {
-  const width = Math.max(1, tileSmoke.tileColumns);
-  const height = Math.max(1, tileSmoke.tileRows);
-  const data = new Uint8Array(width * height * 4);
-  const source = tileSmoke.buffers.tileResolvedRgba;
-  for (let index = 0; index < data.length; index += 4) {
-    data[index] = toByte(source[index]);
-    data[index + 1] = toByte(source[index + 1]);
-    data[index + 2] = toByte(source[index + 2]);
-    data[index + 3] = toByte(source[index + 3]);
-  }
-  const texture = device.createTexture({
-    size: [width, height, 1],
-    format: "rgba8unorm",
-    usage:
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_DST |
-      GPUTextureUsage.RENDER_ATTACHMENT,
+function createResolveMetaBuffer(device, tileSmoke) {
+  const data = createWebGpuResolveMeta(tileSmoke);
+  const usage = globalThis.GPUBufferUsage ?? {
+    COPY_DST: 0x0008,
+    UNIFORM: 0x0040,
+  };
+  const buffer = device.createBuffer({
+    label: "objgauss-resolve-meta",
+    size: data.byteLength,
+    usage: usage.UNIFORM | usage.COPY_DST,
   });
-  device.queue.writeTexture(
-    { texture },
-    data,
-    { bytesPerRow: width * 4, rowsPerImage: height },
-    { width, height, depthOrArrayLayers: 1 },
-  );
-  return texture;
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
 }
 
 function pickObjectFromTileFrame({
@@ -451,10 +413,4 @@ function sceneBounds(points) {
     spanX: Math.max(maxX - minX, 0.0001),
     spanZ: Math.max(maxZ - minZ, 0.0001),
   };
-}
-
-function toByte(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.round(Math.min(1, Math.max(0, numeric)) * 255);
 }
