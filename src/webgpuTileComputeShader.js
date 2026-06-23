@@ -1,12 +1,13 @@
 export const WEBGPU_TILE_COMPUTE_SOURCE = "webgpu-compute-resolve-v1";
 export const WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE = 64;
-export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-accumulation-v1";
+export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-covariance-accumulation-v1";
 export const WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE = 64;
 
 export const WEBGPU_TILE_ACCUMULATION_SHADER = `
 const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13.0;
+const SAMPLE_WEIGHT = 0.25;
 
 struct AccumulationMeta {
   tileCount: f32,
@@ -31,6 +32,7 @@ struct AccumulationMeta {
 @group(0) @binding(5) var<storage, read> tileEntries: array<u32>;
 @group(0) @binding(6) var<storage, read_write> tileAccumulation: array<vec4f>;
 @group(0) @binding(7) var<uniform> accumulationMeta: AccumulationMeta;
+@group(0) @binding(8) var<storage, read> scaleRotation: array<vec4f>;
 
 @compute @workgroup_size(${WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE})
 fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
@@ -66,19 +68,38 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
       (1.0 - ((centerRadius.y - accumulationMeta.boundsMinZ) / max(accumulationMeta.boundsSpanZ, 0.0001))) *
         max(1.0, accumulationMeta.viewportHeight - 1.0)
     );
-    let sigma = max(centerRadius.w / 3.0, 0.0001);
-    let delta = tileCenter - screen;
-    let d = dot(delta, delta) / (sigma * sigma);
-    if (d > RESOLVE_KERNEL_CUTOFF) {
-      continue;
-    }
-
+    let gaussianScale = scaleRotation[gaussianIndex];
+    let pixelsPerWorldUnit = min(
+      accumulationMeta.viewportWidth / max(accumulationMeta.boundsSpanX, 0.0001),
+      accumulationMeta.viewportHeight / max(accumulationMeta.boundsSpanZ, 0.0001)
+    );
+    let sigma = max(gaussianScale.xy * pixelsPerWorldUnit * 4.8 / 3.0, vec2f(0.0001));
+    let cosine = cos(gaussianScale.z);
+    let sine = sin(gaussianScale.z);
     let color = colorOpacity[gaussianIndex];
-    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN;
-    if (weight <= 0.0001) {
-      continue;
+
+    for (var sampleIndex = 0u; sampleIndex < 4u; sampleIndex = sampleIndex + 1u) {
+      let sampleOffset = vec2f(
+        (f32(sampleIndex & 1u) - 0.5) * accumulationMeta.tileSize * 0.5,
+        (f32((sampleIndex >> 1u) & 1u) - 0.5) * accumulationMeta.tileSize * 0.5
+      );
+      let delta = tileCenter + sampleOffset - screen;
+      let rotated = vec2f(
+        cosine * delta.x - sine * delta.y,
+        sine * delta.x + cosine * delta.y
+      );
+      let normalized = rotated / sigma;
+      let d = dot(normalized, normalized);
+      if (d > RESOLVE_KERNEL_CUTOFF) {
+        continue;
+      }
+
+      let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * SAMPLE_WEIGHT;
+      if (weight <= 0.0001) {
+        continue;
+      }
+      accumulation = accumulation + vec4f(color.rgb * weight, weight);
     }
-    accumulation = accumulation + vec4f(color.rgb * weight, weight);
   }
 
   tileAccumulation[tileIndex] = accumulation;

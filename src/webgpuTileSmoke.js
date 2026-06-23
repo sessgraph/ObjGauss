@@ -13,6 +13,12 @@ const OBJECT_STATE_ENABLED = 1 << 4;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13;
+const TILE_SAMPLE_OFFSETS = Object.freeze([
+  [-0.25, -0.25],
+  [0.25, -0.25],
+  [-0.25, 0.25],
+  [0.25, 0.25],
+]);
 
 export function buildWebGpuTileSmoke({
   points,
@@ -113,9 +119,14 @@ export function buildWebGpuTileSmoke({
           tileIndex,
           tileCenters,
           screen,
-          radiusPixels,
+          scale,
+          bounds,
+          viewportWidth,
+          viewportHeight,
+          tileSize,
           gaussianIndex: index,
           colorOpacity,
+          scaleRotation,
           tileAccumulation,
         });
       }
@@ -134,7 +145,7 @@ export function buildWebGpuTileSmoke({
   return {
     layoutVersion: WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
     resolveVersion: WEBGPU_TILE_RESOLVE_VERSION,
-    resolveMode: "tile-center-weighted-oit",
+    resolveMode: "tile-2x2-covariance-weighted-oit",
     tileSize,
     viewportWidth,
     viewportHeight,
@@ -207,31 +218,63 @@ function accumulateTileResolve({
   tileIndex,
   tileCenters,
   screen,
-  radiusPixels,
+  scale,
+  bounds,
+  viewportWidth,
+  viewportHeight,
+  tileSize,
   gaussianIndex,
   colorOpacity,
+  scaleRotation,
   tileAccumulation,
 }) {
   const tileX = tileIndex % tileCenters.tileColumns;
   const tileY = Math.floor(tileIndex / tileCenters.tileColumns);
-  const dx = tileCenters.centersX[tileX] - screen.x;
-  const dy = tileCenters.centersY[tileY] - screen.y;
-  const sigma = Math.max(radiusPixels / 3, 0.0001);
-  const d = (dx * dx + dy * dy) / (sigma * sigma);
-  if (d > RESOLVE_KERNEL_CUTOFF) return;
-
   const gaussianOffset = gaussianIndex * 4;
-  const weight =
-    Math.exp(-0.5 * d) *
-    colorOpacity[gaussianOffset + 3] *
-    RESOLVE_ALPHA_GAIN;
-  if (weight <= 0.0001) return;
+  const scaleOffset = gaussianIndex * 4;
+  const pixelsPerWorldUnit = Math.min(
+    viewportWidth / Math.max(bounds.spanX, 0.0001),
+    viewportHeight / Math.max(bounds.spanZ, 0.0001),
+  );
+  const sigmaX = Math.max((scale[0] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
+  const sigmaY = Math.max((scale[1] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
+  const rotation = scaleRotation[scaleOffset + 2];
+  const cosine = Math.cos(rotation);
+  const sine = Math.sin(rotation);
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let alphaWeight = 0;
+
+  for (const [sampleX, sampleY] of TILE_SAMPLE_OFFSETS) {
+    const dx = tileCenters.centersX[tileX] + sampleX * tileSize - screen.x;
+    const dy = tileCenters.centersY[tileY] + sampleY * tileSize - screen.y;
+    const rotatedX = cosine * dx - sine * dy;
+    const rotatedY = sine * dx + cosine * dy;
+    const d =
+      (rotatedX * rotatedX) / (sigmaX * sigmaX) +
+      (rotatedY * rotatedY) / (sigmaY * sigmaY);
+    if (d > RESOLVE_KERNEL_CUTOFF) continue;
+
+    const weight =
+      Math.exp(-0.5 * d) *
+      colorOpacity[gaussianOffset + 3] *
+      RESOLVE_ALPHA_GAIN *
+      (1 / TILE_SAMPLE_OFFSETS.length);
+    if (weight <= 0.0001) continue;
+    red += colorOpacity[gaussianOffset] * weight;
+    green += colorOpacity[gaussianOffset + 1] * weight;
+    blue += colorOpacity[gaussianOffset + 2] * weight;
+    alphaWeight += weight;
+  }
+
+  if (alphaWeight <= 0.0001) return;
 
   const tileOffset = tileIndex * 4;
-  tileAccumulation[tileOffset] += colorOpacity[gaussianOffset] * weight;
-  tileAccumulation[tileOffset + 1] += colorOpacity[gaussianOffset + 1] * weight;
-  tileAccumulation[tileOffset + 2] += colorOpacity[gaussianOffset + 2] * weight;
-  tileAccumulation[tileOffset + 3] += weight;
+  tileAccumulation[tileOffset] += red;
+  tileAccumulation[tileOffset + 1] += green;
+  tileAccumulation[tileOffset + 2] += blue;
+  tileAccumulation[tileOffset + 3] += alphaWeight;
 }
 
 function resolveTileAccumulation(tileAccumulation) {

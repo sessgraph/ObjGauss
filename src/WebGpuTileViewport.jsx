@@ -403,6 +403,7 @@ function renderFrame({
         { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
         { binding: 6, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
         { binding: 7, resource: { buffer: accumulationMetaBuffer } },
+        { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
       ],
     });
     const computeBindGroup = device.createBindGroup({

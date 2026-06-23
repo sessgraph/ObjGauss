@@ -260,7 +260,7 @@ async function runAudit(url, assetsToCheck) {
           `${asset.id} non-overflow telemetry was not pass/ok: overflowTiles=${tileOverflowTileCount} ratio=${tileOverflowRatio} maxExcess=${tileOverflowMaxExcess} status=${tileCapacityStatus} gate=${tileCapacityGate}`,
         );
       }
-      if (resolveLayout !== "webgpu-tile-resolve-v1" || resolveMode !== "tile-center-weighted-oit") {
+      if (resolveLayout !== "webgpu-tile-resolve-v1" || resolveMode !== "tile-2x2-covariance-weighted-oit") {
         throw new Error(
           `${asset.id} did not expose WebGPU tile resolve contract: layout=${resolveLayout} mode=${resolveMode}`,
         );
@@ -330,7 +330,7 @@ async function runAudit(url, assetsToCheck) {
       const webGpuStorageTileEntries = await viewport.getAttribute("data-webgpu-storage-tile-entries");
       if (editRendererId === "webgpu-tile") {
         if (
-          webGpuAccumulationSource !== "webgpu-compute-accumulation-v1" ||
+          webGpuAccumulationSource !== "webgpu-compute-covariance-accumulation-v1" ||
           webGpuAccumulationStatus !== "dispatched" ||
           webGpuAccumulationWorkgroups <= 0 ||
           webGpuComputeSource !== "webgpu-compute-resolve-v1" ||

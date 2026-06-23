@@ -77,7 +77,7 @@ assert.equal(base.tileEntryStoredCount, base.tileReferenceCount - base.tileOverf
 assert.equal(base.tileEntryCapacity, base.tileCount * base.maxEntriesPerTile);
 assert.ok(base.tileEntryUtilization > 0 && base.tileEntryUtilization <= 1);
 assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
-assert.equal(base.resolveMode, "tile-center-weighted-oit");
+assert.equal(base.resolveMode, "tile-2x2-covariance-weighted-oit");
 assert.ok(base.resolvedTileCount > 0);
 assert.ok(base.resolveWeightSum > 0);
 assert.ok(base.resolveAlphaMean > 0);
@@ -170,7 +170,7 @@ assert.deepEqual(
     base.viewportHeight,
   ],
 );
-assert.equal(WEBGPU_TILE_ACCUMULATION_SOURCE, "webgpu-compute-accumulation-v1");
+assert.equal(WEBGPU_TILE_ACCUMULATION_SOURCE, "webgpu-compute-covariance-accumulation-v1");
 assert.equal(WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE, 64);
 assert.equal(
   webGpuAccumulationWorkgroups(base),
@@ -179,9 +179,12 @@ assert.equal(
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /@compute\s+@workgroup_size\(64\)/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+positionRadius/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+colorOpacity/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+scaleRotation/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+objectState/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read>\s+tileEntries/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read_write>\s+tileAccumulation/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /sampleIndex\s*<\s*4u/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /gaussianScale\.xy/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /tileAccumulation\[tileIndex\]\s*=\s*accumulation/);
 
 const roomy = buildWebGpuTileSmoke({
