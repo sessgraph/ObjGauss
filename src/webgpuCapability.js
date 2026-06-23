@@ -1,4 +1,8 @@
 import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
+import {
+  WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+  WEBGPU_TILE_PROJECTION_MODE,
+} from "./webgpuTileSmoke.js";
 
 export const WEBGPU_TILE_RENDERER_ID = "webgpu-tile";
 export const WEBGPU_TILE_RENDERER_LABEL = "WebGPU Tile 编辑";
@@ -26,8 +30,12 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   boundsPaddingRatio: 0,
   boundsViewportAspect: 1,
   boundsWorldAspect: 1,
-  projectionMode: "edit-perspective-camera-v1",
+  projectionMode: WEBGPU_TILE_PROJECTION_MODE,
   projectionCameraFovDegrees: 52,
+  projectionDepthMin: 0,
+  projectionDepthMax: 1,
+  projectionDepthSpan: 1,
+  depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   packedGaussians: 0,
   binnedGaussians: 0,
   visibleGaussians: 0,
@@ -151,6 +159,10 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     boundsWorldAspect: smoke.boundsWorldAspect,
     projectionMode: smoke.projectionMode,
     projectionCameraFovDegrees: smoke.projectionCameraFovDegrees,
+    projectionDepthMin: smoke.projectionDepthMin,
+    projectionDepthMax: smoke.projectionDepthMax,
+    projectionDepthSpan: smoke.projectionDepthSpan,
+    depthWeightMode: smoke.depthWeightMode,
     packedGaussians: smoke.packedGaussians,
     binnedGaussians: smoke.binnedGaussians,
     visibleGaussians: smoke.visibleGaussians,

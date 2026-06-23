@@ -8,6 +8,7 @@ export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
 export const WEBGPU_TILE_ENTRY_LAYOUT_COMPACT = "compact-offset-list";
 export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
 export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
+export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -17,6 +18,8 @@ const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13;
 const VIEWPORT_FIT_PADDING_RATIO = 0.08;
+const DEPTH_WEIGHT_STRENGTH = 1.45;
+const DEPTH_WEIGHT_FLOOR = 0.22;
 const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
 const EDIT_CAMERA_UP = Object.freeze([0, 1, 0]);
@@ -132,6 +135,7 @@ export function buildWebGpuTileSmoke({
           tileIndex,
           tileCenters,
           screen,
+          bounds,
           tileSize,
           gaussianIndex: index,
           colorOpacity,
@@ -184,6 +188,8 @@ export function buildWebGpuTileSmoke({
         tileOffsets,
         maxEntriesPerTile,
         tileEntryLayout,
+        depthMin: bounds.depthMin,
+        depthSpan: bounds.depthSpan,
         tileColumns,
         tileSize,
         viewportWidth,
@@ -213,6 +219,10 @@ export function buildWebGpuTileSmoke({
     projectionCameraFovDegrees: bounds.cameraFovDegrees,
     projectionCameraPosition: bounds.cameraPosition,
     projectionCameraTarget: bounds.cameraTarget,
+    projectionDepthMin: bounds.depthMin,
+    projectionDepthMax: bounds.depthMax,
+    projectionDepthSpan: bounds.depthSpan,
+    depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
     tileColumns,
     tileRows,
     tileCount,
@@ -360,6 +370,7 @@ function accumulateTileResolve({
   tileIndex,
   tileCenters,
   screen,
+  bounds,
   tileSize,
   gaussianIndex,
   colorOpacity,
@@ -373,6 +384,7 @@ function accumulateTileResolve({
   const rotation = scaleRotation[scaleOffset + 2];
   const sigmaX = Math.max(scaleRotation[scaleOffset], 0.0001);
   const sigmaY = Math.max(scaleRotation[scaleOffset + 1], 0.0001);
+  const depthWeight = frontWeightedOitDepth(screen.depth, bounds.depthMin, bounds.depthSpan);
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
   let red = 0;
@@ -394,6 +406,7 @@ function accumulateTileResolve({
       Math.exp(-0.5 * d) *
       colorOpacity[gaussianOffset + 3] *
       RESOLVE_ALPHA_GAIN *
+      depthWeight *
       (1 / TILE_SAMPLE_OFFSETS.length);
     if (weight <= 0.0001) continue;
     red += colorOpacity[gaussianOffset] * weight;
@@ -462,6 +475,8 @@ function resolvePixelOutput({
   tileOffsets,
   maxEntriesPerTile,
   tileEntryLayout,
+  depthMin,
+  depthSpan,
   tileColumns,
   tileSize,
   viewportWidth,
@@ -481,6 +496,8 @@ function resolvePixelOutput({
   const projection = buildPixelProjection({
     positionRadius,
     scaleRotation,
+    depthMin,
+    depthSpan,
   });
   let pixelResolvedCount = 0;
   let checksum = 2166136261;
@@ -521,6 +538,7 @@ function resolvePixelOutput({
         const weight =
           Math.exp(-0.5 * d) *
           colorOpacity[gaussianOffset + 3] *
+          projection.depthWeight[gaussianIndex] *
           RESOLVE_ALPHA_GAIN;
         if (weight <= 0.0001) continue;
         accumulatedRed += colorOpacity[gaussianOffset] * weight;
@@ -555,12 +573,15 @@ function resolvePixelOutput({
 function buildPixelProjection({
   positionRadius,
   scaleRotation,
+  depthMin,
+  depthSpan,
 }) {
   const gaussianCount = positionRadius.length / 4;
   const screenX = new Float32Array(gaussianCount);
   const screenY = new Float32Array(gaussianCount);
   const sigmaXSquared = new Float32Array(gaussianCount);
   const sigmaYSquared = new Float32Array(gaussianCount);
+  const depthWeight = new Float32Array(gaussianCount);
   const cosine = new Float32Array(gaussianCount);
   const sine = new Float32Array(gaussianCount);
 
@@ -572,12 +593,13 @@ function buildPixelProjection({
     const sigmaY = Math.max(scaleRotation[offset + 1], 0.0001);
     sigmaXSquared[index] = sigmaX * sigmaX;
     sigmaYSquared[index] = sigmaY * sigmaY;
+    depthWeight[index] = frontWeightedOitDepth(positionRadius[offset + 2], depthMin, depthSpan);
     const rotation = scaleRotation[offset + 2];
     cosine[index] = Math.cos(rotation);
     sine[index] = Math.sin(rotation);
   }
 
-  return { screenX, screenY, sigmaXSquared, sigmaYSquared, cosine, sine };
+  return { screenX, screenY, sigmaXSquared, sigmaYSquared, depthWeight, cosine, sine };
 }
 
 function checksumValue(checksum, red, green, blue, alpha, weight) {
@@ -719,6 +741,9 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
       cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
       cameraPosition: EDIT_CAMERA_POSITION,
       cameraTarget: EDIT_CAMERA_TARGET,
+      depthMin: 0,
+      depthMax: 1,
+      depthSpan: 1,
       cameraProjection,
     };
   }
@@ -727,12 +752,16 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
   let maxX = -Infinity;
   let minZ = Infinity;
   let maxZ = -Infinity;
+  let depthMin = Infinity;
+  let depthMax = -Infinity;
   for (const point of points) {
     const screen = projectPointWithCamera(point, cameraProjection);
     minX = Math.min(minX, screen.x);
     maxX = Math.max(maxX, screen.x);
     minZ = Math.min(minZ, screen.y);
     maxZ = Math.max(maxZ, screen.y);
+    depthMin = Math.min(depthMin, screen.depth);
+    depthMax = Math.max(depthMax, screen.depth);
   }
 
   return fitBoundsToViewport({
@@ -742,11 +771,23 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
     maxZ,
     viewportWidth,
     viewportHeight,
+    depthMin,
+    depthMax,
     cameraProjection,
   });
 }
 
-function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHeight, cameraProjection }) {
+function fitBoundsToViewport({
+  minX,
+  maxX,
+  minZ,
+  maxZ,
+  viewportWidth,
+  viewportHeight,
+  depthMin,
+  depthMax,
+  cameraProjection,
+}) {
   let spanX = Math.max(maxX - minX, 0.0001);
   let spanZ = Math.max(maxZ - minZ, 0.0001);
   const centerX = (minX + maxX) * 0.5;
@@ -778,6 +819,9 @@ function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHe
     cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
     cameraPosition: EDIT_CAMERA_POSITION,
     cameraTarget: EDIT_CAMERA_TARGET,
+    depthMin,
+    depthMax,
+    depthSpan: Math.max(depthMax - depthMin, 0.0001),
     cameraProjection,
   };
 }
@@ -892,6 +936,19 @@ function projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHei
         viewportHeight / Math.max(bounds.spanZ, 0.0001),
       ),
   };
+}
+
+function frontWeightedOitDepth(depth, depthMin, depthSpan) {
+  const normalizedDepth = clampNumber(
+    (depth - depthMin) / Math.max(depthSpan, 0.0001),
+    0,
+    1,
+  );
+  return clampNumber(
+    DEPTH_WEIGHT_FLOOR + (1 - DEPTH_WEIGHT_FLOOR) * Math.exp(-DEPTH_WEIGHT_STRENGTH * normalizedDepth),
+    DEPTH_WEIGHT_FLOOR,
+    1,
+  );
 }
 
 function pointRadiusPixels({ scale, screen, pointSize }) {

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-D`: 将 WebGPU Tile 编辑从 edit-camera perspective projection 继续推进到 depth / alpha-order / screen-space covariance 视觉一致性路径，重点处理用户可见的“原始颜色编辑预览仍偏软糊、不像真实 3DGS”问题。
+  - `RENDER-005T-E`: 将 WebGPU Tile 编辑从 front-weighted OIT 继续推进到 screen-space covariance / splat scale calibration，重点处理用户可见的“原始颜色编辑预览仍偏软糊、不像真实 3DGS”问题。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-D: WebGPU front-weighted OIT depth contract
+
+- 状态: done / front-weighted-oit-depth
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 edit-camera perspective projection 后，减少 WebGPU Tile 编辑预览中前后层 Gaussian 被纯 weighted OIT 混成一团的视觉问题。
+- 已实施:
+  - `webgpuTileSmoke` 记录 edit-camera projection depth range，并在 CPU tile resolve / per-pixel reference 中加入 `front-weighted-oit-v1` 深度权重。
+  - WebGPU accumulation shader 与 per-pixel resolve shader 使用同一 depth weight：近处 Gaussian 保持高权重，远处 Gaussian 按归一化相机深度指数衰减但保留 floor，避免远处对象被直接抹掉。
+  - renderer contract / DOM / browser audit 暴露 `depthWeight=front-weighted-oit-v1:min/max/span`，Node smoke 检查 uniform meta 中的 `depthMin/depthSpan` 和 WGSL `frontWeight` contract。
+- 结论:
+  - NeRF Lego proxy 与 Plush semantic 大场景均在 headed desktop Chrome/WebGPU full runtime 下通过，说明该 depth contract 在小样例和 281k Gaussian 场景上都可编译、可提交、可完成对象选择 / 隔离 / 删除预览。
+  - 这一步是 alpha-order 的 GPU-friendly 近似，不是完整 per-pixel depth sort，也不是最终 3D covariance 投影；下一步仍应处理 screen-space covariance / splat scale calibration。
+- 验证:
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuTileComputeShader.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`depthWeight=front-weighted-oit-v1`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5246 --probes full`: passed；`depthWeight="front-weighted-oit-v1"`、device active、queue done、object interactions passed。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5247 --probes full`: passed；281498 Gaussians、`depthWeight="front-weighted-oit-v1"`、compact tile list、device active、queue done。
 
 ### RENDER-005T-C: WebGPU edit-camera perspective projection
 

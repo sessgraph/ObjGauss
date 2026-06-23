@@ -22,6 +22,7 @@ import {
   buildWebGpuTileSmoke,
   WEBGPU_OBJECT_STATE_LAYOUT_VERSION,
   WEBGPU_OBJECT_STATE_STRIDE_UINT32,
+  WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
   WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
   WEBGPU_TILE_PROJECTION_MODE,
@@ -176,6 +177,11 @@ assert.equal(base.boundsPaddingRatio, 0.08);
 assert.ok(Math.abs(base.boundsWorldAspect - base.boundsViewportAspect) < 0.02);
 assert.equal(base.projectionMode, WEBGPU_TILE_PROJECTION_MODE);
 assert.equal(base.projectionCameraFovDegrees, 52);
+assert.equal(base.depthWeightMode, WEBGPU_TILE_DEPTH_WEIGHT_MODE);
+assert.ok(Number.isFinite(base.projectionDepthMin));
+assert.ok(Number.isFinite(base.projectionDepthMax));
+assert.ok(base.projectionDepthMax > base.projectionDepthMin);
+assert.ok(base.projectionDepthSpan > 0);
 assert.ok(base.resolvedTileCount > 0);
 assert.ok(base.pixelResolvedCount > 0);
 assert.ok(base.pixelResolvedCount > base.resolvedTileCount);
@@ -333,8 +339,8 @@ assert.equal(pixelMeta[6], Math.fround(base.boundsMinX));
 assert.equal(pixelMeta[7], Math.fround(base.boundsMinZ));
 assert.equal(pixelMeta[8], Math.fround(base.boundsSpanX));
 assert.equal(pixelMeta[9], Math.fround(base.boundsSpanZ));
-assert.equal(pixelMeta[10], 0);
-assert.equal(pixelMeta[11], 0);
+assert.equal(pixelMeta[10], Math.fround(base.projectionDepthMin));
+assert.equal(pixelMeta[11], Math.fround(base.projectionDepthSpan));
 assert.equal(pixelMeta.byteLength, 48);
 assert.equal(WEBGPU_PIXEL_RESOLVE_SOURCE, "webgpu-compute-pixel-accumulation-v1");
 assert.equal(WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE, 64);
@@ -354,6 +360,8 @@ assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read_write>\s+pixelRes
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /pixelResolvedRgba\[pixelIndex\]/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /colorOpacity\[gaussianIndex\]/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /let\s+screen\s*=\s*centerRadius\.xy/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /let\s+frontWeight\s*=\s*clamp/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /RESOLVE_ALPHA_GAIN\s*\*\s*frontWeight/);
 
 const accumulationMeta = createWebGpuAccumulationMeta(base);
 assert.equal(accumulationMeta.byteLength, 48);
@@ -368,6 +376,8 @@ assert.deepEqual(
     base.viewportHeight,
   ],
 );
+assert.equal(accumulationMeta[10], Math.fround(base.projectionDepthMin));
+assert.equal(accumulationMeta[11], Math.fround(base.projectionDepthSpan));
 assert.equal(WEBGPU_TILE_ACCUMULATION_SOURCE, "webgpu-compute-covariance-accumulation-v1");
 assert.equal(WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE, 64);
 assert.equal(
@@ -385,6 +395,8 @@ assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /var<storage,\s*read_write>\s+tile
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /sampleIndex\s*<\s*4u/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /gaussianScale\.xy/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /let\s+screen\s*=\s*centerRadius\.xy/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /let\s+frontWeight\s*=\s*clamp/);
+assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /RESOLVE_ALPHA_GAIN\s*\*\s*frontWeight\s*\*\s*SAMPLE_WEIGHT/);
 assert.match(WEBGPU_TILE_ACCUMULATION_SHADER, /tileAccumulation\[tileIndex\]\s*=\s*accumulation/);
 
 const roomy = buildWebGpuTileSmoke({
@@ -524,6 +536,7 @@ console.log(
     `checksum=${base.resolveChecksum} objectState=${base.objectStateChecksum} ` +
     `boundsFit=${base.boundsFitMode}:${base.boundsWorldAspect.toFixed(3)}/${base.boundsViewportAspect.toFixed(3)} ` +
     `projection=${base.projectionMode}:${base.projectionCameraFovDegrees} ` +
+    `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
     `overflow=${base.tileOverflowCount} overflowTiles=${base.tileOverflowTileCount} ` +
     `capacity=${base.tileCapacityGate} storage=${storage.checksum}:${storage.bufferCount} ` +
     `accumulation=${WEBGPU_TILE_ACCUMULATION_SOURCE}:${webGpuAccumulationWorkgroups(base)} ` +

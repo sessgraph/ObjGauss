@@ -10,6 +10,8 @@ const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13.0;
 const SAMPLE_WEIGHT = 0.25;
+const DEPTH_WEIGHT_STRENGTH = 1.45;
+const DEPTH_WEIGHT_FLOOR = 0.22;
 
 struct AccumulationMeta {
   tileCount: f32,
@@ -22,8 +24,8 @@ struct AccumulationMeta {
   boundsMinZ: f32,
   boundsSpanX: f32,
   boundsSpanZ: f32,
-  reserved0: f32,
-  reserved1: f32,
+  depthMin: f32,
+  depthSpan: f32,
 };
 
 @group(0) @binding(0) var<storage, read> positionRadius: array<vec4f>;
@@ -65,6 +67,16 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
 
     let centerRadius = positionRadius[gaussianIndex];
     let screen = centerRadius.xy;
+    let normalizedDepth = clamp(
+      (centerRadius.z - accumulationMeta.depthMin) / max(accumulationMeta.depthSpan, 0.0001),
+      0.0,
+      1.0
+    );
+    let frontWeight = clamp(
+      DEPTH_WEIGHT_FLOOR + (1.0 - DEPTH_WEIGHT_FLOOR) * exp(-DEPTH_WEIGHT_STRENGTH * normalizedDepth),
+      DEPTH_WEIGHT_FLOOR,
+      1.0
+    );
     let gaussianScale = scaleRotation[gaussianIndex];
     let sigma = max(gaussianScale.xy, vec2f(0.0001));
     let cosine = cos(gaussianScale.z);
@@ -87,7 +99,7 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
         continue;
       }
 
-      let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * SAMPLE_WEIGHT;
+      let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * frontWeight * SAMPLE_WEIGHT;
       if (weight <= 0.0001) {
         continue;
       }
@@ -138,6 +150,8 @@ const OBJECT_STATE_VISIBLE = 1u;
 const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13.0;
+const DEPTH_WEIGHT_STRENGTH = 1.45;
+const DEPTH_WEIGHT_FLOOR = 0.22;
 
 struct PixelResolveMeta {
   pixelCount: f32,
@@ -150,8 +164,8 @@ struct PixelResolveMeta {
   boundsMinZ: f32,
   boundsSpanX: f32,
   boundsSpanZ: f32,
-  reserved0: f32,
-  reserved1: f32,
+  depthMin: f32,
+  depthSpan: f32,
 };
 
 @group(0) @binding(0) var<storage, read> positionRadius: array<vec4f>;
@@ -194,6 +208,16 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
 
     let centerRadius = positionRadius[gaussianIndex];
     let screen = centerRadius.xy;
+    let normalizedDepth = clamp(
+      (centerRadius.z - pixelResolveMeta.depthMin) / max(pixelResolveMeta.depthSpan, 0.0001),
+      0.0,
+      1.0
+    );
+    let frontWeight = clamp(
+      DEPTH_WEIGHT_FLOOR + (1.0 - DEPTH_WEIGHT_FLOOR) * exp(-DEPTH_WEIGHT_STRENGTH * normalizedDepth),
+      DEPTH_WEIGHT_FLOOR,
+      1.0
+    );
     let gaussianScale = scaleRotation[gaussianIndex];
     let sigma = max(gaussianScale.xy, vec2f(0.0001));
     let cosine = cos(gaussianScale.z);
@@ -210,7 +234,7 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
     }
 
     let color = colorOpacity[gaussianIndex];
-    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN;
+    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN * frontWeight;
     if (weight <= 0.0001) {
       continue;
     }
@@ -255,8 +279,8 @@ export function createWebGpuAccumulationMeta(tileSmoke) {
     Number.isFinite(tileSmoke?.boundsMinZ) ? tileSmoke.boundsMinZ : -1,
     Math.max(0.0001, tileSmoke?.boundsSpanX ?? 2),
     Math.max(0.0001, tileSmoke?.boundsSpanZ ?? 2),
-    0,
-    0,
+    Number.isFinite(tileSmoke?.projectionDepthMin) ? tileSmoke.projectionDepthMin : 0,
+    Math.max(0.0001, tileSmoke?.projectionDepthSpan ?? 1),
   ]);
 }
 
@@ -282,8 +306,8 @@ export function createWebGpuPixelResolveMeta(tileSmoke) {
     Number.isFinite(tileSmoke?.boundsMinZ) ? tileSmoke.boundsMinZ : -1,
     Math.max(0.0001, tileSmoke?.boundsSpanX ?? 2),
     Math.max(0.0001, tileSmoke?.boundsSpanZ ?? 2),
-    0,
-    0,
+    Number.isFinite(tileSmoke?.projectionDepthMin) ? tileSmoke.projectionDepthMin : 0,
+    Math.max(0.0001, tileSmoke?.projectionDepthSpan ?? 1),
   ]);
 }
 

@@ -88,6 +88,7 @@ try {
         `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)} ` +
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
+        `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
         `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
@@ -314,6 +315,10 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuBoundsWorldAspect = Number(await viewport.getAttribute("data-webgpu-bounds-world-aspect") ?? "0");
       const webGpuProjectionMode = await viewport.getAttribute("data-webgpu-projection-mode");
       const webGpuProjectionCameraFov = Number(await viewport.getAttribute("data-webgpu-projection-camera-fov") ?? "0");
+      const webGpuDepthWeightMode = await viewport.getAttribute("data-webgpu-depth-weight-mode");
+      const webGpuProjectionDepthMin = Number(await viewport.getAttribute("data-webgpu-projection-depth-min") ?? "0");
+      const webGpuProjectionDepthMax = Number(await viewport.getAttribute("data-webgpu-projection-depth-max") ?? "0");
+      const webGpuProjectionDepthSpan = Number(await viewport.getAttribute("data-webgpu-projection-depth-span") ?? "0");
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
@@ -396,6 +401,15 @@ async function runAudit(url, assetsToCheck, options) {
         if (webGpuProjectionMode !== "edit-perspective-camera-v1" || Math.abs(webGpuProjectionCameraFov - 52) > 0.001) {
           throw new Error(
             `${asset.id} WebGPU projection did not use edit perspective camera: mode=${webGpuProjectionMode} fov=${webGpuProjectionCameraFov}`,
+          );
+        }
+        if (
+          webGpuDepthWeightMode !== "front-weighted-oit-v1" ||
+          webGpuProjectionDepthSpan <= 0 ||
+          webGpuProjectionDepthMax <= webGpuProjectionDepthMin
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU depth weighting did not expose a valid front-weighted OIT contract: mode=${webGpuDepthWeightMode} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
           );
         }
       }
@@ -611,6 +625,10 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuBoundsWorldAspect,
             webGpuProjectionMode,
             webGpuProjectionCameraFov,
+            webGpuDepthWeightMode,
+            webGpuProjectionDepthMin,
+            webGpuProjectionDepthMax,
+            webGpuProjectionDepthSpan,
             webGpuDeviceLostStatus,
             webGpuDeviceLostReason,
             webGpuDeviceLostMessage,
@@ -799,6 +817,10 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuBoundsWorldAspect,
         webGpuProjectionMode,
         webGpuProjectionCameraFov,
+        webGpuDepthWeightMode,
+        webGpuProjectionDepthMin,
+        webGpuProjectionDepthMax,
+        webGpuProjectionDepthSpan,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,

@@ -493,6 +493,10 @@ export default function WebGpuTileViewport({
       data-webgpu-bounds-world-aspect={rendererContract?.boundsWorldAspect ?? 0}
       data-webgpu-projection-mode={rendererContract?.projectionMode ?? ""}
       data-webgpu-projection-camera-fov={rendererContract?.projectionCameraFovDegrees ?? 0}
+      data-webgpu-depth-weight-mode={rendererContract?.depthWeightMode ?? ""}
+      data-webgpu-projection-depth-min={rendererContract?.projectionDepthMin ?? 0}
+      data-webgpu-projection-depth-max={rendererContract?.projectionDepthMax ?? 0}
+      data-webgpu-projection-depth-span={rendererContract?.projectionDepthSpan ?? 0}
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}
