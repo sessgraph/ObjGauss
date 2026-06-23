@@ -199,7 +199,9 @@ try {
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
-        `deletedObjects=${result.deletedObjects} screenshot=${result.screenshotPath}`,
+        `deletedObjects=${result.deletedObjects} ` +
+        `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
+        `screenshot=${result.screenshotPath}`,
     );
   }
   console.log(
@@ -1038,6 +1040,9 @@ async function runAudit(url, assetsToCheck, options) {
             visibleAfterDelete: "probe-skipped",
             renderModeAfterDelete: "probe-skipped",
             deletedObjects: "probe-skipped",
+            postDeleteRendererId: "probe-skipped",
+            postDeleteObjectFilter: "probe-skipped",
+            sparkFilteredGaussiansAfterDelete: "probe-skipped",
             screenshotPath,
           });
           continue;
@@ -1076,19 +1081,66 @@ async function runAudit(url, assetsToCheck, options) {
       }
       await page.getByRole("button", { name: "预览删除" }).click();
       await page.waitForTimeout(300);
+      await page.waitForFunction(() => {
+        const activeViewport = document.querySelector(".viewport");
+        if (!activeViewport) return false;
+        if (activeViewport.getAttribute("data-renderer") !== "spark-splat") return true;
+        return activeViewport.getAttribute("data-spark-filter-status") === "ready";
+      }, undefined, { timeout: 15000 });
       const deletedObjects = await labeledValue(page, "已删除对象");
       const visibleAfterDelete = await labeledValue(page, "可见");
       const renderModeAfterDelete = await labeledValue(page, "模式");
-      const objectStateChecksumAfterDelete = await viewport.getAttribute("data-webgpu-object-state-checksum");
-      const objectStateVisibleAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
-      const objectStateRemovedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
-      const objectStateIsolatedAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
-      const webGpuStorageChecksumAfterDelete = await viewport.getAttribute("data-webgpu-storage-checksum");
-      const webGpuColorSourceRgbGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
-      const webGpuColorSourceShDcGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
-      const webGpuColorSourceFallbackGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
-      const webGpuColorSourceObjectGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-object-gaussians") ?? "0");
-      const webGpuColorShViewGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-sh-view-gaussians") ?? "0");
+      const postDeleteViewport = page.locator(".viewport").first();
+      const postDeleteRendererId = await postDeleteViewport.getAttribute("data-renderer");
+      const postDeleteObjectFilter = await postDeleteViewport.getAttribute("data-object-filter");
+      const sparkFilteredAfterDelete =
+        postDeleteRendererId === "spark-splat" &&
+        postDeleteObjectFilter === "spark-filtered-ply-reconstruct";
+      const sparkVisibleGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-visible-gaussians") ?? "0")
+        : 0;
+      const sparkRemovedObjectsAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-removed-objects") ?? "0")
+        : 0;
+      const sparkColorModeAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-color-mode")
+        : "";
+      const sparkColorSourceGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-color-source-gaussians") ?? "0")
+        : 0;
+      const sparkColorObjectGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-color-object-gaussians") ?? "0")
+        : 0;
+      const objectStateChecksumAfterDelete = sparkFilteredAfterDelete
+        ? "spark-filtered-ply-reconstruct"
+        : await viewport.getAttribute("data-webgpu-object-state-checksum");
+      const objectStateVisibleAfterDelete = sparkFilteredAfterDelete
+        ? objectStateVisibleObjects - sparkRemovedObjectsAfterDelete
+        : numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
+      const objectStateRemovedAfterDelete = sparkFilteredAfterDelete
+        ? sparkRemovedObjectsAfterDelete
+        : numericValue(await viewport.getAttribute("data-webgpu-object-state-removed-objects") ?? "0");
+      const objectStateIsolatedAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const webGpuStorageChecksumAfterDelete = sparkFilteredAfterDelete
+        ? "spark-filtered-ply-reconstruct"
+        : await viewport.getAttribute("data-webgpu-storage-checksum");
+      const webGpuColorSourceRgbGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? sparkColorSourceGaussiansAfterDelete
+        : numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
+      const webGpuColorSourceShDcGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
+      const webGpuColorSourceFallbackGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
+      const webGpuColorSourceObjectGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? sparkColorObjectGaussiansAfterDelete
+        : numericValue(await viewport.getAttribute("data-webgpu-color-source-object-gaussians") ?? "0");
+      const webGpuColorShViewGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : numericValue(await viewport.getAttribute("data-webgpu-color-sh-view-gaussians") ?? "0");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
@@ -1097,6 +1149,18 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (renderModeAfterDelete !== "原始颜色（编辑预览）") {
         throw new Error(`${asset.id} delete preview did not restore edit-preview original colors`);
+      }
+      if (
+        sparkFilteredAfterDelete &&
+        (sparkVisibleGaussiansAfterDelete <= 0 ||
+          sparkRemovedObjectsAfterDelete !== 1 ||
+          sparkColorModeAfterDelete !== "original" ||
+          sparkColorSourceGaussiansAfterDelete <= 0 ||
+          sparkColorObjectGaussiansAfterDelete !== 0)
+      ) {
+        throw new Error(
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete}`,
+        );
       }
       if (
         webGpuColorSourceRgbGaussiansAfterDelete +
@@ -1126,17 +1190,23 @@ async function runAudit(url, assetsToCheck, options) {
           `${asset.id} SH-view color mode did not affect source colors after delete: shView=${webGpuColorShViewGaussiansAfterDelete} shRest=${webGpuColorShRestGaussians}`,
         );
       }
-      if (
-        objectStateChecksumAfterDelete === objectStateChecksumAfterIsolate ||
-        objectStateVisibleAfterDelete !== objectStateVisibleObjects - 1 ||
-        objectStateRemovedAfterDelete !== 1 ||
-        objectStateIsolatedAfterDelete !== 0
-      ) {
-        throw new Error(
-          `${asset.id} delete did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterDelete} visible=${objectStateVisibleAfterDelete} removed=${objectStateRemovedAfterDelete} isolated=${objectStateIsolatedAfterDelete}`,
-        );
+      if (!sparkFilteredAfterDelete) {
+        if (
+          objectStateChecksumAfterDelete === objectStateChecksumAfterIsolate ||
+          objectStateVisibleAfterDelete !== objectStateVisibleObjects - 1 ||
+          objectStateRemovedAfterDelete !== 1 ||
+          objectStateIsolatedAfterDelete !== 0
+        ) {
+          throw new Error(
+            `${asset.id} delete did not update WebGPU object-state buffer: checksum=${objectStateChecksumAfterDelete} visible=${objectStateVisibleAfterDelete} removed=${objectStateRemovedAfterDelete} isolated=${objectStateIsolatedAfterDelete}`,
+          );
+        }
       }
-      if (editRendererId === "webgpu-tile" && webGpuStorageChecksumAfterDelete === webGpuStorageChecksumAfterIsolate) {
+      if (
+        editRendererId === "webgpu-tile" &&
+        !sparkFilteredAfterDelete &&
+        webGpuStorageChecksumAfterDelete === webGpuStorageChecksumAfterIsolate
+      ) {
         throw new Error(`${asset.id} delete did not update WebGPU storage checksum`);
       }
       const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
@@ -1308,6 +1378,9 @@ async function runAudit(url, assetsToCheck, options) {
         visibleAfterDelete,
         renderModeAfterDelete,
         deletedObjects,
+        postDeleteRendererId,
+        postDeleteObjectFilter,
+        sparkFilteredGaussiansAfterDelete: sparkVisibleGaussiansAfterDelete,
         screenshotPath,
       });
     }

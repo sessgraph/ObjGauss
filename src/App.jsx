@@ -161,9 +161,17 @@ export default function App() {
     [isolatedId, removedIds, sceneObjectIds, visibleIds],
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
+  const canUseSparkFilteredRenderer =
+    hasSplatRenderer &&
+    renderMode === "original" &&
+    objectEditActive &&
+    webGpuColorTuning.colorMode === "source";
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
-  const waitForEditRenderer = !useSplatRenderer && webGpuCapability.status === "pending";
-  const useWebGpuTileRenderer = !useSplatRenderer && editRenderer.rendererId === "webgpu-tile";
+  const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
+  const waitForEditRenderer =
+    !useSplatRenderer && !useSparkFilteredRenderer && webGpuCapability.status === "pending";
+  const useWebGpuTileRenderer =
+    !useSplatRenderer && !useSparkFilteredRenderer && editRenderer.rendererId === "webgpu-tile";
   const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
   const webGpuRuntimeViewportRequest = useMemo(readWebGpuRuntimeViewportRequest, []);
   const [webGpuRuntimeDisplaySize, setWebGpuRuntimeDisplaySize] = useState({ width: 0, height: 0 });
@@ -232,7 +240,11 @@ export default function App() {
         : editRenderer,
     [editRenderer, useWebGpuTileRenderer, webGpuCapability, webGpuRuntimeTileSmoke],
   );
-  const activeRendererText = useSplatRenderer ? "真实 Splat" : activeEditRenderer.rendererLabel;
+  const activeRendererText = useSplatRenderer
+    ? "真实 Splat"
+    : useSparkFilteredRenderer
+      ? "Spark 过滤 Splat"
+      : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>
@@ -591,12 +603,18 @@ export default function App() {
               ) : null}
             </div>
           )}
-          {useSplatRenderer ? (
+          {useSplatRenderer || useSparkFilteredRenderer ? (
             <SplatViewport
               source={scene.splatSource}
+              points={useSparkFilteredRenderer ? scene.points : null}
+              visibleIds={useSparkFilteredRenderer ? visibleIds : null}
+              removedIds={useSparkFilteredRenderer ? removedIds : null}
+              isolatedId={useSparkFilteredRenderer ? isolatedId : null}
+              renderMode={renderMode}
+              filtered={useSparkFilteredRenderer}
               showGrid={showGrid}
               showAxes={showAxes}
-              pointCount={scene.points.length}
+              pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
               rendererLabel={activeRendererText}
             />
           ) : waitForEditRenderer ? (

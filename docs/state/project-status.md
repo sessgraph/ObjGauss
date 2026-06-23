@@ -87,6 +87,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-V 已完成 WebGPU SH-view coverage sweep：`audit:webgpu-coverage-sweep` 支持 `--webgpu-color-mode source|sh-view` 并在 report 中记录 `colorMode` / `shViewAfterDelete`，可以在 view-dependent color 生效后继续比较 footprint / anisotropy variants；trained Lego SH-view sweep 显示 baseline 仍是 best Pareto，tight 可将 coverage ratio 从 `31.205176` 降到 `23.164633` 并降低 tile refs，但 luma delta 从 `0.034507` 恶化到 `0.093626`。因此 footprint 收紧只能作为诊断，不能作为默认修复；下一步应优先看 presentation coverage threshold / alpha path 或 Spark object filter feasibility。
   - RENDER-005T-W 已完成 WebGPU alpha presentation floor diagnostic：`webgpu-alpha-presentation-floor` 可在 `0-0.2` 范围内 runtime tuning，默认仍保持 `0.035`；coverage sweep variants 支持 `id:footprint:maxAnisotropy:alphaFloor`。trained Lego + SH-view alpha sweep 显示 `0.1` floor 将 coverage ratio 从 `31.205176` 降到 `24.248059`，luma delta 从 `0.034507` 降到 `0.00276`，chroma 基本持平，因此 presentation threshold 是比 footprint tightening 更强的候选轴；但目前仍是单 scene 证据，不能默认切换，下一步需要多场景 alpha-floor gate 或 Spark renderer object filter feasibility。
   - RENDER-005T-X 已完成 WebGPU alpha presentation floor multi-scene candidate gate：新增 `npm run audit:webgpu-alpha-floor-sweep` 和 `npm run audit:webgpu-alpha-floor-candidate-gate`，在 NeRF Lego proxy + Plush semantic 上复现 `alpha10` 候选。`alpha10` 是 best mean Pareto (`0.965287`) 且同时降低两个 scene 的 coverage / luma，但 strict gate 失败：mean chroma norm=`1.178616`、Plush per-scene Pareto=`1.07908`、Plush chroma norm=`1.485213`。因此 alpha floor 仍是候选轴，默认 `0.035` 不变。
+  - RENDER-005T-Y 已完成 Spark filtered edit feasibility implementation：`SplatViewport` 可从 object-aware PLY points 用 Spark `constructSplats` / `pushSplat` 重建 filtered `SplatMesh`；`App` 在 source/original object edit 状态下优先用 `Spark 过滤 Splat` 显示隔离/删除后的剩余场景，SH-view diagnostics 与对象色/点击选择仍走 WebGPU / Gaussian OIT 编辑路径；`audit-demo` 已能验证删除后 `postDelete="spark-splat":"spark-filtered-ply-reconstruct"`。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -148,6 +149,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run benchmark:cross-scene` 已固化为跨场景 / 跨变体汇总入口，可聚合 semantic smoke suite、Splatfacto scene suite 和 safe-2000 variant suite 到同一张表，并输出 smoke / candidate / paper stage gates。
   - `npm run audit:webgpu-coverage-gate` 已固化为 WebGPU 编辑预览 coverage/luma/chroma/cost 的多场景 baseline gate，并输出可复查 summary report。
   - `npm run audit:webgpu-alpha-floor-sweep` / `npm run audit:webgpu-alpha-floor-candidate-gate` 已固化为 alpha presentation floor 候选的多场景复现实验和 strict gate。
+  - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
 
@@ -160,6 +162,11 @@ node --check scripts/audit-webgpu-coverage-sweep.mjs
 npm run build
 uv run --extra dev pytest
 npm run audit:webgpu-alpha-floor-candidate-gate -- --port 5292 --allow-failures
+node --check scripts/audit-demo.mjs
+npm run audit:webgpu-tile-smoke
+npm run preview -- --port 5294 --strictPort
+npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5295 --probes full
 node --check src/webgpuTileResolveShader.js
 node --check scripts/audit-demo.mjs
 node --check scripts/audit-webgpu-desktop.mjs

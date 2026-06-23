@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-Y`: 评估把 object filter 接入 Spark renderer 的可行性，或设计 chroma-aware alpha presentation 策略；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
+  - `RENDER-005T-Z`: 给 Spark filtered edit 增加 SH-preserving / residual gate，比较 full `.splat` Spark 与 PLY-reconstructed Spark 的 luma/chroma/coverage 差距；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-Y: Spark filtered edit feasibility implementation
+
+- 状态: done / spark-filtered-edit-audited
+- 类型: 标准 PR / 前端渲染质量与交互
+- 目标: 回应“删除后的自身颜色仍不像真实高斯”的 UX 问题，评估并落地把 object filter 接入 Spark renderer 的最小可用路径。
+- 已实施:
+  - `SplatViewport` 新增 filtered-points 构造模式：使用 Spark `constructSplats` / `pushSplat` 从 object-aware PLY points 重建 filtered `SplatMesh`。
+  - `App` 在 `renderMode=original`、object edit active、source color tuning 时优先用 `Spark 过滤 Splat` 渲染隔离/删除后的剩余场景。
+  - SH-view diagnostics、对象色模式和 canvas click selection 继续走 WebGPU Tile / Gaussian OIT 编辑路径，避免把当前 RGB/SH-DC-only Spark reconstruction 误当成完整 SH route。
+  - `audit-demo` 支持删除后 Spark filtered contract，验证 `data-object-filter="spark-filtered-ply-reconstruct"`、剩余 Gaussian 数和 source color 状态。
+  - 新增 `docs/benchmarks/spark-filtered-edit.md` 记录 runtime contract、验证命令和剩余 gap。
+- 结论:
+  - Spark object filter 的最小可行路线不是直接 patch Spark 内部 shader，而是从 ObjGauss object-aware PLY 生成 filtered Spark `SplatMesh`。
+  - 该路线已经解决删除/隔离后“原始颜色预览仍留在近似编辑 renderer”的核心 UX gap，但仍不保留 trained SH-heavy sample 的完整 SH rest，也不支持 Spark canvas click-to-object。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server`: passed；`postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909`。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5295 --probes full`: passed，headed desktop WebGPU route；隔离/选择仍走 WebGPU Tile，删除后 `postDelete="spark-splat":"spark-filtered-ply-reconstruct":3104`。
 
 ### RENDER-005T-X: WebGPU alpha floor multi-scene candidate gate
 

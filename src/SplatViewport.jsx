@@ -5,6 +5,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export default function SplatViewport({
   source,
+  points = null,
+  visibleIds = null,
+  removedIds = null,
+  isolatedId = null,
+  renderMode = "original",
+  filtered = false,
   showGrid,
   showAxes,
   pointCount,
@@ -19,10 +25,45 @@ export default function SplatViewport({
   const [status, setStatus] = useState("加载中");
 
   const sourceKey = useMemo(() => {
+    if (filtered) {
+      const visibleKey = visibleIds ? [...visibleIds].sort((left, right) => left - right).join(",") : "";
+      const removedKey = removedIds ? [...removedIds].sort((left, right) => left - right).join(",") : "";
+      return [
+        "filtered",
+        points?.length ?? 0,
+        visibleKey,
+        removedKey,
+        isolatedId ?? "all",
+        renderMode,
+      ].join(":");
+    }
     if (source?.url) return source.url;
     if (source?.fileName) return `${source.fileName}:${source.fileBytes?.byteLength ?? 0}`;
     return "none";
-  }, [source]);
+  }, [filtered, isolatedId, points, removedIds, renderMode, source, visibleIds]);
+
+  const filteredStats = useMemo(
+    () =>
+      filtered
+        ? buildFilteredSplatStats({
+            points,
+            visibleIds,
+            removedIds,
+            isolatedId,
+            renderMode,
+          })
+        : {
+            mode: "none",
+            visibleGaussians: 0,
+            filteredGaussians: 0,
+            hiddenObjects: 0,
+            removedObjects: 0,
+            isolatedObject: "",
+            colorSourceGaussians: 0,
+            objectColorGaussians: 0,
+          },
+    [filtered, isolatedId, points, removedIds, renderMode, visibleIds],
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -103,24 +144,41 @@ export default function SplatViewport({
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
-    if (!scene || !camera || !controls || !source) return undefined;
+    if (!scene || !camera || !controls || (!source && !filtered)) return undefined;
 
     let disposed = false;
-    setStatus("加载中");
+    setStatus(filtered ? "构建中" : "加载中");
 
-    const splat = new SplatMesh({
-      url: source.url,
-      fileBytes: source.fileBytes,
-      fileName: source.fileName,
-      onProgress: (event) => {
-        if (!event.lengthComputable || event.total === 0) return;
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setStatus(`${percent}%`);
-      },
-      onLoad: () => {
-        if (!disposed) setStatus("就绪");
-      },
-    });
+    const splat = filtered
+      ? new SplatMesh({
+          maxSplats: Math.max(1, filteredStats.visibleGaussians),
+          constructSplats: (splats) => {
+            pushFilteredSplats({
+              splats,
+              points,
+              visibleIds,
+              removedIds,
+              isolatedId,
+              renderMode,
+            });
+          },
+          onLoad: () => {
+            if (!disposed) setStatus("就绪");
+          },
+        })
+      : new SplatMesh({
+          url: source.url,
+          fileBytes: source.fileBytes,
+          fileName: source.fileName,
+          onProgress: (event) => {
+            if (!event.lengthComputable || event.total === 0) return;
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setStatus(`${percent}%`);
+          },
+          onLoad: () => {
+            if (!disposed) setStatus("就绪");
+          },
+        });
 
     scene.add(splat);
     splat.initialized
@@ -140,7 +198,7 @@ export default function SplatViewport({
       scene.remove(splat);
       splat.dispose();
     };
-  }, [source, sourceKey]);
+  }, [filtered, filteredStats.visibleGaussians, isolatedId, points, removedIds, renderMode, source, sourceKey, visibleIds]);
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.visible = showGrid;
@@ -154,7 +212,17 @@ export default function SplatViewport({
     <div
       className="viewport splatViewport"
       data-renderer="spark-splat"
-      data-object-filter="none"
+      data-object-filter={filtered ? "spark-filtered-ply-reconstruct" : "none"}
+      data-spark-filter-mode={filtered ? "ply-reconstruct" : "none"}
+      data-spark-filter-status={status === "就绪" ? "ready" : "pending"}
+      data-spark-visible-gaussians={filteredStats.visibleGaussians}
+      data-spark-filtered-gaussians={filteredStats.filteredGaussians}
+      data-spark-hidden-objects={filteredStats.hiddenObjects}
+      data-spark-removed-objects={filteredStats.removedObjects}
+      data-spark-isolated-object={filteredStats.isolatedObject}
+      data-spark-color-mode={renderMode}
+      data-spark-color-source-gaussians={filteredStats.colorSourceGaussians}
+      data-spark-color-object-gaussians={filteredStats.objectColorGaussians}
       ref={containerRef}
     >
       <div className="viewportHud">
@@ -178,6 +246,113 @@ export default function SplatViewport({
       </div>
     </div>
   );
+}
+
+function buildFilteredSplatStats({
+  points,
+  visibleIds,
+  removedIds,
+  isolatedId,
+  renderMode,
+}) {
+  const allObjectIds = new Set();
+  const hiddenObjectIds = new Set();
+  let visibleGaussians = 0;
+  for (const point of points ?? []) {
+    allObjectIds.add(point.objectId);
+    if (pointVisible(point, visibleIds, removedIds, isolatedId)) {
+      visibleGaussians += 1;
+    } else {
+      hiddenObjectIds.add(point.objectId);
+    }
+  }
+  return {
+    mode: "ply-reconstruct",
+    visibleGaussians,
+    filteredGaussians: Math.max(0, (points?.length ?? 0) - visibleGaussians),
+    hiddenObjects: hiddenObjectIds.size,
+    removedObjects: removedIds?.size ?? 0,
+    isolatedObject: isolatedId === null || isolatedId === undefined ? "" : String(isolatedId),
+    colorSourceGaussians: renderMode === "original" ? visibleGaussians : 0,
+    objectColorGaussians: renderMode === "original" ? 0 : visibleGaussians,
+    objectCount: allObjectIds.size,
+  };
+}
+
+function pushFilteredSplats({
+  splats,
+  points,
+  visibleIds,
+  removedIds,
+  isolatedId,
+  renderMode,
+}) {
+  for (const point of points ?? []) {
+    if (!pointVisible(point, visibleIds, removedIds, isolatedId)) continue;
+    const scale = pointScale3(point);
+    const quaternion = pointQuaternion(point);
+    const color = pointColor(point, renderMode);
+    splats.pushSplat(
+      new THREE.Vector3(Number(point.x) || 0, Number(point.y) || 0, Number(point.z) || 0),
+      new THREE.Vector3(scale[0], scale[1], scale[2]),
+      quaternion,
+      pointOpacity(point),
+      color,
+    );
+  }
+}
+
+function pointVisible(point, visibleIds, removedIds, isolatedId) {
+  if (!point) return false;
+  if (visibleIds && !visibleIds.has(point.objectId)) return false;
+  if (removedIds?.has(point.objectId)) return false;
+  if (isolatedId !== null && isolatedId !== undefined && point.objectId !== isolatedId) return false;
+  return true;
+}
+
+function pointScale3(point) {
+  if (Array.isArray(point?.scale3) && point.scale3.length >= 3) {
+    return point.scale3.map((value) => clampFinite(value, 0.0006, 0.35, 0.018));
+  }
+  if (Array.isArray(point?.scale) && point.scale.length >= 2) {
+    return [
+      clampFinite(point.scale[0], 0.0006, 0.35, 0.018),
+      clampFinite(point.scale[1], 0.0006, 0.35, 0.018),
+      clampFinite(point.scale[1], 0.0006, 0.35, 0.018),
+    ];
+  }
+  return [0.018, 0.018, 0.018];
+}
+
+function pointQuaternion(point) {
+  if (Array.isArray(point?.rotationQuaternion) && point.rotationQuaternion.length >= 4) {
+    const [w, x, y, z] = point.rotationQuaternion.map(Number);
+    const length = Math.hypot(w, x, y, z);
+    if (Number.isFinite(length) && length > 0.0001) {
+      return new THREE.Quaternion(x / length, y / length, z / length, w / length);
+    }
+  }
+  return new THREE.Quaternion();
+}
+
+function pointColor(point, renderMode) {
+  const rgb = renderMode === "original" ? point?.color : point?.objectColor;
+  const values = Array.isArray(rgb) && rgb.length >= 3 ? rgb : [198, 207, 217];
+  return new THREE.Color(
+    clampFinite(values[0] / 255, 0, 1, 0.78),
+    clampFinite(values[1] / 255, 0, 1, 0.81),
+    clampFinite(values[2] / 255, 0, 1, 0.85),
+  );
+}
+
+function pointOpacity(point) {
+  return clampFinite(point?.opacity, 0, 1, 1);
+}
+
+function clampFinite(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(Math.max(numeric, min), max);
 }
 
 function frameSplat(splat, camera, controls, scene) {
