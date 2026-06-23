@@ -23,6 +23,30 @@
 
 ## Done
 
+### SEMANTIC-004: Render occlusion delta probe
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 SEMANTIC-003 的 occlusion benchmark 从 mask-vote loss proxy 升级为可复现的图像重渲染差分 probe。
+- 实施:
+  - 新增 `objgauss.render_probe`，从 mask manifest 读取相机位姿，执行 CPU point-splat/depth render probe。
+  - `objgauss object-field emergence-curve` 默认输出 `render_occlusion_delta`，并保留 `mask_proxy_occlusion_delta` 作为对照。
+  - CSV 新增 `render_occlusion_mean_delta_l1`、`render_occlusion_mean_relative_delta_l1`、`render_occlusion_mean_affected_fraction` 和 `render_occlusion_effect_score`。
+  - 曲线内 Object Emergence Score 使用 render occlusion effect 补齐 occlusion component。
+- 范围外:
+  - 当前 probe 不是 covariance-aware 3DGS / gsplat renderer。
+  - 不实现 gradient coherence probe。
+  - 不新增曲线图 artifact 或多 scene benchmark。
+- 验收:
+  - Synthetic camera test 中删除 slot 后 render delta 大于 0。
+  - Splatfacto smoke 曲线输出 `occlusion_delta_kind=point_splat_render_l1`。
+  - JSON / CSV 同时保留 proxy occlusion 和 render occlusion。
+- 验证:
+  - `uv run --extra dev pytest`: 28 passed。
+  - `uv run objgauss object-field emergence-curve outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --field outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --masks outputs/masks/nerf-lego-sam/mask-manifest.json --output /tmp/objgauss-lego-splatfacto-render-emergence-curve.json --csv-output /tmp/objgauss-lego-splatfacto-render-emergence-curve.csv --iterations 80 --learning-rate 1.0 --eval-every 20 --render-size 128`: points=5，projection_loss 4.384474 -> 0.308315，render_occlusion_mean_relative_delta_l1=0.124603，render_occlusion_effect_score=0.124603。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: `940bb6b`。
+
 ### SEMANTIC-003: Object emergence benchmark curves
 
 - 状态: done

@@ -39,6 +39,7 @@ from objgauss.object_field import (
     write_json,
 )
 from objgauss.ply import read_ply, write_ply
+from objgauss.render_probe import load_render_probe_frames
 from objgauss.segment import (
     apply_object_colors,
     assign_object_ids,
@@ -292,10 +293,19 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
         slots=field.slots,
         max_frames=args.max_frames,
     )
+    render_frames = None
+    if not args.no_render_occlusion:
+        render_frames = load_render_probe_frames(
+            args.masks,
+            max_frames=args.max_frames,
+            max_size=args.render_size,
+        )
     curve = object_emergence_curve(
         field,
         votes,
         positions_xyz=cloud_positions_for_metrics(cloud),
+        cloud=cloud,
+        render_frames=render_frames,
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         eval_every=args.eval_every,
@@ -308,9 +318,11 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
     first = points[0]
     final = points[-1]
     final_occlusion = final["mask_proxy_occlusion_delta"]
+    final_render_occlusion = final.get("render_occlusion_delta")
     print(f"curve={args.output}")
     if args.csv_output:
         print(f"csv={args.csv_output}")
+    print(f"occlusion_delta_kind={curve['occlusion_delta_kind']}")
     print(f"points={len(points)}")
     print(f"initial_projection_loss={first['projection_loss']:.6f}")
     print(f"final_projection_loss={final['projection_loss']:.6f}")
@@ -321,6 +333,19 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
         "final_mask_proxy_occlusion_mean_delta_loss="
         f"{final_occlusion['mean_delta_loss']:.6f}"
     )
+    if final_render_occlusion:
+        print(
+            "final_render_occlusion_mean_delta_l1="
+            f"{final_render_occlusion['mean_delta_l1']:.6f}"
+        )
+        print(
+            "final_render_occlusion_mean_relative_delta_l1="
+            f"{final_render_occlusion['mean_relative_delta_l1']:.6f}"
+        )
+        print(
+            "final_render_occlusion_effect_score="
+            f"{final_render_occlusion['occlusion_effect_score']:.6f}"
+        )
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -803,6 +828,17 @@ def _build_parser() -> argparse.ArgumentParser:
     field_emergence_curve.add_argument("--learning-rate", type=float, default=0.5)
     field_emergence_curve.add_argument("--eval-every", type=int, default=10)
     field_emergence_curve.add_argument("--max-frames", type=int)
+    field_emergence_curve.add_argument(
+        "--render-size",
+        type=int,
+        default=128,
+        help="max image dimension for render occlusion probe",
+    )
+    field_emergence_curve.add_argument(
+        "--no-render-occlusion",
+        action="store_true",
+        help="skip image-space render occlusion delta and keep mask-proxy metrics only",
+    )
     field_emergence_curve.set_defaults(handler=_object_field_emergence_curve)
 
     field_nerf = object_field_subparsers.add_parser(

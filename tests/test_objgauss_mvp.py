@@ -26,6 +26,7 @@ from objgauss.object_field import (
     save_object_field,
 )
 from objgauss.ply import read_ply, write_ply
+from objgauss.render_probe import load_render_probe_frames
 from objgauss.segment import apply_object_colors, assign_object_ids, filter_objects
 from objgauss.splat import read_splat
 
@@ -234,6 +235,8 @@ def test_object_emergence_curve_tracks_training_phase_metrics(tmp_path):
         field,
         votes,
         positions_xyz=positions,
+        cloud=cloud,
+        render_frames=load_render_probe_frames(masks_path, max_size=32),
         iterations=20,
         learning_rate=1.0,
         eval_every=5,
@@ -247,7 +250,9 @@ def test_object_emergence_curve_tracks_training_phase_metrics(tmp_path):
     assert points[-1]["ari_to_previous"] == 1.0
     assert points[-1]["spatial_compactness_score"] > 0.9
     assert points[-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
-    assert curve["occlusion_delta_kind"] == "mask_proxy_projection_loss"
+    assert points[-1]["render_occlusion_delta"]["mean_delta_l1"] > 0.0
+    assert points[-1]["object_emergence_score"]["components"]["occlusion_effect"] > 0.0
+    assert curve["occlusion_delta_kind"] == "point_splat_render_l1"
 
 
 def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
@@ -395,10 +400,13 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
 
     assert "final_projection_loss=" in output
     assert "final_mask_proxy_occlusion_mean_delta_loss=" in output
+    assert "final_render_occlusion_mean_delta_l1=" in output
     assert [point["step"] for point in curve["points"]] == [0, 10, 20]
     assert curve["points"][-1]["projection_loss"] < curve["points"][0]["projection_loss"]
     assert curve["points"][-1]["mask_proxy_occlusion_delta"]["mean_delta_loss"] > 0.0
+    assert curve["points"][-1]["render_occlusion_delta"]["mean_delta_l1"] > 0.0
     assert "mask_proxy_occlusion_mean_delta_loss" in csv_text
+    assert "render_occlusion_mean_delta_l1" in csv_text
 
 
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):

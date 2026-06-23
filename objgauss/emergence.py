@@ -7,8 +7,10 @@ from typing import Any
 import numpy as np
 
 from objgauss.clustering import summarize_labels
+from objgauss.gaussians import GaussianCloud
 from objgauss.mask_voting import MaskVoteResult, mask_vote_targets, projection_loss
 from objgauss.object_field import ObjectField, softmax
+from objgauss.render_probe import RenderProbeFrame, render_occlusion_delta
 
 _EPS = 1e-8
 
@@ -51,6 +53,8 @@ def object_emergence_curve(
     vote_result: MaskVoteResult,
     *,
     positions_xyz: np.ndarray | None = None,
+    cloud: GaussianCloud | None = None,
+    render_frames: list[RenderProbeFrame] | None = None,
     iterations: int = 100,
     learning_rate: float = 0.5,
     eval_every: int = 10,
@@ -78,6 +82,11 @@ def object_emergence_curve(
     def record(step: int) -> None:
         nonlocal previous_snapshot
         current = ObjectField(logits.copy())
+        render_occlusion = (
+            render_occlusion_delta(cloud, current, render_frames)
+            if cloud is not None and render_frames
+            else None
+        )
         metrics = object_emergence_metrics(
             current,
             positions_xyz=positions_xyz,
@@ -90,6 +99,7 @@ def object_emergence_curve(
             metrics=metrics,
             projection_loss_value=projection_loss(current.logits, targets, weights),
             mask_proxy_occlusion=mask_proxy_occlusion_delta(current, targets, weights),
+            render_occlusion=render_occlusion,
             initial_labels=initial_labels,
             ari_to_initial=adjusted_rand_index(initial_labels, labels),
             ari_to_previous=(
@@ -111,7 +121,15 @@ def object_emergence_curve(
 
     return {
         "kind": "object_emergence_curve",
-        "occlusion_delta_kind": "mask_proxy_projection_loss",
+        "occlusion_delta_kind": (
+            "point_splat_render_l1"
+            if cloud is not None and render_frames
+            else "mask_proxy_projection_loss"
+        ),
+        "mask_proxy_occlusion_delta_kind": "mask_proxy_projection_loss",
+        "render_occlusion_delta_kind": (
+            "point_splat_render_l1" if cloud is not None and render_frames else None
+        ),
         "iterations": iterations,
         "learning_rate": learning_rate,
         "eval_every": eval_every,
@@ -169,6 +187,10 @@ def write_emergence_curve_csv(path: str | Path, curve: dict[str, Any]) -> None:
         "ari_to_previous",
         "mask_proxy_occlusion_mean_delta_loss",
         "mask_proxy_occlusion_max_delta_loss",
+        "render_occlusion_mean_delta_l1",
+        "render_occlusion_mean_relative_delta_l1",
+        "render_occlusion_mean_affected_fraction",
+        "render_occlusion_effect_score",
         "object_emergence_score",
     ]
     with path.open("w", encoding="utf-8", newline="") as file:
@@ -214,13 +236,21 @@ def _curve_point(
     metrics: dict[str, Any],
     projection_loss_value: float,
     mask_proxy_occlusion: dict[str, Any],
+    render_occlusion: dict[str, Any] | None,
     initial_labels: np.ndarray,
     ari_to_initial: float,
     ari_to_previous: float | None,
 ) -> dict[str, Any]:
     assignment = metrics["assignment"]
     spatial = metrics["spatial"]
-    score = metrics["object_emergence_score"]
+    score = _object_emergence_score(
+        assignment_confidence=assignment["assignment_confidence"],
+        spatial_compactness_score=spatial["compactness_score"] if spatial else None,
+        stability_score=metrics["stability"]["stability_score"] if metrics["stability"] else None,
+        occlusion_effect_score=(
+            render_occlusion["occlusion_effect_score"] if render_occlusion else None
+        ),
+    )
     return {
         "step": step,
         "projection_loss": projection_loss_value,
@@ -232,6 +262,7 @@ def _curve_point(
         "ari_to_initial": ari_to_initial,
         "ari_to_previous": ari_to_previous,
         "mask_proxy_occlusion_delta": mask_proxy_occlusion,
+        "render_occlusion_delta": render_occlusion,
         "object_emergence_score": score,
         "labels_changed_from_initial_fraction": float(
             np.count_nonzero(field.labels() != initial_labels) / max(field.gaussian_count, 1)
@@ -280,6 +311,7 @@ def _projection_loss_from_probabilities(
 
 def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
     occlusion = point["mask_proxy_occlusion_delta"]
+    render_occlusion = point.get("render_occlusion_delta")
     score = point["object_emergence_score"]
     return {
         "step": int(point["step"]),
@@ -292,6 +324,24 @@ def _curve_csv_row(point: dict[str, Any]) -> dict[str, float | int | None]:
         "ari_to_previous": _optional_float(point.get("ari_to_previous")),
         "mask_proxy_occlusion_mean_delta_loss": float(occlusion["mean_delta_loss"]),
         "mask_proxy_occlusion_max_delta_loss": float(occlusion["max_delta_loss"]),
+        "render_occlusion_mean_delta_l1": (
+            None if render_occlusion is None else float(render_occlusion["mean_delta_l1"])
+        ),
+        "render_occlusion_mean_relative_delta_l1": (
+            None
+            if render_occlusion is None
+            else float(render_occlusion["mean_relative_delta_l1"])
+        ),
+        "render_occlusion_mean_affected_fraction": (
+            None
+            if render_occlusion is None
+            else float(render_occlusion["mean_affected_fraction"])
+        ),
+        "render_occlusion_effect_score": (
+            None
+            if render_occlusion is None
+            else float(render_occlusion["occlusion_effect_score"])
+        ),
         "object_emergence_score": _optional_float(score.get("score")),
     }
 
@@ -401,6 +451,7 @@ def _object_emergence_score(
     assignment_confidence: float,
     spatial_compactness_score: float | None,
     stability_score: float | None,
+    occlusion_effect_score: float | None = None,
 ) -> dict[str, Any]:
     weights = {
         "assignment_confidence": 0.25,
@@ -412,7 +463,11 @@ def _object_emergence_score(
         "assignment_confidence": float(max(0.0, min(1.0, assignment_confidence))),
         "stability": stability_score,
         "spatial_compactness": spatial_compactness_score,
-        "occlusion_effect": None,
+        "occlusion_effect": (
+            None
+            if occlusion_effect_score is None
+            else float(max(0.0, min(1.0, occlusion_effect_score)))
+        ),
     }
     missing = [name for name, value in components.items() if value is None]
     available = {name: value for name, value in components.items() if value is not None}
