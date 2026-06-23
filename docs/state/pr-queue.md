@@ -37,7 +37,7 @@
   - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5188/`: passed。
   - audit result: splatPixels=3256，editPixels=74388，visibleAfterIsolate=126686，deletedObjects=1。
   - screenshot: `/tmp/objgauss-audit-nerf-lego-trained-output-local.png`。
-- 完成 commit: `<pending>`.
+- 完成 commit: `6d0a922`.
 
 ### SEG-003: Multi-view SAM supervision for Splatfacto candidates
 
