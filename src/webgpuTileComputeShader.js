@@ -64,18 +64,9 @@ fn accumulationMain(@builtin(global_invocation_id) globalId: vec3u) {
     }
 
     let centerRadius = positionRadius[gaussianIndex];
-    let screen = vec2f(
-      ((centerRadius.x - accumulationMeta.boundsMinX) / max(accumulationMeta.boundsSpanX, 0.0001)) *
-        max(1.0, accumulationMeta.viewportWidth - 1.0),
-      (1.0 - ((centerRadius.y - accumulationMeta.boundsMinZ) / max(accumulationMeta.boundsSpanZ, 0.0001))) *
-        max(1.0, accumulationMeta.viewportHeight - 1.0)
-    );
+    let screen = centerRadius.xy;
     let gaussianScale = scaleRotation[gaussianIndex];
-    let pixelsPerWorldUnit = min(
-      accumulationMeta.viewportWidth / max(accumulationMeta.boundsSpanX, 0.0001),
-      accumulationMeta.viewportHeight / max(accumulationMeta.boundsSpanZ, 0.0001)
-    );
-    let sigma = max(gaussianScale.xy * pixelsPerWorldUnit * 4.8 / 3.0, vec2f(0.0001));
+    let sigma = max(gaussianScale.xy, vec2f(0.0001));
     let cosine = cos(gaussianScale.z);
     let sine = sin(gaussianScale.z);
     let color = colorOpacity[gaussianIndex];
@@ -192,10 +183,6 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   let storedCount = tileCounts[tileIndex];
   let entryBase = tileOffsets[tileIndex];
   let pixelCenter = vec2f(f32(pixelX) + 0.5, f32(pixelY) + 0.5);
-  let pixelsPerWorldUnit = min(
-    pixelResolveMeta.viewportWidth / max(pixelResolveMeta.boundsSpanX, 0.0001),
-    pixelResolveMeta.viewportHeight / max(pixelResolveMeta.boundsSpanZ, 0.0001)
-  );
   var accumulation = vec4f(0.0);
 
   for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
@@ -206,14 +193,9 @@ fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
     }
 
     let centerRadius = positionRadius[gaussianIndex];
-    let screen = vec2f(
-      ((centerRadius.x - pixelResolveMeta.boundsMinX) / max(pixelResolveMeta.boundsSpanX, 0.0001)) *
-        max(1.0, pixelResolveMeta.viewportWidth - 1.0),
-      (1.0 - ((centerRadius.y - pixelResolveMeta.boundsMinZ) / max(pixelResolveMeta.boundsSpanZ, 0.0001))) *
-        max(1.0, pixelResolveMeta.viewportHeight - 1.0)
-    );
+    let screen = centerRadius.xy;
     let gaussianScale = scaleRotation[gaussianIndex];
-    let sigma = max(gaussianScale.xy * pixelsPerWorldUnit * 4.8 / 3.0, vec2f(0.0001));
+    let sigma = max(gaussianScale.xy, vec2f(0.0001));
     let cosine = cos(gaussianScale.z);
     let sine = sin(gaussianScale.z);
     let delta = pixelCenter - screen;

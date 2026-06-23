@@ -65,6 +65,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005S 已完成 WebGPU runtime visual fidelity audit 第一轮：full runtime 内部 pixel output 从 `128x128` 提升到 `256x256`，并暴露 viewport / pixel-count telemetry；NeRF Lego proxy 与 Plush semantic 大场景均在 headed desktop Chrome/WebGPU 下通过 256px full runtime audit。
   - RENDER-005T-A 已完成 WebGPU pixel-storage bilinear resolve：full runtime display pass 不再用最近邻放大 `pixelResolvedRgba`，而是使用 bilinear storage sampling，并通过 audit 暴露 `resolveSource=webgpu-pixel-storage-resolve-v1:bilinear-storage`。
   - RENDER-005T-B 已完成 WebGPU aspect-fit runtime viewport：full runtime 会根据实际 viewer display size 计算 area-preserving internal viewport，projection bounds 改为 aspect-fit + 8% 留白，减少固定方形 viewport 和 x/z 独立拉伸导致的贴边 / 比例偏差。
+  - RENDER-005T-C 已完成 WebGPU edit-camera perspective projection：WebGPU Tile 编辑预览现在按固定编辑相机在 CPU 端打包 screen-space center / depth / sigma，GPU accumulation / pixel resolve 和 canvas 点击命中不再按旧 x/z 正交 bounds 做二次投影，并通过 audit 暴露 `projection=edit-perspective-camera-v1:52`。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -128,6 +129,17 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - baseline commit: `c8dcef7`.
 
 ## 最近验证
+
+2026-06-24:
+
+```bash
+node --check scripts/audit-demo.mjs
+node --check scripts/audit-webgpu-desktop.mjs
+npm run audit:webgpu-tile-smoke
+npm run build
+uv run --extra dev pytest
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5245 --probes full
+```
 
 2026-06-23:
 

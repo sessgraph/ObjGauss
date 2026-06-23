@@ -7,6 +7,7 @@ export const WEBGPU_TILE_VIEWPORT = Object.freeze({ width: 1024, height: 1024 })
 export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
 export const WEBGPU_TILE_ENTRY_LAYOUT_COMPACT = "compact-offset-list";
 export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
+export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
 const OBJECT_STATE_REMOVED = 1 << 2;
@@ -16,6 +17,11 @@ const RESOLVE_ALPHA_SCALE = 0.18;
 const RESOLVE_ALPHA_GAIN = 0.78;
 const RESOLVE_KERNEL_CUTOFF = 13;
 const VIEWPORT_FIT_PADDING_RATIO = 0.08;
+const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
+const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
+const EDIT_CAMERA_UP = Object.freeze([0, 1, 0]);
+const EDIT_CAMERA_FOV_DEGREES = 52;
+const EDIT_SPLAT_SIZE_SCALE = 4.8;
 const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, -0.25],
   [0.25, -0.25],
@@ -77,12 +83,10 @@ export function buildWebGpuTileSmoke({
   points.forEach((point, index) => {
     const objectDenseIndex = objectIndex.objectIndexById.get(point.objectId) ?? 0;
     const scale = pointScale(point);
+    const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
     const radiusPixels = pointRadiusPixels({
-      point,
       scale,
-      bounds,
-      viewportWidth,
-      viewportHeight,
+      screen,
       pointSize,
     });
     packGaussian({
@@ -91,6 +95,7 @@ export function buildWebGpuTileSmoke({
       objectDenseIndex,
       radiusPixels,
       scale,
+      screen,
       renderMode,
       positionRadius,
       colorOpacity,
@@ -100,8 +105,8 @@ export function buildWebGpuTileSmoke({
 
     if (!objectIsVisible(objectState, objectDenseIndex)) return;
     visibleGaussians += 1;
+    if (!screenInfluencesViewport({ screen, radiusPixels, viewportWidth, viewportHeight })) return;
 
-    const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
     const minTileX = clampInt(Math.floor((screen.x - radiusPixels) / tileSize), 0, tileColumns - 1);
     const maxTileX = clampInt(Math.floor((screen.x + radiusPixels) / tileSize), 0, tileColumns - 1);
     const minTileY = clampInt(Math.floor((screen.y - radiusPixels) / tileSize), 0, tileRows - 1);
@@ -127,10 +132,6 @@ export function buildWebGpuTileSmoke({
           tileIndex,
           tileCenters,
           screen,
-          scale,
-          bounds,
-          viewportWidth,
-          viewportHeight,
           tileSize,
           gaussianIndex: index,
           colorOpacity,
@@ -183,7 +184,6 @@ export function buildWebGpuTileSmoke({
         tileOffsets,
         maxEntriesPerTile,
         tileEntryLayout,
-        bounds,
         tileColumns,
         tileSize,
         viewportWidth,
@@ -209,6 +209,10 @@ export function buildWebGpuTileSmoke({
     boundsPaddingRatio: bounds.paddingRatio,
     boundsViewportAspect: bounds.viewportAspect,
     boundsWorldAspect: bounds.worldAspect,
+    projectionMode: bounds.projectionMode,
+    projectionCameraFovDegrees: bounds.cameraFovDegrees,
+    projectionCameraPosition: bounds.cameraPosition,
+    projectionCameraTarget: bounds.cameraTarget,
     tileColumns,
     tileRows,
     tileCount,
@@ -264,6 +268,23 @@ export function buildWebGpuTileSmoke({
   };
 }
 
+export function buildWebGpuTileProjectionBounds(
+  points,
+  viewportWidth = WEBGPU_TILE_VIEWPORT.width,
+  viewportHeight = WEBGPU_TILE_VIEWPORT.height,
+) {
+  return sceneBounds(points, viewportWidth, viewportHeight);
+}
+
+export function projectPointToWebGpuTileViewport({
+  point,
+  bounds,
+  viewportWidth = WEBGPU_TILE_VIEWPORT.width,
+  viewportHeight = WEBGPU_TILE_VIEWPORT.height,
+}) {
+  return projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
+}
+
 function buildTileCenters({ tileColumns, tileRows, tileSize }) {
   const centersX = new Float32Array(tileColumns);
   const centersY = new Float32Array(tileRows);
@@ -312,15 +333,13 @@ function populateCompactTileEntries({
     const objectDenseIndex = objectIndex.objectIndexById.get(point.objectId) ?? 0;
     if (!objectIsVisible(objectState, objectDenseIndex)) return;
     const scale = pointScale(point);
+    const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
     const radiusPixels = pointRadiusPixels({
-      point,
       scale,
-      bounds,
-      viewportWidth,
-      viewportHeight,
+      screen,
       pointSize,
     });
-    const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
+    if (!screenInfluencesViewport({ screen, radiusPixels, viewportWidth, viewportHeight })) return;
     const minTileX = clampInt(Math.floor((screen.x - radiusPixels) / tileSize), 0, tileColumns - 1);
     const maxTileX = clampInt(Math.floor((screen.x + radiusPixels) / tileSize), 0, tileColumns - 1);
     const minTileY = clampInt(Math.floor((screen.y - radiusPixels) / tileSize), 0, tileRows - 1);
@@ -341,10 +360,6 @@ function accumulateTileResolve({
   tileIndex,
   tileCenters,
   screen,
-  scale,
-  bounds,
-  viewportWidth,
-  viewportHeight,
   tileSize,
   gaussianIndex,
   colorOpacity,
@@ -355,13 +370,9 @@ function accumulateTileResolve({
   const tileY = Math.floor(tileIndex / tileCenters.tileColumns);
   const gaussianOffset = gaussianIndex * 4;
   const scaleOffset = gaussianIndex * 4;
-  const pixelsPerWorldUnit = Math.min(
-    viewportWidth / Math.max(bounds.spanX, 0.0001),
-    viewportHeight / Math.max(bounds.spanZ, 0.0001),
-  );
-  const sigmaX = Math.max((scale[0] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
-  const sigmaY = Math.max((scale[1] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
   const rotation = scaleRotation[scaleOffset + 2];
+  const sigmaX = Math.max(scaleRotation[scaleOffset], 0.0001);
+  const sigmaY = Math.max(scaleRotation[scaleOffset + 1], 0.0001);
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
   let red = 0;
@@ -451,7 +462,6 @@ function resolvePixelOutput({
   tileOffsets,
   maxEntriesPerTile,
   tileEntryLayout,
-  bounds,
   tileColumns,
   tileSize,
   viewportWidth,
@@ -471,9 +481,6 @@ function resolvePixelOutput({
   const projection = buildPixelProjection({
     positionRadius,
     scaleRotation,
-    bounds,
-    viewportWidth,
-    viewportHeight,
   });
   let pixelResolvedCount = 0;
   let checksum = 2166136261;
@@ -548,9 +555,6 @@ function resolvePixelOutput({
 function buildPixelProjection({
   positionRadius,
   scaleRotation,
-  bounds,
-  viewportWidth,
-  viewportHeight,
 }) {
   const gaussianCount = positionRadius.length / 4;
   const screenX = new Float32Array(gaussianCount);
@@ -559,21 +563,13 @@ function buildPixelProjection({
   const sigmaYSquared = new Float32Array(gaussianCount);
   const cosine = new Float32Array(gaussianCount);
   const sine = new Float32Array(gaussianCount);
-  const pixelsPerWorldUnit = Math.min(
-    viewportWidth / Math.max(bounds.spanX, 0.0001),
-    viewportHeight / Math.max(bounds.spanZ, 0.0001),
-  );
 
   for (let index = 0; index < gaussianCount; index += 1) {
     const offset = index * 4;
-    screenX[index] =
-      ((positionRadius[offset] - bounds.minX) / Math.max(bounds.spanX, 0.0001)) *
-      Math.max(1, viewportWidth - 1);
-    screenY[index] =
-      (1 - (positionRadius[offset + 1] - bounds.minZ) / Math.max(bounds.spanZ, 0.0001)) *
-      Math.max(1, viewportHeight - 1);
-    const sigmaX = Math.max((scaleRotation[offset] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
-    const sigmaY = Math.max((scaleRotation[offset + 1] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
+    screenX[index] = positionRadius[offset];
+    screenY[index] = positionRadius[offset + 1];
+    const sigmaX = Math.max(scaleRotation[offset], 0.0001);
+    const sigmaY = Math.max(scaleRotation[offset + 1], 0.0001);
     sigmaXSquared[index] = sigmaX * sigmaX;
     sigmaYSquared[index] = sigmaY * sigmaY;
     const rotation = scaleRotation[offset + 2];
@@ -706,18 +702,24 @@ function checksumUint32(checksum, value) {
 }
 
 function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
+  const cameraProjection = editCameraProjection(viewportWidth, viewportHeight);
   if (points.length === 0) {
     return {
-      minX: -1,
-      maxX: 1,
-      minZ: -1,
-      maxZ: 1,
-      spanX: 2,
-      spanZ: 2,
+      minX: 0,
+      maxX: Math.max(1, viewportWidth),
+      minZ: 0,
+      maxZ: Math.max(1, viewportHeight),
+      spanX: Math.max(1, viewportWidth),
+      spanZ: Math.max(1, viewportHeight),
       fitMode: "empty-default",
       paddingRatio: 0,
-      viewportAspect: 1,
-      worldAspect: 1,
+      viewportAspect: cameraProjection.viewportAspect,
+      worldAspect: cameraProjection.viewportAspect,
+      projectionMode: WEBGPU_TILE_PROJECTION_MODE,
+      cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
+      cameraPosition: EDIT_CAMERA_POSITION,
+      cameraTarget: EDIT_CAMERA_TARGET,
+      cameraProjection,
     };
   }
 
@@ -726,10 +728,11 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
   let minZ = Infinity;
   let maxZ = -Infinity;
   for (const point of points) {
-    minX = Math.min(minX, point.x);
-    maxX = Math.max(maxX, point.x);
-    minZ = Math.min(minZ, point.z);
-    maxZ = Math.max(maxZ, point.z);
+    const screen = projectPointWithCamera(point, cameraProjection);
+    minX = Math.min(minX, screen.x);
+    maxX = Math.max(maxX, screen.x);
+    minZ = Math.min(minZ, screen.y);
+    maxZ = Math.max(maxZ, screen.y);
   }
 
   return fitBoundsToViewport({
@@ -739,10 +742,11 @@ function sceneBounds(points, viewportWidth = 1, viewportHeight = 1) {
     maxZ,
     viewportWidth,
     viewportHeight,
+    cameraProjection,
   });
 }
 
-function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHeight }) {
+function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHeight, cameraProjection }) {
   let spanX = Math.max(maxX - minX, 0.0001);
   let spanZ = Math.max(maxZ - minZ, 0.0001);
   const centerX = (minX + maxX) * 0.5;
@@ -770,7 +774,77 @@ function fitBoundsToViewport({ minX, maxX, minZ, maxZ, viewportWidth, viewportHe
     paddingRatio: VIEWPORT_FIT_PADDING_RATIO,
     viewportAspect,
     worldAspect: spanX / spanZ,
+    projectionMode: WEBGPU_TILE_PROJECTION_MODE,
+    cameraFovDegrees: EDIT_CAMERA_FOV_DEGREES,
+    cameraPosition: EDIT_CAMERA_POSITION,
+    cameraTarget: EDIT_CAMERA_TARGET,
+    cameraProjection,
   };
+}
+
+function editCameraProjection(viewportWidth, viewportHeight) {
+  const eye = EDIT_CAMERA_POSITION;
+  const target = EDIT_CAMERA_TARGET;
+  const forward = normalize3(subtract3(target, eye));
+  const right = normalize3(cross3(forward, EDIT_CAMERA_UP));
+  const up = normalize3(cross3(right, forward));
+  const viewportAspect = Math.min(
+    4,
+    Math.max(0.25, Math.max(1, viewportWidth) / Math.max(1, viewportHeight)),
+  );
+  return {
+    eye,
+    forward,
+    right,
+    up,
+    viewportWidth: Math.max(1, viewportWidth),
+    viewportHeight: Math.max(1, viewportHeight),
+    viewportAspect,
+    tanHalfFovY: Math.tan((EDIT_CAMERA_FOV_DEGREES * Math.PI) / 360),
+  };
+}
+
+function projectPointWithCamera(point, cameraProjection) {
+  const world = [point.x, point.z, point.y];
+  const cameraDelta = subtract3(world, cameraProjection.eye);
+  const depth = Math.max(0.01, dot3(cameraDelta, cameraProjection.forward));
+  const viewX = dot3(cameraDelta, cameraProjection.right);
+  const viewY = dot3(cameraDelta, cameraProjection.up);
+  const ndcX = viewX / (depth * cameraProjection.tanHalfFovY * cameraProjection.viewportAspect);
+  const ndcY = viewY / (depth * cameraProjection.tanHalfFovY);
+  const viewportWidth = cameraProjection.viewportWidth;
+  const viewportHeight = cameraProjection.viewportHeight;
+  return {
+    x: (ndcX * 0.5 + 0.5) * Math.max(1, viewportWidth - 1),
+    y: (0.5 - ndcY * 0.5) * Math.max(1, viewportHeight - 1),
+    depth,
+    pixelsPerWorldUnit: viewportHeight * 0.5 / (cameraProjection.tanHalfFovY * depth),
+  };
+}
+
+function subtract3(left, right) {
+  return [
+    left[0] - right[0],
+    left[1] - right[1],
+    left[2] - right[2],
+  ];
+}
+
+function dot3(left, right) {
+  return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
+
+function cross3(left, right) {
+  return [
+    left[1] * right[2] - left[2] * right[1],
+    left[2] * right[0] - left[0] * right[2],
+    left[0] * right[1] - left[1] * right[0],
+  ];
+}
+
+function normalize3(vector) {
+  const length = Math.hypot(vector[0], vector[1], vector[2]) || 1;
+  return [vector[0] / length, vector[1] / length, vector[2] / length];
 }
 
 function packGaussian({
@@ -779,6 +853,7 @@ function packGaussian({
   objectDenseIndex,
   radiusPixels,
   scale,
+  screen,
   renderMode,
   positionRadius,
   colorOpacity,
@@ -786,9 +861,9 @@ function packGaussian({
   objectIndices,
 }) {
   const vec4Offset = index * 4;
-  positionRadius[vec4Offset] = point.x;
-  positionRadius[vec4Offset + 1] = point.z;
-  positionRadius[vec4Offset + 2] = point.y;
+  positionRadius[vec4Offset] = screen.x;
+  positionRadius[vec4Offset + 1] = screen.y;
+  positionRadius[vec4Offset + 2] = screen.depth;
   positionRadius[vec4Offset + 3] = radiusPixels;
 
   const rgb = renderMode === "original" ? point.color : point.objectColor;
@@ -797,27 +872,40 @@ function packGaussian({
   colorOpacity[vec4Offset + 2] = rgb[2] / 255;
   colorOpacity[vec4Offset + 3] = clampNumber(point.opacity ?? 1, 0, 1);
 
-  scaleRotation[vec4Offset] = scale[0];
-  scaleRotation[vec4Offset + 1] = scale[1];
+  scaleRotation[vec4Offset] = Math.max((scale[0] * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE) / 3, 0.0001);
+  scaleRotation[vec4Offset + 1] = Math.max((scale[1] * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE) / 3, 0.0001);
   scaleRotation[vec4Offset + 2] = Number.isFinite(point.rotation) ? point.rotation : 0;
   scaleRotation[vec4Offset + 3] = 0;
   objectIndices[index] = objectDenseIndex;
 }
 
 function projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight }) {
+  const cameraScreen = projectPointWithCamera(point, bounds.cameraProjection);
   return {
-    x: ((point.x - bounds.minX) / bounds.spanX) * Math.max(1, viewportWidth - 1),
-    y: (1 - (point.z - bounds.minZ) / bounds.spanZ) * Math.max(1, viewportHeight - 1),
+    x: ((cameraScreen.x - bounds.minX) / bounds.spanX) * Math.max(1, viewportWidth - 1),
+    y: ((cameraScreen.y - bounds.minZ) / bounds.spanZ) * Math.max(1, viewportHeight - 1),
+    depth: cameraScreen.depth,
+    pixelsPerWorldUnit:
+      cameraScreen.pixelsPerWorldUnit *
+      Math.min(
+        viewportWidth / Math.max(bounds.spanX, 0.0001),
+        viewportHeight / Math.max(bounds.spanZ, 0.0001),
+      ),
   };
 }
 
-function pointRadiusPixels({ point, scale, bounds, viewportWidth, viewportHeight, pointSize }) {
+function pointRadiusPixels({ scale, screen, pointSize }) {
   const maxScale = Math.max(scale[0], scale[1], pointSize, 0.0006);
-  const pixelsPerWorldUnit = Math.min(
-    viewportWidth / Math.max(bounds.spanX, 0.0001),
-    viewportHeight / Math.max(bounds.spanZ, 0.0001),
+  return clampNumber(maxScale * screen.pixelsPerWorldUnit * EDIT_SPLAT_SIZE_SCALE, 1.5, 96);
+}
+
+function screenInfluencesViewport({ screen, radiusPixels, viewportWidth, viewportHeight }) {
+  return (
+    screen.x + radiusPixels >= 0 &&
+    screen.x - radiusPixels <= Math.max(1, viewportWidth - 1) &&
+    screen.y + radiusPixels >= 0 &&
+    screen.y - radiusPixels <= Math.max(1, viewportHeight - 1)
   );
-  return clampNumber(maxScale * pixelsPerWorldUnit * 4.8, 1.5, 96);
 }
 
 function pointScale(point) {

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-C`: 将 WebGPU Tile 编辑从 aspect-fit 正交 blob 推进到更接近 Spark 真实查看的相机 / depth / alpha-order 视觉一致性路径，重点处理用户可见的“过度平滑、不像真实 3DGS”问题。
+  - `RENDER-005T-D`: 将 WebGPU Tile 编辑从 edit-camera perspective projection 继续推进到 depth / alpha-order / screen-space covariance 视觉一致性路径，重点处理用户可见的“原始颜色编辑预览仍偏软糊、不像真实 3DGS”问题。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-C: WebGPU edit-camera perspective projection
+
+- 状态: done / edit-camera-projection
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 aspect-fit runtime viewport 后，减少 WebGPU Tile 编辑预览因为简化 x/z 正交投影导致的“自身颜色像颗粒/不像高斯”视觉差距。
+- 已实施:
+  - `webgpuTileSmoke` 改为 CPU 端按固定编辑相机投影 Gaussian，打包 screen-space center / depth / sigma，WGSL accumulation 和 pixel resolve 直接消费 screen-space Gaussian。
+  - WebGPU canvas 点击命中复用同一套 edit-camera projection，并按内部 viewport 映射到实际 canvas 尺寸，避免渲染画面和选中区域继续按旧 x/z 正交逻辑错位。
+  - 新增 `projectionMode=edit-perspective-camera-v1` 与 `projectionCameraFovDegrees=52` runtime telemetry，前端 DOM 和 audit 会检查 WebGPU full path 使用该投影 contract。
+  - Node smoke contract 更新为验证 GPU shader 不再按旧 world bounds 做二次投影，pixel resolve 继续使用 bilinear storage display。
+- 结论:
+  - NeRF Lego proxy 的 headed desktop WebGPU full audit 通过，选择、隔离、删除预览仍能更新 object-state buffer。
+  - 这一步解释并缓解了“原始颜色（编辑预览）颗粒/不像高斯”的一部分原因：WebGPU 编辑预览以前不是 Spark 真实 `.splat` 重渲染，而是低分辨率 tile renderer + 简化投影。
+  - 剩余视觉差距仍来自 depth / alpha-order、screen-space covariance 和最终 tile renderer 质量，不应宣称已经等同 Spark 真实查看。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`projection=edit-perspective-camera-v1:52`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5245 --probes full`: passed；`projection="edit-perspective-camera-v1":52`、device active、queue done、object interactions passed。
 
 ### RENDER-005T-B: WebGPU aspect-fit runtime viewport
 

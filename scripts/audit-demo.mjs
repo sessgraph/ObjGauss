@@ -87,6 +87,7 @@ try {
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)} ` +
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
+        `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
         `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
@@ -311,6 +312,8 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuBoundsPaddingRatio = Number(await viewport.getAttribute("data-webgpu-bounds-padding-ratio") ?? "0");
       const webGpuBoundsViewportAspect = Number(await viewport.getAttribute("data-webgpu-bounds-viewport-aspect") ?? "0");
       const webGpuBoundsWorldAspect = Number(await viewport.getAttribute("data-webgpu-bounds-world-aspect") ?? "0");
+      const webGpuProjectionMode = await viewport.getAttribute("data-webgpu-projection-mode");
+      const webGpuProjectionCameraFov = Number(await viewport.getAttribute("data-webgpu-projection-camera-fov") ?? "0");
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
@@ -388,6 +391,11 @@ async function runAudit(url, assetsToCheck, options) {
         ) {
           throw new Error(
             `${asset.id} WebGPU bounds were not aspect-fit with padding: mode=${webGpuBoundsFitMode} padding=${webGpuBoundsPaddingRatio} worldAspect=${webGpuBoundsWorldAspect} viewportAspect=${webGpuBoundsViewportAspect}`,
+          );
+        }
+        if (webGpuProjectionMode !== "edit-perspective-camera-v1" || Math.abs(webGpuProjectionCameraFov - 52) > 0.001) {
+          throw new Error(
+            `${asset.id} WebGPU projection did not use edit perspective camera: mode=${webGpuProjectionMode} fov=${webGpuProjectionCameraFov}`,
           );
         }
       }
@@ -601,6 +609,8 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuBoundsPaddingRatio,
             webGpuBoundsViewportAspect,
             webGpuBoundsWorldAspect,
+            webGpuProjectionMode,
+            webGpuProjectionCameraFov,
             webGpuDeviceLostStatus,
             webGpuDeviceLostReason,
             webGpuDeviceLostMessage,
@@ -787,6 +797,8 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuBoundsPaddingRatio,
         webGpuBoundsViewportAspect,
         webGpuBoundsWorldAspect,
+        webGpuProjectionMode,
+        webGpuProjectionCameraFov,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,

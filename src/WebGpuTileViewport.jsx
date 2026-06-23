@@ -29,6 +29,10 @@ import {
   WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE,
 } from "./webgpuTextureResolveShader.js";
 import {
+  buildWebGpuTileProjectionBounds,
+  projectPointToWebGpuTileViewport,
+} from "./webgpuTileSmoke.js";
+import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
   WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
@@ -437,6 +441,7 @@ export default function WebGpuTileViewport({
         event,
         canvas,
         points,
+        tileSmoke,
         visibleIds,
         removedIds,
         isolatedId,
@@ -448,7 +453,7 @@ export default function WebGpuTileViewport({
     return () => {
       canvas.removeEventListener("pointerup", pointerUp);
     };
-  }, [isolatedId, onSelectObject, points, removedIds, visibleIds]);
+  }, [isolatedId, onSelectObject, points, removedIds, tileSmoke, visibleIds]);
 
   return (
     <div
@@ -486,6 +491,8 @@ export default function WebGpuTileViewport({
       data-webgpu-bounds-padding-ratio={rendererContract?.boundsPaddingRatio ?? 0}
       data-webgpu-bounds-viewport-aspect={rendererContract?.boundsViewportAspect ?? 0}
       data-webgpu-bounds-world-aspect={rendererContract?.boundsWorldAspect ?? 0}
+      data-webgpu-projection-mode={rendererContract?.projectionMode ?? ""}
+      data-webgpu-projection-camera-fov={rendererContract?.projectionCameraFovDegrees ?? 0}
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}
@@ -1247,12 +1254,15 @@ function pickObjectFromTileFrame({
   event,
   canvas,
   points,
+  tileSmoke,
   visibleIds,
   removedIds,
   isolatedId,
 }) {
-  const bounds = sceneBounds(points);
   const rect = canvas.getBoundingClientRect();
+  const viewportWidth = Math.max(1, tileSmoke?.viewportWidth ?? canvas.width ?? rect.width);
+  const viewportHeight = Math.max(1, tileSmoke?.viewportHeight ?? canvas.height ?? rect.height);
+  const bounds = buildWebGpuTileProjectionBounds(points, viewportWidth, viewportHeight);
   const targetX = event.clientX - rect.left;
   const targetY = event.clientY - rect.top;
   const threshold = Math.max(32, Math.min(rect.width, rect.height) * 0.06);
@@ -1267,8 +1277,9 @@ function pickObjectFromTileFrame({
     ) {
       continue;
     }
-    const x = ((point.x - bounds.minX) / bounds.spanX) * rect.width;
-    const y = (1 - (point.z - bounds.minZ) / bounds.spanZ) * rect.height;
+    const screen = projectPointToWebGpuTileViewport({ point, bounds, viewportWidth, viewportHeight });
+    const x = (screen.x / Math.max(1, viewportWidth - 1)) * rect.width;
+    const y = (screen.y / Math.max(1, viewportHeight - 1)) * rect.height;
     const distance = (x - targetX) ** 2 + (y - targetY) ** 2;
     if (distance < bestDistance) {
       bestDistance = distance;
@@ -1286,28 +1297,4 @@ function resizeCanvasToDisplaySize(canvas) {
     canvas.width = width;
     canvas.height = height;
   }
-}
-
-function sceneBounds(points) {
-  if (points.length === 0) {
-    return { minX: -1, minZ: -1, spanX: 2, spanZ: 2 };
-  }
-
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    maxX = Math.max(maxX, point.x);
-    minZ = Math.min(minZ, point.z);
-    maxZ = Math.max(maxZ, point.z);
-  }
-
-  return {
-    minX,
-    minZ,
-    spanX: Math.max(maxX - minX, 0.0001),
-    spanZ: Math.max(maxZ - minZ, 0.0001),
-  };
 }
