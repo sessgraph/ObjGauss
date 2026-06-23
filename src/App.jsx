@@ -198,6 +198,8 @@ export default function App() {
   const removeSelected = () => {
     if (selectedId === null) return;
     setViewMode("edit");
+    setRenderMode("original");
+    setIsolatedId(null);
     setRemovedIds((current) => new Set([...current, selectedId]));
   };
 

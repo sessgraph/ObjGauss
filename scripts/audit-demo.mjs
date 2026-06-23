@@ -50,6 +50,8 @@ try {
         `splatPixels=${result.splatPixels} editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
+        `visibleAfterDelete=${result.visibleAfterDelete} ` +
+        `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} screenshot=${result.screenshotPath}`,
     );
   }
@@ -106,8 +108,16 @@ async function runAudit(url, assetsToCheck) {
       await page.getByRole("button", { name: "预览删除" }).click();
       await page.waitForTimeout(300);
       const deletedObjects = await labeledValue(page, "已删除对象");
+      const visibleAfterDelete = await labeledValue(page, "可见");
+      const renderModeAfterDelete = await labeledValue(page, "模式");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
+      }
+      if (numericValue(visibleAfterDelete) <= 0) {
+        throw new Error(`${asset.id} delete preview did not show remaining scene`);
+      }
+      if (renderModeAfterDelete !== "自身颜色") {
+        throw new Error(`${asset.id} delete preview did not restore original colors`);
       }
       const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -118,6 +128,8 @@ async function runAudit(url, assetsToCheck) {
         editPixels,
         canvasSelectedObject,
         visibleAfterIsolate,
+        visibleAfterDelete,
+        renderModeAfterDelete,
         deletedObjects,
         screenshotPath,
       });
@@ -234,8 +246,20 @@ async function waitForNonBackgroundPixels(page, timeoutMs = 10000) {
 }
 
 async function labeledValue(page, label) {
-  const row = page.locator(".metric, .stateRow").filter({ hasText: label }).first();
-  return row.locator("strong").innerText();
+  const value = await page.locator(".metric, .stateRow").evaluateAll((rows, targetLabel) => {
+    const row = rows.find(
+      (candidate) => candidate.querySelector("span")?.textContent?.trim() === targetLabel,
+    );
+    return row?.querySelector("strong")?.textContent?.trim() ?? "";
+  }, label);
+  if (!value) {
+    throw new Error(`missing labeled value: ${label}`);
+  }
+  return value;
+}
+
+function numericValue(value) {
+  return Number(value.replace(/[^\d]/g, ""));
 }
 
 async function selectObjectFromCanvas(page, assetId) {
