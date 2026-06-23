@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005R`: 将 desktop WebGPU runtime audit 扩展到 Plush / Splatfacto 级 100k+ Gaussian 场景，验证 compact tile list、storage gate 和对象编辑交互在大场景上的稳定性。
+  - `RENDER-005S`: 提升 WebGPU tile runtime 的显示分辨率 / 视觉质量审计，从低分辨率 runtime probe 推进到更接近用户可用的编辑视图。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -26,21 +26,35 @@
 
 ## In Progress
 
-### RENDER-005R: Large-scene desktop WebGPU runtime audit
+### RENDER-005S: WebGPU runtime visual fidelity audit
 
 - 状态: ready
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 desktop WebGPU runtime 已通过大场景后，提升和审计 WebGPU tile 编辑视图的显示分辨率、非空像素覆盖和用户可感知视觉质量。
+- 待验证:
+  - 对比 `Gaussian OIT 编辑` 与 `WebGPU Tile 编辑` 的 same-scene screenshot / pixel coverage。
+  - 评估当前 128px runtime probe 输出是否应提升为 adaptive viewport scale。
+  - 保持 storage gate / queue / device telemetry 可解释，避免把视觉质量问题误判为 runtime failure。
+
+## Done
+
+### RENDER-005R: Large-scene desktop WebGPU runtime audit
+
+- 状态: done / large-scene-runtime-passed
 - 类型: 标准 PR / 前端渲染验收
 - 目标: 在 WebGPU-capable 桌面 Chrome 中把强制 WebGPU runtime audit 从 NeRF Lego proxy 扩展到 Plush / Splatfacto 级 100k+ Gaussian 场景，验证 C 路线在大场景上的对象编辑稳定性。
-- 待验证:
-  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local`
-  - `npm run audit:webgpu-desktop -- --asset plush-v1-closure-local`
-  - 若本机 public sample 可用，再跑 `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local`
+- 结论:
+  - Plush semantic closure、Plush v1 closure 和本机 safe-2000 Splatfacto public sample 均在 headed desktop Chrome/WebGPU 下通过 `clear-only`、`texture-display-only` 和 `full` probes。
+  - 三个大场景均进入 `data-renderer="webgpu-tile"`，`targetGate="pass"`，`storageLimit="pass"`，`tileCapacity="compact-offset-list":"ok"`。
+  - `full` probe 均 dispatch accumulation / resolve / pixel stages，queue done，device active，并完成对象选择、隔离和删除预览。
 - 验收底线:
   - `data-renderer="webgpu-tile"`、`targetGate="pass"`、`storageLimit="pass"`。
   - `full` probe 中 accumulation / resolve / pixel stages 均 dispatched，queue done，device active。
   - 对象选择、隔离、删除预览仍能更新 object-state checksum 和 visible counts。
-
-## Done
+- 验证:
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5236`: passed；281498 packed/binned Gaussians，tileReferences=724881，maxTileOccupancy=38792，storage max buffer=`positionRadius:4503968`，visibleAfterIsolate=98770，visibleAfterDelete=182728。
+  - `npm run audit:webgpu-desktop -- --asset plush-v1-closure-local --port 5237`: passed；281498 packed/binned Gaussians，tileReferences=724881，maxTileOccupancy=38792，storage max buffer=`positionRadius:4503968`，visibleAfterIsolate=85041，visibleAfterDelete=196457。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local --port 5238`: passed；255794 packed/binned Gaussians，tileReferences=436816，maxTileOccupancy=37934，storage max buffer=`positionRadius:4092704`，visibleAfterIsolate=126686，visibleAfterDelete=129108。
 
 ### RENDER-005Q: Desktop WebGPU presentation audit
 
