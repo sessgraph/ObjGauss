@@ -10,18 +10,47 @@
 
 ## Ready
 
-### TRAIN-003: 固化 NeRF Lego Splatfacto 训练样例
+### TRAIN-003B: NeRF Lego Splatfacto public training sample
 
-- 状态: ready-for-ADR-review
+- 状态: ready-for-owner-confirmation
 - 类型: 重大变更
-- 目标: 将 TRAIN-001 smoke 固化为可复现 runbook / script，跑更长的 Splatfacto 训练，并登记为前端 `NeRF Lego 训练输出样例`。
+- 目标: 基于 TRAIN-003A runbook 跑更长的 Splatfacto 训练，并登记为前端 `NeRF Lego 训练输出样例`。
 - 范围外: 不自研完整 3DGS trainer；不把 checkpoint、SAM checkpoint 或大体积训练输出提交进 git。
 - 验收:
-  - 训练命令可由文档或脚本复现，并记录 CUDA / `gsplat` 环境要求。
+  - 选择比 100-step smoke 更有质量意义的训练配置，并记录训练耗时与输出路径。
   - 长训练导出的 Lego `splat.ply` 可通过 `training register-output` 生成 viewer `.splat` 和 `object_id` PLY。
   - 前端素材库卡片可加载训练输出样例并完成对象选择、隔离、删除预览。
 
 ## Done
+
+### TRAIN-003A: Splatfacto smoke runbook and script
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 TRAIN-001 的 NeRF Lego Splatfacto 100-step smoke 从“本机已有 outputs”固化成可复现 runbook / script，供 SEMANTIC benchmark 缺失输入时生成本地 handoff。
+- 实施:
+  - 新增 `scripts/train-splatfacto-smoke.mjs`，支持 `--dry-run`、`--status` 和 `--run`。
+  - 新增 `npm run train:splatfacto:smoke`。
+  - 新增 `docs/training/splatfacto-smoke.md`，记录 Nerfstudio Splatfacto 训练、`ns-export gaussian-splat`、SAM manifest、Object Field init / vote-masks、CUDA / `gsplat` 包要求和输出 contract。
+  - `docs/benchmarks/semantic-smoke.json` 的 Splatfacto scene `prepare` 提示改为引用新脚本。
+  - README 和 `docs/benchmarks/semantic-smoke.md` 指向 TRAIN-003A runbook。
+  - 测试覆盖脚本 dry-run 输出的核心 pipeline。
+- 范围外:
+  - 不运行新的长训练，不登记 public sample。
+  - 不提交 `outputs/`、checkpoint、SAM checkpoint 或训练日志。
+  - 不替换当前 point-splat render probe。
+- 验收:
+  - `npm run train:splatfacto:smoke -- --dry-run` 输出完整训练 / 导出 / SAM / Object Field pipeline。
+  - `npm run train:splatfacto:smoke -- --status` 能机器检查本地 smoke inputs / outputs 是否齐全。
+  - `npm run acceptance:semantic` 仍通过。
+- 验证:
+  - `node scripts/train-splatfacto-smoke.mjs --dry-run --sam-checkpoint /tmp/sam-vit-b.pth --skip-benchmark`: passed。
+  - `node scripts/train-splatfacto-smoke.mjs --status`: `status=ready missing=0`。
+  - `npm run train:splatfacto:smoke -- --dry-run --sam-checkpoint /tmp/sam-vit-b.pth --skip-benchmark`: passed。
+  - `uv run --extra dev pytest`: 32 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+  - `npm run acceptance:semantic`: passed，输出 `acceptance_semantic_benchmark=passed`。
+- 完成 commit: pending。
 
 ### SEMANTIC-007: Acceptance integration and missing-output runbook
 

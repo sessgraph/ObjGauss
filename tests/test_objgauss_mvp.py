@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import struct
 import zipfile
 import zlib
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -586,6 +588,36 @@ def test_object_field_emergence_benchmark_reports_prepare_steps_for_missing_inpu
     assert "scene missing-scene: missing input path:" in error
     assert "uv run objgauss demo missing-scene" in error
     assert "docs/benchmarks/semantic-smoke.md" in error
+
+
+def test_splatfacto_smoke_script_dry_run_reports_pipeline():
+    repo_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [
+            "node",
+            "scripts/train-splatfacto-smoke.mjs",
+            "--dry-run",
+            "--sam-checkpoint",
+            "/tmp/sam-vit-b.pth",
+            "--skip-benchmark",
+        ],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode=dry-run" in result.stdout
+    assert "ns-train splatfacto" in result.stdout
+    assert "ns-export gaussian-splat" in result.stdout
+    assert "masks from-nerf-sam" in result.stdout
+    assert "object-field init" in result.stdout
+    assert "object-field vote-masks" in result.stdout
+    assert "/tmp/sam-vit-b.pth" in result.stdout
+    assert "acceptance:semantic" not in result.stdout
+    assert "dry_run=passed" in result.stdout
 
 
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):

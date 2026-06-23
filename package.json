@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "audit:demo": "node scripts/audit-demo.mjs",
     "acceptance:demo": "node scripts/acceptance-demo.mjs",
-    "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs"
+    "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",
+    "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs"
   },
   "dependencies": {
     "@sparkjsdev/spark": "^2.1.0",

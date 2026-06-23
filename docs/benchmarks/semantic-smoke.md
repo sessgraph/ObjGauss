@@ -54,54 +54,31 @@ uv run objgauss demo lego-alpha-closure \
   --iterations 120
 ```
 
-Generate the Lego SAM mask manifest when SAM is available locally:
+Generate the Lego Splatfacto smoke scene and SAM Object Field handoff:
 
 ```bash
-uv run \
-  --with torch \
-  --with torchvision \
-  --with "segment-anything @ git+https://github.com/facebookresearch/segment-anything.git" \
-  objgauss masks from-nerf-sam \
-  outputs/assets/training/nerf-synthetic-lego \
-  --output outputs/masks/nerf-lego-sam/mask-manifest.json \
-  --checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth \
-  --model-type vit_b \
-  --device cuda \
-  --split train \
-  --max-frames 2 \
-  --max-masks-per-frame 8 \
-  --min-area 64
+SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
+npm run train:splatfacto:smoke -- --run --skip-benchmark
 ```
 
-The Splatfacto PLY is produced by Nerfstudio, not by ObjGauss. The expected
-handoff path is:
-
-```text
-outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply
-```
-
-After that PLY exists, rebuild its Object Field inputs:
+The Splatfacto PLY is produced by Nerfstudio, not by ObjGauss. The formal
+TRAIN-003A runbook is `docs/training/splatfacto-smoke.md`; it records the
+Nerfstudio command, CUDA / `gsplat` package notes, SAM checkpoint requirement,
+and output contract. Preview the commands before starting the longer run:
 
 ```bash
-uv run objgauss object-field init \
-  outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply \
-  --output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz \
-  --slots 8
-
-uv run objgauss object-field vote-masks \
-  outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply \
-  --field outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz \
-  --masks outputs/masks/nerf-lego-sam/mask-manifest.json \
-  --output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_sam.npz \
-  --ply-output outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/lego_splatfacto_sam_objects.ply \
-  --iterations 80 \
-  --learning-rate 1.0 \
-  --colorize
+npm run train:splatfacto:smoke -- --dry-run
 ```
 
-`TRAIN-003` will formalize the Nerfstudio training runbook. Until then, this
-benchmark treats the Splatfacto smoke PLY as a local prerequisite and reports a
-clear missing-output error when it is absent.
+Check whether the local smoke outputs are already present:
+
+```bash
+npm run train:splatfacto:smoke -- --status
+```
+
+The benchmark still treats `outputs/` as local ignored state. Missing Splatfacto
+outputs now have a reproducible generation entrypoint instead of a hand-written
+handoff.
 
 ## Acceptance Integration
 

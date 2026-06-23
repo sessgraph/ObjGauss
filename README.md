@@ -274,6 +274,22 @@ voting when `--masks` is supplied, and exports an object-aware PLY. With the
 `--public-name nerf_lego_trained` path above, the frontend card
 `NeRF Lego 训练输出样例` can load the registered output.
 
+Generate the local NeRF Lego Splatfacto smoke output used by the semantic
+benchmark:
+
+```bash
+npm run train:splatfacto:smoke -- --dry-run
+SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
+  npm run train:splatfacto:smoke -- --run --skip-benchmark
+npm run train:splatfacto:smoke -- --status
+```
+
+This wraps the Nerfstudio `splatfacto` smoke training command, Gaussian PLY
+export, SAM mask manifest generation, Object Field initialization, and mask
+voting for the ignored local `outputs/training/nerf-lego-splatfacto-smoke/`
+handoff. See `docs/training/splatfacto-smoke.md` for CUDA / `gsplat` notes and
+the full output contract.
+
 Run the browser audit for the closure cards:
 
 ```bash
@@ -315,8 +331,8 @@ uv run objgauss object-field emergence-benchmark \
 
 That manifest expects local ignored outputs for Plush semantic, Lego alpha
 proxy, and Lego Splatfacto smoke. If a machine does not yet have the Splatfacto
-smoke output, follow `docs/benchmarks/semantic-smoke.md`. For the older
-demo-only loop:
+smoke output, run `npm run train:splatfacto:smoke -- --dry-run` and then follow
+`docs/training/splatfacto-smoke.md`. For the older demo-only loop:
 
 ```bash
 npm run acceptance:demo -- --skip-semantic-benchmark
