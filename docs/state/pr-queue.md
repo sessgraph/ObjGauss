@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-22
+> 最近更新: 2026-06-23
 
 ## 队列规则
 
@@ -22,6 +22,32 @@
   - 前端素材库卡片可加载训练输出样例并完成对象选择、隔离、删除预览。
 
 ## Done
+
+### SEMANTIC-002: Object Emergence observability metrics
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 建立 ObjGauss v1 的 object emergence 最小观测系统，避免只靠视觉主观判断。
+- 实施:
+  - 新增 `objgauss/emergence.py`。
+  - 新增 `objgauss object-field emergence` CLI。
+  - 输出 assignment confidence、mean normalized entropy、effective slots、low/high entropy fraction。
+  - 支持传入 Gaussian PLY 后计算空间紧致度。
+  - 支持传入 reference Object Field 后计算 permutation-invariant ARI、matched label agreement 和 slot matching。
+  - 输出 partial Object Emergence Score，显式标记 `occlusion_effect` missing 和 `gradient_coherence` unsupported。
+- 范围外:
+  - 不实现真实 renderer occlusion delta。
+  - 不实现 gradient coherence probe。
+  - 不改变训练逻辑、Object Field 文件格式或 SAM / CLIP slot 对齐。
+  - 不声称 partial OES 已经证明 object emergence 完成。
+- 验收:
+  - CLI 能对单个 Object Field 输出结构化 emergence summary。
+  - 有 cloud 时输出 spatial compactness；有 reference 时输出 ARI 和 label agreement。
+  - permutation 后的相同分群应得到稳定性满分。
+- 验证:
+  - `uv run --extra dev pytest`: 26 passed。
+  - `uv run objgauss object-field emergence outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_sam.npz --cloud outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply --reference outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz --output /tmp/objgauss-lego-splatfacto-emergence.json`: assignment_confidence=0.797826，effective_slots=7.323355，spatial_compactness_score=0.968811，stability_ari=0.642209，matched_label_agreement=0.825040，partial OES=0.772490。
+- 完成 commit: pending。
 
 ### TRAIN-001: 训练 NeRF Lego Gaussian PLY
 

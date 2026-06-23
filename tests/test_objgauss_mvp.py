@@ -11,6 +11,7 @@ import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
 from objgauss.cli import main
 from objgauss.clustering import cluster_features
+from objgauss.emergence import object_emergence_metrics
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.goal_audit import audit_v1_goal
@@ -202,6 +203,26 @@ def test_object_field_label_delta_counts_mask_guidance_changes():
     assert delta.as_dict()["changed_gaussians"] == 2
 
 
+def test_object_emergence_metrics_track_assignment_spatial_and_stability():
+    field = field_from_labels(np.array([0, 0, 1, 1], dtype=np.int32), slots=2, confidence=0.99)
+    permuted = field_from_labels(np.array([1, 1, 0, 0], dtype=np.int32), slots=2, confidence=0.99)
+    positions = np.array(
+        [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [10.0, 0.0, 0.0], [10.1, 0.0, 0.0]],
+        dtype=np.float32,
+    )
+
+    metrics = object_emergence_metrics(field, positions_xyz=positions, reference=permuted)
+
+    assert metrics["assignment"]["assignment_confidence"] > 0.9
+    assert np.isclose(metrics["assignment"]["effective_slots"], 2.0, atol=0.02)
+    assert metrics["spatial"]["compactness_score"] > 0.99
+    assert metrics["stability"]["adjusted_rand_index"] == 1.0
+    assert metrics["stability"]["matched_label_agreement"] == 1.0
+    assert metrics["object_emergence_score"]["score"] > 0.9
+    assert metrics["object_emergence_score"]["complete"] is False
+    assert "occlusion_effect" in metrics["object_emergence_score"]["missing_components"]
+
+
 def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
     input_path = tmp_path / "gaussians.ply"
     field_path = tmp_path / "object_field"
@@ -262,6 +283,48 @@ def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
     assert "gaussians=4" in stats_output
     assert "slots=2" in stats_output
     assert "active_slots=2" in stats_output
+
+
+def test_object_field_emergence_cli_outputs_partial_oes(tmp_path, capsys):
+    input_path = tmp_path / "gaussians.ply"
+    field_path = tmp_path / "object_field.npz"
+    reference_path = tmp_path / "reference_field.npz"
+    summary_path = tmp_path / "emergence.json"
+    write_ply(input_path, _synthetic_cloud(), fmt="ascii")
+    save_object_field(
+        field_path,
+        field_from_labels(np.array([0, 0, 1, 1], dtype=np.int32), slots=2, confidence=0.99),
+    )
+    save_object_field(
+        reference_path,
+        field_from_labels(np.array([1, 1, 0, 0], dtype=np.int32), slots=2, confidence=0.99),
+    )
+
+    assert (
+        main(
+            [
+                "object-field",
+                "emergence",
+                str(field_path),
+                "--cloud",
+                str(input_path),
+                "--reference",
+                str(reference_path),
+                "--output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "object_emergence_score=" in output
+    assert "object_emergence_complete=false" in output
+    assert "missing_components=occlusion_effect" in output
+    assert summary["stability"]["adjusted_rand_index"] == 1.0
+    assert summary["object_emergence_score"]["complete"] is False
 
 
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):

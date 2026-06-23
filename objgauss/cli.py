@@ -8,6 +8,7 @@ import numpy as np
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
+from objgauss.emergence import object_emergence_metrics
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
@@ -225,6 +226,53 @@ def _object_field_stats(args: argparse.Namespace) -> None:
     print(f"slots={field.slots}")
     _print_metrics(metrics)
     _print_summary(field.labels())
+
+
+def _object_field_emergence(args: argparse.Namespace) -> None:
+    field = load_object_field(args.field)
+    positions_xyz = None
+    if args.cloud:
+        cloud = read_ply(args.cloud)
+        if cloud.count != field.gaussian_count:
+            raise ValueError(
+                f"field has {field.gaussian_count} gaussians for cloud with {cloud.count}"
+            )
+        positions_xyz = cloud_positions_for_metrics(cloud)
+    reference = load_object_field(args.reference) if args.reference else None
+    metrics = object_emergence_metrics(
+        field,
+        positions_xyz=positions_xyz,
+        reference=reference,
+    )
+
+    assignment = metrics["assignment"]
+    spatial = metrics["spatial"]
+    stability = metrics["stability"]
+    score = metrics["object_emergence_score"]
+
+    print(f"gaussians={metrics['gaussians']}")
+    print(f"slots={metrics['slots']}")
+    print(f"assignment_confidence={assignment['assignment_confidence']:.6f}")
+    print(f"mean_normalized_entropy={assignment['mean_normalized_entropy']:.6f}")
+    print(f"effective_slots={assignment['effective_slots']:.6f}")
+    print(f"low_entropy_fraction={assignment['low_entropy_fraction']:.6f}")
+    print(f"high_entropy_fraction={assignment['high_entropy_fraction']:.6f}")
+    if spatial:
+        print(f"spatial_compactness_score={spatial['compactness_score']:.6f}")
+        print(f"spatial_overall_normalized_compactness={spatial['overall_normalized_compactness']:.6f}")
+    if stability:
+        print(f"stability_ari={stability['adjusted_rand_index']:.6f}")
+        print(f"matched_label_agreement={stability['matched_label_agreement']:.6f}")
+    if score["score"] is not None:
+        print(f"object_emergence_score={score['score']:.6f}")
+    else:
+        print("object_emergence_score=None")
+    print(f"object_emergence_complete={str(score['complete']).lower()}")
+    print(f"missing_components={','.join(score['missing_components']) or '-'}")
+
+    if args.output:
+        write_json(args.output, metrics)
+        print(f"summary={args.output}")
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -683,6 +731,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     field_stats.add_argument("field", type=Path)
     field_stats.set_defaults(handler=_object_field_stats)
+
+    field_emergence = object_field_subparsers.add_parser(
+        "emergence",
+        help="compute object emergence observability metrics",
+    )
+    field_emergence.add_argument("field", type=Path)
+    field_emergence.add_argument("--cloud", type=Path, help="Gaussian PLY for spatial compactness")
+    field_emergence.add_argument("--reference", type=Path, help="reference Object Field for stability")
+    field_emergence.add_argument("--output", "-o", type=Path)
+    field_emergence.set_defaults(handler=_object_field_emergence)
 
     field_nerf = object_field_subparsers.add_parser(
         "inspect-nerf",
