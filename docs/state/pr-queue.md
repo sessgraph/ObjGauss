@@ -8,18 +8,39 @@
 - 重大变更先补 ADR，Owner 确认后执行。
 - 每个 PR 完成后更新验证结果和完成 commit。
 
-## Ready
+## In Progress
 
 ### SEG-003: Multi-view SAM supervision for Splatfacto candidates
 
-- 状态: ready-for-owner-confirmation
+- 状态: browser-audit-pending
 - 类型: 重大变更
 - 目标: 为 safe-2000 Splatfacto candidate 生成更多 NeRF Lego SAM views，并补 slot balancing / 多视角一致性检查，降低 2-frame supervision 导致的 object slot 不平衡。
 - 范围外: 不继续盲目增加 Splatfacto 训练步数；不提交 SAM checkpoint、训练 checkpoint 或大体积训练输出。
+- 已实施:
+  - `objgauss masks from-nerf-sam` 新增 `--max-area-fraction`，用于过滤过大的 SAM masks；默认 1.0 保持兼容。
+  - 生成并比较 8-frame / 8-slot unfiltered、8-frame / 8-slot filtered、8-frame / 4-slot filtered 多个 safe-2000 SAM supervision 变体。
+  - 当前最佳候选为 8-frame / 4-slot / `max_area_fraction=0.3`，已登记到本机 `public/samples/nerf_lego_trained.*`。
 - 验收:
-  - 生成 8-12 frame SAM manifest，记录 frames、masks、mask_pixels、slots。
-  - safe-2000 上 `training register-output` 的 object_id 分布不再出现接近空槽。
-  - 与 2-frame SAM baseline 比较 supervised_gaussians、effective_slots、ARI、render_occlusion_effect_score 和浏览器对象交互。
+  - 生成 8-frame SAM manifest，frames=8，masks=27，mask_pixels=664780，slots=4。
+  - safe-2000 上 `training register-output` 的 object_id 分布不再出现接近空槽，counts=126686/40747/34682/53679。
+  - 与 2-frame SAM baseline 比较：supervised_gaussians=70025，effective_slots=3.509020，ARI=0.468745，render_occlusion_effect_score=0.195308。
+  - 待完成: 本机浏览器 audit 重跑被工具审批层拒绝；需要获得授权后执行 `npm run audit:demo -- --asset nerf-lego-trained-output-local`。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "nerf_sam" -q`: 2 passed。
+  - `uv run --extra dev pytest`: 33 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+
+## Ready
+
+### ACCEPT-002: Browser audit for balanced Splatfacto sample
+
+- 状态: ready-for-owner-confirmation
+- 类型: 标准 PR
+- 目标: 在获得本地服务 / Playwright 提权授权后，重跑当前 `NeRF Lego 训练输出样例` 的浏览器验收。
+- 范围外: 不重新训练 Splatfacto；不改变 SAM manifest 或 Object Field 参数。
+- 验收:
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --port <free-port>` 通过。
+  - 如通过，将 SEG-003 移入 Done 并记录 screenshot / splatPixels / editPixels / visibleAfterIsolate。
 
 ## Done
 

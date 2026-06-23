@@ -246,6 +246,7 @@ def build_nerf_sam_mask_manifest(
     max_frames: int | None = None,
     max_masks_per_frame: int = 8,
     min_area: int = 1,
+    max_area_fraction: float = 1.0,
     points_per_side: int = 32,
     pred_iou_thresh: float = 0.88,
     stability_score_thresh: float = 0.95,
@@ -257,6 +258,8 @@ def build_nerf_sam_mask_manifest(
         raise ValueError("max_masks_per_frame must be >= 1")
     if min_area < 1:
         raise ValueError("min_area must be >= 1")
+    if not 0.0 < max_area_fraction <= 1.0:
+        raise ValueError("max_area_fraction must be in (0, 1]")
 
     dataset = Path(dataset)
     output = Path(output)
@@ -304,6 +307,7 @@ def build_nerf_sam_mask_manifest(
             height=height,
             width=width,
             min_area=min_area,
+            max_area_fraction=max_area_fraction,
             max_masks=max_masks_per_frame,
         )
         masks: list[dict[str, Any]] = []
@@ -356,6 +360,7 @@ def build_nerf_sam_mask_manifest(
             "pred_iou_thresh": pred_iou_thresh,
             "stability_score_thresh": stability_score_thresh,
             "min_area": min_area,
+            "max_area_fraction": max_area_fraction,
             "max_masks_per_frame": max_masks_per_frame,
         },
         "frames": manifest_frames,
@@ -524,9 +529,11 @@ def _select_sam_masks(
     height: int,
     width: int,
     min_area: int,
+    max_area_fraction: float,
     max_masks: int,
 ) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
+    max_area = int(np.floor(height * width * max_area_fraction))
     for mask in masks:
         if not isinstance(mask, dict) or "segmentation" not in mask:
             continue
@@ -536,7 +543,7 @@ def _select_sam_masks(
                 f"SAM mask shape {segmentation.shape} does not match {height}x{width}"
             )
         area = int(mask.get("area", np.count_nonzero(segmentation)))
-        if area >= min_area:
+        if min_area <= area <= max_area:
             selected.append(mask)
     selected.sort(
         key=lambda mask: int(mask.get("area", np.count_nonzero(mask["segmentation"]))),

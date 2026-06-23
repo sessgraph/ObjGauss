@@ -834,6 +834,48 @@ def test_masks_from_nerf_sam_writes_manifest_with_fake_generator(tmp_path):
     assert int(second.sum()) == 2
 
 
+def test_masks_from_nerf_sam_can_filter_overlarge_masks(tmp_path):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.full((3, 3, 4), 255, dtype=np.uint8),
+    )
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": 0.7,
+                "frames": [{"file_path": "./train/r_0", "transform_matrix": transform}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "sam-masks" / "mask-manifest.json"
+
+    result = build_nerf_sam_mask_manifest(
+        dataset,
+        output=manifest_path,
+        checkpoint="not-used-by-fake-generator.pt",
+        max_masks_per_frame=2,
+        min_area=2,
+        max_area_fraction=0.3,
+        generator=_FakeSamGenerator(),
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    masks = manifest["frames"][0]["masks"]
+    selected = np.load(manifest_path.parent / masks[0]["mask_path"])
+
+    assert result.frames == 1
+    assert result.masks == 1
+    assert result.mask_pixels == 2
+    assert manifest["sam"]["max_area_fraction"] == 0.3
+    assert masks[0]["slot"] == 0
+    assert masks[0]["area"] == 2
+    assert int(selected.sum()) == 2
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")

@@ -106,6 +106,63 @@ render_occlusion_effect_score=0.123359
 The correct next step is not just more Splatfacto iterations. It is better
 multi-view mask supervision and slot balancing for this denser training output.
 
+## SEG-003 Multi-View SAM And Slot Balance
+
+SEG-003 keeps the safe-2000 Splatfacto PLY fixed and changes only the SAM mask
+supervision. The main code change is an optional SAM mask filter:
+
+```text
+objgauss masks from-nerf-sam --max-area-fraction <0..1>
+```
+
+The default is `1.0`, so existing SAM runs keep their behavior. Lower values
+filter overly broad SAM masks such as full-frame/background masks before area
+ranking.
+
+Measured variants on safe-2000:
+
+```text
+2-frame SAM, 8 slots:
+  supervised_gaussians=85349
+  projection_loss=4.467615 -> 0.288167
+  object_id_counts=84464/64455/111/14821/27910/23159/15867/25007
+  effective_slots=5.996345
+  stability_ari=0.388430
+  render_occlusion_effect_score=0.123359
+
+8-frame SAM, 8 slots, unfiltered:
+  frames=8 masks=44 mask_pixels=4944264
+  supervised_gaussians=185949
+  projection_loss=4.161870 -> 0.464762
+  object_id_counts=151240/52607/119/14390/21365/10414/1595/4064
+  effective_slots=4.191789
+  stability_ari=0.113853
+
+8-frame SAM, 8 slots, max_area_fraction=0.6:
+  frames=8 masks=38 mask_pixels=1952770
+  supervised_gaussians=121517
+  projection_loss=4.399354 -> 0.397204
+  object_id_counts=126857/33439/330/26152/27593/18281/6590/16552
+  effective_slots=5.325918
+  stability_ari=0.245749
+
+8-frame SAM, 4 slots, max_area_fraction=0.3:
+  frames=8 masks=27 mask_pixels=664780
+  supervised_gaussians=70025
+  projection_loss=2.782336 -> 0.044949
+  object_id_counts=126686/40747/34682/53679
+  effective_slots=3.509020
+  stability_ari=0.468745
+  render_occlusion_effect_score=0.195308
+```
+
+Current interpretation: unfiltered multi-view SAM increases coverage but adds
+slot-permutation and background-mask noise. The best current semantic candidate
+is the stricter 8-frame / 4-slot / `max_area_fraction=0.3` manifest. It has
+lower coverage than the unfiltered run, but no near-empty object slots, much
+lower vote conflict, and the strongest render occlusion effect among the tested
+safe-2000 variants.
+
 ## One Command
 
 Preview the command sequence without running training:
