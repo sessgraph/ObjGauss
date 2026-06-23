@@ -40,6 +40,9 @@ const webGpuDepthAlphaMode = optionalString(
 );
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
 const webGpuColorMode = optionalString(args.webGpuColorMode ?? args["webgpu-color-mode"]);
+const webGpuAlphaPresentationFloor = optionalFiniteNumber(
+  args.webGpuAlphaPresentationFloor ?? args["webgpu-alpha-presentation-floor"],
+);
 let server = null;
 
 try {
@@ -67,6 +70,7 @@ try {
         webGpuDepthAlphaMode,
         webGpuCameraMode,
         webGpuColorMode,
+        webGpuAlphaPresentationFloor,
       });
       process.stdout.write(result.output);
       process.stderr.write(result.errorOutput);
@@ -76,6 +80,7 @@ try {
         `webgpu_coverage_sweep_variant=${JSON.stringify(variant.id)} ` +
           `asset=${JSON.stringify(asset)} passed=${result.exitCode === 0} ` +
           `footprint=${variant.footprintScale} maxAnisotropy=${variant.maxAnisotropy} ` +
+          `alphaFloor=${metrics.alphaPresentationFloor ?? variant.alphaPresentationFloor ?? webGpuAlphaPresentationFloor ?? "default"} ` +
           `coverageRatio=${metrics.coverageRatio ?? "unknown"} ` +
           `lumaDelta=${metrics.lumaDelta ?? "unknown"} ` +
           `chromaDelta=${metrics.chromaDelta ?? "unknown"} ` +
@@ -198,6 +203,7 @@ try {
       `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
       `webGpuColorMode=${JSON.stringify(webGpuColorMode ?? "default")} ` +
+      `webGpuAlphaPresentationFloor=${webGpuAlphaPresentationFloor ?? "default"} ` +
       `url=${baseUrl}`,
   );
   if (gate.enabled && !gate.passed && !allowFailures) {
@@ -218,6 +224,7 @@ async function runVariant({
   webGpuDepthAlphaMode,
   webGpuCameraMode,
   webGpuColorMode,
+  webGpuAlphaPresentationFloor,
 }) {
   const commandArgs = [
     "scripts/audit-webgpu-desktop.mjs",
@@ -251,6 +258,15 @@ async function runVariant({
   if (webGpuColorMode) {
     commandArgs.push("--webgpu-color-mode", webGpuColorMode);
   }
+  const alphaPresentationFloor = Number.isFinite(variant.alphaPresentationFloor)
+    ? variant.alphaPresentationFloor
+    : webGpuAlphaPresentationFloor;
+  if (Number.isFinite(alphaPresentationFloor)) {
+    commandArgs.push(
+      "--webgpu-alpha-presentation-floor",
+      String(alphaPresentationFloor),
+    );
+  }
   return runProcess(process.execPath, commandArgs);
 }
 
@@ -267,6 +283,9 @@ function parseVariantMetrics(output) {
   const tileReferences = output.match(/tileReferences=([0-9]+)/);
   const colorTuning = output.match(/colorTuning="([^"]+)":"([^"]+)":([0-9]+)/);
   const shViewAfterDelete = output.match(/shViewAfterDelete=([0-9]+)/);
+  const alphaPresentation = output.match(
+    /resolveSource="[^"]+":"[^"]+":"([^"]+)":([0-9.]+)/,
+  );
   return {
     sparkCoverage: residual ? Number(residual[1]) : null,
     editCoverage: residual ? Number(residual[2]) : null,
@@ -283,6 +302,8 @@ function parseVariantMetrics(output) {
     colorMode: colorTuning?.[2] ?? "",
     shViewGaussians: colorTuning ? Number(colorTuning[3]) : null,
     shViewAfterDelete: shViewAfterDelete ? Number(shViewAfterDelete[1]) : null,
+    alphaPresentationMode: alphaPresentation?.[1] ?? "",
+    alphaPresentationFloor: alphaPresentation ? Number(alphaPresentation[2]) : null,
     tileReferenceCount: tileReferences ? Number(tileReferences[1]) : null,
   };
 }
@@ -331,11 +352,12 @@ function parseVariants(value) {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      const [id, footprintScale, maxAnisotropy] = entry.split(":");
+      const [id, footprintScale, maxAnisotropy, alphaPresentationFloor] = entry.split(":");
       return {
         id,
         footprintScale: Number(footprintScale),
         maxAnisotropy: Number(maxAnisotropy),
+        alphaPresentationFloor: optionalFiniteNumber(alphaPresentationFloor),
       };
     })
     .filter((variant) =>
@@ -666,11 +688,11 @@ function renderMarkdown(summary) {
   lines.push("");
   lines.push("## Rows");
   lines.push("");
-  lines.push("| Asset | Variant | Passed | Score | Coverage ratio | Luma delta | Chroma delta | Color mode | SH-view after delete | Tile refs |");
-  lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |");
+  lines.push("| Asset | Variant | Passed | Score | Coverage ratio | Luma delta | Chroma delta | Alpha floor | Color mode | SH-view after delete | Tile refs |");
+  lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |");
   for (const row of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(row.asset)} | ${escapeMarkdown(row.id)} | ${row.passed ? "yes" : "no"} | ${formatReportValue(row.paretoScore)} | ${formatReportValue(row.coverageRatio)} | ${formatReportValue(row.lumaDelta)} | ${formatReportValue(row.chromaDelta)} | ${escapeMarkdown(row.colorMode || "unknown")} | ${formatReportValue(row.shViewAfterDelete)} | ${formatReportValue(row.tileReferenceCount)} |`,
+      `| ${escapeMarkdown(row.asset)} | ${escapeMarkdown(row.id)} | ${row.passed ? "yes" : "no"} | ${formatReportValue(row.paretoScore)} | ${formatReportValue(row.coverageRatio)} | ${formatReportValue(row.lumaDelta)} | ${formatReportValue(row.chromaDelta)} | ${formatReportValue(row.alphaPresentationFloor)} | ${escapeMarkdown(row.colorMode || "unknown")} | ${formatReportValue(row.shViewAfterDelete)} | ${formatReportValue(row.tileReferenceCount)} |`,
     );
   }
   lines.push("");

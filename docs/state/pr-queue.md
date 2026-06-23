@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-W`: 基于 SH-view coverage sweep 已证明 footprint tightening 会降低 coverage 但显著恶化 luma 的事实，继续治理 presentation coverage threshold / alpha path，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-X`: 基于 alpha presentation floor 在 trained Lego 上同时改善 coverage 和 luma 的事实，扩展到 Plush / proxy 等多场景 alpha-floor gate，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,33 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-W: WebGPU alpha presentation floor diagnostic
+
+- 状态: done / alpha-presentation-floor-audited
+- 类型: 标准 PR / 前端渲染质量诊断
+- 目标: 在 SH-view coverage sweep 证明 footprint tightening 降 coverage 但伤 luma 后，将 presentation alpha floor 从硬编码常量推进成 runtime tuning，并判断低 alpha halo 是否解释 trained Lego 的 coverage 膨胀。
+- 已实施:
+  - `webgpuTileResolveShader` 新增 `runtime-alpha-presentation-tuning-v1`，支持 `webgpu-alpha-presentation-floor`，合法范围 `0-0.2`，默认仍为 `0.035`。
+  - `WebGpuTileViewport` 按 URL tuning 生成 resolve shader，并暴露 `data-webgpu-alpha-presentation-tuning-mode` / `data-webgpu-alpha-presentation-floor`。
+  - `audit-demo` / `audit-webgpu-desktop` 校验 requested floor 与浏览器 runtime telemetry 一致。
+  - `audit-webgpu-coverage-sweep` 支持固定 floor，也支持 variant 格式 `id:footprint:maxAnisotropy:alphaFloor`。
+  - `docs/benchmarks/webgpu-coverage-sweep.md` 新增 alpha presentation floor sweep 用法和 trained Lego 结果。
+- 结论:
+  - trained Lego + SH-view baseline `0.035`: coverage ratio=`31.205176`、luma/chroma=`0.034507/0.055774`。
+  - floor `0.05`: coverage ratio=`29.156993`、luma/chroma=`0.024444/0.055686`。
+  - floor `0.075`: coverage ratio=`26.456439`、luma/chroma=`0.010019/0.055521`。
+  - floor `0.1`: coverage ratio=`24.248059`、luma/chroma=`0.00276/0.055336`，best Pareto score=`0.690001`。
+  - 与 footprint tightening 不同，alpha presentation floor 在该 trained scene 上同时改善 coverage 和 luma；这是更强候选轴，但仍需多场景 gate，不能直接改默认。
+- 验证:
+  - `node --check src/webgpuTileResolveShader.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-coverage-sweep.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-coverage-sweep -- --asset nerf-lego-trained-output-local --port 5290 --webgpu-color-mode sh-view --variants baseline:2.2:4:0.035,alpha05:2.2:4:0.05,alpha075:2.2:4:0.075,alpha10:2.2:4:0.1 --output-dir /tmp/objgauss-webgpu-alpha-floor-trained-sh-view`: passed，headed desktop WebGPU 4 variants。
 
 ### RENDER-005T-V: WebGPU SH-view coverage sweep
 

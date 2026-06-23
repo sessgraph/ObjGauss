@@ -1,10 +1,17 @@
 export const WEBGPU_TILE_RESOLVE_SOURCE = "webgpu-pixel-storage-resolve-v1";
 export const WEBGPU_TILE_RESOLVE_FILTER = "bilinear-storage";
 export const WEBGPU_TILE_ALPHA_PRESENTATION_MODE = "alpha-edge-gated-presentation-v1";
+export const WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE = "runtime-alpha-presentation-tuning-v1";
 export const WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR = 0.035;
+export const WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR_MIN = 0;
+export const WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR_MAX = 0.2;
 
-export const WEBGPU_TILE_RESOLVE_SHADER = `
-const ALPHA_PRESENTATION_FLOOR = 0.035;
+export const WEBGPU_TILE_RESOLVE_SHADER = createWebGpuTileResolveShader();
+
+export function createWebGpuTileResolveShader(tuning = null) {
+  const resolved = normalizeWebGpuAlphaPresentationTuning(tuning);
+  return `
+const ALPHA_PRESENTATION_FLOOR = ${resolved.alphaPresentationFloor.toFixed(6)};
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -70,6 +77,22 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   return vec4f(rgb, 1.0);
 }
 `;
+}
+
+export function normalizeWebGpuAlphaPresentationTuning(tuning = null) {
+  const requested = Number(tuning?.alphaPresentationFloor ?? WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR);
+  const alphaPresentationFloor = Number.isFinite(requested)
+    ? clampNumber(
+        requested,
+        WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR_MIN,
+        WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR_MAX,
+      )
+    : WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR;
+  return {
+    mode: WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE,
+    alphaPresentationFloor,
+  };
+}
 
 export function createWebGpuResolveMeta(tileSmoke) {
   return new Uint32Array([
@@ -78,4 +101,8 @@ export function createWebGpuResolveMeta(tileSmoke) {
     0,
     0,
   ]);
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }

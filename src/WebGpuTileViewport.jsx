@@ -18,10 +18,11 @@ import { WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE } from "./webgpuC
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
-  WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+  createWebGpuTileResolveShader,
+  normalizeWebGpuAlphaPresentationTuning,
   WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
+  WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE,
   WEBGPU_TILE_RESOLVE_FILTER,
-  WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "./webgpuTileResolveShader.js";
 import {
@@ -69,6 +70,7 @@ export default function WebGpuTileViewport({
   const canvasRef = useRef(null);
   const runtimeRef = useRef(null);
   const runtimeProbe = useMemo(readWebGpuRuntimeProbe, []);
+  const alphaPresentationTuning = useMemo(readWebGpuAlphaPresentationTuning, []);
   const [frame, setFrame] = useState({
     status: "pending",
     reason: "webgpu-runtime-initializing",
@@ -262,7 +264,9 @@ export default function WebGpuTileViewport({
         const context = canvas.getContext("webgpu");
         if (!context) throw new Error("webgpu-context-unavailable");
         const format = navigator.gpu.getPreferredCanvasFormat();
-        const resolveModule = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
+        const resolveModule = device.createShaderModule({
+          code: createWebGpuTileResolveShader(alphaPresentationTuning),
+        });
         const sampledTextureModule = device.createShaderModule({ code: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER });
         const floatTextureModule = device.createShaderModule({ code: WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER });
         const resolveComputeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
@@ -421,7 +425,7 @@ export default function WebGpuTileViewport({
         runtimeRef.current = null;
       }
     };
-  }, [runtimeProbe]);
+  }, [alphaPresentationTuning, runtimeProbe]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
@@ -570,7 +574,8 @@ export default function WebGpuTileViewport({
       data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
       data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
       data-webgpu-alpha-presentation-mode={WEBGPU_TILE_ALPHA_PRESENTATION_MODE}
-      data-webgpu-alpha-presentation-floor={WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR}
+      data-webgpu-alpha-presentation-tuning-mode={WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE}
+      data-webgpu-alpha-presentation-floor={alphaPresentationTuning.alphaPresentationFloor}
       data-webgpu-object-state-layout={rendererContract?.objectStateLayoutVersion ?? ""}
       data-webgpu-object-state-stride={rendererContract?.objectStateStrideUint32 ?? 0}
       data-webgpu-object-state-visible-objects={rendererContract?.objectStateVisibleObjects ?? 0}
@@ -651,6 +656,16 @@ function readWebGpuRuntimeProbe() {
   return normalizeWebGpuRuntimeProbe(
     new URLSearchParams(window.location.search).get("webgpu-probe"),
   );
+}
+
+function readWebGpuAlphaPresentationTuning() {
+  if (typeof window === "undefined") {
+    return normalizeWebGpuAlphaPresentationTuning();
+  }
+  const params = new URLSearchParams(window.location.search);
+  return normalizeWebGpuAlphaPresentationTuning({
+    alphaPresentationFloor: params.get("webgpu-alpha-presentation-floor"),
+  });
 }
 
 async function requestWebGpuTileDevice(adapter) {

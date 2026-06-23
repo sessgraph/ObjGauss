@@ -27,6 +27,37 @@ The default is `source`. Use `sh-view` when measuring trained outputs that carry
 `f_dc_*` and `f_rest_*`, so coverage experiments are not confounded by static
 RGB color residual.
 
+Alpha presentation floor can be fixed with
+`--webgpu-alpha-presentation-floor <0-0.2>`, or varied per coverage variant by
+using `id:footprint:maxAnisotropy:alphaFloor`. The default remains `0.035`.
+
+## Alpha Presentation Floor Sweep
+
+Use this after SH-view is enabled to test whether low-alpha presentation halo is
+driving coverage residual:
+
+```bash
+npm run audit:webgpu-coverage-sweep -- \
+  --asset nerf-lego-trained-output-local \
+  --webgpu-color-mode sh-view \
+  --variants baseline:2.2:4:0.035,alpha05:2.2:4:0.05,alpha075:2.2:4:0.075,alpha10:2.2:4:0.1 \
+  --output-dir /tmp/objgauss-webgpu-alpha-floor-trained-sh-view
+```
+
+Current trained Lego result:
+
+| Variant | Alpha floor | Coverage ratio | Luma delta | Chroma delta | Score |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| baseline | 0.035 | 31.205176 | 0.034507 | 0.055774 | 1 |
+| alpha05 | 0.05 | 29.156993 | 0.024444 | 0.055686 | 0.903727 |
+| alpha075 | 0.075 | 26.456439 | 0.010019 | 0.055521 | 0.76819 |
+| alpha10 | 0.1 | 24.248059 | 0.00276 | 0.055336 | 0.690001 |
+
+Unlike footprint tightening, raising the presentation floor improves coverage
+and luma together on this trained scene, with chroma nearly unchanged. This is a
+stronger candidate axis, but it is still single-scene evidence and should not
+become the default before passing the multi-scene coverage gate.
+
 ## SH-View Coverage Sweep
 
 Use this when the asset has full SH rest coefficients and you want to compare

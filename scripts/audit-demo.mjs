@@ -22,6 +22,8 @@ import { WEBGPU_PIXEL_RESOLVE_SOURCE } from "../src/webgpuTileComputeShader.js";
 import {
   WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
   WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
+  WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE,
+  normalizeWebGpuAlphaPresentationTuning,
 } from "../src/webgpuTileResolveShader.js";
 import {
   normalizeWebGpuColorTuning,
@@ -122,6 +124,12 @@ const auditOptions = {
       args.webGpuColorMode ??
       args["webgpu-color-mode"] ??
       process.env.OBJGAUSS_WEBGPU_COLOR_MODE,
+  }),
+  webGpuAlphaPresentationTuning: normalizeWebGpuAlphaPresentationTuning({
+    alphaPresentationFloor:
+      args.webGpuAlphaPresentationFloor ??
+      args["webgpu-alpha-presentation-floor"] ??
+      process.env.OBJGAUSS_WEBGPU_ALPHA_PRESENTATION_FLOOR,
   }),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
@@ -779,6 +787,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
       const webGpuResolveFilter = await viewport.getAttribute("data-webgpu-resolve-filter");
       const webGpuAlphaPresentationMode = await viewport.getAttribute("data-webgpu-alpha-presentation-mode");
+      const webGpuAlphaPresentationTuningMode = await viewport.getAttribute("data-webgpu-alpha-presentation-tuning-mode");
       const webGpuAlphaPresentationFloor = Number(await viewport.getAttribute("data-webgpu-alpha-presentation-floor") ?? "0");
       const webGpuRuntimeProbe = await viewport.getAttribute("data-webgpu-runtime-probe");
       const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
@@ -835,7 +844,10 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuResolveSource,
           webGpuResolveFilter,
           webGpuAlphaPresentationMode,
+          webGpuAlphaPresentationTuningMode,
           webGpuAlphaPresentationFloor,
+          expectedAlphaPresentationFloor:
+            options.webGpuAlphaPresentationTuning.alphaPresentationFloor,
         });
         if (webGpuDeviceLostStatus === "lost" && !options.allowWebGpuDeviceLost) {
           throw new Error(
@@ -874,6 +886,7 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuResolveSource,
             webGpuResolveFilter,
             webGpuAlphaPresentationMode,
+            webGpuAlphaPresentationTuningMode,
             webGpuAlphaPresentationFloor,
             webGpuRuntimeProbe,
             webGpuViewportWidth,
@@ -1143,6 +1156,7 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuResolveSource,
         webGpuResolveFilter,
         webGpuAlphaPresentationMode,
+        webGpuAlphaPresentationTuningMode,
         webGpuAlphaPresentationFloor,
         webGpuRuntimeProbe,
         webGpuViewportWidth,
@@ -1336,7 +1350,9 @@ function validateWebGpuRuntimeProbe({
   webGpuResolveSource,
   webGpuResolveFilter,
   webGpuAlphaPresentationMode,
+  webGpuAlphaPresentationTuningMode,
   webGpuAlphaPresentationFloor,
+  expectedAlphaPresentationFloor,
 }) {
   if (actualProbe !== expectedProbe) {
     throw new Error(`${assetId} WebGPU runtime probe mismatch: expected=${expectedProbe} actual=${actualProbe}`);
@@ -1345,11 +1361,17 @@ function validateWebGpuRuntimeProbe({
     webGpuResolveSource === "webgpu-pixel-storage-resolve-v1" &&
     (
       webGpuAlphaPresentationMode !== WEBGPU_TILE_ALPHA_PRESENTATION_MODE ||
-      Math.abs(webGpuAlphaPresentationFloor - WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR) > 0.000001
+      webGpuAlphaPresentationTuningMode !== WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE ||
+      Math.abs(
+        webGpuAlphaPresentationFloor -
+          (Number.isFinite(expectedAlphaPresentationFloor)
+            ? expectedAlphaPresentationFloor
+            : WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR),
+      ) > 0.000001
     )
   ) {
     throw new Error(
-      `${assetId} WebGPU storage resolve did not expose alpha presentation gate: mode=${webGpuAlphaPresentationMode} floor=${webGpuAlphaPresentationFloor}`,
+      `${assetId} WebGPU storage resolve did not expose alpha presentation gate: mode=${webGpuAlphaPresentationMode} tuning=${webGpuAlphaPresentationTuningMode} floor=${webGpuAlphaPresentationFloor} expected=${expectedAlphaPresentationFloor}`,
     );
   }
 
@@ -1568,7 +1590,11 @@ function urlWithWebGpuOptions(url, options) {
     !Number.isFinite(options.webGpuDepthBins) &&
     options.webGpuDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_DEFAULT &&
     options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED &&
-    options.webGpuColorTuning.colorMode === WEBGPU_COLOR_MODE_SOURCE
+    options.webGpuColorTuning.colorMode === WEBGPU_COLOR_MODE_SOURCE &&
+    Math.abs(
+      options.webGpuAlphaPresentationTuning.alphaPresentationFloor -
+        WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+    ) <= 0.000001
   ) {
     return url;
   }
@@ -1596,6 +1622,17 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (options.webGpuColorTuning.colorMode !== WEBGPU_COLOR_MODE_SOURCE) {
     parsed.searchParams.set("webgpu-color-mode", options.webGpuColorTuning.colorMode);
+  }
+  if (
+    Math.abs(
+      options.webGpuAlphaPresentationTuning.alphaPresentationFloor -
+        WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+    ) > 0.000001
+  ) {
+    parsed.searchParams.set(
+      "webgpu-alpha-presentation-floor",
+      String(options.webGpuAlphaPresentationTuning.alphaPresentationFloor),
+    );
   }
   return parsed.toString();
 }

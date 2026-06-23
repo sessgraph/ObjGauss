@@ -54,8 +54,11 @@ import {
 } from "../src/webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
+  createWebGpuTileResolveShader,
+  normalizeWebGpuAlphaPresentationTuning,
   WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
   WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
+  WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE,
   WEBGPU_TILE_RESOLVE_FILTER,
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
@@ -514,7 +517,16 @@ assert.equal(resolveMeta.byteLength, 16);
 assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-pixel-storage-resolve-v1");
 assert.equal(WEBGPU_TILE_RESOLVE_FILTER, "bilinear-storage");
 assert.equal(WEBGPU_TILE_ALPHA_PRESENTATION_MODE, "alpha-edge-gated-presentation-v1");
+assert.equal(WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE, "runtime-alpha-presentation-tuning-v1");
 assert.equal(WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR, 0.035);
+assert.deepEqual(normalizeWebGpuAlphaPresentationTuning(), {
+  mode: WEBGPU_TILE_ALPHA_PRESENTATION_TUNING_MODE,
+  alphaPresentationFloor: WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
+});
+assert.equal(
+  normalizeWebGpuAlphaPresentationTuning({ alphaPresentationFloor: 0.075 }).alphaPresentationFloor,
+  0.075,
+);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /fn\s+samplePixel/);
@@ -522,6 +534,10 @@ assert.match(WEBGPU_TILE_RESOLVE_SHADER, /fract\(pixelPosition\)/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /mix\(/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /ALPHA_PRESENTATION_FLOOR/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /alpha\s*<\s*ALPHA_PRESENTATION_FLOOR/);
+assert.match(
+  createWebGpuTileResolveShader({ alphaPresentationFloor: 0.075 }),
+  /ALPHA_PRESENTATION_FLOOR = 0\.075000/,
+);
 assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
 assert.equal(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE, "webgpu-sampled-texture-resolve-v1");
 assert.match(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER, /texture_2d<f32>/);
