@@ -17,8 +17,8 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005P`: 将 fullscreen pixel-storage display pass 替换/对照为 texture-backed display probes，区分 storage-buffer fragment read、buffer-to-texture copy 和 sampled-texture presentation。
-  - 在 WebGPU-capable 桌面 Chrome 中重跑 Plush / Lego first-frame runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless backend limitation。
+  - `RENDER-005Q`: 在 WebGPU-capable 桌面 Chrome 中重跑 clear-only / texture-display / full runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless unsafe WebGPU presentation limitation。
+  - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -70,6 +70,38 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005P: WebGPU texture-backed display probes
+
+- 状态: done / canvas-presentation-backend-loss-isolated
+- 类型: 标准 PR / 前端渲染诊断
+- 目标: 将 fullscreen pixel-storage display pass 替换/对照为 texture-backed display probes，区分 storage-buffer fragment read、buffer-to-texture copy、sampled-texture presentation 和 canvas render pass/presentation。
+- 范围外:
+  - 不声明 full WebGPU tile renderer 已稳定通过。
+  - 不改变默认 `npm run audit:webgpu-runtime` 的严格失败语义。
+  - 不把 headless unsafe WebGPU probe 结果等同于 WebGPU-capable 桌面 Chrome 结果。
+- 实施:
+  - 新增 `src/webgpuTextureResolveShader.js`，提供 sampled texture resolve shader 和 float texture load resolve shader。
+  - 新增 `texture-display-only` probe：CPU 生成 `rgba8unorm` sampled texture，直接 fullscreen display，不跑 compute。
+  - 新增 `texture-copy-display` probe：pixel compute 写 `pixelResolvedRgba`，再 `copyBufferToTexture` 到 `rgba32float` texture 并 fullscreen display。
+  - 新增 `clear-only` probe：只提交 canvas render pass clear，不绑定 pipeline、不 draw，用来隔离 presentation backend。
+  - `scripts/audit-demo.mjs` 和 Node smoke audit 覆盖新增 probe source、stage dispatch/skipped contract 和 shader contract。
+- 诊断结论:
+  - `texture-display-only`: all compute stages skipped，但 sampled texture display 后 device lost、queue failed。
+  - `texture-copy-display`: pixel compute dispatched，但 texture copy/display 后 device lost、queue failed。
+  - `clear-only`: all compute stages skipped、无 draw，canvas clear pass 仍 device lost、queue failed。
+  - 当前 blocker 已收敛到 headless unsafe WebGPU canvas render pass / presentation backend loss，不是 pixel compute、storage write、storage-buffer fragment read、sampled texture display 或 buffer-to-texture copy 本身。
+- 验证:
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5225/ --no-server`: passed，Browser plugin absent，使用 Playwright fallback + built `dist/` static server。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5225/ --no-server --webgpu-probe texture-display-only`: passed with allowed device lost，`resolveSource=webgpu-sampled-texture-resolve-v1`、all compute stages skipped。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5225/ --no-server --webgpu-probe texture-copy-display`: passed with allowed device lost，`resolveSource=webgpu-buffer-copy-texture-resolve-v1`、`pixelWorkgroups=256`。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5225/ --no-server --webgpu-probe clear-only`: passed with allowed device lost，`resolveSource=webgpu-clear-pass-v1`、all compute stages skipped。
+  - clear-only no-draw fix 后，`npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5226/ --no-server --webgpu-probe clear-only` 复跑通过，`accumulation/compute/pixel=skipped`。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5225/ --no-server`: expected failed，仍报告 `probe=full` 和 `A valid external Instance reference no longer exists`。
 
 ### RENDER-005O: WebGPU pixel output sub-probes
 

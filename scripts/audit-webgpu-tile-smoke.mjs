@@ -38,14 +38,23 @@ import {
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "../src/webgpuTileResolveShader.js";
 import {
+  WEBGPU_FLOAT_TEXTURE_COPY_RESOLVE_SOURCE,
+  WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER,
+  WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER,
+  WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE,
+} from "../src/webgpuTextureResolveShader.js";
+import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
   WEBGPU_RUNTIME_PROBE_MODES,
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
   WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
 } from "../src/webgpuRuntimeProbe.js";
@@ -63,6 +72,9 @@ assert.deepEqual(WEBGPU_RUNTIME_PROBE_MODES, [
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY,
+  WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
 ]);
 assert.equal(normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_FULL), WEBGPU_RUNTIME_PROBE_FULL);
 assert.equal(
@@ -88,6 +100,18 @@ assert.equal(
 assert.equal(
   normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT),
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
+);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY),
+  WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY,
+);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY),
+  WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY,
+);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_CLEAR_ONLY),
+  WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
 );
 assert.equal(WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE, 32);
 assert.equal(normalizeWebGpuRuntimeProbe("invalid"), WEBGPU_RUNTIME_PROBE_FULL);
@@ -243,6 +267,16 @@ assert.equal(WEBGPU_TILE_RESOLVE_SOURCE, "webgpu-pixel-storage-resolve-v1");
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<storage,\s*read>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_TILE_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
 assert.ok(!WEBGPU_TILE_RESOLVE_SHADER.includes("textureSample"));
+assert.equal(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE, "webgpu-sampled-texture-resolve-v1");
+assert.match(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER, /texture_2d<f32>/);
+assert.match(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER, /var\s+sourceSampler:\s*sampler/);
+assert.match(WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER, /textureSampleLevel/);
+assert.ok(!WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER.includes("pixelResolvedRgba"));
+assert.equal(WEBGPU_FLOAT_TEXTURE_COPY_RESOLVE_SOURCE, "webgpu-buffer-copy-texture-resolve-v1");
+assert.match(WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER, /texture_2d<f32>/);
+assert.match(WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER, /var<uniform>\s+resolveMeta/);
+assert.match(WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER, /textureLoad/);
+assert.ok(!WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER.includes("pixelResolvedRgba"));
 
 const computeMeta = createWebGpuComputeMeta(base);
 assert.deepEqual([...computeMeta], [base.tileCount, 0, 0, 0]);

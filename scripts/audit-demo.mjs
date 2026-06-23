@@ -6,11 +6,14 @@ import { chromium } from "playwright";
 import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
 } from "../src/webgpuRuntimeProbe.js";
 
@@ -873,16 +876,49 @@ function validateWebGpuRuntimeProbe({
     expectedProbe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY ||
     expectedProbe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT
   ) {
-    if (
-      webGpuFirstFrameStatus !== "rendered" ||
-      webGpuFirstFramePixels <= 0 ||
-      !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
-      webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
-    ) {
-      throw new Error(
-        `${assetId} WebGPU ${expectedProbe} route did not render through pixel storage resolve: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
-      );
-    }
+    validateRenderedProbeFrame({
+      assetId,
+      expectedProbe,
+      webGpuFirstFrameStatus,
+      webGpuFirstFrameReason,
+      webGpuFirstFramePixels,
+      webGpuFirstFrameChecksum,
+      webGpuResolveSource,
+      expectedSource: "webgpu-pixel-storage-resolve-v1",
+    });
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY) {
+    validateRenderedProbeFrame({
+      assetId,
+      expectedProbe,
+      webGpuFirstFrameStatus,
+      webGpuFirstFrameReason,
+      webGpuFirstFramePixels,
+      webGpuFirstFrameChecksum,
+      webGpuResolveSource,
+      expectedSource: "webgpu-sampled-texture-resolve-v1",
+    });
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
+    validateRenderedProbeFrame({
+      assetId,
+      expectedProbe,
+      webGpuFirstFrameStatus,
+      webGpuFirstFrameReason,
+      webGpuFirstFramePixels,
+      webGpuFirstFrameChecksum,
+      webGpuResolveSource,
+      expectedSource: "webgpu-buffer-copy-texture-resolve-v1",
+    });
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
+    validateRenderedProbeFrame({
+      assetId,
+      expectedProbe,
+      webGpuFirstFrameStatus,
+      webGpuFirstFrameReason,
+      webGpuFirstFramePixels,
+      webGpuFirstFrameChecksum,
+      webGpuResolveSource,
+      expectedSource: "webgpu-clear-pass-v1",
+    });
   } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
     if (
       webGpuFirstFrameStatus !== "probed" ||
@@ -905,6 +941,28 @@ function validateWebGpuRuntimeProbe({
   }
 }
 
+function validateRenderedProbeFrame({
+  assetId,
+  expectedProbe,
+  webGpuFirstFrameStatus,
+  webGpuFirstFrameReason,
+  webGpuFirstFramePixels,
+  webGpuFirstFrameChecksum,
+  webGpuResolveSource,
+  expectedSource,
+}) {
+  if (
+    webGpuFirstFrameStatus !== "rendered" ||
+    webGpuFirstFramePixels <= 0 ||
+    !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
+    webGpuResolveSource !== expectedSource
+  ) {
+    throw new Error(
+      `${assetId} WebGPU ${expectedProbe} route did not render through ${expectedSource}: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+    );
+  }
+}
+
 function expectedProbeStages(probe) {
   if (probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY) {
     return { dispatched: new Set(["accumulation"]) };
@@ -923,6 +981,15 @@ function expectedProbeStages(probe) {
   }
   if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
     return { dispatched: new Set(["pixel"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY) {
+    return { dispatched: new Set() };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
+    return { dispatched: new Set(["pixel"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
+    return { dispatched: new Set() };
   }
   return { dispatched: new Set(["accumulation", "compute", "pixel"]) };
 }

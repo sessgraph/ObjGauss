@@ -22,13 +22,22 @@ import {
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "./webgpuTileResolveShader.js";
 import {
+  WEBGPU_FLOAT_TEXTURE_COPY_RESOLVE_SOURCE,
+  WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER,
+  WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER,
+  WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE,
+} from "./webgpuTextureResolveShader.js";
+import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY,
+  WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
 } from "./webgpuRuntimeProbe.js";
 
@@ -207,6 +216,8 @@ export default function WebGpuTileViewport({
         if (!context) throw new Error("webgpu-context-unavailable");
         const format = navigator.gpu.getPreferredCanvasFormat();
         const resolveModule = device.createShaderModule({ code: WEBGPU_TILE_RESOLVE_SHADER });
+        const sampledTextureModule = device.createShaderModule({ code: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER });
+        const floatTextureModule = device.createShaderModule({ code: WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER });
         const resolveComputeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
         const pixelResolveModule = device.createShaderModule({ code: WEBGPU_PIXEL_RESOLVE_SHADER });
         const accumulationModule = device.createShaderModule({ code: WEBGPU_TILE_ACCUMULATION_SHADER });
@@ -232,11 +243,33 @@ export default function WebGpuTileViewport({
           },
           primitive: { topology: "triangle-list" },
         });
+        const sampledTexturePipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: sampledTextureModule, entryPoint: "vertexMain" },
+          fragment: {
+            module: sampledTextureModule,
+            entryPoint: "fragmentMain",
+            targets: [{ format }],
+          },
+          primitive: { topology: "triangle-list" },
+        });
+        const floatTexturePipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: floatTextureModule, entryPoint: "vertexMain" },
+          fragment: {
+            module: floatTextureModule,
+            entryPoint: "fragmentMain",
+            targets: [{ format }],
+          },
+          primitive: { topology: "triangle-list" },
+        });
         const runtime = {
           device,
           context,
           format,
           pipeline,
+          sampledTexturePipeline,
+          floatTexturePipeline,
           accumulationPipeline,
           computePipeline,
           pixelComputePipeline,
@@ -537,6 +570,8 @@ function renderFrame({
     context,
     format,
     pipeline,
+    sampledTexturePipeline,
+    floatTexturePipeline,
     accumulationPipeline,
     computePipeline,
     pixelComputePipeline,
@@ -552,12 +587,21 @@ function renderFrame({
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY ||
     probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT;
-  const runDisplay =
+  const runStorageDisplay =
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
     probe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY ||
     probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT;
+  const runSampledTextureDisplay =
+    probe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY;
+  const runFloatTextureCopyDisplay =
+    probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY;
+  const runClearOnly =
+    probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY;
+  const runDisplay =
+    runStorageDisplay || runSampledTextureDisplay || runFloatTextureCopyDisplay || runClearOnly;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
   destroyTransientBuffers(runtime);
@@ -625,7 +669,10 @@ function renderFrame({
       : null;
     const computeMetaBuffer = runResolve ? createComputeMetaBuffer(device, tileSmoke) : null;
     const pixelMetaBuffer = runPixel ? createPixelMetaBuffer(device, tileSmoke) : null;
-    const resolveMetaBuffer = runDisplay ? createResolveMetaBuffer(device, tileSmoke) : null;
+    const resolveMetaBuffer =
+      runStorageDisplay || runFloatTextureCopyDisplay
+        ? createResolveMetaBuffer(device, tileSmoke)
+        : null;
     for (const buffer of [
       accumulationMetaBuffer,
       computeMetaBuffer,
@@ -679,7 +726,7 @@ function renderFrame({
           ],
         })
       : null;
-    const bindGroup = runDisplay
+    const bindGroup = runStorageDisplay
       ? device.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
           entries: [
@@ -688,6 +735,39 @@ function renderFrame({
           ],
         })
       : null;
+    const sampledTexture = runSampledTextureDisplay
+      ? createSampledResolveTexture(device, tileSmoke)
+      : null;
+    const sampledTextureSampler = runSampledTextureDisplay
+      ? device.createSampler({
+          magFilter: "nearest",
+          minFilter: "nearest",
+          addressModeU: "clamp-to-edge",
+          addressModeV: "clamp-to-edge",
+        })
+      : null;
+    const sampledTextureBindGroup = runSampledTextureDisplay
+      ? device.createBindGroup({
+          layout: sampledTexturePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: sampledTexture.createView() },
+            { binding: 1, resource: sampledTextureSampler },
+          ],
+        })
+      : null;
+    const floatTexture = runFloatTextureCopyDisplay
+      ? createFloatResolveTexture(device, tileSmoke)
+      : null;
+    const floatTextureBindGroup = runFloatTextureCopyDisplay
+      ? device.createBindGroup({
+          layout: floatTexturePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: floatTexture.createView() },
+            { binding: 1, resource: { buffer: resolveMetaBuffer } },
+          ],
+        })
+      : null;
+    runtime.transientTextures = [sampledTexture, floatTexture].filter(Boolean);
     const encoder = device.createCommandEncoder();
     const accumulationWorkgroups = webGpuAccumulationWorkgroups(tileSmoke);
     const workgroups = webGpuComputeWorkgroups(tileSmoke);
@@ -711,6 +791,21 @@ function renderFrame({
       }
       computePass.end();
     }
+    if (runFloatTextureCopyDisplay) {
+      encoder.copyBufferToTexture(
+        {
+          buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer,
+          bytesPerRow: Math.max(1, tileSmoke.viewportWidth) * 16,
+          rowsPerImage: Math.max(1, tileSmoke.viewportHeight),
+        },
+        { texture: floatTexture },
+        {
+          width: Math.max(1, tileSmoke.viewportWidth),
+          height: Math.max(1, tileSmoke.viewportHeight),
+          depthOrArrayLayers: 1,
+        },
+      );
+    }
     if (runDisplay) {
       const pass = encoder.beginRenderPass({
         colorAttachments: [
@@ -727,9 +822,21 @@ function renderFrame({
           },
         ],
       });
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, bindGroup);
-      pass.draw(3);
+      if (runClearOnly) {
+        // Deliberately no draw call: this isolates canvas render pass submission.
+      } else if (runSampledTextureDisplay) {
+        pass.setPipeline(sampledTexturePipeline);
+        pass.setBindGroup(0, sampledTextureBindGroup);
+        pass.draw(3);
+      } else if (runFloatTextureCopyDisplay) {
+        pass.setPipeline(floatTexturePipeline);
+        pass.setBindGroup(0, floatTextureBindGroup);
+        pass.draw(3);
+      } else {
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.draw(3);
+      }
       pass.end();
     }
     device.queue.submit([encoder.finish()]);
@@ -832,12 +939,13 @@ function stageTelemetry({
 
 function frameTelemetry({ probe, tileSmoke, runDisplay }) {
   if (runDisplay) {
+    const textureDisplay = textureDisplayFrameTelemetry(probe, tileSmoke);
     return {
       status: "rendered",
       reason: renderedFrameReason(probe),
-      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
-      pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
-      source: WEBGPU_TILE_RESOLVE_SOURCE,
+      checksum: textureDisplay.checksum,
+      pixels: textureDisplay.pixels,
+      source: textureDisplay.source,
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY) {
@@ -886,7 +994,45 @@ function renderedFrameReason(probe) {
   if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
     return "webgpu-tiny-pixel-output-probe-rendered";
   }
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY) {
+    return "webgpu-texture-display-only-probe-rendered";
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
+    return "webgpu-texture-copy-display-probe-rendered";
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
+    return "webgpu-clear-only-probe-rendered";
+  }
   return "webgpu-pixel-storage-resolve-rendered";
+}
+
+function textureDisplayFrameTelemetry(probe, tileSmoke) {
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY) {
+    return {
+      checksum: tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
+      source: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE,
+    };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
+    return {
+      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
+      source: WEBGPU_FLOAT_TEXTURE_COPY_RESOLVE_SOURCE,
+    };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
+    return {
+      checksum: tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
+      source: "webgpu-clear-pass-v1",
+    };
+  }
+  return {
+    checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
+    pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
+    source: WEBGPU_TILE_RESOLVE_SOURCE,
+  };
 }
 
 function createAccumulationMetaBuffer(device, tileSmoke) {
@@ -949,12 +1095,90 @@ function createResolveMetaBuffer(device, tileSmoke) {
   return buffer;
 }
 
+function createSampledResolveTexture(device, tileSmoke) {
+  const width = Math.max(1, tileSmoke?.viewportWidth ?? 1);
+  const height = Math.max(1, tileSmoke?.viewportHeight ?? 1);
+  const usage = textureUsage();
+  const texture = device.createTexture({
+    label: "objgauss-sampled-resolve-texture",
+    size: { width, height, depthOrArrayLayers: 1 },
+    format: "rgba8unorm",
+    usage: usage.TEXTURE_BINDING | usage.COPY_DST,
+  });
+  device.queue.writeTexture(
+    { texture },
+    createSampledResolveTextureData(tileSmoke, width, height),
+    {
+      bytesPerRow: width * 4,
+      rowsPerImage: height,
+    },
+    { width, height, depthOrArrayLayers: 1 },
+  );
+  return texture;
+}
+
+function createFloatResolveTexture(device, tileSmoke) {
+  const usage = textureUsage();
+  return device.createTexture({
+    label: "objgauss-float-copy-resolve-texture",
+    size: {
+      width: Math.max(1, tileSmoke?.viewportWidth ?? 1),
+      height: Math.max(1, tileSmoke?.viewportHeight ?? 1),
+      depthOrArrayLayers: 1,
+    },
+    format: "rgba32float",
+    usage: usage.TEXTURE_BINDING | usage.COPY_DST,
+  });
+}
+
+function createSampledResolveTextureData(tileSmoke, width, height) {
+  const data = new Uint8Array(width * height * 4);
+  const tileResolved = tileSmoke?.buffers?.tileResolvedRgba;
+  const tileColumns = Math.max(1, tileSmoke?.tileColumns ?? 1);
+  const tileSize = Math.max(1, tileSmoke?.tileSize ?? 1);
+  for (let y = 0; y < height; y += 1) {
+    const tileY = Math.floor(y / tileSize);
+    for (let x = 0; x < width; x += 1) {
+      const tileX = Math.min(Math.floor(x / tileSize), tileColumns - 1);
+      const tileIndex = tileY * tileColumns + tileX;
+      const tileOffset = tileIndex * 4;
+      const pixelOffset = (y * width + x) * 4;
+      const alpha = clampNumber(tileResolved?.[tileOffset + 3] ?? 0, 0, 0.98);
+      const red = clampNumber(tileResolved?.[tileOffset] ?? 0, 0, 1);
+      const green = clampNumber(tileResolved?.[tileOffset + 1] ?? 0, 0, 1);
+      const blue = clampNumber(tileResolved?.[tileOffset + 2] ?? 0, 0, 1);
+      data[pixelOffset] = Math.round((BACKGROUND_RGB[0] * (1 - alpha)) + red * alpha * 255);
+      data[pixelOffset + 1] = Math.round((BACKGROUND_RGB[1] * (1 - alpha)) + green * alpha * 255);
+      data[pixelOffset + 2] = Math.round((BACKGROUND_RGB[2] * (1 - alpha)) + blue * alpha * 255);
+      data[pixelOffset + 3] = 255;
+    }
+  }
+  return data;
+}
+
+function textureUsage() {
+  return globalThis.GPUTextureUsage ?? {
+    COPY_DST: 0x02,
+    TEXTURE_BINDING: 0x04,
+  };
+}
+
 function destroyTransientBuffers(runtime) {
-  if (!runtime?.transientBuffers) return;
-  for (const buffer of runtime.transientBuffers) {
+  if (!runtime) return;
+  for (const buffer of runtime?.transientBuffers ?? []) {
     buffer?.destroy?.();
   }
+  for (const texture of runtime?.transientTextures ?? []) {
+    texture?.destroy?.();
+  }
   runtime.transientBuffers = [];
+  runtime.transientTextures = [];
+}
+
+function clampNumber(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return min;
+  return Math.min(max, Math.max(min, numeric));
 }
 
 function pickObjectFromTileFrame({
