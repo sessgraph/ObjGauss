@@ -83,7 +83,7 @@ export default function App() {
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
-  const activeRendererText = useSplatRenderer ? "真实 Splat" : "软点云编辑";
+  const activeRendererText = useSplatRenderer ? "真实 Splat" : "Gaussian Shader 编辑";
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
   const visibleCount = useMemo(
     () =>
@@ -429,7 +429,7 @@ export default function App() {
           {!useSplatRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
-              <span>点击软点云或右侧列表选择对象；隔离、隐藏、删除在这里预览。</span>
+              <span>点击 Gaussian 预览或右侧列表选择对象；隔离、隐藏、删除在这里预览。</span>
             </div>
           )}
           {useSplatRenderer ? (

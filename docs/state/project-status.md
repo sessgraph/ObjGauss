@@ -37,10 +37,11 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - 前端:
   - 中文 UI。
   - Spark / Three.js 真实 3DGS splat 预览。
-  - Three.js 高斯中心 soft sprite 编辑 fallback。
+  - Three.js Gaussian Shader 对象编辑 fallback。
   - 已拆分 `真实查看` / `对象编辑` 两个工作模式；对象操作会显式进入点云编辑预览，不再伪装成真实 splat 内直接编辑。
   - 自身颜色 / 对象聚类色切换。
-  - 对象列表、点击软点云画布选中对象、隔离、删除预览；选中对象在软点云编辑模式下有高亮层，删除预览会退出隔离并切回自身颜色显示剩余整体场景。
+  - 对象列表、点击 Gaussian Shader 画布选中对象、隔离、删除预览；选中对象在 shader 编辑模式下有高亮层，删除预览会退出隔离并切回自身颜色显示剩余整体场景。
+  - 对象编辑 renderer 已从 `PointsMaterial` 升级为 screen-space Gaussian kernel `ShaderMaterial`，消费 PLY `scale_0/1/2`、`rot_0..3` 和 `opacity` attributes；Weighted OIT 和 WebGPU tile renderer 仍是后续任务。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -109,6 +110,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 npm run build
+npm run audit:demo -- --url http://127.0.0.1:5192/
 npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5191/
 npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5190/
 uv run objgauss assets pull polyhaven-school-chair-nerf
@@ -179,8 +181,9 @@ npm run build
 
 结果：
 
-- WEB-001 UX repair: 顶部假工具按钮已替换为真实 `真实查看` / `对象编辑` 模式；无 `.splat` 场景默认对象编辑，带 `.splat` 样例加载后默认真实查看；对象可通过右侧列表或软点云画布选中，选择后会进入对象编辑并显示高亮层；对象编辑 renderer 从硬点改为软圆形 sprite splat 近似，但仍不是完整 covariance-aware 3DGS shader；删除预览会退出 `只看所选` 隔离并切回 `自身颜色`，显示删除后的剩余整体场景；素材库只显示 5 个可加载样例；Benchmark tab 显示 smoke/candidate/paper pass 和 Lego/Fern/Chair 三场景指标。
-- WEB-001 validation: `npm run build` 通过；`npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5191/` 通过并检查 `canvasSelectedObject=1`、`editPixels=64530`、`visibleAfterDelete=230,581`、`renderModeAfterDelete="自身颜色"`；targeted Playwright QA 保存到 `/tmp/objgauss-web001-qa/`、`/tmp/objgauss-canvas-select-*.png` 和 `/tmp/objgauss-audit-plush-v1-closure-local.png`，断言覆盖初始模式、真实 splat 加载、软点云画布选中、对象编辑预览、删除后自身颜色、Benchmark tab 和移动端截图；console 仅有 WebGL ReadPixels performance warning。
+- WEB-002 renderer route: ADR 0004 已接受 B -> C 渐进路线；Phase 1 将对象编辑 renderer 从 `PointsMaterial` / soft sprite 过渡到 screen-space Gaussian kernel `ShaderMaterial`，并把 Gaussian scale / opacity / rotation 传入 GPU attributes。Phase 2 Weighted OIT 与 Phase 3 WebGPU tile renderer 尚未完成。
+- WEB-002 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5192/` 三样例通过，分别检查 `editRenderer="Gaussian Shader 编辑"`、画布点选、隔离、删除后 `renderModeAfterDelete="自身颜色"`；targeted Playwright QA 保存到 `/tmp/objgauss-shader-edit-*.png`，断言真实 Splat -> Gaussian Shader 编辑 -> 画布选中 -> 删除预览全链路，且无 shader compile/link console error。
+- WEB-001 UX repair: 顶部假工具按钮已替换为真实 `真实查看` / `对象编辑` 模式；无 `.splat` 场景默认对象编辑，带 `.splat` 样例加载后默认真实查看；删除预览会退出 `只看所选` 隔离并切回 `自身颜色`，显示删除后的剩余整体场景；素材库只显示 5 个可加载样例；Benchmark tab 显示 smoke/candidate/paper pass 和 Lego/Fern/Chair 三场景指标。
 - SEMANTIC-003A: render occlusion probe 已从旧的 center/depth point-splat probe 升级为 `scale_aware_cpu_splat_l1`，使用 Gaussian `scale_0/1/2` 与 opacity rasterize 小 footprint，再做 full-vs-object-removed RGBA delta；仍明确不是 covariance-aware `gsplat` training renderer。
 - SEMANTIC-003B: `objgauss object-field emergence-benchmark` manifest 支持 `heldout_masks` / `heldout` 配置，summary 可记录 held-out projection loss、supervised Gaussians 和 held-out render occlusion effect；Splatfacto scene suite 现在可从 source SAM manifest split 出 train / held-out manifests，并把 held-out projection loss 与 held-out render occlusion 写入 per-scene / cross-scene summary。
 - SEMANTIC-003B current rows: Lego safe-2000 split 为 train 6 frames / held-out 2 frames，held-out supervised_gaussians=459，held-out projection_loss=2.301630，held-out render=0.197505；Fern smoke split 为 train 3 frames / held-out 1 frame，held-out supervised_gaussians=1011，held-out projection_loss=0.670722，held-out render=0.233851；Chair smoke split 为 train 6 frames / held-out 2 frames，held-out supervised_gaussians=6463，held-out projection_loss=2.284750，held-out render=0.224084。

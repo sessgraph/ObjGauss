@@ -173,6 +173,8 @@ function vertexToPoint(vertex) {
     y: Number(vertex.y ?? 0),
     z: Number(vertex.z ?? 0),
     opacity: opacityValue(vertex.opacity),
+    scale: gaussianScale(vertex),
+    rotation: gaussianRotation(vertex),
     objectId,
     color,
     objectColor: colorForObject(objectId),
@@ -222,6 +224,49 @@ function opacityValue(value) {
   if (value === undefined) return 1;
   if (value >= 0 && value <= 1) return value;
   return 1 / (1 + Math.exp(-clamp(value, -80, 80)));
+}
+
+function gaussianScale(vertex) {
+  const fallback = 0.018;
+  const values = [vertex.scale_0, vertex.scale_1, vertex.scale_2]
+    .map((value) => scaleValue(value, fallback))
+    .sort((left, right) => right - left);
+  return [values[0] ?? fallback, values[1] ?? values[0] ?? fallback];
+}
+
+function scaleValue(value, fallback) {
+  if (value === undefined || !Number.isFinite(Number(value))) return fallback;
+  const numeric = Number(value);
+  const scale = numeric < 0 ? Math.exp(clamp(numeric, -16, 4)) : numeric;
+  return clamp(scale, 0.0006, 0.35);
+}
+
+function gaussianRotation(vertex) {
+  if (
+    vertex.rot_0 === undefined ||
+    vertex.rot_1 === undefined ||
+    vertex.rot_2 === undefined ||
+    vertex.rot_3 === undefined
+  ) {
+    return 0;
+  }
+
+  const w = quaternionByte(vertex.rot_0);
+  const x = quaternionByte(vertex.rot_1);
+  const y = quaternionByte(vertex.rot_2);
+  const z = quaternionByte(vertex.rot_3);
+  const length = Math.hypot(w, x, y, z);
+  if (!Number.isFinite(length) || length <= 0.0001) return 0;
+
+  const nw = w / length;
+  const nx = x / length;
+  const ny = y / length;
+  const nz = z / length;
+  return Math.atan2(2 * (nw * nz + nx * ny), 1 - 2 * (ny * ny + nz * nz));
+}
+
+function quaternionByte(value) {
+  return clamp(Number(value ?? 128) / 255, 0, 1) * 2 - 1;
 }
 
 function clamp(value, min, max) {

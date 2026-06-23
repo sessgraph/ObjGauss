@@ -36,6 +36,8 @@ function boxCloud({
       color: originalColor,
       objectColor: colorForObject(objectId),
       opacity: 0.96,
+      scale: [0.028, 0.018],
+      rotation: seeded(index * 53 + objectId * 17) * Math.PI,
     });
   }
   return points;
@@ -63,6 +65,8 @@ function cylinderCloud({
       color: originalColor,
       objectColor: colorForObject(objectId),
       opacity: 0.94,
+      scale: [0.03, 0.016],
+      rotation: t,
     });
   }
   return points;

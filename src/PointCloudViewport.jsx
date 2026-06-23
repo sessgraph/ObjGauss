@@ -2,9 +2,82 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-const EDIT_SPLAT_SIZE_SCALE = 4.4;
-const SELECTED_SPLAT_SIZE_SCALE = 6.2;
-let softPointTexture = null;
+const DEFAULT_POINT_SIZE = 0.018;
+const EDIT_SPLAT_SIZE_SCALE = 4.8;
+const SELECTED_SPLAT_SIZE_SCALE = 7.0;
+const EDIT_VERTEX_SHADER = `
+attribute vec3 color;
+attribute vec2 gaussianScale;
+attribute float gaussianOpacity;
+attribute float gaussianRotation;
+
+uniform vec2 uViewport;
+uniform float uSizeScale;
+uniform float uMinPointSize;
+uniform float uMaxPointSize;
+uniform vec3 uSolidColor;
+uniform float uSolidColorMix;
+
+varying vec3 vColor;
+varying float vOpacity;
+varying vec2 vAxisRatio;
+varying float vRotation;
+
+void main() {
+  vec2 safeScale = max(gaussianScale, vec2(0.0006));
+  float majorScale = max(safeScale.x, safeScale.y);
+  vAxisRatio = clamp(safeScale / majorScale, vec2(0.18), vec2(1.0));
+  vRotation = gaussianRotation;
+  vOpacity = clamp(gaussianOpacity, 0.0, 1.0);
+  vColor = mix(color, uSolidColor, uSolidColorMix);
+
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  float viewZ = max(0.001, -mvPosition.z);
+  float pixelsPerWorldUnit = projectionMatrix[1][1] * uViewport.y * 0.5 / viewZ;
+  float radiusPixels = clamp(
+    majorScale * pixelsPerWorldUnit * uSizeScale,
+    uMinPointSize,
+    uMaxPointSize
+  );
+
+  gl_PointSize = radiusPixels * 2.0;
+  gl_Position = projectionMatrix * mvPosition;
+}
+`;
+
+const EDIT_FRAGMENT_SHADER = `
+precision highp float;
+
+uniform float uSigmaExtent;
+uniform float uKernelCutoff;
+uniform float uAlphaScale;
+
+varying vec3 vColor;
+varying float vOpacity;
+varying vec2 vAxisRatio;
+varying float vRotation;
+
+void main() {
+  vec2 centered = gl_PointCoord * 2.0 - 1.0;
+  float cosine = cos(vRotation);
+  float sine = sin(vRotation);
+  vec2 rotated = vec2(
+    cosine * centered.x - sine * centered.y,
+    sine * centered.x + cosine * centered.y
+  );
+  vec2 normalized = rotated * uSigmaExtent / vAxisRatio;
+  float d = dot(normalized, normalized);
+  if (d > uKernelCutoff) {
+    discard;
+  }
+
+  float alpha = exp(-0.5 * d) * vOpacity * uAlphaScale;
+  if (alpha < 0.004) {
+    discard;
+  }
+  gl_FragColor = vec4(vColor, alpha);
+}
+`;
 
 export default function PointCloudViewport({
   points,
@@ -91,6 +164,8 @@ export default function PointCloudViewport({
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
+      updateMaterialViewport(pointsObjectRef.current?.material, width, height);
+      updateMaterialViewport(selectedObjectRef.current?.material, width, height);
     };
 
     const observer = new ResizeObserver(resize);
@@ -131,42 +206,42 @@ export default function PointCloudViewport({
       selectedObjectRef.current = null;
     }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(buffers.positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(buffers.colors, 3));
+    const geometry = createEditGeometry({
+      positions: buffers.positions,
+      colors: buffers.colors,
+      scales: buffers.scales,
+      opacities: buffers.opacities,
+      rotations: buffers.rotations,
+    });
     geometry.computeBoundingSphere();
-    const splatTexture = getSoftPointTexture();
-
-    const material = new THREE.PointsMaterial({
-      size: pointSize * EDIT_SPLAT_SIZE_SCALE,
-      map: splatTexture,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.58,
-      alphaTest: 0.006,
-      sizeAttenuation: true,
-      depthWrite: false,
+    const viewport = rendererViewport(rendererRef.current);
+    const material = createGaussianSplatMaterial({
+      pointSize,
+      sizeScale: EDIT_SPLAT_SIZE_SCALE,
+      alphaScale: 0.78,
+      solidColorMix: 0,
+      depthTest: true,
+      viewport,
     });
     const cloud = new THREE.Points(geometry, material);
     scene.add(cloud);
     pointsObjectRef.current = cloud;
 
     if (buffers.selectedPositions.length > 0) {
-      const selectedGeometry = new THREE.BufferGeometry();
-      selectedGeometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(buffers.selectedPositions, 3),
-      );
-      const selectedMaterial = new THREE.PointsMaterial({
-        size: pointSize * SELECTED_SPLAT_SIZE_SCALE,
-        map: splatTexture,
-        color: 0xfff0a8,
-        transparent: true,
-        opacity: 0.6,
-        alphaTest: 0.006,
-        sizeAttenuation: true,
-        depthWrite: false,
+      const selectedGeometry = createEditGeometry({
+        positions: buffers.selectedPositions,
+        colors: buffers.selectedColors,
+        scales: buffers.selectedScales,
+        opacities: buffers.selectedOpacities,
+        rotations: buffers.selectedRotations,
+      });
+      const selectedMaterial = createGaussianSplatMaterial({
+        pointSize,
+        sizeScale: SELECTED_SPLAT_SIZE_SCALE,
+        alphaScale: 0.62,
+        solidColorMix: 1,
         depthTest: false,
+        viewport,
       });
       const selectedCloud = new THREE.Points(selectedGeometry, selectedMaterial);
       scene.add(selectedCloud);
@@ -180,10 +255,14 @@ export default function PointCloudViewport({
 
   useEffect(() => {
     if (pointsObjectRef.current) {
-      pointsObjectRef.current.material.size = pointSize * EDIT_SPLAT_SIZE_SCALE;
+      updateMaterialPointSize(pointsObjectRef.current.material, pointSize, EDIT_SPLAT_SIZE_SCALE);
     }
     if (selectedObjectRef.current) {
-      selectedObjectRef.current.material.size = pointSize * SELECTED_SPLAT_SIZE_SCALE;
+      updateMaterialPointSize(
+        selectedObjectRef.current.material,
+        pointSize,
+        SELECTED_SPLAT_SIZE_SCALE,
+      );
     }
   }, [pointSize]);
 
@@ -282,12 +361,20 @@ function buildBuffers({
   });
   const positions = new Float32Array(selected.length * 3);
   const colors = new Float32Array(selected.length * 3);
+  const scales = new Float32Array(selected.length * 2);
+  const opacities = new Float32Array(selected.length);
+  const rotations = new Float32Array(selected.length);
   const objectIds = new Int32Array(selected.length);
   const selectedHighlight = selected.filter((point) => point.objectId === selectedId);
   const selectedPositions = new Float32Array(selectedHighlight.length * 3);
+  const selectedColors = new Float32Array(selectedHighlight.length * 3);
+  const selectedScales = new Float32Array(selectedHighlight.length * 2);
+  const selectedOpacities = new Float32Array(selectedHighlight.length);
+  const selectedRotations = new Float32Array(selectedHighlight.length);
 
   selected.forEach((point, index) => {
     const offset = index * 3;
+    const scaleOffset = index * 2;
     positions[offset] = point.x;
     positions[offset + 1] = point.z;
     positions[offset + 2] = point.y;
@@ -295,48 +382,126 @@ function buildBuffers({
     colors[offset] = rgb[0] / 255;
     colors[offset + 1] = rgb[1] / 255;
     colors[offset + 2] = rgb[2] / 255;
+    const scale = pointScale(point);
+    scales[scaleOffset] = scale[0];
+    scales[scaleOffset + 1] = scale[1];
+    opacities[index] = pointOpacity(point);
+    rotations[index] = pointRotation(point);
     objectIds[index] = point.objectId;
   });
   selectedHighlight.forEach((point, index) => {
     const offset = index * 3;
+    const scaleOffset = index * 2;
     selectedPositions[offset] = point.x;
     selectedPositions[offset + 1] = point.z;
     selectedPositions[offset + 2] = point.y;
+    selectedColors[offset] = 1;
+    selectedColors[offset + 1] = 0.94;
+    selectedColors[offset + 2] = 0.66;
+    const scale = pointScale(point);
+    selectedScales[scaleOffset] = scale[0];
+    selectedScales[scaleOffset + 1] = scale[1];
+    selectedOpacities[index] = pointOpacity(point);
+    selectedRotations[index] = pointRotation(point);
   });
 
   return {
     positions,
     colors,
+    scales,
+    opacities,
+    rotations,
     objectIds,
     selectedPositions,
+    selectedColors,
+    selectedScales,
+    selectedOpacities,
+    selectedRotations,
     visibleCount: selected.length,
   };
 }
 
-function getSoftPointTexture() {
-  if (softPointTexture) return softPointTexture;
+function createEditGeometry({ positions, colors, scales, opacities, rotations }) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("gaussianScale", new THREE.BufferAttribute(scales, 2));
+  geometry.setAttribute("gaussianOpacity", new THREE.BufferAttribute(opacities, 1));
+  geometry.setAttribute("gaussianRotation", new THREE.BufferAttribute(rotations, 1));
+  return geometry;
+}
 
-  const size = 64;
-  const center = size / 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  const gradient = context.createRadialGradient(center, center, 0, center, center, center);
-  gradient.addColorStop(0, "rgba(255, 255, 255, 0.98)");
-  gradient.addColorStop(0.42, "rgba(255, 255, 255, 0.68)");
-  gradient.addColorStop(0.78, "rgba(255, 255, 255, 0.16)");
-  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, size, size);
+function createGaussianSplatMaterial({
+  pointSize,
+  sizeScale,
+  alphaScale,
+  solidColorMix,
+  depthTest,
+  viewport,
+}) {
+  return new THREE.ShaderMaterial({
+    vertexShader: EDIT_VERTEX_SHADER,
+    fragmentShader: EDIT_FRAGMENT_SHADER,
+    transparent: true,
+    depthWrite: false,
+    depthTest,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uViewport: { value: viewport.clone() },
+      uSizeScale: { value: pointSizeScale(pointSize, sizeScale) },
+      uMinPointSize: { value: 1.5 },
+      uMaxPointSize: { value: 96 },
+      uSigmaExtent: { value: 3.0 },
+      uKernelCutoff: { value: 13.0 },
+      uAlphaScale: { value: alphaScale },
+      uSolidColor: { value: new THREE.Color(0xfff0a8) },
+      uSolidColorMix: { value: solidColorMix },
+    },
+  });
+}
 
-  softPointTexture = new THREE.CanvasTexture(canvas);
-  softPointTexture.minFilter = THREE.LinearFilter;
-  softPointTexture.magFilter = THREE.LinearFilter;
-  softPointTexture.wrapS = THREE.ClampToEdgeWrapping;
-  softPointTexture.wrapT = THREE.ClampToEdgeWrapping;
-  return softPointTexture;
+function rendererViewport(renderer) {
+  const size = new THREE.Vector2(1, 1);
+  renderer?.getSize(size);
+  return size;
+}
+
+function updateMaterialViewport(material, width, height) {
+  if (!material?.uniforms?.uViewport) return;
+  material.uniforms.uViewport.value.set(Math.max(width, 1), Math.max(height, 1));
+}
+
+function updateMaterialPointSize(material, pointSize, sizeScale) {
+  if (!material?.uniforms?.uSizeScale) return;
+  material.uniforms.uSizeScale.value = pointSizeScale(pointSize, sizeScale);
+}
+
+function pointSizeScale(pointSize, sizeScale) {
+  return Math.max(0.2, (pointSize / DEFAULT_POINT_SIZE) * sizeScale);
+}
+
+function pointScale(point) {
+  if (Array.isArray(point.scale) && point.scale.length >= 2) {
+    return [
+      clampNumber(point.scale[0], 0.0006, 0.35, DEFAULT_POINT_SIZE),
+      clampNumber(point.scale[1], 0.0006, 0.35, DEFAULT_POINT_SIZE),
+    ];
+  }
+  return [DEFAULT_POINT_SIZE, DEFAULT_POINT_SIZE];
+}
+
+function pointOpacity(point) {
+  return clampNumber(point.opacity, 0, 1, 1);
+}
+
+function pointRotation(point) {
+  return Number.isFinite(point.rotation) ? point.rotation : 0;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
 }
 
 function frameGeometry(geometry, camera, controls, scene) {
