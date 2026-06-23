@@ -17,13 +17,41 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-004E`: browser audit、overflow telemetry 和 fallback hardening。
+  - `RENDER-005A`: WebGPU device-backed renderer skeleton + nonblank first frame on zero-overflow scene。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
+
+### RENDER-004E: WebGPU overflow gate and fallback hardening
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 fixed-capacity tile smoke 的 overflow 从单个计数升级为可审计 capacity gate，并强化 WebGPU target fallback reason，避免 overflow 场景被误认为可直接切换到 WebGPU renderer。
+- 范围外:
+  - 不创建 WebGPU compute/render pipeline。
+  - 不把实际编辑 renderer 从 `Gaussian OIT 编辑` 切到 WebGPU。
+  - 不把 fixed-capacity tile list 宣称为最终方案。
+- 实施:
+  - `src/webgpuTileSmoke.js` 新增 tile capacity summary：overflow tile count、overflow ratio、max excess、stored reference count、entry capacity、entry utilization、capacity mode/status/gate。
+  - `src/webgpuCapability.js` 新增 WebGPU target gate，区分 `webgpu-capability`、`tile-overflow` 和 `renderer-not-implemented` 三类 blocker。
+  - `App` 状态面板展示目标状态与 Tile capacity。
+  - `PointCloudViewport` 暴露 `data-webgpu-target-gate-*` 与 `data-webgpu-tile-capacity-*` DOM contract。
+  - `audit-webgpu-tile-smoke` 同时验证小 cap overflow blocked 与大 cap pass/ok。
+  - `audit-demo` 校验浏览器中的 target gate、capacity gate，并确保 overflow 场景不会通过高质量 WebGPU readiness。
+- 验收:
+  - Plush semantic / Plush v1 暴露 `tileCapacity="overflow"`，并记录 overflow tile count。
+  - Lego 暴露 `tileCapacity="ok"`，overflow tile count 为 0。
+  - 当前 headless WebGPU 不可用时，target gate 明确为 `blocked:webgpu-capability`。
+  - 若 WebGPU 可用且 tile overflow 存在，audit 要求 blocker 为 `tile-overflow`；若无 overflow，则仍 blocked 于 `renderer-not-implemented`，直到真实 WebGPU renderer 完成。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，内置 sample packed=5800、refs=157323、resolved=2301、overflow=40114、overflowTiles=1056、capacity=blocked。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5203/`: passed，assets=3；Plush semantic / Plush v1 为 `tileCapacity="overflow":169`，Lego 为 `tileCapacity="ok":0`，三者 targetGate 均为 `blocked:webgpu-capability`。
+- 完成 commit: `8d233a1`.
 
 ### RENDER-004D: WebGPU object-state buffer smoke
 
