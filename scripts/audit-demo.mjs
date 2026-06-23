@@ -46,8 +46,9 @@ try {
   const results = await runAudit(baseUrl, assets);
   for (const result of results) {
     console.log(
-      `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
+        `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
         `splatPixels=${result.splatPixels} editPixels=${result.editPixels} ` +
+        `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `deletedObjects=${result.deletedObjects} screenshot=${result.screenshotPath}`,
     );
@@ -98,7 +99,7 @@ async function runAudit(url, assetsToCheck) {
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
       }
-      await page.locator(".objectSelectButton").first().click();
+      const canvasSelectedObject = await selectObjectFromCanvas(page, asset.id);
       await page.getByRole("button", { name: "只看所选" }).click();
       await page.waitForTimeout(300);
       const visibleAfterIsolate = await labeledValue(page, "可见");
@@ -115,6 +116,7 @@ async function runAudit(url, assetsToCheck) {
         title,
         splatPixels,
         editPixels,
+        canvasSelectedObject,
         visibleAfterIsolate,
         deletedObjects,
         screenshotPath,
@@ -234,6 +236,40 @@ async function waitForNonBackgroundPixels(page, timeoutMs = 10000) {
 async function labeledValue(page, label) {
   const row = page.locator(".metric, .stateRow").filter({ hasText: label }).first();
   return row.locator("strong").innerText();
+}
+
+async function selectObjectFromCanvas(page, assetId) {
+  const canvas = page.locator(".viewport canvas").first();
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error(`${assetId} point-edit canvas is missing`);
+  }
+
+  const clickPoints = [
+    [0.5, 0.5],
+    [0.45, 0.48],
+    [0.55, 0.48],
+    [0.4, 0.55],
+    [0.6, 0.55],
+    [0.5, 0.4],
+    [0.35, 0.48],
+    [0.65, 0.48],
+  ];
+  for (const [xRatio, yRatio] of clickPoints) {
+    await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
+    await page.waitForTimeout(250);
+    const selectedObject = await selectedObjectValue(page);
+    if (selectedObject !== "无") {
+      return selectedObject;
+    }
+  }
+  throw new Error(`${assetId} canvas selection did not choose an object`);
+}
+
+async function selectedObjectValue(page) {
+  const status = await page.locator(".statusBar").innerText();
+  const match = status.match(/所选：([^\n]+)/);
+  return match?.[1] ?? "无";
 }
 
 function parseArgs(rawArgs) {

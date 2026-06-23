@@ -427,7 +427,7 @@ export default function App() {
           {!useSplatRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
-              <span>隔离、隐藏、删除和对象色在点云模式下显示。</span>
+              <span>点击点云或右侧列表选择对象；隔离、隐藏、删除在这里预览。</span>
             </div>
           )}
           {useSplatRenderer ? (
@@ -449,6 +449,7 @@ export default function App() {
               showAxes={showAxes}
               isolatedId={isolatedId}
               selectedId={selectedId}
+              onSelectObject={selectObject}
               renderModeLabel={renderModeText}
             />
           )}

@@ -12,6 +12,7 @@ export default function PointCloudViewport({
   showAxes,
   isolatedId,
   selectedId,
+  onSelectObject,
   renderModeLabel,
 }) {
   const containerRef = useRef(null);
@@ -23,6 +24,7 @@ export default function PointCloudViewport({
   const selectedObjectRef = useRef(null);
   const gridRef = useRef(null);
   const axesRef = useRef(null);
+  const pickStartRef = useRef(null);
 
   const buffers = useMemo(
     () =>
@@ -184,6 +186,53 @@ export default function PointCloudViewport({
     if (axesRef.current) axesRef.current.visible = showAxes;
   }, [showAxes]);
 
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !camera || !onSelectObject) return;
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    raycaster.params.Points.threshold = Math.max(pointSize * 2.8, 0.018);
+
+    const pointerDown = (event) => {
+      pickStartRef.current = { x: event.clientX, y: event.clientY };
+    };
+
+    const pointerUp = (event) => {
+      const start = pickStartRef.current;
+      pickStartRef.current = null;
+      if (!start) return;
+
+      const dragDistance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      if (dragDistance > 5) return;
+
+      const cloud = pointsObjectRef.current;
+      if (!cloud || buffers.objectIds.length === 0) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const hit = raycaster.intersectObject(cloud, false)[0];
+      if (!hit || typeof hit.index !== "number") return;
+
+      const objectId = buffers.objectIds[hit.index];
+      if (objectId !== undefined) {
+        onSelectObject(objectId);
+      }
+    };
+
+    const canvas = renderer.domElement;
+    canvas.addEventListener("pointerdown", pointerDown);
+    canvas.addEventListener("pointerup", pointerUp);
+    return () => {
+      canvas.removeEventListener("pointerdown", pointerDown);
+      canvas.removeEventListener("pointerup", pointerUp);
+    };
+  }, [buffers.objectIds, onSelectObject, pointSize]);
+
   return (
     <div className="viewport" ref={containerRef}>
       <div className="viewportHud">
@@ -224,6 +273,7 @@ function buildBuffers({
   });
   const positions = new Float32Array(selected.length * 3);
   const colors = new Float32Array(selected.length * 3);
+  const objectIds = new Int32Array(selected.length);
   const selectedHighlight = selected.filter((point) => point.objectId === selectedId);
   const selectedPositions = new Float32Array(selectedHighlight.length * 3);
 
@@ -236,6 +286,7 @@ function buildBuffers({
     colors[offset] = rgb[0] / 255;
     colors[offset + 1] = rgb[1] / 255;
     colors[offset + 2] = rgb[2] / 255;
+    objectIds[index] = point.objectId;
   });
   selectedHighlight.forEach((point, index) => {
     const offset = index * 3;
@@ -247,6 +298,7 @@ function buildBuffers({
   return {
     positions,
     colors,
+    objectIds,
     selectedPositions,
     visibleCount: selected.length,
   };
