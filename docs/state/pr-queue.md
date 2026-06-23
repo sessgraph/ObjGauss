@@ -51,7 +51,7 @@
   - `npm run audit:demo -- --port 5183`: passed，默认 3 个闭环样例仍可加载和交互。
   - `uv run --extra dev pytest`: 32 passed。
   - `npm run build`: 通过，仍有 bundle size warning。
-- 完成 commit: `<pending>`.
+- 完成 commit: `c3de487`.
 
 ### TRAIN-003A: Splatfacto smoke runbook and script
 
