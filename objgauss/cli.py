@@ -13,6 +13,10 @@ from objgauss.emergence import (
     object_emergence_metrics,
     write_emergence_curve_csv,
 )
+from objgauss.emergence_report import (
+    load_emergence_curve,
+    write_emergence_curve_report,
+)
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
@@ -346,6 +350,27 @@ def _object_field_emergence_curve(args: argparse.Namespace) -> None:
             "final_render_occlusion_effect_score="
             f"{final_render_occlusion['occlusion_effect_score']:.6f}"
         )
+
+
+def _object_field_emergence_report(args: argparse.Namespace) -> None:
+    if args.label and len(args.label) != len(args.curves):
+        raise ValueError("--label count must match curve JSON count")
+    curves = [
+        load_emergence_curve(
+            path,
+            label=args.label[index] if args.label else None,
+        )
+        for index, path in enumerate(args.curves)
+    ]
+    summary = write_emergence_curve_report(
+        args.output,
+        curves,
+        title=args.title,
+    )
+    print(f"report={summary['output']}")
+    print(f"curves={summary['curves']}")
+    print(f"charts={summary['charts']}")
+    print(f"metrics={','.join(summary['metrics'])}")
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -840,6 +865,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="skip image-space render occlusion delta and keep mask-proxy metrics only",
     )
     field_emergence_curve.set_defaults(handler=_object_field_emergence_curve)
+
+    field_emergence_report = object_field_subparsers.add_parser(
+        "emergence-report",
+        help="render one or more emergence curve JSON files as an HTML report",
+    )
+    field_emergence_report.add_argument("curves", nargs="+", type=Path)
+    field_emergence_report.add_argument("--output", "-o", required=True, type=Path)
+    field_emergence_report.add_argument(
+        "--label",
+        action="append",
+        help="scene label; repeat once per curve JSON",
+    )
+    field_emergence_report.add_argument(
+        "--title",
+        default="Object Emergence Benchmark",
+    )
+    field_emergence_report.set_defaults(handler=_object_field_emergence_report)
 
     field_nerf = object_field_subparsers.add_parser(
         "inspect-nerf",

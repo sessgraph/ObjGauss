@@ -23,6 +23,31 @@
 
 ## Done
 
+### SEMANTIC-005: Emergence benchmark report artifact
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将多个 `emergence-curve` JSON 聚合为可检查的 HTML/SVG benchmark 曲线报告，支持 2-3 个 scene 横向对比。
+- 实施:
+  - 新增 `objgauss.emergence_report`，生成静态 HTML/SVG 报告，不引入 matplotlib、plotly 或前端运行时依赖。
+  - 新增 `objgauss object-field emergence-report` CLI，支持多个 curve JSON、重复 `--label` 和自定义 `--title`。
+  - 报告包含 summary table 和 7 条曲线图：projection loss、assignment confidence、normalized entropy、ARI、spatial compactness、render occlusion effect 和 OES。
+  - 本地 smoke 使用 Plush semantic、Lego alpha proxy、Lego Splatfacto smoke 三个场景 curve JSON 生成 `/tmp/objgauss-emergence-benchmark-report.html`。
+- 范围外:
+  - 不提交 `/tmp` 或 `outputs/` 中的报告产物。
+  - 不固定正式 benchmark suite、阈值或 public dataset。
+  - 不替换 point-splat render probe 为 covariance-aware 3DGS / gsplat renderer。
+- 验收:
+  - CLI 能读取一个或多个 `object_emergence_curve` JSON 并生成 HTML。
+  - HTML 包含 summary table、SVG charts、scene labels 和 render occlusion metric。
+  - 三个本地 scene 曲线可聚合为同一份 report artifact。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "emergence_report or emergence_curve"`: 3 passed。
+  - `uv run objgauss object-field emergence-report /tmp/objgauss-benchmark-plush-semantic.json /tmp/objgauss-benchmark-lego-alpha.json /tmp/objgauss-benchmark-lego-splatfacto.json --label plush-semantic --label lego-alpha-proxy --label lego-splatfacto-smoke --output /tmp/objgauss-emergence-benchmark-report.html --title "ObjGauss Emergence Benchmark Smoke"`: curves=3，charts=7。
+  - `uv run --extra dev pytest`: 29 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
+
 ### SEMANTIC-004: Render occlusion delta probe
 
 - 状态: done

@@ -409,6 +409,72 @@ def test_object_field_emergence_curve_cli_writes_json_and_csv(tmp_path, capsys):
     assert "render_occlusion_mean_delta_l1" in csv_text
 
 
+def test_object_field_emergence_report_cli_writes_html(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "camera_cloud.ply"
+    field_path = tmp_path / "field.npz"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    curve_path = tmp_path / "curve.json"
+    report_path = tmp_path / "report.html"
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.zeros((cloud.count, 2), dtype=np.float32)))
+
+    assert (
+        main(
+            [
+                "object-field",
+                "emergence-curve",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--masks",
+                str(masks_path),
+                "--output",
+                str(curve_path),
+                "--iterations",
+                "10",
+                "--learning-rate",
+                "1.0",
+                "--eval-every",
+                "10",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "object-field",
+                "emergence-report",
+                str(curve_path),
+                str(curve_path),
+                "--label",
+                "scene-a",
+                "--label",
+                "scene-b",
+                "--output",
+                str(report_path),
+                "--title",
+                "Test Benchmark",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    html_text = report_path.read_text(encoding="utf-8")
+    assert "report=" in output
+    assert "curves=2" in output
+    assert "charts=" in output
+    assert "scene-a" in html_text
+    assert "scene-b" in html_text
+    assert "Projection loss" in html_text
+    assert "Render occlusion effect" in html_text
+    assert "<svg" in html_text
+
+
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)
