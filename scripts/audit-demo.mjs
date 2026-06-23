@@ -48,6 +48,7 @@ try {
     console.log(
         `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
         `splatPixels=${result.splatPixels} editRenderer=${JSON.stringify(result.editRenderer)} ` +
+        `objectFilter=${JSON.stringify(result.objectFilter)} ` +
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
@@ -102,6 +103,10 @@ async function runAudit(url, assetsToCheck) {
       if (editRenderer !== "Gaussian OIT 编辑") {
         throw new Error(`${asset.id} did not enter Gaussian OIT edit renderer: ${editRenderer}`);
       }
+      const objectFilter = await page.locator(".viewport").first().getAttribute("data-object-filter");
+      if (objectFilter !== "gpu-object-state-texture") {
+        throw new Error(`${asset.id} did not expose GPU object-state filtering: ${objectFilter}`);
+      }
       const editPixels = await waitForNonBackgroundPixels(page);
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
@@ -132,6 +137,7 @@ async function runAudit(url, assetsToCheck) {
         splatPixels,
         editPixels,
         editRenderer,
+        objectFilter,
         canvasSelectedObject,
         visibleAfterIsolate,
         visibleAfterDelete,

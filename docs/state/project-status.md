@@ -41,7 +41,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 已拆分 `真实查看` / `对象编辑` 两个工作模式；对象操作会显式进入点云编辑预览，不再伪装成真实 splat 内直接编辑。
   - 自身颜色 / 对象聚类色切换。
   - 对象列表、点击 Gaussian OIT 画布选中对象、隔离、删除预览；选中对象在 shader 编辑模式下有高亮层，删除预览会退出隔离并切回自身颜色显示剩余整体场景。
-  - 对象编辑 renderer 已从 `PointsMaterial` 升级为 screen-space Gaussian kernel `ShaderMaterial`，消费 PLY `scale_0/1/2`、`rot_0..3` 和 `opacity` attributes，并通过 RGBA half-float accumulation / fullscreen resolve 实现 weighted blended OIT；WebGPU tile renderer 仍是后续任务。
+  - 对象编辑 renderer 已从 `PointsMaterial` 升级为 screen-space Gaussian kernel `ShaderMaterial`，消费 PLY `scale_0/1/2`、`rot_0..3` 和 `opacity` attributes，并通过 RGBA half-float accumulation / fullscreen resolve 实现 weighted blended OIT。
+  - 对象过滤已进入 shader 路径：每个 Gaussian 上传 dense object index attribute，隐藏 / 隔离 / 删除通过 GPU object-state `DataTexture` 控制；WebGPU tile renderer 仍是后续任务。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -110,6 +111,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 npm run build
+npm run audit:demo -- --url http://127.0.0.1:5194/
 npm run audit:demo -- --url http://127.0.0.1:5193/
 npm run audit:demo -- --url http://127.0.0.1:5192/
 npm run audit:demo -- --asset plush-v1-closure-local --url http://127.0.0.1:5191/
@@ -182,6 +184,8 @@ npm run build
 
 结果：
 
+- RENDER-003 object-state filtering: Gaussian OIT 编辑 renderer 现在保留全量 Gaussian geometry，使用 dense object index GPU attribute + `gpu-object-state-texture` 控制对象隐藏、隔离和删除；画布拾取会跳过当前 object-state 不可见对象。
+- RENDER-003 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5194/` 三样例通过并检查 `objectFilter="gpu-object-state-texture"`；targeted Playwright QA 保存到 `/tmp/objgauss-gpu-filter-*.png`，验证 `initialVisible=281498 -> isolatedVisible=48066 -> deletedVisible=233432`，且无 shader/framebuffer/texture console error。
 - RENDER-002 Weighted OIT: 对象编辑 renderer 现在使用 RGBA half-float accumulation render target；RGB 累加 `sum(w*c)`，Alpha 累加 `sum(w)`，fullscreen resolve 后混回基础 grid / axes 场景。Phase 3 WebGPU tile renderer 尚未完成。
 - RENDER-002 validation: `npm run build` 通过；`npm run audit:demo -- --url http://127.0.0.1:5193/` 三样例通过，分别检查 `editRenderer="Gaussian OIT 编辑"`、画布点选、隔离、删除后 `renderModeAfterDelete="自身颜色"`；targeted Playwright QA 保存到 `/tmp/objgauss-oit-edit-*.png`，断言真实 Splat -> Gaussian OIT 编辑 -> 画布选中 -> 删除预览全链路，过滤已知 Spark `Worker terminate` 噪声后无 shader/framebuffer/render target console error。
 - WEB-002 renderer route: ADR 0004 已接受 B -> C 渐进路线；Phase 1 将对象编辑 renderer 从 `PointsMaterial` / soft sprite 过渡到 screen-space Gaussian kernel `ShaderMaterial`，并把 Gaussian scale / opacity / rotation 传入 GPU attributes。

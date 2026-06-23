@@ -12,6 +12,7 @@ attribute vec3 color;
 attribute vec2 gaussianScale;
 attribute float gaussianOpacity;
 attribute float gaussianRotation;
+attribute float gaussianObjectIndex;
 
 uniform vec2 uViewport;
 uniform float uSizeScale;
@@ -24,12 +25,14 @@ varying vec3 vColor;
 varying float vOpacity;
 varying vec2 vAxisRatio;
 varying float vRotation;
+varying float vObjectIndex;
 
 void main() {
   vec2 safeScale = max(gaussianScale, vec2(0.0006));
   float majorScale = max(safeScale.x, safeScale.y);
   vAxisRatio = clamp(safeScale / majorScale, vec2(0.18), vec2(1.0));
   vRotation = gaussianRotation;
+  vObjectIndex = gaussianObjectIndex;
   vOpacity = clamp(gaussianOpacity, 0.0, 1.0);
   vColor = mix(color, uSolidColor, uSolidColorMix);
 
@@ -53,13 +56,22 @@ precision highp float;
 uniform float uSigmaExtent;
 uniform float uKernelCutoff;
 uniform float uAlphaScale;
+uniform sampler2D uObjectState;
+uniform float uObjectStateWidth;
 
 varying vec3 vColor;
 varying float vOpacity;
 varying vec2 vAxisRatio;
 varying float vRotation;
+varying float vObjectIndex;
 
 void main() {
+  float stateU = (vObjectIndex + 0.5) / max(uObjectStateWidth, 1.0);
+  float objectVisible = texture2D(uObjectState, vec2(stateU, 0.5)).r;
+  if (objectVisible < 0.5) {
+    discard;
+  }
+
   vec2 centered = gl_PointCoord * 2.0 - 1.0;
   float cosine = cos(vRotation);
   float sine = sin(vRotation);
@@ -137,18 +149,27 @@ export default function PointCloudViewport({
   const resolveSceneRef = useRef(null);
   const resolveCameraRef = useRef(null);
   const resolveMaterialRef = useRef(null);
+  const objectStateTextureRef = useRef(null);
 
   const buffers = useMemo(
     () =>
       buildBuffers({
         points,
-        visibleIds,
-        removedIds,
         renderMode,
-        isolatedId,
         selectedId,
       }),
-    [points, visibleIds, removedIds, renderMode, isolatedId, selectedId],
+    [points, renderMode, selectedId],
+  );
+  const objectFilter = useMemo(
+    () =>
+      buildObjectFilter({
+        objectIdsByIndex: buffers.objectIdsByIndex,
+        objectCountsByIndex: buffers.objectCountsByIndex,
+        visibleIds,
+        removedIds,
+        isolatedId,
+      }),
+    [buffers.objectCountsByIndex, buffers.objectIdsByIndex, visibleIds, removedIds, isolatedId],
   );
 
   useEffect(() => {
@@ -241,6 +262,7 @@ export default function PointCloudViewport({
       controls.dispose();
       accumulationTarget.dispose();
       disposeResolvePass(resolveScene);
+      objectStateTextureRef.current?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -262,6 +284,8 @@ export default function PointCloudViewport({
       selectedObjectRef.current.material.dispose();
       selectedObjectRef.current = null;
     }
+    objectStateTextureRef.current?.dispose();
+    objectStateTextureRef.current = createObjectStateTexture(objectFilter.states);
 
     const geometry = createEditGeometry({
       positions: buffers.positions,
@@ -269,6 +293,7 @@ export default function PointCloudViewport({
       scales: buffers.scales,
       opacities: buffers.opacities,
       rotations: buffers.rotations,
+      objectIndices: buffers.objectIndices,
     });
     geometry.computeBoundingSphere();
     const viewport = rendererViewport(rendererRef.current);
@@ -279,6 +304,8 @@ export default function PointCloudViewport({
       solidColorMix: 0,
       depthTest: true,
       viewport,
+      objectStateTexture: objectStateTextureRef.current,
+      objectStateWidth: objectFilter.objectCount,
     });
     const cloud = new THREE.Points(geometry, material);
     scene.add(cloud);
@@ -291,6 +318,7 @@ export default function PointCloudViewport({
         scales: buffers.selectedScales,
         opacities: buffers.selectedOpacities,
         rotations: buffers.selectedRotations,
+        objectIndices: buffers.selectedObjectIndices,
       });
       const selectedMaterial = createGaussianSplatMaterial({
         pointSize,
@@ -299,6 +327,8 @@ export default function PointCloudViewport({
         solidColorMix: 1,
         depthTest: false,
         viewport,
+        objectStateTexture: objectStateTextureRef.current,
+        objectStateWidth: objectFilter.objectCount,
       });
       const selectedCloud = new THREE.Points(selectedGeometry, selectedMaterial);
       scene.add(selectedCloud);
@@ -309,6 +339,12 @@ export default function PointCloudViewport({
       frameGeometry(geometry, cameraRef.current, controlsRef.current, scene);
     }
   }, [buffers, pointSize]);
+
+  useEffect(() => {
+    updateObjectStateTexture(objectStateTextureRef.current, objectFilter.states);
+    updateMaterialObjectState(pointsObjectRef.current?.material, objectFilter.objectCount);
+    updateMaterialObjectState(selectedObjectRef.current?.material, objectFilter.objectCount);
+  }, [objectFilter]);
 
   useEffect(() => {
     if (pointsObjectRef.current) {
@@ -360,12 +396,13 @@ export default function PointCloudViewport({
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
 
-      const hit = raycaster.intersectObject(cloud, false)[0];
-      if (!hit || typeof hit.index !== "number") return;
-
-      const objectId = buffers.objectIds[hit.index];
-      if (objectId !== undefined) {
+      const hits = raycaster.intersectObject(cloud, false);
+      for (const hit of hits) {
+        if (typeof hit.index !== "number") continue;
+        const objectId = buffers.objectIds[hit.index];
+        if (objectId === undefined || !objectFilter.visibleObjectIds.has(objectId)) continue;
         onSelectObject(objectId);
+        return;
       }
     };
 
@@ -376,14 +413,19 @@ export default function PointCloudViewport({
       canvas.removeEventListener("pointerdown", pointerDown);
       canvas.removeEventListener("pointerup", pointerUp);
     };
-  }, [buffers.objectIds, onSelectObject, pointSize]);
+  }, [buffers.objectIds, objectFilter.visibleObjectIds, onSelectObject, pointSize]);
 
   return (
-    <div className="viewport" ref={containerRef}>
+    <div
+      className="viewport"
+      data-object-filter="gpu-object-state-texture"
+      data-visible-count={objectFilter.visibleCount}
+      ref={containerRef}
+    >
       <div className="viewportHud">
         <div>
           <span className="hudLabel">可见</span>
-          <strong>{buffers.visibleCount.toLocaleString()}</strong>
+          <strong>{objectFilter.visibleCount.toLocaleString()}</strong>
         </div>
         <div>
           <span className="hudLabel">模式</span>
@@ -405,29 +447,26 @@ export default function PointCloudViewport({
 
 function buildBuffers({
   points,
-  visibleIds,
-  removedIds,
   renderMode,
-  isolatedId,
   selectedId,
 }) {
-  const selected = points.filter((point) => {
-    if (removedIds.has(point.objectId)) return false;
-    if (isolatedId !== null && point.objectId !== isolatedId) return false;
-    return visibleIds.has(point.objectId);
-  });
+  const { objectIndexById, objectIdsByIndex, objectCountsByIndex } = objectIndex(points);
+  const selected = points;
   const positions = new Float32Array(selected.length * 3);
   const colors = new Float32Array(selected.length * 3);
   const scales = new Float32Array(selected.length * 2);
   const opacities = new Float32Array(selected.length);
   const rotations = new Float32Array(selected.length);
+  const objectIndices = new Float32Array(selected.length);
   const objectIds = new Int32Array(selected.length);
-  const selectedHighlight = selected.filter((point) => point.objectId === selectedId);
+  const selectedHighlight =
+    selectedId === null ? [] : selected.filter((point) => point.objectId === selectedId);
   const selectedPositions = new Float32Array(selectedHighlight.length * 3);
   const selectedColors = new Float32Array(selectedHighlight.length * 3);
   const selectedScales = new Float32Array(selectedHighlight.length * 2);
   const selectedOpacities = new Float32Array(selectedHighlight.length);
   const selectedRotations = new Float32Array(selectedHighlight.length);
+  const selectedObjectIndices = new Float32Array(selectedHighlight.length);
 
   selected.forEach((point, index) => {
     const offset = index * 3;
@@ -444,6 +483,7 @@ function buildBuffers({
     scales[scaleOffset + 1] = scale[1];
     opacities[index] = pointOpacity(point);
     rotations[index] = pointRotation(point);
+    objectIndices[index] = objectIndexById.get(point.objectId) ?? 0;
     objectIds[index] = point.objectId;
   });
   selectedHighlight.forEach((point, index) => {
@@ -460,6 +500,7 @@ function buildBuffers({
     selectedScales[scaleOffset + 1] = scale[1];
     selectedOpacities[index] = pointOpacity(point);
     selectedRotations[index] = pointRotation(point);
+    selectedObjectIndices[index] = objectIndexById.get(point.objectId) ?? 0;
   });
 
   return {
@@ -468,23 +509,84 @@ function buildBuffers({
     scales,
     opacities,
     rotations,
+    objectIndices,
     objectIds,
+    objectIdsByIndex,
+    objectCountsByIndex,
     selectedPositions,
     selectedColors,
     selectedScales,
     selectedOpacities,
     selectedRotations,
-    visibleCount: selected.length,
+    selectedObjectIndices,
   };
 }
 
-function createEditGeometry({ positions, colors, scales, opacities, rotations }) {
+function objectIndex(points) {
+  const counts = new Map();
+  for (const point of points) {
+    counts.set(point.objectId, (counts.get(point.objectId) ?? 0) + 1);
+  }
+  const objectIdsByIndex = [...counts.keys()].sort((left, right) => left - right);
+  const objectCountsByIndex = objectIdsByIndex.map((id) => counts.get(id) ?? 0);
+  const objectIndexById = new Map(objectIdsByIndex.map((id, index) => [id, index]));
+  return { objectIndexById, objectIdsByIndex, objectCountsByIndex };
+}
+
+function buildObjectFilter({
+  objectIdsByIndex,
+  objectCountsByIndex,
+  visibleIds,
+  removedIds,
+  isolatedId,
+}) {
+  const objectCount = Math.max(objectIdsByIndex.length, 1);
+  const states = new Uint8Array(objectCount * 4);
+  const visibleObjectIds = new Set();
+  let visibleCount = 0;
+
+  objectIdsByIndex.forEach((objectId, index) => {
+    const visible =
+      visibleIds.has(objectId) &&
+      !removedIds.has(objectId) &&
+      (isolatedId === null || objectId === isolatedId);
+    const offset = index * 4;
+    states[offset] = visible ? 255 : 0;
+    states[offset + 3] = 255;
+    if (visible) {
+      visibleObjectIds.add(objectId);
+      visibleCount += objectCountsByIndex[index] ?? 0;
+    }
+  });
+
+  if (objectIdsByIndex.length === 0) {
+    states[0] = 255;
+    states[3] = 255;
+  }
+
+  return {
+    objectCount,
+    states,
+    visibleObjectIds,
+    visibleCount,
+  };
+}
+
+function createEditGeometry({
+  positions,
+  colors,
+  scales,
+  opacities,
+  rotations,
+  objectIndices,
+}) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute("gaussianScale", new THREE.BufferAttribute(scales, 2));
   geometry.setAttribute("gaussianOpacity", new THREE.BufferAttribute(opacities, 1));
   geometry.setAttribute("gaussianRotation", new THREE.BufferAttribute(rotations, 1));
+  geometry.setAttribute("gaussianObjectIndex", new THREE.BufferAttribute(objectIndices, 1));
   return geometry;
 }
 
@@ -500,6 +602,30 @@ function createAccumulationTarget(renderer) {
   });
   target.texture.name = "ObjGauss weighted OIT accumulation";
   return target;
+}
+
+function createObjectStateTexture(states) {
+  const texture = new THREE.DataTexture(
+    states.slice(),
+    Math.max(states.length / 4, 1),
+    1,
+    THREE.RGBAFormat,
+  );
+  texture.name = "ObjGauss object visibility state";
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function updateObjectStateTexture(texture, states) {
+  if (!texture) return;
+  if (texture.image.data.length !== states.length) return;
+  texture.image.data.set(states);
+  texture.needsUpdate = true;
 }
 
 function createResolvePass(accumulationTarget) {
@@ -587,6 +713,8 @@ function createGaussianSplatMaterial({
   solidColorMix,
   depthTest,
   viewport,
+  objectStateTexture,
+  objectStateWidth,
 }) {
   return new THREE.ShaderMaterial({
     vertexShader: EDIT_VERTEX_SHADER,
@@ -611,6 +739,8 @@ function createGaussianSplatMaterial({
       uAlphaScale: { value: alphaScale },
       uSolidColor: { value: new THREE.Color(0xfff0a8) },
       uSolidColorMix: { value: solidColorMix },
+      uObjectState: { value: objectStateTexture },
+      uObjectStateWidth: { value: Math.max(objectStateWidth, 1) },
     },
   });
 }
@@ -640,6 +770,11 @@ function updateMaterialViewport(material, width, height) {
 function updateMaterialPointSize(material, pointSize, sizeScale) {
   if (!material?.uniforms?.uSizeScale) return;
   material.uniforms.uSizeScale.value = pointSizeScale(pointSize, sizeScale);
+}
+
+function updateMaterialObjectState(material, objectStateWidth) {
+  if (!material?.uniforms?.uObjectStateWidth) return;
+  material.uniforms.uObjectStateWidth.value = Math.max(objectStateWidth, 1);
 }
 
 function pointSizeScale(pointSize, sizeScale) {

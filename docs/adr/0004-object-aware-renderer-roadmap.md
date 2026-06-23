@@ -1,6 +1,6 @@
 # ADR 0004: Object-Aware Gaussian Renderer Roadmap
 
-> 状态: Accepted / Phase 2 implemented
+> 状态: Accepted / object-state filtering implemented
 > 日期: 2026-06-23
 
 ## 背景
@@ -48,6 +48,7 @@ Phase 1 / Phase 2 已落地到前端对象编辑 renderer：
 - `src/ply.js` 解析 Gaussian scale、opacity 和 quaternion rotation 的 screen-space 近似角。
 - `src/PointCloudViewport.jsx` 使用 `ShaderMaterial` 渲染 Gaussian kernel，而不是默认 `PointsMaterial`。
 - `src/PointCloudViewport.jsx` 使用 weighted OIT accumulation / resolve 管线，降低普通透明混合排序伪影。
+- `src/PointCloudViewport.jsx` 将 `object_id` 映射为 dense GPU attribute，并通过 object-state `DataTexture` 在 shader 内执行隐藏 / 隔离 / 删除过滤。
 - `src/sampleScene.js` 为内置 demo 提供 fallback scale / rotation。
 - `scripts/audit-demo.mjs` 验证编辑 renderer 为 `Gaussian OIT 编辑`，并覆盖画布选中、隔离和删除后的自身颜色预览。
 
@@ -59,6 +60,7 @@ Phase 1 / Phase 2 已落地到前端对象编辑 renderer：
 - 没有 depth sort；当前使用 weighted blended OIT approximation。
 - 没有 SH view-dependent color。
 - 没有 tile binning 或 WebGPU compute。
+- Spark `.splat` 真实查看路径还不能直接按 `object_id` 过滤；object-state filtering 当前落在 Gaussian OIT 编辑 renderer。
 
 因此 UI 使用 `Gaussian OIT 编辑`，不把它称为最终真实 splat 删除。
 
@@ -67,6 +69,7 @@ Phase 1 / Phase 2 已落地到前端对象编辑 renderer：
 Phase 2 验收标准：
 
 - Browser audit 显示 `editRenderer="Gaussian OIT 编辑"`。
+- Browser audit 显示 `objectFilter="gpu-object-state-texture"`。
 - Plush / Plush semantic / Lego proxy 三个样例均可进入 shader edit renderer。
 - 点击编辑画布可选中 object。
 - 删除预览后仍显示剩余整体场景，并回到 `自身颜色`。
@@ -75,5 +78,4 @@ Phase 2 验收标准：
 
 ## 后续任务
 
-- `RENDER-003`: Object-id filtering inside splat renderer path.
 - `RENDER-004`: WebGPU tile-based object-aware Gaussian renderer.
