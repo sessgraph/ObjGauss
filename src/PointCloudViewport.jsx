@@ -469,6 +469,7 @@ export default function PointCloudViewport({
       data-webgpu-resolve-alpha-mean={rendererContract?.resolveAlphaMean ?? 0}
       data-webgpu-resolve-luma-mean={rendererContract?.resolveLumaMean ?? 0}
       data-webgpu-resolve-checksum={rendererContract?.resolveChecksum ?? ""}
+      data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}
       data-webgpu-pixel-coverage-mode={rendererContract?.pixelCoverageMode ?? ""}
       data-webgpu-pixel-coverage-weight-floor={rendererContract?.pixelCoverageWeightFloor ?? 0}
       data-webgpu-pixel-coverage-footprint-scale={rendererContract?.pixelCoverageFootprintScale ?? 0}

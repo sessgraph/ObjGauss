@@ -501,6 +501,7 @@ export default function WebGpuTileViewport({
       data-webgpu-pixel-depth-sort-mode={rendererContract?.pixelDepthSortMode ?? ""}
       data-webgpu-pixel-depth-gate-strength={rendererContract?.pixelDepthGateStrength ?? 0}
       data-webgpu-pixel-depth-gate-floor={rendererContract?.pixelDepthGateFloor ?? 0}
+      data-webgpu-pixel-depth-bin-count={rendererContract?.pixelDepthBinCount ?? 0}
       data-webgpu-pixel-coverage-mode={rendererContract?.pixelCoverageMode ?? ""}
       data-webgpu-pixel-coverage-weight-floor={rendererContract?.pixelCoverageWeightFloor ?? 0}
       data-webgpu-pixel-coverage-footprint-scale={rendererContract?.pixelCoverageFootprintScale ?? 0}

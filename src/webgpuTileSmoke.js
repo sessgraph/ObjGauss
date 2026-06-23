@@ -11,7 +11,7 @@ export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
-export const WEBGPU_PIXEL_DEPTH_SORT_MODE = "front-depth-gated-oit-v1";
+export const WEBGPU_PIXEL_DEPTH_SORT_MODE = "depth-binned-alpha-composite-v1";
 export const WEBGPU_PIXEL_COVERAGE_MODE = "footprint-weight-floor-calibrated-v1";
 const OBJECT_STATE_VISIBLE = 1 << 0;
 const OBJECT_STATE_SELECTED = 1 << 1;
@@ -27,6 +27,7 @@ const DEPTH_WEIGHT_STRENGTH = 1.45;
 const DEPTH_WEIGHT_FLOOR = 0.22;
 const FRONT_DEPTH_GATE_STRENGTH = 12;
 const FRONT_DEPTH_GATE_FLOOR = 0.06;
+const PIXEL_DEPTH_BIN_COUNT = 8;
 const SCREEN_COVARIANCE_MAX_ANISOTROPY = 4;
 const EDIT_CAMERA_POSITION = Object.freeze([3.6, 2.8, 3.4]);
 const EDIT_CAMERA_TARGET = Object.freeze([0, 0, 0.25]);
@@ -271,6 +272,7 @@ export function buildWebGpuTileSmoke({
     pixelDepthSortMode: WEBGPU_PIXEL_DEPTH_SORT_MODE,
     pixelDepthGateStrength: FRONT_DEPTH_GATE_STRENGTH,
     pixelDepthGateFloor: FRONT_DEPTH_GATE_FLOOR,
+    pixelDepthBinCount: PIXEL_DEPTH_BIN_COUNT,
     pixelCoverageMode: WEBGPU_PIXEL_COVERAGE_MODE,
     pixelCoverageWeightFloor: PIXEL_COVERAGE_WEIGHT_FLOOR,
     pixelCoverageFootprintScale: EDIT_SPLAT_SIZE_SCALE,
@@ -573,6 +575,10 @@ function resolvePixelOutput({
   });
   let pixelResolvedCount = 0;
   let checksum = 2166136261;
+  const binRed = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
+  const binGreen = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
+  const binBlue = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
+  const binWeight = new Float32Array(PIXEL_DEPTH_BIN_COUNT);
 
   for (let y = 0; y < viewportHeight; y += 1) {
     const tileY = Math.floor(y / tileSize);
@@ -585,8 +591,11 @@ function resolvePixelOutput({
           : Math.min(tileCounts[tileIndex], maxEntriesPerTile);
       const entryBase = tileOffsets[tileIndex];
       const pixelOffset = (y * viewportWidth + x) * 4;
-      let nearestDepth = depthMin + depthSpan + 1;
       let candidateCount = 0;
+      binRed.fill(0);
+      binGreen.fill(0);
+      binBlue.fill(0);
+      binWeight.fill(0);
 
       for (let entryOffset = 0; entryOffset < storedCount; entryOffset += 1) {
         const gaussianIndex = tileEntries[entryBase + entryOffset];
@@ -605,57 +614,57 @@ function resolvePixelOutput({
         const candidateWeight =
           Math.exp(-0.5 * d) * colorOpacity[gaussianOffset + 3] * RESOLVE_ALPHA_GAIN;
         if (candidateWeight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
-        nearestDepth = Math.min(nearestDepth, projection.depth[gaussianIndex]);
+        const normalizedDepth = clampNumber(
+          (projection.depth[gaussianIndex] - depthMin) / Math.max(depthSpan, 0.0001),
+          0,
+          0.999999,
+        );
+        const depthBin = Math.min(
+          PIXEL_DEPTH_BIN_COUNT - 1,
+          Math.floor(normalizedDepth * PIXEL_DEPTH_BIN_COUNT),
+        );
+        binRed[depthBin] += colorOpacity[gaussianOffset] * candidateWeight;
+        binGreen[depthBin] += colorOpacity[gaussianOffset + 1] * candidateWeight;
+        binBlue[depthBin] += colorOpacity[gaussianOffset + 2] * candidateWeight;
+        binWeight[depthBin] += candidateWeight;
         candidateCount += 1;
       }
 
       if (candidateCount <= 0) continue;
 
-      let accumulatedRed = 0;
-      let accumulatedGreen = 0;
-      let accumulatedBlue = 0;
-      let accumulatedWeight = 0;
-
-      for (let entryOffset = 0; entryOffset < storedCount; entryOffset += 1) {
-        const gaussianIndex = tileEntries[entryBase + entryOffset];
-        const objectDenseIndex = objectIndices[gaussianIndex];
-        if (!objectIsVisible(objectState, objectDenseIndex)) continue;
-
-        const d = pixelGaussianDistance({
-          x,
-          y,
-          gaussianIndex,
-          projection,
-        });
-        if (d > RESOLVE_KERNEL_CUTOFF) continue;
-
-        const gaussianOffset = gaussianIndex * 4;
-        const frontGate = frontDepthGate(projection.depth[gaussianIndex], nearestDepth, depthSpan);
-        const weight =
-          Math.exp(-0.5 * d) *
-          colorOpacity[gaussianOffset + 3] *
-          projection.depthWeight[gaussianIndex] *
-          frontGate *
-          RESOLVE_ALPHA_GAIN;
+      let outputRedPremultiplied = 0;
+      let outputGreenPremultiplied = 0;
+      let outputBluePremultiplied = 0;
+      let outputAlpha = 0;
+      let totalWeight = 0;
+      for (let depthBin = 0; depthBin < PIXEL_DEPTH_BIN_COUNT; depthBin += 1) {
+        const weight = binWeight[depthBin];
         if (weight <= PIXEL_COVERAGE_WEIGHT_FLOOR) continue;
-        accumulatedRed += colorOpacity[gaussianOffset] * weight;
-        accumulatedGreen += colorOpacity[gaussianOffset + 1] * weight;
-        accumulatedBlue += colorOpacity[gaussianOffset + 2] * weight;
-        accumulatedWeight += weight;
+        const red = binRed[depthBin] / weight;
+        const green = binGreen[depthBin] / weight;
+        const blue = binBlue[depthBin] / weight;
+        const alpha = clampNumber(1 - Math.exp(-weight * RESOLVE_ALPHA_SCALE), 0, 0.98);
+        const visibility = 1 - outputAlpha;
+        outputRedPremultiplied += visibility * red * alpha;
+        outputGreenPremultiplied += visibility * green * alpha;
+        outputBluePremultiplied += visibility * blue * alpha;
+        outputAlpha += visibility * alpha;
+        totalWeight += weight;
+        if (outputAlpha >= 0.995) break;
       }
 
-      if (accumulatedWeight <= 0.0001) continue;
+      if (outputAlpha <= 0.0001 || totalWeight <= 0.0001) continue;
 
-      const red = accumulatedRed / accumulatedWeight;
-      const green = accumulatedGreen / accumulatedWeight;
-      const blue = accumulatedBlue / accumulatedWeight;
-      const alpha = clampNumber(1 - Math.exp(-accumulatedWeight * RESOLVE_ALPHA_SCALE), 0, 0.98);
+      const red = outputRedPremultiplied / Math.max(outputAlpha, 0.0001);
+      const green = outputGreenPremultiplied / Math.max(outputAlpha, 0.0001);
+      const blue = outputBluePremultiplied / Math.max(outputAlpha, 0.0001);
+      const alpha = clampNumber(outputAlpha, 0, 0.98);
       pixelResolvedRgba[pixelOffset] = red;
       pixelResolvedRgba[pixelOffset + 1] = green;
       pixelResolvedRgba[pixelOffset + 2] = blue;
       pixelResolvedRgba[pixelOffset + 3] = alpha;
       pixelResolvedCount += 1;
-      checksum = checksumValue(checksum, red, green, blue, alpha, accumulatedWeight);
+      checksum = checksumValue(checksum, red, green, blue, alpha, totalWeight);
     }
   }
 

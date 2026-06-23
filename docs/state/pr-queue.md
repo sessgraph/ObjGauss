@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-K`: 基于 T-J 的结论，停止只靠缩小 footprint 追视觉相似度，转向拆 Spark vs edit 的 luma / chroma 残差：排序 alpha、view-dependent SH 和 Spark edit handoff 三条路线择一推进。
+  - `RENDER-005T-L`: 基于 T-K 的结论，把 Spark/edit 残差拆成 coverage 与 shading 两条线：coverage 继续做 footprint / alpha threshold 校准；shading 评估 view-dependent SH 或 Spark edit handoff，避免再把两类误差混在一个“颗粒感”指标里。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,33 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-K: WebGPU depth-binned alpha compositing
+
+- 状态: done / depth-binned-alpha-audited
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 T-J 已证明单纯缩小 footprint 只能降低过覆盖、不能改善 luma / chroma 后，把 WebGPU Tile pixel resolve 从 weighted average / nearest-depth gate 推进到更接近最终 C 架构的 front-to-back alpha compositing 近似。
+- 已实施:
+  - `WEBGPU_PIXEL_DEPTH_SORT_MODE` 升级为 `depth-binned-alpha-composite-v1`。
+  - Pixel resolve 不再做两遍 nearest-depth gate + weighted average；改为每像素固定 8 个 depth bins，先按 Gaussian depth 累积 bin 内颜色 / 权重，再按前到后进行 alpha compositing。
+  - WebGPU WGSL shader 和 CPU smoke reference 同步实现同一合成逻辑，输出仍保持 straight RGB + alpha，兼容现有 fullscreen storage resolve。
+  - `WebGpuTileViewport`、`PointCloudViewport`、renderer contract、browser audit 和 tile smoke audit 均暴露 / 校验 `pixelDepthSort=depth-binned-alpha-composite-v1:...:8`。
+- 结论:
+  - NeRF Lego desktop WebGPU full audit 通过；相对 T-J，luma / chroma delta 从 `0.207570 / 0.133965` 降到 `0.109000 / 0.087808`，说明 alpha compositing 路线确实在修复颜色 / 亮度合成残差。
+  - 同一 audit 的 coverage ratio 从 `3.271989` 回升到 `3.856920`，说明 coverage 和 shading 是两个独立问题；T-K 不应被解读为 footprint 完成。
+  - Plush semantic 大场景 281498 Gaussians 也通过 desktop WebGPU full audit；luma / chroma delta 为 `0.119591 / 0.007786`，device / queue active，删除后仍回到 `281498/0/0/0` RGB 原色。
+  - 下一步应分线推进：coverage 继续校准 footprint / alpha threshold，shading 继续评估 SH 或 Spark edit handoff。
+- 验证:
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuTileComputeShader.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`pixelDepthSort=depth-binned-alpha-composite-v1:12/0.06:8`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `node scripts/audit-webgpu-desktop.mjs --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5263/ --no-server --probes full`: passed；coverage ratio=`3.856920`、luma/chroma=`0.109000/0.087808`。
+  - `node scripts/audit-webgpu-desktop.mjs --asset plush-semantic-closure-local --url http://127.0.0.1:5263/ --no-server --probes full`: passed；coverage ratio=`6.680406`、luma/chroma=`0.119591/0.007786`。
 
 ### RENDER-005T-J: WebGPU footprint coverage calibration
 
