@@ -10,13 +10,6 @@
 
 ## Ready
 
-### RENDER-002: Weighted blended OIT for object edit renderer
-
-- 状态: ready
-- 类型: 标准 PR / 前端渲染
-- 目标: 在 `Gaussian Shader 编辑` renderer 上增加 weighted blended accumulation，降低当前普通透明混合带来的排序伪影。
-- 范围外: 不引入 WebGPU tile renderer；不替换 Spark 真实查看 renderer。
-
 ### RENDER-003: Object-aware splat filtering path
 
 - 状态: ready
@@ -32,6 +25,32 @@
 - 要求: 先补设计文档 / ADR 细化，再进入实现。
 
 ## Done
+
+### RENDER-002: Weighted blended OIT for object edit renderer
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染
+- 目标: 在 `Gaussian Shader 编辑` renderer 上增加 weighted blended accumulation，降低当前普通透明混合带来的排序伪影。
+- 范围外:
+  - 不引入 WebGPU tile renderer。
+  - 不替换 Spark 真实查看 renderer。
+  - 不实现完整 3D covariance projection、SH view-dependent color 或真实 splat shader 内对象删除。
+- 实施:
+  - `PointCloudViewport` 增加 RGBA half-float accumulation render target。
+  - Gaussian fragment shader 输出 `vec4(color * weight, weight)`。
+  - 使用 additive custom blending 累加 `sum(w*c)` 与 `sum(w)`。
+  - fullscreen resolve pass 输出 `sum(w*c) / sum(w)`，再以 normal blending 混回基础 grid / axes scene。
+  - UI / audit renderer label 更新为 `Gaussian OIT 编辑`。
+- 验收:
+  - 三个默认 Web demo 样例均能进入 `Gaussian OIT 编辑`。
+  - 画布点选 object、隔离和删除预览仍工作。
+  - 删除后回到 `自身颜色` 并显示剩余整体场景。
+  - 定向 Playwright QA 无 shader / framebuffer / render target console error；已知 Spark `Worker terminate` 切换噪声单独过滤。
+- 验证:
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5193/`: passed，assets=3。
+  - Targeted Playwright QA: passed，截图位于 `/tmp/objgauss-oit-edit-*.png`。
+- 完成 commit: `a7e40f6`.
 
 ### WEB-002: Gaussian shader edit renderer phase 1
 
