@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-23
+> 最近更新: 2026-06-24
 
 ## 队列规则
 
@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005N`: 将 WebGPU runtime path 拆成 accumulation-only / resolve-only / pixel-output-only probes，隔离当前 headless unsafe WebGPU 的 queue backend loss。
+  - `RENDER-005O`: 将 `pixel-output-only` 继续拆成 pixel-compute-only / display-only / tiny-pixel-output probes，区分 pixel shader、pixel buffer 写入和 fullscreen display pass。
   - 在 WebGPU-capable 桌面 Chrome 中重跑 Plush / Lego first-frame runtime audit；若桌面 pass 而 headless fail，则把当前 blocker 定义为 headless backend limitation。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -70,6 +70,36 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005N: WebGPU runtime pass probes
+
+- 状态: done / pixel-output-backend-loss-isolated
+- 类型: 标准 PR / 前端渲染诊断
+- 目标: 将 WebGPU runtime route 拆成 `accumulation-only`、`resolve-only` 和 `pixel-output-only` 三个可审计 probe，定位 headless unsafe WebGPU 的 queue/device loss 出现在哪条 pass path。
+- 范围外:
+  - 不声明 full WebGPU tile renderer 已稳定通过。
+  - 不改变默认 `npm run audit:webgpu-runtime` 的严格失败语义。
+  - 不把 probe 结果等同于完整对象编辑 runtime 验收。
+- 实施:
+  - 新增 `src/webgpuRuntimeProbe.js`，统一定义 `full`、`accumulation-only`、`resolve-only`、`pixel-output-only` probe modes。
+  - `WebGpuTileViewport` 读取 `?webgpu-probe=...`，按 probe mode 只 dispatch 指定 stage；未运行的 stage 暴露为 `status=skipped`，并通过 `data-webgpu-runtime-probe` 暴露当前 probe。
+  - `scripts/audit-demo.mjs` 新增 `--webgpu-probe` 和 `--allow-webgpu-device-lost`；`npm run audit:webgpu-probe` 用于收集诊断 telemetry，默认 full runtime audit 仍在 device lost 时失败。
+  - 非 full probe audit 只验证 stage / queue / storage telemetry，不继续执行对象选择、隔离、删除交互，避免把 runtime 诊断混入 UI 交互失败。
+  - Node smoke audit 覆盖 probe mode 常量和 normalize 行为。
+- 诊断结论:
+  - `accumulation-only`: queue done，device active；说明 covariance accumulation compute pass 本身不是当前 blocker。
+  - `resolve-only`: queue done，device active；说明 tile accumulation -> tile resolved compute pass 本身不是当前 blocker。
+  - `pixel-output-only`: first frame rendered 后 device lost，queue failed；当前 blocker 已收窄到 pixel-output path，即 pixel accumulation shader / pixel storage write / fullscreen pixel storage resolve 之一。
+- 验证:
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5223/ --no-server`: passed，Browser plugin absent，使用 Playwright fallback + built `dist/` static server。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5223/ --no-server --webgpu-probe accumulation-only`: passed，`queue=done`。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5223/ --no-server --webgpu-probe resolve-only`: passed，`queue=done`。
+  - `npm run audit:webgpu-probe -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5223/ --no-server --webgpu-probe pixel-output-only`: passed with allowed device lost，`deviceLost=lost`、`queue=failed`。
+  - `npm run audit:webgpu-runtime -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5223/ --no-server`: expected failed，仍报告 `probe=full`、`A valid external Instance reference no longer exists`。
 
 ### RENDER-005M: WebGPU required-limit and backend-loss diagnostics
 

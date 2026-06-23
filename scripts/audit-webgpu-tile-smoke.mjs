@@ -37,11 +37,40 @@ import {
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "../src/webgpuTileResolveShader.js";
+import {
+  normalizeWebGpuRuntimeProbe,
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_MODES,
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+} from "../src/webgpuRuntimeProbe.js";
 import { editRendererContract } from "../src/webgpuCapability.js";
 
 const scene = createSampleScene();
 const allObjectIds = new Set(scene.points.map((point) => point.objectId));
 const firstObjectId = Math.min(...allObjectIds);
+
+assert.deepEqual(WEBGPU_RUNTIME_PROBE_MODES, [
+  WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+]);
+assert.equal(normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_FULL), WEBGPU_RUNTIME_PROBE_FULL);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY),
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY),
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+);
+assert.equal(
+  normalizeWebGpuRuntimeProbe(WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY),
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+);
+assert.equal(normalizeWebGpuRuntimeProbe("invalid"), WEBGPU_RUNTIME_PROBE_FULL);
 
 const base = buildWebGpuTileSmoke({
   points: scene.points,

@@ -3,6 +3,13 @@ import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
+import {
+  normalizeWebGpuRuntimeProbe,
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+} from "../src/webgpuRuntimeProbe.js";
 
 const DEFAULT_PORT = 5180;
 const DEFAULT_ASSETS = [
@@ -38,6 +45,12 @@ const assets = args.asset ? KNOWN_ASSETS.filter((asset) => asset.id === args.ass
 const auditOptions = {
   requireWebGpu: Boolean(args.requireWebgpu ?? args["require-webgpu"]),
   webGpuFlags: String(args.webgpuFlags ?? args["webgpu-flags"] ?? process.env.OBJGAUSS_WEBGPU_FLAGS ?? "none"),
+  webGpuProbe: normalizeWebGpuRuntimeProbe(
+    args.webgpuProbe ?? args["webgpu-probe"] ?? process.env.OBJGAUSS_WEBGPU_PROBE,
+  ),
+  allowWebGpuDeviceLost: Boolean(
+    args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
+  ),
 };
 
 if (assets.length === 0) {
@@ -54,6 +67,7 @@ try {
         `splatPixels=${result.splatPixels} splatRendererId=${JSON.stringify(result.splatRendererId)} ` +
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
+        `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
@@ -94,7 +108,8 @@ try {
   }
   console.log(
     `browser_audit=passed assets=${results.length} url=${baseUrl} ` +
-      `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)}`,
+      `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
+      `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
   );
 } finally {
   if (server) {
@@ -105,6 +120,7 @@ try {
 async function runAudit(url, assetsToCheck, options) {
   const browser = await chromium.launch(launchOptions(options));
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+  const auditUrl = urlWithWebGpuProbe(url, options.webGpuProbe);
   const consoleIssues = [];
   page.on("console", (message) => {
     if (["error", "warning"].includes(message.type())) {
@@ -116,7 +132,7 @@ async function runAudit(url, assetsToCheck, options) {
   const results = [];
   try {
     for (const asset of assetsToCheck) {
-      await page.goto(url, { waitUntil: "networkidle" });
+      await page.goto(auditUrl, { waitUntil: "networkidle" });
       const title = await page.title();
       if (title !== "ObjGauss 查看器") {
         throw new Error(`unexpected page title: ${title}`);
@@ -403,6 +419,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
+      const webGpuRuntimeProbe = await viewport.getAttribute("data-webgpu-runtime-probe");
       const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
       const webGpuDeviceLostReason = await viewport.getAttribute("data-webgpu-device-lost-reason");
       const webGpuDeviceLostMessage = await viewport.getAttribute("data-webgpu-device-lost-message");
@@ -434,28 +451,31 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuStorageTileOffsets = await viewport.getAttribute("data-webgpu-storage-tile-offsets");
       const webGpuStoragePixelOutput = await viewport.getAttribute("data-webgpu-storage-pixel-output");
       if (editRendererId === "webgpu-tile") {
-        if (
-          webGpuAccumulationSource !== "webgpu-compute-covariance-accumulation-v1" ||
-          webGpuAccumulationStatus !== "dispatched" ||
-          webGpuAccumulationWorkgroups <= 0 ||
-          webGpuComputeSource !== "webgpu-compute-resolve-v1" ||
-          webGpuComputeStatus !== "dispatched" ||
-          webGpuComputeWorkgroups <= 0 ||
-          webGpuPixelSource !== "webgpu-compute-pixel-accumulation-v1" ||
-          webGpuPixelStatus !== "dispatched" ||
-          webGpuPixelWorkgroups <= 0 ||
-          webGpuFirstFrameStatus !== "rendered" ||
-          webGpuFirstFramePixels <= 0 ||
-          !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
-          webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
-        ) {
+        validateWebGpuRuntimeProbe({
+          assetId: asset.id,
+          expectedProbe: options.webGpuProbe,
+          actualProbe: webGpuRuntimeProbe,
+          webGpuAccumulationSource,
+          webGpuAccumulationStatus,
+          webGpuAccumulationReason,
+          webGpuAccumulationWorkgroups,
+          webGpuComputeSource,
+          webGpuComputeStatus,
+          webGpuComputeReason,
+          webGpuComputeWorkgroups,
+          webGpuPixelSource,
+          webGpuPixelStatus,
+          webGpuPixelReason,
+          webGpuPixelWorkgroups,
+          webGpuFirstFrameStatus,
+          webGpuFirstFrameReason,
+          webGpuFirstFramePixels,
+          webGpuFirstFrameChecksum,
+          webGpuResolveSource,
+        });
+        if (webGpuDeviceLostStatus === "lost" && !options.allowWebGpuDeviceLost) {
           throw new Error(
-            `${asset.id} WebGPU first frame did not render through accumulation/compute/pixel/storage resolve: accumulation=${webGpuAccumulationStatus}:${webGpuAccumulationSource}:${webGpuAccumulationWorkgroups}:${webGpuAccumulationReason} compute=${webGpuComputeStatus}:${webGpuComputeSource}:${webGpuComputeWorkgroups}:${webGpuComputeReason} pixel=${webGpuPixelStatus}:${webGpuPixelSource}:${webGpuPixelWorkgroups}:${webGpuPixelReason} frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
-          );
-        }
-        if (webGpuDeviceLostStatus === "lost") {
-          throw new Error(
-            `${asset.id} WebGPU device was lost after first-frame submission: reason=${webGpuDeviceLostReason} message=${webGpuDeviceLostMessage} deviceError=${webGpuDeviceErrorStatus}:${webGpuDeviceErrorType}:${webGpuDeviceErrorMessage} queue=${webGpuQueueStatus}:${webGpuQueueReason}:${webGpuQueueMessage}`,
+            `${asset.id} WebGPU device was lost after first-frame submission: probe=${webGpuRuntimeProbe} reason=${webGpuDeviceLostReason} message=${webGpuDeviceLostMessage} deviceError=${webGpuDeviceErrorStatus}:${webGpuDeviceErrorType}:${webGpuDeviceErrorMessage} queue=${webGpuQueueStatus}:${webGpuQueueReason}:${webGpuQueueMessage}`,
           );
         }
         if (
@@ -471,6 +491,118 @@ async function runAudit(url, assetsToCheck, options) {
           throw new Error(
             `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
+        }
+        if (options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL) {
+          const screenshotPath = `/tmp/objgauss-audit-${asset.id}-${options.webGpuProbe}.png`;
+          await page.screenshot({ path: screenshotPath, fullPage: false });
+          results.push({
+            assetId: asset.id,
+            title,
+            splatPixels,
+            splatRendererId,
+            editPixels: webGpuFirstFramePixels,
+            editRenderer,
+            editRendererId,
+            webGpuFirstFrameStatus,
+            webGpuFirstFramePixels,
+            webGpuFirstFrameChecksum,
+            webGpuResolveSource,
+            webGpuRuntimeProbe,
+            webGpuDeviceLostStatus,
+            webGpuDeviceLostReason,
+            webGpuDeviceLostMessage,
+            webGpuDeviceErrorStatus,
+            webGpuDeviceErrorType,
+            webGpuDeviceErrorMessage,
+            webGpuQueueStatus,
+            webGpuQueueReason,
+            webGpuQueueMessage,
+            webGpuAccumulationSource,
+            webGpuAccumulationStatus,
+            webGpuAccumulationWorkgroups,
+            webGpuComputeSource,
+            webGpuComputeStatus,
+            webGpuComputeWorkgroups,
+            webGpuPixelSource,
+            webGpuPixelStatus,
+            webGpuPixelWorkgroups,
+            webGpuStorageLayout,
+            webGpuStorageStatus,
+            webGpuStorageBufferCount,
+            webGpuStorageByteSize,
+            webGpuStorageTileEntries,
+            webGpuStorageTileOffsets,
+            webGpuStoragePixelOutput,
+            webGpuStorageChecksum,
+            webGpuStorageChecksumAfterIsolate: webGpuStorageChecksum,
+            webGpuStorageChecksumAfterDelete: webGpuStorageChecksum,
+            storageLimitGate,
+            storageLimitReason,
+            storageLimitBlocker,
+            storageLimitMaxBufferSize,
+            storageLimitMaxBindingSize,
+            storageLimitMaxStorageBuffersPerStage,
+            storageLimitRequiredStorageBuffersPerStage,
+            storageLimitEffectiveMaxBufferSize,
+            storageEstimatedLayout,
+            storageEstimatedBufferCount,
+            storageEstimatedByteSize,
+            storageEstimatedMaxBufferByteSize,
+            storageEstimatedMaxBufferKey,
+            rendererTarget,
+            targetGate,
+            targetGateReason,
+            targetGateBlocker,
+            webgpuStatus,
+            fallbackReason,
+            tileSmokeLayout,
+            packedGaussians,
+            visibleGaussians,
+            binnedGaussians,
+            tileSize,
+            tileCount,
+            activeTileCount,
+            tileReferenceCount,
+            maxTileOccupancy,
+            tileOverflowTileCount,
+            tileOverflowRatio,
+            tileOverflowMaxExcess,
+            tileEntryStoredCount,
+            tileEntryCapacity,
+            tileEntryUtilization,
+            tileEntryLayout,
+            tileEntryOffsetCount,
+            tileCapacityMode,
+            tileCapacityStatus,
+            tileCapacityGate,
+            resolveLayout,
+            resolveMode,
+            resolvedTileCount,
+            resolveWeightSum,
+            resolveAlphaMean,
+            resolveLumaMean,
+            resolveChecksum,
+            tileOverflowCount,
+            objectFilter,
+            objectFilterTarget,
+            objectStateLayout,
+            objectStateStride,
+            objectStateVisibleObjects,
+            objectStateHiddenObjects,
+            objectStateRemovedObjects,
+            objectStateSelectedObjects,
+            objectStateIsolatedObjects,
+            objectStateChecksum,
+            objectStateChecksumAfterIsolate: objectStateChecksum,
+            objectStateChecksumAfterDelete: objectStateChecksum,
+            canvasSelectedObject: "probe-skipped",
+            visibleAfterIsolate: "probe-skipped",
+            visibleAfterDelete: "probe-skipped",
+            renderModeAfterDelete: "probe-skipped",
+            deletedObjects: "probe-skipped",
+            screenshotPath,
+          });
+          continue;
         }
       }
       const editPixels =
@@ -550,6 +682,7 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
         webGpuResolveSource,
+        webGpuRuntimeProbe,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,
@@ -649,7 +782,8 @@ async function runAudit(url, assetsToCheck, options) {
       (issue) =>
         !issue.includes("THREE.WebGLRenderer") &&
         !issue.includes("GPU stall due to ReadPixels") &&
-        !issue.includes("No available adapters."),
+        !issue.includes("No available adapters.") &&
+        !(options.allowWebGpuDeviceLost && issue.includes("CONTEXT_LOST_WEBGL")),
     );
     if (relevantIssues.length > 0) {
       throw new Error(`browser console issues:\n${relevantIssues.join("\n")}`);
@@ -660,6 +794,121 @@ async function runAudit(url, assetsToCheck, options) {
   }
 }
 
+function validateWebGpuRuntimeProbe({
+  assetId,
+  expectedProbe,
+  actualProbe,
+  webGpuAccumulationSource,
+  webGpuAccumulationStatus,
+  webGpuAccumulationReason,
+  webGpuAccumulationWorkgroups,
+  webGpuComputeSource,
+  webGpuComputeStatus,
+  webGpuComputeReason,
+  webGpuComputeWorkgroups,
+  webGpuPixelSource,
+  webGpuPixelStatus,
+  webGpuPixelReason,
+  webGpuPixelWorkgroups,
+  webGpuFirstFrameStatus,
+  webGpuFirstFrameReason,
+  webGpuFirstFramePixels,
+  webGpuFirstFrameChecksum,
+  webGpuResolveSource,
+}) {
+  if (actualProbe !== expectedProbe) {
+    throw new Error(`${assetId} WebGPU runtime probe mismatch: expected=${expectedProbe} actual=${actualProbe}`);
+  }
+
+  const stageState = {
+    accumulation: {
+      status: webGpuAccumulationStatus,
+      source: webGpuAccumulationSource,
+      workgroups: webGpuAccumulationWorkgroups,
+      expectedSource: "webgpu-compute-covariance-accumulation-v1",
+      reason: webGpuAccumulationReason,
+    },
+    compute: {
+      status: webGpuComputeStatus,
+      source: webGpuComputeSource,
+      workgroups: webGpuComputeWorkgroups,
+      expectedSource: "webgpu-compute-resolve-v1",
+      reason: webGpuComputeReason,
+    },
+    pixel: {
+      status: webGpuPixelStatus,
+      source: webGpuPixelSource,
+      workgroups: webGpuPixelWorkgroups,
+      expectedSource: "webgpu-compute-pixel-accumulation-v1",
+      reason: webGpuPixelReason,
+    },
+  };
+
+  const expected = expectedProbeStages(expectedProbe);
+  for (const [stage, state] of Object.entries(stageState)) {
+    if (expected.dispatched.has(stage)) {
+      if (
+        state.status !== "dispatched" ||
+        state.source !== state.expectedSource ||
+        state.workgroups <= 0
+      ) {
+        throw new Error(
+          `${assetId} WebGPU ${expectedProbe} did not dispatch ${stage}: ${state.status}:${state.source}:${state.workgroups}:${state.reason}`,
+        );
+      }
+    } else if (state.status !== "skipped" || state.source || state.workgroups !== 0) {
+      throw new Error(
+        `${assetId} WebGPU ${expectedProbe} did not skip ${stage}: ${state.status}:${state.source}:${state.workgroups}:${state.reason}`,
+      );
+    }
+  }
+
+  if (expectedProbe === WEBGPU_RUNTIME_PROBE_FULL) {
+    if (
+      webGpuFirstFrameStatus !== "rendered" ||
+      webGpuFirstFramePixels <= 0 ||
+      !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
+      webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
+    ) {
+      throw new Error(
+        `${assetId} WebGPU full route did not render through pixel storage resolve: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+      );
+    }
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY) {
+    if (
+      webGpuFirstFrameStatus !== "rendered" ||
+      webGpuFirstFramePixels <= 0 ||
+      !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
+      webGpuResolveSource !== "webgpu-pixel-storage-resolve-v1"
+    ) {
+      throw new Error(
+        `${assetId} WebGPU pixel-output-only probe did not render pixel output: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+      );
+    }
+  } else if (
+    webGpuFirstFrameStatus !== "probed" ||
+    webGpuFirstFramePixels <= 0 ||
+    !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "")
+  ) {
+    throw new Error(
+      `${assetId} WebGPU ${expectedProbe} did not expose a submitted probe frame fact: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+    );
+  }
+}
+
+function expectedProbeStages(probe) {
+  if (probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY) {
+    return { dispatched: new Set(["accumulation"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY) {
+    return { dispatched: new Set(["compute"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY) {
+    return { dispatched: new Set(["pixel"]) };
+  }
+  return { dispatched: new Set(["accumulation", "compute", "pixel"]) };
+}
+
 function launchOptions(options = {}) {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? firstExisting([
     "/usr/bin/google-chrome",
@@ -668,6 +917,13 @@ function launchOptions(options = {}) {
   ]);
   const args = ["--no-sandbox", ...webGpuLaunchArgs(options.webGpuFlags)];
   return executablePath ? { executablePath, args } : { args };
+}
+
+function urlWithWebGpuProbe(url, probe) {
+  if (probe === WEBGPU_RUNTIME_PROBE_FULL) return url;
+  const parsed = new URL(url);
+  parsed.searchParams.set("webgpu-probe", probe);
+  return parsed.toString();
 }
 
 function webGpuLaunchArgs(mode) {

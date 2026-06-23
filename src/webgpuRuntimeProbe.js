@@ -1,0 +1,19 @@
+export const WEBGPU_RUNTIME_PROBE_FULL = "full";
+export const WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY = "accumulation-only";
+export const WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY = "resolve-only";
+export const WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY = "pixel-output-only";
+
+export const WEBGPU_RUNTIME_PROBE_MODES = Object.freeze([
+  WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+]);
+
+const WEBGPU_RUNTIME_PROBE_SET = new Set(WEBGPU_RUNTIME_PROBE_MODES);
+
+export function normalizeWebGpuRuntimeProbe(value) {
+  return WEBGPU_RUNTIME_PROBE_SET.has(value)
+    ? value
+    : WEBGPU_RUNTIME_PROBE_FULL;
+}

@@ -21,6 +21,13 @@ import {
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "./webgpuTileResolveShader.js";
+import {
+  normalizeWebGpuRuntimeProbe,
+  WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+  WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
+  WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+} from "./webgpuRuntimeProbe.js";
 
 const BACKGROUND_RGB = [16, 19, 22];
 const WEBGPU_DEVICE_INIT_DELAY_MS = 500;
@@ -38,6 +45,7 @@ export default function WebGpuTileViewport({
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const runtimeRef = useRef(null);
+  const runtimeProbe = useMemo(readWebGpuRuntimeProbe, []);
   const [frame, setFrame] = useState({
     status: "pending",
     reason: "webgpu-runtime-initializing",
@@ -244,6 +252,7 @@ export default function WebGpuTileViewport({
           runtime,
           canvas,
           tileSmoke,
+          runtimeProbe,
           setFrame,
           setStorage,
           setCompute,
@@ -323,7 +332,7 @@ export default function WebGpuTileViewport({
         runtimeRef.current = null;
       }
     };
-  }, []);
+  }, [runtimeProbe]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
@@ -333,6 +342,7 @@ export default function WebGpuTileViewport({
       runtime,
       canvas,
       tileSmoke,
+      runtimeProbe,
       setFrame,
       setStorage,
       setCompute,
@@ -340,7 +350,7 @@ export default function WebGpuTileViewport({
       setAccumulation,
       setQueue,
     });
-  }, [tileSmoke]);
+  }, [runtimeProbe, tileSmoke]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -430,6 +440,7 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
       data-webgpu-resolve-source={frame.source}
+      data-webgpu-runtime-probe={runtimeProbe}
       data-webgpu-device-lost-status={deviceLost.status}
       data-webgpu-device-lost-reason={deviceLost.reason}
       data-webgpu-device-lost-message={deviceLost.message}
@@ -482,6 +493,13 @@ export default function WebGpuTileViewport({
   );
 }
 
+function readWebGpuRuntimeProbe() {
+  if (typeof window === "undefined") return WEBGPU_RUNTIME_PROBE_FULL;
+  return normalizeWebGpuRuntimeProbe(
+    new URLSearchParams(window.location.search).get("webgpu-probe"),
+  );
+}
+
 async function requestWebGpuTileDevice(adapter) {
   const supportedStorageBuffersPerStage =
     adapter.limits?.maxStorageBuffersPerShaderStage ?? 0;
@@ -503,6 +521,7 @@ function renderFrame({
   runtime,
   canvas,
   tileSmoke,
+  runtimeProbe,
   setFrame,
   setStorage,
   setCompute,
@@ -519,6 +538,19 @@ function renderFrame({
     computePipeline,
     pixelComputePipeline,
   } = runtime;
+  const probe = normalizeWebGpuRuntimeProbe(runtimeProbe);
+  const runAccumulation =
+    probe === WEBGPU_RUNTIME_PROBE_FULL ||
+    probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY;
+  const runResolve =
+    probe === WEBGPU_RUNTIME_PROBE_FULL ||
+    probe === WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY;
+  const runPixel =
+    probe === WEBGPU_RUNTIME_PROBE_FULL ||
+    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY;
+  const runDisplay =
+    probe === WEBGPU_RUNTIME_PROBE_FULL ||
+    probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY;
   resizeCanvasToDisplaySize(canvas);
   context.configure({ device, format, alphaMode: "opaque" });
   destroyTransientBuffers(runtime);
@@ -580,95 +612,117 @@ function renderFrame({
   }
 
   try {
-    const accumulationMetaBuffer = createAccumulationMetaBuffer(device, tileSmoke);
-    const computeMetaBuffer = createComputeMetaBuffer(device, tileSmoke);
-    const pixelMetaBuffer = createPixelMetaBuffer(device, tileSmoke);
-    const resolveMetaBuffer = createResolveMetaBuffer(device, tileSmoke);
-    runtime.transientBuffers = [
+    const transientBuffers = [];
+    const accumulationMetaBuffer = runAccumulation
+      ? createAccumulationMetaBuffer(device, tileSmoke)
+      : null;
+    const computeMetaBuffer = runResolve ? createComputeMetaBuffer(device, tileSmoke) : null;
+    const pixelMetaBuffer = runPixel ? createPixelMetaBuffer(device, tileSmoke) : null;
+    const resolveMetaBuffer = runDisplay ? createResolveMetaBuffer(device, tileSmoke) : null;
+    for (const buffer of [
       accumulationMetaBuffer,
       computeMetaBuffer,
       pixelMetaBuffer,
       resolveMetaBuffer,
-    ];
-    const accumulationBindGroup = device.createBindGroup({
-      layout: accumulationPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("positionRadius").buffer } },
-        { binding: 1, resource: { buffer: storageBundle.getBuffer("colorOpacity").buffer } },
-        { binding: 2, resource: { buffer: storageBundle.getBuffer("objectIndices").buffer } },
-        { binding: 3, resource: { buffer: storageBundle.getBuffer("objectState").buffer } },
-        { binding: 4, resource: { buffer: storageBundle.getBuffer("tileCounts").buffer } },
-        { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
-        { binding: 6, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
-        { binding: 7, resource: { buffer: accumulationMetaBuffer } },
-        { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
-        { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
-      ],
-    });
-    const computeBindGroup = device.createBindGroup({
-      layout: computePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
-        { binding: 1, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
-        { binding: 2, resource: { buffer: computeMetaBuffer } },
-      ],
-    });
-    const pixelBindGroup = device.createBindGroup({
-      layout: pixelComputePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("positionRadius").buffer } },
-        { binding: 1, resource: { buffer: storageBundle.getBuffer("colorOpacity").buffer } },
-        { binding: 2, resource: { buffer: storageBundle.getBuffer("objectIndices").buffer } },
-        { binding: 3, resource: { buffer: storageBundle.getBuffer("objectState").buffer } },
-        { binding: 4, resource: { buffer: storageBundle.getBuffer("tileCounts").buffer } },
-        { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
-        { binding: 6, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
-        { binding: 7, resource: { buffer: pixelMetaBuffer } },
-        { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
-        { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
-      ],
-    });
-    const bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
-        { binding: 1, resource: { buffer: resolveMetaBuffer } },
-      ],
-    });
+    ]) {
+      if (buffer) transientBuffers.push(buffer);
+    }
+    runtime.transientBuffers = transientBuffers;
+    const accumulationBindGroup = runAccumulation
+      ? device.createBindGroup({
+          layout: accumulationPipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: storageBundle.getBuffer("positionRadius").buffer } },
+            { binding: 1, resource: { buffer: storageBundle.getBuffer("colorOpacity").buffer } },
+            { binding: 2, resource: { buffer: storageBundle.getBuffer("objectIndices").buffer } },
+            { binding: 3, resource: { buffer: storageBundle.getBuffer("objectState").buffer } },
+            { binding: 4, resource: { buffer: storageBundle.getBuffer("tileCounts").buffer } },
+            { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
+            { binding: 6, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
+            { binding: 7, resource: { buffer: accumulationMetaBuffer } },
+            { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
+            { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
+          ],
+        })
+      : null;
+    const computeBindGroup = runResolve
+      ? device.createBindGroup({
+          layout: computePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: storageBundle.getBuffer("tileAccumulation").buffer } },
+            { binding: 1, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
+            { binding: 2, resource: { buffer: computeMetaBuffer } },
+          ],
+        })
+      : null;
+    const pixelBindGroup = runPixel
+      ? device.createBindGroup({
+          layout: pixelComputePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: storageBundle.getBuffer("positionRadius").buffer } },
+            { binding: 1, resource: { buffer: storageBundle.getBuffer("colorOpacity").buffer } },
+            { binding: 2, resource: { buffer: storageBundle.getBuffer("objectIndices").buffer } },
+            { binding: 3, resource: { buffer: storageBundle.getBuffer("objectState").buffer } },
+            { binding: 4, resource: { buffer: storageBundle.getBuffer("tileCounts").buffer } },
+            { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
+            { binding: 6, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
+            { binding: 7, resource: { buffer: pixelMetaBuffer } },
+            { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
+            { binding: 9, resource: { buffer: storageBundle.getBuffer("tileOffsets").buffer } },
+          ],
+        })
+      : null;
+    const bindGroup = runDisplay
+      ? device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
+            { binding: 1, resource: { buffer: resolveMetaBuffer } },
+          ],
+        })
+      : null;
     const encoder = device.createCommandEncoder();
-    const computePass = encoder.beginComputePass();
     const accumulationWorkgroups = webGpuAccumulationWorkgroups(tileSmoke);
     const workgroups = webGpuComputeWorkgroups(tileSmoke);
     const pixelWorkgroups = webGpuPixelResolveWorkgroups(tileSmoke);
-    computePass.setPipeline(accumulationPipeline);
-    computePass.setBindGroup(0, accumulationBindGroup);
-    computePass.dispatchWorkgroups(accumulationWorkgroups);
-    computePass.setPipeline(computePipeline);
-    computePass.setBindGroup(0, computeBindGroup);
-    computePass.dispatchWorkgroups(workgroups);
-    computePass.setPipeline(pixelComputePipeline);
-    computePass.setBindGroup(0, pixelBindGroup);
-    computePass.dispatchWorkgroups(pixelWorkgroups);
+    const computePass = encoder.beginComputePass();
+    if (runAccumulation) {
+      computePass.setPipeline(accumulationPipeline);
+      computePass.setBindGroup(0, accumulationBindGroup);
+      computePass.dispatchWorkgroups(accumulationWorkgroups);
+    }
+    if (runResolve) {
+      computePass.setPipeline(computePipeline);
+      computePass.setBindGroup(0, computeBindGroup);
+      computePass.dispatchWorkgroups(workgroups);
+    }
+    if (runPixel) {
+      computePass.setPipeline(pixelComputePipeline);
+      computePass.setBindGroup(0, pixelBindGroup);
+      computePass.dispatchWorkgroups(pixelWorkgroups);
+    }
     computePass.end();
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: context.getCurrentTexture().createView(),
-          clearValue: {
-            r: BACKGROUND_RGB[0] / 255,
-            g: BACKGROUND_RGB[1] / 255,
-            b: BACKGROUND_RGB[2] / 255,
-            a: 1,
+    if (runDisplay) {
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: context.getCurrentTexture().createView(),
+            clearValue: {
+              r: BACKGROUND_RGB[0] / 255,
+              g: BACKGROUND_RGB[1] / 255,
+              b: BACKGROUND_RGB[2] / 255,
+              a: 1,
+            },
+            loadOp: "clear",
+            storeOp: "store",
           },
-          loadOp: "clear",
-          storeOp: "store",
-        },
-      ],
-    });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.draw(3);
-    pass.end();
+        ],
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(3);
+      pass.end();
+    }
     device.queue.submit([encoder.finish()]);
     setQueue({
       status: "submitted",
@@ -689,31 +743,28 @@ function renderFrame({
           message: error?.message || String(error || ""),
         }),
     );
-    setAccumulation({
-      status: "dispatched",
-      reason: "webgpu-tile-accumulation-dispatched",
+    setAccumulation(stageTelemetry({
+      active: runAccumulation,
+      activeReason: "webgpu-tile-accumulation-dispatched",
+      skippedReason: "webgpu-runtime-probe-skipped",
       source: WEBGPU_TILE_ACCUMULATION_SOURCE,
       workgroups: accumulationWorkgroups,
-    });
-    setCompute({
-      status: "dispatched",
-      reason: "webgpu-compute-resolve-dispatched",
+    }));
+    setCompute(stageTelemetry({
+      active: runResolve,
+      activeReason: "webgpu-compute-resolve-dispatched",
+      skippedReason: "webgpu-runtime-probe-skipped",
       source: WEBGPU_TILE_COMPUTE_SOURCE,
       workgroups,
-    });
-    setPixel({
-      status: "dispatched",
-      reason: "webgpu-pixel-accumulation-dispatched",
+    }));
+    setPixel(stageTelemetry({
+      active: runPixel,
+      activeReason: "webgpu-pixel-accumulation-dispatched",
+      skippedReason: "webgpu-runtime-probe-skipped",
       source: WEBGPU_PIXEL_RESOLVE_SOURCE,
       workgroups: pixelWorkgroups,
-    });
-    setFrame({
-      status: "rendered",
-      reason: "webgpu-pixel-storage-resolve-rendered",
-      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
-      pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
-      source: WEBGPU_TILE_RESOLVE_SOURCE,
-    });
+    }));
+    setFrame(frameTelemetry({ probe, tileSmoke, runDisplay }));
   } catch (error) {
     setAccumulation({
       status: "failed",
@@ -746,6 +797,68 @@ function renderFrame({
       message: "",
     });
   }
+}
+
+function stageTelemetry({
+  active,
+  activeReason,
+  skippedReason,
+  source,
+  workgroups,
+}) {
+  return active
+    ? {
+        status: "dispatched",
+        reason: activeReason,
+        source,
+        workgroups,
+      }
+    : {
+        status: "skipped",
+        reason: skippedReason,
+        source: "",
+        workgroups: 0,
+      };
+}
+
+function frameTelemetry({ probe, tileSmoke, runDisplay }) {
+  if (runDisplay) {
+    return {
+      status: "rendered",
+      reason:
+        probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY
+          ? "webgpu-pixel-output-only-probe-rendered"
+          : "webgpu-pixel-storage-resolve-rendered",
+      checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
+      pixels: tileSmoke.pixelResolvedCount || tileSmoke.resolvedTileCount,
+      source: WEBGPU_TILE_RESOLVE_SOURCE,
+    };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY) {
+    return {
+      status: "probed",
+      reason: "webgpu-accumulation-only-probe-submitted",
+      checksum: tileSmoke.resolveChecksum,
+      pixels: tileSmoke.resolvedTileCount,
+      source: WEBGPU_TILE_ACCUMULATION_SOURCE,
+    };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY) {
+    return {
+      status: "probed",
+      reason: "webgpu-resolve-only-probe-submitted",
+      checksum: tileSmoke.resolveChecksum,
+      pixels: tileSmoke.resolvedTileCount,
+      source: WEBGPU_TILE_COMPUTE_SOURCE,
+    };
+  }
+  return {
+    status: "probed",
+    reason: "webgpu-runtime-probe-submitted",
+    checksum: tileSmoke.resolveChecksum,
+    pixels: tileSmoke.resolvedTileCount,
+    source: "",
+  };
 }
 
 function createAccumulationMetaBuffer(device, tileSmoke) {
