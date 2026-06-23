@@ -475,6 +475,75 @@ def test_object_field_emergence_report_cli_writes_html(tmp_path, capsys):
     assert "<svg" in html_text
 
 
+def test_object_field_emergence_benchmark_cli_runs_manifest_suite(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "camera_cloud.ply"
+    field_path = tmp_path / "field.npz"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    manifest_path = tmp_path / "benchmark.json"
+    output_dir = tmp_path / "benchmark-output"
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.zeros((cloud.count, 2), dtype=np.float32)))
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "kind": "object_emergence_benchmark",
+                "title": "Test Benchmark",
+                "root": ".",
+                "defaults": {
+                    "iterations": 10,
+                    "learning_rate": 1.0,
+                    "eval_every": 10,
+                    "render_size": 32,
+                },
+                "thresholds": {
+                    "require_projection_loss_decrease": True,
+                    "min_points": 2,
+                    "min_render_occlusion_effect_score": 0.001,
+                },
+                "scenes": [
+                    {
+                        "id": "camera-scene",
+                        "label": "Camera scene",
+                        "input": input_path.name,
+                        "field": field_path.name,
+                        "masks": masks_path.name,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "object-field",
+                "emergence-benchmark",
+                str(manifest_path),
+                "--output-dir",
+                str(output_dir),
+                "--strict",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary_path = output_dir / "summary.json"
+    report_path = output_dir / "report.html"
+    curve_path = output_dir / "camera-scene" / "curve.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "passed=true" in output
+    assert "scene=camera-scene passed=true" in output
+    assert summary["passed"] is True
+    assert summary["scenes"][0]["passed"] is True
+    assert summary["scenes"][0]["checks"]
+    assert report_path.exists()
+    assert curve_path.exists()
+
+
 def test_object_field_inspects_nerf_dataset(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)

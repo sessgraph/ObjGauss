@@ -8,6 +8,7 @@ import numpy as np
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
+from objgauss.emergence_benchmark import run_emergence_benchmark
 from objgauss.emergence import (
     object_emergence_curve,
     object_emergence_metrics,
@@ -371,6 +372,29 @@ def _object_field_emergence_report(args: argparse.Namespace) -> None:
     print(f"curves={summary['curves']}")
     print(f"charts={summary['charts']}")
     print(f"metrics={','.join(summary['metrics'])}")
+
+
+def _object_field_emergence_benchmark(args: argparse.Namespace) -> None:
+    summary = run_emergence_benchmark(
+        args.manifest,
+        output_dir=args.output_dir,
+        report_path=args.report,
+        summary_path=args.summary,
+        strict=args.strict,
+    )
+    print(f"benchmark={args.manifest}")
+    print(f"output_dir={summary['output_dir']}")
+    print(f"summary={summary['summary_path']}")
+    print(f"report={summary['report']['output']}")
+    print(f"scenes={len(summary['scenes'])}")
+    print(f"passed={str(summary['passed']).lower()}")
+    for scene in summary["scenes"]:
+        print(
+            f"scene={scene['id']} passed={str(scene['passed']).lower()} "
+            f"points={scene['points']} "
+            f"projection_loss={scene['initial_projection_loss']:.6f}->{scene['final_projection_loss']:.6f} "
+            f"render_occlusion_effect={scene['final_render_occlusion_effect_score']:.6f}"
+        )
 
 
 def _object_field_inspect_nerf(args: argparse.Namespace) -> None:
@@ -882,6 +906,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default="Object Emergence Benchmark",
     )
     field_emergence_report.set_defaults(handler=_object_field_emergence_report)
+
+    field_emergence_benchmark = object_field_subparsers.add_parser(
+        "emergence-benchmark",
+        help="run a manifest-defined emergence curve benchmark suite",
+    )
+    field_emergence_benchmark.add_argument("manifest", type=Path)
+    field_emergence_benchmark.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs/benchmarks/semantic-smoke"),
+    )
+    field_emergence_benchmark.add_argument("--report", type=Path)
+    field_emergence_benchmark.add_argument("--summary", type=Path)
+    field_emergence_benchmark.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit with an error if any manifest threshold check fails",
+    )
+    field_emergence_benchmark.set_defaults(handler=_object_field_emergence_benchmark)
 
     field_nerf = object_field_subparsers.add_parser(
         "inspect-nerf",

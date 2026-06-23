@@ -1,0 +1,40 @@
+{
+  "kind": "object_emergence_benchmark",
+  "title": "ObjGauss Semantic Smoke Benchmark",
+  "root": "../..",
+  "defaults": {
+    "iterations": 40,
+    "learning_rate": 1.0,
+    "eval_every": 20,
+    "render_size": 96
+  },
+  "thresholds": {
+    "require_projection_loss_decrease": true,
+    "min_points": 3,
+    "min_render_occlusion_effect_score": 0.01
+  },
+  "scenes": [
+    {
+      "id": "plush-semantic",
+      "label": "Plush semantic",
+      "input": "outputs/assets/converted/plush.ply",
+      "field": "outputs/demos/plush-semantic-closure/object_field_initial.npz",
+      "masks": "outputs/demos/plush-semantic-closure/mask-manifest.json"
+    },
+    {
+      "id": "lego-alpha-proxy",
+      "label": "Lego alpha proxy",
+      "input": "outputs/demos/lego-alpha-closure/lego_proxy_raw.ply",
+      "field": "outputs/demos/lego-alpha-closure/object_field_initial.npz",
+      "masks": "outputs/demos/lego-alpha-closure/mask-manifest.json",
+      "max_frames": 4
+    },
+    {
+      "id": "lego-splatfacto-smoke",
+      "label": "Lego Splatfacto smoke",
+      "input": "outputs/training/nerf-lego-splatfacto-smoke/export-smoke-cuda/splat.ply",
+      "field": "outputs/training/nerf-lego-splatfacto-smoke/object-field-sam/object_field_initial.npz",
+      "masks": "outputs/masks/nerf-lego-sam/mask-manifest.json"
+    }
+  ]
+}

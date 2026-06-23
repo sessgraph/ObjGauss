@@ -23,6 +23,31 @@
 
 ## Done
 
+### SEMANTIC-006: Reproducible emergence benchmark suite
+
+- 状态: done
+- 类型: 标准 PR
+- 目标: 将 SEMANTIC-005 的本地 smoke report 固化为 manifest 驱动的一键 benchmark suite，包含固定 scene、输出目录、summary、HTML report 和阈值检查。
+- 实施:
+  - 新增 `objgauss.emergence_benchmark`，读取 `object_emergence_benchmark` manifest，批量运行 emergence curves。
+  - 新增 `objgauss object-field emergence-benchmark` CLI，输出 per-scene `curve.json` / `curve.csv`、顶层 `summary.json` 和 `report.html`。
+  - 支持 manifest `defaults`、全局 / scene-specific `thresholds`、scene `max_frames`，以及 `--strict` 失败即报错。
+  - 新增 `docs/benchmarks/semantic-smoke.json`，固定 Plush semantic、Lego alpha proxy、Lego Splatfacto smoke 三个本地 smoke scene。
+- 范围外:
+  - 不提交 `/tmp` 或 `outputs/` benchmark 产物。
+  - 不生成缺失的 demo / training outputs；当前 suite 依赖本地已有 ignored outputs。
+  - 不替换 point-splat render probe 为 covariance-aware 3DGS / gsplat renderer。
+- 验收:
+  - 一条命令可从 manifest 重新生成三场景 curve JSON/CSV、summary JSON 和 HTML report。
+  - `--strict` 会检查 projection loss decrease、最小 points 和最小 render occlusion effect。
+  - Summary 可机器判断每个 scene 和整体 suite 是否 passed。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "emergence_benchmark or emergence_report or emergence_curve"`: 4 passed。
+  - `uv run objgauss object-field emergence-benchmark docs/benchmarks/semantic-smoke.json --output-dir /tmp/objgauss-semantic-smoke-suite --strict`: passed=true，scenes=3；Plush semantic loss 1.386294 -> 1.346402，Lego alpha proxy loss 1.386294 -> 0.235765，Lego Splatfacto smoke loss 4.384474 -> 0.339695。
+  - `uv run --extra dev pytest`: 30 passed。
+  - `npm run build`: 通过，仍有 bundle size warning。
+- 完成 commit: pending。
+
 ### SEMANTIC-005: Emergence benchmark report artifact
 
 - 状态: done
