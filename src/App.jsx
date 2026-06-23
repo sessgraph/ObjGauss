@@ -33,6 +33,7 @@ import {
 import {
   buildWebGpuTileSmoke,
   normalizeWebGpuCameraTuning,
+  normalizeWebGpuColorTuning,
   normalizeWebGpuCoverageTuning,
   normalizeWebGpuDepthSortTuning,
 } from "./webgpuTileSmoke.js";
@@ -111,10 +112,13 @@ export default function App() {
   const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
   const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
   const webGpuCameraTuning = useMemo(readWebGpuCameraTuning, []);
+  const webGpuColorTuning = useMemo(readWebGpuColorTuning, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
         points: scene.points,
+        shRestCoefficients: scene.shRestCoefficients,
+        shRestCoefficientCount: scene.shRestCoefficientCount,
         visibleIds,
         removedIds,
         isolatedId,
@@ -124,9 +128,12 @@ export default function App() {
         coverageTuning: webGpuCoverageTuning,
         depthSortTuning: webGpuDepthSortTuning,
         cameraTuning: webGpuCameraTuning,
+        colorTuning: webGpuColorTuning,
       }),
     [
       scene.points,
+      scene.shRestCoefficients,
+      scene.shRestCoefficientCount,
       visibleIds,
       removedIds,
       isolatedId,
@@ -136,6 +143,7 @@ export default function App() {
       webGpuCoverageTuning,
       webGpuDepthSortTuning,
       webGpuCameraTuning,
+      webGpuColorTuning,
     ],
   );
   const editRenderer = useMemo(
@@ -180,6 +188,8 @@ export default function App() {
     if (!useWebGpuTileRenderer) return webGpuTileSmoke;
     return buildWebGpuTileSmoke({
       points: scene.points,
+      shRestCoefficients: scene.shRestCoefficients,
+      shRestCoefficientCount: scene.shRestCoefficientCount,
       visibleIds,
       removedIds,
       isolatedId,
@@ -195,9 +205,12 @@ export default function App() {
       coverageTuning: webGpuCoverageTuning,
       depthSortTuning: webGpuDepthSortTuning,
       cameraTuning: webGpuCameraTuning,
+      colorTuning: webGpuColorTuning,
     });
   }, [
     scene.points,
+    scene.shRestCoefficients,
+    scene.shRestCoefficientCount,
     visibleIds,
     removedIds,
     isolatedId,
@@ -210,6 +223,7 @@ export default function App() {
     webGpuCoverageTuning,
     webGpuDepthSortTuning,
     webGpuCameraTuning,
+    webGpuColorTuning,
   ]);
   const activeEditRenderer = useMemo(
     () =>
@@ -269,6 +283,9 @@ export default function App() {
       applyScene({
         name: asset.fileName ?? asset.name,
         points: cloud.points,
+        shRestCoefficients: cloud.shRestCoefficients,
+        shRestCoefficientCount: cloud.shRestCoefficientCount,
+        shDegree: cloud.shDegree,
         splatSource: {
           url: asset.splatPath ?? asset.localPath,
           fileName: asset.fileName ?? asset.name,
@@ -913,6 +930,16 @@ function readWebGpuCameraTuning() {
   const params = new URLSearchParams(window.location.search);
   return normalizeWebGpuCameraTuning({
     cameraMode: params.get("webgpu-camera-mode"),
+  });
+}
+
+function readWebGpuColorTuning() {
+  if (typeof window === "undefined") {
+    return normalizeWebGpuColorTuning();
+  }
+  const params = new URLSearchParams(window.location.search);
+  return normalizeWebGpuColorTuning({
+    colorMode: params.get("webgpu-color-mode"),
   });
 }
 

@@ -26,6 +26,10 @@ export const WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE = "spark-framed-perspective
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
 export const WEBGPU_TILE_SCREEN_COVARIANCE_MODE = "camera-jacobian-covariance-v1";
 export const WEBGPU_TILE_COLOR_FIDELITY_MODE = "source-color-fidelity-v1";
+export const WEBGPU_COLOR_TUNING_MODE = "runtime-color-tuning-v1";
+export const WEBGPU_COLOR_MODE_SOURCE = "source";
+export const WEBGPU_COLOR_MODE_SH_VIEW = "sh-view";
+export const WEBGPU_COLOR_MODE_DEFAULT = WEBGPU_COLOR_MODE_SOURCE;
 export const WEBGPU_PIXEL_DEPTH_SORT_MODE_DEPTH_BINNED = "depth-binned-alpha-composite-v1";
 export const WEBGPU_PIXEL_DEPTH_SORT_MODE_FRONT_TOP_K = "front-top-k-alpha-composite-v1";
 export const WEBGPU_PIXEL_DEPTH_SORT_MODE = WEBGPU_PIXEL_DEPTH_SORT_MODE_DEPTH_BINNED;
@@ -64,6 +68,24 @@ const TILE_SAMPLE_OFFSETS = Object.freeze([
   [-0.25, 0.25],
   [0.25, 0.25],
 ]);
+const SH_C0 = 0.28209479177387814;
+const SH_C1 = 0.4886025119029199;
+const SH_C2 = Object.freeze([
+  1.0925484305920792,
+  -1.0925484305920792,
+  0.31539156525252005,
+  -1.0925484305920792,
+  0.5462742152960396,
+]);
+const SH_C3 = Object.freeze([
+  -0.5900435899266435,
+  2.890611442640554,
+  -0.4570457994644658,
+  0.3731763325901154,
+  -0.4570457994644658,
+  1.445305721320277,
+  -0.5900435899266435,
+]);
 
 export function buildWebGpuTileSmoke({
   points,
@@ -78,16 +100,20 @@ export function buildWebGpuTileSmoke({
   tileSize = WEBGPU_TILE_SIZE,
   maxEntriesPerTile = WEBGPU_TILE_MAX_ENTRIES,
   tileEntryLayout = WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
+  shRestCoefficients = null,
+  shRestCoefficientCount = 0,
   includeTileEntries = false,
   includePixelOutput = false,
   computePixelReference = includePixelOutput,
   coverageTuning = null,
   depthSortTuning = null,
   cameraTuning = null,
+  colorTuning = null,
 }) {
   const resolvedCoverageTuning = normalizeWebGpuCoverageTuning(coverageTuning);
   const resolvedDepthSortTuning = normalizeWebGpuDepthSortTuning(depthSortTuning);
   const resolvedCameraTuning = normalizeWebGpuCameraTuning(cameraTuning);
+  const resolvedColorTuning = normalizeWebGpuColorTuning(colorTuning);
   const pixelDepthBinCount = resolvedDepthSortTuning.pixelDepthBinCount;
   const pixelDepthAlphaMode = resolvedDepthSortTuning.pixelDepthAlphaMode;
   const pixelDepthSortMode = pixelDepthSortModeForAlphaMode(pixelDepthAlphaMode);
@@ -135,6 +161,7 @@ export function buildWebGpuTileSmoke({
   let shRestGaussians = 0;
   let shRestCoefficientMax = 0;
   let shDegreeMax = 0;
+  let shViewColorGaussians = 0;
   let opacitySum = 0;
 
   points.forEach((point, index) => {
@@ -169,11 +196,23 @@ export function buildWebGpuTileSmoke({
     } else {
       fallbackColorGaussians += 1;
     }
-    const shRestCoefficientCount = pointShRestCoefficientCount(point);
-    if (shRestCoefficientCount > 0) {
+    const pointShRestCount = pointShRestCoefficientCount(point);
+    if (pointShRestCount > 0) {
       shRestGaussians += 1;
-      shRestCoefficientMax = Math.max(shRestCoefficientMax, shRestCoefficientCount);
-      shDegreeMax = Math.max(shDegreeMax, pointShDegree(point, shRestCoefficientCount));
+      shRestCoefficientMax = Math.max(shRestCoefficientMax, pointShRestCount);
+      shDegreeMax = Math.max(shDegreeMax, pointShDegree(point, pointShRestCount));
+    }
+    const renderColor = pointRenderColor({
+      point,
+      index,
+      renderMode,
+      colorTuning: resolvedColorTuning,
+      shRestCoefficients,
+      shRestCoefficientCount,
+      cameraProjection: bounds.cameraProjection,
+    });
+    if (renderColor.mode === WEBGPU_COLOR_MODE_SH_VIEW) {
+      shViewColorGaussians += 1;
     }
     opacitySum += clampNumber(point.opacity ?? 1, 0, 1);
     const radiusPixels = pointRadiusPixels({
@@ -190,6 +229,7 @@ export function buildWebGpuTileSmoke({
       screen,
       screenCovariance,
       renderMode,
+      rgb: renderColor.rgb,
       positionRadius,
       colorOpacity,
       scaleRotation,
@@ -332,6 +372,8 @@ export function buildWebGpuTileSmoke({
     pixelCoverageTuningMode: WEBGPU_COVERAGE_TUNING_MODE,
     screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
     colorFidelityMode: WEBGPU_TILE_COLOR_FIDELITY_MODE,
+    colorTuningMode: WEBGPU_COLOR_TUNING_MODE,
+    colorMode: resolvedColorTuning.colorMode,
     colorSourceRgbGaussians: rgbColorGaussians,
     colorSourceShDcGaussians: shDcColorGaussians,
     colorSourceFallbackGaussians: fallbackColorGaussians,
@@ -339,6 +381,7 @@ export function buildWebGpuTileSmoke({
     colorShRestGaussians: shRestGaussians,
     colorShRestCoefficientMax: shRestCoefficientMax,
     colorShDegreeMax: shDegreeMax,
+    colorShViewGaussians: shViewColorGaussians,
     colorOpacityMean: points.length > 0 ? opacitySum / points.length : 0,
     screenCovarianceGaussians,
     screenCovarianceFallbackGaussians,
@@ -414,6 +457,18 @@ export function normalizeWebGpuCoverageTuning(tuning = null) {
       1.5,
       8,
     ),
+  };
+}
+
+export function normalizeWebGpuColorTuning(tuning = null) {
+  const requested = String(tuning?.colorMode ?? WEBGPU_COLOR_MODE_DEFAULT);
+  const colorMode =
+    requested === WEBGPU_COLOR_MODE_SH_VIEW
+      ? WEBGPU_COLOR_MODE_SH_VIEW
+      : WEBGPU_COLOR_MODE_SOURCE;
+  return {
+    mode: WEBGPU_COLOR_TUNING_MODE,
+    colorMode,
   };
 }
 
@@ -1261,7 +1316,7 @@ function packGaussian({
   radiusPixels,
   screen,
   screenCovariance,
-  renderMode,
+  rgb,
   positionRadius,
   colorOpacity,
   scaleRotation,
@@ -1273,7 +1328,6 @@ function packGaussian({
   positionRadius[vec4Offset + 2] = screen.depth;
   positionRadius[vec4Offset + 3] = radiusPixels;
 
-  const rgb = renderMode === "original" ? point.color : point.objectColor;
   colorOpacity[vec4Offset] = rgb[0] / 255;
   colorOpacity[vec4Offset + 1] = rgb[1] / 255;
   colorOpacity[vec4Offset + 2] = rgb[2] / 255;
@@ -1290,6 +1344,116 @@ function renderColorSource(point, renderMode) {
   if (renderMode !== "original") return "object-palette";
   const source = String(point.colorSource ?? "fallback");
   return ["rgb", "sh-dc", "fallback"].includes(source) ? source : "fallback";
+}
+
+function pointRenderColor({
+  point,
+  index,
+  renderMode,
+  colorTuning,
+  shRestCoefficients,
+  shRestCoefficientCount,
+  cameraProjection,
+}) {
+  if (renderMode !== "original") {
+    return { rgb: point.objectColor, mode: "object-palette" };
+  }
+  if (
+    colorTuning?.colorMode === WEBGPU_COLOR_MODE_SH_VIEW &&
+    pointCanUseShViewColor({
+      point,
+      index,
+      shRestCoefficients,
+      shRestCoefficientCount,
+    })
+  ) {
+    return {
+      rgb: shViewColor({
+        point,
+        index,
+        shRestCoefficients,
+        shRestCoefficientCount,
+        cameraProjection,
+      }),
+      mode: WEBGPU_COLOR_MODE_SH_VIEW,
+    };
+  }
+  return { rgb: point.color, mode: WEBGPU_COLOR_MODE_SOURCE };
+}
+
+function pointCanUseShViewColor({ point, index, shRestCoefficients, shRestCoefficientCount }) {
+  if (!Array.isArray(point.shDc) || point.shDc.length < 3) return false;
+  const coefficientCount = pointShRestCoefficientCount(point);
+  if (coefficientCount <= 0 || shRestCoefficientCount <= 0) return false;
+  if (!shRestCoefficients || typeof shRestCoefficients.length !== "number") return false;
+  const offset = index * shRestCoefficientCount;
+  return offset >= 0 && offset + Math.min(coefficientCount, shRestCoefficientCount) <= shRestCoefficients.length;
+}
+
+function shViewColor({ point, index, shRestCoefficients, shRestCoefficientCount, cameraProjection }) {
+  const direction = normalize3(subtract3(pointRenderWorld(point), cameraProjection.eye));
+  return [0, 1, 2].map((channel) =>
+    shChannelToRgb(
+      evaluateShChannel({
+        dc: Number(point.shDc[channel] ?? 0),
+        rest: shRestCoefficients,
+        restOffset: index * shRestCoefficientCount,
+        restCount: Math.min(pointShRestCoefficientCount(point), shRestCoefficientCount),
+        channel,
+        direction,
+      }),
+    ),
+  );
+}
+
+function evaluateShChannel({ dc, rest, restOffset, restCount, channel, direction }) {
+  const x = direction[0];
+  const y = direction[1];
+  const z = direction[2];
+  let value = SH_C0 * dc;
+  if (restCount >= 9) {
+    value +=
+      -SH_C1 * y * shRestCoefficient(rest, restOffset, restCount, 1, channel) +
+      SH_C1 * z * shRestCoefficient(rest, restOffset, restCount, 2, channel) +
+      -SH_C1 * x * shRestCoefficient(rest, restOffset, restCount, 3, channel);
+  }
+  if (restCount >= 24) {
+    value +=
+      SH_C2[0] * x * y * shRestCoefficient(rest, restOffset, restCount, 4, channel) +
+      SH_C2[1] * y * z * shRestCoefficient(rest, restOffset, restCount, 5, channel) +
+      SH_C2[2] * (2 * z * z - x * x - y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 6, channel) +
+      SH_C2[3] * x * z * shRestCoefficient(rest, restOffset, restCount, 7, channel) +
+      SH_C2[4] * (x * x - y * y) * shRestCoefficient(rest, restOffset, restCount, 8, channel);
+  }
+  if (restCount >= 45) {
+    value +=
+      SH_C3[0] * y * (3 * x * x - y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 9, channel) +
+      SH_C3[1] * x * y * z * shRestCoefficient(rest, restOffset, restCount, 10, channel) +
+      SH_C3[2] * y * (4 * z * z - x * x - y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 11, channel) +
+      SH_C3[3] * z * (2 * z * z - 3 * x * x - 3 * y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 12, channel) +
+      SH_C3[4] * x * (4 * z * z - x * x - y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 13, channel) +
+      SH_C3[5] * z * (x * x - y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 14, channel) +
+      SH_C3[6] * x * (x * x - 3 * y * y) *
+        shRestCoefficient(rest, restOffset, restCount, 15, channel);
+  }
+  return value;
+}
+
+function shRestCoefficient(rest, restOffset, restCount, basisIndex, channel) {
+  const coefficientIndex = (basisIndex - 1) * 3 + channel;
+  if (coefficientIndex < 0 || coefficientIndex >= restCount) return 0;
+  const value = Number(rest[restOffset + coefficientIndex] ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function shChannelToRgb(value) {
+  return Math.round(clampNumber(value + 0.5, 0, 1) * 255);
 }
 
 function pointShRestCoefficientCount(point) {

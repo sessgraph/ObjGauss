@@ -27,6 +27,9 @@ export async function parsePlyFile(file) {
   return {
     name: file.name,
     points: cloud.points,
+    shRestCoefficients: cloud.shRestCoefficients,
+    shRestCoefficientCount: cloud.shRestCoefficientCount,
+    shDegree: cloud.shDegree,
     splatSource: {
       fileBytes: buffer.slice(0),
       fileName: file.name,
@@ -40,12 +43,12 @@ export function parsePly(buffer) {
     throw new Error("PLY 缺少 x/y/z 顶点属性");
   }
 
-  const points =
+  const cloud =
     header.format === "ascii"
       ? parseAscii(buffer, header)
       : parseBinary(buffer, header);
 
-  return { points };
+  return cloud;
 }
 
 function readHeader(buffer) {
@@ -119,22 +122,39 @@ function readHeader(buffer) {
 function parseAscii(buffer, header) {
   const text = new TextDecoder("utf-8").decode(buffer.slice(header.headerEnd));
   const lines = text.trim().split(/\r?\n/);
+  const vertexCount = Math.min(header.vertexCount, lines.length);
+  const shRest = shRestPropertyLayout(header.properties);
+  const shRestCoefficients =
+    shRest.coefficientCount > 0
+      ? new Float32Array(vertexCount * shRest.coefficientCount)
+      : null;
   const points = [];
 
-  for (let row = 0; row < Math.min(header.vertexCount, lines.length); row += 1) {
+  for (let row = 0; row < vertexCount; row += 1) {
     const values = lines[row].trim().split(/\s+/);
     const vertex = {};
     header.properties.forEach((property, index) => {
       vertex[property.name] = Number(values[index]);
     });
-    points.push(vertexToPoint(vertex));
+    packShRestCoefficients({ vertex, row, shRest, shRestCoefficients });
+    points.push(vertexToPoint(vertex, shRest.coefficientCount));
   }
-  return points;
+  return {
+    points,
+    shRestCoefficients,
+    shRestCoefficientCount: shRest.coefficientCount,
+    shDegree: shDegreeFromRestCoefficientCount(shRest.coefficientCount),
+  };
 }
 
 function parseBinary(buffer, header) {
   const view = new DataView(buffer);
   const littleEndian = header.format === "binary_little_endian";
+  const shRest = shRestPropertyLayout(header.properties);
+  const shRestCoefficients =
+    shRest.coefficientCount > 0
+      ? new Float32Array(header.vertexCount * shRest.coefficientCount)
+      : null;
   const stride = header.properties.reduce((total, property) => {
     const info = TYPE_INFO[property.type];
     if (!info) throw new Error(`不支持的 PLY 属性类型: ${property.type}`);
@@ -150,16 +170,22 @@ function parseBinary(buffer, header) {
       vertex[property.name] = view[info.getter](offset, littleEndian);
       offset += info.size;
     }
-    points.push(vertexToPoint(vertex));
+    packShRestCoefficients({ vertex, row, shRest, shRestCoefficients });
+    points.push(vertexToPoint(vertex, shRest.coefficientCount));
   }
 
   if (offset > header.headerEnd + stride * header.vertexCount) {
     throw new Error("PLY binary 解析越界");
   }
-  return points;
+  return {
+    points,
+    shRestCoefficients,
+    shRestCoefficientCount: shRest.coefficientCount,
+    shDegree: shDegreeFromRestCoefficientCount(shRest.coefficientCount),
+  };
 }
 
-function vertexToPoint(vertex) {
+function vertexToPoint(vertex, shRestCoefficientCount = null) {
   const objectId =
     vertex.object_id !== undefined
       ? Math.trunc(vertex.object_id)
@@ -170,7 +196,7 @@ function vertexToPoint(vertex) {
   const original = originalColor(vertex);
   const scale3 = gaussianScale3(vertex);
   const rotationQuaternion = gaussianRotationQuaternion(vertex);
-  const shRest = shRestMetadata(vertex);
+  const shRest = shRestMetadata(vertex, shRestCoefficientCount);
   return {
     x: Number(vertex.x ?? 0),
     y: Number(vertex.y ?? 0),
@@ -183,6 +209,7 @@ function vertexToPoint(vertex) {
     objectId,
     color: original.rgb,
     colorSource: original.source,
+    shDc: original.shDc,
     shRestCoefficientCount: shRest.coefficientCount,
     shDegree: shRest.degree,
     objectColor: colorForObject(objectId),
@@ -190,6 +217,7 @@ function vertexToPoint(vertex) {
 }
 
 function originalColor(vertex) {
+  const shDc = shDcCoefficients(vertex);
   if (
     vertex.red !== undefined &&
     vertex.green !== undefined &&
@@ -202,25 +230,31 @@ function originalColor(vertex) {
         normalizeRgb(vertex.blue),
       ],
       source: "rgb",
+      shDc,
     };
   }
 
-  if (
-    vertex.f_dc_0 !== undefined &&
-    vertex.f_dc_1 !== undefined &&
-    vertex.f_dc_2 !== undefined
-  ) {
+  if (shDc) {
     return {
-      rgb: [
-        shToRgb(vertex.f_dc_0),
-        shToRgb(vertex.f_dc_1),
-        shToRgb(vertex.f_dc_2),
-      ],
+      rgb: [shToRgb(shDc[0]), shToRgb(shDc[1]), shToRgb(shDc[2])],
       source: "sh-dc",
+      shDc,
     };
   }
 
-  return { rgb: [198, 207, 217], source: "fallback" };
+  return { rgb: [198, 207, 217], source: "fallback", shDc: null };
+}
+
+function shDcCoefficients(vertex) {
+  if (
+    vertex.f_dc_0 === undefined ||
+    vertex.f_dc_1 === undefined ||
+    vertex.f_dc_2 === undefined
+  ) {
+    return null;
+  }
+  const shDc = [Number(vertex.f_dc_0), Number(vertex.f_dc_1), Number(vertex.f_dc_2)];
+  return shDc.every(Number.isFinite) ? shDc : null;
 }
 
 function normalizeRgb(value) {
@@ -234,7 +268,14 @@ function shToRgb(value) {
   return Math.round(clamp(value * SH_C0 + 0.5, 0, 1) * 255);
 }
 
-function shRestMetadata(vertex) {
+function shRestMetadata(vertex, shRestCoefficientCount = null) {
+  if (Number.isFinite(shRestCoefficientCount) && shRestCoefficientCount >= 0) {
+    const coefficientCount = Math.trunc(shRestCoefficientCount);
+    return {
+      coefficientCount,
+      degree: shDegreeFromRestCoefficientCount(coefficientCount),
+    };
+  }
   let coefficientCount = 0;
   for (const [name, value] of Object.entries(vertex)) {
     if (!name.startsWith("f_rest_")) continue;
@@ -248,6 +289,37 @@ function shRestMetadata(vertex) {
     coefficientCount,
     degree: shDegreeFromRestCoefficientCount(coefficientCount),
   };
+}
+
+function shRestPropertyLayout(properties) {
+  const restProperties = properties
+    .map((property) => ({
+      ...property,
+      restIndex: shRestPropertyIndex(property.name),
+    }))
+    .filter((property) => property.restIndex !== null)
+    .sort((left, right) => left.restIndex - right.restIndex);
+
+  return {
+    properties: restProperties,
+    coefficientCount: restProperties.length,
+  };
+}
+
+function shRestPropertyIndex(name) {
+  if (!name.startsWith("f_rest_")) return null;
+  const index = Number(name.slice(7));
+  if (!Number.isInteger(index) || index < 0) return null;
+  return index;
+}
+
+function packShRestCoefficients({ vertex, row, shRest, shRestCoefficients }) {
+  if (!shRestCoefficients || shRest.coefficientCount <= 0) return;
+  const rowOffset = row * shRest.coefficientCount;
+  shRest.properties.forEach((property, column) => {
+    const value = Number(vertex[property.name] ?? 0);
+    shRestCoefficients[rowOffset + column] = Number.isFinite(value) ? value : 0;
+  });
 }
 
 function shDegreeFromRestCoefficientCount(count) {

@@ -25,6 +25,9 @@ import {
   WEBGPU_CAMERA_MODE_EDIT_FIXED,
   WEBGPU_CAMERA_MODE_SPARK_FRAME,
   WEBGPU_CAMERA_TUNING_MODE,
+  WEBGPU_COLOR_MODE_SH_VIEW,
+  WEBGPU_COLOR_MODE_SOURCE,
+  WEBGPU_COLOR_TUNING_MODE,
   WEBGPU_COVERAGE_TUNING_MODE,
   WEBGPU_DEPTH_ALPHA_MODE_DEPTH_BINNED,
   WEBGPU_DEPTH_ALPHA_MODE_FRONT_TOP_K,
@@ -102,8 +105,13 @@ const parsedShRestPly = parsePly(
   ).buffer,
 );
 assert.equal(parsedShRestPly.points[0].colorSource, "sh-dc");
+assert.deepEqual(parsedShRestPly.points[0].shDc, [0.1, 0.2, 0.3]);
 assert.equal(parsedShRestPly.points[0].shRestCoefficientCount, 9);
 assert.equal(parsedShRestPly.points[0].shDegree, 1);
+assert.equal(parsedShRestPly.shRestCoefficientCount, 9);
+assert.equal(parsedShRestPly.shDegree, 1);
+assert.equal(parsedShRestPly.shRestCoefficients.length, 9);
+assert.ok(Math.abs(parsedShRestPly.shRestCoefficients[8] - 0.08) < 0.000001);
 
 assert.deepEqual(WEBGPU_RUNTIME_PROBE_MODES, [
   WEBGPU_RUNTIME_PROBE_FULL,
@@ -237,6 +245,8 @@ assert.ok(Number.isFinite(base.projectionDepthMax));
 assert.ok(base.projectionDepthMax > base.projectionDepthMin);
 assert.ok(base.projectionDepthSpan > 0);
 assert.equal(base.colorFidelityMode, WEBGPU_TILE_COLOR_FIDELITY_MODE);
+assert.equal(base.colorTuningMode, WEBGPU_COLOR_TUNING_MODE);
+assert.equal(base.colorMode, WEBGPU_COLOR_MODE_SOURCE);
 assert.equal(base.colorSourceRgbGaussians, base.packedGaussians);
 assert.equal(base.colorSourceShDcGaussians, 0);
 assert.equal(base.colorSourceFallbackGaussians, 0);
@@ -244,6 +254,7 @@ assert.equal(base.colorSourceObjectGaussians, 0);
 assert.equal(base.colorShRestGaussians, 0);
 assert.equal(base.colorShRestCoefficientMax, 0);
 assert.equal(base.colorShDegreeMax, 0);
+assert.equal(base.colorShViewGaussians, 0);
 assert.ok(base.colorOpacityMean > 0);
 assert.ok(base.colorOpacityMean <= 1);
 assert.equal(base.screenCovarianceMode, WEBGPU_TILE_SCREEN_COVARIANCE_MODE);
@@ -258,24 +269,52 @@ const shRestScenePoints = scene.points.map((point, index) =>
     ? {
         ...point,
         colorSource: "sh-dc",
+        shDc: [0.1, 0.2, 0.3],
+        color: [135, 142, 149],
         shRestCoefficientCount: 45,
         shDegree: 3,
       }
     : point,
 );
+const shRestCoefficients = new Float32Array(scene.points.length * 45);
+for (let index = 0; index < 45; index += 1) {
+  shRestCoefficients[index] = index % 3 === 0 ? 0.08 : index % 3 === 1 ? -0.04 : 0.02;
+}
 const shRestMetadata = buildWebGpuTileSmoke({
   points: shRestScenePoints,
+  shRestCoefficients,
+  shRestCoefficientCount: 45,
   visibleIds: allObjectIds,
   removedIds: new Set(),
   isolatedId: null,
   renderMode: "original",
   pointSize: 0.018,
 });
+assert.equal(shRestMetadata.colorMode, WEBGPU_COLOR_MODE_SOURCE);
 assert.equal(shRestMetadata.colorSourceRgbGaussians, base.packedGaussians - 1);
 assert.equal(shRestMetadata.colorSourceShDcGaussians, 1);
 assert.equal(shRestMetadata.colorShRestGaussians, 1);
 assert.equal(shRestMetadata.colorShRestCoefficientMax, 45);
 assert.equal(shRestMetadata.colorShDegreeMax, 3);
+assert.equal(shRestMetadata.colorShViewGaussians, 0);
+
+const shViewMetadata = buildWebGpuTileSmoke({
+  points: shRestScenePoints,
+  shRestCoefficients,
+  shRestCoefficientCount: 45,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  colorTuning: { colorMode: WEBGPU_COLOR_MODE_SH_VIEW },
+});
+assert.equal(shViewMetadata.colorMode, WEBGPU_COLOR_MODE_SH_VIEW);
+assert.equal(shViewMetadata.colorShViewGaussians, 1);
+assert.notDeepEqual(
+  Array.from(shViewMetadata.buffers.colorOpacity.slice(0, 3)),
+  Array.from(shRestMetadata.buffers.colorOpacity.slice(0, 3)),
+);
 
 const sparkFrameCamera = buildWebGpuTileSmoke({
   points: scene.points,
@@ -736,6 +775,7 @@ console.log(
     `depthWeight=${base.depthWeightMode}:${base.projectionDepthSpan.toFixed(3)} ` +
     `pixelDepthSort=${base.pixelDepthSortMode}:${base.pixelDepthTuningMode}:${base.pixelDepthAlphaMode}:${base.pixelDepthGateStrength}/${base.pixelDepthGateFloor}:${base.pixelDepthBinCount} ` +
     `pixelCoverage=${base.pixelCoverageMode}:${base.pixelCoverageTuningMode}:${base.pixelCoverageWeightFloor}:${base.pixelCoverageFootprintScale} ` +
+    `colorTuning=${base.colorTuningMode}:${base.colorMode}:${base.colorShViewGaussians} ` +
     `colorFidelity=${base.colorFidelityMode}:${base.colorSourceRgbGaussians}/${base.colorSourceShDcGaussians}/${base.colorSourceFallbackGaussians}/${base.colorSourceObjectGaussians}:${base.colorOpacityMean.toFixed(3)} ` +
     `shRest=${base.colorShRestGaussians}/${base.colorShRestCoefficientMax}/${base.colorShDegreeMax} ` +
     `screenCovariance=${base.screenCovarianceMode}:${base.screenCovarianceGaussians}/${base.screenCovarianceFallbackGaussians}/${base.screenCovarianceClampedGaussians}:${base.screenCovarianceMaxAnisotropy}:${base.screenCovarianceSigmaMean.toFixed(3)} ` +

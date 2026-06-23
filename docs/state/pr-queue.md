@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-U`: 基于 SH-rest presence audit 已证明 trained Lego 带完整 degree-3 SH 的事实，增加可切换的 `sh-view-color` 诊断模式，或评估 Spark renderer object filter 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+  - `RENDER-005T-V`: 基于 SH-view 已显著降低 trained Lego luma/chroma residual、但 coverage ratio 仍约 `31x` 的事实，继续治理编辑 renderer 的 footprint / alpha / presentation 膨胀，或评估把 object filter 接入 Spark renderer 的可行性；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,35 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-U: WebGPU SH-view color diagnostic
+
+- 状态: done / sh-view-color-audited
+- 类型: 标准 PR / 前端渲染质量诊断
+- 目标: 在 SH-rest presence audit 已证明 trained Lego 带完整 degree-3 SH 后，增加可切换的 view-dependent SH 颜色诊断模式，判断“原始颜色（编辑预览）不像 Spark”的颜色残差是否来自未使用 SH rest。
+- 已实施:
+  - 前端 PLY parser 在 RGB 原始色存在时仍保留 raw `f_dc`，并把 `f_rest_*` 打包成 scene 级 typed array，避免把 255k+ Gaussian 的完整 SH rest 塞进每个 point 对象。
+  - WebGPU Tile 新增 `runtime-color-tuning-v1`，支持 URL / audit 参数 `webgpu-color-mode=source|sh-view`；默认保持 `source`。
+  - `sh-view` 只在 `原始颜色（编辑预览）` 生效，对象调试色仍使用 object palette，避免把 object interaction 审计和 SH 颜色诊断混在一起。
+  - `WebGpuTileViewport` / `PointCloudViewport` 暴露 color tuning telemetry；`audit-demo` 校验删除预览切回自身颜色后 `shViewAfterDelete` 生效。
+  - `audit:webgpu-tile-smoke` 新增合成 SH-view buffer 差异检查，确保 source 默认不变、SH-view 可改变 packed color buffer。
+- 结论:
+  - source baseline headed audit：`colorTuning=runtime-color-tuning-v1:source:0`，删除预览后 `colorAfterDelete=255794/0/0/0`、`shViewAfterDelete=0`。
+  - `sh-view` headed audit：删除预览后 `shViewAfterDelete=255794`，说明 trained Lego 的全部 Gaussian 都走了 degree-3 SH view-dependent color。
+  - `sh-view` 将 trained Lego 的 luma/chroma residual 从 source 的 `0.090165/0.071164` 降到 `0.034507/0.055774`，证明颜色差距中 SH 是真实主因之一。
+  - 但 coverage ratio 仍从 source 的 `31.102403` 到 `31.205176`，没有解决颗粒感 / 膨胀感；下一步应转向 footprint / alpha / presentation 或 Spark object filter feasibility。
+- 验证:
+  - `node --check src/ply.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check src/webgpuCapability.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local --port 5287 --probes full`: passed，headed desktop WebGPU source baseline。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-trained-output-local --port 5288 --probes full --webgpu-color-mode sh-view`: passed，headed desktop WebGPU SH-view diagnostic。
 
 ### RENDER-005T-T: WebGPU SH-rest presence audit
 

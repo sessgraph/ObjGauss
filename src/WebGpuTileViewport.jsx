@@ -525,6 +525,8 @@ export default function WebGpuTileViewport({
       data-webgpu-projection-depth-max={rendererContract?.projectionDepthMax ?? 0}
       data-webgpu-projection-depth-span={rendererContract?.projectionDepthSpan ?? 0}
       data-webgpu-color-fidelity-mode={rendererContract?.colorFidelityMode ?? ""}
+      data-webgpu-color-tuning-mode={rendererContract?.colorTuningMode ?? ""}
+      data-webgpu-color-mode={rendererContract?.colorMode ?? ""}
       data-webgpu-color-source-rgb-gaussians={rendererContract?.colorSourceRgbGaussians ?? 0}
       data-webgpu-color-source-sh-dc-gaussians={rendererContract?.colorSourceShDcGaussians ?? 0}
       data-webgpu-color-source-fallback-gaussians={rendererContract?.colorSourceFallbackGaussians ?? 0}
@@ -532,6 +534,7 @@ export default function WebGpuTileViewport({
       data-webgpu-color-sh-rest-gaussians={rendererContract?.colorShRestGaussians ?? 0}
       data-webgpu-color-sh-rest-coefficient-max={rendererContract?.colorShRestCoefficientMax ?? 0}
       data-webgpu-color-sh-degree-max={rendererContract?.colorShDegreeMax ?? 0}
+      data-webgpu-color-sh-view-gaussians={rendererContract?.colorShViewGaussians ?? 0}
       data-webgpu-color-opacity-mean={rendererContract?.colorOpacityMean ?? 0}
       data-webgpu-screen-covariance-mode={rendererContract?.screenCovarianceMode ?? ""}
       data-webgpu-screen-covariance-gaussians={rendererContract?.screenCovarianceGaussians ?? 0}

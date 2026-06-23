@@ -24,6 +24,12 @@ import {
   WEBGPU_TILE_ALPHA_PRESENTATION_MODE,
 } from "../src/webgpuTileResolveShader.js";
 import {
+  normalizeWebGpuColorTuning,
+  WEBGPU_COLOR_MODE_SOURCE,
+  WEBGPU_COLOR_MODE_SH_VIEW,
+  WEBGPU_COLOR_TUNING_MODE,
+} from "../src/webgpuTileSmoke.js";
+import {
   normalizeWebGpuRuntimeProbe,
   WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
   WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
@@ -111,6 +117,12 @@ const auditOptions = {
       args["webgpu-camera-mode"] ??
       process.env.OBJGAUSS_WEBGPU_CAMERA_MODE,
   }),
+  webGpuColorTuning: normalizeWebGpuColorTuning({
+    colorMode:
+      args.webGpuColorMode ??
+      args["webgpu-color-mode"] ??
+      process.env.OBJGAUSS_WEBGPU_COLOR_MODE,
+  }),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
   ),
@@ -139,9 +151,11 @@ try {
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
         `pixelDepthSort=${JSON.stringify(result.webGpuPixelDepthSortMode)}:${JSON.stringify(result.webGpuPixelDepthTuningMode)}:${JSON.stringify(result.webGpuPixelDepthAlphaMode)}:${result.webGpuPixelDepthGateStrength}/${result.webGpuPixelDepthGateFloor}:${result.webGpuPixelDepthBinCount} ` +
         `pixelCoverage=${JSON.stringify(result.webGpuPixelCoverageMode)}:${JSON.stringify(result.webGpuPixelCoverageTuningMode)}:${result.webGpuPixelCoverageWeightFloor}:${result.webGpuPixelCoverageFootprintScale} ` +
+        `colorTuning=${JSON.stringify(result.webGpuColorTuningMode)}:${JSON.stringify(result.webGpuColorMode)}:${result.webGpuColorShViewGaussians} ` +
         `colorFidelity=${JSON.stringify(result.webGpuColorFidelityMode)}:${result.webGpuColorSourceRgbGaussians}/${result.webGpuColorSourceShDcGaussians}/${result.webGpuColorSourceFallbackGaussians}/${result.webGpuColorSourceObjectGaussians}:${result.webGpuColorOpacityMean} ` +
         `shRest=${result.webGpuColorShRestGaussians}/${result.webGpuColorShRestCoefficientMax}/${result.webGpuColorShDegreeMax} ` +
         `colorAfterDelete=${result.webGpuColorSourceRgbGaussiansAfterDelete}/${result.webGpuColorSourceShDcGaussiansAfterDelete}/${result.webGpuColorSourceFallbackGaussiansAfterDelete}/${result.webGpuColorSourceObjectGaussiansAfterDelete} ` +
+        `shViewAfterDelete=${result.webGpuColorShViewGaussiansAfterDelete} ` +
         `screenCovariance=${JSON.stringify(result.webGpuScreenCovarianceMode)}:${result.webGpuScreenCovarianceGaussians}/${result.webGpuScreenCovarianceFallbackGaussians}/${result.webGpuScreenCovarianceClampedGaussians}:${result.webGpuScreenCovarianceMaxAnisotropy}:${result.webGpuScreenCovarianceSigmaMean} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
@@ -401,6 +415,8 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuProjectionDepthMax = Number(await viewport.getAttribute("data-webgpu-projection-depth-max") ?? "0");
       const webGpuProjectionDepthSpan = Number(await viewport.getAttribute("data-webgpu-projection-depth-span") ?? "0");
       const webGpuColorFidelityMode = await viewport.getAttribute("data-webgpu-color-fidelity-mode");
+      const webGpuColorTuningMode = await viewport.getAttribute("data-webgpu-color-tuning-mode");
+      const webGpuColorMode = await viewport.getAttribute("data-webgpu-color-mode");
       const webGpuColorSourceRgbGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
       const webGpuColorSourceShDcGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
       const webGpuColorSourceFallbackGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
@@ -408,6 +424,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuColorShRestGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-sh-rest-gaussians") ?? "0");
       const webGpuColorShRestCoefficientMax = numericValue(await viewport.getAttribute("data-webgpu-color-sh-rest-coefficient-max") ?? "0");
       const webGpuColorShDegreeMax = numericValue(await viewport.getAttribute("data-webgpu-color-sh-degree-max") ?? "0");
+      const webGpuColorShViewGaussians = numericValue(await viewport.getAttribute("data-webgpu-color-sh-view-gaussians") ?? "0");
       const webGpuColorOpacityMean = Number(await viewport.getAttribute("data-webgpu-color-opacity-mean") ?? "0");
       const webGpuScreenCovarianceMode = await viewport.getAttribute("data-webgpu-screen-covariance-mode");
       const webGpuScreenCovarianceGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-gaussians") ?? "0");
@@ -581,6 +598,22 @@ async function runAudit(url, assetsToCheck, options) {
         ) {
           throw new Error(
             `${asset.id} WebGPU footprint scale did not match requested tuning: requested=${options.webGpuFootprintScale} actual=${webGpuPixelCoverageFootprintScale}`,
+          );
+        }
+        if (
+          webGpuColorTuningMode !== WEBGPU_COLOR_TUNING_MODE ||
+          webGpuColorMode !== options.webGpuColorTuning.colorMode ||
+          ![WEBGPU_COLOR_MODE_SOURCE, WEBGPU_COLOR_MODE_SH_VIEW].includes(webGpuColorMode ?? "") ||
+          webGpuColorShViewGaussians < 0 ||
+          webGpuColorShViewGaussians > packedGaussians ||
+          (webGpuColorMode === WEBGPU_COLOR_MODE_SOURCE && webGpuColorShViewGaussians !== 0) ||
+          (webGpuColorMode === WEBGPU_COLOR_MODE_SH_VIEW &&
+            webGpuColorSourceObjectGaussians === 0 &&
+            webGpuColorShRestGaussians > 0 &&
+            webGpuColorShViewGaussians <= 0)
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU color tuning contract is invalid: requested=${options.webGpuColorTuning.colorMode} actual=${webGpuColorTuningMode}:${webGpuColorMode}:${webGpuColorShViewGaussians} shRest=${webGpuColorShRestGaussians}`,
           );
         }
         if (
@@ -882,14 +915,18 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuColorSourceShDcGaussians,
             webGpuColorSourceFallbackGaussians,
             webGpuColorSourceObjectGaussians,
+            webGpuColorTuningMode,
+            webGpuColorMode,
             webGpuColorShRestGaussians,
             webGpuColorShRestCoefficientMax,
             webGpuColorShDegreeMax,
+            webGpuColorShViewGaussians,
             webGpuColorOpacityMean,
             webGpuColorSourceRgbGaussiansAfterDelete: "probe-skipped",
             webGpuColorSourceShDcGaussiansAfterDelete: "probe-skipped",
             webGpuColorSourceFallbackGaussiansAfterDelete: "probe-skipped",
             webGpuColorSourceObjectGaussiansAfterDelete: "probe-skipped",
+            webGpuColorShViewGaussiansAfterDelete: "probe-skipped",
             webGpuScreenCovarianceMode,
             webGpuScreenCovarianceGaussians,
             webGpuScreenCovarianceFallbackGaussians,
@@ -1038,6 +1075,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuColorSourceShDcGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-sh-dc-gaussians") ?? "0");
       const webGpuColorSourceFallbackGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-fallback-gaussians") ?? "0");
       const webGpuColorSourceObjectGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-source-object-gaussians") ?? "0");
+      const webGpuColorShViewGaussiansAfterDelete = numericValue(await viewport.getAttribute("data-webgpu-color-sh-view-gaussians") ?? "0");
       if (deletedObjects !== "1") {
         throw new Error(`${asset.id} delete preview did not update: ${deletedObjects}`);
       }
@@ -1056,6 +1094,23 @@ async function runAudit(url, assetsToCheck, options) {
       ) {
         throw new Error(
           `${asset.id} delete preview did not return to source original colors: rgb=${webGpuColorSourceRgbGaussiansAfterDelete} shDc=${webGpuColorSourceShDcGaussiansAfterDelete} fallback=${webGpuColorSourceFallbackGaussiansAfterDelete} object=${webGpuColorSourceObjectGaussiansAfterDelete}`,
+        );
+      }
+      if (
+        webGpuColorMode === WEBGPU_COLOR_MODE_SOURCE &&
+        webGpuColorShViewGaussiansAfterDelete !== 0
+      ) {
+        throw new Error(
+          `${asset.id} source color mode unexpectedly used SH-view after delete: shView=${webGpuColorShViewGaussiansAfterDelete}`,
+        );
+      }
+      if (
+        webGpuColorMode === WEBGPU_COLOR_MODE_SH_VIEW &&
+        webGpuColorShRestGaussians > 0 &&
+        webGpuColorShViewGaussiansAfterDelete <= 0
+      ) {
+        throw new Error(
+          `${asset.id} SH-view color mode did not affect source colors after delete: shView=${webGpuColorShViewGaussiansAfterDelete} shRest=${webGpuColorShRestGaussians}`,
         );
       }
       if (
@@ -1129,14 +1184,18 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuColorSourceShDcGaussians,
         webGpuColorSourceFallbackGaussians,
         webGpuColorSourceObjectGaussians,
+        webGpuColorTuningMode,
+        webGpuColorMode,
         webGpuColorShRestGaussians,
         webGpuColorShRestCoefficientMax,
         webGpuColorShDegreeMax,
+        webGpuColorShViewGaussians,
         webGpuColorOpacityMean,
         webGpuColorSourceRgbGaussiansAfterDelete,
         webGpuColorSourceShDcGaussiansAfterDelete,
         webGpuColorSourceFallbackGaussiansAfterDelete,
         webGpuColorSourceObjectGaussiansAfterDelete,
+        webGpuColorShViewGaussiansAfterDelete,
         webGpuScreenCovarianceMode,
         webGpuScreenCovarianceGaussians,
         webGpuScreenCovarianceFallbackGaussians,
@@ -1508,7 +1567,8 @@ function urlWithWebGpuOptions(url, options) {
     !Number.isFinite(options.webGpuCovarianceMaxAnisotropy) &&
     !Number.isFinite(options.webGpuDepthBins) &&
     options.webGpuDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_DEFAULT &&
-    options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED
+    options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED &&
+    options.webGpuColorTuning.colorMode === WEBGPU_COLOR_MODE_SOURCE
   ) {
     return url;
   }
@@ -1533,6 +1593,9 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (options.webGpuCameraTuning.cameraMode !== WEBGPU_CAMERA_MODE_EDIT_FIXED) {
     parsed.searchParams.set("webgpu-camera-mode", options.webGpuCameraTuning.cameraMode);
+  }
+  if (options.webGpuColorTuning.colorMode !== WEBGPU_COLOR_MODE_SOURCE) {
+    parsed.searchParams.set("webgpu-color-mode", options.webGpuColorTuning.colorMode);
   }
   return parsed.toString();
 }

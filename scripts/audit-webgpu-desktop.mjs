@@ -39,6 +39,7 @@ const webGpuDepthAlphaMode = optionalString(
   args.webGpuDepthAlphaMode ?? args["webgpu-depth-alpha-mode"],
 );
 const webGpuCameraMode = optionalString(args.webGpuCameraMode ?? args["webgpu-camera-mode"]);
+const webGpuColorMode = optionalString(args.webGpuColorMode ?? args["webgpu-color-mode"]);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 let server = null;
 
@@ -69,6 +70,7 @@ try {
       webGpuDepthBins,
       webGpuDepthAlphaMode,
       webGpuCameraMode,
+      webGpuColorMode,
     });
     results.push(result);
     process.stdout.write(result.output);
@@ -92,6 +94,7 @@ try {
       `webGpuDepthBins=${webGpuDepthBins ?? "default"} ` +
       `webGpuDepthAlphaMode=${JSON.stringify(webGpuDepthAlphaMode ?? "default")} ` +
       `webGpuCameraMode=${JSON.stringify(webGpuCameraMode ?? "default")} ` +
+      `webGpuColorMode=${JSON.stringify(webGpuColorMode ?? "default")} ` +
       `classification=${JSON.stringify(classification)}`,
   );
   if (failed.length > 0 && !allowFailures) {
@@ -117,6 +120,7 @@ async function runProbe({
   webGpuDepthBins,
   webGpuDepthAlphaMode,
   webGpuCameraMode,
+  webGpuColorMode,
 }) {
   const commandArgs = [
     "scripts/audit-demo.mjs",
@@ -154,6 +158,9 @@ async function runProbe({
   }
   if (webGpuCameraMode) {
     commandArgs.push("--webgpu-camera-mode", webGpuCameraMode);
+  }
+  if (webGpuColorMode) {
+    commandArgs.push("--webgpu-color-mode", webGpuColorMode);
   }
 
   const result = await runProcess(process.execPath, commandArgs);
