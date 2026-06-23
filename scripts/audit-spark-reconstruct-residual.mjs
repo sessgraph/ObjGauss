@@ -21,6 +21,7 @@ const DEFAULT_THRESHOLDS = {
   maxChromaDelta: 0.08,
 };
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
+const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -82,7 +83,7 @@ try {
         `filteredGaussians=${result.filteredGaussians} ` +
         `colorSourceGaussians=${result.colorSourceGaussians} ` +
         `packed=${result.packedBaseGaussians}/${result.packedVisibleIndices}:${result.packedBaseBuildMs}/${result.packedExtractMs} ` +
-        `shRest=${result.shRestSourceGaussians}:${result.shRestPreserved} ` +
+        `shRest=${result.shRestSourceGaussians}:${result.shRestPreservedGaussians}:${result.shRestPreserved}:${result.shRestCoefficientCount}:${result.shDegree} ` +
         `screenshot=${JSON.stringify(result.screenshotPath)}`,
     );
   }
@@ -164,10 +165,20 @@ async function auditAsset({ asset, baseUrl, headed, thresholds: gateThresholds }
     const packedBaseBuildMs = finiteNumericValue(await viewport.getAttribute("data-spark-packed-base-build-ms") ?? "0");
     const packedExtractMs = finiteNumericValue(await viewport.getAttribute("data-spark-packed-extract-ms") ?? "0");
     const shRestSourceGaussians = numericValue(await viewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0");
+    const shRestPreservedGaussians = numericValue(
+      await viewport.getAttribute("data-spark-sh-rest-preserved-gaussians") ?? "0",
+    );
     const shRestPreserved = await viewport.getAttribute("data-spark-sh-rest-preserved");
+    const shRestCoefficientCount = numericValue(
+      await viewport.getAttribute("data-spark-sh-rest-coefficients") ?? "0",
+    );
+    const shDegree = numericValue(await viewport.getAttribute("data-spark-sh-degree") ?? "0");
+    const expectedSparkRoute =
+      shRestSourceGaussians > 0 ? SPARK_RECONSTRUCT_SH_SOURCE : SPARK_RECONSTRUCT_SOURCE;
+    const expectedShPreserved = shRestSourceGaussians > 0 ? "true" : "false";
     if (
       objectFilter !== "spark-ply-reconstruct" ||
-      reconstructSource !== SPARK_RECONSTRUCT_SOURCE ||
+      reconstructSource !== expectedSparkRoute ||
       visibleGaussians <= 0 ||
       filteredGaussians !== 0 ||
       colorSourceGaussians !== visibleGaussians ||
@@ -176,10 +187,14 @@ async function auditAsset({ asset, baseUrl, headed, thresholds: gateThresholds }
       packedVisibleIndices !== visibleGaussians ||
       !Number.isFinite(packedBaseBuildMs) ||
       !Number.isFinite(packedExtractMs) ||
-      shRestPreserved !== "false"
+      shRestPreserved !== expectedShPreserved ||
+      (shRestSourceGaussians > 0 &&
+        (shRestPreservedGaussians !== shRestSourceGaussians ||
+          shRestCoefficientCount <= 0 ||
+          shDegree <= 0))
     ) {
       throw new Error(
-        `${asset.id} Spark PLY reconstruct contract failed: filter=${objectFilter} route=${reconstructSource} visible=${visibleGaussians} filtered=${filteredGaussians} color=${colorSourceGaussians}/${colorObjectGaussians} packed=${packedBaseGaussians}/${packedVisibleIndices}:${packedBaseBuildMs}/${packedExtractMs} shRest=${shRestSourceGaussians}:${shRestPreserved}`,
+        `${asset.id} Spark PLY reconstruct contract failed: filter=${objectFilter} route=${reconstructSource}/${expectedSparkRoute} visible=${visibleGaussians} filtered=${filteredGaussians} color=${colorSourceGaussians}/${colorObjectGaussians} packed=${packedBaseGaussians}/${packedVisibleIndices}:${packedBaseBuildMs}/${packedExtractMs} shRest=${shRestSourceGaussians}:${shRestPreservedGaussians}:${shRestPreserved}:${shRestCoefficientCount}:${shDegree}`,
       );
     }
 
@@ -216,7 +231,10 @@ async function auditAsset({ asset, baseUrl, headed, thresholds: gateThresholds }
       packedBaseBuildMs,
       packedExtractMs,
       shRestSourceGaussians,
+      shRestPreservedGaussians,
       shRestPreserved,
+      shRestCoefficientCount,
+      shDegree,
       screenshotPath,
     };
   } finally {
@@ -278,12 +296,12 @@ function markdownReport(summary) {
     "",
     `Mode: \`${summary.mode}\``,
     "",
-    "| Asset | Gate | Coverage Ratio | Luma Delta | Chroma Delta | Object Filter | Route | Visible | Extract ms | SH Rest Preserved |",
+    "| Asset | Gate | Coverage Ratio | Luma Delta | Chroma Delta | Object Filter | Route | Visible | Extract ms | SH Rest |",
     "| --- | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | --- |",
   ];
   for (const result of summary.results) {
     lines.push(
-      `| ${result.assetId} | ${result.passed ? "pass" : "fail"} | ${result.residual.coverageRatio} | ${result.residual.lumaDelta} | ${result.residual.chromaDelta} | ${result.objectFilter} | ${result.reconstructSource} | ${result.visibleGaussians} | ${result.packedExtractMs} | ${result.shRestPreserved} |`,
+      `| ${result.assetId} | ${result.passed ? "pass" : "fail"} | ${result.residual.coverageRatio} | ${result.residual.lumaDelta} | ${result.residual.chromaDelta} | ${result.objectFilter} | ${result.reconstructSource} | ${result.visibleGaussians} | ${result.packedExtractMs} | ${result.shRestSourceGaussians}/${result.shRestPreservedGaussians}/${result.shRestPreserved}/${result.shRestCoefficientCount}/${result.shDegree} |`,
     );
   }
   lines.push(

@@ -2,13 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PackedSplats, SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-
-const PACKED_EXTRACT_ROUTE = "packed-extract-v1";
-const SH_REST_PRESERVED = false;
+import {
+  buildPackedShExtra,
+  extractPackedShExtra,
+  shDcRgb01,
+} from "./sparkPackedSh.js";
 
 export default function SplatViewport({
   source,
   points = null,
+  shRestCoefficients = null,
+  shRestCoefficientCount = 0,
   visibleIds = null,
   removedIds = null,
   isolatedId = null,
@@ -72,8 +76,13 @@ export default function SplatViewport({
 
   const packedCache = useMemo(() => {
     if (!filtered) return null;
-    return buildPackedSplatCache({ points, renderMode });
-  }, [filtered, points, renderMode]);
+    return buildPackedSplatCache({
+      points,
+      renderMode,
+      shRestCoefficients,
+      shRestCoefficientCount,
+    });
+  }, [filtered, points, renderMode, shRestCoefficients, shRestCoefficientCount]);
 
   useEffect(() => {
     return () => {
@@ -175,15 +184,22 @@ export default function SplatViewport({
         removedIds,
         isolatedId,
       });
-      displayPackedSplats = packedCache.packedSplats.extractSplats(visibleIndices, false);
+      displayPackedSplats = extractPackedSplats({
+        packedSplats: packedCache.packedSplats,
+        visibleIndices,
+        preserveExtra: packedCache.shRestPreserved,
+      });
       setPackedStats({
-        route: PACKED_EXTRACT_ROUTE,
+        route: packedCache.route,
         baseGaussians: packedCache.baseGaussians,
         visibleIndices: visibleIndices.length,
         baseBuildMs: packedCache.baseBuildMs,
         extractMs: performance.now() - extractStartedAt,
         shRestSourceGaussians: packedCache.shRestSourceGaussians,
-        shRestPreserved: SH_REST_PRESERVED,
+        shRestPreservedGaussians: packedCache.shRestPreservedGaussians,
+        shRestPreserved: packedCache.shRestPreserved,
+        shRestCoefficientCount: packedCache.shRestCoefficientCount,
+        shDegree: packedCache.shDegree,
       });
     }
 
@@ -257,7 +273,10 @@ export default function SplatViewport({
       data-spark-packed-base-build-ms={formatMillis(packedStats.baseBuildMs)}
       data-spark-packed-extract-ms={formatMillis(packedStats.extractMs)}
       data-spark-sh-rest-source-gaussians={packedStats.shRestSourceGaussians}
+      data-spark-sh-rest-preserved-gaussians={packedStats.shRestPreservedGaussians}
       data-spark-sh-rest-preserved={String(packedStats.shRestPreserved)}
+      data-spark-sh-rest-coefficients={packedStats.shRestCoefficientCount}
+      data-spark-sh-degree={packedStats.shDegree}
       ref={containerRef}
     >
       <div className="viewportHud">
@@ -315,17 +334,30 @@ function buildFilteredSplatStats({
   };
 }
 
-function buildPackedSplatCache({ points, renderMode }) {
+function buildPackedSplatCache({
+  points,
+  renderMode,
+  shRestCoefficients,
+  shRestCoefficientCount,
+}) {
   const startedAt = performance.now();
   const packedSplats = new PackedSplats({ maxSplats: Math.max(1, points?.length ?? 0) });
-  let shRestSourceGaussians = 0;
+  const shRest =
+    renderMode === "original"
+      ? buildPackedShExtra({
+          points,
+          shRestCoefficients,
+          shRestCoefficientCount,
+        })
+      : buildPackedShExtra({
+          points: [],
+          shRestCoefficients: null,
+          shRestCoefficientCount: 0,
+        });
   for (const point of points ?? []) {
-    if (Number(point?.shRestCoefficientCount) > 0) {
-      shRestSourceGaussians += 1;
-    }
     const scale = pointScale3(point);
     const quaternion = pointQuaternion(point);
-    const color = pointColor(point, renderMode);
+    const color = pointColor(point, renderMode, { preferShDc: shRest.preserved });
     packedSplats.pushSplat(
       new THREE.Vector3(Number(point.x) || 0, Number(point.y) || 0, Number(point.z) || 0),
       new THREE.Vector3(scale[0], scale[1], scale[2]),
@@ -334,12 +366,26 @@ function buildPackedSplatCache({ points, renderMode }) {
       color,
     );
   }
+  packedSplats.extra = shRest.extra;
   return {
     packedSplats,
+    route: shRest.route,
     baseGaussians: packedSplats.getNumSplats(),
     baseBuildMs: performance.now() - startedAt,
-    shRestSourceGaussians,
+    shRestSourceGaussians: shRest.sourceGaussians,
+    shRestPreservedGaussians: shRest.preservedGaussians,
+    shRestPreserved: shRest.preserved,
+    shRestCoefficientCount: shRest.coefficientCount,
+    shDegree: shRest.degree,
   };
+}
+
+function extractPackedSplats({ packedSplats, visibleIndices, preserveExtra }) {
+  const extracted = packedSplats.extractSplats(visibleIndices, false);
+  if (preserveExtra) {
+    extracted.extra = extractPackedShExtra(packedSplats.extra, visibleIndices);
+  }
+  return extracted;
 }
 
 function visiblePointIndices({
@@ -390,7 +436,11 @@ function pointQuaternion(point) {
   return new THREE.Quaternion();
 }
 
-function pointColor(point, renderMode) {
+function pointColor(point, renderMode, { preferShDc = false } = {}) {
+  const shDc = renderMode === "original" && preferShDc ? shDcRgb01(point) : null;
+  if (shDc) {
+    return new THREE.Color(shDc[0], shDc[1], shDc[2]);
+  }
   const rgb = renderMode === "original" ? point?.color : point?.objectColor;
   const values = Array.isArray(rgb) && rgb.length >= 3 ? rgb : [198, 207, 217];
   return new THREE.Color(
@@ -418,19 +468,25 @@ function emptyPackedStats() {
     baseBuildMs: 0,
     extractMs: 0,
     shRestSourceGaussians: 0,
+    shRestPreservedGaussians: 0,
     shRestPreserved: false,
+    shRestCoefficientCount: 0,
+    shDegree: 0,
   };
 }
 
 function pendingPackedStats(cache) {
   return {
-    route: cache ? PACKED_EXTRACT_ROUTE : "none",
+    route: cache ? cache.route : "none",
     baseGaussians: cache?.baseGaussians ?? 0,
     visibleIndices: 0,
     baseBuildMs: cache?.baseBuildMs ?? 0,
     extractMs: 0,
     shRestSourceGaussians: cache?.shRestSourceGaussians ?? 0,
-    shRestPreserved: SH_REST_PRESERVED,
+    shRestPreservedGaussians: cache?.shRestPreservedGaussians ?? 0,
+    shRestPreserved: cache?.shRestPreserved ?? false,
+    shRestCoefficientCount: cache?.shRestCoefficientCount ?? 0,
+    shDegree: cache?.shDegree ?? 0,
   };
 }
 

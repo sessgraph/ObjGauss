@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import { parsePly } from "../src/ply.js";
 import { createSampleScene } from "../src/sampleScene.js";
 import {
+  buildPackedShExtra,
+  extractPackedShExtra,
+  shDcRgb01,
+  SPARK_PACKED_EXTRACT_ROUTE,
+  SPARK_PACKED_SH_EXTRACT_ROUTE,
+} from "../src/sparkPackedSh.js";
+import {
   createWebGpuAccumulationMeta,
   createWebGpuComputeMeta,
   createWebGpuPixelResolveMeta,
@@ -115,6 +122,65 @@ assert.equal(parsedShRestPly.shRestCoefficientCount, 9);
 assert.equal(parsedShRestPly.shDegree, 1);
 assert.equal(parsedShRestPly.shRestCoefficients.length, 9);
 assert.ok(Math.abs(parsedShRestPly.shRestCoefficients[8] - 0.08) < 0.000001);
+
+const sparkShPoints = [
+  {
+    shDc: [0.1, 0.2, 0.3],
+    shRestCoefficientCount: 45,
+    shDegree: 3,
+  },
+  {
+    shDc: [0.2, 0.1, 0],
+    shRestCoefficientCount: 0,
+    shDegree: 0,
+  },
+];
+const sparkShRest = new Float32Array(sparkShPoints.length * 45);
+for (let index = 0; index < 45; index += 1) {
+  sparkShRest[index] = index % 2 === 0 ? 0.12 : -0.08;
+}
+const sparkSh = buildPackedShExtra({
+  points: sparkShPoints,
+  shRestCoefficients: sparkShRest,
+  shRestCoefficientCount: 45,
+});
+assert.equal(sparkSh.route, SPARK_PACKED_SH_EXTRACT_ROUTE);
+assert.equal(sparkSh.sourceGaussians, 1);
+assert.equal(sparkSh.preservedGaussians, 1);
+assert.equal(sparkSh.preserved, true);
+assert.equal(sparkSh.coefficientCount, 45);
+assert.equal(sparkSh.degree, 3);
+assert.equal(sparkSh.extra.sh1.length, sparkShPoints.length * 2);
+assert.equal(sparkSh.extra.sh2.length, sparkShPoints.length * 4);
+assert.equal(sparkSh.extra.sh3.length, sparkShPoints.length * 4);
+assert.ok(Array.from(sparkSh.extra.sh1).some((value) => value !== 0));
+assert.ok(Array.from(sparkSh.extra.sh2).some((value) => value !== 0));
+assert.ok(Array.from(sparkSh.extra.sh3).some((value) => value !== 0));
+const extractedSparkSh = extractPackedShExtra(sparkSh.extra, new Uint32Array([0]));
+assert.deepEqual(
+  Array.from(extractedSparkSh.sh1),
+  Array.from(sparkSh.extra.sh1.subarray(0, 2)),
+);
+assert.deepEqual(
+  Array.from(extractedSparkSh.sh2),
+  Array.from(sparkSh.extra.sh2.subarray(0, 4)),
+);
+assert.deepEqual(
+  Array.from(extractedSparkSh.sh3),
+  Array.from(sparkSh.extra.sh3.subarray(0, 4)),
+);
+const sparkNoSh = buildPackedShExtra({
+  points: sparkShPoints,
+  shRestCoefficients: null,
+  shRestCoefficientCount: 0,
+});
+assert.equal(sparkNoSh.route, SPARK_PACKED_EXTRACT_ROUTE);
+assert.equal(sparkNoSh.preserved, false);
+assert.deepEqual(shDcRgb01(sparkShPoints[0]).map((value) => Number(value.toFixed(6))), [
+  0.528209,
+  0.556419,
+  0.584628,
+]);
 
 assert.deepEqual(WEBGPU_RUNTIME_PROBE_MODES, [
   WEBGPU_RUNTIME_PROBE_FULL,

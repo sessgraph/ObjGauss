@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AB`: 给 Spark PLY reconstruction 增加 SH-rest preservation，或把 Spark object filter 从 `PackedSplats.extractSplats` 过渡层推进到原始 `.splat` / packed source 上的 native object mask；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AC`: 为 trained SH-heavy demo 建立 SH-capable full-view source / residual baseline，或把 Spark object filter 从 `PackedSplats.extractSplats` 过渡层推进到原始 packed source 上的 native object mask；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,34 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AB: Spark packed SH-rest preservation
+
+- 状态: done / sh-rest-preserved-audited
+- 类型: 标准 PR / 前端渲染质量与验收
+- 目标: 解释并修复“删除后的自身颜色有颗粒感、不像高斯”的核心数据路径问题：Spark filtered PLY reconstruction 之前只保留 base packed splat，不保留 PLY `f_rest_*` SH rest。
+- 已实施:
+  - 新增 `src/sparkPackedSh.js`，复用 Spark `utils.encodeSh1Rgb/encodeSh2Rgb/encodeSh3Rgb`，按 Spark PLY parser 的 channel-major 到 basis-major 映射把 `f_rest_*` 打包为 `extra.sh1/sh2/sh3`。
+  - `SplatViewport` 在 filtered Spark 路径中接收 scene-level `shRestCoefficients` / `shRestCoefficientCount`，构建 base `PackedSplats.extra`，并在 visible-index extract 后拷贝对应 SH extra。
+  - SH-preserved 路径优先用 `f_dc_*` 作为 Spark base color，避免 object-colored `red/green/blue` debug fields 污染“原始颜色” filtered preview。
+  - Browser contract 区分 `packed-extract-v1` 和 `packed-sh-extract-v1`，并暴露 `data-spark-sh-rest-source-gaussians`、`data-spark-sh-rest-preserved-gaussians`、`data-spark-sh-rest-coefficients`、`data-spark-sh-degree`。
+  - `audit-demo` / `audit-spark-reconstruct-residual` 支持 no-SH asset 继续走旧 route，同时要求 SH-heavy asset preserved count 等于 source count。
+  - `audit:webgpu-tile-smoke` 增加 Spark SH helper smoke，直接验证 degree-3 SH encode 与 extract 后 extra preservation。
+- 结论:
+  - 默认 Lego proxy 仍走 no-SH 兼容路径：`sparkPacked="packed-extract-v1":5696/3909:5.3/4.8`，`sparkShRest=0:0:"false":0:0`。
+  - 本机 trained Lego 删除预览已走 SH-preserved Spark filtered route：`sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7`，`sparkShRest=255794:255794:"true":45:3`。
+  - Trained full reconstruct diagnostic 证明 SH telemetry 正确：`reconstructSource="packed-sh-extract-v1"`、`shRest=255794:255794:true:45:3`；但它相对 registered `.splat` 的 visual residual 仍失败，因为 ObjGauss compact `.splat` viewer source 不携带 degree-3 SH rest，PLY reconstruction 现在比 `.splat` baseline 保留更多 view-dependent appearance。
+- 验证:
+  - `node --check src/sparkPackedSh.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-spark-reconstruct-residual.mjs`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:spark-reconstruct-residual`: passed；沙箱内本地 fetch 被拒，提权重跑通过。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5294/ --no-server`: passed。
 
 ### RENDER-005T-AA: Spark packed extract reconstruction route
 

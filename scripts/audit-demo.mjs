@@ -78,6 +78,7 @@ const KNOWN_ASSETS = [
 const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
+const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -207,7 +208,7 @@ try {
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
-        `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")} ` +
+        `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${result.sparkShRestPreservedGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")}:${result.sparkShRestCoefficientCountAfterDelete ?? 0}:${result.sparkShDegreeAfterDelete ?? 0} ` +
         `screenshot=${result.screenshotPath}`,
     );
   }
@@ -1136,9 +1137,24 @@ async function runAudit(url, assetsToCheck, options) {
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
         : 0;
+      const sparkShRestPreservedGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-preserved-gaussians") ?? "0")
+        : 0;
       const sparkShRestPreservedAfterDelete = sparkFilteredAfterDelete
         ? await postDeleteViewport.getAttribute("data-spark-sh-rest-preserved")
         : "";
+      const sparkShRestCoefficientCountAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-coefficients") ?? "0")
+        : 0;
+      const sparkShDegreeAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-degree") ?? "0")
+        : 0;
+      const sparkExpectedReconstructSourceAfterDelete =
+        sparkShRestSourceGaussiansAfterDelete > 0
+          ? SPARK_RECONSTRUCT_SH_SOURCE
+          : SPARK_RECONSTRUCT_SOURCE;
+      const sparkExpectedShRestPreservedAfterDelete =
+        sparkShRestSourceGaussiansAfterDelete > 0 ? "true" : "false";
       const objectStateChecksumAfterDelete = sparkFilteredAfterDelete
         ? "spark-filtered-ply-reconstruct"
         : await viewport.getAttribute("data-webgpu-object-state-checksum");
@@ -1185,15 +1201,19 @@ async function runAudit(url, assetsToCheck, options) {
           sparkColorModeAfterDelete !== "original" ||
           sparkColorSourceGaussiansAfterDelete <= 0 ||
           sparkColorObjectGaussiansAfterDelete !== 0 ||
-          sparkReconstructSourceAfterDelete !== SPARK_RECONSTRUCT_SOURCE ||
+          sparkReconstructSourceAfterDelete !== sparkExpectedReconstructSourceAfterDelete ||
           sparkPackedBaseGaussiansAfterDelete <= 0 ||
           sparkPackedVisibleIndicesAfterDelete !== sparkVisibleGaussiansAfterDelete ||
           !Number.isFinite(sparkPackedBaseBuildMsAfterDelete) ||
           !Number.isFinite(sparkPackedExtractMsAfterDelete) ||
-          sparkShRestPreservedAfterDelete !== "false")
+          sparkShRestPreservedAfterDelete !== sparkExpectedShRestPreservedAfterDelete ||
+          (sparkShRestSourceGaussiansAfterDelete > 0 &&
+            (sparkShRestPreservedGaussiansAfterDelete !== sparkShRestSourceGaussiansAfterDelete ||
+              sparkShRestCoefficientCountAfterDelete <= 0 ||
+              sparkShDegreeAfterDelete <= 0)))
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
       }
       if (
@@ -1421,7 +1441,10 @@ async function runAudit(url, assetsToCheck, options) {
         sparkPackedBaseBuildMsAfterDelete,
         sparkPackedExtractMsAfterDelete,
         sparkShRestSourceGaussiansAfterDelete,
+        sparkShRestPreservedGaussiansAfterDelete,
         sparkShRestPreservedAfterDelete,
+        sparkShRestCoefficientCountAfterDelete,
+        sparkShDegreeAfterDelete,
         screenshotPath,
       });
     }

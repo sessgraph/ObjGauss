@@ -610,6 +610,8 @@ export default function App() {
             <SplatViewport
               source={scene.splatSource}
               points={useSparkFilteredRenderer ? scene.points : null}
+              shRestCoefficients={useSparkFilteredRenderer ? scene.shRestCoefficients : null}
+              shRestCoefficientCount={useSparkFilteredRenderer ? scene.shRestCoefficientCount : 0}
               visibleIds={useSparkFilteredRenderer ? visibleIds : null}
               removedIds={useSparkFilteredRenderer ? removedIds : null}
               isolatedId={useSparkFilteredRenderer ? isolatedId : null}

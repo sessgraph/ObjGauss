@@ -89,7 +89,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-X 已完成 WebGPU alpha presentation floor multi-scene candidate gate：新增 `npm run audit:webgpu-alpha-floor-sweep` 和 `npm run audit:webgpu-alpha-floor-candidate-gate`，在 NeRF Lego proxy + Plush semantic 上复现 `alpha10` 候选。`alpha10` 是 best mean Pareto (`0.965287`) 且同时降低两个 scene 的 coverage / luma，但 strict gate 失败：mean chroma norm=`1.178616`、Plush per-scene Pareto=`1.07908`、Plush chroma norm=`1.485213`。因此 alpha floor 仍是候选轴，默认 `0.035` 不变。
   - RENDER-005T-Y 已完成 Spark filtered edit feasibility implementation：`SplatViewport` 可从 object-aware PLY points 重建 filtered Spark `SplatMesh`；`App` 在 source/original object edit 状态下优先用 `Spark 过滤 Splat` 显示隔离/删除后的剩余场景，SH-view diagnostics 与对象色/点击选择仍走 WebGPU / Gaussian OIT 编辑路径；`audit-demo` 已能验证删除后 `postDelete="spark-splat":"spark-filtered-ply-reconstruct"`。
   - RENDER-005T-Z 已完成 Spark PLY reconstruction residual gate：新增 URL probe `spark-reconstruct-probe=1` 和 `npm run audit:spark-reconstruct-residual`，可直接比较 full `.splat` Spark 与 object-aware PLY reconstructed Spark 的 coverage / luma / chroma；Lego proxy 默认 gate 通过 (`coverageRatio=1.170841`, `lumaDelta=0.029762`, `chromaDelta=0.028407`)，Plush semantic 可选 multiscene 复查也通过 (`coverageRatio=1.303149`, `lumaDelta=0.049406`, `chromaDelta=0.002846`)，但 281k Gaussian 重建耗时明显，仍需 SH-rest preservation 与性能治理。
-  - RENDER-005T-AA 已完成 Spark packed extract reconstruction route：filtered Spark 路径从 raw PLY `constructSplats` 推进到 base `PackedSplats` cache + visible-index `extractSplats`，浏览器 contract 暴露 `data-spark-reconstruct-source="packed-extract-v1"`、base / visible counts、build / extract timing 和 `data-spark-sh-rest-preserved="false"`；Lego delete preview 通过 `sparkPacked="packed-extract-v1":5696/3909:3.9/1.9` 验收。该路径仍不是原始 `.splat` 内部 object mask，SH rest preservation 仍是下一步。
+  - RENDER-005T-AA 已完成 Spark packed extract reconstruction route：filtered Spark 路径从 raw PLY `constructSplats` 推进到 base `PackedSplats` cache + visible-index `extractSplats`，浏览器 contract 暴露 `data-spark-reconstruct-source="packed-extract-v1"`、base / visible counts、build / extract timing 和 `data-spark-sh-rest-preserved="false"`；Lego delete preview 通过 `sparkPacked="packed-extract-v1":5696/3909:3.9/1.9` 验收。该路径仍不是原始 `.splat` 内部 object mask，native mask / SH-capable full-view baseline 仍是后续任务。
+  - RENDER-005T-AB 已完成 Spark packed SH-rest preservation：filtered Spark PLY reconstruction 现在会把 scene-level `f_rest_*` 编码为 Spark `extra.sh1/sh2/sh3`，并在 visible-index extract 后保留 SH extra；SH-heavy route 暴露 `data-spark-reconstruct-source="packed-sh-extract-v1"` 和 `data-spark-sh-rest-preserved="true"`。本机 `NeRF Lego 训练输出样例` 删除预览通过：`sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7`、`sparkShRest=255794:255794:"true":45:3`。剩余外观 gap 是 registered compact `.splat` viewer source 不携带 degree-3 SH rest，导致 trained full reconstruct visual residual 不能直接以 `.splat` 为完整 SH baseline。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -167,6 +168,11 @@ npm run build
 npm run audit:spark-reconstruct-residual
 npm run preview -- --port 5294 --strictPort
 npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server
+npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5294/ --no-server
+node --check src/sparkPackedSh.js
+node --check scripts/audit-webgpu-tile-smoke.mjs
+npm run audit:webgpu-tile-smoke
+uv run --extra dev pytest
 node --check scripts/audit-webgpu-coverage-sweep.mjs
 npm run build
 uv run --extra dev pytest
