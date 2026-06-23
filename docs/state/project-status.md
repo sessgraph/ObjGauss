@@ -67,6 +67,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-B 已完成 WebGPU aspect-fit runtime viewport：full runtime 会根据实际 viewer display size 计算 area-preserving internal viewport，projection bounds 改为 aspect-fit + 8% 留白，减少固定方形 viewport 和 x/z 独立拉伸导致的贴边 / 比例偏差。
   - RENDER-005T-C 已完成 WebGPU edit-camera perspective projection：WebGPU Tile 编辑预览现在按固定编辑相机在 CPU 端打包 screen-space center / depth / sigma，GPU accumulation / pixel resolve 和 canvas 点击命中不再按旧 x/z 正交 bounds 做二次投影，并通过 audit 暴露 `projection=edit-perspective-camera-v1:52`。
   - RENDER-005T-D 已完成 WebGPU front-weighted OIT depth contract：WebGPU Tile 编辑预览现在会记录 edit-camera depth range，并在 tile accumulation / per-pixel resolve 中使用 `front-weighted-oit-v1`，减少纯 weighted OIT 把前后层 Gaussian 直接混色的问题。
+  - RENDER-005T-E 已完成 WebGPU camera-Jacobian screen covariance：前端 PLY parser 保留三轴 scale / quaternion，WebGPU Tile 按 edit-camera projection Jacobian 将 3D covariance 投影成 screen-space ellipse，并以 4:1 anisotropy clamp 降低低分辨率 tile preview 的针状 streak。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -142,6 +143,8 @@ uv run --extra dev pytest
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5245 --probes full
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5246 --probes full
 npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5247 --probes full
+npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5252 --probes full
+npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5253 --probes full
 ```
 
 2026-06-23:

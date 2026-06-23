@@ -168,13 +168,17 @@ function vertexToPoint(vertex) {
         : 0;
 
   const color = originalColor(vertex);
+  const scale3 = gaussianScale3(vertex);
+  const rotationQuaternion = gaussianRotationQuaternion(vertex);
   return {
     x: Number(vertex.x ?? 0),
     y: Number(vertex.y ?? 0),
     z: Number(vertex.z ?? 0),
     opacity: opacityValue(vertex.opacity),
-    scale: gaussianScale(vertex),
-    rotation: gaussianRotation(vertex),
+    scale: gaussianScale(scale3),
+    scale3,
+    rotation: gaussianRotation(rotationQuaternion),
+    rotationQuaternion,
     objectId,
     color,
     objectColor: colorForObject(objectId),
@@ -226,12 +230,16 @@ function opacityValue(value) {
   return 1 / (1 + Math.exp(-clamp(value, -80, 80)));
 }
 
-function gaussianScale(vertex) {
+function gaussianScale(scale3) {
+  const values = [...scale3].sort((left, right) => right - left);
+  return [values[0] ?? 0.018, values[1] ?? values[0] ?? 0.018];
+}
+
+function gaussianScale3(vertex) {
   const fallback = 0.018;
-  const values = [vertex.scale_0, vertex.scale_1, vertex.scale_2]
-    .map((value) => scaleValue(value, fallback))
-    .sort((left, right) => right - left);
-  return [values[0] ?? fallback, values[1] ?? values[0] ?? fallback];
+  return [vertex.scale_0, vertex.scale_1, vertex.scale_2].map((value) =>
+    scaleValue(value, fallback),
+  );
 }
 
 function scaleValue(value, fallback) {
@@ -241,28 +249,31 @@ function scaleValue(value, fallback) {
   return clamp(scale, 0.0006, 0.35);
 }
 
-function gaussianRotation(vertex) {
+function gaussianRotation(rotationQuaternion) {
+  if (!rotationQuaternion) return 0;
+  const [nw, nx, ny, nz] = rotationQuaternion;
+  return Math.atan2(2 * (nw * nz + nx * ny), 1 - 2 * (ny * ny + nz * nz));
+}
+
+function gaussianRotationQuaternion(vertex) {
   if (
     vertex.rot_0 === undefined ||
     vertex.rot_1 === undefined ||
     vertex.rot_2 === undefined ||
     vertex.rot_3 === undefined
   ) {
-    return 0;
+    return null;
   }
 
-  const w = quaternionByte(vertex.rot_0);
-  const x = quaternionByte(vertex.rot_1);
-  const y = quaternionByte(vertex.rot_2);
-  const z = quaternionByte(vertex.rot_3);
+  const raw = [vertex.rot_0, vertex.rot_1, vertex.rot_2, vertex.rot_3].map(Number);
+  const components = raw.every((value) => Number.isFinite(value) && value >= -1 && value <= 1)
+    ? raw
+    : raw.map(quaternionByte);
+  const [w, x, y, z] = components;
   const length = Math.hypot(w, x, y, z);
-  if (!Number.isFinite(length) || length <= 0.0001) return 0;
+  if (!Number.isFinite(length) || length <= 0.0001) return null;
 
-  const nw = w / length;
-  const nx = x / length;
-  const ny = y / length;
-  const nz = z / length;
-  return Math.atan2(2 * (nw * nz + nx * ny), 1 - 2 * (ny * ny + nz * nz));
+  return [w / length, x / length, y / length, z / length];
 }
 
 function quaternionByte(value) {

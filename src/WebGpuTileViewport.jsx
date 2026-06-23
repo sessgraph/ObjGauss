@@ -497,6 +497,12 @@ export default function WebGpuTileViewport({
       data-webgpu-projection-depth-min={rendererContract?.projectionDepthMin ?? 0}
       data-webgpu-projection-depth-max={rendererContract?.projectionDepthMax ?? 0}
       data-webgpu-projection-depth-span={rendererContract?.projectionDepthSpan ?? 0}
+      data-webgpu-screen-covariance-mode={rendererContract?.screenCovarianceMode ?? ""}
+      data-webgpu-screen-covariance-gaussians={rendererContract?.screenCovarianceGaussians ?? 0}
+      data-webgpu-screen-covariance-fallback-gaussians={rendererContract?.screenCovarianceFallbackGaussians ?? 0}
+      data-webgpu-screen-covariance-clamped-gaussians={rendererContract?.screenCovarianceClampedGaussians ?? 0}
+      data-webgpu-screen-covariance-max-anisotropy={rendererContract?.screenCovarianceMaxAnisotropy ?? 0}
+      data-webgpu-screen-covariance-sigma-mean={rendererContract?.screenCovarianceSigmaMean ?? 0}
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}

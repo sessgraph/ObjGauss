@@ -2,6 +2,7 @@ import { estimateWebGpuTileRuntimeStorage } from "./webgpuTileStorage.js";
 import {
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_PROJECTION_MODE,
+  WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
 } from "./webgpuTileSmoke.js";
 
 export const WEBGPU_TILE_RENDERER_ID = "webgpu-tile";
@@ -36,6 +37,12 @@ const EMPTY_TILE_SMOKE = Object.freeze({
   projectionDepthMax: 1,
   projectionDepthSpan: 1,
   depthWeightMode: WEBGPU_TILE_DEPTH_WEIGHT_MODE,
+  screenCovarianceMode: WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
+  screenCovarianceGaussians: 0,
+  screenCovarianceFallbackGaussians: 0,
+  screenCovarianceClampedGaussians: 0,
+  screenCovarianceMaxAnisotropy: 4,
+  screenCovarianceSigmaMean: 0,
   packedGaussians: 0,
   binnedGaussians: 0,
   visibleGaussians: 0,
@@ -163,6 +170,12 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     projectionDepthMax: smoke.projectionDepthMax,
     projectionDepthSpan: smoke.projectionDepthSpan,
     depthWeightMode: smoke.depthWeightMode,
+    screenCovarianceMode: smoke.screenCovarianceMode,
+    screenCovarianceGaussians: smoke.screenCovarianceGaussians,
+    screenCovarianceFallbackGaussians: smoke.screenCovarianceFallbackGaussians,
+    screenCovarianceClampedGaussians: smoke.screenCovarianceClampedGaussians,
+    screenCovarianceMaxAnisotropy: smoke.screenCovarianceMaxAnisotropy,
+    screenCovarianceSigmaMean: smoke.screenCovarianceSigmaMean,
     packedGaussians: smoke.packedGaussians,
     binnedGaussians: smoke.binnedGaussians,
     visibleGaussians: smoke.visibleGaussians,

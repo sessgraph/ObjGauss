@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-E`: 将 WebGPU Tile 编辑从 front-weighted OIT 继续推进到 screen-space covariance / splat scale calibration，重点处理用户可见的“原始颜色编辑预览仍偏软糊、不像真实 3DGS”问题。
+  - `RENDER-005T-F`: 将 WebGPU Tile 编辑从 256px full runtime 推进到更高内部输出分辨率 / adaptive runtime quality，并继续处理真实排序与 Spark 视觉差距。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,33 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-E: WebGPU camera-Jacobian screen covariance
+
+- 状态: done / screen-covariance-calibrated
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 front-weighted OIT 后，让 WebGPU Tile 编辑预览不再只用二维 scale + yaw 近似 Gaussian footprint，而是消费真实 3DGS 的三轴 scale / quaternion covariance 并投影成屏幕椭圆。
+- 已实施:
+  - PLY parser 保留 `scale3` 和 normalized `rotationQuaternion`，同时继续提供原有二维 `scale` / `rotation` 给 Three Gaussian OIT fallback。
+  - `webgpuTileSmoke` 使用 edit-camera projection Jacobian 将 3D covariance 投影为 screen-space 2D covariance，再分解为 shader 已消费的 `sigmaMajor / sigmaMinor / rotation`。
+  - 对缺少 quaternion 的 proxy 数据保留 legacy fallback；对真实 covariance path 增加 4:1 anisotropy clamp，避免低分辨率 WebGPU Tile 预览出现过长针状 streak。
+  - renderer contract / DOM / browser audit 暴露 `screenCovariance=camera-jacobian-covariance-v1:full/fallback/clamped:maxAnisotropy:sigmaMean`。
+- 结论:
+  - Node smoke 的内置 sample 走 full covariance path：`screenCovariance=camera-jacobian-covariance-v1:5800/0/0:4`。
+  - Plush semantic 大场景全量 281498 个 Gaussian 走 full covariance path，127733 个 Gaussian 被 4:1 anisotropy clamp 校准，desktop WebGPU full runtime 通过。
+  - NeRF Lego proxy 因缺少 quaternion 走 fallback path，desktop WebGPU full runtime 仍通过，说明缺字段样例不会回归。
+  - 这一步解决的是 footprint covariance 投影和极端各向异性校准；仍不是完整 per-pixel depth sort，也不等于 Spark 真实 `.splat` 渲染。
+- 验证:
+  - `node --check src/ply.js`: passed。
+  - `node --check src/sampleScene.js`: passed。
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`screenCovariance=camera-jacobian-covariance-v1:5800/0/0:4`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset plush-semantic-closure-local --port 5252 --probes full`: passed；281498 full covariance Gaussians、127733 clamped、device active、queue done。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5253 --probes full`: passed；0 full / 5696 fallback covariance Gaussians、device active、queue done。
 
 ### RENDER-005T-D: WebGPU front-weighted OIT depth contract
 

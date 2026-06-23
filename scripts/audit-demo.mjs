@@ -89,6 +89,7 @@ try {
         `display=${result.webGpuDisplayWidth}x${result.webGpuDisplayHeight} boundsFit=${JSON.stringify(result.webGpuBoundsFitMode)}:${result.webGpuBoundsWorldAspect}/${result.webGpuBoundsViewportAspect} ` +
         `projection=${JSON.stringify(result.webGpuProjectionMode)}:${result.webGpuProjectionCameraFov} ` +
         `depthWeight=${JSON.stringify(result.webGpuDepthWeightMode)}:${result.webGpuProjectionDepthMin}/${result.webGpuProjectionDepthMax}/${result.webGpuProjectionDepthSpan} ` +
+        `screenCovariance=${JSON.stringify(result.webGpuScreenCovarianceMode)}:${result.webGpuScreenCovarianceGaussians}/${result.webGpuScreenCovarianceFallbackGaussians}/${result.webGpuScreenCovarianceClampedGaussians}:${result.webGpuScreenCovarianceMaxAnisotropy}:${result.webGpuScreenCovarianceSigmaMean} ` +
         `deviceLost=${JSON.stringify(result.webGpuDeviceLostStatus)}:${JSON.stringify(result.webGpuDeviceLostReason)} ` +
         `deviceError=${JSON.stringify(result.webGpuDeviceErrorStatus)}:${JSON.stringify(result.webGpuDeviceErrorType)} ` +
         `queue=${JSON.stringify(result.webGpuQueueStatus)}:${JSON.stringify(result.webGpuQueueReason)} ` +
@@ -319,6 +320,12 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuProjectionDepthMin = Number(await viewport.getAttribute("data-webgpu-projection-depth-min") ?? "0");
       const webGpuProjectionDepthMax = Number(await viewport.getAttribute("data-webgpu-projection-depth-max") ?? "0");
       const webGpuProjectionDepthSpan = Number(await viewport.getAttribute("data-webgpu-projection-depth-span") ?? "0");
+      const webGpuScreenCovarianceMode = await viewport.getAttribute("data-webgpu-screen-covariance-mode");
+      const webGpuScreenCovarianceGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-gaussians") ?? "0");
+      const webGpuScreenCovarianceFallbackGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-fallback-gaussians") ?? "0");
+      const webGpuScreenCovarianceClampedGaussians = numericValue(await viewport.getAttribute("data-webgpu-screen-covariance-clamped-gaussians") ?? "0");
+      const webGpuScreenCovarianceMaxAnisotropy = Number(await viewport.getAttribute("data-webgpu-screen-covariance-max-anisotropy") ?? "0");
+      const webGpuScreenCovarianceSigmaMean = Number(await viewport.getAttribute("data-webgpu-screen-covariance-sigma-mean") ?? "0");
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
@@ -410,6 +417,17 @@ async function runAudit(url, assetsToCheck, options) {
         ) {
           throw new Error(
             `${asset.id} WebGPU depth weighting did not expose a valid front-weighted OIT contract: mode=${webGpuDepthWeightMode} min=${webGpuProjectionDepthMin} max=${webGpuProjectionDepthMax} span=${webGpuProjectionDepthSpan}`,
+          );
+        }
+        if (
+          webGpuScreenCovarianceMode !== "camera-jacobian-covariance-v1" ||
+          webGpuScreenCovarianceGaussians + webGpuScreenCovarianceFallbackGaussians !== packedGaussians ||
+          webGpuScreenCovarianceClampedGaussians < 0 ||
+          webGpuScreenCovarianceMaxAnisotropy < 1 ||
+          webGpuScreenCovarianceSigmaMean <= 0
+        ) {
+          throw new Error(
+            `${asset.id} WebGPU screen covariance contract is invalid: mode=${webGpuScreenCovarianceMode} full=${webGpuScreenCovarianceGaussians} fallback=${webGpuScreenCovarianceFallbackGaussians} clamped=${webGpuScreenCovarianceClampedGaussians} maxAnisotropy=${webGpuScreenCovarianceMaxAnisotropy} packed=${packedGaussians} sigmaMean=${webGpuScreenCovarianceSigmaMean}`,
           );
         }
       }
@@ -629,6 +647,12 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuProjectionDepthMin,
             webGpuProjectionDepthMax,
             webGpuProjectionDepthSpan,
+            webGpuScreenCovarianceMode,
+            webGpuScreenCovarianceGaussians,
+            webGpuScreenCovarianceFallbackGaussians,
+            webGpuScreenCovarianceClampedGaussians,
+            webGpuScreenCovarianceMaxAnisotropy,
+            webGpuScreenCovarianceSigmaMean,
             webGpuDeviceLostStatus,
             webGpuDeviceLostReason,
             webGpuDeviceLostMessage,
@@ -821,6 +845,12 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuProjectionDepthMin,
         webGpuProjectionDepthMax,
         webGpuProjectionDepthSpan,
+        webGpuScreenCovarianceMode,
+        webGpuScreenCovarianceGaussians,
+        webGpuScreenCovarianceFallbackGaussians,
+        webGpuScreenCovarianceClampedGaussians,
+        webGpuScreenCovarianceMaxAnisotropy,
+        webGpuScreenCovarianceSigmaMean,
         webGpuDeviceLostStatus,
         webGpuDeviceLostReason,
         webGpuDeviceLostMessage,

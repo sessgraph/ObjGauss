@@ -28,6 +28,7 @@ function boxCloud({
     if (face === 4) z = sz / 2;
     if (face === 5) z = -sz / 2;
 
+    const rotation = seeded(index * 53 + objectId * 17) * Math.PI;
     points.push({
       x: cx + x + (seeded(index + 5) - 0.5) * jitter,
       y: cy + y + (seeded(index + 7) - 0.5) * jitter,
@@ -37,7 +38,9 @@ function boxCloud({
       objectColor: colorForObject(objectId),
       opacity: 0.96,
       scale: [0.028, 0.018],
-      rotation: seeded(index * 53 + objectId * 17) * Math.PI,
+      scale3: [0.028, 0.018, 0.012],
+      rotation,
+      rotationQuaternion: yawQuaternion(rotation),
     });
   }
   return points;
@@ -66,7 +69,9 @@ function cylinderCloud({
       objectColor: colorForObject(objectId),
       opacity: 0.94,
       scale: [0.03, 0.016],
+      scale3: [0.03, 0.016, 0.014],
       rotation: t,
+      rotationQuaternion: yawQuaternion(t),
     });
   }
   return points;
@@ -122,4 +127,9 @@ export function createSampleScene() {
 function seeded(value) {
   const x = Math.sin(value * 12.9898) * 43758.5453;
   return x - Math.floor(x);
+}
+
+function yawQuaternion(angle) {
+  const half = angle * 0.5;
+  return [Math.cos(half), 0, 0, Math.sin(half)];
 }
