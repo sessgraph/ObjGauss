@@ -18,6 +18,7 @@ import { WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE } from "./webgpuC
 import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
+  WEBGPU_TILE_RESOLVE_FILTER,
   WEBGPU_TILE_RESOLVE_SHADER,
   WEBGPU_TILE_RESOLVE_SOURCE,
 } from "./webgpuTileResolveShader.js";
@@ -64,6 +65,7 @@ export default function WebGpuTileViewport({
     checksum: "",
     pixels: 0,
     source: "",
+    filter: "",
   });
   const [deviceLost, setDeviceLost] = useState({
     status: "active",
@@ -146,6 +148,7 @@ export default function WebGpuTileViewport({
         checksum: "",
         pixels: 0,
         source: "",
+        filter: "",
       });
       setStorage({
         status: "failed",
@@ -304,6 +307,7 @@ export default function WebGpuTileViewport({
           checksum: "",
           pixels: 0,
           source: "",
+          filter: "",
         });
         setStorage({
           status: "failed",
@@ -479,6 +483,7 @@ export default function WebGpuTileViewport({
       data-webgpu-first-frame-checksum={frame.checksum}
       data-webgpu-first-frame-pixels={frame.pixels}
       data-webgpu-resolve-source={frame.source}
+      data-webgpu-resolve-filter={frame.filter}
       data-webgpu-runtime-probe={runtimeProbe}
       data-webgpu-device-lost-status={deviceLost.status}
       data-webgpu-device-lost-reason={deviceLost.reason}
@@ -643,6 +648,7 @@ function renderFrame({
       checksum: "",
       pixels: 0,
       source: "",
+      filter: "",
     });
     setCompute({
       status: "failed",
@@ -909,6 +915,7 @@ function renderFrame({
       checksum: "",
       pixels: 0,
       source: "",
+      filter: "",
     });
     setQueue({
       status: "failed",
@@ -949,6 +956,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
       checksum: textureDisplay.checksum,
       pixels: textureDisplay.pixels,
       source: textureDisplay.source,
+      filter: textureDisplay.filter,
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY) {
@@ -958,6 +966,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
       checksum: tileSmoke.resolveChecksum,
       pixels: tileSmoke.resolvedTileCount,
       source: WEBGPU_TILE_ACCUMULATION_SOURCE,
+      filter: "",
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY) {
@@ -967,6 +976,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
       checksum: tileSmoke.resolveChecksum,
       pixels: tileSmoke.resolvedTileCount,
       source: WEBGPU_TILE_COMPUTE_SOURCE,
+      filter: "",
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
@@ -976,6 +986,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
       checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
       pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
       source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+      filter: "",
     };
   }
   return {
@@ -984,6 +995,7 @@ function frameTelemetry({ probe, tileSmoke, runDisplay }) {
     checksum: tileSmoke.resolveChecksum,
     pixels: tileSmoke.resolvedTileCount,
     source: "",
+    filter: "",
   };
 }
 
@@ -1015,6 +1027,7 @@ function textureDisplayFrameTelemetry(probe, tileSmoke) {
       checksum: tileSmoke.resolveChecksum,
       pixels: tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
       source: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SOURCE,
+      filter: "nearest-sampled-texture",
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
@@ -1022,6 +1035,7 @@ function textureDisplayFrameTelemetry(probe, tileSmoke) {
       checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
       pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
       source: WEBGPU_FLOAT_TEXTURE_COPY_RESOLVE_SOURCE,
+      filter: "nearest-texture-load",
     };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
@@ -1029,12 +1043,14 @@ function textureDisplayFrameTelemetry(probe, tileSmoke) {
       checksum: tileSmoke.resolveChecksum,
       pixels: tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
       source: "webgpu-clear-pass-v1",
+      filter: "clear-pass",
     };
   }
   return {
     checksum: tileSmoke.pixelResolveChecksum || tileSmoke.resolveChecksum,
     pixels: tileSmoke.pixelResolvedCount || tileSmoke.pixelCount || tileSmoke.resolvedTileCount,
     source: WEBGPU_TILE_RESOLVE_SOURCE,
+    filter: WEBGPU_TILE_RESOLVE_FILTER,
   };
 }
 

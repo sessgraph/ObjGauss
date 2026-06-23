@@ -92,7 +92,7 @@ try {
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
-        `resolveSource=${JSON.stringify(result.webGpuResolveSource)} ` +
+        `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
@@ -466,6 +466,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuFirstFramePixels = numericValue(await viewport.getAttribute("data-webgpu-first-frame-pixels") ?? "0");
       const webGpuFirstFrameChecksum = await viewport.getAttribute("data-webgpu-first-frame-checksum");
       const webGpuResolveSource = await viewport.getAttribute("data-webgpu-resolve-source");
+      const webGpuResolveFilter = await viewport.getAttribute("data-webgpu-resolve-filter");
       const webGpuRuntimeProbe = await viewport.getAttribute("data-webgpu-runtime-probe");
       const webGpuDeviceLostStatus = await viewport.getAttribute("data-webgpu-device-lost-status");
       const webGpuDeviceLostReason = await viewport.getAttribute("data-webgpu-device-lost-reason");
@@ -519,6 +520,7 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuFirstFramePixels,
           webGpuFirstFrameChecksum,
           webGpuResolveSource,
+          webGpuResolveFilter,
         });
         if (webGpuDeviceLostStatus === "lost" && !options.allowWebGpuDeviceLost) {
           throw new Error(
@@ -554,6 +556,7 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuFirstFramePixels,
             webGpuFirstFrameChecksum,
             webGpuResolveSource,
+            webGpuResolveFilter,
             webGpuRuntimeProbe,
             webGpuViewportWidth,
             webGpuViewportHeight,
@@ -732,6 +735,7 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
         webGpuResolveSource,
+        webGpuResolveFilter,
         webGpuRuntimeProbe,
         webGpuViewportWidth,
         webGpuViewportHeight,
@@ -868,6 +872,7 @@ function validateWebGpuRuntimeProbe({
   webGpuFirstFramePixels,
   webGpuFirstFrameChecksum,
   webGpuResolveSource,
+  webGpuResolveFilter,
 }) {
   if (actualProbe !== expectedProbe) {
     throw new Error(`${assetId} WebGPU runtime probe mismatch: expected=${expectedProbe} actual=${actualProbe}`);
@@ -930,7 +935,9 @@ function validateWebGpuRuntimeProbe({
       webGpuFirstFramePixels,
       webGpuFirstFrameChecksum,
       webGpuResolveSource,
+      webGpuResolveFilter,
       expectedSource: "webgpu-pixel-storage-resolve-v1",
+      expectedFilter: "bilinear-storage",
     });
   } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_TEXTURE_DISPLAY_ONLY) {
     validateRenderedProbeFrame({
@@ -941,7 +948,9 @@ function validateWebGpuRuntimeProbe({
       webGpuFirstFramePixels,
       webGpuFirstFrameChecksum,
       webGpuResolveSource,
+      webGpuResolveFilter,
       expectedSource: "webgpu-sampled-texture-resolve-v1",
+      expectedFilter: "nearest-sampled-texture",
     });
   } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY) {
     validateRenderedProbeFrame({
@@ -952,7 +961,9 @@ function validateWebGpuRuntimeProbe({
       webGpuFirstFramePixels,
       webGpuFirstFrameChecksum,
       webGpuResolveSource,
+      webGpuResolveFilter,
       expectedSource: "webgpu-buffer-copy-texture-resolve-v1",
+      expectedFilter: "nearest-texture-load",
     });
   } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY) {
     validateRenderedProbeFrame({
@@ -963,7 +974,9 @@ function validateWebGpuRuntimeProbe({
       webGpuFirstFramePixels,
       webGpuFirstFrameChecksum,
       webGpuResolveSource,
+      webGpuResolveFilter,
       expectedSource: "webgpu-clear-pass-v1",
+      expectedFilter: "clear-pass",
     });
   } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
     if (
@@ -995,7 +1008,9 @@ function validateRenderedProbeFrame({
   webGpuFirstFramePixels,
   webGpuFirstFrameChecksum,
   webGpuResolveSource,
+  webGpuResolveFilter,
   expectedSource,
+  expectedFilter,
 }) {
   if (
     webGpuFirstFrameStatus !== "rendered" ||
@@ -1005,6 +1020,11 @@ function validateRenderedProbeFrame({
   ) {
     throw new Error(
       `${assetId} WebGPU ${expectedProbe} route did not render through ${expectedSource}: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
+    );
+  }
+  if (webGpuResolveFilter !== expectedFilter) {
+    throw new Error(
+      `${assetId} WebGPU ${expectedProbe} resolve filter mismatch: expected=${expectedFilter} actual=${webGpuResolveFilter}`,
     );
   }
 }

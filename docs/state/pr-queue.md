@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T`: 将 WebGPU Tile 编辑从低分辨率正交近似推进到更接近 Spark 真实查看的相机匹配 / 视觉一致性路径，重点处理用户可见的“颗粒感、不像真实高斯”问题。
+  - `RENDER-005T-B`: 将 WebGPU Tile 编辑从平滑的低分辨率正交 blob 推进到更接近 Spark 真实查看的相机匹配 / 视觉一致性路径，重点处理用户可见的“过度平滑、不像真实 3DGS”问题。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-A: WebGPU pixel-storage bilinear resolve
+
+- 状态: done / storage-resolve-smoothed
+- 类型: 标准 PR / 前端渲染质量
+- 目标: 在 RENDER-005S 已把 full runtime 内部输出提升到 256px 后，降低该内部图放大到主画布时的最近邻颗粒 / 格子感。
+- 已实施:
+  - `webgpu-pixel-storage-resolve-v1` fullscreen fragment shader 从 `floor()` 最近邻读取 `pixelResolvedRgba` 改为 bilinear storage sampling。
+  - 新增 `WEBGPU_TILE_RESOLVE_FILTER="bilinear-storage"`，`WebGpuTileViewport` 通过 `data-webgpu-resolve-filter` 暴露当前 display filter。
+  - `audit-demo` 和 `audit-webgpu-tile-smoke` 会输出 / 检查 storage full path 的 `resolveSource=webgpu-pixel-storage-resolve-v1:bilinear-storage`。
+- 结论:
+  - NeRF Lego proxy 的 headed desktop WebGPU full audit 通过，说明 bilinear storage resolve 在真实浏览器 WebGPU runtime 中可编译、可提交、可完成对象选择 / 隔离 / 删除预览。
+  - 这一步解决的是放大颗粒感，不等于 Spark 真实 3DGS 对象级重渲染；截图显示画面更平滑，但仍存在相机 / 投影 / alpha-order 视觉差距。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `git diff --check`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；`resolveSource=webgpu-pixel-storage-resolve-v1:bilinear-storage`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --port 5243 --probes full`: passed；`webgpuViewport=256x256:65536`、firstFrame=65536、resolve filter=`bilinear-storage`、device active、queue done。
 
 ### RENDER-005S: WebGPU runtime visual fidelity audit
 

@@ -1,4 +1,5 @@
 export const WEBGPU_TILE_RESOLVE_SOURCE = "webgpu-pixel-storage-resolve-v1";
+export const WEBGPU_TILE_RESOLVE_FILTER = "bilinear-storage";
 
 export const WEBGPU_TILE_RESOLVE_SHADER = `
 struct VertexOutput {
@@ -15,6 +16,10 @@ struct ResolveMeta {
 
 @group(0) @binding(0) var<storage, read> pixelResolvedRgba: array<vec4f>;
 @group(0) @binding(1) var<uniform> resolveMeta: ResolveMeta;
+
+fn samplePixel(pixelX: u32, pixelY: u32, safeWidth: u32) -> vec4f {
+  return pixelResolvedRgba[pixelY * safeWidth + pixelX];
+}
 
 @vertex
 fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
@@ -35,10 +40,23 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let safeWidth = max(resolveMeta.viewportWidth, 1u);
   let safeHeight = max(resolveMeta.viewportHeight, 1u);
   let uv = clamp(input.uv, vec2f(0.0), vec2f(0.999999));
-  let pixelX = min(u32(floor(uv.x * f32(safeWidth))), safeWidth - 1u);
-  let pixelY = min(u32(floor(uv.y * f32(safeHeight))), safeHeight - 1u);
-  let pixelIndex = pixelY * safeWidth + pixelX;
-  let pixel = pixelResolvedRgba[pixelIndex];
+  let pixelPosition = uv * vec2f(f32(safeWidth - 1u), f32(safeHeight - 1u));
+  let baseX = min(u32(floor(pixelPosition.x)), safeWidth - 1u);
+  let baseY = min(u32(floor(pixelPosition.y)), safeHeight - 1u);
+  let nextX = min(baseX + 1u, safeWidth - 1u);
+  let nextY = min(baseY + 1u, safeHeight - 1u);
+  let blend = fract(pixelPosition);
+  let top = mix(
+    samplePixel(baseX, baseY, safeWidth),
+    samplePixel(nextX, baseY, safeWidth),
+    blend.x
+  );
+  let bottom = mix(
+    samplePixel(baseX, nextY, safeWidth),
+    samplePixel(nextX, nextY, safeWidth),
+    blend.x
+  );
+  let pixel = mix(top, bottom, blend.y);
   let background = vec3f(0.0627, 0.0745, 0.0863);
   let alpha = clamp(pixel.a, 0.0, 0.98);
   let rgb = background * (1.0 - alpha) + clamp(pixel.rgb, vec3f(0.0), vec3f(1.0)) * alpha;
