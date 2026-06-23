@@ -50,7 +50,7 @@
   - `node scripts/benchmark-splatfacto-scenes.mjs --run --skip-sam --sam-checkpoint /home/ljy/models/sam/sam_vit_b_01ec64.pth`: passed。
   - `node scripts/benchmark-splatfacto-variants.mjs --run --skip-sam`: passed。
   - `node scripts/benchmark-cross-scene.mjs --run --skip-semantic --skip-scenes --skip-variants`: passed，rows=8，stage gates smoke=true / candidate=true / paper=false。
-- 完成 commit: pending。
+- 完成 commit: `750f646`。
 
 ### BENCH-004: Real Splatfacto cross-scene suite with LLFF Fern
 
