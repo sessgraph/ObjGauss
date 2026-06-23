@@ -18,7 +18,7 @@
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
   - `RENDER-005A`: 在 WebGPU-capable 浏览器中重跑 first-frame runtime audit。
-  - `RENDER-005H`: 将 pixel output 的来源从 tile resolve 展开升级为逐像素 Gaussian accumulation。
+  - `RENDER-005I`: 将 fixed-cap tile entries 推进到 overflow-safe compact tile list / capacity strategy，让 Plush 级大场景不被 smoke cap 长期阻塞。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -48,6 +48,31 @@
 - 完成 commit: runtime audit pending；implementation commit `12f5fc8`.
 
 ## Done
+
+### RENDER-005H: WebGPU per-pixel Gaussian accumulation
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 将 `pixelResolvedRgba` 的来源从 tile resolved color 展开升级为每像素直接遍历所属 tile 的 Gaussian entries，并在 GPU compute 中执行 covariance-aware weighted OIT。
+- 范围外:
+  - 不实现完整 3D covariance 投影和深度排序。
+  - 不解决 fixed-cap tile entries 在 Plush 级大场景上的 overflow blocker。
+  - 不把当前 headless Chrome fallback 宣称为真实 WebGPU runtime 证据。
+- 实施:
+  - `src/webgpuTileComputeShader.js` 将 pixel stage source 升级为 `webgpu-compute-pixel-accumulation-v1`，pixel shader 不再读取 `tileResolvedRgba`，而是读取 `positionRadius`、`colorOpacity`、`objectIndices`、`objectState`、`tileCounts`、`tileEntries`、`scaleRotation` 和 pixel meta。
+  - pixel shader 对每个像素定位 tile，遍历该 tile 中 stored Gaussian list，按 Gaussian scale / rotation 计算椭圆核，并把 weighted color / opacity resolve 到 `pixelResolvedRgba`。
+  - `WebGpuTileViewport` 的 pixel bind group 改为绑定 Gaussian/object/tile-entry buffers；display pass 仍从 `pixelResolvedRgba` fullscreen resolve。
+  - `src/webgpuTileSmoke.js` 的 Node smoke reference 同步计算 direct per-pixel Gaussian output；浏览器 runtime route 只分配 GPU 写入用 pixel buffer，不在主线程做 CPU 全帧 reference。
+  - `audit-webgpu-tile-smoke` 断言 pixel shader 不再依赖 `tileResolvedRgba`，并验证 direct Gaussian pixel source / 48-byte pixel meta / positive pixel reference。
+- 验收:
+  - Node smoke audit 可在无 WebGPU adapter 环境中验证 pixel shader 读取 Gaussian/object/tile-entry storage 并输出 direct Gaussian pixel reference。
+  - WebGPU 可用且 zero-overflow 的环境中，`webgpu-tile` first frame 必须经过 `webgpu-compute-pixel-accumulation-v1 -> webgpu-pixel-storage-resolve-v1`。
+  - 当前 headless WebGPU 不可用环境仍明确 fallback 到 `Gaussian OIT 编辑`，三样例 browser audit 继续通过。
+- 验证:
+  - `npm run audit:webgpu-tile-smoke`: passed，输出 `storage=243af027:10 pixel=webgpu-compute-pixel-accumulation-v1:16384 resolveSource=webgpu-pixel-storage-resolve-v1`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --url http://127.0.0.1:5215/ --no-server`: passed，assets=3；当前 headless Chrome 仍 fallback，`pixel=null:null:0` 是预期，因为没有进入 WebGPU route。
 
 ### RENDER-005G: WebGPU viewport pixel output contract
 

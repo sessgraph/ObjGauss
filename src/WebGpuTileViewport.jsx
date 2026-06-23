@@ -51,7 +51,7 @@ export default function WebGpuTileViewport({
   });
   const [pixel, setPixel] = useState({
     status: "pending",
-    reason: "webgpu-pixel-resolve-pending",
+    reason: "webgpu-pixel-accumulation-pending",
     source: "",
     workgroups: 0,
   });
@@ -219,7 +219,7 @@ export default function WebGpuTileViewport({
         });
         setPixel({
           status: "failed",
-          reason: error?.message || "webgpu-pixel-resolve-unavailable",
+          reason: error?.message || "webgpu-pixel-accumulation-unavailable",
           source: "",
           workgroups: 0,
         });
@@ -477,9 +477,15 @@ function renderFrame({
     const pixelBindGroup = device.createBindGroup({
       layout: pixelComputePipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: storageBundle.getBuffer("tileResolvedRgba").buffer } },
-        { binding: 1, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
-        { binding: 2, resource: { buffer: pixelMetaBuffer } },
+        { binding: 0, resource: { buffer: storageBundle.getBuffer("positionRadius").buffer } },
+        { binding: 1, resource: { buffer: storageBundle.getBuffer("colorOpacity").buffer } },
+        { binding: 2, resource: { buffer: storageBundle.getBuffer("objectIndices").buffer } },
+        { binding: 3, resource: { buffer: storageBundle.getBuffer("objectState").buffer } },
+        { binding: 4, resource: { buffer: storageBundle.getBuffer("tileCounts").buffer } },
+        { binding: 5, resource: { buffer: storageBundle.getBuffer("tileEntries").buffer } },
+        { binding: 6, resource: { buffer: storageBundle.getBuffer("pixelResolvedRgba").buffer } },
+        { binding: 7, resource: { buffer: pixelMetaBuffer } },
+        { binding: 8, resource: { buffer: storageBundle.getBuffer("scaleRotation").buffer } },
       ],
     });
     const bindGroup = device.createBindGroup({
@@ -538,7 +544,7 @@ function renderFrame({
     });
     setPixel({
       status: "dispatched",
-      reason: "webgpu-pixel-resolve-dispatched",
+      reason: "webgpu-pixel-accumulation-dispatched",
       source: WEBGPU_PIXEL_RESOLVE_SOURCE,
       workgroups: pixelWorkgroups,
     });
@@ -564,13 +570,13 @@ function renderFrame({
     });
     setPixel({
       status: "failed",
-      reason: error?.message || "webgpu-pixel-resolve-failed",
+      reason: error?.message || "webgpu-pixel-accumulation-failed",
       source: "",
       workgroups: 0,
     });
     setFrame({
       status: "failed",
-      reason: error?.message || "webgpu-pixel-resolve-failed",
+      reason: error?.message || "webgpu-pixel-accumulation-failed",
       checksum: "",
       pixels: 0,
       source: "",

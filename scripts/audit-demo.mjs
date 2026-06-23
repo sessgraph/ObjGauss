@@ -341,7 +341,7 @@ async function runAudit(url, assetsToCheck) {
           webGpuComputeSource !== "webgpu-compute-resolve-v1" ||
           webGpuComputeStatus !== "dispatched" ||
           webGpuComputeWorkgroups <= 0 ||
-          webGpuPixelSource !== "webgpu-compute-pixel-resolve-v1" ||
+          webGpuPixelSource !== "webgpu-compute-pixel-accumulation-v1" ||
           webGpuPixelStatus !== "dispatched" ||
           webGpuPixelWorkgroups <= 0 ||
           webGpuFirstFrameStatus !== "rendered" ||

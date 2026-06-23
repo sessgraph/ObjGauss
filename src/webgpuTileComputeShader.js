@@ -2,7 +2,7 @@ export const WEBGPU_TILE_COMPUTE_SOURCE = "webgpu-compute-resolve-v1";
 export const WEBGPU_TILE_COMPUTE_WORKGROUP_SIZE = 64;
 export const WEBGPU_TILE_ACCUMULATION_SOURCE = "webgpu-compute-covariance-accumulation-v1";
 export const WEBGPU_TILE_ACCUMULATION_WORKGROUP_SIZE = 64;
-export const WEBGPU_PIXEL_RESOLVE_SOURCE = "webgpu-compute-pixel-resolve-v1";
+export const WEBGPU_PIXEL_RESOLVE_SOURCE = "webgpu-compute-pixel-accumulation-v1";
 export const WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE = 64;
 
 export const WEBGPU_TILE_ACCUMULATION_SHADER = `
@@ -143,33 +143,107 @@ fn computeMain(@builtin(global_invocation_id) globalId: vec3u) {
 `;
 
 export const WEBGPU_PIXEL_RESOLVE_SHADER = `
+const OBJECT_STATE_VISIBLE = 1u;
+const RESOLVE_ALPHA_SCALE = 0.18;
+const RESOLVE_ALPHA_GAIN = 0.78;
+const RESOLVE_KERNEL_CUTOFF = 13.0;
+
 struct PixelResolveMeta {
-  pixelCount: u32,
-  viewportWidth: u32,
-  tileSize: u32,
-  tileColumns: u32,
+  pixelCount: f32,
+  viewportWidth: f32,
+  viewportHeight: f32,
+  tileSize: f32,
+  tileColumns: f32,
+  maxEntriesPerTile: f32,
+  boundsMinX: f32,
+  boundsMinZ: f32,
+  boundsSpanX: f32,
+  boundsSpanZ: f32,
+  reserved0: f32,
+  reserved1: f32,
 };
 
-@group(0) @binding(0) var<storage, read> tileResolvedRgba: array<vec4f>;
-@group(0) @binding(1) var<storage, read_write> pixelResolvedRgba: array<vec4f>;
-@group(0) @binding(2) var<uniform> pixelResolveMeta: PixelResolveMeta;
+@group(0) @binding(0) var<storage, read> positionRadius: array<vec4f>;
+@group(0) @binding(1) var<storage, read> colorOpacity: array<vec4f>;
+@group(0) @binding(2) var<storage, read> objectIndices: array<u32>;
+@group(0) @binding(3) var<storage, read> objectState: array<vec4u>;
+@group(0) @binding(4) var<storage, read> tileCounts: array<u32>;
+@group(0) @binding(5) var<storage, read> tileEntries: array<u32>;
+@group(0) @binding(6) var<storage, read_write> pixelResolvedRgba: array<vec4f>;
+@group(0) @binding(7) var<uniform> pixelResolveMeta: PixelResolveMeta;
+@group(0) @binding(8) var<storage, read> scaleRotation: array<vec4f>;
 
 @compute @workgroup_size(${WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE})
 fn pixelResolveMain(@builtin(global_invocation_id) globalId: vec3u) {
   let pixelIndex = globalId.x;
-  if (pixelIndex >= pixelResolveMeta.pixelCount) {
+  if (pixelIndex >= u32(pixelResolveMeta.pixelCount)) {
     return;
   }
 
-  let viewportWidth = max(pixelResolveMeta.viewportWidth, 1u);
-  let tileSize = max(pixelResolveMeta.tileSize, 1u);
-  let tileColumns = max(pixelResolveMeta.tileColumns, 1u);
+  let viewportWidth = max(u32(pixelResolveMeta.viewportWidth), 1u);
+  let tileSize = max(u32(pixelResolveMeta.tileSize), 1u);
+  let tileColumns = max(u32(pixelResolveMeta.tileColumns), 1u);
+  let maxEntriesPerTile = max(u32(pixelResolveMeta.maxEntriesPerTile), 1u);
   let pixelX = pixelIndex % viewportWidth;
   let pixelY = pixelIndex / viewportWidth;
   let tileX = min(pixelX / tileSize, tileColumns - 1u);
   let tileY = pixelY / tileSize;
   let tileIndex = tileY * tileColumns + tileX;
-  pixelResolvedRgba[pixelIndex] = tileResolvedRgba[tileIndex];
+  let storedCount = min(tileCounts[tileIndex], maxEntriesPerTile);
+  let entryBase = tileIndex * maxEntriesPerTile;
+  let pixelCenter = vec2f(f32(pixelX) + 0.5, f32(pixelY) + 0.5);
+  let pixelsPerWorldUnit = min(
+    pixelResolveMeta.viewportWidth / max(pixelResolveMeta.boundsSpanX, 0.0001),
+    pixelResolveMeta.viewportHeight / max(pixelResolveMeta.boundsSpanZ, 0.0001)
+  );
+  var accumulation = vec4f(0.0);
+
+  for (var entryOffset = 0u; entryOffset < storedCount; entryOffset = entryOffset + 1u) {
+    let gaussianIndex = tileEntries[entryBase + entryOffset];
+    let objectIndex = objectIndices[gaussianIndex];
+    if ((objectState[objectIndex].x & OBJECT_STATE_VISIBLE) == 0u) {
+      continue;
+    }
+
+    let centerRadius = positionRadius[gaussianIndex];
+    let screen = vec2f(
+      ((centerRadius.x - pixelResolveMeta.boundsMinX) / max(pixelResolveMeta.boundsSpanX, 0.0001)) *
+        max(1.0, pixelResolveMeta.viewportWidth - 1.0),
+      (1.0 - ((centerRadius.y - pixelResolveMeta.boundsMinZ) / max(pixelResolveMeta.boundsSpanZ, 0.0001))) *
+        max(1.0, pixelResolveMeta.viewportHeight - 1.0)
+    );
+    let gaussianScale = scaleRotation[gaussianIndex];
+    let sigma = max(gaussianScale.xy * pixelsPerWorldUnit * 4.8 / 3.0, vec2f(0.0001));
+    let cosine = cos(gaussianScale.z);
+    let sine = sin(gaussianScale.z);
+    let delta = pixelCenter - screen;
+    let rotated = vec2f(
+      cosine * delta.x - sine * delta.y,
+      sine * delta.x + cosine * delta.y
+    );
+    let normalized = rotated / sigma;
+    let d = dot(normalized, normalized);
+    if (d > RESOLVE_KERNEL_CUTOFF) {
+      continue;
+    }
+
+    let color = colorOpacity[gaussianIndex];
+    let weight = exp(-0.5 * d) * color.a * RESOLVE_ALPHA_GAIN;
+    if (weight <= 0.0001) {
+      continue;
+    }
+    accumulation = accumulation + vec4f(color.rgb * weight, weight);
+  }
+
+  let weight = accumulation.a;
+  if (weight <= 0.0001) {
+    pixelResolvedRgba[pixelIndex] = vec4f(0.0);
+    return;
+  }
+
+  let color = accumulation.rgb / max(weight, 0.0001);
+  let alpha = clamp(1.0 - exp(-weight * RESOLVE_ALPHA_SCALE), 0.0, 0.98);
+  pixelResolvedRgba[pixelIndex] = vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), alpha);
 }
 `;
 
@@ -215,11 +289,19 @@ export function createWebGpuPixelResolveMeta(tileSmoke) {
     tileSmoke?.pixelCount ??
       Math.max(1, tileSmoke?.viewportWidth ?? 1) * Math.max(1, tileSmoke?.viewportHeight ?? 1),
   );
-  return new Uint32Array([
+  return new Float32Array([
     pixelCount,
     Math.max(1, tileSmoke?.viewportWidth ?? 1),
+    Math.max(1, tileSmoke?.viewportHeight ?? 1),
     Math.max(1, tileSmoke?.tileSize ?? 1),
     Math.max(1, tileSmoke?.tileColumns ?? 1),
+    Math.max(1, tileSmoke?.maxEntriesPerTile ?? 1),
+    Number.isFinite(tileSmoke?.boundsMinX) ? tileSmoke.boundsMinX : -1,
+    Number.isFinite(tileSmoke?.boundsMinZ) ? tileSmoke.boundsMinZ : -1,
+    Math.max(0.0001, tileSmoke?.boundsSpanX ?? 2),
+    Math.max(0.0001, tileSmoke?.boundsSpanZ ?? 2),
+    0,
+    0,
   ]);
 }
 

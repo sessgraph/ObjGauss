@@ -85,11 +85,13 @@ assert.equal(base.tileEntryCapacity, base.tileCount * base.maxEntriesPerTile);
 assert.ok(base.tileEntryUtilization > 0 && base.tileEntryUtilization <= 1);
 assert.equal(base.resolveVersion, "webgpu-tile-resolve-v1");
 assert.equal(base.resolveMode, "tile-2x2-covariance-weighted-oit");
-assert.equal(base.pixelOutputMode, "viewport-storage-rgba-from-tile-resolve");
+assert.equal(base.pixelOutputMode, "viewport-storage-rgba-direct-gaussian");
 assert.equal(base.pixelOutputIncluded, true);
+assert.equal(base.pixelReferenceIncluded, true);
 assert.equal(base.pixelCount, base.viewportWidth * base.viewportHeight);
 assert.ok(base.resolvedTileCount > 0);
 assert.ok(base.pixelResolvedCount > 0);
+assert.ok(base.pixelResolvedCount > base.resolvedTileCount);
 assert.ok(base.resolveWeightSum > 0);
 assert.ok(base.resolveAlphaMean > 0);
 assert.ok(base.resolveLumaMean > 0);
@@ -176,18 +178,40 @@ assert.match(WEBGPU_TILE_COMPUTE_SHADER, /var<storage,\s*read_write>\s+tileResol
 assert.match(WEBGPU_TILE_COMPUTE_SHADER, /tileResolvedRgba\[tileIndex\]/);
 
 const pixelMeta = createWebGpuPixelResolveMeta(base);
-assert.deepEqual([...pixelMeta], [base.pixelCount, base.viewportWidth, base.tileSize, base.tileColumns]);
-assert.equal(pixelMeta.byteLength, 16);
-assert.equal(WEBGPU_PIXEL_RESOLVE_SOURCE, "webgpu-compute-pixel-resolve-v1");
+assert.deepEqual(
+  [...pixelMeta.slice(0, 6)],
+  [
+    base.pixelCount,
+    base.viewportWidth,
+    base.viewportHeight,
+    base.tileSize,
+    base.tileColumns,
+    base.maxEntriesPerTile,
+  ],
+);
+assert.ok(Math.abs(pixelMeta[6] - base.boundsMinX) < 0.000001);
+assert.ok(Math.abs(pixelMeta[7] - base.boundsMinZ) < 0.000001);
+assert.ok(Math.abs(pixelMeta[8] - base.boundsSpanX) < 0.000001);
+assert.ok(Math.abs(pixelMeta[9] - base.boundsSpanZ) < 0.000001);
+assert.equal(pixelMeta[10], 0);
+assert.equal(pixelMeta[11], 0);
+assert.equal(pixelMeta.byteLength, 48);
+assert.equal(WEBGPU_PIXEL_RESOLVE_SOURCE, "webgpu-compute-pixel-accumulation-v1");
 assert.equal(WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE, 64);
 assert.equal(
   webGpuPixelResolveWorkgroups(base),
   Math.ceil(base.pixelCount / WEBGPU_PIXEL_RESOLVE_WORKGROUP_SIZE),
 );
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /@compute\s+@workgroup_size\(64\)/);
-assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+tileResolvedRgba/);
+assert.ok(!WEBGPU_PIXEL_RESOLVE_SHADER.includes("tileResolvedRgba"));
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+positionRadius/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+colorOpacity/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+objectState/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+tileEntries/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read>\s+scaleRotation/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /var<storage,\s*read_write>\s+pixelResolvedRgba/);
 assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /pixelResolvedRgba\[pixelIndex\]/);
+assert.match(WEBGPU_PIXEL_RESOLVE_SHADER, /colorOpacity\[gaussianIndex\]/);
 
 const accumulationMeta = createWebGpuAccumulationMeta(base);
 assert.equal(accumulationMeta.byteLength, 48);

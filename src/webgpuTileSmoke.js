@@ -34,6 +34,7 @@ export function buildWebGpuTileSmoke({
   maxEntriesPerTile = WEBGPU_TILE_MAX_ENTRIES,
   includeTileEntries = false,
   includePixelOutput = false,
+  computePixelReference = includePixelOutput,
 }) {
   const objectIndex = buildObjectIndex(points);
   const objectStateContract = buildObjectState({
@@ -145,7 +146,16 @@ export function buildWebGpuTileSmoke({
   const resolve = resolveTileAccumulation(tileAccumulation);
   const pixelResolve = includePixelOutput
     ? resolvePixelOutput({
-        tileResolvedRgba: resolve.tileResolvedRgba,
+        computePixelReference,
+        positionRadius,
+        colorOpacity,
+        scaleRotation,
+        objectIndices,
+        objectState,
+        tileCounts,
+        tileEntries,
+        maxEntriesPerTile,
+        bounds,
         tileColumns,
         tileSize,
         viewportWidth,
@@ -160,8 +170,9 @@ export function buildWebGpuTileSmoke({
     viewportWidth,
     viewportHeight,
     pixelCount: viewportWidth * viewportHeight,
-    pixelOutputMode: includePixelOutput ? "viewport-storage-rgba-from-tile-resolve" : "not-allocated",
+    pixelOutputMode: includePixelOutput ? "viewport-storage-rgba-direct-gaussian" : "not-allocated",
     pixelOutputIncluded: Boolean(pixelResolve),
+    pixelReferenceIncluded: Boolean(pixelResolve?.computed),
     boundsMinX: bounds.minX,
     boundsMinZ: bounds.minZ,
     boundsSpanX: bounds.spanX,
@@ -333,7 +344,16 @@ function resolveTileAccumulation(tileAccumulation) {
 }
 
 function resolvePixelOutput({
-  tileResolvedRgba,
+  computePixelReference,
+  positionRadius,
+  colorOpacity,
+  scaleRotation,
+  objectIndices,
+  objectState,
+  tileCounts,
+  tileEntries,
+  maxEntriesPerTile,
+  bounds,
   tileColumns,
   tileSize,
   viewportWidth,
@@ -341,6 +361,22 @@ function resolvePixelOutput({
 }) {
   const pixelCount = viewportWidth * viewportHeight;
   const pixelResolvedRgba = new Float32Array(pixelCount * 4);
+  if (!computePixelReference || !tileEntries) {
+    return {
+      pixelResolvedRgba,
+      pixelResolvedCount: 0,
+      pixelResolveChecksum: "",
+      computed: false,
+    };
+  }
+
+  const projection = buildPixelProjection({
+    positionRadius,
+    scaleRotation,
+    bounds,
+    viewportWidth,
+    viewportHeight,
+  });
   let pixelResolvedCount = 0;
   let checksum = 2166136261;
 
@@ -348,19 +384,55 @@ function resolvePixelOutput({
     const tileY = Math.floor(y / tileSize);
     for (let x = 0; x < viewportWidth; x += 1) {
       const tileX = Math.min(Math.floor(x / tileSize), tileColumns - 1);
-      const tileOffset = (tileY * tileColumns + tileX) * 4;
+      const tileIndex = tileY * tileColumns + tileX;
+      const storedCount = Math.min(tileCounts[tileIndex], maxEntriesPerTile);
+      const entryBase = tileIndex * maxEntriesPerTile;
       const pixelOffset = (y * viewportWidth + x) * 4;
-      const red = tileResolvedRgba[tileOffset];
-      const green = tileResolvedRgba[tileOffset + 1];
-      const blue = tileResolvedRgba[tileOffset + 2];
-      const alpha = tileResolvedRgba[tileOffset + 3];
+      let accumulatedRed = 0;
+      let accumulatedGreen = 0;
+      let accumulatedBlue = 0;
+      let accumulatedWeight = 0;
+
+      for (let entryOffset = 0; entryOffset < storedCount; entryOffset += 1) {
+        const gaussianIndex = tileEntries[entryBase + entryOffset];
+        const objectDenseIndex = objectIndices[gaussianIndex];
+        if (!objectIsVisible(objectState, objectDenseIndex)) continue;
+
+        const dx = x + 0.5 - projection.screenX[gaussianIndex];
+        const dy = y + 0.5 - projection.screenY[gaussianIndex];
+        const cosine = projection.cosine[gaussianIndex];
+        const sine = projection.sine[gaussianIndex];
+        const rotatedX = cosine * dx - sine * dy;
+        const rotatedY = sine * dx + cosine * dy;
+        const d =
+          (rotatedX * rotatedX) / projection.sigmaXSquared[gaussianIndex] +
+          (rotatedY * rotatedY) / projection.sigmaYSquared[gaussianIndex];
+        if (d > RESOLVE_KERNEL_CUTOFF) continue;
+
+        const gaussianOffset = gaussianIndex * 4;
+        const weight =
+          Math.exp(-0.5 * d) *
+          colorOpacity[gaussianOffset + 3] *
+          RESOLVE_ALPHA_GAIN;
+        if (weight <= 0.0001) continue;
+        accumulatedRed += colorOpacity[gaussianOffset] * weight;
+        accumulatedGreen += colorOpacity[gaussianOffset + 1] * weight;
+        accumulatedBlue += colorOpacity[gaussianOffset + 2] * weight;
+        accumulatedWeight += weight;
+      }
+
+      if (accumulatedWeight <= 0.0001) continue;
+
+      const red = accumulatedRed / accumulatedWeight;
+      const green = accumulatedGreen / accumulatedWeight;
+      const blue = accumulatedBlue / accumulatedWeight;
+      const alpha = clampNumber(1 - Math.exp(-accumulatedWeight * RESOLVE_ALPHA_SCALE), 0, 0.98);
       pixelResolvedRgba[pixelOffset] = red;
       pixelResolvedRgba[pixelOffset + 1] = green;
       pixelResolvedRgba[pixelOffset + 2] = blue;
       pixelResolvedRgba[pixelOffset + 3] = alpha;
-      if (alpha <= 0.0001) continue;
       pixelResolvedCount += 1;
-      checksum = checksumValue(checksum, red, green, blue, alpha, alpha);
+      checksum = checksumValue(checksum, red, green, blue, alpha, accumulatedWeight);
     }
   }
 
@@ -368,7 +440,47 @@ function resolvePixelOutput({
     pixelResolvedRgba,
     pixelResolvedCount,
     pixelResolveChecksum: checksum.toString(16).padStart(8, "0"),
+    computed: true,
   };
+}
+
+function buildPixelProjection({
+  positionRadius,
+  scaleRotation,
+  bounds,
+  viewportWidth,
+  viewportHeight,
+}) {
+  const gaussianCount = positionRadius.length / 4;
+  const screenX = new Float32Array(gaussianCount);
+  const screenY = new Float32Array(gaussianCount);
+  const sigmaXSquared = new Float32Array(gaussianCount);
+  const sigmaYSquared = new Float32Array(gaussianCount);
+  const cosine = new Float32Array(gaussianCount);
+  const sine = new Float32Array(gaussianCount);
+  const pixelsPerWorldUnit = Math.min(
+    viewportWidth / Math.max(bounds.spanX, 0.0001),
+    viewportHeight / Math.max(bounds.spanZ, 0.0001),
+  );
+
+  for (let index = 0; index < gaussianCount; index += 1) {
+    const offset = index * 4;
+    screenX[index] =
+      ((positionRadius[offset] - bounds.minX) / Math.max(bounds.spanX, 0.0001)) *
+      Math.max(1, viewportWidth - 1);
+    screenY[index] =
+      (1 - (positionRadius[offset + 1] - bounds.minZ) / Math.max(bounds.spanZ, 0.0001)) *
+      Math.max(1, viewportHeight - 1);
+    const sigmaX = Math.max((scaleRotation[offset] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
+    const sigmaY = Math.max((scaleRotation[offset + 1] * pixelsPerWorldUnit * 4.8) / 3, 0.0001);
+    sigmaXSquared[index] = sigmaX * sigmaX;
+    sigmaYSquared[index] = sigmaY * sigmaY;
+    const rotation = scaleRotation[offset + 2];
+    cosine[index] = Math.cos(rotation);
+    sine[index] = Math.sin(rotation);
+  }
+
+  return { screenX, screenY, sigmaXSquared, sigmaYSquared, cosine, sine };
 }
 
 function checksumValue(checksum, red, green, blue, alpha, weight) {
