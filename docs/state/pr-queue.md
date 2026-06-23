@@ -17,7 +17,6 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-004A`: WebGPU capability detection、renderer boundary 和 audit contract。
   - `RENDER-004B`: Gaussian WebGPU buffer packing、clear/project/bin smoke path。
   - `RENDER-004C`: tile accumulation + fullscreen resolve。
   - `RENDER-004D`: object-state buffer 接入隐藏 / 隔离 / 删除。
@@ -28,6 +27,31 @@
   - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
 
 ## Done
+
+### RENDER-004A: WebGPU renderer boundary and capability contract
+
+- 状态: done
+- 类型: 标准 PR / 前端渲染架构
+- 目标: 在真正实现 WebGPU tile renderer 前，先建立 renderer boundary、WebGPU capability detection 和可审计 fallback contract。
+- 范围外:
+  - 不实现 tile binning、WebGPU storage buffer packing 或 accumulation shader。
+  - 不替换当前 `Gaussian OIT 编辑` fallback。
+  - 不声称删除后的自身颜色已经是完整 3DGS 重渲染。
+- 实施:
+  - 新增 `src/webgpuCapability.js`，检测 `navigator.gpu`、adapter 和 device，并输出稳定 capability reason。
+  - `App` 维护 WebGPU capability 状态，明确显示当前 edit renderer、目标 renderer、WebGPU 状态、fallback reason 和 tile overflow。
+  - `SplatViewport` 暴露 `data-renderer="spark-splat"`。
+  - `PointCloudViewport` 暴露 `data-renderer="gaussian-oit"`、`data-renderer-target="webgpu-tile"`、`data-renderer-fallback-reason`、`data-webgpu-status`、`data-tile-overflow-count` 和 object filter。
+  - `audit-demo` 验证 Spark 真实查看 renderer id、WebGPU tile target、resolved WebGPU status、fallback reason、tile overflow 和现有 object-state filtering。
+- 验收:
+  - WebGPU 不可用环境中明确 fallback 到 `Gaussian OIT 编辑`，不伪装成 WebGPU renderer。
+  - Browser audit 能看到 `rendererTarget="webgpu-tile"`、`editRendererId="gaussian-oit"` 和非空 fallback reason。
+  - 三个默认闭环样例的真实查看、编辑画布选中、隔离和删除预览仍通过。
+- 验证:
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --url http://127.0.0.1:5197/`: passed，assets=3；当前 headless Chrome 输出 `webgpuStatus="unavailable"`、`fallbackReason="webgpu-adapter-unavailable"`、`tileOverflowCount=0`。
+- 完成 commit: `ad82813`.
 
 ### RENDER-003: GPU object-state filtering for edit renderer
 
