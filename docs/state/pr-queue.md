@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AT`: 建立 WebGPU / Spark renderer readiness matrix，明确商业 Demo 默认路线、WebGPU 诊断路线和何时允许切换默认渲染。
+  - `RENDER-005T-AU`: 将 renderer readiness matrix 反映到产品 UI，精简商业 Demo 的颜色/调试入口，并让 source/original delete preview 的质量边界更清晰。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,24 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AT: Renderer readiness matrix
+
+- 状态: done / route-decision-recorded
+- 类型: 标准 PR / 渲染路线决策
+- 目标: 建立 WebGPU / Spark renderer readiness matrix，明确商业 Demo 默认路线、WebGPU 诊断路线和何时允许切换默认渲染。
+- 已实施:
+  - 新增 `docs/rendering/renderer-readiness-matrix.md`。
+  - 明确当前商业展示默认走 Spark source/original route：no-SH 样例走 native `.splat` mask，SH-heavy 样例走 PLY packed SH mask。
+  - 明确 WebGPU Tile 是 C-path proof / diagnostics，不是当前商业默认 renderer。
+  - 将“原始颜色 / 自身颜色删除后仍可能颗粒”的原因记录为 hard object mask、边界 assignment、未重优化补洞和 SH-heavy packed route 的质量边界，而不是颜色丢失 bug。
+  - 记录 WebGPU 切默认前必须通过的 headless acceptance、desktop presentation、coverage gate、trained SH parity 和多场景 object edit pixel evidence。
+- 结论:
+  - 当前产品路线应继续优先 Spark filtered edit，避免把 WebGPU 诊断近似展示成商业默认效果。
+  - 下一步 UX 切片应把 renderer route / quality boundary 反映到界面，并把 `对象色` 明确降级为诊断模式。
+- 验证:
+  - `git diff --check`: passed。
+  - 文档引用检查：`docs/state/project-status.md` 和 `docs/state/pr-queue.md` 均指向 `docs/rendering/renderer-readiness-matrix.md`。
 
 ### RENDER-005T-AS: WebGPU headless acceptance and presentation split
 
