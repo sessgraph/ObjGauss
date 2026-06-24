@@ -107,6 +107,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AP 已完成 WebGPU offscreen readback probe：新增 `webgpu-probe=offscreen-readback` 和 `npm run audit:webgpu-offscreen-readback`，该 probe 只 dispatch pixel compute、把 `pixelResolvedRgba` copy 到 `MAP_READ` buffer 并暴露 `data-webgpu-readback-*`，不创建 canvas render pass。Lego proxy 本地 audit 通过：`firstFrame="readback":253952`、`queue="done"`、`deviceLost="active"`、`readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740`，证明 headless/CI 可单独验证 WebGPU compute/storage/readback，而不把 presentation backend loss 误判为 renderer compute failure。
   - RENDER-005T-AQ 已完成 WebGPU offscreen readback 多场景 suite：新增 `scripts/audit-webgpu-offscreen-readback.mjs`，`npm run audit:webgpu-offscreen-readback` 现在默认覆盖 Lego proxy + Plush semantic，并写出 `/tmp/objgauss-webgpu-offscreen-readback/summary.{json,md}`。默认双场景 gate 通过：Lego `readback="mapped":"897e852d":4063232:1015808/1015808:533740`，Plush `readback="mapped":"0f87864a":2359296:589824/589824:254524`、`packedGaussians=281498`、`tileReferences=1190026`。
   - RENDER-005T-AR 已完成 WebGPU offscreen object-state transition gate：`audit-demo --webgpu-object-transition` 会在 `offscreen-readback` 下通过 `spark-filtered-edit=off` 留在 WebGPU Tile 编辑路径，执行选中、隔离和删除，并要求 object-state checksum 与 readback checksum 都三段变化。默认双场景 gate 通过：Lego readback `897e852d -> 3bd507d9 -> 916a5fc9`，Plush readback `0f87864a -> 0bdb3b09 -> 9660bc47`；对应 object-state 分别为 `7243475b -> f72fa1f4 -> 35652440` 和 `362760d7 -> fc48aab0 -> 637142bc`。
+  - RENDER-005T-AS 已完成 WebGPU headless acceptance / presentation split：新增 `npm run acceptance:webgpu-headless`，一键执行 build、WebGPU tile smoke 和 offscreen object-transition suite；`docs/rendering/webgpu-headless-acceptance.md` 明确该命令证明 compute/storage/object-state/readback，不证明 canvas presentation，headed presentation 仍由 `npm run audit:webgpu-desktop` 覆盖，visual tuning 仍由 coverage gate 覆盖。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -161,6 +162,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
   - `npm run acceptance:demo` 已固化为一键闭环总验收命令。
   - `npm run acceptance:semantic` 已固化为 SEMANTIC benchmark suite 验收命令。
+  - `npm run acceptance:webgpu-headless` 已固化为 WebGPU CI/headless acceptance 命令；默认构建 viewer、跑 WebGPU tile smoke、再跑 Lego proxy + Plush semantic 的 offscreen object-transition suite。
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
   - `npm run benchmark:splatfacto:balanced` 已固化为 safe-2000 balanced candidate 的一键本地 benchmark 入口，可重跑 balanced SAM、`training register-output`、emergence metrics、curve、report 和 summary。
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
@@ -183,10 +185,12 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 node --check scripts/audit-demo.mjs
+node --check scripts/acceptance-webgpu-headless.mjs
 node --check scripts/audit-webgpu-offscreen-readback.mjs
 node --check scripts/audit-webgpu-desktop.mjs
 npm run audit:webgpu-tile-smoke
 npm run build
+npm run acceptance:webgpu-headless -- --port 5330 --output-dir /tmp/objgauss-webgpu-headless-acceptance
 npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5323 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition-single
 npm run audit:webgpu-offscreen-readback -- --port 5324 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition
 node --check scripts/audit-spark-pick-report.mjs

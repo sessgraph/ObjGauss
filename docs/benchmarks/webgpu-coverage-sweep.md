@@ -176,8 +176,13 @@ Use the offscreen readback suite when CI/headless WebGPU needs to distinguish
 compute/storage health from canvas presentation backend loss:
 
 ```bash
+npm run acceptance:webgpu-headless
 npm run audit:webgpu-offscreen-readback
 ```
+
+Use `acceptance:webgpu-headless` for the higher-level CI gate. Use
+`audit:webgpu-offscreen-readback` directly when iterating on the lower-level
+readback suite.
 
 The suite runs the WebGPU pixel compute path, copies `pixelResolvedRgba` into a
 `MAP_READ` buffer, validates `data-webgpu-readback-*` telemetry, and writes

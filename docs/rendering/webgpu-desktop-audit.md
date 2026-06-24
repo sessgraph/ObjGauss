@@ -5,6 +5,10 @@
 This audit separates a real desktop Chrome/WebGPU presentation result from the
 known headless unsafe-WebGPU presentation backend loss.
 
+For CI/headless compute, storage, readback, and object-state transition
+coverage, run `npm run acceptance:webgpu-headless` instead. Passing headless
+acceptance is not a substitute for this desktop presentation audit.
+
 ## When To Run
 
 Run this after `RENDER-005P` when a machine has a desktop session and a

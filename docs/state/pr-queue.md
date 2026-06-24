@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AS`: 将 WebGPU offscreen object-transition suite 纳入更高层 acceptance / CI-headless runbook，并明确与 headed presentation gate 的分工。
+  - `RENDER-005T-AT`: 建立 WebGPU / Spark renderer readiness matrix，明确商业 Demo 默认路线、WebGPU 诊断路线和何时允许切换默认渲染。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AS: WebGPU headless acceptance and presentation split
+
+- 状态: done / headless-acceptance-runbooked
+- 类型: 标准 PR / WebGPU acceptance integration
+- 目标: 将 WebGPU offscreen object-transition suite 纳入更高层 acceptance / CI-headless runbook，并明确与 headed presentation gate 的分工。
+- 已实施:
+  - 新增 `scripts/acceptance-webgpu-headless.mjs` 与 `npm run acceptance:webgpu-headless`。
+  - Headless acceptance 顺序执行 `npm run build`、`npm run audit:webgpu-tile-smoke` 和 `npm run audit:webgpu-offscreen-readback`。
+  - 新增 `docs/rendering/webgpu-headless-acceptance.md`，记录命令、输出目录、可证明内容、不可证明内容，以及与 `audit:webgpu-desktop` / `audit:webgpu-coverage-gate` 的分工。
+  - `docs/rendering/webgpu-desktop-audit.md` 增加 headless acceptance 交叉引用，防止把 offscreen readback 误当 canvas presentation 通过。
+- 结论:
+  - `acceptance:webgpu-headless` 是 CI/headless compute/storage/object editing gate。
+  - `audit:webgpu-desktop` 仍是 headed browser canvas presentation gate。
+  - `audit:webgpu-coverage-gate` 仍是 visual fidelity / tuning regression gate。
+  - 该接入不改变默认商业展示 Spark filtered edit route，也不改 WebGPU shader / visual 参数。
+- 验证:
+  - `node --check scripts/acceptance-webgpu-headless.mjs`: passed。
+  - `npm run acceptance:webgpu-headless -- --port 5330 --output-dir /tmp/objgauss-webgpu-headless-acceptance`: passed；Lego / Plush object-transition readback report 写入 `/tmp/objgauss-webgpu-headless-acceptance/offscreen-readback/summary.*`。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AR: WebGPU offscreen object-state transition gate
 
