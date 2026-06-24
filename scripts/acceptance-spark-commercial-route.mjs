@@ -11,6 +11,8 @@ const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
 const skipTrainedSampleAudit = flagEnabled(
   args.skipTrainedSampleAudit ?? args["skip-trained-sample-audit"],
 );
+const nativeAssets = optionalString(args.nativeAssets ?? args["native-assets"]);
+const trainedAssets = optionalString(args.trainedAssets ?? args["trained-assets"]);
 
 const steps = [
   ...(skipBuild ? [] : [["Build viewer", ["npm", "run", "build"]]]),
@@ -31,11 +33,27 @@ const steps = [
       ]),
   [
     "Spark no-SH native object mask route",
-    ["npm", "run", "audit:spark-native-mask-gate", "--", "--port", nativePort],
+    [
+      "npm",
+      "run",
+      "audit:spark-native-mask-gate",
+      "--",
+      "--port",
+      nativePort,
+      ...assetArgs(nativeAssets),
+    ],
   ],
   [
     "Spark SH-heavy packed object mask route",
-    ["npm", "run", "audit:spark-trained-route", "--", "--port", trainedPort],
+    [
+      "npm",
+      "run",
+      "audit:spark-trained-route",
+      "--",
+      "--port",
+      trainedPort,
+      ...assetArgs(trainedAssets),
+    ],
   ],
 ];
 
@@ -49,6 +67,10 @@ const report = {
   },
   skipBuild,
   skipTrainedSampleAudit,
+  assets: {
+    native: nativeAssets || "default",
+    trained: trainedAssets || "default",
+  },
   steps: [],
   routes: {
     native: [],
@@ -127,6 +149,15 @@ function flagEnabled(value) {
   if (value === true) return true;
   if (value === undefined || value === null || value === false) return false;
   return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+function optionalString(value) {
+  if (value === true || value === false || value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+function assetArgs(value) {
+  return value ? ["--assets", value] : [];
 }
 
 function run(label, command) {
@@ -235,6 +266,8 @@ function renderMarkdown(report) {
     `- Generated: ${report.generatedAt}`,
     `- Native port: ${report.ports.native}`,
     `- Trained port: ${report.ports.trained}`,
+    `- Native assets: ${report.assets.native}`,
+    `- Trained assets: ${report.assets.trained}`,
     "",
     "## Step Results",
     "",

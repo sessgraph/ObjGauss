@@ -16,6 +16,7 @@
 | NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
 | NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实多视角 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
 | Poly Haven School Chair NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf/` | 第三个 Splatfacto-trained benchmark scene，由 CC0 glTF mesh 离线渲染多视角 RGBA | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
+| Poly Haven Chair 商用展示样例 | https://polyhaven.com/a/SchoolChair_01 | `public/samples/polyhaven_chair_demo.splat` + `public/samples/polyhaven_chair_demo_objects.ply` | 许可干净、viewer 可直接加载和对象编辑的 Gaussian demo sample | CC0 派生训练输出；public sample 文件本地生成，不提交 git |
 
 处理链路：
 
@@ -262,6 +263,46 @@ outputs/assets/converted/polyhaven-school-chair-nerf/training-manifest.json
 里的第三个 Splatfacto-trained scene row。当前 renderer 是确定性 mesh
 rasterizer，用于生成可复现训练图像；它不是现实相机采集数据，也不替代
 真实 3DGS / Spark renderer。
+
+### Poly Haven Chair Commercial Demo Sample
+
+处理链路：
+
+```text
+Poly Haven School Chair NeRF render set
+  -> Nerfstudio Splatfacto smoke training
+  -> Object Field / SAM mask vote
+  -> object_aware_gaussians.ply + gaussians.splat
+  -> public/samples/polyhaven_chair_demo_objects.ply
+  -> public/samples/polyhaven_chair_demo.splat
+```
+
+发布到本地 viewer 样例目录：
+
+```bash
+npm run publish:polyhaven-chair-demo
+```
+
+默认输入：
+
+```text
+outputs/assets/gaussians/polyhaven-chair-splatfacto-smoke-sam8f-slots6-benchmark/gaussians.splat
+outputs/assets/gaussians/polyhaven-chair-splatfacto-smoke-sam8f-slots6-benchmark/object_aware_gaussians.ply
+```
+
+默认输出：
+
+```text
+public/samples/polyhaven_chair_demo.splat
+public/samples/polyhaven_chair_demo_objects.ply
+/tmp/objgauss-polyhaven-chair-demo-publish/summary.json
+/tmp/objgauss-polyhaven-chair-demo-publish/summary.md
+```
+
+该样例登记为 `polyhaven-chair-commercial-demo-local`，用于商业展示路线、
+对象隔离和删除预览。`public/samples/*.splat` 与 `*.ply` 是本地生成
+ignored 文件，不进入 git；fresh clone 需要先生成或复制训练输出，再运行
+上面的 publish 命令。
 
 浏览器闭环验收：
 

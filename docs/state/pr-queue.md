@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-004`: 基于 `audit:commercial-demo-readiness` 的结论，补一个 license-clean、viewer 可直接交互的 Gaussian demo sample；当前 route-ready 样例均不是 public-commercial license-clean。
+  - `DEMO-005`: 针对用户反馈继续收敛 `自身颜色` hard-mask 预览的 UX copy，并评估 soft boundary / feathered object opacity 是否能降低删除后颗粒感。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-004: Poly Haven Chair commercial Gaussian sample registration
+
+- 状态: done / commercial-sample-registered
+- 类型: 标准 PR / demo asset registration
+- 目标: 基于 `audit:commercial-demo-readiness` 的结论，补一个 license-clean、viewer 可直接交互的 Gaussian demo sample。
+- 已实施:
+  - 新增 `polyhaven-chair-commercial-demo-local` 前端素材与 CLI asset registry 记录，指向本地生成的 `public/samples/polyhaven_chair_demo.splat` 和 `public/samples/polyhaven_chair_demo_objects.ply`。
+  - 新增 `scripts/publish-polyhaven-chair-demo.mjs` 与 `npm run publish:polyhaven-chair-demo`，把已有 Splatfacto chair 输出发布到 ignored public sample 路径，并写 `/tmp/objgauss-polyhaven-chair-demo-publish/summary.{json,md}`。
+  - `acceptance:spark-commercial-route` 支持 `--native-assets` / `--trained-assets`，可以只跑指定样例的 route gate。
+  - `audit-commercial-demo-readiness` 可合并多个 route / quality summaries，把 chair 样例纳入 public-commercial eligibility 表。
+  - `docs/asset-library.md` 和 `docs/rendering/renderer-readiness-matrix.md` 记录本地生成边界、命令和当前准入结论。
+- 结论:
+  - Chair 本地样例有 50,000 个 Gaussian 和 6 个 object ids，Spark trained route / hard-mask quality / commercial readiness 均有本地报告证据。
+  - 当前 public-commercial candidate 从 `0` 增至 `1`，但删除后仍是 `hard-object-mask-no-reoptimize`，不是补洞或重优化后的完整编辑结果。
+  - 完整 generic `audit:demo` 对 chair 本轮超过合理等待后中止，未作为 gate；后续需要 `DEMO-005` 或专门的 heavy-sample audit 优化。
+- 验证:
+  - `node --check scripts/publish-polyhaven-chair-demo.mjs`: passed。
+  - `npm run publish:polyhaven-chair-demo -- --output-dir /tmp/objgauss-polyhaven-chair-demo-publish`: passed。
+  - `uv run objgauss stats public/samples/polyhaven_chair_demo_objects.ply`: passed；`gaussians=50000`，`objects=6`。
+  - `npm run audit:spark-trained-route -- --assets polyhaven-chair-commercial-demo-local --port 5367`: passed。
+  - `npm run acceptance:spark-commercial-route -- --skip-build --skip-trained-sample-audit --trained-assets polyhaven-chair-commercial-demo-local --native-port 5368 --trained-port 5369 --output-dir /tmp/objgauss-spark-commercial-route-chair`: passed。
+  - `npm run audit:object-mask-boundary -- --assets polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-object-mask-boundary-chair`: passed。
+  - `npm run audit:spark-reconstruct-residual -- --assets polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-spark-reconstruct-residual-chair --port 5370 --allow-failures`: passed。
+  - `npm run audit:hard-mask-quality -- --boundary-summary /tmp/objgauss-object-mask-boundary-chair/summary.json --route-summary /tmp/objgauss-spark-commercial-route-chair/summary.json --residual-summary /tmp/objgauss-spark-reconstruct-residual-chair/summary.json --output-dir /tmp/objgauss-hard-mask-quality-chair --require-route --require-residual`: passed；interpretation=`boundary-mixing-dominant`。
+  - `npm run audit:commercial-demo-readiness -- --output-dir /tmp/objgauss-commercial-demo-readiness-with-chair`: passed；`publicCommercial=1`。
 
 ### RENDER-005T-BE: Commercial demo readiness QA
 

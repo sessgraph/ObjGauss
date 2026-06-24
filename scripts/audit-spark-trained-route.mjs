@@ -20,6 +20,11 @@ const KNOWN_ASSETS = [
     name: "NeRF Lego 训练输出样例",
     fileName: "nerf_lego_trained_objects.ply",
   },
+  {
+    id: "polyhaven-chair-commercial-demo-local",
+    name: "Poly Haven Chair 商用展示样例",
+    fileName: "polyhaven_chair_demo_objects.ply",
+  },
 ];
 
 const args = parseArgs(process.argv.slice(2));

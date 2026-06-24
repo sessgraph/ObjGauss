@@ -105,6 +105,14 @@ const HARD_MASK_QUALITY_BY_ASSET = {
     hardMaskGapScore: 0.377656,
     residualCoverageRatio: 15.599172,
   },
+  "polyhaven-chair-commercial-demo-local": {
+    interpretation: "boundary-mixing-dominant",
+    label: "边界混合主导",
+    source: "hard-mask-quality-chain-v1",
+    deletedObjectId: 0,
+    hardMaskGapScore: 0.29813,
+    residualCoverageRatio: 1.075414,
+  },
 };
 
 export default function App() {

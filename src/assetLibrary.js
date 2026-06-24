@@ -150,6 +150,24 @@ export const ASSET_LIBRARY = [
     bestFor: "登记外部 3DGS 训练器产出的 Lego Gaussian，并用 2D mask 投票导出对象级 PLY。",
   },
   {
+    id: "polyhaven-chair-commercial-demo-local",
+    name: "Poly Haven Chair 商用展示样例",
+    category: "可商用展示",
+    sourceType: "gaussian",
+    status: "生成后可用",
+    priority: "P0",
+    pipelineStage: "CC0 训练输出接入",
+    useCases: ["商用展示", "对象编辑", "Spark SH route"],
+    localPath: "/samples/polyhaven_chair_demo_objects.ply",
+    splatPath: "/samples/polyhaven_chair_demo.splat",
+    fileName: "polyhaven_chair_demo_objects.ply",
+    sourceName: "Poly Haven School Chair 01 + ObjGauss Splatfacto smoke",
+    sourceUrl: "https://polyhaven.com/a/SchoolChair_01",
+    license: "CC0；Poly Haven School Chair 01 派生训练输出",
+    formats: [".splat", ".ply", "object_id", "CC0"],
+    bestFor: "许可干净的单对象家具 Gaussian demo，用于商业展示路线、对象隔离和删除预览。",
+  },
+  {
     id: "arkitscenes",
     name: "ARKitScenes",
     category: "真实室内场景",
@@ -259,6 +277,7 @@ export const ASSET_LIBRARY = [
 
 export const FEATURED_ASSET_IDS = [
   "plush-semantic-closure-local",
+  "polyhaven-chair-commercial-demo-local",
   "plush-v1-closure-local",
   "nerf-lego-alpha-closure-local",
   "nerf-lego-trained-output-local",

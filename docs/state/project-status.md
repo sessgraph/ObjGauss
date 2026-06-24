@@ -113,6 +113,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AV 已完成 SH-heavy Spark route-only audit：新增 `npm run audit:spark-trained-route`，默认用静态 preview 验证 `nerf-lego-trained-output-local` 的 `spark-ply-sh-source` 初始 route、删除后的 `spark-packed-sh-mask` / `packed-sh-extract-v1`、`object-opacity-texture-v1`、`hard-object-mask-no-reoptimize` 和完整 degree-3 SH rest preservation。
   - RENDER-005T-BD 已完成产品 hard-mask quality status：状态面板新增 `质量解释`，root DOM 暴露 `data-hard-mask-quality-*`，`audit-demo` 可验证并打印 hard-mask quality contract；`自身颜色` 现在只表示颜色来源，颗粒感来源由 `预览边界` 和 `质量解释` 区分为原始 Spark、高斯 hard mask 边界混合、重建残差或待审计。
   - RENDER-005T-BE 已完成 commercial demo readiness QA：新增 `npm run audit:commercial-demo-readiness`，可把 Spark route summary 与 hard-mask quality summary 合并成样例准入表，区分“商业展示路线可演示”“研究 / 诊断样例”“待 route QA”和 public-commercial license eligibility；当前本地报告显示 public-commercial candidate 为 0。
+  - DEMO-004 已登记 Poly Haven Chair 商用展示样例：`polyhaven-chair-commercial-demo-local` 指向本地生成的 `polyhaven_chair_demo.splat` / `polyhaven_chair_demo_objects.ply`，发布命令为 `npm run publish:polyhaven-chair-demo`；当前本地 commercial readiness 报告显示 public-commercial candidate 为 1，但它仍是 hard-mask / no-reoptimize 删除预览。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -197,6 +198,15 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/publish-polyhaven-chair-demo.mjs
+npm run publish:polyhaven-chair-demo -- --output-dir /tmp/objgauss-polyhaven-chair-demo-publish
+uv run objgauss stats public/samples/polyhaven_chair_demo_objects.ply
+npm run audit:spark-trained-route -- --assets polyhaven-chair-commercial-demo-local --port 5367
+npm run acceptance:spark-commercial-route -- --skip-build --skip-trained-sample-audit --trained-assets polyhaven-chair-commercial-demo-local --native-port 5368 --trained-port 5369 --output-dir /tmp/objgauss-spark-commercial-route-chair
+npm run audit:object-mask-boundary -- --assets polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-object-mask-boundary-chair
+npm run audit:spark-reconstruct-residual -- --assets polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-spark-reconstruct-residual-chair --port 5370 --allow-failures
+npm run audit:hard-mask-quality -- --boundary-summary /tmp/objgauss-object-mask-boundary-chair/summary.json --route-summary /tmp/objgauss-spark-commercial-route-chair/summary.json --residual-summary /tmp/objgauss-spark-reconstruct-residual-chair/summary.json --output-dir /tmp/objgauss-hard-mask-quality-chair --require-route --require-residual
+npm run audit:commercial-demo-readiness -- --output-dir /tmp/objgauss-commercial-demo-readiness-with-chair
 node --check scripts/audit-commercial-demo-readiness.mjs
 npm run audit:commercial-demo-readiness -- --output-dir /tmp/objgauss-commercial-demo-readiness
 node --check scripts/audit-demo.mjs

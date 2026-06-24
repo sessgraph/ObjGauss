@@ -5,11 +5,13 @@ import { ASSET_LIBRARY } from "../src/assetLibrary.js";
 
 const MODE = "commercial-demo-readiness-v1";
 const DEFAULT_ROUTE_SUMMARIES = [
+  "/tmp/objgauss-spark-commercial-route-chair/summary.json",
   "/tmp/objgauss-spark-commercial-route/summary.json",
   "/tmp/objgauss-spark-commercial-route-availability/summary.json",
   "/tmp/objgauss-spark-commercial-route-report/summary.json",
 ];
 const DEFAULT_QUALITY_SUMMARIES = [
+  "/tmp/objgauss-hard-mask-quality-chair/summary.json",
   "/tmp/objgauss-hard-mask-quality/summary.json",
   "/tmp/objgauss-hard-mask-quality-default/summary.json",
 ];
@@ -28,21 +30,21 @@ const requirePublicCommercial = flagEnabled(
   args.requirePublicCommercial ?? args["require-public-commercial"],
 );
 
-const routeSummary = firstExistingJson(routeSummaryPaths);
-const qualitySummary = firstExistingJson(qualitySummaryPaths);
-if (!routeSummary) {
+const routeSummaries = existingJsons(routeSummaryPaths);
+const qualitySummaries = existingJsons(qualitySummaryPaths);
+if (routeSummaries.length === 0) {
   throw new Error(
     `missing Spark route summary; run npm run acceptance:spark-commercial-route first or pass --route-summary`,
   );
 }
-if (!qualitySummary) {
+if (qualitySummaries.length === 0) {
   throw new Error(
     `missing hard-mask quality summary; run npm run audit:hard-mask-quality first or pass --quality-summary`,
   );
 }
 
-const routeByAsset = buildRouteIndex(routeSummary.payload);
-const qualityByAsset = buildQualityIndex(qualitySummary.payload);
+const routeByAsset = buildRouteIndex(routeSummaries.map((summary) => summary.payload));
+const qualityByAsset = buildQualityIndex(qualitySummaries.map((summary) => summary.payload));
 const renderableAssets = ASSET_LIBRARY.filter(
   (asset) => asset.sourceType === "gaussian" && asset.localPath && asset.splatPath,
 );
@@ -68,8 +70,8 @@ const summary = {
   generatedAt: new Date().toISOString(),
   outputDir,
   inputs: {
-    routeSummary: routeSummary.path,
-    qualitySummary: qualitySummary.path,
+    routeSummaries: routeSummaries.map((summary) => summary.path),
+    qualitySummaries: qualitySummaries.map((summary) => summary.path),
   },
   requirements: {
     requireRouteEvidence,
@@ -208,42 +210,46 @@ function classifyLicense(asset) {
   return "license-review-required";
 }
 
-function buildRouteIndex(routeSummary) {
+function buildRouteIndex(routeSummaries) {
   const map = new Map();
-  for (const route of routeSummary?.routes?.native ?? []) {
-    map.set(route.asset, {
-      kind: "native-no-sh",
-      source: route.source,
-      boundary: route.boundary,
-      visibleGaussians: Number(route.visibleGaussians),
-      baseGaussians: Number(route.baseGaussians),
-      screenshot: route.screenshot ?? "",
-    });
-  }
-  for (const route of routeSummary?.routes?.trained ?? []) {
-    map.set(route.asset, {
-      kind: "trained-sh-heavy",
-      source: route.spark?.join("/") ?? "",
-      boundary: route.delete?.join("/") ?? "",
-      visibleGaussians: Number(route.visibleGaussians),
-      baseGaussians: Number(route.baseGaussians),
-      screenshot: route.screenshot ?? "",
-    });
+  for (const routeSummary of routeSummaries) {
+    for (const route of routeSummary?.routes?.native ?? []) {
+      map.set(route.asset, {
+        kind: "native-no-sh",
+        source: route.source,
+        boundary: route.boundary,
+        visibleGaussians: Number(route.visibleGaussians),
+        baseGaussians: Number(route.baseGaussians),
+        screenshot: route.screenshot ?? "",
+      });
+    }
+    for (const route of routeSummary?.routes?.trained ?? []) {
+      map.set(route.asset, {
+        kind: "trained-sh-heavy",
+        source: route.spark?.join("/") ?? "",
+        boundary: route.delete?.join("/") ?? "",
+        visibleGaussians: Number(route.visibleGaussians),
+        baseGaussians: Number(route.baseGaussians),
+        screenshot: route.screenshot ?? "",
+      });
+    }
   }
   return map;
 }
 
-function buildQualityIndex(qualitySummary) {
+function buildQualityIndex(qualitySummaries) {
   const map = new Map();
-  for (const row of qualitySummary?.rows ?? []) {
-    map.set(row.assetId, {
-      interpretation: row.interpretation,
-      residualStatus: row.residualStatus,
-      routeKind: row.routeKind,
-      hardMaskGapScore: row.boundary?.hardMaskGapScore ?? null,
-      residualCoverageRatio: row.residual?.coverageRatio ?? null,
-      screenshotPath: row.residual?.screenshotPath ?? "",
-    });
+  for (const qualitySummary of qualitySummaries) {
+    for (const row of qualitySummary?.rows ?? []) {
+      map.set(row.assetId, {
+        interpretation: row.interpretation,
+        residualStatus: row.residualStatus,
+        routeKind: row.routeKind,
+        hardMaskGapScore: row.boundary?.hardMaskGapScore ?? null,
+        residualCoverageRatio: row.residual?.coverageRatio ?? null,
+        screenshotPath: row.residual?.screenshotPath ?? "",
+      });
+    }
   }
   return map;
 }
@@ -292,8 +298,8 @@ function renderMarkdown(summary) {
     `- Status: ${summary.passed ? "passed" : "failed"}`,
     `- Mode: ${summary.mode}`,
     `- Generated: ${summary.generatedAt}`,
-    `- Spark route summary: ${summary.inputs.routeSummary}`,
-    `- Hard-mask quality summary: ${summary.inputs.qualitySummary}`,
+    `- Spark route summaries: ${summary.inputs.routeSummaries.length}`,
+    `- Hard-mask quality summaries: ${summary.inputs.qualitySummaries.length}`,
     "",
     "This report separates product-route readiness from public-commercial licensing. A sample can pass the Spark commercial route gate and still be unsuitable as a public commercial demo asset if the source license is local-test-only or research-only.",
     "",
@@ -332,12 +338,10 @@ function renderMarkdown(summary) {
   return lines.join("\n");
 }
 
-function firstExistingJson(paths) {
-  for (const summaryPath of paths) {
-    if (!existsSync(summaryPath)) continue;
-    return { path: summaryPath, payload: readJson(summaryPath) };
-  }
-  return null;
+function existingJsons(paths) {
+  return paths
+    .filter((summaryPath) => existsSync(summaryPath))
+    .map((summaryPath) => ({ path: summaryPath, payload: readJson(summaryPath) }));
 }
 
 function readJson(summaryPath) {

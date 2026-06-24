@@ -339,9 +339,11 @@ Current local result:
 
 | Tier | Assets | Product decision |
 | --- | --- | --- |
-| `商业展示路线可演示` | `nerf-lego-alpha-closure-local`, `plush-semantic-closure-local` | Route can be shown, but UI/copy must keep `对象 mask，无补洞 / 边界混合主导` visible. |
+| `商业展示路线可演示` | `nerf-lego-alpha-closure-local`, `plush-semantic-closure-local`, `polyhaven-chair-commercial-demo-local` | Route can be shown, but UI/copy must keep `对象 mask，无补洞 / 边界混合主导` visible. |
 | `研究 / 诊断样例` | `nerf-lego-trained-output-local` | Do not present as commercial default while `browser-residual-dominant` remains. |
 | `待 route QA` | `plush-3dgs-local`, `plush-v1-closure-local` | Needs route and hard-mask quality evidence before demo claims. |
 
-The current report has `publicCommercialCandidateRows=0`: passing the renderer
-route does not make local-test or research-only samples license-clean.
+The current local report with the chair route artifacts has
+`publicCommercialCandidateRows=1`. The generated chair sample is the first
+public-commercial candidate, but it is still a hard-mask / no-reoptimize object
+edit preview rather than an inpainted or retrained post-delete splat.

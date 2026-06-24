@@ -35,6 +35,7 @@
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",
     "acceptance:webgpu-headless": "node scripts/acceptance-webgpu-headless.mjs",
     "acceptance:spark-commercial-route": "node scripts/acceptance-spark-commercial-route.mjs",
+    "publish:polyhaven-chair-demo": "node scripts/publish-polyhaven-chair-demo.mjs",
     "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs",
     "benchmark:splatfacto:balanced": "node scripts/benchmark-splatfacto-balanced.mjs",
     "benchmark:splatfacto:variants": "node scripts/benchmark-splatfacto-variants.mjs",
