@@ -163,6 +163,28 @@ Use `--output-dir <path>` to place the report elsewhere. The report summarizes
 the route, source, visible Gaussian counts, SH preservation tuple, contract
 boundary, and screenshot paths from the underlying browser gates.
 
+`acceptance:demo` keeps this gate opt-in because the SH-heavy route depends on
+the local trained `nerf-lego-trained-output-local` sample:
+
+```bash
+npm run acceptance:demo -- --include-spark-commercial-route
+```
+
+`acceptance:demo` uses the built Vite preview server for browser audit by
+default; pass `--browser-audit-mode dev` only when dev-server watch behavior is
+specifically needed.
+
+The opt-in path also accepts:
+
+```text
+--spark-native-port <port>
+--spark-trained-port <port>
+--spark-route-output-dir <path>
+--skip-spark-route-build
+--browser-audit-assets <asset_id[,asset_id]>
+--skip-browser-visual-residual
+```
+
 It proves that:
 
 - no-SH generated samples use Spark native compact `.splat` object masking;
@@ -174,7 +196,5 @@ renderer-native arbitrary third-party `.splat` object metadata.
 
 ## Next Product Slice
 
-The next UX-facing slice should decide whether the report-backed
-`acceptance:spark-commercial-route` belongs inside broader `acceptance:demo` /
-CI, or should remain an explicit product-route gate because it depends on the
-local trained SH-heavy sample.
+The next UX-facing slice should make the trained SH-heavy sample portability
+story explicit before this gate can become a default CI requirement.

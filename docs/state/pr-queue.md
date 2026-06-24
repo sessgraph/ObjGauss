@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AY`: 评估 report-backed `acceptance:spark-commercial-route` 是否纳入 broader `acceptance:demo` / CI，还是因为依赖本机 trained SH-heavy sample 而保持为显式 product-route gate。
+  - `RENDER-005T-AZ`: 明确 trained SH-heavy sample 的 portability / availability 策略，再决定 Spark commercial route gate 是否能成为默认 CI requirement。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AY: Spark route acceptance demo opt-in
+
+- 状态: done / demo-opt-in-gate
+- 类型: 标准 PR / acceptance integration
+- 目标: 评估 report-backed `acceptance:spark-commercial-route` 是否应默认纳入 broader `acceptance:demo` / CI，并落地一个不破坏新环境的集成方式。
+- 已实施:
+  - `scripts/acceptance-demo.mjs` 保持默认行为不变，不默认要求本机 trained SH-heavy sample。
+  - 新增 `--include-spark-commercial-route`，显式把 `acceptance:spark-commercial-route` 追加到 demo acceptance。
+  - 新增 Spark route 透传参数：`--spark-native-port`、`--spark-trained-port`、`--spark-route-output-dir`、`--skip-spark-route-build`。
+  - 新增 browser audit 窄化参数：`--browser-audit-assets`、`--skip-browser-visual-residual`，便于在复查 opt-in 编排时避免全量视觉残差长跑。
+  - `docs/rendering/renderer-readiness-matrix.md` 记录 opt-in 命令和为什么不默认纳入：SH-heavy route 依赖本机 `nerf-lego-trained-output-local`。
+- 结论:
+  - Spark commercial route gate 可以从 broader demo acceptance 显式调用，但不会成为默认 CI / fresh-env requirement。
+  - `acceptance:demo` 的 browser audit 默认改走 built preview，避免 Vite dev watcher 上限在本机 / CI 中阻断验收；旧 dev 模式仍可用 `--browser-audit-mode dev` 显式选择。
+  - 下一步要先明确 trained SH-heavy sample 的 portability / availability 策略，再决定是否默认纳入 CI。
+- 验证:
+  - `node --check scripts/acceptance-demo.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/acceptance-spark-commercial-route.mjs`: passed。
+  - `npm run acceptance:demo -- --skip-semantic-benchmark --browser-audit-assets nerf-lego-alpha-closure-local --skip-browser-visual-residual --include-spark-commercial-route --spark-native-port 5351 --spark-trained-port 5352 --spark-route-output-dir /tmp/objgauss-acceptance-demo-spark-route --skip-spark-route-build`: passed；输出 `acceptance_demo=passed`。
+  - Summary inspect: `/tmp/objgauss-acceptance-demo-spark-route/summary.json` 为 `status=passed`、`native=2`、`trained=1`，trained delete route 为 `spark-packed-sh-mask / commercial / hard-object-mask-no-reoptimize`，SH rest 为 `255794 / 255794 / true / 45 / 3`。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AX: Spark commercial route report artifact
 

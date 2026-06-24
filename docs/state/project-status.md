@@ -163,7 +163,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 - 流程:
   - `docs/development-flow.md` 已建立。
   - `AGENTS.md` 和 `CLAUDE.md` 已指向统一流程。
-  - `npm run acceptance:demo` 已固化为一键闭环总验收命令。
+  - `npm run acceptance:demo` 已固化为一键闭环总验收命令；browser audit 默认走 built preview 以避开 dev watcher 上限，Spark commercial route gate 可通过 `--include-spark-commercial-route` 显式纳入，但默认不要求本机 trained SH-heavy sample。
   - `npm run acceptance:semantic` 已固化为 SEMANTIC benchmark suite 验收命令。
   - `npm run acceptance:webgpu-headless` 已固化为 WebGPU CI/headless acceptance 命令；默认构建 viewer、跑 WebGPU tile smoke、再跑 Lego proxy + Plush semantic 的 offscreen object-transition suite。
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
@@ -189,6 +189,13 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/acceptance-demo.mjs
+node --check scripts/audit-demo.mjs
+node --check scripts/acceptance-spark-commercial-route.mjs
+npm run acceptance:demo -- --skip-semantic-benchmark --browser-audit-assets nerf-lego-alpha-closure-local --skip-browser-visual-residual --include-spark-commercial-route --spark-native-port 5351 --spark-trained-port 5352 --spark-route-output-dir /tmp/objgauss-acceptance-demo-spark-route --skip-spark-route-build
+node -e "const r=require('/tmp/objgauss-acceptance-demo-spark-route/summary.json'); console.log(JSON.stringify({status:r.status, steps:r.steps.length, native:r.routes.native.length, trained:r.routes.trained.length}, null, 2))"
+uv run --extra dev pytest
+git diff --check
 node --check scripts/acceptance-spark-commercial-route.mjs
 npm run acceptance:spark-commercial-route -- --native-port 5349 --trained-port 5350 --output-dir /tmp/objgauss-spark-commercial-route-report
 node -e "const r=require('/tmp/objgauss-spark-commercial-route-report/summary.json'); console.log(JSON.stringify({status:r.status, steps:r.steps.length, native:r.routes.native.length, trained:r.routes.trained.length}, null, 2))"

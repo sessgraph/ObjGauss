@@ -97,6 +97,7 @@ const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
 const assets = selectAssets(args);
+const serverMode = normalizeServerMode(args.serverMode ?? args["server-mode"] ?? "dev");
 const auditOptions = {
   requireWebGpu: Boolean(args.requireWebgpu ?? args["require-webgpu"]),
   webGpuFlags: String(args.webgpuFlags ?? args["webgpu-flags"] ?? process.env.OBJGAUSS_WEBGPU_FLAGS ?? "none"),
@@ -177,7 +178,7 @@ if (
   throw new Error("--webgpu-object-transition is only supported with --webgpu-probe offscreen-readback");
 }
 
-const server = args.url || args.noServer ? null : startDevServer(port);
+const server = args.url || args.noServer ? null : startServer(port, serverMode);
 try {
   await waitForApp(baseUrl);
   const results = await runAudit(baseUrl, assets, auditOptions);
@@ -2346,10 +2347,17 @@ function validVectorAttribute(value) {
   return parts.length === 3 && parts.every((entry) => Number.isFinite(entry));
 }
 
-function startDevServer(port) {
+function normalizeServerMode(value) {
+  const mode = String(value ?? "dev").trim().toLowerCase();
+  if (mode === "dev" || mode === "preview") return mode;
+  throw new Error(`unknown --server-mode: ${value}`);
+}
+
+function startServer(port, mode) {
+  const script = mode === "preview" ? "preview" : "dev";
   const child = spawn(
     "npm",
-    ["run", "dev", "--", "--port", String(port), "--strictPort"],
+    ["run", script, "--", "--port", String(port), "--strictPort"],
     { detached: true, stdio: ["ignore", "pipe", "pipe"] },
   );
   child.stdout.on("data", (chunk) => process.stdout.write(chunk));
