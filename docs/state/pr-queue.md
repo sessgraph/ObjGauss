@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AN`: 为 Spark `screen-space-object-pick-v1` 增加多点击 hit-rate / ambiguity report。当前单次 demo pick 已有 hit telemetry 和 marker，但 Lego proxy 与 trained Lego 的审计点击都显示 `ambiguous=true`，不能宣称 robust renderer-native picking。
+  - `RENDER-005T-AO`: 改进 Spark `screen-space-object-pick-v1` 消歧策略。`RENDER-005T-AN` 已证明 hit-rate 高但 ambiguity-rate 也高，下一步应评估 depth-prior、object-size prior、边界排除或二次确认 hover/marker，而不是继续扩大单纯点击半径。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AN: Spark pick hit-rate / ambiguity report
+
+- 状态: done / pick-report-audited
+- 类型: 标准 PR / 前端对象交互验收
+- 目标: 将 Spark `screen-space-object-pick-v1` 从单点击 hit telemetry 推进到多点击 hit-rate / ambiguity-rate report，避免把高歧义点击误判为 robust renderer-native picking。
+- 已实施:
+  - 新增 `scripts/audit-spark-pick-report.mjs`，默认启动静态 Vite preview，进入 Spark 删除预览，并对画布执行 15 个 deterministic 点击点。
+  - 新增 `npm run audit:spark-pick-report`，默认覆盖 Lego proxy；trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。
+  - Report 写出 `/tmp/objgauss-spark-pick-report/summary.json`、`summary.md` 和素材截图，并把 `hitRate`、`ambiguityRate`、`markerHits`、`distinctHitObjects`、route / mask source 一并记录。
+  - Report gate 要求至少 1 个 hit、hit rate >= `0.2`、所有 hit 都有合法 marker 和 selected object match；`ambiguous=true` 只记录不失败。
+- 结论:
+  - Lego proxy 默认 route 通过：`14/15` hit、hit rate `0.933333`、ambiguous hits `13/14`、ambiguity rate `0.928571`、marker hits `14/14`，route 为 `native-splat-source-v1`。
+  - Trained SH-heavy 显式 5-click route 通过：`5/5` hit、ambiguity rate `1`、marker hits `5/5`，route 为 `packed-sh-extract-v1`，mask source 为 `ply-packed`。
+  - 这证明 Spark canvas pick 对 demo 交互已经可用，但高 ambiguity 是硬事实；下一步应做 pick 消歧策略，而不是宣称无歧义 renderer-native picking。
+- 验证:
+  - `node --check scripts/audit-spark-pick-report.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-pick-report`: passed。
+  - `npm run audit:spark-pick-report -- --assets nerf-lego-trained-output-local --max-clicks 5 --output-dir /tmp/objgauss-spark-pick-report-trained --port 5316`: passed。
 
 ### RENDER-005T-AM: Spark pick hit telemetry and selected marker
 

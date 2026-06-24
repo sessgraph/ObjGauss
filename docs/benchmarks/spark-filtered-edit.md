@@ -547,6 +547,63 @@ sparkPacked="packed-sh-extract-v1":255794/129108:156.5/0
 sparkShRest=255794:255794:"true":45:3
 ```
 
+Run the multi-click Spark pick report:
+
+```bash
+npm run audit:spark-pick-report
+```
+
+Current default local result:
+
+```text
+spark_pick_report=passed
+asset="nerf-lego-alpha-closure-local"
+clicks=15
+hits=14
+hitRate=0.933333
+ambiguousHits=13
+ambiguityRate=0.928571
+markerHits=14/14
+maskSource="native-splat"
+route="native-splat-source-v1"
+summaryJson="/tmp/objgauss-spark-pick-report/summary.json"
+summaryMd="/tmp/objgauss-spark-pick-report/summary.md"
+```
+
+The trained SH-heavy route is intentionally explicit because it loads a 255k
+Gaussian local sample:
+
+```bash
+npm run audit:spark-pick-report -- \
+  --assets nerf-lego-trained-output-local \
+  --max-clicks 5 \
+  --output-dir /tmp/objgauss-spark-pick-report-trained \
+  --port 5316
+```
+
+Current trained local result:
+
+```text
+spark_pick_report=passed
+asset="nerf-lego-trained-output-local"
+clicks=5
+hits=5
+hitRate=1
+ambiguousHits=5
+ambiguityRate=1
+markerHits=5/5
+distinctHitObjects=["1","2","3"]
+maskSource="ply-packed"
+route="packed-sh-extract-v1"
+summaryJson="/tmp/objgauss-spark-pick-report-trained/summary.json"
+summaryMd="/tmp/objgauss-spark-pick-report-trained/summary.md"
+```
+
+Interpretation: the screen-space pick path has high hit-rate and selected
+marker consistency, but it is not robustly unambiguous. The current gate treats
+ambiguity as report-only evidence; the next renderer interaction slice should
+improve disambiguation instead of merely expanding the pick radius.
+
 ## Remaining Gaps
 
 - The original compact `.splat` mask is now the no-SH default, but SH-heavy
@@ -557,10 +614,10 @@ sparkShRest=255794:255794:"true":45:3
 - Spark canvas selection is currently a screen-space CPU pick over the
   object-aware PLY metadata, not a Spark-internal raycast. It is good enough for
   demo interaction and now exposes hit / ambiguity telemetry plus a selection
-  marker, but current Lego proxy and trained Lego clicks both report
-  `ambiguous=true` with three candidate objects. The next step is a dedicated
-  multi-click hit-rate / ambiguity report before claiming robust renderer-native
-  picking.
+  marker. The multi-click report shows high hit-rate but very high ambiguity
+  (`0.928571` on Lego proxy, `1` on trained Lego 5-click), so the next step is
+  disambiguation through depth/object priors or a clearer hover/confirm UX
+  before claiming robust renderer-native picking.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
