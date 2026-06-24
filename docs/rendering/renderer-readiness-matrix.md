@@ -129,6 +129,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
+| Which object boundaries are candidates for assignment cleanup / remap review? | `npm run audit:object-boundary-cleanup` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |
@@ -324,6 +325,27 @@ The default report writes:
 This does not replace Spark / WebGPU visual residual screenshots. It explains
 whether the likely source of grain is coverage loss, hard boundary mixing, or
 deleted-subset sparsity before tuning shader footprint or alpha presentation.
+
+Use the cleanup candidate wrapper when the next question is not "why is it
+grainy?" but "which object assignments should we inspect or remap first?":
+
+```bash
+npm run audit:object-boundary-cleanup
+```
+
+This writes:
+
+```text
+/tmp/objgauss-object-boundary-cleanup/summary.json
+/tmp/objgauss-object-boundary-cleanup/summary.md
+```
+
+The cleanup layer is still read-only. It reports
+`object-boundary-cleanup-candidate-v1` fields such as
+`cleanupCandidateGaussianEstimate`, `cleanupDominantTargetObject`,
+`cleanupPriorityScore`, and recommendation. The next step is a cleaned
+`object_id` preview / browser residual gate; do not promote cleanup into the
+default commercial route without that visual proof.
 
 ## Hard Mask Quality Chain
 

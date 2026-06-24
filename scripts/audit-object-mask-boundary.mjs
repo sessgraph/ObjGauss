@@ -5,6 +5,7 @@ import { ASSET_LIBRARY } from "../src/assetLibrary.js";
 import { parsePly } from "../src/ply.js";
 
 const MODE = "object-mask-boundary-diagnostic-v1";
+const CLEANUP_MODE = "object-boundary-cleanup-candidate-v1";
 const DEFAULT_ASSETS = [
   "nerf-lego-alpha-closure-local",
   "plush-semantic-closure-local",
@@ -30,6 +31,15 @@ const maxNeighborSamples = positiveInteger(
   args.maxNeighborSamples ?? args["max-neighbor-samples"] ?? 50_000,
 );
 const maxCellChecks = positiveInteger(args.maxCellChecks ?? args["max-cell-checks"] ?? 128);
+const cleanupNeighborThreshold = unitNumber(
+  args.cleanupNeighborThreshold ?? args["cleanup-neighbor-threshold"] ?? 0.65,
+);
+const cleanupDominantThreshold = unitNumber(
+  args.cleanupDominantThreshold ?? args["cleanup-dominant-threshold"] ?? 0.55,
+);
+const cleanupMinNeighbors = positiveInteger(
+  args.cleanupMinNeighbors ?? args["cleanup-min-neighbors"] ?? 3,
+);
 const failOnMissing = flagEnabled(args.failOnMissing ?? args["fail-on-missing"]);
 const assetIds = assetIdList(args.assets ?? args.asset);
 
@@ -60,6 +70,9 @@ for (const asset of assets) {
     neighborRadiusRatio,
     maxNeighborSamples,
     maxCellChecks,
+    cleanupNeighborThreshold,
+    cleanupDominantThreshold,
+    cleanupMinNeighbors,
   });
   results.push(result);
   console.log(
@@ -70,7 +83,9 @@ for (const asset of assets) {
       `uniqueLoss=${formatNumber(result.worstObject.uniqueCoverageLossRatio)} ` +
       `deletedCoverage=${formatNumber(result.worstObject.deletedSubsetCoverageRatio)} ` +
       `sharedBoundary=${formatNumber(result.worstObject.sharedBoundaryCoverageRatio)} ` +
-      `neighborBoundary=${formatNumber(result.worstObject.neighborBoundaryRatio)}`,
+      `neighborBoundary=${formatNumber(result.worstObject.neighborBoundaryRatio)} ` +
+      `cleanupCandidates=${result.cleanup?.candidateGaussianEstimate ?? 0} ` +
+      `cleanupTopObject=${result.cleanup?.topObject?.objectId ?? ""}`,
   );
 }
 
@@ -85,6 +100,9 @@ const summary = {
     neighborRadiusRatio,
     maxNeighborSamples,
     maxCellChecks,
+    cleanupNeighborThreshold,
+    cleanupDominantThreshold,
+    cleanupMinNeighbors,
     failOnMissing,
   },
   assets: assets.map((asset) => asset.id),
@@ -133,6 +151,7 @@ function auditAsset(asset, options) {
   const meanHardMaskGapScore = mean(perObject.map((item) => item.hardMaskGapScore));
   const meanUniqueCoverageLossRatio = mean(perObject.map((item) => item.uniqueCoverageLossRatio));
   const meanNeighborBoundaryRatio = mean(perObject.map((item) => item.neighborBoundaryRatio));
+  const cleanup = cleanupSummary(perObject);
 
   return {
     assetId: asset.id,
@@ -150,6 +169,7 @@ function auditAsset(asset, options) {
     meanHardMaskGapScore,
     meanUniqueCoverageLossRatio,
     meanNeighborBoundaryRatio,
+    cleanup,
     worstObject,
     perObject,
   };
@@ -179,6 +199,22 @@ function objectDiagnostic({ objectId, totalGaussians, base, projections, neighbo
       neighborBoundaryRatio * 0.3 +
       sharedBoundaryCoverageRatio * 0.25,
   );
+  const cleanupCandidateRatio = neighbor?.cleanupCandidateRatio ?? 0;
+  const cleanupCandidateSamples = neighbor?.cleanupCandidateSamples ?? 0;
+  const cleanupCandidateGaussianEstimate = Math.round(cleanupCandidateRatio * (base?.count ?? 0));
+  const cleanupPriorityScore = cleanupPriority({
+    cleanupCandidateRatio,
+    hardMaskGapScore,
+    sharedBoundaryCoverageRatio,
+    uniqueCoverageLossRatio,
+  });
+  const cleanupRecommendation = cleanupRecommendationForObject({
+    cleanupCandidateRatio,
+    cleanupCandidateGaussianEstimate,
+    cleanupPriorityScore,
+    sharedBoundaryCoverageRatio,
+    uniqueCoverageLossRatio,
+  });
   return {
     objectId,
     gaussianCount: base?.count ?? 0,
@@ -193,6 +229,13 @@ function objectDiagnostic({ objectId, totalGaussians, base, projections, neighbo
     neighborBoundaryRatio,
     neighborMixedRatio,
     neighborSamples: neighbor?.samples ?? 0,
+    cleanupCandidateRatio,
+    cleanupCandidateSamples,
+    cleanupCandidateGaussianEstimate,
+    cleanupDominantTargetObject: neighbor?.cleanupDominantTargetObject ?? null,
+    cleanupDominantTargetSupport: neighbor?.cleanupDominantTargetSupport ?? 0,
+    cleanupPriorityScore,
+    cleanupRecommendation,
     hardMaskGapScore: roundMetric(hardMaskGapScore),
   };
 }
@@ -300,8 +343,11 @@ function neighborBoundaryStats(points, objectIds, bounds, options) {
       {
         samples: 0,
         boundarySamples: 0,
+        cleanupCandidateSamples: 0,
+        cleanupLowConfidenceSamples: 0,
         sameNeighbors: 0,
         differentNeighbors: 0,
+        cleanupTargetCounts: new Map(),
       },
     ]),
   );
@@ -315,23 +361,48 @@ function neighborBoundaryStats(points, objectIds, bounds, options) {
     row.samples += 1;
     const nearby = nearbyIndices({ point, cells, cellSize, maxCellChecks: options.maxCellChecks });
     let hasDifferent = false;
+    let sameNeighbors = 0;
+    let differentNeighbors = 0;
+    const differentByObject = new Map();
     for (const otherIndex of nearby) {
       if (otherIndex === index) continue;
       const other = points[otherIndex];
       if (distance(point, other) > radius) continue;
       if (other.objectId === point.objectId) {
         row.sameNeighbors += 1;
+        sameNeighbors += 1;
       } else {
         row.differentNeighbors += 1;
+        differentNeighbors += 1;
+        differentByObject.set(other.objectId, (differentByObject.get(other.objectId) ?? 0) + 1);
         hasDifferent = true;
       }
     }
     if (hasDifferent) row.boundarySamples += 1;
+    const totalNeighbors = sameNeighbors + differentNeighbors;
+    if (totalNeighbors >= options.cleanupMinNeighbors && differentNeighbors > 0) {
+      const mixedRatio = differentNeighbors / totalNeighbors;
+      const dominant = dominantObjectCount(differentByObject);
+      const dominantSupport = dominant.count / Math.max(differentNeighbors, 1);
+      if (
+        mixedRatio >= options.cleanupNeighborThreshold &&
+        dominantSupport >= options.cleanupDominantThreshold
+      ) {
+        row.cleanupCandidateSamples += 1;
+        row.cleanupTargetCounts.set(
+          dominant.objectId,
+          (row.cleanupTargetCounts.get(dominant.objectId) ?? 0) + 1,
+        );
+      } else if (mixedRatio >= options.cleanupNeighborThreshold) {
+        row.cleanupLowConfidenceSamples += 1;
+      }
+    }
   }
 
   const objects = new Map();
   for (const [objectId, row] of perObject.entries()) {
     const totalNeighbors = row.sameNeighbors + row.differentNeighbors;
+    const dominantTarget = dominantObjectCount(row.cleanupTargetCounts);
     objects.set(objectId, {
       objectId,
       samples: row.samples,
@@ -340,9 +411,98 @@ function neighborBoundaryStats(points, objectIds, bounds, options) {
       mixedNeighborRatio: roundMetric(ratio(row.differentNeighbors, totalNeighbors)),
       sameNeighbors: row.sameNeighbors,
       differentNeighbors: row.differentNeighbors,
+      cleanupMode: CLEANUP_MODE,
+      cleanupCandidateSamples: row.cleanupCandidateSamples,
+      cleanupLowConfidenceSamples: row.cleanupLowConfidenceSamples,
+      cleanupCandidateRatio: roundMetric(ratio(row.cleanupCandidateSamples, row.samples)),
+      cleanupDominantTargetObject: dominantTarget.objectId,
+      cleanupDominantTargetSupport: roundMetric(
+        ratio(dominantTarget.count, row.cleanupCandidateSamples),
+      ),
     });
   }
   return { radius: roundMetric(radius), sampleCount, objects };
+}
+
+function dominantObjectCount(counts) {
+  let objectId = null;
+  let count = 0;
+  for (const [candidateObjectId, candidateCount] of counts.entries()) {
+    if (candidateCount > count) {
+      objectId = candidateObjectId;
+      count = candidateCount;
+    }
+  }
+  return { objectId, count };
+}
+
+function cleanupSummary(perObject) {
+  const rows = perObject
+    .filter((row) => row.cleanupCandidateGaussianEstimate > 0)
+    .slice()
+    .sort((left, right) => right.cleanupPriorityScore - left.cleanupPriorityScore);
+  const topObject = rows[0] ?? null;
+  const candidateGaussianEstimate = rows.reduce(
+    (total, row) => total + row.cleanupCandidateGaussianEstimate,
+    0,
+  );
+  return {
+    mode: CLEANUP_MODE,
+    objectCount: rows.length,
+    candidateGaussianEstimate,
+    candidateGaussianShare: roundMetric(
+      candidateGaussianEstimate /
+        Math.max(
+          perObject.reduce((total, row) => total + row.gaussianCount, 0),
+          1,
+        ),
+    ),
+    meanCandidateRatio: mean(perObject.map((row) => row.cleanupCandidateRatio)),
+    topObject: topObject
+      ? {
+          objectId: topObject.objectId,
+          targetObject: topObject.cleanupDominantTargetObject,
+          priorityScore: topObject.cleanupPriorityScore,
+          candidateGaussianEstimate: topObject.cleanupCandidateGaussianEstimate,
+          candidateRatio: topObject.cleanupCandidateRatio,
+          recommendation: topObject.cleanupRecommendation,
+        }
+      : null,
+  };
+}
+
+function cleanupPriority({
+  cleanupCandidateRatio,
+  hardMaskGapScore,
+  sharedBoundaryCoverageRatio,
+  uniqueCoverageLossRatio,
+}) {
+  return roundMetric(
+    clamp01(
+      cleanupCandidateRatio * 0.45 +
+        hardMaskGapScore * 0.25 +
+        sharedBoundaryCoverageRatio * 0.2 +
+        Math.max(0, 0.08 - uniqueCoverageLossRatio) * 1.25 * 0.1,
+    ),
+  );
+}
+
+function cleanupRecommendationForObject({
+  cleanupCandidateRatio,
+  cleanupCandidateGaussianEstimate,
+  cleanupPriorityScore,
+  sharedBoundaryCoverageRatio,
+  uniqueCoverageLossRatio,
+}) {
+  if (cleanupCandidateGaussianEstimate === 0) return "keep-hard-mask-no-remap-candidate";
+  if (uniqueCoverageLossRatio >= 0.08) return "delete-hole-risk-review";
+  if (
+    cleanupPriorityScore >= 0.35 ||
+    (cleanupCandidateRatio >= 0.08 && sharedBoundaryCoverageRatio >= 0.75)
+  ) {
+    return "boundary-remap-review";
+  }
+  return "low-priority-boundary-cleanup";
 }
 
 function nearbyIndices({ point, cells, cellSize, maxCellChecks }) {
@@ -509,17 +669,21 @@ function renderMarkdown(summary) {
     `- Grid: ${summary.options.gridSize}x${summary.options.gridSize}`,
     `- Footprint scale: ${summary.options.footprintScale}`,
     `- Neighbor radius ratio: ${summary.options.neighborRadiusRatio}`,
+    `- Cleanup mode: ${CLEANUP_MODE}`,
+    `- Cleanup thresholds: neighbor=${summary.options.cleanupNeighborThreshold}, dominant=${summary.options.cleanupDominantThreshold}, minNeighbors=${summary.options.cleanupMinNeighbors}`,
     "",
     "This diagnostic estimates where hard `object_id` masking can create visible holes, sparse remnants, or boundary grain after delete/isolate. It is a deterministic PLY-level proxy, not a replacement for browser visual residual screenshots.",
     "",
+    "The cleanup candidate layer is read-only. It samples local 3D neighborhoods and flags Gaussian subsets whose nearby support is dominated by another object id; those rows are candidates for assignment cleanup or boundary remap review, not an automatic label rewrite.",
+    "",
     "## Assets",
     "",
-    "| Asset | Gaussians | Objects | Worst object | Gap score | Unique loss | Deleted coverage | Shared boundary | Neighbor boundary |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Asset | Gaussians | Objects | Worst object | Gap score | Unique loss | Deleted coverage | Shared boundary | Neighbor boundary | Cleanup estimate | Cleanup top object | Cleanup target |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const result of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(result.assetId)} | ${result.gaussianCount ?? 0} | ${result.objectCount ?? 0} | ${result.worstObject?.objectId ?? ""} | ${formatNumber(result.worstObject?.hardMaskGapScore)} | ${formatNumber(result.worstObject?.uniqueCoverageLossRatio)} | ${formatNumber(result.worstObject?.deletedSubsetCoverageRatio)} | ${formatNumber(result.worstObject?.sharedBoundaryCoverageRatio)} | ${formatNumber(result.worstObject?.neighborBoundaryRatio)} |`,
+      `| ${escapeMarkdown(result.assetId)} | ${result.gaussianCount ?? 0} | ${result.objectCount ?? 0} | ${result.worstObject?.objectId ?? ""} | ${formatNumber(result.worstObject?.hardMaskGapScore)} | ${formatNumber(result.worstObject?.uniqueCoverageLossRatio)} | ${formatNumber(result.worstObject?.deletedSubsetCoverageRatio)} | ${formatNumber(result.worstObject?.sharedBoundaryCoverageRatio)} | ${formatNumber(result.worstObject?.neighborBoundaryRatio)} | ${result.cleanup?.candidateGaussianEstimate ?? 0} | ${result.cleanup?.topObject?.objectId ?? ""} | ${result.cleanup?.topObject?.targetObject ?? ""} |`,
     );
   }
   lines.push("", "## Per Object", "");
@@ -530,12 +694,12 @@ function renderMarkdown(summary) {
       continue;
     }
     lines.push(
-      "| Object | Gaussians | Share | Gap score | Unique loss | Deleted coverage | Visible after delete | Shared boundary | Neighbor boundary |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+      "| Object | Gaussians | Share | Gap score | Unique loss | Deleted coverage | Visible after delete | Shared boundary | Neighbor boundary | Cleanup est. | Cleanup ratio | Target | Priority | Recommendation |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     );
     for (const row of result.perObject ?? []) {
       lines.push(
-        `| ${row.objectId} | ${row.gaussianCount} | ${formatNumber(row.gaussianShare)} | ${formatNumber(row.hardMaskGapScore)} | ${formatNumber(row.uniqueCoverageLossRatio)} | ${formatNumber(row.deletedSubsetCoverageRatio)} | ${formatNumber(row.visibleAfterDeleteCoverageRatio)} | ${formatNumber(row.sharedBoundaryCoverageRatio)} | ${formatNumber(row.neighborBoundaryRatio)} |`,
+        `| ${row.objectId} | ${row.gaussianCount} | ${formatNumber(row.gaussianShare)} | ${formatNumber(row.hardMaskGapScore)} | ${formatNumber(row.uniqueCoverageLossRatio)} | ${formatNumber(row.deletedSubsetCoverageRatio)} | ${formatNumber(row.visibleAfterDeleteCoverageRatio)} | ${formatNumber(row.sharedBoundaryCoverageRatio)} | ${formatNumber(row.neighborBoundaryRatio)} | ${row.cleanupCandidateGaussianEstimate ?? 0} | ${formatNumber(row.cleanupCandidateRatio)} | ${row.cleanupDominantTargetObject ?? ""} | ${formatNumber(row.cleanupPriorityScore)} | ${escapeMarkdown(row.cleanupRecommendation)} |`,
       );
     }
     lines.push("");
@@ -571,6 +735,12 @@ function positiveInteger(value) {
 function positiveNumber(value) {
   const parsed = Number.parseFloat(String(value));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function unitNumber(value) {
+  const parsed = Number.parseFloat(String(value));
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(1, parsed));
 }
 
 function flagEnabled(value) {

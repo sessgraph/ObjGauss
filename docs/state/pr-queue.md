@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005F`: 基于 feather candidate gate 结论，停止把 opacity feather 当默认修复，转向 object-boundary remap / assignment cleanup 或 delete-hole quality diagnostic；默认 hard mask 继续保持。
+  - `DEMO-005G`: 基于 object-boundary cleanup candidate report，做只读 remap preview / cleaned object_id 导出实验；默认 hard mask 继续保持，除非 browser residual gate 证明 cleanup 不伤害非目标对象。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005F: Object boundary cleanup candidate report
+
+- 状态: done / read-only-cleanup-candidates
+- 类型: 标准 PR / renderer quality reporting
+- 目标: 基于 feather candidate gate 的 `diagnostic-only` 结论，转向 object assignment 边界清理方向，输出哪些 object / Gaussian 子集值得做 remap review，而不是继续把 opacity feather 当默认视觉修复。
+- 已实施:
+  - `scripts/audit-object-mask-boundary.mjs` 在原 hard-mask boundary diagnostic 基础上新增 `object-boundary-cleanup-candidate-v1` 只读候选层。
+  - 邻域采样现在会统计被另一个 `object_id` 支配的本地 Gaussian 子集，输出 `cleanupCandidateRatio`、`cleanupCandidateGaussianEstimate`、`cleanupDominantTargetObject`、`cleanupPriorityScore` 和 recommendation。
+  - 新增 `npm run audit:object-boundary-cleanup`，默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，并写 `/tmp/objgauss-object-boundary-cleanup/summary.{json,md}`。
+- 结论:
+  - 三场景 cleanup report 通过，assets=3，skipped=0。
+  - Lego proxy 估算 cleanup candidates=`1138`，top object=`1 -> 3`，recommendation=`boundary-remap-review`。
+  - Plush semantic 估算 cleanup candidates=`23335`，top object=`2 -> 0`，recommendation=`boundary-remap-review`。
+  - Poly Haven Chair 估算 cleanup candidates=`983`，top object=`1 -> 0`，recommendation=`low-priority-boundary-cleanup`，说明商用 chair 当前更适合先维持 hard mask + 明确 no-inpaint copy。
+- 验证:
+  - `node --check scripts/audit-object-mask-boundary.mjs`: passed。
+  - `npm run audit:object-mask-boundary -- --assets nerf-lego-alpha-closure-local --output-dir /tmp/objgauss-object-mask-boundary-regression`: passed。
+  - `npm run audit:object-boundary-cleanup`: passed；assets=3，skipped=0。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005E: Spark mask feather candidate gate
 

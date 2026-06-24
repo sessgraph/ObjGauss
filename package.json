@@ -11,6 +11,7 @@
     "audit:commercial-demo-readiness": "node scripts/audit-commercial-demo-readiness.mjs",
     "audit:hard-mask-quality": "node scripts/audit-hard-mask-quality.mjs",
     "audit:object-mask-boundary": "node scripts/audit-object-mask-boundary.mjs",
+    "audit:object-boundary-cleanup": "node scripts/audit-object-mask-boundary.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-object-boundary-cleanup",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
     "audit:webgpu-offscreen-readback": "node scripts/audit-webgpu-offscreen-readback.mjs",
