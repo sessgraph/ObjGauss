@@ -16,6 +16,9 @@ import {
 
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
 const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
+const SPARK_NATIVE_SPLAT_SOURCE = "native-splat-source-v1";
+const SPARK_FILTER_SOURCE_NATIVE = "native-splat";
+const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
 
 export default function SplatViewport({
   source,
@@ -32,6 +35,7 @@ export default function SplatViewport({
   pointCount,
   rendererLabel,
   reconstructRole = "filter",
+  filterSource = SPARK_FILTER_SOURCE_PACKED,
 }) {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -50,6 +54,11 @@ export default function SplatViewport({
     if (source?.fileName) return `${source.fileName}:${source.fileBytes?.byteLength ?? 0}`;
     return "none";
   }, [source]);
+  const useNativeSplatMask =
+    filtered &&
+    reconstructRole === "filter" &&
+    filterSource === SPARK_FILTER_SOURCE_NATIVE &&
+    Boolean(source);
 
   const filteredStats = useMemo(
     () =>
@@ -78,20 +87,32 @@ export default function SplatViewport({
     ? sparkObjectFilter({ filteredStats, packedStats, reconstructRole })
     : "none";
   const sparkFilterMode = filtered
-    ? reconstructRole === "source"
+    ? useNativeSplatMask
+      ? "native-splat-mask"
+      : reconstructRole === "source"
       ? "ply-source"
       : "ply-reconstruct"
     : "none";
+  const sparkMaskSource = filtered
+    ? useNativeSplatMask
+      ? SPARK_FILTER_SOURCE_NATIVE
+      : SPARK_FILTER_SOURCE_PACKED
+    : "none";
 
   const packedCache = useMemo(() => {
-    if (!filtered) return null;
+    if (!filtered || useNativeSplatMask) return null;
     return buildPackedSplatCache({
       points,
       renderMode,
       shRestCoefficients,
       shRestCoefficientCount,
     });
-  }, [filtered, points, renderMode, shRestCoefficients, shRestCoefficientCount]);
+  }, [filtered, points, renderMode, shRestCoefficients, shRestCoefficientCount, useNativeSplatMask]);
+
+  const nativeMaskCache = useMemo(() => {
+    if (!useNativeSplatMask) return null;
+    return buildNativeSplatMaskCache({ points });
+  }, [points, useNativeSplatMask]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -216,7 +237,14 @@ export default function SplatViewport({
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
-    if (!scene || !camera || !controls || !filtered || !packedCache?.packedSplats) {
+    if (
+      !scene ||
+      !camera ||
+      !controls ||
+      !filtered ||
+      useNativeSplatMask ||
+      !packedCache?.packedSplats
+    ) {
       return undefined;
     }
 
@@ -268,14 +296,104 @@ export default function SplatViewport({
         filteredObjectMaskRef.current = null;
       }
     };
-  }, [filtered, packedCache]);
+  }, [filtered, packedCache, useNativeSplatMask]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!scene || !camera || !controls || !useNativeSplatMask || !source || !nativeMaskCache) {
+      return undefined;
+    }
+
+    let disposed = false;
+    setStatus("加载中");
+    setPackedStats(pendingPackedStats(nativeMaskCache));
+
+    const objectMaskStats = updateSparkObjectMask(nativeMaskCache.objectMask, {
+      points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+    });
+    const meshState = createFilteredMeshState();
+    filteredMeshStateRef.current = meshState;
+    const splat = new SplatMesh({
+      url: source.url,
+      fileBytes: source.fileBytes,
+      fileName: source.fileName,
+      objectModifier: nativeMaskCache.objectMask.modifier,
+      onProgress: (event) => {
+        if (!event.lengthComputable || event.total === 0) return;
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setStatus(`${percent}%`);
+      },
+      onLoad: () => {
+        if (!disposed) setStatus("就绪");
+      },
+    });
+    filteredSplatRef.current = splat;
+    filteredObjectMaskRef.current = nativeMaskCache.objectMask;
+    meshState.meshId += 1;
+    meshState.reused = false;
+    meshState.updates = 1;
+    updatePackedStatsFromMaskResult({
+      packedCache: nativeMaskCache,
+      objectMaskStats,
+      meshState,
+      setPackedStats,
+    });
+
+    scene.add(splat);
+    splat.initialized
+      .then(() => {
+        if (disposed) return;
+        const sourceCount = splat.splats?.getNumSplats?.() ?? nativeMaskCache.baseGaussians;
+        setStatus(sourceCount === (points?.length ?? 0) ? "就绪" : "索引不匹配");
+        updatePackedStatsFromMaskResult({
+          packedCache: withSourceCount(nativeMaskCache, sourceCount),
+          objectMaskStats,
+          meshState,
+          setPackedStats,
+        });
+        frameSplat(splat, camera, controls, scene);
+      })
+      .catch((error) => {
+        if (disposed) return;
+        console.error(error);
+        setStatus("加载失败");
+      });
+
+    return () => {
+      disposed = true;
+      scene.remove(splat);
+      disposeSplatMesh(splat);
+      if (filteredSplatRef.current === splat) {
+        filteredSplatRef.current = null;
+        filteredObjectMaskRef.current = null;
+      }
+    };
+  }, [
+    nativeMaskCache,
+    source,
+    sourceKey,
+    useNativeSplatMask,
+  ]);
 
   useEffect(() => {
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     const splat = filteredSplatRef.current;
-    if (!scene || !camera || !controls || !filtered || !packedCache?.packedSplats || !splat) return;
+    if (
+      !scene ||
+      !camera ||
+      !controls ||
+      !filtered ||
+      useNativeSplatMask ||
+      !packedCache?.packedSplats ||
+      !splat
+    ) return;
 
     setStatus("构建中");
     const objectMaskStats = updateSparkObjectMask(packedCache.objectMask, {
@@ -299,7 +417,45 @@ export default function SplatViewport({
         console.error(error);
         setStatus("加载失败");
       });
-  }, [filtered, isolatedId, packedCache, points, removedIds, visibleIds]);
+  }, [filtered, isolatedId, packedCache, points, removedIds, useNativeSplatMask, visibleIds]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const splat = filteredSplatRef.current;
+    if (!scene || !camera || !controls || !useNativeSplatMask || !nativeMaskCache || !splat) return;
+
+    setStatus("构建中");
+    const objectMaskStats = updateSparkObjectMask(nativeMaskCache.objectMask, {
+      points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+    });
+    const meshState = filteredMeshStateRef.current ?? createFilteredMeshState();
+    meshState.reused = filteredObjectMaskRef.current === nativeMaskCache.objectMask;
+    meshState.updates += 1;
+    splat.needsUpdate = true;
+    filteredMeshStateRef.current = meshState;
+    const sourceCount = splat.splats?.getNumSplats?.() ?? nativeMaskCache.baseGaussians;
+    updatePackedStatsFromMaskResult({
+      packedCache: withSourceCount(nativeMaskCache, sourceCount),
+      objectMaskStats,
+      meshState,
+      setPackedStats,
+    });
+    splat.initialized
+      .then(() => {
+        const initializedSourceCount = splat.splats?.getNumSplats?.() ?? sourceCount;
+        setStatus(initializedSourceCount === (points?.length ?? 0) ? "就绪" : "索引不匹配");
+        frameSplat(splat, camera, controls, scene);
+      })
+      .catch((error) => {
+        console.error(error);
+        setStatus("加载失败");
+      });
+  }, [isolatedId, nativeMaskCache, points, removedIds, useNativeSplatMask, visibleIds]);
 
   useEffect(() => {
     return () => {
@@ -307,6 +463,12 @@ export default function SplatViewport({
       packedCache?.packedSplats?.dispose();
     };
   }, [packedCache]);
+
+  useEffect(() => {
+    return () => {
+      disposeSparkObjectMask(nativeMaskCache?.objectMask);
+    };
+  }, [nativeMaskCache]);
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.visible = showGrid;
@@ -322,6 +484,7 @@ export default function SplatViewport({
       data-renderer="spark-splat"
       data-object-filter={objectFilter}
       data-spark-filter-mode={sparkFilterMode}
+      data-spark-mask-source={sparkMaskSource}
       data-spark-filter-status={status === "就绪" ? "ready" : "pending"}
       data-spark-visible-gaussians={filteredStats.visibleGaussians}
       data-spark-filtered-gaussians={filteredStats.filteredGaussians}
@@ -475,6 +638,27 @@ function buildPackedSplatCache({
     shRestPreserved: shRest.preserved,
     shRestCoefficientCount: shRest.coefficientCount,
     shDegree: shRest.degree,
+  };
+}
+
+function buildNativeSplatMaskCache({ points }) {
+  return {
+    objectMask: createSparkObjectMask(points?.length ?? 0),
+    route: SPARK_NATIVE_SPLAT_SOURCE,
+    baseGaussians: points?.length ?? 0,
+    baseBuildMs: 0,
+    shRestSourceGaussians: 0,
+    shRestPreservedGaussians: 0,
+    shRestPreserved: false,
+    shRestCoefficientCount: 0,
+    shDegree: 0,
+  };
+}
+
+function withSourceCount(cache, baseGaussians) {
+  return {
+    ...cache,
+    baseGaussians,
   };
 }
 
@@ -645,6 +829,12 @@ function pendingPackedStats(cache) {
 function sparkPathLabel({ objectFilter, packedStats }) {
   if (objectFilter === "spark-ply-sh-source") return "PLY SH 源";
   if (objectFilter === "spark-ply-source") return "PLY 源";
+  if (
+    objectFilter === SPARK_OBJECT_FILTER_MASK &&
+    packedStats.route === SPARK_NATIVE_SPLAT_SOURCE
+  ) {
+    return "原生过滤";
+  }
   if (objectFilter === SPARK_OBJECT_FILTER_MASK) {
     return packedStats.objectMaskMode === SPARK_OBJECT_MASK_MODE ? "Shader 过滤" : "过滤重建";
   }

@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AI`: 基于已通过的 original compact `.splat` / object-aware PLY index mapping，原型化 original source / native `.splat` object mask runtime；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`，native mask 接线必须继续通过 `audit:splat-index-mapping` 和 object-mask pixel-delta audit。
+  - `RENDER-005T-AJ`: 将 URL-gated native compact `.splat` object mask 从单场景 prototype 推进到多场景候选 gate，并评估是否能成为 source/original object edit 的默认商业展示路线；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`，native mask 默认化必须继续通过 `audit:splat-index-mapping`、object-mask pixel-delta audit 和至少 Lego + Plush 的 browser audit。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AI: Spark native compact splat object mask prototype
+
+- 状态: done / native-mask-prototype-audited
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 基于 RENDER-005T-AH 已证明的 compact `.splat` / object-aware PLY index mapping，把 source/original object edit 从 PLY-derived packed source 进一步原型化到 Spark native compact `.splat` source + object opacity mask。
+- 已实施:
+  - `SplatViewport` 新增 URL-gated native mask route：`?spark-native-mask=on` 时直接创建 `SplatMesh({ url, objectModifier })`，对象显隐仍使用 `object-opacity-texture-v1`。
+  - Native route 暴露 `data-spark-mask-source="native-splat"`、`data-spark-filter-mode="native-splat-mask"`、`data-spark-reconstruct-source="native-splat-source-v1"`。
+  - `audit-demo` 新增 `--spark-native-mask`，要求 native route 命中原始 `.splat` source、保持 persistent mesh update contract，并继续跑 object-mask pixel-delta guard。
+  - 默认 route 仍保持 PLY-derived packed source，browser audit 通过 `sparkMaskSource="ply-packed"` 与 native route 区分。
+- 结论:
+  - Lego proxy native audit 通过：`postDelete="spark-splat":"spark-object-opacity-mask":3909`、`sparkMaskSource="native-splat"`、`sparkPacked="native-splat-source-v1":5696/3909:0/0`、`sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4`、`sparkMesh="persistent-splatmesh-v1":1:"true":4`。
+  - 这一步解释了“自身颜色为什么颗粒感”的核心边界：默认 packed-source Spark mask 已不是点云 fallback，native route 进一步证明原始 compact `.splat` 也能挂 object mask；剩余是否可商用默认化取决于多场景质量、index gate 和 selection UX。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5302/ --no-server --spark-native-mask`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5302/ --no-server`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
 
 ### RENDER-005T-AH: Splat / PLY index mapping audit
 

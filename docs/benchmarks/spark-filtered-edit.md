@@ -166,6 +166,21 @@ evidence for using an external object-id mask keyed by Gaussian index on these
 assets; it does not mean arbitrary third-party `.splat` files carry object ids
 internally.
 
+RENDER-005T-AI adds a URL-gated original-source mask prototype over Spark's
+native compact `.splat` loader:
+
+```text
+compact .splat source
+        + object-aware PLY object_id keyed by proven Gaussian index
+        + object-opacity-texture-v1
+        -> SplatMesh({ url, objectModifier })
+```
+
+This route keeps the Spark source as the compact `.splat` asset and applies the
+same opacity mask through `objectModifier`. It is enabled only with
+`?spark-native-mask=on` so the default commercial demo path remains unchanged
+while native-mask behavior is audited separately.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -199,6 +214,10 @@ internally.
 - Public/generated compact `.splat` and object-aware PLY pairs must pass
   `npm run audit:splat-index-mapping` before relying on Gaussian index keyed
   masks for original-source/native-mask work.
+- `?spark-native-mask=on` switches source/original object edit states from the
+  PLY-derived packed source to Spark's native compact `.splat` source with the
+  same `object-opacity-texture-v1` modifier. This is currently a diagnostic
+  route, not the default.
 
 Runtime DOM evidence:
 
@@ -234,6 +253,7 @@ data-spark-sh-rest-preserved-gaussians="..."
 data-spark-sh-rest-preserved="true|false"
 data-spark-sh-rest-coefficients="0|9|24|45"
 data-spark-sh-degree="0|1|2|3"
+data-spark-mask-source="ply-packed|native-splat"
 ```
 
 The full-scene reconstruction probe is intentionally URL-gated so normal UI
@@ -394,14 +414,44 @@ nerf-lego-alpha-closure-local: 5696/5696, maxPositionDelta=0, maxScaleDelta=0
 nerf-lego-trained-output-local: 255794/255794, maxPositionDelta=0, maxScaleDelta=0
 ```
 
+Run the URL-gated native compact `.splat` mask audit:
+
+```bash
+npm run build
+npm run preview -- --host 127.0.0.1 --port 5302 --strictPort
+npm run audit:demo -- \
+  --asset nerf-lego-alpha-closure-local \
+  --url http://127.0.0.1:5302/ \
+  --no-server \
+  --spark-native-mask
+```
+
+Current local result:
+
+```text
+browser_audit=passed
+postDelete="spark-splat":"spark-object-opacity-mask":3909
+sparkMaskSource="native-splat"
+sparkPacked="native-splat-source-v1":5696/3909:0/0
+sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
+sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
+sparkMaskVisual="spark-object-mask-visual-delta-v1":"839479b7"/"6ef6c73f"/"839479b7":0.000786/0.013558/0.000507:0/0/0
+sparkMesh="persistent-splatmesh-v1":1:"true":4
+sparkShRest=0:0:"false":0:0
+```
+
+The default packed-source route still passes separately and reports
+`sparkMaskSource="ply-packed"`, keeping the native prototype isolated behind the
+URL gate.
+
 ## Remaining Gaps
 
-- The current mask is over the object-aware PLY-derived Spark packed source, not
-  the original compact `.splat` file. Index mapping is now proven for current
-  generated public samples, but original-source/native-mask runtime wiring is
-  still separate work.
-- Prototype an original-source/native mask route that uses the proven index
-  mapping, then repeat the existing object-mask pixel-delta and residual gates.
+- The original compact `.splat` mask is still URL-gated and currently audited on
+  the small Lego proxy scene. It needs multi-scene validation before becoming
+  the default commercial demo route.
+- The native mask relies on ObjGauss-generated sample pairs that pass the index
+  mapping gate. Arbitrary third-party `.splat` files still need an explicit
+  mapping check or embedded object metadata before object masking is trusted.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.

@@ -80,6 +80,7 @@ const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
+const SPARK_NATIVE_RECONSTRUCT_SOURCE = "native-splat-source-v1";
 const SPARK_DISPLAY_CACHE_DISABLED = "disabled-by-native-mask-v1";
 const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
 const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
@@ -146,6 +147,11 @@ const auditOptions = {
       args["webgpu-alpha-presentation-floor"] ??
       process.env.OBJGAUSS_WEBGPU_ALPHA_PRESENTATION_FLOOR,
   }),
+  sparkNativeMask: flagEnabled(
+    args.sparkNativeMask ??
+      args["spark-native-mask"] ??
+      process.env.OBJGAUSS_SPARK_NATIVE_MASK,
+  ),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
   ),
@@ -216,6 +222,7 @@ try {
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
+        `sparkMaskSource=${JSON.stringify(result.sparkMaskSourceAfterDelete ?? "")} ` +
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
         `sparkDisplayCache=${JSON.stringify(result.sparkDisplayCacheModeAfterDelete ?? "")}:${JSON.stringify(result.sparkDisplayCacheHitAfterDelete ?? "")}:${result.sparkDisplayCacheSizeAfterDelete ?? 0}:${result.sparkDisplayCacheHitsAfterDelete ?? 0}/${result.sparkDisplayCacheMissesAfterDelete ?? 0}/${result.sparkDisplayCacheEvictionsAfterDelete ?? 0} ` +
         `sparkObjectMask=${JSON.stringify(result.sparkObjectMaskModeAfterDelete ?? "")}:${JSON.stringify(result.sparkObjectMaskSizeAfterDelete ?? "")}:${result.sparkObjectMaskVisibleGaussiansAfterDelete ?? 0}/${result.sparkObjectMaskHiddenGaussiansAfterDelete ?? 0}:${result.sparkObjectMaskUpdatesAfterDelete ?? 0} ` +
@@ -229,6 +236,7 @@ try {
     `browser_audit=passed assets=${results.length} url=${baseUrl} ` +
       `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
+      `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
       `allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
   );
 } finally {
@@ -1118,6 +1126,9 @@ async function runAudit(url, assetsToCheck, options) {
       const sparkFilteredAfterDelete =
         postDeleteRendererId === "spark-splat" &&
         postDeleteObjectFilter === SPARK_OBJECT_FILTER_MASK;
+      const sparkMaskSourceAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-mask-source")
+        : "";
       const sparkVisibleGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-visible-gaussians") ?? "0")
         : 0;
@@ -1213,9 +1224,14 @@ async function runAudit(url, assetsToCheck, options) {
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-degree") ?? "0")
         : 0;
       const sparkExpectedReconstructSourceAfterDelete =
-        sparkShRestSourceGaussiansAfterDelete > 0
+        options.sparkNativeMask
+          ? SPARK_NATIVE_RECONSTRUCT_SOURCE
+          : sparkShRestSourceGaussiansAfterDelete > 0
           ? SPARK_RECONSTRUCT_SH_SOURCE
           : SPARK_RECONSTRUCT_SOURCE;
+      const sparkExpectedMaskSourceAfterDelete = options.sparkNativeMask
+        ? "native-splat"
+        : "ply-packed";
       const sparkExpectedShRestPreservedAfterDelete =
         sparkShRestSourceGaussiansAfterDelete > 0 ? "true" : "false";
       const objectStateChecksumAfterDelete = sparkFilteredAfterDelete
@@ -1261,6 +1277,7 @@ async function runAudit(url, assetsToCheck, options) {
         sparkFilteredAfterDelete &&
         (sparkVisibleGaussiansAfterDelete <= 0 ||
           sparkRemovedObjectsAfterDelete !== 1 ||
+          sparkMaskSourceAfterDelete !== sparkExpectedMaskSourceAfterDelete ||
           sparkColorModeAfterDelete !== "original" ||
           sparkColorSourceGaussiansAfterDelete <= 0 ||
           sparkColorObjectGaussiansAfterDelete !== 0 ||
@@ -1292,7 +1309,7 @@ async function runAudit(url, assetsToCheck, options) {
               sparkShDegreeAfterDelete <= 0)))
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} source=${sparkMaskSourceAfterDelete}/${sparkExpectedMaskSourceAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
       }
       if (
@@ -1587,6 +1604,7 @@ async function runAudit(url, assetsToCheck, options) {
         deletedObjects,
         postDeleteRendererId,
         postDeleteObjectFilter,
+        sparkMaskSourceAfterDelete,
         sparkFilteredGaussiansAfterDelete: sparkVisibleGaussiansAfterDelete,
         sparkReconstructSourceAfterDelete,
         sparkPackedBaseGaussiansAfterDelete,
@@ -1926,6 +1944,7 @@ function urlWithWebGpuOptions(url, options) {
     options.webGpuDepthAlphaMode === WEBGPU_DEPTH_ALPHA_MODE_DEFAULT &&
     options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED &&
     options.webGpuColorTuning.colorMode === WEBGPU_COLOR_MODE_SOURCE &&
+    !options.sparkNativeMask &&
     Math.abs(
       options.webGpuAlphaPresentationTuning.alphaPresentationFloor -
         WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
@@ -1957,6 +1976,9 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (options.webGpuColorTuning.colorMode !== WEBGPU_COLOR_MODE_SOURCE) {
     parsed.searchParams.set("webgpu-color-mode", options.webGpuColorTuning.colorMode);
+  }
+  if (options.sparkNativeMask) {
+    parsed.searchParams.set("spark-native-mask", "on");
   }
   if (
     Math.abs(

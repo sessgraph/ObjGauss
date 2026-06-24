@@ -97,6 +97,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AF 已完成 Spark object opacity mask over packed source：filtered Spark route 现在用 `object-opacity-texture-v1` mask texture + Spark Dyno `objectModifier` 控制每个 Gaussian opacity，object-state 变化不再做 display `PackedSplats.extractSplats(...)`，browser contract 要求 `data-object-filter="spark-object-opacity-mask"`、`data-spark-packed-extract-ms="0.000"` 和 `data-spark-display-cache-mode="disabled-by-native-mask-v1"`。Lego proxy 删除预览通过：`sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4`；trained Lego 删除预览通过：`sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2`、`sparkShRest=255794:255794:"true":45:3`。因此当前“原始颜色 / 自身颜色”在对象编辑后已是 Spark 高斯路径，剩余颗粒感主要来自隔离 / 删除后的 object_id 子集稀疏、边界 assignment 噪声，以及尚未实现 original compact `.splat` 内部 object mask。
   - RENDER-005T-AG 已完成 Spark object opacity mask visual delta guard：`audit-demo` 小场景 hide / restore stress 现在会截图 delete baseline、hide-one-object 和 restored Spark canvas，要求隐藏对象后 checksum 与 coverage/luma/chroma 发生实际变化，恢复后回到 baseline。Lego proxy 通过：`sparkMaskVisual="spark-object-mask-visual-delta-v1":"4a2ed0e8"/"be002ca4"/"4a2ed0e8":0.000752/0.014063/0.026019:0/0/0`。这把 Spark mask 从“DOM telemetry 正确”推进到“像素级可见变化已验收”；original compact `.splat` 与 object-aware PLY packed source 的 index mapping 仍是下一步。
   - RENDER-005T-AH 已完成 compact `.splat` / object-aware PLY index mapping audit：新增 `npm run audit:splat-index-mapping`，对 5 个 public/generated Gaussian 样例检查 count、逐 index position / scale delta、rounded-position multiset 和 object_id 范围；当前 Plush、Plush v1、Plush semantic、Lego proxy、trained Lego 全部 `maxPositionDelta=0`、`maxScaleDelta=0`、`positionMultisetCoverage=1`，证明这些样例可用 Gaussian index 作为外部 object mask key。该结论只覆盖 ObjGauss 生成/登记的 public samples，不等价于任意第三方 `.splat` 内部携带 object_id。
+  - RENDER-005T-AI 已完成 Spark native compact `.splat` object mask prototype：新增 URL gate `?spark-native-mask=on`，source/original 对象编辑状态可直接加载原始 compact `.splat`，并用已验证 index mapping 的 object-aware PLY `object_id` 构建 `object-opacity-texture-v1`，通过 Spark `SplatMesh({ url, objectModifier })` 控制删除 / 隔离。Lego proxy browser audit 通过：`sparkMaskSource="native-splat"`、`sparkPacked="native-splat-source-v1":5696/3909:0/0`、`sparkMesh="persistent-splatmesh-v1":1:"true":4`；默认 packed-source 路径仍保持 `sparkMaskSource="ply-packed"`。该路径目前仍是诊断开关，尚未作为默认商业展示路线。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -169,6 +170,13 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-demo.mjs
+npm run build
+npm run preview -- --host 127.0.0.1 --port 5302 --strictPort
+npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5302/ --no-server --spark-native-mask
+npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5302/ --no-server
+npm run audit:splat-index-mapping
+npm run audit:webgpu-tile-smoke
 node --check scripts/audit-splat-index-mapping.mjs
 npm run audit:splat-index-mapping
 node --check scripts/audit-demo.mjs

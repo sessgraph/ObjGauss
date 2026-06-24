@@ -115,6 +115,7 @@ export default function App() {
   const webGpuColorTuning = useMemo(readWebGpuColorTuning, []);
   const sparkReconstructProbe = useMemo(readSparkReconstructProbe, []);
   const sparkPlySourceMode = useMemo(readSparkPlySourceMode, []);
+  const sparkNativeMaskMode = useMemo(readSparkNativeMaskMode, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -178,6 +179,8 @@ export default function App() {
   const useSparkPlySourceRenderer = viewMode === "view" && canUseSparkPlySourceRenderer;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer && !useSparkPlySourceRenderer;
   const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
+  const useSparkNativeMaskRenderer =
+    useSparkFilteredRenderer && objectEditActive && sparkNativeMaskMode === "on";
   const useSparkPointRenderer = useSparkPlySourceRenderer || useSparkFilteredRenderer;
   const waitForEditRenderer =
     !useSplatRenderer && !useSparkPointRenderer && webGpuCapability.status === "pending";
@@ -257,7 +260,9 @@ export default function App() {
       ? "Spark PLY SH 源"
     : useSparkFilteredRenderer
       ? objectEditActive
-        ? "Spark 过滤 Splat"
+        ? useSparkNativeMaskRenderer
+          ? "Spark 原生 Splat 过滤"
+          : "Spark 过滤 Splat"
         : "Spark PLY 重建"
       : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
@@ -630,6 +635,7 @@ export default function App() {
               renderMode={renderMode}
               filtered={useSparkPointRenderer}
               reconstructRole={useSparkPlySourceRenderer ? "source" : "filter"}
+              filterSource={useSparkNativeMaskRenderer ? "native-splat" : "ply-packed"}
               showGrid={showGrid}
               showAxes={showAxes}
               pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
@@ -993,6 +999,16 @@ function readSparkPlySourceMode() {
   if (["0", "false", "no", "off"].includes(value)) return "off";
   if (["1", "true", "yes", "on", "force"].includes(value)) return "force";
   return "auto";
+}
+
+function readSparkNativeMaskMode() {
+  if (typeof window === "undefined") return "off";
+  const params = new URLSearchParams(window.location.search);
+  const value = String(
+    params.get("spark-native-mask") ?? params.get("spark-object-source") ?? "off",
+  ).toLowerCase();
+  if (["1", "true", "yes", "on", "native", "force"].includes(value)) return "on";
+  return "off";
 }
 
 function sceneHasShRestSource(scene) {
