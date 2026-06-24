@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005J`: 将 remap browser residual gate 从每场景 top-1 candidate 扩展为 top-N target sweep，覆盖每个场景多个高风险 remap pair；只有 top-N sweep 和多场景 promotion table 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
+  - `DEMO-005K`: 基于 top-N target sweep 生成 target-level remap decision policy / allowlist，把 promotable target 与 risky target 分开；默认 hard mask 继续保持，禁止按全局 remap preview 直接替换 public samples。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005J: Top-N object boundary remap target sweep
+
+- 状态: done / top-n-target-evidence
+- 类型: 标准 PR / renderer quality browser audit
+- 目标: 将 remap browser residual gate 从每场景 top-1 candidate 扩展为 top-N target sweep，覆盖每个场景多个高风险 remap pair；只有 top-N sweep 和多场景 promotion table 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
+- 已实施:
+  - `scripts/audit-object-boundary-remap-residual.mjs` 新增 `--target-count`，按 `remapPairs` 的 top unique `fromObject` 为每个 scene 选择多个 target object。
+  - 比较维度从 per-asset 升级为 `assetId + targetObjectId`，截图文件名也包含 target id，避免多 target 覆盖。
+  - 对象选择改为严格匹配 target object；target 在 remap-preview 中缺失时 gate 失败，不再回退到第一个对象。
+  - 新增 `npm run audit:object-boundary-remap-target-sweep`，默认 `--target-count 2`。
+- 结论:
+  - 默认 top-2 三场景 sweep 通过，rows=`12`，comparisons=`6`，skipped=`0`。
+  - 所有 6 个 target case 都通过 route/residual 阈值，但只有 1/6 是 promotion candidate。
+  - Negative evidence: Lego target `3` hidden delta=`+397`，Plush target `0` hidden delta=`+4085`，说明 sampled remap 可能让某些 target 删除更激进。
+  - Aggregate recommendation=`do-not-promote-default-hard-mask`，promotion=`false`；下一步应做 target-level allowlist / policy，而不是全局默认启用 remap preview。
+- 验证:
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `npm run audit:object-boundary-remap-target-sweep -- --port 5398 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005I: Multi-scene object boundary remap residual promotion table
 

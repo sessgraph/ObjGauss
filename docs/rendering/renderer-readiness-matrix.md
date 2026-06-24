@@ -131,6 +131,18 @@ after-delete residual max at `0.000784/0.004332/0.019990`. This is evidence that
 the sampled remap preview is not obviously harmful on the tested top candidate
 object per scene; it does not prove every high-risk object pair is safe.
 
+Use the explicit top-N target sweep to check more than one high-risk target per
+scene:
+
+```bash
+npm run audit:object-boundary-remap-target-sweep
+```
+
+Current top-2 result: all 6 target cases pass route/residual thresholds, but
+only 1/6 is promotable. Lego target `3` and Plush target `0` hide more
+Gaussians after remap (`+397` and `+4085` hidden delta), so remap cleanup cannot
+be promoted as a global default. It needs target-level review or an allowlist.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -162,6 +174,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Which object boundaries are candidates for assignment cleanup / remap review? | `npm run audit:object-boundary-cleanup` |
 | Can we export a cleaned `object_id` preview without changing official samples? | `npm run audit:object-boundary-remap-preview` |
 | Does a remap preview preserve browser visual residual after delete? | `npm run audit:object-boundary-remap-residual` |
+| Do multiple high-risk remap targets preserve residual before promotion? | `npm run audit:object-boundary-remap-target-sweep` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |

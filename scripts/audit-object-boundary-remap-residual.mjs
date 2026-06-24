@@ -31,6 +31,7 @@ const noServer = flagEnabled(args.noServer ?? args["no-server"]) || Boolean(args
 const headed = flagEnabled(args.headed ?? args.headful);
 const includeVisualStats = !flagEnabled(args.skipVisualStats ?? args["skip-visual-stats"]);
 const minSceneCount = positiveInteger(args.minSceneCount ?? args["min-scene-count"] ?? 2);
+const targetCount = positiveInteger(args.targetCount ?? args["target-count"] ?? 1);
 const maxRemapSamples = positiveIntegerOrNull(args.maxRemapSamples ?? args["max-remap-samples"]);
 const maxAfterCoverageDelta = nonNegativeNumber(
   args.maxAfterCoverageDelta ?? args["max-after-coverage-delta"] ?? 0.08,
@@ -52,12 +53,14 @@ const summary = {
   includeVisualStats,
   thresholds: {
     minSceneCount,
+    targetCount,
     maxAfterCoverageDelta,
     maxAfterLumaDelta,
     maxAfterChromaDelta,
   },
   preview: null,
   skipped: [],
+  targetPlans: [],
   rows: [],
   comparisons: [],
   recommendations: [],
@@ -83,6 +86,18 @@ try {
   if (previewResults.length < minSceneCount) {
     throw new Error(`not enough remap preview scenes: ${previewResults.length}/${minSceneCount}`);
   }
+  const targetPlans = buildTargetPlans(previewResults, targetCount);
+  summary.targetPlans = targetPlans.map((plan) => ({
+    assetId: plan.preview.assetId,
+    targetObjectIds: plan.targetObjectIds,
+  }));
+  const targetCaseCount = targetPlans.reduce(
+    (total, plan) => total + plan.targetObjectIds.length,
+    0,
+  );
+  if (targetCaseCount <= 0) {
+    throw new Error("no remap target cases were selected");
+  }
 
   if (!skipBuild) {
     await runCommand({
@@ -101,7 +116,7 @@ try {
   const result = await runBrowserResidualGate({
     baseUrl: withPackedObjectSource(baseUrl),
     outputDir,
-    previewResults,
+    targetPlans,
     headed,
     includeVisualStats,
   });
@@ -112,10 +127,11 @@ try {
     comparisons: summary.comparisons,
     recommendations: summary.recommendations,
     sceneCount: previewResults.length,
+    targetCaseCount,
   });
   summary.passed =
     summary.failures.length === 0 &&
-    summary.rows.length === previewResults.length * 2 &&
+    summary.rows.length === targetCaseCount * 2 &&
     summary.rows.every((row) => row.passed) &&
     summary.comparisons.every((comparison) => comparison.passed);
 } catch (error) {
@@ -155,7 +171,7 @@ async function generatePreviewPlys() {
   return JSON.parse(readFileSync(summaryPath, "utf-8"));
 }
 
-async function runBrowserResidualGate({ baseUrl, outputDir, previewResults, headed, includeVisualStats }) {
+async function runBrowserResidualGate({ baseUrl, outputDir, targetPlans, headed, includeVisualStats }) {
   const browser = await chromium.launch(launchOptions({ headed }));
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
   const consoleIssues = [];
@@ -168,35 +184,37 @@ async function runBrowserResidualGate({ baseUrl, outputDir, previewResults, head
 
   try {
     const rows = [];
-    for (const preview of previewResults) {
-      const targetObjectId = chooseTargetObjectId(preview);
-      console.log(
-        `object_boundary_remap_residual_asset_start asset=${JSON.stringify(preview.assetId)} target=${JSON.stringify(targetObjectId)}`,
-      );
-      rows.push(
-        await auditPlyVariant({
-          page,
-          url: baseUrl,
-          outputDir,
-          preview,
-          variant: "original",
-          plyPath: preview.sourcePly,
-          targetObjectId,
-          includeVisualStats,
-        }),
-      );
-      rows.push(
-        await auditPlyVariant({
-          page,
-          url: baseUrl,
-          outputDir,
-          preview,
-          variant: "remap-preview",
-          plyPath: preview.outputPly,
-          targetObjectId,
-          includeVisualStats,
-        }),
-      );
+    for (const plan of targetPlans) {
+      const { preview, targetObjectIds } = plan;
+      for (const targetObjectId of targetObjectIds) {
+        console.log(
+          `object_boundary_remap_residual_asset_start asset=${JSON.stringify(preview.assetId)} target=${JSON.stringify(targetObjectId)}`,
+        );
+        rows.push(
+          await auditPlyVariant({
+            page,
+            url: baseUrl,
+            outputDir,
+            preview,
+            variant: "original",
+            plyPath: preview.sourcePly,
+            targetObjectId,
+            includeVisualStats,
+          }),
+        );
+        rows.push(
+          await auditPlyVariant({
+            page,
+            url: baseUrl,
+            outputDir,
+            preview,
+            variant: "remap-preview",
+            plyPath: preview.outputPly,
+            targetObjectId,
+            includeVisualStats,
+          }),
+        );
+      }
     }
 
     const relevantIssues = consoleIssues.filter(
@@ -252,7 +270,7 @@ async function auditPlyVariant({
   const failures = validateRouteStats({ assetId: preview.assetId, variant, stats, targetObjectId });
   const screenshotPath = path.join(
     outputDir,
-    `${safeFileName(preview.assetId)}-${safeFileName(variant)}.png`,
+    `${safeFileName(preview.assetId)}-target-${safeFileName(targetObjectId)}-${safeFileName(variant)}.png`,
   );
   await page.screenshot({ path: screenshotPath, fullPage: false });
   const deleteDelta =
@@ -347,15 +365,15 @@ async function waitForSparkEditReady(page) {
 async function selectObjectAndDelete(page, targetObjectId) {
   const selected = await page.evaluate((target) => {
     const rows = [...document.querySelectorAll(".objectRow")];
-    const row =
-      rows.find((candidate) => candidate.querySelector(".idCell")?.textContent?.trim() === String(target)) ??
-      rows[0];
+    const row = rows.find(
+      (candidate) => candidate.querySelector(".idCell")?.textContent?.trim() === String(target),
+    );
     const button = row?.querySelector(".objectSelectButton");
     button?.click();
     return row?.querySelector(".idCell")?.textContent?.trim() ?? "";
   }, targetObjectId);
   if (!selected) {
-    throw new Error("object list is empty");
+    throw new Error(`target object ${targetObjectId} is missing from the object list`);
   }
   await page.waitForFunction(
     (expected) => {
@@ -459,16 +477,17 @@ function validateRouteStats({ assetId, variant, stats, targetObjectId }) {
 }
 
 function buildComparisons(rows) {
-  const byAsset = new Map();
+  const byCase = new Map();
   for (const row of rows) {
-    const assetRows = byAsset.get(row.assetId) ?? [];
-    assetRows.push(row);
-    byAsset.set(row.assetId, assetRows);
+    const key = `${row.assetId}::${row.targetObjectId}`;
+    const caseRows = byCase.get(key) ?? [];
+    caseRows.push(row);
+    byCase.set(key, caseRows);
   }
   const comparisons = [];
-  for (const [assetId, assetRows] of byAsset) {
-    const original = assetRows.find((row) => row.variant === "original");
-    const remap = assetRows.find((row) => row.variant === "remap-preview");
+  for (const caseRows of byCase.values()) {
+    const original = caseRows.find((row) => row.variant === "original");
+    const remap = caseRows.find((row) => row.variant === "remap-preview");
     if (!original || !remap) continue;
     const beforeDelta =
       original.visual.before && remap.visual.before
@@ -488,7 +507,7 @@ function buildComparisons(rows) {
       afterDelta.lumaDelta <= maxAfterLumaDelta &&
       afterDelta.chromaDelta <= maxAfterChromaDelta;
     comparisons.push({
-      assetId,
+      assetId: original.assetId,
       targetObjectId: original.targetObjectId,
       passed,
       confidence: includeVisualStats ? "browser-visual-stats" : "telemetry-only",
@@ -535,9 +554,9 @@ function buildRecommendations(comparisons) {
   });
 }
 
-function buildPromotionSummary({ comparisons, recommendations, sceneCount }) {
-  const passedScenes = comparisons.filter((comparison) => comparison.passed).length;
-  const promotableScenes = recommendations.filter(
+function buildPromotionSummary({ comparisons, recommendations, sceneCount, targetCaseCount }) {
+  const passedTargets = comparisons.filter((comparison) => comparison.passed).length;
+  const promotableTargets = recommendations.filter(
     (recommendation) => recommendation.promotionCandidate,
   ).length;
   const maxAfterCoverageDistance = maxOrZero(
@@ -555,13 +574,15 @@ function buildPromotionSummary({ comparisons, recommendations, sceneCount }) {
   const promotionCandidate =
     includeVisualStats &&
     sceneCount >= minSceneCount &&
-    passedScenes === sceneCount &&
-    promotableScenes === sceneCount;
+    passedTargets === targetCaseCount &&
+    promotableTargets === targetCaseCount;
   return {
     sceneCount,
     minSceneCount,
-    passedScenes,
-    promotableScenes,
+    targetCaseCount,
+    targetCount,
+    passedTargets,
+    promotableTargets,
     confidence: includeVisualStats ? "browser-visual-stats" : "telemetry-only",
     maxAfterCoverageDistance,
     maxAfterLumaDelta,
@@ -572,17 +593,31 @@ function buildPromotionSummary({ comparisons, recommendations, sceneCount }) {
       ? "candidate-for-cleaned-ply-review"
       : "do-not-promote-default-hard-mask",
     reason: promotionCandidate
-      ? "all scenes preserve browser residual and hide fewer target Gaussians"
-      : "multi-scene evidence is insufficient for replacing public samples",
+      ? "all target cases preserve browser residual and hide fewer target Gaussians"
+      : "top-N target evidence is insufficient for replacing public samples",
   };
 }
 
-function chooseTargetObjectId(preview) {
-  const pair = preview.remapPairs?.[0];
-  if (Number.isFinite(pair?.fromObject)) return pair.fromObject;
-  const objectRow = preview.byObject?.[0];
-  if (Number.isFinite(objectRow?.objectId)) return objectRow.objectId;
-  return 0;
+function buildTargetPlans(previewResults, requestedTargetCount) {
+  return previewResults.map((preview) => ({
+    preview,
+    targetObjectIds: chooseTargetObjectIds(preview, requestedTargetCount),
+  }));
+}
+
+function chooseTargetObjectIds(preview, requestedTargetCount) {
+  const ids = [];
+  for (const pair of preview.remapPairs ?? []) {
+    if (!Number.isFinite(pair?.fromObject)) continue;
+    if (!ids.includes(pair.fromObject)) ids.push(pair.fromObject);
+    if (ids.length >= requestedTargetCount) return ids;
+  }
+  for (const objectRow of preview.byObject ?? []) {
+    if (!Number.isFinite(objectRow?.objectId)) continue;
+    if (!ids.includes(objectRow.objectId)) ids.push(objectRow.objectId);
+    if (ids.length >= requestedTargetCount) return ids;
+  }
+  return ids.length > 0 ? ids : [0];
 }
 
 function withPackedObjectSource(baseUrlValue) {
@@ -607,11 +642,12 @@ function renderMarkdown(payload) {
     `- Generated: ${payload.generatedAt}`,
     `- Assets: ${payload.assets.join(", ")}`,
     `- Skipped assets: ${payload.skipped.map((asset) => asset.assetId).join(", ") || "none"}`,
+    `- Target count: ${payload.thresholds.targetCount}`,
     `- URL: ${payload.url}`,
     `- Preview dir: ${payload.previewDir}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
     "",
-    "This gate compares the original object-aware PLY against a sampled `object_id` remap preview PLY in the browser. It forces the same PLY-packed Spark object-mask route for both files and deletes the top remap-candidate object. Passing means the browser route is valid and the remap preview stays within residual thresholds; it does not automatically promote the remap into public samples.",
+    "This gate compares the original object-aware PLY against a sampled `object_id` remap preview PLY in the browser. It forces the same PLY-packed Spark object-mask route for both files and deletes the selected top-N remap-candidate target objects. Passing means the browser route is valid and the remap preview stays within residual thresholds; it does not automatically promote the remap into public samples.",
     "",
     "## Rows",
     "",
@@ -644,9 +680,9 @@ function renderMarkdown(payload) {
     lines.push("No promotion summary available.");
   } else {
     lines.push(
-      "| Scenes | Passed | Promotable | Recommendation | Promotion candidate | Max coverage distance | Max luma | Max chroma | Mean hidden share | Reason |",
-      "| ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |",
-      `| ${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} | ${payload.promotion.passedScenes} | ${payload.promotion.promotableScenes} | ${escapeMarkdown(payload.promotion.recommendation)} | ${payload.promotion.promotionCandidate ? "yes" : "no"} | ${formatNumber(payload.promotion.maxAfterCoverageDistance)} | ${formatNumber(payload.promotion.maxAfterLumaDelta)} | ${formatNumber(payload.promotion.maxAfterChromaDelta)} | ${formatNumber(payload.promotion.meanHiddenDeltaShare)} | ${escapeMarkdown(payload.promotion.reason)} |`,
+      "| Scenes | Target cases | Passed targets | Promotable targets | Recommendation | Promotion candidate | Max coverage distance | Max luma | Max chroma | Mean hidden share | Reason |",
+      "| ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |",
+      `| ${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} | ${payload.promotion.targetCaseCount} | ${payload.promotion.passedTargets} | ${payload.promotion.promotableTargets} | ${escapeMarkdown(payload.promotion.recommendation)} | ${payload.promotion.promotionCandidate ? "yes" : "no"} | ${formatNumber(payload.promotion.maxAfterCoverageDistance)} | ${formatNumber(payload.promotion.maxAfterLumaDelta)} | ${formatNumber(payload.promotion.maxAfterChromaDelta)} | ${formatNumber(payload.promotion.meanHiddenDeltaShare)} | ${escapeMarkdown(payload.promotion.reason)} |`,
     );
   }
 
@@ -692,7 +728,7 @@ function printSummary(payload) {
   }
   for (const recommendation of payload.recommendations) {
     console.log(
-      `object_boundary_remap_residual_recommendation asset=${JSON.stringify(recommendation.assetId)} ` +
+      `object_boundary_remap_residual_recommendation asset=${JSON.stringify(recommendation.assetId)} target=${JSON.stringify(recommendation.targetObjectId)} ` +
         `recommendation=${JSON.stringify(recommendation.recommendation)} promotion=${recommendation.promotionCandidate}`,
     );
   }
@@ -700,7 +736,7 @@ function printSummary(payload) {
     console.log(
       `object_boundary_remap_residual_promotion recommendation=${JSON.stringify(payload.promotion.recommendation)} ` +
         `promotion=${payload.promotion.promotionCandidate} scenes=${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} ` +
-        `passed=${payload.promotion.passedScenes} promotable=${payload.promotion.promotableScenes} ` +
+        `targets=${payload.promotion.targetCaseCount} passed=${payload.promotion.passedTargets} promotable=${payload.promotion.promotableTargets} ` +
         `max=${payload.promotion.maxAfterCoverageDistance}/${payload.promotion.maxAfterLumaDelta}/${payload.promotion.maxAfterChromaDelta}`,
     );
   }
