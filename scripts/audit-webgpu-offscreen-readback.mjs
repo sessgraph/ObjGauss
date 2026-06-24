@@ -8,7 +8,7 @@ const DEFAULT_ASSETS = [
   "nerf-lego-alpha-closure-local",
   "plush-semantic-closure-local",
 ];
-const MODE = "webgpu-offscreen-readback-suite-v1";
+const MODE = "webgpu-offscreen-readback-transition-suite-v1";
 const PROBE = "offscreen-readback";
 
 const args = parseArgs(process.argv.slice(2));
@@ -19,6 +19,9 @@ const outputDir = String(args.outputDir ?? args["output-dir"] ?? DEFAULT_OUTPUT_
 const webGpuFlags = String(args.webGpuFlags ?? args["webgpu-flags"] ?? "unsafe");
 const allowFailures = flagEnabled(args.allowFailures ?? args["allow-failures"]);
 const headed = flagEnabled(args.headed ?? args.headful);
+const objectTransition = !flagEnabled(
+  args.skipObjectTransition ?? args["skip-object-transition"],
+);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
 const webGpuViewportSize = optionalPositiveInteger(
   args.webGpuViewportSize ?? args["webgpu-viewport-size"],
@@ -49,11 +52,17 @@ try {
       webGpuFlags,
       headed,
       webGpuViewportSize,
+      objectTransition,
     });
     process.stdout.write(result.output);
     process.stderr.write(result.errorOutput);
     const parsed = parseAuditOutput(result.output);
-    const checks = evaluateResult({ asset, exitCode: result.exitCode, parsed });
+    const checks = evaluateResult({
+      asset,
+      exitCode: result.exitCode,
+      parsed,
+      objectTransition,
+    });
     const passed = checks.every((check) => check.passed);
     const row = {
       asset,
@@ -77,6 +86,9 @@ try {
         `deviceLost=${JSON.stringify(row.deviceLostStatus)}:${JSON.stringify(row.deviceLostReason)} ` +
         `pixel=${JSON.stringify(row.pixelStatus)}:${JSON.stringify(row.pixelSource)}:${row.pixelWorkgroups ?? 0} ` +
         `readback=${JSON.stringify(row.readbackStatus)}:${JSON.stringify(row.readbackSource)}:${JSON.stringify(row.readbackChecksum)}:${row.readbackByteSize ?? 0}:${row.readbackFiniteFloats ?? 0}/${row.readbackFloatCount ?? 0}:${row.readbackNonzeroFloats ?? 0} ` +
+        `readbackAfterIsolate=${JSON.stringify(row.readbackAfterIsolateStatus)}:${JSON.stringify(row.readbackAfterIsolateSource)}:${JSON.stringify(row.readbackAfterIsolateChecksum)} ` +
+        `readbackAfterDelete=${JSON.stringify(row.readbackAfterDeleteStatus)}:${JSON.stringify(row.readbackAfterDeleteSource)}:${JSON.stringify(row.readbackAfterDeleteChecksum)} ` +
+        `objectState=${JSON.stringify(row.objectStateChecksum)}:${JSON.stringify(row.objectStateAfterIsolateChecksum)}:${JSON.stringify(row.objectStateAfterDeleteChecksum)} ` +
         `packedGaussians=${row.packedGaussians ?? 0} tileReferences=${row.tileReferences ?? 0}`,
     );
     if (!passed && !allowFailures) {
@@ -92,6 +104,7 @@ try {
     assets,
     webGpuFlags,
     headed,
+    objectTransition,
     webGpuViewportSize: webGpuViewportSize ?? null,
     passed: results.length === assets.length && results.every((result) => result.passed),
     results,
@@ -107,7 +120,8 @@ try {
   console.log(
     `webgpu_offscreen_readback=${summary.passed ? "passed" : "failed"} ` +
       `assets=${JSON.stringify(assets)} scenes=${results.length}/${assets.length} ` +
-      `webGpuFlags=${JSON.stringify(webGpuFlags)} headed=${headed} url=${baseUrl}`,
+      `webGpuFlags=${JSON.stringify(webGpuFlags)} headed=${headed} ` +
+      `objectTransition=${objectTransition} url=${baseUrl}`,
   );
   if (!summary.passed && !allowFailures) {
     process.exitCode = 1;
@@ -122,6 +136,7 @@ async function runOffscreenReadback({
   webGpuFlags,
   headed,
   webGpuViewportSize,
+  objectTransition,
 }) {
   const commandArgs = [
     "scripts/audit-demo.mjs",
@@ -136,6 +151,7 @@ async function runOffscreenReadback({
     baseUrl,
     "--no-server",
   ];
+  if (objectTransition) commandArgs.push("--webgpu-object-transition");
   if (headed) commandArgs.push("--headed");
   if (webGpuViewportSize) {
     commandArgs.push("--webgpu-viewport-size", String(webGpuViewportSize));
@@ -161,8 +177,11 @@ function parseAuditOutput(output) {
   const deviceError = line.match(/deviceError="([^"]*)":"([^"]*)"/);
   const pixel = line.match(/pixel="([^"]*)":"([^"]*)":([0-9]+)/);
   const readback = line.match(/readback="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+):([0-9]+)/);
+  const readbackAfterIsolate = line.match(/readbackAfterIsolate="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+):([0-9]+)/);
+  const readbackAfterDelete = line.match(/readbackAfterDelete="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+):([0-9]+)/);
   const storage = line.match(/storage="([^"]*)":"([^"]*)"/);
   const storageLimit = line.match(/storageLimit="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+)/);
+  const objectState = line.match(/objectState="([^"]*)":"([^"]*)"/);
   const activeTiles = line.match(/activeTiles=([0-9]+)\/([0-9]+)/);
 
   return {
@@ -194,6 +213,20 @@ function parseAuditOutput(output) {
     readbackFiniteFloats: numberCapture(readback?.[5]),
     readbackFloatCount: numberCapture(readback?.[6]),
     readbackNonzeroFloats: numberCapture(readback?.[7]),
+    readbackAfterIsolateStatus: readbackAfterIsolate?.[1] ?? "",
+    readbackAfterIsolateSource: readbackAfterIsolate?.[2] ?? "",
+    readbackAfterIsolateChecksum: readbackAfterIsolate?.[3] ?? "",
+    readbackAfterIsolateByteSize: numberCapture(readbackAfterIsolate?.[4]),
+    readbackAfterIsolateFiniteFloats: numberCapture(readbackAfterIsolate?.[5]),
+    readbackAfterIsolateFloatCount: numberCapture(readbackAfterIsolate?.[6]),
+    readbackAfterIsolateNonzeroFloats: numberCapture(readbackAfterIsolate?.[7]),
+    readbackAfterDeleteStatus: readbackAfterDelete?.[1] ?? "",
+    readbackAfterDeleteSource: readbackAfterDelete?.[2] ?? "",
+    readbackAfterDeleteChecksum: readbackAfterDelete?.[3] ?? "",
+    readbackAfterDeleteByteSize: numberCapture(readbackAfterDelete?.[4]),
+    readbackAfterDeleteFiniteFloats: numberCapture(readbackAfterDelete?.[5]),
+    readbackAfterDeleteFloatCount: numberCapture(readbackAfterDelete?.[6]),
+    readbackAfterDeleteNonzeroFloats: numberCapture(readbackAfterDelete?.[7]),
     storageStatus: storage?.[1] ?? "",
     storageChecksum: storage?.[2] ?? "",
     storageLimitGate: storageLimit?.[1] ?? "",
@@ -209,13 +242,21 @@ function parseAuditOutput(output) {
     tileReferences: numberMatch(line, /tileReferences=([0-9]+)/),
     maxTileOccupancy: numberMatch(line, /maxTileOccupancy=([0-9]+)/),
     tileOverflowCount: numberMatch(line, /tileOverflowCount=([0-9]+)/),
+    objectStateLayout: objectState?.[1] ?? "",
+    objectStateChecksum: objectState?.[2] ?? "",
+    objectStateAfterIsolateChecksum: jsonStringCapture(line, /objectStateAfterIsolate=("[^"]*")/),
+    objectStateAfterDeleteChecksum: jsonStringCapture(line, /objectStateAfterDelete=("[^"]*")/),
     objectFilter: jsonStringCapture(line, /objectFilter=("[^"]+")/),
     objectFilterTarget: jsonStringCapture(line, /objectFilterTarget=("[^"]+")/),
+    visibleAfterIsolate: stringMatch(line, /visibleAfterIsolate=([^\s]+)/),
+    visibleAfterDelete: stringMatch(line, /visibleAfterDelete=([^\s]+)/),
+    renderModeAfterDelete: jsonStringCapture(line, /renderModeAfterDelete=("[^"]*")/),
+    deletedObjects: stringMatch(line, /deletedObjects=([^\s]+)/),
     screenshotPath: stringMatch(line, /screenshot=([^\s]+)/),
   };
 }
 
-function evaluateResult({ asset, exitCode, parsed }) {
+function evaluateResult({ asset, exitCode, parsed, objectTransition }) {
   const checks = [
     check("exit-code", exitCode, 0, exitCode === 0),
     check("parsed-audit-line", parsed.parsed, true, parsed.parsed === true),
@@ -250,7 +291,98 @@ function evaluateResult({ asset, exitCode, parsed }) {
       parsed.objectFilterTarget === "gpu-object-state-buffer",
     ),
   ];
+  if (objectTransition) {
+    checks.push(
+      check("object-state-layout", parsed.objectStateLayout, "webgpu-object-state-v1", parsed.objectStateLayout === "webgpu-object-state-v1"),
+      check("object-state-checksum", parsed.objectStateChecksum, "8 hex chars", /^[0-9a-f]{8}$/.test(parsed.objectStateChecksum ?? "")),
+      check(
+        "object-state-after-isolate",
+        parsed.objectStateAfterIsolateChecksum,
+        "8 hex chars != initial",
+        /^[0-9a-f]{8}$/.test(parsed.objectStateAfterIsolateChecksum ?? "") &&
+          parsed.objectStateAfterIsolateChecksum !== parsed.objectStateChecksum,
+      ),
+      check(
+        "object-state-after-delete",
+        parsed.objectStateAfterDeleteChecksum,
+        "8 hex chars != isolate",
+        /^[0-9a-f]{8}$/.test(parsed.objectStateAfterDeleteChecksum ?? "") &&
+          parsed.objectStateAfterDeleteChecksum !== parsed.objectStateAfterIsolateChecksum,
+      ),
+      check("visible-after-isolate", parsed.visibleAfterIsolate, ">0", numberCapture(parsed.visibleAfterIsolate) > 0),
+      check("visible-after-delete", parsed.visibleAfterDelete, ">0", numberCapture(parsed.visibleAfterDelete) > 0),
+      check("deleted-objects", parsed.deletedObjects, "1", parsed.deletedObjects === "1"),
+      check(
+        "render-mode-after-delete",
+        parsed.renderModeAfterDelete,
+        "原始颜色（编辑预览）",
+        parsed.renderModeAfterDelete === "原始颜色（编辑预览）",
+      ),
+      ...transitionReadbackChecks({
+        label: "isolate",
+        status: parsed.readbackAfterIsolateStatus,
+        source: parsed.readbackAfterIsolateSource,
+        checksum: parsed.readbackAfterIsolateChecksum,
+        byteSize: parsed.readbackAfterIsolateByteSize,
+        finiteFloats: parsed.readbackAfterIsolateFiniteFloats,
+        floatCount: parsed.readbackAfterIsolateFloatCount,
+        nonzeroFloats: parsed.readbackAfterIsolateNonzeroFloats,
+        previousChecksum: parsed.readbackChecksum,
+        pixelSource: parsed.pixelSource,
+      }),
+      ...transitionReadbackChecks({
+        label: "delete",
+        status: parsed.readbackAfterDeleteStatus,
+        source: parsed.readbackAfterDeleteSource,
+        checksum: parsed.readbackAfterDeleteChecksum,
+        byteSize: parsed.readbackAfterDeleteByteSize,
+        finiteFloats: parsed.readbackAfterDeleteFiniteFloats,
+        floatCount: parsed.readbackAfterDeleteFloatCount,
+        nonzeroFloats: parsed.readbackAfterDeleteNonzeroFloats,
+        previousChecksum: parsed.readbackAfterIsolateChecksum,
+        pixelSource: parsed.pixelSource,
+      }),
+      check(
+        "readback-delete-differs-from-initial",
+        parsed.readbackAfterDeleteChecksum,
+        `!= ${parsed.readbackChecksum}`,
+        parsed.readbackAfterDeleteChecksum !== parsed.readbackChecksum,
+      ),
+    );
+  }
   return checks;
+}
+
+function transitionReadbackChecks({
+  label,
+  status,
+  source,
+  checksum,
+  byteSize,
+  finiteFloats,
+  floatCount,
+  nonzeroFloats,
+  previousChecksum,
+  pixelSource,
+}) {
+  return [
+    check(`readback-after-${label}-status`, status, "mapped", status === "mapped"),
+    check(`readback-after-${label}-source`, source, pixelSource, source === pixelSource),
+    check(
+      `readback-after-${label}-checksum`,
+      checksum,
+      `8 hex chars != ${previousChecksum}`,
+      /^[0-9a-f]{8}$/.test(checksum ?? "") && checksum !== previousChecksum,
+    ),
+    check(`readback-after-${label}-byte-size`, byteSize, ">0", byteSize > 0),
+    check(
+      `readback-after-${label}-finite-floats`,
+      `${finiteFloats}/${floatCount}`,
+      "finite == total > 0",
+      floatCount > 0 && finiteFloats === floatCount,
+    ),
+    check(`readback-after-${label}-nonzero-floats`, nonzeroFloats, ">0", nonzeroFloats > 0),
+  ];
 }
 
 function check(name, actual, expected, passed) {
@@ -265,13 +397,14 @@ function renderMarkdown(summary) {
     `Generated: \`${summary.generatedAt}\``,
     `URL: \`${summary.url}\``,
     `WebGPU flags: \`${summary.webGpuFlags}\``,
+    `Object transition: \`${summary.objectTransition ? "enabled" : "disabled"}\``,
     "",
-    "| Asset | Passed | Frame pixels | Readback checksum | Readback bytes | Finite floats | Nonzero floats | Queue | Device | Packed | Tile refs |",
-    "| --- | --- | ---: | --- | ---: | ---: | ---: | --- | --- | ---: | ---: |",
+    "| Asset | Passed | Frame pixels | Readback | After isolate | After delete | Object state | Queue | Device | Packed | Tile refs |",
+    "| --- | --- | ---: | --- | --- | --- | --- | --- | --- | ---: | ---: |",
   ];
   for (const result of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(result.asset)} | ${result.passed ? "yes" : "no"} | ${formatValue(result.firstFramePixels)} | ${escapeMarkdown(result.readbackChecksum || "")} | ${formatValue(result.readbackByteSize)} | ${formatValue(result.readbackFiniteFloats)}/${formatValue(result.readbackFloatCount)} | ${formatValue(result.readbackNonzeroFloats)} | ${escapeMarkdown(result.queueStatus || "")} | ${escapeMarkdown(result.deviceLostStatus || "")} | ${formatValue(result.packedGaussians)} | ${formatValue(result.tileReferences)} |`,
+      `| ${escapeMarkdown(result.asset)} | ${result.passed ? "yes" : "no"} | ${formatValue(result.firstFramePixels)} | ${escapeMarkdown(result.readbackChecksum || "")} | ${escapeMarkdown(result.readbackAfterIsolateChecksum || "")} | ${escapeMarkdown(result.readbackAfterDeleteChecksum || "")} | ${escapeMarkdown(result.objectStateChecksum || "")}/${escapeMarkdown(result.objectStateAfterIsolateChecksum || "")}/${escapeMarkdown(result.objectStateAfterDeleteChecksum || "")} | ${escapeMarkdown(result.queueStatus || "")} | ${escapeMarkdown(result.deviceLostStatus || "")} | ${formatValue(result.packedGaussians)} | ${formatValue(result.tileReferences)} |`,
     );
   }
   lines.push("", "## Failed Checks", "");
@@ -350,7 +483,7 @@ function stringMatch(source, pattern) {
 }
 
 function numberCapture(value) {
-  const parsed = Number(value);
+  const parsed = Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 

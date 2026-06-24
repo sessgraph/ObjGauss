@@ -182,18 +182,23 @@ npm run audit:webgpu-offscreen-readback
 The suite runs the WebGPU pixel compute path, copies `pixelResolvedRgba` into a
 `MAP_READ` buffer, validates `data-webgpu-readback-*` telemetry, and writes
 `summary.json` / `summary.md` under `/tmp/objgauss-webgpu-offscreen-readback`.
-It does not create a canvas render pass, so passing it does not prove
-display/presentation. It proves storage upload, compute dispatch, buffer copy,
-queue completion, and GPU readback.
+It also performs a WebGPU-only object transition by disabling Spark filtered
+edit with `spark-filtered-edit=off`, then verifies that isolate and delete
+change both the GPU object-state checksum and the readback checksum. It does
+not create a canvas render pass, so passing it does not prove
+display/presentation. It proves storage upload, compute dispatch, object-state
+binding, buffer copy, queue completion, and GPU readback.
 
 Current local result:
 
-| Scene | Frame pixels | Readback checksum | Readback bytes | Finite floats | Nonzero floats | Packed | Tile refs |
-| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| NeRF Lego proxy | 253952 | `897e852d` | 4063232 | 1015808/1015808 | 533740 | 5696 | 40389 |
-| Plush semantic | 147456 | `0f87864a` | 2359296 | 589824/589824 | 254524 | 281498 | 1190026 |
+| Scene | Frame pixels | Initial readback | Isolate readback | Delete readback | Object-state checksums | Packed | Tile refs |
+| --- | ---: | --- | --- | --- | --- | ---: | ---: |
+| NeRF Lego proxy | 253952 | `897e852d` | `3bd507d9` | `916a5fc9` | `7243475b` / `f72fa1f4` / `35652440` | 5696 | 40389 |
+| Plush semantic | 147456 | `0f87864a` | `0bdb3b09` | `9660bc47` | `362760d7` / `fc48aab0` / `637142bc` | 281498 | 1190026 |
 
-Use `--assets <asset_id>` to rerun a single scene.
+Use `--assets <asset_id>` to rerun a single scene. Use
+`--skip-object-transition` only when you intentionally want the older first
+readback-only probe.
 
 ## Depth Alpha Mode Diagnostic
 

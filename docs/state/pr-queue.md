@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AR`: 为 offscreen WebGPU readback 增加 object-state transition gate，在不依赖 canvas presentation 的情况下验证隔离 / 删除会改变 GPU object-state 与 readback checksum。
+  - `RENDER-005T-AS`: 将 WebGPU offscreen object-transition suite 纳入更高层 acceptance / CI-headless runbook，并明确与 headed presentation gate 的分工。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,31 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AR: WebGPU offscreen object-state transition gate
+
+- 状态: done / offscreen-transition-audited
+- 类型: 标准 PR / WebGPU CI-headless object editing diagnostics
+- 目标: 在不创建 WebGPU canvas render pass 的情况下，验证隔离 / 删除会同时改变 GPU object-state buffer 和 offscreen readback checksum。
+- 已实施:
+  - `audit-demo` 新增 `--webgpu-object-transition`，仅允许搭配 `--webgpu-probe offscreen-readback`。
+  - transition audit 会通过 URL 诊断开关 `spark-filtered-edit=off` 暂时禁用 Spark filtered edit route，让删除后保留在 WebGPU Tile 编辑路径；默认产品 / 商业展示路线不变。
+  - `audit-demo` 现在输出 `readbackAfterIsolate`、`readbackAfterDelete` 和 `objectStateAfterIsolate` telemetry。
+  - `npm run audit:webgpu-offscreen-readback` 默认启用 object transition gate，仍可用 `--skip-object-transition` 回到首帧 readback suite。
+  - Suite report 记录初始 / 隔离 / 删除三段 readback checksum 和 object-state checksum。
+- 结论:
+  - Lego proxy 通过：readback `897e852d -> 3bd507d9 -> 916a5fc9`，object-state `7243475b -> f72fa1f4 -> 35652440`，可见数 `2592` isolate / `3104` delete。
+  - Plush semantic 281k 大场景通过：readback `0f87864a -> 0bdb3b09 -> 9660bc47`，object-state `362760d7 -> fc48aab0 -> 637142bc`，可见数 `177095` isolate / `104403` delete。
+  - 这证明 WebGPU object-state buffer 的隔离 / 删除状态不只更新 DOM telemetry，也会改变真实 compute pixel output 和 MAP_READ readback。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-offscreen-readback.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5323 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition-single`: passed。
+  - `npm run audit:webgpu-offscreen-readback -- --port 5324 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AQ: WebGPU offscreen readback multi-scene suite
 

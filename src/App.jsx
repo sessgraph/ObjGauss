@@ -116,6 +116,7 @@ export default function App() {
   const sparkReconstructProbe = useMemo(readSparkReconstructProbe, []);
   const sparkPlySourceMode = useMemo(readSparkPlySourceMode, []);
   const sparkNativeMaskMode = useMemo(readSparkNativeMaskMode, []);
+  const sparkFilteredEditEnabled = useMemo(readSparkFilteredEditEnabled, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -175,6 +176,7 @@ export default function App() {
     hasSplatRenderer &&
     renderMode === "original" &&
     (objectEditActive || sparkReconstructProbe) &&
+    sparkFilteredEditEnabled &&
     webGpuColorTuning.colorMode === "source";
   const canUseSparkNativeMaskSource = hasSplatRenderer && !sceneHasShRestSource(scene);
   const useSparkPlySourceRenderer = viewMode === "view" && canUseSparkPlySourceRenderer;
@@ -1018,6 +1020,14 @@ function readSparkNativeMaskMode() {
   }
   if (["1", "true", "yes", "on", "native", "force"].includes(value)) return "force";
   return "auto";
+}
+
+function readSparkFilteredEditEnabled() {
+  if (typeof window === "undefined") return true;
+  const value = String(
+    new URLSearchParams(window.location.search).get("spark-filtered-edit") ?? "auto",
+  ).toLowerCase();
+  return !["0", "false", "no", "off"].includes(value);
 }
 
 function sceneHasShRestSource(scene) {

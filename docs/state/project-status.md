@@ -106,6 +106,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AO 已完成 Spark pick object-support disambiguation：`screen-space-object-pick-v1` 不再只按最近 Gaussian 和第二 object 距离差判歧义，而是用 `object-support-score-v1` 聚合每个候选 object 的最近距离、局部支持占比和前景深度得分，并暴露 `data-spark-pick-strategy/score/score-margin/second-object/second-score`。默认 Lego proxy report 仍 `14/15` hit，但 ambiguity rate 从 `0.928571` 降到 `0.357143`；trained Lego 5-click 从 `1` 降到 `0.2`。`audit-demo` 两个样例的单次 Spark pick 均变为 `ambiguous=false`，同时保持 marker 可见和 selected object match。
   - RENDER-005T-AP 已完成 WebGPU offscreen readback probe：新增 `webgpu-probe=offscreen-readback` 和 `npm run audit:webgpu-offscreen-readback`，该 probe 只 dispatch pixel compute、把 `pixelResolvedRgba` copy 到 `MAP_READ` buffer 并暴露 `data-webgpu-readback-*`，不创建 canvas render pass。Lego proxy 本地 audit 通过：`firstFrame="readback":253952`、`queue="done"`、`deviceLost="active"`、`readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740`，证明 headless/CI 可单独验证 WebGPU compute/storage/readback，而不把 presentation backend loss 误判为 renderer compute failure。
   - RENDER-005T-AQ 已完成 WebGPU offscreen readback 多场景 suite：新增 `scripts/audit-webgpu-offscreen-readback.mjs`，`npm run audit:webgpu-offscreen-readback` 现在默认覆盖 Lego proxy + Plush semantic，并写出 `/tmp/objgauss-webgpu-offscreen-readback/summary.{json,md}`。默认双场景 gate 通过：Lego `readback="mapped":"897e852d":4063232:1015808/1015808:533740`，Plush `readback="mapped":"0f87864a":2359296:589824/589824:254524`、`packedGaussians=281498`、`tileReferences=1190026`。
+  - RENDER-005T-AR 已完成 WebGPU offscreen object-state transition gate：`audit-demo --webgpu-object-transition` 会在 `offscreen-readback` 下通过 `spark-filtered-edit=off` 留在 WebGPU Tile 编辑路径，执行选中、隔离和删除，并要求 object-state checksum 与 readback checksum 都三段变化。默认双场景 gate 通过：Lego readback `897e852d -> 3bd507d9 -> 916a5fc9`，Plush readback `0f87864a -> 0bdb3b09 -> 9660bc47`；对应 object-state 分别为 `7243475b -> f72fa1f4 -> 35652440` 和 `362760d7 -> fc48aab0 -> 637142bc`。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -167,7 +168,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run benchmark:cross-scene` 已固化为跨场景 / 跨变体汇总入口，可聚合 semantic smoke suite、Splatfacto scene suite 和 safe-2000 variant suite 到同一张表，并输出 smoke / candidate / paper stage gates。
   - `npm run audit:webgpu-coverage-gate` 已固化为 WebGPU 编辑预览 coverage/luma/chroma/cost 的多场景 baseline gate，并输出可复查 summary report。
   - `npm run audit:webgpu-alpha-floor-sweep` / `npm run audit:webgpu-alpha-floor-candidate-gate` 已固化为 alpha presentation floor 候选的多场景复现实验和 strict gate。
-  - `npm run audit:webgpu-offscreen-readback` 已固化为 WebGPU compute/storage/readback 多场景 suite；默认不依赖 canvas presentation 成功，覆盖 Lego proxy 与 Plush semantic，并输出 summary report，适合在 CI/headless 环境区分计算管线和 presentation backend loss。
+  - `npm run audit:webgpu-offscreen-readback` 已固化为 WebGPU compute/storage/readback 多场景 object-transition suite；默认不依赖 canvas presentation 成功，覆盖 Lego proxy 与 Plush semantic，验证首帧、隔离、删除三段 readback checksum 和 object-state checksum，并输出 summary report，适合在 CI/headless 环境区分计算管线和 presentation backend loss。
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
@@ -186,8 +187,8 @@ node --check scripts/audit-webgpu-offscreen-readback.mjs
 node --check scripts/audit-webgpu-desktop.mjs
 npm run audit:webgpu-tile-smoke
 npm run build
-npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5321 --output-dir /tmp/objgauss-webgpu-offscreen-readback-single
-npm run audit:webgpu-offscreen-readback -- --port 5322 --output-dir /tmp/objgauss-webgpu-offscreen-readback
+npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5323 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition-single
+npm run audit:webgpu-offscreen-readback -- --port 5324 --output-dir /tmp/objgauss-webgpu-offscreen-readback-transition
 node --check scripts/audit-spark-pick-report.mjs
 npm run build
 npm run audit:spark-pick-report

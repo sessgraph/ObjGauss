@@ -163,7 +163,19 @@ const auditOptions = {
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
   ),
+  webGpuObjectTransition: flagEnabled(
+    args.webGpuObjectTransition ??
+      args["webgpu-object-transition"] ??
+      process.env.OBJGAUSS_WEBGPU_OBJECT_TRANSITION,
+  ),
 };
+
+if (
+  auditOptions.webGpuObjectTransition &&
+  auditOptions.webGpuProbe !== WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK
+) {
+  throw new Error("--webgpu-object-transition is only supported with --webgpu-probe offscreen-readback");
+}
 
 const server = args.url || args.noServer ? null : startDevServer(port);
 try {
@@ -197,6 +209,8 @@ try {
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
         `readback=${JSON.stringify(result.webGpuReadbackStatus ?? "")}:${JSON.stringify(result.webGpuReadbackSource ?? "")}:${JSON.stringify(result.webGpuReadbackChecksum ?? "")}:${result.webGpuReadbackByteSize ?? 0}:${result.webGpuReadbackFiniteFloats ?? 0}/${result.webGpuReadbackFloatCount ?? 0}:${result.webGpuReadbackNonzeroFloats ?? 0} ` +
+        `readbackAfterIsolate=${JSON.stringify(result.webGpuReadbackStatusAfterIsolate ?? "")}:${JSON.stringify(result.webGpuReadbackSourceAfterIsolate ?? "")}:${JSON.stringify(result.webGpuReadbackChecksumAfterIsolate ?? "")}:${result.webGpuReadbackByteSizeAfterIsolate ?? 0}:${result.webGpuReadbackFiniteFloatsAfterIsolate ?? 0}/${result.webGpuReadbackFloatCountAfterIsolate ?? 0}:${result.webGpuReadbackNonzeroFloatsAfterIsolate ?? 0} ` +
+        `readbackAfterDelete=${JSON.stringify(result.webGpuReadbackStatusAfterDelete ?? "")}:${JSON.stringify(result.webGpuReadbackSourceAfterDelete ?? "")}:${JSON.stringify(result.webGpuReadbackChecksumAfterDelete ?? "")}:${result.webGpuReadbackByteSizeAfterDelete ?? 0}:${result.webGpuReadbackFiniteFloatsAfterDelete ?? 0}/${result.webGpuReadbackFloatCountAfterDelete ?? 0}:${result.webGpuReadbackNonzeroFloatsAfterDelete ?? 0} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)}:${JSON.stringify(result.webGpuAlphaPresentationMode)}:${result.webGpuAlphaPresentationFloor} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
@@ -216,6 +230,7 @@ try {
         `resolvedTiles=${result.resolvedTileCount} ` +
         `resolveChecksum=${JSON.stringify(result.resolveChecksum)} ` +
         `objectState=${JSON.stringify(result.objectStateLayout)}:${JSON.stringify(result.objectStateChecksum)} ` +
+        `objectStateAfterIsolate=${JSON.stringify(result.objectStateChecksumAfterIsolate)} ` +
         `objectStateAfterDelete=${JSON.stringify(result.objectStateChecksumAfterDelete)} ` +
         `tileOverflowCount=${result.tileOverflowCount} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
@@ -243,6 +258,7 @@ try {
     `browser_audit=passed assets=${results.length} url=${baseUrl} ` +
       `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
+      `webGpuObjectTransition=${auditOptions.webGpuObjectTransition} ` +
       `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
       `skipVisualResidual=${auditOptions.skipVisualResidual} ` +
       `allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
@@ -938,7 +954,10 @@ async function runAudit(url, assetsToCheck, options) {
             `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
-        if (options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL) {
+        if (
+          options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL &&
+          !options.webGpuObjectTransition
+        ) {
           const screenshotPath = `/tmp/objgauss-audit-${asset.id}-${options.webGpuProbe}.png`;
           await page.screenshot({ path: screenshotPath, fullPage: false });
           results.push({
@@ -1042,6 +1061,20 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuReadbackFloatCount,
             webGpuReadbackFiniteFloats,
             webGpuReadbackNonzeroFloats,
+            webGpuReadbackStatusAfterIsolate: "probe-skipped",
+            webGpuReadbackSourceAfterIsolate: "",
+            webGpuReadbackChecksumAfterIsolate: "",
+            webGpuReadbackByteSizeAfterIsolate: 0,
+            webGpuReadbackFloatCountAfterIsolate: 0,
+            webGpuReadbackFiniteFloatsAfterIsolate: 0,
+            webGpuReadbackNonzeroFloatsAfterIsolate: 0,
+            webGpuReadbackStatusAfterDelete: "probe-skipped",
+            webGpuReadbackSourceAfterDelete: "",
+            webGpuReadbackChecksumAfterDelete: "",
+            webGpuReadbackByteSizeAfterDelete: 0,
+            webGpuReadbackFloatCountAfterDelete: 0,
+            webGpuReadbackFiniteFloatsAfterDelete: 0,
+            webGpuReadbackNonzeroFloatsAfterDelete: 0,
             webGpuStorageLayout,
             webGpuStorageStatus,
             webGpuStorageBufferCount,
@@ -1143,6 +1176,15 @@ async function runAudit(url, assetsToCheck, options) {
       const objectStateSelectedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-selected-objects") ?? "0");
       const objectStateIsolatedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
       const webGpuStorageChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-storage-checksum");
+      const webGpuReadbackAfterIsolate =
+        editRendererId === "webgpu-tile" &&
+        options.webGpuProbe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK
+          ? await waitForWebGpuReadbackTransition(page, {
+              assetId: asset.id,
+              label: "isolate",
+              previousChecksum: webGpuReadbackChecksum,
+            })
+          : emptyWebGpuReadbackTelemetry();
       if (
         objectStateChecksumAfterIsolate === objectStateChecksum ||
         objectStateVisibleAfterIsolate !== 1 ||
@@ -1156,6 +1198,15 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (editRendererId === "webgpu-tile" && webGpuStorageChecksumAfterIsolate === webGpuStorageChecksum) {
         throw new Error(`${asset.id} isolate did not update WebGPU storage checksum`);
+      }
+      if (
+        options.webGpuObjectTransition &&
+        editRendererId === "webgpu-tile" &&
+        webGpuReadbackAfterIsolate.checksum === webGpuReadbackChecksum
+      ) {
+        throw new Error(
+          `${asset.id} isolate did not update WebGPU offscreen readback checksum: ${webGpuReadbackChecksum}`,
+        );
       }
       await page.getByRole("button", { name: "预览删除" }).click();
       await page.waitForTimeout(300);
@@ -1301,6 +1352,16 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuStorageChecksumAfterDelete = sparkFilteredAfterDelete
         ? SPARK_OBJECT_FILTER_MASK
         : await viewport.getAttribute("data-webgpu-storage-checksum");
+      const webGpuReadbackAfterDelete =
+        editRendererId === "webgpu-tile" &&
+        options.webGpuProbe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK &&
+        !sparkFilteredAfterDelete
+          ? await waitForWebGpuReadbackTransition(page, {
+              assetId: asset.id,
+              label: "delete",
+              previousChecksum: webGpuReadbackAfterIsolate.checksum,
+            })
+          : emptyWebGpuReadbackTelemetry();
       const webGpuColorSourceRgbGaussiansAfterDelete = sparkFilteredAfterDelete
         ? sparkColorSourceGaussiansAfterDelete
         : numericValue(await viewport.getAttribute("data-webgpu-color-source-rgb-gaussians") ?? "0");
@@ -1513,6 +1574,16 @@ async function runAudit(url, assetsToCheck, options) {
       ) {
         throw new Error(`${asset.id} delete did not update WebGPU storage checksum`);
       }
+      if (
+        options.webGpuObjectTransition &&
+        editRendererId === "webgpu-tile" &&
+        !sparkFilteredAfterDelete &&
+        webGpuReadbackAfterDelete.checksum === webGpuReadbackAfterIsolate.checksum
+      ) {
+        throw new Error(
+          `${asset.id} delete did not update WebGPU offscreen readback checksum: ${webGpuReadbackAfterDelete.checksum}`,
+        );
+      }
       const screenshotPath = `/tmp/objgauss-audit-${asset.id}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: false });
       results.push({
@@ -1608,6 +1679,28 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuPixelSource,
         webGpuPixelStatus,
         webGpuPixelWorkgroups,
+        webGpuReadbackStatus,
+        webGpuReadbackReason,
+        webGpuReadbackSource,
+        webGpuReadbackChecksum,
+        webGpuReadbackByteSize,
+        webGpuReadbackFloatCount,
+        webGpuReadbackFiniteFloats,
+        webGpuReadbackNonzeroFloats,
+        webGpuReadbackStatusAfterIsolate: webGpuReadbackAfterIsolate.status,
+        webGpuReadbackSourceAfterIsolate: webGpuReadbackAfterIsolate.source,
+        webGpuReadbackChecksumAfterIsolate: webGpuReadbackAfterIsolate.checksum,
+        webGpuReadbackByteSizeAfterIsolate: webGpuReadbackAfterIsolate.byteSize,
+        webGpuReadbackFloatCountAfterIsolate: webGpuReadbackAfterIsolate.floatCount,
+        webGpuReadbackFiniteFloatsAfterIsolate: webGpuReadbackAfterIsolate.finiteFloats,
+        webGpuReadbackNonzeroFloatsAfterIsolate: webGpuReadbackAfterIsolate.nonzeroFloats,
+        webGpuReadbackStatusAfterDelete: webGpuReadbackAfterDelete.status,
+        webGpuReadbackSourceAfterDelete: webGpuReadbackAfterDelete.source,
+        webGpuReadbackChecksumAfterDelete: webGpuReadbackAfterDelete.checksum,
+        webGpuReadbackByteSizeAfterDelete: webGpuReadbackAfterDelete.byteSize,
+        webGpuReadbackFloatCountAfterDelete: webGpuReadbackAfterDelete.floatCount,
+        webGpuReadbackFiniteFloatsAfterDelete: webGpuReadbackAfterDelete.finiteFloats,
+        webGpuReadbackNonzeroFloatsAfterDelete: webGpuReadbackAfterDelete.nonzeroFloats,
         webGpuStorageLayout,
         webGpuStorageStatus,
         webGpuStorageBufferCount,
@@ -2061,6 +2154,7 @@ function urlWithWebGpuOptions(url, options) {
       options.webGpuAlphaPresentationTuning.alphaPresentationFloor -
         WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
     ) <= 0.000001
+    && !options.webGpuObjectTransition
   ) {
     return url;
   }
@@ -2091,6 +2185,9 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (options.sparkNativeMask) {
     parsed.searchParams.set("spark-native-mask", "on");
+  }
+  if (options.webGpuObjectTransition) {
+    parsed.searchParams.set("spark-filtered-edit", "off");
   }
   if (
     Math.abs(
@@ -2286,6 +2383,78 @@ async function waitForWebGpuQueueTelemetry(page, timeoutMs = 8000) {
       deviceLostStatus === "lost"
     );
   }, undefined, { timeout: timeoutMs }).catch(() => {});
+}
+
+async function waitForWebGpuReadbackTransition(
+  page,
+  { assetId, label, previousChecksum },
+  timeoutMs = 15000,
+) {
+  await page.waitForFunction(
+    ({ previous }) => {
+      const viewport = document.querySelector(".viewport");
+      if (viewport?.getAttribute("data-renderer") !== "webgpu-tile") return false;
+      const queueStatus = viewport.getAttribute("data-webgpu-queue-status");
+      const readbackStatus = viewport.getAttribute("data-webgpu-readback-status");
+      const checksum = viewport.getAttribute("data-webgpu-readback-checksum") ?? "";
+      const finiteFloats = Number(viewport.getAttribute("data-webgpu-readback-finite-floats") ?? "0");
+      const floatCount = Number(viewport.getAttribute("data-webgpu-readback-float-count") ?? "0");
+      return (
+        queueStatus === "done" &&
+        readbackStatus === "mapped" &&
+        /^[0-9a-f]{8}$/.test(checksum) &&
+        checksum !== previous &&
+        floatCount > 0 &&
+        finiteFloats === floatCount
+      );
+    },
+    { previous: previousChecksum },
+    { timeout: timeoutMs },
+  );
+  const telemetry = await readWebGpuReadbackTelemetry(page);
+  if (
+    telemetry.status !== "mapped" ||
+    telemetry.source !== WEBGPU_PIXEL_RESOLVE_SOURCE ||
+    !/^[0-9a-f]{8}$/.test(telemetry.checksum) ||
+    telemetry.checksum === previousChecksum ||
+    telemetry.byteSize <= 0 ||
+    telemetry.floatCount <= 0 ||
+    telemetry.finiteFloats !== telemetry.floatCount ||
+    telemetry.nonzeroFloats <= 0
+  ) {
+    throw new Error(
+      `${assetId} invalid WebGPU readback after ${label}: ` +
+        `${telemetry.status}:${telemetry.source}:${telemetry.checksum}:` +
+        `${telemetry.byteSize}:${telemetry.finiteFloats}/${telemetry.floatCount}:` +
+        `${telemetry.nonzeroFloats} previous=${previousChecksum}`,
+    );
+  }
+  return telemetry;
+}
+
+async function readWebGpuReadbackTelemetry(page) {
+  const viewport = page.locator(".viewport").first();
+  return {
+    status: (await viewport.getAttribute("data-webgpu-readback-status")) ?? "",
+    source: (await viewport.getAttribute("data-webgpu-readback-source")) ?? "",
+    checksum: (await viewport.getAttribute("data-webgpu-readback-checksum")) ?? "",
+    byteSize: numericValue(await viewport.getAttribute("data-webgpu-readback-byte-size") ?? "0"),
+    floatCount: numericValue(await viewport.getAttribute("data-webgpu-readback-float-count") ?? "0"),
+    finiteFloats: numericValue(await viewport.getAttribute("data-webgpu-readback-finite-floats") ?? "0"),
+    nonzeroFloats: numericValue(await viewport.getAttribute("data-webgpu-readback-nonzero-floats") ?? "0"),
+  };
+}
+
+function emptyWebGpuReadbackTelemetry() {
+  return {
+    status: "probe-skipped",
+    source: "",
+    checksum: "",
+    byteSize: 0,
+    floatCount: 0,
+    finiteFloats: 0,
+    nonzeroFloats: 0,
+  };
 }
 
 async function waitForEditViewportReady(page) {
