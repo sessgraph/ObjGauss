@@ -101,6 +101,34 @@ using URL params:
 npm run audit:spark-mask-feather-sweep -- --control ui --skip-visual-stats
 ```
 
+Object-boundary remap is the second diagnostic path for reducing hard-mask
+grain. Unlike feathering, it changes only the sampled `object_id` assignment in
+a `/tmp` preview PLY and leaves all Gaussian geometry, opacity, color, scale,
+rotation, and SH fields untouched.
+
+Use the browser residual gate before considering a cleaned PLY promotion:
+
+```bash
+npm run audit:object-boundary-remap-residual
+```
+
+The gate first runs `audit:object-boundary-remap-preview`, then uploads both
+the original object-aware PLY and the remap-preview PLY into the viewer. It
+forces the same PLY-packed Spark object-mask route for both files with
+`spark-object-source=packed`, deletes the top remap-candidate object, captures
+canvas visual stats, and writes:
+
+```text
+/tmp/objgauss-object-boundary-remap-residual/summary.json
+/tmp/objgauss-object-boundary-remap-residual/summary.md
+```
+
+Current Lego proxy result: the gate passes, but the recommendation is
+`browser-evidence-only`, not promotion. The remap preview hides `49` fewer
+Gaussians for target object `2` and stays within residual thresholds
+(`after=0.999216/0.004332/0.019990`), but this is still single-scene evidence
+and does not prove non-target preservation across Plush or commercial Chair.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -131,6 +159,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
 | Which object boundaries are candidates for assignment cleanup / remap review? | `npm run audit:object-boundary-cleanup` |
 | Can we export a cleaned `object_id` preview without changing official samples? | `npm run audit:object-boundary-remap-preview` |
+| Does a remap preview preserve browser visual residual after delete? | `npm run audit:object-boundary-remap-residual` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |

@@ -13,6 +13,7 @@
     "audit:object-mask-boundary": "node scripts/audit-object-mask-boundary.mjs",
     "audit:object-boundary-cleanup": "node scripts/audit-object-mask-boundary.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-object-boundary-cleanup",
     "audit:object-boundary-remap-preview": "node scripts/export-object-boundary-remap-preview.mjs --output-dir /tmp/objgauss-object-boundary-remap-preview",
+    "audit:object-boundary-remap-residual": "node scripts/audit-object-boundary-remap-residual.mjs --output-dir /tmp/objgauss-object-boundary-remap-residual",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
     "audit:webgpu-offscreen-readback": "node scripts/audit-webgpu-offscreen-readback.mjs",

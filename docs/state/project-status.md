@@ -121,6 +121,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - DEMO-005E 已新增 Spark mask feather candidate gate：`npm run audit:spark-mask-feather-candidates` 默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，比较 hard / feather55 / feather70 / feather55r035，并输出 promotion recommendation；当前三个 feather candidates 均为 `diagnostic-only`，默认 hard mask 不变。
   - DEMO-005F 已新增 object boundary cleanup candidate report：`npm run audit:object-boundary-cleanup` 默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，在 hard-mask boundary diagnostic 中输出 `object-boundary-cleanup-candidate-v1`，定位值得做 assignment cleanup / remap review 的 object 子集；该报告只读，不自动改 PLY。
   - DEMO-005G 已新增 object boundary remap preview export：`npm run audit:object-boundary-remap-preview` 可生成保留原始 PLY 属性、仅 patch sampled `object_id` 的 `/tmp` preview PLY，用于下一步 browser residual gate；该实验不改默认样例、不证明视觉质量改善。
+  - DEMO-005H 已新增 object boundary remap browser residual gate：`npm run audit:object-boundary-remap-residual` 会先生成 sampled remap preview PLY，再用 Playwright 上传原始 PLY 与 remap-preview PLY，强制同一 PLY-packed Spark object-mask route，删除 top remap candidate object 并比较 before/after canvas stats。Lego proxy gate 通过：target object=`2`，remap-preview 少隐藏 `49` 个 Gaussian，after-delete residual=`0.999216/0.004332/0.019990`，recommendation=`browser-evidence-only`，因此仍不默认替换样例。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -811,7 +812,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- 对象聚类色和点击选择仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后已可走 Spark object opacity mask over PLY-derived packed source，并保留 SH-heavy PLY 的 degree-3 SH rest。当前仍不是 original compact `.splat` 内部 native object mask；剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及 native source mask 尚未接线。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
+- 对象聚类色和部分诊断仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后 no-SH 样例可走 Spark native compact `.splat` object mask，SH-heavy 样例保留 PLY packed route 以保存 degree-3 SH rest。剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及删除后没有补洞 / 重优化。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。

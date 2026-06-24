@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005H`: 基于 sampled remap preview PLY，做 browser residual gate，对比原始 object-aware PLY 与 remap-preview PLY 的删除后 visual stats / non-target damage；默认 hard mask 继续保持，除非 browser residual gate 证明 cleanup 不伤害非目标对象。
+  - `DEMO-005I`: 将 remap browser residual gate 扩展到 Plush semantic 与 Poly Haven Chair commercial sample，形成多场景 promotion table；只有多场景残差和 non-target preservation 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,24 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005H: Object boundary remap browser residual gate
+
+- 状态: done / browser-evidence-only
+- 类型: 标准 PR / renderer quality browser audit
+- 目标: 基于 sampled remap preview PLY，做 browser residual gate，对比原始 object-aware PLY 与 remap-preview PLY 的删除后 visual stats / non-target damage；默认 hard mask 继续保持，除非 browser residual gate 证明 cleanup 不伤害非目标对象。
+- 已实施:
+  - 新增 `scripts/audit-object-boundary-remap-residual.mjs`，自动生成 `/tmp` remap preview PLY，再用 Playwright 上传原始 PLY 与 remap-preview PLY。
+  - Gate 强制 `spark-object-source=packed` / `spark-reconstruct-probe=1`，确保两个文件走同一 PLY-packed Spark object-mask route，变量只剩 sampled `object_id` remap。
+  - 脚本删除 top remap candidate object，采集 before/after canvas visual stats、Spark route telemetry、object opacity mask stats 和截图，并输出 `summary.json` / `summary.md`。
+  - 新增 `npm run audit:object-boundary-remap-residual`。
+- 结论:
+  - Lego proxy browser residual gate 通过：target object=`2`，original hidden=`1787`，remap-preview hidden=`1738`，少隐藏 `49` 个 Gaussian。
+  - After-delete residual 保持在阈值内：coverage ratio=`0.999216`，luma delta=`0.004332`，chroma delta=`0.019990`。
+  - recommendation=`browser-evidence-only`，不是 promotion；单场景证据不足以默认替换样例或宣称视觉质量改善。
+- 验证:
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `npm run audit:object-boundary-remap-residual -- --assets nerf-lego-alpha-closure-local --output-dir /tmp/objgauss-object-boundary-remap-residual-smoke --port 5396 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005G: Object boundary remap preview export
 
