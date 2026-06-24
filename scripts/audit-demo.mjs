@@ -79,6 +79,7 @@ const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
+const SPARK_DISPLAY_CACHE_MODE = "visible-index-lru-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -208,6 +209,7 @@ try {
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
+        `sparkDisplayCache=${JSON.stringify(result.sparkDisplayCacheModeAfterDelete ?? "")}:${JSON.stringify(result.sparkDisplayCacheHitAfterDelete ?? "")}:${result.sparkDisplayCacheSizeAfterDelete ?? 0}:${result.sparkDisplayCacheHitsAfterDelete ?? 0}/${result.sparkDisplayCacheMissesAfterDelete ?? 0}/${result.sparkDisplayCacheEvictionsAfterDelete ?? 0} ` +
         `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${result.sparkShRestPreservedGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")}:${result.sparkShRestCoefficientCountAfterDelete ?? 0}:${result.sparkShDegreeAfterDelete ?? 0} ` +
         `screenshot=${result.screenshotPath}`,
     );
@@ -1135,6 +1137,27 @@ async function runAudit(url, assetsToCheck, options) {
       const sparkPackedExtractMsAfterDelete = sparkFilteredAfterDelete
         ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-packed-extract-ms") ?? "0")
         : 0;
+      let sparkDisplayCacheModeAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-display-cache-mode")
+        : "";
+      let sparkDisplayCacheKeyAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-display-cache-key")
+        : "";
+      let sparkDisplayCacheHitAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-display-cache-hit")
+        : "";
+      let sparkDisplayCacheSizeAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-display-cache-size") ?? "0")
+        : 0;
+      let sparkDisplayCacheHitsAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-display-cache-hits") ?? "0")
+        : 0;
+      let sparkDisplayCacheMissesAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-display-cache-misses") ?? "0")
+        : 0;
+      let sparkDisplayCacheEvictionsAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-display-cache-evictions") ?? "0")
+        : 0;
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
         : 0;
@@ -1207,6 +1230,11 @@ async function runAudit(url, assetsToCheck, options) {
           sparkPackedVisibleIndicesAfterDelete !== sparkVisibleGaussiansAfterDelete ||
           !Number.isFinite(sparkPackedBaseBuildMsAfterDelete) ||
           !Number.isFinite(sparkPackedExtractMsAfterDelete) ||
+          sparkDisplayCacheModeAfterDelete !== SPARK_DISPLAY_CACHE_MODE ||
+          !sparkDisplayCacheKeyAfterDelete ||
+          sparkDisplayCacheSizeAfterDelete <= 0 ||
+          sparkDisplayCacheMissesAfterDelete <= 0 ||
+          sparkDisplayCacheEvictionsAfterDelete < 0 ||
           sparkShRestPreservedAfterDelete !== sparkExpectedShRestPreservedAfterDelete ||
           (sparkShRestSourceGaussiansAfterDelete > 0 &&
             (sparkShRestPreservedGaussiansAfterDelete !== sparkShRestSourceGaussiansAfterDelete ||
@@ -1214,8 +1242,37 @@ async function runAudit(url, assetsToCheck, options) {
               sparkShDegreeAfterDelete <= 0)))
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
+      }
+      if (sparkFilteredAfterDelete) {
+        const cacheHitsBeforeRestore = sparkDisplayCacheHitsAfterDelete;
+        const cacheKeyBeforeRestore = sparkDisplayCacheKeyAfterDelete;
+        const toggleButton = page.locator(".objectRow:not(.removed) .eyeButton").first();
+        if ((await toggleButton.count()) > 0) {
+          await toggleButton.click();
+          await waitForSparkViewportReady(page);
+          await toggleButton.click();
+          await waitForSparkViewportReady(page);
+          const restoredViewport = page.locator(".viewport").first();
+          sparkDisplayCacheModeAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-mode");
+          sparkDisplayCacheKeyAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-key");
+          sparkDisplayCacheHitAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-hit");
+          sparkDisplayCacheSizeAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-size") ?? "0");
+          sparkDisplayCacheHitsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-hits") ?? "0");
+          sparkDisplayCacheMissesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-misses") ?? "0");
+          sparkDisplayCacheEvictionsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-evictions") ?? "0");
+          if (
+            sparkDisplayCacheModeAfterDelete !== SPARK_DISPLAY_CACHE_MODE ||
+            sparkDisplayCacheHitAfterDelete !== "true" ||
+            sparkDisplayCacheKeyAfterDelete !== cacheKeyBeforeRestore ||
+            sparkDisplayCacheHitsAfterDelete <= cacheHitsBeforeRestore
+          ) {
+            throw new Error(
+              `${asset.id} Spark display cache did not hit after restoring visible set: mode=${sparkDisplayCacheModeAfterDelete} hit=${sparkDisplayCacheHitAfterDelete} key=${sparkDisplayCacheKeyAfterDelete}/${cacheKeyBeforeRestore} hits=${sparkDisplayCacheHitsAfterDelete}/${cacheHitsBeforeRestore} size=${sparkDisplayCacheSizeAfterDelete} misses=${sparkDisplayCacheMissesAfterDelete} evictions=${sparkDisplayCacheEvictionsAfterDelete}`,
+            );
+          }
+        }
       }
       if (
         webGpuColorSourceRgbGaussiansAfterDelete +
@@ -1441,6 +1498,13 @@ async function runAudit(url, assetsToCheck, options) {
         sparkPackedVisibleIndicesAfterDelete,
         sparkPackedBaseBuildMsAfterDelete,
         sparkPackedExtractMsAfterDelete,
+        sparkDisplayCacheModeAfterDelete,
+        sparkDisplayCacheKeyAfterDelete,
+        sparkDisplayCacheHitAfterDelete,
+        sparkDisplayCacheSizeAfterDelete,
+        sparkDisplayCacheHitsAfterDelete,
+        sparkDisplayCacheMissesAfterDelete,
+        sparkDisplayCacheEvictionsAfterDelete,
         sparkShRestSourceGaussiansAfterDelete,
         sparkShRestPreservedGaussiansAfterDelete,
         sparkShRestPreservedAfterDelete,
@@ -1955,6 +2019,16 @@ async function waitForEditViewportReady(page) {
     await waitForWebGpuQueueTelemetry(page);
   }
   await waitForNonBackgroundPixels(page);
+}
+
+async function waitForSparkViewportReady(page) {
+  await page.waitForFunction(() => {
+    const viewport = document.querySelector(".viewport");
+    return (
+      viewport?.getAttribute("data-renderer") === "spark-splat" &&
+      viewport?.getAttribute("data-spark-filter-status") === "ready"
+    );
+  }, undefined, { timeout: 15000 });
 }
 
 function validateVisualResidual(assetId, residual) {

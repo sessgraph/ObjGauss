@@ -8,6 +8,9 @@ import {
   shDcRgb01,
 } from "./sparkPackedSh.js";
 
+const SPARK_DISPLAY_PACKED_CACHE_LIMIT = 4;
+const SPARK_DISPLAY_CACHE_MODE = "visible-index-lru-v1";
+
 export default function SplatViewport({
   source,
   points = null,
@@ -93,12 +96,6 @@ export default function SplatViewport({
       shRestCoefficientCount,
     });
   }, [filtered, points, renderMode, shRestCoefficients, shRestCoefficientCount]);
-
-  useEffect(() => {
-    return () => {
-      packedCache?.packedSplats?.dispose();
-    };
-  }, [packedCache]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -187,29 +184,35 @@ export default function SplatViewport({
 
     let displayPackedSplats = null;
     if (filtered && packedCache?.packedSplats) {
-      const extractStartedAt = performance.now();
       const visibleIndices = visiblePointIndices({
         points,
         visibleIds,
         removedIds,
         isolatedId,
       });
-      displayPackedSplats = extractPackedSplats({
-        packedSplats: packedCache.packedSplats,
+      const displayResult = getCachedDisplayPackedSplats({
+        packedCache,
         visibleIndices,
-        preserveExtra: packedCache.shRestPreserved,
       });
+      displayPackedSplats = displayResult.packedSplats;
       setPackedStats({
         route: packedCache.route,
         baseGaussians: packedCache.baseGaussians,
         visibleIndices: visibleIndices.length,
         baseBuildMs: packedCache.baseBuildMs,
-        extractMs: performance.now() - extractStartedAt,
+        extractMs: displayResult.extractMs,
         shRestSourceGaussians: packedCache.shRestSourceGaussians,
         shRestPreservedGaussians: packedCache.shRestPreservedGaussians,
         shRestPreserved: packedCache.shRestPreserved,
         shRestCoefficientCount: packedCache.shRestCoefficientCount,
         shDegree: packedCache.shDegree,
+        displayCacheMode: displayResult.cacheMode,
+        displayCacheKey: displayResult.cacheKey,
+        displayCacheHit: displayResult.cacheHit,
+        displayCacheSize: displayResult.cacheSize,
+        displayCacheHits: displayResult.cacheHits,
+        displayCacheMisses: displayResult.cacheMisses,
+        displayCacheEvictions: displayResult.cacheEvictions,
       });
     }
 
@@ -250,9 +253,16 @@ export default function SplatViewport({
     return () => {
       disposed = true;
       scene.remove(splat);
-      splat.dispose();
+      disposeSplatMesh(splat, filtered ? displayPackedSplats : null);
     };
   }, [filtered, isolatedId, packedCache, points, removedIds, renderMode, source, sourceKey, visibleIds]);
+
+  useEffect(() => {
+    return () => {
+      disposeDisplayPackedCache(packedCache?.displayCache);
+      packedCache?.packedSplats?.dispose();
+    };
+  }, [packedCache]);
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.visible = showGrid;
@@ -282,6 +292,13 @@ export default function SplatViewport({
       data-spark-packed-visible-indices={packedStats.visibleIndices}
       data-spark-packed-base-build-ms={formatMillis(packedStats.baseBuildMs)}
       data-spark-packed-extract-ms={formatMillis(packedStats.extractMs)}
+      data-spark-display-cache-mode={packedStats.displayCacheMode}
+      data-spark-display-cache-key={packedStats.displayCacheKey}
+      data-spark-display-cache-hit={String(packedStats.displayCacheHit)}
+      data-spark-display-cache-size={packedStats.displayCacheSize}
+      data-spark-display-cache-hits={packedStats.displayCacheHits}
+      data-spark-display-cache-misses={packedStats.displayCacheMisses}
+      data-spark-display-cache-evictions={packedStats.displayCacheEvictions}
       data-spark-sh-rest-source-gaussians={packedStats.shRestSourceGaussians}
       data-spark-sh-rest-preserved-gaussians={packedStats.shRestPreservedGaussians}
       data-spark-sh-rest-preserved={String(packedStats.shRestPreserved)}
@@ -298,6 +315,12 @@ export default function SplatViewport({
           <span className="hudLabel">渲染器</span>
           <strong>{rendererLabel}</strong>
         </div>
+        {filtered ? (
+          <div>
+            <span className="hudLabel">路径</span>
+            <strong>{sparkPathLabel({ objectFilter, packedStats })}</strong>
+          </div>
+        ) : null}
         <div>
           <span className="hudLabel">状态</span>
           <strong>{status}</strong>
@@ -393,6 +416,7 @@ function buildPackedSplatCache({
     route: shRest.route,
     baseGaussians: packedSplats.getNumSplats(),
     baseBuildMs: performance.now() - startedAt,
+    displayCache: createDisplayPackedCache(),
     shRestSourceGaussians: shRest.sourceGaussians,
     shRestPreservedGaussians: shRest.preservedGaussians,
     shRestPreserved: shRest.preserved,
@@ -401,12 +425,105 @@ function buildPackedSplatCache({
   };
 }
 
+function createDisplayPackedCache() {
+  return {
+    entries: new Map(),
+    hits: 0,
+    misses: 0,
+    evictions: 0,
+  };
+}
+
+function getCachedDisplayPackedSplats({
+  packedCache,
+  visibleIndices,
+}) {
+  const cache = packedCache.displayCache;
+  const cacheKey = visibleIndicesCacheKey(visibleIndices);
+  const cached = cache.entries.get(cacheKey);
+  if (cached) {
+    cache.entries.delete(cacheKey);
+    cache.entries.set(cacheKey, cached);
+    cache.hits += 1;
+    return {
+      packedSplats: cached.packedSplats,
+      cacheMode: SPARK_DISPLAY_CACHE_MODE,
+      cacheKey,
+      cacheHit: true,
+      cacheSize: cache.entries.size,
+      cacheHits: cache.hits,
+      cacheMisses: cache.misses,
+      cacheEvictions: cache.evictions,
+      extractMs: 0,
+    };
+  }
+
+  const extractStartedAt = performance.now();
+  const packedSplats = extractPackedSplats({
+    packedSplats: packedCache.packedSplats,
+    visibleIndices,
+    preserveExtra: packedCache.shRestPreserved,
+  });
+  const extractMs = performance.now() - extractStartedAt;
+  cache.entries.set(cacheKey, { packedSplats });
+  cache.misses += 1;
+  evictDisplayPackedCacheEntries(cache);
+  return {
+    packedSplats,
+    cacheMode: SPARK_DISPLAY_CACHE_MODE,
+    cacheKey,
+    cacheHit: false,
+    cacheSize: cache.entries.size,
+    cacheHits: cache.hits,
+    cacheMisses: cache.misses,
+    cacheEvictions: cache.evictions,
+    extractMs,
+  };
+}
+
+function evictDisplayPackedCacheEntries(cache) {
+  while (cache.entries.size > SPARK_DISPLAY_PACKED_CACHE_LIMIT) {
+    const oldestKey = cache.entries.keys().next().value;
+    const oldest = cache.entries.get(oldestKey);
+    oldest?.packedSplats?.dispose();
+    cache.entries.delete(oldestKey);
+    cache.evictions += 1;
+  }
+}
+
+function disposeDisplayPackedCache(cache) {
+  for (const entry of cache?.entries?.values?.() ?? []) {
+    entry?.packedSplats?.dispose();
+  }
+  cache?.entries?.clear?.();
+}
+
+function visibleIndicesCacheKey(visibleIndices) {
+  const length = visibleIndices?.length ?? 0;
+  let hash = 2166136261;
+  for (let index = 0; index < length; index += 1) {
+    hash ^= Number(visibleIndices[index] ?? 0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const first = length > 0 ? visibleIndices[0] : -1;
+  const last = length > 0 ? visibleIndices[length - 1] : -1;
+  return `${length}:${first}:${last}:${hash >>> 0}`;
+}
+
 function extractPackedSplats({ packedSplats, visibleIndices, preserveExtra }) {
   const extracted = packedSplats.extractSplats(visibleIndices, false);
   if (preserveExtra) {
     extracted.extra = extractPackedShExtra(packedSplats.extra, visibleIndices);
   }
   return extracted;
+}
+
+function disposeSplatMesh(splat, preservedPackedSplats) {
+  if (preservedPackedSplats && splat?.packedSplats === preservedPackedSplats) {
+    splat.splats = undefined;
+    splat.packedSplats = undefined;
+  }
+  splat.dispose();
 }
 
 function visiblePointIndices({
@@ -493,6 +610,13 @@ function emptyPackedStats() {
     shRestPreserved: false,
     shRestCoefficientCount: 0,
     shDegree: 0,
+    displayCacheMode: "none",
+    displayCacheKey: "",
+    displayCacheHit: false,
+    displayCacheSize: 0,
+    displayCacheHits: 0,
+    displayCacheMisses: 0,
+    displayCacheEvictions: 0,
   };
 }
 
@@ -508,7 +632,24 @@ function pendingPackedStats(cache) {
     shRestPreserved: cache?.shRestPreserved ?? false,
     shRestCoefficientCount: cache?.shRestCoefficientCount ?? 0,
     shDegree: cache?.shDegree ?? 0,
+    displayCacheMode: cache ? SPARK_DISPLAY_CACHE_MODE : "none",
+    displayCacheKey: "",
+    displayCacheHit: false,
+    displayCacheSize: cache?.displayCache?.entries?.size ?? 0,
+    displayCacheHits: cache?.displayCache?.hits ?? 0,
+    displayCacheMisses: cache?.displayCache?.misses ?? 0,
+    displayCacheEvictions: cache?.displayCache?.evictions ?? 0,
   };
+}
+
+function sparkPathLabel({ objectFilter, packedStats }) {
+  if (objectFilter === "spark-ply-sh-source") return "PLY SH 源";
+  if (objectFilter === "spark-ply-source") return "PLY 源";
+  if (objectFilter === "spark-filtered-ply-reconstruct") {
+    return packedStats.displayCacheHit ? "缓存过滤" : "过滤重建";
+  }
+  if (objectFilter === "spark-ply-reconstruct") return "PLY 重建";
+  return "原生 Splat";
 }
 
 function formatMillis(value) {

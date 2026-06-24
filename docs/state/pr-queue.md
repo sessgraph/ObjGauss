@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AD`: 评估并推进 Spark native object mask / persistent packed source，减少每次 visible-index extract 创建新 `SplatMesh` 的开销；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AE`: 继续评估 Spark native object mask / persistent `SplatMesh` 更新面，目标是让原始 packed source 能按 object-state 过滤，而不是每个全新 visible set 都创建临时 `SplatMesh`；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AD: Spark display PackedSplats cache telemetry
+
+- 状态: done / display-cache-audited
+- 类型: 标准 PR / 前端渲染性能与 UX 诊断
+- 目标: 回应“自身颜色有颗粒感、不像高斯”后续问题里暴露的 Spark filtered edit 开销：在不改默认视觉参数、不伪装 native `.splat` object mask 的前提下，减少回到同一 visible-index set 时重复 `PackedSplats.extractSplats(...)` 的成本，并把路径事实暴露给 UI / browser audit。
+- 已实施:
+  - `SplatViewport` 为 filtered Spark route 增加 `visible-index-lru-v1` display `PackedSplats` cache，默认保留最近 4 个 visible-index set。
+  - 由于 Spark `SplatMesh.dispose()` 会释放传入的 `PackedSplats`，filtered viewport 在清理临时 mesh 前会摘掉 cached packed 引用，由 cache 自己统一释放。
+  - Spark HUD 增加路径提示：`PLY SH 源` / `PLY 源` / `过滤重建` / `缓存过滤` / `PLY 重建`，减少用户把“原始颜色（编辑预览）”误解成原始 `.splat` 内部删除。
+  - Browser contract 新增 `data-spark-display-cache-*` telemetry：mode、key、hit、size、hits、misses、evictions。
+  - `audit-demo` 删除后会隐藏并恢复一个未删除对象，要求回到同一 visible-index set 时 `data-spark-display-cache-hit="true"` 且 hit 计数增长。
+- 结论:
+  - Lego proxy 删除预览通过：`sparkPacked="packed-extract-v1":5696/3909:3.9/1.7`、`sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0`。
+  - Trained Lego SH-heavy 删除预览通过：`sparkPacked="packed-sh-extract-v1":255794/129108:153.8/37.5`、`sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0`、`sparkShRest=255794:255794:"true":45:3`。
+  - 这一步减少重复 extract，并把“缓存过滤 vs 过滤重建”做成可见/可审计事实；它仍不是 Spark 原生 object mask，每个全新 visible set 仍会创建临时 `SplatMesh`。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5298/ --no-server`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5298/ --no-server`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
 
 ### RENDER-005T-AC: Spark PLY SH full-view source baseline
 

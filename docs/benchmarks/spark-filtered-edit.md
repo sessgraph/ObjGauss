@@ -84,6 +84,23 @@ SH-heavy object-aware PLY
 No-SH scenes continue to use the compact `.splat` full view, preserving the
 older smoke baseline.
 
+RENDER-005T-AD adds a display `PackedSplats` LRU cache over the filtered
+visible-index extracts:
+
+```text
+base PackedSplats cache
+        -> visible index Uint32Array
+        -> visible-index cache key
+        -> display PackedSplats LRU cache
+        -> Spark SplatMesh(packedSplats)
+```
+
+Spark `SplatMesh.dispose()` owns and disposes its supplied `PackedSplats`, so the
+filtered viewport detaches cached packed data before disposing the temporary
+mesh. This avoids repeating `extractSplats(...)` when the UI returns to a recent
+visible object set, while still allowing the LRU cache to release entries when
+the base source changes.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -94,6 +111,9 @@ older smoke baseline.
   edit renderer path.
 - The filtered Spark route reuses a base `PackedSplats` cache and extracts a
   display `PackedSplats` when visible / removed / isolated object state changes.
+- Repeated visible object sets can reuse a display `PackedSplats` from a small
+  `visible-index-lru-v1` cache. This is a performance cache for PLY
+  reconstruction, not a native object mask in the original `.splat`.
 - No-SH assets continue to expose `data-spark-reconstruct-source="packed-extract-v1"`
   and `data-spark-sh-rest-preserved="false"`.
 - SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
@@ -117,6 +137,13 @@ data-spark-packed-base-gaussians="..."
 data-spark-packed-visible-indices="..."
 data-spark-packed-base-build-ms="..."
 data-spark-packed-extract-ms="..."
+data-spark-display-cache-mode="visible-index-lru-v1"
+data-spark-display-cache-key="..."
+data-spark-display-cache-hit="true|false"
+data-spark-display-cache-size="..."
+data-spark-display-cache-hits="..."
+data-spark-display-cache-misses="..."
+data-spark-display-cache-evictions="..."
 data-spark-sh-rest-source-gaussians="..."
 data-spark-sh-rest-preserved-gaussians="..."
 data-spark-sh-rest-preserved="true|false"
@@ -152,6 +179,7 @@ Current local result:
 browser_audit=passed
 postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909
 sparkPacked="packed-extract-v1":5696/3909:5.3/4.8
+sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0
 sparkShRest=0:0:"false":0:0
 renderModeAfterDelete="原始颜色（编辑预览）"
 visibleAfterDelete=3,909
@@ -198,6 +226,7 @@ npm run audit:demo -- \
 browser_audit=passed
 postDelete="spark-splat":"spark-filtered-ply-reconstruct":129108
 sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7
+sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0
 sparkShRest=255794:255794:"true":45:3
 ```
 
@@ -255,11 +284,12 @@ visibleGaussians=281498
 
 - Replace reconstruction with a Spark-side object mask over the original packed
   source if Spark exposes a stable native masking surface.
+- Avoid creating a temporary `SplatMesh` for every distinct visible object set.
+  AD avoids repeated extraction for recently visited states, but each new visible
+  set still needs a temporary mesh because Spark does not yet expose a stable
+  runtime object-state mask for the original packed source.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
 - Add Spark-side selection / raycast-to-object mapping if viewport click
   selection should stay in Spark.
-- Avoid per-edit extracted `SplatMesh` allocation for high-frequency brushing;
-  the packed extract route is a safer intermediate layer, but native object
-  masks remain the terminal architecture.
