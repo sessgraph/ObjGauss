@@ -23,6 +23,7 @@
     "audit:spark-reconstruct-residual-multiscene": "node scripts/audit-spark-reconstruct-residual.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --output-dir /tmp/objgauss-spark-reconstruct-residual-multiscene",
     "audit:spark-mask-feather": "node scripts/audit-demo.mjs --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5380 --spark-object-mask-feather --spark-object-mask-feather-opacity 0.55",
     "audit:spark-mask-feather-sweep": "node scripts/audit-spark-mask-feather-sweep.mjs",
+    "audit:spark-mask-feather-candidates": "node scripts/audit-spark-mask-feather-sweep.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local --variants hard:off,feather55:0.55,feather70:0.70,feather55r035:0.55:0.035 --output-dir /tmp/objgauss-spark-mask-feather-candidates --skip-missing-assets",
     "audit:spark-native-mask-gate": "node scripts/audit-spark-native-mask-gate.mjs",
     "audit:spark-pick-report": "node scripts/audit-spark-pick-report.mjs",
     "audit:spark-trained-sample": "node scripts/audit-spark-trained-sample.mjs",

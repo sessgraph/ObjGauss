@@ -81,6 +81,19 @@ scenes, but it does not improve coverage ratio, and only Plush shows a small
 luma improvement. Therefore feather remains diagnostic / candidate behavior
 rather than the default route.
 
+Use the candidate gate before considering any default change:
+
+```bash
+npm run audit:spark-mask-feather-candidates
+```
+
+It covers Lego proxy, Plush semantic, and the local Poly Haven Chair commercial
+sample when available, comparing `hard`, `feather55`, `feather70`, and
+`feather55r035`. A candidate is only promotable if coverage, luma, and chroma
+do not regress on any included scene. Current result: all feather variants are
+`diagnostic-only`; best score is `feather55r035`, but it still increases max
+coverage ratio by `0.010209`, so the default remains hard mask.
+
 Pass `--control ui` when the gate should click the Web UI checkbox instead of
 using URL params:
 

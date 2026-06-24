@@ -26,13 +26,15 @@ const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = String(args.url ?? `http://127.0.0.1:${port}/`);
 const outputDir = String(args.outputDir ?? args["output-dir"] ?? DEFAULT_OUTPUT_DIR);
-const assets = selectAssets(args.assets ?? DEFAULT_ASSETS);
 const variants = parseVariants(String(args.variants ?? DEFAULT_VARIANTS));
 const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
 const noServer = flagEnabled(args.noServer ?? args["no-server"]) || Boolean(args.url);
 const headed = flagEnabled(args.headed ?? args.headful);
 const includeVisualStats = !flagEnabled(args.skipVisualStats ?? args["skip-visual-stats"]);
+const skipMissingAssets = flagEnabled(args.skipMissingAssets ?? args["skip-missing-assets"]);
 const control = normalizeControl(args.control ?? "url");
+const selectedAssets = selectAssets(args.assets ?? DEFAULT_ASSETS);
+const { assets, skippedAssets } = filterAvailableAssets(selectedAssets, { skipMissingAssets });
 
 const summary = {
   mode: MODE,
@@ -41,10 +43,13 @@ const summary = {
   outputDir,
   control,
   includeVisualStats,
+  requestedAssets: selectedAssets.map((asset) => asset.id),
   assets: assets.map((asset) => asset.id),
+  skippedAssets,
   variants,
   rows: [],
   comparisons: [],
+  recommendations: [],
   commands: [],
   failures: [],
   passed: false,
@@ -78,6 +83,12 @@ try {
     includeVisualStats,
   });
   summary.comparisons = buildComparisons(summary.rows, variants);
+  summary.recommendations = buildRecommendations({
+    comparisons: summary.comparisons,
+    variants,
+    expectedAssetCount: assets.length,
+    includeVisualStats,
+  });
   summary.passed =
     summary.failures.length === 0 &&
     summary.rows.length === assets.length * variants.length &&
@@ -444,6 +455,47 @@ function buildComparisons(rows, variants) {
   return comparisons;
 }
 
+function buildRecommendations({ comparisons, variants, expectedAssetCount, includeVisualStats }) {
+  const recommendations = [];
+  for (const variant of variants.filter((candidate) => candidate.enabled)) {
+    const variantComparisons = comparisons.filter((comparison) => comparison.variantId === variant.id);
+    const sceneCount = variantComparisons.length;
+    const passed = sceneCount === expectedAssetCount && variantComparisons.every((comparison) => comparison.passed);
+    const coverageValues = variantComparisons.map((comparison) => comparison.coverageRatioDelta);
+    const lumaValues = variantComparisons.map((comparison) => comparison.lumaDeltaChange);
+    const chromaValues = variantComparisons.map((comparison) => comparison.chromaDeltaChange);
+    const maxCoverageRatioDelta = maxOrZero(coverageValues);
+    const maxLumaDeltaChange = maxOrZero(lumaValues);
+    const maxChromaDeltaChange = maxOrZero(chromaValues);
+    const meanCoverageRatioDelta = meanOrZero(coverageValues);
+    const meanLumaDeltaChange = meanOrZero(lumaValues);
+    const meanChromaDeltaChange = meanOrZero(chromaValues);
+    const promotionCandidate =
+      includeVisualStats &&
+      passed &&
+      maxCoverageRatioDelta <= 0 &&
+      maxLumaDeltaChange <= 0 &&
+      maxChromaDeltaChange <= 0;
+    recommendations.push({
+      variantId: variant.id,
+      sceneCount,
+      expectedSceneCount: expectedAssetCount,
+      passed,
+      confidence: includeVisualStats ? "visual-stats" : "telemetry-only",
+      promotionCandidate,
+      recommendation: promotionCandidate ? "candidate-for-default-review" : "diagnostic-only",
+      meanCoverageRatioDelta,
+      meanLumaDeltaChange,
+      meanChromaDeltaChange,
+      maxCoverageRatioDelta,
+      maxLumaDeltaChange,
+      maxChromaDeltaChange,
+      score: roundMetric(meanCoverageRatioDelta + meanLumaDeltaChange + meanChromaDeltaChange),
+    });
+  }
+  return recommendations.sort((left, right) => left.score - right.score);
+}
+
 function parseVariants(value) {
   const parsed = value
     .split(",")
@@ -488,6 +540,39 @@ function selectAssets(value) {
   });
 }
 
+function filterAvailableAssets(requestedAssets, { skipMissingAssets }) {
+  const skipped = [];
+  const available = [];
+  for (const asset of requestedAssets) {
+    const missingPaths = [asset.localPath, asset.splatPath]
+      .map(publicAssetPath)
+      .filter((assetPath) => assetPath && !existsSync(assetPath));
+    if (missingPaths.length > 0 && skipMissingAssets) {
+      skipped.push({
+        assetId: asset.id,
+        reason: "missing-public-sample",
+        missingPaths,
+      });
+      continue;
+    }
+    if (missingPaths.length > 0) {
+      throw new Error(`${asset.id} is missing public sample file(s): ${missingPaths.join(", ")}`);
+    }
+    available.push(asset);
+  }
+  if (available.length === 0) {
+    throw new Error("no available assets after applying --skip-missing-assets");
+  }
+  return { assets: available, skippedAssets: skipped };
+}
+
+function publicAssetPath(assetPath) {
+  if (!assetPath) return "";
+  const normalized = String(assetPath);
+  if (!normalized.startsWith("/samples/")) return "";
+  return path.join("public", normalized.slice(1));
+}
+
 function urlForVariant(baseUrl, variant, control) {
   const parsed = new URL(baseUrl);
   parsed.searchParams.delete("spark-object-mask-feather");
@@ -515,7 +600,9 @@ function renderMarkdown(payload) {
     `- Status: ${payload.passed ? "passed" : "failed"}`,
     `- Mode: ${payload.mode}`,
     `- Generated: ${payload.generatedAt}`,
+    `- Requested assets: ${payload.requestedAssets.join(", ")}`,
     `- Assets: ${payload.assets.join(", ")}`,
+    `- Skipped assets: ${payload.skippedAssets.map((asset) => asset.assetId).join(", ") || "none"}`,
     `- Variants: ${payload.variants.map((variant) => variant.id).join(", ")}`,
     `- Control: ${payload.control}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
@@ -545,6 +632,20 @@ function renderMarkdown(payload) {
       );
     }
   }
+  lines.push("", "## Recommendations", "");
+  if (payload.recommendations.length === 0) {
+    lines.push("No candidate recommendations available.");
+  } else {
+    lines.push(
+      "| Variant | Recommendation | Scenes | Confidence | Mean coverage delta | Mean luma delta | Mean chroma delta | Max coverage delta | Max luma delta | Max chroma delta | Score |",
+      "| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    );
+    for (const recommendation of payload.recommendations) {
+      lines.push(
+        `| ${escapeMarkdown(recommendation.variantId)} | ${escapeMarkdown(recommendation.recommendation)} | ${recommendation.sceneCount}/${recommendation.expectedSceneCount} | ${escapeMarkdown(recommendation.confidence)} | ${formatNumber(recommendation.meanCoverageRatioDelta)} | ${formatNumber(recommendation.meanLumaDeltaChange)} | ${formatNumber(recommendation.meanChromaDeltaChange)} | ${formatNumber(recommendation.maxCoverageRatioDelta)} | ${formatNumber(recommendation.maxLumaDeltaChange)} | ${formatNumber(recommendation.maxChromaDeltaChange)} | ${formatNumber(recommendation.score)} |`,
+      );
+    }
+  }
   if (payload.failures.length > 0) {
     lines.push("", "## Failures", "", ...payload.failures.map((failure) => `- ${escapeMarkdown(failure)}`));
   }
@@ -565,6 +666,13 @@ function printSummary(payload) {
   }
   for (const failure of payload.failures) {
     console.error(`spark_mask_feather_sweep_failure=${JSON.stringify(failure)}`);
+  }
+  for (const recommendation of payload.recommendations) {
+    console.log(
+      `spark_mask_feather_recommendation variant=${JSON.stringify(recommendation.variantId)} ` +
+        `recommendation=${JSON.stringify(recommendation.recommendation)} scenes=${recommendation.sceneCount}/${recommendation.expectedSceneCount} ` +
+        `score=${recommendation.score} max=${recommendation.maxCoverageRatioDelta}/${recommendation.maxLumaDeltaChange}/${recommendation.maxChromaDeltaChange}`,
+    );
   }
   console.log(
     `spark_mask_feather_sweep=${payload.passed ? "passed" : "failed"} mode=${JSON.stringify(payload.mode)} rows=${payload.rows.length} comparisons=${payload.comparisons.length} report=${JSON.stringify(path.join(payload.outputDir, "summary.md"))}`,
@@ -723,6 +831,18 @@ function roundMetric(value, digits = 6) {
   if (!Number.isFinite(value)) return 0;
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
+}
+
+function meanOrZero(values) {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return 0;
+  return roundMetric(finite.reduce((sum, value) => sum + value, 0) / finite.length);
+}
+
+function maxOrZero(values) {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return 0;
+  return roundMetric(Math.max(...finite));
 }
 
 function safeFileName(value) {

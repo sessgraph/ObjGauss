@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005E`: 基于 UI toggle 和 sweep 报告，继续评估更多 opacity / radius / commercial-chair variants；默认不启用 feather，除非多场景报告证明 coverage / luma / chroma 同时改善。
+  - `DEMO-005F`: 基于 feather candidate gate 结论，停止把 opacity feather 当默认修复，转向 object-boundary remap / assignment cleanup 或 delete-hole quality diagnostic；默认 hard mask 继续保持。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005E: Spark mask feather candidate gate
+
+- 状态: done / candidate-gate-diagnostic-only
+- 类型: 标准 PR / renderer quality reporting
+- 目标: 基于 UI toggle 和 sweep 报告，扩展更多 opacity / radius / commercial-chair variants，给出是否可默认启用 soft boundary 的机器判断。
+- 已实施:
+  - `scripts/audit-spark-mask-feather-sweep.mjs` 新增 candidate recommendations：按 variant 聚合 hard→feather comparison，输出 `promotionCandidate`、recommendation、mean/max coverage / luma / chroma deltas 和 score。
+  - 脚本新增 `--skip-missing-assets`，三场景候选 gate 在缺少本地 generated public sample 时会明确跳过，而不是把 chair 缺失误报为 renderer failure。
+  - 新增 `npm run audit:spark-mask-feather-candidates`，默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample；variants 为 `hard`、`feather55`、`feather70`、`feather55r035`。
+- 结论:
+  - 三场景四变体 visual-stats candidate gate 通过，rows=12、comparisons=9、skippedAssets=0。
+  - 三个 feather candidate 全部为 `diagnostic-only`，没有一个满足 promotion criteria。
+  - 当前 best score 是 `feather55r035`，但仍 `promotionCandidate=false`：mean coverage delta=`0.006688`，max coverage delta=`0.010209`，max chroma delta=`0.001512`。
+  - 结论是默认 hard mask 继续保持；feather 只保留为显式诊断开关。下一步应该看 object boundary cleanup / remap，而不是继续把 opacity feather 当默认修复。
+- 验证:
+  - `node --check scripts/audit-spark-mask-feather-sweep.mjs`: passed。
+  - `npm run audit:spark-mask-feather-candidates -- --skip-build --skip-visual-stats --port 5391 --output-dir /tmp/objgauss-spark-mask-feather-candidates-telemetry`: passed；rows=12。
+  - `npm run audit:spark-mask-feather-candidates -- --skip-build --port 5392 --output-dir /tmp/objgauss-spark-mask-feather-candidates`: passed；rows=12，recommendations=3。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005D: Spark mask feather UI toggle
 
