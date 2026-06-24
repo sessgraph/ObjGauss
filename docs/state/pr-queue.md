@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AF`: 继续评估 Spark native object mask / original packed source object-state filtering feasibility，目标是减少甚至消除每个全新 visible set 的 display `PackedSplats.extractSplats(...)`，把对象显隐推进到 Spark source / shader / object-state 层；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AG`: 为 Spark object opacity mask 增加 pixel-delta / visual assertion，并评估 original compact `.splat` 与 object-aware PLY packed source 的稳定 index mapping；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,33 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AF: Spark object opacity mask over packed source
+
+- 状态: done / object-opacity-mask-audited
+- 类型: 标准 PR / 前端渲染性能与 UX 诊断
+- 目标: 回应“自身颜色为什么有颗粒感、像没走高斯”的问题，把 source/original object edit 的显隐从每个 visible set 的 display `PackedSplats.extractSplats(...)` 推进到 Spark shader/object-state 层，并明确剩余颗粒感来自 object 子集稀疏、边界 assignment 和仍非 original `.splat` 内部 mask。
+- 已实施:
+  - 新增 `src/sparkObjectMask.js`，构建 `object-opacity-texture-v1` `Uint32` mask texture，并通过 Spark Dyno `objectModifier` 按 Gaussian index 将隐藏对象 opacity 置零。
+  - `SplatViewport` 的 filtered Spark route 现在保留同一个 base `PackedSplats` 和 `SplatMesh`，object-state 变化只更新 mask texture 并标记 `splat.needsUpdate`。
+  - display `PackedSplats` LRU cache / per-state extract 在 native mask route 下禁用，浏览器 contract 要求 `data-spark-packed-extract-ms="0.000"` 和 `data-spark-display-cache-mode="disabled-by-native-mask-v1"`。
+  - Browser telemetry 新增 `data-spark-object-mask-*`，记录 mask size、updates、visible / hidden Gaussian counts；small-scene audit 继续跑 hide / restore stress，heavy trained audit 跳过该压力循环，专注 SH-preserved delete contract。
+  - `audit-demo` 增加 browser close timeout，避免重场景 WebGL/Spark 关闭阶段阻塞验收输出。
+- 结论:
+  - 当前“原始颜色 / 自身颜色”在 object edit active 后已经可以走 `spark-splat` + `spark-object-opacity-mask`，不是点云 fallback；trained sample 删除后仍保留 `packed-sh-extract-v1` 和完整 degree-3 SH rest。
+  - 视觉上仍可能有颗粒感，因为隔离 / 删除后显示的是 object_id 子集，隐藏对象不再参与透明混合，边界和错误 assignment 会直接暴露稀疏 Gaussian；这不是“没有高斯”，而是 object-level mask 质量与子集密度问题。
+  - 这一步消除了 object-state 变化时的 display extract contract，但仍不是 original compact `.splat` 内部 object mask；下一步需要 pixel-delta guard 和 original `.splat` index mapping 评估。
+- 验证:
+  - `node --check src/sparkObjectMask.js`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5300/ --no-server`: passed；`postDelete="spark-splat":"spark-object-opacity-mask":3909`、`sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4`、`sparkPacked="packed-extract-v1":5696/3909:4.4/0`。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5300/ --no-server`: passed；`postDelete="spark-splat":"spark-object-opacity-mask":129108`、`sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2`、`sparkShRest=255794:255794:"true":45:3`。
+  - Focused Playwright probe verified trained isolate/delete route: isolate `40747/215047`, delete `215047/40747`, `route="packed-sh-extract-v1"`, `extractMs="0.000"`, `sh=255794:255794:true:45:3`。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AE: Spark filtered persistent SplatMesh update surface
 

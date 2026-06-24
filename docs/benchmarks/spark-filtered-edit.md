@@ -117,6 +117,24 @@ object mask into Spark's original `.splat` renderer: each new visible set still
 needs a display `PackedSplats` object, and the current mesh is pointed at that
 display source.
 
+RENDER-005T-AF moves filtered object visibility from per-state display
+`PackedSplats.extractSplats(...)` into a Spark `objectModifier` opacity mask over
+the stable base `PackedSplats` source:
+
+```text
+base PackedSplats cache
+        -> Uint32 object visibility DataTexture
+        -> Spark Dyno objectModifier
+        -> opacity=0 for hidden Gaussian indices
+        -> persistent SplatMesh
+```
+
+This removes the browser-visible display extract cost for object-state changes:
+`data-spark-packed-extract-ms="0.000"`, display cache telemetry is disabled, and
+the object mask texture exposes visible / hidden Gaussian counts. It is still
+not an object mask inside the original compact `.splat` file; it is a Spark
+shader mask over the object-aware PLY-derived packed source.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -125,15 +143,15 @@ display source.
   directly when the PLY exposes supported `f_rest_*` coefficients.
 - Object-color mode and canvas click selection continue to use the existing
   edit renderer path.
-- The filtered Spark route reuses a base `PackedSplats` cache and extracts a
-  display `PackedSplats` when visible / removed / isolated object state changes.
-- Repeated visible object sets can reuse a display `PackedSplats` from a small
-  `visible-index-lru-v1` cache. This is a performance cache for PLY
-  reconstruction, not a native object mask in the original `.splat`.
-- A filtered Spark session keeps one `SplatMesh` instance alive and updates its
-  packed source when the visible set changes. Browser audit requires
-  `data-spark-mesh-update-mode="persistent-splatmesh-v1"` and a stable mesh id
-  across hide / restore.
+- The filtered Spark route reuses one base `PackedSplats` cache and a
+  `object-opacity-texture-v1` mask texture when visible / removed / isolated
+  object state changes.
+- Display `PackedSplats.extractSplats(...)` is disabled for object-state
+  changes; `data-spark-packed-extract-ms` must stay `0.000`.
+- A filtered Spark session keeps one `SplatMesh` instance alive and marks it for
+  update when the object mask changes. Browser audit requires
+  `data-spark-mesh-update-mode="persistent-splatmesh-v1"` and, for small scenes,
+  a stable mesh id across hide / restore.
 - No-SH assets continue to expose `data-spark-reconstruct-source="packed-extract-v1"`
   and `data-spark-sh-rest-preserved="false"`.
 - SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
@@ -148,7 +166,7 @@ Runtime DOM evidence:
 
 ```text
 data-renderer="spark-splat"
-data-object-filter="spark-ply-sh-source|spark-filtered-ply-reconstruct"
+data-object-filter="spark-ply-sh-source|spark-object-opacity-mask"
 data-spark-filter-mode="ply-source|ply-reconstruct"
 data-spark-visible-gaussians="..."
 data-spark-removed-objects="..."
@@ -156,14 +174,19 @@ data-spark-reconstruct-source="packed-extract-v1"
 data-spark-packed-base-gaussians="..."
 data-spark-packed-visible-indices="..."
 data-spark-packed-base-build-ms="..."
-data-spark-packed-extract-ms="..."
-data-spark-display-cache-mode="visible-index-lru-v1"
-data-spark-display-cache-key="..."
-data-spark-display-cache-hit="true|false"
-data-spark-display-cache-size="..."
-data-spark-display-cache-hits="..."
-data-spark-display-cache-misses="..."
-data-spark-display-cache-evictions="..."
+data-spark-packed-extract-ms="0.000"
+data-spark-display-cache-mode="disabled-by-native-mask-v1"
+data-spark-display-cache-key=""
+data-spark-display-cache-hit="false"
+data-spark-display-cache-size="0"
+data-spark-display-cache-hits="0"
+data-spark-display-cache-misses="0"
+data-spark-display-cache-evictions="0"
+data-spark-object-mask-mode="object-opacity-texture-v1"
+data-spark-object-mask-size="..."
+data-spark-object-mask-updates="..."
+data-spark-object-mask-visible-gaussians="..."
+data-spark-object-mask-hidden-gaussians="..."
 data-spark-mesh-update-mode="persistent-splatmesh-v1"
 data-spark-mesh-id="..."
 data-spark-mesh-reused="true|false"
@@ -201,9 +224,10 @@ Current local result:
 
 ```text
 browser_audit=passed
-postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909
-sparkPacked="packed-extract-v1":5696/3909:3.8/0
-sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0
+postDelete="spark-splat":"spark-object-opacity-mask":3909
+sparkPacked="packed-extract-v1":5696/3909:4.4/0
+sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
+sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
 sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
 renderModeAfterDelete="原始颜色（编辑预览）"
@@ -227,14 +251,14 @@ Current default local result:
 ```text
 spark_reconstruct_residual=passed
 asset="nerf-lego-alpha-closure-local"
-coverageRatio=1.170841
-lumaDelta=0.029762
-chromaDelta=0.028407
+coverageRatio=1.177112
+lumaDelta=0.03071
+chromaDelta=0.027503
 objectFilter="spark-ply-reconstruct"
 reconstructSource="packed-extract-v1"
 visibleGaussians=5696
 filteredGaussians=0
-packed=5696/5696:4.7/2.4
+packed=5696/5696:4.6/0
 shRest=0:0:false:0:0
 ```
 
@@ -249,10 +273,11 @@ npm run audit:demo -- \
 
 ```text
 browser_audit=passed
-postDelete="spark-splat":"spark-filtered-ply-reconstruct":129108
-sparkPacked="packed-sh-extract-v1":255794/129108:155.5/0
-sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0
-sparkMesh="persistent-splatmesh-v1":1:"true":4
+postDelete="spark-splat":"spark-object-opacity-mask":129108
+sparkPacked="packed-sh-extract-v1":255794/129108:155.9/0
+sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
+sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2
+sparkMesh="persistent-splatmesh-v1":1:"true":2
 sparkShRest=255794:255794:"true":45:3
 ```
 
@@ -308,12 +333,11 @@ visibleGaussians=281498
 
 ## Remaining Gaps
 
-- Replace reconstruction with a Spark-side object mask over the original packed
-  source if Spark exposes a stable native masking surface.
-- Avoid creating a temporary `SplatMesh` for every distinct visible object set.
-  AD avoids repeated extraction for recently visited states, but each new visible
-  set still needs a temporary mesh because Spark does not yet expose a stable
-  runtime object-state mask for the original packed source.
+- The current mask is over the object-aware PLY-derived Spark packed source, not
+  the original compact `.splat` file. Original `.splat` index mapping / native
+  source masking remains a separate decision.
+- Add a pixel-delta guard for object opacity masking so the audit proves hidden
+  objects visibly disappear, not only that DOM telemetry updates.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.

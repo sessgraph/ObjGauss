@@ -4,13 +4,18 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
   buildPackedShExtra,
-  extractPackedShExtra,
   shDcRgb01,
 } from "./sparkPackedSh.js";
+import {
+  createSparkObjectMask,
+  disposeSparkObjectMask,
+  maskStats,
+  SPARK_OBJECT_MASK_MODE,
+  updateSparkObjectMask,
+} from "./sparkObjectMask.js";
 
-const SPARK_DISPLAY_PACKED_CACHE_LIMIT = 4;
-const SPARK_DISPLAY_CACHE_MODE = "visible-index-lru-v1";
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
+const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
 
 export default function SplatViewport({
   source,
@@ -35,7 +40,7 @@ export default function SplatViewport({
   const gridRef = useRef(null);
   const axesRef = useRef(null);
   const filteredSplatRef = useRef(null);
-  const filteredDisplayPackedRef = useRef(null);
+  const filteredObjectMaskRef = useRef(null);
   const filteredMeshStateRef = useRef(createFilteredMeshState());
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
@@ -219,30 +224,27 @@ export default function SplatViewport({
     setStatus("构建中");
     setPackedStats(pendingPackedStats(packedCache));
 
-    const visibleIndices = visiblePointIndices({
+    const objectMaskStats = updateSparkObjectMask(packedCache.objectMask, {
       points,
       visibleIds,
       removedIds,
       isolatedId,
     });
-    const displayResult = getCachedDisplayPackedSplats({
-      packedCache,
-      visibleIndices,
-    });
     const meshState = createFilteredMeshState();
     filteredMeshStateRef.current = meshState;
     const splat = new SplatMesh({
-      packedSplats: displayResult.packedSplats,
+      packedSplats: packedCache.packedSplats,
+      objectModifier: packedCache.objectMask.modifier,
       onLoad: () => {
         if (!disposed) setStatus("就绪");
       },
     });
     filteredSplatRef.current = splat;
-    filteredDisplayPackedRef.current = displayResult.packedSplats;
+    filteredObjectMaskRef.current = packedCache.objectMask;
     meshState.meshId += 1;
     meshState.reused = false;
     meshState.updates = 1;
-    updatePackedStatsFromDisplayResult({ packedCache, displayResult, visibleIndices, meshState, setPackedStats });
+    updatePackedStatsFromMaskResult({ packedCache, objectMaskStats, meshState, setPackedStats });
 
     scene.add(splat);
     splat.initialized
@@ -260,10 +262,10 @@ export default function SplatViewport({
     return () => {
       disposed = true;
       scene.remove(splat);
-      disposeSplatMesh(splat, filteredDisplayPackedRef.current);
+      disposeSplatMesh(splat, packedCache.packedSplats);
       if (filteredSplatRef.current === splat) {
         filteredSplatRef.current = null;
-        filteredDisplayPackedRef.current = null;
+        filteredObjectMaskRef.current = null;
       }
     };
   }, [filtered, packedCache]);
@@ -276,27 +278,18 @@ export default function SplatViewport({
     if (!scene || !camera || !controls || !filtered || !packedCache?.packedSplats || !splat) return;
 
     setStatus("构建中");
-    const visibleIndices = visiblePointIndices({
+    const objectMaskStats = updateSparkObjectMask(packedCache.objectMask, {
       points,
       visibleIds,
       removedIds,
       isolatedId,
     });
-    const displayResult = getCachedDisplayPackedSplats({
-      packedCache,
-      visibleIndices,
-    });
     const meshState = filteredMeshStateRef.current ?? createFilteredMeshState();
-    meshState.reused = Boolean(filteredDisplayPackedRef.current);
+    meshState.reused = filteredObjectMaskRef.current === packedCache.objectMask;
     meshState.updates += 1;
-    applyPackedSplatsToSplatMesh({
-      splat,
-      packedSplats: displayResult.packedSplats,
-      previousPackedSplats: filteredDisplayPackedRef.current,
-    });
-    filteredDisplayPackedRef.current = displayResult.packedSplats;
+    splat.needsUpdate = true;
     filteredMeshStateRef.current = meshState;
-    updatePackedStatsFromDisplayResult({ packedCache, displayResult, visibleIndices, meshState, setPackedStats });
+    updatePackedStatsFromMaskResult({ packedCache, objectMaskStats, meshState, setPackedStats });
     splat.initialized
       .then(() => {
         setStatus("就绪");
@@ -310,7 +303,7 @@ export default function SplatViewport({
 
   useEffect(() => {
     return () => {
-      disposeDisplayPackedCache(packedCache?.displayCache);
+      disposeSparkObjectMask(packedCache?.objectMask);
       packedCache?.packedSplats?.dispose();
     };
   }, [packedCache]);
@@ -350,6 +343,11 @@ export default function SplatViewport({
       data-spark-display-cache-hits={packedStats.displayCacheHits}
       data-spark-display-cache-misses={packedStats.displayCacheMisses}
       data-spark-display-cache-evictions={packedStats.displayCacheEvictions}
+      data-spark-object-mask-mode={packedStats.objectMaskMode}
+      data-spark-object-mask-size={`${packedStats.objectMaskWidth}x${packedStats.objectMaskHeight}`}
+      data-spark-object-mask-updates={packedStats.objectMaskUpdates}
+      data-spark-object-mask-visible-gaussians={packedStats.objectMaskVisibleGaussians}
+      data-spark-object-mask-hidden-gaussians={packedStats.objectMaskHiddenGaussians}
       data-spark-mesh-update-mode={packedStats.meshUpdateMode}
       data-spark-mesh-id={packedStats.meshId}
       data-spark-mesh-reused={String(packedStats.meshReused)}
@@ -415,7 +413,7 @@ function buildFilteredSplatStats({
       reconstructRole === "source"
         ? "spark-ply-source"
         : hiddenObjectIds.size > 0
-          ? "spark-filtered-ply-reconstruct"
+          ? SPARK_OBJECT_FILTER_MASK
           : "spark-ply-reconstruct",
     visibleGaussians,
     filteredGaussians: Math.max(0, (points?.length ?? 0) - visibleGaussians),
@@ -468,24 +466,15 @@ function buildPackedSplatCache({
   packedSplats.extra = shRest.extra;
   return {
     packedSplats,
+    objectMask: createSparkObjectMask(points?.length ?? 0),
     route: shRest.route,
     baseGaussians: packedSplats.getNumSplats(),
     baseBuildMs: performance.now() - startedAt,
-    displayCache: createDisplayPackedCache(),
     shRestSourceGaussians: shRest.sourceGaussians,
     shRestPreservedGaussians: shRest.preservedGaussians,
     shRestPreserved: shRest.preserved,
     shRestCoefficientCount: shRest.coefficientCount,
     shDegree: shRest.degree,
-  };
-}
-
-function createDisplayPackedCache() {
-  return {
-    entries: new Map(),
-    hits: 0,
-    misses: 0,
-    evictions: 0,
   };
 }
 
@@ -497,135 +486,36 @@ function createFilteredMeshState() {
   };
 }
 
-function getCachedDisplayPackedSplats({
+function updatePackedStatsFromMaskResult({
   packedCache,
-  visibleIndices,
-}) {
-  const cache = packedCache.displayCache;
-  const cacheKey = visibleIndicesCacheKey(visibleIndices);
-  const cached = cache.entries.get(cacheKey);
-  if (cached) {
-    cache.entries.delete(cacheKey);
-    cache.entries.set(cacheKey, cached);
-    cache.hits += 1;
-    return {
-      packedSplats: cached.packedSplats,
-      cacheMode: SPARK_DISPLAY_CACHE_MODE,
-      cacheKey,
-      cacheHit: true,
-      cacheSize: cache.entries.size,
-      cacheHits: cache.hits,
-      cacheMisses: cache.misses,
-      cacheEvictions: cache.evictions,
-      extractMs: 0,
-    };
-  }
-
-  const extractStartedAt = performance.now();
-  const packedSplats = extractPackedSplats({
-    packedSplats: packedCache.packedSplats,
-    visibleIndices,
-    preserveExtra: packedCache.shRestPreserved,
-  });
-  const extractMs = performance.now() - extractStartedAt;
-  cache.entries.set(cacheKey, { packedSplats });
-  cache.misses += 1;
-  evictDisplayPackedCacheEntries(cache);
-  return {
-    packedSplats,
-    cacheMode: SPARK_DISPLAY_CACHE_MODE,
-    cacheKey,
-    cacheHit: false,
-    cacheSize: cache.entries.size,
-    cacheHits: cache.hits,
-    cacheMisses: cache.misses,
-    cacheEvictions: cache.evictions,
-    extractMs,
-  };
-}
-
-function evictDisplayPackedCacheEntries(cache) {
-  while (cache.entries.size > SPARK_DISPLAY_PACKED_CACHE_LIMIT) {
-    const oldestKey = cache.entries.keys().next().value;
-    const oldest = cache.entries.get(oldestKey);
-    oldest?.packedSplats?.dispose();
-    cache.entries.delete(oldestKey);
-    cache.evictions += 1;
-  }
-}
-
-function disposeDisplayPackedCache(cache) {
-  for (const entry of cache?.entries?.values?.() ?? []) {
-    entry?.packedSplats?.dispose();
-  }
-  cache?.entries?.clear?.();
-}
-
-function visibleIndicesCacheKey(visibleIndices) {
-  const length = visibleIndices?.length ?? 0;
-  let hash = 2166136261;
-  for (let index = 0; index < length; index += 1) {
-    hash ^= Number(visibleIndices[index] ?? 0);
-    hash = Math.imul(hash, 16777619);
-  }
-  const first = length > 0 ? visibleIndices[0] : -1;
-  const last = length > 0 ? visibleIndices[length - 1] : -1;
-  return `${length}:${first}:${last}:${hash >>> 0}`;
-}
-
-function updatePackedStatsFromDisplayResult({
-  packedCache,
-  displayResult,
-  visibleIndices,
+  objectMaskStats,
   meshState,
   setPackedStats,
 }) {
   setPackedStats({
     route: packedCache.route,
     baseGaussians: packedCache.baseGaussians,
-    visibleIndices: visibleIndices.length,
+    visibleIndices: objectMaskStats.objectMaskVisibleGaussians,
     baseBuildMs: packedCache.baseBuildMs,
-    extractMs: displayResult.extractMs,
+    extractMs: 0,
     shRestSourceGaussians: packedCache.shRestSourceGaussians,
     shRestPreservedGaussians: packedCache.shRestPreservedGaussians,
     shRestPreserved: packedCache.shRestPreserved,
     shRestCoefficientCount: packedCache.shRestCoefficientCount,
     shDegree: packedCache.shDegree,
-    displayCacheMode: displayResult.cacheMode,
-    displayCacheKey: displayResult.cacheKey,
-    displayCacheHit: displayResult.cacheHit,
-    displayCacheSize: displayResult.cacheSize,
-    displayCacheHits: displayResult.cacheHits,
-    displayCacheMisses: displayResult.cacheMisses,
-    displayCacheEvictions: displayResult.cacheEvictions,
+    displayCacheMode: "disabled-by-native-mask-v1",
+    displayCacheKey: "",
+    displayCacheHit: false,
+    displayCacheSize: 0,
+    displayCacheHits: 0,
+    displayCacheMisses: 0,
+    displayCacheEvictions: 0,
+    ...objectMaskStats,
     meshUpdateMode: SPARK_MESH_UPDATE_MODE,
     meshId: meshState.meshId,
     meshReused: meshState.reused,
     meshUpdates: meshState.updates,
   });
-}
-
-function applyPackedSplatsToSplatMesh({
-  splat,
-  packedSplats,
-  previousPackedSplats,
-}) {
-  const changed = previousPackedSplats !== packedSplats;
-  splat.splats = packedSplats;
-  splat.packedSplats = packedSplats;
-  splat.numSplats = packedSplats?.getNumSplats?.() ?? 0;
-  if (changed) {
-    splat.updateMappingVersion?.();
-    splat.updateGenerator?.();
-  }
-}
-
-function extractPackedSplats({ packedSplats, visibleIndices, preserveExtra }) {
-  const extracted = packedSplats.extractSplats(visibleIndices, false);
-  if (preserveExtra) {
-    extracted.extra = extractPackedShExtra(packedSplats.extra, visibleIndices);
-  }
-  return extracted;
 }
 
 function disposeSplatMesh(splat, preservedPackedSplats) {
@@ -634,21 +524,6 @@ function disposeSplatMesh(splat, preservedPackedSplats) {
     splat.packedSplats = undefined;
   }
   splat.dispose();
-}
-
-function visiblePointIndices({
-  points,
-  visibleIds,
-  removedIds,
-  isolatedId,
-}) {
-  const indices = [];
-  for (let index = 0; index < (points?.length ?? 0); index += 1) {
-    if (pointVisible(points[index], visibleIds, removedIds, isolatedId)) {
-      indices.push(index);
-    }
-  }
-  return new Uint32Array(indices);
 }
 
 function pointVisible(point, visibleIds, removedIds, isolatedId) {
@@ -727,6 +602,12 @@ function emptyPackedStats() {
     displayCacheHits: 0,
     displayCacheMisses: 0,
     displayCacheEvictions: 0,
+    objectMaskMode: "none",
+    objectMaskWidth: 0,
+    objectMaskHeight: 0,
+    objectMaskUpdates: 0,
+    objectMaskVisibleGaussians: 0,
+    objectMaskHiddenGaussians: 0,
     meshUpdateMode: "none",
     meshId: 0,
     meshReused: false,
@@ -746,13 +627,14 @@ function pendingPackedStats(cache) {
     shRestPreserved: cache?.shRestPreserved ?? false,
     shRestCoefficientCount: cache?.shRestCoefficientCount ?? 0,
     shDegree: cache?.shDegree ?? 0,
-    displayCacheMode: cache ? SPARK_DISPLAY_CACHE_MODE : "none",
+    displayCacheMode: cache ? "disabled-by-native-mask-v1" : "none",
     displayCacheKey: "",
     displayCacheHit: false,
-    displayCacheSize: cache?.displayCache?.entries?.size ?? 0,
-    displayCacheHits: cache?.displayCache?.hits ?? 0,
-    displayCacheMisses: cache?.displayCache?.misses ?? 0,
-    displayCacheEvictions: cache?.displayCache?.evictions ?? 0,
+    displayCacheSize: 0,
+    displayCacheHits: 0,
+    displayCacheMisses: 0,
+    displayCacheEvictions: 0,
+    ...maskStats(cache?.objectMask),
     meshUpdateMode: cache ? SPARK_MESH_UPDATE_MODE : "none",
     meshId: 0,
     meshReused: false,
@@ -763,6 +645,9 @@ function pendingPackedStats(cache) {
 function sparkPathLabel({ objectFilter, packedStats }) {
   if (objectFilter === "spark-ply-sh-source") return "PLY SH 源";
   if (objectFilter === "spark-ply-source") return "PLY 源";
+  if (objectFilter === SPARK_OBJECT_FILTER_MASK) {
+    return packedStats.objectMaskMode === SPARK_OBJECT_MASK_MODE ? "Shader 过滤" : "过滤重建";
+  }
   if (objectFilter === "spark-filtered-ply-reconstruct") {
     return packedStats.displayCacheHit ? "缓存过滤" : "过滤重建";
   }
