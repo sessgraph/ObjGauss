@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AQ`: 将 `offscreen-readback` 扩展成多场景 CI/headless gate 和 summary report，继续把 WebGPU compute/storage/readback 与 canvas presentation failure 分离。
+  - `RENDER-005T-AR`: 为 offscreen WebGPU readback 增加 object-state transition gate，在不依赖 canvas presentation 的情况下验证隔离 / 删除会改变 GPU object-state 与 readback checksum。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AQ: WebGPU offscreen readback multi-scene suite
+
+- 状态: done / multiscene-offscreen-readback-audited
+- 类型: 标准 PR / WebGPU CI-headless diagnostics
+- 目标: 将 `offscreen-readback` 从单场景 probe 扩展为可复现的多场景 CI/headless gate 和 summary report。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-offscreen-readback.mjs`，默认启动 built `dist/` 的 Vite preview，并逐场景调用 `audit-demo --webgpu-probe offscreen-readback`。
+  - `npm run audit:webgpu-offscreen-readback` 现在默认覆盖 `nerf-lego-alpha-closure-local` 与 `plush-semantic-closure-local`，并写出 `/tmp/objgauss-webgpu-offscreen-readback/summary.json` 与 `summary.md`。
+  - Suite 解析 `firstFrame`、`queue`、`deviceLost`、`pixel`、`readback`、`storage`、`objectFilter`、`packedGaussians` 和 `tileReferences` telemetry，并对每个场景执行 gate checks。
+  - 单场景仍可用 `--assets <asset_id>` 显式复查。
+- 结论:
+  - Lego proxy 通过：`firstFrame="readback":253952`、`queue="done"`、`deviceLost="active"`、`readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740`。
+  - Plush semantic 281k 大场景通过：`firstFrame="readback":147456`、`queue="done"`、`deviceLost="active"`、`readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"0f87864a":2359296:589824/589824:254524`、`tileReferences=1190026`。
+  - 这证明 WebGPU storage upload、pixel compute、buffer copy、queue completion 和 MAP_READ readback 在小场景与 Plush 级大场景上都可脱离 canvas presentation 验收。
+- 验证:
+  - `node --check scripts/audit-webgpu-offscreen-readback.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5321 --output-dir /tmp/objgauss-webgpu-offscreen-readback-single`: passed。
+  - `npm run audit:webgpu-offscreen-readback -- --port 5322 --output-dir /tmp/objgauss-webgpu-offscreen-readback`: passed。
 
 ### RENDER-005T-AP: WebGPU offscreen readback probe
 

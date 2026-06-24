@@ -172,28 +172,28 @@ itself to make the edit renderer visually equivalent to Spark.
 
 ## Offscreen Readback Probe
 
-Use the offscreen readback probe when CI/headless WebGPU needs to distinguish
+Use the offscreen readback suite when CI/headless WebGPU needs to distinguish
 compute/storage health from canvas presentation backend loss:
 
 ```bash
-npm run audit:webgpu-offscreen-readback -- \
-  --asset nerf-lego-alpha-closure-local
+npm run audit:webgpu-offscreen-readback
 ```
 
-The probe runs the WebGPU pixel compute path, copies `pixelResolvedRgba` into a
-`MAP_READ` buffer, and validates `data-webgpu-readback-*` telemetry. It does not
-create a canvas render pass, so passing it does not prove display/presentation.
-It proves storage upload, compute dispatch, buffer copy, queue completion, and
-GPU readback.
+The suite runs the WebGPU pixel compute path, copies `pixelResolvedRgba` into a
+`MAP_READ` buffer, validates `data-webgpu-readback-*` telemetry, and writes
+`summary.json` / `summary.md` under `/tmp/objgauss-webgpu-offscreen-readback`.
+It does not create a canvas render pass, so passing it does not prove
+display/presentation. It proves storage upload, compute dispatch, buffer copy,
+queue completion, and GPU readback.
 
 Current local result:
 
-```text
-firstFrame="readback":253952
-queue="done":"webgpu-queue-submitted-work-done"
-deviceLost="active":"webgpu-device-active"
-readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740
-```
+| Scene | Frame pixels | Readback checksum | Readback bytes | Finite floats | Nonzero floats | Packed | Tile refs |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| NeRF Lego proxy | 253952 | `897e852d` | 4063232 | 1015808/1015808 | 533740 | 5696 | 40389 |
+| Plush semantic | 147456 | `0f87864a` | 2359296 | 589824/589824 | 254524 | 281498 | 1190026 |
+
+Use `--assets <asset_id>` to rerun a single scene.
 
 ## Depth Alpha Mode Diagnostic
 
