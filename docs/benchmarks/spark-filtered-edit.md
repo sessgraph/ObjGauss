@@ -101,6 +101,22 @@ mesh. This avoids repeating `extractSplats(...)` when the UI returns to a recent
 visible object set, while still allowing the LRU cache to release entries when
 the base source changes.
 
+RENDER-005T-AE keeps the filtered Spark `SplatMesh` alive for the lifetime of a
+base packed source and updates that mesh when the visible object set changes:
+
+```text
+base PackedSplats cache
+        -> display PackedSplats cache / extract
+        -> persistent SplatMesh
+        -> SplatMesh packed source update
+```
+
+This removes the browser-visible contract that every isolate / delete / restore
+state creates a fresh temporary Spark mesh. It still does not patch a native
+object mask into Spark's original `.splat` renderer: each new visible set still
+needs a display `PackedSplats` object, and the current mesh is pointed at that
+display source.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -114,6 +130,10 @@ the base source changes.
 - Repeated visible object sets can reuse a display `PackedSplats` from a small
   `visible-index-lru-v1` cache. This is a performance cache for PLY
   reconstruction, not a native object mask in the original `.splat`.
+- A filtered Spark session keeps one `SplatMesh` instance alive and updates its
+  packed source when the visible set changes. Browser audit requires
+  `data-spark-mesh-update-mode="persistent-splatmesh-v1"` and a stable mesh id
+  across hide / restore.
 - No-SH assets continue to expose `data-spark-reconstruct-source="packed-extract-v1"`
   and `data-spark-sh-rest-preserved="false"`.
 - SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
@@ -144,6 +164,10 @@ data-spark-display-cache-size="..."
 data-spark-display-cache-hits="..."
 data-spark-display-cache-misses="..."
 data-spark-display-cache-evictions="..."
+data-spark-mesh-update-mode="persistent-splatmesh-v1"
+data-spark-mesh-id="..."
+data-spark-mesh-reused="true|false"
+data-spark-mesh-updates="..."
 data-spark-sh-rest-source-gaussians="..."
 data-spark-sh-rest-preserved-gaussians="..."
 data-spark-sh-rest-preserved="true|false"
@@ -178,8 +202,9 @@ Current local result:
 ```text
 browser_audit=passed
 postDelete="spark-splat":"spark-filtered-ply-reconstruct":3909
-sparkPacked="packed-extract-v1":5696/3909:5.3/4.8
-sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0
+sparkPacked="packed-extract-v1":5696/3909:3.8/0
+sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0
+sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
 renderModeAfterDelete="原始颜色（编辑预览）"
 visibleAfterDelete=3,909
@@ -225,8 +250,9 @@ npm run audit:demo -- \
 ```text
 browser_audit=passed
 postDelete="spark-splat":"spark-filtered-ply-reconstruct":129108
-sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7
-sparkDisplayCache="visible-index-lru-v1":"true":2:1/2/0
+sparkPacked="packed-sh-extract-v1":255794/129108:155.5/0
+sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0
+sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=255794:255794:"true":45:3
 ```
 

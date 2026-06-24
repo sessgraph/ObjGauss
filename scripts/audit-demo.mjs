@@ -80,6 +80,7 @@ const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
 const SPARK_DISPLAY_CACHE_MODE = "visible-index-lru-v1";
+const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -210,6 +211,7 @@ try {
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
         `sparkDisplayCache=${JSON.stringify(result.sparkDisplayCacheModeAfterDelete ?? "")}:${JSON.stringify(result.sparkDisplayCacheHitAfterDelete ?? "")}:${result.sparkDisplayCacheSizeAfterDelete ?? 0}:${result.sparkDisplayCacheHitsAfterDelete ?? 0}/${result.sparkDisplayCacheMissesAfterDelete ?? 0}/${result.sparkDisplayCacheEvictionsAfterDelete ?? 0} ` +
+        `sparkMesh=${JSON.stringify(result.sparkMeshUpdateModeAfterDelete ?? "")}:${result.sparkMeshIdAfterDelete ?? 0}:${JSON.stringify(result.sparkMeshReusedAfterDelete ?? "")}:${result.sparkMeshUpdatesAfterDelete ?? 0} ` +
         `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${result.sparkShRestPreservedGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")}:${result.sparkShRestCoefficientCountAfterDelete ?? 0}:${result.sparkShDegreeAfterDelete ?? 0} ` +
         `screenshot=${result.screenshotPath}`,
     );
@@ -1158,6 +1160,18 @@ async function runAudit(url, assetsToCheck, options) {
       let sparkDisplayCacheEvictionsAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-display-cache-evictions") ?? "0")
         : 0;
+      let sparkMeshUpdateModeAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-mesh-update-mode")
+        : "";
+      let sparkMeshIdAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-mesh-id") ?? "0")
+        : 0;
+      let sparkMeshReusedAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-mesh-reused")
+        : "";
+      let sparkMeshUpdatesAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-mesh-updates") ?? "0")
+        : 0;
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
         : 0;
@@ -1235,6 +1249,9 @@ async function runAudit(url, assetsToCheck, options) {
           sparkDisplayCacheSizeAfterDelete <= 0 ||
           sparkDisplayCacheMissesAfterDelete <= 0 ||
           sparkDisplayCacheEvictionsAfterDelete < 0 ||
+          sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
+          sparkMeshIdAfterDelete <= 0 ||
+          sparkMeshUpdatesAfterDelete <= 0 ||
           sparkShRestPreservedAfterDelete !== sparkExpectedShRestPreservedAfterDelete ||
           (sparkShRestSourceGaussiansAfterDelete > 0 &&
             (sparkShRestPreservedGaussiansAfterDelete !== sparkShRestSourceGaussiansAfterDelete ||
@@ -1242,12 +1259,14 @@ async function runAudit(url, assetsToCheck, options) {
               sparkShDegreeAfterDelete <= 0)))
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
       }
       if (sparkFilteredAfterDelete) {
         const cacheHitsBeforeRestore = sparkDisplayCacheHitsAfterDelete;
         const cacheKeyBeforeRestore = sparkDisplayCacheKeyAfterDelete;
+        const meshIdBeforeRestore = sparkMeshIdAfterDelete;
+        const meshUpdatesBeforeRestore = sparkMeshUpdatesAfterDelete;
         const toggleButton = page.locator(".objectRow:not(.removed) .eyeButton").first();
         if ((await toggleButton.count()) > 0) {
           await toggleButton.click();
@@ -1262,6 +1281,10 @@ async function runAudit(url, assetsToCheck, options) {
           sparkDisplayCacheHitsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-hits") ?? "0");
           sparkDisplayCacheMissesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-misses") ?? "0");
           sparkDisplayCacheEvictionsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-evictions") ?? "0");
+          sparkMeshUpdateModeAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-update-mode");
+          sparkMeshIdAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-id") ?? "0");
+          sparkMeshReusedAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-reused");
+          sparkMeshUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-updates") ?? "0");
           if (
             sparkDisplayCacheModeAfterDelete !== SPARK_DISPLAY_CACHE_MODE ||
             sparkDisplayCacheHitAfterDelete !== "true" ||
@@ -1270,6 +1293,16 @@ async function runAudit(url, assetsToCheck, options) {
           ) {
             throw new Error(
               `${asset.id} Spark display cache did not hit after restoring visible set: mode=${sparkDisplayCacheModeAfterDelete} hit=${sparkDisplayCacheHitAfterDelete} key=${sparkDisplayCacheKeyAfterDelete}/${cacheKeyBeforeRestore} hits=${sparkDisplayCacheHitsAfterDelete}/${cacheHitsBeforeRestore} size=${sparkDisplayCacheSizeAfterDelete} misses=${sparkDisplayCacheMissesAfterDelete} evictions=${sparkDisplayCacheEvictionsAfterDelete}`,
+            );
+          }
+          if (
+            sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
+            sparkMeshIdAfterDelete !== meshIdBeforeRestore ||
+            sparkMeshReusedAfterDelete !== "true" ||
+            sparkMeshUpdatesAfterDelete <= meshUpdatesBeforeRestore
+          ) {
+            throw new Error(
+              `${asset.id} Spark mesh was not persistently reused after visible-set update: mode=${sparkMeshUpdateModeAfterDelete} mesh=${sparkMeshIdAfterDelete}/${meshIdBeforeRestore} reused=${sparkMeshReusedAfterDelete} updates=${sparkMeshUpdatesAfterDelete}/${meshUpdatesBeforeRestore}`,
             );
           }
         }
@@ -1505,6 +1538,10 @@ async function runAudit(url, assetsToCheck, options) {
         sparkDisplayCacheHitsAfterDelete,
         sparkDisplayCacheMissesAfterDelete,
         sparkDisplayCacheEvictionsAfterDelete,
+        sparkMeshUpdateModeAfterDelete,
+        sparkMeshIdAfterDelete,
+        sparkMeshReusedAfterDelete,
+        sparkMeshUpdatesAfterDelete,
         sparkShRestSourceGaussiansAfterDelete,
         sparkShRestPreservedGaussiansAfterDelete,
         sparkShRestPreservedAfterDelete,

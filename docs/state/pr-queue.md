@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AE`: 继续评估 Spark native object mask / persistent `SplatMesh` 更新面，目标是让原始 packed source 能按 object-state 过滤，而不是每个全新 visible set 都创建临时 `SplatMesh`；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AF`: 继续评估 Spark native object mask / original packed source object-state filtering feasibility，目标是减少甚至消除每个全新 visible set 的 display `PackedSplats.extractSplats(...)`，把对象显隐推进到 Spark source / shader / object-state 层；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AE: Spark filtered persistent SplatMesh update surface
+
+- 状态: done / persistent-splatmesh-audited
+- 类型: 标准 PR / 前端渲染性能与 UX 诊断
+- 目标: 在 Spark filtered edit route 已有 display `PackedSplats` cache 的基础上，去掉每次 object-state 变化都创建临时 `SplatMesh` 的 browser-visible contract，改为保留一个 filtered Spark mesh 并更新其 packed source。
+- 已实施:
+  - `SplatViewport` 拆分普通 source `SplatMesh` lifecycle 与 filtered Spark lifecycle；filtered route 只在 base `PackedSplats` source 变化时创建 mesh。
+  - visible / removed / isolated object-state 变化时，filtered route 从 display cache 或 `extractSplats(...)` 取得 display `PackedSplats`，并更新现有 `SplatMesh` 的 packed source、mapping version 和 generator。
+  - `SplatMesh.dispose()` 前继续摘掉 cached display packed 引用，避免释放 LRU cache 持有的数据。
+  - Browser contract 新增 `data-spark-mesh-update-mode="persistent-splatmesh-v1"`、`data-spark-mesh-id`、`data-spark-mesh-reused` 和 `data-spark-mesh-updates`。
+  - `audit-demo` 在删除后隐藏 / 恢复一个未删除对象，要求 Spark display cache hit，同时要求 mesh id 保持一致、reused 为 true、updates 增长。
+- 结论:
+  - Lego proxy 删除预览通过：`sparkPacked="packed-extract-v1":5696/3909:3.8/0`、`sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0`、`sparkMesh="persistent-splatmesh-v1":1:"true":4`。
+  - Trained Lego SH-heavy 删除预览通过：`sparkPacked="packed-sh-extract-v1":255794/129108:155.5/0`、`sparkDisplayCache="visible-index-lru-v1":"true":2:2/2/0`、`sparkMesh="persistent-splatmesh-v1":1:"true":4`、`sparkShRest=255794:255794:"true":45:3`。
+  - 这一步减少 UI 交互中的重建感，并把 Spark filtered source 更新变成可审计事实；它仍不是 Spark 原生 object mask，每个全新 visible set 仍需要 display `PackedSplats` extract 或 cache hit。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5299/ --no-server`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5299/ --no-server`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
 
 ### RENDER-005T-AD: Spark display PackedSplats cache telemetry
 

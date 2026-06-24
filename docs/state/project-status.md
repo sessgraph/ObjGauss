@@ -93,6 +93,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AB 已完成 Spark packed SH-rest preservation：filtered Spark PLY reconstruction 现在会把 scene-level `f_rest_*` 编码为 Spark `extra.sh1/sh2/sh3`，并在 visible-index extract 后保留 SH extra；SH-heavy route 暴露 `data-spark-reconstruct-source="packed-sh-extract-v1"` 和 `data-spark-sh-rest-preserved="true"`。本机 `NeRF Lego 训练输出样例` 删除预览通过：`sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7`、`sparkShRest=255794:255794:"true":45:3`。剩余外观 gap 是 registered compact `.splat` viewer source 不携带 degree-3 SH rest，导致 trained full reconstruct visual residual 不能直接以 `.splat` 为完整 SH baseline。
   - RENDER-005T-AC 已完成 Spark PLY SH full-view source baseline：SH-heavy 场景在 `真实查看` source/original 且无对象编辑状态时自动使用 Spark PLY SH source，暴露 `data-object-filter="spark-ply-sh-source"` 和 `packed-sh-extract-v1`；`?spark-ply-source=off` 可回到 legacy compact `.splat` 诊断路径。本机 trained Lego same-source residual gate 通过：`fullSource="spark-ply-sh-source":"packed-sh-extract-v1":255794:255794:true:45:3`、`coverageRatio=1.170018`、`lumaDelta=0.058189`、`chromaDelta=0.007036`。trained browser interaction audit 通过，真实查看非背景像素提升到 `70188`，删除后继续保留 `sparkShRest=255794:255794:"true":45:3`。
   - RENDER-005T-AD 已完成 Spark display `PackedSplats` cache telemetry：filtered Spark route 新增 `visible-index-lru-v1` display cache，并在临时 `SplatMesh` dispose 前摘掉 cached packed 引用，避免回到同一 visible-index set 时重复 `extractSplats`；UI HUD 区分 `过滤重建` / `缓存过滤` / `PLY SH 源`，browser audit 会通过隐藏/恢复对象证明 cache hit。Lego proxy 与 trained Lego 删除预览均通过，trained route 保持 `packed-sh-extract-v1` 和完整 SH rest preservation。这仍不是原始 `.splat` 内部 native object mask，每个全新 visible set 仍会创建临时 `SplatMesh`。
+  - RENDER-005T-AE 已完成 Spark filtered persistent `SplatMesh` update surface：filtered Spark session 现在会保留同一个 `SplatMesh`，在 isolate / delete / restore 等 object-state 变化时更新其 display `PackedSplats` source，并通过 `data-spark-mesh-update-mode="persistent-splatmesh-v1"`、mesh id、reuse 和 update count 暴露 browser contract。Lego proxy 与 trained Lego 删除预览均证明同一个 mesh 在 hide / restore 后复用并更新：`sparkMesh="persistent-splatmesh-v1":1:"true":4`。这一步减少交互重建感，但仍不是原始 `.splat` 内部 native object mask；每个全新 visible set 仍需要 display `PackedSplats` extract 或 cache hit。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -166,6 +167,12 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 ```bash
 node --check scripts/audit-demo.mjs
 npm run build
+npm run preview -- --port 5299 --strictPort
+npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5299/ --no-server
+npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5299/ --no-server
+npm run audit:spark-reconstruct-residual
+npm run audit:webgpu-tile-smoke
+uv run --extra dev pytest
 npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5298/ --no-server
 npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5298/ --no-server
 npm run audit:spark-reconstruct-residual

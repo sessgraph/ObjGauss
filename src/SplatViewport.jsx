@@ -10,6 +10,7 @@ import {
 
 const SPARK_DISPLAY_PACKED_CACHE_LIMIT = 4;
 const SPARK_DISPLAY_CACHE_MODE = "visible-index-lru-v1";
+const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
 
 export default function SplatViewport({
   source,
@@ -33,27 +34,17 @@ export default function SplatViewport({
   const controlsRef = useRef(null);
   const gridRef = useRef(null);
   const axesRef = useRef(null);
+  const filteredSplatRef = useRef(null);
+  const filteredDisplayPackedRef = useRef(null);
+  const filteredMeshStateRef = useRef(createFilteredMeshState());
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
 
   const sourceKey = useMemo(() => {
-    if (filtered) {
-      const visibleKey = visibleIds ? [...visibleIds].sort((left, right) => left - right).join(",") : "";
-      const removedKey = removedIds ? [...removedIds].sort((left, right) => left - right).join(",") : "";
-      return [
-        "filtered",
-        points?.length ?? 0,
-        reconstructRole,
-        visibleKey,
-        removedKey,
-        isolatedId ?? "all",
-        renderMode,
-      ].join(":");
-    }
     if (source?.url) return source.url;
     if (source?.fileName) return `${source.fileName}:${source.fileBytes?.byteLength ?? 0}`;
     return "none";
-  }, [filtered, isolatedId, points, reconstructRole, removedIds, renderMode, source, visibleIds]);
+  }, [source]);
 
   const filteredStats = useMemo(
     () =>
@@ -176,66 +167,25 @@ export default function SplatViewport({
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
-    if (!scene || !camera || !controls || (!source && !filtered)) return undefined;
+    if (!scene || !camera || !controls || filtered || !source) return undefined;
 
     let disposed = false;
-    setStatus(filtered ? "构建中" : "加载中");
-    setPackedStats(filtered ? pendingPackedStats(packedCache) : emptyPackedStats());
+    setStatus("加载中");
+    setPackedStats(emptyPackedStats());
 
-    let displayPackedSplats = null;
-    if (filtered && packedCache?.packedSplats) {
-      const visibleIndices = visiblePointIndices({
-        points,
-        visibleIds,
-        removedIds,
-        isolatedId,
-      });
-      const displayResult = getCachedDisplayPackedSplats({
-        packedCache,
-        visibleIndices,
-      });
-      displayPackedSplats = displayResult.packedSplats;
-      setPackedStats({
-        route: packedCache.route,
-        baseGaussians: packedCache.baseGaussians,
-        visibleIndices: visibleIndices.length,
-        baseBuildMs: packedCache.baseBuildMs,
-        extractMs: displayResult.extractMs,
-        shRestSourceGaussians: packedCache.shRestSourceGaussians,
-        shRestPreservedGaussians: packedCache.shRestPreservedGaussians,
-        shRestPreserved: packedCache.shRestPreserved,
-        shRestCoefficientCount: packedCache.shRestCoefficientCount,
-        shDegree: packedCache.shDegree,
-        displayCacheMode: displayResult.cacheMode,
-        displayCacheKey: displayResult.cacheKey,
-        displayCacheHit: displayResult.cacheHit,
-        displayCacheSize: displayResult.cacheSize,
-        displayCacheHits: displayResult.cacheHits,
-        displayCacheMisses: displayResult.cacheMisses,
-        displayCacheEvictions: displayResult.cacheEvictions,
-      });
-    }
-
-    const splat = filtered
-      ? new SplatMesh({
-          packedSplats: displayPackedSplats,
-          onLoad: () => {
-            if (!disposed) setStatus("就绪");
-          },
-        })
-      : new SplatMesh({
-          url: source.url,
-          fileBytes: source.fileBytes,
-          fileName: source.fileName,
-          onProgress: (event) => {
-            if (!event.lengthComputable || event.total === 0) return;
-            const percent = Math.round((event.loaded / event.total) * 100);
-            setStatus(`${percent}%`);
-          },
-          onLoad: () => {
-            if (!disposed) setStatus("就绪");
-          },
-        });
+    const splat = new SplatMesh({
+      url: source.url,
+      fileBytes: source.fileBytes,
+      fileName: source.fileName,
+      onProgress: (event) => {
+        if (!event.lengthComputable || event.total === 0) return;
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setStatus(`${percent}%`);
+      },
+      onLoad: () => {
+        if (!disposed) setStatus("就绪");
+      },
+    });
 
     scene.add(splat);
     splat.initialized
@@ -253,9 +203,110 @@ export default function SplatViewport({
     return () => {
       disposed = true;
       scene.remove(splat);
-      disposeSplatMesh(splat, filtered ? displayPackedSplats : null);
+      disposeSplatMesh(splat);
     };
-  }, [filtered, isolatedId, packedCache, points, removedIds, renderMode, source, sourceKey, visibleIds]);
+  }, [filtered, source, sourceKey]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!scene || !camera || !controls || !filtered || !packedCache?.packedSplats) {
+      return undefined;
+    }
+
+    let disposed = false;
+    setStatus("构建中");
+    setPackedStats(pendingPackedStats(packedCache));
+
+    const visibleIndices = visiblePointIndices({
+      points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+    });
+    const displayResult = getCachedDisplayPackedSplats({
+      packedCache,
+      visibleIndices,
+    });
+    const meshState = createFilteredMeshState();
+    filteredMeshStateRef.current = meshState;
+    const splat = new SplatMesh({
+      packedSplats: displayResult.packedSplats,
+      onLoad: () => {
+        if (!disposed) setStatus("就绪");
+      },
+    });
+    filteredSplatRef.current = splat;
+    filteredDisplayPackedRef.current = displayResult.packedSplats;
+    meshState.meshId += 1;
+    meshState.reused = false;
+    meshState.updates = 1;
+    updatePackedStatsFromDisplayResult({ packedCache, displayResult, visibleIndices, meshState, setPackedStats });
+
+    scene.add(splat);
+    splat.initialized
+      .then(() => {
+        if (disposed) return;
+        setStatus("就绪");
+        frameSplat(splat, camera, controls, scene);
+      })
+      .catch((error) => {
+        if (disposed) return;
+        console.error(error);
+        setStatus("加载失败");
+      });
+
+    return () => {
+      disposed = true;
+      scene.remove(splat);
+      disposeSplatMesh(splat, filteredDisplayPackedRef.current);
+      if (filteredSplatRef.current === splat) {
+        filteredSplatRef.current = null;
+        filteredDisplayPackedRef.current = null;
+      }
+    };
+  }, [filtered, packedCache]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const splat = filteredSplatRef.current;
+    if (!scene || !camera || !controls || !filtered || !packedCache?.packedSplats || !splat) return;
+
+    setStatus("构建中");
+    const visibleIndices = visiblePointIndices({
+      points,
+      visibleIds,
+      removedIds,
+      isolatedId,
+    });
+    const displayResult = getCachedDisplayPackedSplats({
+      packedCache,
+      visibleIndices,
+    });
+    const meshState = filteredMeshStateRef.current ?? createFilteredMeshState();
+    meshState.reused = Boolean(filteredDisplayPackedRef.current);
+    meshState.updates += 1;
+    applyPackedSplatsToSplatMesh({
+      splat,
+      packedSplats: displayResult.packedSplats,
+      previousPackedSplats: filteredDisplayPackedRef.current,
+    });
+    filteredDisplayPackedRef.current = displayResult.packedSplats;
+    filteredMeshStateRef.current = meshState;
+    updatePackedStatsFromDisplayResult({ packedCache, displayResult, visibleIndices, meshState, setPackedStats });
+    splat.initialized
+      .then(() => {
+        setStatus("就绪");
+        frameSplat(splat, camera, controls, scene);
+      })
+      .catch((error) => {
+        console.error(error);
+        setStatus("加载失败");
+      });
+  }, [filtered, isolatedId, packedCache, points, removedIds, visibleIds]);
 
   useEffect(() => {
     return () => {
@@ -299,6 +350,10 @@ export default function SplatViewport({
       data-spark-display-cache-hits={packedStats.displayCacheHits}
       data-spark-display-cache-misses={packedStats.displayCacheMisses}
       data-spark-display-cache-evictions={packedStats.displayCacheEvictions}
+      data-spark-mesh-update-mode={packedStats.meshUpdateMode}
+      data-spark-mesh-id={packedStats.meshId}
+      data-spark-mesh-reused={String(packedStats.meshReused)}
+      data-spark-mesh-updates={packedStats.meshUpdates}
       data-spark-sh-rest-source-gaussians={packedStats.shRestSourceGaussians}
       data-spark-sh-rest-preserved-gaussians={packedStats.shRestPreservedGaussians}
       data-spark-sh-rest-preserved={String(packedStats.shRestPreserved)}
@@ -434,6 +489,14 @@ function createDisplayPackedCache() {
   };
 }
 
+function createFilteredMeshState() {
+  return {
+    meshId: 0,
+    reused: false,
+    updates: 0,
+  };
+}
+
 function getCachedDisplayPackedSplats({
   packedCache,
   visibleIndices,
@@ -508,6 +571,53 @@ function visibleIndicesCacheKey(visibleIndices) {
   const first = length > 0 ? visibleIndices[0] : -1;
   const last = length > 0 ? visibleIndices[length - 1] : -1;
   return `${length}:${first}:${last}:${hash >>> 0}`;
+}
+
+function updatePackedStatsFromDisplayResult({
+  packedCache,
+  displayResult,
+  visibleIndices,
+  meshState,
+  setPackedStats,
+}) {
+  setPackedStats({
+    route: packedCache.route,
+    baseGaussians: packedCache.baseGaussians,
+    visibleIndices: visibleIndices.length,
+    baseBuildMs: packedCache.baseBuildMs,
+    extractMs: displayResult.extractMs,
+    shRestSourceGaussians: packedCache.shRestSourceGaussians,
+    shRestPreservedGaussians: packedCache.shRestPreservedGaussians,
+    shRestPreserved: packedCache.shRestPreserved,
+    shRestCoefficientCount: packedCache.shRestCoefficientCount,
+    shDegree: packedCache.shDegree,
+    displayCacheMode: displayResult.cacheMode,
+    displayCacheKey: displayResult.cacheKey,
+    displayCacheHit: displayResult.cacheHit,
+    displayCacheSize: displayResult.cacheSize,
+    displayCacheHits: displayResult.cacheHits,
+    displayCacheMisses: displayResult.cacheMisses,
+    displayCacheEvictions: displayResult.cacheEvictions,
+    meshUpdateMode: SPARK_MESH_UPDATE_MODE,
+    meshId: meshState.meshId,
+    meshReused: meshState.reused,
+    meshUpdates: meshState.updates,
+  });
+}
+
+function applyPackedSplatsToSplatMesh({
+  splat,
+  packedSplats,
+  previousPackedSplats,
+}) {
+  const changed = previousPackedSplats !== packedSplats;
+  splat.splats = packedSplats;
+  splat.packedSplats = packedSplats;
+  splat.numSplats = packedSplats?.getNumSplats?.() ?? 0;
+  if (changed) {
+    splat.updateMappingVersion?.();
+    splat.updateGenerator?.();
+  }
 }
 
 function extractPackedSplats({ packedSplats, visibleIndices, preserveExtra }) {
@@ -617,6 +727,10 @@ function emptyPackedStats() {
     displayCacheHits: 0,
     displayCacheMisses: 0,
     displayCacheEvictions: 0,
+    meshUpdateMode: "none",
+    meshId: 0,
+    meshReused: false,
+    meshUpdates: 0,
   };
 }
 
@@ -639,6 +753,10 @@ function pendingPackedStats(cache) {
     displayCacheHits: cache?.displayCache?.hits ?? 0,
     displayCacheMisses: cache?.displayCache?.misses ?? 0,
     displayCacheEvictions: cache?.displayCache?.evictions ?? 0,
+    meshUpdateMode: cache ? SPARK_MESH_UPDATE_MODE : "none",
+    meshId: 0,
+    meshReused: false,
+    meshUpdates: 0,
   };
 }
 
