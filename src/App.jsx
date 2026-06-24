@@ -470,6 +470,7 @@ export default function App() {
       data-renderer-route-kind={rendererRoute.kind}
       data-color-mode-role={rendererRoute.colorModeRole}
       data-source-preview-boundary={rendererRoute.sourceBoundary}
+      data-source-preview-result={rendererRoute.sourceResult}
       data-preview-quality={rendererRoute.qualityId}
       data-hard-mask-quality-interpretation={hardMaskQuality.interpretation}
       data-hard-mask-quality-source={hardMaskQuality.source}
@@ -852,6 +853,7 @@ export default function App() {
             <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="颜色用途" value={rendererRoute.colorRoleLabel} />
             <StateRow label="预览边界" value={rendererRoute.sourceBoundaryLabel} />
+            <StateRow label="删除结果" value={rendererRoute.sourceResultLabel} />
             <StateRow label="质量解释" value={hardMaskQuality.label} />
             <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
             <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
@@ -1030,16 +1032,30 @@ function rendererRouteContract({
         : "source-splat";
   const sourceBoundaryLabel =
     sourceBoundary === "hard-object-mask-no-reoptimize"
-      ? "对象 mask，无补洞"
+      ? "硬 mask，无补洞"
       : sourceBoundary === "source-splat"
         ? "原始 Splat"
         : "调试色";
+  const sourceResult =
+    sourceBoundary === "hard-object-mask-no-reoptimize"
+      ? "hard-mask-no-inpaint"
+      : sourceBoundary === "source-splat"
+        ? "source-splat"
+        : "diagnostic-preview";
+  const sourceResultLabel =
+    sourceResult === "hard-mask-no-inpaint"
+      ? "源色 mask 预览"
+      : sourceResult === "source-splat"
+        ? "完整源 Splat"
+        : "诊断预览";
 
   const base = {
     colorModeRole,
     colorRoleLabel,
     sourceBoundary,
     sourceBoundaryLabel,
+    sourceResult,
+    sourceResultLabel,
   };
 
   if (renderMode === "clustered") {
@@ -1094,7 +1110,7 @@ function rendererRouteContract({
       qualityLabel: useSparkNativeMaskRenderer ? "原生 Splat mask" : "SH packed mask",
       bannerTitle: "Spark 源色编辑",
       tone: "commercial",
-      title: "商业展示路线：自身颜色 + object mask，不做删除后重优化",
+      title: "商业展示路线：自身颜色 + hard object mask；删除后不补洞、不重优化",
     };
   }
 

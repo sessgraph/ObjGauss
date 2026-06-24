@@ -256,7 +256,7 @@ try {
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
-        `postDeleteRoute=${JSON.stringify(result.routeAfterDeleteId)}:${JSON.stringify(result.routeAfterDeleteKind)}:${JSON.stringify(result.colorModeRoleAfterDelete)}:${JSON.stringify(result.sourcePreviewBoundaryAfterDelete)}:${JSON.stringify(result.hardMaskQualityAfterDelete)} ` +
+        `postDeleteRoute=${JSON.stringify(result.routeAfterDeleteId)}:${JSON.stringify(result.routeAfterDeleteKind)}:${JSON.stringify(result.colorModeRoleAfterDelete)}:${JSON.stringify(result.sourcePreviewBoundaryAfterDelete)}:${JSON.stringify(result.sourcePreviewResultAfterDelete)}:${JSON.stringify(result.hardMaskQualityAfterDelete)} ` +
         `hardMaskQuality=${JSON.stringify(result.hardMaskQualityAfterDelete)}:${JSON.stringify(result.hardMaskQualitySourceAfterDelete)}:${result.hardMaskGapScoreAfterDelete}:${result.hardMaskResidualCoverageRatioAfterDelete}:${JSON.stringify(result.hardMaskDeletedObjectAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
@@ -1273,6 +1273,7 @@ async function runAudit(url, assetsToCheck, options) {
       const routeAfterDeleteKind = await appShell.getAttribute("data-renderer-route-kind");
       const colorModeRoleAfterDelete = await appShell.getAttribute("data-color-mode-role");
       const sourcePreviewBoundaryAfterDelete = await appShell.getAttribute("data-source-preview-boundary");
+      const sourcePreviewResultAfterDelete = await appShell.getAttribute("data-source-preview-result");
       const hardMaskQualityAfterDelete = await appShell.getAttribute("data-hard-mask-quality-interpretation");
       const hardMaskQualitySourceAfterDelete = await appShell.getAttribute("data-hard-mask-quality-source");
       const hardMaskGapScoreAfterDelete = finiteNumericValue(
@@ -1451,10 +1452,11 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (
         colorModeRoleAfterDelete !== "source-color" ||
-        sourcePreviewBoundaryAfterDelete !== "hard-object-mask-no-reoptimize"
+        sourcePreviewBoundaryAfterDelete !== "hard-object-mask-no-reoptimize" ||
+        sourcePreviewResultAfterDelete !== "hard-mask-no-inpaint"
       ) {
         throw new Error(
-          `${asset.id} delete preview did not expose source-color object-mask boundary: route=${routeAfterDeleteId}:${routeAfterDeleteKind} color=${colorModeRoleAfterDelete} boundary=${sourcePreviewBoundaryAfterDelete}`,
+          `${asset.id} delete preview did not expose source-color hard-mask boundary: route=${routeAfterDeleteId}:${routeAfterDeleteKind} color=${colorModeRoleAfterDelete} boundary=${sourcePreviewBoundaryAfterDelete} result=${sourcePreviewResultAfterDelete}`,
         );
       }
       const expectedHardMaskQuality =
@@ -1892,6 +1894,7 @@ async function runAudit(url, assetsToCheck, options) {
         routeAfterDeleteKind,
         colorModeRoleAfterDelete,
         sourcePreviewBoundaryAfterDelete,
+        sourcePreviewResultAfterDelete,
         hardMaskQualityAfterDelete,
         hardMaskQualitySourceAfterDelete,
         hardMaskGapScoreAfterDelete,

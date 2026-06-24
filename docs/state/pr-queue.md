@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005`: 针对用户反馈继续收敛 `自身颜色` hard-mask 预览的 UX copy，并评估 soft boundary / feathered object opacity 是否能降低删除后颗粒感。
+  - `DEMO-005B`: 评估 soft boundary / feathered object opacity 是否能降低删除后颗粒感，不能只靠文案解释。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005A: Source-color hard-mask preview UX contract
+
+- 状态: done / source-preview-copy
+- 类型: 微改动 / renderer UX contract
+- 目标: 回应 `自身颜色` 删除后仍有颗粒感的反馈，让 UI 明确区分颜色来源和删除结果，避免把 hard-mask 预览误解为补洞后的完整高斯重渲染。
+- 已实施:
+  - `src/App.jsx` 新增 `data-source-preview-result`，删除 / 隔离后的 source-color route 暴露为 `hard-mask-no-inpaint`。
+  - 状态面板新增 `删除结果`，删除后显示 `源色 mask 预览`；`预览边界` 改为更直接的 `硬 mask，无补洞`。
+  - `scripts/audit-demo.mjs` 验证删除后同时具备 `source-color`、`hard-object-mask-no-reoptimize` 和 `hard-mask-no-inpaint`。
+  - `docs/rendering/renderer-readiness-matrix.md` 记录 UI contract。
+- 结论:
+  - `自身颜色` 不再承担“删除后完整高斯效果”的含义；它只表示颜色来源，删除结果由 `删除结果` 和 `质量解释` 共同说明。
+  - 这不是视觉质量修复；真正降低颗粒感仍需要 soft mask、边界重分配、补洞或重优化。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5372`: passed；删除后 `postDeleteRoute="spark-native-mask":"commercial":"source-color":"hard-object-mask-no-reoptimize":"hard-mask-no-inpaint":"boundary-mixing-dominant"`。
+  - `git diff --check`: passed。
 
 ### DEMO-004: Poly Haven Chair commercial Gaussian sample registration
 

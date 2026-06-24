@@ -57,6 +57,8 @@ still show grain or holes because:
 This is a renderer/data-quality boundary, not a lost-color bug. If the active
 renderer label is `WebGPU Tile 编辑` or `Gaussian OIT 编辑`, the user is seeing a
 diagnostic approximation rather than the commercial Spark source/original route.
+The product UI exposes this boundary as `预览边界=硬 mask，无补洞` and
+`删除结果=源色 mask 预览`, backed by `data-source-preview-result`.
 
 ## WebGPU Default Switch Gate
 
