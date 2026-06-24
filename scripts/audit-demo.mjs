@@ -262,12 +262,13 @@ async function runAudit(url, assetsToCheck, options) {
       if (splatRendererId !== "spark-splat") {
         throw new Error(`${asset.id} did not expose Spark renderer id: ${splatRendererId}`);
       }
-      const sparkVisualStats = await canvasVisualStats(page, ".splatViewport canvas");
+      const screenshotOptions = { timeoutMs: 60000, usePageClip: true };
+      const sparkVisualStats = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
       validateCanvasVisualStats(asset.id, "Spark", sparkVisualStats);
 
       await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
       await waitForEditViewportReady(page);
-      const editOriginalVisualStats = await canvasVisualStats(page, ".viewport canvas");
+      const editOriginalVisualStats = await canvasVisualStats(page, ".viewport canvas", screenshotOptions);
       validateCanvasVisualStats(asset.id, "edit original", editOriginalVisualStats);
       const visualResidual = compareVisualStats(sparkVisualStats, editOriginalVisualStats);
       validateVisualResidual(asset.id, visualResidual);

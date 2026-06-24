@@ -69,6 +69,21 @@ The route also uses `f_dc_*` as Spark base color when SH rest is preserved, so
 object-colored `red/green/blue` debug fields do not pollute source-color
 filtered previews.
 
+RENDER-005T-AC adds a matching SH-capable full-view source for SH-heavy scenes.
+When the loaded scene has complete `f_rest_*` coefficients, `真实查看` uses the
+same Spark PLY packed path instead of the compact `.splat` export:
+
+```text
+SH-heavy object-aware PLY
+        -> Spark PLY SH source (`spark-ply-sh-source`)
+        -> full-view source screenshot
+        -> Spark PLY reconstruct probe
+        -> same-source residual gate
+```
+
+No-SH scenes continue to use the compact `.splat` full view, preserving the
+older smoke baseline.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -83,13 +98,18 @@ filtered previews.
   and `data-spark-sh-rest-preserved="false"`.
 - SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
   and require preserved count to match source SH Gaussian count.
+- In `真实查看`, SH-heavy assets expose
+  `data-object-filter="spark-ply-sh-source"` with the same
+  `packed-sh-extract-v1` / SH preservation telemetry. Use
+  `?spark-ply-source=off` to force the legacy compact `.splat` source for
+  diagnostics.
 
 Runtime DOM evidence:
 
 ```text
 data-renderer="spark-splat"
-data-object-filter="spark-filtered-ply-reconstruct"
-data-spark-filter-mode="ply-reconstruct"
+data-object-filter="spark-ply-sh-source|spark-filtered-ply-reconstruct"
+data-spark-filter-mode="ply-source|ply-reconstruct"
 data-spark-visible-gaussians="..."
 data-spark-removed-objects="..."
 data-spark-reconstruct-source="packed-extract-v1"
@@ -190,13 +210,29 @@ packed=255794/255794:165/71.9
 shRest=255794:255794:true:45:3
 ```
 
-That diagnostic still fails a visual residual gate against the registered
-`.splat` source (`coverageRatio=15.599172`, `lumaDelta=0.250533`) because the
-registered `.splat` is ObjGauss' compact splat export and does not carry the
-PLY's degree-3 SH rest. The PLY reconstruction is now preserving more
-view-dependent appearance information than the `.splat` baseline, so a stricter
-trained-sample gate needs an SH-preserving viewer source rather than the current
-legacy `.splat` file.
+Before RENDER-005T-AC, that diagnostic failed against the registered `.splat`
+source (`coverageRatio=15.599172`, `lumaDelta=0.250533`) because the `.splat`
+is ObjGauss' compact export and does not carry the PLY's degree-3 SH rest. The
+PLY reconstruction preserved more view-dependent appearance information than
+the `.splat` baseline, so the gate needed an SH-capable full-view source.
+
+After RENDER-005T-AC, the same trained residual gate passes with the SH-capable
+full-view PLY source:
+
+```bash
+node scripts/audit-spark-reconstruct-residual.mjs \
+  --assets nerf-lego-trained-output-local \
+  --output-dir /tmp/objgauss-spark-reconstruct-residual-trained-ac
+```
+
+```text
+spark_reconstruct_residual=passed
+fullSource="spark-ply-sh-source":"packed-sh-extract-v1":255794:255794:true:45:3
+reconstructSource="packed-sh-extract-v1"
+coverageRatio=1.170018
+lumaDelta=0.058189
+chromaDelta=0.007036
+```
 
 The optional multiscene check includes Plush semantic and is slower because it
 reconstructs 281k Gaussians through Spark:
@@ -217,13 +253,11 @@ visibleGaussians=281498
 
 ## Remaining Gaps
 
-- Replace the compact `.splat` viewer source for trained SH-heavy demos with an
-  SH-preserving source format / loader, or keep the PLY reconstruction as the
-  authoritative source-color path for those demos.
 - Replace reconstruction with a Spark-side object mask over the original packed
   source if Spark exposes a stable native masking surface.
-- Add a stricter SH-preserving residual gate once full-view and reconstructed
-  paths use the same SH-capable source representation.
+- Turn the SH-heavy residual check into a first-class npm script / acceptance
+  gate once the trained public sample is considered stable enough for CI/local
+  acceptance.
 - Add Spark-side selection / raycast-to-object mapping if viewport click
   selection should stay in Spark.
 - Avoid per-edit extracted `SplatMesh` allocation for high-frequency brushing;

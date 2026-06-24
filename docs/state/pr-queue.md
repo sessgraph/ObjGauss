@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AC`: 为 trained SH-heavy demo 建立 SH-capable full-view source / residual baseline，或把 Spark object filter 从 `PackedSplats.extractSplats` 过渡层推进到原始 packed source 上的 native object mask；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AD`: 评估并推进 Spark native object mask / persistent packed source，减少每次 visible-index extract 创建新 `SplatMesh` 的开销；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AC: Spark PLY SH full-view source baseline
+
+- 状态: done / sh-source-baseline-audited
+- 类型: 标准 PR / 前端渲染质量与验收
+- 目标: 为 trained SH-heavy demo 建立 SH-capable full-view source / residual baseline，避免继续用不携带 degree-3 SH rest 的 compact `.splat` 作为完整外观对照。
+- 已实施:
+  - `App` 在 `真实查看`、source/original、无 object edit active 且场景有完整 SH rest 时，自动使用 Spark PLY packed source，暴露 `data-object-filter="spark-ply-sh-source"`；`?spark-ply-source=off` 可强制回到 legacy compact `.splat` 诊断路径。
+  - `SplatViewport` 新增 `reconstructRole="source"`，区分 full-view PLY source 与 edit/filter reconstruction，source 路径仍复用 `packed-sh-extract-v1` 和 SH extra preservation。
+  - `audit-spark-reconstruct-residual` 允许 full source 为 `none` / `spark-ply-source` / `spark-ply-sh-source`，并对 SH full source 校验 route、visible count 和 preserved SH telemetry。
+  - `audit-demo` 的 canvas visual stats 改用 page clip + 60s timeout，避免大场景 SH source 在 element screenshot 稳定等待阶段误超时。
+- 结论:
+  - 默认 no-SH Lego proxy 不变：`fullSource="none":"none":0:0:false:0:0`，`reconstructSource="packed-extract-v1"`，residual gate 继续通过。
+  - 本机 trained Lego full-view source 已变成 SH-capable PLY source：`fullSource="spark-ply-sh-source":"packed-sh-extract-v1":255794:255794:true:45:3`。
+  - Trained same-source residual gate 通过：`coverageRatio=1.170018`、`lumaDelta=0.058189`、`chromaDelta=0.007036`，解决了 AB 后“PLY reconstruction 比 compact `.splat` baseline 保留更多 SH，导致 residual 失败”的基准不一致问题。
+  - Trained browser interaction audit 通过，真实查看非背景像素提升到 `70188`，删除后继续保留 `sparkPacked="packed-sh-extract-v1"`、`sparkShRest=255794:255794:"true":45:3`。
+- 验证:
+  - `node --check scripts/audit-spark-reconstruct-residual.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `node scripts/audit-spark-reconstruct-residual.mjs --assets nerf-lego-trained-output-local --output-dir /tmp/objgauss-spark-reconstruct-residual-trained-ac`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5294/ --no-server`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5294/ --no-server`: passed。
 
 ### RENDER-005T-AB: Spark packed SH-rest preservation
 

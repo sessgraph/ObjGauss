@@ -22,6 +22,7 @@ const DEFAULT_THRESHOLDS = {
 };
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
+const SPARK_FULL_SOURCE_FILTERS = ["none", "spark-ply-source", "spark-ply-sh-source"];
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -77,6 +78,7 @@ try {
         `coverageRatio=${result.residual.coverageRatio} ` +
         `lumaDelta=${result.residual.lumaDelta} ` +
         `chromaDelta=${result.residual.chromaDelta} ` +
+        `fullSource=${JSON.stringify(result.fullObjectFilter)}:${JSON.stringify(result.fullReconstructSource)}:${result.fullShRestSourceGaussians}:${result.fullShRestPreservedGaussians}:${result.fullShRestPreserved}:${result.fullShRestCoefficientCount}:${result.fullShDegree} ` +
         `objectFilter=${JSON.stringify(result.objectFilter)} ` +
         `reconstructSource=${JSON.stringify(result.reconstructSource)} ` +
         `visibleGaussians=${result.visibleGaussians} ` +
@@ -143,13 +145,54 @@ async function auditAsset({ asset, baseUrl, headed, thresholds: gateThresholds }
       asset.fileName,
       { timeout: 15000 },
     );
-    await waitForSparkViewport(page, "none");
+    await waitForSparkViewport(page, SPARK_FULL_SOURCE_FILTERS, 60000);
+    await page.waitForTimeout(1000);
     const screenshotOptions = { timeoutMs: 60000, usePageClip: true };
     const fullStats = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
     validateCanvasVisualStats(asset.id, "full Spark", fullStats);
+    const fullViewport = page.locator(".viewport").first();
+    const fullObjectFilter = await fullViewport.getAttribute("data-object-filter");
+    const fullReconstructSource = await fullViewport.getAttribute("data-spark-reconstruct-source");
+    const fullVisibleGaussians = numericValue(
+      await fullViewport.getAttribute("data-spark-visible-gaussians") ?? "0",
+    );
+    const fullPackedBaseGaussians = numericValue(
+      await fullViewport.getAttribute("data-spark-packed-base-gaussians") ?? "0",
+    );
+    const fullPackedVisibleIndices = numericValue(
+      await fullViewport.getAttribute("data-spark-packed-visible-indices") ?? "0",
+    );
+    const fullShRestSourceGaussians = numericValue(
+      await fullViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0",
+    );
+    const fullShRestPreservedGaussians = numericValue(
+      await fullViewport.getAttribute("data-spark-sh-rest-preserved-gaussians") ?? "0",
+    );
+    const fullShRestPreserved = await fullViewport.getAttribute("data-spark-sh-rest-preserved");
+    const fullShRestCoefficientCount = numericValue(
+      await fullViewport.getAttribute("data-spark-sh-rest-coefficients") ?? "0",
+    );
+    const fullShDegree = numericValue(await fullViewport.getAttribute("data-spark-sh-degree") ?? "0");
+    if (
+      fullObjectFilter === "spark-ply-sh-source" &&
+      (fullReconstructSource !== SPARK_RECONSTRUCT_SH_SOURCE ||
+        fullVisibleGaussians <= 0 ||
+        fullPackedBaseGaussians !== fullVisibleGaussians ||
+        fullPackedVisibleIndices !== fullVisibleGaussians ||
+        fullShRestSourceGaussians <= 0 ||
+        fullShRestPreservedGaussians !== fullShRestSourceGaussians ||
+        fullShRestPreserved !== "true" ||
+        fullShRestCoefficientCount <= 0 ||
+        fullShDegree <= 0)
+    ) {
+      throw new Error(
+        `${asset.id} Spark PLY SH full source contract failed: filter=${fullObjectFilter} route=${fullReconstructSource} visible=${fullVisibleGaussians} packed=${fullPackedBaseGaussians}/${fullPackedVisibleIndices} shRest=${fullShRestSourceGaussians}:${fullShRestPreservedGaussians}:${fullShRestPreserved}:${fullShRestCoefficientCount}:${fullShDegree}`,
+      );
+    }
 
     await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
     await waitForSparkViewport(page, "spark-ply-reconstruct");
+    await page.waitForTimeout(1000);
     const reconstructStats = await canvasVisualStats(page, ".viewport canvas", screenshotOptions);
     validateCanvasVisualStats(asset.id, "PLY reconstructed Spark", reconstructStats);
 
@@ -220,6 +263,16 @@ async function auditAsset({ asset, baseUrl, headed, thresholds: gateThresholds }
       full: fullStats,
       reconstruct: reconstructStats,
       residual,
+      fullObjectFilter,
+      fullReconstructSource,
+      fullVisibleGaussians,
+      fullPackedBaseGaussians,
+      fullPackedVisibleIndices,
+      fullShRestSourceGaussians,
+      fullShRestPreservedGaussians,
+      fullShRestPreserved,
+      fullShRestCoefficientCount,
+      fullShDegree,
       objectFilter,
       reconstructSource,
       visibleGaussians,
@@ -296,12 +349,12 @@ function markdownReport(summary) {
     "",
     `Mode: \`${summary.mode}\``,
     "",
-    "| Asset | Gate | Coverage Ratio | Luma Delta | Chroma Delta | Object Filter | Route | Visible | Extract ms | SH Rest |",
-    "| --- | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | --- |",
+    "| Asset | Gate | Coverage Ratio | Luma Delta | Chroma Delta | Full Source | Object Filter | Route | Visible | Extract ms | SH Rest |",
+    "| --- | --- | ---: | ---: | ---: | --- | --- | --- | ---: | ---: | --- |",
   ];
   for (const result of summary.results) {
     lines.push(
-      `| ${result.assetId} | ${result.passed ? "pass" : "fail"} | ${result.residual.coverageRatio} | ${result.residual.lumaDelta} | ${result.residual.chromaDelta} | ${result.objectFilter} | ${result.reconstructSource} | ${result.visibleGaussians} | ${result.packedExtractMs} | ${result.shRestSourceGaussians}/${result.shRestPreservedGaussians}/${result.shRestPreserved}/${result.shRestCoefficientCount}/${result.shDegree} |`,
+      `| ${result.assetId} | ${result.passed ? "pass" : "fail"} | ${result.residual.coverageRatio} | ${result.residual.lumaDelta} | ${result.residual.chromaDelta} | ${result.fullObjectFilter}:${result.fullReconstructSource} | ${result.objectFilter} | ${result.reconstructSource} | ${result.visibleGaussians} | ${result.packedExtractMs} | ${result.shRestSourceGaussians}/${result.shRestPreservedGaussians}/${result.shRestPreserved}/${result.shRestCoefficientCount}/${result.shDegree} |`,
     );
   }
   lines.push(
@@ -313,7 +366,7 @@ function markdownReport(summary) {
     `- maxLumaDelta: ${summary.thresholds.maxLumaDelta}`,
     `- maxChromaDelta: ${summary.thresholds.maxChromaDelta}`,
     "",
-    "Interpretation: this is a smoke residual gate for the Spark PLY reconstruction path. It proves the reconstructed Spark route is rendered and measurable; stricter fidelity thresholds should be added after SH-rest preservation is implemented.",
+    "Interpretation: this is a smoke residual gate for the Spark PLY reconstruction path. No-SH samples compare compact `.splat` full view against PLY reconstruction; SH-heavy samples can use a Spark PLY SH full-view source so full and reconstructed paths share the same SH-capable source representation.",
   );
   return `${lines.join("\n")}\n`;
 }
@@ -325,16 +378,17 @@ function urlWithSparkReconstructProbe(url) {
 }
 
 async function waitForSparkViewport(page, objectFilter, timeoutMs = 15000) {
+  const expectedFilters = Array.isArray(objectFilter) ? objectFilter : [objectFilter];
   await page.waitForFunction(
-    (expectedObjectFilter) => {
+    (expectedObjectFilters) => {
       const viewport = document.querySelector(".viewport");
       return (
         viewport?.getAttribute("data-renderer") === "spark-splat" &&
-        viewport.getAttribute("data-object-filter") === expectedObjectFilter &&
+        expectedObjectFilters.includes(viewport.getAttribute("data-object-filter")) &&
         viewport.getAttribute("data-spark-filter-status") === "ready"
       );
     },
-    objectFilter,
+    expectedFilters,
     { timeout: timeoutMs },
   );
 }

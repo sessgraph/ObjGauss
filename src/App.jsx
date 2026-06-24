@@ -114,6 +114,7 @@ export default function App() {
   const webGpuCameraTuning = useMemo(readWebGpuCameraTuning, []);
   const webGpuColorTuning = useMemo(readWebGpuColorTuning, []);
   const sparkReconstructProbe = useMemo(readSparkReconstructProbe, []);
+  const sparkPlySourceMode = useMemo(readSparkPlySourceMode, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -162,17 +163,26 @@ export default function App() {
     [isolatedId, removedIds, sceneObjectIds, visibleIds],
   );
   const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
+  const canUseSparkPlySourceRenderer =
+    hasSplatRenderer &&
+    renderMode === "original" &&
+    !objectEditActive &&
+    webGpuColorTuning.colorMode === "source" &&
+    sparkPlySourceMode !== "off" &&
+    (sparkPlySourceMode === "force" || sceneHasShRestSource(scene));
   const canUseSparkFilteredRenderer =
     hasSplatRenderer &&
     renderMode === "original" &&
     (objectEditActive || sparkReconstructProbe) &&
     webGpuColorTuning.colorMode === "source";
-  const useSplatRenderer = viewMode === "view" && canUseSplatRenderer;
+  const useSparkPlySourceRenderer = viewMode === "view" && canUseSparkPlySourceRenderer;
+  const useSplatRenderer = viewMode === "view" && canUseSplatRenderer && !useSparkPlySourceRenderer;
   const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
+  const useSparkPointRenderer = useSparkPlySourceRenderer || useSparkFilteredRenderer;
   const waitForEditRenderer =
-    !useSplatRenderer && !useSparkFilteredRenderer && webGpuCapability.status === "pending";
+    !useSplatRenderer && !useSparkPointRenderer && webGpuCapability.status === "pending";
   const useWebGpuTileRenderer =
-    !useSplatRenderer && !useSparkFilteredRenderer && editRenderer.rendererId === "webgpu-tile";
+    !useSplatRenderer && !useSparkPointRenderer && editRenderer.rendererId === "webgpu-tile";
   const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
   const webGpuRuntimeViewportRequest = useMemo(readWebGpuRuntimeViewportRequest, []);
   const [webGpuRuntimeDisplaySize, setWebGpuRuntimeDisplaySize] = useState({ width: 0, height: 0 });
@@ -243,6 +253,8 @@ export default function App() {
   );
   const activeRendererText = useSplatRenderer
     ? "真实 Splat"
+    : useSparkPlySourceRenderer
+      ? "Spark PLY SH 源"
     : useSparkFilteredRenderer
       ? objectEditActive
         ? "Spark 过滤 Splat"
@@ -594,7 +606,7 @@ export default function App() {
         </aside>
 
         <section className="viewerStage" aria-label="3D 视图">
-          {!useSplatRenderer && (
+          {!useSplatRenderer && !useSparkPlySourceRenderer && (
             <div className="viewportBanner">
               <strong>对象编辑预览</strong>
               <span>{renderModeText} / {activeRendererText}</span>
@@ -606,17 +618,18 @@ export default function App() {
               ) : null}
             </div>
           )}
-          {useSplatRenderer || useSparkFilteredRenderer ? (
+          {useSplatRenderer || useSparkPointRenderer ? (
             <SplatViewport
               source={scene.splatSource}
-              points={useSparkFilteredRenderer ? scene.points : null}
-              shRestCoefficients={useSparkFilteredRenderer ? scene.shRestCoefficients : null}
-              shRestCoefficientCount={useSparkFilteredRenderer ? scene.shRestCoefficientCount : 0}
+              points={useSparkPointRenderer ? scene.points : null}
+              shRestCoefficients={useSparkPointRenderer ? scene.shRestCoefficients : null}
+              shRestCoefficientCount={useSparkPointRenderer ? scene.shRestCoefficientCount : 0}
               visibleIds={useSparkFilteredRenderer ? visibleIds : null}
               removedIds={useSparkFilteredRenderer ? removedIds : null}
               isolatedId={useSparkFilteredRenderer ? isolatedId : null}
               renderMode={renderMode}
-              filtered={useSparkFilteredRenderer}
+              filtered={useSparkPointRenderer}
+              reconstructRole={useSparkPlySourceRenderer ? "source" : "filter"}
               showGrid={showGrid}
               showAxes={showAxes}
               pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
@@ -970,6 +983,28 @@ function readSparkReconstructProbe() {
   if (typeof window === "undefined") return false;
   const value = new URLSearchParams(window.location.search).get("spark-reconstruct-probe");
   return ["1", "true", "yes", "on"].includes(String(value ?? "").toLowerCase());
+}
+
+function readSparkPlySourceMode() {
+  if (typeof window === "undefined") return "auto";
+  const value = String(
+    new URLSearchParams(window.location.search).get("spark-ply-source") ?? "auto",
+  ).toLowerCase();
+  if (["0", "false", "no", "off"].includes(value)) return "off";
+  if (["1", "true", "yes", "on", "force"].includes(value)) return "force";
+  return "auto";
+}
+
+function sceneHasShRestSource(scene) {
+  const coefficientCount = Number(scene?.shRestCoefficientCount ?? 0);
+  if (!Number.isFinite(coefficientCount) || coefficientCount < 9) return false;
+  const gaussianCount = scene?.points?.length ?? 0;
+  const shRestCoefficients = scene?.shRestCoefficients;
+  return Boolean(
+    shRestCoefficients &&
+      typeof shRestCoefficients.length === "number" &&
+      shRestCoefficients.length >= gaussianCount * coefficientCount,
+  );
 }
 
 function buildWebGpuRuntimeViewport({ probe, request, displaySize, gaussianCount }) {

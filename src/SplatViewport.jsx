@@ -22,6 +22,7 @@ export default function SplatViewport({
   showAxes,
   pointCount,
   rendererLabel,
+  reconstructRole = "filter",
 }) {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -39,6 +40,7 @@ export default function SplatViewport({
       return [
         "filtered",
         points?.length ?? 0,
+        reconstructRole,
         visibleKey,
         removedKey,
         isolatedId ?? "all",
@@ -48,7 +50,7 @@ export default function SplatViewport({
     if (source?.url) return source.url;
     if (source?.fileName) return `${source.fileName}:${source.fileBytes?.byteLength ?? 0}`;
     return "none";
-  }, [filtered, isolatedId, points, removedIds, renderMode, source, visibleIds]);
+  }, [filtered, isolatedId, points, reconstructRole, removedIds, renderMode, source, visibleIds]);
 
   const filteredStats = useMemo(
     () =>
@@ -59,6 +61,7 @@ export default function SplatViewport({
             removedIds,
             isolatedId,
             renderMode,
+            reconstructRole,
           })
         : {
             mode: "none",
@@ -70,9 +73,16 @@ export default function SplatViewport({
             colorSourceGaussians: 0,
             objectColorGaussians: 0,
           },
-    [filtered, isolatedId, points, removedIds, renderMode, visibleIds],
+    [filtered, isolatedId, points, reconstructRole, removedIds, renderMode, visibleIds],
   );
-  const objectFilter = filtered ? filteredStats.objectFilter : "none";
+  const objectFilter = filtered
+    ? sparkObjectFilter({ filteredStats, packedStats, reconstructRole })
+    : "none";
+  const sparkFilterMode = filtered
+    ? reconstructRole === "source"
+      ? "ply-source"
+      : "ply-reconstruct"
+    : "none";
 
   const packedCache = useMemo(() => {
     if (!filtered) return null;
@@ -257,7 +267,7 @@ export default function SplatViewport({
       className="viewport splatViewport"
       data-renderer="spark-splat"
       data-object-filter={objectFilter}
-      data-spark-filter-mode={filtered ? "ply-reconstruct" : "none"}
+      data-spark-filter-mode={sparkFilterMode}
       data-spark-filter-status={status === "就绪" ? "ready" : "pending"}
       data-spark-visible-gaussians={filteredStats.visibleGaussians}
       data-spark-filtered-gaussians={filteredStats.filteredGaussians}
@@ -308,6 +318,7 @@ function buildFilteredSplatStats({
   removedIds,
   isolatedId,
   renderMode,
+  reconstructRole,
 }) {
   const allObjectIds = new Set();
   const hiddenObjectIds = new Set();
@@ -322,7 +333,12 @@ function buildFilteredSplatStats({
   }
   return {
     mode: "ply-reconstruct",
-    objectFilter: hiddenObjectIds.size > 0 ? "spark-filtered-ply-reconstruct" : "spark-ply-reconstruct",
+    objectFilter:
+      reconstructRole === "source"
+        ? "spark-ply-source"
+        : hiddenObjectIds.size > 0
+          ? "spark-filtered-ply-reconstruct"
+          : "spark-ply-reconstruct",
     visibleGaussians,
     filteredGaussians: Math.max(0, (points?.length ?? 0) - visibleGaussians),
     hiddenObjects: hiddenObjectIds.size,
@@ -332,6 +348,11 @@ function buildFilteredSplatStats({
     objectColorGaussians: renderMode === "original" ? 0 : visibleGaussians,
     objectCount: allObjectIds.size,
   };
+}
+
+function sparkObjectFilter({ filteredStats, packedStats, reconstructRole }) {
+  if (reconstructRole !== "source") return filteredStats.objectFilter;
+  return packedStats.shRestPreserved ? "spark-ply-sh-source" : "spark-ply-source";
 }
 
 function buildPackedSplatCache({
