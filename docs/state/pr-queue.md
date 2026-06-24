@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005I`: 将 remap browser residual gate 扩展到 Plush semantic 与 Poly Haven Chair commercial sample，形成多场景 promotion table；只有多场景残差和 non-target preservation 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
+  - `DEMO-005J`: 将 remap browser residual gate 从每场景 top-1 candidate 扩展为 top-N target sweep，覆盖每个场景多个高风险 remap pair；只有 top-N sweep 和多场景 promotion table 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005I: Multi-scene object boundary remap residual promotion table
+
+- 状态: done / multi-scene-browser-evidence
+- 类型: 标准 PR / renderer quality browser audit
+- 目标: 将 remap browser residual gate 扩展到 Plush semantic 与 Poly Haven Chair commercial sample，形成多场景 promotion table；只有多场景残差和 non-target preservation 都稳定时，才考虑 cleaned preview PLY 的默认化或公开样例替换。
+- 已实施:
+  - `scripts/audit-object-boundary-remap-residual.mjs` 默认资产扩展为 `nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local`。
+  - 新增 `minSceneCount`、可选 `--max-remap-samples`、skipped asset 记录和 aggregate promotion summary。
+  - 浏览器 console 过滤补充上传 PLY source preload 阶段的已知 Spark worker 噪声 `Missing f_dc_0 property`；真正的编辑 route contract 仍要求 `spark-splat` / `ply-packed` / `object-opacity-texture-v1`。
+- 结论:
+  - 默认三场景 gate 通过，rows=`6`，comparisons=`3`，skipped=`0`。
+  - Lego proxy: target object=`2`，hidden delta=`-49`，after residual=`0.999216/0.004332/0.019990`。
+  - Plush semantic: target object=`1`，hidden delta=`-2786`，after residual=`0.999355/0.000070/0.000117`。
+  - Poly Haven Chair: target object=`1`，hidden delta=`-29`，after residual=`0.999800/0.000048/0.000059`。
+  - Aggregate recommendation=`do-not-promote-default-hard-mask`，promotion=`false`；当前证据说明 sampled remap preview 没有明显伤害 top candidate object 的删除预览，但还不能默认替换 public samples。
+- 验证:
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `npm run audit:object-boundary-remap-residual -- --output-dir /tmp/objgauss-object-boundary-remap-residual-multiscene --port 5397 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005H: Object boundary remap browser residual gate
 

@@ -123,11 +123,13 @@ canvas visual stats, and writes:
 /tmp/objgauss-object-boundary-remap-residual/summary.md
 ```
 
-Current Lego proxy result: the gate passes, but the recommendation is
-`browser-evidence-only`, not promotion. The remap preview hides `49` fewer
-Gaussians for target object `2` and stays within residual thresholds
-(`after=0.999216/0.004332/0.019990`), but this is still single-scene evidence
-and does not prove non-target preservation across Plush or commercial Chair.
+Current default result: Lego proxy, Plush semantic, and Poly Haven Chair all
+pass the browser route and residual threshold checks, but the aggregate
+recommendation is still `do-not-promote-default-hard-mask`, not promotion. The
+remap previews hide `49` / `2786` / `29` fewer target-object Gaussians and keep
+after-delete residual max at `0.000784/0.004332/0.019990`. This is evidence that
+the sampled remap preview is not obviously harmful on the tested top candidate
+object per scene; it does not prove every high-risk object pair is safe.
 
 ## WebGPU Default Switch Gate
 

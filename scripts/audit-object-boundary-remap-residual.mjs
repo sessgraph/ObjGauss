@@ -13,7 +13,8 @@ import {
 } from "./lib/visual-stats.mjs";
 
 const MODE = "object-boundary-remap-browser-residual-v1";
-const DEFAULT_ASSETS = "nerf-lego-alpha-closure-local";
+const DEFAULT_ASSETS =
+  "nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local";
 const DEFAULT_OUTPUT_DIR = "/tmp/objgauss-object-boundary-remap-residual";
 const DEFAULT_PORT = 5395;
 const SPARK_OBJECT_FILTER = "spark-object-opacity-mask";
@@ -29,6 +30,8 @@ const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
 const noServer = flagEnabled(args.noServer ?? args["no-server"]) || Boolean(args.url);
 const headed = flagEnabled(args.headed ?? args.headful);
 const includeVisualStats = !flagEnabled(args.skipVisualStats ?? args["skip-visual-stats"]);
+const minSceneCount = positiveInteger(args.minSceneCount ?? args["min-scene-count"] ?? 2);
+const maxRemapSamples = positiveIntegerOrNull(args.maxRemapSamples ?? args["max-remap-samples"]);
 const maxAfterCoverageDelta = nonNegativeNumber(
   args.maxAfterCoverageDelta ?? args["max-after-coverage-delta"] ?? 0.08,
 );
@@ -48,14 +51,17 @@ const summary = {
   assets: assetIds.split(",").map((entry) => entry.trim()).filter(Boolean),
   includeVisualStats,
   thresholds: {
+    minSceneCount,
     maxAfterCoverageDelta,
     maxAfterLumaDelta,
     maxAfterChromaDelta,
   },
   preview: null,
+  skipped: [],
   rows: [],
   comparisons: [],
   recommendations: [],
+  promotion: null,
   commands: [],
   failures: [],
   passed: false,
@@ -70,8 +76,12 @@ try {
   const previewResults = (summary.preview.results ?? []).filter(
     (result) => result.outputPly && existsSync(result.outputPly),
   );
+  summary.skipped = summary.preview.skipped ?? [];
   if (previewResults.length === 0) {
     throw new Error("no remap preview PLY was generated");
+  }
+  if (previewResults.length < minSceneCount) {
+    throw new Error(`not enough remap preview scenes: ${previewResults.length}/${minSceneCount}`);
   }
 
   if (!skipBuild) {
@@ -98,6 +108,11 @@ try {
   summary.rows = result.rows;
   summary.comparisons = result.comparisons;
   summary.recommendations = buildRecommendations(summary.comparisons);
+  summary.promotion = buildPromotionSummary({
+    comparisons: summary.comparisons,
+    recommendations: summary.recommendations,
+    sceneCount: previewResults.length,
+  });
   summary.passed =
     summary.failures.length === 0 &&
     summary.rows.length === previewResults.length * 2 &&
@@ -118,7 +133,7 @@ if (!summary.passed) {
 }
 
 async function generatePreviewPlys() {
-  await runCommand({
+  const command = {
     label: "Generate remap preview PLY",
     command: [
       "node",
@@ -128,7 +143,11 @@ async function generatePreviewPlys() {
       "--output-dir",
       previewDir,
     ],
-  });
+  };
+  if (maxRemapSamples !== null) {
+    command.command.push("--max-remap-samples", String(maxRemapSamples));
+  }
+  await runCommand(command);
   const summaryPath = path.join(previewDir, "summary.json");
   if (!existsSync(summaryPath)) {
     throw new Error(`remap preview summary is missing: ${summaryPath}`);
@@ -187,7 +206,9 @@ async function runBrowserResidualGate({ baseUrl, outputDir, previewResults, head
         !issue.includes("No available adapters.") &&
         !issue.includes("Worker terminate") &&
         !issue.includes("Missing rot_0 property") &&
-        !issue.includes("Worker error: Missing rot_0 property"),
+        !issue.includes("Worker error: Missing rot_0 property") &&
+        !issue.includes("Missing f_dc_0 property") &&
+        !issue.includes("Worker error: Missing f_dc_0 property"),
     );
     if (relevantIssues.length > 0) {
       throw new Error(`browser console issues:\n${relevantIssues.join("\n")}`);
@@ -514,6 +535,48 @@ function buildRecommendations(comparisons) {
   });
 }
 
+function buildPromotionSummary({ comparisons, recommendations, sceneCount }) {
+  const passedScenes = comparisons.filter((comparison) => comparison.passed).length;
+  const promotableScenes = recommendations.filter(
+    (recommendation) => recommendation.promotionCandidate,
+  ).length;
+  const maxAfterCoverageDistance = maxOrZero(
+    comparisons.map((comparison) => Math.abs(comparison.afterDelta.coverageRatio - 1)),
+  );
+  const maxAfterLumaDelta = maxOrZero(
+    comparisons.map((comparison) => comparison.afterDelta.lumaDelta),
+  );
+  const maxAfterChromaDelta = maxOrZero(
+    comparisons.map((comparison) => comparison.afterDelta.chromaDelta),
+  );
+  const meanHiddenDeltaShare = meanOrZero(
+    comparisons.map((comparison) => comparison.hiddenGaussianDeltaShare),
+  );
+  const promotionCandidate =
+    includeVisualStats &&
+    sceneCount >= minSceneCount &&
+    passedScenes === sceneCount &&
+    promotableScenes === sceneCount;
+  return {
+    sceneCount,
+    minSceneCount,
+    passedScenes,
+    promotableScenes,
+    confidence: includeVisualStats ? "browser-visual-stats" : "telemetry-only",
+    maxAfterCoverageDistance,
+    maxAfterLumaDelta,
+    maxAfterChromaDelta,
+    meanHiddenDeltaShare,
+    promotionCandidate,
+    recommendation: promotionCandidate
+      ? "candidate-for-cleaned-ply-review"
+      : "do-not-promote-default-hard-mask",
+    reason: promotionCandidate
+      ? "all scenes preserve browser residual and hide fewer target Gaussians"
+      : "multi-scene evidence is insufficient for replacing public samples",
+  };
+}
+
 function chooseTargetObjectId(preview) {
   const pair = preview.remapPairs?.[0];
   if (Number.isFinite(pair?.fromObject)) return pair.fromObject;
@@ -543,6 +606,7 @@ function renderMarkdown(payload) {
     `- Mode: ${payload.mode}`,
     `- Generated: ${payload.generatedAt}`,
     `- Assets: ${payload.assets.join(", ")}`,
+    `- Skipped assets: ${payload.skipped.map((asset) => asset.assetId).join(", ") || "none"}`,
     `- URL: ${payload.url}`,
     `- Preview dir: ${payload.previewDir}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
@@ -573,6 +637,17 @@ function renderMarkdown(payload) {
         `| ${escapeMarkdown(comparison.assetId)} | ${comparison.targetObjectId} | ${comparison.passed ? "yes" : "no"} | ${comparison.hiddenGaussianDelta} | ${formatNumber(comparison.hiddenGaussianDeltaShare)} | ${formatNumber(comparison.afterDelta.coverageRatio)} | ${formatNumber(comparison.afterDelta.lumaDelta)} | ${formatNumber(comparison.afterDelta.chromaDelta)} | ${formatNumber(comparison.deleteDeltaChange.coverageRatio)} | ${formatNumber(comparison.deleteDeltaChange.lumaDelta)} | ${formatNumber(comparison.deleteDeltaChange.chromaDelta)} |`,
       );
     }
+  }
+
+  lines.push("", "## Promotion Summary", "");
+  if (!payload.promotion) {
+    lines.push("No promotion summary available.");
+  } else {
+    lines.push(
+      "| Scenes | Passed | Promotable | Recommendation | Promotion candidate | Max coverage distance | Max luma | Max chroma | Mean hidden share | Reason |",
+      "| ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |",
+      `| ${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} | ${payload.promotion.passedScenes} | ${payload.promotion.promotableScenes} | ${escapeMarkdown(payload.promotion.recommendation)} | ${payload.promotion.promotionCandidate ? "yes" : "no"} | ${formatNumber(payload.promotion.maxAfterCoverageDistance)} | ${formatNumber(payload.promotion.maxAfterLumaDelta)} | ${formatNumber(payload.promotion.maxAfterChromaDelta)} | ${formatNumber(payload.promotion.meanHiddenDeltaShare)} | ${escapeMarkdown(payload.promotion.reason)} |`,
+    );
   }
 
   lines.push("", "## Recommendations", "");
@@ -619,6 +694,14 @@ function printSummary(payload) {
     console.log(
       `object_boundary_remap_residual_recommendation asset=${JSON.stringify(recommendation.assetId)} ` +
         `recommendation=${JSON.stringify(recommendation.recommendation)} promotion=${recommendation.promotionCandidate}`,
+    );
+  }
+  if (payload.promotion) {
+    console.log(
+      `object_boundary_remap_residual_promotion recommendation=${JSON.stringify(payload.promotion.recommendation)} ` +
+        `promotion=${payload.promotion.promotionCandidate} scenes=${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} ` +
+        `passed=${payload.promotion.passedScenes} promotable=${payload.promotion.promotableScenes} ` +
+        `max=${payload.promotion.maxAfterCoverageDistance}/${payload.promotion.maxAfterLumaDelta}/${payload.promotion.maxAfterChromaDelta}`,
     );
   }
   for (const failure of payload.failures) {
@@ -779,10 +862,35 @@ function nonNegativeNumber(value) {
   return numeric;
 }
 
+function positiveInteger(value) {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric <= 0) {
+    throw new Error(`expected positive integer, received ${JSON.stringify(value)}`);
+  }
+  return numeric;
+}
+
+function positiveIntegerOrNull(value) {
+  if (value === undefined || value === null || value === false || value === "") return null;
+  return positiveInteger(value);
+}
+
 function roundMetric(value, digits = 6) {
   if (!Number.isFinite(value)) return 0;
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
+}
+
+function meanOrZero(values) {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return 0;
+  return roundMetric(finite.reduce((sum, value) => sum + value, 0) / finite.length);
+}
+
+function maxOrZero(values) {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return 0;
+  return roundMetric(Math.max(...finite));
 }
 
 function safeFileName(value) {

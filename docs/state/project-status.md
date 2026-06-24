@@ -122,6 +122,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - DEMO-005F 已新增 object boundary cleanup candidate report：`npm run audit:object-boundary-cleanup` 默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，在 hard-mask boundary diagnostic 中输出 `object-boundary-cleanup-candidate-v1`，定位值得做 assignment cleanup / remap review 的 object 子集；该报告只读，不自动改 PLY。
   - DEMO-005G 已新增 object boundary remap preview export：`npm run audit:object-boundary-remap-preview` 可生成保留原始 PLY 属性、仅 patch sampled `object_id` 的 `/tmp` preview PLY，用于下一步 browser residual gate；该实验不改默认样例、不证明视觉质量改善。
   - DEMO-005H 已新增 object boundary remap browser residual gate：`npm run audit:object-boundary-remap-residual` 会先生成 sampled remap preview PLY，再用 Playwright 上传原始 PLY 与 remap-preview PLY，强制同一 PLY-packed Spark object-mask route，删除 top remap candidate object 并比较 before/after canvas stats。Lego proxy gate 通过：target object=`2`，remap-preview 少隐藏 `49` 个 Gaussian，after-delete residual=`0.999216/0.004332/0.019990`，recommendation=`browser-evidence-only`，因此仍不默认替换样例。
+  - DEMO-005I 已将 object boundary remap residual gate 扩展为默认三场景 promotion table：Lego proxy、Plush semantic、Poly Haven Chair 全部通过同一 PLY-packed Spark route browser gate，remap-preview 分别少隐藏 `49` / `2786` / `29` 个 Gaussian，after-delete residual max=`0.000784/0.004332/0.019990`；aggregate recommendation=`do-not-promote-default-hard-mask`，说明 remap preview 当前可作为证据，不作为默认样例替换。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
