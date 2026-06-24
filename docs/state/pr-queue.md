@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AL`: 补 Spark-side selection / object-list selection 的产品路径决策。现在 no-SH source/original edit 默认已走 native compact `.splat` mask，但 Spark 画布点击选中仍依赖编辑 renderer；下一步要决定商业 demo 是否接受对象列表选中，或实现 Spark raycast / screen-pick 到 object_id。
+  - `RENDER-005T-AM`: 为 Spark `screen-space-object-pick-v1` 补选择 hit-rate / ambiguity gate，并决定是否需要 selected-object visual affordance；当前已可在 Spark 画布点击选中可见 object，但仍不是 Spark-internal raycast。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AL: Spark canvas object selection product path
+
+- 状态: done / spark-canvas-selection-audited
+- 类型: 标准 PR / 前端对象交互
+- 目标: 在 no-SH native `.splat` mask 默认化之后，补上 Spark source/original edit 路径里的画布选择交互，避免商业 demo 只能依赖对象列表选择。
+- 已实施:
+  - `SplatViewport` 新增 `screen-space-object-pick-v1`：点击 Spark canvas 时，把 object-aware PLY Gaussian 投影到当前 Spark camera，选择最近的可见 `object_id`。
+  - Spark viewport 暴露 `data-spark-selection-mode` 和 `data-spark-selected-object`，browser audit 可直接检查选中状态。
+  - `App` 只在 Spark filtered object edit 路径传入 `selectedId` / `onSelectObject`，真实查看不改变行为。
+  - `audit-demo` 在删除后继续点击 Spark canvas，要求所选对象从已删除对象切到一个可见对象。
+- 结论:
+  - Lego no-SH native route 删除后通过 Spark canvas 重新选中对象：`sparkCanvasSelectedObject=0`，同时保持 `sparkMaskSource="native-splat"`。
+  - Trained SH-heavy packed route 删除后也通过 Spark canvas 重新选中对象：`sparkCanvasSelectedObject=3`，同时保持 `sparkMaskSource="ply-packed"` 和 `sparkShRest=255794:255794:"true":45:3`。
+  - 这是一条基于 object-aware PLY metadata 的产品级 screen-space pick，不是 Spark 内部 raycast；下一步如果要宣称 renderer-native picking，需要补 hit-rate / ambiguity gate。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5313/ --no-server`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5313/ --no-server`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:spark-native-mask-gate`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AK: Safe native splat mask default route
 

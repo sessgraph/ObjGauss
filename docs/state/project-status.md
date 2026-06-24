@@ -100,6 +100,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AI 已完成 Spark native compact `.splat` object mask prototype：新增 URL gate `?spark-native-mask=on`，source/original 对象编辑状态可直接加载原始 compact `.splat`，并用已验证 index mapping 的 object-aware PLY `object_id` 构建 `object-opacity-texture-v1`，通过 Spark `SplatMesh({ url, objectModifier })` 控制删除 / 隔离。Lego proxy browser audit 通过：`sparkMaskSource="native-splat"`、`sparkPacked="native-splat-source-v1":5696/3909:0/0`、`sparkMesh="persistent-splatmesh-v1":1:"true":4`；默认 packed-source 路径仍保持 `sparkMaskSource="ply-packed"`。该路径目前仍是诊断开关，尚未作为默认商业展示路线。
   - RENDER-005T-AJ 已完成 Spark native compact `.splat` object mask 多场景候选 gate：新增 `scripts/audit-spark-native-mask-gate.mjs` 和 `npm run audit:spark-native-mask-gate`，默认覆盖 Lego proxy + Plush semantic。Gate 验证 native source / object mask / persistent mesh contract；Lego pixel delta 由完整 `audit-demo` 覆盖。Plush 281k 大场景通过：`source="native-splat"`、`route="native-splat-source-v1"`、`visible=104403/281498`。该 gate 证明 native route 不是单场景偶然，但默认商业展示路线仍未切换。
   - RENDER-005T-AK 已完成 Spark native compact `.splat` mask 安全默认化：source/original 对象编辑状态下，无 SH-rest 样例默认走 native compact `.splat` source；SH-heavy 样例默认保留 PLY packed SH route，避免丢失 degree-3 SH 外观。Lego 默认 audit 通过：`sparkMaskSource="native-splat"`、`sparkPacked="native-splat-source-v1":5696/3909:0/0`、`sparkMaskVisual="spark-object-mask-visual-delta-v1"`；trained SH-heavy audit 通过：`sparkMaskSource="ply-packed"`、`sparkPacked="packed-sh-extract-v1":255794/129108:160.4/0`、`sparkShRest=255794:255794:"true":45:3`。诊断开关保留：`spark-object-source=packed` / `spark-native-mask=off` 强制 PLY packed，`spark-native-mask=on` 强制 native。
+  - RENDER-005T-AL 已完成 Spark canvas object selection product path：source/original Spark filtered edit viewport 现在暴露 `screen-space-object-pick-v1`，点击 Spark 高斯画布会用 object-aware PLY Gaussian 投影选择最近可见 `object_id`，并通过 `data-spark-selection-mode` / `data-spark-selected-object` 验收。Lego 默认 audit 通过：删除后 `sparkCanvasSelectedObject=0`，同时保持 `sparkMaskSource="native-splat"`；trained SH-heavy audit 通过：删除后 `sparkCanvasSelectedObject=3`，同时保持 `sparkMaskSource="ply-packed"` 与完整 SH rest。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -173,6 +174,16 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-demo.mjs
+npm run build
+npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5313/ --no-server
+npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5313/ --no-server
+npm run audit:splat-index-mapping
+npm run audit:webgpu-tile-smoke
+npm run audit:spark-reconstruct-residual
+npm run audit:spark-native-mask-gate
+uv run --extra dev pytest
+git diff --check
 node --check scripts/audit-spark-native-mask-gate.mjs
 node --check scripts/audit-demo.mjs
 npm run build

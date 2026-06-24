@@ -19,6 +19,9 @@ const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
 const SPARK_NATIVE_SPLAT_SOURCE = "native-splat-source-v1";
 const SPARK_FILTER_SOURCE_NATIVE = "native-splat";
 const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
+const SPARK_SELECTION_MODE = "screen-space-object-pick-v1";
+const SPARK_PICK_DRAG_PX = 5;
+const SPARK_PICK_MAX_RADIUS_PX = 28;
 
 export default function SplatViewport({
   source,
@@ -34,6 +37,8 @@ export default function SplatViewport({
   showAxes,
   pointCount,
   rendererLabel,
+  selectedId = null,
+  onSelectObject = null,
   reconstructRole = "filter",
   filterSource = SPARK_FILTER_SOURCE_PACKED,
 }) {
@@ -46,6 +51,7 @@ export default function SplatViewport({
   const filteredSplatRef = useRef(null);
   const filteredObjectMaskRef = useRef(null);
   const filteredMeshStateRef = useRef(createFilteredMeshState());
+  const pickStartRef = useRef(null);
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
 
@@ -98,6 +104,8 @@ export default function SplatViewport({
       ? SPARK_FILTER_SOURCE_NATIVE
       : SPARK_FILTER_SOURCE_PACKED
     : "none";
+  const sparkSelectionMode =
+    filtered && points?.length > 0 && onSelectObject ? SPARK_SELECTION_MODE : "none";
 
   const packedCache = useMemo(() => {
     if (!filtered || useNativeSplatMask) return null;
@@ -478,6 +486,43 @@ export default function SplatViewport({
     if (axesRef.current) axesRef.current.visible = showAxes;
   }, [showAxes]);
 
+  useEffect(() => {
+    const camera = cameraRef.current;
+    const canvas = containerRef.current?.querySelector("canvas");
+    if (!camera || !canvas || !filtered || !onSelectObject || !points?.length) return undefined;
+
+    const pointerDown = (event) => {
+      if (event.button !== 0) return;
+      pickStartRef.current = { x: event.clientX, y: event.clientY };
+    };
+
+    const pointerUp = (event) => {
+      const start = pickStartRef.current;
+      pickStartRef.current = null;
+      if (!start) return;
+      const dragDistance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      if (dragDistance > SPARK_PICK_DRAG_PX) return;
+
+      const objectId = pickSparkObjectFromPointer({
+        event,
+        canvas,
+        camera,
+        points,
+        visibleIds,
+        removedIds,
+        isolatedId,
+      });
+      if (objectId !== null) onSelectObject(objectId);
+    };
+
+    canvas.addEventListener("pointerdown", pointerDown);
+    canvas.addEventListener("pointerup", pointerUp);
+    return () => {
+      canvas.removeEventListener("pointerdown", pointerDown);
+      canvas.removeEventListener("pointerup", pointerUp);
+    };
+  }, [filtered, isolatedId, onSelectObject, points, removedIds, visibleIds]);
+
   return (
     <div
       className="viewport splatViewport"
@@ -520,6 +565,8 @@ export default function SplatViewport({
       data-spark-sh-rest-preserved={String(packedStats.shRestPreserved)}
       data-spark-sh-rest-coefficients={packedStats.shRestCoefficientCount}
       data-spark-sh-degree={packedStats.shDegree}
+      data-spark-selection-mode={sparkSelectionMode}
+      data-spark-selected-object={selectedId ?? ""}
       ref={containerRef}
     >
       <div className="viewportHud">
@@ -535,6 +582,12 @@ export default function SplatViewport({
           <div>
             <span className="hudLabel">路径</span>
             <strong>{sparkPathLabel({ objectFilter, packedStats })}</strong>
+          </div>
+        ) : null}
+        {filtered ? (
+          <div>
+            <span className="hudLabel">所选</span>
+            <strong>{selectedId ?? "无"}</strong>
           </div>
         ) : null}
         <div>
@@ -716,6 +769,59 @@ function pointVisible(point, visibleIds, removedIds, isolatedId) {
   if (removedIds?.has(point.objectId)) return false;
   if (isolatedId !== null && isolatedId !== undefined && point.objectId !== isolatedId) return false;
   return true;
+}
+
+function pickSparkObjectFromPointer({
+  event,
+  canvas,
+  camera,
+  points,
+  visibleIds,
+  removedIds,
+  isolatedId,
+}) {
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const targetX = event.clientX - rect.left;
+  const targetY = event.clientY - rect.top;
+  const maxDistanceSq = SPARK_PICK_MAX_RADIUS_PX * SPARK_PICK_MAX_RADIUS_PX;
+  const projected = new THREE.Vector3();
+  let bestObjectId = null;
+  let bestDistanceSq = maxDistanceSq;
+  let bestDepth = Infinity;
+
+  for (const point of points ?? []) {
+    if (!pointVisible(point, visibleIds, removedIds, isolatedId)) continue;
+    projected.set(
+      Number(point.x) || 0,
+      Number(point.y) || 0,
+      Number(point.z) || 0,
+    );
+    projected.project(camera);
+    if (
+      !Number.isFinite(projected.x) ||
+      !Number.isFinite(projected.y) ||
+      !Number.isFinite(projected.z) ||
+      projected.z < -1 ||
+      projected.z > 1
+    ) {
+      continue;
+    }
+
+    const screenX = (projected.x * 0.5 + 0.5) * rect.width;
+    const screenY = (-projected.y * 0.5 + 0.5) * rect.height;
+    const distanceSq = (screenX - targetX) ** 2 + (screenY - targetY) ** 2;
+    if (
+      distanceSq < bestDistanceSq ||
+      (distanceSq === bestDistanceSq && projected.z < bestDepth)
+    ) {
+      bestDistanceSq = distanceSq;
+      bestDepth = projected.z;
+      bestObjectId = point.objectId;
+    }
+  }
+
+  return bestObjectId;
 }
 
 function pointScale3(point) {

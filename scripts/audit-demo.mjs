@@ -219,6 +219,7 @@ try {
         `objectFilterTarget=${JSON.stringify(result.objectFilterTarget)} ` +
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
+        `sparkCanvasSelectedObject=${result.sparkCanvasSelectedObjectAfterDelete ?? "not-run"} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
@@ -1083,6 +1084,7 @@ async function runAudit(url, assetsToCheck, options) {
             objectStateChecksumAfterIsolate: objectStateChecksum,
             objectStateChecksumAfterDelete: objectStateChecksum,
             canvasSelectedObject: "probe-skipped",
+            sparkCanvasSelectedObjectAfterDelete: "probe-skipped",
             visibleAfterIsolate: "probe-skipped",
             visibleAfterDelete: "probe-skipped",
             renderModeAfterDelete: "probe-skipped",
@@ -1224,6 +1226,7 @@ async function runAudit(url, assetsToCheck, options) {
       let sparkMeshUpdatesAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-mesh-updates") ?? "0")
         : 0;
+      let sparkCanvasSelectedObjectAfterDelete = "not-run";
       let sparkObjectMaskVisualDelta = emptySparkObjectMaskVisualDelta();
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
@@ -1330,6 +1333,26 @@ async function runAudit(url, assetsToCheck, options) {
         throw new Error(
           `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} source=${sparkMaskSourceAfterDelete}/${sparkExpectedMaskSourceAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
+      }
+      if (sparkFilteredAfterDelete) {
+        const selectedBeforeSparkCanvasPick = await selectedObjectValue(page);
+        sparkCanvasSelectedObjectAfterDelete = await selectObjectFromCanvas(page, asset.id, {
+          previousSelected: selectedBeforeSparkCanvasPick,
+        });
+        const sparkSelectedObject = await page
+          .locator(".viewport")
+          .first()
+          .getAttribute("data-spark-selected-object");
+        const selectedRemovedRows = await page.locator(".objectRow.selected.removed").count();
+        if (
+          sparkCanvasSelectedObjectAfterDelete === selectedBeforeSparkCanvasPick ||
+          String(sparkCanvasSelectedObjectAfterDelete) !== String(sparkSelectedObject ?? "") ||
+          selectedRemovedRows > 0
+        ) {
+          throw new Error(
+            `${asset.id} Spark canvas selection did not choose a visible object: before=${selectedBeforeSparkCanvasPick} after=${sparkCanvasSelectedObjectAfterDelete} attr=${sparkSelectedObject} removedRows=${selectedRemovedRows}`,
+          );
+        }
       }
       if (
         sparkFilteredAfterDelete &&
@@ -1617,6 +1640,7 @@ async function runAudit(url, assetsToCheck, options) {
         objectStateChecksumAfterIsolate,
         objectStateChecksumAfterDelete,
         canvasSelectedObject,
+        sparkCanvasSelectedObjectAfterDelete,
         visibleAfterIsolate,
         visibleAfterDelete,
         renderModeAfterDelete,
@@ -2362,7 +2386,7 @@ function finiteNumericValue(value) {
   return Number.isFinite(numeric) ? numeric : Number.NaN;
 }
 
-async function selectObjectFromCanvas(page, assetId) {
+async function selectObjectFromCanvas(page, assetId, { previousSelected = "无" } = {}) {
   const canvas = page.locator(".viewport canvas").first();
   const box = await canvas.boundingBox();
   if (!box) {
@@ -2383,7 +2407,7 @@ async function selectObjectFromCanvas(page, assetId) {
     await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
     await page.waitForTimeout(250);
     const selectedObject = await selectedObjectValue(page);
-    if (selectedObject !== "无") {
+    if (selectedObject !== "无" && selectedObject !== previousSelected) {
       return selectedObject;
     }
   }

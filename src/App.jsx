@@ -644,6 +644,8 @@ export default function App() {
               showAxes={showAxes}
               pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
               rendererLabel={activeRendererText}
+              selectedId={useSparkFilteredRenderer ? selectedId : null}
+              onSelectObject={useSparkFilteredRenderer ? selectObject : null}
             />
           ) : waitForEditRenderer ? (
             <RendererPendingViewport

@@ -222,8 +222,11 @@ diagnostic escape hatch, and `spark-native-mask=on` still forces native mode.
 - Disabled for `webgpu-color-mode=sh-view`; SH-view diagnostics continue to use
   WebGPU Tile, while Spark source/original reconstruction now preserves SH rest
   directly when the PLY exposes supported `f_rest_*` coefficients.
-- Object-color mode and canvas click selection continue to use the existing
-  edit renderer path.
+- Object-color mode continues to use the existing edit renderer path.
+- Source/original Spark filtered edit supports browser-audited canvas selection
+  through `screen-space-object-pick-v1`: the viewport projects visible
+  object-aware PLY Gaussians through the active Spark camera and selects the
+  nearest visible `object_id`.
 - The filtered Spark route reuses one base `PackedSplats` cache and a
   `object-opacity-texture-v1` mask texture when visible / removed / isolated
   object state changes.
@@ -295,6 +298,8 @@ data-spark-sh-rest-preserved="true|false"
 data-spark-sh-rest-coefficients="0|9|24|45"
 data-spark-sh-degree="0|1|2|3"
 data-spark-mask-source="ply-packed|native-splat"
+data-spark-selection-mode="screen-space-object-pick-v1|none"
+data-spark-selected-object="..."
 ```
 
 The full-scene reconstruction probe is intentionally URL-gated so normal UI
@@ -328,6 +333,7 @@ sparkMaskSource="native-splat"
 sparkPacked="native-splat-source-v1":5696/3909:0/0
 sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
 sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
+sparkCanvasSelectedObject=0
 sparkMaskVisual="spark-object-mask-visual-delta-v1":"839479b7"/"6ef6c73f"/"839479b7":0.000786/0.013558/0.000507:0/0/0
 sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
@@ -523,7 +529,8 @@ npm run audit:demo -- \
 ```text
 browser_audit=passed
 sparkMaskSource="ply-packed"
-sparkPacked="packed-sh-extract-v1":255794/129108:160.4/0
+sparkCanvasSelectedObject=3
+sparkPacked="packed-sh-extract-v1":255794/129108:164.5/0
 sparkShRest=255794:255794:"true":45:3
 ```
 
@@ -534,8 +541,10 @@ sparkShRest=255794:255794:"true":45:3
 - The native mask relies on ObjGauss-generated sample pairs that pass the index
   mapping gate. Arbitrary third-party `.splat` files still need an explicit
   mapping check or embedded object metadata before object masking is trusted.
+- Spark canvas selection is currently a screen-space CPU pick over the
+  object-aware PLY metadata, not a Spark-internal raycast. It is good enough for
+  demo interaction, but still needs a dedicated selection hit-rate / ambiguity
+  gate before claiming robust renderer-native picking.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
-- Add Spark-side selection / raycast-to-object mapping if viewport click
-  selection should stay in Spark after native mask becomes a default candidate.
