@@ -110,6 +110,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AS 已完成 WebGPU headless acceptance / presentation split：新增 `npm run acceptance:webgpu-headless`，一键执行 build、WebGPU tile smoke 和 offscreen object-transition suite；`docs/rendering/webgpu-headless-acceptance.md` 明确该命令证明 compute/storage/object-state/readback，不证明 canvas presentation，headed presentation 仍由 `npm run audit:webgpu-desktop` 覆盖，visual tuning 仍由 coverage gate 覆盖。
   - RENDER-005T-AT 已完成 renderer readiness matrix：`docs/rendering/renderer-readiness-matrix.md` 明确商业 Demo 默认继续走 Spark source/original route，WebGPU Tile 作为 C-path proof / diagnostics，Gaussian OIT 作为 fallback；同时把“原始颜色 / 自身颜色删除后仍可能颗粒”界定为 hard object mask、边界 assignment、未重优化补洞和 SH-heavy packed route 的质量边界，而不是颜色丢失 bug。
   - RENDER-005T-AU 已完成产品 renderer route UI contract：颜色下拉改为 `自身颜色` / `对象色诊断`，viewport 增加 route badge，状态面板显示 `展示路线`、`颜色用途`、`预览边界`；root DOM 暴露 route / color role / preview boundary attributes，并由 `audit-demo` 验证首屏 commercial Spark、对象色 diagnostic、删除后 `hard-object-mask-no-reoptimize`。
+  - RENDER-005T-AV 已完成 SH-heavy Spark route-only audit：新增 `npm run audit:spark-trained-route`，默认用静态 preview 验证 `nerf-lego-trained-output-local` 的 `spark-ply-sh-source` 初始 route、删除后的 `spark-packed-sh-mask` / `packed-sh-extract-v1`、`object-opacity-texture-v1`、`hard-object-mask-no-reoptimize` 和完整 degree-3 SH rest preservation。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -176,6 +177,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
+  - `npm run audit:spark-trained-route` 已固化为本机 trained SH-heavy route-only browser gate，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary。
   - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。当前 report 默认要求 ambiguity rate `<=0.5`，用于防止 pick 消歧回退。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
@@ -187,7 +189,9 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 
 ```bash
 node --check scripts/audit-demo.mjs
+node --check scripts/audit-spark-trained-route.mjs
 npm run build
+npm run audit:spark-trained-route -- --port 5346
 npm run audit:demo -- --assets nerf-lego-alpha-closure-local --url http://127.0.0.1:5341/ --no-server
 uv run --extra dev pytest
 git diff --check

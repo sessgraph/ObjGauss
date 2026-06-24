@@ -84,6 +84,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
+| Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 
 ## Product UI Contract
 
@@ -112,12 +113,30 @@ object color     -> diagnostic-object-color
 delete preview   -> source-color / hard-object-mask-no-reoptimize
 ```
 
+## SH-Heavy Route-Only Gate
+
+Use this after `npm run build` when validating the trained local sample route
+without running visual residual, multi-click pick report, or mask restore stress:
+
+```bash
+npm run audit:spark-trained-route
+```
+
+The gate loads `nerf-lego-trained-output-local`, checks the initial route, then
+deletes one object and validates:
+
+```text
+initial route  -> spark-ply-sh-source / commercial / source-splat
+delete route   -> spark-packed-sh-mask / commercial / hard-object-mask-no-reoptimize
+Spark source   -> ply-packed / packed-sh-extract-v1
+SH rest        -> preserved f_rest_* coefficients, degree 3
+object mask    -> object-opacity-texture-v1
+```
+
+Full visual/residual validation remains an explicit heavier gate.
+
 ## Next Product Slice
 
-The next UX-facing slice should make SH-heavy route validation cheaper:
-
-- add a route-only browser audit for `nerf-lego-trained-output-local` that skips
-  expensive visual residual and mask-restore stress work;
-- keep checking that trained SH-heavy delete preview reports `spark-packed-sh-mask`
-  and preserves `f_rest_*` coefficients;
-- keep full visual/residual validation as an explicit heavier gate.
+The next UX-facing slice should consolidate Spark commercial route checks into
+one acceptance command that covers the no-SH native route and the SH-heavy packed
+route together.

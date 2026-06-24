@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AV`: 增加 SH-heavy trained route-only browser audit，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary，不每次跑完整 visual residual。
+  - `RENDER-005T-AW`: 将 no-SH native route gate 与 SH-heavy packed route gate 合并成 Spark commercial route acceptance 命令。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AV: SH-heavy Spark route-only audit
+
+- 状态: done / trained-route-audited
+- 类型: 标准 PR / browser audit
+- 目标: 增加 SH-heavy trained route-only browser audit，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary，不每次跑完整 visual residual。
+- 已实施:
+  - 新增 `scripts/audit-spark-trained-route.mjs` 与 `npm run audit:spark-trained-route`。
+  - 默认覆盖 `nerf-lego-trained-output-local`，使用静态 `vite preview`，避免 dev watcher 上限。
+  - Gate 加载 trained SH-heavy 样例，检查初始 `spark-ply-sh-source` commercial route，再删除一个对象并验证 `spark-packed-sh-mask`、`ply-packed`、`packed-sh-extract-v1`、`object-opacity-texture-v1`、`hard-object-mask-no-reoptimize` 和完整 `f_rest_*` degree-3 preservation。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 SH-heavy route-only gate 说明。
+- 结论:
+  - Trained SH-heavy route 现在有低成本正式 gate，不再需要用完整 `audit:demo` 作为 route contract 证据。
+  - 当前本机结果：`initial="spark-ply-sh-source":"commercial":"source-splat"`，`delete="spark-packed-sh-mask":"commercial":"hard-object-mask-no-reoptimize"`，`spark="ply-packed":"packed-sh-extract-v1"`，`shRest=255794:255794:"true":45:3`。
+- 验证:
+  - `node --check scripts/audit-spark-trained-route.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-trained-route -- --port 5346`: passed；截图 `/tmp/objgauss-spark-trained-route-nerf-lego-trained-output-local.png`。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
 
 ### RENDER-005T-AU: Product renderer route UI contract
 
