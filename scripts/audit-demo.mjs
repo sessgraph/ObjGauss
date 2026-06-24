@@ -1240,15 +1240,17 @@ async function runAudit(url, assetsToCheck, options) {
       const sparkShDegreeAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-degree") ?? "0")
         : 0;
+      const sparkExpectedMaskSourceAfterDelete = options.sparkNativeMask
+        ? "native-splat"
+        : sparkShRestSourceGaussiansAfterDelete > 0
+        ? "ply-packed"
+        : "native-splat";
       const sparkExpectedReconstructSourceAfterDelete =
-        options.sparkNativeMask
+        sparkExpectedMaskSourceAfterDelete === "native-splat"
           ? SPARK_NATIVE_RECONSTRUCT_SOURCE
           : sparkShRestSourceGaussiansAfterDelete > 0
           ? SPARK_RECONSTRUCT_SH_SOURCE
           : SPARK_RECONSTRUCT_SOURCE;
-      const sparkExpectedMaskSourceAfterDelete = options.sparkNativeMask
-        ? "native-splat"
-        : "ply-packed";
       const sparkExpectedShRestPreservedAfterDelete =
         sparkShRestSourceGaussiansAfterDelete > 0 ? "true" : "false";
       const objectStateChecksumAfterDelete = sparkFilteredAfterDelete

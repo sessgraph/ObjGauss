@@ -176,11 +176,15 @@ export default function App() {
     renderMode === "original" &&
     (objectEditActive || sparkReconstructProbe) &&
     webGpuColorTuning.colorMode === "source";
+  const canUseSparkNativeMaskSource = hasSplatRenderer && !sceneHasShRestSource(scene);
   const useSparkPlySourceRenderer = viewMode === "view" && canUseSparkPlySourceRenderer;
   const useSplatRenderer = viewMode === "view" && canUseSplatRenderer && !useSparkPlySourceRenderer;
   const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
   const useSparkNativeMaskRenderer =
-    useSparkFilteredRenderer && objectEditActive && sparkNativeMaskMode === "on";
+    useSparkFilteredRenderer &&
+    objectEditActive &&
+    (sparkNativeMaskMode === "force" ||
+      (sparkNativeMaskMode === "auto" && canUseSparkNativeMaskSource));
   const useSparkPointRenderer = useSparkPlySourceRenderer || useSparkFilteredRenderer;
   const waitForEditRenderer =
     !useSplatRenderer && !useSparkPointRenderer && webGpuCapability.status === "pending";
@@ -1002,13 +1006,16 @@ function readSparkPlySourceMode() {
 }
 
 function readSparkNativeMaskMode() {
-  if (typeof window === "undefined") return "off";
+  if (typeof window === "undefined") return "auto";
   const params = new URLSearchParams(window.location.search);
   const value = String(
-    params.get("spark-native-mask") ?? params.get("spark-object-source") ?? "off",
+    params.get("spark-native-mask") ?? params.get("spark-object-source") ?? "auto",
   ).toLowerCase();
-  if (["1", "true", "yes", "on", "native", "force"].includes(value)) return "on";
-  return "off";
+  if (["0", "false", "no", "off", "packed", "ply", "ply-packed"].includes(value)) {
+    return "off";
+  }
+  if (["1", "true", "yes", "on", "native", "force"].includes(value)) return "force";
+  return "auto";
 }
 
 function sceneHasShRestSource(scene) {

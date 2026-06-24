@@ -3,11 +3,6 @@ import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
-import {
-  canvasVisualStats,
-  roundMetric,
-  validateCanvasVisualStats,
-} from "./lib/visual-stats.mjs";
 
 const DEFAULT_PORT = 5310;
 const SPARK_NATIVE_SOURCE = "native-splat-source-v1";
@@ -16,9 +11,6 @@ const SPARK_OBJECT_FILTER = "spark-object-opacity-mask";
 const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_DISPLAY_CACHE_DISABLED = "disabled-by-native-mask-v1";
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
-const PIXEL_DELTA_MAX_GAUSSIANS = 100_000;
-const MIN_VISUAL_DELTA = 0.0005;
-const MAX_RESTORE_DELTA = 0.002;
 
 const KNOWN_ASSETS = [
   {
@@ -37,11 +29,14 @@ const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
 const assets = selectAssets(args);
+const auditUrl = flagEnabled(args.forceNativeParam ?? args["force-native-param"])
+  ? withNativeMask(baseUrl)
+  : baseUrl;
 const server = args.url || args.noServer ? null : startDevServer(port);
 
 try {
   await waitForApp(baseUrl);
-  const results = await runNativeMaskGate({ url: withNativeMask(baseUrl), assets });
+  const results = await runNativeMaskGate({ url: auditUrl, assets });
   for (const result of results) {
     console.log(
       `native_mask_gate_asset=passed asset=${JSON.stringify(result.assetId)} ` +
@@ -54,7 +49,7 @@ try {
     );
   }
   console.log(
-    `native_mask_gate=passed assets=${JSON.stringify(results.map((result) => result.assetId))} url=${baseUrl}`,
+    `native_mask_gate=passed assets=${JSON.stringify(results.map((result) => result.assetId))} url=${baseUrl} forceNativeParam=${auditUrl !== baseUrl}`,
   );
 } finally {
   if (server) stopDevServer(server);
@@ -76,23 +71,18 @@ async function runNativeMaskGate({ url, assets }) {
     for (const asset of assets) {
       console.log(`native_mask_gate_asset_start asset=${JSON.stringify(asset.id)}`);
       await loadAsset(page, url, asset);
-      await enterEditModeAndDeleteFirstObject(page);
+      await enterEditModeAndDeleteObject(page);
       await waitForNativeMaskReady(page);
 
       const stats = await readNativeMaskStats(page);
       validateNativeMaskStats(asset.id, stats);
-
-      const visualDelta =
-        stats.baseGaussians <= PIXEL_DELTA_MAX_GAUSSIANS
-          ? await runSmallScenePixelDelta(page, asset.id)
-          : skippedVisualDelta();
 
       const screenshotPath = `/tmp/objgauss-native-mask-gate-${asset.id}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: false });
       results.push({
         assetId: asset.id,
         ...stats,
-        ...visualDelta,
+        ...skippedVisualDelta(),
         screenshotPath,
       });
     }
@@ -137,7 +127,7 @@ async function loadAsset(page, url, asset) {
   }, undefined, { timeout: 90000 });
 }
 
-async function enterEditModeAndDeleteFirstObject(page) {
+async function enterEditModeAndDeleteObject(page) {
   await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
   await page.waitForFunction(() => {
     const viewport = document.querySelector(".viewport");
@@ -255,60 +245,9 @@ function validateNativeMaskStats(assetId, stats) {
   }
 }
 
-async function runSmallScenePixelDelta(page, assetId) {
-  const before = await canvasVisualStats(page, ".splatViewport canvas", {
-    timeoutMs: 60000,
-    usePageClip: true,
-  });
-  validateCanvasVisualStats(assetId, "native mask before hide", before);
-
-  const toggleButton = page.locator(".objectRow:not(.removed) .eyeButton").first();
-  await toggleButton.click();
-  await waitForNativeMaskReady(page);
-  const hidden = await canvasVisualStats(page, ".splatViewport canvas", {
-    timeoutMs: 60000,
-    usePageClip: true,
-  });
-  validateCanvasVisualStats(assetId, "native mask hidden", hidden);
-
-  await toggleButton.click();
-  await waitForNativeMaskReady(page);
-  const restored = await canvasVisualStats(page, ".splatViewport canvas", {
-    timeoutMs: 60000,
-    usePageClip: true,
-  });
-  validateCanvasVisualStats(assetId, "native mask restored", restored);
-
-  const delta = {
-    visualMode: "native-mask-pixel-delta-v1",
-    visualCoverageDelta: roundMetric(Math.abs(hidden.coverage - before.coverage)),
-    visualLumaDelta: roundMetric(Math.abs(hidden.lumaMean - before.lumaMean)),
-    visualChromaDelta: roundMetric(Math.abs(hidden.chromaMean - before.chromaMean)),
-    visualRestoreCoverageDelta: roundMetric(Math.abs(restored.coverage - before.coverage)),
-    visualRestoreLumaDelta: roundMetric(Math.abs(restored.lumaMean - before.lumaMean)),
-    visualRestoreChromaDelta: roundMetric(Math.abs(restored.chromaMean - before.chromaMean)),
-  };
-  const changed =
-    before.checksum !== hidden.checksum &&
-    (delta.visualCoverageDelta >= MIN_VISUAL_DELTA ||
-      delta.visualLumaDelta >= MIN_VISUAL_DELTA ||
-      delta.visualChromaDelta >= MIN_VISUAL_DELTA);
-  const restoredToBaseline =
-    before.checksum === restored.checksum ||
-    (delta.visualRestoreCoverageDelta <= MAX_RESTORE_DELTA &&
-      delta.visualRestoreLumaDelta <= MAX_RESTORE_DELTA &&
-      delta.visualRestoreChromaDelta <= MAX_RESTORE_DELTA);
-  if (!changed || !restoredToBaseline) {
-    throw new Error(
-      `${assetId} native mask pixel delta failed: changed=${changed} restored=${restoredToBaseline} delta=${JSON.stringify(delta)}`,
-    );
-  }
-  return delta;
-}
-
 function skippedVisualDelta() {
   return {
-    visualMode: "skipped-large-scene-v1",
+    visualMode: "skipped-contract-gate-v1",
     visualCoverageDelta: 0,
     visualLumaDelta: 0,
     visualChromaDelta: 0,
@@ -342,10 +281,16 @@ function firstExisting(paths) {
   return paths.find((path) => existsSync(path));
 }
 
+function flagEnabled(value) {
+  if (value === true) return true;
+  if (value === false || value === undefined || value === null) return false;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
 function startDevServer(port) {
   const child = spawn(
     "npm",
-    ["run", "dev", "--", "--port", String(port), "--strictPort"],
+    ["run", "preview", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     { detached: true, stdio: ["ignore", "pipe", "pipe"] },
   );
   child.stdout.on("data", (chunk) => process.stdout.write(chunk));

@@ -177,16 +177,15 @@ compact .splat source
 ```
 
 This route keeps the Spark source as the compact `.splat` asset and applies the
-same opacity mask through `objectModifier`. It is enabled only with
-`?spark-native-mask=on` so the default commercial demo path remains unchanged
-while native-mask behavior is audited separately.
+same opacity mask through `objectModifier`. It initially shipped behind
+`?spark-native-mask=on` so native-mask behavior could be audited separately.
 
 RENDER-005T-AJ adds a dedicated native-mask multi-scene gate:
 
 ```text
 Lego proxy native .splat mask
         -> DOM contract
-        -> hide / restore pixel delta
+        -> full audit hide / restore pixel delta
 
 Plush semantic native .splat mask
         -> DOM contract
@@ -196,7 +195,26 @@ Plush semantic native .splat mask
 The gate deliberately avoids Spark/edit visual residual screenshots for Plush.
 That residual belongs to the packed reconstruction quality gate, while the
 native-mask gate only needs to prove original compact `.splat` source,
-object-mask telemetry, persistent mesh update, and small-scene pixel effect.
+object-mask telemetry, and persistent mesh update. Small-scene pixel effect is
+covered by `audit-demo`.
+
+RENDER-005T-AK promotes native compact `.splat` masking to the automatic default
+for no-SH source/original object edit previews:
+
+```text
+no-SH sample + object edit active
+        -> native compact .splat source
+        -> object-opacity-texture-v1
+
+SH-heavy sample + object edit active
+        -> PLY packed SH source
+        -> object-opacity-texture-v1
+```
+
+This keeps `nerf-lego-trained-output-local` on the SH-preserving packed route,
+while Lego proxy and Plush semantic use the original compact `.splat` source by
+default. `spark-object-source=packed` / `spark-native-mask=off` remain the
+diagnostic escape hatch, and `spark-native-mask=on` still forces native mode.
 
 ## Current Contract
 
@@ -219,10 +237,12 @@ object-mask telemetry, persistent mesh update, and small-scene pixel effect.
   `spark-object-mask-visual-delta-v1`: hiding a remaining object must change the
   Spark canvas checksum / visual metrics, and restoring it must return to the
   delete-state baseline.
-- No-SH assets continue to expose `data-spark-reconstruct-source="packed-extract-v1"`
-  and `data-spark-sh-rest-preserved="false"`.
-- SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
-  and require preserved count to match source SH Gaussian count.
+- No-SH assets default to `data-spark-mask-source="native-splat"` and
+  `data-spark-reconstruct-source="native-splat-source-v1"` for source/original
+  object edit states.
+- SH-heavy assets default to `data-spark-mask-source="ply-packed"` and
+  `data-spark-reconstruct-source="packed-sh-extract-v1"` so preserved count can
+  match source SH Gaussian count.
 - In `真实查看`, SH-heavy assets expose
   `data-object-filter="spark-ply-sh-source"` with the same
   `packed-sh-extract-v1` / SH preservation telemetry. Use
@@ -231,13 +251,14 @@ object-mask telemetry, persistent mesh update, and small-scene pixel effect.
 - Public/generated compact `.splat` and object-aware PLY pairs must pass
   `npm run audit:splat-index-mapping` before relying on Gaussian index keyed
   masks for original-source/native-mask work.
-- `?spark-native-mask=on` switches source/original object edit states from the
-  PLY-derived packed source to Spark's native compact `.splat` source with the
-  same `object-opacity-texture-v1` modifier. This is currently a diagnostic
-  route, not the default.
-- `npm run audit:spark-native-mask-gate` must pass before considering this
-  route as a default candidate. The gate covers Lego pixel delta and Plush
-  large-scene native source / mask contract.
+- `spark-object-source=packed` or `spark-native-mask=off` switches
+  source/original object edit states back to the PLY-derived packed source for
+  diagnostics.
+- `spark-native-mask=on` forces Spark's native compact `.splat` source even for
+  SH-heavy scenes; this is a diagnostic override and can lose SH-rest fidelity.
+- `npm run audit:spark-native-mask-gate` must pass for the default native
+  candidate. The gate covers Lego + Plush native source / mask contract, while
+  `audit-demo` covers the Lego pixel delta.
 
 Runtime DOM evidence:
 
@@ -303,10 +324,11 @@ Current local result:
 ```text
 browser_audit=passed
 postDelete="spark-splat":"spark-object-opacity-mask":3909
-sparkPacked="packed-extract-v1":5696/3909:4.4/0
+sparkMaskSource="native-splat"
+sparkPacked="native-splat-source-v1":5696/3909:0/0
 sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
 sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
-sparkMaskVisual="spark-object-mask-visual-delta-v1":"4a2ed0e8"/"be002ca4"/"4a2ed0e8":0.000752/0.014063/0.026019:0/0/0
+sparkMaskVisual="spark-object-mask-visual-delta-v1":"839479b7"/"6ef6c73f"/"839479b7":0.000786/0.013558/0.000507:0/0/0
 sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
 renderModeAfterDelete="原始颜色（编辑预览）"
@@ -460,9 +482,8 @@ sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
 ```
 
-The default packed-source route still passes separately and reports
-`sparkMaskSource="ply-packed"`, keeping the native prototype isolated behind the
-URL gate.
+The packed-source diagnostic route can still be forced with
+`?spark-object-source=packed`.
 
 Run the native-mask multi-scene gate:
 
@@ -480,20 +501,36 @@ nerf-lego-alpha-closure-local:
 source="native-splat"
 route="native-splat-source-v1"
 visible=4960/5696
-visual="native-mask-pixel-delta-v1":0.000872/0.003627/0.002893:0/0/0
+visual="skipped-contract-gate-v1":0/0/0:0/0/0
 
 plush-semantic-closure-local:
 source="native-splat"
 route="native-splat-source-v1"
 visible=104403/281498
-visual="skipped-large-scene-v1":0/0/0:0/0/0
+visual="skipped-contract-gate-v1":0/0/0:0/0/0
+```
+
+SH-heavy trained sample default route check:
+
+```bash
+npm run audit:demo -- \
+  --assets nerf-lego-trained-output-local \
+  --skip-visual-residual \
+  --url http://127.0.0.1:5312/ \
+  --no-server
+```
+
+```text
+browser_audit=passed
+sparkMaskSource="ply-packed"
+sparkPacked="packed-sh-extract-v1":255794/129108:160.4/0
+sparkShRest=255794:255794:"true":45:3
 ```
 
 ## Remaining Gaps
 
-- The original compact `.splat` mask is still URL-gated. It now has a
-  multi-scene candidate gate, but it has not been promoted to the default
-  commercial demo route.
+- The original compact `.splat` mask is now the no-SH default, but SH-heavy
+  scenes still need the PLY packed route for SH fidelity.
 - The native mask relies on ObjGauss-generated sample pairs that pass the index
   mapping gate. Arbitrary third-party `.splat` files still need an explicit
   mapping check or embedded object metadata before object masking is trusted.

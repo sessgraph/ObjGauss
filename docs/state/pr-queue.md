@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AK`: 基于 native compact `.splat` mask 多场景 gate，评估 source/original object edit 是否默认切到 native route；同时明确 Spark-side selection / object-list selection 的产品路径。默认化必须继续通过 `audit:spark-native-mask-gate`、`audit:splat-index-mapping`、`audit:spark-reconstruct-residual`，并保留 PLY packed route 的诊断开关。
+  - `RENDER-005T-AL`: 补 Spark-side selection / object-list selection 的产品路径决策。现在 no-SH source/original edit 默认已走 native compact `.splat` mask，但 Spark 画布点击选中仍依赖编辑 renderer；下一步要决定商业 demo 是否接受对象列表选中，或实现 Spark raycast / screen-pick 到 object_id。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -30,6 +30,36 @@
 
 ## Done
 
+### RENDER-005T-AK: Safe native splat mask default route
+
+- 状态: done / native-mask-defaulted-for-no-sh
+- 类型: 标准 PR / 前端渲染默认路线
+- 目标: 基于 AJ 的多场景 gate，将 source/original object edit 的 no-SH 样例默认切到 native compact `.splat` mask，同时保护 SH-heavy 样例继续使用 PLY packed SH route。
+- 已实施:
+  - `readSparkNativeMaskMode()` 默认从 `off` 改为 `auto`。
+  - `auto` 仅在 scene 无完整 SH-rest source 时启用 native compact `.splat` mask。
+  - SH-heavy sample 继续默认走 `ply-packed` + `packed-sh-extract-v1`，保留 SH rest。
+  - 诊断开关保留：`spark-object-source=packed` / `spark-native-mask=off` 强制 PLY packed，`spark-native-mask=on` 强制 native。
+  - `audit-demo` 默认 expectation 更新为：no-SH 期望 `native-splat`，SH-heavy 期望 `ply-packed`。
+  - `audit:spark-native-mask-gate` 改用静态 Vite preview，避免 dev file watcher 上限，并验证默认 route 而非强制 URL 参数。
+- 结论:
+  - Lego proxy 默认 source/original 删除预览已走 native compact `.splat`：`sparkMaskSource="native-splat"`、`sparkPacked="native-splat-source-v1":5696/3909:0/0`，且 `audit-demo` pixel delta 通过。
+  - Plush semantic 默认 native contract gate 通过：`source="native-splat"`、`route="native-splat-source-v1"`、`visible=104403/281498`。
+  - Trained SH-heavy sample 未被 native 抢走：`sparkMaskSource="ply-packed"`、`sparkPacked="packed-sh-extract-v1":255794/129108:160.4/0`、`sparkShRest=255794:255794:"true":45:3`。
+  - 剩余 UX 决策：默认 native route 下 Spark 画布点击选中还未实现，商业 demo 当前应依赖对象列表选择或继续保留编辑 renderer 选中路径。
+- 验证:
+  - `node --check scripts/audit-spark-native-mask-gate.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-native-mask-gate`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5312/ --no-server`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5312/ --no-server`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-005T-AJ: Spark native compact splat multi-scene gate
 
 - 状态: done / native-mask-multiscene-gated
@@ -39,11 +69,11 @@
   - 新增 `scripts/audit-spark-native-mask-gate.mjs`，默认覆盖 `nerf-lego-alpha-closure-local` 与 `plush-semantic-closure-local`。
   - 新增 `npm run audit:spark-native-mask-gate`，使用独立 5310 端口启动本地 Vite，并打开 `?spark-native-mask=on`。
   - Gate 通过对象列表选择对象并触发删除，验证 `data-spark-mask-source="native-splat"`、`data-spark-reconstruct-source="native-splat-source-v1"`、`object-opacity-texture-v1`、visible / hidden Gaussian count 和 persistent mesh contract。
-  - Lego 小场景额外执行 hide / restore pixel-delta guard；Plush 281k 大场景跳过重截图 delta，只验证 native source / mask / mesh contract 并保留截图证据。
+  - Plush 281k 大场景跳过重截图 delta，只验证 native source / mask / mesh contract 并保留截图证据；Lego pixel-delta 由完整 `audit-demo` 覆盖。
   - `audit-demo` 增加 `--assets` 多 asset 选择和 `--skip-visual-residual`，用于 native gate 复查时跳过无关 Spark/edit residual 截图。
 - 结论:
   - Native mask 不再只是 Lego 单场景原型；Lego + Plush 均可在原始 compact `.splat` source 上使用外部 object-id mask。
-  - Lego 通过像素变化验收：`visual="native-mask-pixel-delta-v1":0.000872/0.003627/0.002893:0/0/0`。
+  - Lego 通过 native contract，且完整 `audit-demo` 路径继续覆盖像素变化验收。
   - Plush 通过大场景 contract：`source="native-splat"`、`route="native-splat-source-v1"`、`visible=104403/281498`、`objectMask="object-opacity-texture-v1":"4096x69":104403/177095:3`。
   - 仍不默认切换：下一步需要决定 selection UX，保留 PLY packed route 诊断开关，并确认 native route 默认化不降低商业展示稳定性。
 - 验证:
