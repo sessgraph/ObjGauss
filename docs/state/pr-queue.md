@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AZ`: 明确 trained SH-heavy sample 的 portability / availability 策略，再决定 Spark commercial route gate 是否能成为默认 CI requirement。
+  - `RENDER-005T-BA`: 基于 trained sample availability audit，决定是否把 Spark commercial route gate 提升为默认 CI requirement，或继续保持显式 product-route gate。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AZ: Trained SH-heavy sample availability contract
+
+- 状态: done / trained-sample-availability-audited
+- 类型: 标准 PR / acceptance preflight
+- 目标: 明确 `nerf-lego-trained-output-local` 的 portability / availability 策略，让 Spark commercial route gate 在启动浏览器前先能判断当前环境是否具备 SH-heavy trained sample。
+- 已实施:
+  - 新增 `scripts/audit-spark-trained-sample.mjs` 与 `npm run audit:spark-trained-sample`。
+  - Audit 检查 `src/assetLibrary.js` 中的 `nerf-lego-trained-output-local` 注册、`public/samples/nerf_lego_trained.splat`、`public/samples/nerf_lego_trained_objects.ply`。
+  - Audit 解析 PLY header 和 `object_id`，检查 geometry、opacity、scale/rotation、`object_id`、`f_dc_*`、degree-3 `f_rest_*`、最小 Gaussian 数和最小 object 数。
+  - `acceptance:spark-commercial-route` 默认前置运行 `audit:spark-trained-sample`，并把报告写到 `<output-dir>/trained-sample/`；可用 `--skip-trained-sample-audit` 显式跳过同轮重复检查。
+  - `docs/rendering/renderer-readiness-matrix.md` 记录 availability audit、prepare 命令和 skip 边界。
+- 结论:
+  - Trained SH-heavy sample 仍是本机 / public sample contract，不是 fresh clone 必然具备的 CI fixture。
+  - 但缺失或结构不合格现在会在浏览器 gate 前 fail fast，并给出 `benchmark:splatfacto:balanced` / `audit:spark-trained-route` prepare path。
+- 验证:
+  - `node --check scripts/audit-spark-trained-sample.mjs`: passed。
+  - `node --check scripts/acceptance-spark-commercial-route.mjs`: passed。
+  - `npm run audit:spark-trained-sample -- --output-dir /tmp/objgauss-spark-trained-sample-audit`: passed；`gaussians=255794`、`objects=4`、`shRest=45`、`shDegree=3`。
+  - `npm run acceptance:spark-commercial-route -- --native-port 5353 --trained-port 5354 --output-dir /tmp/objgauss-spark-commercial-route-availability`: passed；`summary.json` 为 `status=passed`、`steps=4`、`native=2`、`trained=1`、`skipTrainedSampleAudit=false`。
+  - Summary inspect: trained sample preflight 通过，native routes 覆盖 `nerf-lego-alpha-closure-local` 与 `plush-semantic-closure-local`，trained route 覆盖 `nerf-lego-trained-output-local`，delete route 为 `spark-packed-sh-mask / commercial / hard-object-mask-no-reoptimize`，SH rest 为 `255794 / 255794 / true / 45 / 3`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AY: Spark route acceptance demo opt-in
 

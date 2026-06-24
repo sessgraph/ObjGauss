@@ -177,8 +177,9 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
+  - `npm run audit:spark-trained-sample` 已固化为本机 trained SH-heavy sample availability preflight，可在浏览器 route gate 前检查 `nerf_lego_trained.*` public sample、`object_id`、degree-3 `f_rest_*` 和 object 数量。
   - `npm run audit:spark-trained-route` 已固化为本机 trained SH-heavy route-only browser gate，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary。
-  - `npm run acceptance:spark-commercial-route` 已固化为 Spark commercial route 总验收命令，一次覆盖 no-SH native compact `.splat` object mask 与 SH-heavy packed SH object mask；该命令会写 `/tmp/objgauss-spark-commercial-route/summary.{json,md}`，证明 route contract，不证明删除后补洞或重优化。
+  - `npm run acceptance:spark-commercial-route` 已固化为 Spark commercial route 总验收命令，一次覆盖 trained sample availability、no-SH native compact `.splat` object mask 与 SH-heavy packed SH object mask；该命令会写 `/tmp/objgauss-spark-commercial-route/summary.{json,md}`，证明 route contract，不证明删除后补洞或重优化。
   - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。当前 report 默认要求 ambiguity rate `<=0.5`，用于防止 pick 消歧回退。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。

@@ -120,8 +120,16 @@ Use this after `npm run build` when validating the trained local sample route
 without running visual residual, multi-click pick report, or mask restore stress:
 
 ```bash
+npm run audit:spark-trained-sample
 npm run audit:spark-trained-route
 ```
+
+`audit:spark-trained-sample` is the cheap availability contract. It does not
+launch a browser. It checks that the local trained sample is registered, that
+`public/samples/nerf_lego_trained.splat` and
+`public/samples/nerf_lego_trained_objects.ply` exist, and that the PLY exposes
+the properties required by the SH-heavy Spark route: geometry, opacity,
+scale/rotation, `object_id`, `f_dc_*`, and degree-3 `f_rest_*` coefficients.
 
 The gate loads `nerf-lego-trained-output-local`, checks the initial route, then
 deletes one object and validates:
@@ -148,6 +156,7 @@ The command runs:
 
 ```text
 npm run build
+npm run audit:spark-trained-sample
 npm run audit:spark-native-mask-gate
 npm run audit:spark-trained-route
 ```
@@ -162,6 +171,11 @@ By default it writes:
 Use `--output-dir <path>` to place the report elsewhere. The report summarizes
 the route, source, visible Gaussian counts, SH preservation tuple, contract
 boundary, and screenshot paths from the underlying browser gates.
+
+Use `--skip-trained-sample-audit` only when the trained sample has already been
+checked in the same run. Missing local trained outputs should be fixed by
+rebuilding or publishing the sample, not by silently dropping the SH-heavy route
+from the product gate.
 
 `acceptance:demo` keeps this gate opt-in because the SH-heavy route depends on
 the local trained `nerf-lego-trained-output-local` sample:

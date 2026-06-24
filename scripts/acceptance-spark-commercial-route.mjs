@@ -8,9 +8,27 @@ const outputDir = String(
   args.outputDir ?? args["output-dir"] ?? "/tmp/objgauss-spark-commercial-route",
 );
 const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
+const skipTrainedSampleAudit = flagEnabled(
+  args.skipTrainedSampleAudit ?? args["skip-trained-sample-audit"],
+);
 
 const steps = [
   ...(skipBuild ? [] : [["Build viewer", ["npm", "run", "build"]]]),
+  ...(skipTrainedSampleAudit
+    ? []
+    : [
+        [
+          "Spark trained SH-heavy sample availability",
+          [
+            "npm",
+            "run",
+            "audit:spark-trained-sample",
+            "--",
+            "--output-dir",
+            `${outputDir}/trained-sample`,
+          ],
+        ],
+      ]),
   [
     "Spark no-SH native object mask route",
     ["npm", "run", "audit:spark-native-mask-gate", "--", "--port", nativePort],
@@ -30,6 +48,7 @@ const report = {
     trained: trainedPort,
   },
   skipBuild,
+  skipTrainedSampleAudit,
   steps: [],
   routes: {
     native: [],

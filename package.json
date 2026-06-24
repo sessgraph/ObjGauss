@@ -20,6 +20,7 @@
     "audit:spark-reconstruct-residual-multiscene": "node scripts/audit-spark-reconstruct-residual.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --output-dir /tmp/objgauss-spark-reconstruct-residual-multiscene",
     "audit:spark-native-mask-gate": "node scripts/audit-spark-native-mask-gate.mjs",
     "audit:spark-pick-report": "node scripts/audit-spark-pick-report.mjs",
+    "audit:spark-trained-sample": "node scripts/audit-spark-trained-sample.mjs",
     "audit:spark-trained-route": "node scripts/audit-spark-trained-route.mjs",
     "audit:splat-index-mapping": "node scripts/audit-splat-index-mapping.mjs --output-dir /tmp/objgauss-splat-index-mapping",
     "audit:webgpu-depth-sweep": "node scripts/audit-webgpu-depth-sweep.mjs",
