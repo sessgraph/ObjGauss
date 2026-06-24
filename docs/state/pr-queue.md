@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-BD`: 将 hard-mask quality chain 的解释结果接入产品 route status / QA copy，让用户区分 hard object mask 边界问题、coverage hole risk 和 source reconstruction residual。
+  - `RENDER-005T-BE`: 基于产品 route status 与 hard-mask quality 解释，整理商用展示 QA 截图 / 样例准入表，明确哪些样例能标“商业展示默认路线”、哪些只能作为诊断或研究样例。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-BD: Product hard-mask quality status
+
+- 状态: done / quality-status-ui
+- 类型: 标准 PR / renderer UX + browser audit
+- 目标: 将 hard-mask quality chain 的解释结果接入产品 route status / QA copy，让用户区分 hard object mask 边界问题、coverage hole risk 和 source reconstruction residual。
+- 已实施:
+  - `src/App.jsx` 在加载素材时保留 `assetId`，并按当前 route 输出 `hardMaskQuality`。
+  - 状态面板新增 `质量解释`，首屏显示 `原始 Spark 高斯`，对象色显示 `对象色诊断`，删除后按证据显示 `边界混合主导`、`重建残差主导` 或 `硬 mask 待审计`。
+  - App root 新增 `data-hard-mask-quality-interpretation`、`data-hard-mask-quality-source`、`data-hard-mask-gap-score`、`data-hard-mask-residual-coverage-ratio`、`data-hard-mask-deleted-object`。
+  - `scripts/audit-demo.mjs` 验证首屏、对象色和删除后的 hard-mask quality contract，并在 audit 日志输出 `hardMaskQuality=...`。
+  - `docs/rendering/renderer-readiness-matrix.md` 将 Product UI Contract 更新为包含质量解释字段。
+- 结论:
+  - `自身颜色` 现在在 UI 上只表示颜色来源；`预览边界` 和 `质量解释` 共同说明它是否是原始 Spark 高斯，还是 hard object mask / no reoptimize 预览。
+  - Lego proxy 与 Plush semantic 使用 report-backed `boundary-mixing-dominant`；trained Lego 使用 `browser-residual-dominant`；缺少 quality-chain row 的样例显示 `hard-mask-quality-unmeasured`，不伪造结论。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5365`: passed；删除后 `hardMaskQuality="boundary-mixing-dominant":"hard-mask-quality-chain-v1":0.524659:1.170841:"0"`。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+  - `npm run audit:demo -- --assets plush-v1-closure-local --skip-visual-residual --server-mode preview --port 5366`: 本轮超过合理等待时间后手动中止，未作为 gate；前两次 dev-server audit 因本机 watcher 上限 `ENOSPC` 失败，preview 模式已覆盖新增 contract。
 
 ### RENDER-005T-BC: Hard mask quality chain report
 

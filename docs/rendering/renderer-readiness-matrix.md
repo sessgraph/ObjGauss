@@ -124,7 +124,8 @@ explanatory copy:
 - the color selector shows `自身颜色` and `对象色诊断`;
 - the viewport shows a compact route badge such as `商用 Spark / 原生 Splat
   mask`;
-- the state panel exposes `展示路线`, `颜色用途`, and `预览边界`;
+- the state panel exposes `展示路线`, `颜色用途`, `预览边界`, and
+  `质量解释`;
 - the app root exposes machine-readable attributes:
 
 ```text
@@ -133,14 +134,19 @@ data-renderer-route-kind
 data-color-mode-role
 data-source-preview-boundary
 data-preview-quality
+data-hard-mask-quality-interpretation
+data-hard-mask-quality-source
+data-hard-mask-gap-score
+data-hard-mask-residual-coverage-ratio
+data-hard-mask-deleted-object
 ```
 
 `npm run audit:demo` validates the key route transitions:
 
 ```text
-initial view     -> commercial / source-color / source-splat
-object color     -> diagnostic-object-color
-delete preview   -> source-color / hard-object-mask-no-reoptimize
+initial view     -> commercial / source-color / source-splat / source-splat quality
+object color     -> diagnostic-object-color / diagnostic quality
+delete preview   -> source-color / hard-object-mask-no-reoptimize / hard-mask quality
 ```
 
 ## SH-Heavy Route-Only Gate
@@ -300,8 +306,7 @@ The output distinguishes:
   than the hard-mask boundary proxy, so renderer/source parity is the immediate
   blocker.
 
-## Next Product Slice
-
-The next UX-facing slice should decide which of these explanations should be
-shown in the product route status, so users understand when grain comes from
-hard object masks versus source reconstruction mismatch.
+The product route status consumes these explanations directly. Report-backed
+samples expose `boundary-mixing-dominant`, `coverage-hole-risk`, or
+`browser-residual-dominant`; samples without a matching quality-chain row expose
+`hard-mask-quality-unmeasured` instead of inventing a diagnosis.

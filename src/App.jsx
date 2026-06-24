@@ -80,6 +80,32 @@ const WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS = 300_000;
 const WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE = 512;
 const WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE = 384;
 const WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE = 320;
+const HARD_MASK_QUALITY_BY_ASSET = {
+  "nerf-lego-alpha-closure-local": {
+    interpretation: "boundary-mixing-dominant",
+    label: "边界混合主导",
+    source: "hard-mask-quality-chain-v1",
+    deletedObjectId: 0,
+    hardMaskGapScore: 0.524659,
+    residualCoverageRatio: 1.170841,
+  },
+  "plush-semantic-closure-local": {
+    interpretation: "boundary-mixing-dominant",
+    label: "边界混合主导",
+    source: "hard-mask-quality-chain-v1",
+    deletedObjectId: 0,
+    hardMaskGapScore: 0.513937,
+    residualCoverageRatio: 1.303149,
+  },
+  "nerf-lego-trained-output-local": {
+    interpretation: "browser-residual-dominant",
+    label: "重建残差主导",
+    source: "hard-mask-quality-chain-v1",
+    deletedObjectId: 0,
+    hardMaskGapScore: 0.377656,
+    residualCoverageRatio: 15.599172,
+  },
+};
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
@@ -293,6 +319,10 @@ export default function App() {
       useWebGpuTileRenderer,
     ],
   );
+  const hardMaskQuality = useMemo(
+    () => hardMaskQualityContract(scene, rendererRoute),
+    [scene, rendererRoute],
+  );
   const visibleCount = useMemo(
     () =>
       scene.points.filter(
@@ -340,6 +370,7 @@ export default function App() {
       }
       const cloud = parsePly(await response.arrayBuffer());
       applyScene({
+        assetId: asset.id,
         name: asset.fileName ?? asset.name,
         points: cloud.points,
         shRestCoefficients: cloud.shRestCoefficients,
@@ -432,6 +463,11 @@ export default function App() {
       data-color-mode-role={rendererRoute.colorModeRole}
       data-source-preview-boundary={rendererRoute.sourceBoundary}
       data-preview-quality={rendererRoute.qualityId}
+      data-hard-mask-quality-interpretation={hardMaskQuality.interpretation}
+      data-hard-mask-quality-source={hardMaskQuality.source}
+      data-hard-mask-gap-score={hardMaskQuality.hardMaskGapScore ?? ""}
+      data-hard-mask-residual-coverage-ratio={hardMaskQuality.residualCoverageRatio ?? ""}
+      data-hard-mask-deleted-object={hardMaskQuality.deletedObjectId ?? ""}
     >
       <header className="topbar">
         <div className="brand">
@@ -808,6 +844,7 @@ export default function App() {
             <StateRow label="渲染器" value={activeRendererText} />
             <StateRow label="颜色用途" value={rendererRoute.colorRoleLabel} />
             <StateRow label="预览边界" value={rendererRoute.sourceBoundaryLabel} />
+            <StateRow label="质量解释" value={hardMaskQuality.label} />
             <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
             <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
             <StateRow
@@ -1077,6 +1114,32 @@ function rendererRouteContract({
     bannerTitle: "Fallback 预览",
     tone: "fallback",
     title: "兼容回退路线：近似编辑预览",
+  };
+}
+
+function hardMaskQualityContract(scene, rendererRoute) {
+  if (rendererRoute.sourceBoundary === "source-splat") {
+    return {
+      interpretation: "source-splat",
+      label: "原始 Spark 高斯",
+      source: "route-state",
+    };
+  }
+  if (rendererRoute.sourceBoundary === "diagnostic-object-color") {
+    return {
+      interpretation: "diagnostic-object-color",
+      label: "对象色诊断",
+      source: "route-state",
+    };
+  }
+
+  const reportBacked = HARD_MASK_QUALITY_BY_ASSET[scene?.assetId];
+  if (reportBacked) return reportBacked;
+
+  return {
+    interpretation: "hard-mask-quality-unmeasured",
+    label: "硬 mask 待审计",
+    source: "route-state",
   };
 }
 

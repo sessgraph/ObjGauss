@@ -77,6 +77,11 @@ const KNOWN_ASSETS = [
     fileName: "nerf_lego_trained_objects.ply",
   },
 ];
+const HARD_MASK_QUALITY_EXPECTATIONS = {
+  "nerf-lego-alpha-closure-local": "boundary-mixing-dominant",
+  "plush-semantic-closure-local": "boundary-mixing-dominant",
+  "nerf-lego-trained-output-local": "browser-residual-dominant",
+};
 const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
 const VISUAL_RESIDUAL_SKIPPED_MODE = "skipped-by-native-mask-gate-v1";
@@ -189,8 +194,8 @@ try {
         `visualResidual=${JSON.stringify(result.visualResidualMode)}:${result.sparkVisualCoverage}/${result.editOriginalVisualCoverage}:${result.sparkEditCoverageRatio}:${result.sparkEditLumaDelta}:${result.sparkEditChromaDelta} ` +
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
-        `route=${JSON.stringify(result.initialRouteId)}:${JSON.stringify(result.initialRouteKind)}:${JSON.stringify(result.initialColorModeRole)}:${JSON.stringify(result.initialSourcePreviewBoundary)} ` +
-        `objectColorRoute=${JSON.stringify(result.objectColorRouteId)}:${JSON.stringify(result.objectColorRouteKind)}:${JSON.stringify(result.objectColorModeRole)}:${JSON.stringify(result.objectColorSourcePreviewBoundary)} ` +
+        `route=${JSON.stringify(result.initialRouteId)}:${JSON.stringify(result.initialRouteKind)}:${JSON.stringify(result.initialColorModeRole)}:${JSON.stringify(result.initialSourcePreviewBoundary)}:${JSON.stringify(result.initialHardMaskQuality)} ` +
+        `objectColorRoute=${JSON.stringify(result.objectColorRouteId)}:${JSON.stringify(result.objectColorRouteKind)}:${JSON.stringify(result.objectColorModeRole)}:${JSON.stringify(result.objectColorSourcePreviewBoundary)}:${JSON.stringify(result.objectColorHardMaskQuality)} ` +
         `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)}:${JSON.stringify(result.webGpuViewportQuality)}:${result.webGpuViewportPixelBudget} ` +
@@ -245,7 +250,8 @@ try {
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
-        `postDeleteRoute=${JSON.stringify(result.routeAfterDeleteId)}:${JSON.stringify(result.routeAfterDeleteKind)}:${JSON.stringify(result.colorModeRoleAfterDelete)}:${JSON.stringify(result.sourcePreviewBoundaryAfterDelete)} ` +
+        `postDeleteRoute=${JSON.stringify(result.routeAfterDeleteId)}:${JSON.stringify(result.routeAfterDeleteKind)}:${JSON.stringify(result.colorModeRoleAfterDelete)}:${JSON.stringify(result.sourcePreviewBoundaryAfterDelete)}:${JSON.stringify(result.hardMaskQualityAfterDelete)} ` +
+        `hardMaskQuality=${JSON.stringify(result.hardMaskQualityAfterDelete)}:${JSON.stringify(result.hardMaskQualitySourceAfterDelete)}:${result.hardMaskGapScoreAfterDelete}:${result.hardMaskResidualCoverageRatioAfterDelete}:${JSON.stringify(result.hardMaskDeletedObjectAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
         `sparkMaskSource=${JSON.stringify(result.sparkMaskSourceAfterDelete ?? "")} ` +
@@ -317,13 +323,17 @@ async function runAudit(url, assetsToCheck, options) {
       const initialRouteKind = await appShell.getAttribute("data-renderer-route-kind");
       const initialColorModeRole = await appShell.getAttribute("data-color-mode-role");
       const initialSourcePreviewBoundary = await appShell.getAttribute("data-source-preview-boundary");
+      const initialHardMaskQuality = await appShell.getAttribute("data-hard-mask-quality-interpretation");
+      const initialHardMaskQualitySource = await appShell.getAttribute("data-hard-mask-quality-source");
       if (
         initialRouteKind !== "commercial" ||
         initialColorModeRole !== "source-color" ||
-        initialSourcePreviewBoundary !== "source-splat"
+        initialSourcePreviewBoundary !== "source-splat" ||
+        initialHardMaskQuality !== "source-splat" ||
+        initialHardMaskQualitySource !== "route-state"
       ) {
         throw new Error(
-          `${asset.id} initial route did not expose commercial source splat contract: route=${initialRouteId}:${initialRouteKind} color=${initialColorModeRole} boundary=${initialSourcePreviewBoundary}`,
+          `${asset.id} initial route did not expose commercial source splat contract: route=${initialRouteId}:${initialRouteKind} color=${initialColorModeRole} boundary=${initialSourcePreviewBoundary} quality=${initialHardMaskQuality}:${initialHardMaskQualitySource}`,
         );
       }
       const screenshotOptions = { timeoutMs: 60000, usePageClip: true };
@@ -355,14 +365,16 @@ async function runAudit(url, assetsToCheck, options) {
       const objectColorRouteKind = await appShell.getAttribute("data-renderer-route-kind");
       const objectColorModeRole = await appShell.getAttribute("data-color-mode-role");
       const objectColorSourcePreviewBoundary = await appShell.getAttribute("data-source-preview-boundary");
+      const objectColorHardMaskQuality = await appShell.getAttribute("data-hard-mask-quality-interpretation");
       if (
         objectColorRouteId !== "diagnostic-object-color" ||
         objectColorRouteKind !== "diagnostic" ||
         objectColorModeRole !== "diagnostic-object-color" ||
-        objectColorSourcePreviewBoundary !== "diagnostic-object-color"
+        objectColorSourcePreviewBoundary !== "diagnostic-object-color" ||
+        objectColorHardMaskQuality !== "diagnostic-object-color"
       ) {
         throw new Error(
-          `${asset.id} object color mode did not expose diagnostic route: route=${objectColorRouteId}:${objectColorRouteKind} color=${objectColorModeRole} boundary=${objectColorSourcePreviewBoundary}`,
+          `${asset.id} object color mode did not expose diagnostic route: route=${objectColorRouteId}:${objectColorRouteKind} color=${objectColorModeRole} boundary=${objectColorSourcePreviewBoundary} quality=${objectColorHardMaskQuality}`,
         );
       }
       const editRenderer = await labeledValue(page, "渲染器");
@@ -1255,6 +1267,15 @@ async function runAudit(url, assetsToCheck, options) {
       const routeAfterDeleteKind = await appShell.getAttribute("data-renderer-route-kind");
       const colorModeRoleAfterDelete = await appShell.getAttribute("data-color-mode-role");
       const sourcePreviewBoundaryAfterDelete = await appShell.getAttribute("data-source-preview-boundary");
+      const hardMaskQualityAfterDelete = await appShell.getAttribute("data-hard-mask-quality-interpretation");
+      const hardMaskQualitySourceAfterDelete = await appShell.getAttribute("data-hard-mask-quality-source");
+      const hardMaskGapScoreAfterDelete = finiteNumericValue(
+        await appShell.getAttribute("data-hard-mask-gap-score") ?? "0",
+      );
+      const hardMaskResidualCoverageRatioAfterDelete = finiteNumericValue(
+        await appShell.getAttribute("data-hard-mask-residual-coverage-ratio") ?? "0",
+      );
+      const hardMaskDeletedObjectAfterDelete = await appShell.getAttribute("data-hard-mask-deleted-object");
       const postDeleteViewport = page.locator(".viewport").first();
       const postDeleteRendererId = await postDeleteViewport.getAttribute("data-renderer");
       const postDeleteObjectFilter = await postDeleteViewport.getAttribute("data-object-filter");
@@ -1428,6 +1449,26 @@ async function runAudit(url, assetsToCheck, options) {
       ) {
         throw new Error(
           `${asset.id} delete preview did not expose source-color object-mask boundary: route=${routeAfterDeleteId}:${routeAfterDeleteKind} color=${colorModeRoleAfterDelete} boundary=${sourcePreviewBoundaryAfterDelete}`,
+        );
+      }
+      const expectedHardMaskQuality =
+        HARD_MASK_QUALITY_EXPECTATIONS[asset.id] ?? "hard-mask-quality-unmeasured";
+      const expectedHardMaskQualitySource =
+        HARD_MASK_QUALITY_EXPECTATIONS[asset.id] ? "hard-mask-quality-chain-v1" : "route-state";
+      if (
+        hardMaskQualityAfterDelete !== expectedHardMaskQuality ||
+        hardMaskQualitySourceAfterDelete !== expectedHardMaskQualitySource
+      ) {
+        throw new Error(
+          `${asset.id} delete preview hard-mask quality contract failed: quality=${hardMaskQualityAfterDelete}:${hardMaskQualitySourceAfterDelete} expected=${expectedHardMaskQuality}:${expectedHardMaskQualitySource}`,
+        );
+      }
+      if (
+        hardMaskQualitySourceAfterDelete === "hard-mask-quality-chain-v1" &&
+        (hardMaskGapScoreAfterDelete <= 0 || hardMaskResidualCoverageRatioAfterDelete <= 0)
+      ) {
+        throw new Error(
+          `${asset.id} report-backed hard-mask quality did not expose positive metrics: gap=${hardMaskGapScoreAfterDelete} coverage=${hardMaskResidualCoverageRatioAfterDelete}`,
         );
       }
       if (sparkFilteredAfterDelete && routeAfterDeleteKind !== "commercial") {
@@ -1649,6 +1690,8 @@ async function runAudit(url, assetsToCheck, options) {
         initialRouteKind,
         initialColorModeRole,
         initialSourcePreviewBoundary,
+        initialHardMaskQuality,
+        initialHardMaskQualitySource,
         ...visualResidualResultFields(sparkVisualStats, editOriginalVisualStats, visualResidual),
         editPixels,
         editRenderer,
@@ -1657,6 +1700,7 @@ async function runAudit(url, assetsToCheck, options) {
         objectColorRouteKind,
         objectColorModeRole,
         objectColorSourcePreviewBoundary,
+        objectColorHardMaskQuality,
         webGpuFirstFrameStatus,
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
@@ -1842,6 +1886,11 @@ async function runAudit(url, assetsToCheck, options) {
         routeAfterDeleteKind,
         colorModeRoleAfterDelete,
         sourcePreviewBoundaryAfterDelete,
+        hardMaskQualityAfterDelete,
+        hardMaskQualitySourceAfterDelete,
+        hardMaskGapScoreAfterDelete,
+        hardMaskResidualCoverageRatioAfterDelete,
+        hardMaskDeletedObjectAfterDelete,
         deletedObjects,
         postDeleteRendererId,
         postDeleteObjectFilter,

@@ -111,6 +111,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AT 已完成 renderer readiness matrix：`docs/rendering/renderer-readiness-matrix.md` 明确商业 Demo 默认继续走 Spark source/original route，WebGPU Tile 作为 C-path proof / diagnostics，Gaussian OIT 作为 fallback；同时把“原始颜色 / 自身颜色删除后仍可能颗粒”界定为 hard object mask、边界 assignment、未重优化补洞和 SH-heavy packed route 的质量边界，而不是颜色丢失 bug。
   - RENDER-005T-AU 已完成产品 renderer route UI contract：颜色下拉改为 `自身颜色` / `对象色诊断`，viewport 增加 route badge，状态面板显示 `展示路线`、`颜色用途`、`预览边界`；root DOM 暴露 route / color role / preview boundary attributes，并由 `audit-demo` 验证首屏 commercial Spark、对象色 diagnostic、删除后 `hard-object-mask-no-reoptimize`。
   - RENDER-005T-AV 已完成 SH-heavy Spark route-only audit：新增 `npm run audit:spark-trained-route`，默认用静态 preview 验证 `nerf-lego-trained-output-local` 的 `spark-ply-sh-source` 初始 route、删除后的 `spark-packed-sh-mask` / `packed-sh-extract-v1`、`object-opacity-texture-v1`、`hard-object-mask-no-reoptimize` 和完整 degree-3 SH rest preservation。
+  - RENDER-005T-BD 已完成产品 hard-mask quality status：状态面板新增 `质量解释`，root DOM 暴露 `data-hard-mask-quality-*`，`audit-demo` 可验证并打印 hard-mask quality contract；`自身颜色` 现在只表示颜色来源，颗粒感来源由 `预览边界` 和 `质量解释` 区分为原始 Spark、高斯 hard mask 边界混合、重建残差或待审计。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -194,6 +195,11 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-demo.mjs
+npm run build
+npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5365
+uv run --extra dev pytest
+git diff --check
 node --check scripts/audit-hard-mask-quality.mjs
 npm run audit:hard-mask-quality -- --boundary-summary /tmp/objgauss-object-mask-boundary/summary.json --route-summary /tmp/objgauss-spark-commercial-route-availability/summary.json --residual-summary /tmp/objgauss-spark-reconstruct-residual-multiscene/summary.json,/tmp/objgauss-spark-reconstruct-residual-trained/summary.json --output-dir /tmp/objgauss-hard-mask-quality
 npm run audit:hard-mask-quality -- --output-dir /tmp/objgauss-hard-mask-quality-default
