@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AX`: 评估是否把 `acceptance:spark-commercial-route` 纳入 broader `acceptance:demo` / CI，或先新增 compact route report artifact。
+  - `RENDER-005T-AY`: 评估 report-backed `acceptance:spark-commercial-route` 是否纳入 broader `acceptance:demo` / CI，还是因为依赖本机 trained SH-heavy sample 而保持为显式 product-route gate。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AX: Spark commercial route report artifact
+
+- 状态: done / route-report-artifact
+- 类型: 标准 PR / acceptance reporting
+- 目标: 在 `acceptance:spark-commercial-route` 已能统一跑 no-SH native 与 SH-heavy packed route 后，补 compact route report artifact，避免只靠终端长日志审查商业展示路线。
+- 已实施:
+  - `scripts/acceptance-spark-commercial-route.mjs` 现在会 tee 子命令输出并解析关键 browser gate 行。
+  - 默认写出 `/tmp/objgauss-spark-commercial-route/summary.json` 与 `summary.md`。
+  - 支持 `--output-dir <path>` 指定报告目录。
+  - Report 汇总 native no-SH route、SH-heavy initial/delete route、Spark source、visible/base Gaussian、object mask、SH rest preservation tuple、contract boundary 和截图路径。
+- 结论:
+  - 商用 Spark route gate 现在既能 fail fast，也能留下可审查 artifact。
+  - 当前仍不直接纳入 `acceptance:demo`；是否放进 broader CI 需要先决定本机 trained SH-heavy sample 的可用性策略。
+- 验证:
+  - `node --check scripts/acceptance-spark-commercial-route.mjs`: passed。
+  - `npm run acceptance:spark-commercial-route -- --native-port 5349 --trained-port 5350 --output-dir /tmp/objgauss-spark-commercial-route-report`: passed。
+  - Summary inspect: `status=passed`、`steps=3`、`native=2`、`trained=1`，trained delete route 为 `spark-packed-sh-mask / commercial / hard-object-mask-no-reoptimize`，SH rest 为 `255794 / 255794 / true / 45 / 3`。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AW: Spark commercial route acceptance
 

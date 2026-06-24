@@ -152,6 +152,17 @@ npm run audit:spark-native-mask-gate
 npm run audit:spark-trained-route
 ```
 
+By default it writes:
+
+```text
+/tmp/objgauss-spark-commercial-route/summary.json
+/tmp/objgauss-spark-commercial-route/summary.md
+```
+
+Use `--output-dir <path>` to place the report elsewhere. The report summarizes
+the route, source, visible Gaussian counts, SH preservation tuple, contract
+boundary, and screenshot paths from the underlying browser gates.
+
 It proves that:
 
 - no-SH generated samples use Spark native compact `.splat` object masking;
@@ -163,6 +174,7 @@ renderer-native arbitrary third-party `.splat` object metadata.
 
 ## Next Product Slice
 
-The next UX-facing slice should decide whether `acceptance:spark-commercial-route`
-belongs inside broader `acceptance:demo` / CI, or whether it should first emit a
-compact route report artifact for review.
+The next UX-facing slice should decide whether the report-backed
+`acceptance:spark-commercial-route` belongs inside broader `acceptance:demo` /
+CI, or should remain an explicit product-route gate because it depends on the
+local trained SH-heavy sample.
