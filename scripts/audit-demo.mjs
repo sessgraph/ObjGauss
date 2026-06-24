@@ -42,6 +42,7 @@ import {
   WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK,
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
@@ -195,6 +196,7 @@ try {
         `accumulation=${JSON.stringify(result.webGpuAccumulationStatus)}:${JSON.stringify(result.webGpuAccumulationSource)}:${result.webGpuAccumulationWorkgroups} ` +
         `compute=${JSON.stringify(result.webGpuComputeStatus)}:${JSON.stringify(result.webGpuComputeSource)}:${result.webGpuComputeWorkgroups} ` +
         `pixel=${JSON.stringify(result.webGpuPixelStatus)}:${JSON.stringify(result.webGpuPixelSource)}:${result.webGpuPixelWorkgroups} ` +
+        `readback=${JSON.stringify(result.webGpuReadbackStatus ?? "")}:${JSON.stringify(result.webGpuReadbackSource ?? "")}:${JSON.stringify(result.webGpuReadbackChecksum ?? "")}:${result.webGpuReadbackByteSize ?? 0}:${result.webGpuReadbackFiniteFloats ?? 0}/${result.webGpuReadbackFloatCount ?? 0}:${result.webGpuReadbackNonzeroFloats ?? 0} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)}:${JSON.stringify(result.webGpuAlphaPresentationMode)}:${result.webGpuAlphaPresentationFloor} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
         `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
@@ -863,6 +865,14 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuPixelStatus = await viewport.getAttribute("data-webgpu-pixel-status");
       const webGpuPixelReason = await viewport.getAttribute("data-webgpu-pixel-reason");
       const webGpuPixelWorkgroups = numericValue(await viewport.getAttribute("data-webgpu-pixel-workgroups") ?? "0");
+      const webGpuReadbackStatus = await viewport.getAttribute("data-webgpu-readback-status");
+      const webGpuReadbackReason = await viewport.getAttribute("data-webgpu-readback-reason");
+      const webGpuReadbackSource = await viewport.getAttribute("data-webgpu-readback-source");
+      const webGpuReadbackChecksum = await viewport.getAttribute("data-webgpu-readback-checksum");
+      const webGpuReadbackByteSize = numericValue(await viewport.getAttribute("data-webgpu-readback-byte-size") ?? "0");
+      const webGpuReadbackFloatCount = numericValue(await viewport.getAttribute("data-webgpu-readback-float-count") ?? "0");
+      const webGpuReadbackFiniteFloats = numericValue(await viewport.getAttribute("data-webgpu-readback-finite-floats") ?? "0");
+      const webGpuReadbackNonzeroFloats = numericValue(await viewport.getAttribute("data-webgpu-readback-nonzero-floats") ?? "0");
       const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageReason = await viewport.getAttribute("data-webgpu-storage-reason");
@@ -895,6 +905,14 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuFirstFrameChecksum,
           webGpuResolveSource,
           webGpuResolveFilter,
+          webGpuReadbackStatus,
+          webGpuReadbackReason,
+          webGpuReadbackSource,
+          webGpuReadbackChecksum,
+          webGpuReadbackByteSize,
+          webGpuReadbackFloatCount,
+          webGpuReadbackFiniteFloats,
+          webGpuReadbackNonzeroFloats,
           webGpuAlphaPresentationMode,
           webGpuAlphaPresentationTuningMode,
           webGpuAlphaPresentationFloor,
@@ -1016,6 +1034,14 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuPixelSource,
             webGpuPixelStatus,
             webGpuPixelWorkgroups,
+            webGpuReadbackStatus,
+            webGpuReadbackReason,
+            webGpuReadbackSource,
+            webGpuReadbackChecksum,
+            webGpuReadbackByteSize,
+            webGpuReadbackFloatCount,
+            webGpuReadbackFiniteFloats,
+            webGpuReadbackNonzeroFloats,
             webGpuStorageLayout,
             webGpuStorageStatus,
             webGpuStorageBufferCount,
@@ -1758,6 +1784,14 @@ function validateWebGpuRuntimeProbe({
   webGpuFirstFrameChecksum,
   webGpuResolveSource,
   webGpuResolveFilter,
+  webGpuReadbackStatus,
+  webGpuReadbackReason,
+  webGpuReadbackSource,
+  webGpuReadbackChecksum,
+  webGpuReadbackByteSize,
+  webGpuReadbackFloatCount,
+  webGpuReadbackFiniteFloats,
+  webGpuReadbackNonzeroFloats,
   webGpuAlphaPresentationMode,
   webGpuAlphaPresentationTuningMode,
   webGpuAlphaPresentationFloor,
@@ -1895,6 +1929,25 @@ function validateWebGpuRuntimeProbe({
         `${assetId} WebGPU pixel-compute-only probe did not submit pixel compute: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}`,
       );
     }
+  } else if (expectedProbe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK) {
+    if (
+      webGpuFirstFrameStatus !== "readback" ||
+      webGpuFirstFramePixels <= 0 ||
+      !/^[0-9a-f]{8}$/.test(webGpuFirstFrameChecksum ?? "") ||
+      webGpuResolveSource !== WEBGPU_PIXEL_RESOLVE_SOURCE ||
+      webGpuResolveFilter !== "offscreen-map-read" ||
+      webGpuReadbackStatus !== "mapped" ||
+      webGpuReadbackSource !== WEBGPU_PIXEL_RESOLVE_SOURCE ||
+      webGpuReadbackChecksum !== webGpuFirstFrameChecksum ||
+      webGpuReadbackByteSize <= 0 ||
+      webGpuReadbackFloatCount <= 0 ||
+      webGpuReadbackFiniteFloats !== webGpuReadbackFloatCount ||
+      webGpuReadbackNonzeroFloats <= 0
+    ) {
+      throw new Error(
+        `${assetId} WebGPU offscreen-readback probe did not map GPU pixel output: frame=${webGpuFirstFrameStatus}:${webGpuFirstFrameReason} pixels=${webGpuFirstFramePixels} checksum=${webGpuFirstFrameChecksum} source=${webGpuResolveSource}:${webGpuResolveFilter} readback=${webGpuReadbackStatus}:${webGpuReadbackReason}:${webGpuReadbackSource}:${webGpuReadbackChecksum}:${webGpuReadbackByteSize}:${webGpuReadbackFloatCount}:${webGpuReadbackFiniteFloats}:${webGpuReadbackNonzeroFloats}`,
+      );
+    }
   } else if (
     webGpuFirstFrameStatus !== "probed" ||
     webGpuFirstFramePixels <= 0 ||
@@ -1946,6 +1999,9 @@ function expectedProbeStages(probe) {
     return { dispatched: new Set(["pixel"]) };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY) {
+    return { dispatched: new Set(["pixel"]) };
+  }
+  if (probe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK) {
     return { dispatched: new Set(["pixel"]) };
   }
   if (probe === WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY) {

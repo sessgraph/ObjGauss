@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AP`: 为 CI/headless 环境补 WebGPU compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
+  - `RENDER-005T-AQ`: 将 `offscreen-readback` 扩展成多场景 CI/headless gate 和 summary report，继续把 WebGPU compute/storage/readback 与 canvas presentation failure 分离。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AP: WebGPU offscreen readback probe
+
+- 状态: done / offscreen-readback-audited
+- 类型: 标准 PR / WebGPU runtime diagnostics
+- 目标: 为 CI/headless 环境补 WebGPU compute-only / offscreen readback probe，避免把 canvas presentation backend failure 误判为 renderer compute/storage failure。
+- 已实施:
+  - 新增 `webgpu-probe=offscreen-readback`，只 dispatch pixel compute，不创建 WebGPU canvas render pass。
+  - Runtime 在 compute 后执行 `copyBufferToBuffer(pixelResolvedRgba -> MAP_READ staging)`，并把 mapped GPU buffer telemetry 暴露为 `data-webgpu-readback-status/reason/source/checksum/byte-size/float-count/finite-floats/nonzero-floats`。
+  - `audit-demo` 验证 offscreen probe 必须 `pixel=dispatched`、`firstFrame=readback`、`resolveFilter=offscreen-map-read`、readback checksum 与 first-frame checksum 一致、finite float 全覆盖且 nonzero floats 大于 0。
+  - 新增 `npm run audit:webgpu-offscreen-readback`；`audit:webgpu-desktop` 默认 probe 列表加入 `offscreen-readback`，使 desktop/headless classification 先证明 compute/readback 再判断 presentation。
+- 结论:
+  - Lego proxy 本地 offscreen audit 通过：`firstFrame="readback":253952`、`queue="done"`、`deviceLost="active"`、`readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740`。
+  - 这条 probe 不证明 canvas display path 成功；它专门证明 WebGPU storage upload、pixel compute、buffer copy 和 GPU readback 成功。presentation 仍由 `clear-only` / texture display / full headed desktop probes 覆盖。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-desktop.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:webgpu-offscreen-readback -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5320/ --no-server`: passed，使用本地 Vite preview；直接 dev server 在 sandbox 下未能 ready，改用 built preview。
 
 ### RENDER-005T-AO: Spark pick object-support disambiguation
 

@@ -41,6 +41,7 @@ import {
   WEBGPU_RUNTIME_PROBE_CLEAR_ONLY,
   WEBGPU_RUNTIME_PROBE_DISPLAY_ONLY,
   WEBGPU_RUNTIME_PROBE_FULL,
+  WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK,
   WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
   WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY,
   WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
@@ -78,6 +79,16 @@ export default function WebGpuTileViewport({
     pixels: 0,
     source: "",
     filter: "",
+  });
+  const [readback, setReadback] = useState({
+    status: "skipped",
+    reason: "webgpu-readback-not-requested",
+    source: "",
+    checksum: "",
+    byteLength: 0,
+    floatCount: 0,
+    finiteFloats: 0,
+    nonzeroFloats: 0,
   });
   const [deviceLost, setDeviceLost] = useState({
     status: "active",
@@ -225,6 +236,16 @@ export default function WebGpuTileViewport({
         source: "",
         workgroups: 0,
       });
+      setReadback({
+        status: "failed",
+        reason: "navigator-gpu-unavailable",
+        source: "",
+        checksum: "",
+        byteLength: 0,
+        floatCount: 0,
+        finiteFloats: 0,
+        nonzeroFloats: 0,
+      });
       setDeviceLost({
         status: "unavailable",
         reason: "navigator-gpu-unavailable",
@@ -261,14 +282,21 @@ export default function WebGpuTileViewport({
           });
         });
 
-        const context = canvas.getContext("webgpu");
-        if (!context) throw new Error("webgpu-context-unavailable");
-        const format = navigator.gpu.getPreferredCanvasFormat();
-        const resolveModule = device.createShaderModule({
-          code: createWebGpuTileResolveShader(alphaPresentationTuning),
-        });
-        const sampledTextureModule = device.createShaderModule({ code: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER });
-        const floatTextureModule = device.createShaderModule({ code: WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER });
+        const needsPresentation = runtimeProbeNeedsPresentation(runtimeProbe);
+        const context = needsPresentation ? canvas.getContext("webgpu") : null;
+        if (needsPresentation && !context) throw new Error("webgpu-context-unavailable");
+        const format = needsPresentation ? navigator.gpu.getPreferredCanvasFormat() : "";
+        const resolveModule = needsPresentation
+          ? device.createShaderModule({
+              code: createWebGpuTileResolveShader(alphaPresentationTuning),
+            })
+          : null;
+        const sampledTextureModule = needsPresentation
+          ? device.createShaderModule({ code: WEBGPU_SAMPLED_TEXTURE_RESOLVE_SHADER })
+          : null;
+        const floatTextureModule = needsPresentation
+          ? device.createShaderModule({ code: WEBGPU_FLOAT_TEXTURE_LOAD_RESOLVE_SHADER })
+          : null;
         const resolveComputeModule = device.createShaderModule({ code: WEBGPU_TILE_COMPUTE_SHADER });
         const pixelResolveModule = device.createShaderModule({
           code: createWebGpuPixelResolveShader({
@@ -289,36 +317,42 @@ export default function WebGpuTileViewport({
           layout: "auto",
           compute: { module: pixelResolveModule, entryPoint: "pixelResolveMain" },
         });
-        const pipeline = device.createRenderPipeline({
-          layout: "auto",
-          vertex: { module: resolveModule, entryPoint: "vertexMain" },
-          fragment: {
-            module: resolveModule,
-            entryPoint: "fragmentMain",
-            targets: [{ format }],
-          },
-          primitive: { topology: "triangle-list" },
-        });
-        const sampledTexturePipeline = device.createRenderPipeline({
-          layout: "auto",
-          vertex: { module: sampledTextureModule, entryPoint: "vertexMain" },
-          fragment: {
-            module: sampledTextureModule,
-            entryPoint: "fragmentMain",
-            targets: [{ format }],
-          },
-          primitive: { topology: "triangle-list" },
-        });
-        const floatTexturePipeline = device.createRenderPipeline({
-          layout: "auto",
-          vertex: { module: floatTextureModule, entryPoint: "vertexMain" },
-          fragment: {
-            module: floatTextureModule,
-            entryPoint: "fragmentMain",
-            targets: [{ format }],
-          },
-          primitive: { topology: "triangle-list" },
-        });
+        const pipeline = needsPresentation
+          ? device.createRenderPipeline({
+              layout: "auto",
+              vertex: { module: resolveModule, entryPoint: "vertexMain" },
+              fragment: {
+                module: resolveModule,
+                entryPoint: "fragmentMain",
+                targets: [{ format }],
+              },
+              primitive: { topology: "triangle-list" },
+            })
+          : null;
+        const sampledTexturePipeline = needsPresentation
+          ? device.createRenderPipeline({
+              layout: "auto",
+              vertex: { module: sampledTextureModule, entryPoint: "vertexMain" },
+              fragment: {
+                module: sampledTextureModule,
+                entryPoint: "fragmentMain",
+                targets: [{ format }],
+              },
+              primitive: { topology: "triangle-list" },
+            })
+          : null;
+        const floatTexturePipeline = needsPresentation
+          ? device.createRenderPipeline({
+              layout: "auto",
+              vertex: { module: floatTextureModule, entryPoint: "vertexMain" },
+              fragment: {
+                module: floatTextureModule,
+                entryPoint: "fragmentMain",
+                targets: [{ format }],
+              },
+              primitive: { topology: "triangle-list" },
+            })
+          : null;
         const runtime = {
           device,
           context,
@@ -350,6 +384,7 @@ export default function WebGpuTileViewport({
           setCompute,
           setPixel,
           setAccumulation,
+          setReadback,
           setQueue,
         });
       } catch (error) {
@@ -390,6 +425,16 @@ export default function WebGpuTileViewport({
           reason: error?.message || "webgpu-accumulation-unavailable",
           source: "",
           workgroups: 0,
+        });
+        setReadback({
+          status: "failed",
+          reason: error?.message || "webgpu-readback-unavailable",
+          source: "",
+          checksum: "",
+          byteLength: 0,
+          floatCount: 0,
+          finiteFloats: 0,
+          nonzeroFloats: 0,
         });
         setDeviceLost({
           status: "unavailable",
@@ -441,6 +486,7 @@ export default function WebGpuTileViewport({
       setCompute,
       setPixel,
       setAccumulation,
+      setReadback,
       setQueue,
     });
   }, [runtimeProbe, tileSmoke]);
@@ -612,6 +658,14 @@ export default function WebGpuTileViewport({
       data-webgpu-pixel-status={pixel.status}
       data-webgpu-pixel-reason={pixel.reason}
       data-webgpu-pixel-workgroups={pixel.workgroups}
+      data-webgpu-readback-status={readback.status}
+      data-webgpu-readback-reason={readback.reason}
+      data-webgpu-readback-source={readback.source}
+      data-webgpu-readback-checksum={readback.checksum}
+      data-webgpu-readback-byte-size={readback.byteLength}
+      data-webgpu-readback-float-count={readback.floatCount}
+      data-webgpu-readback-finite-floats={readback.finiteFloats}
+      data-webgpu-readback-nonzero-floats={readback.nonzeroFloats}
       data-webgpu-storage-layout={storage.layoutVersion}
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
@@ -668,6 +722,16 @@ function readWebGpuAlphaPresentationTuning() {
   });
 }
 
+function runtimeProbeNeedsPresentation(probe) {
+  const normalized = normalizeWebGpuRuntimeProbe(probe);
+  return ![
+    WEBGPU_RUNTIME_PROBE_ACCUMULATION_ONLY,
+    WEBGPU_RUNTIME_PROBE_RESOLVE_ONLY,
+    WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY,
+    WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK,
+  ].includes(normalized);
+}
+
 async function requestWebGpuTileDevice(adapter) {
   const supportedStorageBuffersPerStage =
     adapter.limits?.maxStorageBuffersPerShaderStage ?? 0;
@@ -695,6 +759,7 @@ function renderFrame({
   setCompute,
   setPixel,
   setAccumulation,
+  setReadback,
   setQueue,
 }) {
   const {
@@ -719,8 +784,10 @@ function renderFrame({
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_COMPUTE_ONLY ||
+    probe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK ||
     probe === WEBGPU_RUNTIME_PROBE_TEXTURE_COPY_DISPLAY ||
     probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT;
+  const runReadback = probe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK;
   const runStorageDisplay =
     probe === WEBGPU_RUNTIME_PROBE_FULL ||
     probe === WEBGPU_RUNTIME_PROBE_PIXEL_OUTPUT_ONLY ||
@@ -734,9 +801,35 @@ function renderFrame({
     probe === WEBGPU_RUNTIME_PROBE_CLEAR_ONLY;
   const runDisplay =
     runStorageDisplay || runSampledTextureDisplay || runFloatTextureCopyDisplay || runClearOnly;
-  resizeCanvasToDisplaySize(canvas);
-  context.configure({ device, format, alphaMode: "opaque" });
+  if (runDisplay) {
+    if (!context) throw new Error("webgpu-context-unavailable");
+    resizeCanvasToDisplaySize(canvas);
+    context.configure({ device, format, alphaMode: "opaque" });
+  }
   destroyTransientBuffers(runtime);
+  setReadback(
+    runReadback
+      ? {
+          status: "pending",
+          reason: "webgpu-offscreen-readback-pending",
+          source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+          checksum: "",
+          byteLength: 0,
+          floatCount: 0,
+          finiteFloats: 0,
+          nonzeroFloats: 0,
+        }
+      : {
+          status: "skipped",
+          reason: "webgpu-readback-not-requested",
+          source: "",
+          checksum: "",
+          byteLength: 0,
+          floatCount: 0,
+          finiteFloats: 0,
+          nonzeroFloats: 0,
+        },
+  );
 
   let storageBundle = null;
   try {
@@ -791,6 +884,16 @@ function renderFrame({
       reason: error?.message || "webgpu-storage-upload-failed",
       source: "",
       workgroups: 0,
+    });
+    setReadback({
+      status: "failed",
+      reason: error?.message || "webgpu-storage-upload-failed",
+      source: "",
+      checksum: "",
+      byteLength: 0,
+      floatCount: 0,
+      finiteFloats: 0,
+      nonzeroFloats: 0,
     });
     return;
   }
@@ -900,6 +1003,9 @@ function renderFrame({
           ],
         })
       : null;
+    const readbackBuffer = runReadback
+      ? createReadbackBuffer(device, storageBundle.getBuffer("pixelResolvedRgba").allocatedByteLength)
+      : null;
     runtime.transientTextures = [sampledTexture, floatTexture].filter(Boolean);
     const encoder = device.createCommandEncoder();
     const accumulationWorkgroups = webGpuAccumulationWorkgroups(tileSmoke);
@@ -937,6 +1043,16 @@ function renderFrame({
           height: Math.max(1, tileSmoke.viewportHeight),
           depthOrArrayLayers: 1,
         },
+      );
+    }
+    if (runReadback) {
+      const pixelBuffer = storageBundle.getBuffer("pixelResolvedRgba");
+      encoder.copyBufferToBuffer(
+        pixelBuffer.buffer,
+        0,
+        readbackBuffer,
+        0,
+        pixelBuffer.allocatedByteLength,
       );
     }
     if (runDisplay) {
@@ -979,12 +1095,54 @@ function renderFrame({
       message: "",
     });
     device.queue.onSubmittedWorkDone().then(
-      () =>
+      async () => {
         setQueue({
           status: "done",
           reason: "webgpu-queue-submitted-work-done",
           message: "",
-        }),
+        });
+        if (runReadback) {
+          try {
+            const result = await readbackBufferTelemetry({
+              buffer: readbackBuffer,
+              byteLength: storageBundle.getBuffer("pixelResolvedRgba").byteLength,
+            });
+            setReadback({
+              status: "mapped",
+              reason: "webgpu-offscreen-readback-mapped",
+              source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+              ...result,
+            });
+            setFrame({
+              status: "readback",
+              reason: "webgpu-offscreen-readback-probe-mapped",
+              checksum: result.checksum,
+              pixels: Math.floor(result.floatCount / 4),
+              source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+              filter: "offscreen-map-read",
+            });
+          } catch (error) {
+            setReadback({
+              status: "failed",
+              reason: error?.message || "webgpu-offscreen-readback-failed",
+              source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+              checksum: "",
+              byteLength: 0,
+              floatCount: 0,
+              finiteFloats: 0,
+              nonzeroFloats: 0,
+            });
+            setFrame({
+              status: "failed",
+              reason: error?.message || "webgpu-offscreen-readback-failed",
+              checksum: "",
+              pixels: 0,
+              source: WEBGPU_PIXEL_RESOLVE_SOURCE,
+              filter: "offscreen-map-read",
+            });
+          }
+        }
+      },
       (error) =>
         setQueue({
           status: "failed",
@@ -1013,7 +1171,9 @@ function renderFrame({
       source: WEBGPU_PIXEL_RESOLVE_SOURCE,
       workgroups: pixelWorkgroups,
     }));
-    setFrame(frameTelemetry({ probe, tileSmoke, runDisplay }));
+    if (!runReadback) {
+      setFrame(frameTelemetry({ probe, tileSmoke, runDisplay }));
+    }
   } catch (error) {
     setAccumulation({
       status: "failed",
@@ -1040,6 +1200,16 @@ function renderFrame({
       pixels: 0,
       source: "",
       filter: "",
+    });
+    setReadback({
+      status: "failed",
+      reason: error?.message || "webgpu-offscreen-readback-failed",
+      source: runReadback ? WEBGPU_PIXEL_RESOLVE_SOURCE : "",
+      checksum: "",
+      byteLength: 0,
+      floatCount: 0,
+      finiteFloats: 0,
+      nonzeroFloats: 0,
     });
     setQueue({
       status: "failed",
@@ -1176,6 +1346,57 @@ function textureDisplayFrameTelemetry(probe, tileSmoke) {
     source: WEBGPU_TILE_RESOLVE_SOURCE,
     filter: WEBGPU_TILE_RESOLVE_FILTER,
   };
+}
+
+function createReadbackBuffer(device, byteLength) {
+  const usage = globalThis.GPUBufferUsage ?? {
+    COPY_DST: 0x0008,
+    MAP_READ: 0x0001,
+  };
+  return device.createBuffer({
+    label: "objgauss-offscreen-pixel-readback",
+    size: Math.max(4, Math.ceil((Number(byteLength) || 0) / 4) * 4),
+    usage: usage.COPY_DST | usage.MAP_READ,
+  });
+}
+
+async function readbackBufferTelemetry({ buffer, byteLength }) {
+  const readByteLength = Math.max(4, Math.floor(Number(byteLength) || 0));
+  const mapMode = globalThis.GPUMapMode ?? { READ: 0x0001 };
+  await buffer.mapAsync(mapMode.READ, 0, readByteLength);
+  const mapped = buffer.getMappedRange(0, readByteLength);
+  const bytes = new Uint8Array(mapped);
+  const floats = new Float32Array(
+    mapped,
+    0,
+    Math.floor(readByteLength / Float32Array.BYTES_PER_ELEMENT),
+  );
+  const checksum = checksumBytes(bytes);
+  const floatCount = floats.length;
+  let finiteFloats = 0;
+  let nonzeroFloats = 0;
+  for (const value of floats) {
+    if (Number.isFinite(value)) finiteFloats += 1;
+    if (value !== 0) nonzeroFloats += 1;
+  }
+  buffer.unmap();
+  buffer.destroy?.();
+  return {
+    checksum,
+    byteLength: readByteLength,
+    floatCount,
+    finiteFloats,
+    nonzeroFloats,
+  };
+}
+
+function checksumBytes(bytes) {
+  let hash = 2166136261;
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function createAccumulationMetaBuffer(device, tileSmoke) {

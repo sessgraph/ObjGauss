@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const DEFAULT_PORT = 5230;
 const DEFAULT_ASSET = "nerf-lego-alpha-closure-local";
-const DEFAULT_PROBES = ["clear-only", "texture-display-only", "full"];
+const DEFAULT_PROBES = ["offscreen-readback", "clear-only", "texture-display-only", "full"];
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);

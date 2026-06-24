@@ -170,6 +170,31 @@ Plush coverage relative to the last baseline coverage gate, but it worsens some
 color deltas. This makes camera framing a useful diagnostic axis, not enough by
 itself to make the edit renderer visually equivalent to Spark.
 
+## Offscreen Readback Probe
+
+Use the offscreen readback probe when CI/headless WebGPU needs to distinguish
+compute/storage health from canvas presentation backend loss:
+
+```bash
+npm run audit:webgpu-offscreen-readback -- \
+  --asset nerf-lego-alpha-closure-local
+```
+
+The probe runs the WebGPU pixel compute path, copies `pixelResolvedRgba` into a
+`MAP_READ` buffer, and validates `data-webgpu-readback-*` telemetry. It does not
+create a canvas render pass, so passing it does not prove display/presentation.
+It proves storage upload, compute dispatch, buffer copy, queue completion, and
+GPU readback.
+
+Current local result:
+
+```text
+firstFrame="readback":253952
+queue="done":"webgpu-queue-submitted-work-done"
+deviceLost="active":"webgpu-device-active"
+readback="mapped":"webgpu-compute-depth-binned-alpha-composite-v1":"897e852d":4063232:1015808/1015808:533740
+```
+
 ## Depth Alpha Mode Diagnostic
 
 Use the alpha mode knob when comparing depth-bin compositing against a closer
