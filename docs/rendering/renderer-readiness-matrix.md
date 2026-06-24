@@ -85,6 +85,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
+| Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 | Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |
@@ -235,7 +236,40 @@ It proves that:
 It does not prove deletion inpainting, reoptimization, WebGPU visual fidelity, or
 renderer-native arbitrary third-party `.splat` object metadata.
 
+## Hard Mask Boundary Diagnostic
+
+Use this when the source/original route is correct but delete / isolate preview
+still looks sparse, grainy, or rough near object boundaries:
+
+```bash
+npm run audit:object-mask-boundary
+```
+
+The diagnostic is browser-free. It reads object-aware PLY files and estimates
+the hard-mask visual gap from:
+
+- `deletedSubsetCoverageRatio`: how much projected footprint belongs to the
+  object being removed;
+- `uniqueCoverageLossRatio`: projected footprint that only the removed object
+  covers, which is the no-reoptimize hole risk;
+- `sharedBoundaryCoverageRatio`: projected footprint where the removed object
+  overlaps other object IDs, which is boundary-grain risk;
+- `neighborBoundaryRatio`: 3D local neighborhoods that contain another
+  `object_id`, which is assignment-mixing risk.
+
+The default report writes:
+
+```text
+/tmp/objgauss-object-mask-boundary/summary.json
+/tmp/objgauss-object-mask-boundary/summary.md
+```
+
+This does not replace Spark / WebGPU visual residual screenshots. It explains
+whether the likely source of grain is coverage loss, hard boundary mixing, or
+deleted-subset sparsity before tuning shader footprint or alpha presentation.
+
 ## Next Product Slice
 
-The next UX-facing slice should make the trained SH-heavy sample portability
-story explicit before this gate can become a default CI requirement.
+The next UX-facing slice should connect this hard-mask diagnostic to browser
+visual residual reports, so the UI can distinguish renderer limitations from
+object-assignment boundary quality.

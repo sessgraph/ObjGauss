@@ -175,6 +175,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:webgpu-alpha-floor-sweep` / `npm run audit:webgpu-alpha-floor-candidate-gate` 已固化为 alpha presentation floor 候选的多场景复现实验和 strict gate。
   - `npm run audit:webgpu-offscreen-readback` 已固化为 WebGPU compute/storage/readback 多场景 object-transition suite；默认不依赖 canvas presentation 成功，覆盖 Lego proxy 与 Plush semantic，验证首帧、隔离、删除三段 readback checksum 和 object-state checksum，并输出 summary report，适合在 CI/headless 环境区分计算管线和 presentation backend loss。
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
+  - `npm run audit:object-mask-boundary` 已固化为 hard object mask 质量诊断，可从 object-aware PLY 输出 deleted-subset coverage、unique coverage loss、shared boundary coverage 和 3D neighbor boundary risk，解释删除后 source/original 预览仍有颗粒感的可能来源。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
   - `npm run audit:spark-trained-sample` 已固化为本机 trained SH-heavy sample availability preflight，可在浏览器 route gate 前检查 `nerf_lego_trained.*` public sample、`object_id`、degree-3 `f_rest_*` 和 object 数量。
@@ -192,6 +193,11 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-object-mask-boundary.mjs
+npm run audit:object-mask-boundary -- --output-dir /tmp/objgauss-object-mask-boundary
+npm run build
+uv run --extra dev pytest
+git diff --check
 node --check scripts/acceptance-renderer-profile.mjs
 npm run acceptance:renderer -- --profile ci --dry-run --output-dir /tmp/objgauss-renderer-profile-ci-dry-run
 npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-profile-product-dry-run

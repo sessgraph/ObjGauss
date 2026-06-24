@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-BB`: 针对 Spark source/original 删除后仍可能颗粒的问题，建立 object-boundary / deleted-subset coverage diagnostic，把 hard object mask 的视觉缺口从主观观感变成可量化报告。
+  - `RENDER-005T-BC`: 将 object-mask boundary diagnostic 与 browser visual residual / Spark route report 对齐，形成 hard-mask 质量解释链，而不是只看单个 PLY-level proxy。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-BB: Object mask boundary diagnostic
+
+- 状态: done / hard-mask-boundary-diagnostic
+- 类型: 标准 PR / renderer quality diagnostic
+- 目标: 针对 Spark source/original 删除后仍可能颗粒的问题，建立 object-boundary / deleted-subset coverage diagnostic，把 hard object mask 的视觉缺口从主观观感变成可量化报告。
+- 已实施:
+  - 新增 `scripts/audit-object-mask-boundary.mjs` 与 `npm run audit:object-mask-boundary`。
+  - 诊断读取 object-aware PLY，不启动浏览器，不修改素材，默认报告写到 `/tmp/objgauss-object-mask-boundary/summary.{json,md}`。
+  - 三组正交投影估算 `deletedSubsetCoverageRatio`、`uniqueCoverageLossRatio`、`visibleAfterDeleteCoverageRatio` 和 `sharedBoundaryCoverageRatio`。
+  - 3D 邻域采样估算 `neighborBoundaryRatio` / `neighborMixedRatio`，用于解释 object assignment 边界混合风险。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 Hard Mask Boundary Diagnostic，明确该脚本解释 hard-mask grain 来源，但不替代 browser visual residual。
+- 结论:
+  - 默认三资产诊断通过：Lego proxy、Plush semantic、trained Lego 都可生成 hard-mask gap report。
+  - 当前结果显示三个样例的 worst-object `uniqueCoverageLossRatio` 都较低（约 `0.0015-0.0200`），但 `sharedBoundaryCoverageRatio` 与部分 `neighborBoundaryRatio` 很高，说明删除后颗粒感更像 hard object 边界混合 / 子集稀疏问题，而不是大面积 coverage 被删空。
+- 验证:
+  - `node --check scripts/audit-object-mask-boundary.mjs`: passed。
+  - `npm run audit:object-mask-boundary -- --output-dir /tmp/objgauss-object-mask-boundary`: passed；assets=3，skipped=0。
+  - Summary inspect: Lego proxy worst object `1`，gap=`0.528368`，uniqueLoss=`0.019980`，sharedBoundary=`0.941537`，neighborBoundary=`0.946644`。
+  - Summary inspect: Plush semantic worst object `2`，gap=`0.541380`，uniqueLoss=`0.001512`，sharedBoundary=`0.995673`，neighborBoundary=`0.972603`。
+  - Summary inspect: trained Lego worst object `2`，gap=`0.402209`，uniqueLoss=`0.017939`，sharedBoundary=`0.959457`，neighborBoundary=`0.514241`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-BA: Renderer CI / product route profile split
 
