@@ -32,12 +32,14 @@ const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
 const noServer = flagEnabled(args.noServer ?? args["no-server"]) || Boolean(args.url);
 const headed = flagEnabled(args.headed ?? args.headful);
 const includeVisualStats = !flagEnabled(args.skipVisualStats ?? args["skip-visual-stats"]);
+const control = normalizeControl(args.control ?? "url");
 
 const summary = {
   mode: MODE,
   generatedAt: new Date().toISOString(),
   url: baseUrl,
   outputDir,
+  control,
   includeVisualStats,
   assets: assets.map((asset) => asset.id),
   variants,
@@ -66,7 +68,15 @@ try {
     await waitForApp(baseUrl);
   }
 
-  summary.rows = await runSweep({ baseUrl, outputDir, assets, variants, headed, includeVisualStats });
+  summary.rows = await runSweep({
+    baseUrl,
+    outputDir,
+    control,
+    assets,
+    variants,
+    headed,
+    includeVisualStats,
+  });
   summary.comparisons = buildComparisons(summary.rows, variants);
   summary.passed =
     summary.failures.length === 0 &&
@@ -86,7 +96,7 @@ if (!summary.passed) {
   process.exit(1);
 }
 
-async function runSweep({ baseUrl, outputDir, assets, variants, headed, includeVisualStats }) {
+async function runSweep({ baseUrl, outputDir, control, assets, variants, headed, includeVisualStats }) {
   const browser = await chromium.launch(launchOptions({ headed }));
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
   const consoleIssues = [];
@@ -100,7 +110,7 @@ async function runSweep({ baseUrl, outputDir, assets, variants, headed, includeV
   try {
     const rows = [];
     for (const variant of variants) {
-      const variantUrl = urlForVariant(baseUrl, variant);
+      const variantUrl = urlForVariant(baseUrl, variant, control);
       for (const asset of assets) {
         console.log(
           `spark_mask_feather_sweep_asset_start asset=${JSON.stringify(asset.id)} variant=${JSON.stringify(variant.id)}`,
@@ -109,6 +119,7 @@ async function runSweep({ baseUrl, outputDir, assets, variants, headed, includeV
           page,
           url: variantUrl,
           outputDir,
+          control,
           asset,
           variant,
           includeVisualStats,
@@ -133,8 +144,9 @@ async function runSweep({ baseUrl, outputDir, assets, variants, headed, includeV
   }
 }
 
-async function auditAssetVariant({ page, url, outputDir, asset, variant, includeVisualStats }) {
+async function auditAssetVariant({ page, url, outputDir, control, asset, variant, includeVisualStats }) {
   await loadAsset(page, url, asset);
+  await setFeatherControl(page, { control, variant });
   await page.waitForTimeout(750);
   const beforeStats = includeVisualStats
     ? await readCanvasStats(page, asset.id, "before delete", ".splatViewport canvas")
@@ -160,6 +172,7 @@ async function auditAssetVariant({ page, url, outputDir, asset, variant, include
     assetId: asset.id,
     assetName: asset.name,
     variantId: variant.id,
+    control,
     featherEnabled: variant.enabled,
     requestedOpacity: variant.opacity,
     requestedRadius: variant.radius,
@@ -208,6 +221,39 @@ async function auditAssetVariant({ page, url, outputDir, asset, variant, include
     },
     screenshotPath,
   };
+}
+
+async function setFeatherControl(page, { control, variant }) {
+  if (control === "url") {
+    await waitForAppFeatherState(page, variant.enabled);
+    return;
+  }
+  if (
+    variant.enabled &&
+    (Math.abs(variant.opacity - 0.55) > 0.00001 || variant.radius !== null)
+  ) {
+    throw new Error(
+      `ui control supports the built-in feather55 candidate only; received ${variant.id}:${variant.opacity}:${variant.radius}`,
+    );
+  }
+  const checkbox = page.getByRole("checkbox", { name: "柔化删除边界" });
+  await checkbox.waitFor({ timeout: 15000 });
+  const checked = await checkbox.isChecked();
+  if (checked !== variant.enabled) {
+    await checkbox.click();
+  }
+  await waitForAppFeatherState(page, variant.enabled);
+}
+
+async function waitForAppFeatherState(page, enabled) {
+  await page.waitForFunction(
+    (expected) => {
+      const app = document.querySelector(".appShell");
+      return app?.getAttribute("data-spark-object-mask-feather-enabled") === String(expected);
+    },
+    enabled,
+    { timeout: 15000 },
+  );
 }
 
 async function loadAsset(page, url, asset) {
@@ -442,12 +488,12 @@ function selectAssets(value) {
   });
 }
 
-function urlForVariant(baseUrl, variant) {
+function urlForVariant(baseUrl, variant, control) {
   const parsed = new URL(baseUrl);
   parsed.searchParams.delete("spark-object-mask-feather");
   parsed.searchParams.delete("spark-object-mask-feather-opacity");
   parsed.searchParams.delete("spark-object-mask-feather-radius");
-  if (variant.enabled) {
+  if (variant.enabled && control !== "ui") {
     parsed.searchParams.set("spark-object-mask-feather", "on");
     parsed.searchParams.set("spark-object-mask-feather-opacity", String(variant.opacity));
     if (variant.radius !== null) {
@@ -471,6 +517,7 @@ function renderMarkdown(payload) {
     `- Generated: ${payload.generatedAt}`,
     `- Assets: ${payload.assets.join(", ")}`,
     `- Variants: ${payload.variants.map((variant) => variant.id).join(", ")}`,
+    `- Control: ${payload.control}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
     "",
     "## Rows",
@@ -508,6 +555,7 @@ function printSummary(payload) {
   for (const row of payload.rows) {
     console.log(
       `spark_mask_feather_row asset=${JSON.stringify(row.assetId)} variant=${JSON.stringify(row.variantId)} ` +
+        `control=${JSON.stringify(row.control)} ` +
         `route=${JSON.stringify(row.route.id)}:${JSON.stringify(row.route.boundary)}:${JSON.stringify(row.route.result)} ` +
         `objectMask=${JSON.stringify(row.objectMask.mode)}:${JSON.stringify(row.objectMask.size)}:${row.objectMask.visibleGaussians}/${row.objectMask.hiddenGaussians}:${row.objectMask.updates} ` +
         `feather=${JSON.stringify(row.feather.mode)}:${row.feather.featheredGaussians}:${row.feather.radius}:${row.feather.opacity}:${row.feather.opacityMean}/${row.feather.minOpacity} ` +
@@ -657,6 +705,12 @@ function parseArgs(rawArgs) {
     }
   }
   return parsed;
+}
+
+function normalizeControl(value) {
+  const controlValue = String(value ?? "url").toLowerCase();
+  if (controlValue === "url" || controlValue === "ui") return controlValue;
+  throw new Error(`unsupported control ${JSON.stringify(value)}; expected url or ui`);
 }
 
 function flagEnabled(value) {

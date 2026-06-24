@@ -60,11 +60,12 @@ diagnostic approximation rather than the commercial Spark source/original route.
 The product UI exposes this boundary as `预览边界=硬 mask，无补洞` and
 `删除结果=源色 mask 预览`, backed by `data-source-preview-result`.
 
-`spark-object-mask-feather=on` is the first diagnostic path for reducing hard
-mask edge speckle without retraining: it keeps hidden-object opacity at zero but
-uses spatial-neighbor feathering to lower opacity on visible Gaussians near the
-hidden boundary. It is not the default commercial route yet; it is a tunable
-candidate that must be compared across scenes before promotion.
+`spark-object-mask-feather=on` and the Web UI `柔化删除边界` checkbox are the
+first diagnostic paths for reducing hard mask edge speckle without retraining:
+they keep hidden-object opacity at zero but use spatial-neighbor feathering to
+lower opacity on visible Gaussians near the hidden boundary. It is not the
+default commercial route yet; it is a tunable candidate that must be compared
+across scenes before promotion.
 
 `npm run audit:spark-mask-feather-sweep` is that comparison gate. It runs a
 route-only browser flow over Lego proxy and Plush semantic by default, compares
@@ -79,6 +80,13 @@ Current sweep result: `feather55` softens boundary opacity on both default
 scenes, but it does not improve coverage ratio, and only Plush shows a small
 luma improvement. Therefore feather remains diagnostic / candidate behavior
 rather than the default route.
+
+Pass `--control ui` when the gate should click the Web UI checkbox instead of
+using URL params:
+
+```bash
+npm run audit:spark-mask-feather-sweep -- --control ui --skip-visual-stats
+```
 
 ## WebGPU Default Switch Gate
 
@@ -150,6 +158,7 @@ explanatory copy:
   mask`;
 - the state panel exposes `展示路线`, `颜色用途`, `预览边界`, and
   `质量解释`;
+- the scene panel exposes `柔化删除边界` as an explicit diagnostic toggle;
 - the app root exposes machine-readable attributes:
 
 ```text
@@ -163,6 +172,10 @@ data-hard-mask-quality-source
 data-hard-mask-gap-score
 data-hard-mask-residual-coverage-ratio
 data-hard-mask-deleted-object
+data-spark-object-mask-feather-control
+data-spark-object-mask-feather-enabled
+data-spark-object-mask-feather-opacity
+data-spark-object-mask-feather-radius
 ```
 
 `npm run audit:demo` validates the key route transitions:

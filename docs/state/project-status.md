@@ -117,6 +117,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - DEMO-005A 已强化 `自身颜色` hard-mask 预览 UX contract：删除后 root DOM 暴露 `data-source-preview-result="hard-mask-no-inpaint"`，状态面板显示 `删除结果=源色 mask 预览`，避免把源色 hard-mask 误解为补洞后的完整高斯重渲染。
   - DEMO-005B 已新增 Spark object mask feather 诊断路径：`spark-object-mask-feather=on` 会保持 hidden object opacity 为 0，同时对靠近 hidden boundary 的 visible Gaussian 降低 opacity；默认仍关闭，并由 `npm run audit:spark-mask-feather` 单场景验收。
   - DEMO-005C 已新增 Spark object mask feather 多场景 sweep/report：`npm run audit:spark-mask-feather-sweep` 默认比较 Lego proxy 与 Plush semantic 的 hard mask / `feather55`，输出 route、opacity texture、coverage / luma / chroma、截图和 summary；当前结果显示 feather 可软化边界但未改善 coverage ratio，因此默认仍关闭。
+  - DEMO-005D 已新增 Spark object mask feather UI toggle：对象编辑控制面板提供 `柔化删除边界` checkbox，默认关闭；开启后通过显式 `objectMaskFeathering` prop 驱动 Spark object opacity texture，root DOM 和状态面板暴露 enabled / opacity / radius，可由 `audit:spark-mask-feather-sweep -- --control ui` 验收。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -188,7 +189,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
   - `npm run audit:spark-trained-sample` 已固化为本机 trained SH-heavy sample availability preflight，可在浏览器 route gate 前检查 `nerf_lego_trained.*` public sample、`object_id`、degree-3 `f_rest_*` 和 object 数量。
   - `npm run audit:spark-trained-route` 已固化为本机 trained SH-heavy route-only browser gate，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary。
-  - `npm run audit:spark-mask-feather-sweep` 已固化为 Spark object mask feather 多场景报告，可比较 hard mask 与 feather variants 对 opacity texture、coverage / luma / chroma 和截图的影响，作为默认启用前的证据 gate。
+  - `npm run audit:spark-mask-feather-sweep` 已固化为 Spark object mask feather 多场景报告，可比较 hard mask 与 feather variants 对 opacity texture、coverage / luma / chroma 和截图的影响，并支持 `--control ui` 验证 Web 内显式 soft-boundary toggle。
   - `npm run acceptance:renderer-ci` 已固化为 fresh-clone-safe renderer 默认 CI profile，覆盖 build、WebGPU tile smoke、no-SH public sample index mapping 和 Spark native object mask gate，不要求本机 trained SH-heavy sample。
   - `npm run acceptance:renderer-product` 已固化为显式产品 / Demo route profile，会调用完整 `acceptance:spark-commercial-route`，包括 trained sample availability preflight 和 SH-heavy packed SH route。
   - `npm run acceptance:spark-commercial-route` 已固化为 Spark commercial route 总验收命令，一次覆盖 trained sample availability、no-SH native compact `.splat` object mask 与 SH-heavy packed SH object mask；该命令会写 `/tmp/objgauss-spark-commercial-route/summary.{json,md}`，证明 route contract，不证明删除后补洞或重优化。
@@ -218,6 +219,8 @@ npm run audit:spark-mask-feather
 node --check scripts/audit-spark-mask-feather-sweep.mjs
 npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --skip-build --port 5387 --output-dir /tmp/objgauss-spark-mask-feather-sweep-smoke
 npm run audit:spark-mask-feather-sweep -- --skip-build --port 5388 --output-dir /tmp/objgauss-spark-mask-feather-sweep
+npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --control ui --skip-build --skip-visual-stats --port 5389 --output-dir /tmp/objgauss-spark-mask-feather-ui-toggle
+npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --control url --skip-build --skip-visual-stats --port 5390 --output-dir /tmp/objgauss-spark-mask-feather-url-regression
 npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5372
 npm run build
 uv run --extra dev pytest

@@ -19,6 +19,7 @@ import PointCloudViewport from "./PointCloudViewport.jsx";
 import { rgbToCss } from "./palette.js";
 import { createSampleScene } from "./sampleScene.js";
 import SplatViewport from "./SplatViewport.jsx";
+import { normalizeSparkObjectMaskFeathering } from "./sparkObjectMask.js";
 import WebGpuTileViewport from "./WebGpuTileViewport.jsx";
 import {
   detectWebGpuCapability,
@@ -80,6 +81,7 @@ const WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS = 300_000;
 const WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE = 512;
 const WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE = 384;
 const WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE = 320;
+const UI_SPARK_OBJECT_MASK_FEATHER_OPACITY = 0.55;
 const HARD_MASK_QUALITY_BY_ASSET = {
   "nerf-lego-alpha-closure-local": {
     interpretation: "boundary-mixing-dominant",
@@ -128,6 +130,9 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [isolatedId, setIsolatedId] = useState(null);
   const [webGpuCapability, setWebGpuCapability] = useState(INITIAL_WEBGPU_CAPABILITY);
+  const [sparkObjectMaskFeathering, setSparkObjectMaskFeathering] = useState(
+    readInitialSparkObjectMaskFeathering,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -306,6 +311,9 @@ export default function App() {
         : "Spark PLY 重建"
       : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
+  const sparkObjectMaskFeatheringLabel = sparkObjectMaskFeathering.enabled
+    ? `柔化 ${sparkObjectMaskFeathering.opacity.toFixed(2)}`
+    : "关闭";
   const rendererRoute = useMemo(
     () =>
       rendererRouteContract({
@@ -430,6 +438,18 @@ export default function App() {
     }
   };
 
+  const toggleSparkObjectMaskFeathering = useCallback((enabled) => {
+    setSparkObjectMaskFeathering((current) =>
+      normalizeSparkObjectMaskFeathering({
+        ...current,
+        enabled,
+        opacity: current.opacity > 0 && current.opacity < 1
+          ? current.opacity
+          : UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
+      }),
+    );
+  }, []);
+
   const selectObject = (id) => {
     setSelectedId(id);
     setViewMode("edit");
@@ -477,6 +497,10 @@ export default function App() {
       data-hard-mask-gap-score={hardMaskQuality.hardMaskGapScore ?? ""}
       data-hard-mask-residual-coverage-ratio={hardMaskQuality.residualCoverageRatio ?? ""}
       data-hard-mask-deleted-object={hardMaskQuality.deletedObjectId ?? ""}
+      data-spark-object-mask-feather-control="ui-v1"
+      data-spark-object-mask-feather-enabled={String(sparkObjectMaskFeathering.enabled)}
+      data-spark-object-mask-feather-opacity={sparkObjectMaskFeathering.opacity}
+      data-spark-object-mask-feather-radius={sparkObjectMaskFeathering.radius}
     >
       <header className="topbar">
         <div className="brand">
@@ -610,6 +634,15 @@ export default function App() {
               />
               显示坐标轴
             </label>
+            <label className="checkRow" title="诊断开关：对 Spark 对象 mask 边界使用可审计 feather">
+              <input
+                type="checkbox"
+                checked={sparkObjectMaskFeathering.enabled}
+                disabled={!hasSplatRenderer}
+                onChange={(event) => toggleSparkObjectMaskFeathering(event.target.checked)}
+              />
+              柔化删除边界
+            </label>
           </section>
 
           <section className="panelSection assetLibraryPanel">
@@ -723,6 +756,7 @@ export default function App() {
               filtered={useSparkPointRenderer}
               reconstructRole={useSparkPlySourceRenderer ? "source" : "filter"}
               filterSource={useSparkNativeMaskRenderer ? "native-splat" : "ply-packed"}
+              objectMaskFeathering={sparkObjectMaskFeathering}
               showGrid={showGrid}
               showAxes={showAxes}
               pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
@@ -854,6 +888,7 @@ export default function App() {
             <StateRow label="颜色用途" value={rendererRoute.colorRoleLabel} />
             <StateRow label="预览边界" value={rendererRoute.sourceBoundaryLabel} />
             <StateRow label="删除结果" value={rendererRoute.sourceResultLabel} />
+            <StateRow label="边界柔化" value={sparkObjectMaskFeatheringLabel} />
             <StateRow label="质量解释" value={hardMaskQuality.label} />
             <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
             <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
@@ -907,6 +942,25 @@ export default function App() {
       </footer>
     </main>
   );
+}
+
+function readInitialSparkObjectMaskFeathering() {
+  if (typeof window === "undefined") {
+    return normalizeSparkObjectMaskFeathering({
+      enabled: false,
+      opacity: UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
+    });
+  }
+  const params = new URLSearchParams(window.location.search);
+  const mode = String(params.get("spark-object-mask-feather") ?? "off").toLowerCase();
+  const enabled = ["1", "true", "yes", "on"].includes(mode);
+  return normalizeSparkObjectMaskFeathering({
+    enabled,
+    radius: Number(params.get("spark-object-mask-feather-radius") ?? 0),
+    opacity: Number(
+      params.get("spark-object-mask-feather-opacity") ?? UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
+    ),
+  });
 }
 
 function RendererPendingViewport({ rendererContract, visibleCount, renderModeLabel }) {

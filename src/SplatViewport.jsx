@@ -45,6 +45,7 @@ export default function SplatViewport({
   onSelectObject = null,
   reconstructRole = "filter",
   filterSource = SPARK_FILTER_SOURCE_PACKED,
+  objectMaskFeathering: objectMaskFeatheringProp = null,
 }) {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -59,7 +60,11 @@ export default function SplatViewport({
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
   const [pickStats, setPickStats] = useState(() => emptyPickStats());
-  const objectMaskFeathering = useMemo(readSparkObjectMaskFeathering, []);
+  const urlObjectMaskFeathering = useMemo(readSparkObjectMaskFeathering, []);
+  const objectMaskFeathering = useMemo(
+    () => normalizeSparkObjectMaskFeathering(objectMaskFeatheringProp ?? urlObjectMaskFeathering),
+    [objectMaskFeatheringProp, urlObjectMaskFeathering],
+  );
 
   const sourceKey = useMemo(() => {
     if (source?.url) return source.url;

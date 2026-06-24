@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005D`: 基于多场景 feather sweep 结果，继续评估更多 opacity / radius / commercial-chair variants 或加显式产品 toggle；默认不启用 feather，除非多场景报告证明 coverage / luma / chroma 同时改善。
+  - `DEMO-005E`: 基于 UI toggle 和 sweep 报告，继续评估更多 opacity / radius / commercial-chair variants；默认不启用 feather，除非多场景报告证明 coverage / luma / chroma 同时改善。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005D: Spark mask feather UI toggle
+
+- 状态: done / explicit-soft-boundary-toggle
+- 类型: 标准 PR / renderer UX + browser audit
+- 目标: 将 Spark object mask feather 从 URL-only 诊断能力接入 Web UI，让用户能在对象编辑里直接切换 hard mask 与 soft-boundary 候选，同时保持默认关闭。
+- 已实施:
+  - `src/App.jsx` 新增 `柔化删除边界` checkbox，默认关闭；URL `spark-object-mask-feather=on` 仍可初始化为开启。
+  - App root 暴露 `data-spark-object-mask-feather-control="ui-v1"`、enabled、opacity 和 radius，状态面板新增 `边界柔化`。
+  - `src/SplatViewport.jsx` 接收显式 `objectMaskFeathering` prop；未传入时仍兼容原 URL 参数。
+  - `scripts/audit-spark-mask-feather-sweep.mjs` 新增 `--control ui|url`，可通过 Playwright 真正点击 UI toggle 验证 telemetry，同时保留 URL sweep 兼容路径。
+- 结论:
+  - UI toggle 可用，但它仍是显式诊断开关；默认 route 仍是 hard mask。
+  - Lego UI audit 中 hard row 为 `feather="off"`，点击 toggle 后 `feather="spatial-neighbor-feather-v1":2932:0.07:0.55:0.901044/0.560784`。
+- 验证:
+  - `node --check scripts/audit-spark-mask-feather-sweep.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --control ui --skip-build --skip-visual-stats --port 5389 --output-dir /tmp/objgauss-spark-mask-feather-ui-toggle`: passed。
+  - `npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --control url --skip-build --skip-visual-stats --port 5390 --output-dir /tmp/objgauss-spark-mask-feather-url-regression`: passed。
 
 ### DEMO-005C: Spark mask feather sweep report
 
