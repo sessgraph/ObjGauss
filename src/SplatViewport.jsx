@@ -10,6 +10,7 @@ import {
   createSparkObjectMask,
   disposeSparkObjectMask,
   maskStats,
+  normalizeSparkObjectMaskFeathering,
   SPARK_OBJECT_MASK_MODE,
   updateSparkObjectMask,
 } from "./sparkObjectMask.js";
@@ -58,6 +59,7 @@ export default function SplatViewport({
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
   const [pickStats, setPickStats] = useState(() => emptyPickStats());
+  const objectMaskFeathering = useMemo(readSparkObjectMaskFeathering, []);
 
   const sourceKey = useMemo(() => {
     if (source?.url) return source.url;
@@ -269,6 +271,7 @@ export default function SplatViewport({
       visibleIds,
       removedIds,
       isolatedId,
+      feathering: objectMaskFeathering,
     });
     const meshState = createFilteredMeshState();
     filteredMeshStateRef.current = meshState;
@@ -308,7 +311,7 @@ export default function SplatViewport({
         filteredObjectMaskRef.current = null;
       }
     };
-  }, [filtered, packedCache, useNativeSplatMask]);
+  }, [filtered, objectMaskFeathering, packedCache, points, removedIds, isolatedId, useNativeSplatMask, visibleIds]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -327,6 +330,7 @@ export default function SplatViewport({
       visibleIds,
       removedIds,
       isolatedId,
+      feathering: objectMaskFeathering,
     });
     const meshState = createFilteredMeshState();
     filteredMeshStateRef.current = meshState;
@@ -387,9 +391,14 @@ export default function SplatViewport({
     };
   }, [
     nativeMaskCache,
+    objectMaskFeathering,
+    points,
+    removedIds,
+    isolatedId,
     source,
     sourceKey,
     useNativeSplatMask,
+    visibleIds,
   ]);
 
   useEffect(() => {
@@ -413,6 +422,7 @@ export default function SplatViewport({
       visibleIds,
       removedIds,
       isolatedId,
+      feathering: objectMaskFeathering,
     });
     const meshState = filteredMeshStateRef.current ?? createFilteredMeshState();
     meshState.reused = filteredObjectMaskRef.current === packedCache.objectMask;
@@ -429,7 +439,7 @@ export default function SplatViewport({
         console.error(error);
         setStatus("加载失败");
       });
-  }, [filtered, isolatedId, packedCache, points, removedIds, useNativeSplatMask, visibleIds]);
+  }, [filtered, isolatedId, objectMaskFeathering, packedCache, points, removedIds, useNativeSplatMask, visibleIds]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -444,6 +454,7 @@ export default function SplatViewport({
       visibleIds,
       removedIds,
       isolatedId,
+      feathering: objectMaskFeathering,
     });
     const meshState = filteredMeshStateRef.current ?? createFilteredMeshState();
     meshState.reused = filteredObjectMaskRef.current === nativeMaskCache.objectMask;
@@ -467,7 +478,7 @@ export default function SplatViewport({
         console.error(error);
         setStatus("加载失败");
       });
-  }, [isolatedId, nativeMaskCache, points, removedIds, useNativeSplatMask, visibleIds]);
+  }, [isolatedId, nativeMaskCache, objectMaskFeathering, points, removedIds, useNativeSplatMask, visibleIds]);
 
   useEffect(() => {
     return () => {
@@ -561,6 +572,12 @@ export default function SplatViewport({
       data-spark-object-mask-updates={packedStats.objectMaskUpdates}
       data-spark-object-mask-visible-gaussians={packedStats.objectMaskVisibleGaussians}
       data-spark-object-mask-hidden-gaussians={packedStats.objectMaskHiddenGaussians}
+      data-spark-object-mask-feather-mode={packedStats.objectMaskFeatherMode}
+      data-spark-object-mask-feather-radius={formatFeatherMetric(packedStats.objectMaskFeatherRadius)}
+      data-spark-object-mask-feather-opacity={formatFeatherMetric(packedStats.objectMaskFeatherOpacity)}
+      data-spark-object-mask-feathered-gaussians={packedStats.objectMaskFeatheredGaussians}
+      data-spark-object-mask-opacity-mean={formatFeatherMetric(packedStats.objectMaskOpacityMean)}
+      data-spark-object-mask-min-opacity={formatFeatherMetric(packedStats.objectMaskMinOpacityScale)}
       data-spark-mesh-update-mode={packedStats.meshUpdateMode}
       data-spark-mesh-id={packedStats.meshId}
       data-spark-mesh-reused={String(packedStats.meshReused)}
@@ -616,6 +633,12 @@ export default function SplatViewport({
           <div>
             <span className="hudLabel">所选</span>
             <strong>{selectedId ?? "无"}</strong>
+          </div>
+        ) : null}
+        {filtered && packedStats.objectMaskFeatherMode !== "off" ? (
+          <div>
+            <span className="hudLabel">边界</span>
+            <strong>Feather {packedStats.objectMaskFeatheredGaussians.toLocaleString()}</strong>
           </div>
         ) : null}
         <div>
@@ -949,6 +972,25 @@ function formatPickMetric(value) {
   return Number.isFinite(numeric) ? numeric.toFixed(3) : "0.000";
 }
 
+function formatFeatherMetric(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(6) : "0.000000";
+}
+
+function readSparkObjectMaskFeathering() {
+  if (typeof window === "undefined") return normalizeSparkObjectMaskFeathering(null);
+  const params = new URLSearchParams(window.location.search);
+  const mode = String(params.get("spark-object-mask-feather") ?? "off").toLowerCase();
+  if (!["1", "true", "yes", "on"].includes(mode)) {
+    return normalizeSparkObjectMaskFeathering(null);
+  }
+  return normalizeSparkObjectMaskFeathering({
+    enabled: true,
+    radius: Number(params.get("spark-object-mask-feather-radius") ?? 0),
+    opacity: Number(params.get("spark-object-mask-feather-opacity") ?? 0.62),
+  });
+}
+
 function pointScale3(point) {
   if (Array.isArray(point?.scale3) && point.scale3.length >= 3) {
     return point.scale3.map((value) => clampFinite(value, 0.0006, 0.35, 0.018));
@@ -1023,6 +1065,12 @@ function emptyPackedStats() {
     objectMaskUpdates: 0,
     objectMaskVisibleGaussians: 0,
     objectMaskHiddenGaussians: 0,
+    objectMaskFeatherMode: "off",
+    objectMaskFeatherRadius: 0,
+    objectMaskFeatherOpacity: 1,
+    objectMaskFeatheredGaussians: 0,
+    objectMaskOpacityMean: 0,
+    objectMaskMinOpacityScale: 0,
     meshUpdateMode: "none",
     meshId: 0,
     meshReused: false,

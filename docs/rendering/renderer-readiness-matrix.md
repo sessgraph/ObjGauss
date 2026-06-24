@@ -60,6 +60,12 @@ diagnostic approximation rather than the commercial Spark source/original route.
 The product UI exposes this boundary as `预览边界=硬 mask，无补洞` and
 `删除结果=源色 mask 预览`, backed by `data-source-preview-result`.
 
+`spark-object-mask-feather=on` is the first diagnostic path for reducing hard
+mask edge speckle without retraining: it keeps hidden-object opacity at zero but
+uses spatial-neighbor feathering to lower opacity on visible Gaussians near the
+hidden boundary. It is not the default commercial route yet; it is a tunable
+candidate that must be compared across scenes before promotion.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -89,6 +95,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
+| Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 | Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |

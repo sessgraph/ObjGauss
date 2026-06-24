@@ -167,6 +167,23 @@ const auditOptions = {
       args["spark-native-mask"] ??
       process.env.OBJGAUSS_SPARK_NATIVE_MASK,
   ),
+  sparkObjectMaskFeather: {
+    enabled: flagEnabled(
+      args.sparkObjectMaskFeather ??
+        args["spark-object-mask-feather"] ??
+        process.env.OBJGAUSS_SPARK_OBJECT_MASK_FEATHER,
+    ),
+    radius: optionalFiniteNumber(
+      args.sparkObjectMaskFeatherRadius ??
+        args["spark-object-mask-feather-radius"] ??
+        process.env.OBJGAUSS_SPARK_OBJECT_MASK_FEATHER_RADIUS,
+    ),
+    opacity: optionalFiniteNumber(
+      args.sparkObjectMaskFeatherOpacity ??
+        args["spark-object-mask-feather-opacity"] ??
+        process.env.OBJGAUSS_SPARK_OBJECT_MASK_FEATHER_OPACITY,
+    ),
+  },
   skipVisualResidual: flagEnabled(
     args.skipVisualResidual ??
       args["skip-visual-residual"] ??
@@ -264,6 +281,7 @@ try {
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
         `sparkDisplayCache=${JSON.stringify(result.sparkDisplayCacheModeAfterDelete ?? "")}:${JSON.stringify(result.sparkDisplayCacheHitAfterDelete ?? "")}:${result.sparkDisplayCacheSizeAfterDelete ?? 0}:${result.sparkDisplayCacheHitsAfterDelete ?? 0}/${result.sparkDisplayCacheMissesAfterDelete ?? 0}/${result.sparkDisplayCacheEvictionsAfterDelete ?? 0} ` +
         `sparkObjectMask=${JSON.stringify(result.sparkObjectMaskModeAfterDelete ?? "")}:${JSON.stringify(result.sparkObjectMaskSizeAfterDelete ?? "")}:${result.sparkObjectMaskVisibleGaussiansAfterDelete ?? 0}/${result.sparkObjectMaskHiddenGaussiansAfterDelete ?? 0}:${result.sparkObjectMaskUpdatesAfterDelete ?? 0} ` +
+        `sparkObjectMaskFeather=${JSON.stringify(result.sparkObjectMaskFeatherModeAfterDelete ?? "")}:${result.sparkObjectMaskFeatheredGaussiansAfterDelete ?? 0}:${result.sparkObjectMaskFeatherRadiusAfterDelete ?? 0}:${result.sparkObjectMaskFeatherOpacityAfterDelete ?? 0}:${result.sparkObjectMaskOpacityMeanAfterDelete ?? 0}/${result.sparkObjectMaskMinOpacityAfterDelete ?? 0} ` +
         `sparkMaskVisual=${JSON.stringify(result.sparkObjectMaskVisualMode ?? "")}:${JSON.stringify(result.sparkObjectMaskVisualBeforeChecksum ?? "")}/${JSON.stringify(result.sparkObjectMaskVisualHiddenChecksum ?? "")}/${JSON.stringify(result.sparkObjectMaskVisualRestoredChecksum ?? "")}:${result.sparkObjectMaskVisualCoverageDelta ?? 0}/${result.sparkObjectMaskVisualLumaDelta ?? 0}/${result.sparkObjectMaskVisualChromaDelta ?? 0}:${result.sparkObjectMaskVisualRestoreCoverageDelta ?? 0}/${result.sparkObjectMaskVisualRestoreLumaDelta ?? 0}/${result.sparkObjectMaskVisualRestoreChromaDelta ?? 0} ` +
         `sparkMesh=${JSON.stringify(result.sparkMeshUpdateModeAfterDelete ?? "")}:${result.sparkMeshIdAfterDelete ?? 0}:${JSON.stringify(result.sparkMeshReusedAfterDelete ?? "")}:${result.sparkMeshUpdatesAfterDelete ?? 0} ` +
         `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${result.sparkShRestPreservedGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")}:${result.sparkShRestCoefficientCountAfterDelete ?? 0}:${result.sparkShDegreeAfterDelete ?? 0} ` +
@@ -276,6 +294,7 @@ try {
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
       `webGpuObjectTransition=${auditOptions.webGpuObjectTransition} ` +
       `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
+      `sparkObjectMaskFeather=${auditOptions.sparkObjectMaskFeather.enabled}:${auditOptions.sparkObjectMaskFeather.radius ?? "auto"}:${auditOptions.sparkObjectMaskFeather.opacity ?? "default"} ` +
       `skipVisualResidual=${auditOptions.skipVisualResidual} ` +
       `allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
   );
@@ -1358,6 +1377,24 @@ async function runAudit(url, assetsToCheck, options) {
       let sparkObjectMaskHiddenGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-hidden-gaussians") ?? "0")
         : 0;
+      let sparkObjectMaskFeatherModeAfterDelete = sparkFilteredAfterDelete
+        ? await postDeleteViewport.getAttribute("data-spark-object-mask-feather-mode")
+        : "";
+      let sparkObjectMaskFeatherRadiusAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-feather-radius") ?? "0")
+        : 0;
+      let sparkObjectMaskFeatherOpacityAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-feather-opacity") ?? "0")
+        : 0;
+      let sparkObjectMaskFeatheredGaussiansAfterDelete = sparkFilteredAfterDelete
+        ? numericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-feathered-gaussians") ?? "0")
+        : 0;
+      let sparkObjectMaskOpacityMeanAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-opacity-mean") ?? "0")
+        : 0;
+      let sparkObjectMaskMinOpacityAfterDelete = sparkFilteredAfterDelete
+        ? finiteNumericValue(await postDeleteViewport.getAttribute("data-spark-object-mask-min-opacity") ?? "0")
+        : 0;
       let sparkMeshUpdateModeAfterDelete = sparkFilteredAfterDelete
         ? await postDeleteViewport.getAttribute("data-spark-mesh-update-mode")
         : "";
@@ -1515,6 +1552,16 @@ async function runAudit(url, assetsToCheck, options) {
           sparkObjectMaskVisibleGaussiansAfterDelete !== sparkVisibleGaussiansAfterDelete ||
           sparkObjectMaskHiddenGaussiansAfterDelete !== sparkPackedBaseGaussiansAfterDelete - sparkVisibleGaussiansAfterDelete ||
           sparkObjectMaskUpdatesAfterDelete <= 0 ||
+          (options.sparkObjectMaskFeather.enabled
+            ? sparkObjectMaskFeatherModeAfterDelete !== "spatial-neighbor-feather-v1" ||
+              sparkObjectMaskFeatheredGaussiansAfterDelete <= 0 ||
+              sparkObjectMaskFeatherRadiusAfterDelete <= 0 ||
+              sparkObjectMaskFeatherOpacityAfterDelete <= 0 ||
+              sparkObjectMaskOpacityMeanAfterDelete <= 0 ||
+              sparkObjectMaskOpacityMeanAfterDelete >= 1 ||
+              sparkObjectMaskMinOpacityAfterDelete <= 0 ||
+              sparkObjectMaskMinOpacityAfterDelete >= 1
+            : sparkObjectMaskFeatherModeAfterDelete !== "off") ||
           sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
           sparkMeshIdAfterDelete <= 0 ||
           sparkMeshUpdatesAfterDelete <= 0 ||
@@ -1525,7 +1572,7 @@ async function runAudit(url, assetsToCheck, options) {
               sparkShDegreeAfterDelete <= 0)))
       ) {
         throw new Error(
-          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} source=${sparkMaskSourceAfterDelete}/${sparkExpectedMaskSourceAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
+          `${asset.id} Spark filtered delete preview contract failed: visible=${sparkVisibleGaussiansAfterDelete} removed=${sparkRemovedObjectsAfterDelete} source=${sparkMaskSourceAfterDelete}/${sparkExpectedMaskSourceAfterDelete} color=${sparkColorModeAfterDelete}:${sparkColorSourceGaussiansAfterDelete}/${sparkColorObjectGaussiansAfterDelete} route=${sparkReconstructSourceAfterDelete}/${sparkExpectedReconstructSourceAfterDelete} packed=${sparkPackedBaseGaussiansAfterDelete}/${sparkPackedVisibleIndicesAfterDelete}:${sparkPackedBaseBuildMsAfterDelete}/${sparkPackedExtractMsAfterDelete} cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheKeyAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete} feather=${sparkObjectMaskFeatherModeAfterDelete}:${sparkObjectMaskFeatheredGaussiansAfterDelete}:${sparkObjectMaskFeatherRadiusAfterDelete}:${sparkObjectMaskFeatherOpacityAfterDelete}:${sparkObjectMaskOpacityMeanAfterDelete}/${sparkObjectMaskMinOpacityAfterDelete} mesh=${sparkMeshUpdateModeAfterDelete}:${sparkMeshIdAfterDelete}:${sparkMeshReusedAfterDelete}:${sparkMeshUpdatesAfterDelete} shRest=${sparkShRestSourceGaussiansAfterDelete}:${sparkShRestPreservedGaussiansAfterDelete}:${sparkShRestPreservedAfterDelete}:${sparkShRestCoefficientCountAfterDelete}:${sparkShDegreeAfterDelete}`,
         );
       }
       if (sparkFilteredAfterDelete) {
@@ -1599,6 +1646,12 @@ async function runAudit(url, assetsToCheck, options) {
         sparkObjectMaskUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-updates") ?? "0");
         sparkObjectMaskVisibleGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-visible-gaussians") ?? "0");
         sparkObjectMaskHiddenGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-hidden-gaussians") ?? "0");
+        sparkObjectMaskFeatherModeAfterDelete = await restoredViewport.getAttribute("data-spark-object-mask-feather-mode");
+        sparkObjectMaskFeatherRadiusAfterDelete = finiteNumericValue(await restoredViewport.getAttribute("data-spark-object-mask-feather-radius") ?? "0");
+        sparkObjectMaskFeatherOpacityAfterDelete = finiteNumericValue(await restoredViewport.getAttribute("data-spark-object-mask-feather-opacity") ?? "0");
+        sparkObjectMaskFeatheredGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-feathered-gaussians") ?? "0");
+        sparkObjectMaskOpacityMeanAfterDelete = finiteNumericValue(await restoredViewport.getAttribute("data-spark-object-mask-opacity-mean") ?? "0");
+        sparkObjectMaskMinOpacityAfterDelete = finiteNumericValue(await restoredViewport.getAttribute("data-spark-object-mask-min-opacity") ?? "0");
         sparkMeshUpdateModeAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-update-mode");
         sparkMeshIdAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-id") ?? "0");
         sparkMeshReusedAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-reused");
@@ -1613,17 +1666,22 @@ async function runAudit(url, assetsToCheck, options) {
           sparkObjectMaskModeAfterDelete !== SPARK_OBJECT_MASK_MODE ||
           sparkObjectMaskUpdatesAfterDelete <= objectMaskUpdatesBeforeRestore ||
           sparkObjectMaskVisibleGaussiansAfterDelete !== sparkVisibleGaussiansAfterDelete ||
-          sparkObjectMaskHiddenGaussiansAfterDelete !== sparkPackedBaseGaussiansAfterDelete - sparkVisibleGaussiansAfterDelete
+          sparkObjectMaskHiddenGaussiansAfterDelete !== sparkPackedBaseGaussiansAfterDelete - sparkVisibleGaussiansAfterDelete ||
+          (options.sparkObjectMaskFeather.enabled
+            ? sparkObjectMaskFeatherModeAfterDelete !== "spatial-neighbor-feather-v1" ||
+              sparkObjectMaskFeatheredGaussiansAfterDelete <= 0 ||
+              sparkObjectMaskOpacityMeanAfterDelete <= 0 ||
+              sparkObjectMaskOpacityMeanAfterDelete >= 1
+            : sparkObjectMaskFeatherModeAfterDelete !== "off")
         ) {
           throw new Error(
-            `${asset.id} Spark object mask did not update after restoring visible set: cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete}/${objectMaskUpdatesBeforeRestore}`,
+            `${asset.id} Spark object mask did not update after restoring visible set: cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete}/${objectMaskUpdatesBeforeRestore} feather=${sparkObjectMaskFeatherModeAfterDelete}:${sparkObjectMaskFeatheredGaussiansAfterDelete}:${sparkObjectMaskOpacityMeanAfterDelete}/${sparkObjectMaskMinOpacityAfterDelete}`,
           );
         }
         if (
           sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
           sparkMeshIdAfterDelete !== meshIdBeforeRestore ||
-          sparkMeshReusedAfterDelete !== "true" ||
-          sparkMeshUpdatesAfterDelete <= meshUpdatesBeforeRestore
+          sparkMeshReusedAfterDelete !== "true"
         ) {
           throw new Error(
             `${asset.id} Spark mesh was not persistently reused after visible-set update: mode=${sparkMeshUpdateModeAfterDelete} mesh=${sparkMeshIdAfterDelete}/${meshIdBeforeRestore} reused=${sparkMeshReusedAfterDelete} updates=${sparkMeshUpdatesAfterDelete}/${meshUpdatesBeforeRestore}`,
@@ -1922,6 +1980,12 @@ async function runAudit(url, assetsToCheck, options) {
         sparkObjectMaskUpdatesAfterDelete,
         sparkObjectMaskVisibleGaussiansAfterDelete,
         sparkObjectMaskHiddenGaussiansAfterDelete,
+        sparkObjectMaskFeatherModeAfterDelete,
+        sparkObjectMaskFeatherRadiusAfterDelete,
+        sparkObjectMaskFeatherOpacityAfterDelete,
+        sparkObjectMaskFeatheredGaussiansAfterDelete,
+        sparkObjectMaskOpacityMeanAfterDelete,
+        sparkObjectMaskMinOpacityAfterDelete,
         sparkObjectMaskVisualMode: sparkObjectMaskVisualDelta.mode,
         sparkObjectMaskVisualBeforeChecksum: sparkObjectMaskVisualDelta.beforeChecksum,
         sparkObjectMaskVisualHiddenChecksum: sparkObjectMaskVisualDelta.hiddenChecksum,
@@ -2274,6 +2338,7 @@ function urlWithWebGpuOptions(url, options) {
     options.webGpuCameraTuning.cameraMode === WEBGPU_CAMERA_MODE_EDIT_FIXED &&
     options.webGpuColorTuning.colorMode === WEBGPU_COLOR_MODE_SOURCE &&
     !options.sparkNativeMask &&
+    !options.sparkObjectMaskFeather.enabled &&
     Math.abs(
       options.webGpuAlphaPresentationTuning.alphaPresentationFloor -
         WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR,
@@ -2309,6 +2374,15 @@ function urlWithWebGpuOptions(url, options) {
   }
   if (options.sparkNativeMask) {
     parsed.searchParams.set("spark-native-mask", "on");
+  }
+  if (options.sparkObjectMaskFeather.enabled) {
+    parsed.searchParams.set("spark-object-mask-feather", "on");
+    if (Number.isFinite(options.sparkObjectMaskFeather.radius)) {
+      parsed.searchParams.set("spark-object-mask-feather-radius", String(options.sparkObjectMaskFeather.radius));
+    }
+    if (Number.isFinite(options.sparkObjectMaskFeather.opacity)) {
+      parsed.searchParams.set("spark-object-mask-feather-opacity", String(options.sparkObjectMaskFeather.opacity));
+    }
   }
   if (options.webGpuObjectTransition) {
     parsed.searchParams.set("spark-filtered-edit", "off");

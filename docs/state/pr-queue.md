@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005B`: 评估 soft boundary / feathered object opacity 是否能降低删除后颗粒感，不能只靠文案解释。
+  - `DEMO-005C`: 把 `spark-object-mask-feather` 从单场景诊断扩展成多场景 sweep / report，比较 hard mask、不同 opacity、不同 radius 对 coverage / luma / chroma 和对象残留的影响，再决定是否默认启用。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005B: Spark object mask feather diagnostic
+
+- 状态: done / soft-boundary-diagnostic
+- 类型: 标准 PR / renderer UX + browser audit
+- 目标: 回应 `自身颜色` hard-mask 删除后颗粒感问题，提供一条可运行、可审计的 soft boundary 诊断路径，而不是只靠文案解释。
+- 已实施:
+  - `src/sparkObjectMask.js` 将 Spark object opacity texture 从二值 0/1 扩展为 0..255 opacity scale；hidden object 仍为 0，visible Gaussian 默认为 255。
+  - 新增 `spark-object-mask-feather=on` URL 开关；开启后用 3D spatial hash 查找靠近 hidden Gaussian 的 visible Gaussian，并按距离降低 opacity。
+  - `src/SplatViewport.jsx` 暴露 `data-spark-object-mask-feather-*` telemetry，包括 mode、radius、opacity、softened Gaussian 数、mean opacity 和 min opacity。
+  - `scripts/audit-demo.mjs` 支持 `--spark-object-mask-feather` / `--spark-object-mask-feather-opacity` / `--spark-object-mask-feather-radius`，默认仍要求 feather=`off`，显式开启时要求 `spatial-neighbor-feather-v1` 和非零 softened Gaussian。
+  - 新增 `npm run audit:spark-mask-feather` 作为可复现单场景 browser gate。
+- 结论:
+  - 默认 hard-mask route 保持兼容；Lego 默认 audit 输出 `sparkObjectMaskFeather="off":0:0:1:1/1`。
+  - Feather 诊断路径在 Lego 上通过：`3214` 个 Gaussian 被软化，auto radius=`0.07`，requested opacity=`0.55`，mean opacity=`0.832853`，min opacity=`0.560784`。
+  - 这仍不是补洞或重优化；它只是降低 visible boundary Gaussian 的 opacity，是否默认启用要等多场景 sweep。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5375`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5376 --spark-object-mask-feather --spark-object-mask-feather-opacity 0.55`: passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005A: Source-color hard-mask preview UX contract
 
