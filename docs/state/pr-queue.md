@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AG`: 为 Spark object opacity mask 增加 pixel-delta / visual assertion，并评估 original compact `.splat` 与 object-aware PLY packed source 的稳定 index mapping；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AH`: 评估 original compact `.splat` 与 object-aware PLY packed source 的稳定 Gaussian index mapping，判断 Spark mask 是否能从 PLY-derived packed source 继续推进到 original source / native `.splat` object masking；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AG: Spark object opacity mask visual delta guard
+
+- 状态: done / visual-delta-audited
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 补上 AF 后的关键证据缺口：不只检查 `data-spark-object-mask-*` telemetry，还要证明 Spark object opacity mask 的显隐变化真的改变 canvas 像素。
+- 已实施:
+  - `audit-demo` 在小场景 Spark mask restore stress 中新增三帧 `canvasVisualStats`：delete baseline、hide-one-object、restore。
+  - 新增 `spark-object-mask-visual-delta-v1` 校验：hide 后 checksum 必须变化，coverage / luma / chroma 至少一个达到最小 delta；restore 后必须回到 delete baseline 或非常接近。
+  - Browser audit 输出新增 `sparkMaskVisual`，记录 before / hidden / restored checksum、hide delta 和 restore delta。
+  - Heavy trained scene 继续跳过该像素压力循环，保留 SH-heavy delete contract，避免把重场景 browser audit 变成高成本性能压力测试。
+- 结论:
+  - Lego proxy 小场景证明 opacity mask 影响真实渲染像素：`sparkMaskVisual="spark-object-mask-visual-delta-v1":"4a2ed0e8"/"be002ca4"/"4a2ed0e8":0.000752/0.014063/0.026019:0/0/0`。
+  - Trained Lego 继续通过 SH-heavy contract：`sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2`、`sparkShRest=255794:255794:"true":45:3`。
+  - 剩余问题不是 telemetry 可信度，而是 original compact `.splat` 与 object-aware PLY packed source 的 stable index mapping / native source mask 可行性。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --url http://127.0.0.1:5301/ --no-server`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5301/ --no-server`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AF: Spark object opacity mask over packed source
 

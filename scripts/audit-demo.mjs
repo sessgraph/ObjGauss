@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 import {
   canvasVisualStats,
   compareVisualStats,
+  roundMetric,
   validateCanvasVisualStats,
 } from "./lib/visual-stats.mjs";
 import {
@@ -83,7 +84,10 @@ const SPARK_DISPLAY_CACHE_DISABLED = "disabled-by-native-mask-v1";
 const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
 const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
+const SPARK_OBJECT_MASK_VISUAL_DELTA_MODE = "spark-object-mask-visual-delta-v1";
 const SPARK_RESTORE_STRESS_MAX_GAUSSIANS = 100_000;
+const SPARK_OBJECT_MASK_MIN_VISUAL_DELTA = 0.0005;
+const SPARK_OBJECT_MASK_MAX_RESTORE_DELTA = 0.002;
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -215,6 +219,7 @@ try {
         `sparkPacked=${JSON.stringify(result.sparkReconstructSourceAfterDelete ?? "")}:${result.sparkPackedBaseGaussiansAfterDelete ?? 0}/${result.sparkPackedVisibleIndicesAfterDelete ?? 0}:${result.sparkPackedBaseBuildMsAfterDelete ?? 0}/${result.sparkPackedExtractMsAfterDelete ?? 0} ` +
         `sparkDisplayCache=${JSON.stringify(result.sparkDisplayCacheModeAfterDelete ?? "")}:${JSON.stringify(result.sparkDisplayCacheHitAfterDelete ?? "")}:${result.sparkDisplayCacheSizeAfterDelete ?? 0}:${result.sparkDisplayCacheHitsAfterDelete ?? 0}/${result.sparkDisplayCacheMissesAfterDelete ?? 0}/${result.sparkDisplayCacheEvictionsAfterDelete ?? 0} ` +
         `sparkObjectMask=${JSON.stringify(result.sparkObjectMaskModeAfterDelete ?? "")}:${JSON.stringify(result.sparkObjectMaskSizeAfterDelete ?? "")}:${result.sparkObjectMaskVisibleGaussiansAfterDelete ?? 0}/${result.sparkObjectMaskHiddenGaussiansAfterDelete ?? 0}:${result.sparkObjectMaskUpdatesAfterDelete ?? 0} ` +
+        `sparkMaskVisual=${JSON.stringify(result.sparkObjectMaskVisualMode ?? "")}:${JSON.stringify(result.sparkObjectMaskVisualBeforeChecksum ?? "")}/${JSON.stringify(result.sparkObjectMaskVisualHiddenChecksum ?? "")}/${JSON.stringify(result.sparkObjectMaskVisualRestoredChecksum ?? "")}:${result.sparkObjectMaskVisualCoverageDelta ?? 0}/${result.sparkObjectMaskVisualLumaDelta ?? 0}/${result.sparkObjectMaskVisualChromaDelta ?? 0}:${result.sparkObjectMaskVisualRestoreCoverageDelta ?? 0}/${result.sparkObjectMaskVisualRestoreLumaDelta ?? 0}/${result.sparkObjectMaskVisualRestoreChromaDelta ?? 0} ` +
         `sparkMesh=${JSON.stringify(result.sparkMeshUpdateModeAfterDelete ?? "")}:${result.sparkMeshIdAfterDelete ?? 0}:${JSON.stringify(result.sparkMeshReusedAfterDelete ?? "")}:${result.sparkMeshUpdatesAfterDelete ?? 0} ` +
         `sparkShRest=${result.sparkShRestSourceGaussiansAfterDelete ?? 0}:${result.sparkShRestPreservedGaussiansAfterDelete ?? 0}:${JSON.stringify(result.sparkShRestPreservedAfterDelete ?? "")}:${result.sparkShRestCoefficientCountAfterDelete ?? 0}:${result.sparkShDegreeAfterDelete ?? 0} ` +
         `screenshot=${result.screenshotPath}`,
@@ -1191,6 +1196,7 @@ async function runAudit(url, assetsToCheck, options) {
       let sparkMeshUpdatesAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-mesh-updates") ?? "0")
         : 0;
+      let sparkObjectMaskVisualDelta = emptySparkObjectMaskVisualDelta();
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
         : 0;
@@ -1293,58 +1299,74 @@ async function runAudit(url, assetsToCheck, options) {
         sparkFilteredAfterDelete &&
         sparkPackedBaseGaussiansAfterDelete <= SPARK_RESTORE_STRESS_MAX_GAUSSIANS
       ) {
+        const maskVisualBefore = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
+        validateCanvasVisualStats(asset.id, "Spark object mask before hide", maskVisualBefore);
         const objectMaskUpdatesBeforeRestore = sparkObjectMaskUpdatesAfterDelete;
         const meshIdBeforeRestore = sparkMeshIdAfterDelete;
         const meshUpdatesBeforeRestore = sparkMeshUpdatesAfterDelete;
         const toggleButton = page.locator(".objectRow:not(.removed) .eyeButton").first();
-        if ((await toggleButton.count()) > 0) {
-          await toggleButton.click();
-          await waitForSparkViewportReady(page);
-          await toggleButton.click();
-          await waitForSparkViewportReady(page);
-          const restoredViewport = page.locator(".viewport").first();
-          sparkDisplayCacheModeAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-mode");
-          sparkDisplayCacheKeyAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-key");
-          sparkDisplayCacheHitAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-hit");
-          sparkDisplayCacheSizeAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-size") ?? "0");
-          sparkDisplayCacheHitsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-hits") ?? "0");
-          sparkDisplayCacheMissesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-misses") ?? "0");
-          sparkDisplayCacheEvictionsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-evictions") ?? "0");
-          sparkObjectMaskModeAfterDelete = await restoredViewport.getAttribute("data-spark-object-mask-mode");
-          sparkObjectMaskSizeAfterDelete = await restoredViewport.getAttribute("data-spark-object-mask-size");
-          sparkObjectMaskUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-updates") ?? "0");
-          sparkObjectMaskVisibleGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-visible-gaussians") ?? "0");
-          sparkObjectMaskHiddenGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-hidden-gaussians") ?? "0");
-          sparkMeshUpdateModeAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-update-mode");
-          sparkMeshIdAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-id") ?? "0");
-          sparkMeshReusedAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-reused");
-          sparkMeshUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-updates") ?? "0");
-          if (
-            sparkDisplayCacheModeAfterDelete !== SPARK_DISPLAY_CACHE_DISABLED ||
-            sparkDisplayCacheHitAfterDelete !== "false" ||
-            sparkDisplayCacheSizeAfterDelete !== 0 ||
-            sparkDisplayCacheHitsAfterDelete !== 0 ||
-            sparkDisplayCacheMissesAfterDelete !== 0 ||
-            sparkDisplayCacheEvictionsAfterDelete !== 0 ||
-            sparkObjectMaskModeAfterDelete !== SPARK_OBJECT_MASK_MODE ||
-            sparkObjectMaskUpdatesAfterDelete <= objectMaskUpdatesBeforeRestore ||
-            sparkObjectMaskVisibleGaussiansAfterDelete !== sparkVisibleGaussiansAfterDelete ||
-            sparkObjectMaskHiddenGaussiansAfterDelete !== sparkPackedBaseGaussiansAfterDelete - sparkVisibleGaussiansAfterDelete
-          ) {
-            throw new Error(
-              `${asset.id} Spark object mask did not update after restoring visible set: cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete}/${objectMaskUpdatesBeforeRestore}`,
-            );
-          }
-          if (
-            sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
-            sparkMeshIdAfterDelete !== meshIdBeforeRestore ||
-            sparkMeshReusedAfterDelete !== "true" ||
-            sparkMeshUpdatesAfterDelete <= meshUpdatesBeforeRestore
-          ) {
-            throw new Error(
-              `${asset.id} Spark mesh was not persistently reused after visible-set update: mode=${sparkMeshUpdateModeAfterDelete} mesh=${sparkMeshIdAfterDelete}/${meshIdBeforeRestore} reused=${sparkMeshReusedAfterDelete} updates=${sparkMeshUpdatesAfterDelete}/${meshUpdatesBeforeRestore}`,
-            );
-          }
+        if ((await toggleButton.count()) <= 0) {
+          throw new Error(`${asset.id} Spark object mask visual delta could not find a restorable object`);
+        }
+
+        await toggleButton.click();
+        await waitForSparkViewportReady(page);
+        const maskVisualHidden = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
+        validateCanvasVisualStats(asset.id, "Spark object mask hidden", maskVisualHidden);
+
+        await toggleButton.click();
+        await waitForSparkViewportReady(page);
+        const maskVisualRestored = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
+        validateCanvasVisualStats(asset.id, "Spark object mask restored", maskVisualRestored);
+        sparkObjectMaskVisualDelta = buildSparkObjectMaskVisualDelta({
+          before: maskVisualBefore,
+          hidden: maskVisualHidden,
+          restored: maskVisualRestored,
+        });
+        validateSparkObjectMaskVisualDelta(asset.id, sparkObjectMaskVisualDelta);
+
+        const restoredViewport = page.locator(".viewport").first();
+        sparkDisplayCacheModeAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-mode");
+        sparkDisplayCacheKeyAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-key");
+        sparkDisplayCacheHitAfterDelete = await restoredViewport.getAttribute("data-spark-display-cache-hit");
+        sparkDisplayCacheSizeAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-size") ?? "0");
+        sparkDisplayCacheHitsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-hits") ?? "0");
+        sparkDisplayCacheMissesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-misses") ?? "0");
+        sparkDisplayCacheEvictionsAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-display-cache-evictions") ?? "0");
+        sparkObjectMaskModeAfterDelete = await restoredViewport.getAttribute("data-spark-object-mask-mode");
+        sparkObjectMaskSizeAfterDelete = await restoredViewport.getAttribute("data-spark-object-mask-size");
+        sparkObjectMaskUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-updates") ?? "0");
+        sparkObjectMaskVisibleGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-visible-gaussians") ?? "0");
+        sparkObjectMaskHiddenGaussiansAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-object-mask-hidden-gaussians") ?? "0");
+        sparkMeshUpdateModeAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-update-mode");
+        sparkMeshIdAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-id") ?? "0");
+        sparkMeshReusedAfterDelete = await restoredViewport.getAttribute("data-spark-mesh-reused");
+        sparkMeshUpdatesAfterDelete = numericValue(await restoredViewport.getAttribute("data-spark-mesh-updates") ?? "0");
+        if (
+          sparkDisplayCacheModeAfterDelete !== SPARK_DISPLAY_CACHE_DISABLED ||
+          sparkDisplayCacheHitAfterDelete !== "false" ||
+          sparkDisplayCacheSizeAfterDelete !== 0 ||
+          sparkDisplayCacheHitsAfterDelete !== 0 ||
+          sparkDisplayCacheMissesAfterDelete !== 0 ||
+          sparkDisplayCacheEvictionsAfterDelete !== 0 ||
+          sparkObjectMaskModeAfterDelete !== SPARK_OBJECT_MASK_MODE ||
+          sparkObjectMaskUpdatesAfterDelete <= objectMaskUpdatesBeforeRestore ||
+          sparkObjectMaskVisibleGaussiansAfterDelete !== sparkVisibleGaussiansAfterDelete ||
+          sparkObjectMaskHiddenGaussiansAfterDelete !== sparkPackedBaseGaussiansAfterDelete - sparkVisibleGaussiansAfterDelete
+        ) {
+          throw new Error(
+            `${asset.id} Spark object mask did not update after restoring visible set: cache=${sparkDisplayCacheModeAfterDelete}:${sparkDisplayCacheHitAfterDelete}:${sparkDisplayCacheSizeAfterDelete}:${sparkDisplayCacheHitsAfterDelete}/${sparkDisplayCacheMissesAfterDelete}/${sparkDisplayCacheEvictionsAfterDelete} objectMask=${sparkObjectMaskModeAfterDelete}:${sparkObjectMaskSizeAfterDelete}:${sparkObjectMaskVisibleGaussiansAfterDelete}/${sparkObjectMaskHiddenGaussiansAfterDelete}:${sparkObjectMaskUpdatesAfterDelete}/${objectMaskUpdatesBeforeRestore}`,
+          );
+        }
+        if (
+          sparkMeshUpdateModeAfterDelete !== SPARK_MESH_UPDATE_MODE ||
+          sparkMeshIdAfterDelete !== meshIdBeforeRestore ||
+          sparkMeshReusedAfterDelete !== "true" ||
+          sparkMeshUpdatesAfterDelete <= meshUpdatesBeforeRestore
+        ) {
+          throw new Error(
+            `${asset.id} Spark mesh was not persistently reused after visible-set update: mode=${sparkMeshUpdateModeAfterDelete} mesh=${sparkMeshIdAfterDelete}/${meshIdBeforeRestore} reused=${sparkMeshReusedAfterDelete} updates=${sparkMeshUpdatesAfterDelete}/${meshUpdatesBeforeRestore}`,
+          );
         }
       }
       if (
@@ -1583,6 +1605,16 @@ async function runAudit(url, assetsToCheck, options) {
         sparkObjectMaskUpdatesAfterDelete,
         sparkObjectMaskVisibleGaussiansAfterDelete,
         sparkObjectMaskHiddenGaussiansAfterDelete,
+        sparkObjectMaskVisualMode: sparkObjectMaskVisualDelta.mode,
+        sparkObjectMaskVisualBeforeChecksum: sparkObjectMaskVisualDelta.beforeChecksum,
+        sparkObjectMaskVisualHiddenChecksum: sparkObjectMaskVisualDelta.hiddenChecksum,
+        sparkObjectMaskVisualRestoredChecksum: sparkObjectMaskVisualDelta.restoredChecksum,
+        sparkObjectMaskVisualCoverageDelta: sparkObjectMaskVisualDelta.coverageDelta,
+        sparkObjectMaskVisualLumaDelta: sparkObjectMaskVisualDelta.lumaDelta,
+        sparkObjectMaskVisualChromaDelta: sparkObjectMaskVisualDelta.chromaDelta,
+        sparkObjectMaskVisualRestoreCoverageDelta: sparkObjectMaskVisualDelta.restoreCoverageDelta,
+        sparkObjectMaskVisualRestoreLumaDelta: sparkObjectMaskVisualDelta.restoreLumaDelta,
+        sparkObjectMaskVisualRestoreChromaDelta: sparkObjectMaskVisualDelta.restoreChromaDelta,
         sparkMeshUpdateModeAfterDelete,
         sparkMeshIdAfterDelete,
         sparkMeshReusedAfterDelete,
@@ -2140,6 +2172,60 @@ function validateVisualResidual(assetId, residual) {
     !Number.isFinite(residual.chromaDelta)
   ) {
     throw new Error(`${assetId} visual residual is invalid: ${JSON.stringify(residual)}`);
+  }
+}
+
+function emptySparkObjectMaskVisualDelta() {
+  return {
+    mode: "not-run",
+    beforeChecksum: "",
+    hiddenChecksum: "",
+    restoredChecksum: "",
+    coverageDelta: 0,
+    lumaDelta: 0,
+    chromaDelta: 0,
+    restoreCoverageDelta: 0,
+    restoreLumaDelta: 0,
+    restoreChromaDelta: 0,
+  };
+}
+
+function buildSparkObjectMaskVisualDelta({ before, hidden, restored }) {
+  return {
+    mode: SPARK_OBJECT_MASK_VISUAL_DELTA_MODE,
+    beforeChecksum: before.checksum,
+    hiddenChecksum: hidden.checksum,
+    restoredChecksum: restored.checksum,
+    coverageDelta: roundMetric(Math.abs(hidden.coverage - before.coverage)),
+    lumaDelta: roundMetric(Math.abs(hidden.lumaMean - before.lumaMean)),
+    chromaDelta: roundMetric(Math.abs(hidden.chromaMean - before.chromaMean)),
+    restoreCoverageDelta: roundMetric(Math.abs(restored.coverage - before.coverage)),
+    restoreLumaDelta: roundMetric(Math.abs(restored.lumaMean - before.lumaMean)),
+    restoreChromaDelta: roundMetric(Math.abs(restored.chromaMean - before.chromaMean)),
+  };
+}
+
+function validateSparkObjectMaskVisualDelta(assetId, delta) {
+  const hideChanged =
+    delta.beforeChecksum !== delta.hiddenChecksum &&
+    (delta.coverageDelta >= SPARK_OBJECT_MASK_MIN_VISUAL_DELTA ||
+      delta.lumaDelta >= SPARK_OBJECT_MASK_MIN_VISUAL_DELTA ||
+      delta.chromaDelta >= SPARK_OBJECT_MASK_MIN_VISUAL_DELTA);
+  if (!hideChanged) {
+    throw new Error(
+      `${assetId} Spark object mask did not produce a visible hide delta: checksums=${delta.beforeChecksum}/${delta.hiddenChecksum} delta=${delta.coverageDelta}/${delta.lumaDelta}/${delta.chromaDelta}`,
+    );
+  }
+
+  const restored =
+    delta.beforeChecksum === delta.restoredChecksum ||
+    (delta.restoreCoverageDelta <= SPARK_OBJECT_MASK_MAX_RESTORE_DELTA &&
+      delta.restoreLumaDelta <= SPARK_OBJECT_MASK_MAX_RESTORE_DELTA &&
+      delta.restoreChromaDelta <= SPARK_OBJECT_MASK_MAX_RESTORE_DELTA);
+  if (!restored) {
+    throw new Error(
+      `${assetId} Spark object mask did not visually restore the deleted-state baseline: checksums=${delta.beforeChecksum}/${delta.restoredChecksum} restoreDelta=${delta.restoreCoverageDelta}/${delta.restoreLumaDelta}/${delta.restoreChromaDelta}`,
+    );
   }
 }
 

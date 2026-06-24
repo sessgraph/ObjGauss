@@ -135,6 +135,20 @@ the object mask texture exposes visible / hidden Gaussian counts. It is still
 not an object mask inside the original compact `.splat` file; it is a Spark
 shader mask over the object-aware PLY-derived packed source.
 
+RENDER-005T-AG adds a pixel-delta guard for the Spark opacity mask route. On
+small scenes, browser audit now captures the Spark canvas after delete, after
+hiding one remaining object, and after restoring that object:
+
+```text
+delete-state Spark canvas
+        -> hide one non-deleted object through object opacity mask
+        -> visual checksum / coverage / luma / chroma must change
+        -> restore object
+        -> visual stats must return to the delete-state baseline
+```
+
+This proves the mask affects rendered pixels, not only DOM telemetry.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -152,6 +166,10 @@ shader mask over the object-aware PLY-derived packed source.
   update when the object mask changes. Browser audit requires
   `data-spark-mesh-update-mode="persistent-splatmesh-v1"` and, for small scenes,
   a stable mesh id across hide / restore.
+- Small-scene browser audit also requires
+  `spark-object-mask-visual-delta-v1`: hiding a remaining object must change the
+  Spark canvas checksum / visual metrics, and restoring it must return to the
+  delete-state baseline.
 - No-SH assets continue to expose `data-spark-reconstruct-source="packed-extract-v1"`
   and `data-spark-sh-rest-preserved="false"`.
 - SH-heavy assets expose `data-spark-reconstruct-source="packed-sh-extract-v1"`
@@ -228,6 +246,7 @@ postDelete="spark-splat":"spark-object-opacity-mask":3909
 sparkPacked="packed-extract-v1":5696/3909:4.4/0
 sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
 sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
+sparkMaskVisual="spark-object-mask-visual-delta-v1":"4a2ed0e8"/"be002ca4"/"4a2ed0e8":0.000752/0.014063/0.026019:0/0/0
 sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
 renderModeAfterDelete="原始颜色（编辑预览）"
@@ -277,6 +296,7 @@ postDelete="spark-splat":"spark-object-opacity-mask":129108
 sparkPacked="packed-sh-extract-v1":255794/129108:155.9/0
 sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
 sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2
+sparkMaskVisual="not-run":""/""/"":0/0/0:0/0/0
 sparkMesh="persistent-splatmesh-v1":1:"true":2
 sparkShRest=255794:255794:"true":45:3
 ```
@@ -336,8 +356,9 @@ visibleGaussians=281498
 - The current mask is over the object-aware PLY-derived Spark packed source, not
   the original compact `.splat` file. Original `.splat` index mapping / native
   source masking remains a separate decision.
-- Add a pixel-delta guard for object opacity masking so the audit proves hidden
-  objects visibly disappear, not only that DOM telemetry updates.
+- Evaluate whether the compact `.splat` source can expose a stable original
+  Gaussian index mapping for native object masking, instead of using the
+  object-aware PLY-derived packed source.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
