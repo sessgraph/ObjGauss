@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AW`: 将 no-SH native route gate 与 SH-heavy packed route gate 合并成 Spark commercial route acceptance 命令。
+  - `RENDER-005T-AX`: 评估是否把 `acceptance:spark-commercial-route` 纳入 broader `acceptance:demo` / CI，或先新增 compact route report artifact。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AW: Spark commercial route acceptance
+
+- 状态: done / commercial-route-accepted
+- 类型: 标准 PR / acceptance integration
+- 目标: 将 no-SH native route gate 与 SH-heavy packed route gate 合并成一条 Spark commercial route acceptance 命令，避免商业展示路线验收依赖人工串命令。
+- 已实施:
+  - 新增 `scripts/acceptance-spark-commercial-route.mjs` 与 `npm run acceptance:spark-commercial-route`。
+  - 默认先执行 `npm run build`，再跑 `audit:spark-native-mask-gate` 和 `audit:spark-trained-route`。
+  - 支持 `--skip-build`、`--native-port` 和 `--trained-port`，便于本地避开端口冲突。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 Spark commercial route acceptance 说明，并明确该 gate 不证明删除补洞、重优化、WebGPU visual fidelity 或任意第三方 `.splat` object metadata。
+- 结论:
+  - 商用 Spark source/original route 现在有一条统一验收命令，同时覆盖 no-SH native compact `.splat` object mask 和 SH-heavy packed SH object mask。
+  - 这条 gate 专门证明 renderer route contract；删除后的 `自身颜色` 仍是 hard object mask / no reoptimize preview，不被解释成最终编辑重渲染。
+- 验证:
+  - `node --check scripts/acceptance-spark-commercial-route.mjs`: passed。
+  - `npm run acceptance:spark-commercial-route -- --native-port 5347 --trained-port 5348`: passed；no-SH native gate 覆盖 `nerf-lego-alpha-closure-local` 和 `plush-semantic-closure-local`，trained SH-heavy gate 覆盖 `nerf-lego-trained-output-local`。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AV: SH-heavy Spark route-only audit
 

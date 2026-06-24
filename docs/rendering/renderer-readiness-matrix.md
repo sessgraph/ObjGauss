@@ -21,8 +21,8 @@ while WebGPU continues to harden toward the C architecture.
 
 | Route | Current role | Default surface | Evidence | Known gaps |
 | --- | --- | --- | --- | --- |
-| Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
-| Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:demo` trained SH route, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
+| Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
+| Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
 | WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
@@ -85,6 +85,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
+| Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |
 
 ## Product UI Contract
 
@@ -135,8 +136,33 @@ object mask    -> object-opacity-texture-v1
 
 Full visual/residual validation remains an explicit heavier gate.
 
+## Spark Commercial Route Acceptance
+
+Use this as the product route contract before demo or release review:
+
+```bash
+npm run acceptance:spark-commercial-route
+```
+
+The command runs:
+
+```text
+npm run build
+npm run audit:spark-native-mask-gate
+npm run audit:spark-trained-route
+```
+
+It proves that:
+
+- no-SH generated samples use Spark native compact `.splat` object masking;
+- SH-heavy trained samples preserve degree-3 SH through the packed route;
+- both routes expose `source-color` plus `hard-object-mask-no-reoptimize` after delete.
+
+It does not prove deletion inpainting, reoptimization, WebGPU visual fidelity, or
+renderer-native arbitrary third-party `.splat` object metadata.
+
 ## Next Product Slice
 
-The next UX-facing slice should consolidate Spark commercial route checks into
-one acceptance command that covers the no-SH native route and the SH-heavy packed
-route together.
+The next UX-facing slice should decide whether `acceptance:spark-commercial-route`
+belongs inside broader `acceptance:demo` / CI, or whether it should first emit a
+compact route report artifact for review.
