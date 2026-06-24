@@ -120,6 +120,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - DEMO-005D 已新增 Spark object mask feather UI toggle：对象编辑控制面板提供 `柔化删除边界` checkbox，默认关闭；开启后通过显式 `objectMaskFeathering` prop 驱动 Spark object opacity texture，root DOM 和状态面板暴露 enabled / opacity / radius，可由 `audit:spark-mask-feather-sweep -- --control ui` 验收。
   - DEMO-005E 已新增 Spark mask feather candidate gate：`npm run audit:spark-mask-feather-candidates` 默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，比较 hard / feather55 / feather70 / feather55r035，并输出 promotion recommendation；当前三个 feather candidates 均为 `diagnostic-only`，默认 hard mask 不变。
   - DEMO-005F 已新增 object boundary cleanup candidate report：`npm run audit:object-boundary-cleanup` 默认覆盖 Lego proxy、Plush semantic 和 Poly Haven Chair commercial sample，在 hard-mask boundary diagnostic 中输出 `object-boundary-cleanup-candidate-v1`，定位值得做 assignment cleanup / remap review 的 object 子集；该报告只读，不自动改 PLY。
+  - DEMO-005G 已新增 object boundary remap preview export：`npm run audit:object-boundary-remap-preview` 可生成保留原始 PLY 属性、仅 patch sampled `object_id` 的 `/tmp` preview PLY，用于下一步 browser residual gate；该实验不改默认样例、不证明视觉质量改善。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -186,6 +187,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:object-mask-boundary` 已固化为 hard object mask 质量诊断，可从 object-aware PLY 输出 deleted-subset coverage、unique coverage loss、shared boundary coverage 和 3D neighbor boundary risk，解释删除后 source/original 预览仍有颗粒感的可能来源。
   - `npm run audit:object-boundary-cleanup` 已固化为 hard-mask 边界清理候选报告，可输出 cleanup candidate Gaussian 估算量、dominant target object、priority score 和 recommendation，用于决定下一轮是否做 cleaned object_id / remap preview 实验。
+  - `npm run audit:object-boundary-remap-preview` 已固化为 sampled cleaned `object_id` preview 导出入口，默认输出 `/tmp/objgauss-object-boundary-remap-preview/*.remap-preview.ply` 和 summary，用于后续对比删除后 visual residual / non-target damage。
   - `npm run audit:hard-mask-quality` 已固化为 hard-mask 质量解释链聚合器，可把 PLY boundary diagnostic、Spark route summary 和 browser visual residual summary 按 asset 对齐，区分 boundary mixing、coverage hole risk 与 browser/source residual 主导问题。
   - `npm run audit:commercial-demo-readiness` 已固化为商用展示 QA 准入报告，可复用 Spark route 与 hard-mask quality artifacts，列出 route tier、质量解释、素材许可范围、required copy 和截图路径，避免把研究/本地样例误标成 public commercial demo。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
@@ -229,6 +231,11 @@ npm run audit:spark-mask-feather-candidates -- --skip-build --skip-visual-stats 
 npm run audit:spark-mask-feather-candidates -- --skip-build --port 5392 --output-dir /tmp/objgauss-spark-mask-feather-candidates
 node --check scripts/audit-object-mask-boundary.mjs
 npm run audit:object-boundary-cleanup
+node --check scripts/export-object-boundary-remap-preview.mjs
+npm run audit:object-boundary-remap-preview
+uv run objgauss stats /tmp/objgauss-object-boundary-remap-preview/nerf-lego-alpha-closure-local.remap-preview.ply
+node scripts/export-object-boundary-remap-preview.mjs --assets plush-semantic-closure-local --max-remap-samples 80000 --output-dir /tmp/objgauss-object-boundary-remap-preview-plush
+uv run objgauss stats /tmp/objgauss-object-boundary-remap-preview-plush/plush-semantic-closure-local.remap-preview.ply
 npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5372
 npm run build
 uv run --extra dev pytest

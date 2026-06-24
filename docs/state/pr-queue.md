@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005G`: 基于 object-boundary cleanup candidate report，做只读 remap preview / cleaned object_id 导出实验；默认 hard mask 继续保持，除非 browser residual gate 证明 cleanup 不伤害非目标对象。
+  - `DEMO-005H`: 基于 sampled remap preview PLY，做 browser residual gate，对比原始 object-aware PLY 与 remap-preview PLY 的删除后 visual stats / non-target damage；默认 hard mask 继续保持，除非 browser residual gate 证明 cleanup 不伤害非目标对象。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005G: Object boundary remap preview export
+
+- 状态: done / sampled-remap-preview
+- 类型: 标准 PR / renderer quality experiment
+- 目标: 基于 `DEMO-005F` 的 cleanup candidate report，生成保留原始 PLY 属性、仅 patch `object_id` 的 cleaned preview PLY，用于下一步 browser residual gate。
+- 已实施:
+  - 新增 `scripts/export-object-boundary-remap-preview.mjs`，读取 object-aware PLY，按 `object-boundary-remap-preview-v1` 采样邻域规则挑出被其他 object id 支配的 Gaussian，并只修改这些 sampled Gaussian 的 `object_id`。
+  - 脚本支持 binary / ascii scalar vertex PLY，默认保留原始 PLY 字节和所有 SH / scale / rotation / color 属性，只 patch `object_id` 字段。
+  - 新增 `npm run audit:object-boundary-remap-preview`，默认导出 Lego proxy preview 到 `/tmp/objgauss-object-boundary-remap-preview/summary.{json,md}` 和 `/tmp/objgauss-object-boundary-remap-preview/*.remap-preview.ply`。
+- 结论:
+  - Lego proxy 全量采样通过：gaussians=`5696`，sampled=`5696`，remapped=`1143`，estimated=`1143`，输出 PLY 可由 `objgauss stats` 读取。
+  - Plush semantic 大场景采样 smoke 通过：gaussians=`281498`，sampled=`70375`，step=`4`，remapped=`5701`，estimated=`22804`，输出 PLY 可由 `objgauss stats` 读取。
+  - 这仍是 sampled preview / export experiment；它没有证明删除后视觉质量改善，也没有进入默认 commercial route。
+- 验证:
+  - `node --check scripts/export-object-boundary-remap-preview.mjs`: passed。
+  - `npm run audit:object-boundary-remap-preview`: passed。
+  - `uv run objgauss stats /tmp/objgauss-object-boundary-remap-preview/nerf-lego-alpha-closure-local.remap-preview.ply`: passed。
+  - `node scripts/export-object-boundary-remap-preview.mjs --assets plush-semantic-closure-local --max-remap-samples 80000 --output-dir /tmp/objgauss-object-boundary-remap-preview-plush`: passed。
+  - `uv run objgauss stats /tmp/objgauss-object-boundary-remap-preview-plush/plush-semantic-closure-local.remap-preview.ply`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005F: Object boundary cleanup candidate report
 

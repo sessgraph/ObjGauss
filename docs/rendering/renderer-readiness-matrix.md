@@ -130,6 +130,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
 | Which object boundaries are candidates for assignment cleanup / remap review? | `npm run audit:object-boundary-cleanup` |
+| Can we export a cleaned `object_id` preview without changing official samples? | `npm run audit:object-boundary-remap-preview` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |
@@ -346,6 +347,25 @@ The cleanup layer is still read-only. It reports
 `cleanupPriorityScore`, and recommendation. The next step is a cleaned
 `object_id` preview / browser residual gate; do not promote cleanup into the
 default commercial route without that visual proof.
+
+The preview export step is:
+
+```bash
+npm run audit:object-boundary-remap-preview
+```
+
+It writes a sampled cleaned PLY to:
+
+```text
+/tmp/objgauss-object-boundary-remap-preview/*.remap-preview.ply
+/tmp/objgauss-object-boundary-remap-preview/summary.json
+/tmp/objgauss-object-boundary-remap-preview/summary.md
+```
+
+The exporter preserves the source PLY bytes and all Gaussian properties, then
+patches only sampled `object_id` values whose local 3D neighborhood is dominated
+by another object id. Treat this as an experiment input for the browser residual
+gate, not as a promoted object assignment cleanup policy.
 
 ## Hard Mask Quality Chain
 
