@@ -78,6 +78,7 @@ const KNOWN_ASSETS = [
 ];
 const DEFAULT_WEBGPU_VISUAL_AUDIT_MIN_VIEWPORT_SIZE = 320;
 const VISUAL_RESIDUAL_MODE = "spark-edit-visual-residual-v1";
+const VISUAL_RESIDUAL_SKIPPED_MODE = "skipped-by-native-mask-gate-v1";
 const SPARK_RECONSTRUCT_SOURCE = "packed-extract-v1";
 const SPARK_RECONSTRUCT_SH_SOURCE = "packed-sh-extract-v1";
 const SPARK_NATIVE_RECONSTRUCT_SOURCE = "native-splat-source-v1";
@@ -93,7 +94,7 @@ const SPARK_OBJECT_MASK_MAX_RESTORE_DELTA = 0.002;
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
-const assets = args.asset ? KNOWN_ASSETS.filter((asset) => asset.id === args.asset) : DEFAULT_ASSETS;
+const assets = selectAssets(args);
 const auditOptions = {
   requireWebGpu: Boolean(args.requireWebgpu ?? args["require-webgpu"]),
   webGpuFlags: String(args.webgpuFlags ?? args["webgpu-flags"] ?? process.env.OBJGAUSS_WEBGPU_FLAGS ?? "none"),
@@ -152,14 +153,15 @@ const auditOptions = {
       args["spark-native-mask"] ??
       process.env.OBJGAUSS_SPARK_NATIVE_MASK,
   ),
+  skipVisualResidual: flagEnabled(
+    args.skipVisualResidual ??
+      args["skip-visual-residual"] ??
+      process.env.OBJGAUSS_SKIP_VISUAL_RESIDUAL,
+  ),
   allowWebGpuDeviceLost: Boolean(
     args.allowWebgpuDeviceLost ?? args["allow-webgpu-device-lost"],
   ),
 };
-
-if (assets.length === 0) {
-  throw new Error(`unknown asset id: ${args.asset}`);
-}
 
 const server = args.url || args.noServer ? null : startDevServer(port);
 try {
@@ -237,6 +239,7 @@ try {
       `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
       `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
+      `skipVisualResidual=${auditOptions.skipVisualResidual} ` +
       `allowWebGpuDeviceLost=${auditOptions.allowWebGpuDeviceLost}`,
   );
 } finally {
@@ -260,6 +263,7 @@ async function runAudit(url, assetsToCheck, options) {
   const results = [];
   try {
     for (const asset of assetsToCheck) {
+      console.log(`browser_audit_asset_start asset=${JSON.stringify(asset.id)}`);
       await page.goto(auditUrl, { waitUntil: "networkidle" });
       const title = await page.title();
       if (title !== "ObjGauss 查看器") {
@@ -284,15 +288,28 @@ async function runAudit(url, assetsToCheck, options) {
         throw new Error(`${asset.id} did not expose Spark renderer id: ${splatRendererId}`);
       }
       const screenshotOptions = { timeoutMs: 60000, usePageClip: true };
-      const sparkVisualStats = await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
-      validateCanvasVisualStats(asset.id, "Spark", sparkVisualStats);
+      const sparkVisualStats = options.skipVisualResidual
+        ? null
+        : await canvasVisualStats(page, ".splatViewport canvas", screenshotOptions);
+      if (sparkVisualStats) {
+        validateCanvasVisualStats(asset.id, "Spark", sparkVisualStats);
+      }
 
       await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
       await waitForEditViewportReady(page);
-      const editOriginalVisualStats = await canvasVisualStats(page, ".viewport canvas", screenshotOptions);
-      validateCanvasVisualStats(asset.id, "edit original", editOriginalVisualStats);
-      const visualResidual = compareVisualStats(sparkVisualStats, editOriginalVisualStats);
-      validateVisualResidual(asset.id, visualResidual);
+      const editOriginalVisualStats = options.skipVisualResidual
+        ? null
+        : await canvasVisualStats(page, ".viewport canvas", screenshotOptions);
+      if (editOriginalVisualStats) {
+        validateCanvasVisualStats(asset.id, "edit original", editOriginalVisualStats);
+      }
+      const visualResidual =
+        sparkVisualStats && editOriginalVisualStats
+          ? compareVisualStats(sparkVisualStats, editOriginalVisualStats)
+          : null;
+      if (visualResidual) {
+        validateVisualResidual(asset.id, visualResidual);
+      }
 
       await page.getByLabel("渲染模式").selectOption("clustered");
       const editRenderer = await labeledValue(page, "渲染器");
@@ -2039,6 +2056,27 @@ function optionalFiniteNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function selectAssets(parsedArgs) {
+  const assetList = parsedArgs.assets ?? parsedArgs.asset;
+  if (!assetList) return DEFAULT_ASSETS;
+  if (assetList === true) {
+    throw new Error("--assets requires a comma-separated asset id list");
+  }
+  const requested = String(assetList)
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (requested.length === 0) {
+    throw new Error("--assets requires at least one asset id");
+  }
+  const byId = new Map(KNOWN_ASSETS.map((asset) => [asset.id, asset]));
+  const unknown = requested.filter((id) => !byId.has(id));
+  if (unknown.length > 0) {
+    throw new Error(`unknown asset id(s): ${unknown.join(",")}`);
+  }
+  return requested.map((id) => byId.get(id));
+}
+
 function clampNumber(value, min, max) {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
@@ -2252,6 +2290,30 @@ function validateSparkObjectMaskVisualDelta(assetId, delta) {
 }
 
 function visualResidualResultFields(sparkStats, editStats, residual) {
+  if (!sparkStats || !editStats || !residual) {
+    return {
+      visualResidualMode: VISUAL_RESIDUAL_SKIPPED_MODE,
+      sparkVisualWidth: 0,
+      sparkVisualHeight: 0,
+      sparkVisualPixels: 0,
+      sparkVisualNonBackgroundPixels: 0,
+      sparkVisualCoverage: 0,
+      sparkVisualLumaMean: 0,
+      sparkVisualChromaMean: 0,
+      sparkVisualChecksum: "",
+      editOriginalVisualWidth: 0,
+      editOriginalVisualHeight: 0,
+      editOriginalVisualPixels: 0,
+      editOriginalVisualNonBackgroundPixels: 0,
+      editOriginalVisualCoverage: 0,
+      editOriginalVisualLumaMean: 0,
+      editOriginalVisualChromaMean: 0,
+      editOriginalVisualChecksum: "",
+      sparkEditCoverageRatio: 0,
+      sparkEditLumaDelta: 0,
+      sparkEditChromaDelta: 0,
+    };
+  }
   return {
     visualResidualMode: VISUAL_RESIDUAL_MODE,
     sparkVisualWidth: sparkStats.width,

@@ -181,6 +181,23 @@ same opacity mask through `objectModifier`. It is enabled only with
 `?spark-native-mask=on` so the default commercial demo path remains unchanged
 while native-mask behavior is audited separately.
 
+RENDER-005T-AJ adds a dedicated native-mask multi-scene gate:
+
+```text
+Lego proxy native .splat mask
+        -> DOM contract
+        -> hide / restore pixel delta
+
+Plush semantic native .splat mask
+        -> DOM contract
+        -> large-scene screenshot evidence
+```
+
+The gate deliberately avoids Spark/edit visual residual screenshots for Plush.
+That residual belongs to the packed reconstruction quality gate, while the
+native-mask gate only needs to prove original compact `.splat` source,
+object-mask telemetry, persistent mesh update, and small-scene pixel effect.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -218,6 +235,9 @@ while native-mask behavior is audited separately.
   PLY-derived packed source to Spark's native compact `.splat` source with the
   same `object-opacity-texture-v1` modifier. This is currently a diagnostic
   route, not the default.
+- `npm run audit:spark-native-mask-gate` must pass before considering this
+  route as a default candidate. The gate covers Lego pixel delta and Plush
+  large-scene native source / mask contract.
 
 Runtime DOM evidence:
 
@@ -444,11 +464,36 @@ The default packed-source route still passes separately and reports
 `sparkMaskSource="ply-packed"`, keeping the native prototype isolated behind the
 URL gate.
 
+Run the native-mask multi-scene gate:
+
+```bash
+npm run audit:spark-native-mask-gate
+```
+
+Current local result:
+
+```text
+native_mask_gate=passed
+assets=["nerf-lego-alpha-closure-local","plush-semantic-closure-local"]
+
+nerf-lego-alpha-closure-local:
+source="native-splat"
+route="native-splat-source-v1"
+visible=4960/5696
+visual="native-mask-pixel-delta-v1":0.000872/0.003627/0.002893:0/0/0
+
+plush-semantic-closure-local:
+source="native-splat"
+route="native-splat-source-v1"
+visible=104403/281498
+visual="skipped-large-scene-v1":0/0/0:0/0/0
+```
+
 ## Remaining Gaps
 
-- The original compact `.splat` mask is still URL-gated and currently audited on
-  the small Lego proxy scene. It needs multi-scene validation before becoming
-  the default commercial demo route.
+- The original compact `.splat` mask is still URL-gated. It now has a
+  multi-scene candidate gate, but it has not been promoted to the default
+  commercial demo route.
 - The native mask relies on ObjGauss-generated sample pairs that pass the index
   mapping gate. Arbitrary third-party `.splat` files still need an explicit
   mapping check or embedded object metadata before object masking is trusted.
@@ -456,4 +501,4 @@ URL gate.
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
 - Add Spark-side selection / raycast-to-object mapping if viewport click
-  selection should stay in Spark.
+  selection should stay in Spark after native mask becomes a default candidate.
