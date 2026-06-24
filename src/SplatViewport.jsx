@@ -22,6 +22,7 @@ const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
 const SPARK_SELECTION_MODE = "screen-space-object-pick-v1";
 const SPARK_PICK_DRAG_PX = 5;
 const SPARK_PICK_MAX_RADIUS_PX = 28;
+const SPARK_PICK_AMBIGUITY_PX = 8;
 
 export default function SplatViewport({
   source,
@@ -54,6 +55,7 @@ export default function SplatViewport({
   const pickStartRef = useRef(null);
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
+  const [pickStats, setPickStats] = useState(() => emptyPickStats());
 
   const sourceKey = useMemo(() => {
     if (source?.url) return source.url;
@@ -503,7 +505,7 @@ export default function SplatViewport({
       const dragDistance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
       if (dragDistance > SPARK_PICK_DRAG_PX) return;
 
-      const objectId = pickSparkObjectFromPointer({
+      const pick = pickSparkObjectFromPointer({
         event,
         canvas,
         camera,
@@ -512,7 +514,8 @@ export default function SplatViewport({
         removedIds,
         isolatedId,
       });
-      if (objectId !== null) onSelectObject(objectId);
+      setPickStats(pick);
+      if (pick.objectId !== null) onSelectObject(pick.objectId);
     };
 
     canvas.addEventListener("pointerdown", pointerDown);
@@ -567,8 +570,26 @@ export default function SplatViewport({
       data-spark-sh-degree={packedStats.shDegree}
       data-spark-selection-mode={sparkSelectionMode}
       data-spark-selected-object={selectedId ?? ""}
+      data-spark-pick-status={pickStats.status}
+      data-spark-pick-object={pickStats.objectId ?? ""}
+      data-spark-pick-distance-px={formatPickMetric(pickStats.distancePx)}
+      data-spark-pick-candidate-objects={pickStats.candidateObjects}
+      data-spark-pick-ambiguous={String(pickStats.ambiguous)}
+      data-spark-pick-radius-px={SPARK_PICK_MAX_RADIUS_PX}
+      data-spark-selected-marker-visible={String(
+        pickStats.status === "hit" && pickStats.objectId === selectedId,
+      )}
       ref={containerRef}
     >
+      {pickStats.status === "hit" && pickStats.objectId === selectedId ? (
+        <div
+          className="sparkSelectionMarker"
+          style={{ left: pickStats.screenX, top: pickStats.screenY }}
+          aria-hidden="true"
+        >
+          <span>{pickStats.objectId}</span>
+        </div>
+      ) : null}
       <div className="viewportHud">
         <div>
           <span className="hudLabel">SPLAT</span>
@@ -781,14 +802,16 @@ function pickSparkObjectFromPointer({
   isolatedId,
 }) {
   const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
+  if (rect.width <= 0 || rect.height <= 0) return missedPickStats("invalid-viewport");
   const targetX = event.clientX - rect.left;
   const targetY = event.clientY - rect.top;
   const maxDistanceSq = SPARK_PICK_MAX_RADIUS_PX * SPARK_PICK_MAX_RADIUS_PX;
   const projected = new THREE.Vector3();
+  const candidateObjectIds = new Set();
   let bestObjectId = null;
   let bestDistanceSq = maxDistanceSq;
   let bestDepth = Infinity;
+  let secondObjectDistanceSq = Infinity;
 
   for (const point of points ?? []) {
     if (!pointVisible(point, visibleIds, removedIds, isolatedId)) continue;
@@ -811,17 +834,68 @@ function pickSparkObjectFromPointer({
     const screenX = (projected.x * 0.5 + 0.5) * rect.width;
     const screenY = (-projected.y * 0.5 + 0.5) * rect.height;
     const distanceSq = (screenX - targetX) ** 2 + (screenY - targetY) ** 2;
+    if (distanceSq > maxDistanceSq) continue;
+    candidateObjectIds.add(point.objectId);
     if (
       distanceSq < bestDistanceSq ||
       (distanceSq === bestDistanceSq && projected.z < bestDepth)
     ) {
+      if (bestObjectId !== null && point.objectId !== bestObjectId) {
+        secondObjectDistanceSq = Math.min(secondObjectDistanceSq, bestDistanceSq);
+      }
       bestDistanceSq = distanceSq;
       bestDepth = projected.z;
       bestObjectId = point.objectId;
+    } else if (point.objectId !== bestObjectId) {
+      secondObjectDistanceSq = Math.min(secondObjectDistanceSq, distanceSq);
     }
   }
 
-  return bestObjectId;
+  if (bestObjectId === null) {
+    return {
+      ...missedPickStats("miss"),
+      screenX: targetX,
+      screenY: targetY,
+      candidateObjects: 0,
+    };
+  }
+
+  const bestDistancePx = Math.sqrt(bestDistanceSq);
+  const secondObjectDistancePx = Math.sqrt(secondObjectDistanceSq);
+  const ambiguous =
+    Number.isFinite(secondObjectDistancePx) &&
+    secondObjectDistancePx - bestDistancePx <= SPARK_PICK_AMBIGUITY_PX;
+
+  return {
+    status: "hit",
+    objectId: bestObjectId,
+    screenX: targetX,
+    screenY: targetY,
+    distancePx: bestDistancePx,
+    candidateObjects: candidateObjectIds.size,
+    ambiguous,
+  };
+}
+
+function emptyPickStats() {
+  return missedPickStats("idle");
+}
+
+function missedPickStats(status) {
+  return {
+    status,
+    objectId: null,
+    screenX: 0,
+    screenY: 0,
+    distancePx: 0,
+    candidateObjects: 0,
+    ambiguous: false,
+  };
+}
+
+function formatPickMetric(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(3) : "0.000";
 }
 
 function pointScale3(point) {

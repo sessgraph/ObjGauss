@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AM`: 为 Spark `screen-space-object-pick-v1` 补选择 hit-rate / ambiguity gate，并决定是否需要 selected-object visual affordance；当前已可在 Spark 画布点击选中可见 object，但仍不是 Spark-internal raycast。
+  - `RENDER-005T-AN`: 为 Spark `screen-space-object-pick-v1` 增加多点击 hit-rate / ambiguity report。当前单次 demo pick 已有 hit telemetry 和 marker，但 Lego proxy 与 trained Lego 的审计点击都显示 `ambiguous=true`，不能宣称 robust renderer-native picking。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,31 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AM: Spark pick hit telemetry and selected marker
+
+- 状态: done / pick-telemetry-and-marker-audited
+- 类型: 标准 PR / 前端对象交互
+- 目标: 在 `screen-space-object-pick-v1` 已能选中对象后，补上可审计 hit / ambiguity telemetry 和画布内选中视觉反馈。
+- 已实施:
+  - Spark viewport 新增 `data-spark-pick-status/object/distance-px/candidate-objects/ambiguous/radius-px`。
+  - Spark viewport 新增 `data-spark-selected-marker-visible`，命中选中对象后在画布上显示非交互选中 marker。
+  - `audit-demo` 在 Spark 删除预览后要求 pick 命中、选中对象一致、距离在 pick radius 内、候选对象数大于 0、marker 可见，并输出 `sparkPick=...`。
+- 结论:
+  - Lego no-SH native route 通过：`sparkCanvasSelectedObject=0`、`sparkPick="screen-space-object-pick-v1":"hit":"0":3.7:3:"true":"true"`。
+  - Trained SH-heavy route 通过：`sparkCanvasSelectedObject=3`、`sparkPick="screen-space-object-pick-v1":"hit":"3":0.892:3:"true":"true"`，同时保持 `sparkMaskSource="ply-packed"` 与完整 SH rest。
+  - 这证明 Spark canvas pick 有可见反馈和可机器审计 hit 质量；但两个样例当前都是 `ambiguous=true`，下一步需要多点击 hit-rate / ambiguity report，而不是直接宣称 renderer-native robust picking。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5314/ --no-server`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5314/ --no-server`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `npm run audit:spark-native-mask-gate`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AL: Spark canvas object selection product path
 

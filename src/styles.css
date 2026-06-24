@@ -635,6 +635,54 @@ input[type="checkbox"] {
   cursor: crosshair;
 }
 
+.sparkSelectionMarker {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.sparkSelectionMarker::before,
+.sparkSelectionMarker::after {
+  position: absolute;
+  content: "";
+}
+
+.sparkSelectionMarker::before {
+  inset: 0;
+  border: 2px solid #f7d76f;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 62%), 0 0 14px rgb(247 215 111 / 42%);
+}
+
+.sparkSelectionMarker::after {
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f7d76f;
+  transform: translate(-50%, -50%);
+}
+
+.sparkSelectionMarker span {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  min-width: 18px;
+  padding: 2px 5px;
+  border: 1px solid rgb(247 215 111 / 48%);
+  border-radius: 5px;
+  color: #fff4bc;
+  background: rgb(12 14 16 / 82%);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
 .viewportHud {
   position: absolute;
   right: 18px;

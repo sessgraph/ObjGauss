@@ -227,6 +227,11 @@ diagnostic escape hatch, and `spark-native-mask=on` still forces native mode.
   through `screen-space-object-pick-v1`: the viewport projects visible
   object-aware PLY Gaussians through the active Spark camera and selects the
   nearest visible `object_id`.
+- Spark selection exposes hit quality telemetry and a non-interactive selection
+  marker. `audit-demo` requires a hit, matching selected object, finite
+  distance within the pick radius, at least one candidate object, and a visible
+  marker. It records ambiguity instead of treating current demo clicks as
+  unambiguous.
 - The filtered Spark route reuses one base `PackedSplats` cache and a
   `object-opacity-texture-v1` mask texture when visible / removed / isolated
   object state changes.
@@ -300,6 +305,12 @@ data-spark-sh-degree="0|1|2|3"
 data-spark-mask-source="ply-packed|native-splat"
 data-spark-selection-mode="screen-space-object-pick-v1|none"
 data-spark-selected-object="..."
+data-spark-pick-status="idle|hit|miss"
+data-spark-pick-object="..."
+data-spark-pick-distance-px="..."
+data-spark-pick-candidate-objects="..."
+data-spark-pick-ambiguous="true|false"
+data-spark-selected-marker-visible="true|false"
 ```
 
 The full-scene reconstruction probe is intentionally URL-gated so normal UI
@@ -334,6 +345,7 @@ sparkPacked="native-splat-source-v1":5696/3909:0/0
 sparkDisplayCache="disabled-by-native-mask-v1":"false":0:0/0/0
 sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4
 sparkCanvasSelectedObject=0
+sparkPick="screen-space-object-pick-v1":"hit":"0":3.7:3:"true":"true"
 sparkMaskVisual="spark-object-mask-visual-delta-v1":"839479b7"/"6ef6c73f"/"839479b7":0.000786/0.013558/0.000507:0/0/0
 sparkMesh="persistent-splatmesh-v1":1:"true":4
 sparkShRest=0:0:"false":0:0
@@ -530,7 +542,8 @@ npm run audit:demo -- \
 browser_audit=passed
 sparkMaskSource="ply-packed"
 sparkCanvasSelectedObject=3
-sparkPacked="packed-sh-extract-v1":255794/129108:164.5/0
+sparkPick="screen-space-object-pick-v1":"hit":"3":0.892:3:"true":"true"
+sparkPacked="packed-sh-extract-v1":255794/129108:156.5/0
 sparkShRest=255794:255794:"true":45:3
 ```
 
@@ -543,8 +556,11 @@ sparkShRest=255794:255794:"true":45:3
   mapping check or embedded object metadata before object masking is trusted.
 - Spark canvas selection is currently a screen-space CPU pick over the
   object-aware PLY metadata, not a Spark-internal raycast. It is good enough for
-  demo interaction, but still needs a dedicated selection hit-rate / ambiguity
-  gate before claiming robust renderer-native picking.
+  demo interaction and now exposes hit / ambiguity telemetry plus a selection
+  marker, but current Lego proxy and trained Lego clicks both report
+  `ambiguous=true` with three candidate objects. The next step is a dedicated
+  multi-click hit-rate / ambiguity report before claiming robust renderer-native
+  picking.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.

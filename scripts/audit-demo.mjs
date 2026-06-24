@@ -87,6 +87,7 @@ const SPARK_OBJECT_FILTER_MASK = "spark-object-opacity-mask";
 const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
 const SPARK_OBJECT_MASK_VISUAL_DELTA_MODE = "spark-object-mask-visual-delta-v1";
+const SPARK_PICK_MODE = "screen-space-object-pick-v1";
 const SPARK_RESTORE_STRESS_MAX_GAUSSIANS = 100_000;
 const SPARK_OBJECT_MASK_MIN_VISUAL_DELTA = 0.0005;
 const SPARK_OBJECT_MASK_MAX_RESTORE_DELTA = 0.002;
@@ -220,6 +221,7 @@ try {
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `sparkCanvasSelectedObject=${result.sparkCanvasSelectedObjectAfterDelete ?? "not-run"} ` +
+        `sparkPick=${JSON.stringify(result.sparkPickModeAfterDelete ?? "")}:${JSON.stringify(result.sparkPickStatusAfterDelete ?? "")}:${JSON.stringify(result.sparkPickObjectAfterDelete ?? "")}:${result.sparkPickDistancePxAfterDelete ?? 0}:${result.sparkPickCandidateObjectsAfterDelete ?? 0}:${JSON.stringify(result.sparkPickAmbiguousAfterDelete ?? "")}:${JSON.stringify(result.sparkSelectedMarkerVisibleAfterDelete ?? "")} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
@@ -1085,6 +1087,7 @@ async function runAudit(url, assetsToCheck, options) {
             objectStateChecksumAfterDelete: objectStateChecksum,
             canvasSelectedObject: "probe-skipped",
             sparkCanvasSelectedObjectAfterDelete: "probe-skipped",
+            ...emptySparkPickResultFields("probe-skipped"),
             visibleAfterIsolate: "probe-skipped",
             visibleAfterDelete: "probe-skipped",
             renderModeAfterDelete: "probe-skipped",
@@ -1227,6 +1230,7 @@ async function runAudit(url, assetsToCheck, options) {
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-mesh-updates") ?? "0")
         : 0;
       let sparkCanvasSelectedObjectAfterDelete = "not-run";
+      let sparkPickStatsAfterDelete = emptySparkPickStats();
       let sparkObjectMaskVisualDelta = emptySparkObjectMaskVisualDelta();
       const sparkShRestSourceGaussiansAfterDelete = sparkFilteredAfterDelete
         ? numericValue(await postDeleteViewport.getAttribute("data-spark-sh-rest-source-gaussians") ?? "0")
@@ -1338,7 +1342,9 @@ async function runAudit(url, assetsToCheck, options) {
         const selectedBeforeSparkCanvasPick = await selectedObjectValue(page);
         sparkCanvasSelectedObjectAfterDelete = await selectObjectFromCanvas(page, asset.id, {
           previousSelected: selectedBeforeSparkCanvasPick,
+          requireSparkPick: true,
         });
+        sparkPickStatsAfterDelete = await readSparkPickStats(page);
         const sparkSelectedObject = await page
           .locator(".viewport")
           .first()
@@ -1347,10 +1353,16 @@ async function runAudit(url, assetsToCheck, options) {
         if (
           sparkCanvasSelectedObjectAfterDelete === selectedBeforeSparkCanvasPick ||
           String(sparkCanvasSelectedObjectAfterDelete) !== String(sparkSelectedObject ?? "") ||
-          selectedRemovedRows > 0
+          selectedRemovedRows > 0 ||
+          sparkPickStatsAfterDelete.mode !== SPARK_PICK_MODE ||
+          sparkPickStatsAfterDelete.status !== "hit" ||
+          String(sparkPickStatsAfterDelete.object) !== String(sparkCanvasSelectedObjectAfterDelete) ||
+          sparkPickStatsAfterDelete.distancePx > sparkPickStatsAfterDelete.radiusPx ||
+          sparkPickStatsAfterDelete.candidateObjects <= 0 ||
+          sparkPickStatsAfterDelete.markerVisible !== "true"
         ) {
           throw new Error(
-            `${asset.id} Spark canvas selection did not choose a visible object: before=${selectedBeforeSparkCanvasPick} after=${sparkCanvasSelectedObjectAfterDelete} attr=${sparkSelectedObject} removedRows=${selectedRemovedRows}`,
+            `${asset.id} Spark canvas selection did not produce a visible hit: before=${selectedBeforeSparkCanvasPick} after=${sparkCanvasSelectedObjectAfterDelete} attr=${sparkSelectedObject} removedRows=${selectedRemovedRows} pick=${JSON.stringify(sparkPickStatsAfterDelete)}`,
           );
         }
       }
@@ -1641,6 +1653,7 @@ async function runAudit(url, assetsToCheck, options) {
         objectStateChecksumAfterDelete,
         canvasSelectedObject,
         sparkCanvasSelectedObjectAfterDelete,
+        ...sparkPickResultFields(sparkPickStatsAfterDelete),
         visibleAfterIsolate,
         visibleAfterDelete,
         renderModeAfterDelete,
@@ -2386,7 +2399,11 @@ function finiteNumericValue(value) {
   return Number.isFinite(numeric) ? numeric : Number.NaN;
 }
 
-async function selectObjectFromCanvas(page, assetId, { previousSelected = "无" } = {}) {
+async function selectObjectFromCanvas(
+  page,
+  assetId,
+  { previousSelected = "无", requireSparkPick = false } = {},
+) {
   const canvas = page.locator(".viewport canvas").first();
   const box = await canvas.boundingBox();
   if (!box) {
@@ -2408,6 +2425,19 @@ async function selectObjectFromCanvas(page, assetId, { previousSelected = "无" 
     await page.waitForTimeout(250);
     const selectedObject = await selectedObjectValue(page);
     if (selectedObject !== "无" && selectedObject !== previousSelected) {
+      if (requireSparkPick) {
+        const pick = await readSparkPickStats(page);
+        if (
+          pick.mode !== SPARK_PICK_MODE ||
+          pick.status !== "hit" ||
+          String(pick.object) !== String(selectedObject) ||
+          pick.distancePx > pick.radiusPx ||
+          pick.candidateObjects <= 0 ||
+          pick.markerVisible !== "true"
+        ) {
+          continue;
+        }
+      }
       return selectedObject;
     }
   }
@@ -2418,6 +2448,58 @@ async function selectedObjectValue(page) {
   const status = await page.locator(".statusBar").innerText();
   const match = status.match(/所选：([^\n]+)/);
   return match?.[1] ?? "无";
+}
+
+async function readSparkPickStats(page) {
+  return page.locator(".viewport").first().evaluate((viewport) => {
+    const numericAttr = (name) => {
+      const numeric = Number(viewport.getAttribute(name) ?? "0");
+      return Number.isFinite(numeric) ? numeric : 0;
+    };
+    return {
+      mode: viewport.getAttribute("data-spark-selection-mode") ?? "",
+      status: viewport.getAttribute("data-spark-pick-status") ?? "",
+      object: viewport.getAttribute("data-spark-pick-object") ?? "",
+      distancePx: numericAttr("data-spark-pick-distance-px"),
+      candidateObjects: numericAttr("data-spark-pick-candidate-objects"),
+      ambiguous: viewport.getAttribute("data-spark-pick-ambiguous") ?? "",
+      radiusPx: numericAttr("data-spark-pick-radius-px"),
+      markerVisible: viewport.getAttribute("data-spark-selected-marker-visible") ?? "",
+    };
+  });
+}
+
+function emptySparkPickStats() {
+  return {
+    mode: "",
+    status: "not-run",
+    object: "",
+    distancePx: 0,
+    candidateObjects: 0,
+    ambiguous: "",
+    radiusPx: 0,
+    markerVisible: "",
+  };
+}
+
+function sparkPickResultFields(stats) {
+  return {
+    sparkPickModeAfterDelete: stats.mode,
+    sparkPickStatusAfterDelete: stats.status,
+    sparkPickObjectAfterDelete: stats.object,
+    sparkPickDistancePxAfterDelete: stats.distancePx,
+    sparkPickCandidateObjectsAfterDelete: stats.candidateObjects,
+    sparkPickAmbiguousAfterDelete: stats.ambiguous,
+    sparkPickRadiusPxAfterDelete: stats.radiusPx,
+    sparkSelectedMarkerVisibleAfterDelete: stats.markerVisible,
+  };
+}
+
+function emptySparkPickResultFields(status = "not-run") {
+  return sparkPickResultFields({
+    ...emptySparkPickStats(),
+    status,
+  });
 }
 
 function parseArgs(rawArgs) {
