@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AH`: 评估 original compact `.splat` 与 object-aware PLY packed source 的稳定 Gaussian index mapping，判断 Spark mask 是否能从 PLY-derived packed source 继续推进到 original source / native `.splat` object masking；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`。
+  - `RENDER-005T-AI`: 基于已通过的 original compact `.splat` / object-aware PLY index mapping，原型化 original source / native `.splat` object mask runtime；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`，Spark reconstruction 默认变更必须先通过 `audit:spark-reconstruct-residual`，native mask 接线必须继续通过 `audit:splat-index-mapping` 和 object-mask pixel-delta audit。
   - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,24 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AH: Splat / PLY index mapping audit
+
+- 状态: done / index-mapping-audited
+- 类型: 标准 PR / 前端渲染验收
+- 目标: 评估 original compact `.splat` 与 object-aware PLY packed source 的稳定 Gaussian index mapping，判断 Spark object mask 是否能从 PLY-derived packed source 继续推进到 original source / native `.splat` object masking。
+- 已实施:
+  - 新增 `scripts/audit-splat-index-mapping.mjs`，直接解析 compact 32-byte `.splat` rows 和 object-aware PLY vertices。
+  - Audit 检查 count、逐 index position delta、逐 index scale delta、rounded-position multiset coverage、重复 position key 和 object_id 范围。
+  - 新增 `npm run audit:splat-index-mapping`，默认输出 `/tmp/objgauss-splat-index-mapping/summary.json` 与 `summary.md`。
+  - `docs/benchmarks/spark-filtered-edit.md` 记录该 gate 和 native-mask 解释边界。
+- 结论:
+  - 5 个 public/generated Gaussian 样例全部保序：`plush-3dgs-local`、`plush-v1-closure-local`、`plush-semantic-closure-local`、`nerf-lego-alpha-closure-local`、`nerf-lego-trained-output-local` 均 `indexMatches=count`、`maxPositionDelta=0`、`maxScaleDelta=0`、`positionMultisetCoverage=1`。
+  - 对当前 ObjGauss 生成/登记 public samples，可以把 object-aware PLY 的 `object_id` 作为按 Gaussian index keyed 的外部 mask 输入。
+  - 该结论不证明任意第三方 compact `.splat` 自带 object_id，也不等价于 original source/native mask runtime 已接线。
+- 验证:
+  - `node --check scripts/audit-splat-index-mapping.mjs`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
 
 ### RENDER-005T-AG: Spark object opacity mask visual delta guard
 

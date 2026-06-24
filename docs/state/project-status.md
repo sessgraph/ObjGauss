@@ -96,6 +96,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AE 已完成 Spark filtered persistent `SplatMesh` update surface：filtered Spark session 现在会保留同一个 `SplatMesh`，在 isolate / delete / restore 等 object-state 变化时更新其 display `PackedSplats` source，并通过 `data-spark-mesh-update-mode="persistent-splatmesh-v1"`、mesh id、reuse 和 update count 暴露 browser contract。Lego proxy 与 trained Lego 删除预览均证明同一个 mesh 在 hide / restore 后复用并更新：`sparkMesh="persistent-splatmesh-v1":1:"true":4`。这一步减少交互重建感，但仍不是原始 `.splat` 内部 native object mask；每个全新 visible set 仍需要 display `PackedSplats` extract 或 cache hit。
   - RENDER-005T-AF 已完成 Spark object opacity mask over packed source：filtered Spark route 现在用 `object-opacity-texture-v1` mask texture + Spark Dyno `objectModifier` 控制每个 Gaussian opacity，object-state 变化不再做 display `PackedSplats.extractSplats(...)`，browser contract 要求 `data-object-filter="spark-object-opacity-mask"`、`data-spark-packed-extract-ms="0.000"` 和 `data-spark-display-cache-mode="disabled-by-native-mask-v1"`。Lego proxy 删除预览通过：`sparkObjectMask="object-opacity-texture-v1":"4096x2":3909/1787:4`；trained Lego 删除预览通过：`sparkObjectMask="object-opacity-texture-v1":"4096x63":129108/126686:2`、`sparkShRest=255794:255794:"true":45:3`。因此当前“原始颜色 / 自身颜色”在对象编辑后已是 Spark 高斯路径，剩余颗粒感主要来自隔离 / 删除后的 object_id 子集稀疏、边界 assignment 噪声，以及尚未实现 original compact `.splat` 内部 object mask。
   - RENDER-005T-AG 已完成 Spark object opacity mask visual delta guard：`audit-demo` 小场景 hide / restore stress 现在会截图 delete baseline、hide-one-object 和 restored Spark canvas，要求隐藏对象后 checksum 与 coverage/luma/chroma 发生实际变化，恢复后回到 baseline。Lego proxy 通过：`sparkMaskVisual="spark-object-mask-visual-delta-v1":"4a2ed0e8"/"be002ca4"/"4a2ed0e8":0.000752/0.014063/0.026019:0/0/0`。这把 Spark mask 从“DOM telemetry 正确”推进到“像素级可见变化已验收”；original compact `.splat` 与 object-aware PLY packed source 的 index mapping 仍是下一步。
+  - RENDER-005T-AH 已完成 compact `.splat` / object-aware PLY index mapping audit：新增 `npm run audit:splat-index-mapping`，对 5 个 public/generated Gaussian 样例检查 count、逐 index position / scale delta、rounded-position multiset 和 object_id 范围；当前 Plush、Plush v1、Plush semantic、Lego proxy、trained Lego 全部 `maxPositionDelta=0`、`maxScaleDelta=0`、`positionMultisetCoverage=1`，证明这些样例可用 Gaussian index 作为外部 object mask key。该结论只覆盖 ObjGauss 生成/登记的 public samples，不等价于任意第三方 `.splat` 内部携带 object_id。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -158,6 +159,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:webgpu-coverage-gate` 已固化为 WebGPU 编辑预览 coverage/luma/chroma/cost 的多场景 baseline gate，并输出可复查 summary report。
   - `npm run audit:webgpu-alpha-floor-sweep` / `npm run audit:webgpu-alpha-floor-candidate-gate` 已固化为 alpha presentation floor 候选的多场景复现实验和 strict gate。
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
+  - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
@@ -167,6 +169,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-splat-index-mapping.mjs
+npm run audit:splat-index-mapping
 node --check scripts/audit-demo.mjs
 npm run build
 npm run preview -- --host 127.0.0.1 --port 5301 --strictPort
@@ -627,7 +631,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- 对象聚类色、隐藏、隔离、删除预览当前仍通过 `Gaussian OIT 编辑` fallback 或 WebGPU tile route 完成，不是 Spark / gsplat 真实 renderer 内的对象级重渲染；`原始颜色（编辑预览）` 只使用 PLY RGB / SH DC 颜色和近似 screen-space Gaussian kernel。WebGPU full runtime 内部输出已从 128px 提到 256px，fullscreen display 已从最近邻放大改为 bilinear storage resolve，并已加入 display-aspect viewport / aspect-fit bounds / 8% 留白、camera-Jacobian covariance、depth-binned alpha composite、可诊断的 Spark-frame camera mode 和 front-top-k sorted-alpha mode，因此颗粒、格子、贴边、非等比拉伸、固定相机 coverage mismatch 和排序近似问题均已有可审计切分；剩余视觉差距主要表现为过度平滑、Spark 合成路径不匹配、view-dependent SH 颜色未接入、近似 covariance / blending 和未接入 Spark 的真实对象级重渲染，而不是 Object Field 颜色本身。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
+- 对象聚类色和点击选择仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后已可走 Spark object opacity mask over PLY-derived packed source，并保留 SH-heavy PLY 的 degree-3 SH rest。当前仍不是 original compact `.splat` 内部 native object mask；剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及 native source mask 尚未接线。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。
@@ -640,7 +644,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. RENDER-005T-T: 继续拆 Spark vs edit 残差中的 SH / view-dependent color，或评估把 object filter 接入 Spark renderer；默认 coverage / depth / camera / alpha 参数变更必须先通过 `audit:webgpu-coverage-gate`。
+1. RENDER-005T-AI: 基于已通过的 `.splat` / PLY index mapping，原型化 original source / native `.splat` object mask runtime，并复用 object-mask pixel-delta、Spark residual 和 index-mapping gates 验收；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
 2. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 3. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 4. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

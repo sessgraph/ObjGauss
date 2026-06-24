@@ -149,6 +149,23 @@ delete-state Spark canvas
 
 This proves the mask affects rendered pixels, not only DOM telemetry.
 
+RENDER-005T-AH adds a standalone index-mapping audit for the generated public
+sample pairs:
+
+```text
+compact .splat rows
+        -> position / scale by Gaussian index
+object-aware PLY vertices
+        -> position / scale / object_id by vertex index
+        -> count + per-index delta + rounded-position multiset check
+```
+
+This proves the current public/generated samples preserve a stable Gaussian
+index between the compact `.splat` source and the object-aware PLY. It is
+evidence for using an external object-id mask keyed by Gaussian index on these
+assets; it does not mean arbitrary third-party `.splat` files carry object ids
+internally.
+
 ## Current Contract
 
 - Enabled for `renderMode=original` object edit states.
@@ -179,6 +196,9 @@ This proves the mask affects rendered pixels, not only DOM telemetry.
   `packed-sh-extract-v1` / SH preservation telemetry. Use
   `?spark-ply-source=off` to force the legacy compact `.splat` source for
   diagnostics.
+- Public/generated compact `.splat` and object-aware PLY pairs must pass
+  `npm run audit:splat-index-mapping` before relying on Gaussian index keyed
+  masks for original-source/native-mask work.
 
 Runtime DOM evidence:
 
@@ -351,14 +371,37 @@ chromaDelta=0.002846
 visibleGaussians=281498
 ```
 
+Run the index-mapping audit for public/generated `.splat` / PLY pairs:
+
+```bash
+npm run audit:splat-index-mapping
+```
+
+Current local result:
+
+```text
+splat_index_mapping=passed
+assets=["plush-3dgs-local","plush-v1-closure-local","plush-semantic-closure-local","nerf-lego-alpha-closure-local","nerf-lego-trained-output-local"]
+```
+
+All five pairs preserve count and index order exactly:
+
+```text
+plush-3dgs-local: 281498/281498, maxPositionDelta=0, maxScaleDelta=0
+plush-v1-closure-local: 281498/281498, maxPositionDelta=0, maxScaleDelta=0
+plush-semantic-closure-local: 281498/281498, maxPositionDelta=0, maxScaleDelta=0
+nerf-lego-alpha-closure-local: 5696/5696, maxPositionDelta=0, maxScaleDelta=0
+nerf-lego-trained-output-local: 255794/255794, maxPositionDelta=0, maxScaleDelta=0
+```
+
 ## Remaining Gaps
 
 - The current mask is over the object-aware PLY-derived Spark packed source, not
-  the original compact `.splat` file. Original `.splat` index mapping / native
-  source masking remains a separate decision.
-- Evaluate whether the compact `.splat` source can expose a stable original
-  Gaussian index mapping for native object masking, instead of using the
-  object-aware PLY-derived packed source.
+  the original compact `.splat` file. Index mapping is now proven for current
+  generated public samples, but original-source/native-mask runtime wiring is
+  still separate work.
+- Prototype an original-source/native mask route that uses the proven index
+  mapping, then repeat the existing object-mask pixel-delta and residual gates.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
