@@ -272,6 +272,27 @@ export default function App() {
         : "Spark PLY 重建"
       : activeEditRenderer.rendererLabel;
   const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
+  const rendererRoute = useMemo(
+    () =>
+      rendererRouteContract({
+        renderMode,
+        objectEditActive,
+        useSplatRenderer,
+        useSparkPlySourceRenderer,
+        useSparkFilteredRenderer,
+        useSparkNativeMaskRenderer,
+        useWebGpuTileRenderer,
+      }),
+    [
+      renderMode,
+      objectEditActive,
+      useSplatRenderer,
+      useSparkPlySourceRenderer,
+      useSparkFilteredRenderer,
+      useSparkNativeMaskRenderer,
+      useWebGpuTileRenderer,
+    ],
+  );
   const visibleCount = useMemo(
     () =>
       scene.points.filter(
@@ -404,7 +425,14 @@ export default function App() {
   };
 
   return (
-    <main className="appShell">
+    <main
+      className="appShell"
+      data-renderer-route={rendererRoute.id}
+      data-renderer-route-kind={rendererRoute.kind}
+      data-color-mode-role={rendererRoute.colorModeRole}
+      data-source-preview-boundary={rendererRoute.sourceBoundary}
+      data-preview-quality={rendererRoute.qualityId}
+    >
       <header className="topbar">
         <div className="brand">
           <div className="brandMark">
@@ -444,8 +472,8 @@ export default function App() {
             onChange={(event) => setEditRenderMode(event.target.value)}
             aria-label="渲染模式"
           >
-            <option value="original">原始颜色（编辑）</option>
-            <option value="clustered">对象色（编辑）</option>
+            <option value="original">自身颜色</option>
+            <option value="clustered">对象色诊断</option>
           </select>
           <button className="iconButton" type="button" onClick={resetDemo} title="重置演示">
             <RefreshCw size={17} />
@@ -506,8 +534,8 @@ export default function App() {
             </ControlRow>
             <ControlRow label="颜色模式">
               <select value={renderMode} onChange={(event) => setEditRenderMode(event.target.value)}>
-                <option value="original">原始颜色（编辑）</option>
-                <option value="clustered">对象色（编辑）</option>
+                <option value="original">自身颜色</option>
+                <option value="clustered">对象色诊断</option>
               </select>
             </ControlRow>
             <ControlRow label="点大小">
@@ -611,15 +639,23 @@ export default function App() {
               重置演示
             </button>
             <div className="hintText">
-              当前：{modeText} / {activeRendererText}。目标：{activeEditRenderer.targetRendererLabel}。
+              路线：{rendererRoute.label} / {rendererRoute.qualityLabel}。
             </div>
           </section>
         </aside>
 
         <section className="viewerStage" aria-label="3D 视图">
+          <div
+            className={`routeBadge ${rendererRoute.tone}`}
+            title={rendererRoute.title}
+            aria-hidden="true"
+          >
+            <span>{rendererRoute.label}</span>
+            <strong>{rendererRoute.qualityLabel}</strong>
+          </div>
           {!useSplatRenderer && !useSparkPlySourceRenderer && (
             <div className="viewportBanner">
-              <strong>对象编辑预览</strong>
+              <strong>{rendererRoute.bannerTitle}</strong>
               <span>{renderModeText} / {activeRendererText}</span>
               {hasSplatRenderer && objectEditActive ? (
                 <button className="bannerAction" type="button" onClick={enterViewMode}>
@@ -768,7 +804,10 @@ export default function App() {
           <section className="panelSection statePanel">
             <h2>渲染状态</h2>
             <StateRow label="工作模式" value={modeText} />
+            <StateRow label="展示路线" value={rendererRoute.label} />
             <StateRow label="渲染器" value={activeRendererText} />
+            <StateRow label="颜色用途" value={rendererRoute.colorRoleLabel} />
+            <StateRow label="预览边界" value={rendererRoute.sourceBoundaryLabel} />
             <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
             <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
             <StateRow
@@ -812,6 +851,7 @@ export default function App() {
       <footer className="statusBar">
         <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
         <span>模式：{modeText}</span>
+        <span>路线：{rendererRoute.label}</span>
         <span>渲染器：{activeRendererText}</span>
         <span>WebGPU：{activeEditRenderer.webGpuLabel}</span>
         <span>高斯点：{scene.points.length.toLocaleString()}</span>
@@ -923,6 +963,121 @@ function allIds(points) {
 function renderModeLabel(mode) {
   if (mode === "original") return "原始颜色（编辑预览）";
   return "对象色（编辑预览）";
+}
+
+function rendererRouteContract({
+  renderMode,
+  objectEditActive,
+  useSplatRenderer,
+  useSparkPlySourceRenderer,
+  useSparkFilteredRenderer,
+  useSparkNativeMaskRenderer,
+  useWebGpuTileRenderer,
+}) {
+  const colorModeRole =
+    renderMode === "clustered" ? "diagnostic-object-color" : "source-color";
+  const colorRoleLabel = renderMode === "clustered" ? "对象色诊断" : "自身颜色";
+  const sourceBoundary =
+    renderMode === "clustered"
+      ? "diagnostic-object-color"
+      : objectEditActive
+        ? "hard-object-mask-no-reoptimize"
+        : "source-splat";
+  const sourceBoundaryLabel =
+    sourceBoundary === "hard-object-mask-no-reoptimize"
+      ? "对象 mask，无补洞"
+      : sourceBoundary === "source-splat"
+        ? "原始 Splat"
+        : "调试色";
+
+  const base = {
+    colorModeRole,
+    colorRoleLabel,
+    sourceBoundary,
+    sourceBoundaryLabel,
+  };
+
+  if (renderMode === "clustered") {
+    return {
+      ...base,
+      id: "diagnostic-object-color",
+      kind: "diagnostic",
+      label: "对象色诊断",
+      qualityId: "debug-object-color",
+      qualityLabel: "调试分组",
+      bannerTitle: "对象色诊断",
+      tone: "diagnostic",
+      title: "诊断路线：用于检查 object_id 分组，不代表商用展示外观",
+    };
+  }
+
+  if (useSplatRenderer) {
+    return {
+      ...base,
+      id: "spark-original-view",
+      kind: "commercial",
+      label: "商用 Spark",
+      qualityId: "source-splat",
+      qualityLabel: "原始 Splat",
+      bannerTitle: "Spark 源色",
+      tone: "commercial",
+      title: "商业展示默认路线：Spark 原始 Splat",
+    };
+  }
+
+  if (useSparkPlySourceRenderer) {
+    return {
+      ...base,
+      id: "spark-ply-sh-source",
+      kind: "commercial",
+      label: "商用 Spark SH",
+      qualityId: "ply-sh-source",
+      qualityLabel: "PLY SH 源",
+      bannerTitle: "Spark SH 源",
+      tone: "commercial",
+      title: "商业展示路线：保留 SH-heavy 本地训练输出的 SH 系数",
+    };
+  }
+
+  if (useSparkFilteredRenderer) {
+    return {
+      ...base,
+      id: useSparkNativeMaskRenderer ? "spark-native-mask" : "spark-packed-sh-mask",
+      kind: "commercial",
+      label: "商用 Spark",
+      qualityId: useSparkNativeMaskRenderer ? "native-splat-mask" : "packed-sh-mask",
+      qualityLabel: useSparkNativeMaskRenderer ? "原生 Splat mask" : "SH packed mask",
+      bannerTitle: "Spark 源色编辑",
+      tone: "commercial",
+      title: "商业展示路线：自身颜色 + object mask，不做删除后重优化",
+    };
+  }
+
+  if (useWebGpuTileRenderer) {
+    return {
+      ...base,
+      id: "webgpu-c-path-diagnostic",
+      kind: "diagnostic",
+      label: "WebGPU C-path",
+      qualityId: "tile-diagnostic-preview",
+      qualityLabel: "诊断预览",
+      bannerTitle: "WebGPU 诊断预览",
+      tone: "diagnostic",
+      title: "C-path 诊断路线：验证 tile renderer，不是当前商用默认外观",
+    };
+  }
+
+  return {
+    ...base,
+    id: "gaussian-oit-fallback",
+    kind: "fallback",
+    label: "Fallback",
+    qualityId: "gaussian-oit-preview",
+    qualityLabel: "Gaussian OIT",
+    bannerTitle: "Fallback 预览",
+    tone: "fallback",
+    title: "兼容回退路线：近似编辑预览",
+  };
 }
 
 function readWebGpuRuntimeProbe() {

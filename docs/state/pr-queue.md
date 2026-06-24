@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AU`: 将 renderer readiness matrix 反映到产品 UI，精简商业 Demo 的颜色/调试入口，并让 source/original delete preview 的质量边界更清晰。
+  - `RENDER-005T-AV`: 增加 SH-heavy trained route-only browser audit，低成本验证 `spark-packed-sh-mask` / SH preservation / hard-object-mask boundary，不每次跑完整 visual residual。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AU: Product renderer route UI contract
+
+- 状态: done / route-ui-audited
+- 类型: 标准 PR / 前端 UX + browser audit
+- 目标: 将 renderer readiness matrix 反映到产品 UI，精简商业 Demo 的颜色/调试入口，并让 source/original delete preview 的质量边界更清晰。
+- 已实施:
+  - 顶部和侧栏颜色下拉改为 `自身颜色` / `对象色诊断`，把对象色明确降级为 debug/diagnostic 入口。
+  - Viewport 增加紧凑 route badge，状态面板增加 `展示路线`、`颜色用途`、`预览边界`。
+  - App root 暴露 `data-renderer-route`、`data-renderer-route-kind`、`data-color-mode-role`、`data-source-preview-boundary`、`data-preview-quality`。
+  - `audit-demo` 新增 route contract：首屏必须是 commercial / source-color / source-splat；对象色必须是 diagnostic-object-color；删除预览必须回到 source-color 且暴露 `hard-object-mask-no-reoptimize`。
+  - `docs/rendering/renderer-readiness-matrix.md` 新增 Product UI Contract。
+- 结论:
+  - UI 现在把商用 Spark route、WebGPU C-path 诊断 route、Fallback route 分开呈现。
+  - 删除后的自身颜色不会再暗示“重新优化后的完整 3DGS”；状态面板明确显示 `对象 mask，无补洞`。
+  - Trained SH-heavy route 在手动复查中打印了 `browser_audit=passed` 与 `postDeleteRoute="spark-packed-sh-mask":"commercial":"source-color":"hard-object-mask-no-reoptimize"`，但本次命令被中止信号打断返回 130，因此只作为补充观察，不记为正式 gate。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --url http://127.0.0.1:5341/ --no-server`: passed；route 输出 `spark-original-view -> diagnostic-object-color -> spark-native-mask`，删除后 boundary 为 `hard-object-mask-no-reoptimize`。
+  - Playwright screenshot: `/tmp/objgauss-audit-nerf-lego-alpha-closure-local.png`，视觉检查 route badge / banner / 状态面板未遮挡主操作。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-AT: Renderer readiness matrix
 

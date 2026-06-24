@@ -579,6 +579,57 @@ input[type="checkbox"] {
   height: 100%;
 }
 
+.routeBadge {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  display: grid;
+  min-width: 138px;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: rgb(15 21 25 / 80%);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.routeBadge span {
+  color: #96a4ad;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.routeBadge strong {
+  color: #f0f5f7;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.15;
+}
+
+.routeBadge.commercial {
+  border-color: rgb(38 199 158 / 32%);
+  background: rgb(13 34 30 / 78%);
+}
+
+.routeBadge.commercial strong {
+  color: #78e5bd;
+}
+
+.routeBadge.diagnostic {
+  border-color: rgb(235 183 88 / 34%);
+  background: rgb(37 28 15 / 78%);
+}
+
+.routeBadge.diagnostic strong {
+  color: #ffd58c;
+}
+
+.routeBadge.fallback {
+  border-color: rgb(159 177 190 / 26%);
+}
+
 .viewportBanner {
   position: absolute;
   top: 18px;
@@ -887,7 +938,7 @@ input[type="checkbox"] {
 
 .statusBar {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, max-content));
+  grid-template-columns: repeat(8, minmax(0, max-content));
   align-items: center;
   gap: 26px;
   padding: 0 18px;
@@ -955,9 +1006,16 @@ input[type="checkbox"] {
     min-height: 520px;
   }
 
+  .routeBadge {
+    top: 12px;
+    right: 12px;
+    min-width: 126px;
+  }
+
   .viewportBanner {
     left: 12px;
     right: 12px;
+    top: 78px;
     max-width: none;
     align-items: flex-start;
     flex-direction: column;

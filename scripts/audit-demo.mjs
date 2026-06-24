@@ -188,6 +188,8 @@ try {
         `visualResidual=${JSON.stringify(result.visualResidualMode)}:${result.sparkVisualCoverage}/${result.editOriginalVisualCoverage}:${result.sparkEditCoverageRatio}:${result.sparkEditLumaDelta}:${result.sparkEditChromaDelta} ` +
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
         `editRendererId=${JSON.stringify(result.editRendererId)} ` +
+        `route=${JSON.stringify(result.initialRouteId)}:${JSON.stringify(result.initialRouteKind)}:${JSON.stringify(result.initialColorModeRole)}:${JSON.stringify(result.initialSourcePreviewBoundary)} ` +
+        `objectColorRoute=${JSON.stringify(result.objectColorRouteId)}:${JSON.stringify(result.objectColorRouteKind)}:${JSON.stringify(result.objectColorModeRole)}:${JSON.stringify(result.objectColorSourcePreviewBoundary)} ` +
         `runtimeProbe=${JSON.stringify(result.webGpuRuntimeProbe)} ` +
         `firstFrame=${JSON.stringify(result.webGpuFirstFrameStatus)}:${result.webGpuFirstFramePixels} ` +
         `webgpuViewport=${result.webGpuViewportWidth}x${result.webGpuViewportHeight}:${result.webGpuPixelCount}:${JSON.stringify(result.webGpuViewportAspectMode)}:${JSON.stringify(result.webGpuViewportQuality)}:${result.webGpuViewportPixelBudget} ` +
@@ -242,6 +244,7 @@ try {
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
+        `postDeleteRoute=${JSON.stringify(result.routeAfterDeleteId)}:${JSON.stringify(result.routeAfterDeleteKind)}:${JSON.stringify(result.colorModeRoleAfterDelete)}:${JSON.stringify(result.sourcePreviewBoundaryAfterDelete)} ` +
         `deletedObjects=${result.deletedObjects} ` +
         `postDelete=${JSON.stringify(result.postDeleteRendererId ?? "")}:${JSON.stringify(result.postDeleteObjectFilter ?? "")}:${result.sparkFilteredGaussiansAfterDelete ?? "unknown"} ` +
         `sparkMaskSource=${JSON.stringify(result.sparkMaskSourceAfterDelete ?? "")} ` +
@@ -308,6 +311,20 @@ async function runAudit(url, assetsToCheck, options) {
       if (splatRendererId !== "spark-splat") {
         throw new Error(`${asset.id} did not expose Spark renderer id: ${splatRendererId}`);
       }
+      const appShell = page.locator(".appShell").first();
+      const initialRouteId = await appShell.getAttribute("data-renderer-route");
+      const initialRouteKind = await appShell.getAttribute("data-renderer-route-kind");
+      const initialColorModeRole = await appShell.getAttribute("data-color-mode-role");
+      const initialSourcePreviewBoundary = await appShell.getAttribute("data-source-preview-boundary");
+      if (
+        initialRouteKind !== "commercial" ||
+        initialColorModeRole !== "source-color" ||
+        initialSourcePreviewBoundary !== "source-splat"
+      ) {
+        throw new Error(
+          `${asset.id} initial route did not expose commercial source splat contract: route=${initialRouteId}:${initialRouteKind} color=${initialColorModeRole} boundary=${initialSourcePreviewBoundary}`,
+        );
+      }
       const screenshotOptions = { timeoutMs: 60000, usePageClip: true };
       const sparkVisualStats = options.skipVisualResidual
         ? null
@@ -333,6 +350,20 @@ async function runAudit(url, assetsToCheck, options) {
       }
 
       await page.getByLabel("渲染模式").selectOption("clustered");
+      const objectColorRouteId = await appShell.getAttribute("data-renderer-route");
+      const objectColorRouteKind = await appShell.getAttribute("data-renderer-route-kind");
+      const objectColorModeRole = await appShell.getAttribute("data-color-mode-role");
+      const objectColorSourcePreviewBoundary = await appShell.getAttribute("data-source-preview-boundary");
+      if (
+        objectColorRouteId !== "diagnostic-object-color" ||
+        objectColorRouteKind !== "diagnostic" ||
+        objectColorModeRole !== "diagnostic-object-color" ||
+        objectColorSourcePreviewBoundary !== "diagnostic-object-color"
+      ) {
+        throw new Error(
+          `${asset.id} object color mode did not expose diagnostic route: route=${objectColorRouteId}:${objectColorRouteKind} color=${objectColorModeRole} boundary=${objectColorSourcePreviewBoundary}`,
+        );
+      }
       const editRenderer = await labeledValue(page, "渲染器");
       if (!["Gaussian OIT 编辑", "WebGPU Tile 编辑"].includes(editRenderer)) {
         throw new Error(`${asset.id} did not enter a known edit renderer: ${editRenderer}`);
@@ -1219,6 +1250,10 @@ async function runAudit(url, assetsToCheck, options) {
       const deletedObjects = await labeledValue(page, "已删除对象");
       const visibleAfterDelete = await labeledValue(page, "可见");
       const renderModeAfterDelete = await labeledValue(page, "模式");
+      const routeAfterDeleteId = await appShell.getAttribute("data-renderer-route");
+      const routeAfterDeleteKind = await appShell.getAttribute("data-renderer-route-kind");
+      const colorModeRoleAfterDelete = await appShell.getAttribute("data-color-mode-role");
+      const sourcePreviewBoundaryAfterDelete = await appShell.getAttribute("data-source-preview-boundary");
       const postDeleteViewport = page.locator(".viewport").first();
       const postDeleteRendererId = await postDeleteViewport.getAttribute("data-renderer");
       const postDeleteObjectFilter = await postDeleteViewport.getAttribute("data-object-filter");
@@ -1385,6 +1420,24 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (renderModeAfterDelete !== "原始颜色（编辑预览）") {
         throw new Error(`${asset.id} delete preview did not restore edit-preview original colors`);
+      }
+      if (
+        colorModeRoleAfterDelete !== "source-color" ||
+        sourcePreviewBoundaryAfterDelete !== "hard-object-mask-no-reoptimize"
+      ) {
+        throw new Error(
+          `${asset.id} delete preview did not expose source-color object-mask boundary: route=${routeAfterDeleteId}:${routeAfterDeleteKind} color=${colorModeRoleAfterDelete} boundary=${sourcePreviewBoundaryAfterDelete}`,
+        );
+      }
+      if (sparkFilteredAfterDelete && routeAfterDeleteKind !== "commercial") {
+        throw new Error(
+          `${asset.id} Spark filtered delete preview did not expose commercial route: route=${routeAfterDeleteId}:${routeAfterDeleteKind}`,
+        );
+      }
+      if (!sparkFilteredAfterDelete && postDeleteRendererId === "webgpu-tile" && routeAfterDeleteId !== "webgpu-c-path-diagnostic") {
+        throw new Error(
+          `${asset.id} WebGPU delete preview did not expose C-path diagnostic route: route=${routeAfterDeleteId}:${routeAfterDeleteKind}`,
+        );
       }
       if (
         sparkFilteredAfterDelete &&
@@ -1591,10 +1644,18 @@ async function runAudit(url, assetsToCheck, options) {
         title,
         splatPixels,
         splatRendererId,
+        initialRouteId,
+        initialRouteKind,
+        initialColorModeRole,
+        initialSourcePreviewBoundary,
         ...visualResidualResultFields(sparkVisualStats, editOriginalVisualStats, visualResidual),
         editPixels,
         editRenderer,
         editRendererId,
+        objectColorRouteId,
+        objectColorRouteKind,
+        objectColorModeRole,
+        objectColorSourcePreviewBoundary,
         webGpuFirstFrameStatus,
         webGpuFirstFramePixels,
         webGpuFirstFrameChecksum,
@@ -1776,6 +1837,10 @@ async function runAudit(url, assetsToCheck, options) {
         visibleAfterIsolate,
         visibleAfterDelete,
         renderModeAfterDelete,
+        routeAfterDeleteId,
+        routeAfterDeleteKind,
+        colorModeRoleAfterDelete,
+        sourcePreviewBoundaryAfterDelete,
         deletedObjects,
         postDeleteRendererId,
         postDeleteObjectFilter,

@@ -85,13 +85,39 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 
+## Product UI Contract
+
+The viewer exposes the renderer decision as compact status rather than long
+explanatory copy:
+
+- the color selector shows `自身颜色` and `对象色诊断`;
+- the viewport shows a compact route badge such as `商用 Spark / 原生 Splat
+  mask`;
+- the state panel exposes `展示路线`, `颜色用途`, and `预览边界`;
+- the app root exposes machine-readable attributes:
+
+```text
+data-renderer-route
+data-renderer-route-kind
+data-color-mode-role
+data-source-preview-boundary
+data-preview-quality
+```
+
+`npm run audit:demo` validates the key route transitions:
+
+```text
+initial view     -> commercial / source-color / source-splat
+object color     -> diagnostic-object-color
+delete preview   -> source-color / hard-object-mask-no-reoptimize
+```
+
 ## Next Product Slice
 
-The next UX-facing slice should make the active route and quality boundary
-visible without adding explanatory clutter:
+The next UX-facing slice should make SH-heavy route validation cheaper:
 
-- keep commercial demo assets on Spark source/original routes by default;
-- demote `对象色` to an explicit diagnostic/debug mode;
-- show the active renderer route in compact status text;
-- avoid implying that source/original delete preview is a full 3DGS
-  reoptimization.
+- add a route-only browser audit for `nerf-lego-trained-output-local` that skips
+  expensive visual residual and mask-restore stress work;
+- keep checking that trained SH-heavy delete preview reports `spark-packed-sh-mask`
+  and preserves `f_rest_*` coefficients;
+- keep full visual/residual validation as an explicit heavier gate.
