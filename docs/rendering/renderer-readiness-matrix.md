@@ -78,6 +78,8 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 
 | Question | Command |
 | --- | --- |
+| What should default CI run for renderer readiness? | `npm run acceptance:renderer-ci` |
+| What should demo / release review run for the full product route? | `npm run acceptance:renderer-product` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
@@ -86,6 +88,31 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 | Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |
+
+## Renderer Acceptance Profiles
+
+`npm run acceptance:renderer-ci` is the default CI renderer profile. It is
+designed to be fresh-clone safe and therefore does not require
+`nerf-lego-trained-output-local`:
+
+```text
+npm run build
+npm run audit:webgpu-tile-smoke
+npm run audit:splat-index-mapping -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local
+npm run audit:spark-native-mask-gate
+```
+
+This profile proves the B/C renderer contracts that can be expected from the
+repo's public no-SH samples: WebGPU tile smoke, compact `.splat` / PLY index
+mapping, and Spark native object masking. It intentionally does not prove the
+trained SH-heavy packed route.
+
+`npm run acceptance:renderer-product` is the explicit product/demo profile. It
+runs `acceptance:spark-commercial-route`, including the trained sample
+availability preflight and the SH-heavy browser route. This is the correct gate
+before commercial demo review, but it should not be promoted to default CI until
+the trained sample becomes a committed, downloadable, or generated fixture in
+that environment.
 
 ## Product UI Contract
 

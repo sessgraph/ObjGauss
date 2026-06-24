@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-BA`: 基于 trained sample availability audit，决定是否把 Spark commercial route gate 提升为默认 CI requirement，或继续保持显式 product-route gate。
+  - `RENDER-005T-BB`: 针对 Spark source/original 删除后仍可能颗粒的问题，建立 object-boundary / deleted-subset coverage diagnostic，把 hard object mask 的视觉缺口从主观观感变成可量化报告。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-BA: Renderer CI / product route profile split
+
+- 状态: done / renderer-profile-split
+- 类型: 标准 PR / acceptance profile
+- 目标: 基于 trained sample availability audit，决定 Spark commercial route gate 的默认 CI 策略，并把 CI-safe renderer gate 与显式 product-route gate 分开。
+- 已实施:
+  - 新增 `scripts/acceptance-renderer-profile.mjs` 与 `npm run acceptance:renderer`。
+  - 新增 `npm run acceptance:renderer-ci`，默认执行 build、WebGPU tile smoke、no-SH public sample index mapping 和 Spark native object mask gate。
+  - 新增 `npm run acceptance:renderer-product`，显式调用完整 `acceptance:spark-commercial-route`，包括 trained sample availability preflight 与 SH-heavy packed SH route。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 Renderer Acceptance Profiles，明确默认 CI 不要求 `nerf-lego-trained-output-local`，产品 / Demo review 才要求该本机 SH-heavy sample。
+- 结论:
+  - Spark commercial route gate 不提升为默认 fresh-clone CI requirement。
+  - 默认 renderer CI profile 只覆盖 repo public no-SH 样例和 C-path smoke；trained SH-heavy route 保持显式 product/demo gate。
+  - 只有当 trained sample 变成 committed、downloadable 或 CI-generated fixture 时，才重新评估默认 CI 纳入。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run acceptance:renderer -- --profile ci --dry-run --output-dir /tmp/objgauss-renderer-profile-ci-dry-run`: passed；dry-run steps=4，且 `includesTrainedShHeavySample=false`。
+  - `npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-profile-product-dry-run`: passed；dry-run steps=1，且 `includesTrainedShHeavySample=true`。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-nonbrowser`: passed；覆盖 build、WebGPU tile smoke 和 no-SH public sample index mapping，report 为 `status=passed`、steps=3。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+  - 本轮完整 `npm run acceptance:renderer-ci -- --native-port 5357 --output-dir /tmp/objgauss-renderer-profile-ci` 在 sandbox 内执行到 Spark native browser gate 时因 localhost `fetch failed` 失败；按规则提权重跑被审批服务断连拒绝。该失败未进入页面逻辑，不推翻此前 `acceptance:spark-commercial-route` 对 native route 的通过证据，但完整 profile browser rerun 仍需在允许 localhost 的环境执行。
 
 ### RENDER-005T-AZ: Trained SH-heavy sample availability contract
 
