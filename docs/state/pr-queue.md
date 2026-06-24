@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005C`: 把 `spark-object-mask-feather` 从单场景诊断扩展成多场景 sweep / report，比较 hard mask、不同 opacity、不同 radius 对 coverage / luma / chroma 和对象残留的影响，再决定是否默认启用。
+  - `DEMO-005D`: 基于多场景 feather sweep 结果，继续评估更多 opacity / radius / commercial-chair variants 或加显式产品 toggle；默认不启用 feather，除非多场景报告证明 coverage / luma / chroma 同时改善。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005C: Spark mask feather sweep report
+
+- 状态: done / multi-scene-feather-report
+- 类型: 标准 PR / renderer UX + browser audit report
+- 目标: 将 `spark-object-mask-feather` 从单场景诊断扩展成多场景 sweep / report，比较 hard mask 与 soft-boundary variant 对 route、opacity texture、coverage / luma / chroma 和截图的影响，再决定是否默认启用。
+- 已实施:
+  - 新增 `scripts/audit-spark-mask-feather-sweep.mjs` 与 `npm run audit:spark-mask-feather-sweep`。
+  - 默认覆盖 `nerf-lego-alpha-closure-local` 与 `plush-semantic-closure-local`，默认 variants 为 `hard:off` 和 `feather55:0.55`。
+  - 脚本使用轻量 Playwright route-only flow：加载样例、进入对象编辑、选择首个 object、执行 `预览删除`，读取 Spark route / object opacity texture / feather telemetry，并采集 before/after canvas visual stats 与截图。
+  - 输出 `/tmp/objgauss-spark-mask-feather-sweep/summary.{json,md}`，包含每场景 hard / feather rows 和 hard→feather comparison。
+- 结论:
+  - 双场景 route contract 通过，Lego 与 Plush 都保持 `spark-native-mask` / `hard-object-mask-no-reoptimize` / `hard-mask-no-inpaint`。
+  - `feather55` 在 Lego 软化 2932 个 Gaussian，在 Plush 软化 65273 个 Gaussian，mean opacity 分别降到 `0.901044` 和 `0.845783`。
+  - 当前结果不支持默认启用：Lego coverage ratio 从 `1.281243` 升到 `1.286964`，Plush 从 `1.511632` 升到 `1.521993`；Plush luma 略好但 chroma 略差。因此 feather 保持诊断 / 候选策略。
+- 验证:
+  - `node --check scripts/audit-spark-mask-feather-sweep.mjs`: passed。
+  - `npm run audit:spark-mask-feather-sweep -- --assets nerf-lego-alpha-closure-local --variants hard:off,feather55:0.55 --skip-build --port 5387 --output-dir /tmp/objgauss-spark-mask-feather-sweep-smoke`: passed。
+  - `npm run audit:spark-mask-feather-sweep -- --skip-build --port 5388 --output-dir /tmp/objgauss-spark-mask-feather-sweep`: passed；rows=4，comparisons=2。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005B: Spark object mask feather diagnostic
 

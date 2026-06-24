@@ -22,6 +22,7 @@
     "audit:spark-reconstruct-residual": "node scripts/audit-spark-reconstruct-residual.mjs --assets nerf-lego-alpha-closure-local --output-dir /tmp/objgauss-spark-reconstruct-residual",
     "audit:spark-reconstruct-residual-multiscene": "node scripts/audit-spark-reconstruct-residual.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --output-dir /tmp/objgauss-spark-reconstruct-residual-multiscene",
     "audit:spark-mask-feather": "node scripts/audit-demo.mjs --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5380 --spark-object-mask-feather --spark-object-mask-feather-opacity 0.55",
+    "audit:spark-mask-feather-sweep": "node scripts/audit-spark-mask-feather-sweep.mjs",
     "audit:spark-native-mask-gate": "node scripts/audit-spark-native-mask-gate.mjs",
     "audit:spark-pick-report": "node scripts/audit-spark-pick-report.mjs",
     "audit:spark-trained-sample": "node scripts/audit-spark-trained-sample.mjs",

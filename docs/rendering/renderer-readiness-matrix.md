@@ -66,6 +66,20 @@ uses spatial-neighbor feathering to lower opacity on visible Gaussians near the
 hidden boundary. It is not the default commercial route yet; it is a tunable
 candidate that must be compared across scenes before promotion.
 
+`npm run audit:spark-mask-feather-sweep` is that comparison gate. It runs a
+route-only browser flow over Lego proxy and Plush semantic by default, compares
+`hard:off` with `feather55:0.55`, and writes:
+
+```text
+/tmp/objgauss-spark-mask-feather-sweep/summary.json
+/tmp/objgauss-spark-mask-feather-sweep/summary.md
+```
+
+Current sweep result: `feather55` softens boundary opacity on both default
+scenes, but it does not improve coverage ratio, and only Plush shows a small
+luma improvement. Therefore feather remains diagnostic / candidate behavior
+rather than the default route.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -96,6 +110,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
+| Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 | Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |
