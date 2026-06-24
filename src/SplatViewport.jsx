@@ -22,7 +22,9 @@ const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
 const SPARK_SELECTION_MODE = "screen-space-object-pick-v1";
 const SPARK_PICK_DRAG_PX = 5;
 const SPARK_PICK_MAX_RADIUS_PX = 28;
-const SPARK_PICK_AMBIGUITY_PX = 8;
+const SPARK_PICK_STRATEGY = "object-support-score-v1";
+const SPARK_PICK_SCORE_MARGIN = 0.08;
+const SPARK_PICK_SUPPORT_SIGMA_PX = SPARK_PICK_MAX_RADIUS_PX * 0.45;
 
 export default function SplatViewport({
   source,
@@ -571,11 +573,16 @@ export default function SplatViewport({
       data-spark-selection-mode={sparkSelectionMode}
       data-spark-selected-object={selectedId ?? ""}
       data-spark-pick-status={pickStats.status}
+      data-spark-pick-strategy={pickStats.strategy}
       data-spark-pick-object={pickStats.objectId ?? ""}
       data-spark-pick-distance-px={formatPickMetric(pickStats.distancePx)}
       data-spark-pick-candidate-objects={pickStats.candidateObjects}
       data-spark-pick-ambiguous={String(pickStats.ambiguous)}
       data-spark-pick-radius-px={SPARK_PICK_MAX_RADIUS_PX}
+      data-spark-pick-score={formatPickMetric(pickStats.score)}
+      data-spark-pick-score-margin={formatPickMetric(pickStats.scoreMargin)}
+      data-spark-pick-second-object={pickStats.secondObjectId ?? ""}
+      data-spark-pick-second-score={formatPickMetric(pickStats.secondScore)}
       data-spark-selected-marker-visible={String(
         pickStats.status === "hit" && pickStats.objectId === selectedId,
       )}
@@ -806,12 +813,10 @@ function pickSparkObjectFromPointer({
   const targetX = event.clientX - rect.left;
   const targetY = event.clientY - rect.top;
   const maxDistanceSq = SPARK_PICK_MAX_RADIUS_PX * SPARK_PICK_MAX_RADIUS_PX;
+  const supportSigmaSq = SPARK_PICK_SUPPORT_SIGMA_PX * SPARK_PICK_SUPPORT_SIGMA_PX;
   const projected = new THREE.Vector3();
-  const candidateObjectIds = new Set();
-  let bestObjectId = null;
-  let bestDistanceSq = maxDistanceSq;
-  let bestDepth = Infinity;
-  let secondObjectDistanceSq = Infinity;
+  const candidatesByObject = new Map();
+  let totalSupport = 0;
 
   for (const point of points ?? []) {
     if (!pointVisible(point, visibleIds, removedIds, isolatedId)) continue;
@@ -835,23 +840,29 @@ function pickSparkObjectFromPointer({
     const screenY = (-projected.y * 0.5 + 0.5) * rect.height;
     const distanceSq = (screenX - targetX) ** 2 + (screenY - targetY) ** 2;
     if (distanceSq > maxDistanceSq) continue;
-    candidateObjectIds.add(point.objectId);
+
+    const support = Math.exp(-0.5 * (distanceSq / supportSigmaSq));
+    totalSupport += support;
+    const current = candidatesByObject.get(point.objectId) ?? {
+      objectId: point.objectId,
+      bestDistanceSq: Infinity,
+      bestDepth: Infinity,
+      support: 0,
+      samples: 0,
+    };
+    current.support += support;
+    current.samples += 1;
     if (
-      distanceSq < bestDistanceSq ||
-      (distanceSq === bestDistanceSq && projected.z < bestDepth)
+      distanceSq < current.bestDistanceSq ||
+      (distanceSq === current.bestDistanceSq && projected.z < current.bestDepth)
     ) {
-      if (bestObjectId !== null && point.objectId !== bestObjectId) {
-        secondObjectDistanceSq = Math.min(secondObjectDistanceSq, bestDistanceSq);
-      }
-      bestDistanceSq = distanceSq;
-      bestDepth = projected.z;
-      bestObjectId = point.objectId;
-    } else if (point.objectId !== bestObjectId) {
-      secondObjectDistanceSq = Math.min(secondObjectDistanceSq, distanceSq);
+      current.bestDistanceSq = distanceSq;
+      current.bestDepth = projected.z;
     }
+    candidatesByObject.set(point.objectId, current);
   }
 
-  if (bestObjectId === null) {
+  if (candidatesByObject.size === 0) {
     return {
       ...missedPickStats("miss"),
       screenX: targetX,
@@ -860,20 +871,55 @@ function pickSparkObjectFromPointer({
     };
   }
 
-  const bestDistancePx = Math.sqrt(bestDistanceSq);
-  const secondObjectDistancePx = Math.sqrt(secondObjectDistanceSq);
-  const ambiguous =
-    Number.isFinite(secondObjectDistancePx) &&
-    secondObjectDistancePx - bestDistancePx <= SPARK_PICK_AMBIGUITY_PX;
+  const candidateEntries = [...candidatesByObject.values()];
+  const minDepth = Math.min(...candidateEntries.map((candidate) => candidate.bestDepth));
+  const maxDepth = Math.max(...candidateEntries.map((candidate) => candidate.bestDepth));
+  const depthSpan = Math.max(maxDepth - minDepth, 0);
+  const scoredCandidates = candidateEntries
+    .map((candidate) => {
+      const bestDistancePx = Math.sqrt(candidate.bestDistanceSq);
+      const distanceScore = clampFinite(
+        1 - bestDistancePx / SPARK_PICK_MAX_RADIUS_PX,
+        0,
+        1,
+        0,
+      );
+      const supportShare =
+        totalSupport > 0 ? clampFinite(candidate.support / totalSupport, 0, 1, 0) : 0;
+      const depthScore =
+        depthSpan > 0
+          ? clampFinite(1 - (candidate.bestDepth - minDepth) / depthSpan, 0, 1, 0)
+          : 1;
+      return {
+        ...candidate,
+        bestDistancePx,
+        score: 0.58 * distanceScore + 0.32 * supportShare + 0.1 * depthScore,
+      };
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.bestDistanceSq !== b.bestDistanceSq) return a.bestDistanceSq - b.bestDistanceSq;
+      return a.bestDepth - b.bestDepth;
+    });
+
+  const best = scoredCandidates[0];
+  const second = scoredCandidates[1] ?? null;
+  const scoreMargin = second ? best.score - second.score : 1;
+  const ambiguous = Boolean(second && scoreMargin <= SPARK_PICK_SCORE_MARGIN);
 
   return {
     status: "hit",
-    objectId: bestObjectId,
+    strategy: SPARK_PICK_STRATEGY,
+    objectId: best.objectId,
     screenX: targetX,
     screenY: targetY,
-    distancePx: bestDistancePx,
-    candidateObjects: candidateObjectIds.size,
+    distancePx: best.bestDistancePx,
+    candidateObjects: candidatesByObject.size,
     ambiguous,
+    score: best.score,
+    scoreMargin,
+    secondObjectId: second?.objectId ?? null,
+    secondScore: second?.score ?? 0,
   };
 }
 
@@ -884,12 +930,17 @@ function emptyPickStats() {
 function missedPickStats(status) {
   return {
     status,
+    strategy: SPARK_PICK_STRATEGY,
     objectId: null,
     screenX: 0,
     screenY: 0,
     distancePx: 0,
     candidateObjects: 0,
     ambiguous: false,
+    score: 0,
+    scoreMargin: 0,
+    secondObjectId: null,
+    secondScore: 0,
   };
 }
 

@@ -13,6 +13,7 @@ const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_PICK_MODE = "screen-space-object-pick-v1";
 const DEFAULT_MIN_HITS = 1;
 const DEFAULT_MIN_HIT_RATE = 0.2;
+const DEFAULT_MAX_AMBIGUITY_RATE = 0.5;
 const DEFAULT_CLICK_POINTS = [
   [0.5, 0.5],
   [0.45, 0.48],
@@ -59,6 +60,9 @@ const baseUrl = args.url ?? `http://127.0.0.1:${port}/`;
 const outputDir = String(args.outputDir ?? args["output-dir"] ?? DEFAULT_OUTPUT_DIR);
 const minHits = optionalPositiveInteger(args.minHits ?? args["min-hits"]) ?? DEFAULT_MIN_HITS;
 const minHitRate = optionalFiniteNumber(args.minHitRate ?? args["min-hit-rate"]) ?? DEFAULT_MIN_HIT_RATE;
+const maxAmbiguityRate =
+  optionalFiniteNumber(args.maxAmbiguityRate ?? args["max-ambiguity-rate"]) ??
+  DEFAULT_MAX_AMBIGUITY_RATE;
 const maxClicks = optionalPositiveInteger(args.maxClicks ?? args["max-clicks"]) ?? DEFAULT_CLICK_POINTS.length;
 const assets = selectAssets(args);
 const server = args.url || args.noServer ? null : startDevServer(port);
@@ -73,6 +77,7 @@ try {
     outputDir,
     minHits,
     minHitRate,
+    maxAmbiguityRate,
     maxClicks,
   });
   const summaryJson = `${outputDir}/summary.json`;
@@ -86,6 +91,7 @@ try {
         `clicks=${result.clicks} hits=${result.hits} misses=${result.misses} ` +
         `hitRate=${result.hitRate} ambiguousHits=${result.ambiguousHits} ` +
         `ambiguityRate=${result.ambiguityRate} markerHits=${result.markerHits}/${result.hits} ` +
+        `pickStrategy=${JSON.stringify(result.pickStrategy)} scoreMargin=${result.meanScoreMargin}/${result.minScoreMargin} ` +
         `distinctHitObjects=${JSON.stringify(result.distinctHitObjects)} ` +
         `maskSource=${JSON.stringify(result.maskSource)} route=${JSON.stringify(result.route)} ` +
         `visible=${result.visibleGaussians}/${result.baseGaussians} screenshot=${result.screenshotPath}`,
@@ -94,13 +100,21 @@ try {
   console.log(
     `spark_pick_report=passed assets=${JSON.stringify(summary.assets.map((asset) => asset.assetId))} ` +
       `summaryJson=${JSON.stringify(summaryJson)} summaryMd=${JSON.stringify(summaryMd)} ` +
-      `minHits=${minHits} minHitRate=${minHitRate} maxClicks=${maxClicks}`,
+      `minHits=${minHits} minHitRate=${minHitRate} maxAmbiguityRate=${maxAmbiguityRate} maxClicks=${maxClicks}`,
   );
 } finally {
   if (server) stopDevServer(server);
 }
 
-async function runPickReport({ url, assets, outputDir, minHits, minHitRate, maxClicks }) {
+async function runPickReport({
+  url,
+  assets,
+  outputDir,
+  minHits,
+  minHitRate,
+  maxAmbiguityRate,
+  maxClicks,
+}) {
   const browser = await chromium.launch(launchOptions());
   const page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
   const consoleIssues = [];
@@ -126,8 +140,9 @@ async function runPickReport({ url, assets, outputDir, minHits, minHitRate, maxC
         clickResults,
         minHits,
         minHitRate,
+        maxAmbiguityRate,
       });
-      validatePickSummary(result, { minHits, minHitRate });
+      validatePickSummary(result, { minHits, minHitRate, maxAmbiguityRate });
       console.log(
         `spark_pick_report_asset_progress asset=${JSON.stringify(result.assetId)} ` +
           `clicks=${result.clicks} hits=${result.hits} hitRate=${result.hitRate} ` +
@@ -159,8 +174,9 @@ async function runPickReport({ url, assets, outputDir, minHits, minHitRate, maxC
       gates: {
         minHits,
         minHitRate,
+        maxAmbiguityRate,
         maxClicks,
-        ambiguityIsReportedOnly: true,
+        ambiguityIsReportedOnly: false,
       },
       assets: results,
     };
@@ -330,11 +346,16 @@ async function readSparkPickStats(page) {
     return {
       mode: viewport.getAttribute("data-spark-selection-mode") ?? "",
       status: viewport.getAttribute("data-spark-pick-status") ?? "",
+      strategy: viewport.getAttribute("data-spark-pick-strategy") ?? "",
       object: viewport.getAttribute("data-spark-pick-object") ?? "",
       distancePx: numericAttr("data-spark-pick-distance-px"),
       candidateObjects: numericAttr("data-spark-pick-candidate-objects"),
       ambiguous: viewport.getAttribute("data-spark-pick-ambiguous") ?? "",
       radiusPx: numericAttr("data-spark-pick-radius-px"),
+      score: numericAttr("data-spark-pick-score"),
+      scoreMargin: numericAttr("data-spark-pick-score-margin"),
+      secondObject: viewport.getAttribute("data-spark-pick-second-object") ?? "",
+      secondScore: numericAttr("data-spark-pick-second-score"),
       markerVisible: viewport.getAttribute("data-spark-selected-marker-visible") ?? "",
     };
   });
@@ -352,7 +373,14 @@ function validPickHit(pick, selectedAfter) {
   );
 }
 
-function summarizePickResults({ asset, deleteStats, clickResults, minHits, minHitRate }) {
+function summarizePickResults({
+  asset,
+  deleteStats,
+  clickResults,
+  minHits,
+  minHitRate,
+  maxAmbiguityRate,
+}) {
   const hits = clickResults.filter((click) => click.status === "hit");
   const validHits = clickResults.filter((click) => click.validHit);
   const invalidHits = hits.filter((click) => !click.validHit);
@@ -379,17 +407,23 @@ function summarizePickResults({ asset, deleteStats, clickResults, minHits, minHi
     ambiguousHits: ambiguousHits.length,
     markerHits: markerHits.length,
     markerRate,
+    pickStrategy: firstNonEmpty(hits.map((click) => click.strategy)),
     distinctHitObjects,
     maxCandidateObjects: Math.max(0, ...clickResults.map((click) => click.candidateObjects)),
     meanHitDistancePx: roundMetric(mean(hits.map((click) => click.distancePx))),
     minHitDistancePx: roundMetric(Math.min(...hits.map((click) => click.distancePx))),
     maxHitDistancePx: roundMetric(Math.max(0, ...hits.map((click) => click.distancePx))),
+    meanScoreMargin: roundMetric(mean(hits.map((click) => click.scoreMargin))),
+    minScoreMargin: roundMetric(Math.min(...hits.map((click) => click.scoreMargin))),
+    meanPickScore: roundMetric(mean(hits.map((click) => click.score))),
     gate: {
       minHits,
       minHitRate,
+      maxAmbiguityRate,
       passed:
         hits.length >= minHits &&
         hitRate >= minHitRate &&
+        ambiguityRate <= maxAmbiguityRate &&
         invalidHits.length === 0 &&
         markerHits.length === hits.length,
     },
@@ -406,10 +440,13 @@ function summarizePickResults({ asset, deleteStats, clickResults, minHits, minHi
   };
 }
 
-function validatePickSummary(result, { minHits, minHitRate }) {
+function validatePickSummary(result, { minHits, minHitRate, maxAmbiguityRate }) {
   const failures = [];
   if (result.hits < minHits) failures.push(`hits=${result.hits}<${minHits}`);
   if (result.hitRate < minHitRate) failures.push(`hitRate=${result.hitRate}<${minHitRate}`);
+  if (result.ambiguityRate > maxAmbiguityRate) {
+    failures.push(`ambiguityRate=${result.ambiguityRate}>${maxAmbiguityRate}`);
+  }
   if (result.invalidHits > 0) failures.push(`invalidHits=${result.invalidHits}`);
   if (result.markerHits !== result.hits) {
     failures.push(`markerHits=${result.markerHits}/${result.hits}`);
@@ -426,15 +463,15 @@ function renderMarkdown(summary) {
     `- Mode: \`${summary.mode}\``,
     `- URL: ${summary.url}`,
     `- Generated: ${summary.generatedAt}`,
-    `- Gate: hits >= ${summary.gates.minHits}, hit rate >= ${summary.gates.minHitRate}, max clicks = ${summary.gates.maxClicks}`,
-    "- Ambiguity is reported only; it is not a pass/fail gate yet.",
+    `- Gate: hits >= ${summary.gates.minHits}, hit rate >= ${summary.gates.minHitRate}, ambiguity rate <= ${summary.gates.maxAmbiguityRate}, max clicks = ${summary.gates.maxClicks}`,
+    "- Ambiguity is now gated as a regression signal.",
     "",
-    "| Asset | Route | Clicks | Hits | Hit Rate | Ambiguous Hits | Ambiguity Rate | Marker Hits | Objects |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    "| Asset | Route | Strategy | Clicks | Hits | Hit Rate | Ambiguous Hits | Ambiguity Rate | Mean Margin | Marker Hits | Objects |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
   ];
   for (const asset of summary.assets) {
     lines.push(
-      `| ${asset.assetId} | ${asset.maskSource}/${asset.route} | ${asset.clicks} | ${asset.hits} | ${asset.hitRate} | ${asset.ambiguousHits} | ${asset.ambiguityRate} | ${asset.markerHits}/${asset.hits} | ${asset.distinctHitObjects.join(", ")} |`,
+      `| ${asset.assetId} | ${asset.maskSource}/${asset.route} | ${asset.pickStrategy} | ${asset.clicks} | ${asset.hits} | ${asset.hitRate} | ${asset.ambiguousHits} | ${asset.ambiguityRate} | ${asset.meanScoreMargin} | ${asset.markerHits}/${asset.hits} | ${asset.distinctHitObjects.join(", ")} |`,
     );
   }
   lines.push("", "## Interpretation", "");
@@ -442,16 +479,16 @@ function renderMarkdown(summary) {
     "This report measures Spark canvas selection after an object has been deleted with `spark-object-opacity-mask`. A hit is valid only when the DOM pick object matches the selected object, the pick distance is inside the advertised radius, at least one candidate object exists, and the marker is visible.",
   );
   lines.push(
-    "High ambiguity means several object ids are close to the click in screen space. It does not fail this gate because the current goal is observability, not final robust renderer-native picking.",
+    "High ambiguity means several object ids are close to the click in screen space. The report gates ambiguity rate as a regression signal, but this is still a screen-space CPU pick over object-aware PLY metadata rather than a Spark-internal raycast.",
   );
   lines.push("", "## Click Details", "");
   for (const asset of summary.assets) {
     lines.push(`### ${asset.assetId}`, "");
-    lines.push("| # | x | y | Status | Object | Selected | Distance | Candidates | Ambiguous | Marker | Valid |");
-    lines.push("| ---: | ---: | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |");
+    lines.push("| # | x | y | Status | Object | Selected | Distance | Candidates | Score | Margin | Second | Ambiguous | Marker | Valid |");
+    lines.push("| ---: | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- |");
     for (const click of asset.clicksDetail) {
       lines.push(
-        `| ${click.index} | ${click.xRatio} | ${click.yRatio} | ${click.status} | ${click.object} | ${click.selectedAfter} | ${click.distancePx} | ${click.candidateObjects} | ${click.ambiguous} | ${click.markerVisible} | ${click.validHit} |`,
+        `| ${click.index} | ${click.xRatio} | ${click.yRatio} | ${click.status} | ${click.object} | ${click.selectedAfter} | ${click.distancePx} | ${click.candidateObjects} | ${click.score} | ${click.scoreMargin} | ${click.secondObject} | ${click.ambiguous} | ${click.markerVisible} | ${click.validHit} |`,
       );
     }
     lines.push("");
@@ -614,6 +651,10 @@ function mean(values) {
   const finite = values.filter((value) => Number.isFinite(value));
   if (finite.length === 0) return 0;
   return finite.reduce((sum, value) => sum + value, 0) / finite.length;
+}
+
+function firstNonEmpty(values) {
+  return values.find((value) => value !== undefined && value !== null && String(value) !== "") ?? "";
 }
 
 function roundMetric(value) {

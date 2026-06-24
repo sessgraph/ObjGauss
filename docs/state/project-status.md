@@ -103,6 +103,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AL 已完成 Spark canvas object selection product path：source/original Spark filtered edit viewport 现在暴露 `screen-space-object-pick-v1`，点击 Spark 高斯画布会用 object-aware PLY Gaussian 投影选择最近可见 `object_id`，并通过 `data-spark-selection-mode` / `data-spark-selected-object` 验收。Lego 默认 audit 通过：删除后 `sparkCanvasSelectedObject=0`，同时保持 `sparkMaskSource="native-splat"`；trained SH-heavy audit 通过：删除后 `sparkCanvasSelectedObject=3`，同时保持 `sparkMaskSource="ply-packed"` 与完整 SH rest。
   - RENDER-005T-AM 已完成 Spark pick hit telemetry 与选中 marker：Spark canvas pick 现在暴露 `data-spark-pick-status/object/distance/candidate-objects/ambiguous` 和 `data-spark-selected-marker-visible`，画布内会显示非交互选中标记；`audit-demo` 要求 hit、选中对象匹配、距离在半径内、候选数大于 0、marker 可见。当前 Lego proxy 输出 `sparkPick="screen-space-object-pick-v1":"hit":"0":3.7:3:"true":"true"`，trained Lego 输出 `sparkPick="screen-space-object-pick-v1":"hit":"3":0.892:3:"true":"true"`；两者都有效命中但都 `ambiguous=true`。
   - RENDER-005T-AN 已完成 Spark pick 多点击 hit-rate / ambiguity report：新增 `npm run audit:spark-pick-report`，默认对 Lego proxy 的 Spark 删除预览执行 15 个画布点击点并输出 `/tmp/objgauss-spark-pick-report/summary.{json,md}`。当前 Lego proxy `14/15` hit、hit rate `0.933333`、ambiguous hit rate `0.928571`；本机 trained Lego 5-click 显式报告 `5/5` hit、ambiguous hit rate `1`，同时保持 `maskSource="ply-packed"` 与 `packed-sh-extract-v1`。结论是 Spark canvas pick 可用且 marker/selected 状态一致，但 screen-space object 邻近歧义很高，不能宣称 robust renderer-native picking。
+  - RENDER-005T-AO 已完成 Spark pick object-support disambiguation：`screen-space-object-pick-v1` 不再只按最近 Gaussian 和第二 object 距离差判歧义，而是用 `object-support-score-v1` 聚合每个候选 object 的最近距离、局部支持占比和前景深度得分，并暴露 `data-spark-pick-strategy/score/score-margin/second-object/second-score`。默认 Lego proxy report 仍 `14/15` hit，但 ambiguity rate 从 `0.928571` 降到 `0.357143`；trained Lego 5-click 从 `1` 降到 `0.2`。`audit-demo` 两个样例的单次 Spark pick 均变为 `ambiguous=false`，同时保持 marker 可见和 selected object match。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -167,7 +168,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
-  - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。
+  - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。当前 report 默认要求 ambiguity rate `<=0.5`，用于防止 pick 消歧回退。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
@@ -181,6 +182,8 @@ node --check scripts/audit-spark-pick-report.mjs
 npm run build
 npm run audit:spark-pick-report
 npm run audit:spark-pick-report -- --assets nerf-lego-trained-output-local --max-clicks 5 --output-dir /tmp/objgauss-spark-pick-report-trained --port 5316
+npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5317/ --no-server
+npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5317/ --no-server
 node --check scripts/audit-demo.mjs
 npm run build
 npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5314/ --no-server

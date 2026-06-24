@@ -17,8 +17,8 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-AO`: 改进 Spark `screen-space-object-pick-v1` 消歧策略。`RENDER-005T-AN` 已证明 hit-rate 高但 ambiguity-rate 也高，下一步应评估 depth-prior、object-size prior、边界排除或二次确认 hover/marker，而不是继续扩大单纯点击半径。
-  - 为 CI/headless 环境保留 compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
+  - `RENDER-005T-AP`: 为 CI/headless 环境补 WebGPU compute-only / offscreen readback probes，避免把 headless presentation failure 误判为 renderer compute failure。
+  - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -29,6 +29,34 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-AO: Spark pick object-support disambiguation
+
+- 状态: done / pick-disambiguation-audited
+- 类型: 标准 PR / 前端对象交互
+- 目标: 在 `RENDER-005T-AN` 证明 hit-rate 高但 ambiguity-rate 也高之后，改进 Spark `screen-space-object-pick-v1` 的消歧策略，并把 ambiguity rate 变成回归门禁。
+- 已实施:
+  - `SplatViewport` 的 Spark pick 从“最近 Gaussian + 第二 object 距离差”升级为 `object-support-score-v1`。
+  - 新 scoring 聚合每个候选 object 的最近距离、点击半径内局部支持占比和前景深度优先级，按 score margin 判定 `ambiguous`。
+  - Spark viewport 新增 `data-spark-pick-strategy`、`data-spark-pick-score`、`data-spark-pick-score-margin`、`data-spark-pick-second-object`、`data-spark-pick-second-score`。
+  - `audit:spark-pick-report` 读取 score telemetry，并默认要求 ambiguity rate `<=0.5`，防止消歧回退。
+- 结论:
+  - Lego proxy 默认 report 保持 `14/15` hit、marker hits `14/14`，ambiguity rate 从 `0.928571` 降到 `0.357143`，mean score margin `0.171357`。
+  - Trained SH-heavy 5-click report 保持 `5/5` hit、marker hits `5/5`，ambiguity rate 从 `1` 降到 `0.2`，mean score margin `0.2034`。
+  - `audit-demo` 小场景和 trained 样例的单次 Spark pick 都变成 `ambiguous=false`，同时保持 `spark-object-opacity-mask`、native / packed route 和 SH-rest preservation contract。
+  - 这仍是 screen-space CPU pick over object-aware PLY metadata，不是 Spark-internal raycast；剩余 close-boundary ambiguity 后续可通过 hover/confirm UX 或 renderer-native object metadata path 继续处理。
+- 验证:
+  - `node --check scripts/audit-spark-pick-report.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-pick-report`: passed。
+  - `npm run audit:spark-pick-report -- --assets nerf-lego-trained-output-local --max-clicks 5 --output-dir /tmp/objgauss-spark-pick-report-trained --port 5316`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --url http://127.0.0.1:5317/ --no-server`: passed。
+  - `npm run audit:demo -- --assets nerf-lego-trained-output-local --skip-visual-residual --url http://127.0.0.1:5317/ --no-server`: passed。
+  - `npm run audit:splat-index-mapping`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:spark-native-mask-gate`: passed。
+  - `npm run audit:spark-reconstruct-residual`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
 
 ### RENDER-005T-AN: Spark pick hit-rate / ambiguity report
 

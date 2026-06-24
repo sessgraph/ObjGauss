@@ -542,7 +542,7 @@ npm run audit:demo -- \
 browser_audit=passed
 sparkMaskSource="ply-packed"
 sparkCanvasSelectedObject=3
-sparkPick="screen-space-object-pick-v1":"hit":"3":0.892:3:"true":"true"
+sparkPick="screen-space-object-pick-v1":"hit":"3":0.892:3:"false":"true"
 sparkPacked="packed-sh-extract-v1":255794/129108:156.5/0
 sparkShRest=255794:255794:"true":45:3
 ```
@@ -561,14 +561,20 @@ asset="nerf-lego-alpha-closure-local"
 clicks=15
 hits=14
 hitRate=0.933333
-ambiguousHits=13
-ambiguityRate=0.928571
+ambiguousHits=5
+ambiguityRate=0.357143
 markerHits=14/14
+pickStrategy="object-support-score-v1"
+scoreMargin=0.171357/0.011
 maskSource="native-splat"
 route="native-splat-source-v1"
 summaryJson="/tmp/objgauss-spark-pick-report/summary.json"
 summaryMd="/tmp/objgauss-spark-pick-report/summary.md"
 ```
+
+Before RENDER-005T-AO, the same deterministic click set reported
+`ambiguityRate=0.928571`. The current report gates ambiguity at `<=0.5`, so
+this is now a regression check instead of report-only telemetry.
 
 The trained SH-heavy route is intentionally explicit because it loads a 255k
 Gaussian local sample:
@@ -589,9 +595,11 @@ asset="nerf-lego-trained-output-local"
 clicks=5
 hits=5
 hitRate=1
-ambiguousHits=5
-ambiguityRate=1
+ambiguousHits=1
+ambiguityRate=0.2
 markerHits=5/5
+pickStrategy="object-support-score-v1"
+scoreMargin=0.2034/0.067
 distinctHitObjects=["1","2","3"]
 maskSource="ply-packed"
 route="packed-sh-extract-v1"
@@ -599,10 +607,14 @@ summaryJson="/tmp/objgauss-spark-pick-report-trained/summary.json"
 summaryMd="/tmp/objgauss-spark-pick-report-trained/summary.md"
 ```
 
-Interpretation: the screen-space pick path has high hit-rate and selected
-marker consistency, but it is not robustly unambiguous. The current gate treats
-ambiguity as report-only evidence; the next renderer interaction slice should
-improve disambiguation instead of merely expanding the pick radius.
+Before RENDER-005T-AO, the trained 5-click route reported
+`ambiguityRate=1`.
+
+Interpretation: the screen-space pick path still uses object-aware PLY metadata
+rather than Spark-internal raycast, but the `object-support-score-v1`
+disambiguation rule keeps hit-rate stable while reducing ambiguity enough to
+gate it. The score mixes nearest distance, local object support and front-depth
+priority; remaining ambiguous clicks are true close-boundary cases.
 
 ## Remaining Gaps
 
@@ -614,10 +626,10 @@ improve disambiguation instead of merely expanding the pick radius.
 - Spark canvas selection is currently a screen-space CPU pick over the
   object-aware PLY metadata, not a Spark-internal raycast. It is good enough for
   demo interaction and now exposes hit / ambiguity telemetry plus a selection
-  marker. The multi-click report shows high hit-rate but very high ambiguity
-  (`0.928571` on Lego proxy, `1` on trained Lego 5-click), so the next step is
-  disambiguation through depth/object priors or a clearer hover/confirm UX
-  before claiming robust renderer-native picking.
+  marker. `object-support-score-v1` reduces ambiguity to `0.357143` on Lego
+  proxy and `0.2` on trained Lego 5-click, but this is still a CPU
+  screen-space pick. A clearer hover/confirm UX or Spark-internal ray/object
+  metadata path is needed before claiming robust renderer-native picking.
 - Turn the SH-heavy residual check into a first-class npm script / acceptance
   gate once the trained public sample is considered stable enough for CI/local
   acceptance.
