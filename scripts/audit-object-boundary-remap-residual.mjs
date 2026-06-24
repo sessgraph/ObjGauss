@@ -65,6 +65,7 @@ const summary = {
   comparisons: [],
   recommendations: [],
   promotion: null,
+  policy: null,
   commands: [],
   failures: [],
   passed: false,
@@ -128,6 +129,11 @@ try {
     recommendations: summary.recommendations,
     sceneCount: previewResults.length,
     targetCaseCount,
+  });
+  summary.policy = buildDecisionPolicy({
+    comparisons: summary.comparisons,
+    recommendations: summary.recommendations,
+    promotion: summary.promotion,
   });
   summary.passed =
     summary.failures.length === 0 &&
@@ -598,6 +604,93 @@ function buildPromotionSummary({ comparisons, recommendations, sceneCount, targe
   };
 }
 
+function buildDecisionPolicy({ comparisons, recommendations, promotion }) {
+  const recommendationByTarget = new Map(
+    recommendations.map((recommendation) => [
+      targetKey(recommendation.assetId, recommendation.targetObjectId),
+      recommendation,
+    ]),
+  );
+  const targets = comparisons.map((comparison) => {
+    const recommendation = recommendationByTarget.get(
+      targetKey(comparison.assetId, comparison.targetObjectId),
+    );
+    const decision = targetDecision({ comparison, recommendation });
+    return {
+      assetId: comparison.assetId,
+      targetObjectId: comparison.targetObjectId,
+      decision: decision.id,
+      action: decision.action,
+      reason: decision.reason,
+      promotionCandidate: Boolean(recommendation?.promotionCandidate),
+      passed: comparison.passed,
+      hiddenGaussianDelta: comparison.hiddenGaussianDelta,
+      hiddenGaussianDeltaShare: comparison.hiddenGaussianDeltaShare,
+      afterDelta: comparison.afterDelta,
+      deleteDeltaChange: comparison.deleteDeltaChange,
+    };
+  });
+  const counts = countPolicyDecisions(targets);
+  return {
+    mode: "object-boundary-remap-decision-policy-v1",
+    generatedAt: new Date().toISOString(),
+    defaultAction: "keep-hard-mask",
+    applyMode: "manual-target-allowlist-only",
+    globalPromotion: Boolean(promotion?.promotionCandidate),
+    recommendation: promotion?.promotionCandidate
+      ? "review-target-allowlist-before-any-sample-update"
+      : "do-not-apply-remap-globally",
+    reason: promotion?.reason ?? "missing promotion summary",
+    counts,
+    allowlistCandidates: targets.filter((target) => target.decision === "allowlist-candidate"),
+    riskyTargets: targets.filter((target) => target.decision.startsWith("deny-")),
+    reviewOnlyTargets: targets.filter((target) => target.decision === "review-only"),
+    targets,
+  };
+}
+
+function targetDecision({ comparison, recommendation }) {
+  if (!comparison.passed) {
+    return {
+      id: "deny-residual-threshold-failed",
+      action: "keep-hard-mask",
+      reason: "browser route or residual threshold failed for this target",
+    };
+  }
+  if (recommendation?.promotionCandidate) {
+    return {
+      id: "allowlist-candidate",
+      action: "manual-review-before-apply",
+      reason: "target hides fewer Gaussians and stays within strict residual thresholds",
+    };
+  }
+  if (comparison.hiddenGaussianDelta > 0) {
+    return {
+      id: "deny-hidden-increase",
+      action: "keep-hard-mask",
+      reason: "remap preview hides more Gaussians for this target",
+    };
+  }
+  return {
+    id: "review-only",
+    action: "keep-hard-mask",
+    reason: "route is valid, but evidence is insufficient for target allowlist",
+  };
+}
+
+function countPolicyDecisions(targets) {
+  const counts = {};
+  for (const target of targets) {
+    counts[target.decision] = (counts[target.decision] ?? 0) + 1;
+  }
+  counts.totalTargets = targets.length;
+  return counts;
+}
+
+function targetKey(assetId, targetObjectId) {
+  return `${assetId}::${targetObjectId}`;
+}
+
 function buildTargetPlans(previewResults, requestedTargetCount) {
   return previewResults.map((preview) => ({
     preview,
@@ -631,6 +724,16 @@ function withPackedObjectSource(baseUrlValue) {
 function writeReport(outputDirPath, payload) {
   writeFileSync(path.join(outputDirPath, "summary.json"), `${JSON.stringify(payload, null, 2)}\n`);
   writeFileSync(path.join(outputDirPath, "summary.md"), renderMarkdown(payload));
+  if (payload.policy) {
+    writeFileSync(
+      path.join(outputDirPath, "remap-decision-policy.json"),
+      `${JSON.stringify(payload.policy, null, 2)}\n`,
+    );
+    writeFileSync(
+      path.join(outputDirPath, "remap-decision-policy.md"),
+      renderPolicyMarkdown(payload.policy),
+    );
+  }
 }
 
 function renderMarkdown(payload) {
@@ -686,6 +789,23 @@ function renderMarkdown(payload) {
     );
   }
 
+  lines.push("", "## Decision Policy", "");
+  if (!payload.policy) {
+    lines.push("No decision policy available.");
+  } else {
+    lines.push(
+      `- Default action: \`${payload.policy.defaultAction}\``,
+      `- Apply mode: \`${payload.policy.applyMode}\``,
+      `- Recommendation: \`${payload.policy.recommendation}\``,
+      "",
+      "| Decision | Count |",
+      "| --- | ---: |",
+    );
+    for (const [decision, count] of Object.entries(payload.policy.counts)) {
+      lines.push(`| ${escapeMarkdown(decision)} | ${count} |`);
+    }
+  }
+
   lines.push("", "## Recommendations", "");
   if (payload.recommendations.length === 0) {
     lines.push("No recommendations available.");
@@ -703,6 +823,43 @@ function renderMarkdown(payload) {
 
   if (payload.failures.length > 0) {
     lines.push("", "## Failures", "", ...payload.failures.map((failure) => `- ${escapeMarkdown(failure)}`));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function renderPolicyMarkdown(policy) {
+  const lines = [
+    "# Object Boundary Remap Decision Policy",
+    "",
+    `- Mode: ${policy.mode}`,
+    `- Generated: ${policy.generatedAt}`,
+    `- Default action: ${policy.defaultAction}`,
+    `- Apply mode: ${policy.applyMode}`,
+    `- Global promotion: ${policy.globalPromotion ? "yes" : "no"}`,
+    `- Recommendation: ${policy.recommendation}`,
+    `- Reason: ${policy.reason}`,
+    "",
+    "## Decision Counts",
+    "",
+    "| Decision | Count |",
+    "| --- | ---: |",
+  ];
+  for (const [decision, count] of Object.entries(policy.counts)) {
+    lines.push(`| ${escapeMarkdown(decision)} | ${count} |`);
+  }
+  lines.push("", "## Targets", "");
+  if (policy.targets.length === 0) {
+    lines.push("No target decisions available.");
+  } else {
+    lines.push(
+      "| Asset | Target object | Decision | Action | Hidden delta | After coverage | After luma | After chroma | Reason |",
+      "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |",
+    );
+    for (const target of policy.targets) {
+      lines.push(
+        `| ${escapeMarkdown(target.assetId)} | ${target.targetObjectId} | ${escapeMarkdown(target.decision)} | ${escapeMarkdown(target.action)} | ${target.hiddenGaussianDelta} | ${formatNumber(target.afterDelta.coverageRatio)} | ${formatNumber(target.afterDelta.lumaDelta)} | ${formatNumber(target.afterDelta.chromaDelta)} | ${escapeMarkdown(target.reason)} |`,
+      );
+    }
   }
   return `${lines.join("\n")}\n`;
 }
@@ -738,6 +895,14 @@ function printSummary(payload) {
         `promotion=${payload.promotion.promotionCandidate} scenes=${payload.promotion.sceneCount}/${payload.promotion.minSceneCount} ` +
         `targets=${payload.promotion.targetCaseCount} passed=${payload.promotion.passedTargets} promotable=${payload.promotion.promotableTargets} ` +
         `max=${payload.promotion.maxAfterCoverageDistance}/${payload.promotion.maxAfterLumaDelta}/${payload.promotion.maxAfterChromaDelta}`,
+    );
+  }
+  if (payload.policy) {
+    console.log(
+      `object_boundary_remap_policy recommendation=${JSON.stringify(payload.policy.recommendation)} ` +
+        `default=${JSON.stringify(payload.policy.defaultAction)} mode=${JSON.stringify(payload.policy.applyMode)} ` +
+        `allowlist=${payload.policy.allowlistCandidates.length} risky=${payload.policy.riskyTargets.length} review=${payload.policy.reviewOnlyTargets.length} ` +
+        `policy=${JSON.stringify(path.join(payload.outputDir, "remap-decision-policy.json"))}`,
     );
   }
   for (const failure of payload.failures) {

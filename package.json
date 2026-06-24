@@ -15,6 +15,7 @@
     "audit:object-boundary-remap-preview": "node scripts/export-object-boundary-remap-preview.mjs --output-dir /tmp/objgauss-object-boundary-remap-preview",
     "audit:object-boundary-remap-residual": "node scripts/audit-object-boundary-remap-residual.mjs --output-dir /tmp/objgauss-object-boundary-remap-residual",
     "audit:object-boundary-remap-target-sweep": "node scripts/audit-object-boundary-remap-residual.mjs --target-count 2 --output-dir /tmp/objgauss-object-boundary-remap-target-sweep",
+    "audit:object-boundary-remap-policy": "node scripts/audit-object-boundary-remap-residual.mjs --target-count 2 --output-dir /tmp/objgauss-object-boundary-remap-policy",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
     "audit:webgpu-offscreen-readback": "node scripts/audit-webgpu-offscreen-readback.mjs",

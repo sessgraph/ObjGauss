@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005K`: 基于 top-N target sweep 生成 target-level remap decision policy / allowlist，把 promotable target 与 risky target 分开；默认 hard mask 继续保持，禁止按全局 remap preview 直接替换 public samples。
+  - `DEMO-005L`: 让 remap preview export / QA 消费 `remap-decision-policy`，只允许显式 allowlist target 进入后续候选产物；risky / review-only target 继续保留 hard mask。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005K: Object boundary remap decision policy
+
+- 状态: done / target-level-policy
+- 类型: 标准 PR / renderer quality browser audit policy
+- 目标: 基于 top-N remap target sweep 生成 target-level decision policy，把 promotable target、risky target 和 review-only target 分开；默认 hard mask 继续保持，禁止按全局 remap preview 直接替换 public samples。
+- 已实施:
+  - `scripts/audit-object-boundary-remap-residual.mjs` 在 promotion summary 后新增 `object-boundary-remap-decision-policy-v1`。
+  - Policy 输出 `defaultAction="keep-hard-mask"`、`applyMode="manual-target-allowlist-only"`、global recommendation、decision counts、allowlist candidates、risky targets、review-only targets 和每个 target 的 residual/hidden-delta evidence。
+  - `summary.md` 新增 Decision Policy 摘要；`writeReport` 额外写出 `remap-decision-policy.json` 和 `remap-decision-policy.md`。
+  - 新增 `npm run audit:object-boundary-remap-policy`，默认复用 top-2 target sweep。
+- 结论:
+  - Lego policy smoke 通过，rows=`4`，comparisons=`2`，policy 文件已写入 `/tmp/objgauss-object-boundary-remap-policy-lego-smoke/remap-decision-policy.json`。
+  - 默认三场景 route-only policy smoke 通过，rows=`12`，comparisons=`6`，policy 文件已写入 `/tmp/objgauss-object-boundary-remap-policy-route-smoke/remap-decision-policy.json`。
+  - 当前 policy 明确不全局启用 remap：recommendation=`do-not-apply-remap-globally`，default action=`keep-hard-mask`。
+  - 三场景 route-only policy 结果为 allowlist=`0`、risky=`2`、review-only=`4`；Lego target `3` 和 Plush target `0` 因 hidden delta 增加被归为 `deny-hidden-increase`。这说明 policy 会把“route/residual 通过”与“可进入 allowlist”分开。
+- 验证:
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `npm run audit:object-boundary-remap-policy -- --assets nerf-lego-alpha-closure-local --min-scene-count 1 --output-dir /tmp/objgauss-object-boundary-remap-policy-lego-smoke --port 5400 --skip-build --skip-visual-stats`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-policy -- --skip-build --skip-visual-stats --port 5402 --output-dir /tmp/objgauss-object-boundary-remap-policy-route-smoke`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005J: Top-N object boundary remap target sweep
 

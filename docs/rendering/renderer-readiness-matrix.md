@@ -143,6 +143,34 @@ only 1/6 is promotable. Lego target `3` and Plush target `0` hide more
 Gaussians after remap (`+397` and `+4085` hidden delta), so remap cleanup cannot
 be promoted as a global default. It needs target-level review or an allowlist.
 
+Use the decision policy gate when a downstream export or QA step needs a
+machine-readable answer for each target:
+
+```bash
+npm run audit:object-boundary-remap-policy
+```
+
+The policy report writes:
+
+```text
+/tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.json
+/tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.md
+```
+
+The policy mode is `object-boundary-remap-decision-policy-v1`. Its default
+action is `keep-hard-mask`, and its apply mode is
+`manual-target-allowlist-only`. This intentionally separates three cases:
+
+- `allowlist-candidate`: target evidence is strong enough for explicit manual
+  review before any sample update.
+- `deny-*`: browser residual or hidden-Gaussian evidence says remap is risky.
+- `review-only`: route is valid, but evidence is not strong enough to apply.
+
+Current route-only smoke evidence across Lego proxy, Plush semantic, and Poly
+Haven Chair classifies 0 targets as allowlist candidates, 2 as risky
+`deny-hidden-increase`, and 4 as `review-only`; global recommendation remains
+`do-not-apply-remap-globally`.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -175,6 +203,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Can we export a cleaned `object_id` preview without changing official samples? | `npm run audit:object-boundary-remap-preview` |
 | Does a remap preview preserve browser visual residual after delete? | `npm run audit:object-boundary-remap-residual` |
 | Do multiple high-risk remap targets preserve residual before promotion? | `npm run audit:object-boundary-remap-target-sweep` |
+| Which remap targets are allowlist candidates, risky, or review-only? | `npm run audit:object-boundary-remap-policy` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |
