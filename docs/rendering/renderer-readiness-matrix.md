@@ -310,3 +310,38 @@ The product route status consumes these explanations directly. Report-backed
 samples expose `boundary-mixing-dominant`, `coverage-hole-risk`, or
 `browser-residual-dominant`; samples without a matching quality-chain row expose
 `hard-mask-quality-unmeasured` instead of inventing a diagnosis.
+
+## Commercial Demo Readiness
+
+Use this after `acceptance:spark-commercial-route` and `audit:hard-mask-quality`
+have produced artifacts:
+
+```bash
+npm run audit:commercial-demo-readiness
+```
+
+The report writes:
+
+```text
+/tmp/objgauss-commercial-demo-readiness/summary.json
+/tmp/objgauss-commercial-demo-readiness/summary.md
+```
+
+This command separates two concerns that should not be mixed in product copy:
+
+- **Product route readiness**: whether the Spark source/original route, object
+  mask, screenshot evidence, and hard-mask quality explanation are good enough
+  for demo review.
+- **Public commercial asset eligibility**: whether the underlying source license
+  is clean enough for a public commercial sample.
+
+Current local result:
+
+| Tier | Assets | Product decision |
+| --- | --- | --- |
+| `商业展示路线可演示` | `nerf-lego-alpha-closure-local`, `plush-semantic-closure-local` | Route can be shown, but UI/copy must keep `对象 mask，无补洞 / 边界混合主导` visible. |
+| `研究 / 诊断样例` | `nerf-lego-trained-output-local` | Do not present as commercial default while `browser-residual-dominant` remains. |
+| `待 route QA` | `plush-3dgs-local`, `plush-v1-closure-local` | Needs route and hard-mask quality evidence before demo claims. |
+
+The current report has `publicCommercialCandidateRows=0`: passing the renderer
+route does not make local-test or research-only samples license-clean.

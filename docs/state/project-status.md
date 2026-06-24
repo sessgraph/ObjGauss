@@ -112,6 +112,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-005T-AU 已完成产品 renderer route UI contract：颜色下拉改为 `自身颜色` / `对象色诊断`，viewport 增加 route badge，状态面板显示 `展示路线`、`颜色用途`、`预览边界`；root DOM 暴露 route / color role / preview boundary attributes，并由 `audit-demo` 验证首屏 commercial Spark、对象色 diagnostic、删除后 `hard-object-mask-no-reoptimize`。
   - RENDER-005T-AV 已完成 SH-heavy Spark route-only audit：新增 `npm run audit:spark-trained-route`，默认用静态 preview 验证 `nerf-lego-trained-output-local` 的 `spark-ply-sh-source` 初始 route、删除后的 `spark-packed-sh-mask` / `packed-sh-extract-v1`、`object-opacity-texture-v1`、`hard-object-mask-no-reoptimize` 和完整 degree-3 SH rest preservation。
   - RENDER-005T-BD 已完成产品 hard-mask quality status：状态面板新增 `质量解释`，root DOM 暴露 `data-hard-mask-quality-*`，`audit-demo` 可验证并打印 hard-mask quality contract；`自身颜色` 现在只表示颜色来源，颗粒感来源由 `预览边界` 和 `质量解释` 区分为原始 Spark、高斯 hard mask 边界混合、重建残差或待审计。
+  - RENDER-005T-BE 已完成 commercial demo readiness QA：新增 `npm run audit:commercial-demo-readiness`，可把 Spark route summary 与 hard-mask quality summary 合并成样例准入表，区分“商业展示路线可演示”“研究 / 诊断样例”“待 route QA”和 public-commercial license eligibility；当前本地报告显示 public-commercial candidate 为 0。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -178,6 +179,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-reconstruct-residual` / `npm run audit:spark-reconstruct-residual-multiscene` 已固化为 Spark full `.splat` 与 PLY reconstructed Spark 的 visual residual gate。
   - `npm run audit:object-mask-boundary` 已固化为 hard object mask 质量诊断，可从 object-aware PLY 输出 deleted-subset coverage、unique coverage loss、shared boundary coverage 和 3D neighbor boundary risk，解释删除后 source/original 预览仍有颗粒感的可能来源。
   - `npm run audit:hard-mask-quality` 已固化为 hard-mask 质量解释链聚合器，可把 PLY boundary diagnostic、Spark route summary 和 browser visual residual summary 按 asset 对齐，区分 boundary mixing、coverage hole risk 与 browser/source residual 主导问题。
+  - `npm run audit:commercial-demo-readiness` 已固化为商用展示 QA 准入报告，可复用 Spark route 与 hard-mask quality artifacts，列出 route tier、质量解释、素材许可范围、required copy 和截图路径，避免把研究/本地样例误标成 public commercial demo。
   - `npm run audit:splat-index-mapping` 已固化为 compact `.splat` 与 object-aware PLY 的 Gaussian index mapping gate，用于 native source / original `.splat` object mask 原型前置验收。
   - `npm run audit:spark-native-mask-gate` 已固化为 native compact `.splat` object mask 的 Lego + Plush 多场景默认 route contract gate。
   - `npm run audit:spark-trained-sample` 已固化为本机 trained SH-heavy sample availability preflight，可在浏览器 route gate 前检查 `nerf_lego_trained.*` public sample、`object_id`、degree-3 `f_rest_*` 和 object 数量。
@@ -195,6 +197,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 2026-06-24:
 
 ```bash
+node --check scripts/audit-commercial-demo-readiness.mjs
+npm run audit:commercial-demo-readiness -- --output-dir /tmp/objgauss-commercial-demo-readiness
 node --check scripts/audit-demo.mjs
 npm run build
 npm run audit:demo -- --assets nerf-lego-alpha-closure-local --skip-visual-residual --server-mode preview --port 5365

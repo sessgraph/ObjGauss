@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-BE`: 基于产品 route status 与 hard-mask quality 解释，整理商用展示 QA 截图 / 样例准入表，明确哪些样例能标“商业展示默认路线”、哪些只能作为诊断或研究样例。
+  - `DEMO-004`: 基于 `audit:commercial-demo-readiness` 的结论，补一个 license-clean、viewer 可直接交互的 Gaussian demo sample；当前 route-ready 样例均不是 public-commercial license-clean。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-BE: Commercial demo readiness QA
+
+- 状态: done / commercial-demo-readiness
+- 类型: 标准 PR / renderer QA reporting
+- 目标: 基于产品 route status 与 hard-mask quality 解释，整理商用展示 QA 截图 / 样例准入表，明确哪些样例能标“商业展示默认路线”、哪些只能作为诊断或研究样例。
+- 已实施:
+  - 新增 `scripts/audit-commercial-demo-readiness.mjs` 与 `npm run audit:commercial-demo-readiness`。
+  - 读取 `acceptance:spark-commercial-route` 的 route summary 和 `audit:hard-mask-quality` 的 quality summary，输出 `/tmp/objgauss-commercial-demo-readiness/summary.{json,md}`。
+  - 把产品 route readiness 与 public-commercial license eligibility 分开：route 通过不等于素材许可干净。
+  - 报告会列出 route tier、quality interpretation、route kind、license scope、public-commercial eligibility、required copy 和 screenshot path。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 Commercial Demo Readiness 说明和当前本地结论。
+- 结论:
+  - `nerf-lego-alpha-closure-local` 与 `plush-semantic-closure-local` 是 `商业展示路线可演示`，但必须显示 `对象 mask，无补洞 / 边界混合主导`，且许可分别是 research-only / local-test-only，不是 public commercial candidate。
+  - `nerf-lego-trained-output-local` 是 `研究 / 诊断样例`，因为当前质量解释为 `browser-residual-dominant`，不得标成商业展示默认效果。
+  - `plush-3dgs-local` 与 `plush-v1-closure-local` 仍是 `待 route QA`。
+  - 当前 `publicCommercialCandidateRows=0`，下一步如果要“可商用展示”，需要生成或登记 license-clean 且 viewer 可交互的 Gaussian 样例。
+- 验证:
+  - `node --check scripts/audit-commercial-demo-readiness.mjs`: passed。
+  - `npm run audit:commercial-demo-readiness -- --output-dir /tmp/objgauss-commercial-demo-readiness`: passed；rows=5，routeReady=3，showcaseCaveated=2，researchDiagnostic=1，publicCommercial=0。
 
 ### RENDER-005T-BD: Product hard-mask quality status
 

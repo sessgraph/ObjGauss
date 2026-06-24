@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "audit:demo": "node scripts/audit-demo.mjs",
+    "audit:commercial-demo-readiness": "node scripts/audit-commercial-demo-readiness.mjs",
     "audit:hard-mask-quality": "node scripts/audit-hard-mask-quality.mjs",
     "audit:object-mask-boundary": "node scripts/audit-object-mask-boundary.mjs",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
