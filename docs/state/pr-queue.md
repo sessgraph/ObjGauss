@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `RENDER-005T-BC`: 将 object-mask boundary diagnostic 与 browser visual residual / Spark route report 对齐，形成 hard-mask 质量解释链，而不是只看单个 PLY-level proxy。
+  - `RENDER-005T-BD`: 将 hard-mask quality chain 的解释结果接入产品 route status / QA copy，让用户区分 hard object mask 边界问题、coverage hole risk 和 source reconstruction residual。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,31 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-005T-BC: Hard mask quality chain report
+
+- 状态: done / hard-mask-quality-chain
+- 类型: 标准 PR / renderer quality reporting
+- 目标: 将 object-mask boundary diagnostic 与 browser visual residual / Spark route report 对齐，形成 hard-mask 质量解释链，而不是只看单个 PLY-level proxy。
+- 已实施:
+  - 新增 `scripts/audit-hard-mask-quality.mjs` 与 `npm run audit:hard-mask-quality`。
+  - Aggregator 读取 `audit:object-mask-boundary` 的 boundary summary、`acceptance:spark-commercial-route` 的 route summary 和 `audit:spark-reconstruct-residual*` 的 browser residual summary。
+  - 按 asset id 对齐证据，并从 Spark object mask hidden Gaussian count 反推实际删除的 object_id，再读取该 object 的 boundary metrics，而不是只使用 worst object。
+  - 输出 `/tmp/objgauss-hard-mask-quality/summary.{json,md}`，区分 `boundary-mixing-dominant`、`coverage-hole-risk` 和 `browser-residual-dominant`。
+  - `docs/rendering/renderer-readiness-matrix.md` 增加 Hard Mask Quality Chain，明确该命令本身不启动浏览器，而是消费已有 browser artifacts。
+- 结论:
+  - Lego proxy 与 Plush semantic 在 route + residual 证据齐全时均为 `boundary-mixing-dominant`，说明 hard mask 后的粗糙主要来自对象边界共享 / 局部混合，而不是 PLY unique coverage 大面积丢失。
+  - Trained Lego 当前为 `browser-residual-dominant`，因为 Spark reconstruct residual coverage ratio=`15.599172`、luma delta=`0.250533` 明显大于 hard-mask proxy；该场景优先问题是 SH-heavy source / reconstruction residual，而不是单纯 object boundary。
+- 验证:
+  - `node --check scripts/audit-hard-mask-quality.mjs`: passed。
+  - `npm run audit:hard-mask-quality -- --boundary-summary /tmp/objgauss-object-mask-boundary/summary.json --route-summary /tmp/objgauss-spark-commercial-route-availability/summary.json --residual-summary /tmp/objgauss-spark-reconstruct-residual-multiscene/summary.json,/tmp/objgauss-spark-reconstruct-residual-trained/summary.json --output-dir /tmp/objgauss-hard-mask-quality`: passed，rows=3，missing route/residual assets=0。
+  - `npm run audit:hard-mask-quality -- --output-dir /tmp/objgauss-hard-mask-quality-default`: passed，默认路径可发现现有 boundary / route / residual artifacts。
+  - Summary inspect: `nerf-lego-alpha-closure-local` evidence=`boundary+route+residual`，deleted object=`0`，gap=`0.524659`，coverageRatio=`1.170841`，interpretation=`boundary-mixing-dominant`。
+  - Summary inspect: `plush-semantic-closure-local` evidence=`boundary+route+residual`，deleted object=`0`，gap=`0.513937`，coverageRatio=`1.303149`，interpretation=`boundary-mixing-dominant`。
+  - Summary inspect: `nerf-lego-trained-output-local` evidence=`boundary+route+residual`，deleted object=`0`，gap=`0.377656`，coverageRatio=`15.599172`，residual=`failed`，interpretation=`browser-residual-dominant`。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-005T-BB: Object mask boundary diagnostic
 

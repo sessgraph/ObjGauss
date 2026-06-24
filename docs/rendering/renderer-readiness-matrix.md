@@ -86,6 +86,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
 | Do compact `.splat` and object-aware PLY preserve Gaussian index mapping? | `npm run audit:splat-index-mapping` |
 | Why can source/original delete preview still look grainy? | `npm run audit:object-mask-boundary` |
+| Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark canvas selection remain usable after delete? | `npm run audit:spark-pick-report` |
 | Does the trained SH-heavy route preserve SH and report packed object masking? | `npm run audit:spark-trained-route` |
 | Do the no-SH and SH-heavy Spark commercial routes both pass together? | `npm run acceptance:spark-commercial-route` |
@@ -268,8 +269,39 @@ This does not replace Spark / WebGPU visual residual screenshots. It explains
 whether the likely source of grain is coverage loss, hard boundary mixing, or
 deleted-subset sparsity before tuning shader footprint or alpha presentation.
 
+## Hard Mask Quality Chain
+
+Use this after producing boundary, Spark route, and Spark reconstruct residual
+artifacts:
+
+```bash
+npm run audit:object-mask-boundary
+npm run acceptance:spark-commercial-route
+npm run audit:spark-reconstruct-residual-multiscene
+npm run audit:hard-mask-quality
+```
+
+`audit:hard-mask-quality` does not launch a browser by itself. It reads existing
+summary JSON files, aligns them by asset id, infers the deleted object from the
+Spark object-mask hidden Gaussian count, and writes:
+
+```text
+/tmp/objgauss-hard-mask-quality/summary.json
+/tmp/objgauss-hard-mask-quality/summary.md
+```
+
+The output distinguishes:
+
+- `boundary-mixing-dominant`: route and residual evidence exist, coverage holes
+  are low, but PLY object boundaries are highly shared or locally mixed;
+- `coverage-hole-risk`: the deleted object owns enough unique projected
+  footprint that hard masking can create visible holes;
+- `browser-residual-dominant`: Spark reconstruction / source mismatch is larger
+  than the hard-mask boundary proxy, so renderer/source parity is the immediate
+  blocker.
+
 ## Next Product Slice
 
-The next UX-facing slice should connect this hard-mask diagnostic to browser
-visual residual reports, so the UI can distinguish renderer limitations from
-object-assignment boundary quality.
+The next UX-facing slice should decide which of these explanations should be
+shown in the product route status, so users understand when grain comes from
+hard object masks versus source reconstruction mismatch.
