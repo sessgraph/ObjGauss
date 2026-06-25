@@ -553,10 +553,12 @@ environment. The WebGPU presentation smoke is intentionally product/local only:
 it proves headed desktop canvas presentation on fixed port `5395`, while CI
 continues to use offscreen / headless C-path gates. The near-1M production gap
 step is a non-failing progress report by default; it should be promoted to
-`--require-ready` only for the terminal production proof run. The profile
-summary embeds the gap status, next action, completed evidence count, missing
-evidence count, and path to the child report so product review does not need to
-inspect the child artifact manually.
+`--require-ready` only for the terminal production proof run. Pass
+`--require-near1m-production-ready` to `acceptance:renderer-product` when the
+product profile itself should become that terminal gate. The profile summary
+embeds the gap status, next action, completed evidence count, missing evidence
+count, and path to the child report so product review does not need to inspect
+the child artifact manually.
 
 ## Product UI Contract
 

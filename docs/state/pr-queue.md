@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-027: Product renderer profile can require near-1M proof
+
+- 状态: done / strict-product-gap-gate
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让 `acceptance:renderer-product` 在默认非阻塞 gap report 之外，能显式升级为要求 near-1M production evidence ready 的终局 gate。
+- 已实施:
+  - 新增 `--require-near1m-production-ready`，product profile 的 `Near-1M production gap report` step 会透传 `audit:near1m-production-gap -- --require-ready`。
+  - 默认 product profile 仍保持非阻塞 progress report；CI profile 不受影响。
+  - `--require-near1m-production-ready` 与 `--skip-near1m-production-gap` 互斥，避免要求 terminal evidence 但跳过检查。
+  - Markdown summary 新增 `Requires near-1M production ready` 决策行。
+- 结论:
+  - 产品 / Demo profile 现在既可用于 review 进度，也可在 near-1M PLY 和 SLA 产物齐备后直接作为 terminal proof gate。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `git diff --check`: passed。
+  - `npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-product-strict-ready-default-dry-run`: passed；默认 near-1M gap step 不带 `--require-ready`。
+  - `npm run acceptance:renderer-product -- --dry-run --require-near1m-production-ready --output-dir /tmp/objgauss-renderer-product-strict-ready-dry-run`: passed；near-1M gap step 透传 `--require-ready`，summary 显示 `Requires near-1M production ready: yes`。
+  - `npm run acceptance:renderer-product -- --dry-run --skip-near1m-production-gap --require-near1m-production-ready --output-dir /tmp/objgauss-renderer-product-strict-ready-conflict`: expected failed with exit `1`；互斥参数被拒绝。
+  - `npm run acceptance:renderer-product -- --skip-route-contract --skip-build --skip-webgpu-presentation-performance --skip-webgpu-presentation-transition --skip-spark-commercial-route --output-dir /tmp/objgauss-renderer-product-strict-ready-default-smoke`: passed；default summary has `requiresNear1mProductionReady=false`, gap `requireReady=false`, gap status `incomplete`。
+  - `npm run acceptance:renderer-product -- --skip-route-contract --skip-build --skip-webgpu-presentation-performance --skip-webgpu-presentation-transition --skip-spark-commercial-route --require-near1m-production-ready --output-dir /tmp/objgauss-renderer-product-strict-ready-expected-fail`: expected failed with exit `1`；strict summary has `requiresNear1mProductionReady=true`, gap `requireReady=true`, gap status `incomplete`, missing evidence `5`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+
 ### RENDER-ROUTE-026: Product renderer summary embeds near-1M gap artifact
 
 - 状态: done / embedded-gap-summary
