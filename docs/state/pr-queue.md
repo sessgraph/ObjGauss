@@ -29,6 +29,32 @@
 
 ## Done
 
+### RENDER-ROUTE-007: WebGPU edit cost budget audit
+
+- 状态: done / edit-cost-budget-gate
+- 类型: 标准 PR / renderer scale audit
+- 目标: 在 RENDER-ROUTE-003 storage budget 和 RENDER-ROUTE-005 objectState-only 增量上传之上，补一个 fresh-clone-safe 的编辑更新成本 gate，量化 100k / 300k / 1M C-path profile 下对象编辑需要写多少数据、dispatch 多少 workgroups、以及 pixel resolve 可能扫描多少 tile-entry candidates。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-edit-cost-budget.mjs` 与 `npm run audit:webgpu-edit-cost-budget`。
+  - Audit 复用 `estimateWebGpuTileRuntimeStorage`、`webGpuAccumulationWorkgroups`、`webGpuComputeWorkgroups` 和 `webGpuPixelResolveWorkgroups`，不构造真实 1M points、不启动浏览器。
+  - 默认三档 profile 与 scale budget 对齐：100k / 512px / 64 objects，300k / 384px / 128 objects，1M / 320px / 256 objects。
+  - 报告同时输出 full first-upload MiB、objectState-only edit upload KiB、objectState upload share、accumulation / resolve / pixel workgroups、tile references、accumulation sample checks 和 pixel candidate-check upper bound。
+  - `acceptance:renderer-ci` 默认加入 `WebGPU edit cost budget` 步骤；新增 `--skip-webgpu-edit-cost-budget` 诊断开关。
+  - `audit:renderer-route-contract` 检查 npm script 和 renderer CI profile 均包含 edit-cost budget gate。
+- 结论:
+  - 默认三档预算均通过：100k edit upload=`1 KiB` / full=`18.15 MiB` / candidates=`0.614G`；300k edit upload=`2 KiB` / full=`49.19 MiB` / candidates=`2.150G`；1M edit upload=`4 KiB` / full=`173.24 MiB` / candidates=`8.192G`。
+  - 这证明 C-path 对象编辑的兼容更新可以避免重传静态 geometry / colors / tile entries，并把成本集中到 objectState 小 buffer + compute redispatch；它不是真实浏览器 FPS 或视觉质量证明。
+- 验证:
+  - `node --check scripts/audit-webgpu-edit-cost-budget.mjs`: passed。
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-edit-cost-budget`: passed；100k / 300k / 1M rows passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-edit-cost-budget`: passed；steps=6。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### PORT-002: Dev and preview fixed port defaults
 
 - 状态: done / fixed-dev-preview-port

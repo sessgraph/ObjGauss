@@ -18,6 +18,9 @@ const skipWebGpuTileSmoke = flagEnabled(args.skipWebGpuTileSmoke ?? args["skip-w
 const skipWebGpuScaleBudget = flagEnabled(
   args.skipWebGpuScaleBudget ?? args["skip-webgpu-scale-budget"],
 );
+const skipWebGpuEditCostBudget = flagEnabled(
+  args.skipWebGpuEditCostBudget ?? args["skip-webgpu-edit-cost-budget"],
+);
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
@@ -96,6 +99,9 @@ function createProfileSpec(name) {
         ...(skipWebGpuScaleBudget
           ? []
           : [["WebGPU scale budget", ["npm", "run", "audit:webgpu-scale-budget"]]]),
+        ...(skipWebGpuEditCostBudget
+          ? []
+          : [["WebGPU edit cost budget", ["npm", "run", "audit:webgpu-edit-cost-budget"]]]),
         ...(skipSplatIndexMapping
           ? []
           : [

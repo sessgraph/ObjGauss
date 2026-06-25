@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale budget proves storage shape, not 1M FPS. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -251,6 +251,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | What should demo / release review run for the full product route? | `npm run acceptance:renderer-product` |
 | Is the B -> C renderer route contract still intact? | `npm run audit:renderer-route-contract` |
 | Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
+| Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
@@ -283,14 +284,16 @@ npm run audit:renderer-route-contract
 npm run build
 npm run audit:webgpu-tile-smoke
 npm run audit:webgpu-scale-budget
+npm run audit:webgpu-edit-cost-budget
 npm run audit:splat-index-mapping -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local
 npm run audit:spark-native-mask-gate
 ```
 
 This profile proves the B/C renderer contracts that can be expected from the
 repo's public no-SH samples: route architecture, WebGPU tile smoke, 100k-1M
-storage budget, compact `.splat` / PLY index mapping, and Spark native object
-masking. It intentionally does not prove the trained SH-heavy packed route.
+storage and edit-cost budgets, compact `.splat` / PLY index mapping, and Spark
+native object masking. It intentionally does not prove the trained SH-heavy
+packed route.
 
 `npm run audit:webgpu-scale-budget` is the storage budget gate for the C-path
 scale target. It estimates the full 11-buffer runtime layout for 100k, 300k,
@@ -300,6 +303,22 @@ per shader stage. The current 1M budget row uses a `320px` internal viewport
 and 32 compact tile references per Gaussian, producing max buffer `122.07 MiB`
 and total storage `173.24 MiB`. This is a scale architecture check, not a
 browser FPS or visual-quality proof.
+
+`npm run audit:webgpu-edit-cost-budget` is the object-edit cost companion gate.
+It uses the same 100k / 300k / 1M synthetic C-path profiles and checks:
+
+- full first-upload storage remains within the configured budget,
+- objectState-only edit upload remains a tiny buffer write,
+- object-state upload share stays below the configured threshold,
+- pixel resolve workgroups and tile-entry candidate scan upper bounds remain
+  within explicit budgets.
+
+The current 1M row uses 256 object slots, a `320px` viewport, and 32 compact
+tile references per Gaussian. It reports a `4 KiB` object-state edit upload
+versus `173.24 MiB` full storage, with an `8.192G` pixel candidate-check upper
+bound. The default total workgroup budget is `4352`, which covers the 512px
+interactive row's `4096` pixel workgroups plus tile accumulation / resolve
+dispatches. This is an update-shape and cost-envelope check, not an FPS proof.
 
 `npm run audit:webgpu-tile-smoke` also covers the C-path edit-state contract.
 The default tile list mode remains `visible-only`, but the WebGPU runtime uses
