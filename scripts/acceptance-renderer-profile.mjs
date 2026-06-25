@@ -24,6 +24,9 @@ const skipWebGpuEditCostBudget = flagEnabled(
 const skipWebGpuPresentationPerformance = flagEnabled(
   args.skipWebGpuPresentationPerformance ?? args["skip-webgpu-presentation-performance"],
 );
+const skipWebGpuPresentationTransition = flagEnabled(
+  args.skipWebGpuPresentationTransition ?? args["skip-webgpu-presentation-transition"],
+);
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
@@ -162,6 +165,23 @@ function createProfileSpec(name) {
                   nativePort,
                   "--output-dir",
                   path.join(outputDir, "webgpu-presentation-performance"),
+                ],
+              ],
+            ]),
+        ...(skipWebGpuPresentationTransition
+          ? []
+          : [
+              [
+                "WebGPU presentation object transition",
+                [
+                  "npm",
+                  "run",
+                  "audit:webgpu-presentation-transition",
+                  "--",
+                  "--port",
+                  nativePort,
+                  "--output-dir",
+                  path.join(outputDir, "webgpu-presentation-transition"),
                 ],
               ],
             ]),

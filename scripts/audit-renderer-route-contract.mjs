@@ -317,13 +317,15 @@ const checks = [
         "audit:webgpu-offscreen-readback",
         "audit:webgpu-runtime-performance",
         "audit:webgpu-presentation-performance",
+        "audit:webgpu-presentation-transition",
         "audit:spark-native-mask-gate",
         "audit:spark-native-pick-feasibility",
         "acceptance:renderer-ci",
         "acceptance:webgpu-headless",
       ]) &&
       contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-edit-cost-budget") &&
-      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-performance"),
+      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-performance") &&
+      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-transition"),
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
@@ -332,8 +334,10 @@ const checks = [
       "audit:webgpu-offscreen-readback",
       "audit:webgpu-runtime-performance",
       "audit:webgpu-presentation-performance",
+      "audit:webgpu-presentation-transition",
       "acceptance renderer CI includes edit cost budget",
       "acceptance renderer product includes presentation performance gate",
+      "acceptance renderer product includes presentation object transition gate",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",
     ],

@@ -29,6 +29,36 @@
 
 ## Done
 
+### RENDER-ROUTE-012: Headed WebGPU presentation object-transition gate
+
+- 状态: done / presentation-transition-gate
+- 类型: 标准 PR / WebGPU C-path browser transition observability
+- 目标: 在 RENDER-ROUTE-010 的 first-frame presentation smoke 之上，补一条 headed full canvas WebGPU object-transition gate，证明对象选中、隔离、删除三段交互不会切到 Spark fallback，而是留在 WebGPU Tile C-path 并暴露 storage timing / object-state checksum。
+- 已实施:
+  - `audit-demo --webgpu-object-transition` 现在支持 full WebGPU probe；offscreen readback checksum 断言仍只在 `--webgpu-probe offscreen-readback` 下启用。
+  - 新增 `scripts/audit-webgpu-presentation-transition.mjs` 和 `npm run audit:webgpu-presentation-transition`。
+  - Gate 默认覆盖 Lego proxy 与 Plush semantic，启动 fixed-port `5395` preview，强制 headed WebGPU full canvas runtime，执行 canvas select -> isolate -> delete。
+  - Report 输出 `/tmp/objgauss-webgpu-presentation-transition/summary.json` 和 `summary.md`，记录 first frame、selected object、visible counts、post-delete renderer、initial / isolate / delete timing、object-state checksum 和截图。
+  - Product renderer acceptance 现在在 presentation performance 后追加 `WebGPU presentation object transition`；CI profile 不跑该 headed gate。
+  - `audit:renderer-route-contract` 和 renderer readiness docs 已登记该 gate。
+- 结论:
+  - 当前本机 fixed-port headed transition gate 通过：Lego proxy 与 Plush semantic 均在删除后保持 `postDelete="webgpu-tile":"gpu-object-state-buffer"`。
+  - Plush semantic 大场景通过：281498 Gaussians、tileReferences=1190026、selected object=`0`、visibleAfterIsolate=`177095`、visibleAfterDelete=`104403`、maxUpdateMs=`178.9`、maxQueueDoneMs=`1847.4`。
+  - Product profile 内复跑同一 transition gate 也通过：2/2 scenes，largestGaussians=281498，maxUpdateMs=`180.3`，maxQueueDoneMs=`2456.9`，仍在当前 `2500ms` smoke envelope 内。
+  - 该 gate 证明 headed browser 下 C-path object edit transition 可用；它仍不是 FPS benchmark，也不是 1M interactive SLA。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-presentation-transition.mjs`: passed。
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run acceptance:renderer-product -- --dry-run --skip-build --output-dir /tmp/objgauss-renderer-product-transition-dry-run`: passed；steps=4，包含 WebGPU presentation transition。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-presentation-transition -- --port 5395 --output-dir /tmp/objgauss-webgpu-presentation-transition`: passed；2/2 scenes，largestGaussians=281498，maxUpdateMs=178.9，maxQueueDoneMs=1847.4。
+  - `npm run acceptance:renderer-product -- --output-dir /tmp/objgauss-renderer-product-transition-profile`: passed；steps=5。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-011: Product renderer acceptance includes WebGPU presentation smoke
 
 - 状态: done / product-presentation-acceptance

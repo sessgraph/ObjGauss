@@ -71,6 +71,14 @@ envelope across the default small and large scenes:
 npm run audit:webgpu-presentation-performance
 ```
 
+Use the presentation transition suite when the question is whether headed
+full-canvas WebGPU object selection, isolate, and delete transitions stay on
+the C-path renderer instead of falling back to Spark:
+
+```bash
+npm run audit:webgpu-presentation-transition
+```
+
 For visual fidelity / tuning regressions, use the existing coverage gate:
 
 ```bash

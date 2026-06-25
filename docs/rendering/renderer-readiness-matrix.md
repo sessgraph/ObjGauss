@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation, but are not full FPS SLAs. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation, but are not full FPS SLAs. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -255,6 +255,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Are WebGPU object edit runtime timings inside the current smoke envelope? | `npm run audit:webgpu-runtime-performance` |
 | Does WebGPU full canvas presentation stay inside the current smoke envelope? | `npm run audit:webgpu-presentation-performance` |
+| Do headed WebGPU object transitions stay on the C-path canvas renderer? | `npm run audit:webgpu-presentation-transition` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
@@ -364,7 +365,8 @@ picking.
 
 `npm run acceptance:renderer-product` is the explicit product/demo profile. It
 runs `audit:renderer-route-contract` first, builds the viewer, runs
-`audit:webgpu-presentation-performance`, then runs
+`audit:webgpu-presentation-performance` and
+`audit:webgpu-presentation-transition`, then runs
 `acceptance:spark-commercial-route` with the trained sample availability
 preflight and the SH-heavy browser route. This is the correct gate before
 commercial demo review, but it should not be promoted to default CI until the

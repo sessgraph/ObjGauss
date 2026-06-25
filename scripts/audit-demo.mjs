@@ -207,9 +207,12 @@ const auditOptions = {
 
 if (
   auditOptions.webGpuObjectTransition &&
-  auditOptions.webGpuProbe !== WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK
+  ![
+    WEBGPU_RUNTIME_PROBE_FULL,
+    WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK,
+  ].includes(auditOptions.webGpuProbe)
 ) {
-  throw new Error("--webgpu-object-transition is only supported with --webgpu-probe offscreen-readback");
+  throw new Error("--webgpu-object-transition is only supported with full or offscreen-readback WebGPU probes");
 }
 
 const server = args.url || args.noServer ? null : startServer(port, serverMode);
@@ -1334,6 +1337,7 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (
         options.webGpuObjectTransition &&
+        options.webGpuProbe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK &&
         editRendererId === "webgpu-tile" &&
         webGpuReadbackAfterIsolate.checksum === webGpuReadbackChecksum
       ) {
@@ -1853,6 +1857,7 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (
         options.webGpuObjectTransition &&
+        options.webGpuProbe === WEBGPU_RUNTIME_PROBE_OFFSCREEN_READBACK &&
         editRendererId === "webgpu-tile" &&
         !sparkFilteredAfterDelete &&
         webGpuReadbackAfterDelete.checksum === webGpuReadbackAfterIsolate.checksum
