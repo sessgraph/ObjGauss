@@ -1012,7 +1012,7 @@ async function runAudit(url, assetsToCheck, options) {
         }
         if (
           webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
-          webGpuStorageStatus !== "uploaded" ||
+          !["uploaded", "object-state-updated"].includes(webGpuStorageStatus ?? "") ||
           webGpuStorageBufferCount < 11 ||
           webGpuStorageByteSize <= 0 ||
           webGpuStorageTileEntries !== "true" ||

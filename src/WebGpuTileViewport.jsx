@@ -15,7 +15,11 @@ import {
   WEBGPU_TILE_COMPUTE_SOURCE,
 } from "./webgpuTileComputeShader.js";
 import { WEBGPU_TILE_REQUIRED_STORAGE_BUFFERS_PER_SHADER_STAGE } from "./webgpuCapability.js";
-import { createWebGpuTileStorageBuffers } from "./webgpuTileStorage.js";
+import {
+  canReuseWebGpuTileStorageBuffers,
+  createWebGpuTileStorageBuffers,
+  updateWebGpuTileObjectStateBuffer,
+} from "./webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
   createWebGpuTileResolveShader,
@@ -34,6 +38,7 @@ import {
 import {
   buildWebGpuTileProjectionBounds,
   projectPointToWebGpuTileViewport,
+  WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
 } from "./webgpuTileSmoke.js";
 import {
   normalizeWebGpuRuntimeProbe,
@@ -834,20 +839,40 @@ function renderFrame({
 
   let storageBundle = null;
   try {
-    storageBundle = createWebGpuTileStorageBuffers(device, tileSmoke);
-    runtime.storageBundle?.destroy?.();
-    runtime.storageBundle = storageBundle;
-    setStorage({
-      status: "uploaded",
-      reason: "webgpu-storage-uploaded",
-      layoutVersion: storageBundle.layoutVersion,
-      checksum: storageBundle.checksum,
-      bufferCount: storageBundle.bufferCount,
-      byteLength: storageBundle.totalByteLength,
-      tileEntriesIncluded: storageBundle.tileEntriesIncluded,
-      tileOffsetsIncluded: storageBundle.tileOffsetsIncluded,
-      pixelOutputIncluded: storageBundle.pixelOutputIncluded,
-    });
+    const canReuseStorage =
+      tileSmoke?.tileListMode === WEBGPU_TILE_LIST_MODE_OBJECT_STATE &&
+      (runAccumulation || runPixel) &&
+      canReuseWebGpuTileStorageBuffers(runtime.storageBundle, tileSmoke);
+    if (canReuseStorage) {
+      storageBundle = runtime.storageBundle;
+      const description = updateWebGpuTileObjectStateBuffer(device, storageBundle, tileSmoke);
+      setStorage({
+        status: "object-state-updated",
+        reason: "webgpu-object-state-buffer-updated",
+        layoutVersion: description.layoutVersion,
+        checksum: description.checksum,
+        bufferCount: description.bufferCount,
+        byteLength: description.totalByteLength,
+        tileEntriesIncluded: description.tileEntriesIncluded,
+        tileOffsetsIncluded: description.tileOffsetsIncluded,
+        pixelOutputIncluded: description.pixelOutputIncluded,
+      });
+    } else {
+      storageBundle = createWebGpuTileStorageBuffers(device, tileSmoke);
+      runtime.storageBundle?.destroy?.();
+      runtime.storageBundle = storageBundle;
+      setStorage({
+        status: "uploaded",
+        reason: "webgpu-storage-uploaded",
+        layoutVersion: storageBundle.layoutVersion,
+        checksum: storageBundle.checksum,
+        bufferCount: storageBundle.bufferCount,
+        byteLength: storageBundle.totalByteLength,
+        tileEntriesIncluded: storageBundle.tileEntriesIncluded,
+        tileOffsetsIncluded: storageBundle.tileOffsetsIncluded,
+        pixelOutputIncluded: storageBundle.pixelOutputIncluded,
+      });
+    }
   } catch (error) {
     setStorage({
       status: "failed",

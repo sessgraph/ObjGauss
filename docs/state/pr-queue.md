@@ -30,6 +30,31 @@
 
 ## Done
 
+### RENDER-ROUTE-005: WebGPU objectState-only incremental upload
+
+- 状态: done / object-state-incremental-upload
+- 类型: 标准 PR / WebGPU C-path edit runtime
+- 目标: 在 object-state-filtered tile list contract 之上，让 WebGPU runtime 在 tile/storage signature 兼容时复用既有 GPU storage bundle，只对 `objectState` storage buffer 执行 `queue.writeBuffer`，避免对象隐藏 / 隔离 / 删除时重传全量 Gaussian geometry / tile entries。
+- 已实施:
+  - `src/webgpuTileStorage.js` 新增 `webGpuTileStorageReuseSignature`、`canReuseWebGpuTileStorageBuffers` 和 `updateWebGpuTileObjectStateBuffer`。
+  - Reuse signature 会比较所有 storage buffer allocation，并对静态输入 buffers（position / color / scale / object indices / tile counts / tile offsets / tile entries）做 checksum；`objectState` 与 GPU 输出 buffers 只检查布局大小。
+  - `WebGpuTileViewport.jsx` 在 `tileListMode="object-state-filtered"` 且 compute path 会重写输出 buffers 时复用当前 storage bundle；兼容时只写 `objgauss-object-state`，否则仍安全重建完整 storage bundle。
+  - `audit:webgpu-tile-smoke` 新增 fake device 断言：object-state tile list 的 isolate / delete 更新不会创建新 GPU buffers，只追加一次 `objgauss-object-state` write，且 storage checksum 更新到新 `tileSmoke` 描述。
+  - `audit:renderer-route-contract` 将 objectState-only reuse / update helper 纳入 C-path 静态合约。
+- 结论:
+  - C-path 已从“tile list 语义稳定”推进到“对象编辑可走 objectState-only 增量上传”的 runtime contract。
+  - 当 geometry、颜色模式、viewport、point size、tile layout 或其他静态输入变化时，runtime 仍会重建完整 bundle；这是正确 fallback，不是回归。
+- 验证:
+  - `node --check src/webgpuTileStorage.js`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-offscreen-readback.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；fake device 断言 objectState-only update 不创建新 buffers，只追加 `objgauss-object-state` write。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-object-state-incremental`: passed；steps=5。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-004: WebGPU object-state-filtered tile list mode
 
 - 状态: done / object-state-tile-list-mode
@@ -43,7 +68,7 @@
   - `audit:renderer-route-contract` 将 object-state-filtered tile list 与 DOM telemetry 纳入 C-path 静态合约。
 - 结论:
   - C-path 现在有明确的 object-state edit runtime 语义：tile list 可以覆盖全量 Gaussian，编辑状态由 object-state buffer 决定。
-  - 当前 runtime 仍会重建 storage bundle；本 PR 先把 tile-list 稳定性和 telemetry 固化，下一步才能安全做真正的 objectState-only `queue.writeBuffer` 增量上传。
+  - 后续 RENDER-ROUTE-005 已在该 contract 上补齐 objectState-only `queue.writeBuffer` 增量上传。
 - 验证:
   - `node --check src/webgpuTileSmoke.js`: passed。
   - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。

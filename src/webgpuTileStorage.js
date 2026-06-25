@@ -1,5 +1,15 @@
 export const WEBGPU_TILE_STORAGE_LAYOUT_VERSION = "webgpu-tile-storage-v1";
 
+const REUSE_SOURCE_CHECKSUM_KEYS = new Set([
+  "positionRadius",
+  "colorOpacity",
+  "scaleRotation",
+  "objectIndices",
+  "tileCounts",
+  "tileOffsets",
+  "tileEntries",
+]);
+
 const STORAGE_BUFFER_DEFINITIONS = Object.freeze([
   {
     key: "positionRadius",
@@ -139,6 +149,7 @@ export function estimateWebGpuTileRuntimeStorage(tileSmoke) {
 export function createWebGpuTileStorageBuffers(device, tileSmoke) {
   const descriptors = storageBufferDescriptors(tileSmoke);
   const description = describeWebGpuTileStorage(tileSmoke);
+  const reuseSignature = webGpuTileStorageReuseSignature(tileSmoke);
   const usage = storageBufferUsage();
   const buffers = descriptors.map((descriptor) => {
     const buffer = device.createBuffer({
@@ -161,6 +172,7 @@ export function createWebGpuTileStorageBuffers(device, tileSmoke) {
 
   return {
     ...description,
+    reuseSignature,
     buffers,
     getBuffer(key) {
       const entry = bufferMap.get(key);
@@ -173,6 +185,58 @@ export function createWebGpuTileStorageBuffers(device, tileSmoke) {
       }
     },
   };
+}
+
+export function canReuseWebGpuTileStorageBuffers(storageBundle, tileSmoke) {
+  return Boolean(
+    storageBundle?.reuseSignature &&
+      storageBundle.reuseSignature === webGpuTileStorageReuseSignature(tileSmoke),
+  );
+}
+
+export function updateWebGpuTileObjectStateBuffer(device, storageBundle, tileSmoke) {
+  const objectState = tileSmoke?.buffers?.objectState;
+  if (!isTypedArray(objectState)) {
+    throw new Error("missing WebGPU object-state update buffer");
+  }
+  const objectStateBuffer = storageBundle?.getBuffer?.("objectState");
+  if (!objectStateBuffer) {
+    throw new Error("missing WebGPU object-state storage buffer");
+  }
+  if (objectState.byteLength > objectStateBuffer.allocatedByteLength) {
+    throw new Error("webgpu-object-state-buffer-too-small");
+  }
+  device.queue.writeBuffer(objectStateBuffer.buffer, 0, objectState);
+  const description = describeWebGpuTileStorage(tileSmoke);
+  Object.assign(storageBundle, description, {
+    reuseSignature: webGpuTileStorageReuseSignature(tileSmoke),
+  });
+  return {
+    ...description,
+    objectStateByteLength: objectState.byteLength,
+  };
+}
+
+export function webGpuTileStorageReuseSignature(tileSmoke) {
+  return storageBufferDescriptors(tileSmoke)
+    .map((descriptor) => {
+      const sourceChecksum = REUSE_SOURCE_CHECKSUM_KEYS.has(descriptor.key)
+        ? checksumSourceTypedArray(descriptor.source)
+        : "mutable";
+      return [
+        descriptor.key,
+        descriptor.elementType,
+        descriptor.elementCount,
+        descriptor.byteLength,
+        descriptor.allocatedByteLength,
+        sourceChecksum,
+      ].join(":");
+    })
+    .join("|");
+}
+
+function checksumSourceTypedArray(source) {
+  return checksumTypedArray(2166136261, source).toString(16).padStart(8, "0");
 }
 
 function storageBufferDescriptors(tileSmoke) {

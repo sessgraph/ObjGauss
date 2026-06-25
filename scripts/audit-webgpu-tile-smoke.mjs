@@ -56,10 +56,13 @@ import {
   WEBGPU_TILE_SMOKE_LAYOUT_VERSION,
 } from "../src/webgpuTileSmoke.js";
 import {
+  canReuseWebGpuTileStorageBuffers,
   createWebGpuTileStorageBuffers,
   describeWebGpuTileStorage,
   estimateWebGpuTileRuntimeStorage,
+  updateWebGpuTileObjectStateBuffer,
   WEBGPU_TILE_STORAGE_LAYOUT_VERSION,
+  webGpuTileStorageReuseSignature,
 } from "../src/webgpuTileStorage.js";
 import {
   createWebGpuResolveMeta,
@@ -924,6 +927,55 @@ assert.equal(
 );
 assert.notEqual(objectStateTileRemoved.objectStateChecksum, objectStateTileBase.objectStateChecksum);
 assert.notEqual(objectStateTileRemoved.resolveChecksum, objectStateTileBase.resolveChecksum);
+
+const objectStateFakeDevice = createFakeDevice();
+const objectStateStorageBundle = createWebGpuTileStorageBuffers(
+  objectStateFakeDevice,
+  objectStateTileBase,
+);
+const initialObjectStateWriteCount = objectStateFakeDevice.writes.length;
+assert.equal(initialObjectStateWriteCount, objectStateStorageBundle.bufferCount);
+assert.equal(
+  objectStateStorageBundle.reuseSignature,
+  webGpuTileStorageReuseSignature(objectStateTileBase),
+);
+assert.equal(
+  canReuseWebGpuTileStorageBuffers(objectStateStorageBundle, objectStateTileIsolated),
+  true,
+);
+const isolatedUpdate = updateWebGpuTileObjectStateBuffer(
+  objectStateFakeDevice,
+  objectStateStorageBundle,
+  objectStateTileIsolated,
+);
+assert.equal(objectStateFakeDevice.created.length, objectStateStorageBundle.bufferCount);
+assert.equal(objectStateFakeDevice.writes.length, initialObjectStateWriteCount + 1);
+assert.equal(objectStateFakeDevice.writes.at(-1).label, "objgauss-object-state");
+assert.equal(
+  objectStateFakeDevice.writes.at(-1).byteLength,
+  objectStateTileIsolated.buffers.objectState.byteLength,
+);
+assert.equal(isolatedUpdate.checksum, describeWebGpuTileStorage(objectStateTileIsolated).checksum);
+assert.equal(objectStateStorageBundle.checksum, isolatedUpdate.checksum);
+assert.equal(
+  objectStateStorageBundle.reuseSignature,
+  webGpuTileStorageReuseSignature(objectStateTileIsolated),
+);
+assert.equal(
+  canReuseWebGpuTileStorageBuffers(objectStateStorageBundle, objectStateTileRemoved),
+  true,
+);
+const removedUpdate = updateWebGpuTileObjectStateBuffer(
+  objectStateFakeDevice,
+  objectStateStorageBundle,
+  objectStateTileRemoved,
+);
+assert.equal(objectStateFakeDevice.created.length, objectStateStorageBundle.bufferCount);
+assert.equal(objectStateFakeDevice.writes.length, initialObjectStateWriteCount + 2);
+assert.equal(objectStateFakeDevice.writes.at(-1).label, "objgauss-object-state");
+assert.equal(removedUpdate.checksum, describeWebGpuTileStorage(objectStateTileRemoved).checksum);
+objectStateStorageBundle.destroy();
+assert.ok(objectStateFakeDevice.created.every((buffer) => buffer.destroyed));
 
 console.log(
   `webgpu_tile_smoke=passed packed=${base.packedGaussians} ` +

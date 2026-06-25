@@ -281,7 +281,12 @@ function evaluateResult({ asset, exitCode, parsed, objectTransition }) {
       parsed.readbackFloatCount > 0 && parsed.readbackFiniteFloats === parsed.readbackFloatCount,
     ),
     check("readback-nonzero-floats", parsed.readbackNonzeroFloats, ">0", parsed.readbackNonzeroFloats > 0),
-    check("storage-status", parsed.storageStatus, "uploaded", parsed.storageStatus === "uploaded"),
+      check(
+        "storage-status",
+        parsed.storageStatus,
+        "uploaded or object-state-updated",
+        ["uploaded", "object-state-updated"].includes(parsed.storageStatus ?? ""),
+      ),
     check("storage-limit", parsed.storageLimitGate, "pass", parsed.storageLimitGate === "pass"),
     check("object-filter", parsed.objectFilter, "gpu-object-state-buffer", parsed.objectFilter === "gpu-object-state-buffer"),
     check(
