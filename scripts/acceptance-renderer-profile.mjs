@@ -27,6 +27,9 @@ const skipWebGpuPresentationPerformance = flagEnabled(
 const skipWebGpuPresentationTransition = flagEnabled(
   args.skipWebGpuPresentationTransition ?? args["skip-webgpu-presentation-transition"],
 );
+const skipRendererRouteGoal = flagEnabled(
+  args.skipRendererRouteGoal ?? args["skip-renderer-route-goal"],
+);
 const skipNear1mProductionGap = flagEnabled(
   args.skipNear1mProductionGap ?? args["skip-near1m-production-gap"],
 );
@@ -110,6 +113,7 @@ function createProfileSpec(name) {
         defaultCiRequirement: true,
         includesTrainedShHeavySample: false,
         sparkCommercialRouteDefaultCi: false,
+        includesRendererRouteGoalReport: false,
         includesNear1mProductionGapReport: false,
         requiresNear1mProductionReady: false,
         reason:
@@ -164,7 +168,8 @@ function createProfileSpec(name) {
         defaultCiRequirement: false,
         includesTrainedShHeavySample: true,
         sparkCommercialRouteDefaultCi: false,
-        includesNear1mProductionGapReport: true,
+        includesRendererRouteGoalReport: !skipRendererRouteGoal,
+        includesNear1mProductionGapReport: !skipNear1mProductionGap,
         requiresNear1mProductionReady: requireNear1mProductionReady,
         reason:
           "product/demo review should require the local SH-heavy trained sample and fail fast when it is missing",
@@ -205,6 +210,22 @@ function createProfileSpec(name) {
                   nativePort,
                   "--output-dir",
                   path.join(outputDir, "webgpu-presentation-transition"),
+                ],
+              ],
+            ]),
+        ...(skipRendererRouteGoal
+          ? []
+          : [
+              [
+                "Renderer route goal report",
+                [
+                  "npm",
+                  "run",
+                  "audit:renderer-route-goal",
+                  "--",
+                  "--output-dir",
+                  path.join(outputDir, "renderer-route-goal"),
+                  ...(requireNear1mProductionReady ? ["--require-production-ready"] : []),
                 ],
               ],
             ]),
@@ -258,6 +279,9 @@ function writeReport(outputDirPath, summary) {
 }
 
 function collectStepArtifact(label) {
+  if (label === "Renderer route goal report") {
+    return readRendererRouteGoalArtifact();
+  }
   if (label === "Near-1M production gap report") {
     return readNear1mProductionGapArtifact();
   }
@@ -266,7 +290,30 @@ function collectStepArtifact(label) {
 
 function collectProfileArtifacts() {
   return {
+    rendererRouteGoal: readRendererRouteGoalArtifact(),
     near1mProductionGap: readNear1mProductionGapArtifact(),
+  };
+}
+
+function readRendererRouteGoalArtifact() {
+  const summaryPath = path.join(outputDir, "renderer-route-goal", "summary.json");
+  const summary = readJsonIfPresent(summaryPath);
+  if (!summary) {
+    return {
+      status: "missing",
+      path: summaryPath,
+    };
+  }
+  return {
+    status: summary.status ?? "unknown",
+    passed: Boolean(summary.passed),
+    path: summaryPath,
+    report: path.join(outputDir, "renderer-route-goal", "summary.md"),
+    nextAction: summary.nextAction ?? "unknown",
+    missingEvidence: Array.isArray(summary.missingEvidence)
+      ? summary.missingEvidence.map((item) => item.id ?? "unknown")
+      : [],
+    requireProductionReady: Boolean(summary.requireProductionReady),
   };
 }
 
@@ -301,11 +348,26 @@ function renderMarkdown(summary) {
     `- Default CI requirement: ${yesNo(summary.decision.defaultCiRequirement)}`,
     `- Includes trained SH-heavy sample: ${yesNo(summary.decision.includesTrainedShHeavySample)}`,
     `- Spark commercial route default CI: ${yesNo(summary.decision.sparkCommercialRouteDefaultCi)}`,
+    `- Includes renderer route goal report: ${yesNo(summary.decision.includesRendererRouteGoalReport)}`,
     `- Includes near-1M production gap report: ${yesNo(summary.decision.includesNear1mProductionGapReport)}`,
     `- Requires near-1M production ready: ${yesNo(summary.decision.requiresNear1mProductionReady)}`,
     `- Reason: ${summary.decision.reason}`,
     "",
   ];
+  const routeGoal = summary.artifacts?.rendererRouteGoal;
+  if (routeGoal && routeGoal.status !== "missing") {
+    lines.push(
+      "## Renderer Route Goal",
+      "",
+      `- Status: ${routeGoal.status}`,
+      `- Passed: ${routeGoal.passed}`,
+      `- Require production ready: ${routeGoal.requireProductionReady}`,
+      `- Next action: ${routeGoal.nextAction}`,
+      `- Missing evidence: ${routeGoal.missingEvidence.join(", ") || "none"}`,
+      `- Report: ${routeGoal.report}`,
+      "",
+    );
+  }
   const near1m = summary.artifacts?.near1mProductionGap;
   if (near1m && near1m.status !== "missing") {
     lines.push(

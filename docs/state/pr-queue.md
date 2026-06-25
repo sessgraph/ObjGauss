@@ -29,6 +29,29 @@
 
 ## Done
 
+### RENDER-ROUTE-029: Product renderer profile embeds route goal artifact
+
+- 状态: done / product-profile-route-goal
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让 `acceptance:renderer-product` 直接包含 B -> C renderer route goal summary，而不是只暴露 route contract 和 near-1M gap 两个分散 artifact。
+- 已实施:
+  - product profile 默认新增 `Renderer route goal report` step，调用 `audit:renderer-route-goal` 并写入 `<output-dir>/renderer-route-goal/summary.*`。
+  - 顶层 `summary.json` 新增 `artifacts.rendererRouteGoal`，Markdown summary 新增 `Renderer Route Goal` 区块。
+  - `--require-near1m-production-ready` 会让 route goal step 透传 `--require-production-ready`，因此当前缺 near-1M proof 时会先在 goal-level gate 失败。
+  - 新增 `--skip-renderer-route-goal` 作为诊断跳过参数。
+- 结论:
+  - 产品 / Demo renderer profile 现在能在一个 summary 中同时展示 B/C foundation 是否过关、terminal near-1M proof 是否缺失，以及下一步动作。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-product-route-goal-final-dry-run`: passed；default product steps include `Renderer route goal report` before `Near-1M production gap report`。
+  - `npm run acceptance:renderer-product -- --dry-run --skip-renderer-route-goal --output-dir /tmp/objgauss-renderer-product-route-goal-skip-dry-run`: passed；route goal step skipped and `includesRendererRouteGoalReport=false`。
+  - `npm run acceptance:renderer-product -- --skip-route-contract --skip-build --skip-webgpu-presentation-performance --skip-webgpu-presentation-transition --skip-spark-commercial-route --output-dir /tmp/objgauss-renderer-product-route-goal-final-default-smoke`: passed；top-level summary embeds `rendererRouteGoal.status=incomplete`, `passed=true`, `missingEvidence=["near1m-production-proof"]` and near-1M gap `missingEvidence=5`。
+  - `npm run acceptance:renderer-product -- --skip-route-contract --skip-build --skip-webgpu-presentation-performance --skip-webgpu-presentation-transition --skip-spark-commercial-route --require-near1m-production-ready --output-dir /tmp/objgauss-renderer-product-route-goal-final-strict-expected-fail`: expected failed with exit `1`；strict profile fails at `Renderer route goal report`, with `requireProductionReady=true` and missing `near1m-production-proof`。
+  - `npm run audit:renderer-route-goal -- --output-dir /tmp/objgauss-renderer-route-goal-product-integration-final`: passed；status `incomplete`, `passed=true`, only missing near-1M production proof。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-028: B-to-C renderer route goal audit
 
 - 状态: done / route-goal-progress-artifact

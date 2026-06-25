@@ -545,7 +545,8 @@ picking.
 runs `audit:renderer-route-contract` first, builds the viewer, runs
 `audit:webgpu-presentation-performance` and
 `audit:webgpu-presentation-transition`, writes the
-`audit:near1m-production-gap` progress artifact, then runs
+`audit:renderer-route-goal` and `audit:near1m-production-gap` progress
+artifacts, then runs
 `acceptance:spark-commercial-route` with the trained sample availability
 preflight and the SH-heavy browser route. This is the correct gate before
 commercial demo review, but it should not be promoted to default CI until the
@@ -567,7 +568,9 @@ WebGPU tile contract, 100k-1M storage/edit budgets, and the near-1M production
 gap audit, then writes one `summary.json` / `summary.md`. By default it exits
 `0` when only the near-1M production proof is incomplete. Pass
 `--require-production-ready` when the same command should become the terminal
-B -> C route gate.
+B -> C route gate. `acceptance:renderer-product` includes this report by
+default, and `--require-near1m-production-ready` promotes the embedded route
+goal report to the same strict terminal behavior.
 
 ## Product UI Contract
 
