@@ -583,6 +583,7 @@ async function runAudit(url, assetsToCheck, options) {
       const packedGaussians = numericValue(await viewport.getAttribute("data-webgpu-packed-gaussians") ?? "0");
       const binnedGaussians = numericValue(await viewport.getAttribute("data-webgpu-binned-gaussians") ?? "0");
       const visibleGaussians = numericValue(await viewport.getAttribute("data-webgpu-visible-gaussians") ?? "0");
+      const tileListMode = await viewport.getAttribute("data-webgpu-tile-list-mode");
       const tileSize = numericValue(await viewport.getAttribute("data-webgpu-tile-size") ?? "0");
       const tileCount = numericValue(await viewport.getAttribute("data-webgpu-tile-count") ?? "0");
       const activeTileCount = numericValue(await viewport.getAttribute("data-webgpu-active-tile-count") ?? "0");
@@ -611,6 +612,9 @@ async function runAudit(url, assetsToCheck, options) {
         throw new Error(`${asset.id} unexpected WebGPU tile size: ${tileSize}`);
       }
       if (editRendererId === "webgpu-tile") {
+        if (tileListMode !== "object-state-filtered") {
+          throw new Error(`${asset.id} WebGPU tile list mode was not object-state-filtered: ${tileListMode}`);
+        }
         if (webGpuDisplayWidth <= 0 || webGpuDisplayHeight <= 0) {
           throw new Error(
             `${asset.id} WebGPU display size was not measured: ${webGpuDisplayWidth}x${webGpuDisplayHeight}`,
@@ -962,8 +966,10 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuStorageLayout = await viewport.getAttribute("data-webgpu-storage-layout");
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageReason = await viewport.getAttribute("data-webgpu-storage-reason");
+      const webGpuStorageUpdateMode = await viewport.getAttribute("data-webgpu-storage-update-mode");
       const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
       const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
+      const webGpuStorageObjectStateByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
       const webGpuStorageChecksum = await viewport.getAttribute("data-webgpu-storage-checksum");
       const webGpuStorageTileEntries = await viewport.getAttribute("data-webgpu-storage-tile-entries");
       const webGpuStorageTileOffsets = await viewport.getAttribute("data-webgpu-storage-tile-offsets");
@@ -1013,15 +1019,17 @@ async function runAudit(url, assetsToCheck, options) {
         if (
           webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
           !["uploaded", "object-state-updated"].includes(webGpuStorageStatus ?? "") ||
+          !["full-upload", "object-state-only"].includes(webGpuStorageUpdateMode ?? "") ||
           webGpuStorageBufferCount < 11 ||
           webGpuStorageByteSize <= 0 ||
+          webGpuStorageObjectStateByteSize <= 0 ||
           webGpuStorageTileEntries !== "true" ||
           webGpuStorageTileOffsets !== "true" ||
           webGpuStoragePixelOutput !== "true" ||
           !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
         ) {
           throw new Error(
-            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
+            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} updateMode=${webGpuStorageUpdateMode} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} objectStateBytes=${webGpuStorageObjectStateByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
         if (
@@ -1245,6 +1253,9 @@ async function runAudit(url, assetsToCheck, options) {
       const objectStateHiddenAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-hidden-objects") ?? "0");
       const objectStateSelectedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-selected-objects") ?? "0");
       const objectStateIsolatedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const webGpuStorageStatusAfterIsolate = await viewport.getAttribute("data-webgpu-storage-status");
+      const webGpuStorageUpdateModeAfterIsolate = await viewport.getAttribute("data-webgpu-storage-update-mode");
+      const webGpuStorageObjectStateByteSizeAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
       const webGpuStorageChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-storage-checksum");
       const webGpuReadbackAfterIsolate =
         editRendererId === "webgpu-tile" &&
@@ -1268,6 +1279,16 @@ async function runAudit(url, assetsToCheck, options) {
       }
       if (editRendererId === "webgpu-tile" && webGpuStorageChecksumAfterIsolate === webGpuStorageChecksum) {
         throw new Error(`${asset.id} isolate did not update WebGPU storage checksum`);
+      }
+      if (
+        editRendererId === "webgpu-tile" &&
+        (webGpuStorageStatusAfterIsolate !== "object-state-updated" ||
+          webGpuStorageUpdateModeAfterIsolate !== "object-state-only" ||
+          webGpuStorageObjectStateByteSizeAfterIsolate <= 0)
+      ) {
+        throw new Error(
+          `${asset.id} isolate did not use WebGPU objectState-only storage update: status=${webGpuStorageStatusAfterIsolate} updateMode=${webGpuStorageUpdateModeAfterIsolate} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterIsolate}`,
+        );
       }
       if (
         options.webGpuObjectTransition &&
@@ -1451,6 +1472,15 @@ async function runAudit(url, assetsToCheck, options) {
       const objectStateIsolatedAfterDelete = sparkFilteredAfterDelete
         ? 0
         : numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
+      const webGpuStorageStatusAfterDelete = sparkFilteredAfterDelete
+        ? "spark-filtered"
+        : await viewport.getAttribute("data-webgpu-storage-status");
+      const webGpuStorageUpdateModeAfterDelete = sparkFilteredAfterDelete
+        ? "spark-filtered"
+        : await viewport.getAttribute("data-webgpu-storage-update-mode");
+      const webGpuStorageObjectStateByteSizeAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
       const webGpuStorageChecksumAfterDelete = sparkFilteredAfterDelete
         ? SPARK_OBJECT_FILTER_MASK
         : await viewport.getAttribute("data-webgpu-storage-checksum");
@@ -1739,6 +1769,17 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuStorageChecksumAfterDelete === webGpuStorageChecksumAfterIsolate
       ) {
         throw new Error(`${asset.id} delete did not update WebGPU storage checksum`);
+      }
+      if (
+        editRendererId === "webgpu-tile" &&
+        !sparkFilteredAfterDelete &&
+        (webGpuStorageStatusAfterDelete !== "object-state-updated" ||
+          webGpuStorageUpdateModeAfterDelete !== "object-state-only" ||
+          webGpuStorageObjectStateByteSizeAfterDelete <= 0)
+      ) {
+        throw new Error(
+          `${asset.id} delete did not use WebGPU objectState-only storage update: status=${webGpuStorageStatusAfterDelete} updateMode=${webGpuStorageUpdateModeAfterDelete} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterDelete}`,
+        );
       }
       if (
         options.webGpuObjectTransition &&

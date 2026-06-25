@@ -316,6 +316,17 @@ In that case the existing storage bundle is reused, only `objectState` receives
 viewport, point size, tile layout, or other static inputs change, the runtime
 falls back to rebuilding the full storage bundle.
 
+The browser-visible contract is:
+
+```text
+data-webgpu-storage-update-mode="full-upload" | "object-state-only"
+data-webgpu-storage-object-state-byte-size="<bytes>"
+```
+
+`audit:demo` requires WebGPU isolate / delete transitions to report
+`object-state-only` with a nonzero object-state byte size when the WebGPU tile
+renderer is active.
+
 `npm run audit:spark-pick-report` validates Spark canvas object selection after
 delete. The current product contract is `screen-space-object-pick-v1` with
 `hover-confirm-v1`: hover exposes a candidate marker and click confirms that

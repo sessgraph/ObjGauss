@@ -30,6 +30,28 @@
 
 ## Done
 
+### RENDER-ROUTE-006: WebGPU object-state update telemetry gate
+
+- 状态: done / object-state-update-telemetry
+- 类型: 标准 PR / WebGPU C-path browser audit contract
+- 目标: 将 RENDER-ROUTE-005 的 objectState-only 增量上传从内部 runtime 行为升级为可 DOM / browser audit 检查的事实，避免后续误回归成全量 storage upload 而不被验收发现。
+- 已实施:
+  - `WebGpuTileViewport.jsx` 新增 `data-webgpu-storage-update-mode` 与 `data-webgpu-storage-object-state-byte-size`。
+  - 首次完整上传标记为 `updateMode="full-upload"`；reuse path 标记为 `updateMode="object-state-only"`，并暴露实际 object-state buffer byte size。
+  - `scripts/audit-demo.mjs` 读取 storage update mode / object-state byte size，并在 WebGPU isolate / delete transition 后要求 `status="object-state-updated"`、`updateMode="object-state-only"` 且 object-state bytes > 0。
+  - `audit:renderer-route-contract` 将 storage update telemetry 和 browser audit 字符串纳入 C-path contract。
+- 结论:
+  - WebGPU C-path 的对象编辑增量更新现在不仅由 Node smoke 证明，也能由浏览器 WebGPU object transition audit 验证。
+  - 这仍不改变 Spark 商用默认路线；它加强的是 WebGPU 终局架构的编辑 runtime 可审计性。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-object-state-update-telemetry`: passed；steps=5。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-005: WebGPU objectState-only incremental upload
 
 - 状态: done / object-state-incremental-upload

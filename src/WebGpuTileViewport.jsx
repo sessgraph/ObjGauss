@@ -675,8 +675,10 @@ export default function WebGpuTileViewport({
       data-webgpu-storage-layout={storage.layoutVersion}
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
+      data-webgpu-storage-update-mode={storage.updateMode ?? ""}
       data-webgpu-storage-buffer-count={storage.bufferCount}
       data-webgpu-storage-byte-size={storage.byteLength}
+      data-webgpu-storage-object-state-byte-size={storage.objectStateByteLength ?? 0}
       data-webgpu-storage-checksum={storage.checksum}
       data-webgpu-storage-tile-entries={storage.tileEntriesIncluded ? "true" : "false"}
       data-webgpu-storage-tile-offsets={storage.tileOffsetsIncluded ? "true" : "false"}
@@ -849,10 +851,12 @@ function renderFrame({
       setStorage({
         status: "object-state-updated",
         reason: "webgpu-object-state-buffer-updated",
+        updateMode: "object-state-only",
         layoutVersion: description.layoutVersion,
         checksum: description.checksum,
         bufferCount: description.bufferCount,
         byteLength: description.totalByteLength,
+        objectStateByteLength: description.objectStateByteLength,
         tileEntriesIncluded: description.tileEntriesIncluded,
         tileOffsetsIncluded: description.tileOffsetsIncluded,
         pixelOutputIncluded: description.pixelOutputIncluded,
@@ -864,10 +868,12 @@ function renderFrame({
       setStorage({
         status: "uploaded",
         reason: "webgpu-storage-uploaded",
+        updateMode: "full-upload",
         layoutVersion: storageBundle.layoutVersion,
         checksum: storageBundle.checksum,
         bufferCount: storageBundle.bufferCount,
         byteLength: storageBundle.totalByteLength,
+        objectStateByteLength: storageBundle.getBuffer("objectState").byteLength,
         tileEntriesIncluded: storageBundle.tileEntriesIncluded,
         tileOffsetsIncluded: storageBundle.tileOffsetsIncluded,
         pixelOutputIncluded: storageBundle.pixelOutputIncluded,
