@@ -30,6 +30,30 @@
 
 ## Done
 
+### RENDER-ROUTE-003: WebGPU 100k-1M scale budget audit
+
+- 状态: done / scale-budget-gate
+- 类型: 标准 PR / renderer scale audit
+- 目标: 将 Phase 3 “WebGPU tile splatting 支持 100k-1M Gaussians”拆出一个 fresh-clone-safe 的 storage / tile-entry budget gate，避免 C-path 只证明小样例 smoke 而没有大规模预算证据。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-scale-budget.mjs` 与 `npm run audit:webgpu-scale-budget`。
+  - Audit 使用现有 `estimateWebGpuTileRuntimeStorage` 和 `editRendererContract`，不构造 1M 个 point、不启动浏览器，按 100k / 300k / 1M 三档 synthetic `tileSmoke` 检查完整 11-buffer WebGPU runtime layout。
+  - 默认预算为单 storage buffer binding `128 MiB`、总 runtime storage `256 MiB`、storage buffers per shader stage `12`；1M 档使用 `320px` internal viewport 和每 Gaussian `32` 个 compact tile refs 的预算假设。
+  - `acceptance:renderer-ci` 默认加入 `WebGPU scale budget` 步骤；新增 `--skip-webgpu-scale-budget` 诊断开关。
+- 结论:
+  - 默认三档预算均通过：100k=`9.16/18.15 MiB` max/total，300k=`32.04/49.19 MiB`，1M=`122.07/173.24 MiB`。
+  - 这证明当前 C-path storage layout / compact tile entries / object-state buffer 在 1M 预算上没有先天超出常见 desktop WebGPU storage binding 约束；它不是 FPS、视觉质量或真实浏览器 1M runtime pass 的证明。
+- 验证:
+  - `node --check scripts/audit-webgpu-scale-budget.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run audit:webgpu-scale-budget`: passed；100k / 300k / 1M rows passed，1M max/total=`122.07/173.24 MiB`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --dry-run --skip-build --skip-webgpu-tile-smoke --skip-splat-index-mapping --skip-native-route`: passed；dry-run steps=2，包含 route contract 和 scale budget。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-scale-budget-nonbrowser`: passed；steps=5，覆盖 route contract、build、WebGPU tile smoke、WebGPU scale budget 和 no-SH public sample index mapping。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-002: Renderer acceptance includes route contract
 
 - 状态: done / acceptance-route-contract

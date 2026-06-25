@@ -291,6 +291,7 @@ const checks = [
       hasScripts([
         "audit:demo",
         "audit:webgpu-tile-smoke",
+        "audit:webgpu-scale-budget",
         "audit:webgpu-offscreen-readback",
         "audit:spark-native-mask-gate",
         "audit:spark-native-pick-feasibility",
@@ -300,6 +301,7 @@ const checks = [
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
+      "audit:webgpu-scale-budget",
       "audit:webgpu-offscreen-readback",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",

@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale budget proves storage shape, not 1M FPS. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -250,6 +250,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | What should default CI run for renderer readiness? | `npm run acceptance:renderer-ci` |
 | What should demo / release review run for the full product route? | `npm run acceptance:renderer-product` |
 | Is the B -> C renderer route contract still intact? | `npm run audit:renderer-route-contract` |
+| Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
@@ -281,14 +282,24 @@ designed to be fresh-clone safe and therefore does not require
 npm run audit:renderer-route-contract
 npm run build
 npm run audit:webgpu-tile-smoke
+npm run audit:webgpu-scale-budget
 npm run audit:splat-index-mapping -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local
 npm run audit:spark-native-mask-gate
 ```
 
 This profile proves the B/C renderer contracts that can be expected from the
-repo's public no-SH samples: route architecture, WebGPU tile smoke, compact
-`.splat` / PLY index mapping, and Spark native object masking. It intentionally
-does not prove the trained SH-heavy packed route.
+repo's public no-SH samples: route architecture, WebGPU tile smoke, 100k-1M
+storage budget, compact `.splat` / PLY index mapping, and Spark native object
+masking. It intentionally does not prove the trained SH-heavy packed route.
+
+`npm run audit:webgpu-scale-budget` is the storage budget gate for the C-path
+scale target. It estimates the full 11-buffer runtime layout for 100k, 300k,
+and 1M Gaussian profiles under a default desktop-style budget of `128 MiB` max
+storage buffer binding, `256 MiB` total runtime storage, and 12 storage buffers
+per shader stage. The current 1M budget row uses a `320px` internal viewport
+and 32 compact tile references per Gaussian, producing max buffer `122.07 MiB`
+and total storage `173.24 MiB`. This is a scale architecture check, not a
+browser FPS or visual-quality proof.
 
 `npm run audit:spark-pick-report` validates Spark canvas object selection after
 delete. The current product contract is `screen-space-object-pick-v1` with

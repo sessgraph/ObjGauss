@@ -40,6 +40,7 @@
     "audit:splat-index-mapping": "node scripts/audit-splat-index-mapping.mjs --output-dir /tmp/objgauss-splat-index-mapping",
     "audit:webgpu-depth-sweep": "node scripts/audit-webgpu-depth-sweep.mjs",
     "audit:webgpu-tile-smoke": "node scripts/audit-webgpu-tile-smoke.mjs",
+    "audit:webgpu-scale-budget": "node scripts/audit-webgpu-scale-budget.mjs",
     "audit:renderer-route-contract": "node scripts/audit-renderer-route-contract.mjs",
     "acceptance:renderer": "node scripts/acceptance-renderer-profile.mjs",
     "acceptance:renderer-ci": "node scripts/acceptance-renderer-profile.mjs --profile ci",

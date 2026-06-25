@@ -15,6 +15,9 @@ const skipSplatIndexMapping = flagEnabled(
   args.skipSplatIndexMapping ?? args["skip-splat-index-mapping"],
 );
 const skipWebGpuTileSmoke = flagEnabled(args.skipWebGpuTileSmoke ?? args["skip-webgpu-tile-smoke"]);
+const skipWebGpuScaleBudget = flagEnabled(
+  args.skipWebGpuScaleBudget ?? args["skip-webgpu-scale-budget"],
+);
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
@@ -90,6 +93,9 @@ function createProfileSpec(name) {
         ...(skipWebGpuTileSmoke
           ? []
           : [["WebGPU tile smoke", ["npm", "run", "audit:webgpu-tile-smoke"]]]),
+        ...(skipWebGpuScaleBudget
+          ? []
+          : [["WebGPU scale budget", ["npm", "run", "audit:webgpu-scale-budget"]]]),
         ...(skipSplatIndexMapping
           ? []
           : [
