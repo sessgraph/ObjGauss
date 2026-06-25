@@ -30,6 +30,25 @@
 
 ## Done
 
+### RENDER-ROUTE-001: B-to-C renderer route contract audit
+
+- 状态: done / route-contract-audit
+- 类型: 标准 PR / renderer architecture audit
+- 目标: 将 B -> C renderer 主线从聊天记忆和长文档描述固化成可机器检查的静态合约，防止后续 UI / audit / renderer 改动把 WebGL Gaussian OIT fallback、WebGPU tile terminal path、Spark commercial source route 或 fixed port policy 拆散。
+- 已实施:
+  - 新增 `scripts/audit-renderer-route-contract.mjs` 与 `npm run audit:renderer-route-contract`。
+  - 审计分三层检查：`B-webgl-gaussian-oit` 验证 `ShaderMaterial` screen-space Gaussian kernel、half-float weighted OIT resolve 和 GPU object-state texture；`C-webgpu-tile` 验证 ADR、storage buffers、tile entries / offsets、object-state buffer、compute accumulation 和 pixel resolve；`bridge-route-contract` 验证 `App` route boundary、browser audit telemetry、npm acceptance commands、Spark pick contract 和 fixed `5395` browser audit 默认端口。
+  - 报告输出 `/tmp/objgauss-renderer-route-contract/summary.{json,md}`，失败时以非零退出码阻断。
+- 结论:
+  - 这条 audit 证明当前仓库的 renderer 路线仍是：Spark 负责商用源色查看 / source-color edit route，Gaussian OIT 作为 WebGL fallback/debug 过渡层，WebGPU tile renderer 作为 C-path 终局架构。
+  - 这不是视觉质量 gate；WebGPU/Spark 视觉残差、真实 occlusion、边界质量和高质量商用编辑仍由对应 browser / benchmark audits 继续约束。
+- 验证:
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### PORT-001: Browser audit fixed port defaults
 
 - 状态: done / fixed-port-defaults
