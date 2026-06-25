@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003D: Near-1M Splatfacto candidate chain targets production SLA
+
+- 状态: done / near1m-candidate-orchestration
+- 类型: 标准 PR / training-output to C-path SLA handoff
+- 目标: 把真实 trained near-1M PLY 的剩余缺口从手工拼命令推进成一条可复用本地 pipeline：长训导出、balanced Object Field 登记、再接 WebGPU C-path production SLA gate。
+- 已实施:
+  - 新增 `scripts/train-splatfacto-near1m-candidate.mjs` 和 `npm run train:splatfacto:near1m-candidate`。
+  - 支持 `--dry-run`、`--status`、`--run` 三模式；默认不启动长训。
+  - `--run` 会串起 `train:splatfacto:smoke` near-1M 参数、`benchmark:splatfacto:balanced --skip-sam` 和 `audit:webgpu-cpath-production-sla`。
+  - 默认 near-1M 参数为 `iterations=10000`、`steps_per_save=1000`、`cache_images=cpu`、`camera_res_scale_factor=1.0`、`max_jobs=2`、SAM `8f / 4 masks / max_area_fraction=0.3`、Object Field `4 slots / 160 iterations`。
+  - 如果 `/tmp/objgauss-cuda13` 存在，脚本会默认把它作为 `--cuda-home` 传给训练 wrapper，复用本机已验证的 CUDA wrapper。
+  - `docs/training/splatfacto-smoke.md` 已新增 TRAIN-003D runbook。
+- 结论:
+  - near-1M candidate 现在有固定的生成 / 登记 / SLA 验收链路。
+  - 当前 `--status` 显示 dataset、SAM checkpoint 和 balanced SAM manifest 已 present，但 near-1M train config / checkpoint / exported PLY / object-aware PLY / production SLA summary 仍 missing。
+  - 这一步仍不启动 10000-step 训练，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull`: passed；命令链包含 near-1M training、balanced registration 和 production SLA gate。
+  - `npm run train:splatfacto:near1m-candidate -- --status`: passed；`near1m_export=not-ready`、`near1m_object_ply=not-ready`、`missing=5`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-022: C-path production SLA has strict near-1M wrapper
 
 - 状态: done / strict-production-sla-wrapper

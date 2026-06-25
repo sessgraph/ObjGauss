@@ -179,6 +179,56 @@ Use `npm run preview -- --port 5395 --strictPort` when `npm run audit:demo`
 cannot start Vite dev server because the system inotify watcher limit is
 exhausted.
 
+## TRAIN-003D Near-1M Candidate To Production SLA
+
+TRAIN-003D is the handoff from "resource-safe candidate" to the renderer C-path
+production SLA gate. It does not commit generated outputs and should only be run
+when the machine can spend the time on a longer Splatfacto run.
+
+Preview the full command sequence:
+
+```bash
+npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti
+```
+
+Check local readiness without starting training:
+
+```bash
+npm run train:splatfacto:near1m-candidate -- --status
+```
+
+Run the full chain:
+
+```bash
+SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
+npm run train:splatfacto:near1m-candidate -- --run --target-hardware local-rtx5060ti
+```
+
+The wrapper performs three steps:
+
+```text
+1. train:splatfacto:smoke with near-1M defaults:
+   iterations=10000
+   steps_per_save=1000
+   cache_images=cpu
+   camera_res_scale_factor=1.0
+   max_jobs=2
+   SAM 8 frames / 4 masks per frame / max_area_fraction=0.3
+
+2. benchmark:splatfacto:balanced on the exported PLY:
+   slots=4
+   object_iterations=160
+   output_dir=outputs/assets/gaussians/nerf-lego-trained-near1m-sam8f-balanced03-slots4-candidate
+
+3. audit:webgpu-cpath-production-sla on:
+   outputs/assets/gaussians/nerf-lego-trained-near1m-sam8f-balanced03-slots4-candidate/object_aware_gaussians.ply
+```
+
+The production SLA step still requires the generated object-aware PLY to contain
+at least `1,000,000` Gaussians. If the long run exports fewer Gaussians, the
+strict gate will fail at preflight and the result should be treated as another
+candidate, not as a production SLA proof.
+
 ## One Command
 
 Preview the command sequence without running training:
