@@ -189,7 +189,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 本机已完成 NeRF Lego Splatfacto 500-step resource-safe candidate，导出 47168 个 Gaussian，并通过 `training register-output` 登记为本机 `NeRF Lego 训练输出样例` public sample；该产物在 ignored `outputs/` / `public/samples/`，不进入 git。
   - 本机已完成 NeRF Lego Splatfacto 2000-step resource-safe candidate，导出 255794 个 Gaussian；几何/渲染指标强于 safe-500，但 2-frame SAM supervision 下 object slots 仍不平衡，暂不作为最终语义样例结论。
   - `objgauss masks from-nerf-sam` 支持 `--max-area-fraction` 过滤过大的 SAM masks；safe-2000 当前最佳语义候选是 8-frame / 4-slot / `max_area_fraction=0.3`，已消除近空 object slots 并提升 render occlusion effect。
-  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。当前 status 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；near-1M train config / checkpoint / exported PLY / object-aware PLY / SLA summary 仍 missing。
+  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E/003F near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。真正启动长训还必须显式传 `--confirm-long-run`，否则 `--run` 会输出 `near1m_long_run_guard=failed`。当前 status 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；near-1M train config / checkpoint / exported PLY / object-aware PLY / SLA summary 仍 missing。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
@@ -207,7 +207,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run acceptance:semantic` 已固化为 SEMANTIC benchmark suite 验收命令。
   - `npm run acceptance:webgpu-headless` 已固化为 WebGPU CI/headless acceptance 命令；默认构建 viewer、跑 WebGPU tile smoke、再跑 Lego proxy + Plush semantic 的 offscreen object-transition suite。
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
-  - `npm run train:splatfacto:near1m-candidate` 已固化为 near-1M trained candidate 到 production SLA 的本地编排入口：默认只在 `--run` 下启动长训，后续输出仍在 ignored `outputs/` 和 `/tmp`；默认 scale gate 会拒绝低于 1M Gaussians 的 exported / object-aware PLY。
+  - `npm run train:splatfacto:near1m-candidate` 已固化为 near-1M trained candidate 到 production SLA 的本地编排入口：只有 `--run --confirm-long-run` 才会启动长训，后续输出仍在 ignored `outputs/` 和 `/tmp`；默认 scale gate 会拒绝低于 1M Gaussians 的 exported / object-aware PLY。
   - `npm run benchmark:splatfacto:balanced` 已固化为 safe-2000 balanced candidate 的一键本地 benchmark 入口，可重跑 balanced SAM、`training register-output`、emergence metrics、curve、report 和 summary。
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
   - `npm run benchmark:splatfacto:scenes` 已固化为 Splatfacto-trained scene suite，可比较 Lego safe-2000、LLFF Fern smoke 与 Poly Haven Chair smoke 三个 scene rows，并支持 train / held-out SAM manifest split。
@@ -270,6 +270,8 @@ npm run audit:webgpu-cpath-production-sla -- --trained-ply public/samples/nerf_l
 node --check scripts/train-splatfacto-near1m-candidate.mjs
 npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull
 npm run train:splatfacto:near1m-candidate -- --status
+# expected failed with exit 2: near-1M long training requires --confirm-long-run
+npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti
 # expected failed with exit 2: safe-2000 has 255794 Gaussians, below near-1M gate
 npm run train:splatfacto:near1m-candidate -- --run --skip-train --skip-sla --export-dir outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1 --target-hardware local-rtx5060ti
 npm run audit:renderer-route-contract

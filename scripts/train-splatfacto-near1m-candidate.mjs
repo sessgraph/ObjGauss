@@ -72,6 +72,7 @@ const skipRegister = Boolean(options.skipRegister);
 const skipSla = Boolean(options.skipSla);
 const publish = Boolean(options.publish);
 const allowSlaFailures = Boolean(options.allowSlaFailures);
+const confirmLongRun = Boolean(options.confirmLongRun);
 
 const steps = [
   {
@@ -217,6 +218,13 @@ console.log(`camera_res_scale_factor=${cameraResScaleFactor}`);
 console.log(`min_exported_gaussians=${minExportedGaussians}`);
 
 if (mode === "run") {
+  if (!skipTrain && !confirmLongRun) {
+    console.error(
+      "near1m_long_run_guard=failed reason=\"starting near-1M Splatfacto training requires --confirm-long-run\"",
+    );
+    console.error("hint=use --skip-train when reusing an existing exported PLY");
+    process.exit(2);
+  }
   const missing = collectMissingForRun();
   if (missing.length > 0) {
     printMissing(missing);
@@ -385,6 +393,7 @@ function parseArgs(values) {
     else if (value === "--skip-pull") parsed.skipPull = true;
     else if (value === "--publish") parsed.publish = true;
     else if (value === "--allow-sla-failures") parsed.allowSlaFailures = true;
+    else if (value === "--confirm-long-run") parsed.confirmLongRun = true;
     else if (value.startsWith("--")) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       const next = values[index + 1];

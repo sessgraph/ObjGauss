@@ -197,11 +197,26 @@ Check local readiness without starting training:
 npm run train:splatfacto:near1m-candidate -- --status
 ```
 
-Run the full chain:
+Run the full chain. This starts a long Splatfacto training job, so it requires
+an explicit confirmation flag:
 
 ```bash
 SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
-npm run train:splatfacto:near1m-candidate -- --run --target-hardware local-rtx5060ti
+npm run train:splatfacto:near1m-candidate -- \
+  --run \
+  --confirm-long-run \
+  --target-hardware local-rtx5060ti
+```
+
+If the near-1M PLY was already exported and only the registration / SLA steps
+need to run, use `--skip-train`; this bypasses the long-run confirmation but
+keeps the exported PLY scale gate:
+
+```bash
+npm run train:splatfacto:near1m-candidate -- \
+  --run \
+  --skip-train \
+  --target-hardware local-rtx5060ti
 ```
 
 The wrapper performs three steps:

@@ -29,6 +29,30 @@
 
 ## Done
 
+### TRAIN-003F: Near-1M long training requires explicit confirmation
+
+- 状态: done / long-run-confirmation-guard
+- 类型: 标准 PR / training resource safety
+- 目标: 防止 `train:splatfacto:near1m-candidate -- --run` 被误触后直接启动 10000-step Splatfacto 长训，保护本机交互和 GPU 资源。
+- 已实施:
+  - `scripts/train-splatfacto-near1m-candidate.mjs` 新增 `--confirm-long-run`。
+  - 当 `--run` 且未 `--skip-train` 时，如果没有 `--confirm-long-run`，脚本会输出 `near1m_long_run_guard=failed` 并以 exit code `2` 停止。
+  - `--skip-train` 复用已有 exported PLY 时不会触发 long-run guard，但仍会执行 near-1M scale gate。
+  - TRAIN-003D runbook 已更新：真正启动长训需显式传 `--confirm-long-run`，只做登记/SLA 则用 `--skip-train`。
+- 结论:
+  - near-1M pipeline 现在有资源安全防误触保护。
+  - 当前验证显示未确认的 `--run` 被拦住；复用 safe-2000 PLY 的 `--skip-train` 路径继续被 scale gate 拒绝。
+  - 这一步仍不启动 10000-step 训练，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti`: expected failed with exit `2`；`near1m_long_run_guard=failed`。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-train --skip-sla --export-dir outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1 --target-hardware local-rtx5060ti`: expected failed with exit `2`；guard bypassed, then `near1m_scale_gate=failed` because `255794 < 1000000`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003E: Near-1M candidate pipeline stops under-scale exports early
 
 - 状态: done / near1m-scale-gate
