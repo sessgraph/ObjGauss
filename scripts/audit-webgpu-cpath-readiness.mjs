@@ -43,6 +43,20 @@ const syntheticRuntimeSummaryPath = String(
 const skipSynthetic1mRuntime = flagEnabled(
   args.skipSynthetic1mRuntime ?? args["skip-synthetic-1m-runtime"],
 );
+const trainedPlyPath = optionalString(
+  args.trainedPly ?? args["trained-ply"] ?? args.inputPly ?? args["input-ply"],
+);
+const trainedPlyRuntimeEnabled = Boolean(trainedPlyPath);
+const trainedPlyMinGaussians = positiveFiniteNumber(
+  args.trainedMinGaussians ?? args["trained-min-gaussians"] ?? args.minGaussians ?? args["min-gaussians"],
+  1_000_000,
+);
+const trainedPlyRuntimeDir = path.join(outputDir, "trained-ply-runtime");
+const trainedPlyRuntimeSummaryPath = String(
+  args.trainedPlyRuntimeSummary ??
+    args["trained-ply-runtime-summary"] ??
+    path.join(trainedPlyRuntimeDir, "summary.json"),
+);
 
 if (assets.length === 0) {
   throw new Error("at least one asset is required for WebGPU C-path readiness audit");
@@ -102,6 +116,26 @@ try {
         syntheticRuntimeDir,
       ]);
     }
+    if (trainedPlyRuntimeEnabled) {
+      await runStep("WebGPU trained PLY browser runtime", [
+        "npm",
+        "run",
+        "audit:webgpu-ply-runtime",
+        "--",
+        "--input-ply",
+        trainedPlyPath,
+        "--scene-kind",
+        "trained",
+        "--min-gaussians",
+        String(Math.round(trainedPlyMinGaussians)),
+        "--port",
+        port,
+        "--webgpu-flags",
+        webGpuFlags,
+        "--output-dir",
+        trainedPlyRuntimeDir,
+      ]);
+    }
   }
 
   const scaleSummary = readJson(scaleSummaryPath);
@@ -110,11 +144,15 @@ try {
   const syntheticRuntimeSummary = skipSynthetic1mRuntime
     ? null
     : readJson(syntheticRuntimeSummaryPath);
+  const trainedPlyRuntimeSummary = trainedPlyRuntimeEnabled
+    ? readJson(trainedPlyRuntimeSummaryPath)
+    : null;
   const evidence = buildEvidence({
     scaleSummary,
     editCostSummary,
     transitionSummary,
     syntheticRuntimeSummary,
+    trainedPlyRuntimeSummary,
   });
   const checks = buildChecks(evidence);
   const gaps = buildGaps(evidence);
@@ -130,12 +168,14 @@ try {
     skipRun,
     thresholds: {
       minLargeSceneGaussians,
+      trainedPlyMinGaussians,
     },
     sourceSummaries: {
       scaleBudget: scaleSummaryPath,
       editCostBudget: editCostSummaryPath,
       presentationTransition: transitionSummaryPath,
       syntheticRuntime1m: skipSynthetic1mRuntime ? "skipped" : syntheticRuntimeSummaryPath,
+      trainedPlyRuntime: trainedPlyRuntimeEnabled ? trainedPlyRuntimeSummaryPath : "not-provided",
     },
     passed,
     status: passed ? "passed" : "failed",
@@ -198,7 +238,13 @@ async function runStep(label, command) {
   }
 }
 
-function buildEvidence({ scaleSummary, editCostSummary, transitionSummary, syntheticRuntimeSummary }) {
+function buildEvidence({
+  scaleSummary,
+  editCostSummary,
+  transitionSummary,
+  syntheticRuntimeSummary,
+  trainedPlyRuntimeSummary,
+}) {
   const scale1m = findRow(scaleSummary.rows, "c-path-1m-budget");
   const edit1m = findRow(editCostSummary.rows, "c-path-1m-budget");
   const transitionRows = Array.isArray(transitionSummary.rows) ? transitionSummary.rows : [];
@@ -212,6 +258,10 @@ function buildEvidence({ scaleSummary, editCostSummary, transitionSummary, synth
   );
   const syntheticRuntimeRow = syntheticRuntimeSummary?.row ?? {};
   const syntheticRuntimeProof = syntheticRuntimeSummary?.proof?.browserRuntime1m ?? "not-run";
+  const trainedPlyRow = trainedPlyRuntimeSummary?.row ?? {};
+  const trainedPlyProof = trainedPlyRuntimeSummary?.proof?.plyRuntime ?? "not-run";
+  const trainedPlySceneProof = trainedPlyRuntimeSummary?.proof?.realTrainedScene1m ?? "not-proven";
+  const trainedPlyGaussians = numeric(trainedPlyRow.packedGaussians);
   return {
     scaleBudget1m: {
       status: scaleSummary.status === "passed" && scale1m?.status === "passed" ? "passed" : "failed",
@@ -287,20 +337,51 @@ function buildEvidence({ scaleSummary, editCostSummary, transitionSummary, synth
       isolateUpdateMs: numeric(syntheticRuntimeSummary?.aggregate?.isolateUpdateMs),
       deleteUpdateMs: numeric(syntheticRuntimeSummary?.aggregate?.deleteUpdateMs),
       screenshotPath: syntheticRuntimeRow.screenshotPath ?? "",
-      interpretation:
-        "A synthetic 1M binary PLY is uploaded through the real UI and exercised through WebGPU Tile select/isolate/delete. This proves browser runtime shape for synthetic 1M, not trained-scene quality.",
+      interpretation: skipSynthetic1mRuntime
+        ? "Synthetic 1M browser runtime was skipped in this readiness run."
+        : "A synthetic 1M binary PLY is uploaded through the real UI and exercised through WebGPU Tile select/isolate/delete. This proves browser runtime shape for synthetic 1M, not trained-scene quality.",
+    },
+    trainedPlyRuntime: {
+      status:
+        !trainedPlyRuntimeEnabled
+          ? "not-provided"
+          : trainedPlyRuntimeSummary?.passed === true &&
+              trainedPlyProof === "proven-ply-upload" &&
+              trainedPlyGaussians >= trainedPlyMinGaussians
+            ? "passed"
+            : "failed",
+      scope: "real/trained PLY headed browser upload/runtime",
+      mode: trainedPlyRuntimeSummary?.mode ?? "",
+      proof: trainedPlyProof,
+      sceneProof: trainedPlySceneProof,
+      gaussians: trainedPlyGaussians,
+      minGaussians: trainedPlyMinGaussians,
+      tileReferences: numeric(trainedPlyRow.tileReferences),
+      minApproxFps: numeric(trainedPlyRuntimeSummary?.aggregate?.minApproxFps),
+      uploadWallMs: numeric(trainedPlyRuntimeSummary?.aggregate?.uploadWallMs),
+      isolateUpdateMs: numeric(trainedPlyRuntimeSummary?.aggregate?.isolateUpdateMs),
+      deleteUpdateMs: numeric(trainedPlyRuntimeSummary?.aggregate?.deleteUpdateMs),
+      screenshotPath: trainedPlyRow.screenshotPath ?? "",
+      interpretation: trainedPlyRuntimeEnabled
+        ? "A caller-provided trained/object-aware PLY was uploaded through the real UI and exercised through WebGPU Tile select/isolate/delete."
+        : "No trained PLY was provided for this readiness run; use --trained-ply with --trained-min-gaussians to collect this evidence.",
     },
     realTrainedBrowserRuntime1m: {
-      status: "not-proven",
+      status:
+        trainedPlySceneProof === "proven-trained-ply-upload" && trainedPlyGaussians >= 1_000_000
+          ? "passed"
+          : "not-proven",
       scope: "real trained 1M headed browser runtime",
       interpretation:
-        "The largest current real headed transition evidence is still the local large scene, not a trained scene near 1M Gaussians.",
+        trainedPlyGaussians > 0
+          ? `Current trained PLY runtime evidence covers ${trainedPlyGaussians} Gaussians; near-1M trained scene proof still requires >= 1000000.`
+          : "The largest current real headed transition evidence is still the local large scene, not a trained scene near 1M Gaussians.",
     },
     fpsSla: {
       status: "not-proven",
       scope: "interactive FPS SLA",
       interpretation:
-        "Frame-pacing smoke and synthetic 1M rAF sampling are smoke envelopes, not a sustained renderer FPS benchmark.",
+        "Frame-pacing smoke and sustained baseline gates are observability evidence; production FPS SLA still requires reviewed thresholds on target hardware and real trained 1M scenes.",
     },
   };
 }
@@ -358,6 +439,22 @@ function buildChecks(evidence) {
         ? evidence.browserRuntime1m.status === "skipped"
         : evidence.browserRuntime1m.status === "passed",
     ),
+    ...(trainedPlyRuntimeEnabled
+      ? [
+          check(
+            "trained-ply-runtime",
+            evidence.trainedPlyRuntime.status,
+            "passed",
+            evidence.trainedPlyRuntime.status === "passed",
+          ),
+          check(
+            "trained-ply-runtime-min-gaussians",
+            evidence.trainedPlyRuntime.gaussians,
+            `>= ${trainedPlyMinGaussians}`,
+            evidence.trainedPlyRuntime.gaussians >= trainedPlyMinGaussians,
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -375,7 +472,7 @@ function buildGaps(evidence) {
       status: evidence.fpsSla.status,
       reason: evidence.fpsSla.interpretation,
       nextEvidence:
-        "Add sustained frame pacing / FPS sampling for camera idle and object edit transitions.",
+        "Promote the sustained baseline into a production SLA only after threshold review on target hardware and real trained 1M scenes.",
     },
   ];
 }
@@ -403,7 +500,7 @@ function renderMarkdown(summary) {
     `- Generated: \`${summary.generatedAt}\``,
     `- Fixed port: \`${summary.port}\``,
     "",
-    "This report combines synthetic 1M C-path budgets, synthetic 1M browser upload/runtime proof, and the current headed real-scene browser object-transition evidence. Passing means the architecture evidence is internally consistent; it does not mean trained 1M scene quality or sustained FPS is proven.",
+    "This report combines synthetic 1M C-path budgets, synthetic 1M browser upload/runtime proof, current headed real-scene browser object-transition evidence, and optional trained PLY runtime evidence. Passing means the architecture evidence is internally consistent; it does not mean trained 1M scene quality or sustained FPS is proven unless the trained PLY evidence explicitly reaches 1M.",
     "",
     "## Evidence",
     "",
@@ -460,6 +557,9 @@ function keyResult(id, item) {
   if (id === "browserRuntime1m") {
     return `${item.gaussians} uploaded Gaussians, ${item.tileReferences} tile refs, min approx FPS ${item.minApproxFps}`;
   }
+  if (id === "trainedPlyRuntime") {
+    return `${item.gaussians} uploaded Gaussians, min required ${item.minGaussians}, proof ${item.proof}`;
+  }
   return item.status;
 }
 
@@ -473,6 +573,8 @@ function printSummary(summary) {
       `largestHeadedGaussians=${summary.evidence?.headedBrowserTransition?.largestGaussians ?? 0}`,
       `browserRuntime1m=${summary.evidence?.browserRuntime1m?.status ?? "not-proven"}`,
       `browserRuntime1mProof=${summary.evidence?.browserRuntime1m?.proof ?? "not-proven"}`,
+      `trainedPlyRuntime=${summary.evidence?.trainedPlyRuntime?.status ?? "not-provided"}`,
+      `trainedPlyGaussians=${summary.evidence?.trainedPlyRuntime?.gaussians ?? 0}`,
       `realTrainedBrowserRuntime1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "not-proven"}`,
       `fpsSla=${summary.evidence?.fpsSla?.status ?? "not-proven"}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
@@ -508,6 +610,12 @@ function parseAssets(value) {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === true || value === false) return "";
+  const text = String(value).trim();
+  return text || "";
 }
 
 function parseArgs(argv) {

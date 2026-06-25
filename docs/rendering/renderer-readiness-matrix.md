@@ -342,6 +342,22 @@ that a generated `1,000,000` Gaussian binary PLY can be loaded through the real
 UI and exercised through WebGPU Tile select/isolate/delete. The report still
 keeps real trained 1M scene runtime and sustained FPS as remaining gaps.
 
+The readiness aggregator also accepts optional trained PLY evidence:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --skip-synthetic-1m-runtime \
+  --trained-ply public/samples/nerf_lego_trained_objects.ply \
+  --trained-min-gaussians 250000 \
+  --port 5395
+```
+
+Current optional-path evidence passes with trained Lego `255,794` Gaussians,
+`581,933` tile references, `trainedPlyRuntime=passed`, and
+`realTrainedBrowserRuntime1m=not-proven`. For the final near-1M trained-scene
+proof, pass a near-1M object-aware PLY and set
+`--trained-min-gaussians 1000000`.
+
 `npm run audit:webgpu-synthetic-1m-runtime` is the focused synthetic 1M browser
 gate. It generates a temporary binary PLY under `/tmp`, uploads it through the
 real file input, forces `uploaded-ply-splat-source=off` so the audit enters the

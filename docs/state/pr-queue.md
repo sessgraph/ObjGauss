@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-018: C-path readiness accepts trained PLY runtime evidence
+
+- 状态: done / trained-ply-readiness-evidence
+- 类型: 标准 PR / WebGPU C-path readiness aggregation
+- 目标: 把 RENDER-ROUTE-017 的 real/trained PLY browser runtime gate 接进 `audit:webgpu-cpath-readiness`，让 near-1M trained scene 的最终证明可以通过同一个 readiness report 落表，而不是分散在独立命令里。
+- 已实施:
+  - `scripts/audit-webgpu-cpath-readiness.mjs` 新增 `--trained-ply` / `--input-ply` 和 `--trained-min-gaussians` / `--min-gaussians`。
+  - 提供 trained PLY 时，readiness 会调用 `npm run audit:webgpu-ply-runtime -- --scene-kind trained`，并读取 `trained-ply-runtime/summary.json`。
+  - Readiness report 新增 `trainedPlyRuntime` evidence row、可选 trained PLY checks、source summary 和 terminal summary fields。
+  - `realTrainedBrowserRuntime1m` 现在会在 trained PLY proof 达到 `proven-trained-ply-upload` 且 Gaussians `>= 1000000` 时转为 passed；当前 255k trained sample 仍保持 not-proven。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该聚合路径。
+- 结论:
+  - 当前本机可选 trained PLY path 通过：input=`public/samples/nerf_lego_trained_objects.ply`，minGaussians=`250000`，uploadedGaussians=`255794`，tileReferences=`581933`，min approx FPS=`26.215`。
+  - Readiness report 输出 `trainedPlyRuntime=passed`，同时保留 `realTrainedBrowserRuntime1m=not-proven`。
+  - 这一步把 near-1M trained scene 的最终验收入口接进主 readiness；它仍不生成 near-1M trained PLY，也不声明生产 FPS SLA。
+- 验证:
+  - `node --check scripts/audit-webgpu-cpath-readiness.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-cpath-readiness -- --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness-trained-ply --skip-synthetic-1m-runtime --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000`: passed；`trainedPlyRuntime=passed`，`trainedPlyGaussians=255794`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-017: Real/trained PLY WebGPU runtime gate
 
 - 状态: done / trained-ply-runtime-gate

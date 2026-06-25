@@ -104,6 +104,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - RENDER-ROUTE-015 已新增 synthetic 1M headed browser runtime audit：`npm run audit:webgpu-synthetic-1m-runtime` 会在 `/tmp` 生成 binary PLY，通过真实文件上传控件加载 `1,000,000` Gaussians，并在 WebGPU Tile C-path 执行 first-frame、选中、隔离、删除和 rAF frame pacing 检查。当前本机完整 readiness 通过：tile refs=`1,709,862`、tile overflow=`0`、upload wall=`3150.075ms`、isolate object-state update=`513.9ms`、delete full-upload update=`551.5ms`、min approx FPS=`15.429`。`audit:webgpu-cpath-readiness` 已纳入该 gate；剩余 gap 是真实训练 1M scene runtime、持续 FPS SLA 和视觉质量。
   - RENDER-ROUTE-016 已新增 WebGPU sustained frame pacing baseline：`npm run audit:webgpu-sustained-frame-pacing` 会用 `120` rAF samples per phase 复跑当前真实场景 frame pacing 和 synthetic 1M upload/runtime。当前本机通过：真实场景最大 `281498` Gaussians，min approx FPS=`33.964`、max mean frame=`29.443ms`、max p95=`16.8ms`、long-frame ratio=`0.008`；synthetic 1M min approx FPS=`28.917`、max mean frame=`34.582ms`、max p95=`16.8ms`、long-frame ratio=`0.008`。这把 sustained frame pacing 从 smoke 推进为 baseline evidence；生产 FPS SLA 和真实训练 1M scene 仍未完成。
   - RENDER-ROUTE-017 已新增 real/trained PLY WebGPU runtime gate：`npm run audit:webgpu-ply-runtime -- --input-ply <path> --scene-kind trained --min-gaussians <n>` 可上传任意 object-aware PLY，通过真实文件输入进入 WebGPU Tile C-path，并检查 first-frame、对象选择、隔离、删除、tile overflow、更新模式和 rAF pacing。当前本机 trained Lego 样例通过：`255794` Gaussians、tile refs=`581933`、min approx FPS=`30.51`、max mean frame=`32.775ms`、upload wall=`1777.187ms`、isolate object-state update=`143.4ms`、delete object-state update=`142.8ms`。这证明真实/训练 PLY 验收入口可用；near-1M trained scene 仍需实际 PLY 产物后用 `--min-gaussians 1000000` 复跑。
+  - RENDER-ROUTE-018 已将 trained PLY runtime 证据接入 WebGPU C-path readiness 聚合器：`npm run audit:webgpu-cpath-readiness -- --trained-ply <path> --trained-min-gaussians <n>` 现在会调用 `audit:webgpu-ply-runtime`，在同一份 readiness report 中输出 `trainedPlyRuntime` 和 `realTrainedBrowserRuntime1m`。当前本机可选路径用 `public/samples/nerf_lego_trained_objects.ply` / `--trained-min-gaussians 250000` 通过：`255794` Gaussians、tile refs=`581933`、min approx FPS=`26.215`、upload wall=`1738.952ms`、isolate update=`142.3ms`、delete update=`141.6ms`。结论仍是 `realTrainedBrowserRuntime1m=not-proven`；最终 gap 是拿到 near-1M trained object-aware PLY 后用 `--trained-min-gaussians 1000000` 复跑。
   - RENDER-005T-AA 已完成 Spark packed extract reconstruction route：filtered Spark 路径从 raw PLY `constructSplats` 推进到 base `PackedSplats` cache + visible-index `extractSplats`，浏览器 contract 暴露 `data-spark-reconstruct-source="packed-extract-v1"`、base / visible counts、build / extract timing 和 `data-spark-sh-rest-preserved="false"`；Lego delete preview 通过 `sparkPacked="packed-extract-v1":5696/3909:3.9/1.9` 验收。该路径仍不是原始 `.splat` 内部 object mask，native mask / SH-capable full-view baseline 仍是后续任务。
   - RENDER-005T-AB 已完成 Spark packed SH-rest preservation：filtered Spark PLY reconstruction 现在会把 scene-level `f_rest_*` 编码为 Spark `extra.sh1/sh2/sh3`，并在 visible-index extract 后保留 SH extra；SH-heavy route 暴露 `data-spark-reconstruct-source="packed-sh-extract-v1"` 和 `data-spark-sh-rest-preserved="true"`。本机 `NeRF Lego 训练输出样例` 删除预览通过：`sparkPacked="packed-sh-extract-v1":255794/129108:171.2/41.7`、`sparkShRest=255794:255794:"true":45:3`。剩余外观 gap 是 registered compact `.splat` viewer source 不携带 degree-3 SH rest，导致 trained full reconstruct visual residual 不能直接以 `.splat` 为完整 SH baseline。
   - RENDER-005T-AC 已完成 Spark PLY SH full-view source baseline：SH-heavy 场景在 `真实查看` source/original 且无对象编辑状态时自动使用 Spark PLY SH source，暴露 `data-object-filter="spark-ply-sh-source"` 和 `packed-sh-extract-v1`；`?spark-ply-source=off` 可回到 legacy compact `.splat` 诊断路径。本机 trained Lego same-source residual gate 通过：`fullSource="spark-ply-sh-source":"packed-sh-extract-v1":255794:255794:true:45:3`、`coverageRatio=1.170018`、`lumaDelta=0.058189`、`chromaDelta=0.007036`。trained browser interaction audit 通过，真实查看非背景像素提升到 `70188`，删除后继续保留 `sparkShRest=255794:255794:"true":45:3`。
@@ -207,7 +208,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run benchmark:cross-scene` 已固化为跨场景 / 跨变体汇总入口，可聚合 semantic smoke suite、Splatfacto scene suite 和 safe-2000 variant suite 到同一张表，并输出 smoke / candidate / paper stage gates。
   - `npm run audit:webgpu-coverage-gate` 已固化为 WebGPU 编辑预览 coverage/luma/chroma/cost 的多场景 baseline gate，并输出可复查 summary report。
   - `npm run audit:webgpu-alpha-floor-sweep` / `npm run audit:webgpu-alpha-floor-candidate-gate` 已固化为 alpha presentation floor 候选的多场景复现实验和 strict gate。
-  - `npm run audit:webgpu-cpath-readiness` 已固化为 WebGPU C-path readiness 聚合审计：一条命令重跑 build、1M storage/edit budget 和 headed browser object transition，并写出哪些证据已完成、哪些 1M browser/FPS gap 仍未完成。
+  - `npm run audit:webgpu-cpath-readiness` 已固化为 WebGPU C-path readiness 聚合审计：一条命令重跑 build、1M storage/edit budget、headed browser object transition 和可选 `--trained-ply` runtime evidence，并写出哪些证据已完成、哪些 1M browser/FPS gap 仍未完成。
   - `npm run audit:webgpu-frame-pacing` 已固化为 headed browser C-path frame pacing smoke：默认覆盖 Lego proxy 与 Plush semantic，采样 idle / isolate / delete 三段 rAF interval，输出 summary report 和截图。
   - `npm run audit:webgpu-ply-runtime` 已固化为 real/trained object-aware PLY browser runtime gate：调用者提供 `--input-ply` 和 `--min-gaussians`，可直接用于后续 near-1M trained scene runtime 验收。
   - `npm run audit:webgpu-sustained-frame-pacing` 已固化为 headed browser C-path sustained frame-pacing baseline：默认覆盖当前真实场景和 synthetic 1M upload/runtime，各 phase 采样 `120` rAF interval，并输出 baseline report。
@@ -237,6 +238,18 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - baseline commit: `c8dcef7`.
 
 ## 最近验证
+
+2026-06-25:
+
+```bash
+node --check scripts/audit-webgpu-cpath-readiness.mjs
+node --check scripts/audit-renderer-route-contract.mjs
+npm run audit:webgpu-cpath-readiness -- --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness-trained-ply --skip-synthetic-1m-runtime --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000
+npm run audit:renderer-route-contract
+npm run build
+uv run --extra dev pytest
+git diff --check
+```
 
 2026-06-24:
 

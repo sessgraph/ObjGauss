@@ -91,6 +91,19 @@ This command writes an explicit remaining-gap section. A passing report now
 proves the synthetic 1M upload/runtime shape, but still keeps real trained 1M
 browser runtime and sustained FPS as not proven.
 
+The readiness aggregator can include a trained PLY runtime row when a candidate
+object-aware PLY is available:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --trained-ply <near-1m-trained-objects.ply> \
+  --trained-min-gaussians 1000000 \
+  --port 5395
+```
+
+Use `--skip-synthetic-1m-runtime` when specifically debugging only the trained
+PLY optional path.
+
 Use the focused synthetic 1M browser gate when the question is whether a
 generated 1M PLY can be uploaded through the real UI and edited on the WebGPU
 Tile C-path:
