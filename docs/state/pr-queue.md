@@ -29,6 +29,32 @@
 
 ## Done
 
+### TRAIN-003J: Near-1M long run has background launcher
+
+- 状态: done / background-long-run-launcher
+- 类型: 标准 PR / training resource safety
+- 目标: 让 near-1M 长训可以在显式确认后后台运行，并提供 PID、日志和状态报告，避免前台终端长时间占用或误以为机器卡死。
+- 已实施:
+  - 新增 `scripts/launch-splatfacto-near1m-background.mjs`。
+  - 新增 npm alias `train:splatfacto:near1m-background`。
+  - 默认 `--dry-run` 只打印将要执行的 `train:splatfacto:near1m-candidate -- --run --confirm-long-run ...` 命令，并写 background dry-run status JSON。
+  - `--status` 读取 `/tmp` launcher manifest，检查 PID 是否仍存活，并输出 log tail。
+  - 真正后台启动仍必须传 `--run --confirm-long-run`；缺少确认会输出 `near1m_background_guard=failed` 并以 exit code `2` 停止。
+  - 后台 launcher 写 `launcher.json`、`status.json` 和 `near1m-run.log` 到指定 `--output-dir`。
+- 结论:
+  - near-1M 长训现在有非阻塞启动与监控入口。
+  - 本次只验证 dry-run/status/guard；没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-smoke`: passed；printed command/log/manifest/status paths。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-smoke`: passed；`near1m_background=not-started`。
+  - `npm run train:splatfacto:near1m-background -- --run --output-dir /tmp/objgauss-near1m-background-guard`: expected failed with exit `2`；requires `--confirm-long-run`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003I: Near-1M GPU preflight has safe standalone command
 
 - 状态: done / standalone-gpu-preflight

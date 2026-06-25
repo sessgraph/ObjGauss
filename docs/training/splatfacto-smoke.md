@@ -220,6 +220,36 @@ npm run train:splatfacto:near1m-gpu-preflight -- \
   --status-json /tmp/objgauss-near1m-gpu-preflight/summary.json
 ```
 
+Prepare a background launch without starting training:
+
+```bash
+npm run train:splatfacto:near1m-background -- \
+  --dry-run \
+  --target-hardware local-rtx5060ti \
+  --gpu-memory-reserve-gb 1 \
+  --output-dir /tmp/objgauss-splatfacto-near1m-background
+```
+
+Start the long run in the background only when the machine is ready:
+
+```bash
+SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
+npm run train:splatfacto:near1m-background -- \
+  --run \
+  --confirm-long-run \
+  --target-hardware local-rtx5060ti \
+  --gpu-memory-reserve-gb 1 \
+  --output-dir /tmp/objgauss-splatfacto-near1m-background
+```
+
+Check the detached process and log tail:
+
+```bash
+npm run train:splatfacto:near1m-background -- \
+  --status \
+  --output-dir /tmp/objgauss-splatfacto-near1m-background
+```
+
 Run the full chain. This starts a long Splatfacto training job, so it requires
 an explicit confirmation flag:
 
