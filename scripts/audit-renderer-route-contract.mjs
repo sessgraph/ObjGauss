@@ -322,14 +322,17 @@ const checks = [
   {
     id: "BR04",
     phase: "bridge-route-contract",
-    target: "scripts/*",
-    statement: "Local browser audit defaults are pinned to fixed port 5395 instead of rotating ports.",
+    target: "package.json + scripts/*",
+    statement: "Local dev, preview, browser audit, and acceptance defaults are pinned to fixed port 5395 instead of rotating ports.",
     pass: () =>
+      contains("package.json", '"dev": "vite --host 127.0.0.1 --port 5395 --strictPort"') &&
+      contains("package.json", '"preview": "vite preview --host 127.0.0.1 --port 5395 --strictPort"') &&
       contains("scripts/audit-demo.mjs", "const DEFAULT_PORT = 5395") &&
       contains("scripts/audit-spark-native-mask-gate.mjs", "const DEFAULT_PORT = 5395") &&
       contains("scripts/acceptance-renderer-profile.mjs", '?? "5395"') &&
       contains("scripts/acceptance-demo.mjs", '|| "5395"'),
     evidence: () => [
+      "npm run dev/preview default to 5395 --strictPort",
       "audit-demo DEFAULT_PORT=5395",
       "spark-native-mask-gate DEFAULT_PORT=5395",
       "acceptance renderer/demo defaults=5395",

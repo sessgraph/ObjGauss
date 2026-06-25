@@ -215,6 +215,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。当前 report 默认要求 ambiguity rate `<=0.5`，用于防止 pick 消歧回退。
   - `npm run audit:spark-native-pick-feasibility` 已固化为 Spark native ray/object metadata feasibility report；默认 fixed port `5395`，只在 URL probe 下执行 raycast sample，当前结论是 Spark raycast 可作为 depth probe，但不能返回 splat index / object id，因此不能替代 `hover-confirm-v1` screen-space object picking。
   - PORT-001 已将本地 browser audit / acceptance 默认端口收敛到 fixed `5395`：`audit:demo`、Spark audits、WebGPU browser audits、renderer / demo / Spark commercial / WebGPU headless acceptance 默认都走 `5395`。如端口占用，应停止占用 `5395` 的本地 preview/audit 进程后重跑，不再轮换随机端口；显式 override 参数仍保留用于特殊诊断。
+  - PORT-002 已将裸跑 `npm run dev` 与 `npm run preview` 也固定到 `127.0.0.1:5395 --strictPort`；日常 Web 查看和 browser audit 使用同一端口，端口占用时先停止占用进程再重跑。
   - `npm run audit:renderer-route-contract` 已固化为 B -> C renderer 路线静态合约审计：检查 WebGL Gaussian OIT fallback、WebGPU tile terminal path、Spark commercial source route、browser audit telemetry 和 fixed `5395` 端口策略仍保持一致。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。

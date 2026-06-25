@@ -17,7 +17,6 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `PORT-002`: 如后续仍遇到端口占用，不换端口；先查并停止占用 `5395` 的本地 preview/browser audit 进程，再重跑。
   - Renderer-native object picking 暂不迁移：Spark `SplatMesh.raycast` 目前只返回 `distance/object/point`，没有 splat index / object id；后续要么等待/扩展 Spark intersection metadata，要么继续使用已审计的 `hover-confirm-v1` screen-space pick。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +28,25 @@
 当前无进行中 PR。
 
 ## Done
+
+### PORT-002: Dev and preview fixed port defaults
+
+- 状态: done / fixed-dev-preview-port
+- 类型: 标准 PR / local workflow ergonomics
+- 目标: 将裸跑 `npm run dev` / `npm run preview` 也固定到 `127.0.0.1:5395 --strictPort`，避免手动看 Web 效果时 Vite 自动换端口。
+- 已实施:
+  - `package.json` 的 `dev` 和 `preview` scripts 均显式带 `--port 5395 --strictPort`。
+  - `audit:renderer-route-contract` 的 fixed-port contract 扩展为同时检查 package scripts、browser audits 和 acceptance defaults。
+  - 文档说明更新为 dev / preview / browser audit 都复用 `5395`；端口被占用时停止占用进程后重跑，不换新端口。
+- 结论:
+  - 默认本地使用方式统一为一个端口：`http://127.0.0.1:5395/`。
+  - 特殊诊断仍可直接显式传端口给具体 audit 脚本，但日常流程不再漂移端口。
+- 验证:
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### RENDER-ROUTE-006: WebGPU object-state update telemetry gate
 

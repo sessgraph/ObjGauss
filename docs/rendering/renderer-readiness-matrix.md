@@ -112,9 +112,9 @@ Use the browser residual gate before considering a cleaned PLY promotion:
 npm run audit:object-boundary-remap-residual
 ```
 
-Remap browser audits use the fixed default local preview port `5395`. Do not
-rotate ad hoc ports between runs; if `5395` is occupied, stop the occupying
-local preview process and rerun on `5395`.
+Local dev, preview, and remap browser audits use the fixed default port `5395`.
+Do not rotate ad hoc ports between runs; if `5395` is occupied, stop the
+occupying local dev/preview/browser-audit process and rerun on `5395`.
 
 The gate first runs `audit:object-boundary-remap-preview`, then uploads both
 the original object-aware PLY and the remap-preview PLY into the viewer. It
