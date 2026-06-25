@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003N: Near-1M background launcher has start preflight
+
+- 状态: done / background-start-preflight
+- 类型: 标准 PR / training resource safety
+- 目标: 在真正后台启动 near-1M 长训前，用一条不会启动训练的命令刷新 candidate status，并区分“可以启动长训”和“最终 production SLA 已完成”。
+- 已实施:
+  - `train:splatfacto:near1m-background -- --preflight` 会运行 nested `train:splatfacto:near1m-candidate -- --status --status-json <output-dir>/near1m-candidate-status.json`。
+  - candidate status 新增 `launchReadiness`，只检查长训启动输入和 GPU preflight；最终 `readiness.status` 仍用于 near-1M outputs / production SLA 是否完成。
+  - background preflight report 使用 schema=`objgauss-near1m-background-preflight-v1`，记录 nested command、candidate status path 和 candidate summary。
+  - background preflight 只有在 `launchReadiness=ready` 时 exit `0`；GPU preflight unavailable / missing launch input 会返回 exit `2`。
+  - background `--status` 现在也打印 `launch_readiness` 和 `launch_missing`。
+- 结论:
+  - near-1M 长训现在有不会启动训练的启动前 gate，避免把“最终输出还没生成”误解成“不能启动”，也避免 GPU preflight 不可用时误启动后台长训。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-preflight-not-ready`: expected failed with exit `2`；`launchReadiness=not-ready` because sandbox GPU preflight is unavailable。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-background-preflight-ready-smoke`: passed；`launchReadiness=ready` while final candidate remains incomplete。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-preflight-ready-smoke`: passed；printed `launch_readiness=ready launch_missing=0`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003M: Near-1M candidate status records last failure
 
 - 状态: done / candidate-failure-diagnostics

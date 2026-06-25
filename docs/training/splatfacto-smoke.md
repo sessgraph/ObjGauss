@@ -224,6 +224,19 @@ npm run train:splatfacto:near1m-gpu-preflight -- \
   --status-json /tmp/objgauss-near1m-gpu-preflight/summary.json
 ```
 
+Refresh the background launcher preflight before starting a detached run. This
+does not start Splatfacto; it writes
+`<output-dir>/near1m-candidate-status.json` and exits `0` only when the launch
+inputs are present and the GPU preflight passes or is explicitly skipped:
+
+```bash
+npm run train:splatfacto:near1m-background -- \
+  --preflight \
+  --target-hardware local-rtx5060ti \
+  --gpu-memory-reserve-gb 1 \
+  --output-dir /tmp/objgauss-splatfacto-near1m-background
+```
+
 Prepare a background launch without starting training:
 
 ```bash
@@ -238,7 +251,11 @@ The background launcher always reserves a nested candidate status report at
 `<output-dir>/near1m-candidate-status.json`. The launched candidate command
 receives that path as `--status-json`, so known guard failures and completed
 runs leave the same `objgauss-near1m-candidate-status-v1` readiness facts that
-the foreground status command writes.
+the foreground status command writes. The nested report separates final
+candidate readiness from `launchReadiness`: final readiness still remains
+incomplete until near-1M outputs and production SLA exist, while launch
+readiness only answers whether the current machine can safely start the long
+training command.
 
 Start the long run in the background only when the machine is ready:
 

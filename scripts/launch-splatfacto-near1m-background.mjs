@@ -7,11 +7,11 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const mode = args.run ? "run" : args.status ? "status" : args.stop ? "stop" : "dry-run";
+const mode = args.run ? "run" : args.status ? "status" : args.stop ? "stop" : args.preflight ? "preflight" : "dry-run";
 
 const outputDir = args.outputDir ?? "/tmp/objgauss-splatfacto-near1m-background";
 const manifestPath = args.manifest ?? path.join(outputDir, "launcher.json");
@@ -26,13 +26,7 @@ const confirmStop = Boolean(args.confirmStop);
 const allowExisting = Boolean(args.allowExisting);
 const stopSignal = args.signal ?? "SIGTERM";
 
-const command = [
-  "npm",
-  "run",
-  "train:splatfacto:near1m-candidate",
-  "--",
-  "--run",
-  "--confirm-long-run",
+const commonCandidateOptions = [
   "--target-hardware",
   targetHardware,
   "--gpu-memory-reserve-gb",
@@ -53,6 +47,25 @@ const command = [
   ...(args.allowSlaFailures ? ["--allow-sla-failures"] : []),
 ];
 
+const command = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-candidate",
+  "--",
+  "--run",
+  "--confirm-long-run",
+  ...commonCandidateOptions,
+];
+
+const candidateStatusCommand = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-candidate",
+  "--",
+  "--status",
+  ...commonCandidateOptions,
+];
+
 if (mode === "status") {
   const report = buildStatusReport();
   printStatus(report);
@@ -65,6 +78,13 @@ if (mode === "dry-run") {
   printDryRun(report);
   writeJson(statusPath, report);
   process.exit(0);
+}
+
+if (mode === "preflight") {
+  const report = runPreflight();
+  printPreflight(report);
+  writeJson(statusPath, report);
+  process.exit(report.status === "ready" ? 0 : 2);
 }
 
 if (mode === "stop") {
@@ -179,6 +199,38 @@ function buildStatusReport() {
   return report;
 }
 
+function runPreflight() {
+  mkdirSync(outputDir, { recursive: true });
+  const result = spawnSync(candidateStatusCommand[0], candidateStatusCommand.slice(1), {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "inherit",
+  });
+  const candidateStatus = readJsonIfPresent(candidateStatusPath);
+  const candidateSummary = summarizeCandidateStatus(candidateStatus);
+  const commandPassed = result.status === 0 && !result.error;
+  const status = commandPassed ? (candidateSummary?.launchReadiness === "ready" ? "ready" : "not-ready") : "failed";
+  return {
+    schema: "objgauss-near1m-background-preflight-v1",
+    mode,
+    generatedAt: new Date().toISOString(),
+    status,
+    exitCode: result.status ?? null,
+    error: result.error?.message ?? null,
+    command: candidateStatusCommand,
+    commandText: formatCommand(candidateStatusCommand),
+    outputDir,
+    manifestPath,
+    statusPath,
+    candidateStatusPath,
+    logPath,
+    targetHardware,
+    gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
+    candidateStatus,
+    candidateSummary,
+  };
+}
+
 function stopBackgroundRun() {
   const manifest = readManifestIfPresent();
   const pid = manifest?.pid;
@@ -258,7 +310,7 @@ function printStatus(report) {
   );
   if (report.candidateSummary) {
     console.log(
-      `near1m_candidate_status=${report.candidateSummary.status} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers} last_exit=${report.candidateSummary.lastExitStatus} last_failure=${report.candidateSummary.lastFailureKind}`,
+      `near1m_candidate_status=${report.candidateSummary.status} launch_readiness=${report.candidateSummary.launchReadiness} launch_missing=${report.candidateSummary.launchMissing} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers} last_exit=${report.candidateSummary.lastExitStatus} last_failure=${report.candidateSummary.lastFailureKind}`,
     );
   } else {
     console.log(`near1m_candidate_status=missing path=${report.candidateStatusPath}`);
@@ -267,6 +319,19 @@ function printStatus(report) {
     console.log("log_tail_begin");
     for (const line of report.tail) console.log(line);
     console.log("log_tail_end");
+  }
+}
+
+function printPreflight(report) {
+  console.log(
+    `near1m_background_preflight=${report.status} exit_code=${report.exitCode ?? "unknown"} candidate_status_json=${report.candidateStatusPath}`,
+  );
+  if (report.candidateSummary) {
+    console.log(
+      `near1m_launch_readiness=${report.candidateSummary.launchReadiness} launch_missing=${report.candidateSummary.launchMissing} gpu_preflight=${report.candidateSummary.gpuMemoryPreflight} candidate_status=${report.candidateSummary.status} missing=${report.candidateSummary.missing} blockers=${report.candidateSummary.blockers}`,
+    );
+  } else {
+    console.log(`near1m_candidate_status=missing path=${report.candidateStatusPath}`);
   }
 }
 
@@ -299,6 +364,8 @@ function summarizeCandidateStatus(report) {
     objectGaussians: report.readiness?.objectGaussians ?? "unknown",
     productionSla: report.readiness?.productionSla ?? "unknown",
     gpuMemoryPreflight: report.readiness?.gpuMemoryPreflight ?? "unknown",
+    launchReadiness: report.launchReadiness?.status ?? "unknown",
+    launchMissing: report.launchReadiness?.missing ?? "unknown",
     blockers: Array.isArray(report.blockers) ? report.blockers.length : "unknown",
     lastExitStatus: report.lastExit?.status ?? "unknown",
     lastExitCode: report.lastExit?.code ?? "unknown",
@@ -339,6 +406,7 @@ function parseArgs(values) {
     else if (value === "--dry-run") parsed.run = false;
     else if (value === "--status") parsed.status = true;
     else if (value === "--stop") parsed.stop = true;
+    else if (value === "--preflight") parsed.preflight = true;
     else if (value === "--confirm-long-run") parsed.confirmLongRun = true;
     else if (value === "--confirm-stop") parsed.confirmStop = true;
     else if (value === "--allow-existing") parsed.allowExisting = true;

@@ -383,6 +383,8 @@ function buildStatusReport() {
   const objectReady = objectCount >= minExportedGaussians;
   const productionSlaReady = existsSync(`${paths.slaOutputDir}/summary.json`);
   const gpuPreflight = getGpuPreflight();
+  const launchMissing = collectMissingForRun();
+  const launchGpuReady = gpuPreflight.status === "passed" || gpuPreflight.status === "skipped";
   const blockers = [];
   for (const check of missingChecks) {
     blockers.push({
@@ -478,6 +480,15 @@ function buildStatusReport() {
       objectGaussians: objectCount,
       productionSla: productionSlaReady ? "ready" : "not-ready",
       gpuMemoryPreflight: gpuPreflight.status,
+    },
+    launchReadiness: {
+      status: launchMissing.length === 0 && launchGpuReady ? "ready" : "not-ready",
+      missing: launchMissing.length,
+      gpuMemoryPreflight: gpuPreflight.status,
+      missingInputs: launchMissing.map((item) => ({
+        label: item.label,
+        path: item.path,
+      })),
     },
     gpuMemoryPreflight: gpuPreflight,
     lastExit,
