@@ -29,6 +29,24 @@
 
 ## Done
 
+### TRAIN-003S: Near-1M candidate status exposes terminal goal gap
+
+- 状态: done / production-gap-audit
+- 类型: 标准 PR / training-output observability
+- 目标: 让 `train:splatfacto:near1m-candidate -- --status` 直接说明离 WebGPU C-path production proof 还差哪些 terminal evidence，避免只看单个文件存在与否误判完成。
+- 已实施:
+  - candidate status JSON 新增 `goalGap`，记录目标、状态、下一步动作、已完成证据数和缺失证据列表。
+  - CLI 输出新增 `near1m_goal_gap` 与逐项 `near1m_goal_blocker_<n>`。
+  - production SLA summary 现在必须读到 `status="passed"` 才算 ready；summary 文件存在但 failed / unreadable 会保持 `incomplete` 并输出 `production-sla-not-passed` blocker。
+  - TRAIN-003 runbook 已记录 `goalGap` contract。
+- 结论:
+  - near-1M 终局缺口现在可由一条非训练 status 命令直接审计；当前默认状态仍是 `incomplete`，下一步为 `start-background-long-run`，缺口仍是 5 个 near-1M / SLA evidence。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --status --skip-gpu-preflight --status-json /tmp/objgauss-near1m-goal-gap-status/summary.json`: passed；printed `near1m_goal_gap=incomplete next_action=start-background-long-run` with 5 blockers。
+  - synthetic failed-SLA `/tmp` status smoke: passed；1,000,000-Gaussian placeholder PLY headers plus `summary.json(status=failed)` produced `production_sla=failed`, `near1m_goal_gap=incomplete`, and `next_action=run-production-sla`。
+
 ### TRAIN-003R: Near-1M background status verifies process identity
 
 - 状态: done / stale-pid-safe-status

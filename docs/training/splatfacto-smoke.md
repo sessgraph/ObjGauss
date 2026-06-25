@@ -320,6 +320,18 @@ candidate readiness summary: missing file count, exported Gaussian count,
 object-aware Gaussian count, production SLA status, blocker count, last exit
 status, and last failure kind.
 
+The candidate status command also exposes the terminal production gap directly:
+
+```text
+near1m_goal_gap=<ready|incomplete> next_action=<fix-launch-readiness|start-background-long-run|register-balanced-object-field|run-production-sla|production-sla-ready>
+near1m_goal_blocker_<n>=<blocker kind, path, and next evidence command>
+```
+
+The same facts are written into `objgauss-near1m-candidate-status-v1.goalGap`.
+A production SLA summary counts as ready only when the summary JSON has
+`status="passed"`; a present but failed or unreadable summary remains a blocker
+and reports `next_action=run-production-sla`.
+
 Stop the detached run when you need to free the machine. This sends `SIGTERM`
 to the recorded detached process group and requires an explicit stop
 confirmation:

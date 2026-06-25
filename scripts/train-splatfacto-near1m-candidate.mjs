@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 
@@ -331,6 +331,8 @@ writeCurrentStatusJson({ code: 0 });
 function buildStatusReport() {
   const exportedCount = existsSync(exportedPly) ? readPlyVertexCountOrZero(exportedPly) : 0;
   const objectCount = existsSync(candidateObjectPly) ? readPlyVertexCountOrZero(candidateObjectPly) : 0;
+  const productionSlaSummaryPath = `${paths.slaOutputDir}/summary.json`;
+  const productionSlaSummary = readJsonIfPresent(productionSlaSummaryPath);
   const checks = [
     {
       label: "dataset transforms",
@@ -371,7 +373,7 @@ function buildStatusReport() {
     },
     {
       label: "production SLA summary",
-      path: `${paths.slaOutputDir}/summary.json`,
+      path: productionSlaSummaryPath,
       prepare: formatCommand(steps[2].command),
     },
   ].map((check) => ({
@@ -381,7 +383,9 @@ function buildStatusReport() {
   const missingChecks = checks.filter((check) => check.status === "missing");
   const exportedReady = exportedCount >= minExportedGaussians;
   const objectReady = objectCount >= minExportedGaussians;
-  const productionSlaReady = existsSync(`${paths.slaOutputDir}/summary.json`);
+  const productionSlaExists = existsSync(productionSlaSummaryPath);
+  const productionSlaStatus = productionSlaSummary?.status ?? (productionSlaExists ? "unreadable" : "not-ready");
+  const productionSlaReady = productionSlaStatus === "passed";
   const gpuPreflight = getGpuPreflight();
   const launchMissing = collectMissingForRun();
   const launchGpuReady = gpuPreflight.status === "passed" || gpuPreflight.status === "skipped";
@@ -412,11 +416,46 @@ function buildStatusReport() {
       minGaussians: minExportedGaussians,
     });
   }
+  if (productionSlaExists && !productionSlaReady) {
+    blockers.push({
+      kind: "production-sla-not-passed",
+      label: "production SLA summary",
+      path: productionSlaSummaryPath,
+      status: productionSlaStatus,
+      prepare: formatCommand(steps[2].command),
+    });
+  }
+  const status = missingChecks.length === 0 && exportedReady && objectReady && productionSlaReady ? "ready" : "incomplete";
+  const readiness = {
+    exportedPly: exportedReady ? "ready" : "not-ready",
+    exportedGaussians: exportedCount,
+    candidateObjectPly: objectReady ? "ready" : "not-ready",
+    objectGaussians: objectCount,
+    productionSla: productionSlaReady ? "ready" : productionSlaStatus,
+    productionSlaSummaryStatus: productionSlaStatus,
+    gpuMemoryPreflight: gpuPreflight.status,
+  };
+  const launchReadiness = {
+    status: launchMissing.length === 0 && launchGpuReady ? "ready" : "not-ready",
+    missing: launchMissing.length,
+    gpuMemoryPreflight: gpuPreflight.status,
+    missingInputs: launchMissing.map((item) => ({
+      label: item.label,
+      path: item.path,
+    })),
+  };
+  const goalGap = buildGoalGap({
+    status,
+    checks,
+    blockers,
+    readiness,
+    launchReadiness,
+  });
   return {
     schema: "objgauss-near1m-candidate-status-v1",
     generatedAt: new Date().toISOString(),
     mode,
-    status: missingChecks.length === 0 && exportedReady && objectReady && productionSlaReady ? "ready" : "incomplete",
+    status,
     missing: missingChecks.length,
     thresholds: {
       minExportedGaussians,
@@ -468,32 +507,18 @@ function buildStatusReport() {
       candidateObjectPly,
       benchmarkOutputDir: paths.benchmarkOutputDir,
       slaOutputDir: paths.slaOutputDir,
-      productionSlaSummary: `${paths.slaOutputDir}/summary.json`,
+      productionSlaSummary: productionSlaSummaryPath,
       trainConfig,
       checkpoint,
     },
     checks,
-    readiness: {
-      exportedPly: exportedReady ? "ready" : "not-ready",
-      exportedGaussians: exportedCount,
-      candidateObjectPly: objectReady ? "ready" : "not-ready",
-      objectGaussians: objectCount,
-      productionSla: productionSlaReady ? "ready" : "not-ready",
-      gpuMemoryPreflight: gpuPreflight.status,
-    },
-    launchReadiness: {
-      status: launchMissing.length === 0 && launchGpuReady ? "ready" : "not-ready",
-      missing: launchMissing.length,
-      gpuMemoryPreflight: gpuPreflight.status,
-      missingInputs: launchMissing.map((item) => ({
-        label: item.label,
-        path: item.path,
-      })),
-    },
+    readiness,
+    launchReadiness,
     gpuMemoryPreflight: gpuPreflight,
     lastExit,
     lastFailure,
     blockers,
+    goalGap,
     commands: {
       train: formatCommand(steps[0].command),
       register: formatCommand(steps[1].command),
@@ -551,6 +576,7 @@ function printStatus(report) {
   );
   console.log(`production_sla=${report.readiness.productionSla}`);
   printGpuPreflight(report.gpuMemoryPreflight);
+  printGoalGap(report.goalGap);
   console.log(`status=${report.status} missing=${report.missing}`);
 }
 
@@ -581,6 +607,70 @@ function writeCurrentStatusJson({ code = 0, failure = null } = {}) {
         }
       : null;
     writeStatusJson(statusJsonPath, buildStatusReport());
+  }
+}
+
+function buildGoalGap({ status, checks, blockers, readiness, launchReadiness }) {
+  const completedEvidence = checks
+    .filter((entry) => entry.status === "present")
+    .map((entry) => ({
+      label: entry.label,
+      path: entry.path,
+      count: Number.isFinite(entry.count) ? entry.count : null,
+    }));
+  const missingEvidence = blockers.map((blocker) => ({
+    kind: blocker.kind ?? "blocker",
+    label: blocker.label ?? "unknown",
+    path: blocker.path ?? null,
+    count: Number.isFinite(blocker.count) ? blocker.count : null,
+    minGaussians: Number.isFinite(blocker.minGaussians) ? blocker.minGaussians : null,
+    status: blocker.status ?? null,
+    nextEvidence: blocker.prepare ?? "rerun the near-1M candidate pipeline",
+  }));
+  return {
+    target: "WebGPU C-path production proof with a real trained object-aware PLY at the near-1M scale gate",
+    status,
+    nextAction: getGoalGapNextAction({ status, readiness, launchReadiness }),
+    completedEvidenceCount: completedEvidence.length,
+    missingEvidenceCount: missingEvidence.length,
+    completedEvidence,
+    missingEvidence,
+  };
+}
+
+function getGoalGapNextAction({ status, readiness, launchReadiness }) {
+  if (status === "ready") return "production-sla-ready";
+  if (launchReadiness.status !== "ready") return "fix-launch-readiness";
+  if (readiness.exportedPly !== "ready") return "start-background-long-run";
+  if (readiness.candidateObjectPly !== "ready") return "register-balanced-object-field";
+  if (readiness.productionSla !== "ready") return "run-production-sla";
+  return "inspect-blockers";
+}
+
+function printGoalGap(goalGap) {
+  if (!goalGap) return;
+  console.log(
+    `near1m_goal_gap=${goalGap.status} next_action=${goalGap.nextAction} completed_evidence=${goalGap.completedEvidenceCount} missing_evidence=${goalGap.missingEvidenceCount}`,
+  );
+  for (const [index, item] of goalGap.missingEvidence.entries()) {
+    const pathText = item.path ? ` path=${JSON.stringify(item.path)}` : "";
+    const countText = Number.isFinite(item.count) ? ` count=${item.count}` : "";
+    const minText = Number.isFinite(item.minGaussians) ? ` min_gaussians=${item.minGaussians}` : "";
+    const statusText = item.status ? ` evidence_status=${JSON.stringify(item.status)}` : "";
+    console.log(
+      `near1m_goal_blocker_${index + 1}=${item.kind} label=${JSON.stringify(
+        item.label,
+      )}${pathText}${countText}${minText}${statusText} next=${JSON.stringify(item.nextEvidence)}`,
+    );
+  }
+}
+
+function readJsonIfPresent(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
   }
 }
 
