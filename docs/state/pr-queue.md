@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-016: Sustained WebGPU frame pacing baseline
+
+- 状态: done / sustained-frame-pacing-baseline
+- 类型: 标准 PR / WebGPU C-path responsiveness evidence
+- 目标: 在短 frame-pacing smoke 和 synthetic 1M runtime proof 之外，补一条更长采样的 headed browser baseline，持续观察当前真实场景与 synthetic 1M 在 WebGPU Tile C-path 上的响应性。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-sustained-frame-pacing.mjs` 和 `npm run audit:webgpu-sustained-frame-pacing`。
+  - Gate 默认先 build viewer，再顺序运行 `audit:webgpu-frame-pacing` 和 `audit:webgpu-synthetic-1m-runtime`。
+  - 默认每个 phase 采样 `120` 个 rAF intervals；真实场景 baseline 阈值为 min approx FPS `10`，synthetic 1M baseline 阈值为 min approx FPS `8`。
+  - Report 输出 `/tmp/objgauss-webgpu-sustained-frame-pacing/summary.json` 和 `summary.md`，合并当前真实场景与 synthetic 1M 的 min FPS、mean frame、p95 frame 和 long-frame ratio。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该 gate。
+- 结论:
+  - 当前本机 sustained baseline 通过：realScenes largestGaussians=`281498`，min approx FPS=`33.964`，max mean frame=`29.443ms`，max p95=`16.8ms`，max long-frame ratio=`0.008`。
+  - Synthetic 1M sustained baseline 通过：uploadedGaussians=`1000000`，tileReferences=`1709862`，min approx FPS=`28.917`，max mean frame=`34.582ms`，max p95=`16.8ms`，max long-frame ratio=`0.008`。
+  - 这证明当前本机 C-path 有 sustained frame-pacing baseline；仍不证明真实训练 1M scene、生产 FPS SLA 或论文级视觉质量。
+- 验证:
+  - `node --check scripts/audit-webgpu-sustained-frame-pacing.mjs`: passed。
+  - `npm run audit:webgpu-sustained-frame-pacing -- --port 5395 --output-dir /tmp/objgauss-webgpu-sustained-frame-pacing-short --frame-count 20 --min-real-approx-fps 1 --min-synthetic-approx-fps 1 --max-real-mean-frame-ms 200 --max-synthetic-mean-frame-ms 200 --max-p95-frame-ms 300`: passed，短采样流程 sanity check。
+  - `npm run audit:webgpu-sustained-frame-pacing -- --port 5395 --output-dir /tmp/objgauss-webgpu-sustained-frame-pacing`: passed，fpsBaseline=`baseline-passed`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-015: Synthetic 1M browser runtime proof
 
 - 状态: done / synthetic-1m-browser-runtime

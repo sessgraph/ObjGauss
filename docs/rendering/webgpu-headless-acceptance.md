@@ -103,6 +103,18 @@ This writes `/tmp/objgauss-webgpu-synthetic-1m-runtime/summary.json` and
 `summary.md`. It is intentionally headed/local because it exercises browser
 upload, presentation, object selection, isolate/delete, and frame pacing.
 
+Use the sustained frame-pacing baseline when the question is whether longer
+rAF sampling remains healthy across the current real scenes and synthetic 1M:
+
+```bash
+npm run audit:webgpu-sustained-frame-pacing
+```
+
+This writes `/tmp/objgauss-webgpu-sustained-frame-pacing/summary.json` and
+`summary.md`. It samples `120` rAF intervals per phase by default and reports a
+baseline result. It is stronger than the short smoke gates, but it is still not
+a production FPS SLA.
+
 Use the frame-pacing smoke when the question is whether the current headed
 browser C-path remains responsive after object edits:
 
