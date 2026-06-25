@@ -21,10 +21,10 @@ while WebGPU continues to harden toward the C architecture.
 
 | Route | Current role | Default surface | Evidence | Known gaps |
 | --- | --- | --- | --- | --- |
-| Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
-| Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. |
-| Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
+| Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
+| Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. |
+| Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
 
@@ -249,6 +249,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | --- | --- |
 | What should default CI run for renderer readiness? | `npm run acceptance:renderer-ci` |
 | What should demo / release review run for the full product route? | `npm run acceptance:renderer-product` |
+| Is the B -> C renderer route contract still intact? | `npm run audit:renderer-route-contract` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
@@ -277,6 +278,7 @@ designed to be fresh-clone safe and therefore does not require
 `nerf-lego-trained-output-local`:
 
 ```text
+npm run audit:renderer-route-contract
 npm run build
 npm run audit:webgpu-tile-smoke
 npm run audit:splat-index-mapping -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local
@@ -284,9 +286,9 @@ npm run audit:spark-native-mask-gate
 ```
 
 This profile proves the B/C renderer contracts that can be expected from the
-repo's public no-SH samples: WebGPU tile smoke, compact `.splat` / PLY index
-mapping, and Spark native object masking. It intentionally does not prove the
-trained SH-heavy packed route.
+repo's public no-SH samples: route architecture, WebGPU tile smoke, compact
+`.splat` / PLY index mapping, and Spark native object masking. It intentionally
+does not prove the trained SH-heavy packed route.
 
 `npm run audit:spark-pick-report` validates Spark canvas object selection after
 delete. The current product contract is `screen-space-object-pick-v1` with
@@ -297,11 +299,12 @@ PLY metadata is usable; it does not prove Spark-internal ray/object metadata
 picking.
 
 `npm run acceptance:renderer-product` is the explicit product/demo profile. It
-runs `acceptance:spark-commercial-route`, including the trained sample
-availability preflight and the SH-heavy browser route. This is the correct gate
-before commercial demo review, but it should not be promoted to default CI until
-the trained sample becomes a committed, downloadable, or generated fixture in
-that environment.
+runs `audit:renderer-route-contract` first, then
+`acceptance:spark-commercial-route`, including the trained sample availability
+preflight and the SH-heavy browser route. This is the correct gate before
+commercial demo review, but it should not be promoted to default CI until the
+trained sample becomes a committed, downloadable, or generated fixture in that
+environment.
 
 ## Product UI Contract
 

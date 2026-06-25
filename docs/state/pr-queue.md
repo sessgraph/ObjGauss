@@ -30,6 +30,26 @@
 
 ## Done
 
+### RENDER-ROUTE-002: Renderer acceptance includes route contract
+
+- 状态: done / acceptance-route-contract
+- 类型: 标准 PR / renderer acceptance hardening
+- 目标: 将 `audit:renderer-route-contract` 纳入默认 renderer acceptance profile，使 B -> C renderer 主线不再只是手动 audit，而是 CI / product route 验收的前置合约检查。
+- 已实施:
+  - `scripts/acceptance-renderer-profile.mjs` 在 `ci` 和 `product` profile 的第一步加入 `Renderer route contract`。
+  - 新增 `--skip-route-contract` 诊断开关；默认不跳过。
+  - `docs/rendering/renderer-readiness-matrix.md`、`docs/state/project-status.md` 同步说明 renderer acceptance 现在覆盖路线合约。
+- 结论:
+  - `npm run acceptance:renderer-ci` 现在先证明 WebGL Gaussian OIT fallback、WebGPU tile C-path、Spark commercial source route、browser telemetry 和 fixed `5395` port policy 仍一致，再继续 build / WebGPU smoke / index mapping / Spark native mask gate。
+  - `npm run acceptance:renderer-product` 也会先跑同一合约，再进入 Spark commercial route acceptance。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --dry-run --skip-build --skip-webgpu-tile-smoke --skip-splat-index-mapping --skip-native-route`: passed；dry-run steps=1，generated command=`npm run audit:renderer-route-contract`。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-route-contract-nonbrowser`: passed；steps=4，覆盖 route contract、build、WebGPU tile smoke 和 no-SH public sample index mapping。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-001: B-to-C renderer route contract audit
 
 - 状态: done / route-contract-audit

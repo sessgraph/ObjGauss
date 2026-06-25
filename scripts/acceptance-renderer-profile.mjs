@@ -9,6 +9,7 @@ const outputDir = String(
 );
 const dryRun = flagEnabled(args.dryRun ?? args["dry-run"]);
 const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
+const skipRouteContract = flagEnabled(args.skipRouteContract ?? args["skip-route-contract"]);
 const skipNativeRoute = flagEnabled(args.skipNativeRoute ?? args["skip-native-route"]);
 const skipSplatIndexMapping = flagEnabled(
   args.skipSplatIndexMapping ?? args["skip-splat-index-mapping"],
@@ -82,6 +83,9 @@ function createProfileSpec(name) {
           "fresh-clone CI must not require the local nerf-lego-trained-output-local sample",
       },
       steps: [
+        ...(skipRouteContract
+          ? []
+          : [["Renderer route contract", ["npm", "run", "audit:renderer-route-contract"]]]),
         ...(skipBuild ? [] : [["Build viewer", ["npm", "run", "build"]]]),
         ...(skipWebGpuTileSmoke
           ? []
@@ -125,6 +129,9 @@ function createProfileSpec(name) {
           "product/demo review should require the local SH-heavy trained sample and fail fast when it is missing",
       },
       steps: [
+        ...(skipRouteContract
+          ? []
+          : [["Renderer route contract", ["npm", "run", "audit:renderer-route-contract"]]]),
         [
           "Spark commercial route acceptance",
           [
