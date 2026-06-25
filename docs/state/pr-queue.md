@@ -29,6 +29,32 @@
 
 ## Done
 
+### TRAIN-003K: Near-1M background launcher has guarded stop
+
+- 状态: done / guarded-background-stop
+- 类型: 标准 PR / training resource safety
+- 目标: 给 near-1M 后台长训补一个显式确认的停止入口，避免需要释放机器时只能手工找 PID 或误杀无关进程。
+- 已实施:
+  - `train:splatfacto:near1m-background -- --stop` 现在必须同时传 `--confirm-stop`，否则以 exit code `2` 停止。
+  - stop 会读取 launcher manifest，默认向记录的 detached process group 发送 `SIGTERM`，覆盖 nested training subprocesses。
+  - manifest missing / PID 不存在 / PID 已退出会返回 no-op status，不会报错扩大影响面。
+  - stop report 写入 status JSON，记录 schema、pid、signal、manifest/log path 和 reason。
+  - TRAIN-003D runbook 已补充 stop 命令。
+- 结论:
+  - near-1M 长训现在有完整的 dry-run / start / status / guarded stop 生命周期入口。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-smoke`: passed。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-smoke`: passed。
+  - `npm run train:splatfacto:near1m-background -- --stop --output-dir /tmp/objgauss-near1m-background-stop-guard`: expected failed with exit `2`；requires `--confirm-stop`。
+  - `npm run train:splatfacto:near1m-background -- --stop --confirm-stop --output-dir /tmp/objgauss-near1m-background-stop-empty`: passed；`near1m_background_stop=not-started`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003J: Near-1M long run has background launcher
 
 - 状态: done / background-long-run-launcher

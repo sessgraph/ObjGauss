@@ -11,7 +11,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const mode = args.run ? "run" : args.status ? "status" : "dry-run";
+const mode = args.run ? "run" : args.status ? "status" : args.stop ? "stop" : "dry-run";
 
 const outputDir = args.outputDir ?? "/tmp/objgauss-splatfacto-near1m-background";
 const manifestPath = args.manifest ?? path.join(outputDir, "launcher.json");
@@ -21,7 +21,9 @@ const targetHardware = args.targetHardware ?? "local-rtx5060ti";
 const gpuMemoryReserveGb = args.gpuMemoryReserveGb ?? "1";
 const port = args.port ?? "5395";
 const confirmLongRun = Boolean(args.confirmLongRun);
+const confirmStop = Boolean(args.confirmStop);
 const allowExisting = Boolean(args.allowExisting);
+const stopSignal = args.signal ?? "SIGTERM";
 
 const command = [
   "npm",
@@ -62,6 +64,17 @@ if (mode === "dry-run") {
   process.exit(0);
 }
 
+if (mode === "stop") {
+  if (!confirmStop) {
+    console.error("near1m_background_stop=failed reason=\"stopping background near-1M training requires --confirm-stop\"");
+    process.exit(2);
+  }
+  const report = stopBackgroundRun();
+  printStop(report);
+  writeJson(statusPath, report);
+  process.exit(report.status === "stop-failed" ? 2 : 0);
+}
+
 if (!confirmLongRun) {
   console.error(
     "near1m_background_guard=failed reason=\"background near-1M training requires --confirm-long-run\"",
@@ -94,6 +107,7 @@ try {
     status: "started",
     startedAt: new Date().toISOString(),
     pid: child.pid,
+    processGroupId: child.pid,
     command,
     commandText: formatCommand(command),
     cwd: process.cwd(),
@@ -155,6 +169,66 @@ function buildStatusReport() {
   return report;
 }
 
+function stopBackgroundRun() {
+  const manifest = readManifestIfPresent();
+  const pid = manifest?.pid;
+  if (!pid) {
+    return {
+      schema: "objgauss-near1m-background-stop-v1",
+      status: "not-started",
+      stoppedAt: new Date().toISOString(),
+      pid: null,
+      signal: stopSignal,
+      manifestPath,
+      logPath,
+      reason: "launcher manifest is missing or has no pid",
+    };
+  }
+  const running = isPidAlive(pid);
+  if (!running) {
+    return {
+      schema: "objgauss-near1m-background-stop-v1",
+      status: "not-running",
+      stoppedAt: new Date().toISOString(),
+      pid,
+      signal: stopSignal,
+      manifestPath,
+      logPath,
+      reason: "recorded pid is not running",
+      manifest,
+    };
+  }
+  try {
+    // The launcher starts the child detached, so the child PID is also the
+    // process group id. Signal the group so nested training subprocesses exit.
+    process.kill(-Number(pid), stopSignal);
+    return {
+      schema: "objgauss-near1m-background-stop-v1",
+      status: "stop-sent",
+      stoppedAt: new Date().toISOString(),
+      pid,
+      processGroupId: pid,
+      signal: stopSignal,
+      manifestPath,
+      logPath,
+      manifest,
+    };
+  } catch (error) {
+    return {
+      schema: "objgauss-near1m-background-stop-v1",
+      status: error?.code === "ESRCH" ? "not-running" : "stop-failed",
+      stoppedAt: new Date().toISOString(),
+      pid,
+      processGroupId: pid,
+      signal: stopSignal,
+      manifestPath,
+      logPath,
+      reason: error?.message ?? String(error),
+      manifest,
+    };
+  }
+}
+
 function printDryRun(report) {
   console.log(`near1m_background=dry-run`);
   console.log(`command=${report.commandText}`);
@@ -172,6 +246,12 @@ function printStatus(report) {
     for (const line of report.tail) console.log(line);
     console.log("log_tail_end");
   }
+}
+
+function printStop(report) {
+  console.log(
+    `near1m_background_stop=${report.status} pid=${report.pid ?? "none"} signal=${report.signal} reason=${JSON.stringify(report.reason ?? "")}`,
+  );
 }
 
 function readManifestIfPresent() {
@@ -214,7 +294,9 @@ function parseArgs(values) {
     if (value === "--run") parsed.run = true;
     else if (value === "--dry-run") parsed.run = false;
     else if (value === "--status") parsed.status = true;
+    else if (value === "--stop") parsed.stop = true;
     else if (value === "--confirm-long-run") parsed.confirmLongRun = true;
+    else if (value === "--confirm-stop") parsed.confirmStop = true;
     else if (value === "--allow-existing") parsed.allowExisting = true;
     else if (value === "--skip-pull") parsed.skipPull = true;
     else if (value === "--skip-gpu-preflight") parsed.skipGpuPreflight = true;

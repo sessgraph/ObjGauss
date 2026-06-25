@@ -250,6 +250,17 @@ npm run train:splatfacto:near1m-background -- \
   --output-dir /tmp/objgauss-splatfacto-near1m-background
 ```
 
+Stop the detached run when you need to free the machine. This sends `SIGTERM`
+to the recorded detached process group and requires an explicit stop
+confirmation:
+
+```bash
+npm run train:splatfacto:near1m-background -- \
+  --stop \
+  --confirm-stop \
+  --output-dir /tmp/objgauss-splatfacto-near1m-background
+```
+
 Run the full chain. This starts a long Splatfacto training job, so it requires
 an explicit confirmation flag:
 
