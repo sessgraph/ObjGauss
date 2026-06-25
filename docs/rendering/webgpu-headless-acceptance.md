@@ -104,6 +104,20 @@ npm run audit:webgpu-cpath-readiness -- \
 Use `--skip-synthetic-1m-runtime` when specifically debugging only the trained
 PLY optional path.
 
+The readiness aggregator can also include sustained frame-pacing evidence:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --include-sustained-frame-pacing \
+  --port 5395
+```
+
+If a sustained baseline has already been generated, pass
+`--sustained-frame-pacing-summary <summary.json>` to fold it into the combined
+readiness report without rerunning the baseline. This adds a
+`sustainedFramePacing` row but still keeps production `fpsSla` as not proven
+until thresholds are reviewed on target hardware and real trained 1M scenes.
+
 Use the focused synthetic 1M browser gate when the question is whether a
 generated 1M PLY can be uploaded through the real UI and edited on the WebGPU
 Tile C-path:

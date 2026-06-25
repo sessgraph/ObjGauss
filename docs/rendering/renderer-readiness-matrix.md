@@ -358,6 +358,21 @@ Current optional-path evidence passes with trained Lego `255,794` Gaussians,
 proof, pass a near-1M object-aware PLY and set
 `--trained-min-gaussians 1000000`.
 
+The readiness aggregator can also include sustained frame-pacing evidence:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --include-sustained-frame-pacing \
+  --port 5395
+```
+
+This runs `audit:webgpu-sustained-frame-pacing` after the standard readiness
+steps and adds a `sustainedFramePacing` evidence row. Use
+`--sustained-frame-pacing-summary <summary.json>` when a reviewed baseline
+summary already exists and the goal is to regenerate the combined readiness
+report. This still does not promote `fpsSla` to passed; production FPS SLA
+requires reviewed thresholds on target hardware and real trained 1M scenes.
+
 `npm run audit:webgpu-synthetic-1m-runtime` is the focused synthetic 1M browser
 gate. It generates a temporary binary PLY under `/tmp`, uploads it through the
 real file input, forces `uploaded-ply-splat-source=off` so the audit enters the

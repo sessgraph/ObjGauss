@@ -332,7 +332,8 @@ const checks = [
       contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-performance") &&
       contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-transition") &&
       contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-synthetic-1m-runtime") &&
-      contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-ply-runtime"),
+      contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-ply-runtime") &&
+      contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-sustained-frame-pacing"),
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
@@ -352,6 +353,7 @@ const checks = [
       "acceptance renderer product includes presentation object transition gate",
       "C-path readiness includes synthetic 1M runtime gate",
       "C-path readiness accepts trained PLY runtime evidence",
+      "C-path readiness accepts sustained frame-pacing evidence",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",
     ],

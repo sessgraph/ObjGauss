@@ -57,6 +57,43 @@ const trainedPlyRuntimeSummaryPath = String(
     args["trained-ply-runtime-summary"] ??
     path.join(trainedPlyRuntimeDir, "summary.json"),
 );
+const sustainedFramePacingDir = path.join(outputDir, "sustained-frame-pacing");
+const sustainedFramePacingSummaryPath = String(
+  args.sustainedFramePacingSummary ??
+    args["sustained-frame-pacing-summary"] ??
+    path.join(sustainedFramePacingDir, "summary.json"),
+);
+const includeSustainedFramePacing =
+  flagEnabled(args.includeSustainedFramePacing ?? args["include-sustained-frame-pacing"]) ||
+  Boolean(optionalString(args.sustainedFramePacingSummary ?? args["sustained-frame-pacing-summary"]));
+const sustainedFrameCount = positiveFiniteNumber(
+  args.sustainedFrameCount ?? args["sustained-frame-count"] ?? args.frameCount ?? args["frame-count"],
+  120,
+);
+const sustainedMinRealApproxFps = positiveFiniteNumber(
+  args.sustainedMinRealApproxFps ?? args["sustained-min-real-approx-fps"],
+  10,
+);
+const sustainedMinSyntheticApproxFps = positiveFiniteNumber(
+  args.sustainedMinSyntheticApproxFps ?? args["sustained-min-synthetic-approx-fps"],
+  8,
+);
+const sustainedMaxRealMeanFrameMs = positiveFiniteNumber(
+  args.sustainedMaxRealMeanFrameMs ?? args["sustained-max-real-mean-frame-ms"],
+  120,
+);
+const sustainedMaxSyntheticMeanFrameMs = positiveFiniteNumber(
+  args.sustainedMaxSyntheticMeanFrameMs ?? args["sustained-max-synthetic-mean-frame-ms"],
+  150,
+);
+const sustainedMaxP95FrameMs = positiveFiniteNumber(
+  args.sustainedMaxP95FrameMs ?? args["sustained-max-p95-frame-ms"],
+  220,
+);
+const sustainedMaxLongFrameRatio = positiveFiniteNumber(
+  args.sustainedMaxLongFrameRatio ?? args["sustained-max-long-frame-ratio"],
+  0.25,
+);
 
 if (assets.length === 0) {
   throw new Error("at least one asset is required for WebGPU C-path readiness audit");
@@ -136,6 +173,35 @@ try {
         trainedPlyRuntimeDir,
       ]);
     }
+    if (includeSustainedFramePacing) {
+      await runStep("WebGPU sustained frame pacing baseline", [
+        "npm",
+        "run",
+        "audit:webgpu-sustained-frame-pacing",
+        "--",
+        "--port",
+        port,
+        "--webgpu-flags",
+        webGpuFlags,
+        "--output-dir",
+        sustainedFramePacingDir,
+        "--skip-build",
+        "--frame-count",
+        String(Math.round(sustainedFrameCount)),
+        "--min-real-approx-fps",
+        String(sustainedMinRealApproxFps),
+        "--min-synthetic-approx-fps",
+        String(sustainedMinSyntheticApproxFps),
+        "--max-real-mean-frame-ms",
+        String(sustainedMaxRealMeanFrameMs),
+        "--max-synthetic-mean-frame-ms",
+        String(sustainedMaxSyntheticMeanFrameMs),
+        "--max-p95-frame-ms",
+        String(sustainedMaxP95FrameMs),
+        "--max-long-frame-ratio",
+        String(sustainedMaxLongFrameRatio),
+      ]);
+    }
   }
 
   const scaleSummary = readJson(scaleSummaryPath);
@@ -147,12 +213,16 @@ try {
   const trainedPlyRuntimeSummary = trainedPlyRuntimeEnabled
     ? readJson(trainedPlyRuntimeSummaryPath)
     : null;
+  const sustainedFramePacingSummary = includeSustainedFramePacing
+    ? readJson(sustainedFramePacingSummaryPath)
+    : null;
   const evidence = buildEvidence({
     scaleSummary,
     editCostSummary,
     transitionSummary,
     syntheticRuntimeSummary,
     trainedPlyRuntimeSummary,
+    sustainedFramePacingSummary,
   });
   const checks = buildChecks(evidence);
   const gaps = buildGaps(evidence);
@@ -169,6 +239,13 @@ try {
     thresholds: {
       minLargeSceneGaussians,
       trainedPlyMinGaussians,
+      sustainedFrameCount,
+      sustainedMinRealApproxFps,
+      sustainedMinSyntheticApproxFps,
+      sustainedMaxRealMeanFrameMs,
+      sustainedMaxSyntheticMeanFrameMs,
+      sustainedMaxP95FrameMs,
+      sustainedMaxLongFrameRatio,
     },
     sourceSummaries: {
       scaleBudget: scaleSummaryPath,
@@ -176,6 +253,7 @@ try {
       presentationTransition: transitionSummaryPath,
       syntheticRuntime1m: skipSynthetic1mRuntime ? "skipped" : syntheticRuntimeSummaryPath,
       trainedPlyRuntime: trainedPlyRuntimeEnabled ? trainedPlyRuntimeSummaryPath : "not-provided",
+      sustainedFramePacing: includeSustainedFramePacing ? sustainedFramePacingSummaryPath : "not-provided",
     },
     passed,
     status: passed ? "passed" : "failed",
@@ -244,6 +322,7 @@ function buildEvidence({
   transitionSummary,
   syntheticRuntimeSummary,
   trainedPlyRuntimeSummary,
+  sustainedFramePacingSummary,
 }) {
   const scale1m = findRow(scaleSummary.rows, "c-path-1m-budget");
   const edit1m = findRow(editCostSummary.rows, "c-path-1m-budget");
@@ -262,6 +341,9 @@ function buildEvidence({
   const trainedPlyProof = trainedPlyRuntimeSummary?.proof?.plyRuntime ?? "not-run";
   const trainedPlySceneProof = trainedPlyRuntimeSummary?.proof?.realTrainedScene1m ?? "not-proven";
   const trainedPlyGaussians = numeric(trainedPlyRow.packedGaussians);
+  const sustainedEvidence = sustainedFramePacingSummary?.evidence ?? {};
+  const sustainedReal = sustainedEvidence.realScenes ?? {};
+  const sustainedSynthetic = sustainedEvidence.synthetic1m ?? {};
   return {
     scaleBudget1m: {
       status: scaleSummary.status === "passed" && scale1m?.status === "passed" ? "passed" : "failed",
@@ -366,6 +448,33 @@ function buildEvidence({
         ? "A caller-provided trained/object-aware PLY was uploaded through the real UI and exercised through WebGPU Tile select/isolate/delete."
         : "No trained PLY was provided for this readiness run; use --trained-ply with --trained-min-gaussians to collect this evidence.",
     },
+    sustainedFramePacing: {
+      status:
+        !includeSustainedFramePacing
+          ? "not-provided"
+          : sustainedFramePacingSummary?.passed === true &&
+              sustainedFramePacingSummary?.fpsBaseline === "baseline-passed" &&
+              sustainedReal.status === "passed" &&
+              sustainedSynthetic.status === "passed"
+            ? "passed"
+            : "failed",
+      scope: "current real scenes plus synthetic 1M sustained rAF baseline",
+      mode: sustainedFramePacingSummary?.mode ?? "",
+      fpsBaseline: sustainedFramePacingSummary?.fpsBaseline ?? "not-proven",
+      realLargestGaussians: numeric(sustainedReal.largestGaussians),
+      realMinApproxFps: numeric(sustainedReal.minApproxFps),
+      realMaxMeanFrameMs: numeric(sustainedReal.maxMeanFrameMs),
+      realMaxP95FrameMs: numeric(sustainedReal.maxP95FrameMs),
+      realMaxLongFrameRatio: numeric(sustainedReal.maxLongFrameRatio),
+      syntheticGaussians: numeric(sustainedSynthetic.uploadedGaussians),
+      syntheticMinApproxFps: numeric(sustainedSynthetic.minApproxFps),
+      syntheticMaxMeanFrameMs: numeric(sustainedSynthetic.maxMeanFrameMs),
+      syntheticMaxP95FrameMs: numeric(sustainedSynthetic.maxP95FrameMs),
+      syntheticMaxLongFrameRatio: numeric(sustainedSynthetic.maxLongFrameRatio),
+      interpretation: includeSustainedFramePacing
+        ? "Longer rAF sampling baseline was collected for current real scenes plus synthetic 1M upload/runtime. This is baseline evidence, not production FPS SLA."
+        : "No sustained frame-pacing baseline was included in this readiness run; use --include-sustained-frame-pacing to collect it.",
+    },
     realTrainedBrowserRuntime1m: {
       status:
         trainedPlySceneProof === "proven-trained-ply-upload" && trainedPlyGaussians >= 1_000_000
@@ -381,7 +490,8 @@ function buildEvidence({
       status: "not-proven",
       scope: "interactive FPS SLA",
       interpretation:
-        "Frame-pacing smoke and sustained baseline gates are observability evidence; production FPS SLA still requires reviewed thresholds on target hardware and real trained 1M scenes.",
+        evidenceStatusText(includeSustainedFramePacing, sustainedFramePacingSummary?.fpsBaseline) +
+        " Production FPS SLA still requires reviewed thresholds on target hardware and real trained 1M scenes.",
     },
   };
 }
@@ -455,6 +565,28 @@ function buildChecks(evidence) {
           ),
         ]
       : []),
+    ...(includeSustainedFramePacing
+      ? [
+          check(
+            "sustained-frame-pacing-baseline",
+            evidence.sustainedFramePacing.status,
+            "passed",
+            evidence.sustainedFramePacing.status === "passed",
+          ),
+          check(
+            "sustained-real-scenes-min-fps",
+            evidence.sustainedFramePacing.realMinApproxFps,
+            `>= ${sustainedMinRealApproxFps}`,
+            evidence.sustainedFramePacing.realMinApproxFps >= sustainedMinRealApproxFps,
+          ),
+          check(
+            "sustained-synthetic-1m-min-fps",
+            evidence.sustainedFramePacing.syntheticMinApproxFps,
+            `>= ${sustainedMinSyntheticApproxFps}`,
+            evidence.sustainedFramePacing.syntheticMinApproxFps >= sustainedMinSyntheticApproxFps,
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -472,7 +604,9 @@ function buildGaps(evidence) {
       status: evidence.fpsSla.status,
       reason: evidence.fpsSla.interpretation,
       nextEvidence:
-        "Promote the sustained baseline into a production SLA only after threshold review on target hardware and real trained 1M scenes.",
+        includeSustainedFramePacing
+          ? "Promote the collected sustained baseline into a production SLA only after threshold review on target hardware and real trained 1M scenes."
+          : "Include the sustained frame-pacing baseline, then promote it into a production SLA only after threshold review on target hardware and real trained 1M scenes.",
     },
   ];
 }
@@ -500,7 +634,7 @@ function renderMarkdown(summary) {
     `- Generated: \`${summary.generatedAt}\``,
     `- Fixed port: \`${summary.port}\``,
     "",
-    "This report combines synthetic 1M C-path budgets, synthetic 1M browser upload/runtime proof, current headed real-scene browser object-transition evidence, and optional trained PLY runtime evidence. Passing means the architecture evidence is internally consistent; it does not mean trained 1M scene quality or sustained FPS is proven unless the trained PLY evidence explicitly reaches 1M.",
+    "This report combines synthetic 1M C-path budgets, synthetic 1M browser upload/runtime proof, current headed real-scene browser object-transition evidence, optional trained PLY runtime evidence, and optional sustained frame-pacing baseline evidence. Passing means the architecture evidence is internally consistent; it does not mean trained 1M scene quality or production FPS SLA is proven unless the trained PLY evidence explicitly reaches 1M and FPS thresholds have been reviewed on target hardware.",
     "",
     "## Evidence",
     "",
@@ -560,6 +694,9 @@ function keyResult(id, item) {
   if (id === "trainedPlyRuntime") {
     return `${item.gaussians} uploaded Gaussians, min required ${item.minGaussians}, proof ${item.proof}`;
   }
+  if (id === "sustainedFramePacing") {
+    return `real min FPS ${item.realMinApproxFps}, synthetic min FPS ${item.syntheticMinApproxFps}, baseline ${item.fpsBaseline}`;
+  }
   return item.status;
 }
 
@@ -575,6 +712,9 @@ function printSummary(summary) {
       `browserRuntime1mProof=${summary.evidence?.browserRuntime1m?.proof ?? "not-proven"}`,
       `trainedPlyRuntime=${summary.evidence?.trainedPlyRuntime?.status ?? "not-provided"}`,
       `trainedPlyGaussians=${summary.evidence?.trainedPlyRuntime?.gaussians ?? 0}`,
+      `sustainedFramePacing=${summary.evidence?.sustainedFramePacing?.status ?? "not-provided"}`,
+      `sustainedRealMinApproxFps=${summary.evidence?.sustainedFramePacing?.realMinApproxFps ?? 0}`,
+      `sustainedSyntheticMinApproxFps=${summary.evidence?.sustainedFramePacing?.syntheticMinApproxFps ?? 0}`,
       `realTrainedBrowserRuntime1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "not-proven"}`,
       `fpsSla=${summary.evidence?.fpsSla?.status ?? "not-proven"}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
@@ -616,6 +756,12 @@ function optionalString(value) {
   if (value === undefined || value === null || value === true || value === false) return "";
   const text = String(value).trim();
   return text || "";
+}
+
+function evidenceStatusText(enabled, fpsBaseline) {
+  if (!enabled) return "Sustained frame-pacing baseline was not included in this readiness run.";
+  if (fpsBaseline === "baseline-passed") return "Sustained frame-pacing baseline passed for current real scenes plus synthetic 1M.";
+  return "Sustained frame-pacing baseline is present but not passed.";
 }
 
 function parseArgs(argv) {
