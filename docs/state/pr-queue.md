@@ -49,6 +49,7 @@
   - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-handoff-dry-run`: passed；printed `near1m_next_action=refresh-preflight`。
   - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-handoff-preflight-ready-smoke`: passed；printed `near1m_next_action=start-background-long-run` and 5 remaining evidence blockers while final candidate stayed incomplete。
   - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-handoff-preflight-ready-smoke`: passed；read nested candidate JSON and printed the same start action plus missing evidence paths。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-handoff-preflight-host`: passed with host escalation；`gpu_preflight=passed`，`free_mib=15215`，`near1m_next_action=start-background-long-run`，final candidate stayed `incomplete` with 5 remaining evidence blockers。
   - `npm run audit:renderer-route-contract`: passed，16/16 checks。
   - `npm run build`: passed，仍有 Spark / Three bundle size warning。
   - `uv run --extra dev pytest`: 41 passed。
