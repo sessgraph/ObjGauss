@@ -5,12 +5,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
 
-const DEFAULT_PORT = 5315;
+const DEFAULT_PORT = 5395;
 const DEFAULT_OUTPUT_DIR = "/tmp/objgauss-spark-pick-report";
 const REPORT_MODE = "spark-screen-space-pick-report-v1";
 const SPARK_OBJECT_FILTER = "spark-object-opacity-mask";
 const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_PICK_MODE = "screen-space-object-pick-v1";
+const SPARK_PICK_INTERACTION_MODE = "hover-confirm-v1";
 const DEFAULT_MIN_HITS = 1;
 const DEFAULT_MIN_HIT_RATE = 0.2;
 const DEFAULT_MAX_AMBIGUITY_RATE = 0.5;
@@ -171,12 +172,13 @@ async function runPickReport({
       mode: REPORT_MODE,
       generatedAt: new Date().toISOString(),
       url,
-      gates: {
+    gates: {
         minHits,
         minHitRate,
         maxAmbiguityRate,
         maxClicks,
         ambiguityIsReportedOnly: false,
+        requiresHoverConfirm: true,
       },
       assets: results,
     };
@@ -312,6 +314,9 @@ async function runPickClicks(page, asset, { maxClicks }) {
     const selectedBefore = await selectedObjectValue(page);
     const x = Math.round(box.x + box.width * xRatio);
     const y = Math.round(box.y + box.height * yRatio);
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(180);
+    const hoverBeforeClick = await readSparkPickStats(page);
     await page.mouse.click(x, y);
     await page.waitForTimeout(220);
     const selectedAfter = await selectedObjectValue(page);
@@ -324,6 +329,12 @@ async function runPickClicks(page, asset, { maxClicks }) {
       y,
       selectedBefore,
       selectedAfter,
+      hoverStatus: hoverBeforeClick.hoverStatus,
+      hoverObject: hoverBeforeClick.hoverObject,
+      hoverDistancePx: hoverBeforeClick.hoverDistancePx,
+      hoverCandidateObjects: hoverBeforeClick.hoverCandidateObjects,
+      hoverAmbiguous: hoverBeforeClick.hoverAmbiguous,
+      hoverMarkerVisible: hoverBeforeClick.hoverMarkerVisible,
       ...pick,
       validHit: validPickHit(pick, selectedAfter),
     });
@@ -345,6 +356,7 @@ async function readSparkPickStats(page) {
     };
     return {
       mode: viewport.getAttribute("data-spark-selection-mode") ?? "",
+      interaction: viewport.getAttribute("data-spark-pick-interaction") ?? "",
       status: viewport.getAttribute("data-spark-pick-status") ?? "",
       strategy: viewport.getAttribute("data-spark-pick-strategy") ?? "",
       object: viewport.getAttribute("data-spark-pick-object") ?? "",
@@ -356,6 +368,12 @@ async function readSparkPickStats(page) {
       scoreMargin: numericAttr("data-spark-pick-score-margin"),
       secondObject: viewport.getAttribute("data-spark-pick-second-object") ?? "",
       secondScore: numericAttr("data-spark-pick-second-score"),
+      hoverStatus: viewport.getAttribute("data-spark-hover-pick-status") ?? "",
+      hoverObject: viewport.getAttribute("data-spark-hover-pick-object") ?? "",
+      hoverDistancePx: numericAttr("data-spark-hover-pick-distance-px"),
+      hoverCandidateObjects: numericAttr("data-spark-hover-pick-candidate-objects"),
+      hoverAmbiguous: viewport.getAttribute("data-spark-hover-pick-ambiguous") ?? "",
+      hoverMarkerVisible: viewport.getAttribute("data-spark-hover-marker-visible") ?? "",
       markerVisible: viewport.getAttribute("data-spark-selected-marker-visible") ?? "",
     };
   });
@@ -364,9 +382,13 @@ async function readSparkPickStats(page) {
 function validPickHit(pick, selectedAfter) {
   return (
     pick.mode === SPARK_PICK_MODE &&
+    pick.interaction === SPARK_PICK_INTERACTION_MODE &&
     pick.status === "hit" &&
     pick.object !== "" &&
     String(pick.object) === String(selectedAfter) &&
+    pick.hoverStatus === "hit" &&
+    String(pick.hoverObject) === String(pick.object) &&
+    pick.hoverMarkerVisible === "true" &&
     pick.distancePx <= pick.radiusPx &&
     pick.candidateObjects > 0 &&
     pick.markerVisible === "true"
@@ -382,6 +404,7 @@ function summarizePickResults({
   maxAmbiguityRate,
 }) {
   const hits = clickResults.filter((click) => click.status === "hit");
+  const hoverHits = clickResults.filter((click) => click.hoverStatus === "hit");
   const validHits = clickResults.filter((click) => click.validHit);
   const invalidHits = hits.filter((click) => !click.validHit);
   const ambiguousHits = hits.filter((click) => click.ambiguous === "true");
@@ -399,6 +422,7 @@ function summarizePickResults({
     mode: REPORT_MODE,
     clicks,
     hits: hits.length,
+    hoverHits: hoverHits.length,
     validHits: validHits.length,
     invalidHits: invalidHits.length,
     misses: clicks - hits.length,
@@ -408,6 +432,7 @@ function summarizePickResults({
     markerHits: markerHits.length,
     markerRate,
     pickStrategy: firstNonEmpty(hits.map((click) => click.strategy)),
+    pickInteraction: firstNonEmpty(clickResults.map((click) => click.interaction)),
     distinctHitObjects,
     maxCandidateObjects: Math.max(0, ...clickResults.map((click) => click.candidateObjects)),
     meanHitDistancePx: roundMetric(mean(hits.map((click) => click.distancePx))),
@@ -422,6 +447,7 @@ function summarizePickResults({
       maxAmbiguityRate,
       passed:
         hits.length >= minHits &&
+        hoverHits.length >= hits.length &&
         hitRate >= minHitRate &&
         ambiguityRate <= maxAmbiguityRate &&
         invalidHits.length === 0 &&
@@ -443,6 +469,10 @@ function summarizePickResults({
 function validatePickSummary(result, { minHits, minHitRate, maxAmbiguityRate }) {
   const failures = [];
   if (result.hits < minHits) failures.push(`hits=${result.hits}<${minHits}`);
+  if (result.hoverHits < result.hits) failures.push(`hoverHits=${result.hoverHits}<${result.hits}`);
+  if (result.pickInteraction !== SPARK_PICK_INTERACTION_MODE) {
+    failures.push(`pickInteraction=${result.pickInteraction}`);
+  }
   if (result.hitRate < minHitRate) failures.push(`hitRate=${result.hitRate}<${minHitRate}`);
   if (result.ambiguityRate > maxAmbiguityRate) {
     failures.push(`ambiguityRate=${result.ambiguityRate}>${maxAmbiguityRate}`);
@@ -463,20 +493,21 @@ function renderMarkdown(summary) {
     `- Mode: \`${summary.mode}\``,
     `- URL: ${summary.url}`,
     `- Generated: ${summary.generatedAt}`,
-    `- Gate: hits >= ${summary.gates.minHits}, hit rate >= ${summary.gates.minHitRate}, ambiguity rate <= ${summary.gates.maxAmbiguityRate}, max clicks = ${summary.gates.maxClicks}`,
+    `- Gate: hits >= ${summary.gates.minHits}, hover hits >= confirmed hits, hit rate >= ${summary.gates.minHitRate}, ambiguity rate <= ${summary.gates.maxAmbiguityRate}, max clicks = ${summary.gates.maxClicks}`,
     "- Ambiguity is now gated as a regression signal.",
+    "- Interaction: hover candidate marker first, click confirms the hovered object.",
     "",
-    "| Asset | Route | Strategy | Clicks | Hits | Hit Rate | Ambiguous Hits | Ambiguity Rate | Mean Margin | Marker Hits | Objects |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    "| Asset | Route | Strategy | Interaction | Clicks | Hover Hits | Hits | Hit Rate | Ambiguous Hits | Ambiguity Rate | Mean Margin | Marker Hits | Objects |",
+    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
   ];
   for (const asset of summary.assets) {
     lines.push(
-      `| ${asset.assetId} | ${asset.maskSource}/${asset.route} | ${asset.pickStrategy} | ${asset.clicks} | ${asset.hits} | ${asset.hitRate} | ${asset.ambiguousHits} | ${asset.ambiguityRate} | ${asset.meanScoreMargin} | ${asset.markerHits}/${asset.hits} | ${asset.distinctHitObjects.join(", ")} |`,
+      `| ${asset.assetId} | ${asset.maskSource}/${asset.route} | ${asset.pickStrategy} | ${asset.pickInteraction} | ${asset.clicks} | ${asset.hoverHits} | ${asset.hits} | ${asset.hitRate} | ${asset.ambiguousHits} | ${asset.ambiguityRate} | ${asset.meanScoreMargin} | ${asset.markerHits}/${asset.hits} | ${asset.distinctHitObjects.join(", ")} |`,
     );
   }
   lines.push("", "## Interpretation", "");
   lines.push(
-    "This report measures Spark canvas selection after an object has been deleted with `spark-object-opacity-mask`. A hit is valid only when the DOM pick object matches the selected object, the pick distance is inside the advertised radius, at least one candidate object exists, and the marker is visible.",
+    "This report measures Spark canvas selection after an object has been deleted with `spark-object-opacity-mask`. A hit is valid only when hover first exposes the same candidate object, click confirmation selects that object, the pick distance is inside the advertised radius, at least one candidate object exists, and both hover / selected markers are visible.",
   );
   lines.push(
     "High ambiguity means several object ids are close to the click in screen space. The report gates ambiguity rate as a regression signal, but this is still a screen-space CPU pick over object-aware PLY metadata rather than a Spark-internal raycast.",
@@ -484,11 +515,11 @@ function renderMarkdown(summary) {
   lines.push("", "## Click Details", "");
   for (const asset of summary.assets) {
     lines.push(`### ${asset.assetId}`, "");
-    lines.push("| # | x | y | Status | Object | Selected | Distance | Candidates | Score | Margin | Second | Ambiguous | Marker | Valid |");
-    lines.push("| ---: | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- |");
+    lines.push("| # | x | y | Hover | Hover Object | Status | Object | Selected | Distance | Candidates | Score | Margin | Second | Ambiguous | Hover Marker | Selected Marker | Valid |");
+    lines.push("| ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |");
     for (const click of asset.clicksDetail) {
       lines.push(
-        `| ${click.index} | ${click.xRatio} | ${click.yRatio} | ${click.status} | ${click.object} | ${click.selectedAfter} | ${click.distancePx} | ${click.candidateObjects} | ${click.score} | ${click.scoreMargin} | ${click.secondObject} | ${click.ambiguous} | ${click.markerVisible} | ${click.validHit} |`,
+        `| ${click.index} | ${click.xRatio} | ${click.yRatio} | ${click.hoverStatus} | ${click.hoverObject} | ${click.status} | ${click.object} | ${click.selectedAfter} | ${click.distancePx} | ${click.candidateObjects} | ${click.score} | ${click.scoreMargin} | ${click.secondObject} | ${click.ambiguous} | ${click.hoverMarkerVisible} | ${click.markerVisible} | ${click.validHit} |`,
       );
     }
     lines.push("");

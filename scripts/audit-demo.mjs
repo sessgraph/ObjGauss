@@ -100,6 +100,7 @@ const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 const SPARK_MESH_UPDATE_MODE = "persistent-splatmesh-v1";
 const SPARK_OBJECT_MASK_VISUAL_DELTA_MODE = "spark-object-mask-visual-delta-v1";
 const SPARK_PICK_MODE = "screen-space-object-pick-v1";
+const SPARK_PICK_INTERACTION_MODE = "hover-confirm-v1";
 const SPARK_RESTORE_STRESS_MAX_GAUSSIANS = 100_000;
 const SPARK_OBJECT_MASK_MIN_VISUAL_DELTA = 0.0005;
 const SPARK_OBJECT_MASK_MAX_RESTORE_DELTA = 0.002;
@@ -269,7 +270,7 @@ try {
         `editPixels=${result.editPixels} ` +
         `canvasSelectedObject=${result.canvasSelectedObject} ` +
         `sparkCanvasSelectedObject=${result.sparkCanvasSelectedObjectAfterDelete ?? "not-run"} ` +
-        `sparkPick=${JSON.stringify(result.sparkPickModeAfterDelete ?? "")}:${JSON.stringify(result.sparkPickStatusAfterDelete ?? "")}:${JSON.stringify(result.sparkPickObjectAfterDelete ?? "")}:${result.sparkPickDistancePxAfterDelete ?? 0}:${result.sparkPickCandidateObjectsAfterDelete ?? 0}:${JSON.stringify(result.sparkPickAmbiguousAfterDelete ?? "")}:${JSON.stringify(result.sparkSelectedMarkerVisibleAfterDelete ?? "")} ` +
+        `sparkPick=${JSON.stringify(result.sparkPickModeAfterDelete ?? "")}:${JSON.stringify(result.sparkPickInteractionAfterDelete ?? "")}:${JSON.stringify(result.sparkPickStatusAfterDelete ?? "")}:${JSON.stringify(result.sparkPickObjectAfterDelete ?? "")}:${result.sparkPickDistancePxAfterDelete ?? 0}:${result.sparkPickCandidateObjectsAfterDelete ?? 0}:${JSON.stringify(result.sparkPickAmbiguousAfterDelete ?? "")}:${JSON.stringify(result.sparkPickHoverStatusAfterDelete ?? "")}:${JSON.stringify(result.sparkPickHoverObjectAfterDelete ?? "")}:${JSON.stringify(result.sparkPickHoverMarkerVisibleAfterDelete ?? "")}:${JSON.stringify(result.sparkSelectedMarkerVisibleAfterDelete ?? "")} ` +
         `visibleAfterIsolate=${result.visibleAfterIsolate} ` +
         `visibleAfterDelete=${result.visibleAfterDelete} ` +
         `renderModeAfterDelete=${JSON.stringify(result.renderModeAfterDelete)} ` +
@@ -1592,8 +1593,12 @@ async function runAudit(url, assetsToCheck, options) {
           String(sparkCanvasSelectedObjectAfterDelete) !== String(sparkSelectedObject ?? "") ||
           selectedRemovedRows > 0 ||
           sparkPickStatsAfterDelete.mode !== SPARK_PICK_MODE ||
+          sparkPickStatsAfterDelete.interaction !== SPARK_PICK_INTERACTION_MODE ||
           sparkPickStatsAfterDelete.status !== "hit" ||
           String(sparkPickStatsAfterDelete.object) !== String(sparkCanvasSelectedObjectAfterDelete) ||
+          sparkPickStatsAfterDelete.hoverStatus !== "hit" ||
+          String(sparkPickStatsAfterDelete.hoverObject) !== String(sparkCanvasSelectedObjectAfterDelete) ||
+          sparkPickStatsAfterDelete.hoverMarkerVisible !== "true" ||
           sparkPickStatsAfterDelete.distancePx > sparkPickStatsAfterDelete.radiusPx ||
           sparkPickStatsAfterDelete.candidateObjects <= 0 ||
           sparkPickStatsAfterDelete.markerVisible !== "true"
@@ -2851,7 +2856,11 @@ async function selectObjectFromCanvas(
     [0.65, 0.48],
   ];
   for (const [xRatio, yRatio] of clickPoints) {
-    await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
+    const x = box.x + box.width * xRatio;
+    const y = box.y + box.height * yRatio;
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(180);
+    await page.mouse.click(x, y);
     await page.waitForTimeout(250);
     const selectedObject = await selectedObjectValue(page);
     if (selectedObject !== "无" && selectedObject !== previousSelected) {
@@ -2859,8 +2868,12 @@ async function selectObjectFromCanvas(
         const pick = await readSparkPickStats(page);
         if (
           pick.mode !== SPARK_PICK_MODE ||
+          pick.interaction !== SPARK_PICK_INTERACTION_MODE ||
           pick.status !== "hit" ||
           String(pick.object) !== String(selectedObject) ||
+          pick.hoverStatus !== "hit" ||
+          String(pick.hoverObject) !== String(selectedObject) ||
+          pick.hoverMarkerVisible !== "true" ||
           pick.distancePx > pick.radiusPx ||
           pick.candidateObjects <= 0 ||
           pick.markerVisible !== "true"
@@ -2888,12 +2901,16 @@ async function readSparkPickStats(page) {
     };
     return {
       mode: viewport.getAttribute("data-spark-selection-mode") ?? "",
+      interaction: viewport.getAttribute("data-spark-pick-interaction") ?? "",
       status: viewport.getAttribute("data-spark-pick-status") ?? "",
       object: viewport.getAttribute("data-spark-pick-object") ?? "",
       distancePx: numericAttr("data-spark-pick-distance-px"),
       candidateObjects: numericAttr("data-spark-pick-candidate-objects"),
       ambiguous: viewport.getAttribute("data-spark-pick-ambiguous") ?? "",
       radiusPx: numericAttr("data-spark-pick-radius-px"),
+      hoverStatus: viewport.getAttribute("data-spark-hover-pick-status") ?? "",
+      hoverObject: viewport.getAttribute("data-spark-hover-pick-object") ?? "",
+      hoverMarkerVisible: viewport.getAttribute("data-spark-hover-marker-visible") ?? "",
       markerVisible: viewport.getAttribute("data-spark-selected-marker-visible") ?? "",
     };
   });
@@ -2902,12 +2919,16 @@ async function readSparkPickStats(page) {
 function emptySparkPickStats() {
   return {
     mode: "",
+    interaction: "",
     status: "not-run",
     object: "",
     distancePx: 0,
     candidateObjects: 0,
     ambiguous: "",
     radiusPx: 0,
+    hoverStatus: "",
+    hoverObject: "",
+    hoverMarkerVisible: "",
     markerVisible: "",
   };
 }
@@ -2915,12 +2936,16 @@ function emptySparkPickStats() {
 function sparkPickResultFields(stats) {
   return {
     sparkPickModeAfterDelete: stats.mode,
+    sparkPickInteractionAfterDelete: stats.interaction,
     sparkPickStatusAfterDelete: stats.status,
     sparkPickObjectAfterDelete: stats.object,
     sparkPickDistancePxAfterDelete: stats.distancePx,
     sparkPickCandidateObjectsAfterDelete: stats.candidateObjects,
     sparkPickAmbiguousAfterDelete: stats.ambiguous,
     sparkPickRadiusPxAfterDelete: stats.radiusPx,
+    sparkPickHoverStatusAfterDelete: stats.hoverStatus,
+    sparkPickHoverObjectAfterDelete: stats.hoverObject,
+    sparkPickHoverMarkerVisibleAfterDelete: stats.hoverMarkerVisible,
     sparkSelectedMarkerVisibleAfterDelete: stats.markerVisible,
   };
 }

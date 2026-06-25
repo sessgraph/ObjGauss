@@ -21,11 +21,14 @@ const SPARK_NATIVE_SPLAT_SOURCE = "native-splat-source-v1";
 const SPARK_FILTER_SOURCE_NATIVE = "native-splat";
 const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
 const SPARK_SELECTION_MODE = "screen-space-object-pick-v1";
+const SPARK_PICK_INTERACTION_MODE = "hover-confirm-v1";
 const SPARK_PICK_DRAG_PX = 5;
 const SPARK_PICK_MAX_RADIUS_PX = 28;
 const SPARK_PICK_STRATEGY = "object-support-score-v1";
 const SPARK_PICK_SCORE_MARGIN = 0.08;
 const SPARK_PICK_SUPPORT_SIGMA_PX = SPARK_PICK_MAX_RADIUS_PX * 0.45;
+const SPARK_PICK_HOVER_THROTTLE_MS = 80;
+const SPARK_PICK_HOVER_MIN_DELTA_PX = 4;
 
 export default function SplatViewport({
   source,
@@ -57,9 +60,15 @@ export default function SplatViewport({
   const filteredObjectMaskRef = useRef(null);
   const filteredMeshStateRef = useRef(createFilteredMeshState());
   const pickStartRef = useRef(null);
+  const hoverPickRef = useRef({
+    x: Number.NaN,
+    y: Number.NaN,
+    time: 0,
+  });
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
   const [pickStats, setPickStats] = useState(() => emptyPickStats());
+  const [hoverPickStats, setHoverPickStats] = useState(() => emptyPickStats());
   const urlObjectMaskFeathering = useMemo(readSparkObjectMaskFeathering, []);
   const objectMaskFeathering = useMemo(
     () => normalizeSparkObjectMaskFeathering(objectMaskFeatheringProp ?? urlObjectMaskFeathering),
@@ -117,6 +126,8 @@ export default function SplatViewport({
     : "none";
   const sparkSelectionMode =
     filtered && points?.length > 0 && onSelectObject ? SPARK_SELECTION_MODE : "none";
+  const sparkPickInteraction =
+    sparkSelectionMode === SPARK_SELECTION_MODE ? SPARK_PICK_INTERACTION_MODE : "none";
 
   const packedCache = useMemo(() => {
     if (!filtered || useNativeSplatMask) return null;
@@ -507,9 +518,45 @@ export default function SplatViewport({
   }, [showAxes]);
 
   useEffect(() => {
+    hoverPickRef.current = { x: Number.NaN, y: Number.NaN, time: 0 };
+    setPickStats(emptyPickStats());
+    setHoverPickStats(emptyPickStats());
+  }, [filtered, isolatedId, points, removedIds, sourceKey, visibleIds]);
+
+  useEffect(() => {
     const camera = cameraRef.current;
     const canvas = containerRef.current?.querySelector("canvas");
     if (!camera || !canvas || !filtered || !onSelectObject || !points?.length) return undefined;
+
+    const hoverPick = (event, { force = false } = {}) => {
+      const now = performance.now();
+      const previous = hoverPickRef.current;
+      const delta = Math.hypot(event.clientX - previous.x, event.clientY - previous.y);
+      if (
+        !force &&
+        delta < SPARK_PICK_HOVER_MIN_DELTA_PX &&
+        now - previous.time < SPARK_PICK_HOVER_THROTTLE_MS
+      ) {
+        return null;
+      }
+      hoverPickRef.current = { x: event.clientX, y: event.clientY, time: now };
+      const pick = pickSparkObjectFromPointer({
+        event,
+        canvas,
+        camera,
+        points,
+        visibleIds,
+        removedIds,
+        isolatedId,
+      });
+      setHoverPickStats(pick);
+      return pick;
+    };
+
+    const pointerMove = (event) => {
+      if (event.buttons !== 0) return;
+      hoverPick(event);
+    };
 
     const pointerDown = (event) => {
       if (event.button !== 0) return;
@@ -523,22 +570,16 @@ export default function SplatViewport({
       const dragDistance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
       if (dragDistance > SPARK_PICK_DRAG_PX) return;
 
-      const pick = pickSparkObjectFromPointer({
-        event,
-        canvas,
-        camera,
-        points,
-        visibleIds,
-        removedIds,
-        isolatedId,
-      });
+      const pick = hoverPick(event, { force: true });
       setPickStats(pick);
       if (pick.objectId !== null) onSelectObject(pick.objectId);
     };
 
+    canvas.addEventListener("pointermove", pointerMove, { passive: true });
     canvas.addEventListener("pointerdown", pointerDown);
     canvas.addEventListener("pointerup", pointerUp);
     return () => {
+      canvas.removeEventListener("pointermove", pointerMove);
       canvas.removeEventListener("pointerdown", pointerDown);
       canvas.removeEventListener("pointerup", pointerUp);
     };
@@ -593,6 +634,7 @@ export default function SplatViewport({
       data-spark-sh-rest-coefficients={packedStats.shRestCoefficientCount}
       data-spark-sh-degree={packedStats.shDegree}
       data-spark-selection-mode={sparkSelectionMode}
+      data-spark-pick-interaction={sparkPickInteraction}
       data-spark-selected-object={selectedId ?? ""}
       data-spark-pick-status={pickStats.status}
       data-spark-pick-strategy={pickStats.strategy}
@@ -605,11 +647,30 @@ export default function SplatViewport({
       data-spark-pick-score-margin={formatPickMetric(pickStats.scoreMargin)}
       data-spark-pick-second-object={pickStats.secondObjectId ?? ""}
       data-spark-pick-second-score={formatPickMetric(pickStats.secondScore)}
+      data-spark-hover-pick-status={hoverPickStats.status}
+      data-spark-hover-pick-object={hoverPickStats.objectId ?? ""}
+      data-spark-hover-pick-distance-px={formatPickMetric(hoverPickStats.distancePx)}
+      data-spark-hover-pick-candidate-objects={hoverPickStats.candidateObjects}
+      data-spark-hover-pick-ambiguous={String(hoverPickStats.ambiguous)}
+      data-spark-hover-pick-score={formatPickMetric(hoverPickStats.score)}
+      data-spark-hover-pick-score-margin={formatPickMetric(hoverPickStats.scoreMargin)}
+      data-spark-hover-pick-second-object={hoverPickStats.secondObjectId ?? ""}
+      data-spark-hover-pick-second-score={formatPickMetric(hoverPickStats.secondScore)}
+      data-spark-hover-marker-visible={String(hoverPickStats.status === "hit")}
       data-spark-selected-marker-visible={String(
         pickStats.status === "hit" && pickStats.objectId === selectedId,
       )}
       ref={containerRef}
     >
+      {hoverPickStats.status === "hit" ? (
+        <div
+          className="sparkSelectionMarker hover"
+          style={{ left: hoverPickStats.screenX, top: hoverPickStats.screenY }}
+          aria-hidden="true"
+        >
+          <span>{hoverPickStats.objectId}</span>
+        </div>
+      ) : null}
       {pickStats.status === "hit" && pickStats.objectId === selectedId ? (
         <div
           className="sparkSelectionMarker"
@@ -632,6 +693,12 @@ export default function SplatViewport({
           <div>
             <span className="hudLabel">路径</span>
             <strong>{sparkPathLabel({ objectFilter, packedStats })}</strong>
+          </div>
+        ) : null}
+        {filtered ? (
+          <div>
+            <span className="hudLabel">候选</span>
+            <strong>{hoverPickStats.status === "hit" ? hoverPickStats.objectId : "无"}</strong>
           </div>
         ) : null}
         {filtered ? (

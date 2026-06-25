@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005O`: 评估 Spark pick 的 hover / confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围，但产品交互仍需要更明确的选中确认。
+  - `DEMO-005P`: 评估 Spark-internal ray/object metadata path，判断能否从 screen-space CPU pick 进一步收敛到 renderer-native object picking；hover-confirm 已解决产品确认 UX，但仍不是 Spark 内部 raycast。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -28,6 +28,30 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005O: Spark hover-confirm object picking UX
+
+- 状态: done / hover-confirm-pick
+- 类型: 标准 PR / renderer UX + browser audit
+- 目标: 让 Spark canvas object selection 从 click-only 变成 hover candidate + click confirm，降低对象编辑中误选的不确定性，并把交互 contract 纳入现有 audit。
+- 已实施:
+  - `src/SplatViewport.jsx` 新增 `hover-confirm-v1` pick interaction：pointer hover 先计算候选 object、显示候选 marker；pointer up 重新确认同一 screen-space pick 并调用 `onSelectObject`。
+  - Spark viewport root DOM 新增 hover pick telemetry：`data-spark-pick-interaction`、`data-spark-hover-pick-*` 和 `data-spark-hover-marker-visible`；原有 confirmed pick telemetry 保持兼容。
+  - `src/styles.css` 新增候选 marker 样式：hover candidate 为 cyan dashed ring，confirmed selected marker 保持 yellow ring。
+  - `scripts/audit-spark-pick-report.mjs` 默认端口改为 fixed `5395`，并改为每个点先 hover 再 click；gate 要求 hover hits 覆盖 confirmed hits、interaction=`hover-confirm-v1`、hover marker 和 selected marker 都可见。
+  - `scripts/audit-demo.mjs` 同步验证 hover-confirm contract，常规 Spark canvas selection gate 不再只接受 click-only pick。
+- 结论:
+  - Lego proxy Spark pick report 通过：clicks=`6`，hoverHits=`6`，hits=`6`，validHits=`6`，markerHits=`6/6`，interaction=`hover-confirm-v1`，fixed URL=`http://127.0.0.1:5395/`。
+  - `audit:demo` 单样例通过，日志输出 `sparkPick="screen-space-object-pick-v1":"hover-confirm-v1":"hit"...`，证明完整 Demo 流也消费了新 contract。
+  - 这改善的是产品确认 UX；底层仍是 object-aware PLY metadata 的 screen-space CPU pick，不是 Spark-internal raycast。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-spark-pick-report.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-pick-report -- --port 5395 --max-clicks 6 --output-dir /tmp/objgauss-spark-pick-report-hover-confirm`: passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --server-mode preview --port 5395 --skip-visual-residual`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005N: Reviewed remap allowlist review runbook and manifest audit
 

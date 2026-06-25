@@ -718,6 +718,22 @@ input[type="checkbox"] {
   transform: translate(-50%, -50%);
 }
 
+.sparkSelectionMarker.hover {
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+}
+
+.sparkSelectionMarker.hover::before {
+  border-color: #69d7ff;
+  border-style: dashed;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 48%), 0 0 14px rgb(105 215 255 / 26%);
+}
+
+.sparkSelectionMarker.hover::after {
+  background: #69d7ff;
+}
+
 .sparkSelectionMarker span {
   position: absolute;
   top: 30px;
@@ -732,6 +748,11 @@ input[type="checkbox"] {
   line-height: 1.2;
   text-align: center;
   transform: translateX(-50%);
+}
+
+.sparkSelectionMarker.hover span {
+  border-color: rgb(105 215 255 / 46%);
+  color: #d4f5ff;
 }
 
 .viewportHud {

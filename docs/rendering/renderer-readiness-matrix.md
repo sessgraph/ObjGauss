@@ -288,6 +288,14 @@ repo's public no-SH samples: WebGPU tile smoke, compact `.splat` / PLY index
 mapping, and Spark native object masking. It intentionally does not prove the
 trained SH-heavy packed route.
 
+`npm run audit:spark-pick-report` validates Spark canvas object selection after
+delete. The current product contract is `screen-space-object-pick-v1` with
+`hover-confirm-v1`: hover exposes a candidate marker and click confirms that
+candidate as the selected object. The report uses fixed local preview port
+`5395` by default. Passing proves the screen-space CPU pick over object-aware
+PLY metadata is usable; it does not prove Spark-internal ray/object metadata
+picking.
+
 `npm run acceptance:renderer-product` is the explicit product/demo profile. It
 runs `acceptance:spark-commercial-route`, including the trained sample
 availability preflight and the SH-heavy browser route. This is the correct gate
