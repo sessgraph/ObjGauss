@@ -84,6 +84,8 @@ const allowSlaFailures = Boolean(options.allowSlaFailures);
 const confirmLongRun = Boolean(options.confirmLongRun);
 const skipGpuPreflight = Boolean(options.skipGpuPreflight);
 const statusJsonPath = options.statusJson ?? options.statusJsonOutput;
+let lastExit = null;
+let lastFailure = null;
 
 const steps = [
   {
@@ -244,24 +246,46 @@ console.log(`gpu_memory_reserve_gb=${gpuMemoryReserveGb}`);
 
 if (mode === "run") {
   if (!skipTrain && !confirmLongRun) {
+    const reason = "starting near-1M Splatfacto training requires --confirm-long-run";
+    const hint = "use --skip-train when reusing an existing exported PLY";
     console.error(
-      "near1m_long_run_guard=failed reason=\"starting near-1M Splatfacto training requires --confirm-long-run\"",
+      `near1m_long_run_guard=failed reason=${JSON.stringify(reason)}`,
     );
-    console.error("hint=use --skip-train when reusing an existing exported PLY");
-    exitWithStatusJson(2);
+    console.error(`hint=${hint}`);
+    exitWithStatusJson(2, {
+      kind: "long-run-confirmation-required",
+      phase: "preflight",
+      reason,
+      hint,
+    });
   }
   const missing = collectMissingForRun();
   if (missing.length > 0) {
     printMissing(missing);
-    exitWithStatusJson(2);
+    exitWithStatusJson(2, {
+      kind: "missing-inputs",
+      phase: "preflight",
+      reason: `${missing.length} required input(s) missing`,
+      missing: missing.map((item) => ({
+        label: item.label,
+        path: item.path,
+      })),
+    });
   }
   if (!skipTrain) {
     try {
       assertGpuPreflight();
     } catch (error) {
-      console.error(`near1m_gpu_preflight=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
-      console.error("hint=pass --skip-gpu-preflight only if you accept running without a 1GB reserve preflight");
-      exitWithStatusJson(2);
+      const reason = error?.message ?? String(error);
+      const hint = "pass --skip-gpu-preflight only if you accept running without a 1GB reserve preflight";
+      console.error(`near1m_gpu_preflight=failed reason=${JSON.stringify(reason)}`);
+      console.error(`hint=${hint}`);
+      exitWithStatusJson(2, {
+        kind: "gpu-preflight-failed",
+        phase: "preflight",
+        reason,
+        hint,
+      });
     }
   }
 }
@@ -275,16 +299,26 @@ try {
         try {
           step.beforeRun();
         } catch (error) {
-          console.error(`near1m_scale_gate=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
-          exitWithStatusJson(2);
+          const reason = error?.message ?? String(error);
+          console.error(`near1m_scale_gate=failed reason=${JSON.stringify(reason)}`);
+          exitWithStatusJson(2, {
+            kind: "scale-gate-failed",
+            phase: step.label,
+            reason,
+          });
         }
       }
       await run(step.command);
     }
   }
 } catch (error) {
-  console.error(`near1m_step=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
-  exitWithStatusJson(2);
+  const reason = error?.message ?? String(error);
+  console.error(`near1m_step=failed reason=${JSON.stringify(reason)}`);
+  exitWithStatusJson(2, {
+    kind: "step-failed",
+    phase: "run-step",
+    reason,
+  });
 }
 
 if (mode === "dry-run") {
@@ -292,7 +326,7 @@ if (mode === "dry-run") {
 } else {
   console.log("\ntrain_splatfacto_near1m_candidate=passed");
 }
-writeCurrentStatusJson();
+writeCurrentStatusJson({ code: 0 });
 
 function buildStatusReport() {
   const exportedCount = existsSync(exportedPly) ? readPlyVertexCountOrZero(exportedPly) : 0;
@@ -446,6 +480,8 @@ function buildStatusReport() {
       gpuMemoryPreflight: gpuPreflight.status,
     },
     gpuMemoryPreflight: gpuPreflight,
+    lastExit,
+    lastFailure,
     blockers,
     commands: {
       train: formatCommand(steps[0].command),
@@ -519,14 +555,26 @@ function writeStatusJson(filePath, report) {
   console.log(`status_json=${filePath}`);
 }
 
-function writeCurrentStatusJson() {
+function writeCurrentStatusJson({ code = 0, failure = null } = {}) {
   if (statusJsonPath) {
+    lastExit = {
+      status: code === 0 ? "passed" : "failed",
+      code,
+      mode,
+      at: new Date().toISOString(),
+    };
+    lastFailure = failure
+      ? {
+          ...failure,
+          at: lastExit.at,
+        }
+      : null;
     writeStatusJson(statusJsonPath, buildStatusReport());
   }
 }
 
-function exitWithStatusJson(code) {
-  writeCurrentStatusJson();
+function exitWithStatusJson(code, failure = null) {
+  writeCurrentStatusJson({ code, failure });
   process.exit(code);
 }
 

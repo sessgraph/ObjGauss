@@ -208,8 +208,12 @@ npm run train:splatfacto:near1m-candidate -- \
 The status report uses schema `objgauss-near1m-candidate-status-v1` and records
 the input/output paths, scale thresholds, current Gaussian counts, missing
 files, blockers, the guarded full-run command, and the current GPU memory
-preflight result. It is a preflight report; a green JSON status still does not
-replace the strict production SLA gate.
+preflight result. When the wrapper writes this report during dry-run, success,
+or a known failure path, it also records `lastExit` and `lastFailure` so the
+next status check can distinguish guard failures, missing inputs, GPU preflight
+failures, scale gate failures, and failed subprocesses. It is a preflight
+report; a green JSON status still does not replace the strict production SLA
+gate.
 
 Check only the GPU memory reserve guard. This is safe to run before a long
 training window and does not start Splatfacto:
@@ -258,7 +262,8 @@ npm run train:splatfacto:near1m-background -- \
 
 When the nested candidate status report exists, `--status` also prints the
 candidate readiness summary: missing file count, exported Gaussian count,
-object-aware Gaussian count, production SLA status, and blocker count.
+object-aware Gaussian count, production SLA status, blocker count, last exit
+status, and last failure kind.
 
 Stop the detached run when you need to free the machine. This sends `SIGTERM`
 to the recorded detached process group and requires an explicit stop

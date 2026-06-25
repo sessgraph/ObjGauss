@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003M: Near-1M candidate status records last failure
+
+- 状态: done / candidate-failure-diagnostics
+- 类型: 标准 PR / training-output observability
+- 目标: 让 near-1M candidate status JSON 不只说明 readiness incomplete，还能说明最近一次 wrapper 是成功、guard 拦截、缺输入、GPU preflight 失败、scale gate 失败，还是子步骤失败。
+- 已实施:
+  - `objgauss-near1m-candidate-status-v1` report 新增 `lastExit`，记录 `status`、`code`、`mode` 和时间。
+  - 已知失败路径会写 `lastFailure.kind/phase/reason/hint`；覆盖 long-run confirmation、missing inputs、GPU preflight、scale gate 和 child step failure。
+  - 成功 / dry-run status JSON 会写 `lastExit.status=passed` 和 `lastFailure=null`。
+  - background `--status` 会把 nested candidate status 的 `last_exit` 与 `last_failure` 打印出来。
+  - TRAIN-003D runbook 已记录 `lastExit` / `lastFailure` 字段语义。
+- 结论:
+  - near-1M 后台长训的机器可读 handoff 现在能直接解释最后一次运行为什么没有推进到 production SLA。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti --status-json /tmp/objgauss-near1m-candidate-failure-status/summary.json`: expected failed with exit `2`；status JSON contains `lastExit.status=failed` and `lastFailure.kind=long-run-confirmation-required`。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull --status-json /tmp/objgauss-near1m-candidate-passed-status/summary.json`: passed；status JSON contains `lastExit.status=passed` and `lastFailure=null`。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-failure-status --candidate-status-json /tmp/objgauss-near1m-candidate-failure-status/summary.json`: passed；printed `last_exit=failed last_failure=long-run-confirmation-required`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003L: Near-1M background status includes candidate readiness
 
 - 状态: done / nested-candidate-readiness-handoff

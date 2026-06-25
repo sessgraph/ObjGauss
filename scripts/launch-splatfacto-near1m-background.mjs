@@ -258,7 +258,7 @@ function printStatus(report) {
   );
   if (report.candidateSummary) {
     console.log(
-      `near1m_candidate_status=${report.candidateSummary.status} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers}`,
+      `near1m_candidate_status=${report.candidateSummary.status} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers} last_exit=${report.candidateSummary.lastExitStatus} last_failure=${report.candidateSummary.lastFailureKind}`,
     );
   } else {
     console.log(`near1m_candidate_status=missing path=${report.candidateStatusPath}`);
@@ -300,6 +300,10 @@ function summarizeCandidateStatus(report) {
     productionSla: report.readiness?.productionSla ?? "unknown",
     gpuMemoryPreflight: report.readiness?.gpuMemoryPreflight ?? "unknown",
     blockers: Array.isArray(report.blockers) ? report.blockers.length : "unknown",
+    lastExitStatus: report.lastExit?.status ?? "unknown",
+    lastExitCode: report.lastExit?.code ?? "unknown",
+    lastFailureKind: report.lastFailure?.kind ?? "none",
+    lastFailureReason: report.lastFailure?.reason ?? "",
   };
 }
 
