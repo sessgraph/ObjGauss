@@ -88,6 +88,9 @@ try {
         `readback=${JSON.stringify(row.readbackStatus)}:${JSON.stringify(row.readbackSource)}:${JSON.stringify(row.readbackChecksum)}:${row.readbackByteSize ?? 0}:${row.readbackFiniteFloats ?? 0}/${row.readbackFloatCount ?? 0}:${row.readbackNonzeroFloats ?? 0} ` +
         `readbackAfterIsolate=${JSON.stringify(row.readbackAfterIsolateStatus)}:${JSON.stringify(row.readbackAfterIsolateSource)}:${JSON.stringify(row.readbackAfterIsolateChecksum)} ` +
         `readbackAfterDelete=${JSON.stringify(row.readbackAfterDeleteStatus)}:${JSON.stringify(row.readbackAfterDeleteSource)}:${JSON.stringify(row.readbackAfterDeleteChecksum)} ` +
+        `storageTiming=${JSON.stringify(row.storageTimingMode)}:${formatValue(row.storageTimingUpdateMs)}/${formatValue(row.storageTimingSubmitMs)}/${formatValue(row.storageTimingQueueDoneMs)} ` +
+        `storageTimingAfterIsolate=${JSON.stringify(row.storageTimingAfterIsolateMode)}:${formatValue(row.storageTimingAfterIsolateUpdateMs)}/${formatValue(row.storageTimingAfterIsolateSubmitMs)}/${formatValue(row.storageTimingAfterIsolateQueueDoneMs)} ` +
+        `storageTimingAfterDelete=${JSON.stringify(row.storageTimingAfterDeleteMode)}:${formatValue(row.storageTimingAfterDeleteUpdateMs)}/${formatValue(row.storageTimingAfterDeleteSubmitMs)}/${formatValue(row.storageTimingAfterDeleteQueueDoneMs)} ` +
         `objectState=${JSON.stringify(row.objectStateChecksum)}:${JSON.stringify(row.objectStateAfterIsolateChecksum)}:${JSON.stringify(row.objectStateAfterDeleteChecksum)} ` +
         `packedGaussians=${row.packedGaussians ?? 0} tileReferences=${row.tileReferences ?? 0}`,
     );
@@ -180,6 +183,9 @@ function parseAuditOutput(output) {
   const readbackAfterIsolate = line.match(/readbackAfterIsolate="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+):([0-9]+)/);
   const readbackAfterDelete = line.match(/readbackAfterDelete="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+):([0-9]+)/);
   const storage = line.match(/storage="([^"]*)":"([^"]*)"/);
+  const storageTiming = parseStorageTiming(line, "storageTiming");
+  const storageTimingAfterIsolate = parseStorageTiming(line, "storageTimingAfterIsolate");
+  const storageTimingAfterDelete = parseStorageTiming(line, "storageTimingAfterDelete");
   const storageLimit = line.match(/storageLimit="([^"]*)":"([^"]*)":"([^"]*)":([0-9]+):([0-9]+)\/([0-9]+)/);
   const objectState = line.match(/objectState="([^"]*)":"([^"]*)"/);
   const activeTiles = line.match(/activeTiles=([0-9]+)\/([0-9]+)/);
@@ -229,6 +235,24 @@ function parseAuditOutput(output) {
     readbackAfterDeleteNonzeroFloats: numberCapture(readbackAfterDelete?.[7]),
     storageStatus: storage?.[1] ?? "",
     storageChecksum: storage?.[2] ?? "",
+    storageTimingStatus: storageTiming.status,
+    storageTimingMode: storageTiming.mode,
+    storageTimingUpdateMs: storageTiming.updateMs,
+    storageTimingSubmitMs: storageTiming.submitMs,
+    storageTimingQueueDoneMs: storageTiming.queueDoneMs,
+    storageTimingObjectStateByteSize: storageTiming.objectStateByteSize,
+    storageTimingAfterIsolateStatus: storageTimingAfterIsolate.status,
+    storageTimingAfterIsolateMode: storageTimingAfterIsolate.mode,
+    storageTimingAfterIsolateUpdateMs: storageTimingAfterIsolate.updateMs,
+    storageTimingAfterIsolateSubmitMs: storageTimingAfterIsolate.submitMs,
+    storageTimingAfterIsolateQueueDoneMs: storageTimingAfterIsolate.queueDoneMs,
+    storageTimingAfterIsolateObjectStateByteSize: storageTimingAfterIsolate.objectStateByteSize,
+    storageTimingAfterDeleteStatus: storageTimingAfterDelete.status,
+    storageTimingAfterDeleteMode: storageTimingAfterDelete.mode,
+    storageTimingAfterDeleteUpdateMs: storageTimingAfterDelete.updateMs,
+    storageTimingAfterDeleteSubmitMs: storageTimingAfterDelete.submitMs,
+    storageTimingAfterDeleteQueueDoneMs: storageTimingAfterDelete.queueDoneMs,
+    storageTimingAfterDeleteObjectStateByteSize: storageTimingAfterDelete.objectStateByteSize,
     storageLimitGate: storageLimit?.[1] ?? "",
     storageLimitBlocker: storageLimit?.[2] ?? "",
     storageEstimatedMaxBufferKey: storageLimit?.[3] ?? "",
@@ -281,12 +305,26 @@ function evaluateResult({ asset, exitCode, parsed, objectTransition }) {
       parsed.readbackFloatCount > 0 && parsed.readbackFiniteFloats === parsed.readbackFloatCount,
     ),
     check("readback-nonzero-floats", parsed.readbackNonzeroFloats, ">0", parsed.readbackNonzeroFloats > 0),
-      check(
-        "storage-status",
-        parsed.storageStatus,
-        "uploaded or object-state-updated",
-        ["uploaded", "object-state-updated"].includes(parsed.storageStatus ?? ""),
-      ),
+    check(
+      "storage-status",
+      parsed.storageStatus,
+      "uploaded or object-state-updated",
+      ["uploaded", "object-state-updated"].includes(parsed.storageStatus ?? ""),
+    ),
+    ...storageTimingChecks({
+      label: "initial",
+      status: parsed.storageTimingStatus,
+      mode: parsed.storageTimingMode,
+      updateMs: parsed.storageTimingUpdateMs,
+      submitMs: parsed.storageTimingSubmitMs,
+      queueDoneMs: parsed.storageTimingQueueDoneMs,
+      objectStateByteSize: parsed.storageTimingObjectStateByteSize,
+      allowed: [
+        { status: "uploaded", mode: "full-upload" },
+        { status: "object-state-updated", mode: "object-state-only" },
+      ],
+      requireQueueDone: true,
+    }),
     check("storage-limit", parsed.storageLimitGate, "pass", parsed.storageLimitGate === "pass"),
     check("object-filter", parsed.objectFilter, "gpu-object-state-buffer", parsed.objectFilter === "gpu-object-state-buffer"),
     check(
@@ -335,6 +373,17 @@ function evaluateResult({ asset, exitCode, parsed, objectTransition }) {
         previousChecksum: parsed.readbackChecksum,
         pixelSource: parsed.pixelSource,
       }),
+      ...storageTimingChecks({
+        label: "isolate",
+        status: parsed.storageTimingAfterIsolateStatus,
+        mode: parsed.storageTimingAfterIsolateMode,
+        updateMs: parsed.storageTimingAfterIsolateUpdateMs,
+        submitMs: parsed.storageTimingAfterIsolateSubmitMs,
+        queueDoneMs: parsed.storageTimingAfterIsolateQueueDoneMs,
+        objectStateByteSize: parsed.storageTimingAfterIsolateObjectStateByteSize,
+        allowed: [{ status: "object-state-updated", mode: "object-state-only" }],
+        requireQueueDone: true,
+      }),
       ...transitionReadbackChecks({
         label: "delete",
         status: parsed.readbackAfterDeleteStatus,
@@ -346,6 +395,20 @@ function evaluateResult({ asset, exitCode, parsed, objectTransition }) {
         nonzeroFloats: parsed.readbackAfterDeleteNonzeroFloats,
         previousChecksum: parsed.readbackAfterIsolateChecksum,
         pixelSource: parsed.pixelSource,
+      }),
+      ...storageTimingChecks({
+        label: "delete",
+        status: parsed.storageTimingAfterDeleteStatus,
+        mode: parsed.storageTimingAfterDeleteMode,
+        updateMs: parsed.storageTimingAfterDeleteUpdateMs,
+        submitMs: parsed.storageTimingAfterDeleteSubmitMs,
+        queueDoneMs: parsed.storageTimingAfterDeleteQueueDoneMs,
+        objectStateByteSize: parsed.storageTimingAfterDeleteObjectStateByteSize,
+        allowed: [
+          { status: "object-state-updated", mode: "object-state-only" },
+          { status: "uploaded", mode: "full-upload" },
+        ],
+        requireQueueDone: false,
       }),
       check(
         "readback-delete-differs-from-initial",
@@ -390,6 +453,39 @@ function transitionReadbackChecks({
   ];
 }
 
+function storageTimingChecks({
+  label,
+  status,
+  mode,
+  updateMs,
+  submitMs,
+  queueDoneMs,
+  objectStateByteSize,
+  allowed,
+  requireQueueDone,
+}) {
+  const expected = allowed
+    .map((entry) => `${entry.status}/${entry.mode}`)
+    .join(" or ");
+  return [
+    check(
+      `storage-timing-${label}-mode`,
+      `${status}/${mode}`,
+      expected,
+      allowed.some((entry) => entry.status === status && entry.mode === mode),
+    ),
+    check(`storage-timing-${label}-update-ms`, updateMs, "finite >= 0", isNonNegativeNumber(updateMs)),
+    check(`storage-timing-${label}-submit-ms`, submitMs, "finite >= 0", isNonNegativeNumber(submitMs)),
+    check(
+      `storage-timing-${label}-queue-done-ms`,
+      queueDoneMs,
+      requireQueueDone ? "finite >= 0" : "finite >= 0 or pending",
+      !requireQueueDone || isNonNegativeNumber(queueDoneMs),
+    ),
+    check(`storage-timing-${label}-object-state-bytes`, objectStateByteSize, ">0", objectStateByteSize > 0),
+  ];
+}
+
 function check(name, actual, expected, passed) {
   return { name, actual, expected, passed: Boolean(passed) };
 }
@@ -404,12 +500,12 @@ function renderMarkdown(summary) {
     `WebGPU flags: \`${summary.webGpuFlags}\``,
     `Object transition: \`${summary.objectTransition ? "enabled" : "disabled"}\``,
     "",
-    "| Asset | Passed | Frame pixels | Readback | After isolate | After delete | Object state | Queue | Device | Packed | Tile refs |",
-    "| --- | --- | ---: | --- | --- | --- | --- | --- | --- | ---: | ---: |",
+    "| Asset | Passed | Frame pixels | Readback | After isolate | After delete | Storage timing | Isolate timing | Delete timing | Object state | Queue | Device | Packed | Tile refs |",
+    "| --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: |",
   ];
   for (const result of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(result.asset)} | ${result.passed ? "yes" : "no"} | ${formatValue(result.firstFramePixels)} | ${escapeMarkdown(result.readbackChecksum || "")} | ${escapeMarkdown(result.readbackAfterIsolateChecksum || "")} | ${escapeMarkdown(result.readbackAfterDeleteChecksum || "")} | ${escapeMarkdown(result.objectStateChecksum || "")}/${escapeMarkdown(result.objectStateAfterIsolateChecksum || "")}/${escapeMarkdown(result.objectStateAfterDeleteChecksum || "")} | ${escapeMarkdown(result.queueStatus || "")} | ${escapeMarkdown(result.deviceLostStatus || "")} | ${formatValue(result.packedGaussians)} | ${formatValue(result.tileReferences)} |`,
+      `| ${escapeMarkdown(result.asset)} | ${result.passed ? "yes" : "no"} | ${formatValue(result.firstFramePixels)} | ${escapeMarkdown(result.readbackChecksum || "")} | ${escapeMarkdown(result.readbackAfterIsolateChecksum || "")} | ${escapeMarkdown(result.readbackAfterDeleteChecksum || "")} | ${escapeMarkdown(formatStorageTiming(result, "storageTiming"))} | ${escapeMarkdown(formatStorageTiming(result, "storageTimingAfterIsolate"))} | ${escapeMarkdown(formatStorageTiming(result, "storageTimingAfterDelete"))} | ${escapeMarkdown(result.objectStateChecksum || "")}/${escapeMarkdown(result.objectStateAfterIsolateChecksum || "")}/${escapeMarkdown(result.objectStateAfterDeleteChecksum || "")} | ${escapeMarkdown(result.queueStatus || "")} | ${escapeMarkdown(result.deviceLostStatus || "")} | ${formatValue(result.packedGaussians)} | ${formatValue(result.tileReferences)} |`,
     );
   }
   lines.push("", "## Failed Checks", "");
@@ -479,6 +575,28 @@ function jsonStringCapture(source, pattern) {
   }
 }
 
+function parseStorageTiming(line, token) {
+  const match = line.match(new RegExp(`${token}="([^"]*)":"([^"]*)":([^:\\s]+):([^:\\s]+):([^:\\s]+):([0-9]+)`));
+  if (!match) {
+    return {
+      status: "",
+      mode: "",
+      updateMs: null,
+      submitMs: null,
+      queueDoneMs: null,
+      objectStateByteSize: 0,
+    };
+  }
+  return {
+    status: match[1],
+    mode: match[2],
+    updateMs: finiteNumberCapture(match[3]),
+    submitMs: finiteNumberCapture(match[4]),
+    queueDoneMs: finiteNumberCapture(match[5]),
+    objectStateByteSize: numberCapture(match[6]),
+  };
+}
+
 function numberMatch(source, pattern) {
   return numberCapture(source.match(pattern)?.[1]);
 }
@@ -490,6 +608,24 @@ function stringMatch(source, pattern) {
 function numberCapture(value) {
   const parsed = Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function finiteNumberCapture(value) {
+  const parsed = Number(String(value ?? "").replaceAll(",", ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isNonNegativeNumber(value) {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function formatStorageTiming(result, prefix) {
+  const mode = result[`${prefix}Mode`] || "";
+  const updateMs = result[`${prefix}UpdateMs`];
+  const submitMs = result[`${prefix}SubmitMs`];
+  const queueDoneMs = result[`${prefix}QueueDoneMs`];
+  if (!mode) return "";
+  return `${mode}:${formatValue(updateMs)}/${formatValue(submitMs)}/${formatValue(queueDoneMs)}ms`;
 }
 
 function formatValue(value) {

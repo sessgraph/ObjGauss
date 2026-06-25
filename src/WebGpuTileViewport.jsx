@@ -109,6 +109,8 @@ export default function WebGpuTileViewport({
     status: "pending",
     reason: "webgpu-queue-pending",
     message: "",
+    submitMs: 0,
+    doneMs: 0,
   });
   const [compute, setCompute] = useState({
     status: "pending",
@@ -135,6 +137,7 @@ export default function WebGpuTileViewport({
     checksum: "",
     bufferCount: 0,
     byteLength: 0,
+    updateMs: 0,
     tileEntriesIncluded: false,
     tileOffsetsIncluded: false,
     pixelOutputIncluded: false,
@@ -652,6 +655,8 @@ export default function WebGpuTileViewport({
       data-webgpu-queue-status={queue.status}
       data-webgpu-queue-reason={queue.reason}
       data-webgpu-queue-message={queue.message}
+      data-webgpu-frame-submit-ms={queue.submitMs ?? 0}
+      data-webgpu-queue-done-ms={queue.doneMs ?? 0}
       data-webgpu-accumulation-source={accumulation.source}
       data-webgpu-accumulation-status={accumulation.status}
       data-webgpu-accumulation-reason={accumulation.reason}
@@ -676,6 +681,7 @@ export default function WebGpuTileViewport({
       data-webgpu-storage-status={storage.status}
       data-webgpu-storage-reason={storage.reason}
       data-webgpu-storage-update-mode={storage.updateMode ?? ""}
+      data-webgpu-storage-update-ms={storage.updateMs ?? 0}
       data-webgpu-storage-buffer-count={storage.bufferCount}
       data-webgpu-storage-byte-size={storage.byteLength}
       data-webgpu-storage-object-state-byte-size={storage.objectStateByteLength ?? 0}
@@ -703,6 +709,16 @@ export default function WebGpuTileViewport({
       </div>
     </div>
   );
+}
+
+function runtimeNow() {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
+function elapsedMs(startedAt) {
+  return Number(Math.max(0, runtimeNow() - startedAt).toFixed(3));
 }
 
 function vectorAttribute(value) {
@@ -840,7 +856,9 @@ function renderFrame({
   );
 
   let storageBundle = null;
+  let storageUpdateMs = 0;
   try {
+    const storageStartedAt = runtimeNow();
     const canReuseStorage =
       tileSmoke?.tileListMode === WEBGPU_TILE_LIST_MODE_OBJECT_STATE &&
       (runAccumulation || runPixel) &&
@@ -848,10 +866,12 @@ function renderFrame({
     if (canReuseStorage) {
       storageBundle = runtime.storageBundle;
       const description = updateWebGpuTileObjectStateBuffer(device, storageBundle, tileSmoke);
+      storageUpdateMs = elapsedMs(storageStartedAt);
       setStorage({
         status: "object-state-updated",
         reason: "webgpu-object-state-buffer-updated",
         updateMode: "object-state-only",
+        updateMs: storageUpdateMs,
         layoutVersion: description.layoutVersion,
         checksum: description.checksum,
         bufferCount: description.bufferCount,
@@ -865,10 +885,12 @@ function renderFrame({
       storageBundle = createWebGpuTileStorageBuffers(device, tileSmoke);
       runtime.storageBundle?.destroy?.();
       runtime.storageBundle = storageBundle;
+      storageUpdateMs = elapsedMs(storageStartedAt);
       setStorage({
         status: "uploaded",
         reason: "webgpu-storage-uploaded",
         updateMode: "full-upload",
+        updateMs: storageUpdateMs,
         layoutVersion: storageBundle.layoutVersion,
         checksum: storageBundle.checksum,
         bufferCount: storageBundle.bufferCount,
@@ -883,6 +905,7 @@ function renderFrame({
     setStorage({
       status: "failed",
       reason: error?.message || "webgpu-storage-upload-failed",
+      updateMs: storageUpdateMs,
       layoutVersion: "",
       checksum: "",
       bufferCount: 0,
@@ -1120,11 +1143,16 @@ function renderFrame({
       }
       pass.end();
     }
+    const submitStartedAt = runtimeNow();
     device.queue.submit([encoder.finish()]);
+    const submitMs = elapsedMs(submitStartedAt);
+    const queueSubmittedAt = runtimeNow();
     setQueue({
       status: "submitted",
       reason: "webgpu-queue-submitted",
       message: "",
+      submitMs,
+      doneMs: 0,
     });
     device.queue.onSubmittedWorkDone().then(
       async () => {
@@ -1132,6 +1160,8 @@ function renderFrame({
           status: "done",
           reason: "webgpu-queue-submitted-work-done",
           message: "",
+          submitMs,
+          doneMs: elapsedMs(queueSubmittedAt),
         });
         if (runReadback) {
           try {
@@ -1180,6 +1210,8 @@ function renderFrame({
           status: "failed",
           reason: "webgpu-queue-submitted-work-failed",
           message: error?.message || String(error || ""),
+          submitMs,
+          doneMs: elapsedMs(queueSubmittedAt),
         }),
     );
     setAccumulation(stageTelemetry({

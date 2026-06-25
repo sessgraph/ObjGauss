@@ -29,6 +29,35 @@
 
 ## Done
 
+### RENDER-ROUTE-008: WebGPU runtime timing telemetry gate
+
+- 状态: done / runtime-timing-telemetry
+- 类型: 标准 PR / WebGPU C-path browser audit contract
+- 目标: 将 RENDER-ROUTE-006 的 objectState-only 更新事实继续升级为浏览器 runtime 可观测 timing：storage update 耗时、queue submit CPU 耗时、queue done 等待耗时。
+- 已实施:
+  - `WebGpuTileViewport.jsx` 新增 `data-webgpu-storage-update-ms`、`data-webgpu-frame-submit-ms` 和 `data-webgpu-queue-done-ms`。
+  - storage timing 包住真实 full-upload / objectState-only `queue.writeBuffer` 路径；submit timing 包住 `device.queue.submit()`；queue done timing 来自 `queue.onSubmittedWorkDone()`。
+  - `scripts/audit-demo.mjs` 在 WebGPU route 初始帧、isolate transition 和 delete transition 中检查 timing 为有限非负数。
+  - `scripts/audit-demo.mjs` 在 browser audit 输出中写出 `storageTiming`、`storageTimingAfterIsolate` 和 `storageTimingAfterDelete`，使日志 / report 能直接看到 update mode 与耗时。
+  - `scripts/audit-demo.mjs` 新增 `waitForWebGpuStorageUpdate`，在 object isolate / delete 后等待 storage checksum 改变和 timing settled，再读取 telemetry。
+  - `scripts/audit-webgpu-offscreen-readback.mjs` 解析 storage timing 输出，并对 isolate / delete transition 建立 timing gate；isolate 只接受 `object-state-only`，delete 接受 `object-state-only` 或 `full-upload`。
+  - Isolate transition 仍要求 `object-state-only`；delete transition 允许 `object-state-only` 或 `full-upload`，因为删除预览可能同时从对象色切回源色，导致静态 color buffers 改变并触发正确的 full-upload fallback。
+  - `audit:renderer-route-contract` 将 runtime timing DOM attrs 和 browser audit helper 纳入 C-path contract。
+- 结论:
+  - C-path object edit 现在不仅能证明“只写 objectState 小 buffer”，还能在浏览器 audit 中记录这次 update / submit / queue done 的 runtime timing。
+  - 这些字段是 observability，不是 FPS 或交互延迟 SLA；真实 1M FPS 仍需要 headed WebGPU performance run。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-offscreen-readback.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-runtime-timing-final`: passed，steps=6。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-offscreen-readback -- --assets nerf-lego-alpha-closure-local --port 5395 --output-dir /tmp/objgauss-webgpu-offscreen-readback-runtime-timing-lego`: passed；readback initial/isolate/delete checksums 均变化；`storageTimingAfterIsolate="object-state-only":17.8/0/68.8`，`storageTimingAfterDelete="object-state-only":16.3/0/68.9`。
+  - `npm run audit:webgpu-offscreen-readback -- --assets plush-semantic-closure-local --port 5395 --output-dir /tmp/objgauss-webgpu-offscreen-readback-runtime-timing-plush`: passed；281498 Gaussians、tileReferences=1190026；isolate 为 `object-state-only`，delete 为 `full-upload` fallback：`storageTimingAfterDelete="full-upload":179.7/0.1/0`。
+
 ### RENDER-ROUTE-007: WebGPU edit cost budget audit
 
 - 状态: done / edit-cost-budget-gate

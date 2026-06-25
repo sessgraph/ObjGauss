@@ -339,12 +339,18 @@ The browser-visible contract is:
 
 ```text
 data-webgpu-storage-update-mode="full-upload" | "object-state-only"
+data-webgpu-storage-update-ms="<milliseconds>"
 data-webgpu-storage-object-state-byte-size="<bytes>"
+data-webgpu-frame-submit-ms="<milliseconds>"
+data-webgpu-queue-done-ms="<milliseconds>"
 ```
 
-`audit:demo` requires WebGPU isolate / delete transitions to report
-`object-state-only` with a nonzero object-state byte size when the WebGPU tile
-renderer is active.
+`audit:demo` requires WebGPU isolate transitions to report `object-state-only`
+with a nonzero object-state byte size and finite update / submit / queue timing.
+Delete transitions may report either `object-state-only` or `full-upload`: the
+full upload fallback is expected when deletion also changes static inputs such
+as source/object color buffers. In both cases timing must be browser-visible.
+These timings are runtime observability signals, not FPS guarantees.
 
 `npm run audit:spark-pick-report` validates Spark canvas object selection after
 delete. The current product contract is `screen-space-object-pick-v1` with

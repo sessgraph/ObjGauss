@@ -245,6 +245,9 @@ try {
         `readbackAfterDelete=${JSON.stringify(result.webGpuReadbackStatusAfterDelete ?? "")}:${JSON.stringify(result.webGpuReadbackSourceAfterDelete ?? "")}:${JSON.stringify(result.webGpuReadbackChecksumAfterDelete ?? "")}:${result.webGpuReadbackByteSizeAfterDelete ?? 0}:${result.webGpuReadbackFiniteFloatsAfterDelete ?? 0}/${result.webGpuReadbackFloatCountAfterDelete ?? 0}:${result.webGpuReadbackNonzeroFloatsAfterDelete ?? 0} ` +
         `resolveSource=${JSON.stringify(result.webGpuResolveSource)}:${JSON.stringify(result.webGpuResolveFilter)}:${JSON.stringify(result.webGpuAlphaPresentationMode)}:${result.webGpuAlphaPresentationFloor} ` +
         `storage=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageChecksum)} ` +
+        `storageTiming=${JSON.stringify(result.webGpuStorageStatus)}:${JSON.stringify(result.webGpuStorageUpdateMode)}:${result.webGpuStorageUpdateMs}:${result.webGpuFrameSubmitMs}:${result.webGpuQueueDoneMs}:${result.webGpuStorageObjectStateByteSize} ` +
+        `storageTimingAfterIsolate=${JSON.stringify(result.webGpuStorageStatusAfterIsolate ?? "")}:${JSON.stringify(result.webGpuStorageUpdateModeAfterIsolate ?? "")}:${result.webGpuStorageUpdateMsAfterIsolate ?? 0}:${result.webGpuFrameSubmitMsAfterIsolate ?? 0}:${result.webGpuQueueDoneMsAfterIsolate ?? 0}:${result.webGpuStorageObjectStateByteSizeAfterIsolate ?? 0} ` +
+        `storageTimingAfterDelete=${JSON.stringify(result.webGpuStorageStatusAfterDelete ?? "")}:${JSON.stringify(result.webGpuStorageUpdateModeAfterDelete ?? "")}:${result.webGpuStorageUpdateMsAfterDelete ?? 0}:${result.webGpuFrameSubmitMsAfterDelete ?? 0}:${result.webGpuQueueDoneMsAfterDelete ?? 0}:${result.webGpuStorageObjectStateByteSizeAfterDelete ?? 0} ` +
         `storageLimit=${JSON.stringify(result.storageLimitGate)}:${JSON.stringify(result.storageLimitBlocker)}:${JSON.stringify(result.storageEstimatedMaxBufferKey)}:${result.storageEstimatedMaxBufferByteSize}:${result.storageLimitRequiredStorageBuffersPerStage}/${result.storageLimitMaxStorageBuffersPerStage} ` +
         `rendererTarget=${JSON.stringify(result.rendererTarget)} ` +
         `targetGate=${JSON.stringify(result.targetGate)}:${JSON.stringify(result.targetGateBlocker)} ` +
@@ -943,6 +946,8 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuQueueStatus = await viewport.getAttribute("data-webgpu-queue-status");
       const webGpuQueueReason = await viewport.getAttribute("data-webgpu-queue-reason");
       const webGpuQueueMessage = await viewport.getAttribute("data-webgpu-queue-message");
+      const webGpuFrameSubmitMs = finiteNumericValue(await viewport.getAttribute("data-webgpu-frame-submit-ms") ?? "NaN");
+      const webGpuQueueDoneMs = finiteNumericValue(await viewport.getAttribute("data-webgpu-queue-done-ms") ?? "NaN");
       const webGpuAccumulationSource = await viewport.getAttribute("data-webgpu-accumulation-source");
       const webGpuAccumulationStatus = await viewport.getAttribute("data-webgpu-accumulation-status");
       const webGpuAccumulationReason = await viewport.getAttribute("data-webgpu-accumulation-reason");
@@ -967,6 +972,7 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuStorageStatus = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageReason = await viewport.getAttribute("data-webgpu-storage-reason");
       const webGpuStorageUpdateMode = await viewport.getAttribute("data-webgpu-storage-update-mode");
+      const webGpuStorageUpdateMs = finiteNumericValue(await viewport.getAttribute("data-webgpu-storage-update-ms") ?? "NaN");
       const webGpuStorageBufferCount = numericValue(await viewport.getAttribute("data-webgpu-storage-buffer-count") ?? "0");
       const webGpuStorageByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-byte-size") ?? "0");
       const webGpuStorageObjectStateByteSize = numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
@@ -1020,6 +1026,12 @@ async function runAudit(url, assetsToCheck, options) {
           webGpuStorageLayout !== "webgpu-tile-storage-v1" ||
           !["uploaded", "object-state-updated"].includes(webGpuStorageStatus ?? "") ||
           !["full-upload", "object-state-only"].includes(webGpuStorageUpdateMode ?? "") ||
+          !Number.isFinite(webGpuStorageUpdateMs) ||
+          webGpuStorageUpdateMs < 0 ||
+          !Number.isFinite(webGpuFrameSubmitMs) ||
+          webGpuFrameSubmitMs < 0 ||
+          ((webGpuQueueStatus === "done" || webGpuQueueStatus === "failed") &&
+            (!Number.isFinite(webGpuQueueDoneMs) || webGpuQueueDoneMs < 0)) ||
           webGpuStorageBufferCount < 11 ||
           webGpuStorageByteSize <= 0 ||
           webGpuStorageObjectStateByteSize <= 0 ||
@@ -1029,7 +1041,7 @@ async function runAudit(url, assetsToCheck, options) {
           !/^[0-9a-f]{8}$/.test(webGpuStorageChecksum ?? "")
         ) {
           throw new Error(
-            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, and pixel output: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} updateMode=${webGpuStorageUpdateMode} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} objectStateBytes=${webGpuStorageObjectStateByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
+            `${asset.id} WebGPU storage buffers were not uploaded with tile entries, offsets, pixel output, and timing: layout=${webGpuStorageLayout} status=${webGpuStorageStatus} reason=${webGpuStorageReason} updateMode=${webGpuStorageUpdateMode} updateMs=${webGpuStorageUpdateMs} submitMs=${webGpuFrameSubmitMs} queueDoneMs=${webGpuQueueDoneMs} queue=${webGpuQueueStatus}:${webGpuQueueReason} buffers=${webGpuStorageBufferCount} bytes=${webGpuStorageByteSize} objectStateBytes=${webGpuStorageObjectStateByteSize} tileEntries=${webGpuStorageTileEntries} tileOffsets=${webGpuStorageTileOffsets} pixelOutput=${webGpuStoragePixelOutput} checksum=${webGpuStorageChecksum}`,
           );
         }
         if (
@@ -1247,6 +1259,13 @@ async function runAudit(url, assetsToCheck, options) {
       const canvasSelectedObject = await selectObjectFromCanvas(page, asset.id);
       await page.getByRole("button", { name: "只看所选" }).click();
       await page.waitForTimeout(300);
+      if (editRendererId === "webgpu-tile") {
+        await waitForWebGpuStorageUpdate(page, {
+          assetId: asset.id,
+          label: "isolate",
+          previousChecksum: webGpuStorageChecksum,
+        });
+      }
       const visibleAfterIsolate = await labeledValue(page, "可见");
       const objectStateChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-object-state-checksum");
       const objectStateVisibleAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-visible-objects") ?? "0");
@@ -1255,6 +1274,9 @@ async function runAudit(url, assetsToCheck, options) {
       const objectStateIsolatedAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-object-state-isolated-objects") ?? "0");
       const webGpuStorageStatusAfterIsolate = await viewport.getAttribute("data-webgpu-storage-status");
       const webGpuStorageUpdateModeAfterIsolate = await viewport.getAttribute("data-webgpu-storage-update-mode");
+      const webGpuStorageUpdateMsAfterIsolate = finiteNumericValue(await viewport.getAttribute("data-webgpu-storage-update-ms") ?? "NaN");
+      const webGpuFrameSubmitMsAfterIsolate = finiteNumericValue(await viewport.getAttribute("data-webgpu-frame-submit-ms") ?? "NaN");
+      const webGpuQueueDoneMsAfterIsolate = finiteNumericValue(await viewport.getAttribute("data-webgpu-queue-done-ms") ?? "NaN");
       const webGpuStorageObjectStateByteSizeAfterIsolate = numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
       const webGpuStorageChecksumAfterIsolate = await viewport.getAttribute("data-webgpu-storage-checksum");
       const webGpuReadbackAfterIsolate =
@@ -1284,10 +1306,16 @@ async function runAudit(url, assetsToCheck, options) {
         editRendererId === "webgpu-tile" &&
         (webGpuStorageStatusAfterIsolate !== "object-state-updated" ||
           webGpuStorageUpdateModeAfterIsolate !== "object-state-only" ||
+          !Number.isFinite(webGpuStorageUpdateMsAfterIsolate) ||
+          webGpuStorageUpdateMsAfterIsolate < 0 ||
+          !Number.isFinite(webGpuFrameSubmitMsAfterIsolate) ||
+          webGpuFrameSubmitMsAfterIsolate < 0 ||
+          !Number.isFinite(webGpuQueueDoneMsAfterIsolate) ||
+          webGpuQueueDoneMsAfterIsolate < 0 ||
           webGpuStorageObjectStateByteSizeAfterIsolate <= 0)
       ) {
         throw new Error(
-          `${asset.id} isolate did not use WebGPU objectState-only storage update: status=${webGpuStorageStatusAfterIsolate} updateMode=${webGpuStorageUpdateModeAfterIsolate} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterIsolate}`,
+          `${asset.id} isolate did not use WebGPU objectState-only storage update with timing: status=${webGpuStorageStatusAfterIsolate} updateMode=${webGpuStorageUpdateModeAfterIsolate} updateMs=${webGpuStorageUpdateMsAfterIsolate} submitMs=${webGpuFrameSubmitMsAfterIsolate} queueDoneMs=${webGpuQueueDoneMsAfterIsolate} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterIsolate}`,
         );
       }
       if (
@@ -1307,6 +1335,17 @@ async function runAudit(url, assetsToCheck, options) {
         if (activeViewport.getAttribute("data-renderer") !== "spark-splat") return true;
         return activeViewport.getAttribute("data-spark-filter-status") === "ready";
       }, undefined, { timeout: 15000 });
+      if (editRendererId === "webgpu-tile") {
+        const activeRendererAfterDelete = await page.locator(".viewport").first().getAttribute("data-renderer");
+        if (activeRendererAfterDelete === "webgpu-tile") {
+          await waitForWebGpuStorageUpdate(page, {
+            assetId: asset.id,
+            label: "delete",
+            previousChecksum: webGpuStorageChecksumAfterIsolate,
+            allowFullUpload: true,
+          });
+        }
+      }
       const deletedObjects = await labeledValue(page, "已删除对象");
       const visibleAfterDelete = await labeledValue(page, "可见");
       const renderModeAfterDelete = await labeledValue(page, "模式");
@@ -1478,6 +1517,15 @@ async function runAudit(url, assetsToCheck, options) {
       const webGpuStorageUpdateModeAfterDelete = sparkFilteredAfterDelete
         ? "spark-filtered"
         : await viewport.getAttribute("data-webgpu-storage-update-mode");
+      const webGpuStorageUpdateMsAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : finiteNumericValue(await viewport.getAttribute("data-webgpu-storage-update-ms") ?? "NaN");
+      const webGpuFrameSubmitMsAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : finiteNumericValue(await viewport.getAttribute("data-webgpu-frame-submit-ms") ?? "NaN");
+      const webGpuQueueDoneMsAfterDelete = sparkFilteredAfterDelete
+        ? 0
+        : finiteNumericValue(await viewport.getAttribute("data-webgpu-queue-done-ms") ?? "NaN");
       const webGpuStorageObjectStateByteSizeAfterDelete = sparkFilteredAfterDelete
         ? 0
         : numericValue(await viewport.getAttribute("data-webgpu-storage-object-state-byte-size") ?? "0");
@@ -1773,12 +1821,20 @@ async function runAudit(url, assetsToCheck, options) {
       if (
         editRendererId === "webgpu-tile" &&
         !sparkFilteredAfterDelete &&
-        (webGpuStorageStatusAfterDelete !== "object-state-updated" ||
-          webGpuStorageUpdateModeAfterDelete !== "object-state-only" ||
+        (!(
+          (webGpuStorageStatusAfterDelete === "object-state-updated" &&
+            webGpuStorageUpdateModeAfterDelete === "object-state-only") ||
+          (webGpuStorageStatusAfterDelete === "uploaded" &&
+            webGpuStorageUpdateModeAfterDelete === "full-upload")
+        ) ||
+          !Number.isFinite(webGpuStorageUpdateMsAfterDelete) ||
+          webGpuStorageUpdateMsAfterDelete < 0 ||
+          !Number.isFinite(webGpuFrameSubmitMsAfterDelete) ||
+          webGpuFrameSubmitMsAfterDelete < 0 ||
           webGpuStorageObjectStateByteSizeAfterDelete <= 0)
       ) {
         throw new Error(
-          `${asset.id} delete did not use WebGPU objectState-only storage update: status=${webGpuStorageStatusAfterDelete} updateMode=${webGpuStorageUpdateModeAfterDelete} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterDelete}`,
+          `${asset.id} delete did not use WebGPU storage update fallback with timing: status=${webGpuStorageStatusAfterDelete} updateMode=${webGpuStorageUpdateModeAfterDelete} updateMs=${webGpuStorageUpdateMsAfterDelete} submitMs=${webGpuFrameSubmitMsAfterDelete} queueDoneMs=${webGpuQueueDoneMsAfterDelete} objectStateBytes=${webGpuStorageObjectStateByteSizeAfterDelete}`,
         );
       }
       if (
@@ -1927,6 +1983,23 @@ async function runAudit(url, assetsToCheck, options) {
         webGpuStorageTileOffsets,
         webGpuStoragePixelOutput,
         webGpuStorageChecksum,
+        webGpuStorageUpdateMode,
+        webGpuStorageUpdateMs,
+        webGpuFrameSubmitMs,
+        webGpuQueueDoneMs,
+        webGpuStorageObjectStateByteSize,
+        webGpuStorageStatusAfterIsolate,
+        webGpuStorageUpdateModeAfterIsolate,
+        webGpuStorageUpdateMsAfterIsolate,
+        webGpuFrameSubmitMsAfterIsolate,
+        webGpuQueueDoneMsAfterIsolate,
+        webGpuStorageObjectStateByteSizeAfterIsolate,
+        webGpuStorageStatusAfterDelete,
+        webGpuStorageUpdateModeAfterDelete,
+        webGpuStorageUpdateMsAfterDelete,
+        webGpuFrameSubmitMsAfterDelete,
+        webGpuQueueDoneMsAfterDelete,
+        webGpuStorageObjectStateByteSizeAfterDelete,
         webGpuStorageChecksumAfterIsolate,
         webGpuStorageChecksumAfterDelete,
         storageLimitGate,
@@ -2634,6 +2707,55 @@ async function waitForWebGpuQueueTelemetry(page, timeoutMs = 8000) {
       deviceLostStatus === "lost"
     );
   }, undefined, { timeout: timeoutMs }).catch(() => {});
+}
+
+async function waitForWebGpuStorageUpdate(
+  page,
+  { assetId, label, previousChecksum, allowFullUpload = false },
+  timeoutMs = 20000,
+) {
+  await page.waitForFunction(
+    ({ previous, allowFullUpload: allowFull }) => {
+      const viewport = document.querySelector(".viewport");
+      if (viewport?.getAttribute("data-renderer") !== "webgpu-tile") return false;
+      const storageStatus = viewport.getAttribute("data-webgpu-storage-status");
+      const storageUpdateMode = viewport.getAttribute("data-webgpu-storage-update-mode");
+      const storageChecksum = viewport.getAttribute("data-webgpu-storage-checksum") ?? "";
+      const storageUpdateMs = Number(viewport.getAttribute("data-webgpu-storage-update-ms") ?? "NaN");
+      const submitMs = Number(viewport.getAttribute("data-webgpu-frame-submit-ms") ?? "NaN");
+      const queueDoneMs = Number(viewport.getAttribute("data-webgpu-queue-done-ms") ?? "NaN");
+      const queueStatus = viewport.getAttribute("data-webgpu-queue-status");
+      const deviceLostStatus = viewport.getAttribute("data-webgpu-device-lost-status");
+      const objectStateOnly =
+        storageStatus === "object-state-updated" &&
+        storageUpdateMode === "object-state-only";
+      const fullUpload =
+        allowFull &&
+        storageStatus === "uploaded" &&
+        storageUpdateMode === "full-upload";
+      const queueReady =
+        queueStatus === "submitted" ||
+        (queueStatus === "done" && Number.isFinite(queueDoneMs) && queueDoneMs >= 0) ||
+        queueStatus === "failed" ||
+        deviceLostStatus === "lost";
+      return (
+        (objectStateOnly || fullUpload) &&
+        /^[0-9a-f]{8}$/.test(storageChecksum) &&
+        storageChecksum !== previous &&
+        Number.isFinite(storageUpdateMs) &&
+        storageUpdateMs >= 0 &&
+        Number.isFinite(submitMs) &&
+        submitMs >= 0 &&
+        queueReady
+      );
+    },
+    { previous: previousChecksum, allowFullUpload },
+    { timeout: timeoutMs },
+  ).catch((error) => {
+    throw new Error(
+      `${assetId} WebGPU ${label} storage update timing did not settle: ${error.message}`,
+    );
+  });
 }
 
 async function waitForWebGpuReadbackTransition(
