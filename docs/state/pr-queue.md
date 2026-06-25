@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-013: WebGPU C-path readiness evidence aggregator
+
+- 状态: done / cpath-readiness-report
+- 类型: 标准 PR / WebGPU C-path evidence reporting
+- 目标: 将 1M static scale budget、1M edit-cost budget 和真实 headed browser object transition 证据收敛到一条本地命令，明确哪些已证明、哪些仍是 gap，避免把 budget audit 误读成 1M browser FPS。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-cpath-readiness.mjs` 和 `npm run audit:webgpu-cpath-readiness`。
+  - Readiness audit 默认执行 build、`audit:webgpu-scale-budget`、`audit:webgpu-edit-cost-budget` 和 fixed-port `5395` headed `audit:webgpu-presentation-transition`。
+  - Report 输出 `/tmp/objgauss-webgpu-cpath-readiness/summary.json` 和 `summary.md`，合并 scale / edit / presentation transition evidence，并单独列出 remaining gaps。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU headless/presentation runbook 已登记该命令。
+- 结论:
+  - 当前本机 readiness 通过：1M scale budget max / total storage=`122.07 / 173.24 MiB`。
+  - 1M edit-cost row 通过：object-state edit update=`4 KiB`，full storage=`173.24 MiB`，pixel candidate upper bound=`8.192G`。
+  - Headed browser transition 当前覆盖到 Plush semantic `281498` Gaussians，2/2 scenes 保持 `postDelete="webgpu-tile":"gpu-object-state-buffer"`，max queue done=`1836.8ms`。
+  - 报告仍明确标注 `browserRuntime1m=not-proven` 和 `fpsSla=not-proven`；本 PR 不是 1M interactive SLA。
+- 验证:
+  - `node --check scripts/audit-webgpu-cpath-readiness.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-cpath-readiness -- --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-012: Headed WebGPU presentation object-transition gate
 
 - 状态: done / presentation-transition-gate

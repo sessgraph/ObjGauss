@@ -45,6 +45,7 @@
     "audit:webgpu-tile-smoke": "node scripts/audit-webgpu-tile-smoke.mjs",
     "audit:webgpu-scale-budget": "node scripts/audit-webgpu-scale-budget.mjs",
     "audit:webgpu-edit-cost-budget": "node scripts/audit-webgpu-edit-cost-budget.mjs",
+    "audit:webgpu-cpath-readiness": "node scripts/audit-webgpu-cpath-readiness.mjs",
     "audit:renderer-route-contract": "node scripts/audit-renderer-route-contract.mjs",
     "acceptance:renderer": "node scripts/acceptance-renderer-profile.mjs",
     "acceptance:renderer-ci": "node scripts/acceptance-renderer-profile.mjs --profile ci",

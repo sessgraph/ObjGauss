@@ -79,6 +79,17 @@ the C-path renderer instead of falling back to Spark:
 npm run audit:webgpu-presentation-transition
 ```
 
+Use the C-path readiness aggregator when the question is the combined state of
+1M storage/edit budgets plus the current real headed browser transition proof:
+
+```bash
+npm run audit:webgpu-cpath-readiness
+```
+
+This command writes an explicit remaining-gap section. A passing report still
+keeps real 1M browser runtime / FPS as not proven until a true 1M scene is run
+in the browser with frame pacing instrumentation.
+
 For visual fidelity / tuning regressions, use the existing coverage gate:
 
 ```bash

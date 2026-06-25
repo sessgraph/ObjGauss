@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation, but are not full FPS SLAs. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-cpath-readiness`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation, but are not full FPS SLAs. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -252,6 +252,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Is the B -> C renderer route contract still intact? | `npm run audit:renderer-route-contract` |
 | Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
 | Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
+| What is the combined C-path readiness state and remaining 1M gap? | `npm run audit:webgpu-cpath-readiness` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Are WebGPU object edit runtime timings inside the current smoke envelope? | `npm run audit:webgpu-runtime-performance` |
 | Does WebGPU full canvas presentation stay inside the current smoke envelope? | `npm run audit:webgpu-presentation-performance` |
@@ -322,6 +323,18 @@ versus `173.24 MiB` full storage, with an `8.192G` pixel candidate-check upper
 bound. The default total workgroup budget is `4352`, which covers the 512px
 interactive row's `4096` pixel workgroups plus tile accumulation / resolve
 dispatches. This is an update-shape and cost-envelope check, not an FPS proof.
+
+`npm run audit:webgpu-cpath-readiness` is the local evidence aggregator for the
+C-path. It runs the viewer build, `audit:webgpu-scale-budget`,
+`audit:webgpu-edit-cost-budget`, and headed fixed-port
+`audit:webgpu-presentation-transition`, then writes
+`/tmp/objgauss-webgpu-cpath-readiness/summary.json` and `summary.md`. The
+current local report passes with the 1M scale budget row at max / total storage
+`122.07 / 173.24 MiB`, the 1M edit-cost row at `4 KiB` object-state update
+versus `173.24 MiB` full storage, and headed browser transition evidence up to
+Plush semantic `281498` Gaussians with max queue-done `1836.8ms`. The report
+intentionally keeps `browserRuntime1m=not-proven` and `fpsSla=not-proven`; it
+is a readiness matrix, not the terminal 1M browser performance proof.
 
 `npm run audit:webgpu-tile-smoke` also covers the C-path edit-state contract.
 The default tile list mode remains `visible-only`, but the WebGPU runtime uses
