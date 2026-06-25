@@ -23,7 +23,7 @@ npm run build
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local
 ```
 
-The command starts `vite preview` on `127.0.0.1:5230`, launches system
+The command starts `vite preview` on `127.0.0.1:5395`, launches system
 Chrome/Chromium in headed mode with `--enable-unsafe-webgpu`, and runs:
 
 ```text
@@ -48,7 +48,7 @@ npm run audit:webgpu-desktop -- --browser-channel chrome
 npm run audit:webgpu-desktop -- --executable-path /usr/bin/google-chrome
 
 # Reuse an already running server.
-npm run audit:webgpu-desktop -- --url http://127.0.0.1:5230/ --no-server
+npm run audit:webgpu-desktop -- --url http://127.0.0.1:5395/ --no-server
 
 # Diagnostic headless run; this is expected to fail on the current machine.
 npm run audit:webgpu-desktop -- --headless --allow-failures

@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { normalizeWebGpuPixelDepthBinCount } from "../src/webgpuDepthTuning.js";
 
-const DEFAULT_PORT = 5276;
+const DEFAULT_PORT = 5395;
 const DEFAULT_ASSETS = ["nerf-lego-alpha-closure-local"];
 const DEFAULT_BINS = [4, 8, 12, 16];
 const DEFAULT_FOOTPRINT_SCALE = 2.2;

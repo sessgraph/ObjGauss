@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `PORT-001`: 如需继续提升本地验收操作体验，把浏览器 audit / acceptance 的默认端口统一收敛到 fixed `5395` runbook / defaults；当前新增 Spark pick feasibility audit 已固定 `5395`，但历史脚本仍有旧默认端口。
+  - `PORT-002`: 如后续仍遇到端口占用，不换端口；先查并停止占用 `5395` 的本地 preview/browser audit 进程，再重跑。
   - Renderer-native object picking 暂不迁移：Spark `SplatMesh.raycast` 目前只返回 `distance/object/point`，没有 splat index / object id；后续要么等待/扩展 Spark intersection metadata，要么继续使用已审计的 `hover-confirm-v1` screen-space pick。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,28 @@
 当前无进行中 PR。
 
 ## Done
+
+### PORT-001: Browser audit fixed port defaults
+
+- 状态: done / fixed-port-defaults
+- 类型: 标准 PR / local browser audit ergonomics
+- 目标: 将本地 browser audit / acceptance 默认端口统一到 fixed `5395`，避免每条命令不断换端口；保留显式 `--port` / `--native-port` / `--trained-port` override 能力。
+- 已实施:
+  - `audit:demo`、Spark route / pick / feather / reconstruct audits、WebGPU desktop / coverage / depth / offscreen audits 的 `DEFAULT_PORT` 均收敛到 `5395`。
+  - `acceptance:demo`、`acceptance:spark-commercial-route`、`acceptance:renderer-*`、`acceptance:webgpu-headless` 的默认 browser audit ports 均收敛到 `5395`；多 step acceptance 仍顺序执行，每个子 audit 自己启动并停止 `--strictPort` preview。
+  - `package.json` 的 `audit:spark-mask-feather` shortcut 改为 `--port 5395`。
+  - 当前 runbook 中仍用于“照命令跑”的旧端口示例已更新到 `5395`：`docs/training/splatfacto-smoke.md`、`docs/rendering/webgpu-desktop-audit.md`、`docs/rendering/webgpu-headless-acceptance.md`、`docs/benchmarks/spark-filtered-edit.md`。
+- 结论:
+  - 新默认行为是“同一端口反复使用”：如果 `5395` 被占用，`--strictPort` 会失败，应停止占用该端口的本地 preview/audit 进程再重跑，而不是换到新端口。
+  - 历史验证记录中的旧端口保留为历史事实，不作为当前 runbook 默认。
+- 验证:
+  - `node --check` changed browser audit / acceptance scripts: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:demo -- --asset nerf-lego-alpha-closure-local --server-mode preview --skip-visual-residual`: passed，默认 preview URL=`http://127.0.0.1:5395/`。
+  - `npm run audit:spark-native-mask-gate -- --assets nerf-lego-alpha-closure-local`: passed，默认 preview URL=`http://127.0.0.1:5395/`。
+  - `npm run acceptance:renderer-ci -- --dry-run --skip-build --skip-webgpu-tile-smoke --skip-splat-index-mapping`: passed，generated command uses `--port 5395`。
+  - `git diff --check`: passed。
 
 ### DEMO-005P: Spark native pick feasibility audit
 

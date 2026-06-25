@@ -4,7 +4,7 @@ const args = parseArgs(process.argv.slice(2));
 const outputDir = String(
   args.outputDir ?? args["output-dir"] ?? "/tmp/objgauss-webgpu-headless-acceptance",
 );
-const port = String(args.port ?? "5330");
+const port = String(args.port ?? "5395");
 const assets = optionalString(args.assets ?? args.asset);
 const webGpuFlags = String(args.webGpuFlags ?? args["webgpu-flags"] ?? "unsafe");
 const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);

@@ -10,7 +10,7 @@ import {
   validateCanvasVisualStats,
 } from "./lib/visual-stats.mjs";
 
-const DEFAULT_PORT = 5296;
+const DEFAULT_PORT = 5395;
 const DEFAULT_ASSETS = ["nerf-lego-alpha-closure-local"];
 const RESIDUAL_MODE = "spark-reconstruct-residual-v1";
 const SPARK_RECONSTRUCT_PROBE_PARAM = "spark-reconstruct-probe";

@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const args = parseArgs(process.argv.slice(2));
-const nativePort = String(args.nativePort ?? args["native-port"] ?? "5347");
-const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5348");
+const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
+const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const outputDir = String(
   args.outputDir ?? args["output-dir"] ?? "/tmp/objgauss-spark-commercial-route",
 );

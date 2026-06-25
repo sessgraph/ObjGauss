@@ -328,10 +328,10 @@ Use a built static preview to avoid dev-server file watcher limits:
 
 ```bash
 npm run build
-npm run preview -- --port 5294 --strictPort
+npm run preview -- --port 5395 --strictPort
 npm run audit:demo -- \
   --asset nerf-lego-alpha-closure-local \
-  --url http://127.0.0.1:5294/ \
+  --url http://127.0.0.1:5395/ \
   --no-server
 ```
 
@@ -386,7 +386,7 @@ SH-heavy trained sample interaction result:
 ```bash
 npm run audit:demo -- \
   --asset nerf-lego-trained-output-local \
-  --url http://127.0.0.1:5294/ \
+  --url http://127.0.0.1:5395/ \
   --no-server
 ```
 
@@ -478,10 +478,10 @@ Run the URL-gated native compact `.splat` mask audit:
 
 ```bash
 npm run build
-npm run preview -- --host 127.0.0.1 --port 5302 --strictPort
+npm run preview -- --host 127.0.0.1 --port 5395 --strictPort
 npm run audit:demo -- \
   --asset nerf-lego-alpha-closure-local \
-  --url http://127.0.0.1:5302/ \
+  --url http://127.0.0.1:5395/ \
   --no-server \
   --spark-native-mask
 ```
@@ -534,7 +534,7 @@ SH-heavy trained sample default route check:
 npm run audit:demo -- \
   --assets nerf-lego-trained-output-local \
   --skip-visual-residual \
-  --url http://127.0.0.1:5312/ \
+  --url http://127.0.0.1:5395/ \
   --no-server
 ```
 
@@ -583,8 +583,7 @@ Gaussian local sample:
 npm run audit:spark-pick-report -- \
   --assets nerf-lego-trained-output-local \
   --max-clicks 5 \
-  --output-dir /tmp/objgauss-spark-pick-report-trained \
-  --port 5316
+  --output-dir /tmp/objgauss-spark-pick-report-trained
 ```
 
 Current trained local result:

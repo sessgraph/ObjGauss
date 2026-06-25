@@ -4,14 +4,14 @@ const args = parseArgs(process.argv.slice(2));
 const pullAssets = flagEnabled(args["pull-assets"]);
 const skipSemanticBenchmark = flagEnabled(args["skip-semantic-benchmark"]);
 const includeSparkCommercialRoute = flagEnabled(args["include-spark-commercial-route"]);
-const sparkNativePort = optionalString(args["spark-native-port"]) || "5351";
-const sparkTrainedPort = optionalString(args["spark-trained-port"]) || "5352";
+const sparkNativePort = optionalString(args["spark-native-port"]) || "5395";
+const sparkTrainedPort = optionalString(args["spark-trained-port"]) || "5395";
 const sparkRouteOutputDir =
   optionalString(args["spark-route-output-dir"]) ||
   "/tmp/objgauss-acceptance-demo-spark-commercial-route";
 const skipSparkRouteBuild = flagEnabled(args["skip-spark-route-build"]);
 const browserAuditMode = optionalString(args["browser-audit-mode"]) || "preview";
-const browserAuditPort = optionalString(args["browser-audit-port"]) || "5180";
+const browserAuditPort = optionalString(args["browser-audit-port"]) || "5395";
 const browserAuditAssets = optionalString(args["browser-audit-assets"]);
 const skipBrowserVisualResidual = flagEnabled(args["skip-browser-visual-residual"]);
 

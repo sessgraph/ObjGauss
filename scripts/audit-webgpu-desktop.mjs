@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const DEFAULT_PORT = 5230;
+const DEFAULT_PORT = 5395;
 const DEFAULT_ASSET = "nerf-lego-alpha-closure-local";
 const DEFAULT_PROBES = ["offscreen-readback", "clear-only", "texture-display-only", "full"];
 

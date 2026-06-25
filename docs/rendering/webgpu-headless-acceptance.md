@@ -91,8 +91,8 @@ npm run acceptance:webgpu-headless -- --output-dir /tmp/objgauss-webgpu-headless
 # Reuse an existing build.
 npm run acceptance:webgpu-headless -- --skip-build
 
-# Change the preview port.
-npm run acceptance:webgpu-headless -- --port 5331
+# Keep local browser audits on the fixed preview port.
+npm run acceptance:webgpu-headless -- --port 5395
 ```
 
 Use `npm run audit:webgpu-offscreen-readback -- --skip-object-transition` only

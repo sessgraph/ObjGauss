@@ -14,8 +14,8 @@ const skipSplatIndexMapping = flagEnabled(
   args.skipSplatIndexMapping ?? args["skip-splat-index-mapping"],
 );
 const skipWebGpuTileSmoke = flagEnabled(args.skipWebGpuTileSmoke ?? args["skip-webgpu-tile-smoke"]);
-const nativePort = String(args.nativePort ?? args["native-port"] ?? "5355");
-const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5356");
+const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
+const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
   args.noShAssets ??
     args["no-sh-assets"] ??

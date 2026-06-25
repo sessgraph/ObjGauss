@@ -51,7 +51,7 @@ import {
   WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
 } from "../src/webgpuRuntimeProbe.js";
 
-const DEFAULT_PORT = 5180;
+const DEFAULT_PORT = 5395;
 const DEFAULT_ASSETS = [
   {
     id: "plush-semantic-closure-local",

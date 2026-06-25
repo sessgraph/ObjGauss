@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
 
-const DEFAULT_PORT = 5310;
+const DEFAULT_PORT = 5395;
 const SPARK_NATIVE_SOURCE = "native-splat-source-v1";
 const SPARK_MASK_SOURCE = "native-splat";
 const SPARK_OBJECT_FILTER = "spark-object-opacity-mask";

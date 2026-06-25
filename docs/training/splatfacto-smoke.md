@@ -167,7 +167,7 @@ The current public sample was updated to that candidate and passed browser
 audit through static preview:
 
 ```text
-command=npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5188/
+command=npm run audit:demo -- --asset nerf-lego-trained-output-local --url http://127.0.0.1:5395/
 splatPixels=3256
 editPixels=74388
 visibleAfterIsolate=126686
@@ -175,7 +175,7 @@ deletedObjects=1
 screenshot=/tmp/objgauss-audit-nerf-lego-trained-output-local.png
 ```
 
-Use `npm run preview -- --port 5188 --strictPort` when `npm run audit:demo`
+Use `npm run preview -- --port 5395 --strictPort` when `npm run audit:demo`
 cannot start Vite dev server because the system inotify watcher limit is
 exhausted.
 

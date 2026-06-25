@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const DEFAULT_PORT = 5321;
+const DEFAULT_PORT = 5395;
 const DEFAULT_OUTPUT_DIR = "/tmp/objgauss-webgpu-offscreen-readback";
 const DEFAULT_ASSETS = [
   "nerf-lego-alpha-closure-local",
