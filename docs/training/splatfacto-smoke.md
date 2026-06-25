@@ -197,6 +197,19 @@ Check local readiness without starting training:
 npm run train:splatfacto:near1m-candidate -- --status
 ```
 
+Write the same readiness facts as a machine-readable report:
+
+```bash
+npm run train:splatfacto:near1m-candidate -- \
+  --status \
+  --status-json /tmp/objgauss-near1m-status/summary.json
+```
+
+The status report uses schema `objgauss-near1m-candidate-status-v1` and records
+the input/output paths, scale thresholds, current Gaussian counts, missing
+files, blockers, and the guarded full-run command. It is a preflight report; a
+green JSON status still does not replace the strict production SLA gate.
+
 Run the full chain. This starts a long Splatfacto training job, so it requires
 an explicit confirmation flag:
 

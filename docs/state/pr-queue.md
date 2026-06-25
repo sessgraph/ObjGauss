@@ -29,6 +29,29 @@
 
 ## Done
 
+### TRAIN-003G: Near-1M candidate status has JSON report
+
+- 状态: done / near1m-status-json-report
+- 类型: 标准 PR / training-output readiness observability
+- 目标: 把 near-1M candidate handoff 的当前缺口从人读日志升级为机器可读 readiness report，方便后续 acceptance、看板或本地 runbook 判断缺的是训练产物还是链路。
+- 已实施:
+  - `scripts/train-splatfacto-near1m-candidate.mjs` 新增 `--status-json <path>`。
+  - `--status` 会继续打印原有人读检查，同时可写出 schema=`objgauss-near1m-candidate-status-v1` 的 JSON report。
+  - JSON report 记录 paths、thresholds、parameters、flags、checks、readiness、blockers 和 guarded full-run command。
+  - TRAIN-003D runbook 已记录 status JSON 命令和 report 语义。
+- 结论:
+  - near-1M pipeline 现在能把 terminal C-path production SLA 的剩余 gap 机器化落表。
+  - 当前 status JSON 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；Nerfstudio config / checkpoint / exported near-1M PLY / candidate object-aware PLY / production SLA summary 仍 missing。
+  - 这一步仍不启动 10000-step 训练，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --status --status-json /tmp/objgauss-near1m-status/summary.json`: passed；report schema=`objgauss-near1m-candidate-status-v1`，`status=incomplete`，`missing=5`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003F: Near-1M long training requires explicit confirmation
 
 - 状态: done / long-run-confirmation-guard

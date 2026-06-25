@@ -1,5 +1,6 @@
-import { existsSync, openSync, readSync, closeSync, statSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { dirname } from "node:path";
 
 const args = process.argv.slice(2);
 const options = parseArgs(args);
@@ -73,6 +74,7 @@ const skipSla = Boolean(options.skipSla);
 const publish = Boolean(options.publish);
 const allowSlaFailures = Boolean(options.allowSlaFailures);
 const confirmLongRun = Boolean(options.confirmLongRun);
+const statusJsonPath = options.statusJson ?? options.statusJsonOutput;
 
 const steps = [
   {
@@ -203,7 +205,11 @@ const steps = [
 ];
 
 if (mode === "status") {
-  printStatus();
+  const report = buildStatusReport();
+  printStatus(report);
+  if (statusJsonPath) {
+    writeStatusJson(statusJsonPath, report);
+  }
   process.exit(0);
 }
 
@@ -254,7 +260,7 @@ if (mode === "dry-run") {
   console.log("\ntrain_splatfacto_near1m_candidate=passed");
 }
 
-function printStatus() {
+function buildStatusReport() {
   const exportedCount = existsSync(exportedPly) ? readPlyVertexCountOrZero(exportedPly) : 0;
   const objectCount = existsSync(candidateObjectPly) ? readPlyVertexCountOrZero(candidateObjectPly) : 0;
   const checks = [
@@ -300,24 +306,146 @@ function printStatus() {
       path: `${paths.slaOutputDir}/summary.json`,
       prepare: formatCommand(steps[2].command),
     },
-  ];
-  let missing = 0;
-  for (const check of checks) {
-    const ok = existsSync(check.path);
-    if (!ok) missing += 1;
-    const countText = check.count ? ` count=${check.count}` : "";
-    console.log(`check=${check.label} status=${ok ? "present" : "missing"} path=${check.path}${countText}`);
-    if (!ok) {
+  ].map((check) => ({
+    ...check,
+    status: existsSync(check.path) ? "present" : "missing",
+  }));
+  const missingChecks = checks.filter((check) => check.status === "missing");
+  const exportedReady = exportedCount >= minExportedGaussians;
+  const objectReady = objectCount >= minExportedGaussians;
+  const productionSlaReady = existsSync(`${paths.slaOutputDir}/summary.json`);
+  const blockers = [];
+  for (const check of missingChecks) {
+    blockers.push({
+      kind: "missing-file",
+      label: check.label,
+      path: check.path,
+      prepare: check.prepare,
+    });
+  }
+  if (exportedCount > 0 && !exportedReady) {
+    blockers.push({
+      kind: "under-scale-export",
+      label: "exported near-1M PLY",
+      path: exportedPly,
+      count: exportedCount,
+      minGaussians: minExportedGaussians,
+    });
+  }
+  if (objectCount > 0 && !objectReady) {
+    blockers.push({
+      kind: "under-scale-object-ply",
+      label: "candidate object-aware PLY",
+      path: candidateObjectPly,
+      count: objectCount,
+      minGaussians: minExportedGaussians,
+    });
+  }
+  return {
+    schema: "objgauss-near1m-candidate-status-v1",
+    generatedAt: new Date().toISOString(),
+    mode,
+    status: missingChecks.length === 0 && exportedReady && objectReady && productionSlaReady ? "ready" : "incomplete",
+    missing: missingChecks.length,
+    thresholds: {
+      minExportedGaussians,
+      minObjectGaussians: minExportedGaussians,
+      minTrainedApproxFps: Number.parseFloat(minTrainedApproxFps),
+    },
+    parameters: {
+      targetHardware,
+      iterations,
+      stepsPerSave,
+      cacheImages,
+      cameraResScaleFactor,
+      maxJobs,
+      device,
+      slots,
+      samMaxFrames,
+      samMaxMasksPerFrame,
+      samMaxAreaFraction,
+      objectIterations,
+      curveIterations,
+      evalEvery,
+      renderSize,
+      learningRate,
+      port,
+    },
+    flags: {
+      skipTrain,
+      skipRegister,
+      skipSla,
+      publish,
+      allowSlaFailures,
+      confirmLongRun,
+    },
+    paths: {
+      dataset: paths.dataset,
+      outputRoot: paths.outputRoot,
+      experiment: paths.experiment,
+      timestamp: paths.timestamp,
+      exportDir: paths.exportDir,
+      exportedPly,
+      objectFieldDir: paths.objectFieldDir,
+      samManifest: paths.samManifest,
+      samCheckpoint: paths.samCheckpoint,
+      candidateOutputDir: paths.candidateOutputDir,
+      candidateObjectPly,
+      benchmarkOutputDir: paths.benchmarkOutputDir,
+      slaOutputDir: paths.slaOutputDir,
+      productionSlaSummary: `${paths.slaOutputDir}/summary.json`,
+      trainConfig,
+      checkpoint,
+    },
+    checks,
+    readiness: {
+      exportedPly: exportedReady ? "ready" : "not-ready",
+      exportedGaussians: exportedCount,
+      candidateObjectPly: objectReady ? "ready" : "not-ready",
+      objectGaussians: objectCount,
+      productionSla: productionSlaReady ? "ready" : "not-ready",
+    },
+    blockers,
+    commands: {
+      train: formatCommand(steps[0].command),
+      register: formatCommand(steps[1].command),
+      productionSla: formatCommand(steps[2].command),
+      guardedRun: formatCommand([
+        "npm",
+        "run",
+        "train:splatfacto:near1m-candidate",
+        "--",
+        "--run",
+        "--confirm-long-run",
+        "--target-hardware",
+        targetHardware,
+      ]),
+    },
+  };
+}
+
+function printStatus(report) {
+  for (const check of report.checks) {
+    const countText = Number.isFinite(check.count) ? ` count=${check.count}` : "";
+    console.log(`check=${check.label} status=${check.status} path=${check.path}${countText}`);
+    if (check.status !== "present") {
       console.log(`prepare=${check.prepare}`);
     }
   }
   console.log(
-    `near1m_export=${exportedCount >= minExportedGaussians ? "ready" : "not-ready"} exported_gaussians=${exportedCount} min_exported_gaussians=${minExportedGaussians}`,
+    `near1m_export=${report.readiness.exportedPly} exported_gaussians=${report.readiness.exportedGaussians} min_exported_gaussians=${minExportedGaussians}`,
   );
   console.log(
-    `near1m_object_ply=${objectCount >= minExportedGaussians ? "ready" : "not-ready"} object_gaussians=${objectCount} min_object_gaussians=${minExportedGaussians}`,
+    `near1m_object_ply=${report.readiness.candidateObjectPly} object_gaussians=${report.readiness.objectGaussians} min_object_gaussians=${minExportedGaussians}`,
   );
-  console.log(`status=${missing === 0 ? "ready" : "incomplete"} missing=${missing}`);
+  console.log(`production_sla=${report.readiness.productionSla}`);
+  console.log(`status=${report.status} missing=${report.missing}`);
+}
+
+function writeStatusJson(filePath, report) {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`status_json=${filePath}`);
 }
 
 function collectMissingForRun() {
