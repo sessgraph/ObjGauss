@@ -14,6 +14,14 @@ const webGpuFlags = String(args.webGpuFlags ?? args["webgpu-flags"] ?? "unsafe")
 const skipBuild = flagEnabled(args.skipBuild ?? args["skip-build"]);
 const skipRun = flagEnabled(args.skipRun ?? args["skip-run"]);
 const allowFailures = flagEnabled(args.allowFailures ?? args["allow-failures"]);
+const trainedPlyPath = optionalString(
+  args.trainedPly ?? args["trained-ply"] ?? args.inputPly ?? args["input-ply"],
+);
+const trainedPlyEnabled = Boolean(trainedPlyPath);
+const trainedPlyMinGaussians = positiveInteger(
+  args.trainedMinGaussians ?? args["trained-min-gaussians"] ?? args.minGaussians ?? args["min-gaussians"],
+  1_000_000,
+);
 const realFrameCount = positiveInteger(
   args.realFrameCount ?? args["real-frame-count"] ?? args.frameCount ?? args["frame-count"],
   DEFAULT_FRAME_COUNT,
@@ -25,12 +33,20 @@ const syntheticFrameCount = positiveInteger(
     args["frame-count"],
   DEFAULT_FRAME_COUNT,
 );
+const trainedFrameCount = positiveInteger(
+  args.trainedFrameCount ?? args["trained-frame-count"] ?? args.frameCount ?? args["frame-count"],
+  DEFAULT_FRAME_COUNT,
+);
 const minRealApproxFps = positiveFiniteNumber(
   args.minRealApproxFps ?? args["min-real-approx-fps"],
   10,
 );
 const minSyntheticApproxFps = positiveFiniteNumber(
   args.minSyntheticApproxFps ?? args["min-synthetic-approx-fps"],
+  8,
+);
+const minTrainedApproxFps = positiveFiniteNumber(
+  args.minTrainedApproxFps ?? args["min-trained-approx-fps"],
   8,
 );
 const maxRealMeanFrameMs = positiveFiniteNumber(
@@ -41,6 +57,10 @@ const maxSyntheticMeanFrameMs = positiveFiniteNumber(
   args.maxSyntheticMeanFrameMs ?? args["max-synthetic-mean-frame-ms"],
   150,
 );
+const maxTrainedMeanFrameMs = positiveFiniteNumber(
+  args.maxTrainedMeanFrameMs ?? args["max-trained-mean-frame-ms"],
+  150,
+);
 const maxP95FrameMs = positiveFiniteNumber(args.maxP95FrameMs ?? args["max-p95-frame-ms"], 220);
 const maxLongFrameRatio = positiveFiniteNumber(
   args.maxLongFrameRatio ?? args["max-long-frame-ratio"],
@@ -49,11 +69,15 @@ const maxLongFrameRatio = positiveFiniteNumber(
 
 const realDir = path.join(outputDir, "real-scenes-frame-pacing");
 const syntheticDir = path.join(outputDir, "synthetic-1m-frame-pacing");
+const trainedDir = path.join(outputDir, "trained-ply-frame-pacing");
 const realSummaryPath = String(
   args.realSummary ?? args["real-summary"] ?? path.join(realDir, "summary.json"),
 );
 const syntheticSummaryPath = String(
   args.syntheticSummary ?? args["synthetic-summary"] ?? path.join(syntheticDir, "summary.json"),
+);
+const trainedSummaryPath = String(
+  args.trainedSummary ?? args["trained-summary"] ?? path.join(trainedDir, "summary.json"),
 );
 
 mkdirSync(outputDir, { recursive: true });
@@ -112,11 +136,43 @@ try {
       String(minSyntheticApproxFps),
       ...(allowFailures ? ["--allow-failures"] : []),
     ]);
+    if (trainedPlyEnabled) {
+      await runStep("Trained PLY sustained frame pacing", [
+        "npm",
+        "run",
+        "audit:webgpu-ply-runtime",
+        "--",
+        "--input-ply",
+        trainedPlyPath,
+        "--scene-kind",
+        "trained",
+        "--min-gaussians",
+        String(trainedPlyMinGaussians),
+        "--port",
+        port,
+        "--webgpu-flags",
+        webGpuFlags,
+        "--output-dir",
+        trainedDir,
+        "--frame-count",
+        String(trainedFrameCount),
+        "--max-mean-frame-ms",
+        String(maxTrainedMeanFrameMs),
+        "--max-p95-frame-ms",
+        String(maxP95FrameMs),
+        "--max-long-frame-ratio",
+        String(maxLongFrameRatio),
+        "--min-approx-fps",
+        String(minTrainedApproxFps),
+        ...(allowFailures ? ["--allow-failures"] : []),
+      ]);
+    }
   }
 
   const realSummary = readJsonOrNull(realSummaryPath);
   const syntheticSummary = readJsonOrNull(syntheticSummaryPath);
-  const evidence = buildEvidence({ realSummary, syntheticSummary });
+  const trainedSummary = trainedPlyEnabled ? readJsonOrNull(trainedSummaryPath) : null;
+  const evidence = buildEvidence({ realSummary, syntheticSummary, trainedSummary });
   const checks = buildChecks(evidence);
   const passed = checks.every((entry) => entry.passed);
   const summary = {
@@ -130,21 +186,29 @@ try {
     thresholds: {
       realFrameCount,
       syntheticFrameCount,
+      trainedFrameCount,
+      trainedPlyMinGaussians,
       minRealApproxFps,
       minSyntheticApproxFps,
+      minTrainedApproxFps,
       maxRealMeanFrameMs,
       maxSyntheticMeanFrameMs,
+      maxTrainedMeanFrameMs,
       maxP95FrameMs,
       maxLongFrameRatio,
     },
     sourceSummaries: {
       realScenes: realSummaryPath,
       synthetic1m: syntheticSummaryPath,
+      trainedPly: trainedPlyEnabled ? trainedSummaryPath : "not-provided",
     },
     passed,
     status: passed ? "passed" : "failed",
     fpsBaseline:
-      passed && evidence.realScenes.status === "passed" && evidence.synthetic1m.status === "passed"
+      passed &&
+      evidence.realScenes.status === "passed" &&
+      evidence.synthetic1m.status === "passed" &&
+      (!trainedPlyEnabled || evidence.trainedPly.status === "passed")
         ? "baseline-passed"
         : "not-proven",
     steps,
@@ -153,7 +217,11 @@ try {
     remainingGaps: [
       {
         id: "real-trained-browser-runtime-1m",
-        status: "not-proven",
+        status:
+          evidence.trainedPly.sceneProof === "proven-trained-ply-upload" &&
+          evidence.trainedPly.uploadedGaussians >= 1_000_000
+            ? "passed"
+            : "not-proven",
         nextEvidence:
           "Run a trained or captured real scene near 1M Gaussians through the same sustained frame pacing gate.",
       },
@@ -165,13 +233,15 @@ try {
       },
     ],
     interpretation:
-      "This is a longer fixed-port headed browser frame-pacing baseline for current real scenes plus synthetic 1M upload/runtime. It is stronger than the short smoke gates, but it is not a production FPS SLA and does not prove trained 1M scene quality.",
+      "This is a longer fixed-port headed browser frame-pacing baseline for current real scenes, synthetic 1M upload/runtime, and optional trained PLY upload/runtime. It is stronger than the short smoke gates, but it is not a production FPS SLA.",
   };
   writeReport(summary);
   console.log(
     `webgpu_sustained_frame_pacing=${summary.status} fpsBaseline=${summary.fpsBaseline} ` +
       `realMinApproxFps=${summary.evidence.realScenes.minApproxFps} ` +
       `syntheticMinApproxFps=${summary.evidence.synthetic1m.minApproxFps} ` +
+      `trainedPly=${summary.evidence.trainedPly.status} ` +
+      `trainedMinApproxFps=${summary.evidence.trainedPly.minApproxFps} ` +
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
   );
   if (!passed && !allowFailures) process.exitCode = 1;
@@ -211,10 +281,12 @@ async function runStep(label, command) {
   }
 }
 
-function buildEvidence({ realSummary, syntheticSummary }) {
+function buildEvidence({ realSummary, syntheticSummary, trainedSummary }) {
   const realAggregate = realSummary?.aggregate ?? {};
   const syntheticAggregate = syntheticSummary?.aggregate ?? {};
   const syntheticRow = syntheticSummary?.row ?? {};
+  const trainedAggregate = trainedSummary?.aggregate ?? {};
+  const trainedRow = trainedSummary?.row ?? {};
   return {
     realScenes: {
       status:
@@ -266,6 +338,39 @@ function buildEvidence({ realSummary, syntheticSummary }) {
       interpretation:
         "Synthetic 1M upload/runtime uses longer rAF sampling through real UI upload and WebGPU Tile object edits.",
     },
+    trainedPly: {
+      status:
+        !trainedPlyEnabled
+          ? "not-provided"
+          : trainedSummary?.passed === true &&
+              trainedSummary?.proof?.plyRuntime === "proven-ply-upload" &&
+              numeric(trainedRow.packedGaussians) >= trainedPlyMinGaussians &&
+              numeric(trainedAggregate.minApproxFps) >= minTrainedApproxFps &&
+              numeric(trainedAggregate.maxMeanFrameMs) <= maxTrainedMeanFrameMs &&
+              numeric(trainedAggregate.maxP95FrameMs) <= maxP95FrameMs &&
+              numeric(trainedAggregate.maxLongFrameRatio) <= maxLongFrameRatio
+            ? "passed"
+            : "failed",
+      mode: trainedSummary?.mode ?? "",
+      proof: trainedSummary?.proof?.plyRuntime ?? "not-proven",
+      sceneProof: trainedSummary?.proof?.realTrainedScene1m ?? "not-proven",
+      uploadedGaussians: numeric(trainedRow.packedGaussians),
+      tileReferences: numeric(trainedRow.tileReferences),
+      minApproxFps: numeric(trainedAggregate.minApproxFps),
+      maxMeanFrameMs: numeric(trainedAggregate.maxMeanFrameMs),
+      maxP95FrameMs: numeric(trainedAggregate.maxP95FrameMs),
+      maxLongFrameRatio: numeric(trainedAggregate.maxLongFrameRatio),
+      uploadWallMs: numeric(trainedAggregate.uploadWallMs),
+      isolateUpdateMs: numeric(trainedAggregate.isolateUpdateMs),
+      deleteUpdateMs: numeric(trainedAggregate.deleteUpdateMs),
+      frameCount: trainedFrameCount,
+      minGaussians: trainedPlyMinGaussians,
+      screenshotPath: trainedRow.screenshotPath ?? "",
+      summaryPath: trainedPlyEnabled ? trainedSummaryPath : "not-provided",
+      interpretation: trainedPlyEnabled
+        ? "Caller-provided trained PLY upload/runtime uses longer rAF sampling through WebGPU Tile object edits."
+        : "No trained PLY was provided for this sustained baseline run.",
+    },
   };
 }
 
@@ -316,6 +421,41 @@ function buildChecks(evidence) {
       `<= ${maxSyntheticMeanFrameMs}`,
       evidence.synthetic1m.maxMeanFrameMs <= maxSyntheticMeanFrameMs,
     ),
+    ...(trainedPlyEnabled
+      ? [
+          check(
+            "trained-ply-summary",
+            Boolean(evidence.trainedPly.mode),
+            "present",
+            Boolean(evidence.trainedPly.mode),
+          ),
+          check(
+            "trained-ply-proof",
+            evidence.trainedPly.proof,
+            "proven-ply-upload",
+            evidence.trainedPly.proof === "proven-ply-upload",
+          ),
+          check(
+            "trained-ply-count",
+            evidence.trainedPly.uploadedGaussians,
+            `>= ${trainedPlyMinGaussians}`,
+            evidence.trainedPly.uploadedGaussians >= trainedPlyMinGaussians,
+          ),
+          check("trained-ply-status", evidence.trainedPly.status, "passed", evidence.trainedPly.status === "passed"),
+          check(
+            "trained-ply-min-approx-fps",
+            evidence.trainedPly.minApproxFps,
+            `>= ${minTrainedApproxFps}`,
+            evidence.trainedPly.minApproxFps >= minTrainedApproxFps,
+          ),
+          check(
+            "trained-ply-max-mean-frame-ms",
+            evidence.trainedPly.maxMeanFrameMs,
+            `<= ${maxTrainedMeanFrameMs}`,
+            evidence.trainedPly.maxMeanFrameMs <= maxTrainedMeanFrameMs,
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -425,6 +565,12 @@ function flagEnabled(value) {
   if (value === true) return true;
   if (value === undefined || value === null || value === false) return false;
   return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === true || value === false) return "";
+  const text = String(value).trim();
+  return text || "";
 }
 
 function positiveFiniteNumber(value, fallback) {

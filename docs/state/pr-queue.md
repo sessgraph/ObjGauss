@@ -29,6 +29,33 @@
 
 ## Done
 
+### RENDER-ROUTE-020: Sustained frame pacing accepts trained PLY evidence
+
+- 状态: done / trained-ply-sustained-baseline
+- 类型: 标准 PR / WebGPU C-path trained scene responsiveness evidence
+- 目标: 把 real/trained object-aware PLY 纳入 `audit:webgpu-sustained-frame-pacing`，让未来 near-1M trained scene 可以在同一条 C-path baseline 中证明浏览器上传、对象编辑和长采样响应性。
+- 已实施:
+  - `scripts/audit-webgpu-sustained-frame-pacing.mjs` 新增 `--trained-ply` / `--input-ply`、`--trained-min-gaussians`、`--trained-frame-count`、`--min-trained-approx-fps` 和 `--max-trained-mean-frame-ms`。
+  - 提供 trained PLY 时，sustained baseline 会调用 `npm run audit:webgpu-ply-runtime -- --scene-kind trained`，并在 summary 中追加 `trainedPly` evidence row。
+  - `fpsBaseline` 现在会在提供 trained PLY 时要求 `trainedPly.status=passed`，否则保持旧的 real scenes + synthetic 1M 判断。
+  - `audit:webgpu-cpath-readiness -- --include-sustained-frame-pacing --trained-ply <path>` 会把同一 trained PLY 透传给 sustained baseline，并在 readiness summary 中输出 `sustainedTrainedPly` / `sustainedTrainedMinApproxFps`。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该路径。
+- 结论:
+  - C-path 现在有一条合并的 trained PLY 长采样验收入口。
+  - 当前本机短采样验证通过：real scenes min approx FPS=`5.825`，synthetic 1M min approx FPS=`4.11`，trained Lego PLY min approx FPS=`11.322`。
+  - Readiness 聚合验证通过：`sustainedTrainedPly=passed`，`sustainedTrainedMinApproxFps=11.322`，`realTrainedBrowserRuntime1m=not-proven`，`fpsSla=not-proven`。
+  - 这一步仍不生成 near-1M trained PLY，也不把 `fpsSla` 标为完成。
+- 验证:
+  - `node --check scripts/audit-webgpu-sustained-frame-pacing.mjs`: passed。
+  - `node --check scripts/audit-webgpu-cpath-readiness.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-sustained-frame-pacing -- --port 5395 --output-dir /tmp/objgauss-webgpu-sustained-frame-pacing-trained-ply-short --skip-build --frame-count 10 --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000 --min-real-approx-fps 1 --min-synthetic-approx-fps 1 --min-trained-approx-fps 1 --max-real-mean-frame-ms 300 --max-synthetic-mean-frame-ms 300 --max-trained-mean-frame-ms 300 --max-p95-frame-ms 2500 --max-long-frame-ratio 1`: passed；`trainedPly=passed`，`trainedMinApproxFps=11.322`。
+  - `npm run audit:webgpu-cpath-readiness -- --skip-run --skip-synthetic-1m-runtime --scale-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/scale-budget/summary.json --edit-cost-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/edit-cost-budget/summary.json --transition-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/presentation-transition/summary.json --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000 --trained-ply-runtime-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/trained-ply-runtime/summary.json --sustained-frame-pacing-summary /tmp/objgauss-webgpu-sustained-frame-pacing-trained-ply-short/summary.json --sustained-min-real-approx-fps 1 --sustained-min-synthetic-approx-fps 1 --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness-trained-sustained-summary`: passed；`sustainedTrainedPly=passed`，`fpsSla=not-proven`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-019: C-path readiness accepts sustained frame-pacing evidence
 
 - 状态: done / sustained-readiness-evidence

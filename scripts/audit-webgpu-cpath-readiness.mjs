@@ -200,6 +200,14 @@ try {
         String(sustainedMaxP95FrameMs),
         "--max-long-frame-ratio",
         String(sustainedMaxLongFrameRatio),
+        ...(trainedPlyRuntimeEnabled
+          ? [
+              "--trained-ply",
+              trainedPlyPath,
+              "--trained-min-gaussians",
+              String(Math.round(trainedPlyMinGaussians)),
+            ]
+          : []),
       ]);
     }
   }
@@ -344,6 +352,7 @@ function buildEvidence({
   const sustainedEvidence = sustainedFramePacingSummary?.evidence ?? {};
   const sustainedReal = sustainedEvidence.realScenes ?? {};
   const sustainedSynthetic = sustainedEvidence.synthetic1m ?? {};
+  const sustainedTrained = sustainedEvidence.trainedPly ?? {};
   return {
     scaleBudget1m: {
       status: scaleSummary.status === "passed" && scale1m?.status === "passed" ? "passed" : "failed",
@@ -471,8 +480,16 @@ function buildEvidence({
       syntheticMaxMeanFrameMs: numeric(sustainedSynthetic.maxMeanFrameMs),
       syntheticMaxP95FrameMs: numeric(sustainedSynthetic.maxP95FrameMs),
       syntheticMaxLongFrameRatio: numeric(sustainedSynthetic.maxLongFrameRatio),
+      trainedPlyStatus: sustainedTrained.status ?? "not-provided",
+      trainedPlyGaussians: numeric(sustainedTrained.uploadedGaussians),
+      trainedPlyMinApproxFps: numeric(sustainedTrained.minApproxFps),
+      trainedPlyMaxMeanFrameMs: numeric(sustainedTrained.maxMeanFrameMs),
+      trainedPlyMaxP95FrameMs: numeric(sustainedTrained.maxP95FrameMs),
+      trainedPlyMaxLongFrameRatio: numeric(sustainedTrained.maxLongFrameRatio),
+      trainedPlyProof: sustainedTrained.proof ?? "not-proven",
+      trainedPlySceneProof: sustainedTrained.sceneProof ?? "not-proven",
       interpretation: includeSustainedFramePacing
-        ? "Longer rAF sampling baseline was collected for current real scenes plus synthetic 1M upload/runtime. This is baseline evidence, not production FPS SLA."
+        ? "Longer rAF sampling baseline was collected for current real scenes, synthetic 1M upload/runtime, and optional trained PLY upload/runtime. This is baseline evidence, not production FPS SLA."
         : "No sustained frame-pacing baseline was included in this readiness run; use --include-sustained-frame-pacing to collect it.",
     },
     realTrainedBrowserRuntime1m: {
@@ -585,6 +602,16 @@ function buildChecks(evidence) {
             `>= ${sustainedMinSyntheticApproxFps}`,
             evidence.sustainedFramePacing.syntheticMinApproxFps >= sustainedMinSyntheticApproxFps,
           ),
+          ...(trainedPlyRuntimeEnabled
+            ? [
+                check(
+                  "sustained-trained-ply",
+                  evidence.sustainedFramePacing.trainedPlyStatus,
+                  "passed",
+                  evidence.sustainedFramePacing.trainedPlyStatus === "passed",
+                ),
+              ]
+            : []),
         ]
       : []),
   ];
@@ -695,7 +722,11 @@ function keyResult(id, item) {
     return `${item.gaussians} uploaded Gaussians, min required ${item.minGaussians}, proof ${item.proof}`;
   }
   if (id === "sustainedFramePacing") {
-    return `real min FPS ${item.realMinApproxFps}, synthetic min FPS ${item.syntheticMinApproxFps}, baseline ${item.fpsBaseline}`;
+    const trained =
+      item.trainedPlyStatus && item.trainedPlyStatus !== "not-provided"
+        ? `, trained min FPS ${item.trainedPlyMinApproxFps}`
+        : "";
+    return `real min FPS ${item.realMinApproxFps}, synthetic min FPS ${item.syntheticMinApproxFps}${trained}, baseline ${item.fpsBaseline}`;
   }
   return item.status;
 }
@@ -715,6 +746,8 @@ function printSummary(summary) {
       `sustainedFramePacing=${summary.evidence?.sustainedFramePacing?.status ?? "not-provided"}`,
       `sustainedRealMinApproxFps=${summary.evidence?.sustainedFramePacing?.realMinApproxFps ?? 0}`,
       `sustainedSyntheticMinApproxFps=${summary.evidence?.sustainedFramePacing?.syntheticMinApproxFps ?? 0}`,
+      `sustainedTrainedPly=${summary.evidence?.sustainedFramePacing?.trainedPlyStatus ?? "not-provided"}`,
+      `sustainedTrainedMinApproxFps=${summary.evidence?.sustainedFramePacing?.trainedPlyMinApproxFps ?? 0}`,
       `realTrainedBrowserRuntime1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "not-proven"}`,
       `fpsSla=${summary.evidence?.fpsSla?.status ?? "not-proven"}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,

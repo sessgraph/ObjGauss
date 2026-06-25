@@ -157,6 +157,19 @@ This writes `/tmp/objgauss-webgpu-sustained-frame-pacing/summary.json` and
 baseline result. It is stronger than the short smoke gates, but it is still not
 a production FPS SLA.
 
+Include a trained PLY in the sustained baseline when the question is whether a
+real/trained object-aware PLY also survives longer rAF sampling:
+
+```bash
+npm run audit:webgpu-sustained-frame-pacing -- \
+  --trained-ply public/samples/nerf_lego_trained_objects.ply \
+  --trained-min-gaussians 250000 \
+  --port 5395
+```
+
+When a near-1M trained object-aware PLY is available, use the same command with
+`--trained-min-gaussians 1000000`.
+
 Use the frame-pacing smoke when the question is whether the current headed
 browser C-path remains responsive after object edits:
 

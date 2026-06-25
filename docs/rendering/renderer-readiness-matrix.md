@@ -424,6 +424,21 @@ references, min approximate FPS `28.917`, max mean frame interval `34.582ms`,
 max p95 frame interval `16.8ms`, and max long-frame ratio `0.008`. This
 establishes a sustained baseline gate, not a production FPS SLA.
 
+The same sustained baseline can include a trained PLY row:
+
+```bash
+npm run audit:webgpu-sustained-frame-pacing -- \
+  --trained-ply public/samples/nerf_lego_trained_objects.ply \
+  --trained-min-gaussians 250000 \
+  --port 5395
+```
+
+When `audit:webgpu-cpath-readiness --include-sustained-frame-pacing` is run
+with `--trained-ply`, readiness forwards that PLY into the sustained baseline
+and reports the trained row as `sustainedTrainedPly`. For the final near-1M
+trained-scene proof, use a near-1M object-aware PLY and
+`--trained-min-gaussians 1000000`.
+
 `npm run audit:webgpu-frame-pacing` is the headed browser responsiveness smoke
 for the current C-path scenes. It forces `spark-filtered-edit=off`, enters the
 WebGPU Tile edit route, then samples `requestAnimationFrame` intervals during
