@@ -210,6 +210,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run acceptance:webgpu-headless` 已固化为 WebGPU CI/headless acceptance 命令；默认构建 viewer、跑 WebGPU tile smoke、再跑 Lego proxy + Plush semantic 的 offscreen object-transition suite。
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
   - `npm run train:splatfacto:near1m-candidate` 已固化为 near-1M trained candidate 到 production SLA 的本地编排入口：只有 `--run --confirm-long-run` 才会启动长训，后续输出仍在 ignored `outputs/` 和 `/tmp`；默认 scale gate 会拒绝低于 1M Gaussians 的 exported / object-aware PLY。
+  - `npm run audit:near1m-production-gap` 已固化为非训练 near-1M terminal evidence gap artifact：默认写 `/tmp/objgauss-near1m-production-gap/summary.{json,md}` 并在 incomplete 时 exit `0` 用作进度报告；加 `--require-ready` 时会把同一套检查变成 final gate，当前预期失败并报告 5 个缺口。
   - `npm run benchmark:splatfacto:balanced` 已固化为 safe-2000 balanced candidate 的一键本地 benchmark 入口，可重跑 balanced SAM、`training register-output`、emergence metrics、curve、report 和 summary。
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
   - `npm run benchmark:splatfacto:scenes` 已固化为 Splatfacto-trained scene suite，可比较 Lego safe-2000、LLFF Fern smoke 与 Poly Haven Chair smoke 三个 scene rows，并支持 train / held-out SAM manifest split。

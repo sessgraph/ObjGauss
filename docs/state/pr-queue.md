@@ -29,6 +29,24 @@
 
 ## Done
 
+### TRAIN-003T: Near-1M production gap audit writes artifact
+
+- 状态: done / progress-artifact-gate
+- 类型: 标准 PR / training-output observability
+- 目标: 把 near-1M terminal evidence gap 从 console/status JSON 扩展为一条可复查的 audit artifact 命令。
+- 已实施:
+  - 新增 `scripts/audit-near1m-production-gap.mjs`。
+  - 新增 npm alias `audit:near1m-production-gap`。
+  - 默认运行会调用 candidate status、读取 `goalGap`，并写 `summary.json` / `summary.md`。
+  - 默认 incomplete 不失败，适合作为进度报告；`--require-ready` 会在当前 5 个 terminal evidence 缺口未补齐时失败，适合作为 final gate。
+  - TRAIN-003 runbook 和项目状态已记录该命令。
+- 结论:
+  - near-1M production proof 现在有独立 artifact 报告：当前状态仍为 `incomplete`，`next_action=start-background-long-run`，缺口仍是 5 个 near-1M / SLA evidence。
+- 验证:
+  - `node --check scripts/audit-near1m-production-gap.mjs`: passed。
+  - `npm run audit:near1m-production-gap -- --output-dir /tmp/objgauss-near1m-production-gap-smoke`: passed；wrote incomplete progress artifact。
+  - `npm run audit:near1m-production-gap -- --output-dir /tmp/objgauss-near1m-production-gap-require-ready --require-ready`: expected failed with exit `1`；reported the same 5 blockers as final gate。
+
 ### TRAIN-003S: Near-1M candidate status exposes terminal goal gap
 
 - 状态: done / production-gap-audit

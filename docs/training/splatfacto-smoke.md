@@ -332,6 +332,18 @@ A production SLA summary counts as ready only when the summary JSON has
 `status="passed"`; a present but failed or unreadable summary remains a blocker
 and reports `next_action=run-production-sla`.
 
+To write a compact operator-facing gap report without starting training:
+
+```bash
+npm run audit:near1m-production-gap -- \
+  --output-dir /tmp/objgauss-near1m-production-gap
+```
+
+By default this audit exits `0` when the terminal proof is still incomplete, so
+it can be used as a progress report. Add `--require-ready` to turn the same
+audit into the final gate after the near-1M outputs and production SLA have
+been produced.
+
 Stop the detached run when you need to free the machine. This sends `SIGTERM`
 to the recorded detached process group and requires an explicit stop
 confirmation:
