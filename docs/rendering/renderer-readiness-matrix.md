@@ -1,7 +1,7 @@
 # Renderer Readiness Matrix
 
 > Status: RENDER-005T-AT decision record
-> Last updated: 2026-06-24
+> Last updated: 2026-06-25
 
 This document defines which renderer route ObjGauss should use for commercial
 demo, diagnostics, and the long-term WebGPU tile renderer path.
@@ -209,6 +209,24 @@ The fixture writes a temporary synthetic policy and reviewed allowlist under
 `/tmp`, then requires applied remaps to be greater than zero. Current fixture
 evidence on Lego target `2`: applied=`402`, blocked=`741`.
 
+Before adding any real target to the reviewed allowlist, follow the manual
+review runbook:
+
+```text
+docs/rendering/object-boundary-remap-review-runbook.md
+```
+
+The committed allowlist manifest must pass:
+
+```bash
+npm run audit:object-boundary-remap-reviewed-allowlist-manifest
+```
+
+That gate keeps the manifest empty by default, but if an approved target is
+present it requires reviewer metadata, owner approval, `allowlist-candidate`
+policy evidence, hidden-delta / residual numbers, and durable
+repository-relative report and screenshot paths.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -243,6 +261,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do multiple high-risk remap targets preserve residual before promotion? | `npm run audit:object-boundary-remap-target-sweep` |
 | Which remap targets are allowlist candidates, risky, or review-only? | `npm run audit:object-boundary-remap-policy` |
 | Does remap export obey the target-level decision policy? | `npm run audit:object-boundary-remap-policy-export` |
+| Is the reviewed remap allowlist complete enough for human-approved targets? | `npm run audit:object-boundary-remap-reviewed-allowlist-manifest` |
 | Does the reviewed allowlist positive path actually apply remaps? | `npm run audit:object-boundary-remap-reviewed-allowlist` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |

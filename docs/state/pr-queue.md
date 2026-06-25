@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-24
+> 最近更新: 2026-06-25
 
 ## 队列规则
 
@@ -17,8 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005N`: 给 reviewed allowlist 增加人工评审 runbook / checklist，定义 target 进入 allowlist 前必须查看的 screenshots、hidden delta、non-target damage 和 owner approval 字段。
-  - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
+  - `DEMO-005O`: 评估 Spark pick 的 hover / confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围，但产品交互仍需要更明确的选中确认。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -29,6 +28,34 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005N: Reviewed remap allowlist review runbook and manifest audit
+
+- 状态: done / reviewed-allowlist-review-gate
+- 类型: 标准 PR / renderer quality export gate
+- 目标: 给 reviewed allowlist 增加人工评审 runbook / checklist，定义 target 进入 allowlist 前必须查看的 screenshots、hidden delta、non-target damage 和 owner approval 字段，并让 manifest 可机器校验。
+- 已实施:
+  - 新增 `docs/rendering/object-boundary-remap-review-runbook.md`，记录 fixed-port `5395` policy gate、证据复制、人工评审 checklist、拒绝条件和 approved target JSON 模板。
+  - 新增 `scripts/lib/remap-reviewed-allowlist.mjs`，集中校验 reviewed allowlist manifest、approved target reviewer / owner approval / evidence / residual threshold 字段。
+  - `scripts/export-object-boundary-remap-preview.mjs` 改为使用 shared reviewed allowlist validator；approved target 缺少人工审批字段时会被 export 拒绝，而不是只凭 `assetId/objectId` 应用 remap。
+  - 新增 `scripts/audit-object-boundary-remap-reviewed-allowlist-manifest.mjs` 与 `npm run audit:object-boundary-remap-reviewed-allowlist-manifest`；默认要求 approved target 的 evidence report / screenshot 路径为仓库相对路径且存在。
+  - 更新 synthetic positive fixture，使 `/tmp` allowlist 也携带完整 synthetic owner approval / evidence 字段，但不批准真实 repo target。
+- 结论:
+  - Committed reviewed allowlist 仍保持 `targets=[]`，manifest audit 通过：targets=`0`，evidence=`required`。
+  - 真实三场景 policy-export 仍 raw candidates=`10012`，applied=`0`，blocked=`10012`。
+  - Synthetic positive fixture 仍通过：Lego fixture target=`2`，applied=`402`，blocked=`741`。
+  - 这一步把 reviewed allowlist 从“空安全阀”升级为“可审计人工批准流程”；仍没有任何真实 remap target 进入默认样例。
+- 验证:
+  - `node --check scripts/lib/remap-reviewed-allowlist.mjs`: passed。
+  - `node --check scripts/export-object-boundary-remap-preview.mjs`: passed。
+  - `node --check scripts/audit-object-boundary-remap-reviewed-allowlist.mjs`: passed。
+  - `node --check scripts/audit-object-boundary-remap-reviewed-allowlist-manifest.mjs`: passed。
+  - `npm run audit:object-boundary-remap-reviewed-allowlist-manifest`: passed。
+  - `npm run audit:object-boundary-remap-reviewed-allowlist`: passed。
+  - `npm run audit:object-boundary-remap-policy-export`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005M: Reviewed remap allowlist manifest and positive fixture
 

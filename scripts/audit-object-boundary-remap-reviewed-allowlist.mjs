@@ -173,6 +173,7 @@ function fixtureTarget({ assetId: targetAssetId, targetObjectId }) {
 }
 
 function fixtureAllowlist({ assetId: targetAssetId, targetObjectId }) {
+  const today = new Date().toISOString().slice(0, 10);
   return {
     mode: "object-boundary-remap-reviewed-allowlist-v1",
     version: 1,
@@ -182,7 +183,32 @@ function fixtureAllowlist({ assetId: targetAssetId, targetObjectId }) {
         assetId: targetAssetId,
         targetObjectId,
         reviewer: "fixture",
+        reviewedAt: today,
         reason: "synthetic positive fixture for reviewed allowlist gate",
+        ownerApproval: {
+          decision: "approved-for-policy-gated-remap",
+          approvedBy: "fixture",
+          approvedAt: today,
+        },
+        evidence: {
+          policyDecision: "allowlist-candidate",
+          policyReport: policyPath,
+          residualReport: path.join(candidateDir, "summary.md"),
+          originalScreenshot: path.join(outputDir, "fixture-original-screenshot-placeholder.png"),
+          remapPreviewScreenshot: path.join(outputDir, "fixture-remap-screenshot-placeholder.png"),
+          hiddenGaussianDelta: -1,
+          hiddenGaussianDeltaShare: -0.000001,
+          afterDelta: {
+            coverageRatio: 1,
+            lumaDelta: 0,
+            chromaDelta: 0,
+          },
+          deleteDeltaChange: {
+            coverageRatio: 0,
+            lumaDelta: 0,
+            chromaDelta: 0,
+          },
+        },
       },
     ],
   };

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { ASSET_LIBRARY } from "../src/assetLibrary.js";
 import { parsePly } from "../src/ply.js";
+import { loadReviewedAllowlistManifest } from "./lib/remap-reviewed-allowlist.mjs";
 
 const MODE = "object-boundary-remap-preview-v1";
 const DEFAULT_ASSETS = ["nerf-lego-alpha-closure-local"];
@@ -56,7 +57,7 @@ const cleanupMinNeighbors = positiveInteger(
   args.cleanupMinNeighbors ?? args["cleanup-min-neighbors"] ?? 3,
 );
 const writePreviewPly = !flagEnabled(args.dryRun ?? args["dry-run"]);
-const reviewedAllowlist = loadReviewedAllowlist(reviewedAllowlistPath);
+const reviewedAllowlist = loadReviewedAllowlistManifest(reviewedAllowlistPath);
 const decisionPolicy = loadDecisionPolicy({
   policyPath,
   reviewedAllowlist,
@@ -320,47 +321,6 @@ function summarizeRemaps(remaps) {
   return {
     byObject: [...objectRows.values()].sort((left, right) => right.remapped - left.remapped),
     remapPairs: [...pairRows.values()].sort((left, right) => right.remapped - left.remapped),
-  };
-}
-
-function loadReviewedAllowlist(inputPath) {
-  if (!inputPath) return null;
-  if (!existsSync(inputPath)) {
-    throw new Error(`reviewed allowlist is missing: ${inputPath}`);
-  }
-  const raw = JSON.parse(readFileSync(inputPath, "utf-8"));
-  if (raw.mode !== "object-boundary-remap-reviewed-allowlist-v1") {
-    throw new Error(`unsupported reviewed allowlist mode: ${raw.mode}`);
-  }
-  const targets = [];
-  for (const target of raw.targets ?? []) {
-    if (target.approved === false) continue;
-    const assetId = String(target.assetId ?? "");
-    const targetObjectId = Number(target.targetObjectId);
-    if (!assetId || !Number.isFinite(targetObjectId)) {
-      throw new Error(`invalid reviewed allowlist target: ${JSON.stringify(target)}`);
-    }
-    targets.push({
-      assetId,
-      targetObjectId,
-      reviewer: String(target.reviewer ?? ""),
-      reason: String(target.reason ?? ""),
-    });
-  }
-  return {
-    path: inputPath,
-    raw,
-    targets,
-    summary: {
-      mode: raw.mode,
-      path: inputPath,
-      defaultAction: raw.defaultAction ?? "keep-hard-mask",
-      targetCount: targets.length,
-      targets: targets.map((target) => ({
-        assetId: target.assetId,
-        targetObjectId: target.targetObjectId,
-      })),
-    },
   };
 }
 
