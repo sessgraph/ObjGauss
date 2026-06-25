@@ -53,6 +53,7 @@
     "audit:webgpu-edit-cost-budget": "node scripts/audit-webgpu-edit-cost-budget.mjs",
     "audit:webgpu-cpath-readiness": "node scripts/audit-webgpu-cpath-readiness.mjs",
     "audit:renderer-route-contract": "node scripts/audit-renderer-route-contract.mjs",
+    "audit:renderer-route-goal": "node scripts/audit-renderer-route-goal.mjs",
     "acceptance:renderer": "node scripts/acceptance-renderer-profile.mjs",
     "acceptance:renderer-ci": "node scripts/acceptance-renderer-profile.mjs --profile ci",
     "acceptance:renderer-product": "node scripts/acceptance-renderer-profile.mjs --profile product",

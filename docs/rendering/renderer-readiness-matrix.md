@@ -249,6 +249,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | --- | --- |
 | What should default CI run for renderer readiness? | `npm run acceptance:renderer-ci` |
 | What should demo / release review run for the full product route? | `npm run acceptance:renderer-product` |
+| What is the single B -> C route goal status and remaining terminal gap? | `npm run audit:renderer-route-goal` |
 | Is the B -> C renderer route contract still intact? | `npm run audit:renderer-route-contract` |
 | Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
 | Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
@@ -559,6 +560,14 @@ product profile itself should become that terminal gate. The profile summary
 embeds the gap status, next action, completed evidence count, missing evidence
 count, and path to the child report so product review does not need to inspect
 the child artifact manually.
+
+`npm run audit:renderer-route-goal` is the compact goal-level progress report
+for the B -> C route. It reruns the B-phase WebGL Gaussian OIT contract, C-phase
+WebGPU tile contract, 100k-1M storage/edit budgets, and the near-1M production
+gap audit, then writes one `summary.json` / `summary.md`. By default it exits
+`0` when only the near-1M production proof is incomplete. Pass
+`--require-production-ready` when the same command should become the terminal
+B -> C route gate.
 
 ## Product UI Contract
 

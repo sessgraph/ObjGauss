@@ -243,6 +243,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - PORT-001 已将本地 browser audit / acceptance 默认端口收敛到 fixed `5395`：`audit:demo`、Spark audits、WebGPU browser audits、renderer / demo / Spark commercial / WebGPU headless acceptance 默认都走 `5395`。如端口占用，应停止占用 `5395` 的本地 preview/audit 进程后重跑，不再轮换随机端口；显式 override 参数仍保留用于特殊诊断。
   - PORT-002 已将裸跑 `npm run dev` 与 `npm run preview` 也固定到 `127.0.0.1:5395 --strictPort`；日常 Web 查看和 browser audit 使用同一端口，端口占用时先停止占用进程再重跑。
   - `npm run audit:renderer-route-contract` 已固化为 B -> C renderer 路线静态合约审计：检查 WebGL Gaussian OIT fallback、WebGPU tile terminal path、Spark commercial source route、browser audit telemetry 和 fixed `5395` 端口策略仍保持一致。
+  - `npm run audit:renderer-route-goal` 已固化为 B -> C renderer 路线目标级进度审计：聚合 route contract、WebGPU 100k-1M scale/edit budgets 和 near-1M production gap 到一份 summary；默认在仅缺 near-1M 终局证据时 exit `0` 作为进度报告，显式加 `--require-production-ready` 时会作为 terminal gate 失败。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.

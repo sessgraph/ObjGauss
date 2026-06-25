@@ -29,6 +29,28 @@
 
 ## Done
 
+### RENDER-ROUTE-028: B-to-C renderer route goal audit
+
+- 状态: done / route-goal-progress-artifact
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 把 B -> C 渲染路线目标完成度从多个分散 gate 收敛成一份 goal-level summary，明确区分“基础架构已过”和“near-1M terminal proof 未完成”。
+- 已实施:
+  - 新增 `scripts/audit-renderer-route-goal.mjs`。
+  - 新增 npm alias `audit:renderer-route-goal`。
+  - goal audit 会聚合 `audit:renderer-route-contract`、`audit:webgpu-scale-budget`、`audit:webgpu-edit-cost-budget` 和 `audit:near1m-production-gap`。
+  - 默认仅缺 near-1M production proof 时输出 `status=incomplete` 但 exit `0`，用于进度报告。
+  - 加 `--require-production-ready` 时同一缺口会 exit `1`，用于 B -> C route terminal gate。
+- 结论:
+  - 现在一条命令可以回答 B -> C 路线当前离终局还差什么：B/C renderer foundation、100k-1M scale/edit budgets 已通过，剩余缺口仍是 near-1M real trained PLY + production SLA。
+- 验证:
+  - `node --check scripts/audit-renderer-route-goal.mjs`: passed。
+  - `npm run audit:renderer-route-goal -- --output-dir /tmp/objgauss-renderer-route-goal-final`: passed；summary status `incomplete`, `passed=true`, missing only `near1m-production-proof`。
+  - `npm run audit:renderer-route-goal -- --require-production-ready --output-dir /tmp/objgauss-renderer-route-goal-final-require-ready`: expected failed with exit `1`；strict summary status `incomplete`, `passed=false`, near-1M step status `incomplete`, missing evidence `5`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-027: Product renderer profile can require near-1M proof
 
 - 状态: done / strict-product-gap-gate
