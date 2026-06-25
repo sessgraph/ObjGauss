@@ -302,6 +302,19 @@ npm run train:splatfacto:near1m-background -- \
   --output-dir /tmp/objgauss-splatfacto-near1m-background
 ```
 
+`--status` verifies the recorded process identity instead of treating PID
+existence alone as proof that the background training job is still alive. New
+launcher manifests record the launch process `/proc` start time, process group,
+cwd, and command line. Status reports expose `near1m_process_identity`:
+
+- `running` means the current PID matches the recorded launch identity or the
+  near-1M candidate command line.
+- `stale-pid` means the PID now belongs to another process; this does not block
+  a future launch and `--stop` treats it as a no-op.
+- `running-unverified` means the PID exists but identity details are
+  unavailable; `--stop` refuses to signal that PID rather than risk stopping an
+  unrelated process.
+
 When the nested candidate status report exists, `--status` also prints the
 candidate readiness summary: missing file count, exported Gaussian count,
 object-aware Gaussian count, production SLA status, blocker count, last exit

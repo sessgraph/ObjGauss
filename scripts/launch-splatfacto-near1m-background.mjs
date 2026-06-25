@@ -4,6 +4,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readlinkSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -164,7 +165,7 @@ if (mode === "stop") {
   const report = stopBackgroundRun();
   printStop(report);
   writeJson(statusPath, report);
-  process.exit(report.status === "stop-failed" ? 2 : 0);
+  process.exit(report.status === "stop-failed" || report.status === "stop-refused" ? 2 : 0);
 }
 
 if (!confirmLongRun) {
@@ -175,10 +176,11 @@ if (!confirmLongRun) {
 }
 
 const existing = readManifestIfPresent();
-if (existing?.pid && isPidAlive(existing.pid) && !allowExisting) {
+const existingProcess = inspectBackgroundProcess(existing);
+if (existingProcess.blocksNewRun && !allowExisting) {
   console.error(
     `near1m_background_guard=failed reason=${JSON.stringify(
-      `existing launcher pid ${existing.pid} is still running; pass --allow-existing only for diagnostics`,
+      `existing launcher pid ${existing.pid} is ${existingProcess.status}; pass --allow-existing only for diagnostics`,
     )}`,
   );
   process.exit(2);
@@ -211,14 +213,17 @@ try {
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
     handoffPath,
   };
+  manifest.launchProcessIdentity = readProcIdentity(child.pid);
   writeJson(manifestPath, manifest);
   const candidateStatus = readJsonIfPresent(candidateStatusPath);
+  const processIdentity = inspectBackgroundProcess(manifest);
   const launchStatus = {
     schema: "objgauss-near1m-background-status-v1",
     mode,
     generatedAt: new Date().toISOString(),
-    status: child.pid ? "running" : "unknown",
+    status: processIdentity.running ? "running" : "unknown",
     pid: child.pid,
+    process: processIdentity,
     manifestPath,
     logPath,
     handoffPath,
@@ -234,7 +239,7 @@ try {
   launchStatus.handoff = buildHandoff({
     candidateStatus,
     candidateSummary: launchStatus.candidateSummary,
-    running: Boolean(child.pid),
+    running: processIdentity.running,
   });
   writeReport(launchStatus);
   console.log(
@@ -268,15 +273,24 @@ function buildDryRunReport() {
 function buildStatusReport() {
   const manifest = readManifestIfPresent();
   const pid = manifest?.pid;
-  const running = pid ? isPidAlive(pid) : false;
+  const processIdentity = inspectBackgroundProcess(manifest);
+  const running = processIdentity.running;
   const logStats = existsSync(logPath) ? statSync(logPath) : null;
   const candidateStatus = readJsonIfPresent(candidateStatusPath);
+  const status = processIdentity.status === "stale-pid"
+    ? "stale-pid"
+    : running
+      ? "running"
+      : manifest
+        ? "not-running"
+        : "not-started";
   const report = {
     schema: "objgauss-near1m-background-status-v1",
     mode,
     generatedAt: new Date().toISOString(),
-    status: running ? "running" : manifest ? "not-running" : "not-started",
+    status,
     pid: pid ?? null,
+    process: processIdentity,
     manifestPath,
     logPath,
     handoffPath,
@@ -349,18 +363,34 @@ function stopBackgroundRun() {
       reason: "launcher manifest is missing or has no pid",
     };
   }
-  const running = isPidAlive(pid);
-  if (!running) {
+  const processIdentity = inspectBackgroundProcess(manifest);
+  if (!processIdentity.running) {
     return {
       schema: "objgauss-near1m-background-stop-v1",
-      status: "not-running",
+      status: processIdentity.status === "stale-pid" ? "stale-pid" : "not-running",
       stoppedAt: new Date().toISOString(),
       pid,
       signal: stopSignal,
       manifestPath,
       logPath,
       candidateStatusPath,
-      reason: "recorded pid is not running",
+      reason: processIdentity.reason ?? "recorded pid is not running",
+      process: processIdentity,
+      manifest,
+    };
+  }
+  if (!processIdentity.verified) {
+    return {
+      schema: "objgauss-near1m-background-stop-v1",
+      status: "stop-refused",
+      stoppedAt: new Date().toISOString(),
+      pid,
+      signal: stopSignal,
+      manifestPath,
+      logPath,
+      candidateStatusPath,
+      reason: processIdentity.reason ?? "recorded pid is alive but process identity is not verified",
+      process: processIdentity,
       manifest,
     };
   }
@@ -378,6 +408,7 @@ function stopBackgroundRun() {
       manifestPath,
       logPath,
       candidateStatusPath,
+      process: processIdentity,
       manifest,
     };
   } catch (error) {
@@ -392,6 +423,7 @@ function stopBackgroundRun() {
       logPath,
       candidateStatusPath,
       reason: error?.message ?? String(error),
+      process: processIdentity,
       manifest,
     };
   }
@@ -412,6 +444,11 @@ function printStatus(report) {
   console.log(
     `near1m_background=${report.status} pid=${report.pid ?? "none"} log=${report.logPath} log_bytes=${report.logBytes} handoff_md=${report.handoffPath}`,
   );
+  if (report.process) {
+    console.log(
+      `near1m_process_identity=${report.process.status} verified=${report.process.verified} blocks_new_run=${report.process.blocksNewRun} match_method=${report.process.matchMethod ?? "none"} reason=${JSON.stringify(report.process.reason ?? "")}`,
+    );
+  }
   if (report.candidateSummary) {
     console.log(
       `near1m_candidate_status=${report.candidateSummary.status} launch_readiness=${report.candidateSummary.launchReadiness} launch_missing=${report.candidateSummary.launchMissing} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers} last_exit=${report.candidateSummary.lastExitStatus} last_failure=${report.candidateSummary.lastFailureKind}`,
@@ -445,6 +482,11 @@ function printStop(report) {
   console.log(
     `near1m_background_stop=${report.status} pid=${report.pid ?? "none"} signal=${report.signal} reason=${JSON.stringify(report.reason ?? "")}`,
   );
+  if (report.process) {
+    console.log(
+      `near1m_process_identity=${report.process.status} verified=${report.process.verified} match_method=${report.process.matchMethod ?? "none"} reason=${JSON.stringify(report.process.reason ?? "")}`,
+    );
+  }
 }
 
 function readManifestIfPresent() {
@@ -588,6 +630,186 @@ function isPidAlive(pid) {
   }
 }
 
+function inspectBackgroundProcess(manifest) {
+  const pid = manifest?.pid;
+  if (!Number.isFinite(Number(pid)) || Number(pid) <= 0) {
+    return {
+      pid: pid ?? null,
+      status: "missing-pid",
+      running: false,
+      verified: false,
+      blocksNewRun: false,
+      reason: "launcher manifest is missing or has no valid pid",
+    };
+  }
+  if (!isPidAlive(pid)) {
+    return {
+      pid: Number(pid),
+      status: "not-running",
+      running: false,
+      verified: false,
+      blocksNewRun: false,
+      reason: "recorded pid is not running",
+    };
+  }
+
+  const identity = readProcIdentity(pid);
+  const match = matchRecordedProcess(manifest, identity);
+  if (match.status === "matched") {
+    return {
+      pid: Number(pid),
+      status: "running",
+      running: true,
+      verified: true,
+      blocksNewRun: true,
+      reason: match.reason ?? "recorded pid matches near-1M launcher process identity",
+      matchMethod: match.method ?? "unknown",
+      identity,
+    };
+  }
+  if (match.status === "mismatch") {
+    return {
+      pid: Number(pid),
+      status: "stale-pid",
+      running: false,
+      verified: false,
+      blocksNewRun: false,
+      reason: match.reason,
+      missingIdentityTokens: match.missingTokens,
+      identity,
+    };
+  }
+  return {
+    pid: Number(pid),
+    status: "running-unverified",
+    running: true,
+    verified: false,
+    blocksNewRun: true,
+    reason: match.reason,
+    identity,
+  };
+}
+
+function readProcIdentity(pid) {
+  const procDir = `/proc/${Number(pid)}`;
+  const identity = {
+    pid: Number(pid),
+    procAvailable: existsSync(procDir),
+    argv: [],
+    commandLine: null,
+    cwd: null,
+    processGroupId: null,
+    startTimeTicks: null,
+    readErrors: [],
+  };
+  try {
+    const raw = readFileSync(path.join(procDir, "cmdline"));
+    identity.argv = raw.toString("utf8").split("\0").filter(Boolean);
+    identity.commandLine = identity.argv.join(" ");
+  } catch (error) {
+    identity.readErrors.push(`cmdline:${error?.code ?? error?.message ?? String(error)}`);
+  }
+  try {
+    identity.cwd = readlinkSync(path.join(procDir, "cwd"));
+  } catch (error) {
+    identity.readErrors.push(`cwd:${error?.code ?? error?.message ?? String(error)}`);
+  }
+  try {
+    const stat = parseProcStat(readFileSync(path.join(procDir, "stat"), "utf8"));
+    identity.processGroupId = stat.processGroupId;
+    identity.startTimeTicks = stat.startTimeTicks;
+  } catch (error) {
+    identity.readErrors.push(`stat:${error?.code ?? error?.message ?? String(error)}`);
+  }
+  return identity;
+}
+
+function parseProcStat(text) {
+  const closeParen = text.lastIndexOf(")");
+  if (closeParen < 0) throw new Error("invalid /proc stat format");
+  const fieldsAfterCommand = text.slice(closeParen + 2).trim().split(/\s+/);
+  return {
+    processGroupId: Number.parseInt(fieldsAfterCommand[2], 10),
+    startTimeTicks: Number.parseInt(fieldsAfterCommand[19], 10),
+  };
+}
+
+function matchRecordedProcess(manifest, identity) {
+  const launchIdentityMatch = matchLaunchProcessIdentity(manifest, identity);
+  if (launchIdentityMatch.status === "matched") {
+    return launchIdentityMatch;
+  }
+
+  if (!identity?.commandLine) {
+    return {
+      status: "unverified",
+      reason: "process command line is unavailable; refusing to treat pid as verified near-1M training",
+    };
+  }
+
+  const commandLine = identity.commandLine;
+  const missingTokens = [];
+  for (const token of ["train:splatfacto:near1m-candidate", "--confirm-long-run"]) {
+    if (!commandLine.includes(token)) missingTokens.push(token);
+  }
+  if (manifest?.candidateStatusPath && !commandLine.includes(String(manifest.candidateStatusPath))) {
+    missingTokens.push("candidateStatusPath");
+  }
+  if (manifest?.cwd && identity.cwd && path.resolve(identity.cwd) !== path.resolve(manifest.cwd)) {
+    missingTokens.push("cwd");
+  }
+  if (missingTokens.length > 0) {
+    return {
+      status: "mismatch",
+      missingTokens,
+      reason: `recorded pid is alive but does not match near-1M launcher identity (${missingTokens.join(", ")})`,
+    };
+  }
+
+  return {
+    status: "matched",
+    method: "command-line",
+    reason: "recorded pid command line matches near-1M launcher command identity",
+  };
+}
+
+function matchLaunchProcessIdentity(manifest, identity) {
+  const recorded = manifest?.launchProcessIdentity;
+  if (!recorded || !identity) return { status: "unavailable" };
+  if (
+    Number.isFinite(Number(recorded.startTimeTicks)) &&
+    Number.isFinite(Number(identity.startTimeTicks)) &&
+    Number(recorded.startTimeTicks) === Number(identity.startTimeTicks)
+  ) {
+    if (
+      Number.isFinite(Number(recorded.processGroupId)) &&
+      Number.isFinite(Number(identity.processGroupId)) &&
+      Number(recorded.processGroupId) !== Number(identity.processGroupId)
+    ) {
+      return {
+        status: "mismatch",
+        method: "launch-process-start-time",
+        reason: "recorded pid start time matches, but process group changed",
+        missingTokens: ["processGroupId"],
+      };
+    }
+    if (recorded.cwd && identity.cwd && path.resolve(recorded.cwd) !== path.resolve(identity.cwd)) {
+      return {
+        status: "mismatch",
+        method: "launch-process-start-time",
+        reason: "recorded pid start time matches, but cwd changed",
+        missingTokens: ["cwd"],
+      };
+    }
+    return {
+      status: "matched",
+      method: "launch-process-start-time",
+      reason: "recorded pid start time matches the process captured at background launch",
+    };
+  }
+  return { status: "unavailable" };
+}
+
 function tailFile(filePath, maxLines) {
   const text = readFileSync(filePath, "utf8");
   return text.trimEnd().split(/\r?\n/).slice(-maxLines);
@@ -621,6 +843,14 @@ function renderHandoffMarkdown(report) {
     `- Status JSON: \`${statusPath}\``,
     `- Candidate status JSON: \`${candidateStatusPath}\``,
     `- Log path: \`${logPath}\``,
+    ...(report.process
+      ? [
+          `- Process identity: \`${report.process.status}\``,
+          `- Process verified: \`${report.process.verified}\``,
+          `- Process match method: \`${report.process.matchMethod ?? "none"}\``,
+          `- Process reason: ${report.process.reason ?? "unknown"}`,
+        ]
+      : []),
     "",
     "## Next Action",
     "",

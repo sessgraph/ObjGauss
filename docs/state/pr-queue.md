@@ -29,6 +29,28 @@
 
 ## Done
 
+### TRAIN-003R: Near-1M background status verifies process identity
+
+- 状态: done / stale-pid-safe-status
+- 类型: 标准 PR / training-output observability
+- 目标: 让 near-1M background `--status` / `--stop` 不再只凭 PID 存活判断，避免 PID 复用或旧 launcher manifest 把状态误报成 running。
+- 已实施:
+  - confirmed start manifest 现在记录 launch process `/proc` identity，包括 command line、cwd、process group 和 start time。
+  - `--status` 新增 `near1m_process_identity` 输出，并区分 `running`、`stale-pid`、`running-unverified`。
+  - start guard 只会被 verified / unverified running process 阻止；`stale-pid` 不再阻止下一次启动。
+  - `--stop --confirm-stop` 对 `stale-pid` 做 no-op，对 `running-unverified` 拒绝发信号，避免误杀无关进程。
+  - TRAIN-003 runbook 已记录 process identity 语义。
+- 结论:
+  - near-1M 长训 handoff 现在能更可靠地区分真实后台训练、已退出训练和 PID 复用；这仍不启动 10000-step 训练，也不生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - stale PID smoke with `/tmp/objgauss-near1m-stale-pid-smoke`: passed；PID 1 manifest reported `near1m_background=stale-pid` and `blocks_new_run=false`。
+  - stale PID stop smoke: passed；`--stop --confirm-stop` reported `near1m_background_stop=stale-pid` without signalling the unrelated PID。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-pid-identity-dry-run`: passed。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-pid-identity-dry-run`: passed。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-pid-identity-preflight`: passed；launch readiness remains ready while final candidate remains incomplete with 5 blockers。
+
 ### TRAIN-003Q: Near-1M confirmed start writes monitor handoff
 
 - 状态: done / started-run-handoff
