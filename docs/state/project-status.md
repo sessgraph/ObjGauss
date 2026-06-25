@@ -129,6 +129,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - DEMO-005M 已新增 reviewed remap allowlist manifest 与正向 fixture gate：`docs/rendering/object-boundary-remap-reviewed-allowlist.json` 当前为空，`npm run audit:object-boundary-remap-policy-export` 同时要求 policy candidate 和 reviewed allowlist 命中，因此真实三场景仍 raw candidates=`10012`、applied=`0`、blocked=`10012`。`npm run audit:object-boundary-remap-reviewed-allowlist` 使用 `/tmp` synthetic policy + reviewed allowlist 证明正向路径可工作：Lego fixture target=`2`，applied=`402`，blocked=`741`。
   - DEMO-005N 已新增 reviewed allowlist 人工评审 runbook 与 manifest schema gate：`docs/rendering/object-boundary-remap-review-runbook.md` 定义进入 allowlist 前必须查看 fixed-port browser screenshots、hidden delta、non-target residual 和 owner approval；`npm run audit:object-boundary-remap-reviewed-allowlist-manifest` 会校验 committed allowlist，当前 `targets=0` 通过。Export 现在会拒绝缺少 reviewer / owner approval / allowlist-candidate evidence 的 approved target；真实三场景 policy export 仍 applied=`0`、blocked=`10012`。
   - DEMO-005O 已新增 Spark canvas hover-confirm selection UX：Spark source/original object edit 现在先在 hover 时显示候选 marker，再由 click 确认选中；root DOM 暴露 `data-spark-pick-interaction="hover-confirm-v1"`、hover pick object / marker 和 confirmed pick marker。`npm run audit:spark-pick-report -- --port 5395` 已验证 Lego proxy 6/6 hover hits、6/6 confirmed hits、markerHits=6/6；`audit:demo` 单样例也通过同一 fixed-port `5395` hover-confirm contract。
+  - DEMO-005P 已新增 Spark native pick feasibility audit：`SplatViewport` 暴露 `spark-native-pick-feasibility-v1` telemetry，`npm run audit:spark-native-pick-feasibility -- --port 5395` 在 Lego proxy 删除预览下验证 Spark `SplatMesh.raycast` 可 hit，但 intersection payload 只有 `distance,object,point`，没有 splat index / object id。结论是 recommendation=`keep-screen-space-hover-confirm`，blocker=`raycast-intersection-missing-splat-index`；当前不能安全迁移到 renderer-native object picking。
   - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
@@ -208,6 +209,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `npm run acceptance:renderer-product` 已固化为显式产品 / Demo route profile，会调用完整 `acceptance:spark-commercial-route`，包括 trained sample availability preflight 和 SH-heavy packed SH route。
   - `npm run acceptance:spark-commercial-route` 已固化为 Spark commercial route 总验收命令，一次覆盖 trained sample availability、no-SH native compact `.splat` object mask 与 SH-heavy packed SH object mask；该命令会写 `/tmp/objgauss-spark-commercial-route/summary.{json,md}`，证明 route contract，不证明删除后补洞或重优化。
   - `npm run audit:spark-pick-report` 已固化为 Spark canvas `screen-space-object-pick-v1` 的多点击 hit-rate / ambiguity report；默认跑 Lego proxy，小成本 gate，trained 大场景可用 `--assets nerf-lego-trained-output-local --max-clicks 5` 显式复查。当前 report 默认要求 ambiguity rate `<=0.5`，用于防止 pick 消歧回退。
+  - `npm run audit:spark-native-pick-feasibility` 已固化为 Spark native ray/object metadata feasibility report；默认 fixed port `5395`，只在 URL probe 下执行 raycast sample，当前结论是 Spark raycast 可作为 depth probe，但不能返回 splat index / object id，因此不能替代 `hover-confirm-v1` screen-space object picking。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
@@ -820,6 +822,7 @@ npm run acceptance:demo
 ## 当前限制
 
 - 对象聚类色和部分诊断仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后 no-SH 样例可走 Spark native compact `.splat` object mask，SH-heavy 样例保留 PLY packed route 以保存 degree-3 SH rest。剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及删除后没有补洞 / 重优化。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
+- Spark `SplatMesh.raycast` 当前可命中 splat depth，但 intersection 不暴露 splat index / object id，且不能证明 object opacity mask filter-aware；因此对象选择仍应使用已验收的 `hover-confirm-v1` screen-space pick，不能宣称已经是 renderer-native object picking。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，也未做跨视角 SAM slot 对齐或语义命名。

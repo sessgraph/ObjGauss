@@ -22,6 +22,7 @@ const SPARK_FILTER_SOURCE_NATIVE = "native-splat";
 const SPARK_FILTER_SOURCE_PACKED = "ply-packed";
 const SPARK_SELECTION_MODE = "screen-space-object-pick-v1";
 const SPARK_PICK_INTERACTION_MODE = "hover-confirm-v1";
+const SPARK_NATIVE_PICK_PROBE_MODE = "spark-native-pick-feasibility-v1";
 const SPARK_PICK_DRAG_PX = 5;
 const SPARK_PICK_MAX_RADIUS_PX = 28;
 const SPARK_PICK_STRATEGY = "object-support-score-v1";
@@ -67,9 +68,11 @@ export default function SplatViewport({
   });
   const [status, setStatus] = useState("加载中");
   const [packedStats, setPackedStats] = useState(() => emptyPackedStats());
+  const [nativePickStats, setNativePickStats] = useState(() => emptyNativePickStats());
   const [pickStats, setPickStats] = useState(() => emptyPickStats());
   const [hoverPickStats, setHoverPickStats] = useState(() => emptyPickStats());
   const urlObjectMaskFeathering = useMemo(readSparkObjectMaskFeathering, []);
+  const nativePickProbeEnabled = useMemo(readSparkNativePickProbeEnabled, []);
   const objectMaskFeathering = useMemo(
     () => normalizeSparkObjectMaskFeathering(objectMaskFeatheringProp ?? urlObjectMaskFeathering),
     [objectMaskFeatheringProp, urlObjectMaskFeathering],
@@ -228,6 +231,7 @@ export default function SplatViewport({
     let disposed = false;
     setStatus("加载中");
     setPackedStats(emptyPackedStats());
+    setNativePickStats(emptyNativePickStats());
 
     const splat = new SplatMesh({
       url: source.url,
@@ -281,6 +285,7 @@ export default function SplatViewport({
     let disposed = false;
     setStatus("构建中");
     setPackedStats(pendingPackedStats(packedCache));
+    setNativePickStats(inspectSparkNativePick({ splat: null, points, probeEnabled: false }));
 
     const objectMaskStats = updateSparkObjectMask(packedCache.objectMask, {
       points,
@@ -311,6 +316,13 @@ export default function SplatViewport({
         if (disposed) return;
         setStatus("就绪");
         frameSplat(splat, camera, controls, scene);
+        updateNativePickStats({
+          splat,
+          points,
+          camera,
+          probeEnabled: nativePickProbeEnabled,
+          setNativePickStats,
+        });
       })
       .catch((error) => {
         if (disposed) return;
@@ -325,9 +337,20 @@ export default function SplatViewport({
       if (filteredSplatRef.current === splat) {
         filteredSplatRef.current = null;
         filteredObjectMaskRef.current = null;
+        setNativePickStats(emptyNativePickStats());
       }
     };
-  }, [filtered, objectMaskFeathering, packedCache, points, removedIds, isolatedId, useNativeSplatMask, visibleIds]);
+  }, [
+    filtered,
+    nativePickProbeEnabled,
+    objectMaskFeathering,
+    packedCache,
+    points,
+    removedIds,
+    isolatedId,
+    useNativeSplatMask,
+    visibleIds,
+  ]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -340,6 +363,7 @@ export default function SplatViewport({
     let disposed = false;
     setStatus("加载中");
     setPackedStats(pendingPackedStats(nativeMaskCache));
+    setNativePickStats(inspectSparkNativePick({ splat: null, points, probeEnabled: false }));
 
     const objectMaskStats = updateSparkObjectMask(nativeMaskCache.objectMask, {
       points,
@@ -389,6 +413,14 @@ export default function SplatViewport({
           setPackedStats,
         });
         frameSplat(splat, camera, controls, scene);
+        updateNativePickStats({
+          splat,
+          points,
+          camera,
+          probeEnabled: nativePickProbeEnabled,
+          sourceCount,
+          setNativePickStats,
+        });
       })
       .catch((error) => {
         if (disposed) return;
@@ -403,10 +435,12 @@ export default function SplatViewport({
       if (filteredSplatRef.current === splat) {
         filteredSplatRef.current = null;
         filteredObjectMaskRef.current = null;
+        setNativePickStats(emptyNativePickStats());
       }
     };
   }, [
     nativeMaskCache,
+    nativePickProbeEnabled,
     objectMaskFeathering,
     points,
     removedIds,
@@ -450,12 +484,29 @@ export default function SplatViewport({
       .then(() => {
         setStatus("就绪");
         frameSplat(splat, camera, controls, scene);
+        updateNativePickStats({
+          splat,
+          points,
+          camera,
+          probeEnabled: nativePickProbeEnabled,
+          setNativePickStats,
+        });
       })
       .catch((error) => {
         console.error(error);
         setStatus("加载失败");
       });
-  }, [filtered, isolatedId, objectMaskFeathering, packedCache, points, removedIds, useNativeSplatMask, visibleIds]);
+  }, [
+    filtered,
+    isolatedId,
+    nativePickProbeEnabled,
+    objectMaskFeathering,
+    packedCache,
+    points,
+    removedIds,
+    useNativeSplatMask,
+    visibleIds,
+  ]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -489,12 +540,29 @@ export default function SplatViewport({
         const initializedSourceCount = splat.splats?.getNumSplats?.() ?? sourceCount;
         setStatus(initializedSourceCount === (points?.length ?? 0) ? "就绪" : "索引不匹配");
         frameSplat(splat, camera, controls, scene);
+        updateNativePickStats({
+          splat,
+          points,
+          camera,
+          probeEnabled: nativePickProbeEnabled,
+          sourceCount: initializedSourceCount,
+          setNativePickStats,
+        });
       })
       .catch((error) => {
         console.error(error);
         setStatus("加载失败");
       });
-  }, [isolatedId, nativeMaskCache, objectMaskFeathering, points, removedIds, useNativeSplatMask, visibleIds]);
+  }, [
+    isolatedId,
+    nativeMaskCache,
+    nativePickProbeEnabled,
+    objectMaskFeathering,
+    points,
+    removedIds,
+    useNativeSplatMask,
+    visibleIds,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -635,6 +703,22 @@ export default function SplatViewport({
       data-spark-sh-degree={packedStats.shDegree}
       data-spark-selection-mode={sparkSelectionMode}
       data-spark-pick-interaction={sparkPickInteraction}
+      data-spark-native-pick-probe-mode={nativePickStats.mode}
+      data-spark-native-pick-probe-enabled={String(nativePickStats.probeEnabled)}
+      data-spark-native-pick-raycast-function={String(nativePickStats.raycastFunction)}
+      data-spark-native-pick-raycastable={String(nativePickStats.raycastable)}
+      data-spark-native-pick-sample-status={nativePickStats.sampleStatus}
+      data-spark-native-pick-sample-hits={nativePickStats.sampleHits}
+      data-spark-native-pick-intersection-keys={nativePickStats.intersectionKeys}
+      data-spark-native-pick-returns-splat-index={String(nativePickStats.returnsSplatIndex)}
+      data-spark-native-pick-returns-object-id={String(nativePickStats.returnsObjectId)}
+      data-spark-native-pick-object-filter-aware={String(nativePickStats.objectFilterAware)}
+      data-spark-native-pick-source-type={nativePickStats.sourceType}
+      data-spark-native-pick-source-splats={nativePickStats.sourceSplats}
+      data-spark-native-pick-source-methods={nativePickStats.sourceMethods}
+      data-spark-native-pick-object-metadata={nativePickStats.objectMetadata}
+      data-spark-native-pick-recommendation={nativePickStats.recommendation}
+      data-spark-native-pick-blocker={nativePickStats.blocker}
       data-spark-selected-object={selectedId ?? ""}
       data-spark-pick-status={pickStats.status}
       data-spark-pick-strategy={pickStats.strategy}
@@ -1039,6 +1123,220 @@ function missedPickStats(status) {
   };
 }
 
+function emptyNativePickStats() {
+  return {
+    mode: SPARK_NATIVE_PICK_PROBE_MODE,
+    probeEnabled: false,
+    raycastFunction: false,
+    raycastable: false,
+    sampleStatus: "idle",
+    sampleHits: 0,
+    intersectionKeys: "",
+    returnsSplatIndex: false,
+    returnsObjectId: false,
+    objectFilterAware: false,
+    sourceType: "none",
+    sourceSplats: 0,
+    sourceMethods: "",
+    objectMetadata: "none",
+    recommendation: "keep-screen-space-hover-confirm",
+    blocker: "no-splatmesh",
+  };
+}
+
+function updateNativePickStats({
+  splat,
+  points,
+  camera,
+  probeEnabled,
+  sourceCount = null,
+  setNativePickStats,
+}) {
+  setNativePickStats(
+    inspectSparkNativePick({
+      splat,
+      points,
+      camera,
+      probeEnabled: false,
+      sourceCount,
+    }),
+  );
+  if (!probeEnabled || typeof window === "undefined") return;
+  window.setTimeout(() => {
+    if (!splat?.parent) return;
+    setNativePickStats(
+      inspectSparkNativePick({
+        splat,
+        points,
+        camera,
+        probeEnabled: true,
+        sourceCount,
+      }),
+    );
+  }, 250);
+}
+
+function inspectSparkNativePick({
+  splat,
+  points,
+  camera,
+  probeEnabled = false,
+  sourceCount = null,
+}) {
+  const stats = {
+    ...emptyNativePickStats(),
+    probeEnabled: Boolean(probeEnabled),
+  };
+  if (!splat) return stats;
+
+  const source = splat.splats ?? splat.packedSplats ?? splat.extSplats ?? splat.paged ?? null;
+  const sourceMethods = publicMethodNames(source);
+  const resolvedSourceCount =
+    sourceCount ?? safeCallNumber(() => source?.getNumSplats?.()) ?? safeCallNumber(() => splat.context?.numSplats?.value) ?? 0;
+  const objectMetadata =
+    points?.length > 0 && resolvedSourceCount === points.length
+      ? "external-object-aware-ply-index-map-v1"
+      : points?.length > 0
+        ? "external-object-map-count-mismatch"
+        : "none";
+
+  stats.raycastFunction = typeof splat.raycast === "function";
+  stats.raycastable = Boolean(splat.raycastable);
+  stats.sourceType = source?.constructor?.name ?? "none";
+  stats.sourceSplats = resolvedSourceCount;
+  stats.sourceMethods = sourceMethods.join(",");
+  stats.objectMetadata = objectMetadata;
+
+  let probe = {
+    status: probeEnabled ? "missing-camera" : "disabled",
+    hits: 0,
+    intersectionKeys: [],
+    returnsSplatIndex: false,
+    returnsObjectId: false,
+  };
+  if (probeEnabled && camera && stats.raycastFunction && stats.raycastable) {
+    probe = probeSparkNativeRaycast({ splat, camera });
+  } else if (probeEnabled && !stats.raycastFunction) {
+    probe.status = "missing-raycast";
+  } else if (probeEnabled && !stats.raycastable) {
+    probe.status = "not-raycastable";
+  }
+
+  stats.sampleStatus = probe.status;
+  stats.sampleHits = probe.hits;
+  stats.intersectionKeys = probe.intersectionKeys.join(",");
+  stats.returnsSplatIndex = probe.returnsSplatIndex;
+  stats.returnsObjectId = probe.returnsObjectId;
+  stats.objectFilterAware = false;
+
+  const blocker = nativePickBlocker({ stats });
+  stats.blocker = blocker;
+  stats.recommendation =
+    blocker === "none"
+      ? "candidate-native-raycast-object-pick"
+      : "keep-screen-space-hover-confirm";
+  return stats;
+}
+
+function probeSparkNativeRaycast({ splat, camera }) {
+  const samplePoints = [
+    [0, 0],
+    [-0.22, 0],
+    [0.22, 0],
+    [0, -0.18],
+    [0, 0.18],
+  ];
+  const raycaster = new THREE.Raycaster();
+  raycaster.near = camera.near;
+  raycaster.far = camera.far;
+  let totalHits = 0;
+  let intersectionKeys = [];
+  let returnsSplatIndex = false;
+  let returnsObjectId = false;
+  let previousMinRaycastOpacity = null;
+
+  try {
+    previousMinRaycastOpacity = splat.minRaycastOpacity;
+    if (Number.isFinite(previousMinRaycastOpacity)) {
+      splat.minRaycastOpacity = Math.min(previousMinRaycastOpacity, 0.01);
+    }
+    splat.updateMatrixWorld?.(true);
+    for (const [x, y] of samplePoints) {
+      const intersects = [];
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+      splat.raycast(raycaster, intersects);
+      totalHits += intersects.length;
+      if (intersects.length === 0) continue;
+
+      const keys = Object.keys(intersects[0] ?? {}).sort();
+      intersectionKeys = keys;
+      returnsSplatIndex = keys.some((key) => /^(index|splatIndex|splat_index|instanceId)$/i.test(key));
+      returnsObjectId = keys.some((key) => /^(objectId|object_id)$/i.test(key));
+      break;
+    }
+  } catch (error) {
+    if (Number.isFinite(previousMinRaycastOpacity)) {
+      splat.minRaycastOpacity = previousMinRaycastOpacity;
+    }
+    return {
+      status: `error:${String(error?.message ?? error).slice(0, 80)}`,
+      hits: 0,
+      intersectionKeys: [],
+      returnsSplatIndex: false,
+      returnsObjectId: false,
+    };
+  }
+  if (Number.isFinite(previousMinRaycastOpacity)) {
+    splat.minRaycastOpacity = previousMinRaycastOpacity;
+  }
+
+  return {
+    status: totalHits > 0 ? "hit" : "miss",
+    hits: totalHits,
+    intersectionKeys,
+    returnsSplatIndex,
+    returnsObjectId,
+  };
+}
+
+function nativePickBlocker({ stats }) {
+  if (!stats.raycastFunction) return "raycast-unavailable";
+  if (!stats.raycastable) return "raycast-disabled";
+  if (stats.probeEnabled && stats.sampleStatus.startsWith("error:")) return "raycast-probe-error";
+  if (stats.probeEnabled && stats.sampleStatus !== "hit") return "raycast-probe-no-hit";
+  if (!stats.returnsSplatIndex) return "raycast-intersection-missing-splat-index";
+  if (stats.objectMetadata !== "external-object-aware-ply-index-map-v1") {
+    return "missing-index-aligned-object-metadata";
+  }
+  if (!stats.objectFilterAware) return "raycast-not-object-filter-aware";
+  return "none";
+}
+
+function publicMethodNames(value) {
+  if (!value) return [];
+  const names = new Set();
+  let current = value;
+  for (let depth = 0; current && depth < 3; depth += 1) {
+    for (const name of Object.getOwnPropertyNames(current)) {
+      if (name === "constructor") continue;
+      if (typeof value[name] === "function" && /splat|ray|index|fetch|forEach|getNum/i.test(name)) {
+        names.add(name);
+      }
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return [...names].sort().slice(0, 16);
+}
+
+function safeCallNumber(callback) {
+  try {
+    const value = callback();
+    return Number.isFinite(Number(value)) ? Number(value) : null;
+  } catch {
+    return null;
+  }
+}
+
 function formatPickMetric(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric.toFixed(3) : "0.000";
@@ -1061,6 +1359,13 @@ function readSparkObjectMaskFeathering() {
     radius: Number(params.get("spark-object-mask-feather-radius") ?? 0),
     opacity: Number(params.get("spark-object-mask-feather-opacity") ?? 0.62),
   });
+}
+
+function readSparkNativePickProbeEnabled() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  const mode = String(params.get("spark-native-pick-probe") ?? "off").toLowerCase();
+  return ["1", "true", "yes", "on"].includes(mode);
 }
 
 function pointScale3(point) {

@@ -17,7 +17,8 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005P`: 评估 Spark-internal ray/object metadata path，判断能否从 screen-space CPU pick 进一步收敛到 renderer-native object picking；hover-confirm 已解决产品确认 UX，但仍不是 Spark 内部 raycast。
+  - `PORT-001`: 如需继续提升本地验收操作体验，把浏览器 audit / acceptance 的默认端口统一收敛到 fixed `5395` runbook / defaults；当前新增 Spark pick feasibility audit 已固定 `5395`，但历史脚本仍有旧默认端口。
+  - Renderer-native object picking 暂不迁移：Spark `SplatMesh.raycast` 目前只返回 `distance/object/point`，没有 splat index / object id；后续要么等待/扩展 Spark intersection metadata，要么继续使用已审计的 `hover-confirm-v1` screen-space pick。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
   - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
@@ -28,6 +29,27 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005P: Spark native pick feasibility audit
+
+- 状态: done / native-pick-feasibility-blocked
+- 类型: 标准 PR / renderer UX + browser audit
+- 目标: 评估 Spark-internal ray/object metadata path，判断能否从 `screen-space-object-pick-v1` 进一步收敛到 renderer-native object picking。
+- 已实施:
+  - `src/SplatViewport.jsx` 新增 `spark-native-pick-feasibility-v1` telemetry：暴露 raycast function / raycastable / sample hit / intersection keys / splat-index / object-id / object-filter-aware / object metadata / recommendation / blocker。
+  - Native pick probe 只在 URL `spark-native-pick-probe=1` 下执行，probe 延后到 Spark frame 后，且只临时降低 `minRaycastOpacity` 后立即恢复，不改变产品渲染或默认选择路径。
+  - 新增 `scripts/audit-spark-native-pick-feasibility.mjs` 与 `npm run audit:spark-native-pick-feasibility`，默认 fixed port `5395` + `--strictPort`，输出 `/tmp/objgauss-spark-native-pick-feasibility/summary.{json,md}`。
+  - `package.json` 增加 audit 命令入口。
+- 结论:
+  - Lego proxy 删除预览下 Spark raycast 可用且能 hit：`raycast=true:true:hit:2`。
+  - Intersection payload 只有 `distance,object,point`，没有 `splatIndex` / `objectId`，且 raycast 本身不证明 object opacity mask filter-aware。
+  - Recommendation=`keep-screen-space-hover-confirm`，blocker=`raycast-intersection-missing-splat-index`。也就是说当前不能安全迁移到 renderer-native object picking；继续保留 `hover-confirm-v1` screen-space pick 是正确产品路径。
+- 验证:
+  - `node --check scripts/audit-spark-native-pick-feasibility.mjs`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `npm run audit:spark-native-pick-feasibility -- --port 5395 --output-dir /tmp/objgauss-spark-native-pick-feasibility`: passed。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005O: Spark hover-confirm object picking UX
 
