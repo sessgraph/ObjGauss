@@ -94,6 +94,20 @@ const sustainedMaxLongFrameRatio = positiveFiniteNumber(
   args.sustainedMaxLongFrameRatio ?? args["sustained-max-long-frame-ratio"],
   0.25,
 );
+const fpsSlaReviewed = flagEnabled(
+  args.fpsSlaReviewed ?? args["fps-sla-reviewed"] ?? args.reviewedFpsSla ?? args["reviewed-fps-sla"],
+);
+const fpsSlaTargetHardware = optionalString(
+  args.fpsSlaTargetHardware ?? args["fps-sla-target-hardware"] ?? args.targetHardware ?? args["target-hardware"],
+);
+const fpsSlaMinTrainedGaussians = positiveFiniteNumber(
+  args.fpsSlaMinTrainedGaussians ?? args["fps-sla-min-trained-gaussians"],
+  1_000_000,
+);
+const fpsSlaMinTrainedApproxFps = positiveFiniteNumber(
+  args.fpsSlaMinTrainedApproxFps ?? args["fps-sla-min-trained-approx-fps"],
+  24,
+);
 
 if (assets.length === 0) {
   throw new Error("at least one asset is required for WebGPU C-path readiness audit");
@@ -254,6 +268,10 @@ try {
       sustainedMaxSyntheticMeanFrameMs,
       sustainedMaxP95FrameMs,
       sustainedMaxLongFrameRatio,
+      fpsSlaReviewed,
+      fpsSlaTargetHardware,
+      fpsSlaMinTrainedGaussians,
+      fpsSlaMinTrainedApproxFps,
     },
     sourceSummaries: {
       scaleBudget: scaleSummaryPath,
@@ -353,6 +371,15 @@ function buildEvidence({
   const sustainedReal = sustainedEvidence.realScenes ?? {};
   const sustainedSynthetic = sustainedEvidence.synthetic1m ?? {};
   const sustainedTrained = sustainedEvidence.trainedPly ?? {};
+  const fpsSlaBlockers = buildFpsSlaBlockers({
+    trainedPlySceneProof,
+    trainedPlyGaussians,
+    sustainedStatus: sustainedFramePacingSummary?.fpsBaseline ?? "not-proven",
+    sustainedTrainedStatus: sustainedTrained.status ?? "not-provided",
+    sustainedTrainedSceneProof: sustainedTrained.sceneProof ?? "not-proven",
+    sustainedTrainedGaussians: numeric(sustainedTrained.uploadedGaussians),
+    sustainedTrainedMinApproxFps: numeric(sustainedTrained.minApproxFps),
+  });
   return {
     scaleBudget1m: {
       status: scaleSummary.status === "passed" && scale1m?.status === "passed" ? "passed" : "failed",
@@ -504,11 +531,19 @@ function buildEvidence({
           : "The largest current real headed transition evidence is still the local large scene, not a trained scene near 1M Gaussians.",
     },
     fpsSla: {
-      status: "not-proven",
+      status: fpsSlaBlockers.length === 0 ? "passed" : "not-proven",
       scope: "interactive FPS SLA",
-      interpretation:
-        evidenceStatusText(includeSustainedFramePacing, sustainedFramePacingSummary?.fpsBaseline) +
-        " Production FPS SLA still requires reviewed thresholds on target hardware and real trained 1M scenes.",
+      reviewed: fpsSlaReviewed,
+      targetHardware: fpsSlaTargetHardware || "not-provided",
+      minTrainedGaussians: fpsSlaMinTrainedGaussians,
+      minTrainedApproxFps: fpsSlaMinTrainedApproxFps,
+      trainedRuntimeGaussians: trainedPlyGaussians,
+      sustainedTrainedGaussians: numeric(sustainedTrained.uploadedGaussians),
+      sustainedTrainedMinApproxFps: numeric(sustainedTrained.minApproxFps),
+      blockers: fpsSlaBlockers,
+      interpretation: fpsSlaBlockers.length === 0
+        ? `Reviewed FPS SLA passed on ${fpsSlaTargetHardware} with trained ${trainedPlyGaussians} Gaussian runtime and sustained trained min approx FPS ${numeric(sustainedTrained.minApproxFps)}.`
+        : `${evidenceStatusText(includeSustainedFramePacing, sustainedFramePacingSummary?.fpsBaseline)} Production FPS SLA remains unproven: ${fpsSlaBlockers.join("; ")}.`,
     },
   };
 }
@@ -614,6 +649,16 @@ function buildChecks(evidence) {
             : []),
         ]
       : []),
+    ...(fpsSlaReviewed
+      ? [
+          check(
+            "reviewed-fps-sla",
+            evidence.fpsSla.status,
+            "passed",
+            evidence.fpsSla.status === "passed",
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -631,9 +676,11 @@ function buildGaps(evidence) {
       status: evidence.fpsSla.status,
       reason: evidence.fpsSla.interpretation,
       nextEvidence:
-        includeSustainedFramePacing
-          ? "Promote the collected sustained baseline into a production SLA only after threshold review on target hardware and real trained 1M scenes."
-          : "Include the sustained frame-pacing baseline, then promote it into a production SLA only after threshold review on target hardware and real trained 1M scenes.",
+        evidence.fpsSla.status === "passed"
+          ? "No remaining FPS SLA evidence gap for the reviewed target hardware and thresholds in this report."
+          : includeSustainedFramePacing
+            ? "Promote the collected sustained baseline into a production SLA only after threshold review on target hardware and real trained 1M scenes."
+            : "Include the sustained frame-pacing baseline, then promote it into a production SLA only after threshold review on target hardware and real trained 1M scenes.",
     },
   ];
 }
@@ -728,6 +775,9 @@ function keyResult(id, item) {
         : "";
     return `real min FPS ${item.realMinApproxFps}, synthetic min FPS ${item.syntheticMinApproxFps}${trained}, baseline ${item.fpsBaseline}`;
   }
+  if (id === "fpsSla") {
+    return `reviewed ${item.reviewed}, target ${item.targetHardware}, trained min FPS ${item.sustainedTrainedMinApproxFps}/${item.minTrainedApproxFps}`;
+  }
   return item.status;
 }
 
@@ -750,6 +800,8 @@ function printSummary(summary) {
       `sustainedTrainedMinApproxFps=${summary.evidence?.sustainedFramePacing?.trainedPlyMinApproxFps ?? 0}`,
       `realTrainedBrowserRuntime1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "not-proven"}`,
       `fpsSla=${summary.evidence?.fpsSla?.status ?? "not-proven"}`,
+      `fpsSlaReviewed=${summary.evidence?.fpsSla?.reviewed ?? false}`,
+      `fpsSlaTarget=${JSON.stringify(summary.evidence?.fpsSla?.targetHardware ?? "not-provided")}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
     ].join(" "),
   );
@@ -795,6 +847,36 @@ function evidenceStatusText(enabled, fpsBaseline) {
   if (!enabled) return "Sustained frame-pacing baseline was not included in this readiness run.";
   if (fpsBaseline === "baseline-passed") return "Sustained frame-pacing baseline passed for current real scenes plus synthetic 1M.";
   return "Sustained frame-pacing baseline is present but not passed.";
+}
+
+function buildFpsSlaBlockers({
+  trainedPlySceneProof,
+  trainedPlyGaussians,
+  sustainedStatus,
+  sustainedTrainedStatus,
+  sustainedTrainedSceneProof,
+  sustainedTrainedGaussians,
+  sustainedTrainedMinApproxFps,
+}) {
+  const blockers = [];
+  if (!fpsSlaReviewed) blockers.push("reviewed SLA flag missing");
+  if (!fpsSlaTargetHardware) blockers.push("target hardware not provided");
+  if (trainedPlySceneProof !== "proven-trained-ply-upload") blockers.push("trained PLY runtime is not a real trained 1M proof");
+  if (trainedPlyGaussians < fpsSlaMinTrainedGaussians) {
+    blockers.push(`trained runtime Gaussians ${trainedPlyGaussians} < ${fpsSlaMinTrainedGaussians}`);
+  }
+  if (sustainedStatus !== "baseline-passed") blockers.push("sustained baseline is not passed");
+  if (sustainedTrainedStatus !== "passed") blockers.push("sustained trained PLY row is not passed");
+  if (sustainedTrainedSceneProof !== "proven-trained-ply-upload") {
+    blockers.push("sustained trained PLY row is not a real trained 1M proof");
+  }
+  if (sustainedTrainedGaussians < fpsSlaMinTrainedGaussians) {
+    blockers.push(`sustained trained Gaussians ${sustainedTrainedGaussians} < ${fpsSlaMinTrainedGaussians}`);
+  }
+  if (sustainedTrainedMinApproxFps < fpsSlaMinTrainedApproxFps) {
+    blockers.push(`sustained trained min approx FPS ${sustainedTrainedMinApproxFps} < ${fpsSlaMinTrainedApproxFps}`);
+  }
+  return blockers;
 }
 
 function parseArgs(argv) {

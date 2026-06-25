@@ -373,6 +373,24 @@ summary already exists and the goal is to regenerate the combined readiness
 report. This still does not promote `fpsSla` to passed; production FPS SLA
 requires reviewed thresholds on target hardware and real trained 1M scenes.
 
+`fpsSla` can only be promoted in readiness with an explicit reviewed SLA gate:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --trained-ply <near-1m-trained-objects.ply> \
+  --trained-min-gaussians 1000000 \
+  --include-sustained-frame-pacing \
+  --fps-sla-reviewed \
+  --fps-sla-target-hardware "local-rtx5060ti" \
+  --fps-sla-min-trained-approx-fps 24 \
+  --port 5395
+```
+
+The pass condition requires both real trained 1M browser runtime proof and a
+trained PLY row inside the sustained baseline. Current 255k trained Lego
+evidence intentionally leaves `fpsSla=not-proven` and reports blockers instead
+of treating a smoke or baseline as a production SLA.
+
 `npm run audit:webgpu-synthetic-1m-runtime` is the focused synthetic 1M browser
 gate. It generates a temporary binary PLY under `/tmp`, uploads it through the
 real file input, forces `uploaded-ply-splat-source=off` so the audit enters the

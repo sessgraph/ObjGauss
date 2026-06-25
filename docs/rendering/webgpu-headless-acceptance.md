@@ -118,6 +118,23 @@ readiness report without rerunning the baseline. This adds a
 `sustainedFramePacing` row but still keeps production `fpsSla` as not proven
 until thresholds are reviewed on target hardware and real trained 1M scenes.
 
+To promote `fpsSla`, the readiness run must explicitly opt in to reviewed SLA
+semantics and use a real trained near-1M object-aware PLY:
+
+```bash
+npm run audit:webgpu-cpath-readiness -- \
+  --trained-ply <near-1m-trained-objects.ply> \
+  --trained-min-gaussians 1000000 \
+  --include-sustained-frame-pacing \
+  --fps-sla-reviewed \
+  --fps-sla-target-hardware "local-rtx5060ti" \
+  --fps-sla-min-trained-approx-fps 24 \
+  --port 5395
+```
+
+Without that explicit reviewed gate, or without real trained 1M runtime and
+sustained trained PLY evidence, readiness must keep `fpsSla=not-proven`.
+
 Use the focused synthetic 1M browser gate when the question is whether a
 generated 1M PLY can be uploaded through the real UI and edited on the WebGPU
 Tile C-path:

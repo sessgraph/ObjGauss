@@ -29,6 +29,31 @@
 
 ## Done
 
+### RENDER-ROUTE-021: C-path readiness has reviewed FPS SLA promotion gate
+
+- 状态: done / reviewed-fps-sla-promotion-contract
+- 类型: 标准 PR / WebGPU C-path production SLA evidence contract
+- 目标: 把 `fpsSla` 从永远 hard-coded `not-proven` 升级为可严格证明的 readiness evidence，同时避免把 smoke / baseline 误判成生产 SLA。
+- 已实施:
+  - `scripts/audit-webgpu-cpath-readiness.mjs` 新增 `--fps-sla-reviewed`、`--fps-sla-target-hardware`、`--fps-sla-min-trained-gaussians` 和 `--fps-sla-min-trained-approx-fps`。
+  - `fpsSla` 现在只有在 reviewed flag、目标硬件、real trained 1M PLY runtime proof、sustained trained PLY row 和 trained min FPS 全部满足时才会 `passed`。
+  - 如果传入 `--fps-sla-reviewed` 但证据不足，readiness 会新增 `reviewed-fps-sla` check 并失败；普通 readiness 不会因为 `fpsSla=not-proven` 失败。
+  - Report 现在输出 `fpsSlaReviewed`、`fpsSlaTarget`、thresholds、blockers 和更具体的 `fpsSla` interpretation。
+  - Renderer readiness matrix 和 WebGPU runbook 已记录 promotion 命令。
+- 结论:
+  - C-path readiness 现在具备未来 production FPS SLA 的严格验收入口。
+  - 当前 255k trained Lego 普通 readiness 仍保持 `fpsSla=not-proven`，blockers 明确列出缺少 reviewed flag / target hardware、未达到 real trained 1M proof、Gaussians 数不足和默认 trained FPS SLA 阈值不足。
+  - 启用 reviewed SLA negative gate 后，当前报告按预期 `webgpu_cpath_readiness=failed`，但 `--allow-failures` 返回 0；blockers 收敛为 trained PLY runtime / sustained trained PLY row 都不是 real trained 1M proof，且 Gaussians `255794 < 1000000`。
+  - 这一步仍不生成 near-1M trained PLY，也不声明生产 FPS SLA 已完成。
+- 验证:
+  - `node --check scripts/audit-webgpu-cpath-readiness.mjs`: passed。
+  - `npm run audit:webgpu-cpath-readiness -- --skip-run --skip-synthetic-1m-runtime --scale-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/scale-budget/summary.json --edit-cost-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/edit-cost-budget/summary.json --transition-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/presentation-transition/summary.json --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000 --trained-ply-runtime-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/trained-ply-runtime/summary.json --sustained-frame-pacing-summary /tmp/objgauss-webgpu-sustained-frame-pacing-trained-ply-short/summary.json --sustained-min-real-approx-fps 1 --sustained-min-synthetic-approx-fps 1 --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness-fps-sla-review`: passed；`fpsSla=not-proven`。
+  - `npm run audit:webgpu-cpath-readiness -- --allow-failures --skip-run --skip-synthetic-1m-runtime --scale-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/scale-budget/summary.json --edit-cost-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/edit-cost-budget/summary.json --transition-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/presentation-transition/summary.json --trained-ply public/samples/nerf_lego_trained_objects.ply --trained-min-gaussians 250000 --trained-ply-runtime-summary /tmp/objgauss-webgpu-cpath-readiness-trained-ply/trained-ply-runtime/summary.json --sustained-frame-pacing-summary /tmp/objgauss-webgpu-sustained-frame-pacing-trained-ply-short/summary.json --sustained-min-real-approx-fps 1 --sustained-min-synthetic-approx-fps 1 --fps-sla-reviewed --fps-sla-target-hardware local-rtx5060ti --fps-sla-min-trained-approx-fps 1 --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness-fps-sla-negative`: expected failed report with exit 0 due `--allow-failures`；`fpsSla=not-proven`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-020: Sustained frame pacing accepts trained PLY evidence
 
 - 状态: done / trained-ply-sustained-baseline
