@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005M`: 增加 reviewed remap allowlist manifest / positive fixture gate，把“policy allowlist-candidate”和“人工批准可应用 target”分成两个可审计文件，再允许后续候选产物引用。
+  - `DEMO-005N`: 给 reviewed allowlist 增加人工评审 runbook / checklist，定义 target 进入 allowlist 前必须查看的 screenshots、hidden delta、non-target damage 和 owner approval 字段。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005M: Reviewed remap allowlist manifest and positive fixture
+
+- 状态: done / reviewed-allowlist-gate
+- 类型: 标准 PR / renderer quality export gate
+- 目标: 增加 reviewed remap allowlist manifest / positive fixture gate，把“policy allowlist-candidate”和“人工批准可应用 target”分成两个可审计文件，再允许后续候选产物引用。
+- 已实施:
+  - 新增 `docs/rendering/object-boundary-remap-reviewed-allowlist.json`，mode=`object-boundary-remap-reviewed-allowlist-v1`，当前 `targets=[]`，默认 `keep-hard-mask`。
+  - `scripts/export-object-boundary-remap-preview.mjs` 新增 `--reviewed-allowlist`，有 policy 时只应用同时满足 policy `allowlist-candidate` 与 reviewed allowlist 的 target；inline `--allow-target` 保留为诊断 override，并在 summary 中单独记录。
+  - `scripts/audit-object-boundary-remap-residual.mjs` 新增 `--reviewed-allowlist` 透传到 preview export，让 browser QA 与 export gate 使用同一 allowlist contract。
+  - 新增 `scripts/audit-object-boundary-remap-reviewed-allowlist.mjs` 与 `npm run audit:object-boundary-remap-reviewed-allowlist`，用 `/tmp` synthetic policy + synthetic reviewed allowlist 做正向 fixture，不批准真实 repo target。
+  - `npm run audit:object-boundary-remap-policy-export` 默认读取 committed reviewed allowlist manifest。
+- 结论:
+  - 真实三场景 policy-export 通过，reviewed allowlist targetCount=`0`，raw candidates=`10012`，applied=`0`，blocked=`10012`。
+  - Synthetic positive fixture 通过：Lego fixture target=`2`，raw candidates=`1143`，applied=`402`，blocked=`741`，证明只有 policy + reviewed allowlist 同时命中时才会 patch。
+  - Denied target 负向 smoke 仍通过：`nerf-lego-alpha-closure-local:3` 即使作为 inline diagnostic target 传入，也因 policy `deny-hidden-increase` 保持 applied=`0`。
+- 验证:
+  - `node --check scripts/export-object-boundary-remap-preview.mjs`: passed。
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `node --check scripts/audit-object-boundary-remap-reviewed-allowlist.mjs`: passed。
+  - `npm run audit:object-boundary-remap-policy-export`: passed。
+  - `npm run audit:object-boundary-remap-reviewed-allowlist`: passed。
+  - `node scripts/export-object-boundary-remap-preview.mjs --assets nerf-lego-alpha-closure-local --policy /tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.json --reviewed-allowlist docs/rendering/object-boundary-remap-reviewed-allowlist.json --allow-target nerf-lego-alpha-closure-local:3 --output-dir /tmp/objgauss-object-boundary-remap-reviewed-allowlist-denied-smoke`: passed。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
 
 ### DEMO-005L: Policy-gated remap preview export
 

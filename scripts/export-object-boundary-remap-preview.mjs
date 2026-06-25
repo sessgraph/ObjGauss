@@ -37,6 +37,12 @@ const maxRemapSamples = positiveInteger(
 );
 const maxCellChecks = positiveInteger(args.maxCellChecks ?? args["max-cell-checks"] ?? 128);
 const policyPath = optionalString(args.policy ?? args["policy-path"] ?? args.remapPolicy ?? args["remap-policy"]);
+const reviewedAllowlistPath = optionalString(
+  args.reviewedAllowlist ??
+    args["reviewed-allowlist"] ??
+    args.reviewedAllowlistPath ??
+    args["reviewed-allowlist-path"],
+);
 const explicitAllowTargets = parseAllowTargets(
   args.allowTarget ?? args["allow-target"] ?? args.allowTargets ?? args["allow-targets"],
 );
@@ -50,7 +56,12 @@ const cleanupMinNeighbors = positiveInteger(
   args.cleanupMinNeighbors ?? args["cleanup-min-neighbors"] ?? 3,
 );
 const writePreviewPly = !flagEnabled(args.dryRun ?? args["dry-run"]);
-const decisionPolicy = loadDecisionPolicy({ policyPath, explicitAllowTargets });
+const reviewedAllowlist = loadReviewedAllowlist(reviewedAllowlistPath);
+const decisionPolicy = loadDecisionPolicy({
+  policyPath,
+  reviewedAllowlist,
+  explicitAllowTargets,
+});
 
 const assets = selectAssets(assetIds);
 const results = [];
@@ -312,10 +323,55 @@ function summarizeRemaps(remaps) {
   };
 }
 
-function loadDecisionPolicy({ policyPath: inputPolicyPath, explicitAllowTargets: inputAllowTargets }) {
+function loadReviewedAllowlist(inputPath) {
+  if (!inputPath) return null;
+  if (!existsSync(inputPath)) {
+    throw new Error(`reviewed allowlist is missing: ${inputPath}`);
+  }
+  const raw = JSON.parse(readFileSync(inputPath, "utf-8"));
+  if (raw.mode !== "object-boundary-remap-reviewed-allowlist-v1") {
+    throw new Error(`unsupported reviewed allowlist mode: ${raw.mode}`);
+  }
+  const targets = [];
+  for (const target of raw.targets ?? []) {
+    if (target.approved === false) continue;
+    const assetId = String(target.assetId ?? "");
+    const targetObjectId = Number(target.targetObjectId);
+    if (!assetId || !Number.isFinite(targetObjectId)) {
+      throw new Error(`invalid reviewed allowlist target: ${JSON.stringify(target)}`);
+    }
+    targets.push({
+      assetId,
+      targetObjectId,
+      reviewer: String(target.reviewer ?? ""),
+      reason: String(target.reason ?? ""),
+    });
+  }
+  return {
+    path: inputPath,
+    raw,
+    targets,
+    summary: {
+      mode: raw.mode,
+      path: inputPath,
+      defaultAction: raw.defaultAction ?? "keep-hard-mask",
+      targetCount: targets.length,
+      targets: targets.map((target) => ({
+        assetId: target.assetId,
+        targetObjectId: target.targetObjectId,
+      })),
+    },
+  };
+}
+
+function loadDecisionPolicy({
+  policyPath: inputPolicyPath,
+  reviewedAllowlist: inputReviewedAllowlist,
+  explicitAllowTargets: inputAllowTargets,
+}) {
   if (!inputPolicyPath) {
-    if (inputAllowTargets.length > 0) {
-      throw new Error("--allow-target requires --policy");
+    if (inputAllowTargets.length > 0 || inputReviewedAllowlist) {
+      throw new Error("--allow-target and --reviewed-allowlist require --policy");
     }
     return null;
   }
@@ -338,9 +394,15 @@ function loadDecisionPolicy({ policyPath: inputPolicyPath, explicitAllowTargets:
     }
   }
   const requestedByAsset = new Map();
+  for (const target of inputReviewedAllowlist?.targets ?? []) {
+    mapSetAdd(requestedByAsset, target.assetId, target.targetObjectId);
+  }
   for (const target of inputAllowTargets) {
     mapSetAdd(requestedByAsset, target.assetId, target.targetObjectId);
   }
+  const requestedTargets = [...requestedByAsset.entries()].flatMap(([assetId, targets]) =>
+    [...targets].sort(numberSort).map((targetObjectId) => ({ assetId, targetObjectId })),
+  );
   return {
     path: inputPolicyPath,
     raw,
@@ -353,8 +415,14 @@ function loadDecisionPolicy({ policyPath: inputPolicyPath, explicitAllowTargets:
       recommendation: raw.recommendation ?? "",
       defaultAction: raw.defaultAction ?? "",
       sourceApplyMode: raw.applyMode ?? "",
-      applyMode: "explicit-target-allowlist-v1",
-      explicitAllowTargets: inputAllowTargets,
+      applyMode:
+        inputAllowTargets.length > 0
+          ? "reviewed-allowlist-plus-inline-diagnostic-v1"
+          : "reviewed-allowlist-v1",
+      reviewedAllowlist: inputReviewedAllowlist?.summary ?? null,
+      inlineAllowTargets: inputAllowTargets,
+      requestedTargets,
+      explicitAllowTargets: requestedTargets,
       counts: raw.counts ?? {},
     },
   };
@@ -383,13 +451,13 @@ function applyDecisionPolicy({ policy, assetId, remaps }) {
         ? decision
         : requested.has(remap.fromObject)
           ? "not-allowed-by-policy"
-          : "missing-explicit-allow-target";
+          : "missing-reviewed-allowlist-target";
     blockedByDecision[reason] = (blockedByDecision[reason] ?? 0) + 1;
   }
   return {
     remaps: appliedRemaps,
     summary: {
-      mode: "explicit-target-allowlist-v1",
+      mode: "reviewed-allowlist-policy-gate-v1",
       policyPath: policy.path,
       defaultAction: policy.raw.defaultAction ?? "keep-hard-mask",
       policyRecommendation: policy.raw.recommendation ?? "",
@@ -653,7 +721,7 @@ function renderMarkdown(summary) {
   ];
   if (summary.decisionPolicy) {
     lines.push(
-      "When a decision policy is provided, remaps are applied only when the target is both a policy `allowlist-candidate` and explicitly listed with `--allow-target asset_id:object_id`. All other candidate remaps keep the original hard-mask assignment.",
+      "When a decision policy is provided, remaps are applied only when the target is both a policy `allowlist-candidate` and approved by the reviewed allowlist manifest. Inline `--allow-target asset_id:object_id` remains a diagnostic override and is recorded separately. All other candidate remaps keep the original hard-mask assignment.",
       "",
       "## Decision Policy Gate",
       "",
@@ -661,7 +729,8 @@ function renderMarkdown(summary) {
       `- Apply mode: ${summary.decisionPolicy.applyMode}`,
       `- Recommendation: ${summary.decisionPolicy.recommendation}`,
       `- Default action: ${summary.decisionPolicy.defaultAction}`,
-      `- Explicit allow targets: ${summary.decisionPolicy.explicitAllowTargets
+      `- Reviewed allowlist: ${summary.decisionPolicy.reviewedAllowlist?.path ?? "none"}`,
+      `- Requested allow targets: ${summary.decisionPolicy.requestedTargets
         .map((target) => `${target.assetId}:${target.targetObjectId}`)
         .join(", ") || "none"}`,
       "",

@@ -36,6 +36,12 @@ const maxRemapSamples = positiveIntegerOrNull(args.maxRemapSamples ?? args["max-
 const remapPolicyPath = optionalString(
   args.remapPolicy ?? args["remap-policy"] ?? args.policy ?? args["policy-path"],
 );
+const remapReviewedAllowlistPath = optionalString(
+  args.reviewedAllowlist ??
+    args["reviewed-allowlist"] ??
+    args.reviewedAllowlistPath ??
+    args["reviewed-allowlist-path"],
+);
 const remapPolicyAllowTargets = optionalString(
   args.allowTarget ?? args["allow-target"] ?? args.allowTargets ?? args["allow-targets"],
 );
@@ -66,6 +72,7 @@ const summary = {
   },
   remapPolicy: {
     path: remapPolicyPath,
+    reviewedAllowlistPath: remapReviewedAllowlistPath,
     allowTargets: remapPolicyAllowTargets,
   },
   preview: null,
@@ -181,6 +188,9 @@ async function generatePreviewPlys() {
   }
   if (remapPolicyPath) {
     command.command.push("--policy", remapPolicyPath);
+  }
+  if (remapReviewedAllowlistPath) {
+    command.command.push("--reviewed-allowlist", remapReviewedAllowlistPath);
   }
   if (remapPolicyAllowTargets) {
     command.command.push("--allow-target", remapPolicyAllowTargets);
@@ -765,6 +775,7 @@ function renderMarkdown(payload) {
     `- URL: ${payload.url}`,
     `- Preview dir: ${payload.previewDir}`,
     `- Remap policy: ${payload.remapPolicy?.path ?? "none"}`,
+    `- Remap reviewed allowlist: ${payload.remapPolicy?.reviewedAllowlistPath ?? "none"}`,
     `- Remap policy explicit allow targets: ${payload.remapPolicy?.allowTargets ?? "none"}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
     "",

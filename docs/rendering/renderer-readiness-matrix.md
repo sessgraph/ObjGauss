@@ -185,14 +185,29 @@ npm run audit:object-boundary-remap-policy-export
 Policy-gated export applies remaps only when both conditions are true:
 
 1. the target is a policy `allowlist-candidate`;
-2. the command explicitly includes `--allow-target asset_id:object_id`.
+2. the target is present in the reviewed allowlist manifest
+   `docs/rendering/object-boundary-remap-reviewed-allowlist.json`.
 
-Without an explicit allow target, or when the requested target is `deny-*` /
+Inline `--allow-target asset_id:object_id` remains available for diagnostic
+smoke tests, but production candidate export should use the reviewed manifest.
+Without a reviewed allowlist entry, or when the requested target is `deny-*` /
 `review-only`, the export writes a valid preview PLY but leaves those
-`object_id` assignments unchanged. Current three-scene evidence has
-raw candidates=`10012`, applied remaps=`0`, and blocked remaps=`10012`; a
-negative smoke with `--allow-target nerf-lego-alpha-closure-local:3` also keeps
-applied remaps at `0` because that target is `deny-hidden-increase`.
+`object_id` assignments unchanged. Current three-scene evidence uses an empty
+reviewed manifest and has raw candidates=`10012`, applied remaps=`0`, and
+blocked remaps=`10012`; a negative smoke with
+`--allow-target nerf-lego-alpha-closure-local:3` also keeps applied remaps at
+`0` because that target is `deny-hidden-increase`.
+
+Use the reviewed allowlist fixture to prove the positive path without approving
+real samples:
+
+```bash
+npm run audit:object-boundary-remap-reviewed-allowlist
+```
+
+The fixture writes a temporary synthetic policy and reviewed allowlist under
+`/tmp`, then requires applied remaps to be greater than zero. Current fixture
+evidence on Lego target `2`: applied=`402`, blocked=`741`.
 
 ## WebGPU Default Switch Gate
 
@@ -228,6 +243,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do multiple high-risk remap targets preserve residual before promotion? | `npm run audit:object-boundary-remap-target-sweep` |
 | Which remap targets are allowlist candidates, risky, or review-only? | `npm run audit:object-boundary-remap-policy` |
 | Does remap export obey the target-level decision policy? | `npm run audit:object-boundary-remap-policy-export` |
+| Does the reviewed allowlist positive path actually apply remaps? | `npm run audit:object-boundary-remap-reviewed-allowlist` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |

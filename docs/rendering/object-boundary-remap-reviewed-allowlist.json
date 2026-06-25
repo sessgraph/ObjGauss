@@ -1,0 +1,7 @@
+{
+  "mode": "object-boundary-remap-reviewed-allowlist-v1",
+  "version": 1,
+  "defaultAction": "keep-hard-mask",
+  "description": "Reviewed targets that may be applied by policy-gated object boundary remap export. Keep empty until a target has both policy allowlist-candidate evidence and explicit human review.",
+  "targets": []
+}
