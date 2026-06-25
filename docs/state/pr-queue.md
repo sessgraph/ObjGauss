@@ -29,6 +29,28 @@
 
 ## Done
 
+### RENDER-ROUTE-030: Renderer CI profile includes route goal progress
+
+- 状态: done / ci-route-goal-progress
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让 default `acceptance:renderer-ci` 也持续产出 B -> C renderer route goal summary，避免只有 product profile 才能看到 near-1M terminal proof 缺口。
+- 已实施:
+  - CI profile 默认新增 `Renderer route goal report` step，调用 `audit:renderer-route-goal` 并写入 `<output-dir>/renderer-route-goal/summary.*`。
+  - 该 step 仍为非阻塞 progress artifact：当前缺 near-1M proof 时 `audit:renderer-route-goal` exit `0`，profile 继续通过。
+  - `--skip-renderer-route-goal` 同时适用于 CI / product profiles。
+  - renderer readiness matrix 和项目状态已记录 CI profile 的新语义。
+- 结论:
+  - 默认 renderer CI 现在也能在不要求本机 trained SH-heavy sample、不启动 near-1M 长训的前提下，持续报告 B/C foundation 已过和 near-1M production proof 未完成。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run acceptance:renderer-ci -- --dry-run --output-dir /tmp/objgauss-renderer-ci-route-goal-final-dry-run`: passed；default CI steps include `Renderer route goal report`。
+  - `npm run acceptance:renderer-ci -- --dry-run --skip-renderer-route-goal --output-dir /tmp/objgauss-renderer-ci-route-goal-final-skip-dry-run`: passed；route goal step skipped and `includesRendererRouteGoalReport=false`。
+  - `npm run acceptance:renderer-ci -- --skip-route-contract --skip-build --skip-webgpu-tile-smoke --skip-webgpu-scale-budget --skip-webgpu-edit-cost-budget --skip-splat-index-mapping --skip-native-route --output-dir /tmp/objgauss-renderer-ci-route-goal-final-subset-smoke`: passed；top-level summary embeds `rendererRouteGoal.status=incomplete`, `passed=true`, `missingEvidence=["near1m-production-proof"]`。
+  - `npm run acceptance:renderer-product -- --dry-run --skip-renderer-route-goal --output-dir /tmp/objgauss-renderer-product-route-goal-final-skip-still-works`: passed；product skip remains valid。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-029: Product renderer profile embeds route goal artifact
 
 - 状态: done / product-profile-route-goal

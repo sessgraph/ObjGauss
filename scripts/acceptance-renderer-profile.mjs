@@ -113,7 +113,7 @@ function createProfileSpec(name) {
         defaultCiRequirement: true,
         includesTrainedShHeavySample: false,
         sparkCommercialRouteDefaultCi: false,
-        includesRendererRouteGoalReport: false,
+        includesRendererRouteGoalReport: !skipRendererRouteGoal,
         includesNear1mProductionGapReport: false,
         requiresNear1mProductionReady: false,
         reason:
@@ -133,6 +133,21 @@ function createProfileSpec(name) {
         ...(skipWebGpuEditCostBudget
           ? []
           : [["WebGPU edit cost budget", ["npm", "run", "audit:webgpu-edit-cost-budget"]]]),
+        ...(skipRendererRouteGoal
+          ? []
+          : [
+              [
+                "Renderer route goal report",
+                [
+                  "npm",
+                  "run",
+                  "audit:renderer-route-goal",
+                  "--",
+                  "--output-dir",
+                  path.join(outputDir, "renderer-route-goal"),
+                ],
+              ],
+            ]),
         ...(skipSplatIndexMapping
           ? []
           : [

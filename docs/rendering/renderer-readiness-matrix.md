@@ -296,15 +296,17 @@ npm run build
 npm run audit:webgpu-tile-smoke
 npm run audit:webgpu-scale-budget
 npm run audit:webgpu-edit-cost-budget
+npm run audit:renderer-route-goal
 npm run audit:splat-index-mapping -- --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local
 npm run audit:spark-native-mask-gate
 ```
 
 This profile proves the B/C renderer contracts that can be expected from the
 repo's public no-SH samples: route architecture, WebGPU tile smoke, 100k-1M
-storage and edit-cost budgets, compact `.splat` / PLY index mapping, and Spark
-native object masking. It intentionally does not prove the trained SH-heavy
-packed route.
+storage and edit-cost budgets, compact `.splat` / PLY index mapping, Spark
+native object masking, and a non-blocking B -> C route goal progress artifact.
+It intentionally does not prove the trained SH-heavy packed route or the
+near-1M production proof.
 
 `npm run audit:webgpu-scale-budget` is the storage budget gate for the C-path
 scale target. It estimates the full 11-buffer runtime layout for 100k, 300k,
@@ -568,9 +570,9 @@ WebGPU tile contract, 100k-1M storage/edit budgets, and the near-1M production
 gap audit, then writes one `summary.json` / `summary.md`. By default it exits
 `0` when only the near-1M production proof is incomplete. Pass
 `--require-production-ready` when the same command should become the terminal
-B -> C route gate. `acceptance:renderer-product` includes this report by
-default, and `--require-near1m-production-ready` promotes the embedded route
-goal report to the same strict terminal behavior.
+B -> C route gate. `acceptance:renderer-ci` and `acceptance:renderer-product`
+include this report by default. Product `--require-near1m-production-ready`
+promotes the embedded route goal report to the same strict terminal behavior.
 
 ## Product UI Contract
 
