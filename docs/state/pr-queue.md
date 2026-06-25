@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003E: Near-1M candidate pipeline stops under-scale exports early
+
+- 状态: done / near1m-scale-gate
+- 类型: 标准 PR / training-output scale guard
+- 目标: 防止 near-1M pipeline 在导出 PLY 仍低于 1M Gaussians 时继续跑 Object Field 登记和 production SLA，避免把低规模候选误推进成准生产链路。
+- 已实施:
+  - `scripts/train-splatfacto-near1m-candidate.mjs` 新增 `--min-exported-gaussians`，默认 `1000000`。
+  - `--run` 会在 `benchmark:splatfacto:balanced` 前读取 exported PLY header；低于阈值时输出 `near1m_scale_gate=failed` 并以 exit code `2` 停止。
+  - `--run` 会在 production SLA 前检查 candidate object-aware PLY 同样满足阈值。
+  - `--status` 现在输出 `min_exported_gaussians` / `min_object_gaussians`，并按同一阈值判断 ready/not-ready。
+  - TRAIN-003D runbook 已说明低于 1M 的 safe-2000 PLY 会被 gate 拒绝，降低阈值只能用于诊断，不可用于 production SLA。
+- 结论:
+  - near-1M candidate chain 现在不会浪费时间把 255k safe-2000 这类 under-scale PLY 继续登记成 near-1M candidate。
+  - 当前负向验证按预期失败：safe-2000 exported PLY `255794 < 1000000`，登记命令未执行。
+  - 这一步仍不生成 near-1M trained PLY，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull`: passed；输出 `min_exported_gaussians=1000000`。
+  - `npm run train:splatfacto:near1m-candidate -- --status`: passed；`near1m_export=not-ready exported_gaussians=0 min_exported_gaussians=1000000`。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-train --skip-sla --export-dir outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1 --target-hardware local-rtx5060ti`: expected failed with exit `2`；`near1m_scale_gate=failed` because `255794 < 1000000`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003D: Near-1M Splatfacto candidate chain targets production SLA
 
 - 状态: done / near1m-candidate-orchestration

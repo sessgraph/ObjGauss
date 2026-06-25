@@ -229,6 +229,26 @@ at least `1,000,000` Gaussians. If the long run exports fewer Gaussians, the
 strict gate will fail at preflight and the result should be treated as another
 candidate, not as a production SLA proof.
 
+The wrapper also checks the exported PLY before Object Field registration. By
+default `min_exported_gaussians=1000000`, so a smaller export fails before
+running `benchmark:splatfacto:balanced`:
+
+```text
+near1m_scale_gate=failed reason="exported near-1M PLY has 255794 Gaussians; expected >= 1000000"
+```
+
+Override the threshold only for diagnostic experiments:
+
+```bash
+npm run train:splatfacto:near1m-candidate -- \
+  --run \
+  --min-exported-gaussians 250000 \
+  --skip-sla
+```
+
+Do not use a lowered threshold for `audit:webgpu-cpath-production-sla`; that
+gate still enforces the real trained 1M requirement.
+
 ## One Command
 
 Preview the command sequence without running training:

@@ -39,6 +39,10 @@ const label = options.label ?? "near1m-balanced";
 const targetHardware = options.targetHardware ?? options.fpsSlaTargetHardware ?? "local-rtx5060ti";
 const iterations = options.iterations ?? "10000";
 const stepsPerSave = options.stepsPerSave ?? "1000";
+const minExportedGaussians = positiveInteger(
+  options.minExportedGaussians ?? options["min-exported-gaussians"] ?? options.minGaussians,
+  1_000_000,
+);
 const dataParser = options.dataParser ?? "blender-data";
 const vis = options.vis ?? "tensorboard";
 const cacheImages = options.cacheImages ?? "cpu";
@@ -134,6 +138,7 @@ const steps = [
   {
     label: "Register balanced near-1M Object Field candidate",
     skip: skipRegister,
+    beforeRun: () => assertPlyScale("exported near-1M PLY", exportedPly, minExportedGaussians),
     command: [
       "npm",
       "run",
@@ -175,6 +180,7 @@ const steps = [
   {
     label: "Run strict WebGPU C-path production SLA gate",
     skip: skipSla,
+    beforeRun: () => assertPlyScale("candidate object-aware PLY", candidateObjectPly, minExportedGaussians),
     command: [
       "npm",
       "run",
@@ -208,6 +214,7 @@ console.log(`sam_manifest=${paths.samManifest}`);
 console.log(`target_hardware=${targetHardware}`);
 console.log(`iterations=${iterations}`);
 console.log(`camera_res_scale_factor=${cameraResScaleFactor}`);
+console.log(`min_exported_gaussians=${minExportedGaussians}`);
 
 if (mode === "run") {
   const missing = collectMissingForRun();
@@ -221,6 +228,14 @@ for (const step of steps.filter((item) => !item.skip)) {
   console.log(`\n=== ${step.label} ===`);
   console.log(formatCommand(step.command));
   if (mode === "run") {
+    if (step.beforeRun) {
+      try {
+        step.beforeRun();
+      } catch (error) {
+        console.error(`near1m_scale_gate=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
+        process.exit(2);
+      }
+    }
     await run(step.command);
   }
 }
@@ -289,10 +304,10 @@ function printStatus() {
     }
   }
   console.log(
-    `near1m_export=${exportedCount >= 1_000_000 ? "ready" : "not-ready"} exported_gaussians=${exportedCount}`,
+    `near1m_export=${exportedCount >= minExportedGaussians ? "ready" : "not-ready"} exported_gaussians=${exportedCount} min_exported_gaussians=${minExportedGaussians}`,
   );
   console.log(
-    `near1m_object_ply=${objectCount >= 1_000_000 ? "ready" : "not-ready"} object_gaussians=${objectCount}`,
+    `near1m_object_ply=${objectCount >= minExportedGaussians ? "ready" : "not-ready"} object_gaussians=${objectCount} min_object_gaussians=${minExportedGaussians}`,
   );
   console.log(`status=${missing === 0 ? "ready" : "incomplete"} missing=${missing}`);
 }
@@ -342,6 +357,17 @@ function printMissing(missing) {
   }
 }
 
+function assertPlyScale(label, filePath, minGaussians) {
+  if (!existsSync(filePath)) {
+    throw new Error(`${label} is missing: ${filePath}`);
+  }
+  const count = readPlyVertexCount(filePath);
+  if (count < minGaussians) {
+    throw new Error(`${label} has ${count} Gaussians; expected >= ${minGaussians}`);
+  }
+  console.log(`scale_check=${label} gaussians=${count} min=${minGaussians} status=passed`);
+}
+
 function optionalPair(flag, value) {
   return value === undefined || value === null || value === "" ? [] : [flag, String(value)];
 }
@@ -381,6 +407,11 @@ function formatCommand(command) {
 function quote(value) {
   const text = String(value);
   return /^[A-Za-z0-9_./:=@%+,-]+$/.test(text) ? text : JSON.stringify(text);
+}
+
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function formatCheckpointStep(iterationCount) {
