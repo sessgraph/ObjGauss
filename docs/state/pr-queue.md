@@ -29,6 +29,25 @@
 
 ## Done
 
+### TRAIN-003I: Near-1M GPU preflight has safe standalone command
+
+- 状态: done / standalone-gpu-preflight
+- 类型: 标准 PR / training resource safety
+- 目标: 让用户在决定是否启动 near-1M 长训前，用一条不会启动训练的命令验证本机 GPU reserve 是否满足。
+- 已实施:
+  - `scripts/train-splatfacto-near1m-candidate.mjs` 新增 `--gpu-preflight-only` 模式。
+  - 新增 npm alias `train:splatfacto:near1m-gpu-preflight`，只执行 GPU memory reserve preflight。
+  - GPU-only report 使用 schema=`objgauss-near1m-gpu-preflight-v1`，可通过 `--status-json` 写出 GPU index、显存 total/used/free、reserve 和 free-after-reserve。
+  - TRAIN-003D runbook 已把 standalone GPU preflight 放在 full chain 前。
+- 结论:
+  - near-1M 长训现在有独立、可复查、不会误启动训练的 GPU readiness command。
+  - Codex 沙箱内该命令仍会因为 `nvidia-smi` EPERM 返回 `unavailable`；提权只读宿主机 preflight 已通过：GPU 0=`NVIDIA GeForce RTX 5060 Ti`，total=`16311MiB`，free=`15186MiB`，reserve=`1024MiB`。
+  - 这一步仍不启动 10000-step 训练，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-gpu-preflight -- --gpu-memory-reserve-gb 1 --status-json /tmp/objgauss-near1m-gpu-preflight-sandbox/summary.json`: expected failed with exit `2` in sandbox；`gpu_preflight=unavailable` due `spawnSync nvidia-smi EPERM`。
+  - `npm run train:splatfacto:near1m-gpu-preflight -- --gpu-memory-reserve-gb 1 --status-json /tmp/objgauss-near1m-gpu-preflight-host/summary.json`: passed with host read-only escalation；`gpu_preflight=passed`，free=`15186MiB`。
+
 ### TRAIN-003H: Near-1M long run has GPU memory reserve preflight
 
 - 状态: done / gpu-memory-reserve-preflight

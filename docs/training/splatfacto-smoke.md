@@ -211,6 +211,15 @@ files, blockers, the guarded full-run command, and the current GPU memory
 preflight result. It is a preflight report; a green JSON status still does not
 replace the strict production SLA gate.
 
+Check only the GPU memory reserve guard. This is safe to run before a long
+training window and does not start Splatfacto:
+
+```bash
+npm run train:splatfacto:near1m-gpu-preflight -- \
+  --gpu-memory-reserve-gb 1 \
+  --status-json /tmp/objgauss-near1m-gpu-preflight/summary.json
+```
+
 Run the full chain. This starts a long Splatfacto training job, so it requires
 an explicit confirmation flag:
 

@@ -189,7 +189,7 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 本机已完成 NeRF Lego Splatfacto 500-step resource-safe candidate，导出 47168 个 Gaussian，并通过 `training register-output` 登记为本机 `NeRF Lego 训练输出样例` public sample；该产物在 ignored `outputs/` / `public/samples/`，不进入 git。
   - 本机已完成 NeRF Lego Splatfacto 2000-step resource-safe candidate，导出 255794 个 Gaussian；几何/渲染指标强于 safe-500，但 2-frame SAM supervision 下 object slots 仍不平衡，暂不作为最终语义样例结论。
   - `objgauss masks from-nerf-sam` 支持 `--max-area-fraction` 过滤过大的 SAM masks；safe-2000 当前最佳语义候选是 8-frame / 4-slot / `max_area_fraction=0.3`，已消除近空 object slots 并提升 render occlusion effect。
-  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E/003F/003G/003H near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`，`--status-json` 可写出 `objgauss-near1m-candidate-status-v1` 机器可读 readiness report。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。真正启动长训还必须显式传 `--confirm-long-run`，否则 `--run` 会输出 `near1m_long_run_guard=failed`；确认后的 CUDA 长训还会先用 `nvidia-smi` 执行默认 `1GB` GPU memory reserve preflight，失败时在启动 Splatfacto 前输出 `near1m_gpu_preflight=failed`。当前 status JSON 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；near-1M train config / checkpoint / exported PLY / object-aware PLY / SLA summary 仍 missing。
+  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E/003F/003G/003H/003I near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`，`--status-json` 可写出 `objgauss-near1m-candidate-status-v1` 机器可读 readiness report。`npm run train:splatfacto:near1m-gpu-preflight` 可单独执行 `1GB` GPU memory reserve preflight，不启动 Splatfacto。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。真正启动长训还必须显式传 `--confirm-long-run`，否则 `--run` 会输出 `near1m_long_run_guard=failed`；确认后的 CUDA 长训还会先用 `nvidia-smi` 执行默认 `1GB` GPU memory reserve preflight，失败时在启动 Splatfacto 前输出 `near1m_gpu_preflight=failed`。宿主机提权只读预检已通过：RTX 5060 Ti，free=`15186MiB`，reserve=`1024MiB`；当前 status JSON 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；near-1M train config / checkpoint / exported PLY / object-aware PLY / SLA summary 仍 missing。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
@@ -271,6 +271,7 @@ node --check scripts/train-splatfacto-near1m-candidate.mjs
 npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull
 npm run train:splatfacto:near1m-candidate -- --status
 npm run train:splatfacto:near1m-candidate -- --status --status-json /tmp/objgauss-near1m-status/summary.json
+npm run train:splatfacto:near1m-gpu-preflight -- --gpu-memory-reserve-gb 1 --status-json /tmp/objgauss-near1m-gpu-preflight-host/summary.json
 # expected failed with exit 2: near-1M long training requires --confirm-long-run
 npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti
 # expected failed with exit 2 before training: nvidia-smi GPU reserve preflight unavailable/failed in this environment

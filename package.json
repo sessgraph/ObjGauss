@@ -62,6 +62,7 @@
     "publish:polyhaven-chair-demo": "node scripts/publish-polyhaven-chair-demo.mjs",
     "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs",
     "train:splatfacto:near1m-candidate": "node scripts/train-splatfacto-near1m-candidate.mjs",
+    "train:splatfacto:near1m-gpu-preflight": "node scripts/train-splatfacto-near1m-candidate.mjs --gpu-preflight-only",
     "benchmark:splatfacto:balanced": "node scripts/benchmark-splatfacto-balanced.mjs",
     "benchmark:splatfacto:variants": "node scripts/benchmark-splatfacto-variants.mjs",
     "benchmark:splatfacto:scenes": "node scripts/benchmark-splatfacto-scenes.mjs",

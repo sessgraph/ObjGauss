@@ -4,7 +4,13 @@ import { dirname } from "node:path";
 
 const args = process.argv.slice(2);
 const options = parseArgs(args);
-const mode = options.run ? "run" : options.status ? "status" : "dry-run";
+const mode = options.run
+  ? "run"
+  : options.status
+    ? "status"
+    : options.gpuPreflightOnly
+      ? "gpu-preflight"
+      : "dry-run";
 
 const paths = {
   dataset: options.dataset ?? "outputs/assets/training/nerf-synthetic-lego",
@@ -214,6 +220,15 @@ if (mode === "status") {
     writeStatusJson(statusJsonPath, report);
   }
   process.exit(0);
+}
+
+if (mode === "gpu-preflight") {
+  const report = buildGpuPreflightReport();
+  printGpuPreflight(report.gpuMemoryPreflight);
+  if (statusJsonPath) {
+    writeStatusJson(statusJsonPath, report);
+  }
+  process.exit(report.gpuMemoryPreflight.status === "passed" || report.gpuMemoryPreflight.status === "skipped" ? 0 : 2);
 }
 
 console.log(`mode=${mode}`);
@@ -446,6 +461,27 @@ function buildStatusReport() {
   };
 }
 
+function buildGpuPreflightReport() {
+  return {
+    schema: "objgauss-near1m-gpu-preflight-v1",
+    generatedAt: new Date().toISOString(),
+    mode,
+    thresholds: {
+      gpuMemoryReserveGb,
+      gpuMemoryReserveMiB: Math.ceil(gpuMemoryReserveGb * 1024),
+    },
+    parameters: {
+      device,
+      gpuIndex,
+      targetHardware,
+    },
+    flags: {
+      skipGpuPreflight,
+    },
+    gpuMemoryPreflight: getGpuPreflight(),
+  };
+}
+
 function printStatus(report) {
   for (const check of report.checks) {
     const countText = Number.isFinite(check.count) ? ` count=${check.count}` : "";
@@ -461,11 +497,14 @@ function printStatus(report) {
     `near1m_object_ply=${report.readiness.candidateObjectPly} object_gaussians=${report.readiness.objectGaussians} min_object_gaussians=${minExportedGaussians}`,
   );
   console.log(`production_sla=${report.readiness.productionSla}`);
-  const gpu = report.gpuMemoryPreflight;
+  printGpuPreflight(report.gpuMemoryPreflight);
+  console.log(`status=${report.status} missing=${report.missing}`);
+}
+
+function printGpuPreflight(gpu) {
   console.log(
     `gpu_preflight=${gpu.status} reserve_mib=${gpu.reserveMiB} free_mib=${gpu.freeMiB ?? "unknown"} device=${gpu.deviceIndex ?? gpuIndex} reason=${JSON.stringify(gpu.reason ?? "")}`,
   );
-  console.log(`status=${report.status} missing=${report.missing}`);
 }
 
 function writeStatusJson(filePath, report) {
@@ -648,6 +687,7 @@ function parseArgs(values) {
     else if (value === "--allow-sla-failures") parsed.allowSlaFailures = true;
     else if (value === "--confirm-long-run") parsed.confirmLongRun = true;
     else if (value === "--skip-gpu-preflight") parsed.skipGpuPreflight = true;
+    else if (value === "--gpu-preflight-only") parsed.gpuPreflightOnly = true;
     else if (value.startsWith("--")) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       const next = values[index + 1];
