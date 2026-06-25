@@ -29,6 +29,29 @@
 
 ## Done
 
+### RENDER-ROUTE-009: WebGPU runtime performance smoke gate
+
+- 状态: done / runtime-performance-smoke
+- 类型: 标准 PR / WebGPU C-path browser performance observability
+- 目标: 在 RENDER-ROUTE-008 的 browser-visible timing telemetry 上补一条可复现的 runtime smoke envelope，持续记录 object edit transition 的 storage update、queue submit 和 queue done timing，避免 C-path 只停留在静态 budget 或单行日志证据。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-runtime-performance.mjs` 和 `npm run audit:webgpu-runtime-performance`。
+  - Performance smoke 默认复用 `audit:webgpu-offscreen-readback` 的 Lego proxy + Plush semantic object-transition suite，并读取 `/tmp/objgauss-webgpu-runtime-performance/offscreen-readback/summary.json`。
+  - Report 输出 `/tmp/objgauss-webgpu-runtime-performance/summary.json` 和 `summary.md`，按 asset 汇总 packed Gaussians、tile references、initial / isolate / delete timing、最大 update 和最大 queue done。
+  - 默认 smoke envelope：objectState update <= 300ms、full upload update <= 500ms、queue submit <= 25ms、queue done <= 2500ms、至少包含一个 >=250k Gaussian 大场景。
+  - `audit:renderer-route-contract` 和 renderer readiness docs 已登记该 gate。
+- 结论:
+  - 当前本机 fixed-port browser smoke 通过：Lego proxy 5696 Gaussians、tileReferences=40389，最大 update=19.4ms、最大 queue done=68.9ms；Plush semantic 281498 Gaussians、tileReferences=1190026，最大 update=181ms、最大 queue done=1679.1ms。
+  - 该 gate 证明当前 WebGPU C-path object edit 的浏览器 runtime timing 仍在 smoke envelope 内；它不是 FPS benchmark，也不是 1M interactive SLA。
+- 验证:
+  - `node --check scripts/audit-webgpu-runtime-performance.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-runtime-performance -- --port 5395 --output-dir /tmp/objgauss-webgpu-runtime-performance`: passed；2/2 scenes，largestGaussians=281498，maxUpdateMs=181，maxQueueDoneMs=1679.1。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-008: WebGPU runtime timing telemetry gate
 
 - 状态: done / runtime-timing-telemetry

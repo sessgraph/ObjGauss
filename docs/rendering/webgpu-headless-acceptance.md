@@ -69,6 +69,25 @@ For visual fidelity / tuning regressions, use the existing coverage gate:
 npm run audit:webgpu-coverage-gate
 ```
 
+For runtime timing regressions in the same offscreen object-transition path, use
+the performance smoke gate:
+
+```bash
+npm run audit:webgpu-runtime-performance
+```
+
+It reruns `audit:webgpu-offscreen-readback`, parses the browser-visible
+`storageTiming*` telemetry, and writes:
+
+```text
+/tmp/objgauss-webgpu-runtime-performance/summary.json
+/tmp/objgauss-webgpu-runtime-performance/summary.md
+```
+
+This timing gate proves the current update / submit / queue-done envelope for
+WebGPU object edits. It is not an FPS benchmark and does not replace headed
+canvas presentation or visual residual gates.
+
 Interpretation:
 
 - `acceptance:webgpu-headless` passing means WebGPU compute/storage/object
