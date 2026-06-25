@@ -26,6 +26,16 @@ while WebGPU continues to harden toward the C architecture.
 | WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-synthetic-1m-runtime`, `audit:webgpu-ply-runtime`, `audit:webgpu-sustained-frame-pacing`, `audit:webgpu-cpath-readiness`, `audit:webgpu-cpath-production-sla`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape. Synthetic 1M upload/runtime proves the browser C-path can load and edit a generated 1M PLY, but not trained-scene quality. PLY runtime audit is the reusable gate for real/trained near-1M uploads; current local proof covers the trained Lego 255k sample. Sustained frame-pacing baseline proves longer rAF sampling on current real scenes plus synthetic 1M. The strict production SLA wrapper rejects summary shortcuts and requires a real trained near-1M PLY plus reviewed target hardware. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
+`npm run audit:renderer-route-goal` is the goal-level rollup for this matrix. By
+default it stays CI-safe and only reports C-path runtime readiness as
+`not-collected`, without failing the progress report. Use
+`--cpath-readiness-summary <summary.json>` to attach an existing
+`audit:webgpu-cpath-readiness` result, or `--include-cpath-readiness` to run it
+from the route-goal command. Add `--require-cpath-readiness` when headed object
+transition plus synthetic 1M browser runtime must be present before the report
+can pass. This is separate from `--require-production-ready`, which still
+requires the real trained near-1M object-aware PLY and reviewed production SLA.
+
 ## Product Decision
 
 The commercial demo should prefer Spark whenever the user is in source/original

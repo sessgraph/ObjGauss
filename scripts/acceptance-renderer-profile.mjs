@@ -329,6 +329,8 @@ function readRendererRouteGoalArtifact() {
       ? summary.missingEvidence.map((item) => item.id ?? "unknown")
       : [],
     requireProductionReady: Boolean(summary.requireProductionReady),
+    includeCpathReadiness: Boolean(summary.includeCpathReadiness),
+    requireCpathReadiness: Boolean(summary.requireCpathReadiness),
   };
 }
 
@@ -377,6 +379,8 @@ function renderMarkdown(summary) {
       `- Status: ${routeGoal.status}`,
       `- Passed: ${routeGoal.passed}`,
       `- Require production ready: ${routeGoal.requireProductionReady}`,
+      `- Include C-path readiness: ${routeGoal.includeCpathReadiness}`,
+      `- Require C-path readiness: ${routeGoal.requireCpathReadiness}`,
       `- Next action: ${routeGoal.nextAction}`,
       `- Missing evidence: ${routeGoal.missingEvidence.join(", ") || "none"}`,
       `- Report: ${routeGoal.report}`,

@@ -29,6 +29,27 @@
 
 ## Done
 
+### RENDER-ROUTE-031: Renderer route goal reports C-path runtime readiness evidence
+
+- 状态: done / cpath-runtime-evidence-in-goal
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让 `audit:renderer-route-goal` 在 B/C foundation 和 near-1M terminal gap 之外，明确展示 C-path runtime readiness 是否已收集、是否可复用、是否可作为严格 gate。
+- 已实施:
+  - `audit:renderer-route-goal` 新增非阻塞 C-path runtime evidence 行：`webgpu-cpath-readiness`、headed browser object transition、synthetic 1M runtime、trained PLY runtime、real trained 1M runtime、sustained frame pacing 和 FPS SLA。
+  - 默认 route-goal 仍 fresh-clone / CI friendly：不主动跑 browser C-path readiness，runtime evidence 显示为 `not-collected` 且不进入 missing evidence。
+  - 新增 `--cpath-readiness-summary <summary.json>` 可复用已有 `audit:webgpu-cpath-readiness` summary；新增 `--include-cpath-readiness` 可显式主动运行；新增 `--require-cpath-readiness` 可把 headed object transition + synthetic 1M runtime 证据变成 gate。
+  - `acceptance:renderer-ci` / `acceptance:renderer-product` 的顶层 renderer route goal artifact 现在暴露 `includeCpathReadiness` 与 `requireCpathReadiness`。
+- 结论:
+  - route-goal 现在能区分三层事实：B/C renderer foundation 已过、C-path runtime readiness 可复用/可严格要求、终局仍缺 real trained near-1M object-aware PLY + production SLA。
+  - 255k trained PLY runtime、synthetic 1M runtime 和 sustained baseline 只会作为各自 evidence 行出现，不会被误计为 near-1M production proof。
+- 验证:
+  - `node --check scripts/audit-renderer-route-goal.mjs`: passed。
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run audit:renderer-route-goal -- --output-dir /tmp/objgauss-renderer-route-goal-cpath-default-smoke-2`: passed；default report remains `incomplete`, `passed=true`, missing only `near1m-production-proof`。
+  - `npm run audit:renderer-route-goal -- --cpath-readiness-summary /tmp/objgauss-webgpu-cpath-readiness-trained-sustained-summary/summary.json --output-dir /tmp/objgauss-renderer-route-goal-cpath-summary-smoke`: passed；reused C-path readiness summary while keeping near-1M proof incomplete。
+  - `npm run audit:renderer-route-goal -- --require-cpath-readiness --cpath-readiness-summary /tmp/objgauss-webgpu-cpath-readiness/summary.json --output-dir /tmp/objgauss-renderer-route-goal-cpath-require-positive-smoke-2`: passed；strict C-path readiness satisfied, remaining allowed progress gap is near-1M production proof。
+  - `npm run audit:renderer-route-goal -- --require-cpath-readiness --cpath-readiness-summary /tmp/objgauss-webgpu-cpath-readiness-trained-sustained-summary/summary.json --output-dir /tmp/objgauss-renderer-route-goal-cpath-require-expected-fail-2`: expected failed with exit `1`；summary skipped synthetic 1M runtime, so strict C-path readiness blocks before treating runtime evidence as complete。
+
 ### RENDER-ROUTE-030: Renderer CI profile includes route goal progress
 
 - 状态: done / ci-route-goal-progress

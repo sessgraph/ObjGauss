@@ -8,6 +8,18 @@ const outputDir = String(args.outputDir ?? args["output-dir"] ?? "/tmp/objgauss-
 const requireProductionReady = flagEnabled(
   args.requireProductionReady ?? args["require-production-ready"],
 );
+const requireCpathReadiness = flagEnabled(
+  args.requireCpathReadiness ?? args["require-cpath-readiness"],
+);
+const providedCpathReadinessSummaryPath = optionalString(
+  args.cpathReadinessSummary ?? args["cpath-readiness-summary"],
+);
+const cpathReadinessOutputDir = childDir("webgpu-cpath-readiness");
+const cpathReadinessSummaryPath =
+  providedCpathReadinessSummaryPath || path.join(cpathReadinessOutputDir, "summary.json");
+const includeCpathReadiness =
+  flagEnabled(args.includeCpathReadiness ?? args["include-cpath-readiness"]) ||
+  Boolean(providedCpathReadinessSummaryPath);
 
 mkdirSync(outputDir, { recursive: true });
 
@@ -66,30 +78,56 @@ const steps = [
     summaryPath: path.join(childDir("near1m-production-gap"), "summary.json"),
     allowIncomplete: !requireProductionReady,
   },
+  ...(includeCpathReadiness && !providedCpathReadinessSummaryPath
+    ? [
+        {
+          id: "webgpu-cpath-readiness",
+          label: "WebGPU C-path runtime readiness",
+          command: [
+            "npm",
+            "run",
+            "audit:webgpu-cpath-readiness",
+            "--",
+            "--output-dir",
+            cpathReadinessOutputDir,
+          ],
+          summaryPath: cpathReadinessSummaryPath,
+        },
+      ]
+    : []),
 ];
 
-const stepResults = steps.map(runStep);
+const stepResults = appendExternalCpathReadinessResult(steps.map(runStep));
 const evidence = buildEvidence(stepResults);
 const foundationalPassed = evidence
-  .filter((item) => item.scope !== "near1m-production")
+  .filter((item) => item.required !== false && item.scope === "renderer-foundation")
+  .every((item) => item.status === "passed");
+const requiredRuntimePassed = evidence
+  .filter((item) => item.required !== false && item.scope === "renderer-runtime")
   .every((item) => item.status === "passed");
 const productionReady = evidence
-  .filter((item) => item.scope === "near1m-production")
+  .filter((item) => item.required !== false && item.scope === "near1m-production")
   .every((item) => item.status === "passed");
-const status = getGoalStatus({ foundationalPassed, productionReady });
-const passed = status === "ready" || (status === "incomplete" && !requireProductionReady);
+const status = getGoalStatus({ foundationalPassed, requiredRuntimePassed, productionReady });
+const missingEvidence = evidence.filter((item) => item.required !== false && item.status !== "passed");
+const passed =
+  status === "ready" ||
+  (status === "incomplete" && missingEvidence.every((item) => missingEvidenceAllowed(item)));
 
 const summary = {
   mode: MODE,
   generatedAt: new Date().toISOString(),
   outputDir,
   requireProductionReady,
+  includeCpathReadiness,
+  requireCpathReadiness,
+  cpathReadinessSummaryPath,
   status,
   passed,
-  nextAction: productionReady ? "none" : "start-background-long-run",
+  nextAction: nextActionFor({ requiredRuntimePassed, productionReady }),
   steps: stepResults,
   evidence,
-  missingEvidence: evidence.filter((item) => item.status !== "passed"),
+  missingEvidence,
 };
 
 writeReport(summary);
@@ -135,12 +173,15 @@ function buildEvidence(results) {
   const scale = byId(results, "webgpu-scale-budget");
   const edit = byId(results, "webgpu-edit-cost-budget");
   const near1m = byId(results, "near1m-production-gap");
+  const cpath = byId(results, "webgpu-cpath-readiness");
   const phases = route?.summary?.phases ?? {};
   const gap = near1m?.summary?.goalGap ?? {};
+  const cpathRuntime = buildCpathRuntimeEvidence(cpath);
   return [
     {
       id: "phase-b-shader-gaussian-oit",
       scope: "renderer-foundation",
+      required: true,
       label: "Phase B WebGL Gaussian shader + weighted OIT fallback",
       status: phaseStatus(phases["B-webgl-gaussian-oit"]),
       evidence: phaseEvidence(phases["B-webgl-gaussian-oit"]),
@@ -149,6 +190,7 @@ function buildEvidence(results) {
     {
       id: "phase-c-webgpu-tile",
       scope: "renderer-foundation",
+      required: true,
       label: "Phase C WebGPU tile renderer architecture",
       status: phaseStatus(phases["C-webgpu-tile"]),
       evidence: phaseEvidence(phases["C-webgpu-tile"]),
@@ -157,6 +199,7 @@ function buildEvidence(results) {
     {
       id: "bridge-route-contract",
       scope: "renderer-foundation",
+      required: true,
       label: "Explicit Spark / WebGPU / Gaussian OIT route boundary",
       status: phaseStatus(phases["bridge-route-contract"]),
       evidence: phaseEvidence(phases["bridge-route-contract"]),
@@ -165,6 +208,7 @@ function buildEvidence(results) {
     {
       id: "webgpu-1m-scale-budget",
       scope: "renderer-foundation",
+      required: true,
       label: "C-path storage budget covers 100k-1M Gaussians",
       status: scale?.summary?.status === "passed" ? "passed" : "failed",
       evidence: summarizeBudgetRows(scale?.summary?.rows),
@@ -173,14 +217,17 @@ function buildEvidence(results) {
     {
       id: "webgpu-object-edit-cost-budget",
       scope: "renderer-foundation",
+      required: true,
       label: "C-path object-state-only edit update budget",
       status: edit?.summary?.status === "passed" ? "passed" : "failed",
       evidence: summarizeBudgetRows(edit?.summary?.rows),
       source: edit?.summaryPath,
     },
+    ...cpathRuntime,
     {
       id: "near1m-production-proof",
       scope: "near1m-production",
+      required: true,
       label: "Real trained near-1M object-aware PLY + production SLA",
       status: gap.status === "ready" ? "passed" : "incomplete",
       evidence:
@@ -192,9 +239,127 @@ function buildEvidence(results) {
   ];
 }
 
-function getGoalStatus({ foundationalPassed, productionReady }) {
+function buildCpathRuntimeEvidence(step) {
+  const summary = step?.summary;
+  const source = step?.summaryPath ?? cpathReadinessSummaryPath;
+  const cpathStatus = cpathSummaryStatus(summary);
+  const runtime = summary?.evidence ?? {};
+  const headed = runtime.headedBrowserTransition ?? {};
+  const synthetic = runtime.browserRuntime1m ?? {};
+  const trained = runtime.trainedPlyRuntime ?? {};
+  const realTrained1m = runtime.realTrainedBrowserRuntime1m ?? {};
+  const sustained = runtime.sustainedFramePacing ?? {};
+  const fpsSla = runtime.fpsSla ?? {};
+  return [
+    {
+      id: "webgpu-cpath-readiness",
+      scope: "renderer-runtime",
+      required: requireCpathReadiness,
+      label: "WebGPU C-path readiness aggregate",
+      status: cpathStatus,
+      evidence: cpathSummaryEvidence(summary),
+      source,
+    },
+    {
+      id: "headed-browser-object-transition",
+      scope: "renderer-runtime",
+      required: requireCpathReadiness,
+      label: "Headed browser WebGPU object transition",
+      status: nestedStatus(headed.status, cpathStatus),
+      evidence:
+        headed.status === "passed"
+          ? `${headed.scenes ?? "unknown"}/${headed.expectedScenes ?? "unknown"} scenes; largest=${
+              headed.largestGaussians ?? "unknown"
+            }`
+          : cpathMissingEvidence("headed object transition"),
+      source,
+    },
+    {
+      id: "synthetic-1m-browser-runtime",
+      scope: "renderer-runtime",
+      required: requireCpathReadiness,
+      label: "Synthetic 1M WebGPU browser upload/runtime",
+      status: nestedStatus(synthetic.status, cpathStatus),
+      evidence:
+        synthetic.status === "passed"
+          ? `${synthetic.proof ?? "proof"}; gaussians=${synthetic.gaussians ?? "unknown"}; minApproxFps=${
+              synthetic.minApproxFps ?? "unknown"
+            }`
+          : cpathMissingEvidence("synthetic 1M browser runtime"),
+      source,
+    },
+    {
+      id: "trained-ply-runtime",
+      scope: "renderer-runtime",
+      required: false,
+      label: "Caller-provided trained PLY runtime",
+      status: nestedStatus(trained.status, cpathStatus),
+      evidence:
+        trained.status === "passed"
+          ? `${trained.proof ?? "proof"}; gaussians=${trained.gaussians ?? "unknown"}; minRequired=${
+              trained.minGaussians ?? "unknown"
+            }`
+          : trained.interpretation ?? cpathMissingEvidence("trained PLY runtime"),
+      source,
+    },
+    {
+      id: "real-trained-browser-runtime-1m",
+      scope: "near1m-production",
+      required: false,
+      label: "Real trained 1M WebGPU browser runtime",
+      status: nestedStatus(realTrained1m.status, cpathStatus),
+      evidence:
+        realTrained1m.status === "passed"
+          ? "real trained >=1M browser runtime proven"
+          : realTrained1m.interpretation ?? cpathMissingEvidence("real trained 1M runtime"),
+      source,
+    },
+    {
+      id: "sustained-frame-pacing-baseline",
+      scope: "renderer-runtime",
+      required: false,
+      label: "Sustained frame-pacing baseline",
+      status: nestedStatus(sustained.status, cpathStatus),
+      evidence:
+        sustained.status === "passed"
+          ? `realMinFps=${sustained.realMinApproxFps ?? "unknown"}; syntheticMinFps=${
+              sustained.syntheticMinApproxFps ?? "unknown"
+            }; trainedMinFps=${sustained.trainedPlyMinApproxFps ?? "unknown"}`
+          : sustained.interpretation ?? cpathMissingEvidence("sustained frame pacing"),
+      source,
+    },
+    {
+      id: "fps-sla",
+      scope: "near1m-production",
+      required: false,
+      label: "Reviewed production FPS SLA",
+      status: nestedStatus(fpsSla.status, cpathStatus),
+      evidence:
+        fpsSla.status === "passed"
+          ? `target=${fpsSla.targetHardware ?? "unknown"}; trainedMinFps=${
+              fpsSla.sustainedTrainedMinApproxFps ?? "unknown"
+            }`
+          : fpsSla.interpretation ?? cpathMissingEvidence("production FPS SLA"),
+      source,
+    },
+  ];
+}
+
+function getGoalStatus({ foundationalPassed, requiredRuntimePassed, productionReady }) {
   if (!foundationalPassed) return "failed";
+  if (!requiredRuntimePassed) return "incomplete";
   return productionReady ? "ready" : "incomplete";
+}
+
+function nextActionFor({ requiredRuntimePassed, productionReady }) {
+  if (!requiredRuntimePassed) return "run-webgpu-cpath-readiness";
+  return productionReady ? "none" : "start-background-long-run";
+}
+
+function missingEvidenceAllowed(item) {
+  if (item.id === "near1m-production-proof" && !requireProductionReady) return true;
+  if (item.scope === "renderer-runtime" && !requireCpathReadiness) return true;
+  return false;
 }
 
 function phaseStatus(phase) {
@@ -224,16 +389,18 @@ function renderMarkdown(summary) {
     `- Status: ${summary.status}`,
     `- Passed: ${summary.passed}`,
     `- Require production ready: ${summary.requireProductionReady}`,
+    `- Include C-path readiness: ${summary.includeCpathReadiness}`,
+    `- Require C-path readiness: ${summary.requireCpathReadiness}`,
     `- Next action: ${summary.nextAction}`,
     `- Output: ${summary.outputDir}`,
     "",
     "## Evidence",
     "",
-    "| ID | Status | Scope | Evidence | Source |",
-    "| --- | --- | --- | --- | --- |",
+    "| ID | Required | Status | Scope | Evidence | Source |",
+    "| --- | --- | --- | --- | --- | --- |",
     ...summary.evidence.map(
       (item) =>
-        `| ${escapeMarkdown(item.id)} | ${item.status} | ${escapeMarkdown(item.scope)} | ${escapeMarkdown(
+        `| ${escapeMarkdown(item.id)} | ${item.required === false ? "no" : "yes"} | ${item.status} | ${escapeMarkdown(item.scope)} | ${escapeMarkdown(
           item.evidence,
         )} | \`${escapeMarkdown(item.source ?? "")}\` |`,
     ),
@@ -266,6 +433,8 @@ function printSummary(summary) {
       `renderer_route_goal=${summary.status}`,
       `passed=${summary.passed}`,
       `require_production_ready=${summary.requireProductionReady}`,
+      `include_cpath_readiness=${summary.includeCpathReadiness}`,
+      `require_cpath_readiness=${summary.requireCpathReadiness}`,
       `missing=${summary.missingEvidence.length}`,
       `next_action=${summary.nextAction}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
@@ -278,6 +447,24 @@ function printSummary(summary) {
       )}`,
     );
   }
+}
+
+function appendExternalCpathReadinessResult(results) {
+  if (!includeCpathReadiness || !providedCpathReadinessSummaryPath) return results;
+  const summary = readJsonIfPresent(cpathReadinessSummaryPath);
+  return [
+    ...results,
+    {
+      id: "webgpu-cpath-readiness",
+      label: "WebGPU C-path runtime readiness",
+      command: `external summary: ${cpathReadinessSummaryPath}`,
+      exitCode: summary ? 0 : null,
+      durationMs: 0,
+      status: summary ? summary.status ?? "provided" : "not-collected",
+      summaryPath: cpathReadinessSummaryPath,
+      summary,
+    },
+  ];
 }
 
 function byId(results, id) {
@@ -293,8 +480,45 @@ function readJsonIfPresent(filePath) {
   }
 }
 
+function cpathSummaryStatus(summary) {
+  if (!summary) return "not-collected";
+  if (summary.status === "passed") return "passed";
+  if (summary.status === "failed") return "failed";
+  return summary.status ?? "unknown";
+}
+
+function cpathSummaryEvidence(summary) {
+  if (!summary) {
+    return "not collected; pass --cpath-readiness-summary <summary.json> or --include-cpath-readiness";
+  }
+  return `status=${summary.status ?? "unknown"}; browserRuntime1m=${
+    summary.evidence?.browserRuntime1m?.status ?? "unknown"
+  }; realTrained1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "unknown"}; fpsSla=${
+    summary.evidence?.fpsSla?.status ?? "unknown"
+  }`;
+}
+
+function nestedStatus(status, parentStatus) {
+  if (status) return status;
+  if (parentStatus === "not-collected") return "not-collected";
+  return "unknown";
+}
+
+function cpathMissingEvidence(label) {
+  if (!includeCpathReadiness) {
+    return `not collected in this route-goal run; provide a C-path readiness summary to report ${label}`;
+  }
+  return `${label} not proven in the provided C-path readiness summary`;
+}
+
 function childDir(name) {
   return path.join(outputDir, name);
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === true || value === false) return "";
+  const text = String(value).trim();
+  return text || "";
 }
 
 function parseArgs(argv) {
