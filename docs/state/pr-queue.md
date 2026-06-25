@@ -29,6 +29,27 @@
 
 ## Done
 
+### RENDER-ROUTE-025: Product renderer acceptance includes near-1M gap report
+
+- 状态: done / product-profile-gap-report
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让产品 / Demo renderer acceptance 自动带上 near-1M production proof 缺口 artifact，避免产品验收只看 Spark commercial route 而忽略 C-path terminal evidence。
+- 已实施:
+  - `acceptance:renderer-product` 新增 `Near-1M production gap report` step，调用 `audit:near1m-production-gap` 并写入 profile output dir。
+  - 新增 `--skip-near1m-production-gap` 可跳过该 progress report。
+  - profile decision / Markdown summary 暴露 `Includes near-1M production gap report`。
+  - renderer readiness matrix 和项目状态已记录该 profile 语义。
+- 结论:
+  - 产品 / Demo profile 现在会生成 C-path near-1M terminal gap artifact；默认 incomplete 仍不失败，terminal final gate 仍应使用 `audit:near1m-production-gap -- --require-ready` 或 `audit:webgpu-cpath-production-sla`。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-product-near1m-gap-dry-run`: passed；dry-run step list includes `Near-1M production gap report`。
+  - `npm run audit:near1m-production-gap -- --output-dir /tmp/objgauss-near1m-production-gap-profile-smoke`: passed；wrote incomplete progress artifact with 5 blockers。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003T: Near-1M production gap audit writes artifact
 
 - 状态: done / progress-artifact-gate

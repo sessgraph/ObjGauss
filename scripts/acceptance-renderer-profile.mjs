@@ -27,6 +27,9 @@ const skipWebGpuPresentationPerformance = flagEnabled(
 const skipWebGpuPresentationTransition = flagEnabled(
   args.skipWebGpuPresentationTransition ?? args["skip-webgpu-presentation-transition"],
 );
+const skipNear1mProductionGap = flagEnabled(
+  args.skipNear1mProductionGap ?? args["skip-near1m-production-gap"],
+);
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
@@ -91,6 +94,7 @@ function createProfileSpec(name) {
         defaultCiRequirement: true,
         includesTrainedShHeavySample: false,
         sparkCommercialRouteDefaultCi: false,
+        includesNear1mProductionGapReport: false,
         reason:
           "fresh-clone CI must not require the local nerf-lego-trained-output-local sample",
       },
@@ -143,6 +147,7 @@ function createProfileSpec(name) {
         defaultCiRequirement: false,
         includesTrainedShHeavySample: true,
         sparkCommercialRouteDefaultCi: false,
+        includesNear1mProductionGapReport: true,
         reason:
           "product/demo review should require the local SH-heavy trained sample and fail fast when it is missing",
       },
@@ -185,6 +190,21 @@ function createProfileSpec(name) {
                 ],
               ],
             ]),
+        ...(skipNear1mProductionGap
+          ? []
+          : [
+              [
+                "Near-1M production gap report",
+                [
+                  "npm",
+                  "run",
+                  "audit:near1m-production-gap",
+                  "--",
+                  "--output-dir",
+                  path.join(outputDir, "near1m-production-gap"),
+                ],
+              ],
+            ]),
         [
           "Spark commercial route acceptance",
           [
@@ -224,6 +244,7 @@ function renderMarkdown(summary) {
     `- Default CI requirement: ${yesNo(summary.decision.defaultCiRequirement)}`,
     `- Includes trained SH-heavy sample: ${yesNo(summary.decision.includesTrainedShHeavySample)}`,
     `- Spark commercial route default CI: ${yesNo(summary.decision.sparkCommercialRouteDefaultCi)}`,
+    `- Includes near-1M production gap report: ${yesNo(summary.decision.includesNear1mProductionGapReport)}`,
     `- Reason: ${summary.decision.reason}`,
     "",
     "## Steps",

@@ -253,6 +253,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
 | Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
 | What is the combined C-path readiness state and remaining 1M gap? | `npm run audit:webgpu-cpath-readiness` |
+| What terminal near-1M evidence is still missing before production proof? | `npm run audit:near1m-production-gap` |
 | Has C-path production FPS SLA been proven on reviewed target hardware with a real trained near-1M PLY? | `npm run audit:webgpu-cpath-production-sla -- --trained-ply <path> --target-hardware <label>` |
 | Can a synthetic 1M PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-synthetic-1m-runtime` |
 | Can a real/trained object-aware PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-ply-runtime -- --input-ply <path> --scene-kind trained --min-gaussians <n>` |
@@ -412,6 +413,17 @@ production SLA proof rather than daily report regeneration. Use
 `--dry-run --allow-failures` only to test preflight/report wiring without
 claiming SLA completion.
 
+For a non-training progress artifact before the final PLY exists, run:
+
+```bash
+npm run audit:near1m-production-gap
+```
+
+This writes `summary.json` / `summary.md` with the current terminal evidence
+gap and exits `0` while the proof is incomplete. Add `--require-ready` to use
+the same audit as a final gate after the near-1M PLY and production SLA summary
+exist.
+
 `npm run audit:webgpu-synthetic-1m-runtime` is the focused synthetic 1M browser
 gate. It generates a temporary binary PLY under `/tmp`, uploads it through the
 real file input, forces `uploaded-ply-splat-source=off` so the audit enters the
@@ -531,14 +543,17 @@ picking.
 `npm run acceptance:renderer-product` is the explicit product/demo profile. It
 runs `audit:renderer-route-contract` first, builds the viewer, runs
 `audit:webgpu-presentation-performance` and
-`audit:webgpu-presentation-transition`, then runs
+`audit:webgpu-presentation-transition`, writes the
+`audit:near1m-production-gap` progress artifact, then runs
 `acceptance:spark-commercial-route` with the trained sample availability
 preflight and the SH-heavy browser route. This is the correct gate before
 commercial demo review, but it should not be promoted to default CI until the
 trained sample becomes a committed, downloadable, or generated fixture in that
 environment. The WebGPU presentation smoke is intentionally product/local only:
 it proves headed desktop canvas presentation on fixed port `5395`, while CI
-continues to use offscreen / headless C-path gates.
+continues to use offscreen / headless C-path gates. The near-1M production gap
+step is a non-failing progress report by default; it should be promoted to
+`--require-ready` only for the terminal production proof run.
 
 ## Product UI Contract
 
