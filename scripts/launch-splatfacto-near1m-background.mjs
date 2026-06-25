@@ -18,6 +18,7 @@ const manifestPath = args.manifest ?? path.join(outputDir, "launcher.json");
 const statusPath = args.statusJson ?? args.statusJsonOutput ?? path.join(outputDir, "status.json");
 const candidateStatusPath = args.candidateStatusJson ?? path.join(outputDir, "near1m-candidate-status.json");
 const logPath = args.logPath ?? path.join(outputDir, "near1m-run.log");
+const handoffPath = args.handoffMd ?? path.join(outputDir, "handoff.md");
 const targetHardware = args.targetHardware ?? "local-rtx5060ti";
 const gpuMemoryReserveGb = args.gpuMemoryReserveGb ?? "1";
 const port = args.port ?? "5395";
@@ -70,6 +71,7 @@ const backgroundOptions = [
   ...optionalPair("--candidate-status-json", args.candidateStatusJson),
   ...optionalPair("--manifest", args.manifest),
   ...optionalPair("--log-path", args.logPath),
+  ...optionalPair("--handoff-md", args.handoffMd),
   ...optionalPair("--sam-checkpoint", args.samCheckpoint),
   ...optionalPair("--iterations", args.iterations),
   ...optionalPair("--steps-per-save", args.stepsPerSave),
@@ -136,21 +138,21 @@ const candidateStatusCommand = [
 if (mode === "status") {
   const report = buildStatusReport();
   printStatus(report);
-  writeJson(statusPath, report);
+  writeReport(report);
   process.exit(0);
 }
 
 if (mode === "dry-run") {
   const report = buildDryRunReport();
   printDryRun(report);
-  writeJson(statusPath, report);
+  writeReport(report);
   process.exit(0);
 }
 
 if (mode === "preflight") {
   const report = runPreflight();
   printPreflight(report);
-  writeJson(statusPath, report);
+  writeReport(report);
   process.exit(report.status === "ready" ? 0 : 2);
 }
 
@@ -237,6 +239,7 @@ function buildDryRunReport() {
     statusPath,
     candidateStatusPath,
     logPath,
+    handoffPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
     handoff: buildHandoff({ candidateStatus: null, running: false }),
@@ -257,6 +260,7 @@ function buildStatusReport() {
     pid: pid ?? null,
     manifestPath,
     logPath,
+    handoffPath,
     candidateStatusPath,
     logBytes: logStats?.size ?? 0,
     tail: existsSync(logPath) ? tailFile(logPath, 40) : [],
@@ -297,6 +301,7 @@ function runPreflight() {
     statusPath,
     candidateStatusPath,
     logPath,
+    handoffPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
     candidateStatus,
@@ -380,12 +385,13 @@ function printDryRun(report) {
   console.log(`manifest=${report.manifestPath}`);
   console.log(`status_json=${report.statusPath}`);
   console.log(`candidate_status_json=${report.candidateStatusPath}`);
+  console.log(`handoff_md=${report.handoffPath}`);
   printHandoff(report.handoff);
 }
 
 function printStatus(report) {
   console.log(
-    `near1m_background=${report.status} pid=${report.pid ?? "none"} log=${report.logPath} log_bytes=${report.logBytes}`,
+    `near1m_background=${report.status} pid=${report.pid ?? "none"} log=${report.logPath} log_bytes=${report.logBytes} handoff_md=${report.handoffPath}`,
   );
   if (report.candidateSummary) {
     console.log(
@@ -404,7 +410,7 @@ function printStatus(report) {
 
 function printPreflight(report) {
   console.log(
-    `near1m_background_preflight=${report.status} exit_code=${report.exitCode ?? "unknown"} candidate_status_json=${report.candidateStatusPath}`,
+    `near1m_background_preflight=${report.status} exit_code=${report.exitCode ?? "unknown"} candidate_status_json=${report.candidateStatusPath} handoff_md=${report.handoffPath}`,
   );
   if (report.candidateSummary) {
     console.log(
@@ -571,6 +577,95 @@ function tailFile(filePath, maxLines) {
 function writeJson(filePath, value) {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeReport(report) {
+  writeJson(statusPath, report);
+  writeHandoffMarkdown(handoffPath, report);
+}
+
+function writeHandoffMarkdown(filePath, report) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, renderHandoffMarkdown(report));
+}
+
+function renderHandoffMarkdown(report) {
+  const handoff = report.handoff;
+  const lines = [
+    "# ObjGauss Near-1M Background Handoff",
+    "",
+    `- Generated: ${report.generatedAt ?? new Date().toISOString()}`,
+    `- Mode: ${report.mode ?? mode}`,
+    `- Background status: ${report.status ?? "unknown"}`,
+    `- Target hardware: ${targetHardware}`,
+    `- GPU reserve: ${gpuMemoryReserveGb} GB`,
+    `- Status JSON: \`${statusPath}\``,
+    `- Candidate status JSON: \`${candidateStatusPath}\``,
+    `- Log path: \`${logPath}\``,
+    "",
+    "## Next Action",
+    "",
+    `- Action: \`${handoff?.nextAction ?? "unknown"}\``,
+    `- Can start long run: \`${handoff?.canStartLongRun ?? false}\``,
+    `- Final candidate status: \`${handoff?.finalCandidateStatus ?? "unknown"}\``,
+    `- Launch readiness: \`${handoff?.launchReadiness ?? "unknown"}\``,
+    `- Starts training: \`${handoff?.safety?.startsTraining ?? false}\``,
+    "",
+    "```bash",
+    stripCommandPrompt(handoff?.commands?.next ?? ""),
+    "```",
+    "",
+    "## Remaining Evidence",
+    "",
+  ];
+
+  const remainingEvidence = Array.isArray(handoff?.remainingEvidence) ? handoff.remainingEvidence : [];
+  if (remainingEvidence.length === 0) {
+    lines.push("No remaining evidence blockers are reported by the current candidate status.");
+  } else {
+    for (const [index, item] of remainingEvidence.entries()) {
+      lines.push(`### ${index + 1}. ${item.label ?? "Unknown evidence"}`, "");
+      lines.push(`- Kind: \`${item.kind ?? "unknown"}\``);
+      if (item.path) lines.push(`- Path: \`${item.path}\``);
+      const count = formatCountCell(item);
+      if (count) lines.push(`- Count: \`${count}\``);
+      appendNextEvidenceMarkdown(lines, item.nextEvidence);
+    }
+  }
+
+  lines.push(
+    "",
+    "## Safety",
+    "",
+    "This handoff file is not production SLA proof. `start-background-long-run` only means the launch inputs and GPU reserve gate are ready. Final completion still requires a real exported PLY and object-aware PLY at the configured near-1M scale gate plus a passing production SLA summary.",
+    "",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function stripCommandPrompt(commandText) {
+  return String(commandText ?? "").replace(/^\$ /, "");
+}
+
+function appendNextEvidenceMarkdown(lines, nextEvidence) {
+  const text = String(nextEvidence ?? "").trim();
+  if (!text) return;
+  if (isShellCommand(text)) {
+    lines.push("- Next evidence:", "", "```bash", stripCommandPrompt(text), "```", "");
+  } else {
+    lines.push(`- Next evidence: ${text}`, "");
+  }
+}
+
+function isShellCommand(text) {
+  const command = stripCommandPrompt(text);
+  return /^(npm|uv|node|python|python3|git|SAM_CHECKPOINT=)\b/.test(command);
+}
+
+function formatCountCell(item) {
+  if (item?.count === null || item?.count === undefined) return "";
+  if (item?.minGaussians === null || item?.minGaussians === undefined) return String(item.count);
+  return `${item.count} / ${item.minGaussians}`;
 }
 
 function optionalPair(flag, value) {

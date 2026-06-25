@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003P: Near-1M background handoff writes Markdown artifact
+
+- 状态: done / operator-handoff-artifact
+- 类型: 标准 PR / training-output observability
+- 目标: 把 near-1M background handoff 从 console / JSON 扩展成可直接阅读和复制命令的 Markdown 交接文件。
+- 已实施:
+  - `train:splatfacto:near1m-background` 的 dry-run/status/preflight 默认写 `<output-dir>/handoff.md`。
+  - 新增 `--handoff-md <path>` 可覆盖 Markdown 输出位置。
+  - Markdown handoff 记录 next action、是否会启动长训、final candidate status、launch readiness、下一条命令和每个 remaining evidence blocker 的路径与 next evidence command。
+  - TRAIN-003 runbook 已记录 Markdown handoff contract。
+- 结论:
+  - near-1M handoff 现在不仅机器可读，也有一份 operator-facing artifact；长训窗口前可以直接打开 `handoff.md` 确认启动命令和最终 SLA 缺口。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-handoff-md-dry-run`: passed；wrote `handoff.md` with `refresh-preflight` next action。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-handoff-md-dry-run`: passed；rewrote `handoff.md` from status mode。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-handoff-md-preflight-readable-smoke`: passed；wrote `handoff.md` with `start-background-long-run`, final candidate `incomplete`, and 5 copyable remaining evidence commands。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-handoff-md-custom-text --handoff-md /tmp/objgauss-near1m-handoff-md-custom-text/custom-handoff.md`: passed；custom Markdown path was written and non-command evidence stayed plain text。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003O: Near-1M background handoff prints next action
 
 - 状态: done / long-run-handoff

@@ -265,6 +265,12 @@ near1m_next_command=<command to run next>
 near1m_remaining_evidence_<n>=<blocker kind and next evidence>
 ```
 
+The same facts are written to `<output-dir>/handoff.md` by default. Use
+`--handoff-md <path>` when the Markdown handoff should be written elsewhere.
+The Markdown file is intended as the operator-facing artifact: it includes the
+next command as a copyable shell block and lists each remaining evidence blocker
+with its path and next evidence command.
+
 This handoff is deliberately conservative. A `start-background-long-run` action
 means the launch inputs and GPU reserve gate are ready, not that the final
 candidate is complete. Final completion still requires the exported PLY and
