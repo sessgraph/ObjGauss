@@ -29,6 +29,32 @@
 
 ## Done
 
+### RENDER-ROUTE-011: Product renderer acceptance includes WebGPU presentation smoke
+
+- 状态: done / product-presentation-acceptance
+- 类型: 标准 PR / renderer acceptance profile hardening
+- 目标: 将 RENDER-ROUTE-010 的 headed WebGPU full canvas presentation smoke 接入显式 product / demo renderer acceptance，同时保持默认 CI profile fresh-clone/headless 友好，避免把本机 WebGPU presentation 依赖误放进 CI。
+- 已实施:
+  - `scripts/acceptance-renderer-profile.mjs` 的 product profile 现在按 `Renderer route contract -> Build viewer -> WebGPU presentation performance smoke -> Spark commercial route acceptance` 执行。
+  - Product profile 的 WebGPU presentation step 写出 `/tmp/.../webgpu-presentation-performance/summary.json|md`，并固定使用 `5395`。
+  - Spark commercial route 在 product profile 中改为消费顶层 build 后的 `dist/`，通过 `--skip-build` 避免重复构建。
+  - 新增 `--skip-webgpu-presentation-performance` 诊断开关；默认 product profile 不跳过。
+  - `audit:renderer-route-contract` 现在检查 product profile 包含 `audit:webgpu-presentation-performance`。
+  - Renderer readiness matrix 已说明 product/local 承担 headed presentation，CI 继续使用 offscreen / headless C-path gates。
+- 结论:
+  - 当前本机 `acceptance:renderer-product` 通过 4 步：route contract、build、WebGPU presentation performance、Spark commercial route。
+  - Product profile 内 WebGPU presentation 通过：2/2 scenes，largestGaussians=281498，maxUpdateMs=181.3，maxQueueDoneMs=1742.3。
+  - CI profile 未被误加 headed WebGPU presentation；dry-run 只保留 route contract 等 CI 可控步骤。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run acceptance:renderer-product -- --dry-run --skip-build --output-dir /tmp/objgauss-renderer-product-presentation-dry-run`: passed；steps=3，包含 WebGPU presentation performance smoke。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-product -- --output-dir /tmp/objgauss-renderer-product-presentation-profile`: passed；steps=4。
+  - `npm run acceptance:renderer-ci -- --dry-run --skip-build --skip-webgpu-tile-smoke --skip-webgpu-scale-budget --skip-webgpu-edit-cost-budget --skip-splat-index-mapping --skip-native-route --output-dir /tmp/objgauss-renderer-ci-presentation-split-dry-run`: passed；steps=1。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-010: WebGPU headed presentation performance smoke gate
 
 - 状态: done / presentation-performance-smoke

@@ -21,6 +21,9 @@ const skipWebGpuScaleBudget = flagEnabled(
 const skipWebGpuEditCostBudget = flagEnabled(
   args.skipWebGpuEditCostBudget ?? args["skip-webgpu-edit-cost-budget"],
 );
+const skipWebGpuPresentationPerformance = flagEnabled(
+  args.skipWebGpuPresentationPerformance ?? args["skip-webgpu-presentation-performance"],
+);
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
 const noShAssets = String(
@@ -144,6 +147,24 @@ function createProfileSpec(name) {
         ...(skipRouteContract
           ? []
           : [["Renderer route contract", ["npm", "run", "audit:renderer-route-contract"]]]),
+        ...(skipBuild ? [] : [["Build viewer", ["npm", "run", "build"]]]),
+        ...(skipWebGpuPresentationPerformance
+          ? []
+          : [
+              [
+                "WebGPU presentation performance smoke",
+                [
+                  "npm",
+                  "run",
+                  "audit:webgpu-presentation-performance",
+                  "--",
+                  "--port",
+                  nativePort,
+                  "--output-dir",
+                  path.join(outputDir, "webgpu-presentation-performance"),
+                ],
+              ],
+            ]),
         [
           "Spark commercial route acceptance",
           [
@@ -157,7 +178,7 @@ function createProfileSpec(name) {
             trainedPort,
             "--output-dir",
             path.join(outputDir, "spark-commercial-route"),
-            ...(skipBuild ? ["--skip-build"] : []),
+            "--skip-build",
           ],
         ],
       ],

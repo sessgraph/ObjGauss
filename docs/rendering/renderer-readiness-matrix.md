@@ -363,12 +363,15 @@ PLY metadata is usable; it does not prove Spark-internal ray/object metadata
 picking.
 
 `npm run acceptance:renderer-product` is the explicit product/demo profile. It
-runs `audit:renderer-route-contract` first, then
-`acceptance:spark-commercial-route`, including the trained sample availability
+runs `audit:renderer-route-contract` first, builds the viewer, runs
+`audit:webgpu-presentation-performance`, then runs
+`acceptance:spark-commercial-route` with the trained sample availability
 preflight and the SH-heavy browser route. This is the correct gate before
 commercial demo review, but it should not be promoted to default CI until the
 trained sample becomes a committed, downloadable, or generated fixture in that
-environment.
+environment. The WebGPU presentation smoke is intentionally product/local only:
+it proves headed desktop canvas presentation on fixed port `5395`, while CI
+continues to use offscreen / headless C-path gates.
 
 ## Product UI Contract
 

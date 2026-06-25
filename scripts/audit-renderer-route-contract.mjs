@@ -322,7 +322,8 @@ const checks = [
         "acceptance:renderer-ci",
         "acceptance:webgpu-headless",
       ]) &&
-      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-edit-cost-budget"),
+      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-edit-cost-budget") &&
+      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-performance"),
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
@@ -332,6 +333,7 @@ const checks = [
       "audit:webgpu-runtime-performance",
       "audit:webgpu-presentation-performance",
       "acceptance renderer CI includes edit cost budget",
+      "acceptance renderer product includes presentation performance gate",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",
     ],
