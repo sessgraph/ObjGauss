@@ -90,6 +90,17 @@ This command writes an explicit remaining-gap section. A passing report still
 keeps real 1M browser runtime / FPS as not proven until a true 1M scene is run
 in the browser with frame pacing instrumentation.
 
+Use the frame-pacing smoke when the question is whether the current headed
+browser C-path remains responsive after object edits:
+
+```bash
+npm run audit:webgpu-frame-pacing
+```
+
+This samples `requestAnimationFrame` intervals during idle, after isolate, and
+after delete on the default Lego proxy and Plush semantic scenes. It is not a
+sustained renderer FPS benchmark and does not prove the 1M browser target.
+
 For visual fidelity / tuning regressions, use the existing coverage gate:
 
 ```bash

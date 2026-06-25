@@ -29,6 +29,29 @@
 
 ## Done
 
+### RENDER-ROUTE-014: Headed WebGPU frame pacing smoke
+
+- 状态: done / frame-pacing-smoke
+- 类型: 标准 PR / WebGPU C-path browser responsiveness observability
+- 目标: 在 storage / queue timing 和 headed presentation transition 之外，补一条真实浏览器 `requestAnimationFrame` frame-pacing smoke，持续观察当前 C-path 场景在 idle、isolate、delete 后是否仍保持基本交互响应。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-frame-pacing.mjs` 和 `npm run audit:webgpu-frame-pacing`。
+  - Gate 默认覆盖 Lego proxy 与 Plush semantic，启动 fixed-port `5395` preview，强制 `spark-filtered-edit=off`，进入 WebGPU Tile 编辑路径。
+  - 每个 scene 采样 idle / after-isolate / after-delete 三段 rAF intervals，并检查 mean frame、p95 frame、long-frame ratio 和 approximate FPS。
+  - Report 输出 `/tmp/objgauss-webgpu-frame-pacing/summary.json`、`summary.md` 和每个 scene 的 `/tmp` 截图。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU presentation runbook 已登记该 gate。
+- 结论:
+  - 当前本机 frame pacing smoke 通过：2/2 scenes，largestGaussians=`281498`，maxTileReferences=`1190026`。
+  - Plush semantic 大场景通过：min approx FPS=`26.471`，max mean frame=`37.777ms`，max p95 frame=`16.8ms`，max long-frame ratio=`0.013`。
+  - 该 gate 证明当前真实场景 headed browser C-path 响应 smoke；它不是 sustained renderer FPS benchmark，也不是真实 1M browser runtime proof。
+- 验证:
+  - `node --check scripts/audit-webgpu-frame-pacing.mjs`: passed。
+  - `npm run audit:webgpu-frame-pacing -- --port 5395 --output-dir /tmp/objgauss-webgpu-frame-pacing`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-013: WebGPU C-path readiness evidence aggregator
 
 - 状态: done / cpath-readiness-report

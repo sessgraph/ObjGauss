@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-cpath-readiness`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation, but are not full FPS SLAs. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-cpath-readiness`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape, not 1M FPS. Runtime and presentation smoke record browser update / submit / queue timing for object edits and canvas presentation; frame-pacing smoke samples rAF responsiveness on current real scenes, but neither is a full 1M FPS SLA. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -257,6 +257,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Are WebGPU object edit runtime timings inside the current smoke envelope? | `npm run audit:webgpu-runtime-performance` |
 | Does WebGPU full canvas presentation stay inside the current smoke envelope? | `npm run audit:webgpu-presentation-performance` |
 | Do headed WebGPU object transitions stay on the C-path canvas renderer? | `npm run audit:webgpu-presentation-transition` |
+| Does headed WebGPU remain browser-responsive after object edits on current scenes? | `npm run audit:webgpu-frame-pacing` |
 | Does WebGPU present to a desktop canvas? | `npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full` |
 | Is WebGPU visual tuning still within the current baseline? | `npm run audit:webgpu-coverage-gate` |
 | Is Spark native object masking safe for generated no-SH samples? | `npm run audit:spark-native-mask-gate` |
@@ -335,6 +336,16 @@ versus `173.24 MiB` full storage, and headed browser transition evidence up to
 Plush semantic `281498` Gaussians with max queue-done `1836.8ms`. The report
 intentionally keeps `browserRuntime1m=not-proven` and `fpsSla=not-proven`; it
 is a readiness matrix, not the terminal 1M browser performance proof.
+
+`npm run audit:webgpu-frame-pacing` is the headed browser responsiveness smoke
+for the current C-path scenes. It forces `spark-filtered-edit=off`, enters the
+WebGPU Tile edit route, then samples `requestAnimationFrame` intervals during
+idle, after isolate, and after delete. The current local report covers Lego
+proxy and Plush semantic `281498` Gaussians; Plush passes with min approximate
+FPS `26.471`, max mean frame interval `37.777ms`, max p95 frame interval
+`16.8ms`, and max long-frame ratio `0.013`. This is stronger than queue timing
+alone, but it is still a smoke envelope for current scenes, not sustained
+renderer FPS and not a true 1M browser runtime proof.
 
 `npm run audit:webgpu-tile-smoke` also covers the C-path edit-state contract.
 The default tile list mode remains `visible-only`, but the WebGPU runtime uses
