@@ -42,11 +42,13 @@
   - background `--status` 现在也打印 `launch_readiness` 和 `launch_missing`。
 - 结论:
   - near-1M 长训现在有不会启动训练的启动前 gate，避免把“最终输出还没生成”误解成“不能启动”，也避免 GPU preflight 不可用时误启动后台长训。
+  - 宿主机提权只读 preflight 已证明本机启动输入和 GPU reserve gate 当前可通过：`launchReadiness=ready`，`gpu_preflight=passed`。
   - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
 - 验证:
   - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
   - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
   - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-preflight-not-ready`: expected failed with exit `2`；`launchReadiness=not-ready` because sandbox GPU preflight is unavailable。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-preflight-host`: passed with host escalation；`gpu_preflight=passed`，`free_mib=15163`，`launchReadiness=ready`。
   - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-background-preflight-ready-smoke`: passed；`launchReadiness=ready` while final candidate remains incomplete。
   - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-preflight-ready-smoke`: passed；printed `launch_readiness=ready launch_missing=0`。
   - `npm run audit:renderer-route-contract`: passed，16/16 checks。
