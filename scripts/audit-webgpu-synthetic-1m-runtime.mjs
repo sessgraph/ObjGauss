@@ -1,5 +1,13 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -7,17 +15,31 @@ import { chromium } from "playwright";
 
 const DEFAULT_PORT = 5395;
 const DEFAULT_OUTPUT_DIR = "/tmp/objgauss-webgpu-synthetic-1m-runtime";
+const DEFAULT_PLY_OUTPUT_DIR = "/tmp/objgauss-webgpu-ply-runtime";
 const DEFAULT_GAUSSIANS = 1_000_000;
 const DEFAULT_OBJECTS = 256;
-const MODE = "webgpu-synthetic-upload-1m-runtime-v1";
+const SYNTHETIC_MODE = "webgpu-synthetic-upload-1m-runtime-v1";
+const PLY_MODE = "webgpu-ply-upload-runtime-v1";
 const LONG_FRAME_MS = 50;
 
 const args = parseArgs(process.argv.slice(2));
+const inputPlyPath = optionalString(args.inputPly ?? args["input-ply"] ?? args.ply);
+const inputPlyMode = Boolean(inputPlyPath);
+const sceneKind = String(args.sceneKind ?? args["scene-kind"] ?? (inputPlyMode ? "input-ply" : "synthetic")).toLowerCase();
+const auditMode = inputPlyMode ? PLY_MODE : SYNTHETIC_MODE;
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = String(args.url ?? `http://127.0.0.1:${port}/`);
-const outputDir = String(args.outputDir ?? args["output-dir"] ?? DEFAULT_OUTPUT_DIR);
+const outputDir = String(
+  args.outputDir ?? args["output-dir"] ?? (inputPlyMode ? DEFAULT_PLY_OUTPUT_DIR : DEFAULT_OUTPUT_DIR),
+);
 const gaussianCount = positiveInteger(args.gaussians ?? args.count, DEFAULT_GAUSSIANS);
-const objectCount = positiveInteger(args.objects ?? args["object-count"], DEFAULT_OBJECTS);
+const objectCount = inputPlyMode
+  ? optionalPositiveInteger(args.objects ?? args["object-count"], 0)
+  : positiveInteger(args.objects ?? args["object-count"], DEFAULT_OBJECTS);
+const minUploadedGaussians = positiveInteger(
+  args.minGaussians ?? args["min-gaussians"],
+  inputPlyMode ? 1 : DEFAULT_GAUSSIANS,
+);
 const webGpuFlags = String(args.webGpuFlags ?? args["webgpu-flags"] ?? "unsafe");
 const headed = !flagEnabled(args.headless);
 const shouldStartServer = !(args.url || args.noServer || args["no-server"]);
@@ -50,12 +72,17 @@ let browser = null;
 
 try {
   mkdirSync(outputDir, { recursive: true });
-  const plyPath = path.join(outputDir, `synthetic_${gaussianCount}_objects_${objectCount}.ply`);
-  const generated = generateSyntheticPly({ outputPath: plyPath, gaussianCount, objectCount });
+  const generated = inputPlyMode
+    ? describeInputPly({ inputPath: inputPlyPath, objectCount, sceneKind })
+    : generateSyntheticPly({
+        outputPath: path.join(outputDir, `synthetic_${gaussianCount}_objects_${objectCount}.ply`),
+        gaussianCount,
+        objectCount,
+      });
 
   if (shouldStartServer) {
     if (!existsSync("dist/index.html")) {
-      throw new Error("dist/index.html is missing; run `npm run build` before synthetic 1M runtime audit");
+      throw new Error("dist/index.html is missing; run `npm run build` before WebGPU PLY runtime audit");
     }
     server = startPreviewServer(port);
     await waitForApp(baseUrl);
@@ -71,11 +98,11 @@ try {
   });
   page.on("pageerror", (error) => consoleIssues.push(`pageerror: ${error.message}`));
 
-  const row = await auditSyntheticUpload(page, generated);
-  const checks = buildSuiteChecks(row);
+  const row = await auditPlyUpload(page, generated);
+  const checks = buildSuiteChecks(row, generated);
   const passed = row.passed && checks.every((checkEntry) => checkEntry.passed);
   const summary = {
-    mode: MODE,
+    mode: auditMode,
     generatedAt: new Date().toISOString(),
     outputDir,
     url: baseUrl,
@@ -85,6 +112,7 @@ try {
     budgets: {
       frameCount,
       longFrameMs: LONG_FRAME_MS,
+      minUploadedGaussians,
       maxMeanFrameMs,
       maxP95FrameMs,
       maxLongFrameRatio,
@@ -97,22 +125,34 @@ try {
     proof: {
       browserRuntime1m:
         row.packedGaussians >= 1_000_000 && row.initial.firstFrameStatus === "rendered"
-          ? "proven-synthetic-upload"
+          ? inputPlyMode
+            ? "proven-ply-upload"
+            : "proven-synthetic-upload"
           : "not-proven",
-      realTrainedScene1m: "not-proven",
+      plyRuntime:
+        row.packedGaussians >= minUploadedGaussians && row.initial.firstFrameStatus === "rendered"
+          ? "proven-ply-upload"
+          : "not-proven",
+      realTrainedScene1m:
+        inputPlyMode &&
+        sceneKind === "trained" &&
+        row.packedGaussians >= 1_000_000 &&
+        row.initial.firstFrameStatus === "rendered"
+          ? "proven-trained-ply-upload"
+          : "not-proven",
       sustainedFpsSla: "not-proven",
     },
     aggregate: summarizeRow(row),
     consoleIssues,
     checks,
     row,
-    interpretation:
-      `This audit uploads a synthetic ${generated.gaussianCount} Gaussian PLY through the real UI and exercises the headed browser WebGPU Tile C-path. Only runs at or above 1M Gaussians count as synthetic 1M browser-runtime proof. This is not evidence for a trained 1M scene, paper-quality image fidelity, or sustained FPS SLA.`,
+    interpretation: interpretationForRun({ generated, row }),
   };
   writeReport(summary);
+  const logPrefix = inputPlyMode ? "webgpu_ply_runtime" : "webgpu_synthetic_1m_runtime";
   console.log(
-    `webgpu_synthetic_1m_runtime=${passed ? "passed" : "failed"} ` +
-      `gaussians=${row.packedGaussians} objects=${generated.objectCount} ` +
+    `${logPrefix}=${passed ? "passed" : "failed"} ` +
+      `gaussians=${row.packedGaussians} objects=${generated.objectCount || "unknown"} ` +
       `tileReferences=${row.tileReferences} minApproxFps=${summary.aggregate.minApproxFps} ` +
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
   );
@@ -122,7 +162,7 @@ try {
   if (server) stopPreviewServer(server);
 }
 
-async function auditSyntheticUpload(page, generated) {
+async function auditPlyUpload(page, generated) {
   const url = urlWithProbe(baseUrl);
   await page.goto(url, { waitUntil: "networkidle" });
   await expectReadyPage(page);
@@ -167,7 +207,10 @@ async function auditSyntheticUpload(page, generated) {
   const deleteTelemetry = await readWebGpuTelemetry(page);
   const afterDelete = await sampleFramePacing(page, "after-delete");
 
-  const screenshotPath = path.join(outputDir, "synthetic-1m-webgpu-runtime.png");
+  const screenshotPath = path.join(
+    outputDir,
+    generated.source === "input-ply" ? "ply-webgpu-runtime.png" : "synthetic-1m-webgpu-runtime.png",
+  );
   await page.screenshot({ path: screenshotPath, fullPage: false });
 
   const phases = [idle, afterIsolate, afterDelete];
@@ -247,6 +290,41 @@ async function auditSyntheticUpload(page, generated) {
     phases,
     screenshotPath,
   };
+}
+
+function describeInputPly({ inputPath, objectCount, sceneKind }) {
+  const resolved = path.resolve(inputPath);
+  if (!existsSync(resolved)) {
+    throw new Error(`input PLY does not exist: ${resolved}`);
+  }
+  const stats = statSync(resolved);
+  return {
+    source: "input-ply",
+    sceneKind,
+    path: resolved,
+    fileName: path.basename(resolved),
+    gaussianCount: readPlyVertexCount(resolved),
+    objectCount,
+    rowStride: 0,
+    byteSize: stats.size,
+  };
+}
+
+function readPlyVertexCount(filePath) {
+  const fd = openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(1024 * 1024);
+    const byteCount = readSync(fd, buffer, 0, buffer.length, 0);
+    const header = buffer.subarray(0, byteCount).toString("ascii");
+    if (!header.includes("end_header")) {
+      throw new Error("PLY header is larger than 1 MiB or missing end_header");
+    }
+    const match = header.match(/^element\s+vertex\s+(\d+)\s*$/m);
+    if (!match) throw new Error("PLY header is missing element vertex count");
+    return Number(match[1]);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function generateSyntheticPly({ outputPath, gaussianCount, objectCount }) {
@@ -333,6 +411,8 @@ function generateSyntheticPly({ outputPath, gaussianCount, objectCount }) {
   writeFileSync(outputPath, Buffer.concat([Buffer.from(header, "ascii"), body]));
   const stats = statSync(outputPath);
   return {
+    source: "synthetic",
+    sceneKind: "synthetic",
     path: outputPath,
     fileName: path.basename(outputPath),
     gaussianCount,
@@ -558,10 +638,20 @@ async function selectedObjectValue(page) {
   return match?.[1] ?? "无";
 }
 
-function buildSuiteChecks(row) {
+function buildSuiteChecks(row, generated) {
   return [
-    check("gaussian-count-request", gaussianCount, ">= 1000000", gaussianCount >= 1_000_000),
-    check("object-count-request", objectCount, ">= 2", objectCount >= 2),
+    check(
+      "gaussian-count-request",
+      row.packedGaussians,
+      `>= ${minUploadedGaussians}`,
+      row.packedGaussians >= minUploadedGaussians,
+    ),
+    check(
+      "object-count-request",
+      generated.objectCount || "not-declared",
+      generated.source === "input-ply" ? "not-required" : ">= 2",
+      generated.source === "input-ply" || generated.objectCount >= 2,
+    ),
     ...row.checks.map((entry) => ({ asset: row.asset, ...entry })),
   ];
 }
@@ -590,17 +680,25 @@ function writeReport(summary) {
 
 function renderMarkdown(summary) {
   const row = summary.row;
+  const title =
+    summary.generated.source === "input-ply"
+      ? "# WebGPU PLY Runtime Audit"
+      : "# WebGPU Synthetic 1M Runtime Audit";
+  const plyLabel = summary.generated.source === "input-ply" ? "Input PLY" : "Generated PLY";
   const lines = [
-    "# WebGPU Synthetic 1M Runtime Audit",
+    title,
     "",
     `- Mode: \`${summary.mode}\``,
     `- Status: \`${summary.passed ? "passed" : "failed"}\``,
     `- Generated: \`${summary.generatedAt}\``,
     `- URL: \`${summary.url}\``,
     `- Headed: \`${summary.headed ? "true" : "false"}\``,
-    `- Generated PLY: \`${summary.generated.path}\``,
+    `- ${plyLabel}: \`${summary.generated.path}\``,
+    `- PLY source: \`${summary.generated.source}\``,
+    `- Scene kind: \`${summary.generated.sceneKind}\``,
     `- PLY bytes: \`${summary.generated.byteSize}\``,
-    `- Proof: browserRuntime1m=\`${summary.proof.browserRuntime1m}\`, realTrainedScene1m=\`${summary.proof.realTrainedScene1m}\`, sustainedFpsSla=\`${summary.proof.sustainedFpsSla}\``,
+    `- Min uploaded Gaussians: \`${summary.budgets.minUploadedGaussians}\``,
+    `- Proof: browserRuntime1m=\`${summary.proof.browserRuntime1m}\`, plyRuntime=\`${summary.proof.plyRuntime}\`, realTrainedScene1m=\`${summary.proof.realTrainedScene1m}\`, sustainedFpsSla=\`${summary.proof.sustainedFpsSla}\``,
     "",
     summary.interpretation,
     "",
@@ -641,6 +739,20 @@ function renderMarkdown(summary) {
   }
   lines.push("");
   return `${lines.join("\n")}\n`;
+}
+
+function interpretationForRun({ generated, row }) {
+  if (generated.source === "input-ply") {
+    return (
+      `This audit uploads input PLY ${JSON.stringify(generated.fileName)} ` +
+      `(${row.packedGaussians} Gaussians, sceneKind=${generated.sceneKind}) through the real UI ` +
+      "and exercises the headed browser WebGPU Tile C-path. It proves this specific PLY route, not generic trained 1M quality or a production FPS SLA."
+    );
+  }
+  return (
+    `This audit uploads a synthetic ${generated.gaussianCount} Gaussian PLY through the real UI ` +
+    "and exercises the headed browser WebGPU Tile C-path. Only runs at or above 1M Gaussians count as synthetic 1M browser-runtime proof. This is not evidence for a trained 1M scene, paper-quality image fidelity, or sustained FPS SLA."
+  );
 }
 
 function urlWithProbe(url) {
@@ -760,6 +872,12 @@ function positiveFiniteNumber(value, fallback) {
 function positiveInteger(value, fallback) {
   const parsed = positiveFiniteNumber(value, fallback);
   return Math.max(1, Math.round(parsed));
+}
+
+function optionalPositiveInteger(value, fallback) {
+  if (value === undefined || value === null || value === true || value === false) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
 }
 
 function roundMetric(value) {

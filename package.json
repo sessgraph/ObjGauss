@@ -27,6 +27,7 @@
     "audit:webgpu-presentation-transition": "node scripts/audit-webgpu-presentation-transition.mjs",
     "audit:webgpu-frame-pacing": "node scripts/audit-webgpu-frame-pacing.mjs",
     "audit:webgpu-synthetic-1m-runtime": "node scripts/audit-webgpu-synthetic-1m-runtime.mjs",
+    "audit:webgpu-ply-runtime": "node scripts/audit-webgpu-ply-runtime.mjs",
     "audit:webgpu-sustained-frame-pacing": "node scripts/audit-webgpu-sustained-frame-pacing.mjs",
     "audit:webgpu-desktop": "node scripts/audit-webgpu-desktop.mjs",
     "audit:webgpu-coverage-sweep": "node scripts/audit-webgpu-coverage-sweep.mjs",

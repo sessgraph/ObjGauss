@@ -103,6 +103,21 @@ This writes `/tmp/objgauss-webgpu-synthetic-1m-runtime/summary.json` and
 `summary.md`. It is intentionally headed/local because it exercises browser
 upload, presentation, object selection, isolate/delete, and frame pacing.
 
+Use the reusable PLY runtime gate when the question is whether a real or
+trained object-aware PLY can be uploaded through the browser and edited on the
+WebGPU Tile C-path:
+
+```bash
+npm run audit:webgpu-ply-runtime -- \
+  --input-ply public/samples/nerf_lego_trained_objects.ply \
+  --scene-kind trained \
+  --min-gaussians 250000 \
+  --port 5395
+```
+
+For the final near-1M trained-scene proof, use the same command with the
+near-1M PLY path and `--min-gaussians 1000000`.
+
 Use the sustained frame-pacing baseline when the question is whether longer
 rAF sampling remains healthy across the current real scenes and synthetic 1M:
 

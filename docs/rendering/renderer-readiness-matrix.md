@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-synthetic-1m-runtime`, `audit:webgpu-sustained-frame-pacing`, `audit:webgpu-cpath-readiness`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape. Synthetic 1M upload/runtime proves the browser C-path can load and edit a generated 1M PLY, but not trained-scene quality. Sustained frame-pacing baseline proves longer rAF sampling on current real scenes plus synthetic 1M, but production FPS SLA still needs reviewed thresholds and real trained 1M scenes. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-synthetic-1m-runtime`, `audit:webgpu-ply-runtime`, `audit:webgpu-sustained-frame-pacing`, `audit:webgpu-cpath-readiness`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape. Synthetic 1M upload/runtime proves the browser C-path can load and edit a generated 1M PLY, but not trained-scene quality. PLY runtime audit is the reusable gate for real/trained near-1M uploads; current local proof covers the trained Lego 255k sample. Sustained frame-pacing baseline proves longer rAF sampling on current real scenes plus synthetic 1M, but production FPS SLA still needs reviewed thresholds and real trained 1M scenes. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -254,6 +254,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
 | What is the combined C-path readiness state and remaining 1M gap? | `npm run audit:webgpu-cpath-readiness` |
 | Can a synthetic 1M PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-synthetic-1m-runtime` |
+| Can a real/trained object-aware PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-ply-runtime -- --input-ply <path> --scene-kind trained --min-gaussians <n>` |
 | Does WebGPU keep a longer frame-pacing baseline on current scenes plus synthetic 1M? | `npm run audit:webgpu-sustained-frame-pacing` |
 | Does WebGPU compute/storage/object-state work in CI/headless? | `npm run acceptance:webgpu-headless` |
 | Are WebGPU object edit runtime timings inside the current smoke envelope? | `npm run audit:webgpu-runtime-performance` |
@@ -350,6 +351,29 @@ evidence: `1,000,000` uploaded Gaussians, `1,709,862` tile references,
 `0` tile overflow, upload wall time `3150.075ms`, isolate object-state update
 `513.9ms`, delete full-upload update `551.5ms`, and min approximate FPS
 `15.429`. This is synthetic runtime proof, not a real trained scene or FPS SLA.
+
+`npm run audit:webgpu-ply-runtime` is the reusable real/trained PLY runtime
+gate. It uploads a caller-provided object-aware PLY through the real file input,
+forces the WebGPU Tile edit route, checks first frame, selection, isolate,
+delete, tile overflow, update mode, and rAF frame pacing, then writes a report
+under `/tmp`. Example for the current trained Lego sample:
+
+```bash
+npm run audit:webgpu-ply-runtime -- \
+  --input-ply public/samples/nerf_lego_trained_objects.ply \
+  --scene-kind trained \
+  --min-gaussians 250000 \
+  --port 5395 \
+  --output-dir /tmp/objgauss-webgpu-ply-runtime-trained
+```
+
+Current local evidence: trained Lego PLY upload passes with `255,794`
+Gaussians, `581,933` tile references, min approximate FPS `30.51`, max mean
+frame interval `32.775ms`, upload wall time `1777.187ms`, isolate object-state
+update `143.4ms`, and delete object-state update `142.8ms`. This proves the
+real/trained PLY audit path, not the near-1M trained-scene target. When a
+near-1M trained PLY is available, rerun the same command with
+`--min-gaussians 1000000`.
 
 `npm run audit:webgpu-sustained-frame-pacing` is the longer headed browser
 frame-pacing baseline. It runs the current real-scene frame-pacing audit and

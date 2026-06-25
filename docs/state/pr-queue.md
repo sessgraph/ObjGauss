@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-017: Real/trained PLY WebGPU runtime gate
+
+- 状态: done / trained-ply-runtime-gate
+- 类型: 标准 PR / WebGPU C-path real asset runtime readiness
+- 目标: 把 near-1M trained scene 的剩余 gap 固化成可执行 gate：给定任意 object-aware PLY，浏览器通过真实文件上传进入 WebGPU Tile C-path，并完成对象选择、隔离、删除和 frame pacing 检查。
+- 已实施:
+  - `scripts/audit-webgpu-synthetic-1m-runtime.mjs` 扩展为双模式：默认 synthetic 1M 生成路径保持兼容；传入 `--input-ply` 时改为 `webgpu-ply-upload-runtime-v1`。
+  - 新增薄入口 `scripts/audit-webgpu-ply-runtime.mjs` 和 `npm run audit:webgpu-ply-runtime`。
+  - PLY runtime gate 会读取 PLY header 的 vertex count，用 `--min-gaussians` 做规模门禁，并在报告中区分 `plyRuntime`、`browserRuntime1m` 和 `realTrainedScene1m` proof。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该 gate。
+- 结论:
+  - 当前本机 trained Lego PLY runtime 通过：input=`public/samples/nerf_lego_trained_objects.ply`，sceneKind=`trained`，uploadedGaussians=`255794`，tileReferences=`581933`。
+  - Browser route proof：`plyRuntime=proven-ply-upload`，`browserRuntime1m=not-proven`，`realTrainedScene1m=not-proven`。
+  - 当前 gate 证明真实/训练 PLY 上传验收入口可用；near-1M trained scene 仍需实际 PLY 产物后用 `--min-gaussians 1000000` 复跑。
+- 验证:
+  - `node --check scripts/audit-webgpu-synthetic-1m-runtime.mjs`: passed。
+  - `node --check scripts/audit-webgpu-ply-runtime.mjs`: passed。
+  - `npm run audit:webgpu-ply-runtime -- --input-ply public/samples/nerf_lego_trained_objects.ply --scene-kind trained --min-gaussians 250000 --port 5395 --output-dir /tmp/objgauss-webgpu-ply-runtime-trained --frame-count 60 --max-mean-frame-ms 120 --max-p95-frame-ms 220 --max-long-frame-ratio 0.35 --min-approx-fps 8`: passed；min approx FPS=`30.51`。
+  - `npm run audit:webgpu-synthetic-1m-runtime -- --gaussians 50000 --objects 32 --port 5395 --output-dir /tmp/objgauss-webgpu-synthetic-compat-small --frame-count 10 --max-mean-frame-ms 200 --max-p95-frame-ms 300 --min-approx-fps 1 --allow-failures`: expected failed only on 1M count gate; synthetic browser path remained compatible。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-016: Sustained WebGPU frame pacing baseline
 
 - 状态: done / sustained-frame-pacing-baseline
