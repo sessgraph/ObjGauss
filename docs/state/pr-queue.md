@@ -29,6 +29,32 @@
 
 ## Done
 
+### RENDER-ROUTE-015: Synthetic 1M browser runtime proof
+
+- 状态: done / synthetic-1m-browser-runtime
+- 类型: 标准 PR / WebGPU C-path scale runtime observability
+- 目标: 在 1M storage/edit budget 和 281k 真实场景 browser transition 之间补一条真实浏览器上传运行证据，证明 WebGPU Tile C-path 能通过 UI 上传 synthetic 1M PLY 并完成对象级交互。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-synthetic-1m-runtime.mjs` 和 `npm run audit:webgpu-synthetic-1m-runtime`。
+  - Gate 默认在 `/tmp` 生成 `1,000,000` Gaussian / `256` object 的 binary PLY，不提交任何生成数据。
+  - Gate 通过真实文件上传控件加载 PLY，使用 `uploaded-ply-splat-source=off` 直接进入 WebGPU Tile 对象编辑路线，检查 first frame、tile overflow、对象选中、隔离、删除和三段 rAF frame pacing。
+  - `src/App.jsx` 新增 `uploaded-ply-splat-source=off` 诊断参数；默认行为不变，普通上传仍保留 `splatSource`。
+  - `audit:webgpu-cpath-readiness` 已纳入 synthetic 1M runtime 子步骤，并把剩余 gap 改为真实训练 1M scene runtime 和 sustained FPS SLA。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该 gate。
+- 结论:
+  - 当前本机 synthetic 1M runtime 通过：uploadedGaussians=`1000000`，tileReferences=`1709862`，tileOverflow=`0`。
+  - 最新 C-path readiness 通过：scale1m=`passed`，edit1m=`passed`，headedTransition=`passed`，browserRuntime1m=`passed` / proof=`proven-synthetic-upload`。
+  - 这证明 synthetic 1M browser runtime shape；仍不证明真实训练 1M scene、论文级视觉质量或 sustained FPS SLA。
+- 验证:
+  - `node --check scripts/audit-webgpu-synthetic-1m-runtime.mjs`: passed。
+  - `npm run audit:webgpu-synthetic-1m-runtime -- --gaussians 50000 --objects 32 --port 5395 --output-dir /tmp/objgauss-webgpu-synthetic-1m-runtime-small --frame-count 10 --max-mean-frame-ms 200 --max-p95-frame-ms 300 --min-approx-fps 1 --allow-failures`: expected failed only on 1M suite count; browser upload / WebGPU interaction passed。
+  - `npm run audit:webgpu-synthetic-1m-runtime -- --port 5395 --output-dir /tmp/objgauss-webgpu-synthetic-1m-runtime`: passed；min approx FPS=`15.429`。
+  - `npm run audit:webgpu-cpath-readiness -- --port 5395 --output-dir /tmp/objgauss-webgpu-cpath-readiness`: passed；realTrainedBrowserRuntime1m=`not-proven`，fpsSla=`not-proven`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-014: Headed WebGPU frame pacing smoke
 
 - 状态: done / frame-pacing-smoke

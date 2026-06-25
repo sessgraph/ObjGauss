@@ -157,6 +157,7 @@ export default function App() {
   const sparkPlySourceMode = useMemo(readSparkPlySourceMode, []);
   const sparkNativeMaskMode = useMemo(readSparkNativeMaskMode, []);
   const sparkFilteredEditEnabled = useMemo(readSparkFilteredEditEnabled, []);
+  const uploadedPlySplatSourceEnabled = useMemo(readUploadedPlySplatSourceEnabled, []);
   const webGpuTileSmoke = useMemo(
     () =>
       buildWebGpuTileSmoke({
@@ -369,6 +370,9 @@ export default function App() {
     setError("");
     try {
       const next = await parsePlyFile(file);
+      if (!uploadedPlySplatSourceEnabled) {
+        next.splatSource = null;
+      }
       applyScene(next);
     } catch (loadError) {
       setError(loadError.message || "PLY 加载失败");
@@ -1324,6 +1328,14 @@ function readSparkFilteredEditEnabled() {
   if (typeof window === "undefined") return true;
   const value = String(
     new URLSearchParams(window.location.search).get("spark-filtered-edit") ?? "auto",
+  ).toLowerCase();
+  return !["0", "false", "no", "off"].includes(value);
+}
+
+function readUploadedPlySplatSourceEnabled() {
+  if (typeof window === "undefined") return true;
+  const value = String(
+    new URLSearchParams(window.location.search).get("uploaded-ply-splat-source") ?? "auto",
   ).toLowerCase();
   return !["0", "false", "no", "off"].includes(value);
 }

@@ -319,6 +319,7 @@ const checks = [
         "audit:webgpu-presentation-performance",
         "audit:webgpu-presentation-transition",
         "audit:webgpu-frame-pacing",
+        "audit:webgpu-synthetic-1m-runtime",
         "audit:webgpu-cpath-readiness",
         "audit:spark-native-mask-gate",
         "audit:spark-native-pick-feasibility",
@@ -327,7 +328,8 @@ const checks = [
       ]) &&
       contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-edit-cost-budget") &&
       contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-performance") &&
-      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-transition"),
+      contains("scripts/acceptance-renderer-profile.mjs", "audit:webgpu-presentation-transition") &&
+      contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-synthetic-1m-runtime"),
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
@@ -338,10 +340,12 @@ const checks = [
       "audit:webgpu-presentation-performance",
       "audit:webgpu-presentation-transition",
       "audit:webgpu-frame-pacing",
+      "audit:webgpu-synthetic-1m-runtime",
       "audit:webgpu-cpath-readiness",
       "acceptance renderer CI includes edit cost budget",
       "acceptance renderer product includes presentation performance gate",
       "acceptance renderer product includes presentation object transition gate",
+      "C-path readiness includes synthetic 1M runtime gate",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",
     ],
@@ -355,6 +359,7 @@ const checks = [
       contains("package.json", '"dev": "vite --host 127.0.0.1 --port 5395 --strictPort"') &&
       contains("package.json", '"preview": "vite preview --host 127.0.0.1 --port 5395 --strictPort"') &&
       contains("scripts/audit-demo.mjs", "const DEFAULT_PORT = 5395") &&
+      contains("scripts/audit-webgpu-synthetic-1m-runtime.mjs", "const DEFAULT_PORT = 5395") &&
       contains("scripts/audit-spark-native-mask-gate.mjs", "const DEFAULT_PORT = 5395") &&
       contains("scripts/acceptance-renderer-profile.mjs", '?? "5395"') &&
       contains("scripts/acceptance-demo.mjs", '|| "5395"'),

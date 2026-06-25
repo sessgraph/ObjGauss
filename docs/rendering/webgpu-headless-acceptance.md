@@ -80,15 +80,28 @@ npm run audit:webgpu-presentation-transition
 ```
 
 Use the C-path readiness aggregator when the question is the combined state of
-1M storage/edit budgets plus the current real headed browser transition proof:
+1M storage/edit budgets, synthetic 1M headed browser upload/runtime proof, and
+the current real headed browser transition proof:
 
 ```bash
 npm run audit:webgpu-cpath-readiness
 ```
 
-This command writes an explicit remaining-gap section. A passing report still
-keeps real 1M browser runtime / FPS as not proven until a true 1M scene is run
-in the browser with frame pacing instrumentation.
+This command writes an explicit remaining-gap section. A passing report now
+proves the synthetic 1M upload/runtime shape, but still keeps real trained 1M
+browser runtime and sustained FPS as not proven.
+
+Use the focused synthetic 1M browser gate when the question is whether a
+generated 1M PLY can be uploaded through the real UI and edited on the WebGPU
+Tile C-path:
+
+```bash
+npm run audit:webgpu-synthetic-1m-runtime
+```
+
+This writes `/tmp/objgauss-webgpu-synthetic-1m-runtime/summary.json` and
+`summary.md`. It is intentionally headed/local because it exercises browser
+upload, presentation, object selection, isolate/delete, and frame pacing.
 
 Use the frame-pacing smoke when the question is whether the current headed
 browser C-path remains responsive after object edits:

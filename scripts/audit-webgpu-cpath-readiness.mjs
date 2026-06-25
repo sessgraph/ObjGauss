@@ -23,6 +23,7 @@ const minLargeSceneGaussians = positiveFiniteNumber(
 const scaleDir = path.join(outputDir, "scale-budget");
 const editCostDir = path.join(outputDir, "edit-cost-budget");
 const transitionDir = path.join(outputDir, "presentation-transition");
+const syntheticRuntimeDir = path.join(outputDir, "synthetic-1m-runtime");
 const scaleSummaryPath = String(
   args.scaleSummary ?? args["scale-summary"] ?? path.join(scaleDir, "summary.json"),
 );
@@ -33,6 +34,14 @@ const transitionSummaryPath = String(
   args.transitionSummary ??
     args["transition-summary"] ??
     path.join(transitionDir, "summary.json"),
+);
+const syntheticRuntimeSummaryPath = String(
+  args.syntheticRuntimeSummary ??
+    args["synthetic-runtime-summary"] ??
+    path.join(syntheticRuntimeDir, "summary.json"),
+);
+const skipSynthetic1mRuntime = flagEnabled(
+  args.skipSynthetic1mRuntime ?? args["skip-synthetic-1m-runtime"],
 );
 
 if (assets.length === 0) {
@@ -79,12 +88,34 @@ try {
       "--output-dir",
       transitionDir,
     ]);
+    if (!skipSynthetic1mRuntime) {
+      await runStep("WebGPU synthetic 1M browser runtime", [
+        "npm",
+        "run",
+        "audit:webgpu-synthetic-1m-runtime",
+        "--",
+        "--port",
+        port,
+        "--webgpu-flags",
+        webGpuFlags,
+        "--output-dir",
+        syntheticRuntimeDir,
+      ]);
+    }
   }
 
   const scaleSummary = readJson(scaleSummaryPath);
   const editCostSummary = readJson(editCostSummaryPath);
   const transitionSummary = readJson(transitionSummaryPath);
-  const evidence = buildEvidence({ scaleSummary, editCostSummary, transitionSummary });
+  const syntheticRuntimeSummary = skipSynthetic1mRuntime
+    ? null
+    : readJson(syntheticRuntimeSummaryPath);
+  const evidence = buildEvidence({
+    scaleSummary,
+    editCostSummary,
+    transitionSummary,
+    syntheticRuntimeSummary,
+  });
   const checks = buildChecks(evidence);
   const gaps = buildGaps(evidence);
   const passed = checks.every((check) => check.passed);
@@ -104,6 +135,7 @@ try {
       scaleBudget: scaleSummaryPath,
       editCostBudget: editCostSummaryPath,
       presentationTransition: transitionSummaryPath,
+      syntheticRuntime1m: skipSynthetic1mRuntime ? "skipped" : syntheticRuntimeSummaryPath,
     },
     passed,
     status: passed ? "passed" : "failed",
@@ -166,7 +198,7 @@ async function runStep(label, command) {
   }
 }
 
-function buildEvidence({ scaleSummary, editCostSummary, transitionSummary }) {
+function buildEvidence({ scaleSummary, editCostSummary, transitionSummary, syntheticRuntimeSummary }) {
   const scale1m = findRow(scaleSummary.rows, "c-path-1m-budget");
   const edit1m = findRow(editCostSummary.rows, "c-path-1m-budget");
   const transitionRows = Array.isArray(transitionSummary.rows) ? transitionSummary.rows : [];
@@ -178,6 +210,8 @@ function buildEvidence({ scaleSummary, editCostSummary, transitionSummary }) {
   const headedLargeRows = transitionRows.filter(
     (row) => numeric(row.packedGaussians) >= minLargeSceneGaussians,
   );
+  const syntheticRuntimeRow = syntheticRuntimeSummary?.row ?? {};
+  const syntheticRuntimeProof = syntheticRuntimeSummary?.proof?.browserRuntime1m ?? "not-run";
   return {
     scaleBudget1m: {
       status: scaleSummary.status === "passed" && scale1m?.status === "passed" ? "passed" : "failed",
@@ -235,16 +269,38 @@ function buildEvidence({ scaleSummary, editCostSummary, transitionSummary }) {
         "Real headed browser evidence covers current small and 281k-class scenes staying on WebGPU Tile through select/isolate/delete.",
     },
     browserRuntime1m: {
-      status: "not-proven",
-      scope: "real 1M headed browser runtime / FPS",
+      status:
+        syntheticRuntimeSummary?.passed === true &&
+        syntheticRuntimeProof === "proven-synthetic-upload" &&
+        numeric(syntheticRuntimeRow.packedGaussians) >= 1_000_000
+          ? "passed"
+          : skipSynthetic1mRuntime
+            ? "skipped"
+            : "failed",
+      scope: "synthetic 1M headed browser upload/runtime",
+      mode: syntheticRuntimeSummary?.mode ?? "",
+      proof: syntheticRuntimeProof,
+      gaussians: numeric(syntheticRuntimeRow.packedGaussians),
+      tileReferences: numeric(syntheticRuntimeRow.tileReferences),
+      minApproxFps: numeric(syntheticRuntimeSummary?.aggregate?.minApproxFps),
+      uploadWallMs: numeric(syntheticRuntimeSummary?.aggregate?.uploadWallMs),
+      isolateUpdateMs: numeric(syntheticRuntimeSummary?.aggregate?.isolateUpdateMs),
+      deleteUpdateMs: numeric(syntheticRuntimeSummary?.aggregate?.deleteUpdateMs),
+      screenshotPath: syntheticRuntimeRow.screenshotPath ?? "",
       interpretation:
-        "The 1M rows are static budget envelopes. The largest current headed browser transition evidence is the local large scene, not a true 1M interactive FPS run.",
+        "A synthetic 1M binary PLY is uploaded through the real UI and exercised through WebGPU Tile select/isolate/delete. This proves browser runtime shape for synthetic 1M, not trained-scene quality.",
+    },
+    realTrainedBrowserRuntime1m: {
+      status: "not-proven",
+      scope: "real trained 1M headed browser runtime",
+      interpretation:
+        "The largest current real headed transition evidence is still the local large scene, not a trained scene near 1M Gaussians.",
     },
     fpsSla: {
       status: "not-proven",
       scope: "interactive FPS SLA",
       interpretation:
-        "Timing smoke records update, submit, and queue-done envelopes; it does not sample frame pacing or sustained FPS.",
+        "Frame-pacing smoke and synthetic 1M rAF sampling are smoke envelopes, not a sustained renderer FPS benchmark.",
     },
   };
 }
@@ -294,17 +350,25 @@ function buildChecks(evidence) {
       evidence.headedBrowserTransition.scenes > 0 &&
         evidence.headedBrowserTransition.cpathRows === evidence.headedBrowserTransition.scenes,
     ),
+    check(
+      "synthetic-browser-runtime-1m",
+      evidence.browserRuntime1m.status,
+      skipSynthetic1mRuntime ? "skipped" : "passed",
+      skipSynthetic1mRuntime
+        ? evidence.browserRuntime1m.status === "skipped"
+        : evidence.browserRuntime1m.status === "passed",
+    ),
   ];
 }
 
 function buildGaps(evidence) {
   return [
     {
-      id: "browser-runtime-1m",
-      status: evidence.browserRuntime1m.status,
-      reason: evidence.browserRuntime1m.interpretation,
+      id: "real-trained-browser-runtime-1m",
+      status: evidence.realTrainedBrowserRuntime1m.status,
+      reason: evidence.realTrainedBrowserRuntime1m.interpretation,
       nextEvidence:
-        "Run a real browser scene near 1M Gaussians with the same select/isolate/delete transition and frame pacing instrumentation.",
+        "Run a trained or captured real scene near 1M Gaussians with the same select/isolate/delete transition and frame pacing instrumentation.",
     },
     {
       id: "fps-sla",
@@ -339,7 +403,7 @@ function renderMarkdown(summary) {
     `- Generated: \`${summary.generatedAt}\``,
     `- Fixed port: \`${summary.port}\``,
     "",
-    "This report combines synthetic 1M C-path budgets with the current headed browser object-transition evidence. Passing means the architecture evidence is internally consistent; it does not mean 1M browser FPS is proven.",
+    "This report combines synthetic 1M C-path budgets, synthetic 1M browser upload/runtime proof, and the current headed real-scene browser object-transition evidence. Passing means the architecture evidence is internally consistent; it does not mean trained 1M scene quality or sustained FPS is proven.",
     "",
     "## Evidence",
     "",
@@ -393,6 +457,9 @@ function keyResult(id, item) {
   if (id === "headedBrowserTransition") {
     return `${item.scenes}/${item.expectedScenes} scenes, largest ${item.largestGaussians}, max queue ${item.maxQueueDoneMs} ms`;
   }
+  if (id === "browserRuntime1m") {
+    return `${item.gaussians} uploaded Gaussians, ${item.tileReferences} tile refs, min approx FPS ${item.minApproxFps}`;
+  }
   return item.status;
 }
 
@@ -405,6 +472,8 @@ function printSummary(summary) {
       `headedTransition=${summary.evidence?.headedBrowserTransition?.status ?? "missing"}`,
       `largestHeadedGaussians=${summary.evidence?.headedBrowserTransition?.largestGaussians ?? 0}`,
       `browserRuntime1m=${summary.evidence?.browserRuntime1m?.status ?? "not-proven"}`,
+      `browserRuntime1mProof=${summary.evidence?.browserRuntime1m?.proof ?? "not-proven"}`,
+      `realTrainedBrowserRuntime1m=${summary.evidence?.realTrainedBrowserRuntime1m?.status ?? "not-proven"}`,
       `fpsSla=${summary.evidence?.fpsSla?.status ?? "not-proven"}`,
       `report=${JSON.stringify(path.join(outputDir, "summary.md"))}`,
     ].join(" "),
