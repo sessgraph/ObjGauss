@@ -29,6 +29,32 @@
 
 ## Done
 
+### TRAIN-003L: Near-1M background status includes candidate readiness
+
+- 状态: done / nested-candidate-readiness-handoff
+- 类型: 标准 PR / training-output observability
+- 目标: 让后台 near-1M 长训结束、失败或被 guard 拦住后，都能通过固定 JSON 和 `--status` 直接判断 production SLA 缺口，而不是只看日志尾巴。
+- 已实施:
+  - `train:splatfacto:near1m-candidate -- --status-json <path>` 现在会在 dry-run、成功和已知失败路径写出 `objgauss-near1m-candidate-status-v1` readiness report。
+  - `train:splatfacto:near1m-background` 会把 `<output-dir>/near1m-candidate-status.json` 作为 nested `--status-json` 传给 candidate run。
+  - background launcher manifest / dry-run / status report 会记录 `candidateStatusPath`。
+  - background `--status` 会读取 nested candidate status JSON，并打印 missing、exported/object Gaussian count、production SLA status 和 blocker count。
+  - TRAIN-003D runbook 已记录 nested candidate status report 的语义。
+- 结论:
+  - near-1M 长训现在不只可启动和停止，还能把最终 C-path SLA 剩余 gap 固定落到一份机器可读 candidate readiness report。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull --status-json /tmp/objgauss-near1m-candidate-status-json-smoke/summary.json`: passed；wrote status JSON。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-background-status-json-smoke`: passed；command includes nested `--status-json`。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-background-status-json-smoke --candidate-status-json /tmp/objgauss-near1m-candidate-status-json-smoke/summary.json`: passed；printed `near1m_candidate_status=incomplete missing=5`。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti --status-json /tmp/objgauss-near1m-candidate-run-guard-status/summary.json`: expected failed with exit `2`；long-run guard fired and still wrote status JSON。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003K: Near-1M background launcher has guarded stop
 
 - 状态: done / guarded-background-stop

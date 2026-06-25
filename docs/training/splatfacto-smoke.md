@@ -230,6 +230,12 @@ npm run train:splatfacto:near1m-background -- \
   --output-dir /tmp/objgauss-splatfacto-near1m-background
 ```
 
+The background launcher always reserves a nested candidate status report at
+`<output-dir>/near1m-candidate-status.json`. The launched candidate command
+receives that path as `--status-json`, so known guard failures and completed
+runs leave the same `objgauss-near1m-candidate-status-v1` readiness facts that
+the foreground status command writes.
+
 Start the long run in the background only when the machine is ready:
 
 ```bash
@@ -249,6 +255,10 @@ npm run train:splatfacto:near1m-background -- \
   --status \
   --output-dir /tmp/objgauss-splatfacto-near1m-background
 ```
+
+When the nested candidate status report exists, `--status` also prints the
+candidate readiness summary: missing file count, exported Gaussian count,
+object-aware Gaussian count, production SLA status, and blocker count.
 
 Stop the detached run when you need to free the machine. This sends `SIGTERM`
 to the recorded detached process group and requires an explicit stop

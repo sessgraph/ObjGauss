@@ -16,6 +16,7 @@ const mode = args.run ? "run" : args.status ? "status" : args.stop ? "stop" : "d
 const outputDir = args.outputDir ?? "/tmp/objgauss-splatfacto-near1m-background";
 const manifestPath = args.manifest ?? path.join(outputDir, "launcher.json");
 const statusPath = args.statusJson ?? args.statusJsonOutput ?? path.join(outputDir, "status.json");
+const candidateStatusPath = args.candidateStatusJson ?? path.join(outputDir, "near1m-candidate-status.json");
 const logPath = args.logPath ?? path.join(outputDir, "near1m-run.log");
 const targetHardware = args.targetHardware ?? "local-rtx5060ti";
 const gpuMemoryReserveGb = args.gpuMemoryReserveGb ?? "1";
@@ -38,6 +39,8 @@ const command = [
   gpuMemoryReserveGb,
   "--port",
   port,
+  "--status-json",
+  candidateStatusPath,
   ...optionalPair("--sam-checkpoint", args.samCheckpoint),
   ...optionalPair("--iterations", args.iterations),
   ...optionalPair("--steps-per-save", args.stepsPerSave),
@@ -114,6 +117,7 @@ try {
     outputDir,
     logPath,
     statusPath,
+    candidateStatusPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
   };
@@ -124,6 +128,7 @@ try {
     pid: child.pid,
     manifestPath,
     logPath,
+    candidateStatusPath,
     commandText: manifest.commandText,
     startedAt: manifest.startedAt,
   });
@@ -143,6 +148,7 @@ function buildDryRunReport() {
     outputDir,
     manifestPath,
     statusPath,
+    candidateStatusPath,
     logPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
@@ -154,6 +160,7 @@ function buildStatusReport() {
   const pid = manifest?.pid;
   const running = pid ? isPidAlive(pid) : false;
   const logStats = existsSync(logPath) ? statSync(logPath) : null;
+  const candidateStatus = readJsonIfPresent(candidateStatusPath);
   const report = {
     schema: "objgauss-near1m-background-status-v1",
     mode,
@@ -162,8 +169,11 @@ function buildStatusReport() {
     pid: pid ?? null,
     manifestPath,
     logPath,
+    candidateStatusPath,
     logBytes: logStats?.size ?? 0,
     tail: existsSync(logPath) ? tailFile(logPath, 40) : [],
+    candidateStatus,
+    candidateSummary: summarizeCandidateStatus(candidateStatus),
     manifest,
   };
   return report;
@@ -181,6 +191,7 @@ function stopBackgroundRun() {
       signal: stopSignal,
       manifestPath,
       logPath,
+      candidateStatusPath,
       reason: "launcher manifest is missing or has no pid",
     };
   }
@@ -194,6 +205,7 @@ function stopBackgroundRun() {
       signal: stopSignal,
       manifestPath,
       logPath,
+      candidateStatusPath,
       reason: "recorded pid is not running",
       manifest,
     };
@@ -211,6 +223,7 @@ function stopBackgroundRun() {
       signal: stopSignal,
       manifestPath,
       logPath,
+      candidateStatusPath,
       manifest,
     };
   } catch (error) {
@@ -223,6 +236,7 @@ function stopBackgroundRun() {
       signal: stopSignal,
       manifestPath,
       logPath,
+      candidateStatusPath,
       reason: error?.message ?? String(error),
       manifest,
     };
@@ -235,12 +249,20 @@ function printDryRun(report) {
   console.log(`log=${report.logPath}`);
   console.log(`manifest=${report.manifestPath}`);
   console.log(`status_json=${report.statusPath}`);
+  console.log(`candidate_status_json=${report.candidateStatusPath}`);
 }
 
 function printStatus(report) {
   console.log(
     `near1m_background=${report.status} pid=${report.pid ?? "none"} log=${report.logPath} log_bytes=${report.logBytes}`,
   );
+  if (report.candidateSummary) {
+    console.log(
+      `near1m_candidate_status=${report.candidateSummary.status} missing=${report.candidateSummary.missing} exported_gaussians=${report.candidateSummary.exportedGaussians} object_gaussians=${report.candidateSummary.objectGaussians} production_sla=${report.candidateSummary.productionSla} blockers=${report.candidateSummary.blockers}`,
+    );
+  } else {
+    console.log(`near1m_candidate_status=missing path=${report.candidateStatusPath}`);
+  }
   if (report.tail.length > 0) {
     console.log("log_tail_begin");
     for (const line of report.tail) console.log(line);
@@ -255,12 +277,30 @@ function printStop(report) {
 }
 
 function readManifestIfPresent() {
-  if (!existsSync(manifestPath)) return null;
+  return readJsonIfPresent(manifestPath);
+}
+
+function readJsonIfPresent(filePath) {
+  if (!existsSync(filePath)) return null;
   try {
-    return JSON.parse(readFileSync(manifestPath, "utf8"));
+    return JSON.parse(readFileSync(filePath, "utf8"));
   } catch {
     return null;
   }
+}
+
+function summarizeCandidateStatus(report) {
+  if (!report) return null;
+  return {
+    schema: report.schema ?? "unknown",
+    status: report.status ?? "unknown",
+    missing: report.missing ?? "unknown",
+    exportedGaussians: report.readiness?.exportedGaussians ?? "unknown",
+    objectGaussians: report.readiness?.objectGaussians ?? "unknown",
+    productionSla: report.readiness?.productionSla ?? "unknown",
+    gpuMemoryPreflight: report.readiness?.gpuMemoryPreflight ?? "unknown",
+    blockers: Array.isArray(report.blockers) ? report.blockers.length : "unknown",
+  };
 }
 
 function isPidAlive(pid) {

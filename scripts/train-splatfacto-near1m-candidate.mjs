@@ -248,12 +248,12 @@ if (mode === "run") {
       "near1m_long_run_guard=failed reason=\"starting near-1M Splatfacto training requires --confirm-long-run\"",
     );
     console.error("hint=use --skip-train when reusing an existing exported PLY");
-    process.exit(2);
+    exitWithStatusJson(2);
   }
   const missing = collectMissingForRun();
   if (missing.length > 0) {
     printMissing(missing);
-    process.exit(2);
+    exitWithStatusJson(2);
   }
   if (!skipTrain) {
     try {
@@ -261,25 +261,30 @@ if (mode === "run") {
     } catch (error) {
       console.error(`near1m_gpu_preflight=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
       console.error("hint=pass --skip-gpu-preflight only if you accept running without a 1GB reserve preflight");
-      process.exit(2);
+      exitWithStatusJson(2);
     }
   }
 }
 
-for (const step of steps.filter((item) => !item.skip)) {
-  console.log(`\n=== ${step.label} ===`);
-  console.log(formatCommand(step.command));
-  if (mode === "run") {
-    if (step.beforeRun) {
-      try {
-        step.beforeRun();
-      } catch (error) {
-        console.error(`near1m_scale_gate=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
-        process.exit(2);
+try {
+  for (const step of steps.filter((item) => !item.skip)) {
+    console.log(`\n=== ${step.label} ===`);
+    console.log(formatCommand(step.command));
+    if (mode === "run") {
+      if (step.beforeRun) {
+        try {
+          step.beforeRun();
+        } catch (error) {
+          console.error(`near1m_scale_gate=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
+          exitWithStatusJson(2);
+        }
       }
+      await run(step.command);
     }
-    await run(step.command);
   }
+} catch (error) {
+  console.error(`near1m_step=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
+  exitWithStatusJson(2);
 }
 
 if (mode === "dry-run") {
@@ -287,6 +292,7 @@ if (mode === "dry-run") {
 } else {
   console.log("\ntrain_splatfacto_near1m_candidate=passed");
 }
+writeCurrentStatusJson();
 
 function buildStatusReport() {
   const exportedCount = existsSync(exportedPly) ? readPlyVertexCountOrZero(exportedPly) : 0;
@@ -511,6 +517,17 @@ function writeStatusJson(filePath, report) {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`status_json=${filePath}`);
+}
+
+function writeCurrentStatusJson() {
+  if (statusJsonPath) {
+    writeStatusJson(statusJsonPath, buildStatusReport());
+  }
+}
+
+function exitWithStatusJson(code) {
+  writeCurrentStatusJson();
+  process.exit(code);
 }
 
 function collectMissingForRun() {
