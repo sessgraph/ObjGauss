@@ -35,6 +35,7 @@ export const INITIAL_WEBGPU_CAPABILITY = Object.freeze({
 const EMPTY_TILE_SMOKE = Object.freeze({
   layoutVersion: "webgpu-tile-smoke-v1",
   tileSize: 16,
+  tileListMode: "visible-only",
   viewportWidth: 1024,
   viewportHeight: 1024,
   boundsMinX: -1,
@@ -196,6 +197,7 @@ export function editRendererContract(webGpuCapability, tileSmoke) {
     storageEstimatedMaxBufferKey: storageEstimate.maxBufferKey,
     tileSmokeLayout: smoke.layoutVersion,
     tileSize: smoke.tileSize,
+    tileListMode: smoke.tileListMode,
     viewportWidth: smoke.viewportWidth,
     viewportHeight: smoke.viewportHeight,
     boundsMinX: smoke.boundsMinX,

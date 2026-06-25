@@ -48,6 +48,8 @@ import {
   WEBGPU_TILE_DEPTH_WEIGHT_MODE,
   WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
   WEBGPU_TILE_ENTRY_LAYOUT_FIXED,
+  WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
+  WEBGPU_TILE_LIST_MODE_VISIBLE,
   WEBGPU_TILE_PROJECTION_MODE,
   WEBGPU_TILE_SCREEN_COVARIANCE_MODE,
   WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE,
@@ -276,6 +278,7 @@ assert.ok(base.binnedGaussians > 0);
 assert.ok(base.activeTileCount > 0);
 assert.ok(base.tileReferenceCount >= base.binnedGaussians);
 assert.equal(base.tileEntryLayout, WEBGPU_TILE_ENTRY_LAYOUT_COMPACT);
+assert.equal(base.tileListMode, WEBGPU_TILE_LIST_MODE_VISIBLE);
 assert.equal(base.tileEntryOffsetCount, base.tileCount);
 assert.equal(base.tileCapacityMode, WEBGPU_TILE_ENTRY_LAYOUT_COMPACT);
 assert.equal(base.tileCapacityStatus, "ok");
@@ -853,6 +856,75 @@ assert.notEqual(removed.objectStateChecksum, base.objectStateChecksum);
 const removedStorage = describeWebGpuTileStorage(removed);
 assert.notEqual(removedStorage.checksum, storage.checksum);
 
+const objectStateTileBase = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  tileListMode: WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
+});
+assert.equal(objectStateTileBase.tileListMode, WEBGPU_TILE_LIST_MODE_OBJECT_STATE);
+assert.equal(objectStateTileBase.tileReferenceCount, base.tileReferenceCount);
+assert.equal(
+  checksumTypedArray(objectStateTileBase.buffers.tileEntries),
+  checksumTypedArray(base.buffers.tileEntries),
+);
+
+const objectStateTileIsolated = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set(),
+  isolatedId: firstObjectId,
+  selectedId: firstObjectId,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  tileListMode: WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
+});
+assert.equal(objectStateTileIsolated.tileListMode, WEBGPU_TILE_LIST_MODE_OBJECT_STATE);
+assert.equal(objectStateTileIsolated.tileReferenceCount, objectStateTileBase.tileReferenceCount);
+assert.equal(
+  checksumTypedArray(objectStateTileIsolated.buffers.tileCounts),
+  checksumTypedArray(objectStateTileBase.buffers.tileCounts),
+);
+assert.equal(
+  checksumTypedArray(objectStateTileIsolated.buffers.tileOffsets),
+  checksumTypedArray(objectStateTileBase.buffers.tileOffsets),
+);
+assert.equal(
+  checksumTypedArray(objectStateTileIsolated.buffers.tileEntries),
+  checksumTypedArray(objectStateTileBase.buffers.tileEntries),
+);
+assert.notEqual(objectStateTileIsolated.objectStateChecksum, objectStateTileBase.objectStateChecksum);
+assert.notEqual(objectStateTileIsolated.resolveChecksum, objectStateTileBase.resolveChecksum);
+
+const objectStateTileRemoved = buildWebGpuTileSmoke({
+  points: scene.points,
+  visibleIds: allObjectIds,
+  removedIds: new Set([firstObjectId]),
+  isolatedId: null,
+  renderMode: "original",
+  pointSize: 0.018,
+  includeTileEntries: true,
+  includePixelOutput: true,
+  maxEntriesPerTile: 64,
+  tileListMode: WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
+});
+assert.equal(objectStateTileRemoved.tileReferenceCount, objectStateTileBase.tileReferenceCount);
+assert.equal(
+  checksumTypedArray(objectStateTileRemoved.buffers.tileEntries),
+  checksumTypedArray(objectStateTileBase.buffers.tileEntries),
+);
+assert.notEqual(objectStateTileRemoved.objectStateChecksum, objectStateTileBase.objectStateChecksum);
+assert.notEqual(objectStateTileRemoved.resolveChecksum, objectStateTileBase.resolveChecksum);
+
 console.log(
   `webgpu_tile_smoke=passed packed=${base.packedGaussians} ` +
     `objects=${base.objectCount} tiles=${base.activeTileCount}/${base.tileCount} ` +
@@ -874,6 +946,16 @@ console.log(
     `pixel=${WEBGPU_PIXEL_RESOLVE_SOURCE}:${webGpuPixelResolveWorkgroups(base)} ` +
     `resolveSource=${WEBGPU_TILE_RESOLVE_SOURCE}:${WEBGPU_TILE_RESOLVE_FILTER}:${WEBGPU_TILE_ALPHA_PRESENTATION_MODE}:${WEBGPU_TILE_ALPHA_PRESENTATION_FLOOR}`,
 );
+
+function checksumTypedArray(source) {
+  const bytes = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+  let checksum = 2166136261;
+  for (const byte of bytes) {
+    checksum ^= byte;
+    checksum = Math.imul(checksum, 16777619) >>> 0;
+  }
+  return checksum.toString(16).padStart(8, "0");
+}
 
 function createFakeDevice() {
   const created = [];

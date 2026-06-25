@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale budget proves storage shape, not 1M FPS. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale budget proves storage shape, not 1M FPS. Object-state-filtered tile list is in place, but objectState-only incremental upload is still pending. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -300,6 +300,16 @@ per shader stage. The current 1M budget row uses a `320px` internal viewport
 and 32 compact tile references per Gaussian, producing max buffer `122.07 MiB`
 and total storage `173.24 MiB`. This is a scale architecture check, not a
 browser FPS or visual-quality proof.
+
+`npm run audit:webgpu-tile-smoke` also covers the C-path edit-state contract.
+The default tile list mode remains `visible-only`, but the WebGPU runtime uses
+`object-state-filtered`: the compact tile list can contain all Gaussians while
+the shader skips hidden objects through `objectState`. The smoke gate verifies
+that isolate/delete changes keep `tileCounts`, `tileOffsets`, and `tileEntries`
+stable while changing `objectStateChecksum` and the resolved output checksum.
+This creates the contract needed for a later objectState-only `queue.writeBuffer`
+runtime update; it does not yet prove that incremental upload optimization has
+landed.
 
 `npm run audit:spark-pick-report` validates Spark canvas object selection after
 delete. The current product contract is `screen-space-object-pick-v1` with

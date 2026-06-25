@@ -21,6 +21,8 @@ export const WEBGPU_TILE_VIEWPORT = Object.freeze({ width: 1024, height: 1024 })
 export const WEBGPU_OBJECT_STATE_STRIDE_UINT32 = 4;
 export const WEBGPU_TILE_ENTRY_LAYOUT_COMPACT = "compact-offset-list";
 export const WEBGPU_TILE_ENTRY_LAYOUT_FIXED = "fixed-cap-smoke";
+export const WEBGPU_TILE_LIST_MODE_VISIBLE = "visible-only";
+export const WEBGPU_TILE_LIST_MODE_OBJECT_STATE = "object-state-filtered";
 export const WEBGPU_TILE_PROJECTION_MODE = "edit-perspective-camera-v1";
 export const WEBGPU_TILE_SPARK_FRAME_PROJECTION_MODE = "spark-framed-perspective-camera-v1";
 export const WEBGPU_TILE_DEPTH_WEIGHT_MODE = "front-weighted-oit-v1";
@@ -100,6 +102,7 @@ export function buildWebGpuTileSmoke({
   tileSize = WEBGPU_TILE_SIZE,
   maxEntriesPerTile = WEBGPU_TILE_MAX_ENTRIES,
   tileEntryLayout = WEBGPU_TILE_ENTRY_LAYOUT_COMPACT,
+  tileListMode = WEBGPU_TILE_LIST_MODE_VISIBLE,
   shRestCoefficients = null,
   shRestCoefficientCount = 0,
   includeTileEntries = false,
@@ -114,6 +117,8 @@ export function buildWebGpuTileSmoke({
   const resolvedDepthSortTuning = normalizeWebGpuDepthSortTuning(depthSortTuning);
   const resolvedCameraTuning = normalizeWebGpuCameraTuning(cameraTuning);
   const resolvedColorTuning = normalizeWebGpuColorTuning(colorTuning);
+  const resolvedTileListMode = normalizeWebGpuTileListMode(tileListMode);
+  const binHiddenGaussians = resolvedTileListMode === WEBGPU_TILE_LIST_MODE_OBJECT_STATE;
   const pixelDepthBinCount = resolvedDepthSortTuning.pixelDepthBinCount;
   const pixelDepthAlphaMode = resolvedDepthSortTuning.pixelDepthAlphaMode;
   const pixelDepthSortMode = pixelDepthSortModeForAlphaMode(pixelDepthAlphaMode);
@@ -236,8 +241,9 @@ export function buildWebGpuTileSmoke({
       objectIndices,
     });
 
-    if (!objectIsVisible(objectState, objectDenseIndex)) return;
-    visibleGaussians += 1;
+    const visible = objectIsVisible(objectState, objectDenseIndex);
+    if (visible) visibleGaussians += 1;
+    if (!visible && !binHiddenGaussians) return;
     if (!screenInfluencesViewport({ screen, radiusPixels, viewportWidth, viewportHeight })) return;
 
     const minTileX = clampInt(Math.floor((screen.x - radiusPixels) / tileSize), 0, tileColumns - 1);
@@ -261,17 +267,19 @@ export function buildWebGpuTileSmoke({
         if (nextOccupancy > maxTileOccupancy) {
           maxTileOccupancy = nextOccupancy;
         }
-        accumulateTileResolve({
-          tileIndex,
-          tileCenters,
-          screen,
-          bounds,
-          tileSize,
-          gaussianIndex: index,
-          colorOpacity,
-          scaleRotation,
-          tileAccumulation,
-        });
+        if (visible) {
+          accumulateTileResolve({
+            tileIndex,
+            tileCenters,
+            screen,
+            bounds,
+            tileSize,
+            gaussianIndex: index,
+            colorOpacity,
+            scaleRotation,
+            tileAccumulation,
+          });
+        }
       }
     }
   });
@@ -291,6 +299,7 @@ export function buildWebGpuTileSmoke({
       tileRows,
       pointSize,
       coverageTuning: resolvedCoverageTuning,
+      tileListMode: resolvedTileListMode,
       tileOffsets,
       tileEntries,
     });
@@ -394,6 +403,7 @@ export function buildWebGpuTileSmoke({
     tileCount,
     maxEntriesPerTile,
     tileEntryLayout,
+    tileListMode: resolvedTileListMode,
     tileEntryOffsetCount: tileOffsets?.length ?? 0,
     packedGaussians: points.length,
     visibleGaussians,
@@ -470,6 +480,12 @@ export function normalizeWebGpuColorTuning(tuning = null) {
     mode: WEBGPU_COLOR_TUNING_MODE,
     colorMode,
   };
+}
+
+export function normalizeWebGpuTileListMode(mode = WEBGPU_TILE_LIST_MODE_VISIBLE) {
+  return String(mode) === WEBGPU_TILE_LIST_MODE_OBJECT_STATE
+    ? WEBGPU_TILE_LIST_MODE_OBJECT_STATE
+    : WEBGPU_TILE_LIST_MODE_VISIBLE;
 }
 
 export {
@@ -554,13 +570,15 @@ function populateCompactTileEntries({
   tileRows,
   pointSize,
   coverageTuning,
+  tileListMode,
   tileOffsets,
   tileEntries,
 }) {
+  const binHiddenGaussians = tileListMode === WEBGPU_TILE_LIST_MODE_OBJECT_STATE;
   const cursors = new Uint32Array(tileOffsets);
   points.forEach((point, index) => {
     const objectDenseIndex = objectIndex.objectIndexById.get(point.objectId) ?? 0;
-    if (!objectIsVisible(objectState, objectDenseIndex)) return;
+    if (!binHiddenGaussians && !objectIsVisible(objectState, objectDenseIndex)) return;
     const scale = pointScale(point);
     const screen = projectPointToSmokeViewport({ point, bounds, viewportWidth, viewportHeight });
     const screenCovariance = projectPointScreenCovariance({

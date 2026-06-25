@@ -595,6 +595,7 @@ export default function WebGpuTileViewport({
       data-webgpu-packed-gaussians={rendererContract?.packedGaussians ?? 0}
       data-webgpu-visible-gaussians={rendererContract?.visibleGaussians ?? 0}
       data-webgpu-binned-gaussians={rendererContract?.binnedGaussians ?? 0}
+      data-webgpu-tile-list-mode={rendererContract?.tileListMode ?? tileSmoke?.tileListMode ?? ""}
       data-webgpu-tile-size={rendererContract?.tileSize ?? 0}
       data-webgpu-tile-count={rendererContract?.tileCount ?? 0}
       data-webgpu-active-tile-count={rendererContract?.activeTileCount ?? 0}

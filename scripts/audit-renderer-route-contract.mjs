@@ -201,6 +201,7 @@ const checks = [
       containsAll("src/webgpuTileSmoke.js", [
         "WEBGPU_TILE_SMOKE_LAYOUT_VERSION",
         "WEBGPU_TILE_ENTRY_LAYOUT_COMPACT",
+        "WEBGPU_TILE_LIST_MODE_OBJECT_STATE",
         "WEBGPU_OBJECT_STATE_LAYOUT_VERSION",
         "WEBGPU_TILE_SCREEN_COVARIANCE_MODE",
         "WEBGPU_PIXEL_DEPTH_SORT_MODE",
@@ -212,6 +213,7 @@ const checks = [
     evidence: () => [
       "webgpu-tile-smoke-v1",
       "compact-offset-list",
+      "object-state-filtered",
       "object-state-v1",
       "camera-jacobian covariance",
       "pixelResolveChecksum",
@@ -228,6 +230,7 @@ const checks = [
         "data-object-filter",
         "gpu-object-state-buffer",
         "data-webgpu-storage-layout",
+        "data-webgpu-tile-list-mode",
         "data-webgpu-object-state-layout",
         "data-webgpu-accumulation-source",
         "data-webgpu-pixel-source",
@@ -236,6 +239,7 @@ const checks = [
     evidence: () => [
       "data-renderer",
       "data-object-filter=gpu-object-state-buffer",
+      "tile-list-mode telemetry",
       "storage/object-state/pass/readback telemetry",
     ],
   },

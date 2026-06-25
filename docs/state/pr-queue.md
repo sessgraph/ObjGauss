@@ -30,6 +30,30 @@
 
 ## Done
 
+### RENDER-ROUTE-004: WebGPU object-state-filtered tile list mode
+
+- 状态: done / object-state-tile-list-mode
+- 类型: 标准 PR / WebGPU C-path edit runtime
+- 目标: 让 WebGPU Tile runtime 具备“全量 tile list + object-state 过滤”的编辑模式，使对象隐藏 / 隔离 / 删除不必在 tile list 语义上依赖重新按可见对象裁剪；这是后续 object-state 小 buffer 更新和避免大场景全量重传的前置 contract。
+- 已实施:
+  - `src/webgpuTileSmoke.js` 新增 `WEBGPU_TILE_LIST_MODE_VISIBLE` 与 `WEBGPU_TILE_LIST_MODE_OBJECT_STATE`，默认保持 visible-only；object-state-filtered 模式会把隐藏对象也写入 compact tile list，但 CPU/GPU accumulation 继续由 `objectState` 跳过隐藏 Gaussian。
+  - `App.jsx` 的 WebGPU runtime tile smoke 启用 `object-state-filtered` tile list；Spark 商用 route 与 Gaussian OIT fallback 不受影响。
+  - `WebGpuTileViewport.jsx` 暴露 `data-webgpu-tile-list-mode` telemetry。
+  - `audit:webgpu-tile-smoke` 新增断言：object-state-filtered 模式下，隔离 / 删除前后的 `tileCounts`、`tileOffsets`、`tileEntries` checksum 保持一致，而 `objectStateChecksum` 与 render resolve checksum 发生变化。
+  - `audit:renderer-route-contract` 将 object-state-filtered tile list 与 DOM telemetry 纳入 C-path 静态合约。
+- 结论:
+  - C-path 现在有明确的 object-state edit runtime 语义：tile list 可以覆盖全量 Gaussian，编辑状态由 object-state buffer 决定。
+  - 当前 runtime 仍会重建 storage bundle；本 PR 先把 tile-list 稳定性和 telemetry 固化，下一步才能安全做真正的 objectState-only `queue.writeBuffer` 增量上传。
+- 验证:
+  - `node --check src/webgpuTileSmoke.js`: passed。
+  - `node --check scripts/audit-webgpu-tile-smoke.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed；新增 object-state-filtered tile list stability assertions。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run acceptance:renderer-ci -- --skip-native-route --output-dir /tmp/objgauss-renderer-profile-ci-object-state-tile-list`: passed；steps=5。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-003: WebGPU 100k-1M scale budget audit
 
 - 状态: done / scale-budget-gate

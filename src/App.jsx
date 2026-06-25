@@ -37,6 +37,7 @@ import {
   normalizeWebGpuColorTuning,
   normalizeWebGpuCoverageTuning,
   normalizeWebGpuDepthSortTuning,
+  WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
 } from "./webgpuTileSmoke.js";
 
 const FEATURED_ASSETS = featuredAssets();
@@ -265,6 +266,7 @@ export default function App() {
       pointSize,
       viewportWidth: webGpuRuntimeViewport.width,
       viewportHeight: webGpuRuntimeViewport.height,
+      tileListMode: WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
       includeTileEntries: true,
       includePixelOutput: true,
       computePixelReference: false,
