@@ -209,19 +209,38 @@ try {
     candidateStatusPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
+    handoffPath,
   };
   writeJson(manifestPath, manifest);
-  writeJson(statusPath, {
+  const candidateStatus = readJsonIfPresent(candidateStatusPath);
+  const launchStatus = {
     schema: "objgauss-near1m-background-status-v1",
+    mode,
+    generatedAt: new Date().toISOString(),
     status: child.pid ? "running" : "unknown",
     pid: child.pid,
     manifestPath,
     logPath,
+    handoffPath,
     candidateStatusPath,
+    logBytes: existsSync(logPath) ? statSync(logPath).size : 0,
+    tail: existsSync(logPath) ? tailFile(logPath, 40) : [],
+    candidateStatus,
+    candidateSummary: summarizeCandidateStatus(candidateStatus),
+    manifest,
     commandText: manifest.commandText,
     startedAt: manifest.startedAt,
+  };
+  launchStatus.handoff = buildHandoff({
+    candidateStatus,
+    candidateSummary: launchStatus.candidateSummary,
+    running: Boolean(child.pid),
   });
-  console.log(`near1m_background=started pid=${child.pid} log=${logPath} manifest=${manifestPath}`);
+  writeReport(launchStatus);
+  console.log(
+    `near1m_background=started pid=${child.pid} log=${logPath} manifest=${manifestPath} handoff_md=${handoffPath}`,
+  );
+  printHandoff(launchStatus.handoff);
 } finally {
   closeSync(logFd);
 }

@@ -29,6 +29,32 @@
 
 ## Done
 
+### TRAIN-003Q: Near-1M confirmed start writes monitor handoff
+
+- 状态: done / started-run-handoff
+- 类型: 标准 PR / training-output observability
+- 目标: 让 confirmed background start 成功后也立即写 status JSON 和 Markdown handoff，而不是只在 dry-run/status/preflight 时有交接 artifact。
+- 已实施:
+  - `train:splatfacto:near1m-background -- --run --confirm-long-run` 启动 detached process 后，会写完整 `objgauss-near1m-background-status-v1` status JSON。
+  - started status 会包含 `objgauss-near1m-background-handoff-v1`，并把 next action 设为 `monitor-background`。
+  - confirmed start 同时写 `<output-dir>/handoff.md`，下一条命令指向 matching `--status`。
+  - 启动 console 输出现在也打印 `handoff_md` 和 monitor handoff。
+- 结论:
+  - near-1M 长训一旦真正启动，操作者不需要再手工拼 status 命令；启动瞬间就会留下可读 handoff 和机器可读状态。
+  - 本次没有启动真实 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --run --output-dir /tmp/objgauss-near1m-start-handoff-guard`: expected failed with exit `2`；confirmed long-run guard still blocks unconfirmed start。
+  - `PATH=/tmp/objgauss-fake-npm:$PATH node scripts/launch-splatfacto-near1m-background.mjs --run --confirm-long-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-start-handoff-fake-run`: passed；exercised started status / Markdown handoff path with `near1m_next_action=monitor-background` without real training。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-start-handoff-dry-run`: passed。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-start-handoff-dry-run`: passed。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-start-handoff-preflight-smoke`: passed。
+  - `pgrep -af "nerfstudio|splatfacto|train:splatfacto|ns-train|ns-export"`: no real training process found beyond the inspection command itself。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003P: Near-1M background handoff writes Markdown artifact
 
 - 状态: done / operator-handoff-artifact

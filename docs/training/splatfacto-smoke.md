@@ -271,6 +271,11 @@ The Markdown file is intended as the operator-facing artifact: it includes the
 next command as a copyable shell block and lists each remaining evidence blocker
 with its path and next evidence command.
 
+Confirmed background starts write the same status JSON and Markdown handoff
+immediately after the detached process is launched. In that state the next
+action is `monitor-background`, so the handoff points back to the matching
+`--status` command instead of asking the operator to preflight again.
+
 This handoff is deliberately conservative. A `start-background-long-run` action
 means the launch inputs and GPU reserve gate are ready, not that the final
 candidate is complete. Final completion still requires the exported PLY and
