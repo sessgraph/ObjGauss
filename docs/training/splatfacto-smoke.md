@@ -257,6 +257,20 @@ incomplete until near-1M outputs and production SLA exist, while launch
 readiness only answers whether the current machine can safely start the long
 training command.
 
+The background launcher also writes and prints a handoff block:
+
+```text
+near1m_next_action=<refresh-preflight|fix-launch-readiness|start-background-long-run|monitor-background|production-sla-ready>
+near1m_next_command=<command to run next>
+near1m_remaining_evidence_<n>=<blocker kind and next evidence>
+```
+
+This handoff is deliberately conservative. A `start-background-long-run` action
+means the launch inputs and GPU reserve gate are ready, not that the final
+candidate is complete. Final completion still requires the exported PLY and
+object-aware PLY to meet the near-1M scale gate and the production SLA summary
+to pass.
+
 Start the long run in the background only when the machine is ready:
 
 ```bash

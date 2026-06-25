@@ -29,6 +29,31 @@
 
 ## Done
 
+### TRAIN-003O: Near-1M background handoff prints next action
+
+- 状态: done / long-run-handoff
+- 类型: 标准 PR / training-output observability
+- 目标: 让 near-1M background dry-run/status/preflight 不只报告当前状态，还能明确输出下一条可执行命令和最终 SLA 证据缺口。
+- 已实施:
+  - `train:splatfacto:near1m-background` 新增 `objgauss-near1m-background-handoff-v1` report，写入 status JSON 并打印 `near1m_next_action`、`near1m_next_command` 和 `near1m_remaining_evidence_*`。
+  - Handoff 区分 `refresh-preflight`、`fix-launch-readiness`、`start-background-long-run`、`monitor-background` 和 `production-sla-ready`。
+  - `start-background-long-run` 只表示 launch inputs / GPU reserve gate 可启动；最终 candidate 仍以 exported PLY、object-aware PLY 和 production SLA summary 为准。
+  - TRAIN-003 runbook 已记录 handoff 输出语义。
+- 结论:
+  - near-1M handoff 现在可以直接告诉操作者下一步该刷新 preflight、修 launch readiness、启动后台长训，还是继续监控；同时避免把 launch-ready 误解成 production SLA complete。
+  - 本次没有启动 10000-step 训练，也没有生成 near-1M PLY。
+- 验证:
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-background -- --dry-run --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --output-dir /tmp/objgauss-near1m-handoff-dry-run`: passed；printed `near1m_next_action=refresh-preflight`。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-handoff-dry-run`: passed；printed `near1m_next_action=refresh-preflight`。
+  - `npm run train:splatfacto:near1m-background -- --preflight --target-hardware local-rtx5060ti --gpu-memory-reserve-gb 1 --skip-gpu-preflight --output-dir /tmp/objgauss-near1m-handoff-preflight-ready-smoke`: passed；printed `near1m_next_action=start-background-long-run` and 5 remaining evidence blockers while final candidate stayed incomplete。
+  - `npm run train:splatfacto:near1m-background -- --status --output-dir /tmp/objgauss-near1m-handoff-preflight-ready-smoke`: passed；read nested candidate JSON and printed the same start action plus missing evidence paths。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### TRAIN-003N: Near-1M background launcher has start preflight
 
 - 状态: done / background-start-preflight

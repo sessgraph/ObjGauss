@@ -57,6 +57,73 @@ const command = [
   ...commonCandidateOptions,
 ];
 
+const backgroundOptions = [
+  "--target-hardware",
+  targetHardware,
+  "--gpu-memory-reserve-gb",
+  gpuMemoryReserveGb,
+  "--output-dir",
+  outputDir,
+  "--port",
+  port,
+  ...optionalPair("--status-json", args.statusJson ?? args.statusJsonOutput),
+  ...optionalPair("--candidate-status-json", args.candidateStatusJson),
+  ...optionalPair("--manifest", args.manifest),
+  ...optionalPair("--log-path", args.logPath),
+  ...optionalPair("--sam-checkpoint", args.samCheckpoint),
+  ...optionalPair("--iterations", args.iterations),
+  ...optionalPair("--steps-per-save", args.stepsPerSave),
+  ...optionalPair("--camera-res-scale-factor", args.cameraResScaleFactor),
+  ...optionalPair("--max-jobs", args.maxJobs),
+  ...optionalPair("--gpu-index", args.gpuIndex),
+  ...optionalPair("--min-exported-gaussians", args.minExportedGaussians),
+  ...(args.skipPull ? ["--skip-pull"] : []),
+  ...(args.skipGpuPreflight ? ["--skip-gpu-preflight"] : []),
+  ...(args.allowSlaFailures ? ["--allow-sla-failures"] : []),
+];
+
+const backgroundStartCommand = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-background",
+  "--",
+  "--run",
+  "--confirm-long-run",
+  ...backgroundOptions,
+];
+
+const backgroundPreflightCommand = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-background",
+  "--",
+  "--preflight",
+  ...backgroundOptions,
+];
+
+const backgroundStatusCommand = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-background",
+  "--",
+  "--status",
+  "--output-dir",
+  outputDir,
+  "--candidate-status-json",
+  candidateStatusPath,
+];
+
+const backgroundStopCommand = [
+  "npm",
+  "run",
+  "train:splatfacto:near1m-background",
+  "--",
+  "--stop",
+  "--confirm-stop",
+  "--output-dir",
+  outputDir,
+];
+
 const candidateStatusCommand = [
   "npm",
   "run",
@@ -172,6 +239,7 @@ function buildDryRunReport() {
     logPath,
     targetHardware,
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
+    handoff: buildHandoff({ candidateStatus: null, running: false }),
   };
 }
 
@@ -196,6 +264,11 @@ function buildStatusReport() {
     candidateSummary: summarizeCandidateStatus(candidateStatus),
     manifest,
   };
+  report.handoff = buildHandoff({
+    candidateStatus,
+    candidateSummary: report.candidateSummary,
+    running,
+  });
   return report;
 }
 
@@ -228,6 +301,11 @@ function runPreflight() {
     gpuMemoryReserveGb: Number.parseFloat(gpuMemoryReserveGb),
     candidateStatus,
     candidateSummary,
+    handoff: buildHandoff({
+      candidateStatus,
+      candidateSummary,
+      running: false,
+    }),
   };
 }
 
@@ -302,6 +380,7 @@ function printDryRun(report) {
   console.log(`manifest=${report.manifestPath}`);
   console.log(`status_json=${report.statusPath}`);
   console.log(`candidate_status_json=${report.candidateStatusPath}`);
+  printHandoff(report.handoff);
 }
 
 function printStatus(report) {
@@ -320,6 +399,7 @@ function printStatus(report) {
     for (const line of report.tail) console.log(line);
     console.log("log_tail_end");
   }
+  printHandoff(report.handoff);
 }
 
 function printPreflight(report) {
@@ -333,6 +413,7 @@ function printPreflight(report) {
   } else {
     console.log(`near1m_candidate_status=missing path=${report.candidateStatusPath}`);
   }
+  printHandoff(report.handoff);
 }
 
 function printStop(report) {
@@ -372,6 +453,104 @@ function summarizeCandidateStatus(report) {
     lastFailureKind: report.lastFailure?.kind ?? "none",
     lastFailureReason: report.lastFailure?.reason ?? "",
   };
+}
+
+function buildHandoff({ candidateStatus, candidateSummary, running }) {
+  const launchReadiness = candidateSummary?.launchReadiness ?? "unknown";
+  const finalStatus = candidateSummary?.status ?? "unknown";
+  const remainingEvidence = summarizeRemainingEvidence(candidateStatus, candidateSummary);
+  const canStart = !running && launchReadiness === "ready";
+  const finalComplete = finalStatus === "ready" && remainingEvidence.length === 0;
+  let nextAction = "refresh-preflight";
+  let nextCommand = backgroundPreflightCommand;
+
+  if (running) {
+    nextAction = "monitor-background";
+    nextCommand = backgroundStatusCommand;
+  } else if (finalComplete) {
+    nextAction = "production-sla-ready";
+    nextCommand = backgroundStatusCommand;
+  } else if (canStart) {
+    nextAction = "start-background-long-run";
+    nextCommand = backgroundStartCommand;
+  } else if (candidateSummary) {
+    nextAction = "fix-launch-readiness";
+    nextCommand = backgroundPreflightCommand;
+  }
+
+  return {
+    schema: "objgauss-near1m-background-handoff-v1",
+    nextAction,
+    canStartLongRun: canStart,
+    finalCandidateStatus: finalStatus,
+    launchReadiness,
+    remainingEvidence,
+    commands: {
+      next: formatCommand(nextCommand),
+      preflight: formatCommand(backgroundPreflightCommand),
+      startBackground: formatCommand(backgroundStartCommand),
+      status: formatCommand(backgroundStatusCommand),
+      stop: formatCommand(backgroundStopCommand),
+    },
+    safety: {
+      startsTraining: nextAction === "start-background-long-run",
+      requiresExplicitConfirmation: true,
+      confirmationFlag: "--confirm-long-run",
+      note: "preflight/status/dry-run do not start Splatfacto; start-background-long-run does.",
+    },
+  };
+}
+
+function summarizeRemainingEvidence(candidateStatus, candidateSummary) {
+  if (!candidateStatus) {
+    return [
+      {
+        kind: "missing-candidate-status",
+        label: "candidate status report",
+        nextEvidence: "run background preflight to refresh near1m-candidate-status.json",
+      },
+    ];
+  }
+  if (candidateSummary?.status === "ready") return [];
+  const blockers = Array.isArray(candidateStatus.blockers) ? candidateStatus.blockers : [];
+  if (blockers.length > 0) {
+    return blockers.map((blocker) => ({
+      kind: blocker.kind ?? "blocker",
+      label: blocker.label ?? "unknown",
+      path: blocker.path ?? null,
+      count: blocker.count ?? null,
+      minGaussians: blocker.minGaussians ?? null,
+      nextEvidence: blocker.prepare ?? "rerun near-1M candidate pipeline and production SLA",
+    }));
+  }
+  return [
+    {
+      kind: "incomplete-candidate",
+      label: "near-1M production SLA evidence",
+      nextEvidence: "produce exported/object-aware PLY >= min threshold and pass production SLA",
+    },
+  ];
+}
+
+function printHandoff(handoff) {
+  if (!handoff) return;
+  console.log(
+    `near1m_next_action=${handoff.nextAction} can_start_long_run=${handoff.canStartLongRun} final_candidate_status=${handoff.finalCandidateStatus} remaining_evidence=${handoff.remainingEvidence.length}`,
+  );
+  console.log(`near1m_next_command=${handoff.commands.next}`);
+  if (handoff.remainingEvidence.length > 0) {
+    for (const [index, item] of handoff.remainingEvidence.entries()) {
+      const countText = item.count === null || item.count === undefined ? "" : ` count=${item.count}`;
+      const minText =
+        item.minGaussians === null || item.minGaussians === undefined ? "" : ` min_gaussians=${item.minGaussians}`;
+      const pathText = item.path ? ` path=${JSON.stringify(item.path)}` : "";
+      console.log(
+        `near1m_remaining_evidence_${index + 1}=${item.kind} label=${JSON.stringify(
+          item.label,
+        )}${pathText}${countText}${minText} next=${JSON.stringify(item.nextEvidence)}`,
+      );
+    }
+  }
 }
 
 function isPidAlive(pid) {
