@@ -29,6 +29,27 @@
 
 ## Done
 
+### RENDER-ROUTE-026: Product renderer summary embeds near-1M gap artifact
+
+- 状态: done / embedded-gap-summary
+- 类型: 标准 PR / renderer acceptance observability
+- 目标: 让 `acceptance:renderer-product` 的顶层 summary 直接展示 near-1M production gap 摘要，不需要人工再打开 child artifact 才知道 C-path terminal evidence 缺口。
+- 已实施:
+  - product profile 运行 `Near-1M production gap report` 后，会把 child `summary.json` 摘到 step artifact 和顶层 `artifacts.near1mProductionGap`。
+  - Markdown summary 新增 `Near-1M Production Gap` 区块，展示 status、next action、completed / missing evidence count 和 child report path。
+  - 新增诊断参数 `--skip-spark-commercial-route`，用于在不跑浏览器 Spark route 的情况下验证 product profile 子集；默认 product profile 仍会跑 Spark commercial route。
+  - renderer readiness matrix 和项目状态已记录顶层嵌入语义。
+- 结论:
+  - 产品 / Demo renderer profile 现在能在一个 summary 里同时呈现产品 route 结果和 C-path near-1M production gap。
+- 验证:
+  - `node --check scripts/acceptance-renderer-profile.mjs`: passed。
+  - `npm run acceptance:renderer-product -- --skip-route-contract --skip-build --skip-webgpu-presentation-performance --skip-webgpu-presentation-transition --skip-spark-commercial-route --output-dir /tmp/objgauss-renderer-product-gap-embedded-final`: passed；top-level summary embeds `near1mProductionGap.status=incomplete`, `nextAction=start-background-long-run`, `missingEvidence=5`。
+  - `npm run acceptance:renderer-product -- --dry-run --output-dir /tmp/objgauss-renderer-product-gap-embedded-dry-run`: passed；default product step list still includes Spark commercial route and near-1M gap report。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-025: Product renderer acceptance includes near-1M gap report
 
 - 状态: done / product-profile-gap-report

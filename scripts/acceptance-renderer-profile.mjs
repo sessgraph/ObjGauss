@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
@@ -29,6 +29,9 @@ const skipWebGpuPresentationTransition = flagEnabled(
 );
 const skipNear1mProductionGap = flagEnabled(
   args.skipNear1mProductionGap ?? args["skip-near1m-production-gap"],
+);
+const skipSparkCommercialRoute = flagEnabled(
+  args.skipSparkCommercialRoute ?? args["skip-spark-commercial-route"],
 );
 const nativePort = String(args.nativePort ?? args["native-port"] ?? "5395");
 const trainedPort = String(args.trainedPort ?? args["trained-port"] ?? "5395");
@@ -63,9 +66,11 @@ try {
       command: command.join(" "),
       exitCode: result.exitCode,
       durationMs: result.durationMs,
+      artifact: collectStepArtifact(label),
     });
   }
   report.status = dryRun ? "dry-run" : "passed";
+  report.artifacts = collectProfileArtifacts();
   writeReport(outputDir, report);
 } catch (error) {
   report.status = "failed";
@@ -76,8 +81,10 @@ try {
       command: error.result.command.join(" "),
       exitCode: error.result.exitCode,
       durationMs: error.result.durationMs,
+      artifact: collectStepArtifact(error.result.label),
     });
   }
+  report.artifacts = collectProfileArtifacts();
   writeReport(outputDir, report);
   throw error;
 }
@@ -205,22 +212,26 @@ function createProfileSpec(name) {
                 ],
               ],
             ]),
-        [
-          "Spark commercial route acceptance",
-          [
-            "npm",
-            "run",
-            "acceptance:spark-commercial-route",
-            "--",
-            "--native-port",
-            nativePort,
-            "--trained-port",
-            trainedPort,
-            "--output-dir",
-            path.join(outputDir, "spark-commercial-route"),
-            "--skip-build",
-          ],
-        ],
+        ...(skipSparkCommercialRoute
+          ? []
+          : [
+              [
+                "Spark commercial route acceptance",
+                [
+                  "npm",
+                  "run",
+                  "acceptance:spark-commercial-route",
+                  "--",
+                  "--native-port",
+                  nativePort,
+                  "--trained-port",
+                  trainedPort,
+                  "--output-dir",
+                  path.join(outputDir, "spark-commercial-route"),
+                  "--skip-build",
+                ],
+              ],
+            ]),
       ],
     };
   }
@@ -234,8 +245,42 @@ function writeReport(outputDirPath, summary) {
   writeFileSync(path.join(outputDirPath, "summary.md"), renderMarkdown(summary));
 }
 
+function collectStepArtifact(label) {
+  if (label === "Near-1M production gap report") {
+    return readNear1mProductionGapArtifact();
+  }
+  return null;
+}
+
+function collectProfileArtifacts() {
+  return {
+    near1mProductionGap: readNear1mProductionGapArtifact(),
+  };
+}
+
+function readNear1mProductionGapArtifact() {
+  const summaryPath = path.join(outputDir, "near1m-production-gap", "summary.json");
+  const summary = readJsonIfPresent(summaryPath);
+  if (!summary) {
+    return {
+      status: "missing",
+      path: summaryPath,
+    };
+  }
+  return {
+    status: summary.status ?? "unknown",
+    passed: Boolean(summary.passed),
+    path: summaryPath,
+    report: path.join(outputDir, "near1m-production-gap", "summary.md"),
+    nextAction: summary.goalGap?.nextAction ?? "unknown",
+    missingEvidence: summary.goalGap?.missingEvidenceCount ?? "unknown",
+    completedEvidence: summary.goalGap?.completedEvidenceCount ?? "unknown",
+    requireReady: Boolean(summary.requireReady),
+  };
+}
+
 function renderMarkdown(summary) {
-  return [
+  const lines = [
     "# Renderer Acceptance Profile",
     "",
     `- Status: ${summary.status}`,
@@ -247,6 +292,21 @@ function renderMarkdown(summary) {
     `- Includes near-1M production gap report: ${yesNo(summary.decision.includesNear1mProductionGapReport)}`,
     `- Reason: ${summary.decision.reason}`,
     "",
+  ];
+  const near1m = summary.artifacts?.near1mProductionGap;
+  if (near1m && near1m.status !== "missing") {
+    lines.push(
+      "## Near-1M Production Gap",
+      "",
+      `- Status: ${near1m.status}`,
+      `- Next action: ${near1m.nextAction}`,
+      `- Completed evidence: ${near1m.completedEvidence}`,
+      `- Missing evidence: ${near1m.missingEvidence}`,
+      `- Report: ${near1m.report}`,
+      "",
+    );
+  }
+  lines.push(
     "## Steps",
     "",
     "| Step | Exit | Duration ms | Command |",
@@ -256,7 +316,8 @@ function renderMarkdown(summary) {
         `| ${escapeMarkdown(step.label)} | ${step.exitCode ?? ""} | ${step.durationMs ?? 0} | \`${escapeMarkdown(step.command)}\` |`,
     ),
     "",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 function parseArgs(argv) {
@@ -305,6 +366,15 @@ function run(label, command) {
       }
     });
   });
+}
+
+function readJsonIfPresent(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function yesNo(value) {
