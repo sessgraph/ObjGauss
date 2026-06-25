@@ -112,6 +112,10 @@ Use the browser residual gate before considering a cleaned PLY promotion:
 npm run audit:object-boundary-remap-residual
 ```
 
+Remap browser audits use the fixed default local preview port `5395`. Do not
+rotate ad hoc ports between runs; if `5395` is occupied, stop the occupying
+local preview process and rerun on `5395`.
+
 The gate first runs `audit:object-boundary-remap-preview`, then uploads both
 the original object-aware PLY and the remap-preview PLY into the viewer. It
 forces the same PLY-packed Spark object-mask route for both files with
@@ -171,6 +175,25 @@ Haven Chair classifies 0 targets as allowlist candidates, 2 as risky
 `deny-hidden-increase`, and 4 as `review-only`; global recommendation remains
 `do-not-apply-remap-globally`.
 
+Use the policy-gated export when a downstream candidate PLY must consume that
+decision policy:
+
+```bash
+npm run audit:object-boundary-remap-policy-export
+```
+
+Policy-gated export applies remaps only when both conditions are true:
+
+1. the target is a policy `allowlist-candidate`;
+2. the command explicitly includes `--allow-target asset_id:object_id`.
+
+Without an explicit allow target, or when the requested target is `deny-*` /
+`review-only`, the export writes a valid preview PLY but leaves those
+`object_id` assignments unchanged. Current three-scene evidence has
+raw candidates=`10012`, applied remaps=`0`, and blocked remaps=`10012`; a
+negative smoke with `--allow-target nerf-lego-alpha-closure-local:3` also keeps
+applied remaps at `0` because that target is `deny-hidden-increase`.
+
 ## WebGPU Default Switch Gate
 
 WebGPU should not become the commercial default until all of these are true on
@@ -204,6 +227,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Does a remap preview preserve browser visual residual after delete? | `npm run audit:object-boundary-remap-residual` |
 | Do multiple high-risk remap targets preserve residual before promotion? | `npm run audit:object-boundary-remap-target-sweep` |
 | Which remap targets are allowlist candidates, risky, or review-only? | `npm run audit:object-boundary-remap-policy` |
+| Does remap export obey the target-level decision policy? | `npm run audit:object-boundary-remap-policy-export` |
 | Can hard-mask boundary risk be explained with route and residual artifacts? | `npm run audit:hard-mask-quality` |
 | Does Spark source-color object masking have a soft-boundary diagnostic path? | `npm run audit:spark-mask-feather` |
 | Does the soft-boundary candidate improve multiple scenes enough to promote? | `npm run audit:spark-mask-feather-sweep` |

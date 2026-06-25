@@ -17,7 +17,7 @@
 - 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
 - 设计: `docs/adr/0005-webgpu-tile-renderer.md`
 - 下一步:
-  - `DEMO-005L`: 让 remap preview export / QA 消费 `remap-decision-policy`，只允许显式 allowlist target 进入后续候选产物；risky / review-only target 继续保留 hard mask。
+  - `DEMO-005M`: 增加 reviewed remap allowlist manifest / positive fixture gate，把“policy allowlist-candidate”和“人工批准可应用 target”分成两个可审计文件，再允许后续候选产物引用。
   - 后续再评估 Spark pick 的 hover/confirm UX 或 Spark-internal ray/object metadata path；`object-support-score-v1` 已把当前 deterministic report 的 ambiguity 降到可 gate 范围。
 - 验收底线:
   - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
@@ -29,6 +29,29 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-005L: Policy-gated remap preview export
+
+- 状态: done / policy-gated-export
+- 类型: 标准 PR / renderer quality export gate
+- 目标: 让 remap preview export / QA 消费 `remap-decision-policy`，只允许显式 allowlist target 进入后续候选产物；risky / review-only target 继续保留 hard mask。
+- 已实施:
+  - `scripts/export-object-boundary-remap-preview.mjs` 新增 `--policy` / `--allow-target asset_id:object_id`。
+  - 有 policy 时，export 只 patch 同时满足 policy `allowlist-candidate` 和显式 `--allow-target` 的 `fromObject` remaps；所有其他 candidate remaps 保持原始 `object_id`。
+  - Export summary 同时记录 raw candidate remaps、实际 applied remaps、policy blocked remaps、blocked decision breakdown、raw remap pairs 和 policy-gated remap pairs。
+  - `scripts/audit-object-boundary-remap-residual.mjs` 新增 `--remap-policy` / `--allow-target` 透传到 preview 生成阶段，让后续 browser QA 可以消费同一 policy gate。
+  - 新增 `npm run audit:object-boundary-remap-policy-export`，默认读取 `/tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.json`。
+- 结论:
+  - 当前三场景 policy-export 通过，raw candidates=`10012`，applied remaps=`0`，blocked remaps=`10012`，输出仍可由 `objgauss stats` 读取。
+  - 对 denied target 的负向 smoke 通过：显式传入 `--allow-target nerf-lego-alpha-closure-local:3` 后，Lego raw candidates=`1143`，applied remaps=`0`，blocked remaps=`1143`。
+  - 这把“policy 分类”升级为“产物门禁”：没有人工显式 allow-target 时，后续 remap-preview PLY 保持 hard-mask assignment，不会误把 review-only / risky target 应用到候选产物。
+- 验证:
+  - `node --check scripts/export-object-boundary-remap-preview.mjs`: passed。
+  - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
+  - `npm run audit:object-boundary-remap-policy -- --skip-build --skip-visual-stats`: passed on fixed default port `5395` with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-policy-export`: passed。
+  - `node scripts/export-object-boundary-remap-preview.mjs --assets nerf-lego-alpha-closure-local --policy /tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.json --allow-target nerf-lego-alpha-closure-local:3 --output-dir /tmp/objgauss-object-boundary-remap-policy-export-denied-smoke`: passed。
+  - `uv run objgauss stats /tmp/objgauss-object-boundary-remap-policy-export/nerf-lego-alpha-closure-local.remap-preview.ply`: passed，并与原始 Lego object counts 一致。
 
 ### DEMO-005K: Object boundary remap decision policy
 
@@ -47,8 +70,7 @@
   - 三场景 route-only policy 结果为 allowlist=`0`、risky=`2`、review-only=`4`；Lego target `3` 和 Plush target `0` 因 hidden delta 增加被归为 `deny-hidden-increase`。这说明 policy 会把“route/residual 通过”与“可进入 allowlist”分开。
 - 验证:
   - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
-  - `npm run audit:object-boundary-remap-policy -- --assets nerf-lego-alpha-closure-local --min-scene-count 1 --output-dir /tmp/objgauss-object-boundary-remap-policy-lego-smoke --port 5400 --skip-build --skip-visual-stats`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
-  - `npm run audit:object-boundary-remap-policy -- --skip-build --skip-visual-stats --port 5402 --output-dir /tmp/objgauss-object-boundary-remap-policy-route-smoke`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-policy -- --skip-build --skip-visual-stats`: passed on fixed default port `5395` with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005J: Top-N object boundary remap target sweep
 
@@ -67,7 +89,7 @@
   - Aggregate recommendation=`do-not-promote-default-hard-mask`，promotion=`false`；下一步应做 target-level allowlist / policy，而不是全局默认启用 remap preview。
 - 验证:
   - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
-  - `npm run audit:object-boundary-remap-target-sweep -- --port 5398 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-target-sweep -- --skip-build`: covered by the fixed-port `5395` policy sweep with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005I: Multi-scene object boundary remap residual promotion table
 
@@ -86,7 +108,7 @@
   - Aggregate recommendation=`do-not-promote-default-hard-mask`，promotion=`false`；当前证据说明 sampled remap preview 没有明显伤害 top candidate object 的删除预览，但还不能默认替换 public samples。
 - 验证:
   - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
-  - `npm run audit:object-boundary-remap-residual -- --output-dir /tmp/objgauss-object-boundary-remap-residual-multiscene --port 5397 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-residual -- --output-dir /tmp/objgauss-object-boundary-remap-residual-multiscene --skip-build`: use fixed default port `5395`; Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005H: Object boundary remap browser residual gate
 
@@ -104,7 +126,7 @@
   - recommendation=`browser-evidence-only`，不是 promotion；单场景证据不足以默认替换样例或宣称视觉质量改善。
 - 验证:
   - `node --check scripts/audit-object-boundary-remap-residual.mjs`: passed。
-  - `npm run audit:object-boundary-remap-residual -- --assets nerf-lego-alpha-closure-local --output-dir /tmp/objgauss-object-boundary-remap-residual-smoke --port 5396 --skip-build`: passed with Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
+  - `npm run audit:object-boundary-remap-residual -- --assets nerf-lego-alpha-closure-local --output-dir /tmp/objgauss-object-boundary-remap-residual-smoke --skip-build`: use fixed default port `5395`; Playwright fallback；Browser plugin absent；本地 preview server 需要提权，沙箱内监听端口会 `EPERM`。
 
 ### DEMO-005G: Object boundary remap preview export
 

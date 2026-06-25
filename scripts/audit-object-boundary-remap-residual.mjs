@@ -33,6 +33,12 @@ const includeVisualStats = !flagEnabled(args.skipVisualStats ?? args["skip-visua
 const minSceneCount = positiveInteger(args.minSceneCount ?? args["min-scene-count"] ?? 2);
 const targetCount = positiveInteger(args.targetCount ?? args["target-count"] ?? 1);
 const maxRemapSamples = positiveIntegerOrNull(args.maxRemapSamples ?? args["max-remap-samples"]);
+const remapPolicyPath = optionalString(
+  args.remapPolicy ?? args["remap-policy"] ?? args.policy ?? args["policy-path"],
+);
+const remapPolicyAllowTargets = optionalString(
+  args.allowTarget ?? args["allow-target"] ?? args.allowTargets ?? args["allow-targets"],
+);
 const maxAfterCoverageDelta = nonNegativeNumber(
   args.maxAfterCoverageDelta ?? args["max-after-coverage-delta"] ?? 0.08,
 );
@@ -57,6 +63,10 @@ const summary = {
     maxAfterCoverageDelta,
     maxAfterLumaDelta,
     maxAfterChromaDelta,
+  },
+  remapPolicy: {
+    path: remapPolicyPath,
+    allowTargets: remapPolicyAllowTargets,
   },
   preview: null,
   skipped: [],
@@ -168,6 +178,12 @@ async function generatePreviewPlys() {
   };
   if (maxRemapSamples !== null) {
     command.command.push("--max-remap-samples", String(maxRemapSamples));
+  }
+  if (remapPolicyPath) {
+    command.command.push("--policy", remapPolicyPath);
+  }
+  if (remapPolicyAllowTargets) {
+    command.command.push("--allow-target", remapPolicyAllowTargets);
   }
   await runCommand(command);
   const summaryPath = path.join(previewDir, "summary.json");
@@ -748,6 +764,8 @@ function renderMarkdown(payload) {
     `- Target count: ${payload.thresholds.targetCount}`,
     `- URL: ${payload.url}`,
     `- Preview dir: ${payload.previewDir}`,
+    `- Remap policy: ${payload.remapPolicy?.path ?? "none"}`,
+    `- Remap policy explicit allow targets: ${payload.remapPolicy?.allowTargets ?? "none"}`,
     `- Visual stats: ${payload.includeVisualStats ? "enabled" : "disabled"}`,
     "",
     "This gate compares the original object-aware PLY against a sampled `object_id` remap preview PLY in the browser. It forces the same PLY-packed Spark object-mask route for both files and deletes the selected top-N remap-candidate target objects. Passing means the browser route is valid and the remap preview stays within residual thresholds; it does not automatically promote the remap into public samples.",
@@ -1074,6 +1092,12 @@ function positiveInteger(value) {
 function positiveIntegerOrNull(value) {
   if (value === undefined || value === null || value === false || value === "") return null;
   return positiveInteger(value);
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null || value === false || value === "") return null;
+  if (value === true) throw new Error("expected string value");
+  return String(value);
 }
 
 function roundMetric(value, digits = 6) {

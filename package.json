@@ -16,6 +16,7 @@
     "audit:object-boundary-remap-residual": "node scripts/audit-object-boundary-remap-residual.mjs --output-dir /tmp/objgauss-object-boundary-remap-residual",
     "audit:object-boundary-remap-target-sweep": "node scripts/audit-object-boundary-remap-residual.mjs --target-count 2 --output-dir /tmp/objgauss-object-boundary-remap-target-sweep",
     "audit:object-boundary-remap-policy": "node scripts/audit-object-boundary-remap-residual.mjs --target-count 2 --output-dir /tmp/objgauss-object-boundary-remap-policy",
+    "audit:object-boundary-remap-policy-export": "node scripts/export-object-boundary-remap-preview.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local --policy /tmp/objgauss-object-boundary-remap-policy/remap-decision-policy.json --output-dir /tmp/objgauss-object-boundary-remap-policy-export",
     "audit:webgpu-runtime": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe",
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
     "audit:webgpu-offscreen-readback": "node scripts/audit-webgpu-offscreen-readback.mjs",

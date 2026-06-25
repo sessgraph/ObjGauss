@@ -36,6 +36,10 @@ const maxRemapSamples = positiveInteger(
   args.maxRemapSamples ?? args["max-remap-samples"] ?? 120_000,
 );
 const maxCellChecks = positiveInteger(args.maxCellChecks ?? args["max-cell-checks"] ?? 128);
+const policyPath = optionalString(args.policy ?? args["policy-path"] ?? args.remapPolicy ?? args["remap-policy"]);
+const explicitAllowTargets = parseAllowTargets(
+  args.allowTarget ?? args["allow-target"] ?? args.allowTargets ?? args["allow-targets"],
+);
 const cleanupNeighborThreshold = unitNumber(
   args.cleanupNeighborThreshold ?? args["cleanup-neighbor-threshold"] ?? 0.65,
 );
@@ -46,6 +50,7 @@ const cleanupMinNeighbors = positiveInteger(
   args.cleanupMinNeighbors ?? args["cleanup-min-neighbors"] ?? 3,
 );
 const writePreviewPly = !flagEnabled(args.dryRun ?? args["dry-run"]);
+const decisionPolicy = loadDecisionPolicy({ policyPath, explicitAllowTargets });
 
 const assets = selectAssets(assetIds);
 const results = [];
@@ -72,13 +77,23 @@ for (const asset of assets) {
     cleanupDominantThreshold,
     cleanupMinNeighbors,
   });
+  const policyGateResult = decisionPolicy
+    ? applyDecisionPolicy({
+        policy: decisionPolicy,
+        assetId: asset.id,
+        remaps: candidates.remaps,
+      })
+    : null;
+  const policyGate = policyGateResult?.summary ?? null;
+  const appliedRemaps = policyGateResult ? policyGateResult.remaps : candidates.remaps;
+  const appliedRows = summarizeRemaps(appliedRemaps);
   const outputPly = path.join(outputDir, `${asset.id}.remap-preview.ply`);
   if (writePreviewPly) {
     const patched = patchObjectIds({
       input,
       header,
       objectIdLayout,
-      remaps: candidates.remaps,
+      remaps: appliedRemaps,
     });
     writeFileSync(outputPly, patched);
   }
@@ -95,21 +110,32 @@ for (const asset of assets) {
     objectCount: new Set(cloud.points.map((point) => point.objectId)).size,
     sampleStep: candidates.sampleStep,
     sampledGaussians: candidates.sampledGaussians,
-    remappedGaussians: candidates.remaps.length,
-    remappedGaussianShare: roundMetric(candidates.remaps.length / Math.max(cloud.points.length, 1)),
-    estimatedFullRemapGaussians: candidates.estimatedFullRemapGaussians,
-    estimatedFullRemapShare: roundMetric(
+    rawCandidateRemapGaussians: candidates.remaps.length,
+    rawCandidateRemapShare: roundMetric(candidates.remaps.length / Math.max(cloud.points.length, 1)),
+    rawEstimatedFullRemapGaussians: candidates.estimatedFullRemapGaussians,
+    rawEstimatedFullRemapShare: roundMetric(
       candidates.estimatedFullRemapGaussians / Math.max(cloud.points.length, 1),
     ),
+    remappedGaussians: appliedRemaps.length,
+    remappedGaussianShare: roundMetric(appliedRemaps.length / Math.max(cloud.points.length, 1)),
+    estimatedFullRemapGaussians: Math.min(cloud.points.length, appliedRemaps.length * candidates.sampleStep),
+    estimatedFullRemapShare: roundMetric(
+      Math.min(cloud.points.length, appliedRemaps.length * candidates.sampleStep) /
+        Math.max(cloud.points.length, 1),
+    ),
     lowConfidenceSamples: candidates.lowConfidenceSamples,
-    byObject: candidates.byObject,
-    remapPairs: candidates.remapPairs,
+    policyGate,
+    byObject: appliedRows.byObject,
+    remapPairs: appliedRows.remapPairs,
+    rawByObject: candidates.byObject,
+    rawRemapPairs: candidates.remapPairs,
   };
   results.push(result);
   console.log(
     `object_boundary_remap_preview_asset=passed asset=${JSON.stringify(asset.id)} ` +
       `gaussians=${result.gaussianCount} sampled=${result.sampledGaussians} ` +
-      `step=${result.sampleStep} remapped=${result.remappedGaussians} ` +
+      `step=${result.sampleStep} raw=${result.rawCandidateRemapGaussians} remapped=${result.remappedGaussians} ` +
+      `policyBlocked=${result.policyGate?.blockedRemaps ?? 0} ` +
       `estimated=${result.estimatedFullRemapGaussians} output=${JSON.stringify(result.outputPly)}`,
   );
 }
@@ -127,6 +153,7 @@ const summary = {
     cleanupDominantThreshold,
     cleanupMinNeighbors,
   },
+  decisionPolicy: decisionPolicy?.summary ?? null,
   assets: assetIds,
   skipped,
   passed: results.length > 0 && results.every((result) => result.passed),
@@ -270,6 +297,126 @@ function updatePairRow(rows, remap) {
     row.remapped,
     remap.dominantSupport,
   );
+}
+
+function summarizeRemaps(remaps) {
+  const objectRows = new Map();
+  const pairRows = new Map();
+  for (const remap of remaps) {
+    updateObjectRow(objectRows, remap);
+    updatePairRow(pairRows, remap);
+  }
+  return {
+    byObject: [...objectRows.values()].sort((left, right) => right.remapped - left.remapped),
+    remapPairs: [...pairRows.values()].sort((left, right) => right.remapped - left.remapped),
+  };
+}
+
+function loadDecisionPolicy({ policyPath: inputPolicyPath, explicitAllowTargets: inputAllowTargets }) {
+  if (!inputPolicyPath) {
+    if (inputAllowTargets.length > 0) {
+      throw new Error("--allow-target requires --policy");
+    }
+    return null;
+  }
+  if (!existsSync(inputPolicyPath)) {
+    throw new Error(`decision policy is missing: ${inputPolicyPath}`);
+  }
+  const raw = JSON.parse(readFileSync(inputPolicyPath, "utf-8"));
+  if (raw.mode !== "object-boundary-remap-decision-policy-v1") {
+    throw new Error(`unsupported decision policy mode: ${raw.mode}`);
+  }
+  const targetsByKey = new Map();
+  const allowlistCandidatesByAsset = new Map();
+  for (const target of raw.targets ?? []) {
+    const assetId = String(target.assetId ?? "");
+    const targetObjectId = Number(target.targetObjectId);
+    if (!assetId || !Number.isFinite(targetObjectId)) continue;
+    targetsByKey.set(targetKey(assetId, targetObjectId), target);
+    if (target.decision === "allowlist-candidate") {
+      mapSetAdd(allowlistCandidatesByAsset, assetId, targetObjectId);
+    }
+  }
+  const requestedByAsset = new Map();
+  for (const target of inputAllowTargets) {
+    mapSetAdd(requestedByAsset, target.assetId, target.targetObjectId);
+  }
+  return {
+    path: inputPolicyPath,
+    raw,
+    targetsByKey,
+    allowlistCandidatesByAsset,
+    requestedByAsset,
+    summary: {
+      mode: raw.mode,
+      path: inputPolicyPath,
+      recommendation: raw.recommendation ?? "",
+      defaultAction: raw.defaultAction ?? "",
+      sourceApplyMode: raw.applyMode ?? "",
+      applyMode: "explicit-target-allowlist-v1",
+      explicitAllowTargets: inputAllowTargets,
+      counts: raw.counts ?? {},
+    },
+  };
+}
+
+function applyDecisionPolicy({ policy, assetId, remaps }) {
+  const requested = policy.requestedByAsset.get(assetId) ?? new Set();
+  const candidateTargets = policy.allowlistCandidatesByAsset.get(assetId) ?? new Set();
+  const allowedTargets = new Set(
+    [...requested].filter((targetObjectId) => candidateTargets.has(targetObjectId)),
+  );
+  const appliedRemaps = [];
+  const blockedByDecision = {};
+  const blockedTargetObjectIds = new Set();
+  const appliedTargetObjectIds = new Set();
+  for (const remap of remaps) {
+    if (allowedTargets.has(remap.fromObject)) {
+      appliedRemaps.push(remap);
+      appliedTargetObjectIds.add(remap.fromObject);
+      continue;
+    }
+    blockedTargetObjectIds.add(remap.fromObject);
+    const decision = policy.targetsByKey.get(targetKey(assetId, remap.fromObject))?.decision ?? "not-in-policy";
+    const reason =
+      !candidateTargets.has(remap.fromObject)
+        ? decision
+        : requested.has(remap.fromObject)
+          ? "not-allowed-by-policy"
+          : "missing-explicit-allow-target";
+    blockedByDecision[reason] = (blockedByDecision[reason] ?? 0) + 1;
+  }
+  return {
+    remaps: appliedRemaps,
+    summary: {
+      mode: "explicit-target-allowlist-v1",
+      policyPath: policy.path,
+      defaultAction: policy.raw.defaultAction ?? "keep-hard-mask",
+      policyRecommendation: policy.raw.recommendation ?? "",
+      requestedTargetObjectIds: [...requested].sort(numberSort),
+      policyAllowlistCandidateTargetObjectIds: [...candidateTargets].sort(numberSort),
+      allowedTargetObjectIds: [...allowedTargets].sort(numberSort),
+      appliedTargetObjectIds: [...appliedTargetObjectIds].sort(numberSort),
+      blockedTargetObjectIds: [...blockedTargetObjectIds].sort(numberSort),
+      rawRemaps: remaps.length,
+      appliedRemaps: appliedRemaps.length,
+      blockedRemaps: remaps.length - appliedRemaps.length,
+      blockedByDecision,
+    },
+  };
+}
+
+function mapSetAdd(map, key, value) {
+  let set = map.get(key);
+  if (!set) {
+    set = new Set();
+    map.set(key, set);
+  }
+  set.add(value);
+}
+
+function targetKey(assetId, targetObjectId) {
+  return `${assetId}::${targetObjectId}`;
 }
 
 function patchObjectIds({ input, header, objectIdLayout, remaps }) {
@@ -464,6 +611,27 @@ function assetIdList(value) {
     .filter(Boolean);
 }
 
+function parseAllowTargets(value) {
+  if (value === undefined || value === null || value === false) return [];
+  if (value === true) throw new Error("--allow-target requires asset_id:object_id entries");
+  return String(value)
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.lastIndexOf(":");
+      if (separator <= 0 || separator === entry.length - 1) {
+        throw new Error(`invalid --allow-target entry: ${entry}`);
+      }
+      const assetId = entry.slice(0, separator);
+      const targetObjectId = Number(entry.slice(separator + 1));
+      if (!assetId || !Number.isFinite(targetObjectId)) {
+        throw new Error(`invalid --allow-target entry: ${entry}`);
+      }
+      return { assetId, targetObjectId };
+    });
+}
+
 function publicPath(value) {
   const normalized = String(value ?? "");
   if (!normalized.startsWith("/")) return normalized;
@@ -478,18 +646,50 @@ function renderMarkdown(summary) {
     `- Mode: ${summary.mode}`,
     `- Generated: ${summary.generatedAt}`,
     `- Preview PLY written: ${summary.writePreviewPly ? "yes" : "no"}`,
+    `- Decision policy: ${summary.decisionPolicy ? summary.decisionPolicy.path : "none"}`,
     "",
     "This is an experimental, sampled remap preview. It preserves the source PLY bytes and only patches `object_id` for sampled Gaussians whose local 3D neighborhood is dominated by another object id. It is not a promoted cleanup policy and must be followed by browser residual checks before any default route change.",
     "",
+  ];
+  if (summary.decisionPolicy) {
+    lines.push(
+      "When a decision policy is provided, remaps are applied only when the target is both a policy `allowlist-candidate` and explicitly listed with `--allow-target asset_id:object_id`. All other candidate remaps keep the original hard-mask assignment.",
+      "",
+      "## Decision Policy Gate",
+      "",
+      `- Policy mode: ${summary.decisionPolicy.mode}`,
+      `- Apply mode: ${summary.decisionPolicy.applyMode}`,
+      `- Recommendation: ${summary.decisionPolicy.recommendation}`,
+      `- Default action: ${summary.decisionPolicy.defaultAction}`,
+      `- Explicit allow targets: ${summary.decisionPolicy.explicitAllowTargets
+        .map((target) => `${target.assetId}:${target.targetObjectId}`)
+        .join(", ") || "none"}`,
+      "",
+    );
+  }
+  lines.push(
     "## Assets",
     "",
-    "| Asset | Gaussians | Sampled | Step | Remapped | Estimated full remap | Share | Output |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
-  ];
+    "| Asset | Gaussians | Sampled | Step | Raw candidates | Applied remaps | Policy blocked | Estimated full remap | Share | Output |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+  );
   for (const result of summary.results) {
     lines.push(
-      `| ${escapeMarkdown(result.assetId)} | ${result.gaussianCount} | ${result.sampledGaussians} | ${result.sampleStep} | ${result.remappedGaussians} | ${result.estimatedFullRemapGaussians} | ${formatNumber(result.estimatedFullRemapShare)} | ${escapeMarkdown(result.outputPly ?? "")} |`,
+      `| ${escapeMarkdown(result.assetId)} | ${result.gaussianCount} | ${result.sampledGaussians} | ${result.sampleStep} | ${result.rawCandidateRemapGaussians ?? result.remappedGaussians} | ${result.remappedGaussians} | ${result.policyGate?.blockedRemaps ?? 0} | ${result.estimatedFullRemapGaussians} | ${formatNumber(result.estimatedFullRemapShare)} | ${escapeMarkdown(result.outputPly ?? "")} |`,
     );
+  }
+  if (summary.decisionPolicy) {
+    lines.push("", "## Policy Gate By Asset", "");
+    lines.push(
+      "| Asset | Requested targets | Policy candidates | Applied targets | Blocked targets | Raw remaps | Applied remaps | Blocked remaps |",
+      "| --- | --- | --- | --- | --- | ---: | ---: | ---: |",
+    );
+    for (const result of summary.results) {
+      const gate = result.policyGate;
+      lines.push(
+        `| ${escapeMarkdown(result.assetId)} | ${formatIdList(gate?.requestedTargetObjectIds)} | ${formatIdList(gate?.policyAllowlistCandidateTargetObjectIds)} | ${formatIdList(gate?.appliedTargetObjectIds)} | ${formatIdList(gate?.blockedTargetObjectIds)} | ${gate?.rawRemaps ?? 0} | ${gate?.appliedRemaps ?? 0} | ${gate?.blockedRemaps ?? 0} |`,
+      );
+    }
   }
   lines.push("", "## Remap Pairs", "");
   for (const result of summary.results) {
@@ -548,6 +748,13 @@ function unitNumber(value) {
   return Math.max(0, Math.min(1, parsed));
 }
 
+function optionalString(value) {
+  if (value === undefined || value === null || value === false) return null;
+  if (value === true) throw new Error("expected string value");
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
 function flagEnabled(value) {
   if (value === true) return true;
   if (value === undefined || value === null || value === false) return false;
@@ -564,8 +771,17 @@ function formatNumber(value) {
   return roundMetric(Number(value ?? 0)).toFixed(6);
 }
 
+function formatIdList(value) {
+  const values = Array.isArray(value) ? value : [];
+  return values.length > 0 ? values.join(", ") : "none";
+}
+
 function runningMean(currentMean, countAfterInsert, nextValue) {
   return roundMetric(currentMean + (nextValue - currentMean) / Math.max(countAfterInsert, 1));
+}
+
+function numberSort(left, right) {
+  return left - right;
 }
 
 function escapeMarkdown(value) {
