@@ -63,6 +63,14 @@ Use the desktop audit when the question is whether browser presentation works:
 npm run audit:webgpu-desktop -- --asset nerf-lego-alpha-closure-local --probes full
 ```
 
+Use the presentation performance smoke when the question is whether the full
+WebGPU canvas path still renders within the current headed browser timing
+envelope across the default small and large scenes:
+
+```bash
+npm run audit:webgpu-presentation-performance
+```
+
 For visual fidelity / tuning regressions, use the existing coverage gate:
 
 ```bash

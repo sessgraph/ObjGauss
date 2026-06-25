@@ -293,6 +293,7 @@ const checks = [
         "full-upload",
         "waitForWebGpuStorageUpdate",
         "storageTimingAfterDelete",
+        "webgpu-presentation-only",
       ]),
     evidence: () => [
       "gaussian-oit/webgpu-tile accepted",
@@ -315,6 +316,7 @@ const checks = [
         "audit:webgpu-edit-cost-budget",
         "audit:webgpu-offscreen-readback",
         "audit:webgpu-runtime-performance",
+        "audit:webgpu-presentation-performance",
         "audit:spark-native-mask-gate",
         "audit:spark-native-pick-feasibility",
         "acceptance:renderer-ci",
@@ -328,6 +330,7 @@ const checks = [
       "audit:webgpu-edit-cost-budget",
       "audit:webgpu-offscreen-readback",
       "audit:webgpu-runtime-performance",
+      "audit:webgpu-presentation-performance",
       "acceptance renderer CI includes edit cost budget",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",

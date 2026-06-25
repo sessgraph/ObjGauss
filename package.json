@@ -23,6 +23,7 @@
     "audit:webgpu-probe": "node scripts/audit-demo.mjs --require-webgpu --webgpu-flags unsafe --allow-webgpu-device-lost --webgpu-probe accumulation-only",
     "audit:webgpu-offscreen-readback": "node scripts/audit-webgpu-offscreen-readback.mjs",
     "audit:webgpu-runtime-performance": "node scripts/audit-webgpu-runtime-performance.mjs",
+    "audit:webgpu-presentation-performance": "node scripts/audit-webgpu-presentation-performance.mjs",
     "audit:webgpu-desktop": "node scripts/audit-webgpu-desktop.mjs",
     "audit:webgpu-coverage-sweep": "node scripts/audit-webgpu-coverage-sweep.mjs",
     "audit:webgpu-coverage-gate": "node scripts/audit-webgpu-coverage-sweep.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local --output-dir /tmp/objgauss-webgpu-coverage-sweep-gate --gate-variant baseline --max-mean-pareto-score 1 --max-mean-luma-norm 1 --max-mean-chroma-norm 1 --max-scene-pareto-score 1 --max-scene-luma-norm 1 --max-scene-chroma-norm 1",

@@ -29,6 +29,30 @@
 
 ## Done
 
+### RENDER-ROUTE-010: WebGPU headed presentation performance smoke gate
+
+- 状态: done / presentation-performance-smoke
+- 类型: 标准 PR / WebGPU C-path browser presentation observability
+- 目标: 在 runtime timing smoke 之外补一条 headed browser full canvas presentation gate，持续证明 WebGPU C-path 不只是 compute / offscreen readback 可跑，也能真实提交到 canvas、产出非空首帧、写截图，并在当前 timing envelope 内完成小场景和 281k 大场景的 presentation。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-presentation-performance.mjs` 和 `npm run audit:webgpu-presentation-performance`。
+  - Presentation smoke 默认启动 fixed-port `5395` preview，强制 `audit-demo` 进入 WebGPU full runtime，并用 `--webgpu-presentation-only` 只验收 presentation path，避免 Spark residual / object mask stress 干扰该 gate。
+  - `audit-demo` 新增 `webGpuPresentationOnly` 开关；presentation-only 早退结果会保留 storage update / submit / queue done timing，并把截图写到 `/tmp/objgauss-audit-*-webgpu-presentation.png`。
+  - Report 输出 `/tmp/objgauss-webgpu-presentation-performance/summary.json` 和 `summary.md`，按 asset 汇总 first-frame pixels、packed Gaussians、tile references、storage timing、device / queue 状态和截图路径。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU acceptance docs 已登记该 gate。
+- 结论:
+  - 当前本机 fixed-port headed smoke 通过：Lego proxy 5696 Gaussians、tileReferences=40389、firstFramePixels=253952、storage update=16.3ms、queue done=73.3ms；Plush semantic 281498 Gaussians、tileReferences=1190026、firstFramePixels=147456、storage update=180.3ms、queue done=1867.5ms。
+  - 该 gate 证明 WebGPU full canvas presentation 在当前 headed desktop smoke envelope 内可用；它不是 FPS benchmark，也不是 1M interactive SLA。
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-presentation-performance.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `npm run audit:webgpu-presentation-performance -- --port 5395 --output-dir /tmp/objgauss-webgpu-presentation-performance`: passed；2/2 scenes，largestGaussians=281498，maxUpdateMs=180.3，maxQueueDoneMs=1867.5。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-009: WebGPU runtime performance smoke gate
 
 - 状态: done / runtime-performance-smoke

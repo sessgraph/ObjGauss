@@ -198,6 +198,11 @@ const auditOptions = {
       args["webgpu-object-transition"] ??
       process.env.OBJGAUSS_WEBGPU_OBJECT_TRANSITION,
   ),
+  webGpuPresentationOnly: flagEnabled(
+    args.webGpuPresentationOnly ??
+      args["webgpu-presentation-only"] ??
+      process.env.OBJGAUSS_WEBGPU_PRESENTATION_ONLY,
+  ),
 };
 
 if (
@@ -297,6 +302,7 @@ try {
       `requireWebGpu=${auditOptions.requireWebGpu} webGpuFlags=${JSON.stringify(auditOptions.webGpuFlags)} ` +
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
       `webGpuObjectTransition=${auditOptions.webGpuObjectTransition} ` +
+      `webGpuPresentationOnly=${auditOptions.webGpuPresentationOnly} ` +
       `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
       `sparkObjectMaskFeather=${auditOptions.sparkObjectMaskFeather.enabled}:${auditOptions.sparkObjectMaskFeather.radius ?? "auto"}:${auditOptions.sparkObjectMaskFeather.opacity ?? "default"} ` +
       `skipVisualResidual=${auditOptions.skipVisualResidual} ` +
@@ -1045,10 +1051,13 @@ async function runAudit(url, assetsToCheck, options) {
           );
         }
         if (
-          options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL &&
-          !options.webGpuObjectTransition
+          (options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL &&
+            !options.webGpuObjectTransition) ||
+          options.webGpuPresentationOnly
         ) {
-          const screenshotPath = `/tmp/objgauss-audit-${asset.id}-${options.webGpuProbe}.png`;
+          const screenshotPath = options.webGpuPresentationOnly
+            ? `/tmp/objgauss-audit-${asset.id}-webgpu-presentation.png`
+            : `/tmp/objgauss-audit-${asset.id}-${options.webGpuProbe}.png`;
           await page.screenshot({ path: screenshotPath, fullPage: false });
           results.push({
             assetId: asset.id,
@@ -1173,6 +1182,11 @@ async function runAudit(url, assetsToCheck, options) {
             webGpuStorageTileOffsets,
             webGpuStoragePixelOutput,
             webGpuStorageChecksum,
+            webGpuStorageUpdateMode,
+            webGpuStorageUpdateMs,
+            webGpuFrameSubmitMs,
+            webGpuQueueDoneMs,
+            webGpuStorageObjectStateByteSize,
             webGpuStorageChecksumAfterIsolate: webGpuStorageChecksum,
             webGpuStorageChecksumAfterDelete: webGpuStorageChecksum,
             storageLimitGate,
