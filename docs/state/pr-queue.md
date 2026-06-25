@@ -29,6 +29,29 @@
 
 ## Done
 
+### TRAIN-003H: Near-1M long run has GPU memory reserve preflight
+
+- 状态: done / gpu-memory-reserve-preflight
+- 类型: 标准 PR / training resource safety
+- 目标: 在真正启动 near-1M Splatfacto 长训前增加显存安全预检，避免确认长训后直接占满 GPU 导致本机交互卡住。
+- 已实施:
+  - `scripts/train-splatfacto-near1m-candidate.mjs` 新增 `--gpu-memory-reserve-gb`，默认 `1`。
+  - 当 `--run --confirm-long-run` 且未 `--skip-train` 时，脚本会先调用 `nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free`，确认指定 GPU 有足够 free memory 保留默认 `1GB`。
+  - `--status` / `--status-json` 现在记录 `gpuMemoryPreflight`、reserve 阈值、GPU index 和 preflight status。
+  - 新增 `--skip-gpu-preflight` 作为显式诊断绕过；它不会绕过 long-run confirmation，也不会绕过 near-1M scale gate。
+  - TRAIN-003D runbook 已说明该 guard 是 start-time reserve check，不是 PyTorch 显存硬上限。
+- 结论:
+  - near-1M pipeline 现在即使用户传了 `--confirm-long-run`，也会先验证 GPU reserve，再启动 Splatfacto。
+  - 当前执行环境下 `nvidia-smi` 对 Codex shell 返回 EPERM，因此 confirmed run 按预期在训练前失败并输出 `near1m_gpu_preflight=failed`。
+  - 这一步仍不启动 10000-step 训练，也不声明 production SLA 已完成。
+- 验证:
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `npm run train:splatfacto:near1m-candidate -- --dry-run --target-hardware local-rtx5060ti --skip-pull`: passed；输出 `gpu_memory_reserve_gb=1`。
+  - `npm run train:splatfacto:near1m-candidate -- --status --status-json /tmp/objgauss-near1m-status/summary.json`: passed；report includes `gpuMemoryPreflight`。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-sla --target-hardware local-rtx5060ti`: expected failed with exit `2`；long-run guard fires before GPU preflight。
+  - `npm run train:splatfacto:near1m-candidate -- --run --confirm-long-run --skip-sla --target-hardware local-rtx5060ti`: expected failed with exit `2` before training；`near1m_gpu_preflight=failed`。
+  - `npm run train:splatfacto:near1m-candidate -- --run --skip-train --skip-sla --skip-gpu-preflight --export-dir outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1 --target-hardware local-rtx5060ti`: expected failed with exit `2`；scale gate still rejects safe-2000 PLY because `255794 < 1000000`。
+
 ### TRAIN-003G: Near-1M candidate status has JSON report
 
 - 状态: done / near1m-status-json-report

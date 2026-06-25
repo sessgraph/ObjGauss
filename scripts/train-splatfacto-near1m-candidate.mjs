@@ -1,5 +1,5 @@
 import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 
 const args = process.argv.slice(2);
@@ -67,6 +67,8 @@ const renderSize = options.renderSize ?? "96";
 const learningRate = options.learningRate ?? "1.0";
 const port = options.port ?? "5395";
 const minTrainedApproxFps = options.fpsSlaMinTrainedApproxFps ?? options.minTrainedApproxFps ?? "24";
+const gpuIndex = nonNegativeInteger(options.gpuIndex, 0);
+const gpuMemoryReserveGb = nonNegativeNumber(options.gpuMemoryReserveGb, 1);
 
 const skipTrain = Boolean(options.skipTrain);
 const skipRegister = Boolean(options.skipRegister);
@@ -74,6 +76,7 @@ const skipSla = Boolean(options.skipSla);
 const publish = Boolean(options.publish);
 const allowSlaFailures = Boolean(options.allowSlaFailures);
 const confirmLongRun = Boolean(options.confirmLongRun);
+const skipGpuPreflight = Boolean(options.skipGpuPreflight);
 const statusJsonPath = options.statusJson ?? options.statusJsonOutput;
 
 const steps = [
@@ -222,6 +225,7 @@ console.log(`target_hardware=${targetHardware}`);
 console.log(`iterations=${iterations}`);
 console.log(`camera_res_scale_factor=${cameraResScaleFactor}`);
 console.log(`min_exported_gaussians=${minExportedGaussians}`);
+console.log(`gpu_memory_reserve_gb=${gpuMemoryReserveGb}`);
 
 if (mode === "run") {
   if (!skipTrain && !confirmLongRun) {
@@ -235,6 +239,15 @@ if (mode === "run") {
   if (missing.length > 0) {
     printMissing(missing);
     process.exit(2);
+  }
+  if (!skipTrain) {
+    try {
+      assertGpuPreflight();
+    } catch (error) {
+      console.error(`near1m_gpu_preflight=failed reason=${JSON.stringify(error?.message ?? String(error))}`);
+      console.error("hint=pass --skip-gpu-preflight only if you accept running without a 1GB reserve preflight");
+      process.exit(2);
+    }
   }
 }
 
@@ -314,6 +327,7 @@ function buildStatusReport() {
   const exportedReady = exportedCount >= minExportedGaussians;
   const objectReady = objectCount >= minExportedGaussians;
   const productionSlaReady = existsSync(`${paths.slaOutputDir}/summary.json`);
+  const gpuPreflight = getGpuPreflight();
   const blockers = [];
   for (const check of missingChecks) {
     blockers.push({
@@ -351,6 +365,8 @@ function buildStatusReport() {
       minExportedGaussians,
       minObjectGaussians: minExportedGaussians,
       minTrainedApproxFps: Number.parseFloat(minTrainedApproxFps),
+      gpuMemoryReserveGb,
+      gpuMemoryReserveMiB: Math.ceil(gpuMemoryReserveGb * 1024),
     },
     parameters: {
       targetHardware,
@@ -370,6 +386,7 @@ function buildStatusReport() {
       renderSize,
       learningRate,
       port,
+      gpuIndex,
     },
     flags: {
       skipTrain,
@@ -378,6 +395,7 @@ function buildStatusReport() {
       publish,
       allowSlaFailures,
       confirmLongRun,
+      skipGpuPreflight,
     },
     paths: {
       dataset: paths.dataset,
@@ -404,7 +422,9 @@ function buildStatusReport() {
       candidateObjectPly: objectReady ? "ready" : "not-ready",
       objectGaussians: objectCount,
       productionSla: productionSlaReady ? "ready" : "not-ready",
+      gpuMemoryPreflight: gpuPreflight.status,
     },
+    gpuMemoryPreflight: gpuPreflight,
     blockers,
     commands: {
       train: formatCommand(steps[0].command),
@@ -419,6 +439,8 @@ function buildStatusReport() {
         "--confirm-long-run",
         "--target-hardware",
         targetHardware,
+        "--gpu-memory-reserve-gb",
+        String(gpuMemoryReserveGb),
       ]),
     },
   };
@@ -439,6 +461,10 @@ function printStatus(report) {
     `near1m_object_ply=${report.readiness.candidateObjectPly} object_gaussians=${report.readiness.objectGaussians} min_object_gaussians=${minExportedGaussians}`,
   );
   console.log(`production_sla=${report.readiness.productionSla}`);
+  const gpu = report.gpuMemoryPreflight;
+  console.log(
+    `gpu_preflight=${gpu.status} reserve_mib=${gpu.reserveMiB} free_mib=${gpu.freeMiB ?? "unknown"} device=${gpu.deviceIndex ?? gpuIndex} reason=${JSON.stringify(gpu.reason ?? "")}`,
+  );
   console.log(`status=${report.status} missing=${report.missing}`);
 }
 
@@ -493,6 +519,105 @@ function printMissing(missing) {
   }
 }
 
+function assertGpuPreflight() {
+  const result = getGpuPreflight();
+  if (result.status !== "passed" && result.status !== "skipped") {
+    throw new Error(result.reason ?? `GPU preflight status is ${result.status}`);
+  }
+  console.log(
+    `gpu_preflight=${result.status} device=${result.deviceIndex ?? gpuIndex} reserve_mib=${result.reserveMiB} free_mib=${result.freeMiB ?? "unknown"}`,
+  );
+}
+
+function getGpuPreflight() {
+  const reserveMiB = Math.ceil(gpuMemoryReserveGb * 1024);
+  if (skipGpuPreflight) {
+    return {
+      status: "skipped",
+      reason: "--skip-gpu-preflight",
+      reserveGb: gpuMemoryReserveGb,
+      reserveMiB,
+    };
+  }
+  if (device !== "cuda") {
+    return {
+      status: "skipped",
+      reason: `device=${device}`,
+      reserveGb: gpuMemoryReserveGb,
+      reserveMiB,
+    };
+  }
+  const command = [
+    "nvidia-smi",
+    "--query-gpu=index,name,memory.total,memory.used,memory.free",
+    "--format=csv,noheader,nounits",
+  ];
+  const result = spawnSync(command[0], command.slice(1), {
+    encoding: "utf8",
+  });
+  if (result.error) {
+    return {
+      status: "unavailable",
+      reason: result.error.message,
+      command: formatCommand(command),
+      reserveGb: gpuMemoryReserveGb,
+      reserveMiB,
+    };
+  }
+  if (result.status !== 0) {
+    return {
+      status: "unavailable",
+      reason: (result.stderr || result.stdout || `nvidia-smi exited with code ${result.status}`).trim(),
+      command: formatCommand(command),
+      reserveGb: gpuMemoryReserveGb,
+      reserveMiB,
+    };
+  }
+  const rows = parseNvidiaSmiRows(result.stdout);
+  const selected = rows.find((row) => row.index === gpuIndex);
+  if (!selected) {
+    return {
+      status: "unavailable",
+      reason: `nvidia-smi returned no row for GPU index ${gpuIndex}`,
+      command: formatCommand(command),
+      reserveGb: gpuMemoryReserveGb,
+      reserveMiB,
+    };
+  }
+  const freeAfterReserveMiB = selected.freeMiB - reserveMiB;
+  return {
+    status: freeAfterReserveMiB >= 0 ? "passed" : "failed",
+    reason:
+      freeAfterReserveMiB >= 0
+        ? "free memory satisfies reserve"
+        : `GPU ${selected.index} free memory ${selected.freeMiB} MiB is below reserve ${reserveMiB} MiB`,
+    command: formatCommand(command),
+    deviceIndex: selected.index,
+    name: selected.name,
+    totalMiB: selected.totalMiB,
+    usedMiB: selected.usedMiB,
+    freeMiB: selected.freeMiB,
+    reserveGb: gpuMemoryReserveGb,
+    reserveMiB,
+    freeAfterReserveMiB,
+  };
+}
+
+function parseNvidiaSmiRows(output) {
+  return output
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.split(",").map((part) => part.trim()))
+    .filter((parts) => parts.length >= 5)
+    .map(([indexText, name, totalText, usedText, freeText]) => ({
+      index: nonNegativeInteger(indexText, 0),
+      name,
+      totalMiB: nonNegativeInteger(totalText, 0),
+      usedMiB: nonNegativeInteger(usedText, 0),
+      freeMiB: nonNegativeInteger(freeText, 0),
+    }));
+}
+
 function assertPlyScale(label, filePath, minGaussians) {
   if (!existsSync(filePath)) {
     throw new Error(`${label} is missing: ${filePath}`);
@@ -522,6 +647,7 @@ function parseArgs(values) {
     else if (value === "--publish") parsed.publish = true;
     else if (value === "--allow-sla-failures") parsed.allowSlaFailures = true;
     else if (value === "--confirm-long-run") parsed.confirmLongRun = true;
+    else if (value === "--skip-gpu-preflight") parsed.skipGpuPreflight = true;
     else if (value.startsWith("--")) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       const next = values[index + 1];
@@ -549,6 +675,16 @@ function quote(value) {
 function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function nonNegativeNumber(value, fallback) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function formatCheckpointStep(iterationCount) {

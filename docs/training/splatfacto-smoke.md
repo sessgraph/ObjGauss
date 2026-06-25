@@ -207,8 +207,9 @@ npm run train:splatfacto:near1m-candidate -- \
 
 The status report uses schema `objgauss-near1m-candidate-status-v1` and records
 the input/output paths, scale thresholds, current Gaussian counts, missing
-files, blockers, and the guarded full-run command. It is a preflight report; a
-green JSON status still does not replace the strict production SLA gate.
+files, blockers, the guarded full-run command, and the current GPU memory
+preflight result. It is a preflight report; a green JSON status still does not
+replace the strict production SLA gate.
 
 Run the full chain. This starts a long Splatfacto training job, so it requires
 an explicit confirmation flag:
@@ -218,8 +219,16 @@ SAM_CHECKPOINT=/home/ljy/models/sam/sam_vit_b_01ec64.pth \
 npm run train:splatfacto:near1m-candidate -- \
   --run \
   --confirm-long-run \
+  --gpu-memory-reserve-gb 1 \
   --target-hardware local-rtx5060ti
 ```
+
+By default, confirmed CUDA long runs query `nvidia-smi` before starting
+training and require at least `1GB` of free GPU memory to remain available. This
+is a start-time reserve guard, not a hard PyTorch memory cap. If `nvidia-smi` is
+not available or the reserve check fails, the wrapper stops before launching
+Splatfacto. Use `--skip-gpu-preflight` only for explicit diagnostics where you
+accept running without that reserve check.
 
 If the near-1M PLY was already exported and only the registration / SLA steps
 need to run, use `--skip-train`; this bypasses the long-run confirmation but
