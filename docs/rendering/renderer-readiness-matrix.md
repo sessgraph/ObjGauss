@@ -23,7 +23,7 @@ while WebGPU continues to harden toward the C architecture.
 | --- | --- | --- | --- | --- |
 | Spark native `.splat` | Commercial no-SH default | `真实查看` and source/original object edit on no-SH assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-native-mask-gate`, `audit:splat-index-mapping`, `audit:demo` pixel delta | Depends on generated sample index mapping; arbitrary third-party splats need a mapping check or embedded object metadata. |
 | Spark PLY SH source / packed filter | Commercial SH-heavy default | `真实查看` and source/original object edit on SH-heavy assets | `audit:renderer-route-contract`, `acceptance:spark-commercial-route`, `audit:spark-trained-route`, `audit:spark-pick-report` trained route | Not the original compact `.splat`; filtered subsets can look sparse or grainy near hard object boundaries. |
-| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-synthetic-1m-runtime`, `audit:webgpu-ply-runtime`, `audit:webgpu-sustained-frame-pacing`, `audit:webgpu-cpath-readiness`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape. Synthetic 1M upload/runtime proves the browser C-path can load and edit a generated 1M PLY, but not trained-scene quality. PLY runtime audit is the reusable gate for real/trained near-1M uploads; current local proof covers the trained Lego 255k sample. Sustained frame-pacing baseline proves longer rAF sampling on current real scenes plus synthetic 1M, but production FPS SLA still needs reviewed thresholds and real trained 1M scenes. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
+| WebGPU Tile | C-path renderer candidate | Diagnostics, headed desktop audits, CI/headless compute/readback | `audit:renderer-route-contract`, `audit:webgpu-scale-budget`, `audit:webgpu-edit-cost-budget`, `audit:webgpu-synthetic-1m-runtime`, `audit:webgpu-ply-runtime`, `audit:webgpu-sustained-frame-pacing`, `audit:webgpu-cpath-readiness`, `audit:webgpu-cpath-production-sla`, `audit:webgpu-frame-pacing`, `audit:webgpu-tile-smoke`, `acceptance:webgpu-headless`, `audit:webgpu-runtime-performance`, `audit:webgpu-presentation-performance`, `audit:webgpu-presentation-transition`, `audit:webgpu-desktop`, `audit:webgpu-coverage-gate` | Visual residual and coverage still trail Spark; not the commercial default. Scale / edit-cost budgets prove storage and update shape. Synthetic 1M upload/runtime proves the browser C-path can load and edit a generated 1M PLY, but not trained-scene quality. PLY runtime audit is the reusable gate for real/trained near-1M uploads; current local proof covers the trained Lego 255k sample. Sustained frame-pacing baseline proves longer rAF sampling on current real scenes plus synthetic 1M. The strict production SLA wrapper rejects summary shortcuts and requires a real trained near-1M PLY plus reviewed target hardware. Object-state-filtered tile list and objectState-only incremental upload are in place for compatible edit updates. |
 | Gaussian OIT edit fallback | B-path / fallback | Object-color debug and WebGPU-unavailable edit preview | `audit:renderer-route-contract`, `audit:webgpu-tile-smoke`, fallback contracts in browser audit | Approximate edit preview, not final splat quality. |
 
 ## Product Decision
@@ -253,6 +253,7 @@ Until then, WebGPU remains the C-path proof and diagnostic route.
 | Does the WebGPU C-path storage layout fit 100k-1M budgets? | `npm run audit:webgpu-scale-budget` |
 | Do object edits avoid full static re-upload inside 100k-1M budgets? | `npm run audit:webgpu-edit-cost-budget` |
 | What is the combined C-path readiness state and remaining 1M gap? | `npm run audit:webgpu-cpath-readiness` |
+| Has C-path production FPS SLA been proven on reviewed target hardware with a real trained near-1M PLY? | `npm run audit:webgpu-cpath-production-sla -- --trained-ply <path> --target-hardware <label>` |
 | Can a synthetic 1M PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-synthetic-1m-runtime` |
 | Can a real/trained object-aware PLY upload run through headed browser WebGPU Tile object edits? | `npm run audit:webgpu-ply-runtime -- --input-ply <path> --scene-kind trained --min-gaussians <n>` |
 | Does WebGPU keep a longer frame-pacing baseline on current scenes plus synthetic 1M? | `npm run audit:webgpu-sustained-frame-pacing` |
@@ -390,6 +391,26 @@ The pass condition requires both real trained 1M browser runtime proof and a
 trained PLY row inside the sustained baseline. Current 255k trained Lego
 evidence intentionally leaves `fpsSla=not-proven` and reports blockers instead
 of treating a smoke or baseline as a production SLA.
+
+The strict terminal gate is:
+
+```bash
+npm run audit:webgpu-cpath-production-sla -- \
+  --trained-ply <near-1m-trained-objects.ply> \
+  --target-hardware "local-rtx5060ti" \
+  --fps-sla-min-trained-approx-fps 24 \
+  --port 5395
+```
+
+This wrapper first reads the PLY header and refuses inputs below
+`1,000,000` Gaussians. It then runs the full C-path readiness chain with
+`--include-sustained-frame-pacing`, `--fps-sla-reviewed`, and the same trained
+PLY forwarded into the sustained baseline. It intentionally rejects summary
+shortcuts such as `--scale-summary`, `--trained-ply-runtime-summary`, or
+`--sustained-frame-pacing-summary`, so this command is suitable for the final
+production SLA proof rather than daily report regeneration. Use
+`--dry-run --allow-failures` only to test preflight/report wiring without
+claiming SLA completion.
 
 `npm run audit:webgpu-synthetic-1m-runtime` is the focused synthetic 1M browser
 gate. It generates a temporary binary PLY under `/tmp`, uploads it through the

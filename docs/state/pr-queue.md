@@ -29,6 +29,32 @@
 
 ## Done
 
+### RENDER-ROUTE-022: C-path production SLA has strict near-1M wrapper
+
+- 状态: done / strict-production-sla-wrapper
+- 类型: 标准 PR / WebGPU C-path terminal SLA gate
+- 目标: 把最终 production FPS SLA 证明从通用 readiness 聚合器中抽成一个更难误用的严格入口，要求真实 trained near-1M PLY、目标硬件和 reviewed SLA。
+- 已实施:
+  - 新增 `scripts/audit-webgpu-cpath-production-sla.mjs` 和 `npm run audit:webgpu-cpath-production-sla`。
+  - Wrapper 会先读取 PLY header，拒绝低于 `1,000,000` Gaussians 的 trained PLY；`--trained-min-gaussians` 不能把生产阈值降到 1M 以下。
+  - Wrapper 要求 `--target-hardware` / `--fps-sla-target-hardware`，并拒绝 `--skip-run`、`--skip-synthetic-1m-runtime`、`--scale-summary`、`--trained-ply-runtime-summary`、`--sustained-frame-pacing-summary` 等 summary shortcut。
+  - Preflight 通过后，Wrapper 会调用完整 `audit:webgpu-cpath-readiness`，强制 `--include-sustained-frame-pacing`、`--fps-sla-reviewed`、`--fps-sla-min-trained-gaussians 1000000`，并把同一 trained PLY 转发给 sustained baseline。
+  - Report 写入 `/tmp/objgauss-webgpu-cpath-production-sla/summary.{json,md}`，单独列出 preflight、readiness、`realTrainedBrowserRuntime1m`、`sustainedTrainedPly` 和 `fpsSla`。
+  - `audit:renderer-route-contract`、renderer readiness matrix 和 WebGPU runbook 已登记该终局入口。
+- 结论:
+  - C-path 现在有一条严格的 terminal SLA command，可用于未来 near-1M trained object-aware PLY 的最终证明。
+  - 当前 255k trained Lego dry-run 被 preflight 正确拒绝：`trainedGaussians=255794 < 1000000`，readiness 未运行，`fpsSla=not-run`。
+  - 这一步仍不生成 near-1M trained PLY，也不声明 production FPS SLA 已完成。
+- 验证:
+  - `node --check scripts/audit-webgpu-cpath-production-sla.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run audit:webgpu-cpath-production-sla -- --trained-ply public/samples/nerf_lego_trained_objects.ply --target-hardware local-rtx5060ti --dry-run --allow-failures --output-dir /tmp/objgauss-webgpu-cpath-production-sla-dry-run`: expected failed preflight with exit 0；`trainedGaussians=255794`，`readiness=not-run`。
+  - `npm run audit:webgpu-cpath-production-sla -- --trained-ply public/samples/nerf_lego_trained_objects.ply --target-hardware local-rtx5060ti --skip-run --dry-run --allow-failures --output-dir /tmp/objgauss-webgpu-cpath-production-sla-forbidden-dry-run`: expected failed preflight with exit 0；`forbidden=["skip-run"]`。
+  - `npm run audit:renderer-route-contract`: passed，16/16 checks。
+  - `npm run build`: passed，仍有 Spark / Three bundle size warning。
+  - `uv run --extra dev pytest`: 41 passed。
+  - `git diff --check`: passed。
+
 ### RENDER-ROUTE-021: C-path readiness has reviewed FPS SLA promotion gate
 
 - 状态: done / reviewed-fps-sla-promotion-contract

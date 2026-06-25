@@ -322,6 +322,7 @@ const checks = [
         "audit:webgpu-synthetic-1m-runtime",
         "audit:webgpu-ply-runtime",
         "audit:webgpu-sustained-frame-pacing",
+        "audit:webgpu-cpath-production-sla",
         "audit:webgpu-cpath-readiness",
         "audit:spark-native-mask-gate",
         "audit:spark-native-pick-feasibility",
@@ -334,7 +335,9 @@ const checks = [
       contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-synthetic-1m-runtime") &&
       contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-ply-runtime") &&
       contains("scripts/audit-webgpu-cpath-readiness.mjs", "audit:webgpu-sustained-frame-pacing") &&
-      contains("scripts/audit-webgpu-sustained-frame-pacing.mjs", "audit:webgpu-ply-runtime"),
+      contains("scripts/audit-webgpu-sustained-frame-pacing.mjs", "audit:webgpu-ply-runtime") &&
+      contains("scripts/audit-webgpu-cpath-production-sla.mjs", "audit:webgpu-cpath-readiness") &&
+      contains("scripts/audit-webgpu-cpath-production-sla.mjs", "fps-sla-reviewed"),
     evidence: () => [
       "audit:demo",
       "audit:webgpu-tile-smoke",
@@ -348,6 +351,7 @@ const checks = [
       "audit:webgpu-synthetic-1m-runtime",
       "audit:webgpu-ply-runtime",
       "audit:webgpu-sustained-frame-pacing",
+      "audit:webgpu-cpath-production-sla",
       "audit:webgpu-cpath-readiness",
       "acceptance renderer CI includes edit cost budget",
       "acceptance renderer product includes presentation performance gate",
@@ -356,6 +360,7 @@ const checks = [
       "C-path readiness accepts trained PLY runtime evidence",
       "C-path readiness accepts sustained frame-pacing evidence",
       "sustained frame-pacing accepts trained PLY runtime evidence",
+      "C-path production SLA wrapper requires reviewed readiness",
       "acceptance:renderer-ci",
       "acceptance:webgpu-headless",
     ],

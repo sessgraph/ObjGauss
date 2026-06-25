@@ -135,6 +135,23 @@ npm run audit:webgpu-cpath-readiness -- \
 Without that explicit reviewed gate, or without real trained 1M runtime and
 sustained trained PLY evidence, readiness must keep `fpsSla=not-proven`.
 
+For the final production SLA proof, prefer the strict wrapper:
+
+```bash
+npm run audit:webgpu-cpath-production-sla -- \
+  --trained-ply <near-1m-trained-objects.ply> \
+  --target-hardware "local-rtx5060ti" \
+  --fps-sla-min-trained-approx-fps 24 \
+  --port 5395
+```
+
+This wrapper refuses trained PLY inputs below `1,000,000` Gaussians and rejects
+summary shortcut flags such as `--scale-summary`,
+`--trained-ply-runtime-summary`, or `--sustained-frame-pacing-summary`. It then
+runs the full C-path readiness chain with the reviewed SLA flags and writes
+`/tmp/objgauss-webgpu-cpath-production-sla/summary.json` plus `summary.md`.
+Use `--dry-run --allow-failures` only for preflight/report validation.
+
 Use the focused synthetic 1M browser gate when the question is whether a
 generated 1M PLY can be uploaded through the real UI and edited on the WebGPU
 Tile C-path:
