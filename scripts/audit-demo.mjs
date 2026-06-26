@@ -2486,7 +2486,7 @@ function urlWithWebGpuOptions(url, options) {
     return url;
   }
   const parsed = new URL(url);
-  if (options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL) {
+  if (options.requireWebGpu || options.webGpuProbe !== WEBGPU_RUNTIME_PROBE_FULL) {
     parsed.searchParams.set("webgpu-probe", options.webGpuProbe);
   }
   if (options.webGpuViewportSize) {

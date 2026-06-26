@@ -150,6 +150,24 @@ export const ASSET_LIBRARY = [
     bestFor: "登记外部 3DGS 训练器产出的 Lego Gaussian，并用 2D mask 投票导出对象级 PLY。",
   },
   {
+    id: "nerf-lego-alpha-fgbg-bg005-local",
+    name: "NeRF Lego Alpha 前景/背景诊断基线",
+    category: "本地验收",
+    sourceType: "gaussian",
+    status: "诊断可用",
+    priority: "P1",
+    pipelineStage: "Alpha fgbg bundle",
+    useCases: ["真实训练输出", "Alpha前景背景", "ObjectField", "对象编辑"],
+    localPath: "/samples/nerf_lego_alpha_fgbg_bg005_objects.ply",
+    splatPath: "/samples/nerf_lego_alpha_fgbg_bg005.splat",
+    fileName: "nerf_lego_alpha_fgbg_bg005_objects.ply",
+    sourceName: "External 3DGS trainer + NeRF Synthetic Lego alpha fgbg",
+    sourceUrl: "https://github.com/bmild/nerf",
+    license: "NeRF 官方示例数据，仅训练/研究使用",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "对比 background-confidence=0.05 的 Level 1 前景/背景 Object Field 数据基线；不作为展示默认，也不作为 part-level 稳定分离结论。",
+  },
+  {
     id: "polyhaven-chair-commercial-demo-local",
     name: "Poly Haven Chair 商用展示样例",
     category: "可商用展示",
@@ -281,6 +299,7 @@ export const FEATURED_ASSET_IDS = [
   "plush-v1-closure-local",
   "nerf-lego-alpha-closure-local",
   "nerf-lego-trained-output-local",
+  "nerf-lego-alpha-fgbg-bg005-local",
   "plush-3dgs-local",
 ];
 

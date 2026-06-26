@@ -295,6 +295,22 @@ def test_object_field_from_labels_has_soft_slots():
     assert metrics.active_slots == 2
 
 
+def test_object_field_labels_can_group_low_confidence_as_unknown():
+    probabilities = np.array(
+        [
+            [0.95, 0.05],
+            [0.55, 0.45],
+            [0.20, 0.80],
+            [0.49, 0.51],
+        ],
+        dtype=np.float32,
+    )
+    field = ObjectField(np.log(probabilities))
+
+    assert field.labels(min_confidence=0.8).tolist() == [0, 2, 1, 2]
+    assert field.labels(min_confidence=0.8, unknown_label=7).tolist() == [0, 7, 1, 7]
+
+
 def test_object_field_label_delta_counts_mask_guidance_changes():
     initial = ObjectField(np.zeros((4, 2), dtype=np.float32))
     trained = field_from_labels(np.array([0, 1, 1, 0], dtype=np.int32), slots=2)
@@ -420,6 +436,53 @@ def test_object_field_init_export_and_stats_cli(tmp_path, capsys):
     assert "gaussians=4" in stats_output
     assert "slots=2" in stats_output
     assert "active_slots=2" in stats_output
+
+
+def test_object_field_export_cli_groups_low_confidence_as_unknown(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "gaussians.ply"
+    field_path = tmp_path / "object_field.npz"
+    output_path = tmp_path / "objects_unknown.ply"
+    probabilities = np.array(
+        [
+            [0.95, 0.05],
+            [0.55, 0.45],
+            [0.20, 0.80],
+            [0.49, 0.51],
+        ],
+        dtype=np.float32,
+    )
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.log(probabilities)))
+
+    assert (
+        main(
+            [
+                "object-field",
+                "export",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--output",
+                str(output_path),
+                "--min-confidence",
+                "0.8",
+                "--unknown-object-id",
+                "7",
+                "--ascii",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    exported = read_ply(output_path)
+
+    assert exported.vertices["object_id"].tolist() == [0, 7, 1, 7]
+    assert "min_confidence=0.800000" in output
+    assert "unknown_object_id=7" in output
+    assert "unknown_gaussians=2" in output
+    assert "object_id=7 count=2" in output
 
 
 def test_object_field_emergence_cli_outputs_partial_oes(tmp_path, capsys):
@@ -1079,6 +1142,98 @@ def test_masks_from_nerf_alpha_cli_writes_manifest_and_npy(tmp_path, capsys):
     assert mask.tolist() == [[False, True], [True, False]]
 
 
+def test_masks_from_nerf_alpha_fgbg_cli_writes_ignore_and_validates(tmp_path, capsys):
+    dataset = tmp_path / "nerf-synthetic-lego"
+    (dataset / "train").mkdir(parents=True)
+    _write_rgba_png(
+        dataset / "train" / "r_0.png",
+        np.array(
+            [
+                [[10, 20, 30, 0], [40, 50, 60, 255]],
+                [[70, 80, 90, 128], [100, 110, 120, 10]],
+            ],
+            dtype=np.uint8,
+        ),
+    )
+    transform = np.eye(4, dtype=float).tolist()
+    (dataset / "transforms_train.json").write_text(
+        json.dumps(
+            {
+                "camera_angle_x": 0.7,
+                "frames": [{"file_path": "./train/r_0", "transform_matrix": transform}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "masks" / "mask-manifest.json"
+    summary_path = tmp_path / "masks" / "validation-summary.json"
+
+    assert (
+        main(
+            [
+                "masks",
+                "from-nerf-alpha-fgbg",
+                str(dataset),
+                "--output",
+                str(manifest_path),
+                "--background-threshold",
+                "20",
+                "--foreground-threshold",
+                "200",
+                "--background-confidence",
+                "0.1",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    frame = manifest["frames"][0]
+    background = np.load(manifest_path.parent / frame["masks"][0]["mask_path"])
+    foreground = np.load(manifest_path.parent / frame["masks"][1]["mask_path"])
+    ignore = np.load(manifest_path.parent / frame["ignore_mask_path"])
+
+    assert "foreground_pixels=1" in output
+    assert "background_pixels=2" in output
+    assert "ignore_pixels=1" in output
+    assert manifest["source_type"] == "nerf-alpha-fgbg"
+    assert manifest["alpha_thresholds"]["background_confidence"] == 0.1
+    assert manifest["alpha_thresholds"]["foreground_confidence"] == 1.0
+    assert [slot["type"] for slot in manifest["slots"]] == ["background", "foreground"]
+    assert frame["frame_index"] == 0
+    assert frame["ignore_pixels"] == 1
+    assert frame["masks"][0]["confidence"] == 0.1
+    assert frame["masks"][1]["confidence"] == 1.0
+    assert background.tolist() == [[True, False], [False, True]]
+    assert foreground.tolist() == [[False, True], [False, False]]
+    assert ignore.tolist() == [[False, False], [True, False]]
+
+    assert (
+        main(
+            [
+                "masks",
+                "validate",
+                str(manifest_path),
+                "--dataset",
+                str(dataset),
+                "--summary-output",
+                str(summary_path),
+                "--strict",
+            ]
+        )
+        == 0
+    )
+    validation_output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "passed=true" in validation_output
+    assert "overlap_pixels=0" in validation_output
+    assert "frame=0 slot=0 pixels=2" in validation_output
+    assert "frame=0 slot=1 pixels=1" in validation_output
+    assert summary["passed"] is True
+    assert summary["slots"] == [0, 1]
+
+
 def test_masks_from_nerf_rgba_colors_cli_writes_multislot_manifest(tmp_path, capsys):
     dataset = tmp_path / "nerf-synthetic-lego"
     (dataset / "train").mkdir(parents=True)
@@ -1269,6 +1424,37 @@ def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     assert np.array_equal(result.field.labels(), np.array([0, 0, 1, 1], dtype=np.int32))
 
 
+def test_mask_voting_trains_background_slot_from_unmatched_projection(tmp_path):
+    cloud = _camera_cloud()
+    manifest = _write_partial_rect_mask_manifest(tmp_path / "partial-masks.json")
+    field = ObjectField(np.zeros((cloud.count, 2), dtype=np.float32))
+
+    votes = vote_masks_to_gaussians(
+        cloud,
+        manifest,
+        slots=2,
+        background_slot=1,
+        background_weight=0.5,
+    )
+    result = train_object_field_from_votes(field, votes, iterations=200, learning_rate=1.0)
+    vote_quality = result.vote_summary.as_dict()["vote_quality"]
+    background = result.vote_summary.as_dict()["background_training"]
+
+    assert votes.projected == 4
+    assert votes.matched == 2
+    assert votes.background_matched == 2
+    assert votes.supervised_gaussians == 4
+    assert np.allclose(votes.votes[:, 0], np.array([1.0, 1.0, 0.0, 0.0], dtype=np.float32))
+    assert np.allclose(votes.votes[:, 1], np.array([0.0, 0.0, 0.5, 0.5], dtype=np.float32))
+    assert background["slot"] == 1
+    assert background["weight"] == 0.5
+    assert background["matched"] == 2
+    assert vote_quality["supervised_fraction"] == 1.0
+    assert [slot["winner_gaussians"] for slot in vote_quality["per_slot"]] == [2, 2]
+    assert result.final_loss < result.initial_loss
+    assert np.array_equal(result.field.labels(), np.array([0, 0, 1, 1], dtype=np.int32))
+
+
 def test_mask_vote_quality_counts_conflicting_votes(tmp_path):
     payload = {
         "width": 100,
@@ -1351,6 +1537,61 @@ def test_object_field_vote_masks_cli_exports_summary_and_ply(tmp_path, capsys):
     assert summary["vote_quality"]["per_slot"][0]["winner_gaussians"] == 2
 
 
+def test_object_field_vote_masks_cli_trains_background_slot(tmp_path, capsys):
+    cloud = _camera_cloud()
+    input_path = tmp_path / "camera_cloud.ply"
+    field_path = tmp_path / "field"
+    output_field = tmp_path / "field_trained"
+    output_ply = tmp_path / "field_trained.ply"
+    summary_path = tmp_path / "summary.json"
+    masks_path = _write_partial_rect_mask_manifest(tmp_path / "masks.json")
+    write_ply(input_path, cloud, fmt="ascii")
+    save_object_field(field_path, ObjectField(np.zeros((cloud.count, 2), dtype=np.float32)))
+
+    assert (
+        main(
+            [
+                "object-field",
+                "vote-masks",
+                str(input_path),
+                "--field",
+                str(field_path),
+                "--masks",
+                str(masks_path),
+                "--output",
+                str(output_field),
+                "--summary-output",
+                str(summary_path),
+                "--ply-output",
+                str(output_ply),
+                "--iterations",
+                "200",
+                "--learning-rate",
+                "1.0",
+                "--background-slot",
+                "1",
+                "--background-weight",
+                "0.5",
+                "--ascii",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    trained = load_object_field(output_field)
+    exported = read_ply(output_ply)
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "background_slot=1" in output
+    assert "background_matched=2" in output
+    assert trained.labels().tolist() == [0, 0, 1, 1]
+    assert set(np.unique(exported.vertices["object_id"])) == {0, 1}
+    assert summary["background_training"]["slot"] == 1
+    assert summary["background_training"]["matched"] == 2
+    assert summary["vote_quality"]["per_slot"][1]["winner_gaussians"] == 2
+
+
 def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp_path, capsys):
     input_path = tmp_path / "external_trainer" / "point_cloud.ply"
     masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -1409,6 +1650,184 @@ def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp
     assert set(np.unique(object_ply.vertices["object_id"])) == {0, 1}
     assert (public_dir / "nerf_lego_trained.splat").exists()
     assert (public_dir / "nerf_lego_trained_objects.ply").exists()
+
+
+def test_training_register_output_can_export_unknown_object_policy(tmp_path, capsys):
+    input_path = tmp_path / "external_trainer" / "point_cloud.ply"
+    masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")
+    output_dir = tmp_path / "registered"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "training",
+                "register-output",
+                str(input_path),
+                "--asset-id",
+                "nerf-lego-trained-output-local",
+                "--output-dir",
+                str(output_dir),
+                "--masks",
+                str(masks_path),
+                "--iterations",
+                "1",
+                "--object-min-confidence",
+                "1.0",
+                "--unknown-object-id",
+                "2",
+                "--no-public-copy",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "training-output-manifest.json").read_text(encoding="utf-8"))
+    object_ply = read_ply(output_dir / "object_aware_gaussians.ply")
+
+    assert set(np.unique(object_ply.vertices["object_id"])) == {2}
+    assert manifest["object_label_policy"] == {
+        "type": "max_probability_unknown_threshold",
+        "min_confidence": 1.0,
+        "unknown_object_id": 2,
+        "unknown_gaussians": 4,
+    }
+    assert "unknown_object_id=2" in output
+    assert "unknown_gaussians=4" in output
+
+
+def test_training_register_output_can_train_background_slot(tmp_path, capsys):
+    input_path = tmp_path / "external_trainer" / "point_cloud.ply"
+    masks_path = _write_partial_rect_mask_manifest(tmp_path / "masks.json")
+    output_dir = tmp_path / "registered"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "training",
+                "register-output",
+                str(input_path),
+                "--asset-id",
+                "nerf-lego-trained-output-local",
+                "--output-dir",
+                str(output_dir),
+                "--masks",
+                str(masks_path),
+                "--background-slot",
+                "1",
+                "--background-weight",
+                "0.5",
+                "--iterations",
+                "120",
+                "--learning-rate",
+                "1.0",
+                "--no-public-copy",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    manifest = json.loads((output_dir / "training-output-manifest.json").read_text(encoding="utf-8"))
+    object_ply = read_ply(output_dir / "object_aware_gaussians.ply")
+
+    assert "background_slot=1" in output
+    assert "background_matched=2" in output
+    assert manifest["slots"] == 2
+    assert manifest["background_training"]["slot"] == 1
+    assert manifest["background_training"]["weight"] == 0.5
+    assert manifest["background_training"]["matched"] == 2
+    assert manifest["training"]["background_training"]["matched"] == 2
+    assert manifest["training"]["vote_quality"]["per_slot"][1]["winner_gaussians"] == 2
+    assert set(np.unique(object_ply.vertices["object_id"])) == {0, 1}
+
+
+def test_training_write_sample_bundle_binds_dataset_masks_and_training_output(tmp_path, capsys):
+    dataset = _write_small_lego_dataset(tmp_path / "nerf-synthetic-lego")
+    alpha_masks = tmp_path / "alpha-fgbg" / "mask-manifest.json"
+    assert (
+        main(
+            [
+                "masks",
+                "from-nerf-alpha-fgbg",
+                str(dataset),
+                "--output",
+                str(alpha_masks),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    input_path = tmp_path / "external_trainer" / "point_cloud.ply"
+    vote_masks = _write_rect_mask_manifest(tmp_path / "vote-masks.json")
+    output_dir = tmp_path / "registered"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+    assert (
+        main(
+            [
+                "training",
+                "register-output",
+                str(input_path),
+                "--asset-id",
+                "nerf-lego-trained-output-local",
+                "--output-dir",
+                str(output_dir),
+                "--masks",
+                str(vote_masks),
+                "--iterations",
+                "80",
+                "--learning-rate",
+                "1.0",
+                "--no-public-copy",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    sample_path = tmp_path / "sample" / "sample.json"
+    assert (
+        main(
+            [
+                "training",
+                "write-sample-bundle",
+                "--output",
+                str(sample_path),
+                "--sample-id",
+                "objgauss-lego-alpha-fgbg-test",
+                "--asset-id",
+                "nerf-synthetic-lego",
+                "--dataset",
+                str(dataset),
+                "--masks",
+                str(alpha_masks),
+                "--training-manifest",
+                str(output_dir / "training-output-manifest.json"),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    sample = json.loads(sample_path.read_text(encoding="utf-8"))
+
+    assert "sample_id=objgauss-lego-alpha-fgbg-test" in output
+    assert "gaussians=4" in output
+    assert sample["schema"] == "objgauss-sample-bundle-v1"
+    assert sample["sample_id"] == "objgauss-lego-alpha-fgbg-test"
+    assert sample["asset_id"] == "nerf-synthetic-lego"
+    assert sample["image_count"] == 1
+    assert sample["mask_frame_count"] == 1
+    assert sample["gaussian_count"] == 4
+    assert sample["object_field_gaussian_count"] == 4
+    assert sample["object_field_slot_count"] == 2
+    assert sample["consistency"]["object_field_matches_gaussians"] is True
+    assert sample["consistency"]["object_ply_matches_gaussians"] is True
+    assert sample["consistency"]["mask_slots_match_object_field"] is True
+    assert [slot["type"] for slot in sample["slots"]] == ["background", "foreground"]
+    assert len(sample["splat_sha256"]) == 64
 
 
 def test_demo_v1_closure_builds_acceptance_artifacts(tmp_path, capsys):
@@ -2038,6 +2457,24 @@ def _write_rect_mask_manifest(path):
                 "masks": [
                     {"slot": 0, "label": "left", "rect": [0, 0, 50, 100]},
                     {"slot": 1, "label": "right", "rect": [50, 0, 100, 100]},
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_partial_rect_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "frames": [
+            {
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {"slot": 0, "label": "left", "rect": [0, 0, 50, 100]},
                 ],
             }
         ],

@@ -14,6 +14,7 @@
 | Plush 2D 语义 Mask 闭环样例 | Plush 3DGS 示例派生产物 | `public/samples/plush_semantic.splat` + `public/samples/plush_semantic_objects.ply` + `outputs/demos/plush-semantic-closure/` | 统一验收：真实 3DGS、非 KMeans 的 2D color masks、Object Field、对象编辑 | 继承 Plush 来源限制，仅本地测试；不是 SAM/CLIP 输出 |
 | Poly Haven School Chair 1K | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/raw/polyhaven-school-chair-1k/` | 许可干净的单对象 Demo 输入，后续用于 mesh 多视角渲染和 3DGS 训练 | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | NeRF Synthetic Lego | https://github.com/bmild/nerf | `outputs/assets/training/nerf-synthetic-lego/` | ObjGauss v1 Object Field 的多视角训练烟测 | NeRF 官方示例数据，仅训练/研究使用 |
+| NeRF Lego Alpha 前景/背景诊断基线 | NeRF Synthetic Lego + 本机外部 3DGS 训练输出 | `public/samples/nerf_lego_alpha_fgbg_bg005.splat` + `public/samples/nerf_lego_alpha_fgbg_bg005_objects.ply` | 页面对比 `background_confidence=0.05` 的 Level 1 foreground/background Object Field 训练结果 | NeRF 官方示例数据，仅训练/研究使用；诊断基线，不是展示默认，也不是 part-level 稳定分离结论 |
 | NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实多视角 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
 | Poly Haven School Chair NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf/` | 第三个 Splatfacto-trained benchmark scene，由 CC0 glTF mesh 离线渲染多视角 RGBA | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | Poly Haven Chair 商用展示样例 | https://polyhaven.com/a/SchoolChair_01 | `public/samples/polyhaven_chair_demo.splat` + `public/samples/polyhaven_chair_demo_objects.ply` | 许可干净、viewer 可直接加载和对象编辑的 Gaussian demo sample | CC0 派生训练输出；public sample 文件本地生成，不提交 git |
@@ -183,6 +184,20 @@ objgauss training register-output path/to/point_cloud.ply \
 该命令只负责接入成熟训练器产物，不在 ObjGauss 内部训练 3DGS。
 默认会生成 viewer `.splat`、Object Field、带 `object_id` 的 PLY 和
 `training-output-manifest.json`。
+
+Alpha foreground/background 本地页面预览：
+
+```text
+outputs/assets/gaussians/nerf-lego-alpha-fgbg-bg005-v2/gaussians.splat
+  -> public/samples/nerf_lego_alpha_fgbg_bg005.splat
+
+outputs/assets/gaussians/nerf-lego-alpha-fgbg-bg005-v2/object_aware_gaussians.ply
+  -> public/samples/nerf_lego_alpha_fgbg_bg005_objects.ply
+```
+
+这组样例使用 `background_confidence=0.05` 的 alpha fgbg mask bundle：
+168,653 Gaussians，foreground/background `object_id` counts 为 `35,579/133,074`。
+它用于查看 Level 1 数据基线，不证明 part-level 对象稳定分离。
 
 默认输出：
 

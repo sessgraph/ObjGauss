@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-25
+> 最近更新: 2026-06-26
 
 ## 队列规则
 
@@ -28,6 +28,80 @@
 当前无进行中 PR。
 
 ## Done
+
+### SCENE-BUNDLE-001: Traceable alpha foreground/background sample bundle
+
+- 状态: done / scene-object-bundle-alpha-fgbg
+- 类型: 标准 PR / training data management
+- 目标: 把训练数据从散落的 images / masks / PLY / Object Field 升级成可追溯的 scene/object bundle，并先为 Lego 建立 Level 1 foreground/background 基线，而不是继续硬调 4-slot SAM。
+- 已实施:
+  - 新增 `objgauss masks from-nerf-alpha-fgbg`：从 NeRF RGBA alpha 生成 `slot 0 = background`、`slot 1 = foreground` 和 `ignore_mask_path`，默认使用 `alpha < 20` / `alpha > 200`，中间透明边界进入 ignore。
+  - `from-nerf-alpha-fgbg` 新增 `--background-confidence` / `--foreground-confidence`，默认将 full-frame background mask 权重降到 `0.05`，避免无 depth/visibility occlusion 的投票路径被大背景面积压倒。
+  - 新增 `objgauss masks validate`：检查 image/mask shape、bool/0-1 mask、slot 连续性、overlap、empty mask、过大 mask 和 ignore mask，并可写 validation summary。
+  - 新增 `objgauss training write-sample-bundle` 与 `objgauss/sample_bundle.py`：写 `objgauss-sample-bundle-v1` 顶层 `sample.json`，绑定 dataset/transforms、mask manifest、training-output-manifest、Gaussian PLY、Object Field、object-aware PLY、slot 定义和一致性检查。
+  - 新增 `docs/training/scene-object-bundles.md`，记录 Level 1 Lego foreground/background bundle 命令和当前本机结果。
+- 本机 ignored 产物:
+  - `outputs/masks/nerf-lego-alpha-fgbg-bg005-v2/mask-manifest.json`: 100 frames / 200 masks / foreground `843797` / background `61517043` / ignore `1639160`，`background_confidence=0.05`。
+  - `outputs/masks/nerf-lego-alpha-fgbg-bg005-v2/validation-summary.json`: passed，zero overlap，使用 `--max-mask-area-fraction 0.995` 适配大背景。
+  - `outputs/assets/gaussians/nerf-lego-alpha-fgbg-bg005-v2/object_aware_gaussians.ply`: 168,653 Gaussians，`slots=2`，`supervised_gaussians=149892`，projection loss `1.264038 -> 0.497213`，object counts background/foreground=`133074/35579`。
+  - `outputs/samples/objgauss-lego-alpha-fgbg-bg005-v2/sample.json`: 绑定 dataset、mask manifest、training manifest、Gaussian PLY、Object Field 和 slots。
+  - 敏感性对照 `background_confidence=0.02`: `outputs/assets/gaussians/nerf-lego-alpha-fgbg-bg002-v2/object_aware_gaussians.ply`，projection loss `1.430821 -> 0.535701`，object counts background/foreground=`88582/80071`。
+- 结论:
+  - Level 1 bundle / full-frame alpha supervision 路线已跑通，且数据绑定和 validator 能复查。
+  - `bg005-v2` 是当前保守候选；`bg002-v2` 可显著扩大 foreground，但更可能吸收背景 / 桌面，需要作为 sensitivity evidence 而不是默认结果。
+  - 当前 foreground label 仍偏小、`vote_conflict_fraction=0.430143` 仍高；这说明下一步要检查 camera/PLY alignment、alpha threshold sensitivity、base splat 质量和 depth/visibility-aware voting，不能把该结果当作 part-level 稳定分离证明。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "alpha_fgbg or write_sample_bundle"`: 2 passed。
+  - `uv run --extra dev pytest`: 49 passed。
+  - `npm run build`: passed，仍有既有 bundle size warning。
+  - `uv run objgauss masks from-nerf-alpha-fgbg ... --background-confidence 0.05`: passed。
+  - `uv run objgauss masks validate ... --strict --max-mask-area-fraction 0.995`: passed。
+  - `uv run objgauss training register-output ... --masks outputs/masks/nerf-lego-alpha-fgbg-bg005-v2/mask-manifest.json --slots 2`: passed，CPU/Object Field path，不占用 GPU 训练显存。
+  - `uv run objgauss training write-sample-bundle ...`: passed。
+  - `nvidia-smi`: RTX 5060 Ti 当前约 `596MiB` used / `15246MiB` free，GPU memory 留给显示。
+
+### OBJECT-FIELD-BG-TRAIN-001: Mask voting can train a background Object Field slot
+
+- 状态: done / background-slot-mask-vote-training
+- 类型: 标准 PR / Object Field training
+- 目标: 不再只靠导出阶段 hard confidence threshold 归类背景，而是在 mask voting 训练目标里加入 background/unknown 槽监督，让投影可见但未命中前景 mask 的 Gaussian 产生训练信号。
+- 已实施:
+  - `vote_masks_to_gaussians()` 新增 `background_slot` / `background_weight`；启用后，每帧 projected-visible 且未命中任何前景 mask 的 Gaussian 会给 background slot 投票。
+  - `MaskVoteResult.as_dict()` 和训练 summary 新增 `background_training`，记录 background slot、weight、matched 数和 projected fraction。
+  - `objgauss object-field vote-masks` 支持 `--background-slot` / `--background-weight`，summary 和 PLY 导出走同一训练结果。
+  - `objgauss training register-output` 支持 `--background-slot` / `--background-weight`，manifest 顶层和 `training` summary 均记录背景训练证据；未显式给 `--slots` 时可按 background slot 自动扩容。
+  - Splatfacto smoke、balanced benchmark、near-1M candidate 与 near-1M background launcher 均透传 background slot 参数；脚本会在 `--background-slot 4` 时把默认 4 foreground slots 自动扩为 `--slots 5`。
+  - 使用现有本机 168,653-Gaussian near-1M candidate PLY 重新登记出 background-slot 训练版 ignored artifact：`outputs/assets/gaussians/nerf-lego-trained-near1m-sam8f-balanced03-slots4-bgslot4/object_aware_gaussians.ply`。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "background_slot or training_register_output_ingests_external_gaussians_and_votes_masks"`: 4 passed。
+  - `uv run --extra dev pytest`: 47 passed。
+  - `npm run build`: passed，仍有既有 bundle size warning。
+  - `node --check scripts/train-splatfacto-smoke.mjs`: passed。
+  - `node --check scripts/benchmark-splatfacto-balanced.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - dry-run confirmed `--background-slot 4 --background-weight 0.25` 会在 smoke / balanced / near-1M candidate / background launcher 透传，并将 slot count 扩为 5。
+  - `uv run objgauss training register-output ... --background-slot 4 --background-weight 0.25`: 168,653 Gaussians，`slots=5`，`supervised_gaussians=118729`，`background_matched=496056`，projection loss `2.245413 -> 0.604945`，object counts `15810/9080/15376/25100/103287`。
+
+### OBJECT-FIELD-UNKNOWN-001: Low-confidence Object Field export can emit background object
+
+- 状态: done / low-confidence-unknown-object-export
+- 类型: 标准 PR / Object Field export
+- 目标: 让 Object Field hard label 导出支持把低置信度 Gaussian 统一归入 background / unknown object，避免所有未稳分离点被强制塞进已有对象槽。
+- 已实施:
+  - `ObjectField.labels()` 和 `attach_hard_labels()` 新增 `min_confidence` / `unknown_label` 可选策略；默认行为保持 hard argmax 不变。
+  - `objgauss object-field export`、`objgauss object-field stats`、`objgauss object-field vote-masks --ply-output` 支持 `--min-confidence` 与 `--unknown-object-id`。
+  - `objgauss training register-output` 支持 `--object-min-confidence` / `--unknown-object-id`，并在 manifest 写入 `object_label_policy`。
+  - Splatfacto smoke、balanced benchmark、near-1M candidate 与 near-1M background launcher 均可透传 unknown/background 策略。
+  - 本机 168,653-Gaussian Lego 产物已导出诊断 preview：`outputs/training/nerf-lego-splatfacto-near1m/object-field-sam8f-balanced03-slots4/lego_splatfacto_sam_objects_unknown095.ply`。
+- 验证:
+  - `uv run --extra dev pytest`: 44 passed。
+  - `npm run build`: passed，仍有既有 bundle size warning。
+  - `node --check scripts/train-splatfacto-smoke.mjs`: passed。
+  - `node --check scripts/benchmark-splatfacto-balanced.mjs`: passed。
+  - `node --check scripts/train-splatfacto-near1m-candidate.mjs`: passed。
+  - `node --check scripts/launch-splatfacto-near1m-background.mjs`: passed。
+  - near-1M candidate / background dry-run 均确认 `--object-min-confidence 0.95 --unknown-object-id 4` 可透传。
 
 ### RENDER-ROUTE-031: Renderer route goal reports C-path runtime readiness evidence
 

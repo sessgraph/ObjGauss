@@ -28,10 +28,12 @@ from objgauss.mask_voting import (
 )
 from objgauss.lego_verify import verify_lego_alpha_closure_demo
 from objgauss.masks import (
+    build_nerf_alpha_fgbg_mask_manifest,
     build_nerf_alpha_mask_manifest,
     build_nerf_rgba_color_mask_manifest,
     build_nerf_sam_mask_manifest,
     split_mask_manifest,
+    validate_mask_manifest,
 )
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
 from objgauss.object_field import (
@@ -56,6 +58,7 @@ from objgauss.semantic_demo import (
     build_plush_semantic_closure_demo,
     verify_plush_semantic_closure_demo,
 )
+from objgauss.sample_bundle import write_sample_bundle
 from objgauss.splat import read_splat
 from objgauss.training import register_training_output
 
@@ -218,7 +221,14 @@ def _object_field_init(args: argparse.Namespace) -> None:
 def _object_field_export(args: argparse.Namespace) -> None:
     cloud = read_ply(args.input)
     field = load_object_field(args.field)
-    labeled = attach_hard_labels(cloud, field, object_id_field=args.object_id_field)
+    labels = _labels_with_unknown_policy(field, args)
+    labeled = attach_hard_labels(
+        cloud,
+        field,
+        object_id_field=args.object_id_field,
+        min_confidence=args.min_confidence,
+        unknown_label=args.unknown_object_id,
+    )
     if args.colorize:
         labeled = apply_object_colors(
             labeled,
@@ -227,16 +237,19 @@ def _object_field_export(args: argparse.Namespace) -> None:
         )
     write_ply(args.output, labeled, fmt=_output_format(args))
     print(f"exported {cloud.count} gaussians from {args.field} to {args.output}")
-    _print_summary(field.labels())
+    _print_unknown_policy(field, labels, args)
+    _print_summary(labels)
 
 
 def _object_field_stats(args: argparse.Namespace) -> None:
     field = load_object_field(args.field)
     metrics = object_field_metrics(field)
+    labels = _labels_with_unknown_policy(field, args)
     print(f"gaussians={field.gaussian_count}")
     print(f"slots={field.slots}")
     _print_metrics(metrics)
-    _print_summary(field.labels())
+    _print_unknown_policy(field, labels, args)
+    _print_summary(labels)
 
 
 def _object_field_emergence(args: argparse.Namespace) -> None:
@@ -469,6 +482,8 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
         args.masks,
         slots=field.slots,
         max_frames=args.max_frames,
+        background_slot=args.background_slot,
+        background_weight=args.background_weight,
     )
     result = train_object_field_from_votes(
         field,
@@ -481,6 +496,9 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
     print(f"frames={votes.frames}")
     print(f"projected={votes.projected}")
     print(f"matched={votes.matched}")
+    if votes.background_slot is not None:
+        print(f"background_slot={votes.background_slot}")
+        print(f"background_matched={votes.background_matched}")
     print(f"supervised_gaussians={result.supervised_gaussians}")
     vote_quality = mask_vote_quality_audit(votes)
     conflict = vote_quality["vote_conflict"]
@@ -491,14 +509,21 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
     print(f"initial_loss={result.initial_loss:.6f}")
     print(f"final_loss={result.final_loss:.6f}")
     _print_metrics(object_field_metrics(result.field))
-    _print_summary(result.field.labels())
+    labels = _labels_with_unknown_policy(result.field, args)
+    _print_unknown_policy(result.field, labels, args)
+    _print_summary(labels)
 
     if args.summary_output:
         write_json(args.summary_output, training_summary(result))
         print(f"summary={args.summary_output}")
 
     if args.ply_output:
-        labeled = attach_hard_labels(cloud, result.field)
+        labeled = attach_hard_labels(
+            cloud,
+            result.field,
+            min_confidence=args.min_confidence,
+            unknown_label=args.unknown_object_id,
+        )
         if args.colorize:
             labeled = apply_object_colors(labeled, rewrite_sh=args.rewrite_sh)
         write_ply(args.ply_output, labeled, fmt=_output_format(args))
@@ -521,6 +546,29 @@ def _masks_from_nerf_alpha(args: argparse.Namespace) -> None:
     print(f"width={result.width}")
     print(f"height={result.height}")
     print(f"foreground_pixels={result.foreground_pixels}")
+
+
+def _masks_from_nerf_alpha_fgbg(args: argparse.Namespace) -> None:
+    result = build_nerf_alpha_fgbg_mask_manifest(
+        args.dataset,
+        output=args.output,
+        split=args.split,
+        max_frames=args.max_frames,
+        foreground_threshold=args.foreground_threshold,
+        background_threshold=args.background_threshold,
+        foreground_slot=args.foreground_slot,
+        background_slot=args.background_slot,
+        foreground_confidence=args.foreground_confidence,
+        background_confidence=args.background_confidence,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"width={result.width}")
+    print(f"height={result.height}")
+    print(f"foreground_pixels={result.foreground_pixels}")
+    print(f"background_pixels={result.background_pixels}")
+    print(f"ignore_pixels={result.ignore_pixels}")
 
 
 def _masks_from_nerf_rgba_colors(args: argparse.Namespace) -> None:
@@ -582,6 +630,44 @@ def _masks_split_manifest(args: argparse.Namespace) -> None:
     print(f"heldout_frames={result.heldout_frames}")
     print(f"train_masks={result.train_masks}")
     print(f"heldout_masks={result.heldout_masks}")
+
+
+def _masks_validate(args: argparse.Namespace) -> None:
+    result = validate_mask_manifest(
+        args.manifest,
+        dataset=args.dataset,
+        max_overlap_fraction=args.max_overlap_fraction,
+        max_mask_area_fraction=args.max_mask_area_fraction,
+        allow_empty=args.allow_empty,
+    )
+    print(f"manifest={result.manifest_path}")
+    print(f"passed={str(result.passed).lower()}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"slots={','.join(str(slot) for slot in result.slots) if result.slots else '-'}")
+    print(f"errors={len(result.errors)}")
+    print(f"warnings={len(result.warnings)}")
+    for index, frame in enumerate(result.frame_stats[: args.max_report_frames]):
+        print(
+            f"frame={frame['frame_index']} "
+            f"overlap_pixels={frame['overlap_pixels']} "
+            f"overlap_fraction={frame['overlap_fraction']:.6f} "
+            f"ignore_pixels={frame['ignore_pixels'] if frame['ignore_pixels'] is not None else '-'}"
+        )
+        for mask in frame["masks"]:
+            print(
+                f"frame={frame['frame_index']} slot={mask['slot']} "
+                f"pixels={mask['pixels']} fraction={mask['fraction']:.6f}"
+            )
+    for error in result.errors:
+        print(f"error={error}")
+    for warning in result.warnings:
+        print(f"warning={warning}")
+    if args.summary_output:
+        write_json(args.summary_output, result.as_dict())
+        print(f"summary={args.summary_output}")
+    if not result.passed and args.strict:
+        raise ValueError("mask manifest validation failed")
 
 
 def _demo_v1_closure(args: argparse.Namespace) -> None:
@@ -752,6 +838,10 @@ def _training_register_output(args: argparse.Namespace) -> None:
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         colorize=not args.no_colorize,
+        object_min_confidence=args.object_min_confidence,
+        unknown_object_id=args.unknown_object_id,
+        background_slot=args.background_slot,
+        background_weight=args.background_weight,
     )
     print(f"manifest={result.manifest_path}")
     print(f"gaussian_ply={result.gaussian_ply_path}")
@@ -769,14 +859,63 @@ def _training_register_output(args: argparse.Namespace) -> None:
         print(f"slots={result.slots}")
     if result.supervised_gaussians is not None:
         print(f"supervised_gaussians={result.supervised_gaussians}")
+    if result.background_slot is not None:
+        print(f"background_slot={result.background_slot}")
+    if result.background_matched is not None:
+        print(f"background_matched={result.background_matched}")
+    if result.unknown_object_id is not None:
+        print(f"unknown_object_id={result.unknown_object_id}")
+    if result.unknown_gaussians is not None:
+        print(f"unknown_gaussians={result.unknown_gaussians}")
     if result.initial_loss is not None and result.final_loss is not None:
         print(f"initial_loss={result.initial_loss:.6f}")
         print(f"final_loss={result.final_loss:.6f}")
 
 
+def _training_write_sample_bundle(args: argparse.Namespace) -> None:
+    result = write_sample_bundle(
+        output=args.output,
+        sample_id=args.sample_id,
+        asset_id=args.asset_id,
+        dataset=args.dataset,
+        masks=args.masks,
+        training_manifest=args.training_manifest,
+        split=args.split,
+    )
+    print(f"sample={result.sample_path}")
+    print(f"sample_id={result.sample_id}")
+    print(f"asset_id={result.asset_id}")
+    print(f"image_count={result.image_count}")
+    print(f"mask_frame_count={result.mask_frame_count}")
+    if result.gaussian_count is not None:
+        print(f"gaussians={result.gaussian_count}")
+    if result.object_field_gaussian_count is not None:
+        print(f"object_field_gaussians={result.object_field_gaussian_count}")
+    if result.slot_count is not None:
+        print(f"slots={result.slot_count}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
+
+
+def _labels_with_unknown_policy(field, args: argparse.Namespace) -> np.ndarray:
+    return field.labels(
+        min_confidence=getattr(args, "min_confidence", None),
+        unknown_label=getattr(args, "unknown_object_id", None),
+    )
+
+
+def _print_unknown_policy(field, labels: np.ndarray, args: argparse.Namespace) -> None:
+    min_confidence = getattr(args, "min_confidence", None)
+    if min_confidence is None:
+        return
+    unknown_label = getattr(args, "unknown_object_id", None)
+    unknown = field.slots if unknown_label is None else int(unknown_label)
+    print(f"min_confidence={float(min_confidence):.6f}")
+    print(f"unknown_object_id={unknown}")
+    print(f"unknown_gaussians={int(np.count_nonzero(labels == unknown))}")
 
 
 def _print_metrics(metrics) -> None:
@@ -904,6 +1043,19 @@ def _build_parser() -> argparse.ArgumentParser:
     field_export.add_argument("--field", required=True, type=Path)
     field_export.add_argument("--output", "-o", required=True, type=Path)
     field_export.add_argument("--object-id-field", default="object_id")
+    field_export.add_argument(
+        "--min-confidence",
+        type=float,
+        help=(
+            "send Gaussians whose max object probability is below this threshold "
+            "to an unknown/background object"
+        ),
+    )
+    field_export.add_argument(
+        "--unknown-object-id",
+        type=int,
+        help="object_id to use for low-confidence Gaussians; defaults to the slot count",
+    )
     field_export.add_argument("--colorize", action="store_true")
     field_export.add_argument("--rewrite-sh", action="store_true")
     field_export.add_argument("--ascii", action="store_true", help="write ASCII PLY")
@@ -914,6 +1066,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="print object field metrics",
     )
     field_stats.add_argument("field", type=Path)
+    field_stats.add_argument(
+        "--min-confidence",
+        type=float,
+        help="include an unknown/background object count below this max-probability threshold",
+    )
+    field_stats.add_argument(
+        "--unknown-object-id",
+        type=int,
+        help="object_id to use for low-confidence Gaussians; defaults to the slot count",
+    )
     field_stats.set_defaults(handler=_object_field_stats)
 
     field_emergence = object_field_subparsers.add_parser(
@@ -1011,6 +1173,33 @@ def _build_parser() -> argparse.ArgumentParser:
     field_vote.add_argument("--iterations", type=int, default=100)
     field_vote.add_argument("--learning-rate", type=float, default=0.5)
     field_vote.add_argument("--max-frames", type=int)
+    field_vote.add_argument(
+        "--background-slot",
+        type=int,
+        help=(
+            "train this slot from projected Gaussians that are visible in a mask frame "
+            "but do not hit any foreground mask"
+        ),
+    )
+    field_vote.add_argument(
+        "--background-weight",
+        type=float,
+        default=1.0,
+        help="vote weight for --background-slot negative evidence",
+    )
+    field_vote.add_argument(
+        "--min-confidence",
+        type=float,
+        help=(
+            "when writing --ply-output, send Gaussians below this max-probability "
+            "threshold to an unknown/background object"
+        ),
+    )
+    field_vote.add_argument(
+        "--unknown-object-id",
+        type=int,
+        help="object_id to use for low-confidence Gaussians; defaults to the slot count",
+    )
     field_vote.add_argument("--colorize", action="store_true")
     field_vote.add_argument("--rewrite-sh", action="store_true")
     field_vote.add_argument("--ascii", action="store_true", help="write ASCII PLY")
@@ -1031,6 +1220,22 @@ def _build_parser() -> argparse.ArgumentParser:
     nerf_alpha.add_argument("--label", default="foreground")
     nerf_alpha.add_argument("--threshold", type=int, default=1)
     nerf_alpha.set_defaults(handler=_masks_from_nerf_alpha)
+
+    nerf_alpha_fgbg = masks_subparsers.add_parser(
+        "from-nerf-alpha-fgbg",
+        help="convert NeRF Synthetic RGBA alpha to foreground/background masks plus ignore boundary",
+    )
+    nerf_alpha_fgbg.add_argument("dataset", type=Path)
+    nerf_alpha_fgbg.add_argument("--output", "-o", required=True, type=Path)
+    nerf_alpha_fgbg.add_argument("--split", default="train")
+    nerf_alpha_fgbg.add_argument("--max-frames", type=int)
+    nerf_alpha_fgbg.add_argument("--background-slot", type=int, default=0)
+    nerf_alpha_fgbg.add_argument("--foreground-slot", type=int, default=1)
+    nerf_alpha_fgbg.add_argument("--background-threshold", type=int, default=20)
+    nerf_alpha_fgbg.add_argument("--foreground-threshold", type=int, default=200)
+    nerf_alpha_fgbg.add_argument("--background-confidence", type=float, default=0.05)
+    nerf_alpha_fgbg.add_argument("--foreground-confidence", type=float, default=1.0)
+    nerf_alpha_fgbg.set_defaults(handler=_masks_from_nerf_alpha_fgbg)
 
     nerf_rgba_colors = masks_subparsers.add_parser(
         "from-nerf-rgba-colors",
@@ -1073,6 +1278,20 @@ def _build_parser() -> argparse.ArgumentParser:
     split_manifest.add_argument("--heldout-every", type=int, default=4)
     split_manifest.add_argument("--heldout-offset", type=int)
     split_manifest.set_defaults(handler=_masks_split_manifest)
+
+    validate_manifest = masks_subparsers.add_parser(
+        "validate",
+        help="validate mask manifest image/mask shape, slots, overlap, empty masks, and ignore masks",
+    )
+    validate_manifest.add_argument("manifest", type=Path)
+    validate_manifest.add_argument("--dataset", type=Path)
+    validate_manifest.add_argument("--summary-output", type=Path)
+    validate_manifest.add_argument("--max-overlap-fraction", type=float, default=0.0)
+    validate_manifest.add_argument("--max-mask-area-fraction", type=float, default=0.98)
+    validate_manifest.add_argument("--allow-empty", action="store_true")
+    validate_manifest.add_argument("--strict", action="store_true")
+    validate_manifest.add_argument("--max-report-frames", type=int, default=8)
+    validate_manifest.set_defaults(handler=_masks_validate)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)
@@ -1226,8 +1445,48 @@ def _build_parser() -> argparse.ArgumentParser:
     register_output.add_argument("--no-public-copy", action="store_true")
     register_output.add_argument("--iterations", type=int, default=100)
     register_output.add_argument("--learning-rate", type=float, default=0.5)
+    register_output.add_argument(
+        "--background-slot",
+        type=int,
+        help=(
+            "train this Object Field slot from projected Gaussians that are visible "
+            "but unmatched by foreground masks"
+        ),
+    )
+    register_output.add_argument(
+        "--background-weight",
+        type=float,
+        default=1.0,
+        help="vote weight for --background-slot negative evidence",
+    )
+    register_output.add_argument(
+        "--object-min-confidence",
+        type=float,
+        help=(
+            "send trained Object Field assignments below this max-probability threshold "
+            "to an unknown/background object in object_aware_gaussians.ply"
+        ),
+    )
+    register_output.add_argument(
+        "--unknown-object-id",
+        type=int,
+        help="object_id to use for low-confidence Gaussians; defaults to the slot count",
+    )
     register_output.add_argument("--no-colorize", action="store_true")
     register_output.set_defaults(handler=_training_register_output)
+
+    write_bundle = training_subparsers.add_parser(
+        "write-sample-bundle",
+        help="write a traceable scene/object sample.json binding dataset, masks, and training output",
+    )
+    write_bundle.add_argument("--output", "-o", required=True, type=Path)
+    write_bundle.add_argument("--sample-id", required=True)
+    write_bundle.add_argument("--asset-id", required=True)
+    write_bundle.add_argument("--dataset", required=True, type=Path)
+    write_bundle.add_argument("--masks", required=True, type=Path)
+    write_bundle.add_argument("--training-manifest", required=True, type=Path)
+    write_bundle.add_argument("--split", default="train")
+    write_bundle.set_defaults(handler=_training_write_sample_bundle)
 
     return parser
 

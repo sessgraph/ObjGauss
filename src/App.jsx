@@ -11,7 +11,7 @@ import {
   Scissors,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ASSET_LIBRARY, featuredAssets } from "./assetLibrary.js";
 import { parsePly, parsePlyFile } from "./ply.js";
@@ -83,6 +83,11 @@ const WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE = 512;
 const WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE = 384;
 const WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE = 320;
 const UI_SPARK_OBJECT_MASK_FEATHER_OPACITY = 0.55;
+const SKIPPED_WEBGPU_CAPABILITY = Object.freeze({
+  status: "unavailable",
+  reason: "webgpu-capability-probe-skipped",
+  label: "未探测",
+});
 const HARD_MASK_QUALITY_BY_ASSET = {
   "nerf-lego-alpha-closure-local": {
     interpretation: "boundary-mixing-dominant",
@@ -120,6 +125,7 @@ const HARD_MASK_QUALITY_BY_ASSET = {
 
 export default function App() {
   const [scene, setScene] = useState(() => createSampleScene());
+  const initialAssetLoaded = useRef(false);
   const [viewMode, setViewMode] = useState("edit");
   const [sideTab, setSideTab] = useState("samples");
   const [renderMode, setRenderMode] = useState("original");
@@ -136,16 +142,23 @@ export default function App() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const webGpuCapabilityProbeEnabled = useMemo(readWebGpuCapabilityProbeEnabled, []);
 
   useEffect(() => {
     let cancelled = false;
+    if (!webGpuCapabilityProbeEnabled) {
+      setWebGpuCapability(SKIPPED_WEBGPU_CAPABILITY);
+      return () => {
+        cancelled = true;
+      };
+    }
     detectWebGpuCapability().then((capability) => {
       if (!cancelled) setWebGpuCapability(capability);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [webGpuCapabilityProbeEnabled]);
 
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
   const renderModeText = renderModeLabel(renderMode);
@@ -411,6 +424,17 @@ export default function App() {
   };
 
   const loadSample = () => loadAsset(LOCAL_SAMPLE_ASSET);
+
+  useEffect(() => {
+    if (initialAssetLoaded.current) return;
+    initialAssetLoaded.current = true;
+    const assetId = readInitialAssetId();
+    if (!assetId) return;
+    const asset = ASSET_LIBRARY.find((item) => item.id === assetId);
+    if (!asset?.localPath) return;
+    setSideTab("samples");
+    void loadAsset(asset);
+  }, []);
 
   const resetDemo = () => {
     const next = createSampleScene();
@@ -969,6 +993,11 @@ function readInitialSparkObjectMaskFeathering() {
   });
 }
 
+function readInitialAssetId() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("asset") ?? "";
+}
+
 function RendererPendingViewport({ rendererContract, visibleCount, renderModeLabel }) {
   return (
     <div
@@ -1232,6 +1261,25 @@ function readWebGpuRuntimeProbe() {
   return normalizeWebGpuRuntimeProbe(
     new URLSearchParams(window.location.search).get("webgpu-probe"),
   );
+}
+
+function readWebGpuCapabilityProbeEnabled() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  const explicit = String(params.get("webgpu") ?? params.get("webgpu-capability") ?? "").toLowerCase();
+  if (["1", "true", "yes", "on", "probe", "force"].includes(explicit)) return true;
+  if (["0", "false", "no", "off", "skip"].includes(explicit)) return false;
+  return [
+    "webgpu-probe",
+    "webgpu-viewport-size",
+    "webgpu-footprint-scale",
+    "webgpu-covariance-max-anisotropy",
+    "webgpu-depth-bins",
+    "webgpu-depth-alpha-mode",
+    "webgpu-camera-mode",
+    "webgpu-color-mode",
+    "webgpu-alpha-presentation-floor",
+  ].some((key) => params.has(key));
 }
 
 function readWebGpuRuntimeViewportRequest() {

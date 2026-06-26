@@ -22,8 +22,12 @@ const assetId = options.assetId ?? "nerf-synthetic-lego";
 const dataParser = options.dataParser ?? "blender-data";
 const iterations = options.iterations ?? "100";
 const objectIterations = options.objectIterations ?? "80";
+const objectMinConfidence = options.objectMinConfidence;
+const unknownObjectId = options.unknownObjectId;
+const backgroundSlot = options.backgroundSlot;
+const backgroundWeight = options.backgroundWeight;
 const device = options.device ?? "cuda";
-const slots = options.slots ?? "8";
+const slots = slotsWithBackground(options.slots ?? "8", backgroundSlot);
 const samModelType = options.samModelType ?? "vit_b";
 const samMaxFrames = options.samMaxFrames ?? "2";
 const samMaxMasksPerFrame = options.samMaxMasksPerFrame ?? "8";
@@ -207,6 +211,10 @@ const steps = [
       objectIterations,
       "--learning-rate",
       "1.0",
+      ...optionalPair("--background-slot", backgroundSlot),
+      ...optionalPair("--background-weight", backgroundWeight),
+      ...optionalPair("--min-confidence", objectMinConfidence),
+      ...optionalPair("--unknown-object-id", unknownObjectId),
       "--colorize",
       "--summary-output",
       `${paths.objectFieldDir}/sam-mask-training-summary.json`,
@@ -315,6 +323,18 @@ function cudaEnv() {
 
 function optionalPair(flag, value) {
   return value === undefined || value === null ? [] : [flag, String(value)];
+}
+
+function slotsWithBackground(slotValue, backgroundSlotValue) {
+  if (backgroundSlotValue === undefined || backgroundSlotValue === null) {
+    return String(slotValue);
+  }
+  const slotCount = Number.parseInt(slotValue, 10);
+  const background = Number.parseInt(backgroundSlotValue, 10);
+  if (!Number.isFinite(slotCount) || !Number.isFinite(background)) {
+    return String(slotValue);
+  }
+  return String(Math.max(slotCount, background + 1));
 }
 
 function parseArgs(values) {

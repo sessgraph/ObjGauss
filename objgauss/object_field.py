@@ -43,8 +43,30 @@ class ObjectField:
     def probabilities(self) -> np.ndarray:
         return softmax(self.logits, axis=1)
 
-    def labels(self) -> np.ndarray:
-        return np.argmax(self.logits, axis=1).astype(np.int32, copy=False)
+    def labels(
+        self,
+        *,
+        min_confidence: float | None = None,
+        unknown_label: int | None = None,
+    ) -> np.ndarray:
+        labels = np.argmax(self.logits, axis=1).astype(np.int32, copy=False)
+        if min_confidence is None:
+            return labels
+
+        threshold = float(min_confidence)
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("min_confidence must be in [0, 1]")
+        unknown = self.slots if unknown_label is None else int(unknown_label)
+        if unknown < 0:
+            raise ValueError("unknown_label must be non-negative")
+        if unknown < self.slots:
+            raise ValueError("unknown_label must be >= slot count")
+
+        probabilities = self.probabilities()
+        confident = np.max(probabilities, axis=1) >= threshold
+        output = labels.copy()
+        output[~confident] = unknown
+        return output
 
 
 @dataclass(frozen=True)
@@ -196,15 +218,18 @@ def attach_hard_labels(
     field: ObjectField,
     *,
     object_id_field: str = "object_id",
+    min_confidence: float | None = None,
+    unknown_label: int | None = None,
 ) -> GaussianCloud:
     if cloud.count != field.gaussian_count:
         raise ValueError(
             f"field has {field.gaussian_count} gaussians for cloud with {cloud.count}"
         )
+    labels = field.labels(min_confidence=min_confidence, unknown_label=unknown_label)
     if object_id_field != "object_id":
-        vertices = _assign_custom_object_ids(cloud, field.labels(), object_id_field)
+        vertices = _assign_custom_object_ids(cloud, labels, object_id_field)
         return cloud.with_vertices(vertices)
-    return assign_object_ids(cloud, field.labels())
+    return assign_object_ids(cloud, labels)
 
 
 def object_field_metrics(

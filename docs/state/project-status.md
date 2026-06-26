@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-06-25
+> 最近更新: 2026-06-26
 
 ## 当前阶段
 
@@ -30,8 +30,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss filter`
   - `objgauss stats`
   - `objgauss assets list/pull`
-  - `objgauss masks from-nerf-alpha/from-nerf-rgba-colors/from-nerf-sam`
-  - `objgauss training register-output`
+  - `objgauss masks from-nerf-alpha/from-nerf-alpha-fgbg/from-nerf-rgba-colors/from-nerf-sam/validate`
+  - `objgauss training register-output/write-sample-bundle`
   - `objgauss demo v1-closure/verify-v1-closure/plush-semantic-closure/verify-plush-semantic-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
   - `objgauss object-field init/export/stats/emergence/emergence-curve/emergence-report/emergence-benchmark/inspect-nerf/vote-masks`
 - 前端:
@@ -168,10 +168,13 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - 可从现有 Gaussian PLY warm start，并导出 hard `object_id` PLY 复用前端。
   - 可检查 NeRF-style `transforms_*.json` 训练素材完整性。
   - 可从 NeRF Synthetic RGBA alpha 通道生成真实图片 mask manifest。
+  - 可从 NeRF Synthetic RGBA alpha 通道生成 foreground/background + ignore boundary mask manifest，并用 foreground/background confidence 调整训练监督权重；`masks validate` 可检查 image/mask shape、slot 连续性、overlap、空 mask、过大 mask 和 ignore mask。
   - 可从 NeRF Synthetic Lego RGBA 颜色生成多 slot 真实 2D mask manifest。
   - 可在本机提供 `segment-anything` 和 checkpoint 时生成 SAM automatic mask manifest，支持 JPEG 输入和 `--max-image-size` 资源安全降采样。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
   - 可通过 projection loss 更新 Object Field logits。
+  - 可在 hard `object_id` 导出、mask voting PLY 输出和训练输出登记时按 max-probability threshold 将低置信度 Gaussian 归入 background / unknown object，并在登记 manifest 记录该策略。
+  - `vote-masks` / `training register-output` 支持可选 background slot 训练：每帧投影可见但未命中任何前景 mask 的 Gaussian 会作为 background/unknown slot 的训练投票，而不是仅在导出阶段硬过滤。
   - 可输出 mask vote quality audit，检查监督覆盖率、每槽覆盖、冲突比例、target entropy 和观测权重。
   - 可输出 Object Emergence observability metrics，检查 assignment entropy、effective slots、空间紧致度、reference stability / ARI 和 partial OES。
   - 可输出 Object Emergence benchmark curves，跟踪 projection loss、entropy、effective slots、ARI、空间紧致度、mask-proxy occlusion delta 和 scale-aware CPU splat render occlusion delta 随 mask-vote training iteration 的变化。
@@ -184,6 +187,8 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
   - `objgauss training register-output` 可登记外部成熟 3DGS 训练器产出的 `.ply` / `.splat`。
   - 登记时可生成 viewer `.splat`、标准 Gaussian PLY、Object Field、mask 投票 summary 和 `object_id` PLY。
   - 带 mask 登记时，Object Field 初始场使用 Gaussian 几何 warm start，避免全零 logits 在稀疏 mask vote 下坍缩到少数对象槽。
+  - 带 mask 登记时可传 `--background-slot` / `--background-weight`，将 projected-unmatched Gaussian 作为背景槽监督写入 `training.background_training` 和顶层 manifest 证据；未显式给 `--slots` 时，`--background-slot` 可自动扩展 slot count。
+  - `objgauss training write-sample-bundle` 可写 `objgauss-sample-bundle-v1` 顶层 `sample.json`，把 dataset / transforms、mask manifest、training-output-manifest、Gaussian PLY、Object Field 和 slot 定义绑定，防止旧 Object Field 与新 PLY 混用。
   - 本机已验证 Nerfstudio Splatfacto 可读取 `nerf-synthetic-lego` 的 `blender-data` 格式，完成 100-step CUDA smoke 训练、导出 Gaussian PLY，并接入 Object Field / SAM mask voting。
   - `npm run train:splatfacto:smoke` 已固化为 TRAIN-003A smoke 生成入口，支持 `--dry-run`、`--status` 和 `--run`。
   - 本机已完成 NeRF Lego Splatfacto 500-step resource-safe candidate，导出 47168 个 Gaussian，并通过 `training register-output` 登记为本机 `NeRF Lego 训练输出样例` public sample；该产物在 ignored `outputs/` / `public/samples/`，不进入 git。
@@ -909,6 +914,9 @@ npm run acceptance:demo
 - Python 测试: 24 passed。
 - 前端构建: 通过。
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
+- OBJECT-FIELD-BG-TRAIN-001: Object Field mask voting 新增训练级 background slot 机制；`vote-masks` / `training register-output` 可把投影可见但未命中前景 mask 的 Gaussian 作为背景槽投票训练，并在 summary / manifest 记录 `background_training`。本地单元测试覆盖底层投票、CLI summary、登记 manifest 和 object-aware PLY 导出。
+- OBJECT-FIELD-BG-TRAIN-001 local Lego registration: 使用现有 168,653-Gaussian near-1M candidate PLY 重新登记 background slot 4，输出 ignored `outputs/assets/gaussians/nerf-lego-trained-near1m-sam8f-balanced03-slots4-bgslot4/object_aware_gaussians.ply` 和 public local copy `public/samples/nerf_lego_trained_near1m_bgslot4_objects.ply`；`slots=5`，`supervised_gaussians=118729`，`background_matched=496056`，projection loss `2.245413 -> 0.604945`，object counts `15810/9080/15376/25100/103287`。该结果证明背景槽已作为训练信号生效，但前景 slot 1/2/3 的 mask winners 仍少，不能单独证明对象语义已稳定分离。
+- SCENE-BUNDLE-001: 新增 scene/object bundle 训练数据层；`from-nerf-alpha-fgbg` 可生成 K=2 foreground/background + ignore alpha mask，并通过 `--background-confidence` / `--foreground-confidence` 把 full-frame background supervision 降权，避免无 depth/visibility occlusion 的投票路径被大背景面积压倒；`masks validate` 可做训练前一致性检查，`training write-sample-bundle` 可写顶层 `sample.json` 绑定 dataset、masks、Gaussian PLY、Object Field 和 slot 定义。当前推荐本机 ignored bundle 为 `outputs/samples/objgauss-lego-alpha-fgbg-bg005-v2/sample.json`；Lego alpha fgbg manifest 为 100 frames / 200 masks / foreground `843797` / background `61517043` / ignore `1639160`，validation passed，K=2 Object Field `supervised_gaussians=149892`，projection loss `1.264038 -> 0.497213`，object counts background/foreground=`133074/35579`，high-confidence export at `min_confidence=0.7` 为 background/foreground/unknown=`100730/16915/51008`。`background_confidence=0.02` 对照可把 foreground 扩到 `80071`，但更可能吸收背景 / 桌面；两组训练均为 CPU/Object Field 路径，本机 GPU 仍约 `596MiB` used / `15246MiB` free。该结果证明可追溯 bundle 和 alpha fgbg 训练目标跑通，但 `vote_conflict_fraction=0.430143` 仍高，不是 part-level 稳定分离结论；下一步优先 depth/visibility-aware voting、camera/PLY alignment、alpha threshold sensitivity 和 base splat quality。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
 - OBJFIELD-001: Plush PLY 可初始化 6-slot Object Field；NeRF Lego 检查 400 frames、缺图 0、无效 pose 0。
 - SEG-001 / OBJFIELD-002: synthetic projection mask vote 可训练 Object Field，并输出 `object_id` PLY。

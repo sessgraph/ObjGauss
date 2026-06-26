@@ -60,13 +60,17 @@ const cudaHome =
   (existsSync("/tmp/objgauss-cuda13") ? "/tmp/objgauss-cuda13" : undefined);
 const maxJobs = options.maxJobs ?? process.env.MAX_JOBS ?? "2";
 const device = options.device ?? "cuda";
-const slots = options.slots ?? "4";
 const samMaxFrames = options.samMaxFrames ?? "8";
 const samMaxMasksPerFrame = options.samMaxMasksPerFrame ?? "4";
 const samMinArea = options.samMinArea ?? "64";
 const samMaxAreaFraction = options.samMaxAreaFraction ?? "0.3";
 const samMaxImageSize = options.samMaxImageSize;
 const objectIterations = options.objectIterations ?? "160";
+const objectMinConfidence = options.objectMinConfidence;
+const unknownObjectId = options.unknownObjectId;
+const backgroundSlot = options.backgroundSlot;
+const backgroundWeight = options.backgroundWeight;
+const slots = slotsWithBackground(options.slots ?? "4", backgroundSlot);
 const curveIterations = options.curveIterations ?? "80";
 const evalEvery = options.evalEvery ?? "20";
 const renderSize = options.renderSize ?? "96";
@@ -145,6 +149,10 @@ const steps = [
       slots,
       "--object-iterations",
       objectIterations,
+      ...optionalPair("--background-slot", backgroundSlot),
+      ...optionalPair("--background-weight", backgroundWeight),
+      ...optionalPair("--object-min-confidence", objectMinConfidence),
+      ...optionalPair("--unknown-object-id", unknownObjectId),
       "--skip-benchmark",
       ...(options.skipPull ? ["--skip-pull", "true"] : []),
     ],
@@ -188,6 +196,10 @@ const steps = [
       renderSize,
       "--learning-rate",
       learningRate,
+      ...optionalPair("--background-slot", backgroundSlot),
+      ...optionalPair("--background-weight", backgroundWeight),
+      ...optionalPair("--object-min-confidence", objectMinConfidence),
+      ...optionalPair("--unknown-object-id", unknownObjectId),
       ...(publish ? ["--publish"] : []),
     ],
   },
@@ -836,6 +848,18 @@ function assertPlyScale(label, filePath, minGaussians) {
 
 function optionalPair(flag, value) {
   return value === undefined || value === null || value === "" ? [] : [flag, String(value)];
+}
+
+function slotsWithBackground(slotValue, backgroundSlotValue) {
+  if (backgroundSlotValue === undefined || backgroundSlotValue === null) {
+    return String(slotValue);
+  }
+  const slotCount = Number.parseInt(slotValue, 10);
+  const background = Number.parseInt(backgroundSlotValue, 10);
+  if (!Number.isFinite(slotCount) || !Number.isFinite(background)) {
+    return String(slotValue);
+  }
+  return String(Math.max(slotCount, background + 1));
 }
 
 function parseArgs(values) {

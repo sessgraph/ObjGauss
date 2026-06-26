@@ -15,9 +15,14 @@ from objgauss.mask_voting import (
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import initialize_object_field, object_field_label_delta, save_object_field
+from objgauss.object_field import (
+    attach_hard_labels,
+    initialize_object_field,
+    object_field_label_delta,
+    save_object_field,
+)
 from objgauss.ply import append_or_replace_property, read_ply, write_ply
-from objgauss.segment import apply_object_colors, assign_object_ids
+from objgauss.segment import apply_object_colors
 from objgauss.splat import read_splat, write_splat
 
 
@@ -33,6 +38,10 @@ class TrainingOutputRegistration:
     gaussian_count: int
     slots: int | None
     supervised_gaussians: int | None
+    unknown_object_id: int | None
+    unknown_gaussians: int | None
+    background_slot: int | None
+    background_matched: int | None
     initial_loss: float | None
     final_loss: float | None
 
@@ -50,11 +59,17 @@ def register_training_output(
     iterations: int = 100,
     learning_rate: float = 0.5,
     colorize: bool = True,
+    object_min_confidence: float | None = None,
+    unknown_object_id: int | None = None,
+    background_slot: int | None = None,
+    background_weight: float = 1.0,
 ) -> TrainingOutputRegistration:
     if not asset_id:
         raise ValueError("asset_id is required")
     if slots is not None and slots < 1:
         raise ValueError("slots must be >= 1")
+    if masks is None and background_slot is not None:
+        raise ValueError("background_slot requires masks")
     if iterations < 1:
         raise ValueError("iterations must be >= 1")
     if learning_rate <= 0:
@@ -77,16 +92,27 @@ def register_training_output(
     object_ply_path = None
     training = None
     field_delta = None
+    label_policy = None
+    unknown_gaussians = None
+    resolved_unknown_object_id = None
     inferred_slots = slots
     if masks is not None:
         masks = Path(masks)
         inferred_slots = slots or _slots_from_mask_manifest(masks)
+        if background_slot is not None and slots is None and background_slot >= inferred_slots:
+            inferred_slots = background_slot + 1
         init = initialize_object_field(cloud, slots=inferred_slots)
         field = init.field
         object_field_initial_path = output_dir / "object_field_initial.npz"
         object_field_path = output_dir / "object_field_trained.npz"
         save_object_field(object_field_initial_path, field)
-        votes = vote_masks_to_gaussians(cloud, masks, slots=inferred_slots)
+        votes = vote_masks_to_gaussians(
+            cloud,
+            masks,
+            slots=inferred_slots,
+            background_slot=background_slot,
+            background_weight=background_weight,
+        )
         training = train_object_field_from_votes(
             field,
             votes,
@@ -95,7 +121,27 @@ def register_training_output(
         )
         field_delta = object_field_label_delta(field, training.field)
         save_object_field(object_field_path, training.field)
-        labeled = assign_object_ids(cloud, training.field.labels())
+        labels = training.field.labels(
+            min_confidence=object_min_confidence,
+            unknown_label=unknown_object_id,
+        )
+        if object_min_confidence is not None:
+            resolved_unknown_object_id = (
+                training.field.slots if unknown_object_id is None else int(unknown_object_id)
+            )
+            unknown_gaussians = int(np.count_nonzero(labels == resolved_unknown_object_id))
+            label_policy = {
+                "type": "max_probability_unknown_threshold",
+                "min_confidence": float(object_min_confidence),
+                "unknown_object_id": resolved_unknown_object_id,
+                "unknown_gaussians": unknown_gaussians,
+            }
+        labeled = attach_hard_labels(
+            cloud,
+            training.field,
+            min_confidence=object_min_confidence,
+            unknown_label=unknown_object_id,
+        )
         if colorize:
             labeled = apply_object_colors(labeled)
         object_ply_path = output_dir / "object_aware_gaussians.ply"
@@ -138,6 +184,17 @@ def register_training_output(
         "initial_field": str(object_field_initial_path) if object_field_initial_path else None,
         "trained_field": str(object_field_path) if object_field_path else None,
         "object_ply": str(object_ply_path) if object_ply_path else None,
+        "object_label_policy": label_policy,
+        "background_training": (
+            {
+                "type": "projected_unmatched_mask_vote",
+                "slot": int(background_slot),
+                "weight": float(background_weight),
+                "matched": int(training.vote_summary.background_matched),
+            }
+            if training is not None and background_slot is not None
+            else None
+        ),
         "public_splat": str(public_splat_path) if public_splat_path else None,
         "public_object_ply": str(public_object_ply_path) if public_object_ply_path else None,
         "training": training_summary(training) if training is not None else None,
@@ -182,6 +239,14 @@ def register_training_output(
         gaussian_count=cloud.count,
         slots=inferred_slots,
         supervised_gaussians=training.supervised_gaussians if training else None,
+        unknown_object_id=resolved_unknown_object_id,
+        unknown_gaussians=unknown_gaussians,
+        background_slot=training.vote_summary.background_slot if training else None,
+        background_matched=(
+            training.vote_summary.background_matched
+            if training is not None and training.vote_summary.background_slot is not None
+            else None
+        ),
         initial_loss=training.initial_loss if training else None,
         final_loss=training.final_loss if training else None,
     )

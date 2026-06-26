@@ -21,19 +21,34 @@ class MaskVoteResult:
     frames: int
     projected: int
     matched: int
+    background_slot: int | None = None
+    background_weight: float | None = None
+    background_matched: int = 0
 
     @property
     def supervised_gaussians(self) -> int:
         return int(np.count_nonzero(self.observations > 0))
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "frames": self.frames,
             "projected": self.projected,
             "matched": self.matched,
             "supervised_gaussians": self.supervised_gaussians,
             "vote_quality": mask_vote_quality_audit(self),
         }
+        if self.background_slot is not None:
+            result["background_training"] = {
+                "type": "projected_unmatched_mask_vote",
+                "slot": int(self.background_slot),
+                "weight": float(self.background_weight or 0.0),
+                "matched": int(self.background_matched),
+                "matched_projected_fraction": _safe_fraction(
+                    int(self.background_matched),
+                    int(self.projected),
+                ),
+            }
+        return result
 
 
 @dataclass(frozen=True)
@@ -61,9 +76,16 @@ def vote_masks_to_gaussians(
     *,
     slots: int,
     max_frames: int | None = None,
+    background_slot: int | None = None,
+    background_weight: float = 1.0,
 ) -> MaskVoteResult:
     if slots < 1:
         raise ValueError("slots must be >= 1")
+    if background_slot is not None:
+        if background_slot < 0 or background_slot >= slots:
+            raise ValueError(f"background slot {background_slot} is outside [0, {slots})")
+        if background_weight <= 0:
+            raise ValueError("background_weight must be > 0")
     manifest_path = Path(manifest_path)
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     frames = payload.get("frames")
@@ -79,6 +101,7 @@ def vote_masks_to_gaussians(
     observations = np.zeros(cloud.count, dtype=np.float32)
     projected_total = 0
     matched_total = 0
+    background_matched_total = 0
     used_frames = 0
 
     for frame in frames[:max_frames]:
@@ -111,6 +134,8 @@ def vote_masks_to_gaussians(
             slot = _required_int(mask.get("slot"), "mask slot")
             if slot < 0 or slot >= slots:
                 raise ValueError(f"mask slot {slot} is outside [0, {slots})")
+            if background_slot is not None and slot == background_slot:
+                raise ValueError("background slot must not be used by foreground masks")
             confidence = float(mask.get("confidence", 1.0))
             if confidence <= 0:
                 continue
@@ -123,6 +148,12 @@ def vote_masks_to_gaussians(
             frame_matched |= selected
 
         matched_total += int(np.count_nonzero(frame_matched))
+        if background_slot is not None:
+            background_selected = projection.visible & ~frame_matched
+            if np.any(background_selected):
+                votes[background_selected, background_slot] += float(background_weight)
+                observations[background_selected] += float(background_weight)
+                background_matched_total += int(np.count_nonzero(background_selected))
         used_frames += 1
 
     return MaskVoteResult(
@@ -131,6 +162,9 @@ def vote_masks_to_gaussians(
         frames=used_frames,
         projected=projected_total,
         matched=matched_total,
+        background_slot=background_slot,
+        background_weight=float(background_weight) if background_slot is not None else None,
+        background_matched=background_matched_total,
     )
 
 

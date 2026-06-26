@@ -30,6 +30,12 @@ const SPARK_PICK_SCORE_MARGIN = 0.08;
 const SPARK_PICK_SUPPORT_SIGMA_PX = SPARK_PICK_MAX_RADIUS_PX * 0.45;
 const SPARK_PICK_HOVER_THROTTLE_MS = 80;
 const SPARK_PICK_HOVER_MIN_DELTA_PX = 4;
+const SPARK_WORKER_TERMINATE_MESSAGE = "Worker terminate";
+const SPARK_WORKER_TERMINATE_SUPPRESSION_MS = 1500;
+
+let sparkWorkerTerminateSuppressionUntil = 0;
+let sparkWorkerTerminateSuppressionTimer = null;
+let sparkWorkerTerminateSuppressionInstalled = false;
 
 export default function SplatViewport({
   source,
@@ -55,6 +61,7 @@ export default function SplatViewport({
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
+  const cameraFrameSourceKeyRef = useRef(null);
   const gridRef = useRef(null);
   const axesRef = useRef(null);
   const filteredSplatRef = useRef(null);
@@ -209,6 +216,7 @@ export default function SplatViewport({
 
     renderer.setAnimationLoop(() => {
       controls.update();
+      writeCameraTelemetry(container, camera, controls);
       renderer.render(scene, camera);
     });
 
@@ -216,7 +224,7 @@ export default function SplatViewport({
       renderer.setAnimationLoop(null);
       observer.disconnect();
       controls.dispose();
-      spark.dispose();
+      disposeSparkRenderer(spark);
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -252,7 +260,15 @@ export default function SplatViewport({
       .then(() => {
         if (disposed) return;
         setStatus("就绪");
-        frameSplat(splat, camera, controls, scene);
+        frameSplatForSource({
+          splat,
+          camera,
+          controls,
+          scene,
+          container: containerRef.current,
+          sourceKey,
+          frameRef: cameraFrameSourceKeyRef,
+        });
       })
       .catch((error) => {
         if (disposed) return;
@@ -315,7 +331,15 @@ export default function SplatViewport({
       .then(() => {
         if (disposed) return;
         setStatus("就绪");
-        frameSplat(splat, camera, controls, scene);
+        frameSplatForSource({
+          splat,
+          camera,
+          controls,
+          scene,
+          container: containerRef.current,
+          sourceKey,
+          frameRef: cameraFrameSourceKeyRef,
+        });
         updateNativePickStats({
           splat,
           points,
@@ -343,13 +367,10 @@ export default function SplatViewport({
   }, [
     filtered,
     nativePickProbeEnabled,
-    objectMaskFeathering,
     packedCache,
     points,
-    removedIds,
-    isolatedId,
+    sourceKey,
     useNativeSplatMask,
-    visibleIds,
   ]);
 
   useEffect(() => {
@@ -412,7 +433,15 @@ export default function SplatViewport({
           meshState,
           setPackedStats,
         });
-        frameSplat(splat, camera, controls, scene);
+        frameSplatForSource({
+          splat,
+          camera,
+          controls,
+          scene,
+          container: containerRef.current,
+          sourceKey,
+          frameRef: cameraFrameSourceKeyRef,
+        });
         updateNativePickStats({
           splat,
           points,
@@ -441,14 +470,10 @@ export default function SplatViewport({
   }, [
     nativeMaskCache,
     nativePickProbeEnabled,
-    objectMaskFeathering,
     points,
-    removedIds,
-    isolatedId,
     source,
     sourceKey,
     useNativeSplatMask,
-    visibleIds,
   ]);
 
   useEffect(() => {
@@ -483,7 +508,7 @@ export default function SplatViewport({
     splat.initialized
       .then(() => {
         setStatus("就绪");
-        frameSplat(splat, camera, controls, scene);
+        writeCameraTelemetry(containerRef.current, camera, controls);
         updateNativePickStats({
           splat,
           points,
@@ -539,7 +564,7 @@ export default function SplatViewport({
       .then(() => {
         const initializedSourceCount = splat.splats?.getNumSplats?.() ?? sourceCount;
         setStatus(initializedSourceCount === (points?.length ?? 0) ? "就绪" : "索引不匹配");
-        frameSplat(splat, camera, controls, scene);
+        writeCameraTelemetry(containerRef.current, camera, controls);
         updateNativePickStats({
           splat,
           points,
@@ -967,7 +992,62 @@ function disposeSplatMesh(splat, preservedPackedSplats) {
     splat.splats = undefined;
     splat.packedSplats = undefined;
   }
-  splat.dispose();
+  disposeSparkResource(() => splat.dispose());
+}
+
+function disposeSparkRenderer(spark) {
+  disposeSparkResource(() => spark.dispose());
+}
+
+function disposeSparkResource(dispose) {
+  beginSparkWorkerTerminateSuppression();
+  try {
+    dispose();
+  } catch (error) {
+    if (!isSparkWorkerTerminateError(error)) throw error;
+  } finally {
+    endSparkWorkerTerminateSuppressionSoon();
+  }
+}
+
+function beginSparkWorkerTerminateSuppression() {
+  if (typeof window === "undefined") return;
+  if (!sparkWorkerTerminateSuppressionInstalled) {
+    window.addEventListener("unhandledrejection", suppressSparkWorkerTerminateRejection);
+    sparkWorkerTerminateSuppressionInstalled = true;
+  }
+  sparkWorkerTerminateSuppressionUntil = Math.max(
+    sparkWorkerTerminateSuppressionUntil,
+    Date.now() + SPARK_WORKER_TERMINATE_SUPPRESSION_MS,
+  );
+}
+
+function endSparkWorkerTerminateSuppressionSoon() {
+  if (typeof window === "undefined" || !sparkWorkerTerminateSuppressionInstalled) return;
+  if (sparkWorkerTerminateSuppressionTimer !== null) {
+    window.clearTimeout(sparkWorkerTerminateSuppressionTimer);
+  }
+  sparkWorkerTerminateSuppressionTimer = window.setTimeout(() => {
+    if (Date.now() < sparkWorkerTerminateSuppressionUntil) {
+      endSparkWorkerTerminateSuppressionSoon();
+      return;
+    }
+    window.removeEventListener("unhandledrejection", suppressSparkWorkerTerminateRejection);
+    sparkWorkerTerminateSuppressionInstalled = false;
+    sparkWorkerTerminateSuppressionUntil = 0;
+    sparkWorkerTerminateSuppressionTimer = null;
+  }, SPARK_WORKER_TERMINATE_SUPPRESSION_MS);
+}
+
+function suppressSparkWorkerTerminateRejection(event) {
+  if (Date.now() > sparkWorkerTerminateSuppressionUntil) return;
+  if (isSparkWorkerTerminateError(event.reason)) {
+    event.preventDefault();
+  }
+}
+
+function isSparkWorkerTerminateError(error) {
+  return error instanceof Error && error.message === SPARK_WORKER_TERMINATE_MESSAGE;
 }
 
 function pointVisible(point, visibleIds, removedIds, isolatedId) {
@@ -1506,9 +1586,21 @@ function formatMillis(value) {
   return Number.isFinite(numeric) ? numeric.toFixed(3) : "0.000";
 }
 
+function frameSplatForSource({ splat, camera, controls, scene, container, sourceKey, frameRef }) {
+  const frameKey = sourceKey || "none";
+  if (frameRef?.current === frameKey) {
+    writeCameraTelemetry(container, camera, controls);
+    return;
+  }
+  if (frameSplat(splat, camera, controls, scene)) {
+    if (frameRef) frameRef.current = frameKey;
+  }
+  writeCameraTelemetry(container, camera, controls);
+}
+
 function frameSplat(splat, camera, controls, scene) {
   const box = splat.getBoundingBox(true);
-  if (!box || box.isEmpty()) return;
+  if (!box || box.isEmpty()) return false;
 
   const center = new THREE.Vector3();
   const size = new THREE.Vector3();
@@ -1527,4 +1619,26 @@ function frameSplat(splat, camera, controls, scene) {
   }
   controls.target.copy(center);
   controls.update();
+  return true;
+}
+
+function writeCameraTelemetry(container, camera, controls) {
+  if (!container || !camera || !controls) return;
+  const target = controls.target ?? new THREE.Vector3();
+  const distance = camera.position.distanceTo(target);
+  container.dataset.sparkCameraPosition = vectorToDataset(camera.position);
+  container.dataset.sparkCameraTarget = vectorToDataset(target);
+  container.dataset.sparkCameraDistance = formatCameraMetric(distance);
+}
+
+function vectorToDataset(vector) {
+  return [
+    formatCameraMetric(vector.x),
+    formatCameraMetric(vector.y),
+    formatCameraMetric(vector.z),
+  ].join(",");
+}
+
+function formatCameraMetric(value) {
+  return Number.isFinite(value) ? Number(value).toFixed(6) : "0.000000";
 }

@@ -22,6 +22,18 @@ class MaskManifestResult:
 
 
 @dataclass(frozen=True)
+class AlphaFgBgMaskManifestResult:
+    manifest_path: Path
+    frames: int
+    masks: int
+    width: int
+    height: int
+    foreground_pixels: int
+    background_pixels: int
+    ignore_pixels: int
+
+
+@dataclass(frozen=True)
 class ColorMaskManifestResult:
     manifest_path: Path
     frames: int
@@ -52,6 +64,30 @@ class MaskManifestSplitResult:
     heldout_frames: int
     train_masks: int
     heldout_masks: int
+
+
+@dataclass(frozen=True)
+class MaskManifestValidationResult:
+    manifest_path: Path
+    passed: bool
+    frames: int
+    masks: int
+    slots: tuple[int, ...]
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+    frame_stats: tuple[dict[str, Any], ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "manifest": str(self.manifest_path),
+            "passed": self.passed,
+            "frames": self.frames,
+            "masks": self.masks,
+            "slots": list(self.slots),
+            "errors": list(self.errors),
+            "warnings": list(self.warnings),
+            "frame_stats": list(self.frame_stats),
+        }
 
 
 LEGO_COLOR_SLOTS = (
@@ -216,6 +252,178 @@ def build_nerf_alpha_mask_manifest(
         width=width,
         height=height,
         foreground_pixels=foreground_pixels,
+    )
+
+
+def build_nerf_alpha_fgbg_mask_manifest(
+    dataset: str | Path,
+    *,
+    output: str | Path,
+    split: str = "train",
+    max_frames: int | None = None,
+    foreground_threshold: int = 200,
+    background_threshold: int = 20,
+    foreground_slot: int = 1,
+    background_slot: int = 0,
+    foreground_confidence: float = 1.0,
+    background_confidence: float = 0.05,
+) -> AlphaFgBgMaskManifestResult:
+    if not 0 <= background_slot:
+        raise ValueError("background_slot must be >= 0")
+    if not 0 <= foreground_slot:
+        raise ValueError("foreground_slot must be >= 0")
+    if background_slot == foreground_slot:
+        raise ValueError("background_slot and foreground_slot must be different")
+    if not 0 <= background_threshold < foreground_threshold <= 255:
+        raise ValueError("thresholds must satisfy 0 <= background < foreground <= 255")
+    if foreground_confidence <= 0:
+        raise ValueError("foreground_confidence must be > 0")
+    if background_confidence <= 0:
+        raise ValueError("background_confidence must be > 0")
+    if max_frames is not None and max_frames < 1:
+        raise ValueError("max_frames must be >= 1")
+
+    dataset = Path(dataset)
+    output = Path(output)
+    transforms_path = dataset / f"transforms_{split}.json"
+    if not transforms_path.exists():
+        raise ValueError(f"missing NeRF transforms file: {transforms_path}")
+    payload = json.loads(transforms_path.read_text(encoding="utf-8"))
+    camera_angle_x = payload.get("camera_angle_x")
+    frames = payload.get("frames")
+    if not isinstance(frames, list) or not frames:
+        raise ValueError(f"{transforms_path} must contain a non-empty frames list")
+    if camera_angle_x is None:
+        raise ValueError(f"{transforms_path} is missing camera_angle_x")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    masks_dir = output.parent / "masks"
+    masks_dir.mkdir(parents=True, exist_ok=True)
+    manifest_frames: list[dict[str, Any]] = []
+    width = 0
+    height = 0
+    foreground_pixels = 0
+    background_pixels = 0
+    ignore_pixels = 0
+    mask_count = 0
+
+    for frame_index, frame in enumerate(frames[:max_frames]):
+        if not isinstance(frame, dict):
+            raise ValueError("NeRF frame entries must be objects")
+        image_path = resolve_nerf_image(dataset, frame.get("file_path"))
+        alpha = read_png_alpha(image_path)
+        if width == 0:
+            height, width = alpha.shape
+        elif alpha.shape != (height, width):
+            raise ValueError(f"{image_path} shape {alpha.shape} does not match {height}x{width}")
+
+        foreground = alpha > foreground_threshold
+        background = alpha < background_threshold
+        ignore = ~(foreground | background)
+        foreground_count = int(np.count_nonzero(foreground))
+        background_count = int(np.count_nonzero(background))
+        ignore_count = int(np.count_nonzero(ignore))
+        foreground_pixels += foreground_count
+        background_pixels += background_count
+        ignore_pixels += ignore_count
+
+        background_path = masks_dir / f"{split}_{frame_index:04d}_slot_{background_slot:02d}.npy"
+        foreground_path = masks_dir / f"{split}_{frame_index:04d}_slot_{foreground_slot:02d}.npy"
+        ignore_path = masks_dir / f"{split}_{frame_index:04d}_ignore.npy"
+        np.save(background_path, background)
+        np.save(foreground_path, foreground)
+        np.save(ignore_path, ignore)
+        mask_count += 2
+
+        manifest_frames.append(
+            {
+                "name": f"{split}-{frame_index:04d}",
+                "frame_index": frame_index,
+                "image_path": str(image_path.relative_to(dataset)),
+                "transform_frame_path": str(frame.get("file_path")),
+                "transform_matrix": frame.get("transform_matrix"),
+                "width": width,
+                "height": height,
+                "ignore_mask_path": str(ignore_path.relative_to(output.parent)),
+                "ignore_pixels": ignore_count,
+                "masks": [
+                    {
+                        "slot": background_slot,
+                        "slot_id": background_slot,
+                        "label": "background",
+                        "name": "background",
+                        "type": "background",
+                        "mask_path": str(background_path.relative_to(output.parent)),
+                        "source": "alpha",
+                        "polarity": "background",
+                        "confidence": float(background_confidence),
+                        "area": background_count,
+                    },
+                    {
+                        "slot": foreground_slot,
+                        "slot_id": foreground_slot,
+                        "label": "foreground",
+                        "name": "foreground",
+                        "type": "foreground",
+                        "mask_path": str(foreground_path.relative_to(output.parent)),
+                        "source": "alpha",
+                        "polarity": "foreground",
+                        "confidence": float(foreground_confidence),
+                        "area": foreground_count,
+                    },
+                ],
+            }
+        )
+
+    slots = sorted(
+        [
+            {
+                "slot": int(background_slot),
+                "slot_id": int(background_slot),
+                "name": "background",
+                "label": "background",
+                "type": "background",
+            },
+            {
+                "slot": int(foreground_slot),
+                "slot_id": int(foreground_slot),
+                "name": "foreground",
+                "label": "foreground",
+                "type": "foreground",
+            },
+        ],
+        key=lambda item: int(item["slot"]),
+    )
+    manifest = {
+        "width": width,
+        "height": height,
+        "image_width": width,
+        "image_height": height,
+        "camera_angle_x": float(camera_angle_x),
+        "source": str(dataset),
+        "source_type": "nerf-alpha-fgbg",
+        "split": split,
+        "slot_count": len(slots),
+        "slots": slots,
+        "alpha_thresholds": {
+            "foreground_gt": int(foreground_threshold),
+            "background_lt": int(background_threshold),
+            "ignore": f"{background_threshold} <= alpha <= {foreground_threshold}",
+            "foreground_confidence": float(foreground_confidence),
+            "background_confidence": float(background_confidence),
+        },
+        "frames": manifest_frames,
+    }
+    output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return AlphaFgBgMaskManifestResult(
+        manifest_path=output,
+        frames=len(manifest_frames),
+        masks=mask_count,
+        width=width,
+        height=height,
+        foreground_pixels=foreground_pixels,
+        background_pixels=background_pixels,
+        ignore_pixels=ignore_pixels,
     )
 
 
@@ -466,6 +674,174 @@ def build_nerf_sam_mask_manifest(
     )
 
 
+def validate_mask_manifest(
+    manifest_path: str | Path,
+    *,
+    dataset: str | Path | None = None,
+    max_overlap_fraction: float = 0.0,
+    max_mask_area_fraction: float = 0.98,
+    allow_empty: bool = False,
+) -> MaskManifestValidationResult:
+    if max_overlap_fraction < 0:
+        raise ValueError("max_overlap_fraction must be >= 0")
+    if not 0.0 < max_mask_area_fraction <= 1.0:
+        raise ValueError("max_mask_area_fraction must be in (0, 1]")
+
+    manifest_path = Path(manifest_path)
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    root = manifest_path.parent
+    source_root = _mask_manifest_source_root(payload, dataset)
+    width = _optional_int(payload.get("width") or payload.get("image_width"))
+    height = _optional_int(payload.get("height") or payload.get("image_height"))
+    frames = payload.get("frames")
+    errors: list[str] = []
+    warnings: list[str] = []
+    frame_stats: list[dict[str, Any]] = []
+    observed_slots: set[int] = set()
+    total_masks = 0
+
+    if not isinstance(frames, list) or not frames:
+        errors.append("mask manifest must contain a non-empty frames list")
+        frames = []
+
+    for frame_index, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            errors.append(f"frame {frame_index} is not an object")
+            continue
+        frame_width = _optional_int(frame.get("width")) or width
+        frame_height = _optional_int(frame.get("height")) or height
+        image_path = frame.get("image_path")
+        if source_root is not None and isinstance(image_path, str) and image_path:
+            image_file = source_root / image_path
+            if not image_file.exists():
+                errors.append(f"frame {frame_index} image is missing: {image_file}")
+            else:
+                try:
+                    image = read_image_rgba(image_file)
+                    image_height, image_width = image.shape[:2]
+                    if frame_width is not None and frame_height is not None:
+                        if (image_height, image_width) != (frame_height, frame_width):
+                            errors.append(
+                                f"frame {frame_index} image shape {image_height}x{image_width} "
+                                f"does not match {frame_height}x{frame_width}"
+                            )
+                except Exception as exc:
+                    errors.append(f"frame {frame_index} image could not be read: {exc}")
+        elif source_root is not None:
+            warnings.append(f"frame {frame_index} does not declare image_path")
+
+        masks = frame.get("masks")
+        if not isinstance(masks, list) or not masks:
+            errors.append(f"frame {frame_index} has no masks")
+            continue
+        mask_arrays: list[np.ndarray] = []
+        mask_stats: list[dict[str, Any]] = []
+        for mask_index, mask in enumerate(masks):
+            total_masks += 1
+            if not isinstance(mask, dict):
+                errors.append(f"frame {frame_index} mask {mask_index} is not an object")
+                continue
+            slot = mask.get("slot", mask.get("slot_id"))
+            try:
+                slot_id = int(slot)
+                observed_slots.add(slot_id)
+            except Exception:
+                errors.append(f"frame {frame_index} mask {mask_index} has invalid slot")
+                slot_id = -1
+            mask_path = mask.get("mask_path")
+            if not isinstance(mask_path, str) or not mask_path:
+                errors.append(f"frame {frame_index} mask {mask_index} is missing mask_path")
+                continue
+            path = root / mask_path
+            if not path.exists():
+                errors.append(f"frame {frame_index} mask {mask_index} is missing: {path}")
+                continue
+            try:
+                mask_array = _load_boolean_mask(path)
+            except Exception as exc:
+                errors.append(f"frame {frame_index} mask {mask_index} invalid array: {exc}")
+                continue
+            if frame_width is not None and frame_height is not None:
+                if mask_array.shape != (frame_height, frame_width):
+                    errors.append(
+                        f"frame {frame_index} mask {mask_index} shape {mask_array.shape} "
+                        f"does not match {frame_height}x{frame_width}"
+                    )
+            area = int(np.count_nonzero(mask_array))
+            total_pixels = int(mask_array.size)
+            if area == 0 and not allow_empty:
+                errors.append(f"frame {frame_index} slot {slot_id} mask is empty")
+            if area > total_pixels * max_mask_area_fraction:
+                errors.append(
+                    f"frame {frame_index} slot {slot_id} mask covers {area / total_pixels:.6f}, "
+                    f"max allowed is {max_mask_area_fraction:.6f}"
+                )
+            mask_arrays.append(mask_array)
+            mask_stats.append(
+                {
+                    "slot": int(slot_id),
+                    "pixels": area,
+                    "fraction": 0.0 if total_pixels == 0 else float(area / total_pixels),
+                }
+            )
+
+        overlap_pixels = 0
+        overlap_fraction = 0.0
+        if mask_arrays:
+            stacked = np.stack(mask_arrays, axis=0)
+            overlap_pixels = int(np.count_nonzero(stacked.sum(axis=0) > 1))
+            overlap_fraction = float(overlap_pixels / stacked.shape[1] / stacked.shape[2])
+            if overlap_fraction > max_overlap_fraction:
+                errors.append(
+                    f"frame {frame_index} overlap_fraction={overlap_fraction:.6f} "
+                    f"exceeds {max_overlap_fraction:.6f}"
+                )
+
+        ignore_pixels = None
+        ignore_mask_path = frame.get("ignore_mask_path")
+        if isinstance(ignore_mask_path, str) and ignore_mask_path:
+            try:
+                ignore = _load_boolean_mask(root / ignore_mask_path)
+                ignore_pixels = int(np.count_nonzero(ignore))
+                if frame_width is not None and frame_height is not None:
+                    if ignore.shape != (frame_height, frame_width):
+                        errors.append(
+                            f"frame {frame_index} ignore mask shape {ignore.shape} "
+                            f"does not match {frame_height}x{frame_width}"
+                        )
+            except Exception as exc:
+                errors.append(f"frame {frame_index} ignore mask invalid array: {exc}")
+
+        frame_stats.append(
+            {
+                "frame_index": int(frame.get("frame_index", frame_index)),
+                "masks": mask_stats,
+                "overlap_pixels": overlap_pixels,
+                "overlap_fraction": overlap_fraction,
+                "ignore_pixels": ignore_pixels,
+            }
+        )
+
+    observed_slots.update(_slots_from_manifest_slots(payload.get("slots")))
+    if observed_slots:
+        expected = set(range(max(observed_slots) + 1))
+        if observed_slots != expected:
+            errors.append(
+                f"slot ids must be contiguous from 0; observed={sorted(observed_slots)}"
+            )
+
+    return MaskManifestValidationResult(
+        manifest_path=manifest_path,
+        passed=not errors,
+        frames=len(frames),
+        masks=total_masks,
+        slots=tuple(sorted(observed_slots)),
+        errors=tuple(errors),
+        warnings=tuple(warnings),
+        frame_stats=tuple(frame_stats),
+    )
+
+
 def read_png_alpha(path: str | Path) -> np.ndarray:
     return read_png_rgba(path)[:, :, 3]
 
@@ -653,6 +1029,48 @@ def _count_manifest_masks(frames: list[dict[str, Any]]) -> int:
 def _write_manifest_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _mask_manifest_source_root(
+    payload: dict[str, Any],
+    dataset: str | Path | None,
+) -> Path | None:
+    if dataset is not None:
+        return Path(dataset)
+    source = payload.get("source")
+    if isinstance(source, str) and source:
+        return Path(source)
+    return None
+
+
+def _load_boolean_mask(path: Path) -> np.ndarray:
+    array = np.load(path)
+    if array.ndim != 2:
+        raise ValueError(f"{path} must be a 2D mask array")
+    if array.dtype == np.bool_:
+        return array.astype(bool, copy=False)
+    unique = np.unique(array)
+    if not np.all(np.isin(unique, [0, 1])):
+        raise ValueError(f"{path} must be bool or contain only 0/1 values")
+    return array.astype(bool, copy=False)
+
+
+def _slots_from_manifest_slots(value: object) -> set[int]:
+    slots: set[int] = set()
+    if not isinstance(value, list):
+        return slots
+    for slot in value:
+        if not isinstance(slot, dict):
+            continue
+        raw = slot.get("slot", slot.get("slot_id"))
+        if raw is None:
+            continue
+        slots.add(int(raw))
+    return slots
+
+
+def _optional_int(value: object) -> int | None:
+    return None if value is None else int(value)
 
 
 def _create_sam_generator(
