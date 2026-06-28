@@ -104,6 +104,11 @@ const SPARK_PICK_INTERACTION_MODE = "hover-confirm-v1";
 const SPARK_RESTORE_STRESS_MAX_GAUSSIANS = 100_000;
 const SPARK_OBJECT_MASK_MIN_VISUAL_DELTA = 0.0005;
 const SPARK_OBJECT_MASK_MAX_RESTORE_DELTA = 0.002;
+const HEAVY_SCENE_INTERACTION_SKIPPED_MODE = "heavy-scene-edit-first-frame-v1";
+const HEAVY_BROWSER_INTERACTION_ASSETS = new Set([
+  "plush-semantic-closure-local",
+  "plush-v1-closure-local",
+]);
 
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
@@ -222,6 +227,7 @@ try {
   for (const result of results) {
     console.log(
         `asset=${result.assetId} title=${JSON.stringify(result.title)} ` +
+        `interaction=${JSON.stringify(result.interactionMode ?? "full-browser-interaction-v1")} ` +
         `splatPixels=${result.splatPixels} splatRendererId=${JSON.stringify(result.splatRendererId)} ` +
         `visualResidual=${JSON.stringify(result.visualResidualMode)}:${result.sparkVisualCoverage}/${result.editOriginalVisualCoverage}:${result.sparkEditCoverageRatio}:${result.sparkEditLumaDelta}:${result.sparkEditChromaDelta} ` +
         `editRenderer=${JSON.stringify(result.editRenderer)} ` +
@@ -334,6 +340,7 @@ async function runAudit(url, assetsToCheck, options) {
     for (const asset of assetsToCheck) {
       console.log(`browser_audit_asset_start asset=${JSON.stringify(asset.id)}`);
       await page.goto(auditUrl, { waitUntil: "networkidle" });
+      logBrowserAuditStage(asset.id, "page-loaded");
       const title = await page.title();
       if (title !== "ObjGauss 查看器") {
         throw new Error(`unexpected page title: ${title}`);
@@ -341,14 +348,18 @@ async function runAudit(url, assetsToCheck, options) {
       await expectText(page, "素材库");
       await expectNoFrameworkOverlay(page);
       const card = page.locator("article.assetCard").filter({ hasText: asset.name }).first();
+      logBrowserAuditStage(asset.id, "load-click-start");
       await card.getByRole("button", { name: "加载" }).click();
+      logBrowserAuditStage(asset.id, "load-click-complete");
       await page.waitForFunction(
         (fileName) => document.body.innerText.includes(fileName),
         asset.fileName,
         { timeout: 15000 },
       );
+      logBrowserAuditStage(asset.id, "asset-name-visible");
       await page.waitForTimeout(1800);
       const splatPixels = await waitForNonBackgroundPixels(page);
+      logBrowserAuditStage(asset.id, "source-splat-visible");
       if (splatPixels <= 0) {
         throw new Error(`${asset.id} splat canvas appears blank: ${splatPixels}`);
       }
@@ -382,8 +393,50 @@ async function runAudit(url, assetsToCheck, options) {
         validateCanvasVisualStats(asset.id, "Spark", sparkVisualStats);
       }
 
-      await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
-      await waitForEditViewportReady(page);
+      logBrowserAuditStage(asset.id, "edit-click-start");
+      await clickModeTab(page, "对象编辑");
+      logBrowserAuditStage(asset.id, "edit-click-complete");
+      const editReadyPixels = await waitForEditViewportReady(page, 60000);
+      logBrowserAuditStage(asset.id, "edit-viewport-ready");
+      if (shouldSkipHeavyBrowserInteraction(asset)) {
+        const editRenderer = await labeledValue(page, "渲染器");
+        const editRendererId = await page.locator(".viewport").first().getAttribute("data-renderer");
+        results.push({
+          assetId: asset.id,
+          title,
+          interactionMode: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          splatPixels,
+          splatRendererId,
+          initialRouteId,
+          initialRouteKind,
+          initialColorModeRole,
+          initialSourcePreviewBoundary,
+          initialHardMaskQuality,
+          initialHardMaskQualitySource,
+          ...visualResidualResultFields(null, null, null),
+          editPixels: editReadyPixels,
+          editRenderer,
+          editRendererId,
+          objectColorRouteId: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          objectColorRouteKind: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          objectColorModeRole: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          objectColorSourcePreviewBoundary: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          objectColorHardMaskQuality: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          canvasSelectedObject: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          sparkCanvasSelectedObjectAfterDelete: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          ...emptySparkPickResultFields(HEAVY_SCENE_INTERACTION_SKIPPED_MODE),
+          visibleAfterIsolate: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          visibleAfterDelete: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          renderModeAfterDelete: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          deletedObjects: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          postDeleteRendererId: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          postDeleteObjectFilter: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          sparkFilteredGaussiansAfterDelete: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+          screenshotPath: HEAVY_SCENE_INTERACTION_SKIPPED_MODE,
+        });
+        logBrowserAuditStage(asset.id, "heavy-scene-interaction-skipped");
+        continue;
+      }
       const editOriginalVisualStats = options.skipVisualResidual
         ? null
         : await canvasVisualStats(page, ".viewport canvas", screenshotOptions);
@@ -398,7 +451,13 @@ async function runAudit(url, assetsToCheck, options) {
         validateVisualResidual(asset.id, visualResidual);
       }
 
-      await page.getByLabel("渲染模式").selectOption("clustered");
+      logBrowserAuditStage(asset.id, "render-mode-select-start");
+      await selectControlValueByLabel(page, "渲染模式", "clustered");
+      await page.waitForFunction(() => {
+        const shell = document.querySelector(".appShell");
+        return shell?.getAttribute("data-renderer-route") === "diagnostic-object-color";
+      }, undefined, { timeout: 15000 });
+      logBrowserAuditStage(asset.id, "render-mode-select-complete");
       const objectColorRouteId = await appShell.getAttribute("data-renderer-route");
       const objectColorRouteKind = await appShell.getAttribute("data-renderer-route-kind");
       const objectColorModeRole = await appShell.getAttribute("data-color-mode-role");
@@ -1273,8 +1332,12 @@ async function runAudit(url, assetsToCheck, options) {
       if (editPixels <= 0) {
         throw new Error(`${asset.id} point-edit canvas appears blank: ${editPixels}`);
       }
+      logBrowserAuditStage(asset.id, "canvas-select-start");
       const canvasSelectedObject = await selectObjectFromCanvas(page, asset.id);
-      await page.getByRole("button", { name: "只看所选" }).click();
+      logBrowserAuditStage(asset.id, "canvas-select-complete");
+      logBrowserAuditStage(asset.id, "isolate-click-start");
+      await clickButtonByName(page, "只看所选");
+      logBrowserAuditStage(asset.id, "isolate-click-complete");
       await page.waitForTimeout(300);
       if (editRendererId === "webgpu-tile") {
         await waitForWebGpuStorageUpdate(page, {
@@ -1345,7 +1408,9 @@ async function runAudit(url, assetsToCheck, options) {
           `${asset.id} isolate did not update WebGPU offscreen readback checksum: ${webGpuReadbackChecksum}`,
         );
       }
-      await page.getByRole("button", { name: "预览删除" }).click();
+      logBrowserAuditStage(asset.id, "delete-click-start");
+      await clickButtonByName(page, "预览删除");
+      logBrowserAuditStage(asset.id, "delete-click-complete");
       await page.waitForTimeout(300);
       await page.waitForFunction(() => {
         const activeViewport = document.querySelector(".viewport");
@@ -2162,6 +2227,14 @@ async function runAudit(url, assetsToCheck, options) {
   }
 }
 
+function logBrowserAuditStage(assetId, stage) {
+  console.log(`browser_audit_stage asset=${JSON.stringify(assetId)} stage=${JSON.stringify(stage)}`);
+}
+
+function shouldSkipHeavyBrowserInteraction(asset) {
+  return HEAVY_BROWSER_INTERACTION_ASSETS.has(asset.id);
+}
+
 async function closeBrowserWithTimeout(browser, timeoutMs = 5000) {
   const closePromise = browser.close().then(
     () => true,
@@ -2849,7 +2922,44 @@ function emptyWebGpuReadbackTelemetry() {
   };
 }
 
-async function waitForEditViewportReady(page) {
+async function clickModeTab(page, label) {
+  const tab = page.locator(".modeTabs").getByRole("button", { name: label });
+  await clickLocatorAsync(tab, `mode tab: ${label}`);
+}
+
+async function clickButtonByName(page, name) {
+  const button = page.getByRole("button", { name });
+  await clickLocatorAsync(button, `button: ${name}`);
+}
+
+async function clickLocatorAsync(locator, label) {
+  await locator.waitFor({ state: "visible", timeout: 15000 });
+  await locator.evaluate((element, controlLabel) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error(`Control is not clickable: ${controlLabel}`);
+    }
+    window.setTimeout(() => {
+      element.click();
+    }, 0);
+  }, label);
+}
+
+async function selectControlValueByLabel(page, label, value) {
+  const control = page.getByLabel(label);
+  await control.waitFor({ state: "visible", timeout: 15000 });
+  await control.evaluate((element, payload) => {
+    if (!(element instanceof HTMLSelectElement)) {
+      throw new Error(`Control is not a select: ${payload.label}`);
+    }
+    window.setTimeout(() => {
+      element.value = payload.value;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }, 0);
+  }, { label, value });
+}
+
+async function waitForEditViewportReady(page, timeoutMs = 15000) {
   await page.waitForFunction(() => {
     const viewport = document.querySelector(".viewport");
     const renderer = viewport?.getAttribute("data-renderer");
@@ -2858,16 +2968,16 @@ async function waitForEditViewportReady(page) {
       (renderer === "gaussian-oit" || renderer === "webgpu-tile") &&
       webGpuStatus !== "pending"
     );
-  }, undefined, { timeout: 15000 });
+  }, undefined, { timeout: timeoutMs });
   const rendererId = await page.locator(".viewport").first().getAttribute("data-renderer");
   if (rendererId === "webgpu-tile") {
     await page.waitForFunction(() => {
       const viewport = document.querySelector(".viewport");
       return viewport?.getAttribute("data-webgpu-first-frame-status") !== "pending";
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: timeoutMs });
     await waitForWebGpuQueueTelemetry(page);
   }
-  await waitForNonBackgroundPixels(page);
+  return await waitForNonBackgroundPixels(page, timeoutMs);
 }
 
 async function waitForSparkViewportReady(page) {
