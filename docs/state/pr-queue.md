@@ -116,7 +116,7 @@
   - Dataset object-aware PLY: `1,148,428,347` bytes，LFS sha256 `b8a1f2d5c40c8cb5bfb1476565529aa31de018c1884ef0f58706fba4f3e0aecf`。
   - Model head / upload commit: `82b700392699852c62dca70ac4274dc722d82282`。
   - Model checkpoint: `3,200,373,037` bytes，LFS sha256 `f3558aadfb1d8d546232eb0f7e55e823a50a0011abcaf360879e5e91d84d36ce`。
-- 完成 commit: `98c9ce2bfacb594cd74e8482b65f9408b15cc707`
+- 完成 commit: `232e11e4648c2c7c190865bd3e1aaaee40cb639d`
 - 验证:
   - `uvx --with socksio hf auth whoami`: `user=jianyong365`。
   - Hugging Face API `repo_info(..., files_metadata=True)`: expected large files present with matching size / LFS sha256。
