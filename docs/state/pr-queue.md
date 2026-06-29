@@ -105,7 +105,7 @@
 - 负向证据 / 边界:
   - Full `4,503,634`-Gaussian PLY 直接 runtime audit 未通过，min approx FPS=`4.412`。
   - 因此本 PR 关闭的是 sampled1m terminal proof，不把 HF 全量 PLY 标记为 production-interactive。
-- 完成 commit: `待回填`
+- 完成 commit: `9da28e702446bb42556c1fbae7d70c862c4c01a8`
 - 验证:
   - `node --check scripts/audit-demo.mjs`: passed。
   - `node --check scripts/audit-webgpu-presentation-transition.mjs`: passed。
