@@ -4,6 +4,7 @@ import {
   Eye,
   EyeOff,
   FileUp,
+  Filter,
   Layers3,
   LoaderCircle,
   RefreshCw,
@@ -42,6 +43,12 @@ import {
 
 const FEATURED_ASSETS = featuredAssets();
 const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
+const ASSET_FILTERS = [
+  { id: "all", label: "全部" },
+  { id: "trained", label: "训练模型" },
+  { id: "near1m", label: "near-1M" },
+  { id: "commercial", label: "商用" },
+];
 const BENCHMARK_GATES = [
   { label: "Smoke", value: "pass" },
   { label: "Candidate", value: "pass" },
@@ -128,6 +135,7 @@ export default function App() {
   const initialAssetLoaded = useRef(false);
   const [viewMode, setViewMode] = useState("edit");
   const [sideTab, setSideTab] = useState("samples");
+  const [assetFilter, setAssetFilter] = useState(readInitialAssetFilter);
   const [renderMode, setRenderMode] = useState("original");
   const [pointSize, setPointSize] = useState(0.018);
   const [showGrid, setShowGrid] = useState(true);
@@ -142,6 +150,7 @@ export default function App() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [objectPlyLoad, setObjectPlyLoad] = useState(() => objectPlyLoadState());
   const webGpuCapabilityProbeEnabled = useMemo(readWebGpuCapabilityProbeEnabled, []);
 
   useEffect(() => {
@@ -161,6 +170,11 @@ export default function App() {
   }, [webGpuCapabilityProbeEnabled]);
 
   const summary = useMemo(() => summarize(scene.points), [scene.points]);
+  const assetFilterCounts = useMemo(() => assetCountsByFilter(FEATURED_ASSETS), []);
+  const filteredAssets = useMemo(
+    () => filterAssets(FEATURED_ASSETS, assetFilter),
+    [assetFilter],
+  );
   const renderModeText = renderModeLabel(renderMode);
   const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
   const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
@@ -390,6 +404,7 @@ export default function App() {
       if (!uploadedPlySplatSourceEnabled) {
         next.splatSource = null;
       }
+      setObjectPlyLoad(objectPlyLoadState({ state: "uploaded", mode: "file-upload", path: file.name }));
       applyScene(next);
     } catch (loadError) {
       setError(loadError.message || "PLY 加载失败");
@@ -402,6 +417,15 @@ export default function App() {
     if (!asset?.localPath) return;
     setBusy(true);
     setError("");
+    setObjectPlyLoad(
+      objectPlyLoadState({
+        assetId: asset.id,
+        state: asset.deferObjectPly && !options.forceObjectPly ? "deferred" : "loading",
+        mode: asset.deferObjectPly && !options.forceObjectPly ? "quick-view" : "object-ply",
+        path: asset.localPath,
+        splatPath: asset.splatPath,
+      }),
+    );
     try {
       if (asset.deferObjectPly && asset.splatPath && !options.forceObjectPly) {
         applyScene(
@@ -438,8 +462,26 @@ export default function App() {
           fileName: asset.splatFileName ?? asset.fileName ?? asset.name,
         },
       });
+      setObjectPlyLoad(
+        objectPlyLoadState({
+          assetId: asset.id,
+          state: "loaded",
+          mode: options.forceObjectPly ? "object-ply" : "asset-load",
+          path: asset.localPath,
+          splatPath: asset.splatPath,
+        }),
+      );
       return true;
     } catch (loadError) {
+      setObjectPlyLoad(
+        objectPlyLoadState({
+          assetId: asset.id,
+          state: "error",
+          mode: options.forceObjectPly ? "object-ply" : "asset-load",
+          path: asset.localPath,
+          splatPath: asset.splatPath,
+        }),
+      );
       setError(loadError.message || "示例 PLY 加载失败");
       return false;
     } finally {
@@ -460,6 +502,12 @@ export default function App() {
   };
 
   const loadSample = () => loadAsset(LOCAL_SAMPLE_ASSET);
+
+  const loadAssetObjectPly = async (asset) => {
+    const loaded = await loadAsset(asset, { forceObjectPly: true });
+    if (!loaded) return;
+    setViewMode("edit");
+  };
 
   useEffect(() => {
     if (initialAssetLoaded.current) return;
@@ -482,6 +530,7 @@ export default function App() {
     setViewMode("edit");
     setRenderMode("original");
     setError("");
+    setObjectPlyLoad(objectPlyLoadState());
   };
 
   const enterViewMode = () => {
@@ -575,7 +624,15 @@ export default function App() {
       data-spark-object-mask-feather-enabled={String(sparkObjectMaskFeathering.enabled)}
       data-spark-object-mask-feather-opacity={sparkObjectMaskFeathering.opacity}
       data-spark-object-mask-feather-radius={sparkObjectMaskFeathering.radius}
-      data-object-ply-load-state={objectDataDeferred ? "deferred" : "loaded"}
+      data-active-asset-id={scene.assetId ?? ""}
+      data-asset-filter={assetFilter}
+      data-asset-filter-count={filteredAssets.length}
+      data-asset-filter-trained-count={assetFilterCounts.trained ?? 0}
+      data-object-ply-load-state={objectPlyLoad.state}
+      data-object-ply-load-mode={objectPlyLoad.mode}
+      data-object-ply-asset-id={objectPlyLoad.assetId}
+      data-object-ply-path={objectPlyLoad.path}
+      data-splat-path={scene.splatSource?.url ?? objectPlyLoad.splatPath}
     >
       <header className="topbar">
         <div className="brand">
@@ -743,7 +800,7 @@ export default function App() {
           <section className="panelSection assetLibraryPanel">
             <div className="sectionTitleRow">
               <h2>素材库</h2>
-              <span>{FEATURED_ASSETS.length} 个可加载样例</span>
+              <span>{filteredAssets.length} / {FEATURED_ASSETS.length} 个可加载样例</span>
             </div>
             <div className="panelTabs" role="tablist" aria-label="素材库视图">
               <button
@@ -766,9 +823,34 @@ export default function App() {
               </button>
             </div>
             {sideTab === "samples" ? (
-              <div className="assetCards">
-                {FEATURED_ASSETS.map((asset) => (
-                  <article className="assetCard" key={asset.id}>
+              <>
+                <div className="assetFilterBar" role="group" aria-label="素材筛选">
+                  {ASSET_FILTERS.map((filter) => (
+                    <button
+                      className={assetFilter === filter.id ? "active" : ""}
+                      type="button"
+                      key={filter.id}
+                      data-asset-filter-option={filter.id}
+                      aria-pressed={assetFilter === filter.id}
+                      onClick={() => setAssetFilter(filter.id)}
+                    >
+                      <Filter size={13} />
+                      <span>{filter.label}</span>
+                      <strong>{assetFilterCounts[filter.id] ?? 0}</strong>
+                    </button>
+                  ))}
+                </div>
+                <div className="assetCards">
+                {filteredAssets.map((asset) => (
+                  <article
+                    className="assetCard"
+                    key={asset.id}
+                    data-asset-id={asset.id}
+                    data-asset-filter-trained={String(isTrainedAsset(asset))}
+                    data-asset-filter-near1m={String(isNear1mAsset(asset))}
+                    data-asset-defer-object-ply={String(Boolean(asset.deferObjectPly))}
+                    data-object-ply-policy={asset.deferObjectPly ? "on-demand" : "eager"}
+                  >
                     <div className="assetMeta">
                       <span>{asset.category}</span>
                       <span>{asset.pipelineStage}</span>
@@ -776,6 +858,12 @@ export default function App() {
                     </div>
                     <strong>{asset.name}</strong>
                     <p>{asset.bestFor}</p>
+                    {asset.deferObjectPly && (
+                      <div className="assetLoadPolicy">
+                        <span>快速查看 {asset.splatSizeLabel ?? ".splat"}</span>
+                        <span>对象 PLY 按需 {asset.objectPlySizeLabel ?? ""}</span>
+                      </div>
+                    )}
                     <div className="assetUseCases" aria-label={`${asset.name} 用途`}>
                       {asset.useCases.map((useCase) => (
                         <span key={useCase}>{useCase}</span>
@@ -788,18 +876,34 @@ export default function App() {
                     </div>
                     <div className="assetFooter">
                       <span className="assetStatus ready">{asset.status}</span>
-                      <button
-                        className="assetActionButton"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => loadAsset(asset)}
-                      >
-                        {asset.deferObjectPly ? "快速查看" : "加载"}
-                      </button>
+                      <div className="assetActions">
+                        <button
+                          className="assetActionButton"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => loadAsset(asset)}
+                        >
+                          {asset.deferObjectPly ? "快速查看" : "加载"}
+                        </button>
+                        {asset.deferObjectPly && (
+                          <button
+                            className="assetActionButton secondary"
+                            type="button"
+                            disabled={busy}
+                            onClick={() => loadAssetObjectPly(asset)}
+                          >
+                            加载对象 PLY
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </article>
                 ))}
-              </div>
+                {filteredAssets.length === 0 && (
+                  <div className="emptyAssetState">当前筛选没有可加载样例</div>
+                )}
+                </div>
+              </>
             ) : (
               <BenchmarkPanel />
             )}
@@ -1061,6 +1165,71 @@ function readInitialSparkObjectMaskFeathering() {
 function readInitialAssetId() {
   if (typeof window === "undefined") return "";
   return new URLSearchParams(window.location.search).get("asset") ?? "";
+}
+
+function readInitialAssetFilter() {
+  if (typeof window === "undefined") return "all";
+  const value = new URLSearchParams(window.location.search).get("asset-filter") ?? "all";
+  return ASSET_FILTERS.some((filter) => filter.id === value) ? value : "all";
+}
+
+function objectPlyLoadState({
+  assetId = "",
+  state = "none",
+  mode = "none",
+  path = "",
+  splatPath = "",
+} = {}) {
+  return { assetId, state, mode, path, splatPath };
+}
+
+function assetCountsByFilter(assets) {
+  return ASSET_FILTERS.reduce((counts, filter) => {
+    counts[filter.id] = filterAssets(assets, filter.id).length;
+    return counts;
+  }, {});
+}
+
+function filterAssets(assets, filter) {
+  if (filter === "trained") return assets.filter(isTrainedAsset);
+  if (filter === "near1m") return assets.filter(isNear1mAsset);
+  if (filter === "commercial") return assets.filter(isCommercialAsset);
+  return assets;
+}
+
+function isTrainedAsset(asset) {
+  const text = assetSearchText(asset);
+  return (
+    text.includes("trained") ||
+    text.includes("训练输出") ||
+    text.includes("splatfacto") ||
+    text.includes("near-1m") ||
+    text.includes("near1m") ||
+    Boolean(asset.deferObjectPly)
+  );
+}
+
+function isNear1mAsset(asset) {
+  const text = assetSearchText(asset);
+  return text.includes("near-1m") || text.includes("near1m") || text.includes("1m");
+}
+
+function isCommercialAsset(asset) {
+  return asset.category === "可商用展示" || String(asset.license ?? "").includes("CC0");
+}
+
+function assetSearchText(asset) {
+  return [
+    asset.id,
+    asset.name,
+    asset.category,
+    asset.pipelineStage,
+    asset.sourceName,
+    ...(asset.useCases ?? []),
+    ...(asset.formats ?? []),
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function RendererPendingViewport({ rendererContract, visibleCount, renderModeLabel }) {
