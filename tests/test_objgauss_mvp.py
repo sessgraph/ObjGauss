@@ -18,7 +18,11 @@ from objgauss.emergence import object_emergence_curve, object_emergence_metrics
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.goal_audit import audit_v1_goal
-from objgauss.mask_voting import train_object_field_from_votes, vote_masks_to_gaussians
+from objgauss.mask_voting import (
+    depth_visibility_diagnostic,
+    train_object_field_from_votes,
+    vote_masks_to_gaussians,
+)
 from objgauss.masks import build_nerf_sam_mask_manifest, read_png_rgba
 from objgauss.object_field import (
     ObjectField,
@@ -1455,6 +1459,60 @@ def test_mask_voting_trains_background_slot_from_unmatched_projection(tmp_path):
     assert np.array_equal(result.field.labels(), np.array([0, 0, 1, 1], dtype=np.int32))
 
 
+def test_mask_voting_depth_buffer_culls_occluded_mask_hits(tmp_path):
+    cloud = _occluded_camera_cloud()
+    manifest = _write_center_foreground_mask_manifest(tmp_path / "foreground-masks.json")
+
+    baseline = vote_masks_to_gaussians(
+        cloud,
+        manifest,
+        slots=2,
+        background_slot=0,
+        background_weight=0.5,
+    )
+    depth_aware = vote_masks_to_gaussians(
+        cloud,
+        manifest,
+        slots=2,
+        background_slot=0,
+        background_weight=0.5,
+        visibility_mode="depth-buffer",
+    )
+
+    assert baseline.projected == 3
+    assert baseline.matched == 2
+    assert baseline.background_matched == 1
+    assert baseline.depth_culled == 0
+    assert np.allclose(baseline.votes[:, 1], np.array([1.0, 1.0, 0.0], dtype=np.float32))
+    assert depth_aware.raw_projected == 3
+    assert depth_aware.projected == 2
+    assert depth_aware.matched == 1
+    assert depth_aware.background_matched == 1
+    assert depth_aware.depth_culled == 1
+    assert depth_aware.depth_culled_matched == 1
+    assert np.allclose(depth_aware.votes[:, 1], np.array([1.0, 0.0, 0.0], dtype=np.float32))
+
+
+def test_depth_visibility_diagnostic_reports_slot_balance_improvement(tmp_path):
+    cloud = _occluded_camera_cloud()
+    manifest = _write_center_foreground_mask_manifest(tmp_path / "foreground-masks.json")
+
+    summary = depth_visibility_diagnostic(
+        cloud,
+        manifest,
+        slots=2,
+        background_slot=0,
+        background_weight=0.5,
+    )
+
+    assert summary["kind"] == "objgauss-depth-visibility-vote-diagnostic-v1"
+    assert summary["baseline"]["slot_balance"]["winner_gaussians"] == [1, 2]
+    assert summary["depth_aware"]["slot_balance"]["winner_gaussians"] == [1, 1]
+    assert summary["deltas"]["slot_balance_score_delta"] > 0.0
+    assert summary["deltas"]["depth_culled_matched"] == 1
+    assert summary["recommendation"] == "depth-aware-diagnostic-improved"
+
+
 def test_mask_vote_quality_counts_conflicting_votes(tmp_path):
     payload = {
         "width": 100,
@@ -1590,6 +1648,43 @@ def test_object_field_vote_masks_cli_trains_background_slot(tmp_path, capsys):
     assert summary["background_training"]["slot"] == 1
     assert summary["background_training"]["matched"] == 2
     assert summary["vote_quality"]["per_slot"][1]["winner_gaussians"] == 2
+
+
+def test_object_field_vote_diagnostics_cli_writes_depth_summary(tmp_path, capsys):
+    input_path = tmp_path / "occluded_cloud.ply"
+    masks_path = _write_center_foreground_mask_manifest(tmp_path / "foreground-masks.json")
+    summary_path = tmp_path / "depth-diagnostic.json"
+    write_ply(input_path, _occluded_camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "object-field",
+                "vote-diagnostics",
+                str(input_path),
+                "--masks",
+                str(masks_path),
+                "--slots",
+                "2",
+                "--background-slot",
+                "0",
+                "--background-weight",
+                "0.5",
+                "--output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "diagnostic=objgauss-depth-visibility-vote-diagnostic-v1" in output
+    assert "depth_culled_matched=1" in output
+    assert "recommendation=depth-aware-diagnostic-improved" in output
+    assert summary["deltas"]["slot_balance_score_delta"] > 0.0
+    assert summary["depth_aware"]["visibility"]["mode"] == "depth-buffer"
 
 
 def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp_path, capsys):
@@ -2377,6 +2472,31 @@ def _camera_cloud() -> GaussianCloud:
     return GaussianCloud(vertices=vertices, source_format="ascii")
 
 
+def _occluded_camera_cloud() -> GaussianCloud:
+    vertices = np.zeros(
+        3,
+        dtype=np.dtype(
+            [
+                ("x", "f4"),
+                ("y", "f4"),
+                ("z", "f4"),
+                ("opacity", "f4"),
+                ("red", "u1"),
+                ("green", "u1"),
+                ("blue", "u1"),
+            ]
+        ),
+    )
+    vertices["x"] = np.array([0.0, 0.0, 0.8], dtype=np.float32)
+    vertices["y"] = 0.0
+    vertices["z"] = np.array([-2.0, -4.0, -2.0], dtype=np.float32)
+    vertices["opacity"] = 1.0
+    vertices["red"] = 128
+    vertices["green"] = 128
+    vertices["blue"] = 128
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
 def _camera_cloud_with_object_ids() -> GaussianCloud:
     cloud = _camera_cloud()
     fields = list(cloud.vertices.dtype.descr)
@@ -2475,6 +2595,24 @@ def _write_partial_rect_mask_manifest(path):
                 "transform_matrix": np.eye(4, dtype=float).tolist(),
                 "masks": [
                     {"slot": 0, "label": "left", "rect": [0, 0, 50, 100]},
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_center_foreground_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "frames": [
+            {
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {"slot": 1, "label": "foreground", "rect": [45, 45, 55, 55]},
                 ],
             }
         ],

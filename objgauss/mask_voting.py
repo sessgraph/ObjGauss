@@ -24,6 +24,12 @@ class MaskVoteResult:
     background_slot: int | None = None
     background_weight: float | None = None
     background_matched: int = 0
+    visibility_mode: str = "projected"
+    depth_tolerance: float = 0.0
+    raw_projected: int = 0
+    depth_visible: int = 0
+    depth_culled: int = 0
+    depth_culled_matched: int = 0
 
     @property
     def supervised_gaussians(self) -> int:
@@ -35,6 +41,14 @@ class MaskVoteResult:
             "projected": self.projected,
             "matched": self.matched,
             "supervised_gaussians": self.supervised_gaussians,
+            "visibility": {
+                "mode": self.visibility_mode,
+                "depth_tolerance": float(self.depth_tolerance),
+                "raw_projected": int(self.raw_projected or self.projected),
+                "depth_visible": int(self.depth_visible or self.projected),
+                "depth_culled": int(self.depth_culled),
+                "depth_culled_matched": int(self.depth_culled_matched),
+            },
             "vote_quality": mask_vote_quality_audit(self),
         }
         if self.background_slot is not None:
@@ -78,9 +92,14 @@ def vote_masks_to_gaussians(
     max_frames: int | None = None,
     background_slot: int | None = None,
     background_weight: float = 1.0,
+    visibility_mode: str = "projected",
+    depth_tolerance: float = 0.0,
 ) -> MaskVoteResult:
     if slots < 1:
         raise ValueError("slots must be >= 1")
+    visibility_mode = _validate_visibility_mode(visibility_mode)
+    if not np.isfinite(depth_tolerance) or depth_tolerance < 0:
+        raise ValueError("depth_tolerance must be a finite value >= 0")
     if background_slot is not None:
         if background_slot < 0 or background_slot >= slots:
             raise ValueError(f"background slot {background_slot} is outside [0, {slots})")
@@ -100,6 +119,10 @@ def vote_masks_to_gaussians(
     votes = np.zeros((cloud.count, slots), dtype=np.float32)
     observations = np.zeros(cloud.count, dtype=np.float32)
     projected_total = 0
+    raw_projected_total = 0
+    depth_visible_total = 0
+    depth_culled_total = 0
+    depth_culled_matched_total = 0
     matched_total = 0
     background_matched_total = 0
     used_frames = 0
@@ -125,7 +148,20 @@ def vote_masks_to_gaussians(
             height=height,
             camera_angle_x=camera_angle_x,
         )
-        projected_total += int(np.count_nonzero(projection.visible))
+        raw_visible = projection.visible
+        visible = _visibility_mask(
+            projection,
+            width=width,
+            height=height,
+            mode=visibility_mode,
+            depth_tolerance=depth_tolerance,
+        )
+        raw_projected = int(np.count_nonzero(raw_visible))
+        depth_visible = int(np.count_nonzero(visible))
+        raw_projected_total += raw_projected
+        depth_visible_total += depth_visible
+        depth_culled_total += int(np.count_nonzero(raw_visible & ~visible))
+        projected_total += depth_visible
         frame_matched = np.zeros(cloud.count, dtype=bool)
 
         for mask in masks:
@@ -140,7 +176,9 @@ def vote_masks_to_gaussians(
             if confidence <= 0:
                 continue
             contained = _mask_contains(mask, projection, width, height, root)
-            selected = projection.visible & contained
+            if visibility_mode == "depth-buffer":
+                depth_culled_matched_total += int(np.count_nonzero(raw_visible & contained & ~visible))
+            selected = visible & contained
             if not np.any(selected):
                 continue
             votes[selected, slot] += confidence
@@ -149,7 +187,7 @@ def vote_masks_to_gaussians(
 
         matched_total += int(np.count_nonzero(frame_matched))
         if background_slot is not None:
-            background_selected = projection.visible & ~frame_matched
+            background_selected = visible & ~frame_matched
             if np.any(background_selected):
                 votes[background_selected, background_slot] += float(background_weight)
                 observations[background_selected] += float(background_weight)
@@ -165,6 +203,12 @@ def vote_masks_to_gaussians(
         background_slot=background_slot,
         background_weight=float(background_weight) if background_slot is not None else None,
         background_matched=background_matched_total,
+        visibility_mode=visibility_mode,
+        depth_tolerance=float(depth_tolerance),
+        raw_projected=raw_projected_total,
+        depth_visible=depth_visible_total,
+        depth_culled=depth_culled_total,
+        depth_culled_matched=depth_culled_matched_total,
     )
 
 
@@ -173,6 +217,7 @@ class Projection:
     u: np.ndarray
     v: np.ndarray
     visible: np.ndarray
+    depth: np.ndarray
 
 
 def project_points(
@@ -209,7 +254,70 @@ def project_points(
         & np.isfinite(u)
         & np.isfinite(v)
     )
-    return Projection(u=u.astype(np.float32), v=v.astype(np.float32), visible=visible)
+    return Projection(
+        u=u.astype(np.float32),
+        v=v.astype(np.float32),
+        visible=visible,
+        depth=forward.astype(np.float32, copy=False),
+    )
+
+
+def depth_visibility_diagnostic(
+    cloud: GaussianCloud,
+    manifest_path: str | Path,
+    *,
+    slots: int,
+    max_frames: int | None = None,
+    background_slot: int | None = None,
+    background_weight: float = 1.0,
+    depth_tolerance: float = 0.0,
+) -> dict[str, Any]:
+    baseline = vote_masks_to_gaussians(
+        cloud,
+        manifest_path,
+        slots=slots,
+        max_frames=max_frames,
+        background_slot=background_slot,
+        background_weight=background_weight,
+        visibility_mode="projected",
+    )
+    depth_aware = vote_masks_to_gaussians(
+        cloud,
+        manifest_path,
+        slots=slots,
+        max_frames=max_frames,
+        background_slot=background_slot,
+        background_weight=background_weight,
+        visibility_mode="depth-buffer",
+        depth_tolerance=depth_tolerance,
+    )
+    baseline_summary = _vote_diagnostic_summary(baseline)
+    depth_summary = _vote_diagnostic_summary(depth_aware)
+    conflict_delta = (
+        baseline_summary["vote_conflict_fraction"] - depth_summary["vote_conflict_fraction"]
+    )
+    balance_delta = depth_summary["slot_balance_score"] - baseline_summary["slot_balance_score"]
+    supervised_delta = depth_summary["supervised_fraction"] - baseline_summary["supervised_fraction"]
+    return {
+        "kind": "objgauss-depth-visibility-vote-diagnostic-v1",
+        "config": {
+            "slots": int(slots),
+            "max_frames": max_frames,
+            "background_slot": background_slot,
+            "background_weight": float(background_weight) if background_slot is not None else None,
+            "depth_tolerance": float(depth_tolerance),
+        },
+        "baseline": baseline_summary,
+        "depth_aware": depth_summary,
+        "deltas": {
+            "vote_conflict_fraction_reduction": float(conflict_delta),
+            "slot_balance_score_delta": float(balance_delta),
+            "supervised_fraction_delta": float(supervised_delta),
+            "matched_delta": int(depth_aware.matched - baseline.matched),
+            "depth_culled_matched": int(depth_aware.depth_culled_matched),
+        },
+        "recommendation": _depth_vote_recommendation(conflict_delta, balance_delta, depth_aware),
+    }
 
 
 def train_object_field_from_votes(
@@ -393,6 +501,113 @@ def _safe_fraction(numerator: int, denominator: int) -> float:
 
 def _clamp_unit(value: float) -> float:
     return min(max(value, 0.0), 1.0)
+
+
+def _validate_visibility_mode(mode: str) -> str:
+    if mode not in {"projected", "depth-buffer"}:
+        raise ValueError("visibility_mode must be 'projected' or 'depth-buffer'")
+    return mode
+
+
+def _visibility_mask(
+    projection: Projection,
+    *,
+    width: int,
+    height: int,
+    mode: str,
+    depth_tolerance: float,
+) -> np.ndarray:
+    if mode == "projected":
+        return projection.visible
+    if mode == "depth-buffer":
+        return _depth_buffer_visible(
+            projection,
+            width=width,
+            height=height,
+            depth_tolerance=depth_tolerance,
+        )
+    raise ValueError("visibility mode must be 'projected' or 'depth-buffer'")
+
+
+def _depth_buffer_visible(
+    projection: Projection,
+    *,
+    width: int,
+    height: int,
+    depth_tolerance: float,
+) -> np.ndarray:
+    visible_indices = np.flatnonzero(projection.visible)
+    result = np.zeros_like(projection.visible, dtype=bool)
+    if visible_indices.size == 0:
+        return result
+
+    x = np.clip(np.floor(projection.u[visible_indices]).astype(np.int64), 0, width - 1)
+    y = np.clip(np.floor(projection.v[visible_indices]).astype(np.int64), 0, height - 1)
+    pixel = y * width + x
+    depth = projection.depth[visible_indices]
+    min_depth = np.full(width * height, np.inf, dtype=np.float32)
+    np.minimum.at(min_depth, pixel, depth)
+    result[visible_indices] = depth <= (min_depth[pixel] + float(depth_tolerance))
+    return result
+
+
+def _vote_diagnostic_summary(vote_result: MaskVoteResult) -> dict[str, Any]:
+    quality = mask_vote_quality_audit(vote_result)
+    conflict = quality["vote_conflict"]
+    slot_balance = _slot_balance_summary(quality)
+    return {
+        "frames": int(vote_result.frames),
+        "projected": int(vote_result.projected),
+        "matched": int(vote_result.matched),
+        "supervised_gaussians": int(quality["supervised_gaussians"]),
+        "supervised_fraction": float(quality["supervised_fraction"]),
+        "matched_projected_fraction": float(quality["matched_projected_fraction"]),
+        "vote_conflict_gaussians": int(conflict["gaussians"]),
+        "vote_conflict_fraction": float(conflict["fraction"]),
+        "normalized_target_entropy": float(conflict["normalized_target_entropy"]),
+        "target_confidence_mean": float(quality["target_confidence"]["mean"]),
+        "slot_balance": slot_balance,
+        "slot_balance_score": float(slot_balance["score"]),
+        "per_slot": quality["per_slot"],
+        "visibility": vote_result.as_dict()["visibility"],
+    }
+
+
+def _slot_balance_summary(quality: dict[str, Any]) -> dict[str, Any]:
+    per_slot = quality.get("per_slot")
+    if not isinstance(per_slot, list):
+        return {"score": 0.0, "active_slots": 0, "min_winners": 0, "max_winners": 0}
+    winners = [int(slot.get("winner_gaussians", 0) or 0) for slot in per_slot]
+    active = [count for count in winners if count > 0]
+    if not active:
+        return {
+            "score": 0.0,
+            "active_slots": 0,
+            "min_winners": 0,
+            "max_winners": 0,
+            "winner_gaussians": winners,
+        }
+    min_winners = min(active)
+    max_winners = max(active)
+    return {
+        "score": 0.0 if max_winners <= 0 else float(min_winners / max_winners),
+        "active_slots": int(len(active)),
+        "min_winners": int(min_winners),
+        "max_winners": int(max_winners),
+        "winner_gaussians": winners,
+    }
+
+
+def _depth_vote_recommendation(
+    conflict_delta: float,
+    balance_delta: float,
+    depth_aware: MaskVoteResult,
+) -> str:
+    if depth_aware.depth_culled_matched <= 0:
+        return "no-depth-occlusion-signal"
+    if conflict_delta > 0.0 or balance_delta > 0.0:
+        return "depth-aware-diagnostic-improved"
+    return "depth-aware-diagnostic-review"
 
 
 def mask_vote_targets(vote_result: MaskVoteResult) -> tuple[np.ndarray, np.ndarray]:

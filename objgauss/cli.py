@@ -21,6 +21,7 @@ from objgauss.emergence_report import (
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
 from objgauss.mask_voting import (
+    depth_visibility_diagnostic,
     mask_vote_quality_audit,
     train_object_field_from_votes,
     training_summary,
@@ -484,6 +485,8 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
         max_frames=args.max_frames,
         background_slot=args.background_slot,
         background_weight=args.background_weight,
+        visibility_mode=args.visibility_mode,
+        depth_tolerance=args.depth_tolerance,
     )
     result = train_object_field_from_votes(
         field,
@@ -494,7 +497,12 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
     save_object_field(args.output, result.field)
     print(f"object_field={args.output}")
     print(f"frames={votes.frames}")
+    print(f"visibility_mode={votes.visibility_mode}")
     print(f"projected={votes.projected}")
+    if votes.visibility_mode == "depth-buffer":
+        print(f"raw_projected={votes.raw_projected}")
+        print(f"depth_culled={votes.depth_culled}")
+        print(f"depth_culled_matched={votes.depth_culled_matched}")
     print(f"matched={votes.matched}")
     if votes.background_slot is not None:
         print(f"background_slot={votes.background_slot}")
@@ -528,6 +536,37 @@ def _object_field_vote_masks(args: argparse.Namespace) -> None:
             labeled = apply_object_colors(labeled, rewrite_sh=args.rewrite_sh)
         write_ply(args.ply_output, labeled, fmt=_output_format(args))
         print(f"ply={args.ply_output}")
+
+
+def _object_field_vote_diagnostics(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    summary = depth_visibility_diagnostic(
+        cloud,
+        args.masks,
+        slots=args.slots,
+        max_frames=args.max_frames,
+        background_slot=args.background_slot,
+        background_weight=args.background_weight,
+        depth_tolerance=args.depth_tolerance,
+    )
+    baseline = summary["baseline"]
+    depth_aware = summary["depth_aware"]
+    deltas = summary["deltas"]
+    print("diagnostic=objgauss-depth-visibility-vote-diagnostic-v1")
+    print(f"frames={baseline['frames']}")
+    print(f"baseline_conflict_fraction={baseline['vote_conflict_fraction']:.6f}")
+    print(f"depth_conflict_fraction={depth_aware['vote_conflict_fraction']:.6f}")
+    print(f"conflict_fraction_reduction={deltas['vote_conflict_fraction_reduction']:.6f}")
+    print(f"baseline_slot_balance={baseline['slot_balance_score']:.6f}")
+    print(f"depth_slot_balance={depth_aware['slot_balance_score']:.6f}")
+    print(f"slot_balance_delta={deltas['slot_balance_score_delta']:.6f}")
+    print(f"baseline_supervised_fraction={baseline['supervised_fraction']:.6f}")
+    print(f"depth_supervised_fraction={depth_aware['supervised_fraction']:.6f}")
+    print(f"depth_culled_matched={deltas['depth_culled_matched']}")
+    print(f"recommendation={summary['recommendation']}")
+    if args.output:
+        write_json(args.output, summary)
+        print(f"summary={args.output}")
 
 
 def _masks_from_nerf_alpha(args: argparse.Namespace) -> None:
@@ -1174,6 +1213,18 @@ def _build_parser() -> argparse.ArgumentParser:
     field_vote.add_argument("--learning-rate", type=float, default=0.5)
     field_vote.add_argument("--max-frames", type=int)
     field_vote.add_argument(
+        "--visibility-mode",
+        choices=["projected", "depth-buffer"],
+        default="projected",
+        help="mask voting visibility filter; default keeps legacy projected voting",
+    )
+    field_vote.add_argument(
+        "--depth-tolerance",
+        type=float,
+        default=0.0,
+        help="world-depth tolerance for --visibility-mode depth-buffer",
+    )
+    field_vote.add_argument(
         "--background-slot",
         type=int,
         help=(
@@ -1204,6 +1255,34 @@ def _build_parser() -> argparse.ArgumentParser:
     field_vote.add_argument("--rewrite-sh", action="store_true")
     field_vote.add_argument("--ascii", action="store_true", help="write ASCII PLY")
     field_vote.set_defaults(handler=_object_field_vote_masks)
+
+    field_vote_diagnostics = object_field_subparsers.add_parser(
+        "vote-diagnostics",
+        help="compare projected mask voting against depth-buffer visibility voting",
+    )
+    field_vote_diagnostics.add_argument("input", type=Path)
+    field_vote_diagnostics.add_argument("--masks", required=True, type=Path)
+    field_vote_diagnostics.add_argument("--slots", required=True, type=int)
+    field_vote_diagnostics.add_argument("--output", "-o", type=Path)
+    field_vote_diagnostics.add_argument("--max-frames", type=int)
+    field_vote_diagnostics.add_argument(
+        "--background-slot",
+        type=int,
+        help="optional slot for projected-but-unmatched background evidence",
+    )
+    field_vote_diagnostics.add_argument(
+        "--background-weight",
+        type=float,
+        default=1.0,
+        help="vote weight for --background-slot negative evidence",
+    )
+    field_vote_diagnostics.add_argument(
+        "--depth-tolerance",
+        type=float,
+        default=0.0,
+        help="world-depth tolerance for the depth-buffer diagnostic",
+    )
+    field_vote_diagnostics.set_defaults(handler=_object_field_vote_diagnostics)
 
     masks = subparsers.add_parser("masks", help="build mask manifests for Object Field voting")
     masks_subparsers = masks.add_subparsers(dest="masks_command", required=True)
