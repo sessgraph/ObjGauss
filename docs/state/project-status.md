@@ -48,6 +48,25 @@ PLY 的直接 browser runtime 审计失败，min approx FPS 为 `4.412`；因此
 HF 全量 PLY 误称为 production-interactive。下一步若要让全量 HF PLY 直接交互，
 需要 LOD、streaming、分块加载或专门的全量性能优化。
 
+## Large Model Viewer 默认路线
+
+2026-06-29 `RENDER-ROUTE-032` 已把 near-1M trained asset 的默认查看路线整理为：
+
+- 素材库支持 `全部` / `训练模型` / `near-1M` / `商用` 筛选，`?asset-filter=trained`
+  可直接显示 `nerf-lego-trained-near1m-random1300k-local`。
+- near-1M card 默认 `快速查看` 只加载
+  `public/samples/nerf_lego_trained_near1m_random1300k.splat`，不请求
+  `1.15GB` object-aware PLY。
+- 只有点击 `加载对象 PLY` 或进入对象编辑时，才加载
+  `public/samples/nerf_lego_trained_near1m_random1300k_objects.ply`。
+- root DOM 暴露 active asset、筛选数量、object PLY load state / mode / path，
+  由 `npm run audit:large-model-viewer-route` 审计。
+
+本地验证结果：`audit:large-model-viewer-route` 通过，训练筛选 card 数 `4`，
+quick view `.splat` 请求数 `1`、quick object PLY 请求数 `0`，对象编辑和直接按钮
+各触发 `1` 次 object PLY 请求。该审计使用 Playwright fulfill 小型 PLY 来证明请求
+策略，不下载 HF 全量 PLY；截图在 `/tmp/objgauss-large-model-viewer-route.png`。
+
 ## 阶段最终目标
 
 当前阶段的最终目标不是先追求完整科研级训练质量，而是把 ObjGauss v1 的最小闭环变成可重复验收的工程事实：
@@ -192,10 +211,10 @@ HF 全量 PLY 误称为 production-interactive。下一步若要让全量 HF PLY
   - DEMO-005N 已新增 reviewed allowlist 人工评审 runbook 与 manifest schema gate：`docs/rendering/object-boundary-remap-review-runbook.md` 定义进入 allowlist 前必须查看 fixed-port browser screenshots、hidden delta、non-target residual 和 owner approval；`npm run audit:object-boundary-remap-reviewed-allowlist-manifest` 会校验 committed allowlist，当前 `targets=0` 通过。Export 现在会拒绝缺少 reviewer / owner approval / allowlist-candidate evidence 的 approved target；真实三场景 policy export 仍 applied=`0`、blocked=`10012`。
   - DEMO-005O 已新增 Spark canvas hover-confirm selection UX：Spark source/original object edit 现在先在 hover 时显示候选 marker，再由 click 确认选中；root DOM 暴露 `data-spark-pick-interaction="hover-confirm-v1"`、hover pick object / marker 和 confirmed pick marker。`npm run audit:spark-pick-report -- --port 5395` 已验证 Lego proxy 6/6 hover hits、6/6 confirmed hits、markerHits=6/6；`audit:demo` 单样例也通过同一 fixed-port `5395` hover-confirm contract。
   - DEMO-005P 已新增 Spark native pick feasibility audit：`SplatViewport` 暴露 `spark-native-pick-feasibility-v1` telemetry，`npm run audit:spark-native-pick-feasibility -- --port 5395` 在 Lego proxy 删除预览下验证 Spark `SplatMesh.raycast` 可 hit，但 intersection payload 只有 `distance,object,point`，没有 splat index / object id。结论是 recommendation=`keep-screen-space-hover-confirm`，blocker=`raycast-intersection-missing-splat-index`；当前不能安全迁移到 renderer-native object picking。
-  - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例。
+  - 素材库卡片只展示当前 viewer 可直接加载/交互的本地 Gaussian 样例，并支持训练模型 / near-1M / 商用筛选。
   - Web 内已有 Benchmark tab，展示 SEMANTIC-003 smoke / candidate / paper gates 和三场景 Splatfacto 指标。
   - 移动端已改为 viewport 优先的纵向堆叠布局。
-  - `NeRF Lego 训练输出样例` 卡片已预留，外部训练产物登记到 `public/samples/nerf_lego_trained.*` 后可加载。
+  - `NeRF Lego 训练输出样例` 与 near-1M trained card 已接入；near-1M 默认 quick `.splat` 查看，object-aware PLY 走显式按需加载。
   - `npm run audit:demo` 可启动临时 Vite 服务并浏览器验收三个闭环样例。
 - 素材:
   - `plush-3dgs-local` 可自动拉取。

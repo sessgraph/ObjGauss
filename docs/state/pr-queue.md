@@ -14,25 +14,10 @@
 
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
-3. **产品 viewer 线**: 继续把大模型加载、筛选和 native `.splat` object mask route 收敛成可审计的默认体验。
+3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
 4. **语义质量线**: 从当前 Object Field / SAM mask voting 走向 depth-aware voting、跨视角 slot 对齐和 CLIP 语义命名。
 
 ## Ready
-
-### RENDER-ROUTE-032: Default large-model viewer route and filtering UX
-
-- 状态: ready / product-viewer
-- 类型: 标准 PR / frontend UX + route audit
-- 目标: 把当前 near-1M “快速查看 .splat、按需加载 object-aware PLY” 的大模型体验整理成默认可解释 route，并补齐训练模型筛选 / 加载状态审计。
-- 范围:
-  - 保持 `.splat` 快速预览默认不加载 1.15GB PLY。
-  - 对 object-aware PLY 加载、取消、失败、已加载状态做明确 UI 和 telemetry。
-  - 训练模型筛选机制优先显示 trained / near-1M / object-aware assets，避免用户在素材库里找不到训练结果。
-  - 不把 HF 远端大文件自动下载到 git-tracked 路径。
-- 验收底线:
-  - 浏览器 audit 证明 near-1M card 的快速查看只请求 `.splat`。
-  - 点击 `加载对象 PLY` 或进入对象编辑时才请求 object-aware PLY。
-  - 训练模型筛选能直接定位 `nerf-lego-trained-near1m-random1300k-local`。
 
 ### TRAIN-QUALITY-002: Depth-aware mask voting and slot alignment
 
@@ -82,6 +67,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-ROUTE-032: Default large-model viewer route and filtering UX
+
+- 状态: done / product-viewer-route
+- 类型: 标准 PR / frontend UX + route audit
+- 目标: 把当前 near-1M “快速查看 .splat、按需加载 object-aware PLY” 的大模型体验整理成默认可解释 route，并补齐训练模型筛选 / 加载状态审计。
+- 已实施:
+  - 素材库新增 `全部`、`训练模型`、`near-1M`、`商用` 筛选，`?asset-filter=trained` 可直接定位 `nerf-lego-trained-near1m-random1300k-local`。
+  - near-1M card 明确展示 quick `.splat` 与 object-aware PLY 按需加载策略，默认 `快速查看` 不触发 1.15GB PLY 请求。
+  - 新增 `加载对象 PLY` 显式动作；进入对象编辑或点击该按钮时才请求 object-aware PLY。
+  - root DOM 暴露 active asset、filter count、object PLY load state / mode / path / splat path，供浏览器审计和 handoff 复查。
+  - 新增 `npm run audit:large-model-viewer-route`，用 Playwright route fulfill 小型 PLY，证明请求策略而不下载全量 PLY。
+- 完成 commit: `044dbcdcd67fe11cb15e62e2a439704ff25b74c8`
+- 验证:
+  - `node --check scripts/audit-large-model-viewer-route.mjs`: passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `npm run audit:large-model-viewer-route -- --server-mode preview`: passed，`cards=4`、`quickSplatRequests=1`、`quickObjectPlyRequests=0`、`editObjectPlyRequests=1`、`directObjectPlyRequests=1`，截图 `/tmp/objgauss-large-model-viewer-route.png`。
+  - `npm run audit:demo -- --assets nerf-lego-alpha-closure-local --server-mode preview --port 5395 --skip-visual-residual`: passed。
+  - `uv run --extra dev pytest`: 49 passed。
+  - `git diff --check`: passed。
 
 ### NEAR1M-SLA-001: Close near-1M WebGPU C-path production SLA
 
