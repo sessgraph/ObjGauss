@@ -98,6 +98,8 @@ For comparison, `background-confidence=0.02` is more aggressive:
 - high-confidence export at `min_confidence=0.7`: background `64,885`, foreground `41,445`, unknown `62,323`
 
 This proves the traceable bundle and full-frame alpha supervision path works. It does not yet prove
-stable part-level object separation. The remaining `vote_conflict_fraction=0.430143` is consistent
-with projection voting without depth occlusion; before returning to 4-slot SAM part masks, prefer
-adding depth/visibility-aware voting or a reviewed threshold/weight sweep.
+stable part-level object separation. The baseline `vote_conflict_fraction=0.430143` is consistent
+with projection voting without depth occlusion. `TRAIN-QUALITY-002` added a depth-buffer diagnostic
+that lowers this alpha foreground/background conflict to `0.402118` and writes a reviewable summary,
+but it is not the default training strategy yet. Before returning to 4-slot SAM part masks, prefer
+using that diagnostic alongside a reviewed threshold/weight sweep.

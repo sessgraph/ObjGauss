@@ -15,22 +15,11 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: 从当前 Object Field / SAM mask voting 走向 depth-aware voting、跨视角 slot 对齐和 CLIP 语义命名。
+4. **语义质量线**: depth-aware mask voting 诊断已落地；下一步从诊断证据走向跨视角 slot 对齐和 CLIP 语义命名。
 
 ## Ready
 
-### TRAIN-QUALITY-002: Depth-aware mask voting and slot alignment
-
-- 状态: ready / semantic-quality
-- 类型: 标准 PR / Object Field training quality
-- 目标: 降低当前 SAM / alpha mask voting 中的背景吸收、slot 不平衡和边界噪声，让 Object Field 质量提升不只依赖更多训练步数。
-- 范围:
-  - 先做 depth / visibility-aware voting 诊断，不直接替换默认结果。
-  - 比较 alpha foreground/background、SAM balanced、near-1M tuned candidate 的 vote conflict、slot coverage 和 render occlusion metrics。
-  - 输出可复查 benchmark summary。
-- 验收底线:
-  - 至少一个真实 Lego trained sample 的 vote conflict 或 slot balance 指标改善。
-  - 不降低现有 `acceptance:semantic` / `acceptance:demo`。
+当前无 ready PR。
 
 ## Planned
 
@@ -67,6 +56,34 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-QUALITY-002: Depth-aware mask voting and slot alignment
+
+- 状态: done / semantic-quality-diagnostic
+- 类型: 标准 PR / Object Field training quality
+- 目标: 降低当前 SAM / alpha mask voting 中的背景吸收、slot 不平衡和边界噪声，让 Object Field 质量提升不只依赖更多训练步数。
+- 已实施:
+  - `vote_masks_to_gaussians()` 新增显式 `visibility_mode="depth-buffer"` 和 `depth_tolerance`，用每帧像素级 z-buffer 只让最前方 Gaussian 消费 mask vote；默认仍是 legacy `projected`，不改变现有训练。
+  - `MaskVoteResult.as_dict()` 新增 `visibility` telemetry：`raw_projected`、`depth_visible`、`depth_culled`、`depth_culled_matched`。
+  - 新增 `depth_visibility_diagnostic()`，同时跑 baseline projected voting 与 depth-buffer voting，输出 conflict fraction、slot balance、supervised fraction、matched delta 和 recommendation。
+  - CLI 新增 `objgauss object-field vote-diagnostics`，可写 `objgauss-depth-visibility-vote-diagnostic-v1` JSON summary。
+  - `objgauss object-field vote-masks` 新增显式 `--visibility-mode projected|depth-buffer` 和 `--depth-tolerance`；默认保持 `projected`。
+- 真实样例诊断:
+  - SAM balanced safe-2000 Lego: `/tmp/objgauss-depth-vote-sam-balanced.json`，conflict `0.021192 -> 0.018820`，reduction `0.002373`；slot balance `0.001571 -> 0.001748`；`depth_culled_matched=8271`；recommendation `depth-aware-diagnostic-improved`。
+  - Alpha fgbg Lego: `/tmp/objgauss-depth-vote-alpha-fgbg.json`，conflict `0.430143 -> 0.402118`，reduction `0.028025`；slot balance `0.130996 -> 0.133745`；`depth_culled_matched=904903`；recommendation `depth-aware-diagnostic-improved`。
+- 边界:
+  - 本 PR 只关闭 depth / visibility-aware voting diagnostic；默认训练和现有 public samples 不切换。
+  - 跨视角 slot alignment、CLIP 命名和默认训练策略 promotion 仍留给后续 PR。
+- 完成 commit: `bd9e6c4625f8ade831ba20433c854d291fca5e36`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "depth_visibility or vote_diagnostics or depth_buffer or vote_masks_cli"`: 5 passed。
+  - `uv run --extra dev pytest`: 52 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `uv run objgauss object-field vote-diagnostics outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/object_aware_gaussians.ply --masks outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json --slots 4 --output /tmp/objgauss-depth-vote-sam-balanced.json`: passed。
+  - `uv run objgauss object-field vote-diagnostics outputs/assets/gaussians/nerf-lego-alpha-fgbg-bg005-v2/object_aware_gaussians.ply --masks outputs/masks/nerf-lego-alpha-fgbg-bg005-v2/mask-manifest.json --slots 2 --output /tmp/objgauss-depth-vote-alpha-fgbg.json`: passed。
+  - `npm run acceptance:semantic`: passed。
+  - `npm run acceptance:demo -- --skip-semantic-benchmark --skip-browser-visual-residual`: passed。
+  - `git diff --check`: passed。
 
 ### RENDER-ROUTE-032: Default large-model viewer route and filtering UX
 

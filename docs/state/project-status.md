@@ -67,6 +67,27 @@ quick view `.splat` 请求数 `1`、quick object PLY 请求数 `0`，对象编�
 各触发 `1` 次 object PLY 请求。该审计使用 Playwright fulfill 小型 PLY 来证明请求
 策略，不下载 HF 全量 PLY；截图在 `/tmp/objgauss-large-model-viewer-route.png`。
 
+## Depth-Aware Mask Vote 诊断
+
+2026-06-29 `TRAIN-QUALITY-002` 已落地 depth / visibility-aware mask voting 诊断：
+
+- 默认 Object Field 训练仍使用 legacy projected voting，不改变现有 public samples。
+- `vote_masks_to_gaussians(..., visibility_mode="depth-buffer")` 可用每帧像素级 z-buffer
+  只让最前方 Gaussian 消费 mask vote，并记录 `depth_culled_matched`。
+- `objgauss object-field vote-diagnostics` 会同时跑 projected baseline 与 depth-buffer
+  diagnostic，输出 `objgauss-depth-visibility-vote-diagnostic-v1` summary。
+
+真实 Lego 样例诊断结果：
+
+- SAM balanced safe-2000: conflict `0.021192 -> 0.018820`，slot balance
+  `0.001571 -> 0.001748`，`depth_culled_matched=8271`。
+- Alpha foreground/background: conflict `0.430143 -> 0.402118`，slot balance
+  `0.130996 -> 0.133745`，`depth_culled_matched=904903`。
+
+结论：depth-buffer diagnostic 在真实 Lego trained / alpha fgbg 样例上能降低 vote
+conflict 并轻微改善 slot balance，但还没有 promotion 为默认训练策略。下一步应基于该
+summary 做跨视角 slot alignment、CLIP 命名和 promotion gate，而不是只增加训练步数。
+
 ## 阶段最终目标
 
 当前阶段的最终目标不是先追求完整科研级训练质量，而是把 ObjGauss v1 的最小闭环变成可重复验收的工程事实：
@@ -236,6 +257,7 @@ quick view `.splat` 请求数 `1`、quick object PLY 请求数 `0`，对象编�
   - 可通过 projection loss 更新 Object Field logits。
   - 可在 hard `object_id` 导出、mask voting PLY 输出和训练输出登记时按 max-probability threshold 将低置信度 Gaussian 归入 background / unknown object，并在登记 manifest 记录该策略。
   - `vote-masks` / `training register-output` 支持可选 background slot 训练：每帧投影可见但未命中任何前景 mask 的 Gaussian 会作为 background/unknown slot 的训练投票，而不是仅在导出阶段硬过滤。
+  - `vote-masks` 支持显式 `--visibility-mode depth-buffer` 诊断路径；`vote-diagnostics` 可比较 projected baseline 与 depth-buffer voting 的 conflict / slot balance / coverage delta。
   - 可输出 mask vote quality audit，检查监督覆盖率、每槽覆盖、冲突比例、target entropy 和观测权重。
   - 可输出 Object Emergence observability metrics，检查 assignment entropy、effective slots、空间紧致度、reference stability / ARI 和 partial OES。
   - 可输出 Object Emergence benchmark curves，跟踪 projection loss、entropy、effective slots、ARI、空间紧致度、mask-proxy occlusion delta 和 scale-aware CPU splat render occlusion delta 随 mask-vote training iteration 的变化。
@@ -977,7 +999,7 @@ npm run acceptance:demo
 - 浏览器验证: 桌面 1440x920 与移动端 390x844 均渲染非空、无前端错误。
 - OBJECT-FIELD-BG-TRAIN-001: Object Field mask voting 新增训练级 background slot 机制；`vote-masks` / `training register-output` 可把投影可见但未命中前景 mask 的 Gaussian 作为背景槽投票训练，并在 summary / manifest 记录 `background_training`。本地单元测试覆盖底层投票、CLI summary、登记 manifest 和 object-aware PLY 导出。
 - OBJECT-FIELD-BG-TRAIN-001 local Lego registration: 使用现有 168,653-Gaussian near-1M candidate PLY 重新登记 background slot 4，输出 ignored `outputs/assets/gaussians/nerf-lego-trained-near1m-sam8f-balanced03-slots4-bgslot4/object_aware_gaussians.ply` 和 public local copy `public/samples/nerf_lego_trained_near1m_bgslot4_objects.ply`；`slots=5`，`supervised_gaussians=118729`，`background_matched=496056`，projection loss `2.245413 -> 0.604945`，object counts `15810/9080/15376/25100/103287`。该结果证明背景槽已作为训练信号生效，但前景 slot 1/2/3 的 mask winners 仍少，不能单独证明对象语义已稳定分离。
-- SCENE-BUNDLE-001: 新增 scene/object bundle 训练数据层；`from-nerf-alpha-fgbg` 可生成 K=2 foreground/background + ignore alpha mask，并通过 `--background-confidence` / `--foreground-confidence` 把 full-frame background supervision 降权，避免无 depth/visibility occlusion 的投票路径被大背景面积压倒；`masks validate` 可做训练前一致性检查，`training write-sample-bundle` 可写顶层 `sample.json` 绑定 dataset、masks、Gaussian PLY、Object Field 和 slot 定义。当前推荐本机 ignored bundle 为 `outputs/samples/objgauss-lego-alpha-fgbg-bg005-v2/sample.json`；Lego alpha fgbg manifest 为 100 frames / 200 masks / foreground `843797` / background `61517043` / ignore `1639160`，validation passed，K=2 Object Field `supervised_gaussians=149892`，projection loss `1.264038 -> 0.497213`，object counts background/foreground=`133074/35579`，high-confidence export at `min_confidence=0.7` 为 background/foreground/unknown=`100730/16915/51008`。`background_confidence=0.02` 对照可把 foreground 扩到 `80071`，但更可能吸收背景 / 桌面；两组训练均为 CPU/Object Field 路径，本机 GPU 仍约 `596MiB` used / `15246MiB` free。该结果证明可追溯 bundle 和 alpha fgbg 训练目标跑通，但 `vote_conflict_fraction=0.430143` 仍高，不是 part-level 稳定分离结论；下一步优先 depth/visibility-aware voting、camera/PLY alignment、alpha threshold sensitivity 和 base splat quality。
+- SCENE-BUNDLE-001: 新增 scene/object bundle 训练数据层；`from-nerf-alpha-fgbg` 可生成 K=2 foreground/background + ignore alpha mask，并通过 `--background-confidence` / `--foreground-confidence` 把 full-frame background supervision 降权，避免无 depth/visibility occlusion 的投票路径被大背景面积压倒；`masks validate` 可做训练前一致性检查，`training write-sample-bundle` 可写顶层 `sample.json` 绑定 dataset、masks、Gaussian PLY、Object Field 和 slot 定义。当前推荐本机 ignored bundle 为 `outputs/samples/objgauss-lego-alpha-fgbg-bg005-v2/sample.json`；Lego alpha fgbg manifest 为 100 frames / 200 masks / foreground `843797` / background `61517043` / ignore `1639160`，validation passed，K=2 Object Field `supervised_gaussians=149892`，projection loss `1.264038 -> 0.497213`，object counts background/foreground=`133074/35579`，high-confidence export at `min_confidence=0.7` 为 background/foreground/unknown=`100730/16915/51008`。`background_confidence=0.02` 对照可把 foreground 扩到 `80071`，但更可能吸收背景 / 桌面；两组训练均为 CPU/Object Field 路径，本机 GPU 仍约 `596MiB` used / `15246MiB` free。该结果证明可追溯 bundle 和 alpha fgbg 训练目标跑通，但 baseline `vote_conflict_fraction=0.430143` 仍高，不是 part-level 稳定分离结论；TRAIN-QUALITY-002 的 depth-buffer diagnostic 可将 alpha fgbg conflict 降到 `0.402118`，但尚未 promotion 为默认训练策略。
 - ASSET-001: Poly Haven School Chair 实际拉取 5 个文件；NeRF Synthetic Lego 实际抽取 805 个文件。
 - OBJFIELD-001: Plush PLY 可初始化 6-slot Object Field；NeRF Lego 检查 400 frames、缺图 0、无效 pose 0。
 - SEG-001 / OBJFIELD-002: synthetic projection mask vote 可训练 Object Field，并输出 `object_id` PLY。
@@ -1025,8 +1047,8 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 产品 viewer 线：把 near-1M / HF 大模型体验整理成默认可解释 route，保持 `.splat` 快速查看、不自动加载 1.15GB+ PLY，并补齐训练模型筛选、按需加载和失败状态审计。
-2. 语义质量线：推进 depth-aware mask voting、跨视角 slot 对齐和 CLIP 命名；near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
+1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
+2. 语义质量线：depth-aware mask voting 诊断已落地；下一步推进跨视角 slot 对齐、CLIP 命名和默认训练策略 promotion gate。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
 3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 4. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
