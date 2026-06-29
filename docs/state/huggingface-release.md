@@ -18,6 +18,8 @@ development-stage release：
 
 - Dataset README commit: `9c202e5393c6dea70b1a077e5b70766205d83c87`
 - Model README commit: `e4364f247644062bd22bbeceda974dd69a86f06d`
+- Dataset current verified head: `295b13f8bac09bc302019ab6c9d238d11d2d6538`
+- Model current verified head: `82b700392699852c62dca70ac4274dc722d82282`
 
 ## 本地源产物
 
@@ -88,14 +90,17 @@ Model repo 存放 Nerfstudio / Splatfacto 可恢复训练权重和配置：
 - Dataset masks、training manifest、mask training summary、metrics 上传。
 - Dataset Object Field `.npz` 上传。
 - Dataset compact viewer `.splat` 上传。
+- Dataset object-aware PLY 上传并远端核对通过：
+  - path: `gaussians/object_aware_gaussians.ply`
+  - commit: `295b13f8bac09bc302019ab6c9d238d11d2d6538`
+  - size: `1,148,428,347` bytes
+  - LFS sha256: `b8a1f2d5c40c8cb5bfb1476565529aa31de018c1884ef0f58706fba4f3e0aecf`
 - Model `config.yml` 与 `dataparser_transforms.json` 上传。
-
-仍需远端核对或补传：
-
-- Dataset `gaussians/object_aware_gaussians.ply` 大文件上传结果未写入项目事实源。
-- Model `nerfstudio/nerfstudio_models/step-000009999.ckpt` 大文件上传结果未写入项目事实源。
-
-如果后续确认这两个大文件已上传，应在本文件补上对应 HF commit hash。
+- Model Splatfacto checkpoint 上传并远端核对通过：
+  - path: `nerfstudio/nerfstudio_models/step-000009999.ckpt`
+  - commit: `82b700392699852c62dca70ac4274dc722d82282`
+  - size: `3,200,373,037` bytes
+  - LFS sha256: `f3558aadfb1d8d546232eb0f7e55e823a50a0011abcaf360879e5e91d84d36ce`
 
 ## 发布约束
 
@@ -104,9 +109,9 @@ Model repo 存放 Nerfstudio / Splatfacto 可恢复训练权重和配置：
 - 当前 HF 页面只能表述为 development-stage release，不能表述为 stable release、production ready 或 commercial demo。
 - near-1M trained object-aware PLY 已形成本地训练产物，但 `audit:webgpu-cpath-production-sla` 仍未通过，因此不能把 HF 发布当作 terminal proof。
 
-## 待执行命令
+## 重传命令
 
-如需补传 Dataset object-aware PLY：
+如需重新上传 Dataset object-aware PLY：
 
 ```bash
 uvx --with socksio hf upload \
@@ -117,7 +122,7 @@ uvx --with socksio hf upload \
   --commit-message "Add object-aware near1m Gaussian PLY"
 ```
 
-如需补传 Model checkpoint：
+如需重新上传 Model checkpoint：
 
 ```bash
 uvx --with socksio hf upload \
@@ -139,7 +144,7 @@ uvx --with socksio hf auth whoami
 当前事实：
 
 - near-1M real trained object-aware PLY: 本地已形成，规模超过 `1,000,000` Gaussian。
-- HF development-stage handoff: 已创建并记录，部分大文件仍需远端确认。
+- HF development-stage handoff: 已创建并记录，Dataset object-aware PLY 与 Model checkpoint 已远端核对。
 - terminal proof: 未完成。
 
 剩余 blocker 是 `audit:webgpu-cpath-production-sla` 未通过。最近一次失败集中在

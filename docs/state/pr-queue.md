@@ -12,27 +12,12 @@
 
 当前阶段按四条线推进，优先级从上到下：
 
-1. **终局证据线**: 先核对 / 补传 HF 大文件，再修复并通过 near-1M WebGPU C-path production SLA。
+1. **终局证据线**: HF 大文件已核对并补齐；下一步修复并通过 near-1M WebGPU C-path production SLA。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: 继续把大模型加载、筛选和 native `.splat` object mask route 收敛成可审计的默认体验。
 4. **语义质量线**: 从当前 Object Field / SAM mask voting 走向 depth-aware voting、跨视角 slot 对齐和 CLIP 语义命名。
 
 ## Ready
-
-### HF-RELEASE-002: Verify large Hugging Face assets
-
-- 状态: ready / release-handoff
-- 类型: 标准 PR / data release management
-- 目标: 核对或补传 Dataset `object_aware_gaussians.ply` 与 Model `step-000009999.ckpt`，并把远端 commit hash 写回 `docs/state/huggingface-release.md`。
-- 范围:
-  - 使用 `uvx --with socksio hf ...` 检查远端文件列表和大小。
-  - 必要时补传两个大文件。
-  - 更新 `docs/state/huggingface-release.md` 的已确认上传记录、commit hash 和校验口径。
-  - 不把大文件提交进 git，不把 development-stage release 改写成 stable release。
-- 验收底线:
-  - HF Dataset 页面可看到 `gaussians/object_aware_gaussians.ply`。
-  - HF Model 页面可看到 `nerfstudio/nerfstudio_models/step-000009999.ckpt`。
-  - 本地 release record 明确区分 uploaded、verified 和 pending。
 
 ### NEAR1M-SLA-001: Close near-1M WebGPU C-path production SLA
 
@@ -115,6 +100,26 @@
 当前无进行中 PR。
 
 ## Done
+
+### HF-RELEASE-002: Verify large Hugging Face assets
+
+- 状态: done / release-handoff-verified
+- 类型: 标准 PR / data release management
+- 目标: 核对或补传 Dataset `object_aware_gaussians.ply` 与 Model `step-000009999.ckpt`，并把远端 commit hash 写回 `docs/state/huggingface-release.md`。
+- 已实施:
+  - 使用 Hugging Face API 核对远端文件列表和 metadata。
+  - 上传 Dataset `gaussians/object_aware_gaussians.ply`。
+  - 上传 Model `nerfstudio/nerfstudio_models/step-000009999.ckpt`。
+  - 更新 release record、项目状态和风险表。
+- 远端证据:
+  - Dataset head / upload commit: `295b13f8bac09bc302019ab6c9d238d11d2d6538`。
+  - Dataset object-aware PLY: `1,148,428,347` bytes，LFS sha256 `b8a1f2d5c40c8cb5bfb1476565529aa31de018c1884ef0f58706fba4f3e0aecf`。
+  - Model head / upload commit: `82b700392699852c62dca70ac4274dc722d82282`。
+  - Model checkpoint: `3,200,373,037` bytes，LFS sha256 `f3558aadfb1d8d546232eb0f7e55e823a50a0011abcaf360879e5e91d84d36ce`。
+- 完成 commit: `98c9ce2bfacb594cd74e8482b65f9408b15cc707`
+- 验证:
+  - `uvx --with socksio hf auth whoami`: `user=jianyong365`。
+  - Hugging Face API `repo_info(..., files_metadata=True)`: expected large files present with matching size / LFS sha256。
 
 ### HF-RELEASE-001: Record Hugging Face development-stage release
 

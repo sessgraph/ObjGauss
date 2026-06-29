@@ -17,8 +17,9 @@ development-stage release 记录，事实源见 `docs/state/huggingface-release.
 - Model README development-stage commit: `e4364f247644062bd22bbeceda974dd69a86f06d`
 
 该 HF 发布仅用于开发阶段研究复现和下载 handoff。当前不能标记为 stable release、
-production ready 或 commercial demo；large object-aware PLY / checkpoint 的远端上传
-结果需要继续核对并回写 commit hash。
+production ready 或 commercial demo；large object-aware PLY / checkpoint 已完成远端上传
+和 metadata 核对，Dataset verified head 为 `295b13f8bac09bc302019ab6c9d238d11d2d6538`，
+Model verified head 为 `82b700392699852c62dca70ac4274dc722d82282`。
 
 ## 阶段最终目标
 
@@ -963,7 +964,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- Hugging Face 上的 near-1M NeRF Lego Dataset / Model 当前只是 development-stage release。它记录研究复现资产和模型产物 handoff，不代表稳定公开版本；远端大文件上传状态和 `audit:webgpu-cpath-production-sla` 通过状态必须分别核对，不能相互替代。
+- Hugging Face 上的 near-1M NeRF Lego Dataset / Model 当前只是 development-stage release。它记录研究复现资产和模型产物 handoff，不代表稳定公开版本；远端大文件已核对通过，但 `audit:webgpu-cpath-production-sla` 仍需单独通过，不能把 HF 发布等同于 terminal proof。
 - 对象聚类色和部分诊断仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后 no-SH 样例可走 Spark native compact `.splat` object mask，SH-heavy 样例保留 PLY packed route 以保存 degree-3 SH rest。剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及删除后没有补洞 / 重优化。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
 - Spark `SplatMesh.raycast` 当前可命中 splat depth，但 intersection 不暴露 splat index / object id，且不能证明 object opacity mask filter-aware；因此对象选择仍应使用已验收的 `hover-confirm-v1` screen-space pick，不能宣称已经是 renderer-native object picking。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
@@ -978,7 +979,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 补齐 near-1M 终局证据：核对 / 补传 HF Dataset object-aware PLY 和 Model checkpoint，修复并重跑 `audit:webgpu-cpath-production-sla`，只有 production SLA summary 为 `passed` 才能关闭 terminal proof。
+1. 补齐 near-1M 终局证据：HF Dataset object-aware PLY 和 Model checkpoint 已上传并远端核对；下一步修复并重跑 `audit:webgpu-cpath-production-sla`，只有 production SLA summary 为 `passed` 才能关闭 terminal proof。
 2. RENDER-005T-AI: 基于已通过的 `.splat` / PLY index mapping，原型化 original source / native `.splat` object mask runtime，并复用 object-mask pixel-delta、Spark residual 和 index-mapping gates 验收；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
 3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 4. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
