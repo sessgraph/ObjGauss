@@ -1,6 +1,6 @@
 # ObjGauss 风险登记
 
-> 最近更新: 2026-06-22
+> 最近更新: 2026-06-29
 
 | ID | 风险 | 影响 | 当前缓解 | 关闭条件 | 状态 |
 | --- | --- | --- | --- | --- | --- |
@@ -12,4 +12,6 @@
 | R-006 | Three.js / Spark bundle 超 500KB warning | 后续页面加载可能变慢 | 当前只记录，不影响 MVP；RENDER-001 后主 JS 约 5.6MB / gzip 1.94MB | 引入 code splitting 或按需加载 Spark renderer | accepted |
 | R-007 | Poly Haven mesh 还不是可直接 viewer 打开的 3DGS Demo | 许可干净素材已接入，但公开演示仍需要训练转换 | 已记录 mesh -> 多视角渲染 -> 3DGS 后续链路 | School Chair 训练出 `.splat` / ObjGauss PLY 并可前端加载 | open |
 | R-008 | SAM / CLIP 仍是外部预计算 mask 来源 | 语义分割效果依赖外部脚本，仓库不能端到端复现实例分割 | 已定义稳定 mask manifest 和 `vote-masks` 消费命令；`objgauss masks from-nerf-alpha` 已能从 NeRF Lego 真实图片生成前景 mask manifest；`objgauss masks from-nerf-rgba-colors` 已能从真实图片生成多 slot color mask manifest；`objgauss masks from-nerf-sam` 已作为可选 SAM 入口接入，且真实 `sam_vit_b` checkpoint 小场景 manifest 已被 `vote-masks` 消费 | CLIP 语义命名、跨视角 SAM slot 对齐和质量对比另行立项 | open |
-| R-009 | NeRF Lego 还没有真实训练出的 Gaussian PLY / `.splat` | Lego 路线仍依赖 proxy，不能完全代表真实 3DGS optimization 输出 | `SEMANTIC-001` 已用真实 Plush 3DGS 证明阶段闭环；`TRAIN-002` 已固化外部训练输出接入命令，真实 trainer 产物一旦存在即可登记、跑 mask voting、导出 `object_id` PLY | `TRAIN-001` 产出真实 Lego Gaussian，并用 `training register-output` 完成前端可加载验收 | open |
+| R-009 | NeRF Lego 还没有真实训练出的 Gaussian PLY / `.splat` | Lego 路线仍依赖 proxy，不能完全代表真实 3DGS optimization 输出 | 已完成真实 NeRF Lego Splatfacto safe-500 / safe-2000 / near-1M tuned candidate；near-1M 本地 object-aware PLY 为 `4,503,634` Gaussians，并已接入前端快速查看 / 按需加载对象 PLY | 真实 Lego Gaussian 已产出、登记并可前端加载 | closed |
+| R-010 | near-1M trained object-aware PLY 已存在，但 production SLA 未通过 | 不能把 HF 发布或本地 near-1M PLY 误称为 terminal proof / production ready | `docs/state/huggingface-release.md` 明确标注 development-stage release；`audit:webgpu-cpath-production-sla` 是唯一终局 gate；`pr-queue.md` 已将 `NEAR1M-SLA-001` 设为优先 PR | production SLA summary 为 `status="passed"`，且 renderer route goal strict gate 不再缺 near-1M proof | open |
+| R-011 | Hugging Face 公开仓库处于开发阶段，远端大文件状态可能与本地记录不一致 | 其他人下载时可能缺少 object-aware PLY 或 checkpoint，复现失败 | HF README 已加 development-stage 注释；`HF-RELEASE-002` 要核对 / 补传大文件并回写 commit hash | Dataset object-aware PLY 和 Model checkpoint 均远端可见，大小 / checksum / commit 已写入 `docs/state/huggingface-release.md` | open |

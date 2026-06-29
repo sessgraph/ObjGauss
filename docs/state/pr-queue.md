@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-26
+> 最近更新: 2026-06-29
 
 ## 队列规则
 
@@ -8,26 +8,126 @@
 - 重大变更先补 ADR，Owner 确认后执行。
 - 每个 PR 完成后更新验证结果和完成 commit。
 
+## 当前阶段 PR 路线
+
+当前阶段按四条线推进，优先级从上到下：
+
+1. **终局证据线**: 先核对 / 补传 HF 大文件，再修复并通过 near-1M WebGPU C-path production SLA。
+2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
+3. **产品 viewer 线**: 继续把大模型加载、筛选和 native `.splat` object mask route 收敛成可审计的默认体验。
+4. **语义质量线**: 从当前 Object Field / SAM mask voting 走向 depth-aware voting、跨视角 slot 对齐和 CLIP 语义命名。
+
 ## Ready
 
-### RENDER-004: WebGPU tile-based Gaussian renderer
+### HF-RELEASE-002: Verify large Hugging Face assets
 
-- 状态: ready
-- 类型: 重大变更 / 渲染器
-- 目标: 以 WebGPU tile binning + per-tile accumulation 作为 ObjGauss object-aware Gaussian renderer 终局架构。
-- 设计: `docs/adr/0005-webgpu-tile-renderer.md`
-- 下一步:
-  - Renderer-native object picking 暂不迁移：Spark `SplatMesh.raycast` 目前只返回 `distance/object/point`，没有 splat index / object id；后续要么等待/扩展 Spark intersection metadata，要么继续使用已审计的 `hover-confirm-v1` screen-space pick。
+- 状态: ready / release-handoff
+- 类型: 标准 PR / data release management
+- 目标: 核对或补传 Dataset `object_aware_gaussians.ply` 与 Model `step-000009999.ckpt`，并把远端 commit hash 写回 `docs/state/huggingface-release.md`。
+- 范围:
+  - 使用 `uvx --with socksio hf ...` 检查远端文件列表和大小。
+  - 必要时补传两个大文件。
+  - 更新 `docs/state/huggingface-release.md` 的已确认上传记录、commit hash 和校验口径。
+  - 不把大文件提交进 git，不把 development-stage release 改写成 stable release。
 - 验收底线:
-  - WebGPU 可用环境中暴露 `data-renderer="webgpu-tile"` 和 `data-object-filter="gpu-object-state-buffer"`。
-  - 不支持 WebGPU 或初始化失败时明确 fallback 到当前 `Gaussian OIT 编辑`，不静默伪装成功。
-  - 隔离 / 删除后 `visibleCount` 与 object-state 一致，并记录 `tileOverflowCount`。
+  - HF Dataset 页面可看到 `gaussians/object_aware_gaussians.ply`。
+  - HF Model 页面可看到 `nerfstudio/nerfstudio_models/step-000009999.ckpt`。
+  - 本地 release record 明确区分 uploaded、verified 和 pending。
+
+### NEAR1M-SLA-001: Close near-1M WebGPU C-path production SLA
+
+- 状态: ready / terminal-proof
+- 类型: 标准 PR / WebGPU SLA bugfix + evidence
+- 目标: 让真实 near-1M trained object-aware PLY 通过 `npm run audit:webgpu-cpath-production-sla`，形成终局证据线。
+- 当前起点:
+  - 本地 object-aware PLY 已存在，规模 `4,503,634` Gaussians。
+  - 最近 production SLA 失败点集中在 `scripts/audit-webgpu-presentation-transition.mjs` 的 `checkTiming` 读取 `mode` 时出现 `TypeError`。
+  - production SLA summary 已存在但 status 不是 `passed`，不能算 terminal proof。
+- 范围:
+  - 修复 presentation transition timing 读取的空值 / mode contract。
+  - 用 near-1M object-aware PLY 重跑 production SLA。
+  - 更新 `docs/state/project-status.md`、`docs/state/huggingface-release.md` 和本 PR 队列。
+- 验收底线:
+  - `npm run audit:webgpu-cpath-production-sla -- --trained-ply <near1m-object-aware.ply> --target-hardware local-rtx5060ti` 输出 `status="passed"`。
+  - summary 明确记录 real trained PLY Gaussian count `>=1000000`。
+  - `audit:renderer-route-goal -- --require-production-ready` 不再因 near-1M proof 缺失失败。
+
+### RENDER-ROUTE-032: Default large-model viewer route and filtering UX
+
+- 状态: ready / product-viewer
+- 类型: 标准 PR / frontend UX + route audit
+- 目标: 把当前 near-1M “快速查看 .splat、按需加载 object-aware PLY” 的大模型体验整理成默认可解释 route，并补齐训练模型筛选 / 加载状态审计。
+- 范围:
+  - 保持 `.splat` 快速预览默认不加载 1.15GB PLY。
+  - 对 object-aware PLY 加载、取消、失败、已加载状态做明确 UI 和 telemetry。
+  - 训练模型筛选机制优先显示 trained / near-1M / object-aware assets，避免用户在素材库里找不到训练结果。
+  - 不把 HF 远端大文件自动下载到 git-tracked 路径。
+- 验收底线:
+  - 浏览器 audit 证明 near-1M card 的快速查看只请求 `.splat`。
+  - 点击 `加载对象 PLY` 或进入对象编辑时才请求 object-aware PLY。
+  - 训练模型筛选能直接定位 `nerf-lego-trained-near1m-random1300k-local`。
+
+### TRAIN-QUALITY-002: Depth-aware mask voting and slot alignment
+
+- 状态: ready / semantic-quality
+- 类型: 标准 PR / Object Field training quality
+- 目标: 降低当前 SAM / alpha mask voting 中的背景吸收、slot 不平衡和边界噪声，让 Object Field 质量提升不只依赖更多训练步数。
+- 范围:
+  - 先做 depth / visibility-aware voting 诊断，不直接替换默认结果。
+  - 比较 alpha foreground/background、SAM balanced、near-1M tuned candidate 的 vote conflict、slot coverage 和 render occlusion metrics。
+  - 输出可复查 benchmark summary。
+- 验收底线:
+  - 至少一个真实 Lego trained sample 的 vote conflict 或 slot balance 指标改善。
+  - 不降低现有 `acceptance:semantic` / `acceptance:demo`。
+
+## Planned
+
+### SEG-CLIP-001: CLIP semantic naming and SAM cross-view slot alignment
+
+- 状态: planned
+- 类型: 标准 PR / semantic labeling
+- 目标: 在已有 SAM manifest 和 Object Field 训练链路上补语义命名与跨视角 slot 对齐，和 color-mask / KMeans baseline 做质量对比。
+- 前置: `TRAIN-QUALITY-002` 至少完成一轮质量诊断，避免把 CLIP 命名建立在明显不稳定的 slots 上。
+
+### DEMO-POLYHAVEN-001: License-clean public demo candidate
+
+- 状态: planned
+- 类型: 标准 PR / public demo data
+- 目标: 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto 输出推进成许可干净、可浏览器验收的公开 demo 候选。
+- 前置: 明确质量阈值、训练成本和公开展示文案；不可复用 Plush 混合许可样例作为公开 demo 承诺。
+
+### PERF-BUNDLE-001: Split Spark / Three viewer bundles
+
+- 状态: planned
+- 类型: 标准 PR / frontend performance
+- 目标: 对 Spark / Three 相关 viewer 代码做按需加载或拆包，降低当前 Vite bundle size warning 对首屏体验的影响。
+- 前置: 不改变 renderer route contract；需要保留 `audit:demo`、Spark route 和 WebGPU route 验收。
+
+### RENDER-NATIVE-PICK-001: Renderer-native object picking feasibility
+
+- 状态: planned / blocked-by-spark-metadata
+- 类型: 研究 PR / renderer interaction
+- 目标: 评估是否能从 Spark raycast 或上游扩展拿到 splat index / object id，替代当前已验收的 `hover-confirm-v1` screen-space picking。
+- 当前判断: Spark `SplatMesh.raycast` 只返回 `distance/object/point`，没有 splat index / object id，因此本项不应阻塞 near-1M terminal proof。
 
 ## In Progress
 
 当前无进行中 PR。
 
 ## Done
+
+### HF-RELEASE-001: Record Hugging Face development-stage release
+
+- 状态: done / documentation-handoff
+- 类型: 文档 PR / release management
+- 目标: 将 near-1M NeRF Lego Dataset / Model 的 Hugging Face development-stage release 写入项目事实源。
+- 已实施:
+  - 新增 `docs/state/huggingface-release.md`，记录 HF Dataset / Model 地址、development-stage README commits、本地源产物、已确认上传项、待核对大文件和发布约束。
+  - 更新 `docs/state/project-status.md`，把 HF release 纳入当前状态和下一步主线。
+  - 更新 `docs/asset-library.md`，记录 HF 资产入口、研究使用边界和不提交大文件规则。
+- 完成 commit: `fb3513e`
+- 验证:
+  - `git diff --check`: passed。
 
 ### SCENE-BUNDLE-001: Traceable alpha foreground/background sample bundle
 
