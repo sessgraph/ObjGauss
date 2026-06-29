@@ -107,7 +107,8 @@ Model repo 存放 Nerfstudio / Splatfacto 可恢复训练权重和配置：
 - 许可证口径：NeRF Synthetic Lego / upstream research dataset 派生产物，仅按研究用途记录；HF card 使用 `license: other` 和 research-use-only 说明。
 - 训练产物和 demo 资产分层：HF 承载大训练产物；`public/samples/` 只保留本地页面可加载的样例链接或 symlink，不把大文件提交进 git。
 - 当前 HF 页面只能表述为 development-stage release，不能表述为 stable release、production ready 或 commercial demo。
-- near-1M trained object-aware PLY 已形成本地训练产物，但 `audit:webgpu-cpath-production-sla` 仍未通过，因此不能把 HF 发布当作 terminal proof。
+- HF Dataset 中的全量 object-aware PLY 为 `4,503,634` Gaussians，已远端核对；它是开发阶段研究产物，不等于 production-interactive viewer asset。
+- near-1M terminal proof 当前使用本地 ignored deterministic sampled1m derivative，通过 `npm run assets:sample-ply` 从全量 HF PLY 源产物派生；该 sampled1m PLY 尚未作为 HF stable asset 发布。
 
 ## 重传命令
 
@@ -143,10 +144,48 @@ uvx --with socksio hf auth whoami
 
 当前事实：
 
-- near-1M real trained object-aware PLY: 本地已形成，规模超过 `1,000,000` Gaussian。
+- Full real trained object-aware PLY: 本地与 HF Dataset 均已形成，规模 `4,503,634` Gaussians。
 - HF development-stage handoff: 已创建并记录，Dataset object-aware PLY 与 Model checkpoint 已远端核对。
-- terminal proof: 未完成。
+- terminal proof: sampled1m derivative 已完成并通过 production SLA。
 
-剩余 blocker 是 `audit:webgpu-cpath-production-sla` 未通过。最近一次失败集中在
-`scripts/audit-webgpu-presentation-transition.mjs` 的 `checkTiming` 读取
-`mode` 时出现 `TypeError`；production SLA summary 存在但 status 不是 `passed`。
+Sampled1m terminal proof 输入：
+
+- path: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply`
+- manifest: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/sample-manifest.json`
+- source: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-candidate/object_aware_gaussians.ply`
+- source count: `4,503,634`
+- sampled count: `1,000,000`
+- byte size: `255,001,677`
+- sha256: `354440011354a80aeb23a357466e65ccb9c2f2ace07c3756590ab7e203271ea1`
+- object counts: `0=450284`、`1=112243`、`2=360042`、`3=77431`
+
+生成命令：
+
+```bash
+npm run assets:sample-ply -- \
+  --input outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-candidate/object_aware_gaussians.ply \
+  --output outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply \
+  --target-gaussians 1000000 \
+  --manifest-output outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/sample-manifest.json \
+  --label near1m-random1300k-v1-deterministic-sampled1m \
+  --overwrite
+```
+
+通过的终局审计：
+
+- `npm run audit:webgpu-cpath-production-sla -- --trained-ply outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply --target-hardware local-rtx5060ti --output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2`
+- report: `/tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2/summary.md`
+- status: `passed`
+- trainedGaussians: `1,000,000`
+- real trained browser runtime: `passed`
+- FPS SLA: `passed`
+- sustained trained min approx FPS: `33.804`
+
+配套 strict goal gate：
+
+- `npm run audit:near1m-production-gap -- --require-ready --candidate-output-dir outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m --sla-output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2 --export-dir outputs/training/nerf-lego-splatfacto-near1m-tuned/export-random1300k-v1 --output-root outputs/training/nerf-lego-splatfacto-near1m-tuned --experiment lego-splatfacto-near1m-tuned --timestamp near1m-random1300k-v1 --target-hardware local-rtx5060ti --output-dir /tmp/objgauss-near1m-production-gap-sampled1m`: `ready`
+- `npm run audit:renderer-route-goal -- --require-production-ready --near1m-candidate-output-dir outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m --near1m-sla-output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2 --near1m-export-dir outputs/training/nerf-lego-splatfacto-near1m-tuned/export-random1300k-v1 --near1m-output-root outputs/training/nerf-lego-splatfacto-near1m-tuned --near1m-experiment lego-splatfacto-near1m-tuned --near1m-timestamp near1m-random1300k-v1 --near1m-target-hardware local-rtx5060ti --output-dir /tmp/objgauss-renderer-route-goal-production-ready-sampled1m-v2`: `ready`
+
+边界和后续风险：全量 `4,503,634`-Gaussian PLY 的直接 browser runtime 审计未通过，
+min approx FPS 为 `4.412`。因此 HF 全量 PLY 仍不能标记为 production-interactive；
+后续需要 LOD、streaming、分块加载或全量性能优化。

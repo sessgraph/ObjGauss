@@ -144,6 +144,7 @@ async function runTransitionProbe(asset) {
     "--no-server",
     "--skip-visual-residual",
     "--webgpu-object-transition",
+    "--include-heavy-scene-interactions",
   ];
   if (headed) commandArgs.push("--headed");
   if (browserChannel) commandArgs.push("--browser-channel", browserChannel);
@@ -209,6 +210,9 @@ function parseAuditOutput(output) {
 }
 
 function buildRow({ asset, exitCode, parsed }) {
+  const initialTiming = normalizeTiming(parsed.initial);
+  const isolateTiming = normalizeTiming(parsed.isolate);
+  const deleteTiming = normalizeTiming(parsed.delete);
   const checks = [
     check("exit-code", exitCode, 0, exitCode === 0),
     check("parsed-audit-line", parsed.parsed, true, parsed.parsed === true),
@@ -222,16 +226,16 @@ function buildRow({ asset, exitCode, parsed }) {
     check("pixel-status", parsed.pixelStatus, "dispatched", parsed.pixelStatus === "dispatched"),
     check("pixel-source", parsed.pixelSource, "webgpu-compute-*", parsed.pixelSource?.startsWith("webgpu-compute-")),
     check("pixel-workgroups", parsed.pixelWorkgroups, ">0", parsed.pixelWorkgroups > 0),
-    ...checkTiming("initial", parsed.initial, {
+    ...checkTiming("initial", initialTiming, {
       allowed: [
         { status: "uploaded", mode: "full-upload" },
         { status: "object-state-updated", mode: "object-state-only" },
       ],
     }),
-    ...checkTiming("isolate", parsed.isolate, {
+    ...checkTiming("isolate", isolateTiming, {
       allowed: [{ status: "object-state-updated", mode: "object-state-only" }],
     }),
-    ...checkTiming("delete", parsed.delete, {
+    ...checkTiming("delete", deleteTiming, {
       allowed: [
         { status: "object-state-updated", mode: "object-state-only" },
         { status: "uploaded", mode: "full-upload" },
@@ -267,15 +271,29 @@ function buildRow({ asset, exitCode, parsed }) {
     check("tile-overflow", parsed.tileOverflowCount, 0, parsed.tileOverflowCount === 0),
     check("screenshot", parsed.screenshotPath, "/tmp path exists", parsed.screenshotPath?.startsWith("/tmp/") && existsSync(parsed.screenshotPath)),
   ];
-  const timings = [parsed.initial, parsed.isolate, parsed.delete];
+  const timings = [initialTiming, isolateTiming, deleteTiming];
   return {
     asset,
     passed: checks.every((entry) => entry.passed),
     checks,
     ...parsed,
+    initial: initialTiming,
+    isolate: isolateTiming,
+    delete: deleteTiming,
     maxUpdateMs: maxNumeric(timings.map((entry) => entry.updateMs)),
     maxSubmitMs: maxNumeric(timings.map((entry) => entry.submitMs)),
     maxQueueDoneMs: maxNumeric(timings.map((entry) => entry.queueDoneMs)),
+  };
+}
+
+function normalizeTiming(timing) {
+  return {
+    status: optionalString(timing?.status),
+    mode: optionalString(timing?.mode),
+    updateMs: Number.isFinite(timing?.updateMs) ? timing.updateMs : null,
+    submitMs: Number.isFinite(timing?.submitMs) ? timing.submitMs : null,
+    queueDoneMs: Number.isFinite(timing?.queueDoneMs) ? timing.queueDoneMs : null,
+    objectStateBytes: Number.isFinite(timing?.objectStateBytes) ? timing.objectStateBytes : 0,
   };
 }
 

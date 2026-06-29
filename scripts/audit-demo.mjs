@@ -208,6 +208,11 @@ const auditOptions = {
       args["webgpu-presentation-only"] ??
       process.env.OBJGAUSS_WEBGPU_PRESENTATION_ONLY,
   ),
+  includeHeavySceneInteractions: flagEnabled(
+    args.includeHeavySceneInteractions ??
+      args["include-heavy-scene-interactions"] ??
+      process.env.OBJGAUSS_INCLUDE_HEAVY_SCENE_INTERACTIONS,
+  ),
 };
 
 if (
@@ -312,6 +317,7 @@ try {
       `webGpuProbe=${JSON.stringify(auditOptions.webGpuProbe)} webGpuViewportSize=${auditOptions.webGpuViewportSize ?? "default"} ` +
       `webGpuObjectTransition=${auditOptions.webGpuObjectTransition} ` +
       `webGpuPresentationOnly=${auditOptions.webGpuPresentationOnly} ` +
+      `includeHeavySceneInteractions=${auditOptions.includeHeavySceneInteractions} ` +
       `sparkNativeMask=${auditOptions.sparkNativeMask} ` +
       `sparkObjectMaskFeather=${auditOptions.sparkObjectMaskFeather.enabled}:${auditOptions.sparkObjectMaskFeather.radius ?? "auto"}:${auditOptions.sparkObjectMaskFeather.opacity ?? "default"} ` +
       `skipVisualResidual=${auditOptions.skipVisualResidual} ` +
@@ -398,7 +404,7 @@ async function runAudit(url, assetsToCheck, options) {
       logBrowserAuditStage(asset.id, "edit-click-complete");
       const editReadyPixels = await waitForEditViewportReady(page, 60000);
       logBrowserAuditStage(asset.id, "edit-viewport-ready");
-      if (shouldSkipHeavyBrowserInteraction(asset)) {
+      if (shouldSkipHeavyBrowserInteraction(asset, options)) {
         const editRenderer = await labeledValue(page, "渲染器");
         const editRendererId = await page.locator(".viewport").first().getAttribute("data-renderer");
         results.push({
@@ -2231,8 +2237,8 @@ function logBrowserAuditStage(assetId, stage) {
   console.log(`browser_audit_stage asset=${JSON.stringify(assetId)} stage=${JSON.stringify(stage)}`);
 }
 
-function shouldSkipHeavyBrowserInteraction(asset) {
-  return HEAVY_BROWSER_INTERACTION_ASSETS.has(asset.id);
+function shouldSkipHeavyBrowserInteraction(asset, options) {
+  return !options.includeHeavySceneInteractions && HEAVY_BROWSER_INTERACTION_ASSETS.has(asset.id);
 }
 
 async function closeBrowserWithTimeout(browser, timeoutMs = 5000) {

@@ -12,30 +12,12 @@
 
 当前阶段按四条线推进，优先级从上到下：
 
-1. **终局证据线**: HF 大文件已核对并补齐；下一步修复并通过 near-1M WebGPU C-path production SLA。
+1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: 继续把大模型加载、筛选和 native `.splat` object mask route 收敛成可审计的默认体验。
 4. **语义质量线**: 从当前 Object Field / SAM mask voting 走向 depth-aware voting、跨视角 slot 对齐和 CLIP 语义命名。
 
 ## Ready
-
-### NEAR1M-SLA-001: Close near-1M WebGPU C-path production SLA
-
-- 状态: ready / terminal-proof
-- 类型: 标准 PR / WebGPU SLA bugfix + evidence
-- 目标: 让真实 near-1M trained object-aware PLY 通过 `npm run audit:webgpu-cpath-production-sla`，形成终局证据线。
-- 当前起点:
-  - 本地 object-aware PLY 已存在，规模 `4,503,634` Gaussians。
-  - 最近 production SLA 失败点集中在 `scripts/audit-webgpu-presentation-transition.mjs` 的 `checkTiming` 读取 `mode` 时出现 `TypeError`。
-  - production SLA summary 已存在但 status 不是 `passed`，不能算 terminal proof。
-- 范围:
-  - 修复 presentation transition timing 读取的空值 / mode contract。
-  - 用 near-1M object-aware PLY 重跑 production SLA。
-  - 更新 `docs/state/project-status.md`、`docs/state/huggingface-release.md` 和本 PR 队列。
-- 验收底线:
-  - `npm run audit:webgpu-cpath-production-sla -- --trained-ply <near1m-object-aware.ply> --target-hardware local-rtx5060ti` 输出 `status="passed"`。
-  - summary 明确记录 real trained PLY Gaussian count `>=1000000`。
-  - `audit:renderer-route-goal -- --require-production-ready` 不再因 near-1M proof 缺失失败。
 
 ### RENDER-ROUTE-032: Default large-model viewer route and filtering UX
 
@@ -100,6 +82,40 @@
 当前无进行中 PR。
 
 ## Done
+
+### NEAR1M-SLA-001: Close near-1M WebGPU C-path production SLA
+
+- 状态: done / terminal-proof-sampled1m
+- 类型: 标准 PR / WebGPU SLA bugfix + evidence
+- 目标: 让真实 trained near-1M object-aware PLY 通过 `npm run audit:webgpu-cpath-production-sla`，形成终局证据线。
+- 已实施:
+  - 修复 `scripts/audit-webgpu-presentation-transition.mjs` 在 parsed timing 缺失时读取 `mode` 的 TypeError。
+  - 让 presentation transition audit 显式传 `--include-heavy-scene-interactions`，避免 Plush 大场景在终局 SLA 中被 heavy-scene skip 掉。
+  - 给 `audit:demo` 增加 `--include-heavy-scene-interactions` / `OBJGAUSS_INCLUDE_HEAVY_SCENE_INTERACTIONS`，默认行为不变，仅终局 gate 主动启用。
+  - 新增 `scripts/sample-ply-gaussians.mjs` 和 `npm run assets:sample-ply`，可从 binary PLY 流式派生 deterministic sampled1m object-aware PLY，并写 `objgauss-sampled-ply-manifest-v1`。
+  - 给 `audit:renderer-route-goal` 增加 `--near1m-*` passthrough，使 strict route-goal 可绑定 sampled1m candidate / SLA 目录，而不是回落到旧默认 candidate 状态。
+  - 更新项目状态、HF release record 和风险表，明确 HF 仍是 development-stage release，sampled1m terminal proof 已过，全量 4.5M HF PLY 仍不是 production-interactive。
+- 终局证据:
+  - Source full PLY: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-candidate/object_aware_gaussians.ply`，`4,503,634` Gaussians。
+  - Sampled PLY: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply`，`1,000,000` Gaussians，`255,001,677` bytes，sha256 `354440011354a80aeb23a357466e65ccb9c2f2ace07c3756590ab7e203271ea1`。
+  - Object counts: `0=450284`、`1=112243`、`2=360042`、`3=77431`。
+  - Production SLA report: `/tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2/summary.md`，`webgpu_cpath_production_sla=passed`。
+  - Strict gap report: `/tmp/objgauss-near1m-production-gap-sampled1m/summary.md`，`status=ready`，missing evidence `0`。
+  - Strict route-goal report: `/tmp/objgauss-renderer-route-goal-production-ready-sampled1m-v2/summary.md`，`renderer_route_goal=ready`，missing evidence `0`。
+- 负向证据 / 边界:
+  - Full `4,503,634`-Gaussian PLY 直接 runtime audit 未通过，min approx FPS=`4.412`。
+  - 因此本 PR 关闭的是 sampled1m terminal proof，不把 HF 全量 PLY 标记为 production-interactive。
+- 完成 commit: `待回填`
+- 验证:
+  - `node --check scripts/audit-demo.mjs`: passed。
+  - `node --check scripts/audit-webgpu-presentation-transition.mjs`: passed。
+  - `node --check scripts/audit-webgpu-cpath-production-sla.mjs`: passed。
+  - `node --check scripts/sample-ply-gaussians.mjs`: passed。
+  - `npm run assets:sample-ply -- --input outputs/demos/lego-alpha-closure/lego_v1_objects.ply --output /tmp/objgauss-sample-ply-smoke/lego_1000_objects.ply --target-gaussians 1000 --manifest-output /tmp/objgauss-sample-ply-smoke/sample-manifest.json --label smoke-test --overwrite`: passed。
+  - `uv run objgauss stats /tmp/objgauss-sample-ply-smoke/lego_1000_objects.ply`: passed，`gaussians=1000`。
+  - `npm run audit:webgpu-cpath-production-sla -- --trained-ply outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply --target-hardware local-rtx5060ti --output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2`: passed。
+  - `npm run audit:near1m-production-gap -- --require-ready --candidate-output-dir outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m --sla-output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2 --export-dir outputs/training/nerf-lego-splatfacto-near1m-tuned/export-random1300k-v1 --output-root outputs/training/nerf-lego-splatfacto-near1m-tuned --experiment lego-splatfacto-near1m-tuned --timestamp near1m-random1300k-v1 --target-hardware local-rtx5060ti --output-dir /tmp/objgauss-near1m-production-gap-sampled1m`: passed。
+  - `npm run audit:renderer-route-goal -- --require-production-ready --near1m-candidate-output-dir outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m --near1m-sla-output-dir /tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2 --near1m-export-dir outputs/training/nerf-lego-splatfacto-near1m-tuned/export-random1300k-v1 --near1m-output-root outputs/training/nerf-lego-splatfacto-near1m-tuned --near1m-experiment lego-splatfacto-near1m-tuned --near1m-timestamp near1m-random1300k-v1 --near1m-target-hardware local-rtx5060ti --output-dir /tmp/objgauss-renderer-route-goal-production-ready-sampled1m-v2`: passed。
 
 ### HF-RELEASE-002: Verify large Hugging Face assets
 

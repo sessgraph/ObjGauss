@@ -61,6 +61,7 @@
     "acceptance:semantic": "node scripts/acceptance-semantic-benchmark.mjs",
     "acceptance:webgpu-headless": "node scripts/acceptance-webgpu-headless.mjs",
     "acceptance:spark-commercial-route": "node scripts/acceptance-spark-commercial-route.mjs",
+    "assets:sample-ply": "node scripts/sample-ply-gaussians.mjs",
     "publish:polyhaven-chair-demo": "node scripts/publish-polyhaven-chair-demo.mjs",
     "train:splatfacto:smoke": "node scripts/train-splatfacto-smoke.mjs",
     "train:splatfacto:near1m-candidate": "node scripts/train-splatfacto-near1m-candidate.mjs",

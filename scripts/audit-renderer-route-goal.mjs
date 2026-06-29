@@ -20,6 +20,23 @@ const cpathReadinessSummaryPath =
 const includeCpathReadiness =
   flagEnabled(args.includeCpathReadiness ?? args["include-cpath-readiness"]) ||
   Boolean(providedCpathReadinessSummaryPath);
+const near1mGapArgs = [
+  ...optionalPair("--target-hardware", args.near1mTargetHardware ?? args["near1m-target-hardware"]),
+  ...optionalPair("--gpu-memory-reserve-gb", args.near1mGpuMemoryReserveGb ?? args["near1m-gpu-memory-reserve-gb"]),
+  ...optionalPair("--port", args.near1mPort ?? args["near1m-port"]),
+  ...optionalPair("--sam-checkpoint", args.near1mSamCheckpoint ?? args["near1m-sam-checkpoint"]),
+  ...optionalPair("--min-exported-gaussians", args.near1mMinExportedGaussians ?? args["near1m-min-exported-gaussians"]),
+  ...optionalPair("--dataset", args.near1mDataset ?? args["near1m-dataset"]),
+  ...optionalPair("--output-root", args.near1mOutputRoot ?? args["near1m-output-root"]),
+  ...optionalPair("--experiment", args.near1mExperiment ?? args["near1m-experiment"]),
+  ...optionalPair("--timestamp", args.near1mTimestamp ?? args["near1m-timestamp"]),
+  ...optionalPair("--export-dir", args.near1mExportDir ?? args["near1m-export-dir"]),
+  ...optionalPair("--candidate-output-dir", args.near1mCandidateOutputDir ?? args["near1m-candidate-output-dir"]),
+  ...optionalPair("--sla-output-dir", args.near1mSlaOutputDir ?? args["near1m-sla-output-dir"]),
+  ...(flagEnabled(args.near1mIncludeGpuPreflight ?? args["near1m-include-gpu-preflight"])
+    ? ["--include-gpu-preflight"]
+    : []),
+];
 
 mkdirSync(outputDir, { recursive: true });
 
@@ -73,6 +90,7 @@ const steps = [
       "--",
       "--output-dir",
       childDir("near1m-production-gap"),
+      ...near1mGapArgs,
       ...(requireProductionReady ? ["--require-ready"] : []),
     ],
     summaryPath: path.join(childDir("near1m-production-gap"), "summary.json"),
@@ -122,6 +140,7 @@ const summary = {
   includeCpathReadiness,
   requireCpathReadiness,
   cpathReadinessSummaryPath,
+  near1mGapArgs,
   status,
   passed,
   nextAction: nextActionFor({ requiredRuntimePassed, productionReady }),
@@ -391,6 +410,7 @@ function renderMarkdown(summary) {
     `- Require production ready: ${summary.requireProductionReady}`,
     `- Include C-path readiness: ${summary.includeCpathReadiness}`,
     `- Require C-path readiness: ${summary.requireCpathReadiness}`,
+    `- Near-1M gap args: ${summary.near1mGapArgs.length > 0 ? summary.near1mGapArgs.join(" ") : "default"}`,
     `- Next action: ${summary.nextAction}`,
     `- Output: ${summary.outputDir}`,
     "",
@@ -519,6 +539,11 @@ function optionalString(value) {
   if (value === undefined || value === null || value === true || value === false) return "";
   const text = String(value).trim();
   return text || "";
+}
+
+function optionalPair(flag, value) {
+  const text = optionalString(value);
+  return text ? [flag, text] : [];
 }
 
 function parseArgs(argv) {

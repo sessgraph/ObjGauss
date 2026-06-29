@@ -21,6 +21,33 @@ production ready 或 commercial demo；large object-aware PLY / checkpoint 已�
 和 metadata 核对，Dataset verified head 为 `295b13f8bac09bc302019ab6c9d238d11d2d6538`，
 Model verified head 为 `82b700392699852c62dca70ac4274dc722d82282`。
 
+## Near-1M 终局证据状态
+
+2026-06-29 已用 HF 远端已核对的 `4,503,634`-Gaussian object-aware PLY
+派生出 deterministic sampled1m 本地审计输入，并通过 WebGPU C-path production
+SLA。该 sampled1m 产物在 ignored `outputs/` 下，不进入 git，也尚未作为 HF stable
+asset 发布：
+
+- Sampled PLY: `outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply`
+- Gaussians: `1,000,000`
+- Byte size: `255,001,677`
+- sha256: `354440011354a80aeb23a357466e65ccb9c2f2ace07c3756590ab7e203271ea1`
+- Object counts: `0=450284`、`1=112243`、`2=360042`、`3=77431`
+- 生成命令: `npm run assets:sample-ply -- --input outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-candidate/object_aware_gaussians.ply --output outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/object_aware_gaussians.ply --target-gaussians 1000000 --manifest-output outputs/assets/gaussians/nerf-lego-trained-near1m-random1300k-v1-sampled1m/sample-manifest.json --label near1m-random1300k-v1-deterministic-sampled1m --overwrite`
+- SLA report: `/tmp/objgauss-webgpu-cpath-production-sla-sampled1m-v2/summary.md`
+- strict route-goal report: `/tmp/objgauss-renderer-route-goal-production-ready-sampled1m-v2/summary.md`
+
+关键验收结果：`webgpu_cpath_production_sla=passed`，`trainedGaussians=1000000`，
+`realTrainedBrowserRuntime1m=passed`，`fpsSla=passed`，sustained trained
+min approx FPS 为 `33.804`，`audit:near1m-production-gap -- --require-ready`
+返回 `ready`，`audit:renderer-route-goal -- --require-production-ready` 在显式绑定
+sampled1m candidate / SLA 目录时返回 `ready`。
+
+边界：HF Dataset 中的全量 object-aware PLY 仍是 `4,503,634` Gaussians。该全量
+PLY 的直接 browser runtime 审计失败，min approx FPS 为 `4.412`；因此不能把
+HF 全量 PLY 误称为 production-interactive。下一步若要让全量 HF PLY 直接交互，
+需要 LOD、streaming、分块加载或专门的全量性能优化。
+
 ## 阶段最终目标
 
 当前阶段的最终目标不是先追求完整科研级训练质量，而是把 ObjGauss v1 的最小闭环变成可重复验收的工程事实：
@@ -209,9 +236,9 @@ Model verified head 为 `82b700392699852c62dca70ac4274dc722d82282`。
   - 本机已完成 NeRF Lego Splatfacto 500-step resource-safe candidate，导出 47168 个 Gaussian，并通过 `training register-output` 登记为本机 `NeRF Lego 训练输出样例` public sample；该产物在 ignored `outputs/` / `public/samples/`，不进入 git。
   - 本机已完成 NeRF Lego Splatfacto 2000-step resource-safe candidate，导出 255794 个 Gaussian；几何/渲染指标强于 safe-500，但 2-frame SAM supervision 下 object slots 仍不平衡，暂不作为最终语义样例结论。
   - `objgauss masks from-nerf-sam` 支持 `--max-area-fraction` 过滤过大的 SAM masks；safe-2000 当前最佳语义候选是 8-frame / 4-slot / `max_area_fraction=0.3`，已消除近空 object slots 并提升 render occlusion effect。
-  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E/003F/003G/003H/003I/003J/003K/003L/003M/003N near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`，`--status-json` 可写出 `objgauss-near1m-candidate-status-v1` 机器可读 readiness report，并会在 dry-run、成功和已知失败路径留下当前 readiness、`launchReadiness`、`lastExit` 与 `lastFailure`。`npm run train:splatfacto:near1m-gpu-preflight` 可单独执行 `1GB` GPU memory reserve preflight，不启动 Splatfacto。`npm run train:splatfacto:near1m-background` 可 preflight / dry-run / status / guarded stop / 显式 confirmed 后台启动 near-1M 长训，并写 `/tmp` 下的 launcher manifest、status JSON、nested candidate status JSON 和 log；`--preflight` 会刷新 nested candidate status 并只在启动输入与 GPU preflight ready 时返回 0，`--status` 会汇总 nested candidate readiness、launch readiness、last exit 和 last failure kind，`--stop --confirm-stop` 会向记录的 detached process group 发送 `SIGTERM`。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。真正启动长训还必须显式传 `--confirm-long-run`，否则 `--run` 会输出 `near1m_long_run_guard=failed`；确认后的 CUDA 长训还会先用 `nvidia-smi` 执行默认 `1GB` GPU memory reserve preflight，失败时在启动 Splatfacto 前输出 `near1m_gpu_preflight=failed`。宿主机提权只读 preflight 已通过：RTX 5060 Ti，free=`15215MiB`，reserve=`1024MiB`，`launchReadiness=ready`；当前 status JSON 显示 dataset、SAM checkpoint、balanced SAM manifest 已 present；near-1M train config / checkpoint / exported PLY / object-aware PLY / SLA summary 仍 missing。
+  - `npm run train:splatfacto:near1m-candidate` 已固化为 TRAIN-003D/003E/003F/003G/003H/003I/003J/003K/003L/003M/003N near-1M candidate handoff：dry-run/status/run 三模式串起 10000-step Splatfacto candidate、balanced Object Field 登记和 `audit:webgpu-cpath-production-sla`，`--status-json` 可写出 `objgauss-near1m-candidate-status-v1` 机器可读 readiness report，并会在 dry-run、成功和已知失败路径留下当前 readiness、`launchReadiness`、`lastExit` 与 `lastFailure`。`npm run train:splatfacto:near1m-gpu-preflight` 可单独执行 `1GB` GPU memory reserve preflight，不启动 Splatfacto。`npm run train:splatfacto:near1m-background` 可 preflight / dry-run / status / guarded stop / 显式 confirmed 后台启动 near-1M 长训，并写 `/tmp` 下的 launcher manifest、status JSON、nested candidate status JSON 和 log；`--preflight` 会刷新 nested candidate status 并只在启动输入与 GPU preflight ready 时返回 0，`--status` 会汇总 nested candidate readiness、launch readiness、last exit 和 last failure kind，`--stop --confirm-stop` 会向记录的 detached process group 发送 `SIGTERM`。Pipeline 默认要求 exported PLY / object-aware PLY 均 `>=1000000` Gaussians；低于阈值会在登记或 SLA 前输出 `near1m_scale_gate=failed` 并停止。真正启动长训还必须显式传 `--confirm-long-run`，否则 `--run` 会输出 `near1m_long_run_guard=failed`；确认后的 CUDA 长训还会先用 `nvidia-smi` 执行默认 `1GB` GPU memory reserve preflight，失败时在启动 Splatfacto 前输出 `near1m_gpu_preflight=failed`。宿主机提权只读 preflight 已通过：RTX 5060 Ti，free=`15215MiB`，reserve=`1024MiB`，`launchReadiness=ready`；当前 random1300k-v1 本地训练证据已形成，sampled1m derivative 通过 strict production SLA，完整 4.5M PLY 仍需单独 LOD / streaming / 全量性能优化。
   - `train:splatfacto:near1m-candidate -- --status` 现在会直接输出 `near1m_goal_gap` 和逐项 `near1m_goal_blocker_<n>`，并把同样结构写入 status JSON 的 `goalGap` 字段；production SLA summary 必须读到 `status="passed"` 才算 terminal evidence，存在但 failed / unreadable 的 summary 会保持 `incomplete` 并给出 `next_action=run-production-sla`。
-  - `train:splatfacto:near1m-background` 的 dry-run/status/preflight/confirmed start 现在会输出 `objgauss-near1m-background-handoff-v1`，包含 `near1m_next_action`、下一条可执行命令、是否会启动长训，以及剩余 production SLA 证据缺口；默认还会写 `<output-dir>/handoff.md` 作为 operator-facing Markdown 交接文件。`--status` / `--stop` 已补 process identity 诊断：新 manifest 记录 launch process start time / process group / cwd / command line，状态输出 `near1m_process_identity=running|stale-pid|running-unverified`，避免 PID 复用或旧 manifest 把状态误报成 running，也避免 stop 误杀不匹配进程。宿主机只读 preflight 已验证真实 GPU reserve 通过时会输出 `near1m_next_action=start-background-long-run`；confirmed start 会立即写 `monitor-background` handoff。最终 candidate 仍保持 `incomplete` 和 5 个缺口，直到 near-1M PLY 与 SLA 真实存在。
+  - `train:splatfacto:near1m-background` 的 dry-run/status/preflight/confirmed start 现在会输出 `objgauss-near1m-background-handoff-v1`，包含 `near1m_next_action`、下一条可执行命令、是否会启动长训，以及剩余 production SLA 证据缺口；默认还会写 `<output-dir>/handoff.md` 作为 operator-facing Markdown 交接文件。`--status` / `--stop` 已补 process identity 诊断：新 manifest 记录 launch process start time / process group / cwd / command line，状态输出 `near1m_process_identity=running|stale-pid|running-unverified`，避免 PID 复用或旧 manifest 把状态误报成 running，也避免 stop 误杀不匹配进程。该入口仍用于未来长训 / 重训 handoff；当前 terminal proof 已由 random1300k-v1 的 deterministic sampled1m derivative 和 production SLA report 关闭。
 - Demo:
   - `objgauss demo v1-closure` 可生成当前 v1 闭环验收包。
   - `objgauss demo verify-v1-closure` 可重新读取产物并机器检查闭环证据。
@@ -230,7 +257,7 @@ Model verified head 为 `82b700392699852c62dca70ac4274dc722d82282`。
   - `npm run acceptance:webgpu-headless` 已固化为 WebGPU CI/headless acceptance 命令；默认构建 viewer、跑 WebGPU tile smoke、再跑 Lego proxy + Plush semantic 的 offscreen object-transition suite。
   - `docs/training/splatfacto-smoke.md` 已记录 Splatfacto smoke 训练 / 导出 / SAM / Object Field 的 runbook 和输出 contract。
   - `npm run train:splatfacto:near1m-candidate` 已固化为 near-1M trained candidate 到 production SLA 的本地编排入口：只有 `--run --confirm-long-run` 才会启动长训，后续输出仍在 ignored `outputs/` 和 `/tmp`；默认 scale gate 会拒绝低于 1M Gaussians 的 exported / object-aware PLY。
-  - `npm run audit:near1m-production-gap` 已固化为非训练 near-1M terminal evidence gap artifact：默认写 `/tmp/objgauss-near1m-production-gap/summary.{json,md}` 并在 incomplete 时 exit `0` 用作进度报告；加 `--require-ready` 时会把同一套检查变成 final gate，当前预期失败并报告 5 个缺口。
+  - `npm run audit:near1m-production-gap` 已固化为非训练 near-1M terminal evidence gap artifact：默认写 `/tmp/objgauss-near1m-production-gap/summary.{json,md}` 并在 incomplete 时 exit `0` 用作进度报告；加 `--require-ready` 时会把同一套检查变成 final gate。绑定 random1300k-v1 sampled1m candidate / SLA 目录时已返回 `ready`，completed evidence `8`，missing evidence `0`。
   - `npm run benchmark:splatfacto:balanced` 已固化为 safe-2000 balanced candidate 的一键本地 benchmark 入口，可重跑 balanced SAM、`training register-output`、emergence metrics、curve、report 和 summary。
   - `npm run benchmark:splatfacto:variants` 已固化为 safe-2000 同场景多 mask / slot policy 对比入口，可生成三变体 summary、CSV、Markdown 表格和 HTML 曲线报告。
   - `npm run benchmark:splatfacto:scenes` 已固化为 Splatfacto-trained scene suite，可比较 Lego safe-2000、LLFF Fern smoke 与 Poly Haven Chair smoke 三个 scene rows，并支持 train / held-out SAM manifest split。
@@ -263,7 +290,7 @@ Model verified head 为 `82b700392699852c62dca70ac4274dc722d82282`。
   - PORT-001 已将本地 browser audit / acceptance 默认端口收敛到 fixed `5395`：`audit:demo`、Spark audits、WebGPU browser audits、renderer / demo / Spark commercial / WebGPU headless acceptance 默认都走 `5395`。如端口占用，应停止占用 `5395` 的本地 preview/audit 进程后重跑，不再轮换随机端口；显式 override 参数仍保留用于特殊诊断。
   - PORT-002 已将裸跑 `npm run dev` 与 `npm run preview` 也固定到 `127.0.0.1:5395 --strictPort`；日常 Web 查看和 browser audit 使用同一端口，端口占用时先停止占用进程再重跑。
   - `npm run audit:renderer-route-contract` 已固化为 B -> C renderer 路线静态合约审计：检查 WebGL Gaussian OIT fallback、WebGPU tile terminal path、Spark commercial source route、browser audit telemetry 和 fixed `5395` 端口策略仍保持一致。
-  - `npm run audit:renderer-route-goal` 已固化为 B -> C renderer 路线目标级进度审计：聚合 route contract、WebGPU 100k-1M scale/edit budgets 和 near-1M production gap 到一份 summary；默认在仅缺 near-1M 终局证据时 exit `0` 作为进度报告，显式加 `--require-production-ready` 时会作为 terminal gate 失败。该命令现在还会在 evidence 表中区分 C-path runtime readiness：默认只报告 `not-collected` 且不阻塞 CI，可用 `--cpath-readiness-summary <summary.json>` 复用已有 `audit:webgpu-cpath-readiness` 结果，或用 `--include-cpath-readiness` 主动运行；加 `--require-cpath-readiness` 时会要求 headed object transition 与 synthetic 1M runtime 证据齐备，但仍不会把 255k trained PLY 或 synthetic 1M 误计为 real trained near-1M production proof。
+  - `npm run audit:renderer-route-goal` 已固化为 B -> C renderer 路线目标级进度审计：聚合 route contract、WebGPU 100k-1M scale/edit budgets 和 near-1M production gap 到一份 summary；默认可作为进度报告，显式加 `--require-production-ready` 时会作为 terminal gate。该命令现在还会在 evidence 表中区分 C-path runtime readiness：默认只报告 `not-collected` 且不阻塞 CI，可用 `--cpath-readiness-summary <summary.json>` 复用已有 `audit:webgpu-cpath-readiness` 结果，或用 `--include-cpath-readiness` 主动运行；加 `--require-cpath-readiness` 时会要求 headed object transition 与 synthetic 1M runtime 证据齐备，但仍不会把 255k trained PLY 或 synthetic 1M 误计为 real trained near-1M production proof。本次新增 `--near1m-*` passthrough，绑定 sampled1m candidate / SLA 目录时 `--require-production-ready` 已返回 `ready`。
   - `docs/benchmarks/spark-filtered-edit.md` 已记录 Spark filtered edit preview 的 runtime contract、验证命令和剩余 gap。
   - `objgauss demo audit-v1-goal --allow-incomplete` 已固化为阶段目标完成度审计命令。
   - baseline commit: `c8dcef7`.
@@ -964,7 +991,7 @@ npm run acceptance:demo
 
 ## 当前限制
 
-- Hugging Face 上的 near-1M NeRF Lego Dataset / Model 当前只是 development-stage release。它记录研究复现资产和模型产物 handoff，不代表稳定公开版本；远端大文件已核对通过，但 `audit:webgpu-cpath-production-sla` 仍需单独通过，不能把 HF 发布等同于 terminal proof。
+- Hugging Face 上的 near-1M NeRF Lego Dataset / Model 当前只是 development-stage release。它记录研究复现资产和模型产物 handoff，不代表稳定公开版本；远端大文件已核对通过，sampled1m derivative 已通过 `audit:webgpu-cpath-production-sla` 形成 terminal proof，但 HF 全量 `4,503,634`-Gaussian object-aware PLY 直接 browser runtime 仍未达到 production-interactive。
 - 对象聚类色和部分诊断仍走 `Gaussian OIT 编辑` fallback 或 WebGPU tile route；`原始颜色（编辑预览）` 在 object edit active 后 no-SH 样例可走 Spark native compact `.splat` object mask，SH-heavy 样例保留 PLY packed route 以保存 degree-3 SH rest。剩余颗粒感主要来自 object_id 子集稀疏、边界 assignment 噪声、透明混合中被隐藏对象不再贡献，以及删除后没有补洞 / 重优化。WebGPU full runtime 内部输出、bilinear resolve、aspect-fit viewport、camera-Jacobian covariance、depth-binned alpha composite、Spark-frame camera diagnostic 和 front-top-k diagnostic 已把 coverage / sorting / color 残差拆成可审计项。当前 headless unsafe WebGPU failure 已归类为 canvas render pass / presentation backend limitation；headed desktop Chrome/WebGPU 已通过 NeRF Lego proxy、Plush 和 safe-2000 Splatfacto 的 full WebGPU tile runtime audit。
 - Spark `SplatMesh.raycast` 当前可命中 splat depth，但 intersection 不暴露 splat index / object id，且不能证明 object opacity mask filter-aware；因此对象选择仍应使用已验收的 `hover-confirm-v1` screen-space pick，不能宣称已经是 renderer-native object picking。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
@@ -979,8 +1006,8 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 补齐 near-1M 终局证据：HF Dataset object-aware PLY 和 Model checkpoint 已上传并远端核对；下一步修复并重跑 `audit:webgpu-cpath-production-sla`，只有 production SLA summary 为 `passed` 才能关闭 terminal proof。
-2. RENDER-005T-AI: 基于已通过的 `.splat` / PLY index mapping，原型化 original source / native `.splat` object mask runtime，并复用 object-mask pixel-delta、Spark residual 和 index-mapping gates 验收；默认 coverage / depth / camera / alpha / color 参数变更必须先通过 `audit:webgpu-coverage-gate`，alpha floor 默认变更还必须先通过 `audit:webgpu-alpha-floor-candidate-gate`。
+1. 产品 viewer 线：把 near-1M / HF 大模型体验整理成默认可解释 route，保持 `.splat` 快速查看、不自动加载 1.15GB+ PLY，并补齐训练模型筛选、按需加载和失败状态审计。
+2. 语义质量线：推进 depth-aware mask voting、跨视角 slot 对齐和 CLIP 命名；near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
 3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 4. 后续 SEG: CLIP 语义命名、跨视角 SAM slot 对齐，以及与 color-mask / KMeans baseline 的质量对比。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
