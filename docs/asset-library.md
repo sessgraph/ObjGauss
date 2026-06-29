@@ -185,6 +185,19 @@ objgauss training register-output path/to/point_cloud.ply \
 默认会生成 viewer `.splat`、Object Field、带 `object_id` 的 PLY 和
 `training-output-manifest.json`。
 
+near-1M trained candidate 的 Hugging Face development-stage release 记录：
+
+```text
+Dataset: https://huggingface.co/datasets/jianyong365/objgauss-nerf-lego-near1m
+Model:   https://huggingface.co/jianyong365/objgauss-nerf-lego-near1m-model
+State:   development-stage release only
+Record:  docs/state/huggingface-release.md
+```
+
+这组 HF 资产用于研究复现和下载 handoff，不是 stable release。它继承
+NeRF Synthetic Lego / upstream research dataset 的使用边界；公开页面必须保留
+development-stage 声明。大型训练产物继续放在 HF / ignored `outputs/`，不要提交进 git。
+
 Alpha foreground/background 本地页面预览：
 
 ```text
