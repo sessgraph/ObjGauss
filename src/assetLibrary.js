@@ -150,6 +150,29 @@ export const ASSET_LIBRARY = [
     bestFor: "登记外部 3DGS 训练器产出的 Lego Gaussian，并用 2D mask 投票导出对象级 PLY。",
   },
   {
+    id: "nerf-lego-trained-near1m-random1300k-local",
+    name: "NeRF Lego near-1M 训练输出样例",
+    category: "本地诊断",
+    sourceType: "gaussian",
+    status: "训练后可用",
+    priority: "P0",
+    pipelineStage: "near-1M terminal proof candidate",
+    useCases: ["near-1M训练输出", "ObjectField", "WebGPU SLA", "对象编辑"],
+    localPath: "/samples/nerf_lego_trained_near1m_random1300k_objects.ply",
+    splatPath: "/samples/nerf_lego_trained_near1m_random1300k.splat",
+    fileName: "nerf_lego_trained_near1m_random1300k_objects.ply",
+    splatFileName: "nerf_lego_trained_near1m_random1300k.splat",
+    gaussianCount: 4503634,
+    deferObjectPly: true,
+    objectPlySizeLabel: "1.15GB",
+    splatSizeLabel: "144MB",
+    sourceName: "Splatfacto tuned near-1M + NeRF Synthetic Lego",
+    sourceUrl: "https://github.com/bmild/nerf",
+    license: "NeRF 官方示例数据，仅训练/研究使用",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "本机 near-1M real trained object-aware PLY 终局证据候选；大文件，仅用于本地诊断和 SLA。",
+  },
+  {
     id: "nerf-lego-alpha-fgbg-bg005-local",
     name: "NeRF Lego Alpha 前景/背景诊断基线",
     category: "本地验收",
@@ -294,6 +317,7 @@ export const ASSET_LIBRARY = [
 ];
 
 export const FEATURED_ASSET_IDS = [
+  "nerf-lego-trained-near1m-random1300k-local",
   "plush-semantic-closure-local",
   "polyhaven-chair-commercial-demo-local",
   "plush-v1-closure-local",

@@ -35,6 +35,24 @@ const samMinArea = options.samMinArea ?? "64";
 const samMaxAreaFraction = options.samMaxAreaFraction;
 const samMaxImageSize = options.samMaxImageSize;
 const checkpointStep = options.checkpointStep ?? formatCheckpointStep(iterations);
+const splatfactoModelOptions = [
+  ...optionalPair("--pipeline.model.random-init", pythonBool(options.randomInit)),
+  ...optionalPair("--pipeline.model.num-random", options.numRandom),
+  ...optionalPair("--pipeline.model.random-scale", options.randomScale),
+  ...optionalPair("--pipeline.model.warmup-length", options.warmupLength),
+  ...optionalPair("--pipeline.model.refine-every", options.refineEvery),
+  ...optionalPair("--pipeline.model.reset-alpha-every", options.resetAlphaEvery),
+  ...optionalPair("--pipeline.model.densify-grad-thresh", options.densifyGradThresh),
+  ...optionalPair("--pipeline.model.densify-size-thresh", options.densifySizeThresh),
+  ...optionalPair("--pipeline.model.n-split-samples", options.nSplitSamples),
+  ...optionalPair("--pipeline.model.cull-alpha-thresh", options.cullAlphaThresh),
+  ...optionalPair("--pipeline.model.cull-scale-thresh", options.cullScaleThresh),
+  ...optionalPair("--pipeline.model.cull-screen-size", options.cullScreenSize),
+  ...optionalPair("--pipeline.model.split-screen-size", options.splitScreenSize),
+  ...optionalPair("--pipeline.model.stop-screen-size-at", options.stopScreenSizeAt),
+  ...optionalPair("--pipeline.model.stop-split-at", options.stopSplitAt),
+  ...optionalPair("--pipeline.model.num-downscales", options.numDownscales),
+];
 const sceneSlug =
   options.sceneSlug ??
   assetId
@@ -108,6 +126,9 @@ const steps = [
         "--pipeline.datamanager.camera-res-scale-factor",
         options.cameraResScaleFactor,
       ),
+      ...optionalPair("--pipeline.datamanager.images-on-gpu", pythonBool(options.imagesOnGpu)),
+      ...optionalPair("--pipeline.datamanager.masks-on-gpu", pythonBool(options.masksOnGpu)),
+      ...splatfactoModelOptions,
       ...dataParserCommand(),
     ],
   },
@@ -323,6 +344,14 @@ function cudaEnv() {
 
 function optionalPair(flag, value) {
   return value === undefined || value === null ? [] : [flag, String(value)];
+}
+
+function pythonBool(value) {
+  if (value === undefined || value === null) return value;
+  const normalized = String(value).toLowerCase();
+  if (normalized === "true") return "True";
+  if (normalized === "false") return "False";
+  return value;
 }
 
 function slotsWithBackground(slotValue, backgroundSlotValue) {

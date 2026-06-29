@@ -294,6 +294,17 @@ npm run train:splatfacto:near1m-background -- \
   --output-dir /tmp/objgauss-splatfacto-near1m-background
 ```
 
+If the default near-1M run completes but the exported PLY remains below the
+`1,000,000` Gaussian scale gate, do not rerun the same timestamp and defaults.
+Start a tuned candidate in a separate output directory / timestamp and pass the
+Splatfacto densification controls explicitly through the background launcher,
+for example `--num-random`, `--cull-alpha-thresh`,
+`--densify-grad-thresh`, `--refine-every`, `--reset-alpha-every`,
+`--stop-split-at`, `--cache-images`, `--images-on-gpu`, and
+`--masks-on-gpu`. Keeping the tuned run separate preserves the failed scale-gate
+evidence and makes the successful production SLA proof traceable to the exact
+training knobs.
+
 Check the detached process and log tail:
 
 ```bash

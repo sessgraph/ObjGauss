@@ -365,15 +365,19 @@ export default function App() {
       ).length,
     [scene.points, visibleIds, removedIds, isolatedId],
   );
+  const objectDataDeferred = Boolean(scene.deferredObjectAsset && scene.points.length === 0);
+  const sceneDisplayPointCount =
+    scene.points.length > 0 ? scene.points.length : Number(scene.gaussianCount) || 0;
+  const displayVisibleCount = objectDataDeferred ? sceneDisplayPointCount : visibleCount;
 
-  const applyScene = (next) => {
+  const applyScene = (next, options = {}) => {
     setScene(next);
     const ids = allIds(next.points);
     setVisibleIds(ids);
     setRemovedIds(new Set());
     setSelectedId(null);
     setIsolatedId(null);
-    setViewMode(next.splatSource ? "view" : "edit");
+    setViewMode(options.viewMode ?? (next.splatSource ? "view" : "edit"));
     setRenderMode("original");
   };
 
@@ -394,11 +398,28 @@ export default function App() {
     }
   };
 
-  const loadAsset = async (asset) => {
+  const loadAsset = async (asset, options = {}) => {
     if (!asset?.localPath) return;
     setBusy(true);
     setError("");
     try {
+      if (asset.deferObjectPly && asset.splatPath && !options.forceObjectPly) {
+        applyScene(
+          {
+            assetId: asset.id,
+            name: asset.name,
+            points: [],
+            gaussianCount: asset.gaussianCount ?? 0,
+            deferredObjectAsset: asset,
+            splatSource: {
+              url: asset.splatPath,
+              fileName: asset.splatFileName ?? asset.name,
+            },
+          },
+          { viewMode: "view" },
+        );
+        return true;
+      }
       const response = await fetch(asset.localPath);
       if (!response.ok) {
         throw new Error(`示例 PLY 加载失败 (${response.status})`);
@@ -408,19 +429,34 @@ export default function App() {
         assetId: asset.id,
         name: asset.fileName ?? asset.name,
         points: cloud.points,
+        gaussianCount: cloud.points.length,
         shRestCoefficients: cloud.shRestCoefficients,
         shRestCoefficientCount: cloud.shRestCoefficientCount,
         shDegree: cloud.shDegree,
         splatSource: {
           url: asset.splatPath ?? asset.localPath,
-          fileName: asset.fileName ?? asset.name,
+          fileName: asset.splatFileName ?? asset.fileName ?? asset.name,
         },
       });
+      return true;
     } catch (loadError) {
       setError(loadError.message || "示例 PLY 加载失败");
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  const loadDeferredObjectPly = async ({
+    nextViewMode = "edit",
+    nextRenderMode = "original",
+  } = {}) => {
+    const asset = scene.deferredObjectAsset;
+    if (!asset?.localPath) return;
+    const loaded = await loadAsset(asset, { forceObjectPly: true });
+    if (!loaded) return;
+    setViewMode(nextViewMode);
+    setRenderMode(nextRenderMode);
   };
 
   const loadSample = () => loadAsset(LOCAL_SAMPLE_ASSET);
@@ -458,10 +494,18 @@ export default function App() {
   };
 
   const enterEditMode = () => {
+    if (objectDataDeferred) {
+      void loadDeferredObjectPly({ nextViewMode: "edit" });
+      return;
+    }
     setViewMode("edit");
   };
 
   const setEditRenderMode = (mode) => {
+    if (mode === "clustered" && objectDataDeferred) {
+      void loadDeferredObjectPly({ nextViewMode: "edit", nextRenderMode: "clustered" });
+      return;
+    }
     setRenderMode(mode);
     if (mode === "clustered") {
       setViewMode("edit");
@@ -531,6 +575,7 @@ export default function App() {
       data-spark-object-mask-feather-enabled={String(sparkObjectMaskFeathering.enabled)}
       data-spark-object-mask-feather-opacity={sparkObjectMaskFeathering.opacity}
       data-spark-object-mask-feather-radius={sparkObjectMaskFeathering.radius}
+      data-object-ply-load-state={objectDataDeferred ? "deferred" : "loaded"}
     >
       <header className="topbar">
         <div className="brand">
@@ -604,8 +649,28 @@ export default function App() {
             </button>
             <div className="fileBox">
               <span>{scene.name}</span>
-              <small>{scene.points.length.toLocaleString()} 个高斯点</small>
+              <small>
+                {sceneDisplayPointCount.toLocaleString()} 个高斯点
+                {objectDataDeferred ? " / 对象数据未加载" : ""}
+              </small>
             </div>
+            {objectDataDeferred && (
+              <>
+                <div className="hintText">
+                  当前使用 {scene.deferredObjectAsset.splatSizeLabel ?? ".splat"} Splat；对象编辑需加载{" "}
+                  {scene.deferredObjectAsset.objectPlySizeLabel ?? "PLY"} PLY。
+                </div>
+                <button
+                  className="secondaryButton"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => loadDeferredObjectPly({ nextViewMode: "edit" })}
+                >
+                  <Database size={16} />
+                  加载对象 PLY
+                </button>
+              </>
+            )}
             {error && <div className="errorBox">{error}</div>}
           </section>
 
@@ -729,7 +794,7 @@ export default function App() {
                         disabled={busy}
                         onClick={() => loadAsset(asset)}
                       >
-                        加载
+                        {asset.deferObjectPly ? "快速查看" : "加载"}
                       </button>
                     </div>
                   </article>
@@ -789,7 +854,7 @@ export default function App() {
               objectMaskFeathering={sparkObjectMaskFeathering}
               showGrid={showGrid}
               showAxes={showAxes}
-              pointCount={useSparkFilteredRenderer ? visibleCount : scene.points.length}
+              pointCount={useSparkFilteredRenderer ? visibleCount : sceneDisplayPointCount}
               rendererLabel={activeRendererText}
               selectedId={useSparkFilteredRenderer ? selectedId : null}
               onSelectObject={useSparkFilteredRenderer ? selectObject : null}
@@ -837,9 +902,9 @@ export default function App() {
           <section className="panelSection inspectorHead">
             <h2>对象检查器</h2>
             <div className="metricGrid">
-              <Metric label="对象" value={summary.length} />
-              <Metric label="高斯点" value={scene.points.length.toLocaleString()} />
-              <Metric label="可见" value={visibleCount.toLocaleString()} />
+              <Metric label="对象" value={objectDataDeferred ? "待加载" : summary.length} />
+              <Metric label="高斯点" value={sceneDisplayPointCount.toLocaleString()} />
+              <Metric label="可见" value={displayVisibleCount.toLocaleString()} />
             </div>
           </section>
 
@@ -966,8 +1031,8 @@ export default function App() {
         <span>路线：{rendererRoute.label}</span>
         <span>渲染器：{activeRendererText}</span>
         <span>WebGPU：{activeEditRenderer.webGpuLabel}</span>
-        <span>高斯点：{scene.points.length.toLocaleString()}</span>
-        <span>可见：{visibleCount.toLocaleString()}</span>
+        <span>高斯点：{sceneDisplayPointCount.toLocaleString()}</span>
+        <span>可见：{displayVisibleCount.toLocaleString()}</span>
         <span>所选：{selectedId ?? "无"}</span>
       </footer>
     </main>

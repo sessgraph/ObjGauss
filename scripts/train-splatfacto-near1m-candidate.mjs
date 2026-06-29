@@ -53,6 +53,8 @@ const minExportedGaussians = positiveInteger(
 const dataParser = options.dataParser ?? "blender-data";
 const vis = options.vis ?? "tensorboard";
 const cacheImages = options.cacheImages ?? "cpu";
+const imagesOnGpu = options.imagesOnGpu;
+const masksOnGpu = options.masksOnGpu;
 const cameraResScaleFactor = options.cameraResScaleFactor ?? "1.0";
 const cudaHome =
   options.cudaHome ??
@@ -131,6 +133,24 @@ const steps = [
       cacheImages,
       "--camera-res-scale-factor",
       cameraResScaleFactor,
+      ...optionalPair("--images-on-gpu", imagesOnGpu),
+      ...optionalPair("--masks-on-gpu", masksOnGpu),
+      ...optionalPair("--random-init", options.randomInit),
+      ...optionalPair("--num-random", options.numRandom),
+      ...optionalPair("--random-scale", options.randomScale),
+      ...optionalPair("--warmup-length", options.warmupLength),
+      ...optionalPair("--refine-every", options.refineEvery),
+      ...optionalPair("--reset-alpha-every", options.resetAlphaEvery),
+      ...optionalPair("--densify-grad-thresh", options.densifyGradThresh),
+      ...optionalPair("--densify-size-thresh", options.densifySizeThresh),
+      ...optionalPair("--n-split-samples", options.nSplitSamples),
+      ...optionalPair("--cull-alpha-thresh", options.cullAlphaThresh),
+      ...optionalPair("--cull-scale-thresh", options.cullScaleThresh),
+      ...optionalPair("--cull-screen-size", options.cullScreenSize),
+      ...optionalPair("--split-screen-size", options.splitScreenSize),
+      ...optionalPair("--stop-screen-size-at", options.stopScreenSizeAt),
+      ...optionalPair("--stop-split-at", options.stopSplitAt),
+      ...optionalPair("--num-downscales", options.numDownscales),
       ...optionalPair("--cuda-home", cudaHome),
       "--max-jobs",
       maxJobs,
