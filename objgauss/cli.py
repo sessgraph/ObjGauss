@@ -6,6 +6,10 @@ from pathlib import Path
 import numpy as np
 
 from objgauss.assets import list_assets, pull_asset
+from objgauss.baseline_comparison import (
+    compare_baseline_candidates,
+    write_comparison_markdown,
+)
 from objgauss.clustering import cluster_features, summarize_labels
 from objgauss.clip_scoring import (
     CLIP_LABEL_PRESETS,
@@ -811,6 +815,38 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
         raise ValueError(f"slot naming quality gate failed: {quality.get('blockers', [])}")
 
 
+def _masks_compare_baselines(args: argparse.Namespace) -> None:
+    summary = compare_baseline_candidates(
+        args.candidate,
+        min_supervised_fraction=args.min_supervised_fraction,
+        max_vote_conflict_fraction=args.max_vote_conflict_fraction,
+        min_slot_balance_score=args.min_slot_balance_score,
+        min_object_active_slots=args.min_object_active_slots,
+        object_id_field=args.object_id_field,
+    )
+    write_json(args.output, summary)
+    if args.markdown_output:
+        write_comparison_markdown(args.markdown_output, summary)
+    policy = summary["promotion_policy"]
+    print(f"comparison_summary={args.output}")
+    if args.markdown_output:
+        print(f"comparison_markdown={args.markdown_output}")
+    print(f"candidates={summary['candidate_count']}")
+    print(f"promotion_policy={policy['status']}")
+    print(f"recommended_candidate={policy.get('recommended_candidate') or '-'}")
+    if policy.get("blockers"):
+        print(f"promotion_blockers={policy['blockers']}")
+    for candidate in summary["candidates"]:
+        promotion = candidate["promotion"]
+        print(
+            f"candidate={candidate['name']} "
+            f"promotion={promotion['status']} "
+            f"blockers={promotion.get('blockers', [])}"
+        )
+    if args.require_promotion_ready and policy["status"] != "promote":
+        raise ValueError(f"semantic promotion policy failed: {policy.get('blockers', [])}")
+
+
 def _demo_v1_closure(args: argparse.Namespace) -> None:
     result = build_v1_closure_demo(
         input_ply=args.input,
@@ -1566,6 +1602,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="exit non-zero when the slot-level naming quality gate fails",
     )
     align_slots.set_defaults(handler=_masks_align_slots)
+
+    compare_baselines = masks_subparsers.add_parser(
+        "compare-baselines",
+        help="compare CLIP slot naming against color-mask, KMeans, alpha, and other baselines",
+    )
+    compare_baselines.add_argument(
+        "--candidate",
+        action="append",
+        required=True,
+        help="candidate evidence binding as name=path; repeat the same name to merge evidence",
+    )
+    compare_baselines.add_argument("--output", "-o", required=True, type=Path)
+    compare_baselines.add_argument("--markdown-output", type=Path)
+    compare_baselines.add_argument("--min-supervised-fraction", type=float, default=0.2)
+    compare_baselines.add_argument("--max-vote-conflict-fraction", type=float, default=0.05)
+    compare_baselines.add_argument("--min-slot-balance-score", type=float, default=0.01)
+    compare_baselines.add_argument("--min-object-active-slots", type=int, default=2)
+    compare_baselines.add_argument("--object-id-field", default="object_id")
+    compare_baselines.add_argument(
+        "--require-promotion-ready",
+        action="store_true",
+        help="exit non-zero unless at least one semantic candidate passes promotion policy",
+    )
+    compare_baselines.set_defaults(handler=_masks_compare_baselines)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

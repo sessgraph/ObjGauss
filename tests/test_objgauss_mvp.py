@@ -1756,6 +1756,171 @@ def test_masks_score_clip_feeds_align_slot_names(tmp_path, capsys):
     assert {slot["label"] for slot in aligned["slots"]} <= {"red brick", "blue brick"}
 
 
+def test_masks_compare_baselines_writes_promotion_policy(tmp_path, capsys):
+    clip_path = tmp_path / "clip-aligned.json"
+    alpha_path = tmp_path / "alpha-training-summary.json"
+    color_path = tmp_path / "color-training-summary.json"
+    kmeans_path = tmp_path / "kmeans-objects.ply"
+    summary_path = tmp_path / "comparison-summary.json"
+    markdown_path = tmp_path / "comparison-summary.md"
+
+    clip_path.write_text(
+        json.dumps(
+            {
+                "slot_count": 4,
+                "slots": [
+                    {"slot": 0, "label": "lego wheel tread"},
+                    {"slot": 1, "label": "lego wheel tread"},
+                    {"slot": 2, "label": "lego wheel tread"},
+                    {"slot": 3, "label": "lego wheel tread"},
+                ],
+                "slot_alignment": {
+                    "kind": "objgauss-cross-view-slot-alignment-v1",
+                    "record_filters": {
+                        "kind": "objgauss-slot-record-filters-v1",
+                        "source_masks": 27,
+                        "kept_records": 8,
+                        "filtered_low_area": 10,
+                        "filtered_top_label": 9,
+                    },
+                    "slot_naming_quality": {
+                        "kind": "objgauss-slot-naming-quality-v1",
+                        "passed": False,
+                        "blockers": [
+                            "not-enough-unique-slot-labels",
+                            "slot-label-dominant:lego wheel tread",
+                        ],
+                        "slots": 4,
+                        "named_slots": 4,
+                        "unique_slot_labels": 1,
+                        "slot_label_counts": {"lego wheel tread": 4},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    alpha_path.write_text(
+        json.dumps(
+            {
+                "initial_loss": 1.2,
+                "final_loss": 0.4,
+                "iterations": 20,
+                "supervised_gaussians": 80,
+                "frames": 3,
+                "projected": 100,
+                "matched": 80,
+                "vote_quality": _vote_quality_fixture(
+                    supervised_fraction=0.8,
+                    conflict_fraction=0.08,
+                    winners=[60, 20],
+                ),
+                "metrics": {"active_slots": 2, "normalized_entropy": 0.35},
+            }
+        ),
+        encoding="utf-8",
+    )
+    color_path.write_text(
+        json.dumps(
+            {
+                "initial_loss": 1.0,
+                "final_loss": 0.2,
+                "iterations": 12,
+                "supervised_gaussians": 40,
+                "frames": 2,
+                "projected": 60,
+                "matched": 45,
+                "metrics": {"active_slots": 4, "normalized_entropy": 0.25},
+            }
+        ),
+        encoding="utf-8",
+    )
+    write_ply(
+        kmeans_path,
+        assign_object_ids(_synthetic_cloud(), np.array([0, 0, 1, 1], dtype=np.int32)),
+        fmt="ascii",
+    )
+
+    assert (
+        main(
+            [
+                "masks",
+                "compare-baselines",
+                "--candidate",
+                f"clip={clip_path}",
+                "--candidate",
+                f"alpha={alpha_path}",
+                "--candidate",
+                f"color={color_path}",
+                "--candidate",
+                f"kmeans={kmeans_path}",
+                "--output",
+                str(summary_path),
+                "--markdown-output",
+                str(markdown_path),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    markdown = markdown_path.read_text(encoding="utf-8")
+    candidates = {candidate["name"]: candidate for candidate in summary["candidates"]}
+
+    assert "promotion_policy=do-not-promote" in output
+    assert summary["kind"] == "objgauss-clip-baseline-comparison-v1"
+    assert "Development-stage research comparison" in summary["development_stage_notice"]
+    assert summary["promotion_policy"]["status"] == "do-not-promote"
+    assert candidates["clip"]["promotion"]["status"] == "blocked"
+    assert "slot-naming:not-enough-unique-slot-labels" in candidates["clip"]["promotion"]["blockers"]
+    assert candidates["alpha"]["vote_quality"]["slot_balance_score"] == pytest.approx(1 / 3)
+    assert candidates["alpha"]["promotion"]["status"] == "reference-only"
+    assert candidates["color"]["training"]["loss_reduced"] is True
+    assert candidates["kmeans"]["object_id_stats"]["active_slots"] == 2
+    assert candidates["kmeans"]["object_id_stats"]["slot_balance_score"] == 1.0
+    assert "# ObjGauss CLIP Baseline Comparison" in markdown
+    assert "| Candidate | Evidence | Naming |" in markdown
+
+
+def test_masks_compare_baselines_can_require_promotion_ready(tmp_path, capsys):
+    clip_path = tmp_path / "clip-aligned.json"
+    summary_path = tmp_path / "comparison-summary.json"
+    clip_path.write_text(
+        json.dumps(
+            {
+                "slot_alignment": {
+                    "slot_naming_quality": {
+                        "kind": "objgauss-slot-naming-quality-v1",
+                        "passed": False,
+                        "blockers": ["not-enough-unique-slot-labels"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "masks",
+                "compare-baselines",
+                "--candidate",
+                f"clip={clip_path}",
+                "--output",
+                str(summary_path),
+                "--require-promotion-ready",
+            ]
+        )
+
+    assert exc.value.code == 2
+    assert "semantic promotion policy failed" in capsys.readouterr().err
+    assert json.loads(summary_path.read_text(encoding="utf-8"))["promotion_policy"]["status"] == (
+        "do-not-promote"
+    )
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -3161,6 +3326,38 @@ class _FixedClipScorer:
         self.seen_images = [np.asarray(image).copy() for image in images]
         self.seen_labels = tuple(labels)
         return self._scores
+
+
+def _vote_quality_fixture(*, supervised_fraction, conflict_fraction, winners):
+    supervised_gaussians = int(sum(winners))
+    return {
+        "gaussian_count": int(round(supervised_gaussians / supervised_fraction)),
+        "slots": len(winners),
+        "supervised_gaussians": supervised_gaussians,
+        "unsupervised_gaussians": 0,
+        "supervised_fraction": supervised_fraction,
+        "projected": 100,
+        "matched": supervised_gaussians,
+        "matched_projected_fraction": 0.8,
+        "vote_conflict": {
+            "gaussians": int(round(supervised_gaussians * conflict_fraction)),
+            "fraction": conflict_fraction,
+            "target_entropy": 0.0,
+            "normalized_target_entropy": 0.0,
+        },
+        "target_confidence": {"mean": 0.9, "min": 0.6},
+        "per_slot": [
+            {
+                "slot": slot,
+                "vote_weight": float(count),
+                "supervised_gaussians": int(count),
+                "winner_gaussians": int(count),
+                "supervised_fraction": float(count / max(1, supervised_gaussians)),
+                "winner_fraction": float(count / max(1, supervised_gaussians)),
+            }
+            for slot, count in enumerate(winners)
+        ],
+    }
 
 
 def _write_center_foreground_mask_manifest(path):
