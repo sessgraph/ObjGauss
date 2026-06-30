@@ -7,6 +7,7 @@ import numpy as np
 
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
+from objgauss.clip_scoring import read_clip_labels, score_mask_manifest_with_clip
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
 from objgauss.emergence_benchmark import run_emergence_benchmark
 from objgauss.emergence import (
@@ -710,6 +711,35 @@ def _masks_validate(args: argparse.Namespace) -> None:
         raise ValueError("mask manifest validation failed")
 
 
+def _masks_score_clip(args: argparse.Namespace) -> None:
+    labels = read_clip_labels(args.labels or [], labels_file=args.labels_file)
+    result = score_mask_manifest_with_clip(
+        args.manifest,
+        output=args.output,
+        labels=labels,
+        dataset=args.dataset,
+        backend=args.backend,
+        model=args.model,
+        device=args.device,
+        max_frames=args.max_frames,
+        max_masks=args.max_masks,
+        crop_padding=args.crop_padding,
+        overwrite_scores=args.overwrite_scores,
+    )
+    print(f"scored_manifest={result.output_manifest}")
+    print(f"backend={result.backend}")
+    print(f"model={result.model}")
+    print(f"labels={len(result.labels)}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"scored_masks={result.scored_masks}")
+    print(f"cached_masks={result.cached_masks}")
+    print(f"named_masks={result.named_masks}")
+    if args.summary_output:
+        write_json(args.summary_output, result.as_dict())
+        print(f"summary={args.summary_output}")
+
+
 def _masks_align_slots(args: argparse.Namespace) -> None:
     cloud = read_ply(args.cloud)
     result = align_mask_manifest_slots(
@@ -1401,6 +1431,30 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_manifest.add_argument("--strict", action="store_true")
     validate_manifest.add_argument("--max-report-frames", type=int, default=8)
     validate_manifest.set_defaults(handler=_masks_validate)
+
+    score_clip = masks_subparsers.add_parser(
+        "score-clip",
+        help="score mask crops against text labels and cache CLIP scores into a mask manifest",
+    )
+    score_clip.add_argument("manifest", type=Path)
+    score_clip.add_argument("--output", "-o", required=True, type=Path)
+    score_clip.add_argument("--dataset", type=Path)
+    score_clip.add_argument("--labels", nargs="+", default=[])
+    score_clip.add_argument("--labels-file", type=Path)
+    score_clip.add_argument("--summary-output", type=Path)
+    score_clip.add_argument(
+        "--backend",
+        choices=["transformers", "hash"],
+        default="transformers",
+        help="use transformers for real CLIP inference; hash is a deterministic diagnostic backend",
+    )
+    score_clip.add_argument("--model", default="openai/clip-vit-base-patch32")
+    score_clip.add_argument("--device")
+    score_clip.add_argument("--max-frames", type=int)
+    score_clip.add_argument("--max-masks", type=int)
+    score_clip.add_argument("--crop-padding", type=float, default=0.05)
+    score_clip.add_argument("--overwrite-scores", action="store_true")
+    score_clip.set_defaults(handler=_masks_score_clip)
 
     align_slots = masks_subparsers.add_parser(
         "align-slots",

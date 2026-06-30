@@ -1517,6 +1517,124 @@ def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path)
     assert exported_ignore_path.exists()
 
 
+def test_masks_score_clip_writes_cached_scores_and_portable_paths(tmp_path, capsys):
+    source_dir = tmp_path / "source"
+    export_dir = tmp_path / "export"
+    summary_path = tmp_path / "clip-summary.json"
+    manifest_path = _write_clip_score_mask_manifest(source_dir / "mask-manifest.json")
+    scored_path = export_dir / "scored-mask-manifest.json"
+
+    assert (
+        main(
+            [
+                "masks",
+                "score-clip",
+                str(manifest_path),
+                "--output",
+                str(scored_path),
+                "--backend",
+                "hash",
+                "--labels",
+                "red brick",
+                "blue brick",
+                "--summary-output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    scored = json.loads(scored_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    first_mask = scored["frames"][0]["masks"][0]
+    exported_mask_path = scored_path.parent / first_mask["mask_path"]
+
+    assert "backend=hash-diagnostic" in output
+    assert "scored_masks=2" in output
+    assert "cached_masks=0" in output
+    assert summary["kind"] == "objgauss-clip-mask-score-v1"
+    assert scored["clip_scoring"]["scored_masks"] == 2
+    assert scored["clip_scoring"]["labels"] == ["red brick", "blue brick"]
+    assert first_mask["clip"]["kind"] == "objgauss-mask-clip-score-v1"
+    assert set(first_mask["clip_scores"]) == {"red brick", "blue brick"}
+    assert sum(first_mask["clip_scores"].values()) == pytest.approx(1.0)
+    assert exported_mask_path.exists()
+
+    cached_path = tmp_path / "cached" / "scored-mask-manifest.json"
+    assert (
+        main(
+            [
+                "masks",
+                "score-clip",
+                str(scored_path),
+                "--output",
+                str(cached_path),
+                "--backend",
+                "hash",
+                "--labels",
+                "red brick",
+                "blue brick",
+            ]
+        )
+        == 0
+    )
+    cached_output = capsys.readouterr().out
+    assert "scored_masks=0" in cached_output
+    assert "cached_masks=2" in cached_output
+
+
+def test_masks_score_clip_feeds_align_slot_names(tmp_path, capsys):
+    cloud_path = tmp_path / "camera_cloud.ply"
+    manifest_path = _write_clip_score_mask_manifest(tmp_path / "source" / "mask-manifest.json")
+    scored_path = tmp_path / "scored" / "mask-manifest.json"
+    aligned_path = tmp_path / "aligned" / "mask-manifest.json"
+    write_ply(cloud_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "score-clip",
+                str(manifest_path),
+                "--output",
+                str(scored_path),
+                "--backend",
+                "hash",
+                "--labels",
+                "red brick",
+                "blue brick",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(scored_path),
+                "--cloud",
+                str(cloud_path),
+                "--output",
+                str(aligned_path),
+                "--min-iou",
+                "0.5",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+
+    assert "aligned_slots=2" in output
+    assert "named_slots=2" in output
+    assert {slot["semantic_name_source"] for slot in aligned["slots"]} == {"clip_scores"}
+    assert {slot["label"] for slot in aligned["slots"]} <= {"red brick", "blue brick"}
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -2763,6 +2881,57 @@ def _write_swapped_clip_mask_manifest(path):
                     },
                 ],
             },
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_clip_score_mask_manifest(path):
+    dataset = path.parent / "dataset"
+    masks_dir = path.parent / "masks"
+    (dataset / "train").mkdir(parents=True)
+    masks_dir.mkdir(parents=True)
+    rgba = np.zeros((100, 100, 4), dtype=np.uint8)
+    rgba[:, :50] = np.array([220, 40, 30, 255], dtype=np.uint8)
+    rgba[:, 50:] = np.array([30, 40, 220, 255], dtype=np.uint8)
+    _write_rgba_png(dataset / "train" / "r_0.png", rgba)
+    left = np.zeros((100, 100), dtype=bool)
+    right = np.zeros((100, 100), dtype=bool)
+    left[:, :50] = True
+    right[:, 50:] = True
+    np.save(masks_dir / "left.npy", left)
+    np.save(masks_dir / "right.npy", right)
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source": str(dataset),
+        "source_type": "sam-automatic-mask-generator",
+        "slots": [
+            {"slot": 0, "label": "sam-area-rank-0"},
+            {"slot": 1, "label": "sam-area-rank-1"},
+        ],
+        "frames": [
+            {
+                "name": "frame-0",
+                "image_path": "train/r_0.png",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "mask_path": "masks/left.npy",
+                        "area": int(left.sum()),
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "mask_path": "masks/right.npy",
+                        "area": int(right.sum()),
+                    },
+                ],
+            }
         ],
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
