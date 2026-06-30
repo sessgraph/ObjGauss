@@ -15,13 +15,20 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy 和 slot naming diversity policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
 当前无 ready PR。
 
 ## Planned
+
+### CLIP-COVERAGE-001: Improve foreground mask coverage for semantic promotion
+
+- 状态: planned
+- 类型: 标准 PR / semantic quality evidence
+- 目标: 在不放宽 promotion threshold 的前提下，改进 CLIP / SAM mask selection 和 foreground coverage，降低 mask-level background dominant，并把 downstream supervised fraction 从当前 `0.114283` 提升到 promotion policy 需要的 `>=0.200000`。
+- 前置: 复用 `CLIP-BALANCE-001` 的 support rebalance 与 comparison policy；继续不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -49,6 +56,47 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-BALANCE-001: Add slot support rebalance policy
+
+- 状态: done / slot-balance-blocker-cleared-do-not-promote
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 实施方案 3，重做 slot balance：在跨视角 alignment 后显式丢弃 Gaussian support 太弱的 slot，并把 kept / dropped 证据写入 manifest 与 comparison summary，避免弱 slot 拉低 promotion policy 的 slot balance。
+- 已实施:
+  - `objgauss masks align-slots` 新增 `--min-slot-support-gaussians`、`--min-slot-support-ratio` 和 `--min-balanced-slots`。
+  - alignment 输出新增 `slot_alignment.slot_rebalance`，记录 policy 是否启用、阈值、kept support、support balance score、dropped slots / masks 和 drop reason。
+  - CLI 输出新增 `dropped_unbalanced_slots`、`dropped_unbalanced_masks` 和 `support_balance_score`，方便 terminal proof。
+  - `objgauss masks compare-baselines` 会透传 aligned manifest 的 `slot_rebalance` 到 candidate summary，便于在同一 comparison evidence 中审计 rebalance。
+  - 默认行为保持不变；support rebalance 必须显式 CLI 参数开启。
+- 真实运行证据:
+  - Balanced alignment:
+    `/tmp/objgauss-sam-clip-slot-balance-v1-aligned-mask-manifest.json`。
+  - 命令使用 `--exclude-background-top-labels --min-mask-area 500 --foreground-only-slot-names --unique-slot-names --slot-name-diversity-penalty 2.0 --min-slot-support-ratio 0.01 --min-balanced-slots 3`。
+  - Alignment 输出 `frames=3`、`masks=4`、`aligned_slots=3`、`dropped_unbalanced_slots=1`、`dropped_unbalanced_masks=1`、`slot_naming_quality=passed`。
+  - Kept slot labels 为 `lego wheel tread`、`black rubber tire`、`gray wheel hub`；kept support 为 `[31637, 1248, 1089]`，manifest support balance score `0.034422`。
+  - Dropped weak slot: source order `3`，support `225 < 317`，原命名为 `yellow lego vehicle body`。
+  - Manifest validate: `/tmp/objgauss-sam-clip-slot-balance-v1-validation.json` passed，errors / warnings `0`。
+  - Downstream vote-masks smoke: `/tmp/objgauss-sam-clip-slot-balance-v1-mask-training-summary.json`，loss `3.246389 -> 0.218255`，supervised fraction `0.114283`，conflict `0.008244`，active winner slot balance `0.028220`。
+  - Comparison policy:
+    `/tmp/objgauss-clip-balance-001-comparison-summary.json` 仍为 `promotion_policy=do-not-promote`，但 blockers 已只剩 `mask-naming:background-label-dominant` 和 `supervised_fraction-below-threshold:0.114283<0.200000`；slot balance blocker 已清除。
+- 质量结论:
+  - 方案 3 对当前真实 Lego CLIP route 是有效的：它没有放宽 promotion threshold，而是删除弱支持 slot 后让 downstream slot balance 从 `0.006349` 提升到 `0.028220`。
+  - 仍不能 promotion：mask-level CLIP naming 仍被背景 dominant 阻断，且过滤后 supervised fraction 只有 `0.114283`，低于 `0.200000`。
+  - 下一步应进入 `CLIP-COVERAGE-001`，优化 mask selection / foreground coverage，而不是继续调 slot balance 或降低门槛。
+- 边界:
+  - 本 PR 不新增 torch / transformers 默认依赖，不运行新的 CLIP inference，不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
+  - 本 PR 不改变默认 alignment 行为；support rebalance 需要显式 CLI 参数。
+- 完成 commit: `f160833`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "align_slots or compare_baselines"`: 7 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run objgauss masks align-slots ... --min-slot-support-ratio 0.01 --min-balanced-slots 3`: passed，`slot_naming_quality=passed`，`support_balance_score=0.034422`。
+  - `uv run objgauss masks validate /tmp/objgauss-sam-clip-slot-balance-v1-aligned-mask-manifest.json --max-overlap-fraction 1 --allow-empty`: passed。
+  - `uv run objgauss object-field vote-masks ... --masks /tmp/objgauss-sam-clip-slot-balance-v1-aligned-mask-manifest.json --iterations 20 --visibility-mode depth-buffer`: passed。
+  - `uv run objgauss masks compare-baselines ... --output /tmp/objgauss-clip-balance-001-comparison-summary.json`: passed，`promotion_policy=do-not-promote`，slot balance blocker cleared。
+  - `uv run --extra dev pytest`: 62 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### CLIP-QUALITY-004: Add slot-level CLIP diversity and foreground-only naming policy
 

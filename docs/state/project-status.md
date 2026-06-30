@@ -212,14 +212,39 @@ CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score ca
   `promotion_policy=do-not-promote`，blockers 为 mask-level
   `background-label-dominant`、supervised fraction `0.114960 < 0.200000`、
   slot balance `0.006349 < 0.010000`。
+- CLIP slot support rebalance policy:
+  `objgauss masks align-slots` 已支持 `--min-slot-support-gaussians`、
+  `--min-slot-support-ratio` 和 `--min-balanced-slots`，可显式丢弃 aligned 后
+  Gaussian support 太弱的 slot，并在 manifest 的 `slot_alignment.slot_rebalance`
+  与 `compare-baselines` candidate summary 里保留 kept / dropped 证据。真实 quality v1
+  balanced run 写出
+  `/tmp/objgauss-sam-clip-slot-balance-v1-aligned-mask-manifest.json`，使用
+  `--min-slot-support-ratio 0.01 --min-balanced-slots 3` 后得到 `frames=3`、
+  `masks=4`、`aligned_slots=3`，slot labels 为 `lego wheel tread`、
+  `black rubber tire`、`gray wheel hub`；丢弃弱 support slot `yellow lego vehicle body`
+  的 source order `3`，support `225 < 317`。kept support 为
+  `[31637, 1248, 1089]`，manifest support balance score `0.034422`。
+  Manifest validate summary 为
+  `/tmp/objgauss-sam-clip-slot-balance-v1-validation.json`，passed，errors /
+  warnings `0`。Downstream `vote-masks` smoke 写出
+  `/tmp/objgauss-sam-clip-slot-balance-v1-mask-training-summary.json`，loss
+  `3.246389 -> 0.218255`，supervised fraction `0.114283`，conflict `0.008244`，
+  active winner slot balance `0.028220`。Comparison summary
+  `/tmp/objgauss-clip-balance-001-comparison-summary.json` 仍是
+  `promotion_policy=do-not-promote`，但 blockers 已收敛为
+  `mask-naming:background-label-dominant` 和
+  `supervised_fraction-below-threshold:0.114283<0.200000`，slot balance blocker
+  已清除。
 
 边界：真实 CLIP inference 已通过临时 `uv --with` 依赖环境跑通，但仓库默认依赖仍不包含
 torch / transformers，也不提交 CLIP 权重或模型 cache。当前已落地 mask-level CLIP
-命名质量 gate、slot-level gate、baseline comparison 和 slot naming diversity policy，但真实
-Lego SAM balanced safe-2000 的语义路线仍结论为 `do-not-promote`：slot-level 命名塌缩
-已经被 diversity / foreground-only policy 缓解，但 mask-level 背景占比、监督覆盖和 slot
-balance 仍未达到 promotion policy。下一步应改进 CLIP / SAM mask 选择和 coverage，而不是把
-当前 CLIP labels 作为默认语义质量策略。
+命名质量 gate、slot-level gate、baseline comparison、slot naming diversity policy 和 slot
+support rebalance policy，但真实 Lego SAM balanced safe-2000 的语义路线仍结论为
+`do-not-promote`：slot-level 命名塌缩已经被 diversity / foreground-only policy 缓解，
+slot balance blocker 也已被 support rebalance 清除；剩余关键问题是 mask-level 背景占比
+仍高，且过滤后 supervised fraction 只有 `0.114283`。下一步应改进 CLIP / SAM mask 选择
+和 foreground coverage，而不是把当前 CLIP labels 作为默认语义质量策略或放宽 promotion
+threshold。
 
 ## 阶段最终目标
 
