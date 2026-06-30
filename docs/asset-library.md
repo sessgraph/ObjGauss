@@ -1,5 +1,10 @@
 # ObjGauss 素材库
 
+> **Development-stage assets / 开发阶段资产。** 本素材库记录研究原型、
+> 训练 smoke、诊断样例和 handoff 资产。除非单独标注为 stable release 或
+> commercial demo，否则这里的本地 `outputs/`、HF 资产和 public sample
+> 说明都只代表开发阶段状态，文件布局、指标和模型产物可能继续变化。
+
 这个素材库先解决两个问题：
 
 - 给 ObjGauss MVP 找稳定的测试输入。

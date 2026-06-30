@@ -1,6 +1,6 @@
 # ObjGauss 项目状态边界
 
-> 最近更新: 2026-06-22
+> 最近更新: 2026-06-30
 
 ## 项目目标
 
@@ -12,6 +12,13 @@ ObjGauss 的目标是验证和构建“对象级可编辑 3D Gaussian 场景”�
 - 在界面中预览原始颜色（编辑预览）和对象色（编辑预览）。
 - 支持对象隔离、删除预览和后续编辑流程。
 - 建立训练素材与 Demo 素材分层管理。
+
+## 开发阶段说明
+
+ObjGauss 当前仍是 development-stage research prototype / 开发阶段研究原型。
+当前 API、CLI、资产布局、指标、模型产物和文档都可能在 stable release 前变化。
+HF 资产与本地 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为
+production-ready release 或 commercial demo release。
 
 ## 当前 MVP 边界
 
