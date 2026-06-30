@@ -786,6 +786,9 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
         min_unique_slot_labels=args.min_unique_slot_labels,
         max_slot_label_fraction=args.max_slot_label_fraction,
         max_background_slot_fraction=args.max_background_slot_fraction,
+        foreground_only_slot_names=args.foreground_only_slot_names,
+        unique_slot_names=args.unique_slot_names,
+        slot_name_diversity_penalty=args.slot_name_diversity_penalty,
     )
     quality = result.slot_naming_quality
     filters = result.record_filters
@@ -800,6 +803,9 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
     print(f"filtered_top_label={filters.get('filtered_top_label', 0)}")
     print(f"slot_naming_quality={'passed' if quality.get('passed') else 'failed'}")
     print(f"slot_label_counts={quality.get('slot_label_counts', {})}")
+    print(f"foreground_only_slot_names={str(args.foreground_only_slot_names).lower()}")
+    print(f"unique_slot_names={str(args.unique_slot_names).lower()}")
+    print(f"slot_name_diversity_penalty={args.slot_name_diversity_penalty:.6f}")
     if quality.get("blockers"):
         print(f"slot_quality_blockers={quality['blockers']}")
     for cluster in result.clusters:
@@ -1596,6 +1602,22 @@ def _build_parser() -> argparse.ArgumentParser:
     align_slots.add_argument("--min-unique-slot-labels", type=int, default=2)
     align_slots.add_argument("--max-slot-label-fraction", type=float, default=0.5)
     align_slots.add_argument("--max-background-slot-fraction", type=float, default=0.25)
+    align_slots.add_argument(
+        "--foreground-only-slot-names",
+        action="store_true",
+        help="do not allow configured background labels to become aligned slot names",
+    )
+    align_slots.add_argument(
+        "--unique-slot-names",
+        action="store_true",
+        help="prefer an unused slot label when another candidate is available",
+    )
+    align_slots.add_argument(
+        "--slot-name-diversity-penalty",
+        type=float,
+        default=0.0,
+        help="divide repeated label scores by 1 + penalty * prior_slot_uses",
+    )
     align_slots.add_argument(
         "--require-slot-quality",
         action="store_true",

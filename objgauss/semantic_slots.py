@@ -115,6 +115,9 @@ def align_mask_manifest_slots(
     min_unique_slot_labels: int = 2,
     max_slot_label_fraction: float = 0.5,
     max_background_slot_fraction: float = 0.25,
+    foreground_only_slot_names: bool = False,
+    unique_slot_names: bool = False,
+    slot_name_diversity_penalty: float = 0.0,
 ) -> SlotAlignmentResult:
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be in [0, 1]")
@@ -136,6 +139,8 @@ def align_mask_manifest_slots(
         raise ValueError("max_slot_label_fraction must be in (0, 1]")
     if not 0.0 <= max_background_slot_fraction <= 1.0:
         raise ValueError("max_background_slot_fraction must be in [0, 1]")
+    if slot_name_diversity_penalty < 0.0:
+        raise ValueError("slot_name_diversity_penalty must be >= 0")
 
     clean_background_labels = _clean_label_set(background_labels or DEFAULT_SLOT_BACKGROUND_LABELS)
     excluded_labels = _clean_label_set(exclude_top_labels or ())
@@ -176,22 +181,39 @@ def align_mask_manifest_slots(
         for slot, cluster in enumerate(ordered_clusters)
         for record in cluster.records
     }
+    naming_policy = _slot_naming_policy(
+        background_labels=clean_background_labels,
+        foreground_only_slot_names=foreground_only_slot_names,
+        unique_slot_names=unique_slot_names,
+        slot_name_diversity_penalty=slot_name_diversity_penalty,
+    )
+    summaries = tuple(
+        _cluster_summaries_with_naming_policy(
+            ordered_clusters,
+            background_labels=clean_background_labels,
+            foreground_only_slot_names=foreground_only_slot_names,
+            unique_slot_names=unique_slot_names,
+            slot_name_diversity_penalty=slot_name_diversity_penalty,
+        )
+    )
+    slot_naming_quality = _slot_naming_quality(
+        summaries,
+        background_labels=clean_background_labels,
+        min_named_slots=min_named_slots,
+        min_unique_slot_labels=min_unique_slot_labels,
+        max_slot_label_fraction=max_slot_label_fraction,
+        max_background_slot_fraction=max_background_slot_fraction,
+    )
 
     aligned_payload = _rewrite_aligned_manifest(
         payload,
         record_to_slot=record_to_slot,
-        clusters=ordered_clusters,
+        slot_summaries=summaries,
         max_frames=max_frames,
         source_record_count=extraction.projected_masks,
         record_filters=extraction.as_dict(),
-        slot_naming_quality=_slot_naming_quality(
-            ordered_clusters,
-            background_labels=clean_background_labels,
-            min_named_slots=min_named_slots,
-            min_unique_slot_labels=min_unique_slot_labels,
-            max_slot_label_fraction=max_slot_label_fraction,
-            max_background_slot_fraction=max_background_slot_fraction,
-        ),
+        slot_naming_quality=slot_naming_quality,
+        naming_policy=naming_policy,
         source_root=manifest_path.parent,
         output_root=output.parent,
     )
@@ -203,10 +225,6 @@ def align_mask_manifest_slots(
     output_frames = aligned_payload.get("frames")
     output_frame_count = len(output_frames) if isinstance(output_frames, list) else 0
 
-    summaries = tuple(
-        _cluster_summary(slot, cluster)
-        for slot, cluster in enumerate(ordered_clusters)
-    )
     slot_naming_quality = aligned_payload["slot_alignment"]["slot_naming_quality"]
     record_filters = aligned_payload["slot_alignment"]["record_filters"]
     named_slots = sum(1 for cluster in summaries if cluster["semantic_name_source"] != "unnamed")
@@ -387,11 +405,12 @@ def _rewrite_aligned_manifest(
     payload: dict[str, Any],
     *,
     record_to_slot: dict[tuple[int, int], int],
-    clusters: list[_SlotCluster],
+    slot_summaries: tuple[dict[str, Any], ...],
     max_frames: int | None,
     source_record_count: int,
     record_filters: dict[str, Any],
     slot_naming_quality: dict[str, Any],
+    naming_policy: dict[str, Any],
     source_root: Path,
     output_root: Path,
 ) -> dict[str, Any]:
@@ -412,14 +431,15 @@ def _rewrite_aligned_manifest(
                 continue
             source_slot = mask.get("slot", mask.get("slot_id"))
             source_label = mask.get("label", mask.get("name"))
-            slot_summary = _slot_definition(stable_slot, clusters[stable_slot])
+            slot_summary = slot_summaries[stable_slot]
             mask["source_slot"] = source_slot
             mask["source_label"] = source_label
             mask["aligned_slot"] = int(stable_slot)
             mask["slot"] = int(stable_slot)
             mask["slot_id"] = int(stable_slot)
-            mask["label"] = slot_summary["label"]
+            mask["label"] = slot_summary["semantic_label"]
             mask["semantic_name_source"] = slot_summary["semantic_name_source"]
+            mask["semantic_name_policy"] = slot_summary["semantic_name_policy"]
             _rewrite_relative_path(
                 mask,
                 "mask_path",
@@ -446,10 +466,10 @@ def _rewrite_aligned_manifest(
 
     aligned["frames"] = aligned_frames
     aligned["slots"] = [
-        _slot_definition(slot, cluster)
-        for slot, cluster in enumerate(clusters)
+        _slot_definition(summary)
+        for summary in slot_summaries
     ]
-    aligned["slot_count"] = len(clusters)
+    aligned["slot_count"] = len(slot_summaries)
     aligned["slot_alignment"] = {
         "kind": "objgauss-cross-view-slot-alignment-v1",
         "source_slot_semantics": "per-frame-mask-rank",
@@ -459,6 +479,7 @@ def _rewrite_aligned_manifest(
         "masks": len(record_to_slot),
         "dropped_masks": int(source_record_count - len(record_to_slot)),
         "record_filters": record_filters,
+        "naming_policy": naming_policy,
         "slot_naming_quality": slot_naming_quality,
     }
     return aligned
@@ -481,49 +502,225 @@ def _rewrite_relative_path(
     entry[key] = os.path.relpath(absolute, output_root.resolve())
 
 
-def _slot_definition(slot: int, cluster: _SlotCluster) -> dict[str, Any]:
-    summary = _cluster_summary(slot, cluster)
+def _slot_definition(summary: dict[str, Any]) -> dict[str, Any]:
     return {
-        "slot": int(slot),
-        "slot_id": int(slot),
+        "slot": int(summary["slot"]),
+        "slot_id": int(summary["slot"]),
         "label": summary["semantic_label"],
         "name": summary["semantic_label"],
         "semantic_name_source": summary["semantic_name_source"],
+        "semantic_name_policy": summary["semantic_name_policy"],
         "mask_count": summary["mask_count"],
         "frame_count": summary["frame_count"],
         "support_gaussians": summary["support_gaussians"],
         "source_slots": summary["source_slots"],
         "clip_candidates": summary["clip_candidates"],
+        "name_candidates": summary["name_candidates"],
     }
 
 
-def _cluster_summary(slot: int, cluster: _SlotCluster) -> dict[str, Any]:
-    semantic_label, source = _semantic_label(cluster, fallback=f"slot-{slot}")
+def _cluster_summaries_with_naming_policy(
+    clusters: list[_SlotCluster],
+    *,
+    background_labels: set[str],
+    foreground_only_slot_names: bool,
+    unique_slot_names: bool,
+    slot_name_diversity_penalty: float,
+) -> tuple[dict[str, Any], ...]:
+    used_labels: Counter[str] = Counter()
+    summaries = []
+    for slot, cluster in enumerate(clusters):
+        selection = _select_semantic_label(
+            cluster,
+            fallback=f"slot-{slot}",
+            background_labels=background_labels,
+            foreground_only_slot_names=foreground_only_slot_names,
+            unique_slot_names=unique_slot_names,
+            slot_name_diversity_penalty=slot_name_diversity_penalty,
+            used_labels=used_labels,
+        )
+        if selection["semantic_name_source"] != "unnamed":
+            used_labels[selection["semantic_label"].lower()] += 1
+        summaries.append(_cluster_summary(slot, cluster, selection=selection))
+    return tuple(summaries)
+
+
+def _cluster_summary(
+    slot: int,
+    cluster: _SlotCluster,
+    *,
+    selection: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if selection is None:
+        selection = _select_semantic_label(
+            cluster,
+            fallback=f"slot-{slot}",
+            background_labels=set(),
+            foreground_only_slot_names=False,
+            unique_slot_names=False,
+            slot_name_diversity_penalty=0.0,
+            used_labels=Counter(),
+        )
     return {
         "slot": int(slot),
-        "semantic_label": semantic_label,
-        "semantic_name_source": source,
+        "semantic_label": selection["semantic_label"],
+        "semantic_name_source": selection["semantic_name_source"],
+        "semantic_name_policy": selection["semantic_name_policy"],
+        "semantic_name_score": selection["semantic_name_score"],
+        "semantic_name_adjusted_score": selection["semantic_name_adjusted_score"],
+        "semantic_name_raw_rank": selection["semantic_name_raw_rank"],
         "mask_count": len(cluster.records),
         "frame_count": len({record.frame_index for record in cluster.records}),
         "support_gaussians": len(cluster.gaussian_indices),
         "source_slots": sorted({int(record.source_slot) for record in cluster.records}),
         "source_labels": _ranked_items(cluster.label_weights),
         "clip_candidates": _ranked_items(cluster.clip_scores),
+        "name_candidates": selection["name_candidates"],
     }
 
 
-def _semantic_label(cluster: _SlotCluster, *, fallback: str) -> tuple[str, str]:
-    clip_candidates = _ranked_items(cluster.clip_scores)
-    if clip_candidates:
-        return str(clip_candidates[0]["label"]), "clip_scores"
-    label_candidates = _ranked_items(cluster.label_weights)
-    if label_candidates:
-        return str(label_candidates[0]["label"]), "mask_label_majority"
-    return fallback, "unnamed"
+def _select_semantic_label(
+    cluster: _SlotCluster,
+    *,
+    fallback: str,
+    background_labels: set[str],
+    foreground_only_slot_names: bool,
+    unique_slot_names: bool,
+    slot_name_diversity_penalty: float,
+    used_labels: Counter[str],
+) -> dict[str, Any]:
+    candidates = _semantic_label_candidates(
+        cluster,
+        background_labels=background_labels,
+        foreground_only_slot_names=foreground_only_slot_names,
+        used_labels=used_labels,
+        slot_name_diversity_penalty=slot_name_diversity_penalty,
+    )
+    if unique_slot_names:
+        unused = [candidate for candidate in candidates if candidate["used_count"] == 0]
+        if unused:
+            candidates = unused
+    if not candidates:
+        return {
+            "semantic_label": fallback,
+            "semantic_name_source": "unnamed",
+            "semantic_name_policy": _semantic_name_policy_label(
+                foreground_only_slot_names=foreground_only_slot_names,
+                unique_slot_names=unique_slot_names,
+                slot_name_diversity_penalty=slot_name_diversity_penalty,
+            ),
+            "semantic_name_score": 0.0,
+            "semantic_name_adjusted_score": 0.0,
+            "semantic_name_raw_rank": None,
+            "name_candidates": [],
+        }
+    selected = sorted(
+        candidates,
+        key=lambda item: (-item["adjusted_score"], item["raw_rank"], item["label"]),
+    )[0]
+    return {
+        "semantic_label": str(selected["label"]),
+        "semantic_name_source": str(selected["source"]),
+        "semantic_name_policy": _semantic_name_policy_label(
+            foreground_only_slot_names=foreground_only_slot_names,
+            unique_slot_names=unique_slot_names,
+            slot_name_diversity_penalty=slot_name_diversity_penalty,
+        ),
+        "semantic_name_score": float(selected["score"]),
+        "semantic_name_adjusted_score": float(selected["adjusted_score"]),
+        "semantic_name_raw_rank": int(selected["raw_rank"]),
+        "name_candidates": candidates[:5],
+    }
+
+
+def _semantic_label_candidates(
+    cluster: _SlotCluster,
+    *,
+    background_labels: set[str],
+    foreground_only_slot_names: bool,
+    used_labels: Counter[str],
+    slot_name_diversity_penalty: float,
+) -> list[dict[str, Any]]:
+    clip_candidates = [
+        {
+            "label": str(item["label"]),
+            "score": float(item["score"]),
+            "source": "clip_scores",
+            "raw_rank": index,
+        }
+        for index, item in enumerate(_ranked_items(cluster.clip_scores, limit=None))
+    ]
+    label_candidates = [
+        {
+            "label": str(item["label"]),
+            "score": float(item["score"]),
+            "source": "mask_label_majority",
+            "raw_rank": index,
+        }
+        for index, item in enumerate(_ranked_items(cluster.label_weights, limit=None))
+    ]
+    raw_candidates = clip_candidates or label_candidates
+    if foreground_only_slot_names:
+        raw_candidates = [
+            candidate
+            for candidate in raw_candidates
+            if candidate["label"].lower() not in background_labels
+        ]
+        if not raw_candidates and clip_candidates:
+            raw_candidates = [
+                candidate
+                for candidate in label_candidates
+                if candidate["label"].lower() not in background_labels
+            ]
+
+    candidates = []
+    for candidate in raw_candidates:
+        used_count = int(used_labels.get(candidate["label"].lower(), 0))
+        adjusted = float(candidate["score"]) / (1.0 + slot_name_diversity_penalty * used_count)
+        candidates.append(
+            {
+                **candidate,
+                "used_count": used_count,
+                "adjusted_score": adjusted,
+            }
+        )
+    return sorted(candidates, key=lambda item: (-item["adjusted_score"], item["raw_rank"], item["label"]))
+
+
+def _slot_naming_policy(
+    *,
+    background_labels: set[str],
+    foreground_only_slot_names: bool,
+    unique_slot_names: bool,
+    slot_name_diversity_penalty: float,
+) -> dict[str, Any]:
+    return {
+        "kind": "objgauss-slot-naming-policy-v1",
+        "foreground_only_slot_names": bool(foreground_only_slot_names),
+        "unique_slot_names": bool(unique_slot_names),
+        "slot_name_diversity_penalty": float(slot_name_diversity_penalty),
+        "background_labels": sorted(background_labels),
+    }
+
+
+def _semantic_name_policy_label(
+    *,
+    foreground_only_slot_names: bool,
+    unique_slot_names: bool,
+    slot_name_diversity_penalty: float,
+) -> str:
+    parts = ["clip-slot-naming"]
+    if foreground_only_slot_names:
+        parts.append("foreground-only")
+    if unique_slot_names:
+        parts.append("unique")
+    if slot_name_diversity_penalty > 0:
+        parts.append(f"diversity-penalty:{slot_name_diversity_penalty:g}")
+    return ":".join(parts)
 
 
 def _slot_naming_quality(
-    clusters: list[_SlotCluster],
+    slot_summaries: tuple[dict[str, Any], ...],
     *,
     background_labels: set[str],
     min_named_slots: int,
@@ -534,8 +731,9 @@ def _slot_naming_quality(
     label_counts: Counter[str] = Counter()
     source_counts: Counter[str] = Counter()
     background_count = 0
-    for slot, cluster in enumerate(clusters):
-        label, source = _semantic_label(cluster, fallback=f"slot-{slot}")
+    for summary in slot_summaries:
+        label = str(summary["semantic_label"])
+        source = str(summary["semantic_name_source"])
         source_counts[source] += 1
         if source == "unnamed":
             continue
@@ -566,7 +764,7 @@ def _slot_naming_quality(
         "kind": "objgauss-slot-naming-quality-v1",
         "passed": not blockers,
         "blockers": blockers,
-        "slots": int(len(clusters)),
+        "slots": int(len(slot_summaries)),
         "named_slots": named_slots,
         "unique_slot_labels": unique_slot_labels,
         "slot_label_counts": dict(sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))),
@@ -586,10 +784,13 @@ def _slot_naming_quality(
     }
 
 
-def _ranked_items(scores: dict[str, float], *, limit: int = 5) -> list[dict[str, Any]]:
+def _ranked_items(scores: dict[str, float], *, limit: int | None = 5) -> list[dict[str, Any]]:
+    items = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    if limit is not None:
+        items = items[:limit]
     return [
         {"label": label, "score": float(score)}
-        for label, score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
+        for label, score in items
     ]
 
 

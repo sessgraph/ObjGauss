@@ -1502,6 +1502,56 @@ def test_masks_align_slots_filters_low_area_and_background_top_labels(tmp_path, 
     assert quality["slot_label_counts"] == {"left brick": 1}
 
 
+def test_masks_align_slots_foreground_unique_policy_avoids_collapsed_clip_names(tmp_path, capsys):
+    input_path = tmp_path / "camera_cloud.ply"
+    manifest_path = _write_collapsed_clip_mask_manifest(tmp_path / "collapsed-mask-manifest.json")
+    aligned_path = tmp_path / "aligned-mask-manifest.json"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(input_path),
+                "--output",
+                str(aligned_path),
+                "--foreground-only-slot-names",
+                "--unique-slot-names",
+                "--slot-name-diversity-penalty",
+                "2.0",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+    labels = [slot["label"] for slot in aligned["slots"]]
+    policy = aligned["slot_alignment"]["naming_policy"]
+    quality = aligned["slot_alignment"]["slot_naming_quality"]
+
+    assert "foreground_only_slot_names=true" in output
+    assert "unique_slot_names=true" in output
+    assert policy["kind"] == "objgauss-slot-naming-policy-v1"
+    assert policy["foreground_only_slot_names"] is True
+    assert policy["unique_slot_names"] is True
+    assert policy["slot_name_diversity_penalty"] == 2.0
+    assert "white background" not in labels
+    assert len(set(labels)) == 2
+    assert labels == ["lego wheel tread", "red cab roof"]
+    assert quality["passed"] is True
+    assert quality["slot_label_counts"] == {"lego wheel tread": 1, "red cab roof": 1}
+    assert aligned["slots"][0]["semantic_name_policy"] == (
+        "clip-slot-naming:foreground-only:unique:diversity-penalty:2"
+    )
+    assert aligned["frames"][0]["masks"][1]["semantic_name_policy"] == (
+        "clip-slot-naming:foreground-only:unique:diversity-penalty:2"
+    )
+
+
 def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path):
     cloud_path = tmp_path / "camera_cloud.ply"
     source_dir = tmp_path / "source"
@@ -3204,6 +3254,47 @@ def _write_filtered_clip_mask_manifest(path):
                         "rect": [45, 0, 55, 100],
                         "area": 20,
                         "clip_scores": {"tiny highlight": 0.9, "left brick": 0.1},
+                    },
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_collapsed_clip_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source_type": "sam-automatic-mask-generator",
+        "frames": [
+            {
+                "name": "frame-0",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [0, 0, 50, 100],
+                        "area": 5000,
+                        "clip_scores": {
+                            "white background": 0.95,
+                            "lego wheel tread": 0.90,
+                            "yellow vehicle body": 0.88,
+                        },
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [50, 0, 100, 100],
+                        "area": 5000,
+                        "clip_scores": {
+                            "white background": 0.95,
+                            "lego wheel tread": 0.89,
+                            "red cab roof": 0.87,
+                        },
                     },
                 ],
             }
