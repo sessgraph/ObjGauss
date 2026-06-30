@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract 与真实 `transformers` CLIP run 已落地；下一步修 CLIP label set / crop 背景抑制 / 命名多样性 gate，再决定是否 promotion。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run 与 mask-level naming quality gate 已落地；下一步转向 slot-level 命名质量、SAM mask 筛选和 baseline 对比。
 
 ## Ready
 
@@ -23,12 +23,12 @@
 
 ## Planned
 
-### CLIP-QUALITY-001: Improve CLIP labels, crops, and naming gate
+### CLIP-SLOT-QUALITY-002: Slot-level semantic naming quality
 
 - 状态: planned
 - 类型: 标准 PR / semantic labeling evidence
-- 目标: 基于真实 CLIP inference 已跑通的结果，改进候选 label set、mask crop / background suppression、prompt/template 和命名多样性 gate，避免 top labels 塌缩到背景或单一零件名。
-- 前置: `CLIP-RUN-001` 证明真实 inference 链路可用，但当前结果为 `do-not-promote`；仍不得把 CLIP 权重 / cache / 大训练产物提交进 git。
+- 目标: 在 `CLIP-QUALITY-001` 已提供 mask-level quality gate 的基础上，增加 slot-level 命名质量检查、背景 / 低面积 mask 筛选和与 color-mask / KMeans baseline 的质量对比，避免 aligned slots 仍塌缩到背景或轮胎类。
+- 前置: 当前真实 CLIP quality v1 能提升 mask-level label diversity，但 aligned top-4 slot labels 仍不能 promotion；仍不得把 CLIP 权重 / cache / 大训练产物提交进 git。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -56,6 +56,38 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-QUALITY-001: Improve CLIP labels, crops, and naming gate
+
+- 状态: done / quality-gate-landed-do-not-promote
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 基于真实 CLIP inference 已跑通的结果，改进候选 label set、mask crop / background suppression、prompt/template 和命名多样性 gate，避免 top labels 塌缩到背景或单一零件名。
+- 已实施:
+  - `objgauss masks score-clip` 新增 `--label-preset nerf-lego-v1|lego-parts-v1`，提供开发阶段 Lego label set，避免每次手写候选标签。
+  - 新增 `--prompt-template`，可对同一 canonical label 展开多个 CLIP prompt，再聚合回原始 label 的 `clip_scores`。
+  - 新增 `--background-fill white|black|gray|mean|image`，可用 mask 内均值填充 crop bbox 内非 mask 像素，降低固定白背景对小 mask 的影响。
+  - CLIP score cache 现在会按 label set、backend、model 和 prompt templates 检查签名；label / prompt / backend 改变时会重新打分，避免误用旧 cache。
+  - `score-clip` summary 新增 `objgauss-clip-naming-quality-v1`，记录 top label distribution、background label fraction、top label dominance、score margin 和 blockers；`--require-naming-quality` 可把该 gate 变成非零退出。
+- 真实运行证据:
+  - `uv run --with torch --with transformers --with pillow --with socksio objgauss masks score-clip ... --label-preset nerf-lego-v1 --prompt-template ... --background-fill mean --summary-output /tmp/objgauss-sam-clip-quality-v1-summary.json`: `frames=8`，`masks=27`，`scored_masks=27`，`named_masks=27`。
+  - Quality v1 mask top labels: `white background=11`、`lego wheel tread=10`、`cast shadow=3`、`black rubber tire=2`、`table surface=1`；`unique_top_labels=5`，但 `background_top_label_fraction=0.555556`，blocker=`background-label-dominant`。
+  - Validation: `/tmp/objgauss-sam-clip-quality-v1-validation.json` passed。
+  - Alignment: `/tmp/objgauss-sam-clip-quality-v1-aligned-top4-mask-manifest.json`，`aligned_slots=4`，`named_slots=4`，slot labels 为 `white background`、`lego wheel tread`、`lego wheel tread`、`white background`。
+  - Object-only strict diagnostic: `/tmp/objgauss-sam-clip-quality-objectonly-strict-v1-summary.json`，top labels 为 `lego wheel tread=19`、`black rubber tire=8`；`--min-unique-top-labels 3` 下 blocker=`not-enough-unique-top-labels`。
+- 质量结论:
+  - 相比 `CLIP-RUN-001` 的 `lego tread=23/27`，prompt + preset + mean background fill 已把 mask-level top labels 扩展到 5 类。
+  - 但背景类仍过高，object-only 又只剩轮胎 / tread 两类；aligned top-4 slots 仍塌缩，因此结论仍是 `do-not-promote`。
+  - 下一步进入 `CLIP-SLOT-QUALITY-002`，重点不是再调单次 CLIP 命令，而是做 slot-level gate、背景 / 小 mask 筛选和 baseline 对比。
+- 边界:
+  - 新增 label preset 是 development-stage diagnostic preset，不是稳定语义 taxonomy。
+  - CLIP / torch / transformers 仍是可选本地依赖，不进入默认仓库依赖；CLIP 权重、模型 cache、`/tmp` 输出和 ignored `outputs/` 训练产物不提交。
+- 完成 commit: `ff4b1b93654041484405a98872ff7e4e0ea08eb7`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "score_clip or align_slots"`: 5 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 57 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### CLIP-RUN-001: Run real CLIP scoring and naming quality gate
 
