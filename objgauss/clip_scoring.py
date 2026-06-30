@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import os
@@ -73,6 +74,7 @@ class TransformersClipMaskScorer:
     backend = "transformers"
 
     def __init__(self, *, model: str, device: str | None = None) -> None:
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
         try:
             import torch
             from transformers import CLIPModel, CLIPProcessor
@@ -104,6 +106,19 @@ class TransformersClipMaskScorer:
             outputs = self._model(**inputs)
             probabilities = outputs.logits_per_image.softmax(dim=1)
         return probabilities.detach().cpu().numpy().astype(np.float32, copy=False)
+
+    def close(self) -> None:
+        model = getattr(self, "_model", None)
+        if model is not None:
+            try:
+                model.to("cpu")
+            except Exception:
+                pass
+        self._model = None
+        self._processor = None
+        if self._device.startswith("cuda") and self._torch.cuda.is_available():
+            self._torch.cuda.empty_cache()
+        gc.collect()
 
 
 def score_mask_manifest_with_clip(
@@ -225,7 +240,7 @@ def score_mask_manifest_with_clip(
         json.dumps(scored_payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    return ClipScoringResult(
+    result = ClipScoringResult(
         source_manifest=manifest_path,
         output_manifest=output,
         backend=scorer.backend,
@@ -236,6 +251,8 @@ def score_mask_manifest_with_clip(
         scored_masks=len(pending),
         cached_masks=cached_masks,
     )
+    _close_scorer(scorer)
+    return result
 
 
 def read_clip_labels(
@@ -267,6 +284,12 @@ def _create_scorer(*, backend: str, model: str, device: str | None) -> ClipMaskS
     if backend in {"hash", "hash-diagnostic"}:
         return HashClipMaskScorer()
     raise ValueError("backend must be transformers or hash")
+
+
+def _close_scorer(scorer: ClipMaskScorer) -> None:
+    close = getattr(scorer, "close", None)
+    if callable(close):
+        close()
 
 
 def _clean_labels(labels: list[str] | tuple[str, ...]) -> tuple[str, ...]:
