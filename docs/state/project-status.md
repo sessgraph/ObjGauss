@@ -194,14 +194,32 @@ CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score ca
   SAM conflict `0.021192` / slot balance `0.001571`、alpha conflict `0.430143`
   / slot balance `0.130996`、color-mask loss `1.386294 -> 0.390825`、
   KMeans active slots `8` / slot balance `0.875182`。
+- CLIP slot naming diversity policy:
+  `objgauss masks align-slots` 已支持 `--foreground-only-slot-names`、
+  `--unique-slot-names` 和 `--slot-name-diversity-penalty`，并在输出 manifest 的
+  `slot_alignment.naming_policy`、slot 定义和 mask entry 上记录使用的 naming policy。
+  真实 quality v1 run 在
+  `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-aligned-top4-mask-manifest.json`
+  通过 slot naming gate：slot labels 从 filtered 旧策略的 `lego wheel tread=4`
+  改为 `lego wheel tread`、`black rubber tire`、`gray wheel hub`、
+  `yellow lego vehicle body` 各 1 个；manifest validate summary 为
+  `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-validation.json`，passed。
+  该 aligned manifest 的 downstream `vote-masks` smoke 写出
+  `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-mask-training-summary.json`，
+  loss `3.245392 -> 0.219241`，active slots `4`，conflict `0.009012`。
+  但 comparison summary
+  `/tmp/objgauss-clip-quality-004-comparison-summary.json` 仍是
+  `promotion_policy=do-not-promote`，blockers 为 mask-level
+  `background-label-dominant`、supervised fraction `0.114960 < 0.200000`、
+  slot balance `0.006349 < 0.010000`。
 
 边界：真实 CLIP inference 已通过临时 `uv --with` 依赖环境跑通，但仓库默认依赖仍不包含
 torch / transformers，也不提交 CLIP 权重或模型 cache。当前已落地 mask-level CLIP
-命名质量 gate 与 slot-level gate，但真实 Lego SAM balanced safe-2000 的语义命名仍结论为
-`do-not-promote`：背景过滤后 object labels 仍塌缩到 tread，且 comparison policy 要求
-slot naming、vote quality 和 training summary 同时满足后才允许 semantic promotion。下一步
-应改进 CLIP / SAM 语义质量或补 downstream training evidence，而不是把当前 CLIP labels
-作为默认语义质量策略。
+命名质量 gate、slot-level gate、baseline comparison 和 slot naming diversity policy，但真实
+Lego SAM balanced safe-2000 的语义路线仍结论为 `do-not-promote`：slot-level 命名塌缩
+已经被 diversity / foreground-only policy 缓解，但 mask-level 背景占比、监督覆盖和 slot
+balance 仍未达到 promotion policy。下一步应改进 CLIP / SAM mask 选择和 coverage，而不是把
+当前 CLIP labels 作为默认语义质量策略。
 
 ## 阶段最终目标
 

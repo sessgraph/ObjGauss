@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison 与 promotion policy 已落地；当前真实 CLIP slot naming 仍保持 `do-not-promote`。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy 和 slot naming diversity policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
@@ -49,6 +49,46 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-QUALITY-004: Add slot-level CLIP diversity and foreground-only naming policy
+
+- 状态: done / slot-naming-collapse-mitigated-do-not-promote
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 给 CLIP slot naming 增加 foreground-only naming、unique slot name preference 和 diversity penalty，缓解 aligned slots 塌缩到背景或单一 `lego wheel tread` label。
+- 已实施:
+  - `objgauss masks align-slots` 新增 `--foreground-only-slot-names`，不允许 configured background labels 成为 aligned slot name。
+  - 新增 `--unique-slot-names`，当存在可用候选时优先给后续 slot 选择未使用过的 label。
+  - 新增 `--slot-name-diversity-penalty`，按 `score / (1 + penalty * prior_slot_uses)` 对重复 label 降权。
+  - 输出 manifest 新增 `slot_alignment.naming_policy`，slot 定义和 mask entry 记录 `semantic_name_policy`，slot 定义保留 raw `clip_candidates` 与 policy 后 `name_candidates`，便于审计为什么选中某个 label。
+  - 默认行为保持不变；新 naming policy 必须显式 CLI 参数开启。
+- 真实运行证据:
+  - Diverse alignment:
+    `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-aligned-top4-mask-manifest.json`。
+  - 命令使用 `--exclude-background-top-labels --min-mask-area 500 --foreground-only-slot-names --unique-slot-names --slot-name-diversity-penalty 2.0`。
+  - Alignment 输出 `frames=4`、`masks=5`、`aligned_slots=4`、`filtered_low_area=10`、`filtered_top_label=9`、`slot_naming_quality=passed`。
+  - Slot labels 从旧 filtered 策略的 `lego wheel tread=4` 改为 `lego wheel tread=1`、`black rubber tire=1`、`gray wheel hub=1`、`yellow lego vehicle body=1`。
+  - Manifest validate: `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-validation.json` passed，errors / warnings `0`。
+  - Downstream vote-masks smoke: `/tmp/objgauss-sam-clip-slot-quality-diverse-v1-mask-training-summary.json`，loss `3.245392 -> 0.219241`，active slots `4`，supervised fraction `0.114960`，conflict `0.009012`，slot balance `0.006349`。
+  - Comparison policy:
+    `/tmp/objgauss-clip-quality-004-comparison-summary.json` 仍为 `promotion_policy=do-not-promote`，blockers=`mask-naming:background-label-dominant`、`supervised_fraction-below-threshold:0.114960<0.200000`、`slot_balance_score-below-threshold:0.006349<0.010000`。
+- 质量结论:
+  - foreground-only + unique + diversity penalty 已解决本轮最明显的 slot-level label collapse；slot-level gate 可通过。
+  - 仍不能 promotion：mask-level naming quality 仍记录背景 dominant，且过滤后 masks 太少，导致 downstream supervised fraction 和 slot balance 低于 policy threshold。
+  - 下一步应优化 mask selection / coverage 或把 CLIP naming policy 与更稳的 slot support source 结合，而不是放宽 promotion threshold。
+- 边界:
+  - 本 PR 不新增 torch / transformers 默认依赖，不运行新的 CLIP inference，不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
+  - 本 PR 不改变默认 alignment 行为；policy 需要显式 CLI 参数。
+- 完成 commit: `a82b18a8b6b147749c256dba2c18c7eae8a279f2`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "align_slots or compare_baselines"`: 6 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run objgauss masks align-slots ... --foreground-only-slot-names --unique-slot-names --slot-name-diversity-penalty 2.0`: passed，`slot_naming_quality=passed`。
+  - `uv run objgauss masks validate /tmp/objgauss-sam-clip-slot-quality-diverse-v1-aligned-top4-mask-manifest.json --max-overlap-fraction 1 --allow-empty`: passed。
+  - `uv run objgauss object-field vote-masks ... --masks /tmp/objgauss-sam-clip-slot-quality-diverse-v1-aligned-top4-mask-manifest.json --iterations 20 --visibility-mode depth-buffer`: passed。
+  - `uv run objgauss masks compare-baselines ... --output /tmp/objgauss-clip-quality-004-comparison-summary.json`: passed，`promotion_policy=do-not-promote`。
+  - `uv run --extra dev pytest`: 61 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### CLIP-BASELINE-003: Compare CLIP slot naming against baselines
 
