@@ -15,20 +15,13 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate 与 slot-level naming quality gate 已落地；下一步做 baseline 对比和 promotion policy。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison 与 promotion policy 已落地；当前真实 CLIP slot naming 仍保持 `do-not-promote`。
 
 ## Ready
 
 当前无 ready PR。
 
 ## Planned
-
-### CLIP-BASELINE-003: Compare CLIP slot naming against baselines
-
-- 状态: planned
-- 类型: 标准 PR / semantic labeling evidence
-- 目标: 将 CLIP slot-level naming quality 与 color-mask / KMeans / alpha baseline 的 slot balance、vote quality 和 downstream Object Field 结果放在同一张 comparison summary 里，明确 promotion policy。
-- 前置: `CLIP-SLOT-QUALITY-002` 已证明 slot-level gate 可复跑，但当前真实 CLIP slots 仍 `do-not-promote`；仍不得把 CLIP 权重 / cache / 大训练产物提交进 git。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -56,6 +49,40 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-BASELINE-003: Compare CLIP slot naming against baselines
+
+- 状态: done / comparison-policy-landed-do-not-promote
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 将 CLIP slot-level naming quality 与 color-mask / KMeans / alpha baseline 的 slot balance、vote quality 和 downstream Object Field 结果放在同一张 comparison summary 里，明确 promotion policy。
+- 已实施:
+  - 新增 `objgauss masks compare-baselines`，通过可重复的 `--candidate name=path` 显式绑定 comparison evidence；同名 candidate 可合并 manifest、training summary、depth diagnostic 和 PLY object stats。
+  - 新增 `objgauss-clip-baseline-comparison-v1` JSON summary 与 Markdown report 输出，内置 development-stage notice，避免把当前研究证据表述为 stable / production promotion。
+  - promotion policy 明确为：semantic CLIP candidate 必须通过 slot naming gate；存在 mask naming gate 时也必须通过；必须有 downstream vote quality 与 training summary；vote quality 需要满足 supervised fraction、conflict fraction、slot balance 阈值；baseline-only candidate 只作为 reference row，不自动 promotion。
+  - PLY evidence 支持读取 `object_id` 分布，给 KMeans / Object Field 初始输出提供 active slots 与 slot balance reference。
+- 真实运行证据:
+  - Comparison summary: `/tmp/objgauss-clip-baseline-comparison-v1-summary.json`。
+  - Markdown report: `/tmp/objgauss-clip-baseline-comparison-v1-summary.md`。
+  - Candidates: `clip_unfiltered`、`clip_filtered`、`clip_objectonly`、`sam`、`alpha`、`color`、`kmeans`，`promotion_policy=do-not-promote`。
+  - `clip_unfiltered`: slot labels `lego wheel tread=2`、`white background=2`，blockers=`background-slot-dominant`、`background-label-dominant`、`missing-vote-quality-evidence`、`missing-training-summary`。
+  - `clip_filtered`: slot labels `lego wheel tread=4`，blockers=`not-enough-unique-slot-labels`、`slot-label-dominant:lego wheel tread`、`background-label-dominant`、`missing-vote-quality-evidence`、`missing-training-summary`。
+  - `clip_objectonly`: slot labels `lego wheel tread=3`、`black rubber tire=1`，blocker=`slot-label-dominant:lego wheel tread`，仍缺 downstream vote / training evidence。
+  - Baseline references: SAM supervised fraction `0.273755`、conflict `0.021192`、slot balance `0.001571`、loss `2.782336 -> 0.044949`；alpha supervised fraction `0.888760`、conflict `0.430143`、slot balance `0.130996`、loss `1.264038 -> 0.497213`；color-mask loss `1.386294 -> 0.390825`；KMeans object stats active slots `8`、slot balance `0.875182`。
+- 质量结论:
+  - baseline comparison 已关闭“多个文件人工判断”的证据缺口。
+  - 当前 CLIP slot naming 仍不能 promotion；失败原因同时来自语义命名塌缩和缺少 downstream Object Field 训练证据。
+  - color-mask / KMeans / alpha 只作为 reference baseline，不是 CLIP semantic promotion 的替代结论。
+- 边界:
+  - 本 PR 不新增 torch / transformers 默认依赖，不运行新的 CLIP inference，不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
+  - `compare-baselines` 读取已有证据，不重新训练 Object Field，也不改变默认 semantic / viewer route。
+- 完成 commit: `56baa31e0ccdc149a69e5295dc778096519edc6c`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "compare_baselines or score_clip or align_slots"`: 8 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run objgauss masks compare-baselines ... --output /tmp/objgauss-clip-baseline-comparison-v1-summary.json --markdown-output /tmp/objgauss-clip-baseline-comparison-v1-summary.md`: passed，`promotion_policy=do-not-promote`。
+  - `uv run --extra dev pytest`: 60 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### CLIP-SLOT-QUALITY-002: Slot-level semantic naming quality
 

@@ -6,9 +6,9 @@
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，`CLIP-QUALITY-001` 和 `CLIP-SLOT-QUALITY-002` 已落地 mask-level / slot-level naming quality gate，但真实 aligned slots 仍保持 `do-not-promote`。
-- 推荐: 不把模型权重放入仓库；下一步做 `CLIP-BASELINE-003`，把 CLIP slot naming 与 color-mask / KMeans / alpha baseline 的 slot balance、vote quality 和 downstream Object Field 结果放到同一 comparison summary。
-- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数稳定语义命名、跨视角对齐，并通过 mask-level / slot-level 命名覆盖率、slot balance、vote quality 与 color-mask / KMeans baseline 对比。
+- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，`CLIP-QUALITY-001`、`CLIP-SLOT-QUALITY-002` 和 `CLIP-BASELINE-003` 已落地 mask-level / slot-level naming quality gate、baseline comparison 与 promotion policy，但真实 aligned slots 仍保持 `do-not-promote`。
+- 推荐: 不把模型权重放入仓库；下一步优先改进 CLIP / SAM 语义质量或补齐 CLIP candidate 的 downstream Object Field vote / training evidence，promotion 前必须通过 `objgauss masks compare-baselines`。
+- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数稳定语义命名、跨视角对齐，并通过 mask-level / slot-level 命名覆盖率、slot balance、vote quality、training summary 与 color-mask / KMeans baseline 对比。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 

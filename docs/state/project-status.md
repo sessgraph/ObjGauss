@@ -178,12 +178,30 @@ CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score ca
   `not-enough-unique-slot-labels` 和 `slot-label-dominant:lego wheel tread`。
   object-only slot gate 同样失败，slot labels 为
   `lego wheel tread=3`、`black rubber tire=1`。
+- CLIP baseline comparison / promotion policy:
+  `objgauss masks compare-baselines` 已将 CLIP slot naming 与 SAM、alpha、
+  color-mask 和 KMeans / Object Field 初始 PLY reference 放到同一份
+  `objgauss-clip-baseline-comparison-v1` summary；输出内置 development-stage notice。
+  真实 comparison summary 为
+  `/tmp/objgauss-clip-baseline-comparison-v1-summary.json`，Markdown report 为
+  `/tmp/objgauss-clip-baseline-comparison-v1-summary.md`，候选包含
+  `clip_unfiltered`、`clip_filtered`、`clip_objectonly`、`sam`、`alpha`、`color`
+  和 `kmeans`，结论为 `promotion_policy=do-not-promote`。
+  关键阻断：未过滤 CLIP slots 为 `lego wheel tread=2`、`white background=2`；
+  filtered slots 全部为 `lego wheel tread=4`；object-only slots 为
+  `lego wheel tread=3`、`black rubber tire=1`；三组 CLIP 语义候选都缺少
+  downstream vote quality / training summary evidence。Baseline reference 行记录了
+  SAM conflict `0.021192` / slot balance `0.001571`、alpha conflict `0.430143`
+  / slot balance `0.130996`、color-mask loss `1.386294 -> 0.390825`、
+  KMeans active slots `8` / slot balance `0.875182`。
 
 边界：真实 CLIP inference 已通过临时 `uv --with` 依赖环境跑通，但仓库默认依赖仍不包含
 torch / transformers，也不提交 CLIP 权重或模型 cache。当前已落地 mask-level CLIP
 命名质量 gate 与 slot-level gate，但真实 Lego SAM balanced safe-2000 的语义命名仍结论为
-`do-not-promote`：背景过滤后 object labels 仍塌缩到 tread。下一步应做 baseline
-comparison 和 promotion policy，而不是把当前 CLIP labels 作为默认语义质量策略。
+`do-not-promote`：背景过滤后 object labels 仍塌缩到 tread，且 comparison policy 要求
+slot naming、vote quality 和 training summary 同时满足后才允许 semantic promotion。下一步
+应改进 CLIP / SAM 语义质量或补 downstream training evidence，而不是把当前 CLIP labels
+作为默认语义质量策略。
 
 ## 阶段最终目标
 
@@ -209,7 +227,7 @@ comparison 和 promotion policy，而不是把当前 CLIP labels 作为默认语
   - `objgauss filter`
   - `objgauss stats`
   - `objgauss assets list/pull`
-  - `objgauss masks from-nerf-alpha/from-nerf-alpha-fgbg/from-nerf-rgba-colors/from-nerf-sam/validate/score-clip/align-slots`
+  - `objgauss masks from-nerf-alpha/from-nerf-alpha-fgbg/from-nerf-rgba-colors/from-nerf-sam/validate/score-clip/align-slots/compare-baselines`
   - `objgauss training register-output/write-sample-bundle`
   - `objgauss demo v1-closure/verify-v1-closure/plush-semantic-closure/verify-plush-semantic-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
   - `objgauss object-field init/export/stats/emergence/emergence-curve/emergence-report/emergence-benchmark/inspect-nerf/vote-masks/vote-diagnostics`
