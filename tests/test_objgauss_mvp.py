@@ -1552,6 +1552,57 @@ def test_masks_align_slots_foreground_unique_policy_avoids_collapsed_clip_names(
     )
 
 
+def test_masks_align_slots_rebalances_weak_slot_support(tmp_path, capsys):
+    input_path = tmp_path / "imbalanced_camera_cloud.ply"
+    manifest_path = _write_imbalanced_slot_mask_manifest(tmp_path / "imbalanced-mask-manifest.json")
+    aligned_path = tmp_path / "aligned-mask-manifest.json"
+    write_ply(input_path, _imbalanced_camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(input_path),
+                "--output",
+                str(aligned_path),
+                "--min-slot-support-ratio",
+                "0.4",
+                "--min-balanced-slots",
+                "2",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+    rebalance = aligned["slot_alignment"]["slot_rebalance"]
+
+    assert "aligned_slots=2" in output
+    assert "dropped_masks=1" in output
+    assert "dropped_unbalanced_slots=1" in output
+    assert "dropped_unbalanced_masks=1" in output
+    assert "support_balance_score=0.500000" in output
+    assert aligned["slot_count"] == 2
+    assert [slot["label"] for slot in aligned["slots"]] == ["large tread", "black tire"]
+    assert [slot["support_gaussians"] for slot in aligned["slots"]] == [4, 2]
+    assert rebalance["kind"] == "objgauss-slot-support-rebalance-v1"
+    assert rebalance["enabled"] is True
+    assert rebalance["min_slot_support_ratio"] == 0.4
+    assert rebalance["min_balanced_slots"] == 2
+    assert rebalance["kept_support_gaussians"] == [4, 2]
+    assert rebalance["support_balance_score"] == pytest.approx(0.5)
+    assert rebalance["dropped_slots"] == 1
+    assert rebalance["dropped_masks"] == 1
+    assert rebalance["dropped_clusters"][0]["source_order"] == 2
+    assert rebalance["dropped_clusters"][0]["support_gaussians"] == 1
+    assert rebalance["dropped_clusters"][0]["drop_reason"] == "slot-support-below-threshold:1<2"
+    assert [mask["slot"] for mask in aligned["frames"][0]["masks"]] == [0, 1]
+
+
 def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path):
     cloud_path = tmp_path / "camera_cloud.ply"
     source_dir = tmp_path / "source"
@@ -1845,6 +1896,16 @@ def test_masks_compare_baselines_writes_promotion_policy(tmp_path, capsys):
                         "unique_slot_labels": 1,
                         "slot_label_counts": {"lego wheel tread": 4},
                     },
+                    "slot_rebalance": {
+                        "kind": "objgauss-slot-support-rebalance-v1",
+                        "enabled": True,
+                        "min_slot_support_ratio": 0.01,
+                        "kept_slots": 3,
+                        "dropped_slots": 1,
+                        "dropped_masks": 1,
+                        "kept_support_gaussians": [300, 20, 10],
+                        "support_balance_score": 1 / 30,
+                    },
                 },
             }
         ),
@@ -1924,6 +1985,8 @@ def test_masks_compare_baselines_writes_promotion_policy(tmp_path, capsys):
     assert summary["promotion_policy"]["status"] == "do-not-promote"
     assert candidates["clip"]["promotion"]["status"] == "blocked"
     assert "slot-naming:not-enough-unique-slot-labels" in candidates["clip"]["promotion"]["blockers"]
+    assert candidates["clip"]["slot_rebalance"]["dropped_slots"] == 1
+    assert candidates["clip"]["slot_rebalance"]["support_balance_score"] == pytest.approx(1 / 30)
     assert candidates["alpha"]["vote_quality"]["slot_balance_score"] == pytest.approx(1 / 3)
     assert candidates["alpha"]["promotion"]["status"] == "reference-only"
     assert candidates["color"]["training"]["loss_reduced"] is True
@@ -3035,6 +3098,31 @@ def _camera_cloud() -> GaussianCloud:
     return GaussianCloud(vertices=vertices, source_format="ascii")
 
 
+def _imbalanced_camera_cloud() -> GaussianCloud:
+    vertices = np.zeros(
+        7,
+        dtype=np.dtype(
+            [
+                ("x", "f4"),
+                ("y", "f4"),
+                ("z", "f4"),
+                ("opacity", "f4"),
+                ("red", "u1"),
+                ("green", "u1"),
+                ("blue", "u1"),
+            ]
+        ),
+    )
+    vertices["x"] = np.array([-0.8, -0.6, -0.4, -0.2, 0.2, 0.4, 0.8], dtype=np.float32)
+    vertices["y"] = 0.0
+    vertices["z"] = -2.0
+    vertices["opacity"] = 1.0
+    vertices["red"] = 128
+    vertices["green"] = 128
+    vertices["blue"] = 128
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
 def _occluded_camera_cloud() -> GaussianCloud:
     vertices = np.zeros(
         3,
@@ -3295,6 +3383,46 @@ def _write_collapsed_clip_mask_manifest(path):
                             "lego wheel tread": 0.89,
                             "red cab roof": 0.87,
                         },
+                    },
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_imbalanced_slot_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source_type": "sam-automatic-mask-generator",
+        "frames": [
+            {
+                "name": "frame-0",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [0, 0, 50, 100],
+                        "area": 5000,
+                        "clip_scores": {"large tread": 0.9, "tiny hub": 0.1},
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [50, 0, 65, 100],
+                        "area": 1500,
+                        "clip_scores": {"black tire": 0.9, "large tread": 0.1},
+                    },
+                    {
+                        "slot": 2,
+                        "label": "sam-area-rank-2",
+                        "rect": [65, 0, 100, 100],
+                        "area": 3500,
+                        "clip_scores": {"tiny hub": 0.9, "black tire": 0.1},
                     },
                 ],
             }

@@ -38,6 +38,7 @@ class SlotAlignmentResult:
     clusters: tuple[dict[str, Any], ...]
     slot_naming_quality: dict[str, Any]
     record_filters: dict[str, Any]
+    slot_rebalance: dict[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -53,6 +54,7 @@ class SlotAlignmentResult:
             "clusters": list(self.clusters),
             "slot_naming_quality": self.slot_naming_quality,
             "record_filters": self.record_filters,
+            "slot_rebalance": self.slot_rebalance,
         }
 
 
@@ -97,6 +99,39 @@ class _MaskRecordExtraction:
         }
 
 
+@dataclass(frozen=True)
+class _SlotRebalanceResult:
+    clusters: tuple[_SlotCluster, ...]
+    dropped_clusters: tuple[dict[str, Any], ...]
+    min_slot_support_gaussians: int
+    min_slot_support_ratio: float
+    min_balanced_slots: int
+
+    @property
+    def dropped_slots(self) -> int:
+        return len(self.dropped_clusters)
+
+    @property
+    def dropped_masks(self) -> int:
+        return sum(int(cluster["mask_count"]) for cluster in self.dropped_clusters)
+
+    def as_dict(self) -> dict[str, Any]:
+        support_counts = [len(cluster.gaussian_indices) for cluster in self.clusters]
+        return {
+            "kind": "objgauss-slot-support-rebalance-v1",
+            "enabled": bool(self.min_slot_support_gaussians > 0 or self.min_slot_support_ratio > 0),
+            "min_slot_support_gaussians": int(self.min_slot_support_gaussians),
+            "min_slot_support_ratio": float(self.min_slot_support_ratio),
+            "min_balanced_slots": int(self.min_balanced_slots),
+            "kept_slots": int(len(self.clusters)),
+            "dropped_slots": int(self.dropped_slots),
+            "dropped_masks": int(self.dropped_masks),
+            "kept_support_gaussians": support_counts,
+            "support_balance_score": _support_balance_score(support_counts),
+            "dropped_clusters": list(self.dropped_clusters),
+        }
+
+
 def align_mask_manifest_slots(
     cloud: GaussianCloud,
     manifest_path: str | Path,
@@ -118,6 +153,9 @@ def align_mask_manifest_slots(
     foreground_only_slot_names: bool = False,
     unique_slot_names: bool = False,
     slot_name_diversity_penalty: float = 0.0,
+    min_slot_support_gaussians: int = 0,
+    min_slot_support_ratio: float = 0.0,
+    min_balanced_slots: int = 1,
 ) -> SlotAlignmentResult:
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be in [0, 1]")
@@ -141,6 +179,12 @@ def align_mask_manifest_slots(
         raise ValueError("max_background_slot_fraction must be in [0, 1]")
     if slot_name_diversity_penalty < 0.0:
         raise ValueError("slot_name_diversity_penalty must be >= 0")
+    if min_slot_support_gaussians < 0:
+        raise ValueError("min_slot_support_gaussians must be >= 0")
+    if not 0.0 <= min_slot_support_ratio <= 1.0:
+        raise ValueError("min_slot_support_ratio must be in [0, 1]")
+    if min_balanced_slots < 1:
+        raise ValueError("min_balanced_slots must be >= 1")
 
     clean_background_labels = _clean_label_set(background_labels or DEFAULT_SLOT_BACKGROUND_LABELS)
     excluded_labels = _clean_label_set(exclude_top_labels or ())
@@ -176,6 +220,15 @@ def align_mask_manifest_slots(
     ordered_clusters = _order_clusters(clusters)
     if max_slots is not None:
         ordered_clusters = ordered_clusters[:max_slots]
+    rebalance = _rebalance_slot_support(
+        ordered_clusters,
+        min_slot_support_gaussians=min_slot_support_gaussians,
+        min_slot_support_ratio=min_slot_support_ratio,
+        min_balanced_slots=min_balanced_slots,
+    )
+    ordered_clusters = list(rebalance.clusters)
+    if not ordered_clusters:
+        raise ValueError("slot support rebalance removed all clusters")
     record_to_slot = {
         (record.frame_index, record.mask_index): slot
         for slot, cluster in enumerate(ordered_clusters)
@@ -212,6 +265,7 @@ def align_mask_manifest_slots(
         max_frames=max_frames,
         source_record_count=extraction.projected_masks,
         record_filters=extraction.as_dict(),
+        slot_rebalance=rebalance.as_dict(),
         slot_naming_quality=slot_naming_quality,
         naming_policy=naming_policy,
         source_root=manifest_path.parent,
@@ -227,6 +281,7 @@ def align_mask_manifest_slots(
 
     slot_naming_quality = aligned_payload["slot_alignment"]["slot_naming_quality"]
     record_filters = aligned_payload["slot_alignment"]["record_filters"]
+    slot_rebalance = aligned_payload["slot_alignment"]["slot_rebalance"]
     named_slots = sum(1 for cluster in summaries if cluster["semantic_name_source"] != "unnamed")
     remapped_masks = sum(
         1
@@ -247,6 +302,7 @@ def align_mask_manifest_slots(
         clusters=summaries,
         slot_naming_quality=slot_naming_quality,
         record_filters=record_filters,
+        slot_rebalance=slot_rebalance,
     )
 
 
@@ -401,6 +457,61 @@ def _order_clusters(clusters: list[_SlotCluster]) -> list[_SlotCluster]:
     )
 
 
+def _rebalance_slot_support(
+    clusters: list[_SlotCluster],
+    *,
+    min_slot_support_gaussians: int,
+    min_slot_support_ratio: float,
+    min_balanced_slots: int,
+) -> _SlotRebalanceResult:
+    if not clusters:
+        return _SlotRebalanceResult(
+            clusters=(),
+            dropped_clusters=(),
+            min_slot_support_gaussians=min_slot_support_gaussians,
+            min_slot_support_ratio=min_slot_support_ratio,
+            min_balanced_slots=min_balanced_slots,
+        )
+    if min_slot_support_gaussians <= 0 and min_slot_support_ratio <= 0:
+        return _SlotRebalanceResult(
+            clusters=tuple(clusters),
+            dropped_clusters=(),
+            min_slot_support_gaussians=min_slot_support_gaussians,
+            min_slot_support_ratio=min_slot_support_ratio,
+            min_balanced_slots=min_balanced_slots,
+        )
+    max_support = max(len(cluster.gaussian_indices) for cluster in clusters)
+    ratio_floor = int(np.ceil(float(max_support) * float(min_slot_support_ratio)))
+    support_floor = max(int(min_slot_support_gaussians), ratio_floor)
+    kept: list[_SlotCluster] = []
+    dropped: list[dict[str, Any]] = []
+    for slot, cluster in enumerate(clusters):
+        support = len(cluster.gaussian_indices)
+        if support >= support_floor or len(kept) < int(min_balanced_slots):
+            kept.append(cluster)
+            continue
+        dropped.append(
+            {
+                "source_order": int(slot),
+                "support_gaussians": int(support),
+                "mask_count": int(len(cluster.records)),
+                "frame_count": int(len({record.frame_index for record in cluster.records})),
+                "source_slots": sorted({int(record.source_slot) for record in cluster.records}),
+                "drop_reason": (
+                    f"slot-support-below-threshold:{support}<"
+                    f"{support_floor}"
+                ),
+            }
+        )
+    return _SlotRebalanceResult(
+        clusters=tuple(kept),
+        dropped_clusters=tuple(dropped),
+        min_slot_support_gaussians=min_slot_support_gaussians,
+        min_slot_support_ratio=min_slot_support_ratio,
+        min_balanced_slots=min_balanced_slots,
+    )
+
+
 def _rewrite_aligned_manifest(
     payload: dict[str, Any],
     *,
@@ -409,6 +520,7 @@ def _rewrite_aligned_manifest(
     max_frames: int | None,
     source_record_count: int,
     record_filters: dict[str, Any],
+    slot_rebalance: dict[str, Any],
     slot_naming_quality: dict[str, Any],
     naming_policy: dict[str, Any],
     source_root: Path,
@@ -479,6 +591,7 @@ def _rewrite_aligned_manifest(
         "masks": len(record_to_slot),
         "dropped_masks": int(source_record_count - len(record_to_slot)),
         "record_filters": record_filters,
+        "slot_rebalance": slot_rebalance,
         "naming_policy": naming_policy,
         "slot_naming_quality": slot_naming_quality,
     }
@@ -717,6 +830,16 @@ def _semantic_name_policy_label(
     if slot_name_diversity_penalty > 0:
         parts.append(f"diversity-penalty:{slot_name_diversity_penalty:g}")
     return ":".join(parts)
+
+
+def _support_balance_score(counts: list[int]) -> float:
+    active = [int(count) for count in counts if int(count) > 0]
+    if not active:
+        return 0.0
+    max_count = max(active)
+    if max_count <= 0:
+        return 0.0
+    return float(min(active) / max_count)
 
 
 def _slot_naming_quality(

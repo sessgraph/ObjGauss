@@ -789,9 +789,13 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
         foreground_only_slot_names=args.foreground_only_slot_names,
         unique_slot_names=args.unique_slot_names,
         slot_name_diversity_penalty=args.slot_name_diversity_penalty,
+        min_slot_support_gaussians=args.min_slot_support_gaussians,
+        min_slot_support_ratio=args.min_slot_support_ratio,
+        min_balanced_slots=args.min_balanced_slots,
     )
     quality = result.slot_naming_quality
     filters = result.record_filters
+    rebalance = result.slot_rebalance
     print(f"aligned_manifest={result.output_manifest}")
     print(f"frames={result.frames}")
     print(f"masks={result.masks}")
@@ -806,6 +810,9 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
     print(f"foreground_only_slot_names={str(args.foreground_only_slot_names).lower()}")
     print(f"unique_slot_names={str(args.unique_slot_names).lower()}")
     print(f"slot_name_diversity_penalty={args.slot_name_diversity_penalty:.6f}")
+    print(f"dropped_unbalanced_slots={rebalance.get('dropped_slots', 0)}")
+    print(f"dropped_unbalanced_masks={rebalance.get('dropped_masks', 0)}")
+    print(f"support_balance_score={float(rebalance.get('support_balance_score', 0.0)):.6f}")
     if quality.get("blockers"):
         print(f"slot_quality_blockers={quality['blockers']}")
     for cluster in result.clusters:
@@ -1617,6 +1624,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="divide repeated label scores by 1 + penalty * prior_slot_uses",
+    )
+    align_slots.add_argument(
+        "--min-slot-support-gaussians",
+        type=int,
+        default=0,
+        help="drop aligned slots with fewer Gaussian supports unless needed to keep min-balanced-slots",
+    )
+    align_slots.add_argument(
+        "--min-slot-support-ratio",
+        type=float,
+        default=0.0,
+        help="drop aligned slots whose support is below this fraction of the largest slot",
+    )
+    align_slots.add_argument(
+        "--min-balanced-slots",
+        type=int,
+        default=1,
+        help="minimum slots to keep even when support rebalance thresholds would drop them",
     )
     align_slots.add_argument(
         "--require-slot-quality",

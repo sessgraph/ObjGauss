@@ -201,6 +201,9 @@ def _merge_json_payload(candidate: dict[str, Any], payload: dict[str, Any], *, p
         record_filters = slot_alignment.get("record_filters")
         if isinstance(record_filters, dict):
             candidate["record_filters"] = dict(record_filters)
+        slot_rebalance = slot_alignment.get("slot_rebalance")
+        if isinstance(slot_rebalance, dict):
+            candidate["slot_rebalance"] = _json_safe_dict(slot_rebalance)
 
     slots = payload.get("slots")
     if isinstance(slots, list):
