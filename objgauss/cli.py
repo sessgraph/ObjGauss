@@ -7,7 +7,11 @@ import numpy as np
 
 from objgauss.assets import list_assets, pull_asset
 from objgauss.clustering import cluster_features, summarize_labels
-from objgauss.clip_scoring import read_clip_labels, score_mask_manifest_with_clip
+from objgauss.clip_scoring import (
+    CLIP_LABEL_PRESETS,
+    read_clip_labels,
+    score_mask_manifest_with_clip,
+)
 from objgauss.demo import build_v1_closure_demo, verify_v1_closure_demo
 from objgauss.emergence_benchmark import run_emergence_benchmark
 from objgauss.emergence import (
@@ -712,7 +716,11 @@ def _masks_validate(args: argparse.Namespace) -> None:
 
 
 def _masks_score_clip(args: argparse.Namespace) -> None:
-    labels = read_clip_labels(args.labels or [], labels_file=args.labels_file)
+    labels = read_clip_labels(
+        args.labels or [],
+        labels_file=args.labels_file,
+        presets=args.label_preset or [],
+    )
     result = score_mask_manifest_with_clip(
         args.manifest,
         output=args.output,
@@ -724,20 +732,35 @@ def _masks_score_clip(args: argparse.Namespace) -> None:
         max_frames=args.max_frames,
         max_masks=args.max_masks,
         crop_padding=args.crop_padding,
+        background_fill=args.background_fill,
+        prompt_templates=args.prompt_template,
+        background_labels=args.background_labels,
+        min_unique_top_labels=args.min_unique_top_labels,
+        max_top_label_fraction=args.max_top_label_fraction,
+        max_background_label_fraction=args.max_background_label_fraction,
         overwrite_scores=args.overwrite_scores,
     )
+    quality = result.naming_quality
     print(f"scored_manifest={result.output_manifest}")
     print(f"backend={result.backend}")
     print(f"model={result.model}")
     print(f"labels={len(result.labels)}")
+    print(f"prompt_templates={len(result.prompt_templates)}")
+    print(f"background_fill={result.background_fill}")
     print(f"frames={result.frames}")
     print(f"masks={result.masks}")
     print(f"scored_masks={result.scored_masks}")
     print(f"cached_masks={result.cached_masks}")
     print(f"named_masks={result.named_masks}")
+    print(f"naming_quality={'passed' if quality.get('passed') else 'failed'}")
+    print(f"top_label_counts={quality.get('top_label_counts', {})}")
+    if quality.get("blockers"):
+        print(f"quality_blockers={quality['blockers']}")
     if args.summary_output:
         write_json(args.summary_output, result.as_dict())
         print(f"summary={args.summary_output}")
+    if args.require_naming_quality and not quality.get("passed"):
+        raise ValueError(f"CLIP naming quality gate failed: {quality.get('blockers', [])}")
 
 
 def _masks_align_slots(args: argparse.Namespace) -> None:
@@ -1441,6 +1464,12 @@ def _build_parser() -> argparse.ArgumentParser:
     score_clip.add_argument("--dataset", type=Path)
     score_clip.add_argument("--labels", nargs="+", default=[])
     score_clip.add_argument("--labels-file", type=Path)
+    score_clip.add_argument(
+        "--label-preset",
+        action="append",
+        choices=sorted(CLIP_LABEL_PRESETS),
+        help="append a curated label set before labels-file / --labels de-duplication",
+    )
     score_clip.add_argument("--summary-output", type=Path)
     score_clip.add_argument(
         "--backend",
@@ -1453,6 +1482,30 @@ def _build_parser() -> argparse.ArgumentParser:
     score_clip.add_argument("--max-frames", type=int)
     score_clip.add_argument("--max-masks", type=int)
     score_clip.add_argument("--crop-padding", type=float, default=0.05)
+    score_clip.add_argument(
+        "--background-fill",
+        choices=["white", "black", "gray", "mean", "image"],
+        default="white",
+        help="fill non-mask pixels inside each crop before CLIP scoring",
+    )
+    score_clip.add_argument(
+        "--prompt-template",
+        action="append",
+        help="CLIP text prompt template containing {label}; may be repeated",
+    )
+    score_clip.add_argument(
+        "--background-labels",
+        nargs="+",
+        help="labels counted as background in naming quality gate",
+    )
+    score_clip.add_argument("--min-unique-top-labels", type=int, default=2)
+    score_clip.add_argument("--max-top-label-fraction", type=float, default=0.75)
+    score_clip.add_argument("--max-background-label-fraction", type=float, default=0.5)
+    score_clip.add_argument(
+        "--require-naming-quality",
+        action="store_true",
+        help="exit non-zero when the naming diversity/background gate fails",
+    )
     score_clip.add_argument("--overwrite-scores", action="store_true")
     score_clip.set_defaults(handler=_masks_score_clip)
 

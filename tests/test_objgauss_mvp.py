@@ -13,6 +13,7 @@ import pytest
 import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
 from objgauss.cli import main
+from objgauss.clip_scoring import score_mask_manifest_with_clip
 from objgauss.clustering import cluster_features
 from objgauss.emergence import object_emergence_curve, object_emergence_metrics
 from objgauss.features import extract_features
@@ -1553,6 +1554,7 @@ def test_masks_score_clip_writes_cached_scores_and_portable_paths(tmp_path, caps
     assert "backend=hash-diagnostic" in output
     assert "scored_masks=2" in output
     assert "cached_masks=0" in output
+    assert "naming_quality=" in output
     assert summary["kind"] == "objgauss-clip-mask-score-v1"
     assert scored["clip_scoring"]["scored_masks"] == 2
     assert scored["clip_scoring"]["labels"] == ["red brick", "blue brick"]
@@ -1582,6 +1584,74 @@ def test_masks_score_clip_writes_cached_scores_and_portable_paths(tmp_path, caps
     cached_output = capsys.readouterr().out
     assert "scored_masks=0" in cached_output
     assert "cached_masks=2" in cached_output
+
+    prompted_path = tmp_path / "prompted" / "scored-mask-manifest.json"
+    assert (
+        main(
+            [
+                "masks",
+                "score-clip",
+                str(scored_path),
+                "--output",
+                str(prompted_path),
+                "--backend",
+                "hash",
+                "--labels",
+                "red brick",
+                "blue brick",
+                "--prompt-template",
+                "a masked crop of {label}",
+            ]
+        )
+        == 0
+    )
+    prompted_output = capsys.readouterr().out
+    assert "scored_masks=2" in prompted_output
+    assert "cached_masks=0" in prompted_output
+
+
+def test_masks_score_clip_prompt_background_and_quality_gate(tmp_path):
+    manifest_path = _write_clip_quality_mask_manifest(tmp_path / "source" / "mask-manifest.json")
+    scored_path = tmp_path / "scored" / "mask-manifest.json"
+    scorer = _FixedClipScorer(
+        [
+            [0.65, 0.15, 0.15, 0.05],
+            [0.60, 0.20, 0.15, 0.05],
+        ]
+    )
+
+    result = score_mask_manifest_with_clip(
+        manifest_path,
+        output=scored_path,
+        labels=["red brick", "blue brick"],
+        prompt_templates=["a close-up photo of {label}", "a masked crop of {label}"],
+        background_fill="mean",
+        max_top_label_fraction=0.60,
+        scorer=scorer,
+    )
+
+    scored = json.loads(scored_path.read_text(encoding="utf-8"))
+    first_mask = scored["frames"][0]["masks"][0]
+
+    assert scorer.seen_labels == (
+        "a close-up photo of red brick",
+        "a masked crop of red brick",
+        "a close-up photo of blue brick",
+        "a masked crop of blue brick",
+    )
+    assert int(np.max(scorer.seen_images[0][:, :, 1])) < 50
+    assert first_mask["clip"]["prompt_templates"] == [
+        "a close-up photo of {label}",
+        "a masked crop of {label}",
+    ]
+    assert first_mask["clip"]["top_label"] == "red brick"
+    assert first_mask["clip_scores"]["red brick"] == pytest.approx(0.80)
+    assert result.naming_quality["passed"] is False
+    assert result.naming_quality["top_label_counts"] == {"red brick": 2}
+    assert result.naming_quality["blockers"] == [
+        "not-enough-unique-top-labels",
+        "top-label-dominant:red brick",
+    ]
 
 
 def test_masks_score_clip_feeds_align_slot_names(tmp_path, capsys):
@@ -2936,6 +3006,70 @@ def _write_clip_score_mask_manifest(path):
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+def _write_clip_quality_mask_manifest(path):
+    dataset = path.parent / "dataset"
+    masks_dir = path.parent / "masks"
+    (dataset / "train").mkdir(parents=True)
+    masks_dir.mkdir(parents=True)
+    rgba = np.zeros((10, 10, 4), dtype=np.uint8)
+    rgba[:, :] = np.array([0, 180, 0, 255], dtype=np.uint8)
+    first = np.zeros((10, 10), dtype=bool)
+    first[2:8, 4] = True
+    first[4, 2:8] = True
+    second = np.zeros((10, 10), dtype=bool)
+    second[1:5, 1:5] = True
+    rgba[first] = np.array([200, 10, 10, 255], dtype=np.uint8)
+    rgba[second] = np.array([200, 10, 10, 255], dtype=np.uint8)
+    _write_rgba_png(dataset / "train" / "r_0.png", rgba)
+    np.save(masks_dir / "first.npy", first)
+    np.save(masks_dir / "second.npy", second)
+    payload = {
+        "width": 10,
+        "height": 10,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source": str(dataset),
+        "source_type": "sam-automatic-mask-generator",
+        "frames": [
+            {
+                "name": "frame-0",
+                "image_path": "train/r_0.png",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "mask_path": "masks/first.npy",
+                        "area": int(first.sum()),
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "mask_path": "masks/second.npy",
+                        "area": int(second.sum()),
+                    },
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+class _FixedClipScorer:
+    backend = "fixed"
+    model = "fixed-v1"
+
+    def __init__(self, scores):
+        self._scores = np.asarray(scores, dtype=np.float32)
+        self.seen_images = []
+        self.seen_labels = ()
+
+    def score(self, images, labels):
+        self.seen_images = [np.asarray(image).copy() for image in images]
+        self.seen_labels = tuple(labels)
+        return self._scores
 
 
 def _write_center_foreground_mask_manifest(path):
