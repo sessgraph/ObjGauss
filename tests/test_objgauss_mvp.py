@@ -1438,7 +1438,13 @@ def test_masks_align_slots_rewrites_swapped_slots_with_clip_names(tmp_path, caps
     assert "aligned_slots=2" in output
     assert "remapped_masks=2" in output
     assert "named_slots=2" in output
+    assert "slot_naming_quality=passed" in output
     assert aligned["slot_alignment"]["kind"] == "objgauss-cross-view-slot-alignment-v1"
+    assert aligned["slot_alignment"]["slot_naming_quality"]["passed"] is True
+    assert aligned["slot_alignment"]["slot_naming_quality"]["slot_label_counts"] == {
+        "left brick": 1,
+        "right brick": 1,
+    }
     assert [slot["label"] for slot in aligned["slots"]] == ["left brick", "right brick"]
     assert [slot["semantic_name_source"] for slot in aligned["slots"]] == [
         "clip_scores",
@@ -1449,6 +1455,51 @@ def test_masks_align_slots_rewrites_swapped_slots_with_clip_names(tmp_path, caps
     assert aligned["frames"][1]["masks"][0]["source_slot"] == 0
     assert aligned["frames"][1]["masks"][0]["source_label"] == "sam-area-rank-0"
     assert aligned["frames"][1]["masks"][0]["label"] == "right brick"
+
+
+def test_masks_align_slots_filters_low_area_and_background_top_labels(tmp_path, capsys):
+    input_path = tmp_path / "camera_cloud.ply"
+    manifest_path = _write_filtered_clip_mask_manifest(tmp_path / "filtered-mask-manifest.json")
+    aligned_path = tmp_path / "aligned-mask-manifest.json"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(input_path),
+                "--output",
+                str(aligned_path),
+                "--min-mask-area",
+                "100",
+                "--exclude-background-top-labels",
+                "--min-unique-slot-labels",
+                "1",
+                "--max-slot-label-fraction",
+                "1",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+    filters = aligned["slot_alignment"]["record_filters"]
+    quality = aligned["slot_alignment"]["slot_naming_quality"]
+
+    assert "filtered_low_area=1" in output
+    assert "filtered_top_label=1" in output
+    assert filters["source_masks"] == 3
+    assert filters["filtered_low_area"] == 1
+    assert filters["filtered_top_label"] == 1
+    assert filters["kept_records"] == 1
+    assert aligned["slot_count"] == 1
+    assert aligned["slots"][0]["label"] == "left brick"
+    assert quality["passed"] is True
+    assert quality["slot_label_counts"] == {"left brick": 1}
 
 
 def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path):
@@ -2951,6 +3002,46 @@ def _write_swapped_clip_mask_manifest(path):
                     },
                 ],
             },
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_filtered_clip_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source_type": "sam-automatic-mask-generator",
+        "frames": [
+            {
+                "name": "frame-0",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [0, 0, 50, 100],
+                        "area": 5000,
+                        "clip_scores": {"left brick": 0.9, "white background": 0.1},
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [50, 0, 100, 100],
+                        "area": 5000,
+                        "clip_scores": {"white background": 0.9, "right brick": 0.1},
+                    },
+                    {
+                        "slot": 2,
+                        "label": "sam-area-rank-2",
+                        "rect": [45, 0, 55, 100],
+                        "area": 20,
+                        "clip_scores": {"tiny highlight": 0.9, "left brick": 0.1},
+                    },
+                ],
+            }
         ],
     }
     path.write_text(json.dumps(payload), encoding="utf-8")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,17 @@ import numpy as np
 from objgauss.features import positions
 from objgauss.gaussians import GaussianCloud
 from objgauss.mask_voting import project_points
+
+DEFAULT_SLOT_BACKGROUND_LABELS = (
+    "background",
+    "white background",
+    "table surface",
+    "floor",
+    "wall",
+    "shadow",
+    "cast shadow",
+    "object shadow",
+)
 
 
 @dataclass(frozen=True)
@@ -24,6 +36,8 @@ class SlotAlignmentResult:
     dropped_masks: int
     named_slots: int
     clusters: tuple[dict[str, Any], ...]
+    slot_naming_quality: dict[str, Any]
+    record_filters: dict[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -37,6 +51,8 @@ class SlotAlignmentResult:
             "dropped_masks": int(self.dropped_masks),
             "named_slots": int(self.named_slots),
             "clusters": list(self.clusters),
+            "slot_naming_quality": self.slot_naming_quality,
+            "record_filters": self.record_filters,
         }
 
 
@@ -60,6 +76,27 @@ class _SlotCluster:
     label_weights: dict[str, float]
 
 
+@dataclass(frozen=True)
+class _MaskRecordExtraction:
+    records: list[_MaskRecord]
+    source_masks: int
+    projected_masks: int
+    filtered_low_area: int
+    filtered_top_label: int
+    filtered_empty_projection: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "objgauss-slot-record-filters-v1",
+            "source_masks": int(self.source_masks),
+            "projected_masks": int(self.projected_masks),
+            "kept_records": int(len(self.records)),
+            "filtered_low_area": int(self.filtered_low_area),
+            "filtered_top_label": int(self.filtered_top_label),
+            "filtered_empty_projection": int(self.filtered_empty_projection),
+        }
+
+
 def align_mask_manifest_slots(
     cloud: GaussianCloud,
     manifest_path: str | Path,
@@ -69,6 +106,15 @@ def align_mask_manifest_slots(
     min_shared_gaussians: int = 1,
     max_slots: int | None = None,
     max_frames: int | None = None,
+    min_mask_area: int = 0,
+    min_mask_area_fraction: float = 0.0,
+    exclude_top_labels: list[str] | tuple[str, ...] | None = None,
+    exclude_background_top_labels: bool = False,
+    background_labels: list[str] | tuple[str, ...] | None = None,
+    min_named_slots: int = 1,
+    min_unique_slot_labels: int = 2,
+    max_slot_label_fraction: float = 0.5,
+    max_background_slot_fraction: float = 0.25,
 ) -> SlotAlignmentResult:
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be in [0, 1]")
@@ -78,6 +124,23 @@ def align_mask_manifest_slots(
         raise ValueError("max_slots must be >= 1")
     if max_frames is not None and max_frames < 1:
         raise ValueError("max_frames must be >= 1")
+    if min_mask_area < 0:
+        raise ValueError("min_mask_area must be >= 0")
+    if not 0.0 <= min_mask_area_fraction <= 1.0:
+        raise ValueError("min_mask_area_fraction must be in [0, 1]")
+    if min_named_slots < 0:
+        raise ValueError("min_named_slots must be >= 0")
+    if min_unique_slot_labels < 0:
+        raise ValueError("min_unique_slot_labels must be >= 0")
+    if not 0.0 < max_slot_label_fraction <= 1.0:
+        raise ValueError("max_slot_label_fraction must be in (0, 1]")
+    if not 0.0 <= max_background_slot_fraction <= 1.0:
+        raise ValueError("max_background_slot_fraction must be in [0, 1]")
+
+    clean_background_labels = _clean_label_set(background_labels or DEFAULT_SLOT_BACKGROUND_LABELS)
+    excluded_labels = _clean_label_set(exclude_top_labels or ())
+    if exclude_background_top_labels:
+        excluded_labels |= clean_background_labels
 
     manifest_path = Path(manifest_path)
     output = Path(output)
@@ -87,9 +150,18 @@ def align_mask_manifest_slots(
         raise ValueError("mask manifest must contain a non-empty frames list")
 
     root = manifest_path.parent
-    records = _mask_records_for_manifest(cloud, payload, root=root, max_frames=max_frames)
+    extraction = _mask_records_for_manifest(
+        cloud,
+        payload,
+        root=root,
+        max_frames=max_frames,
+        min_mask_area=min_mask_area,
+        min_mask_area_fraction=min_mask_area_fraction,
+        exclude_top_labels=excluded_labels,
+    )
+    records = extraction.records
     if not records:
-        raise ValueError("mask manifest did not produce any projected mask records")
+        raise ValueError("mask manifest did not produce any kept projected mask records")
 
     clusters = _cluster_mask_records(
         records,
@@ -110,7 +182,16 @@ def align_mask_manifest_slots(
         record_to_slot=record_to_slot,
         clusters=ordered_clusters,
         max_frames=max_frames,
-        source_record_count=len(records),
+        source_record_count=extraction.projected_masks,
+        record_filters=extraction.as_dict(),
+        slot_naming_quality=_slot_naming_quality(
+            ordered_clusters,
+            background_labels=clean_background_labels,
+            min_named_slots=min_named_slots,
+            min_unique_slot_labels=min_unique_slot_labels,
+            max_slot_label_fraction=max_slot_label_fraction,
+            max_background_slot_fraction=max_background_slot_fraction,
+        ),
         source_root=manifest_path.parent,
         output_root=output.parent,
     )
@@ -126,6 +207,8 @@ def align_mask_manifest_slots(
         _cluster_summary(slot, cluster)
         for slot, cluster in enumerate(ordered_clusters)
     )
+    slot_naming_quality = aligned_payload["slot_alignment"]["slot_naming_quality"]
+    record_filters = aligned_payload["slot_alignment"]["record_filters"]
     named_slots = sum(1 for cluster in summaries if cluster["semantic_name_source"] != "unnamed")
     remapped_masks = sum(
         1
@@ -144,6 +227,8 @@ def align_mask_manifest_slots(
         dropped_masks=dropped_masks,
         named_slots=named_slots,
         clusters=summaries,
+        slot_naming_quality=slot_naming_quality,
+        record_filters=record_filters,
     )
 
 
@@ -153,13 +238,21 @@ def _mask_records_for_manifest(
     *,
     root: Path,
     max_frames: int | None,
-) -> list[_MaskRecord]:
+    min_mask_area: int,
+    min_mask_area_fraction: float,
+    exclude_top_labels: set[str],
+) -> _MaskRecordExtraction:
     default_width = _optional_int(payload.get("width") or payload.get("image_width"))
     default_height = _optional_int(payload.get("height") or payload.get("image_height"))
     default_angle_x = _optional_float(payload.get("camera_angle_x"))
     xyz = positions(cloud)
     records: list[_MaskRecord] = []
     frames = payload["frames"]
+    source_masks = 0
+    projected_masks = 0
+    filtered_low_area = 0
+    filtered_top_label = 0
+    filtered_empty_projection = 0
 
     for frame_index, frame in enumerate(frames[:max_frames]):
         if not isinstance(frame, dict):
@@ -184,14 +277,25 @@ def _mask_records_for_manifest(
         for mask_index, mask in enumerate(masks):
             if not isinstance(mask, dict):
                 raise ValueError("mask entries must be objects")
+            source_masks += 1
+            area = _mask_pixel_area(mask, root=root, width=width, height=height)
+            min_area = max(int(min_mask_area), int(np.ceil(width * height * min_mask_area_fraction)))
+            if min_area > 0 and area < min_area:
+                filtered_low_area += 1
+                continue
+            top_label = _top_clip_label(mask)
+            if top_label and top_label.lower() in exclude_top_labels:
+                filtered_top_label += 1
+                continue
             contained = _mask_contains(mask, projection, width, height, root)
             selected = np.flatnonzero(projection.visible & contained)
             if selected.size == 0:
+                filtered_empty_projection += 1
                 continue
+            projected_masks += 1
             source_slot = _required_int(mask.get("slot", mask.get("slot_id")), "mask slot")
             label = str(mask.get("label") or mask.get("name") or f"slot-{source_slot}")
             confidence = float(mask.get("confidence", 1.0) or 1.0)
-            area = int(mask.get("area", selected.size) or selected.size)
             records.append(
                 _MaskRecord(
                     frame_index=frame_index,
@@ -204,7 +308,14 @@ def _mask_records_for_manifest(
                     clip_scores=_clip_scores(mask),
                 )
             )
-    return records
+    return _MaskRecordExtraction(
+        records=records,
+        source_masks=source_masks,
+        projected_masks=projected_masks,
+        filtered_low_area=filtered_low_area,
+        filtered_top_label=filtered_top_label,
+        filtered_empty_projection=filtered_empty_projection,
+    )
 
 
 def _cluster_mask_records(
@@ -279,6 +390,8 @@ def _rewrite_aligned_manifest(
     clusters: list[_SlotCluster],
     max_frames: int | None,
     source_record_count: int,
+    record_filters: dict[str, Any],
+    slot_naming_quality: dict[str, Any],
     source_root: Path,
     output_root: Path,
 ) -> dict[str, Any]:
@@ -345,6 +458,8 @@ def _rewrite_aligned_manifest(
         "frames": len(aligned_frames),
         "masks": len(record_to_slot),
         "dropped_masks": int(source_record_count - len(record_to_slot)),
+        "record_filters": record_filters,
+        "slot_naming_quality": slot_naming_quality,
     }
     return aligned
 
@@ -407,11 +522,82 @@ def _semantic_label(cluster: _SlotCluster, *, fallback: str) -> tuple[str, str]:
     return fallback, "unnamed"
 
 
+def _slot_naming_quality(
+    clusters: list[_SlotCluster],
+    *,
+    background_labels: set[str],
+    min_named_slots: int,
+    min_unique_slot_labels: int,
+    max_slot_label_fraction: float,
+    max_background_slot_fraction: float,
+) -> dict[str, Any]:
+    label_counts: Counter[str] = Counter()
+    source_counts: Counter[str] = Counter()
+    background_count = 0
+    for slot, cluster in enumerate(clusters):
+        label, source = _semantic_label(cluster, fallback=f"slot-{slot}")
+        source_counts[source] += 1
+        if source == "unnamed":
+            continue
+        label_counts[label] += 1
+        if label.lower() in background_labels:
+            background_count += 1
+
+    named_slots = int(sum(label_counts.values()))
+    unique_slot_labels = int(len(label_counts))
+    max_label = ""
+    max_count = 0
+    if label_counts:
+        max_label, max_count = sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))[0]
+    max_fraction = float(max_count / named_slots) if named_slots else 0.0
+    background_fraction = float(background_count / named_slots) if named_slots else 0.0
+
+    blockers: list[str] = []
+    if named_slots < min_named_slots:
+        blockers.append("not-enough-named-slots")
+    if unique_slot_labels < min_unique_slot_labels:
+        blockers.append("not-enough-unique-slot-labels")
+    if max_fraction > max_slot_label_fraction:
+        blockers.append(f"slot-label-dominant:{max_label}")
+    if background_fraction > max_background_slot_fraction:
+        blockers.append("background-slot-dominant")
+
+    return {
+        "kind": "objgauss-slot-naming-quality-v1",
+        "passed": not blockers,
+        "blockers": blockers,
+        "slots": int(len(clusters)),
+        "named_slots": named_slots,
+        "unique_slot_labels": unique_slot_labels,
+        "slot_label_counts": dict(sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))),
+        "semantic_name_sources": dict(sorted(source_counts.items())),
+        "max_slot_label": max_label,
+        "max_slot_label_count": int(max_count),
+        "max_slot_label_fraction": max_fraction,
+        "background_labels": sorted(background_labels),
+        "background_slot_count": int(background_count),
+        "background_slot_fraction": background_fraction,
+        "thresholds": {
+            "min_named_slots": int(min_named_slots),
+            "min_unique_slot_labels": int(min_unique_slot_labels),
+            "max_slot_label_fraction": float(max_slot_label_fraction),
+            "max_background_slot_fraction": float(max_background_slot_fraction),
+        },
+    }
+
+
 def _ranked_items(scores: dict[str, float], *, limit: int = 5) -> list[dict[str, Any]]:
     return [
         {"label": label, "score": float(score)}
         for label, score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
     ]
+
+
+def _top_clip_label(mask: dict[str, Any]) -> str | None:
+    scores = _clip_scores(mask)
+    if not scores:
+        return None
+    return sorted(scores.items(), key=lambda item: (-item[1], item[0]))[0][0]
 
 
 def _is_semantic_label(label: str) -> bool:
@@ -440,6 +626,29 @@ def _numeric_scores(value: dict[str, Any]) -> dict[str, float]:
         if np.isfinite(numeric):
             scores[str(label)] = numeric
     return scores
+
+
+def _clean_label_set(labels: list[str] | tuple[str, ...]) -> set[str]:
+    return {str(label).strip().lower() for label in labels if str(label).strip()}
+
+
+def _mask_pixel_area(mask: dict[str, Any], *, root: Path, width: int, height: int) -> int:
+    raw_area = mask.get("area", mask.get("pixels"))
+    if raw_area is not None:
+        return int(raw_area)
+    if "rect" in mask:
+        x0, y0, x1, y1 = _required_rect(mask["rect"])
+        x0 = max(0.0, min(float(width), x0))
+        x1 = max(0.0, min(float(width), x1))
+        y0 = max(0.0, min(float(height), y0))
+        y1 = max(0.0, min(float(height), y1))
+        return int(max(0.0, x1 - x0) * max(0.0, y1 - y0))
+    if "mask_path" in mask:
+        array = np.load(root / str(mask["mask_path"]))
+        if array.shape != (height, width):
+            raise ValueError(f"mask {mask['mask_path']} shape {array.shape} does not match {height}x{width}")
+        return int(np.count_nonzero(array))
+    raise ValueError("mask entry must include rect or mask_path")
 
 
 def _mask_contains(

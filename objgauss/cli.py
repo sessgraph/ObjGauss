@@ -773,7 +773,18 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
         min_shared_gaussians=args.min_shared_gaussians,
         max_slots=args.max_slots,
         max_frames=args.max_frames,
+        min_mask_area=args.min_mask_area,
+        min_mask_area_fraction=args.min_mask_area_fraction,
+        exclude_top_labels=args.exclude_top_labels,
+        exclude_background_top_labels=args.exclude_background_top_labels,
+        background_labels=args.background_labels,
+        min_named_slots=args.min_named_slots,
+        min_unique_slot_labels=args.min_unique_slot_labels,
+        max_slot_label_fraction=args.max_slot_label_fraction,
+        max_background_slot_fraction=args.max_background_slot_fraction,
     )
+    quality = result.slot_naming_quality
+    filters = result.record_filters
     print(f"aligned_manifest={result.output_manifest}")
     print(f"frames={result.frames}")
     print(f"masks={result.masks}")
@@ -781,6 +792,12 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
     print(f"remapped_masks={result.remapped_masks}")
     print(f"dropped_masks={result.dropped_masks}")
     print(f"named_slots={result.named_slots}")
+    print(f"filtered_low_area={filters.get('filtered_low_area', 0)}")
+    print(f"filtered_top_label={filters.get('filtered_top_label', 0)}")
+    print(f"slot_naming_quality={'passed' if quality.get('passed') else 'failed'}")
+    print(f"slot_label_counts={quality.get('slot_label_counts', {})}")
+    if quality.get("blockers"):
+        print(f"slot_quality_blockers={quality['blockers']}")
     for cluster in result.clusters:
         print(
             f"slot={cluster['slot']} "
@@ -790,6 +807,8 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
             f"frames={cluster['frame_count']} "
             f"support_gaussians={cluster['support_gaussians']}"
         )
+    if args.require_slot_quality and not quality.get("passed"):
+        raise ValueError(f"slot naming quality gate failed: {quality.get('blockers', [])}")
 
 
 def _demo_v1_closure(args: argparse.Namespace) -> None:
@@ -1520,6 +1539,32 @@ def _build_parser() -> argparse.ArgumentParser:
     align_slots.add_argument("--max-slots", type=int)
     align_slots.add_argument("--min-iou", type=float, default=0.05)
     align_slots.add_argument("--min-shared-gaussians", type=int, default=1)
+    align_slots.add_argument("--min-mask-area", type=int, default=0)
+    align_slots.add_argument("--min-mask-area-fraction", type=float, default=0.0)
+    align_slots.add_argument(
+        "--exclude-top-labels",
+        nargs="+",
+        help="drop masks whose top CLIP label matches one of these labels before slot alignment",
+    )
+    align_slots.add_argument(
+        "--exclude-background-top-labels",
+        action="store_true",
+        help="drop masks whose top CLIP label is one of the configured background labels",
+    )
+    align_slots.add_argument(
+        "--background-labels",
+        nargs="+",
+        help="labels counted as background for filtering and slot quality",
+    )
+    align_slots.add_argument("--min-named-slots", type=int, default=1)
+    align_slots.add_argument("--min-unique-slot-labels", type=int, default=2)
+    align_slots.add_argument("--max-slot-label-fraction", type=float, default=0.5)
+    align_slots.add_argument("--max-background-slot-fraction", type=float, default=0.25)
+    align_slots.add_argument(
+        "--require-slot-quality",
+        action="store_true",
+        help="exit non-zero when the slot-level naming quality gate fails",
+    )
     align_slots.set_defaults(handler=_masks_align_slots)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
