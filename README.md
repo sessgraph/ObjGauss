@@ -1,5 +1,12 @@
 # ObjGauss MVP
 
+> **Development-stage research project / 开发阶段项目。** ObjGauss is
+> currently used for research prototyping, verification, and reproducibility
+> handoff. APIs, CLI commands, asset layout, metrics, model artifacts, and
+> documentation may change before a stable release. Current Hugging Face assets
+> and local outputs should not be treated as production-ready or commercial demo
+> releases.
+
 ObjGauss is a minimal object-aware layer on top of a standard 3D Gaussian
 Splatting export. This repository intentionally does not fork a renderer or
 trainer. The MVP starts from a `gaussians.ply` file produced by an existing

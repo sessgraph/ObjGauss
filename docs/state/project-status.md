@@ -6,6 +6,11 @@
 
 MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS splat renderer，并具备可复现的 ObjGauss v1 闭环验收 demo。
 
+项目整体仍是 development-stage research prototype / 开发阶段研究原型。当前 API、
+CLI、资产布局、指标、模型产物和文档都可能在 stable release 前变化；HF 资产与本地
+ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
+commercial demo release。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
