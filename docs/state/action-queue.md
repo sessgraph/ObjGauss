@@ -1,14 +1,14 @@
 # ObjGauss 行动队列
 
-> 最近更新: 2026-06-22
+> 最近更新: 2026-06-30
 
 ## Open
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，但还缺 CLIP 语义命名和跨视角 SAM slot 对齐。
-- 推荐: 不把模型权重放入仓库；后续另行设计 CLIP 命名、slot 对齐和质量对比。
-- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被语义命名或跨视角对齐，并与 color-mask / KMeans baseline 对比。
+- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；还缺真实 CLIP inference 和质量对比。
+- 推荐: 不把模型权重放入仓库；下一步准备 torch / transformers 与本地 CLIP 模型缓存，运行 `objgauss masks score-clip --backend transformers --device cuda`，再做命名覆盖率、slot balance 和 promotion gate。
+- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数语义命名、跨视角对齐，并与 color-mask / KMeans baseline 对比。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 

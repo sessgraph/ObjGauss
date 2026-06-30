@@ -15,13 +15,20 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting 与 manifest-level 跨视角 slot alignment 已落地；下一步推进 CLIP score 生成、命名覆盖率和默认训练策略 promotion gate。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment 与 CLIP score cache contract 已落地；下一步跑真实 `transformers` CLIP scoring、命名覆盖率和默认训练策略 promotion gate。
 
 ## Ready
 
 当前无 ready PR。
 
 ## Planned
+
+### CLIP-RUN-001: Run real CLIP scoring and naming quality gate
+
+- 状态: planned
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 在本机安装或复用 torch / transformers 与 CLIP 模型缓存后，用 `objgauss masks score-clip --backend transformers --device cuda` 给真实 SAM manifest 写入语义分数，再跑 `align-slots`、命名覆盖率和 Object Field promotion gate。
+- 前置: 当前 uv 环境检查为 `torch=False`、`transformers=False`；需要先准备可选依赖和可用的 CLIP 模型缓存，且不把权重提交进 git。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -49,6 +56,33 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-SCORE-001: Cache CLIP scores in mask manifests
+
+- 状态: done / clip-score-cache-contract
+- 类型: 标准 PR / semantic labeling
+- 目标: 把“CLIP 命名”从手工预计算约定推进成仓库内可执行的 mask crop score cache 入口，并让 `align-slots` 可以直接消费生成的 `clip_scores`。
+- 已实施:
+  - 新增 `objgauss/clip_scoring.py`，读取 mask manifest、按 mask crop 裁剪 RGB、写回 `clip_scores` 和 `clip` metadata。
+  - CLI 新增 `objgauss masks score-clip`，支持 `--labels`、`--labels-file`、`--backend transformers|hash`、`--model`、`--device`、`--max-frames`、`--max-masks`、`--crop-padding`、`--overwrite-scores` 和 `--summary-output`。
+  - `transformers` backend 运行时动态导入 torch / transformers，默认模型为 `openai/clip-vit-base-patch32`；缺依赖时输出可执行安装提示。
+  - `hash` backend 是 deterministic diagnostic backend，只用于测试和 manifest contract smoke，不代表语义质量。
+  - 输出 manifest 会重写相对 `mask_path` 和 frame 级 `ignore_mask_path`，因此写到 `/tmp` 后仍可继续 validate / align / vote。
+- 真实样例 contract smoke:
+  - `uv run objgauss masks score-clip outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json --output /tmp/objgauss-sam-clip-hash-mask-manifest.json --backend hash --labels "lego body" "lego tread" "lego wheel" "background" --summary-output /tmp/objgauss-sam-clip-hash-summary.json`: `frames=8`，`masks=27`，`scored_masks=27`，`named_masks=27`。
+  - `uv run objgauss masks validate /tmp/objgauss-sam-clip-hash-mask-manifest.json --max-overlap-fraction 1 --allow-empty --summary-output /tmp/objgauss-sam-clip-hash-validation.json`: passed。
+  - `uv run objgauss masks align-slots /tmp/objgauss-sam-clip-hash-mask-manifest.json --cloud outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/object_aware_gaussians.ply --output /tmp/objgauss-sam-clip-hash-aligned-top4-mask-manifest.json --min-iou 0.02 --min-shared-gaussians 16 --max-slots 4`: `aligned_slots=4`，`named_slots=4`。
+- 边界:
+  - 当前 uv 环境检查为 `torch=False`、`transformers=False`，因此本 PR 未运行真实 CLIP inference。
+  - `hash-diagnostic` 输出只能证明 score cache 和 downstream naming contract，不证明 label 正确。
+  - CLIP 权重 / cache 仍不得提交进 git；真实 CLIP 运行另行进入 `CLIP-RUN-001`。
+- 完成 commit: `6836e364848446a7bbd44bf04ac2395c0b162d97`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "score_clip or align_slots"`: 4 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 56 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### SEG-CLIP-001: CLIP semantic naming and SAM cross-view slot alignment
 

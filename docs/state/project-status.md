@@ -91,11 +91,14 @@ summary 做跨视角 slot alignment、CLIP 命名和 promotion gate，而不是�
 ## Cross-View Slot Alignment / CLIP 命名
 
 2026-06-30 `SEG-CLIP-001` 已落地 manifest-level 跨视角 slot alignment 和
-CLIP-score 命名入口：
+CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score cache 入口：
 
 - 新增 `objgauss masks align-slots`，按每个 2D mask 投影命中的 Gaussian support
   聚类，重写稳定的跨视角 `slot` / `slot_id`，并保留 `source_slot`、
   `source_label` 和 `aligned_slot`。
+- 新增 `objgauss masks score-clip`，按 mask crop 对一组文本 label 写入
+  `clip_scores` 与 `clip` metadata；真实推理走可选 `transformers` backend，
+  测试 / contract smoke 走 `hash` diagnostic backend。
 - 如果 manifest 已包含预计算 `clip_scores` / `clip_label_scores` /
   `semantic_scores` / `clip.scores`，alignment 会按 cluster 聚合分数并给 slot 写
   `label` / `name` / `semantic_name_source="clip_scores"`。
@@ -117,11 +120,18 @@ CLIP-score 命名入口：
   `/tmp/objgauss-sam-aligned-top4-object-aware-gaussians.ply`，`255,794`
   Gaussians，loss `2.737449 -> 0.595588`，object counts
   `0=80479`、`1=50125`、`2=57008`、`3=68182`。
+- CLIP score cache contract smoke:
+  `/tmp/objgauss-sam-clip-hash-mask-manifest.json`，`backend=hash-diagnostic`，
+  `frames=8`，`masks=27`，`scored_masks=27`，`named_masks=27`。
+- CLIP-score downstream alignment smoke:
+  `/tmp/objgauss-sam-clip-hash-aligned-top4-mask-manifest.json`，`aligned_slots=4`，
+  `named_slots=4`，slot labels 来自 `clip_scores`。
 
-边界：当前仓库仍不在线运行 CLIP 模型，也不下载 CLIP 权重；本 PR 只定义和验证
-“消费预计算 CLIP 分数并命名”的 manifest contract。真实 SAM manifest 当前没有
-CLIP scores，所以 `named_slots=0` 是预期结果。SAM top-4 仍明显 slot imbalance，
-不能把该结果直接标记为默认语义质量 promotion。
+边界：代码已支持真实 `transformers` CLIP backend，但当前 uv 环境检查结果为
+`torch=False`、`transformers=False`，因此本轮未执行真实 CLIP inference，也不下载
+CLIP 权重。`hash-diagnostic` 结果只证明 manifest cache contract 和 downstream
+命名链路，不代表语义正确性。SAM top-4 仍明显 slot imbalance，不能把该结果直接
+标记为默认语义质量 promotion。
 
 ## 阶段最终目标
 
@@ -147,7 +157,7 @@ CLIP scores，所以 `named_slots=0` 是预期结果。SAM top-4 仍明显 slot 
   - `objgauss filter`
   - `objgauss stats`
   - `objgauss assets list/pull`
-  - `objgauss masks from-nerf-alpha/from-nerf-alpha-fgbg/from-nerf-rgba-colors/from-nerf-sam/validate/align-slots`
+  - `objgauss masks from-nerf-alpha/from-nerf-alpha-fgbg/from-nerf-rgba-colors/from-nerf-sam/validate/score-clip/align-slots`
   - `objgauss training register-output/write-sample-bundle`
   - `objgauss demo v1-closure/verify-v1-closure/plush-semantic-closure/verify-plush-semantic-closure/lego-alpha-closure/verify-lego-alpha-closure/audit-v1-goal`
   - `objgauss object-field init/export/stats/emergence/emergence-curve/emergence-report/emergence-benchmark/inspect-nerf/vote-masks/vote-diagnostics`
@@ -289,6 +299,7 @@ CLIP scores，所以 `named_slots=0` 是预期结果。SAM top-4 仍明显 slot 
   - 可从 NeRF Synthetic Lego RGBA 颜色生成多 slot 真实 2D mask manifest。
   - 可在本机提供 `segment-anything` 和 checkpoint 时生成 SAM automatic mask manifest，支持 JPEG 输入和 `--max-image-size` 资源安全降采样。
   - 可消费预计算 SAM / CLIP / 2D mask manifest，并投影投票到 Gaussian。
+  - 可用 `objgauss masks score-clip` 将 mask crop 与文本 label 的 CLIP scores 缓存进 manifest；真实 CLIP 推理通过可选 `transformers` backend 提供，仓库默认依赖不包含 torch / transformers。
   - 可用 `objgauss masks align-slots` 将逐帧 SAM area-rank slot 重写为跨视角稳定 slot，并在 manifest 已有预计算 CLIP 分数时聚合命名。
   - 可通过 projection loss 更新 Object Field logits。
   - 可在 hard `object_id` 导出、mask voting PLY 输出和训练输出登记时按 max-probability threshold 将低置信度 Gaussian 归入 background / unknown object，并在登记 manifest 记录该策略。
@@ -1073,7 +1084,7 @@ npm run acceptance:demo
 - Spark `SplatMesh.raycast` 当前可命中 splat depth，但 intersection 不暴露 splat index / object id，且不能证明 object opacity mask filter-aware；因此对象选择仍应使用已验收的 `hover-confirm-v1` screen-space pick，不能宣称已经是 renderer-native object picking。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
-- SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库内还不运行 CLIP 模型，但已能对已有 SAM manifest 做跨视角 slot alignment，并能消费预计算 CLIP scores 做 slot 命名。
+- SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库已提供可选 `transformers` CLIP score cache 入口和 hash diagnostic contract smoke，但当前本机尚未安装 torch / transformers，也未执行真实 CLIP inference。
 - Object Emergence Score 的单点 `emergence` CLI 仍是 partial OES；`emergence-curve` 在提供 cloud 和 mask manifest 时已覆盖 assignment / stability / spatial compactness / scale-aware CPU splat render occlusion。`emergence-benchmark` 当前是本地 smoke suite，依赖 ignored `outputs/` 产物；缺失输入时按 `docs/benchmarks/semantic-smoke.md` 与 `docs/benchmarks/splatfacto-scenes.md` 生成。本 suite 仍不是 CI 固定 public benchmark。gradient coherence 和 covariance-aware 3DGS renderer occlusion 仍未实现，不能据此单独宣称 object emergence 完成。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环代理样例仍是 posed RGBA 生成的轻量 Gaussian proxy；另有 Nerfstudio Splatfacto 100-step smoke 产物和 TRAIN-003A runbook/script 证明本机可复现真实 3DGS optimization PLY，但尚未作为前端公开样例固化。
@@ -1084,7 +1095,7 @@ npm run acceptance:demo
 ## 下一步主线
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
-2. 语义质量线：depth-aware mask voting 和 manifest-level 跨视角 slot alignment 已落地；下一步推进 CLIP score 生成、命名覆盖率、slot balance 改善和默认训练策略 promotion gate。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
+2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment 和 CLIP score cache contract 已落地；下一步安装/复用本地 CLIP 依赖与模型缓存，跑真实 `transformers` CLIP scoring、命名覆盖率、slot balance 改善和默认训练策略 promotion gate。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
 3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
 4. 后续 SEG: CLIP score 生成 / cache、alignment 质量指标，以及与 color-mask / KMeans baseline 的质量对比。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
