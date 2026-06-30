@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-29
+> 最近更新: 2026-06-30
 
 ## 队列规则
 
@@ -15,20 +15,13 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting 诊断已落地；下一步从诊断证据走向跨视角 slot 对齐和 CLIP 语义命名。
+4. **语义质量线**: depth-aware mask voting 与 manifest-level 跨视角 slot alignment 已落地；下一步推进 CLIP score 生成、命名覆盖率和默认训练策略 promotion gate。
 
 ## Ready
 
 当前无 ready PR。
 
 ## Planned
-
-### SEG-CLIP-001: CLIP semantic naming and SAM cross-view slot alignment
-
-- 状态: planned
-- 类型: 标准 PR / semantic labeling
-- 目标: 在已有 SAM manifest 和 Object Field 训练链路上补语义命名与跨视角 slot 对齐，和 color-mask / KMeans baseline 做质量对比。
-- 前置: `TRAIN-QUALITY-002` 至少完成一轮质量诊断，避免把 CLIP 命名建立在明显不稳定的 slots 上。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -56,6 +49,39 @@
 当前无进行中 PR。
 
 ## Done
+
+### SEG-CLIP-001: CLIP semantic naming and SAM cross-view slot alignment
+
+- 状态: done / manifest-level-slot-alignment
+- 类型: 标准 PR / semantic labeling
+- 目标: 在已有 SAM manifest 和 Object Field 训练链路上补语义命名与跨视角 slot 对齐，避免继续把逐帧 SAM area-rank slot 当作跨视角稳定 object id。
+- 已实施:
+  - 新增 `objgauss/semantic_slots.py`，按每个 mask 投影命中的 Gaussian support 做跨视角聚类，并重写稳定 `slot` / `slot_id`。
+  - CLI 新增 `objgauss masks align-slots`，支持 `--min-iou`、`--min-shared-gaussians`、`--max-slots` 和 `--max-frames`。
+  - 输出 manifest 保留 `source_slot`、`source_label`、`aligned_slot`，并写顶层 `slots`、`slot_count`、`slot_alignment`。
+  - manifest 已有预计算 `clip_scores` / `clip_label_scores` / `semantic_scores` / `clip.scores` 时，会聚合为 slot label / name；当前不在线运行 CLIP 模型、不下载 CLIP 权重。
+  - 输出 manifest 会重写相对 `mask_path` 和 frame 级 `ignore_mask_path`，并丢弃无保留 mask 的 frame，保证写到 `/tmp` 后仍可被 validator / vote-diagnostics / vote-masks 消费。
+- 真实样例诊断:
+  - Alignment: `/tmp/objgauss-sam-aligned-top4-mask-manifest.json`，`frames=6`，`masks=11`，`aligned_slots=4`，`remapped_masks=6`，`dropped_masks=16`，`named_slots=0`。
+  - Validate: `/tmp/objgauss-sam-aligned-top4-validation.json`，passed，zero overlap，slots `0,1,2,3`。
+  - Depth-aware diagnostic: `/tmp/objgauss-sam-aligned-top4-vote-diagnostic.json`，conflict `0.015662 -> 0.014064`，`depth_culled_matched=8101`，recommendation `depth-aware-diagnostic-improved`。
+  - Object Field vote-masks smoke: `/tmp/objgauss-sam-aligned-top4-object-aware-gaussians.ply`，`255,794` Gaussians，loss `2.737449 -> 0.595588`，object counts `0=80479`、`1=50125`、`2=57008`、`3=68182`。
+- 边界:
+  - 本 PR 关闭的是 manifest-level slot alignment 和预计算 CLIP-score 命名 contract，不证明在线 CLIP inference 已接入。
+  - 真实 SAM manifest 当前没有 CLIP scores，所以 `named_slots=0` 是预期结果。
+  - SAM top-4 仍明显 slot imbalance，不能直接 promotion 为默认语义质量策略；下一步应做 CLIP score 生成 / cache、命名覆盖率和 promotion gate。
+- 完成 commit: `c0dc6184f5fafd6ffa9319f6c98d5331bb202e14`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "align_slots or from_nerf_sam or mask_voting_depth"`: 5 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 54 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `uv run objgauss masks align-slots outputs/masks/nerf-lego-sam-8f-balanced03-slots4/mask-manifest.json --cloud outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/object_aware_gaussians.ply --output /tmp/objgauss-sam-aligned-top4-mask-manifest.json --min-iou 0.02 --min-shared-gaussians 16 --max-slots 4`: passed。
+  - `uv run objgauss masks validate /tmp/objgauss-sam-aligned-top4-mask-manifest.json --max-overlap-fraction 1 --allow-empty --summary-output /tmp/objgauss-sam-aligned-top4-validation.json`: passed。
+  - `uv run objgauss object-field vote-diagnostics outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/object_aware_gaussians.ply --masks /tmp/objgauss-sam-aligned-top4-mask-manifest.json --slots 4 --output /tmp/objgauss-sam-aligned-top4-vote-diagnostic.json`: passed。
+  - `uv run objgauss object-field vote-masks outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/gaussians.ply --field outputs/assets/gaussians/nerf-lego-trained-safe-2000-sam8f-balanced03-slots4-benchmark/object_field_initial.npz --masks /tmp/objgauss-sam-aligned-top4-mask-manifest.json --output /tmp/objgauss-sam-aligned-top4-object-field-trained.npz --summary-output /tmp/objgauss-sam-aligned-top4-mask-training-summary.json --ply-output /tmp/objgauss-sam-aligned-top4-object-aware-gaussians.ply --iterations 20 --visibility-mode depth-buffer`: passed。
+  - `uv run objgauss stats /tmp/objgauss-sam-aligned-top4-object-aware-gaussians.ply`: passed，`gaussians=255794`。
+  - `git diff --check`: passed。
 
 ### TRAIN-QUALITY-002: Depth-aware mask voting and slot alignment
 
