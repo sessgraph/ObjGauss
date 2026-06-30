@@ -60,6 +60,7 @@ from objgauss.semantic_demo import (
     verify_plush_semantic_closure_demo,
 )
 from objgauss.sample_bundle import write_sample_bundle
+from objgauss.semantic_slots import align_mask_manifest_slots
 from objgauss.splat import read_splat
 from objgauss.training import register_training_output
 
@@ -707,6 +708,35 @@ def _masks_validate(args: argparse.Namespace) -> None:
         print(f"summary={args.summary_output}")
     if not result.passed and args.strict:
         raise ValueError("mask manifest validation failed")
+
+
+def _masks_align_slots(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.cloud)
+    result = align_mask_manifest_slots(
+        cloud,
+        args.manifest,
+        output=args.output,
+        min_iou=args.min_iou,
+        min_shared_gaussians=args.min_shared_gaussians,
+        max_slots=args.max_slots,
+        max_frames=args.max_frames,
+    )
+    print(f"aligned_manifest={result.output_manifest}")
+    print(f"frames={result.frames}")
+    print(f"masks={result.masks}")
+    print(f"aligned_slots={result.aligned_slots}")
+    print(f"remapped_masks={result.remapped_masks}")
+    print(f"dropped_masks={result.dropped_masks}")
+    print(f"named_slots={result.named_slots}")
+    for cluster in result.clusters:
+        print(
+            f"slot={cluster['slot']} "
+            f"label={cluster['semantic_label']} "
+            f"source={cluster['semantic_name_source']} "
+            f"masks={cluster['mask_count']} "
+            f"frames={cluster['frame_count']} "
+            f"support_gaussians={cluster['support_gaussians']}"
+        )
 
 
 def _demo_v1_closure(args: argparse.Namespace) -> None:
@@ -1371,6 +1401,19 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_manifest.add_argument("--strict", action="store_true")
     validate_manifest.add_argument("--max-report-frames", type=int, default=8)
     validate_manifest.set_defaults(handler=_masks_validate)
+
+    align_slots = masks_subparsers.add_parser(
+        "align-slots",
+        help="rewrite a mask manifest with cross-view stable slots and optional CLIP-score names",
+    )
+    align_slots.add_argument("manifest", type=Path)
+    align_slots.add_argument("--cloud", required=True, type=Path)
+    align_slots.add_argument("--output", "-o", required=True, type=Path)
+    align_slots.add_argument("--max-frames", type=int)
+    align_slots.add_argument("--max-slots", type=int)
+    align_slots.add_argument("--min-iou", type=float, default=0.05)
+    align_slots.add_argument("--min-shared-gaussians", type=int, default=1)
+    align_slots.set_defaults(handler=_masks_align_slots)
 
     demo = subparsers.add_parser("demo", help="build reproducible ObjGauss demos")
     demo_subparsers = demo.add_subparsers(dest="demo_command", required=True)

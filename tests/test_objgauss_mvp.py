@@ -1408,6 +1408,115 @@ def test_masks_from_nerf_sam_can_filter_overlarge_masks(tmp_path):
     assert int(selected.sum()) == 2
 
 
+def test_masks_align_slots_rewrites_swapped_slots_with_clip_names(tmp_path, capsys):
+    input_path = tmp_path / "camera_cloud.ply"
+    manifest_path = _write_swapped_clip_mask_manifest(tmp_path / "swapped-mask-manifest.json")
+    aligned_path = tmp_path / "aligned-mask-manifest.json"
+    write_ply(input_path, _camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(input_path),
+                "--output",
+                str(aligned_path),
+                "--min-iou",
+                "0.5",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+
+    assert "aligned_slots=2" in output
+    assert "remapped_masks=2" in output
+    assert "named_slots=2" in output
+    assert aligned["slot_alignment"]["kind"] == "objgauss-cross-view-slot-alignment-v1"
+    assert [slot["label"] for slot in aligned["slots"]] == ["left brick", "right brick"]
+    assert [slot["semantic_name_source"] for slot in aligned["slots"]] == [
+        "clip_scores",
+        "clip_scores",
+    ]
+    assert [mask["slot"] for mask in aligned["frames"][0]["masks"]] == [0, 1]
+    assert [mask["slot"] for mask in aligned["frames"][1]["masks"]] == [1, 0]
+    assert aligned["frames"][1]["masks"][0]["source_slot"] == 0
+    assert aligned["frames"][1]["masks"][0]["source_label"] == "sam-area-rank-0"
+    assert aligned["frames"][1]["masks"][0]["label"] == "right brick"
+
+
+def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path):
+    cloud_path = tmp_path / "camera_cloud.ply"
+    source_dir = tmp_path / "source"
+    masks_dir = source_dir / "masks"
+    export_dir = tmp_path / "export"
+    manifest_path = source_dir / "mask-manifest.json"
+    aligned_path = export_dir / "aligned-mask-manifest.json"
+    masks_dir.mkdir(parents=True)
+    write_ply(cloud_path, _camera_cloud(), fmt="ascii")
+
+    mask = np.zeros((100, 100), dtype=bool)
+    mask[:, :50] = True
+    ignore = np.zeros((100, 100), dtype=bool)
+    np.save(masks_dir / "left.npy", mask)
+    np.save(masks_dir / "ignore.npy", ignore)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "width": 100,
+                "height": 100,
+                "camera_angle_x": float(np.pi / 2.0),
+                "frames": [
+                    {
+                        "name": "frame-0",
+                        "ignore_mask_path": "masks/ignore.npy",
+                        "transform_matrix": np.eye(4, dtype=float).tolist(),
+                        "masks": [
+                            {
+                                "slot": 0,
+                                "label": "left brick",
+                                "mask_path": "masks/left.npy",
+                                "area": int(mask.sum()),
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(cloud_path),
+                "--output",
+                str(aligned_path),
+            ]
+        )
+        == 0
+    )
+
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+    frame = aligned["frames"][0]
+    exported_mask_path = aligned_path.parent / frame["masks"][0]["mask_path"]
+    exported_ignore_path = aligned_path.parent / frame["ignore_mask_path"]
+
+    assert exported_mask_path.resolve() == (masks_dir / "left.npy").resolve()
+    assert exported_ignore_path.resolve() == (masks_dir / "ignore.npy").resolve()
+    assert exported_mask_path.exists()
+    assert exported_ignore_path.exists()
+
+
 def test_mask_voting_trains_object_field_from_projected_rects(tmp_path):
     cloud = _camera_cloud()
     manifest = _write_rect_mask_manifest(tmp_path / "masks.json")
@@ -2597,6 +2706,63 @@ def _write_partial_rect_mask_manifest(path):
                     {"slot": 0, "label": "left", "rect": [0, 0, 50, 100]},
                 ],
             }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_swapped_clip_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source_type": "sam-automatic-mask-generator",
+        "slots": [
+            {"slot": 0, "label": "sam-area-rank-0"},
+            {"slot": 1, "label": "sam-area-rank-1"},
+        ],
+        "frames": [
+            {
+                "name": "frame-0",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [0, 0, 50, 100],
+                        "area": 20,
+                        "clip_scores": {"left brick": 0.9, "right brick": 0.1},
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [50, 0, 100, 100],
+                        "area": 20,
+                        "clip_scores": {"left brick": 0.1, "right brick": 0.9},
+                    },
+                ],
+            },
+            {
+                "name": "frame-1",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [50, 0, 100, 100],
+                        "area": 18,
+                        "clip_scores": {"left brick": 0.2, "right brick": 0.8},
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [0, 0, 50, 100],
+                        "area": 18,
+                        "clip_scores": {"left brick": 0.8, "right brick": 0.2},
+                    },
+                ],
+            },
         ],
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
