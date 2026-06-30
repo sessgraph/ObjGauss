@@ -6,9 +6,9 @@
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；还缺真实 CLIP inference 和质量对比。
-- 推荐: 不把模型权重放入仓库；下一步准备 torch / transformers 与本地 CLIP 模型缓存，运行 `objgauss masks score-clip --backend transformers --device cuda`，再做命名覆盖率、slot balance 和 promotion gate。
-- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数语义命名、跨视角对齐，并与 color-mask / KMeans baseline 对比。
+- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，但首次质量 gate 因 label 塌缩结论为 `do-not-promote`。
+- 推荐: 不把模型权重放入仓库；下一步做 `CLIP-QUALITY-001`，改进 label set、mask crop / background suppression、prompt/template 和命名多样性 gate，再与 color-mask / KMeans baseline 做质量对比。
+- 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数稳定语义命名、跨视角对齐，并通过命名覆盖率、slot balance 与 color-mask / KMeans baseline 对比。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链
 

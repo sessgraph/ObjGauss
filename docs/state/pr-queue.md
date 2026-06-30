@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment 与 CLIP score cache contract 已落地；下一步跑真实 `transformers` CLIP scoring、命名覆盖率和默认训练策略 promotion gate。
+4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract 与真实 `transformers` CLIP run 已落地；下一步修 CLIP label set / crop 背景抑制 / 命名多样性 gate，再决定是否 promotion。
 
 ## Ready
 
@@ -23,12 +23,12 @@
 
 ## Planned
 
-### CLIP-RUN-001: Run real CLIP scoring and naming quality gate
+### CLIP-QUALITY-001: Improve CLIP labels, crops, and naming gate
 
 - 状态: planned
 - 类型: 标准 PR / semantic labeling evidence
-- 目标: 在本机安装或复用 torch / transformers 与 CLIP 模型缓存后，用 `objgauss masks score-clip --backend transformers --device cuda` 给真实 SAM manifest 写入语义分数，再跑 `align-slots`、命名覆盖率和 Object Field promotion gate。
-- 前置: 当前 uv 环境检查为 `torch=False`、`transformers=False`；需要先准备可选依赖和可用的 CLIP 模型缓存，且不把权重提交进 git。
+- 目标: 基于真实 CLIP inference 已跑通的结果，改进候选 label set、mask crop / background suppression、prompt/template 和命名多样性 gate，避免 top labels 塌缩到背景或单一零件名。
+- 前置: `CLIP-RUN-001` 证明真实 inference 链路可用，但当前结果为 `do-not-promote`；仍不得把 CLIP 权重 / cache / 大训练产物提交进 git。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -56,6 +56,37 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-RUN-001: Run real CLIP scoring and naming quality gate
+
+- 状态: done / evidence-collected-do-not-promote
+- 类型: 标准 PR / semantic labeling evidence
+- 目标: 用真实 `transformers` CLIP backend 给 SAM manifest 写入语义分数，再跑 validate、align-slots、命名覆盖率和 depth-aware diagnostic，确认是否可作为默认语义命名策略。
+- 已实施:
+  - 用临时 `uv --with torch --with transformers --with pillow --with socksio` 依赖环境运行 `objgauss masks score-clip --backend transformers --device cuda`，不修改仓库默认依赖。
+  - `objgauss/clip_scoring.py` 增加 transformers scorer cleanup，关闭时释放模型、processor、CUDA cache 和 Python GC，避免真实 CLIP 命令在输出完成后因后台线程 shutdown 异常退出。
+  - 对真实 CLIP 输出继续运行 `masks validate`、`masks align-slots` 和 `object-field vote-diagnostics`。
+- 真实运行证据:
+  - GPU preflight: RTX 5060 Ti，空闲约 `15193MiB`；临时依赖为 `torch 2.12.1+cu130`、`transformers 5.12.1`、`pillow 12.2.0`。
+  - CLIP summary: `/tmp/objgauss-sam-clip-real-summary.json`，`backend=transformers`，`model=openai/clip-vit-base-patch32`，`frames=8`，`masks=27`，`scored_masks=27`，`named_masks=27`。
+  - Validation: `/tmp/objgauss-sam-clip-real-validation.json`，passed，slots `0,1,2,3`，errors / warnings `0`。
+  - Alignment: `/tmp/objgauss-sam-clip-real-aligned-top4-mask-manifest.json`，`frames=6`，`masks=11`，`aligned_slots=4`，`named_slots=4`。
+  - Depth-aware diagnostic: `/tmp/objgauss-sam-clip-real-aligned-top4-vote-diagnostic.json`，conflict `0.015662 -> 0.014064`，`depth_culled_matched=8101`，recommendation `depth-aware-diagnostic-improved`。
+- 质量结论:
+  - Mask top labels 分布为 `lego tread=23`、`table surface=3`、`white background=1`。
+  - Aligned top-4 labels 为 slot 0 `white background`、slot 1/2/3 `lego tread`。
+  - 真实 inference 链路可用，但当前 label set / crop 策略导致命名塌缩，结论为 `do-not-promote`；下一步进入 `CLIP-QUALITY-001`。
+- 边界:
+  - CLIP / torch / transformers 仍是可选本地依赖，不进入默认仓库依赖。
+  - CLIP 权重、模型 cache、`/tmp` 输出和 ignored `outputs/` 训练产物不提交。
+  - 本 PR 只关闭真实 inference 和质量证据收集，不关闭默认语义分割策略。
+- 完成 commit: `bf2346fe60c7a61c81b243fa607e924069b6f856`
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "score_clip or align_slots"`: 4 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 56 passed。
+  - `npm run build`: passed，仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
 
 ### CLIP-SCORE-001: Cache CLIP scores in mask manifests
 

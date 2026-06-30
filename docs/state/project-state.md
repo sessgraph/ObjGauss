@@ -46,7 +46,7 @@ production-ready release 或 commercial demo release。
 - 已在 splat renderer 内实现对象级隐藏、隔离、删除或对象聚类色 shader。
 - 已对所有 3DGS PLY / `.splat` / SH 格式做完整兼容矩阵。
 - 已实现语义级对象分割。
-- 已在本仓库内运行 SAM / CLIP 模型或下载其权重。
+- 已将 SAM / CLIP 作为默认仓库依赖、提交其权重或完成稳定语义级对象分割。
 - 已实现完整 3DGS render loss 联合训练。
 - NeRF Lego proxy 已等价于完整 3DGS optimization 训练输出。
 - 已完成 ARKitScenes / OmniObject3D / Poly Haven 转换管线。
@@ -56,6 +56,6 @@ production-ready release 或 commercial demo release。
 ## 设计边界
 
 - 完整 3DGS renderer 替换已按 ADR `0001-3dgs-renderer` 落地；后续 shader 级对象编辑仍需单独立项。
-- SAM/CLIP/Gaussian Grouping 等语义分割依赖属于重大或标准 PR；当前统一接口是预计算 mask manifest -> Object Field。
+- SAM/CLIP/Gaussian Grouping 等语义分割依赖属于重大或标准 PR；当前统一接口是预计算 mask manifest -> Object Field。SAM / CLIP 可作为本地可选模型运行，但权重和 cache 不进入 git，当前 CLIP 命名质量仍未 promotion。
 - 大型素材、训练素材、训练输出默认不提交仓库。
 - 小型 Demo 样例进入 `public/samples/` 前必须记录来源和许可。

@@ -131,12 +131,26 @@ CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score ca
 - CLIP-score downstream alignment smoke:
   `/tmp/objgauss-sam-clip-hash-aligned-top4-mask-manifest.json`，`aligned_slots=4`，
   `named_slots=4`，slot labels 来自 `clip_scores`。
+- Real CLIP scoring run:
+  `uv run --with torch --with transformers --with pillow --with socksio objgauss masks score-clip ... --backend transformers --device cuda`
+  已用 `openai/clip-vit-base-patch32` 跑通真实 CLIP inference；summary 为
+  `/tmp/objgauss-sam-clip-real-summary.json`，`frames=8`，`masks=27`，
+  `scored_masks=27`，`named_masks=27`。本次临时依赖环境为
+  `torch 2.12.1+cu130`、`transformers 5.12.1`，CUDA 可用；GPU preflight 显示
+  RTX 5060 Ti 空闲约 `15193MiB`。
+- Real CLIP naming quality gate:
+  `/tmp/objgauss-sam-clip-real-mask-manifest.json` validation passed；
+  `/tmp/objgauss-sam-clip-real-aligned-top4-mask-manifest.json` 得到
+  `aligned_slots=4`、`named_slots=4`。但 mask top labels 分布为
+  `lego tread=23`、`table surface=3`、`white background=1`；aligned top-4 labels 为
+  slot 0 `white background`、slot 1/2/3 `lego tread`。该结果证明真实 CLIP
+  运行链路可用，但当前 label set / crop 策略不能 promotion。
 
-边界：代码已支持真实 `transformers` CLIP backend，但当前 uv 环境检查结果为
-`torch=False`、`transformers=False`，因此本轮未执行真实 CLIP inference，也不下载
-CLIP 权重。`hash-diagnostic` 结果只证明 manifest cache contract 和 downstream
-命名链路，不代表语义正确性。SAM top-4 仍明显 slot imbalance，不能把该结果直接
-标记为默认语义质量 promotion。
+边界：真实 CLIP inference 已通过临时 `uv --with` 依赖环境跑通，但仓库默认依赖仍不包含
+torch / transformers，也不提交 CLIP 权重或模型 cache。当前真实 CLIP 命名质量 gate
+结论为 `do-not-promote`：label 分布塌缩且主体命名错误。下一步应改进 label set、
+crop / background suppression 和命名多样性 gate，而不是把当前 CLIP labels 作为默认
+语义质量策略。
 
 ## 阶段最终目标
 
@@ -1089,7 +1103,7 @@ npm run acceptance:demo
 - Spark `SplatMesh.raycast` 当前可命中 splat depth，但 intersection 不暴露 splat index / object id，且不能证明 object opacity mask filter-aware；因此对象选择仍应使用已验收的 `hover-confirm-v1` screen-space pick，不能宣称已经是 renderer-native object picking。
 - `plush-semantic-closure` 已证明真实 3DGS + 非 KMeans 2D color masks + Object Field + 前端对象编辑的统一闭环；但它仍是确定性颜色规则，不等价于 SAM / CLIP 实例语义分割。
 - 当前 v1 闭环 demo 的 Plush mask manifest 由已有对象标签派生，用于回归验收；NeRF Lego alpha/color masks 已能从真实图片生成，但仍是确定性 alpha/颜色规则，不等价于 SAM / CLIP 实例语义分割。
-- SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；仓库已提供可选 `transformers` CLIP score cache 入口和 hash diagnostic contract smoke，但当前本机尚未安装 torch / transformers，也未执行真实 CLIP inference。
+- SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；`objgauss masks score-clip --backend transformers --device cuda` 已用临时 `uv --with` 依赖跑通真实 CLIP inference，但当前 label set / crop 策略未通过命名质量 gate，不能 promotion 为默认语义命名策略。
 - Object Emergence Score 的单点 `emergence` CLI 仍是 partial OES；`emergence-curve` 在提供 cloud 和 mask manifest 时已覆盖 assignment / stability / spatial compactness / scale-aware CPU splat render occlusion。`emergence-benchmark` 当前是本地 smoke suite，依赖 ignored `outputs/` 产物；缺失输入时按 `docs/benchmarks/semantic-smoke.md` 与 `docs/benchmarks/splatfacto-scenes.md` 生成。本 suite 仍不是 CI 固定 public benchmark。gradient coherence 和 covariance-aware 3DGS renderer occlusion 仍未实现，不能据此单独宣称 object emergence 完成。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
 - NeRF Lego 闭环代理样例仍是 posed RGBA 生成的轻量 Gaussian proxy；另有 Nerfstudio Splatfacto 100-step smoke 产物和 TRAIN-003A runbook/script 证明本机可复现真实 3DGS optimization PLY，但尚未作为前端公开样例固化。
@@ -1100,8 +1114,8 @@ npm run acceptance:demo
 ## 下一步主线
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
-2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment 和 CLIP score cache contract 已落地；下一步安装/复用本地 CLIP 依赖与模型缓存，跑真实 `transformers` CLIP scoring、命名覆盖率、slot balance 改善和默认训练策略 promotion gate。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
+2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract 和真实 `transformers` CLIP run 已落地；下一步改进 CLIP label set / crop 背景抑制 / 命名多样性 gate，并继续推进 slot balance 和默认训练策略 promotion gate。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
 3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
-4. 后续 SEG: CLIP score 生成 / cache、alignment 质量指标，以及与 color-mask / KMeans baseline 的质量对比。
+4. 后续 SEG: CLIP label / crop quality gate、alignment 质量指标，以及与 color-mask / KMeans baseline 的质量对比。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
