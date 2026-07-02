@@ -13,6 +13,7 @@ from objgauss.core import (
     TrainableKernelImageTarget,
     TrainableKernelResult,
     TrainableKernelSample,
+    TrainingRendererLossResult,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
@@ -22,6 +23,7 @@ from objgauss.core import (
     build_chunk_index,
     cluster_features,
     dynamic_k_proposal_report,
+    evaluate_training_renderer_loss,
     initialize_object_field,
     image_target_contract_summary,
     make_trainable_image_target,
@@ -38,6 +40,7 @@ from objgauss.core import (
     validate_image_target_contract_summary,
     validate_renderer_loss_boundary_summary,
     validate_trainable_image_target,
+    validate_training_renderer_summary,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
@@ -202,6 +205,14 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     image_contract = image_target_contract_summary(tuple(frame.image_target for frame in bound_frames))
     assert image_contract["status"] == "image_targets_bound"
     assert validate_image_target_contract_summary(image_contract) is True
+    assignment = np.full((6, 2), 0.5, dtype=np.float32)
+    renderer_result = evaluate_training_renderer_loss(
+        bound_frames[:1],
+        [assignment],
+        np.asarray([[0.2, 0.3, 0.4], [0.6, 0.7, 0.8]], dtype=np.float32),
+    )
+    assert isinstance(renderer_result, TrainingRendererLossResult)
+    assert validate_training_renderer_summary(renderer_result.as_dict()) is True
 
 
 def _tiny_cloud() -> GaussianCloud:

@@ -19,20 +19,19 @@
 
 ## Ready
 
-### TRAIN-RENDERER-API-001: Define differentiable renderer API and gradient path
+### TRAIN-IMAGE-LOSS-OPTIM-001: Use image renderer loss in trainable optimization
 
 - 状态: ready
-- 类型: 标准 PR / training renderer API contract
-- 目标: 在 image/camera target ABI 已绑定后，定义真实 renderer loss producer
-  的最小 API、gradient path、telemetry 和 dependency boundary，让后续可以选择
-  CPU differentiable stub、torch renderer 或 GPU rasterizer，而不是继续扩大 point
-  smoke。
+- 类型: 标准 PR / training objective
+- 目标: 在 `TRAIN-RENDERER-API-001` 已提供 image-space renderer loss producer 后，
+  将 `image_render_loss` 作为可配置项接入 trainable kernel objective，使训练不只输出
+  telemetry，而能真正优化 image-space target。
 - 边界:
-  - 若需要 torch / GPU differentiable rasterizer，先写清 dependency / ADR 边界。
+  - 默认仍不引入 torch / GPU differentiable rasterizer。
   - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
-  - 不默认加载 near-1M / 4.5M 大资产；先用小 fixture 验证 API 和 telemetry。
-  - 必须继续输出 `L_render + L_object + L_temporal`，并新增 image-space
-    `image_render_loss` telemetry。
+  - 不默认加载 near-1M / 4.5M 大资产；先用 fixture 和小型 public sample 验证。
+  - 继续保留 point `L_render`、`L_object`、`L_temporal` telemetry，不把 CPU point splat
+    stub 宣称为完整 3DGS renderer。
 
 ## Planned
 
@@ -55,6 +54,56 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-RENDERER-API-001: Define differentiable renderer API and gradient path
+
+- 状态: done / training-renderer-api
+- 类型: 标准 PR / training renderer API contract
+- 目标: 在 image/camera target ABI 已绑定后，定义真实 renderer loss producer
+  的最小 API、gradient path、telemetry 和 dependency boundary，让后续可以选择
+  CPU differentiable stub、torch renderer 或 GPU rasterizer，而不是继续扩大 point
+  smoke。
+- 已实施:
+  - `objgauss/core/training_renderer.py` 新增
+    `objgauss-training-renderer-api-v1` 和
+    `cpu-image-point-splat-differentiable-v1`。
+  - renderer loss producer 消费 `TrainableKernelFrame + A[N,K] + decoder_colors`，
+    使用已绑定 image / camera target 生成 image-space render，并计算
+    visibility-masked `image_render_loss`。
+  - 暴露 `analytic-color-assignment-gradient-v1`，覆盖 `decoder_colors` 与
+    `assignments` 梯度；`positions`、`camera`、`visibility_mask` 和
+    `point_radius` 明确为 frozen fields。
+  - `TrainableKernelImageTarget` summary 记录 `point_radius`，保证 target generation
+    与 renderer API 使用同一 point footprint。
+  - `objgauss training kernel-sample` 在 image targets bound 时自动输出
+    `renderer_api` summary，并打印 renderer status、renderer name、gradient path
+    和 `image_render_loss`。
+  - `renderer_loss_boundary_report(...)` 识别 ready renderer API 后，将状态提升为
+    `renderer_api_ready`，并把 blockers 收敛为 `full_3dgs_renderer_not_selected`。
+- 边界:
+  - 不引入 torch / GPU renderer /真实 3DGS differentiable rasterizer。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出，不移动 public samples，不默认拉 near-1M / 4.5M 大资产。
+  - 当前 renderer API 是 dependency-free CPU point splat stub，用于训练 loss producer
+    contract 和梯度路径验证，不宣称为完整 3DGS training。
+- 验证:
+  - `uv run --extra dev pytest tests/test_training_renderer.py tests/test_renderer_loss.py tests/test_trainable_kernel.py tests/test_core_namespace.py`:
+    24 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel_sample"`:
+    1 passed, 64 deselected。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 12 --learning-rate 0.35 --max-points 8 --bind-image-targets --image-width 16 --image-height 12 --seed 8 --summary-output /tmp/objgauss-kernel-renderer-api-summary.json --require-loss-decrease`:
+    passed；`renderer_api_status=ready`、
+    `renderer_name=cpu-image-point-splat-differentiable-v1`、
+    `renderer_gradient_path=analytic-color-assignment-gradient-v1`、
+    `image_render_loss=0.058243`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-kernel-renderer-api-summary.json --output /tmp/objgauss-renderer-api-boundary.json --require-point-smoke-ready`:
+    passed；`status=renderer_api_ready`、
+    `current_renderer=cpu-image-point-splat-differentiable-v1`、
+    `upgrade_blockers=['full_3dgs_renderer_not_selected']`。
+  - `uv run --extra dev pytest`: 126 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-IMAGE-TARGET-001: Bind image/camera targets for renderer training
 

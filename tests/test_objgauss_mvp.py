@@ -2506,12 +2506,18 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "render_target_mode=image_space_targets_bound" in output
     assert "image_targets_status=image_targets_bound" in output
     assert "visibility_policy=covered_pixels" in output
+    assert "renderer_api_status=ready" in output
+    assert "renderer_name=cpu-image-point-splat-differentiable-v1" in output
+    assert "renderer_gradient_path=analytic-color-assignment-gradient-v1" in output
+    assert "image_render_loss=" in output
     assert "loss_decreased=true" in output
     assert summary["loss_decreased"] is True
     assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
     assert summary["sample"]["sampled_count"] == 4
     assert summary["image_target_contract"]["status"] == "image_targets_bound"
     assert summary["image_target_contract"]["targets"][0]["shape"] == [8, 10, 3]
+    assert summary["renderer_api"]["status"] == "ready"
+    assert summary["renderer_api"]["gradient_path"] == "analytic-color-assignment-gradient-v1"
 
     assert (
         main(
@@ -2531,16 +2537,19 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     boundary_output = capsys.readouterr().out
     boundary = json.loads(boundary_path.read_text(encoding="utf-8"))
 
-    assert "status=point_render_smoke_ready" in boundary_output
+    assert "status=renderer_api_ready" in boundary_output
     assert "point_smoke_ready=true" in boundary_output
+    assert "evidence_renderer_gradient_path=analytic-color-assignment-gradient-v1" in boundary_output
     assert boundary["schema"] == "objgauss-renderer-loss-boundary-v1"
     assert boundary["point_smoke_ready"] is True
     assert boundary["evidence"]["image_targets_bound"] is True
+    assert boundary["evidence"]["renderer_api_ready"] is True
     assert boundary["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
     assert boundary["render_target_contract"]["target"]["kind"] == "image_space_render"
     assert "image_space_targets_not_bound" not in boundary["upgrade_blockers"]
     assert "camera_visibility_policy_not_bound" not in boundary["upgrade_blockers"]
-    assert "differentiable_gaussian_renderer_not_selected" in boundary["upgrade_blockers"]
+    assert "renderer_gradient_path_not_defined" not in boundary["upgrade_blockers"]
+    assert "full_3dgs_renderer_not_selected" in boundary["upgrade_blockers"]
 
 
 def test_training_register_output_can_export_unknown_object_policy(tmp_path, capsys):

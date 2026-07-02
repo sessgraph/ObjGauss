@@ -53,21 +53,40 @@ def renderer_loss_boundary_report(
     status = "point_render_smoke_ready" if point_ready else "contract_defined"
     if kernel_summary is not None and point_blockers:
         status = "point_render_smoke_blocked"
+    if point_ready and evidence.get("renderer_api_ready"):
+        status = "renderer_api_ready"
     upgrade_blockers = []
     if not evidence.get("image_targets_bound"):
         upgrade_blockers.append("image_space_targets_not_bound")
-    upgrade_blockers.extend(
-        [
-            "differentiable_gaussian_renderer_not_selected",
-            "renderer_gradient_path_not_defined",
-        ]
-    )
+    if evidence.get("renderer_api_ready"):
+        upgrade_blockers.append("full_3dgs_renderer_not_selected")
+    else:
+        upgrade_blockers.extend(
+            [
+                "differentiable_gaussian_renderer_not_selected",
+                "renderer_gradient_path_not_defined",
+            ]
+        )
     if not evidence.get("image_target_visibility_policies"):
         upgrade_blockers.append("camera_visibility_policy_not_bound")
+    next_steps = (
+        (
+            "select or implement full 3DGS image renderer behind the training renderer API",
+            "wire image_render_loss into the trainable optimization objective",
+            "keep viewer renderer as debug consumer, not the training renderer default",
+        )
+        if evidence.get("renderer_api_ready")
+        else (
+            "bind trainable frames to camera/image targets",
+            "define image-space renderer API and telemetry",
+            "decide whether GPU/torch/differentiable rasterizer requires ADR",
+            "keep viewer renderer as debug consumer, not the training renderer default",
+        )
+    )
     return RendererLossBoundaryReport(
         schema=RENDERER_LOSS_BOUNDARY_SCHEMA,
         status=status,
-        current_renderer=POINT_RENDER_SMOKE_RENDERER,
+        current_renderer=evidence.get("renderer_name") or POINT_RENDER_SMOKE_RENDERER,
         target_renderer=target_renderer,
         point_smoke_ready=point_ready,
         input_frame_contract={
@@ -116,12 +135,7 @@ def renderer_loss_boundary_report(
         evidence=evidence,
         point_smoke_blockers=tuple(point_blockers),
         upgrade_blockers=tuple(upgrade_blockers),
-        next_steps=(
-            "bind trainable frames to camera/image targets",
-            "define image-space renderer API and telemetry",
-            "decide whether GPU/torch/differentiable rasterizer requires ADR",
-            "keep viewer renderer as debug consumer, not the training renderer default",
-        ),
+        next_steps=next_steps,
     )
 
 
@@ -169,7 +183,13 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         if isinstance(kernel_summary.get("image_target_contract"), dict)
         else {}
     )
+    renderer_api = (
+        kernel_summary.get("renderer_api")
+        if isinstance(kernel_summary.get("renderer_api"), dict)
+        else {}
+    )
     image_targets_bound = image_target_contract.get("status") == "image_targets_bound"
+    renderer_api_ready = renderer_api.get("status") == "ready"
     evidence = {
         "kind": "trainable_kernel_summary",
         "schema": kernel_summary.get("schema"),
@@ -181,6 +201,11 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         "image_targets_bound": image_targets_bound,
         "image_target_contract_schema": image_target_contract.get("schema"),
         "image_target_visibility_policies": image_target_contract.get("visibility_policies", []),
+        "renderer_api_ready": renderer_api_ready,
+        "renderer_api_schema": renderer_api.get("schema"),
+        "renderer_name": renderer_api.get("renderer_name"),
+        "renderer_gradient_path": renderer_api.get("gradient_path"),
+        "image_render_loss": renderer_api.get("image_render_loss"),
         "initial_total_loss": initial["total_loss"],
         "final_total_loss": final["total_loss"],
         "initial_render_loss": initial["render_loss"],

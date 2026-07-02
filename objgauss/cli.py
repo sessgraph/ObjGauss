@@ -79,6 +79,7 @@ from objgauss.core.trainable_kernel import (
     train_kernel_mvp_from_cloud,
 )
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
+from objgauss.core.training_renderer import evaluate_training_renderer_loss
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1133,6 +1134,13 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         "sample": sample.as_dict(),
         "input": str(args.input),
     }
+    if summary["image_target_contract"]["status"] == "image_targets_bound":
+        renderer_api = evaluate_training_renderer_loss(
+            sample.frames,
+            result.assignments,
+            result.decoder_colors,
+        )
+        summary["renderer_api"] = renderer_api.as_dict()
     print(f"schema={summary['schema']}")
     print(f"input={args.input}")
     print(f"source_gaussians={sample.source_count}")
@@ -1146,6 +1154,12 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"image_targets_bound={image_contract['targets_bound']}")
     if image_contract["visibility_policies"]:
         print(f"visibility_policy={image_contract['visibility_policies'][0]}")
+    renderer_api_summary = summary.get("renderer_api")
+    if isinstance(renderer_api_summary, dict):
+        print(f"renderer_api_status={renderer_api_summary['status']}")
+        print(f"renderer_name={renderer_api_summary['renderer_name']}")
+        print(f"renderer_gradient_path={renderer_api_summary['gradient_path']}")
+        print(f"image_render_loss={renderer_api_summary['image_render_loss']:.6f}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
@@ -1182,6 +1196,10 @@ def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
         print(f"evidence_target_source={evidence.get('target_source')}")
         print(f"evidence_initial_render_loss={evidence['initial_render_loss']:.6f}")
         print(f"evidence_final_render_loss={evidence['final_render_loss']:.6f}")
+        if evidence.get("renderer_api_ready"):
+            print(f"evidence_renderer_name={evidence.get('renderer_name')}")
+            print(f"evidence_renderer_gradient_path={evidence.get('renderer_gradient_path')}")
+            print(f"evidence_image_render_loss={evidence['image_render_loss']:.6f}")
     if args.output:
         write_json(args.output, summary)
         print(f"summary={args.output}")

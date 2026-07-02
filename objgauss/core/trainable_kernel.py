@@ -41,6 +41,7 @@ class TrainableKernelImageTarget:
     image: np.ndarray
     camera: TrainableKernelCamera
     visibility_mask: np.ndarray
+    point_radius: int = 1
     visibility_policy: str = "covered_pixels"
     color_space: str = "linear_rgb"
     source: str = "synthetic_point_splat_debug"
@@ -60,6 +61,7 @@ class TrainableKernelImageTarget:
             "dtype": "float32",
             "color_space": self.color_space,
             "visibility_policy": self.visibility_policy,
+            "point_radius": int(self.point_radius),
             "visibility_coverage": float(np.mean(mask)),
             "image_sha256": _array_sha256(image),
             "mean_rgb": np.round(np.mean(image, axis=(0, 1)), 6).tolist(),
@@ -568,6 +570,7 @@ def make_trainable_image_target(
         image=image,
         camera=camera,
         visibility_mask=visibility_mask,
+        point_radius=point_radius,
         visibility_policy=visibility_policy,
         source=source,
     )
@@ -634,6 +637,8 @@ def validate_trainable_image_target(target: TrainableKernelImageTarget) -> bool:
         raise ValueError("image_target camera matrices must be finite")
     if target.visibility_policy not in {"covered_pixels", "all_pixels"}:
         raise ValueError("image_target visibility_policy is unsupported")
+    if target.point_radius < 0:
+        raise ValueError("image_target point_radius must be >= 0")
     if not mask.any():
         raise ValueError("image_target visibility_mask must supervise at least one pixel")
     return True

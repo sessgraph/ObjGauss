@@ -13,6 +13,7 @@ from objgauss.core.trainable_kernel import (
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
 )
+from objgauss.core.training_renderer import evaluate_training_renderer_loss
 
 
 def test_renderer_loss_boundary_accepts_trainable_kernel_summary():
@@ -57,6 +58,34 @@ def test_renderer_loss_boundary_clears_image_target_blockers_when_bound():
     assert "image_space_targets_not_bound" not in payload["upgrade_blockers"]
     assert "camera_visibility_policy_not_bound" not in payload["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" in payload["upgrade_blockers"]
+
+
+def test_renderer_loss_boundary_accepts_renderer_api_gradient_path():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    result = train_kernel_mvp(
+        frames,
+        slots=2,
+        iterations=12,
+        learning_rate=0.4,
+        seed=8,
+    )
+    summary = result.as_dict()
+    summary["renderer_api"] = evaluate_training_renderer_loss(
+        frames,
+        result.assignments,
+        result.decoder_colors,
+    ).as_dict()
+
+    report = renderer_loss_boundary_report(summary)
+    payload = report.as_dict()
+
+    assert payload["status"] == "renderer_api_ready"
+    assert payload["current_renderer"] == "cpu-image-point-splat-differentiable-v1"
+    assert payload["evidence"]["renderer_api_ready"] is True
+    assert payload["evidence"]["renderer_gradient_path"] == "analytic-color-assignment-gradient-v1"
+    assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
+    assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
+    assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]
 
 
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():

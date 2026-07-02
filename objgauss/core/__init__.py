@@ -28,6 +28,14 @@ _EXPORTS = {
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
     "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
+    "TrainingRendererFrameLoss": (
+        "objgauss.core.training_renderer",
+        "TrainingRendererFrameLoss",
+    ),
+    "TrainingRendererLossResult": (
+        "objgauss.core.training_renderer",
+        "TrainingRendererLossResult",
+    ),
     "RendererLossBoundaryReport": ("objgauss.core.renderer_loss", "RendererLossBoundaryReport"),
     "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
@@ -46,6 +54,10 @@ _EXPORTS = {
     ),
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
     "dynamic_k_proposal_report": ("objgauss.core.object_state", "dynamic_k_proposal_report"),
+    "evaluate_training_renderer_loss": (
+        "objgauss.core.training_renderer",
+        "evaluate_training_renderer_loss",
+    ),
     "make_trainable_kernel_mvp_fixture": (
         "objgauss.core.trainable_kernel",
         "make_trainable_kernel_mvp_fixture",
@@ -90,6 +102,10 @@ _EXPORTS = {
     "validate_trainable_image_target": (
         "objgauss.core.trainable_kernel",
         "validate_trainable_image_target",
+    ),
+    "validate_training_renderer_summary": (
+        "objgauss.core.training_renderer",
+        "validate_training_renderer_summary",
     ),
     "validate_renderer_loss_boundary_summary": (
         "objgauss.core.renderer_loss",

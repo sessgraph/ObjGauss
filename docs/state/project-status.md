@@ -346,6 +346,23 @@ target summary。`renderer_loss_boundary_report(...)` 现在能识别
 differentiable rasterizer，不替换 Three.js / Spark / WebGPU viewer renderer，不提交
 训练输出或大资产。
 
+`TRAIN-RENDERER-API-001` 已完成 dependency-free training renderer API 第一版：
+`objgauss/core/training_renderer.py` 新增 `objgauss-training-renderer-api-v1`，
+提供 `cpu-image-point-splat-differentiable-v1` renderer loss producer。该模块消费
+`TrainableKernelFrame + A[N,K] + decoder_colors`，按已绑定的 image / camera target
+生成 image-space render、计算 visibility-masked `image_render_loss`，并暴露
+`analytic-color-assignment-gradient-v1` 梯度路径，覆盖 `decoder_colors` 与
+`assignments`，同时明确 `positions`、`camera`、`visibility_mask` 和 `point_radius`
+仍是 frozen fields。`kernel-sample` 在 image targets 已绑定时会自动写入
+`renderer_api` summary，CLI 输出 `renderer_api_status=ready`、renderer name、
+gradient path 和 `image_render_loss`。`renderer_loss_boundary_report(...)` 现在把这类
+summary 升级为 `status=renderer_api_ready`，移除
+`renderer_gradient_path_not_defined` / `differentiable_gaussian_renderer_not_selected`
+blockers，剩余 blocker 收敛为 `full_3dgs_renderer_not_selected`。该步骤仍不引入
+torch / GPU rasterizer，不替换 viewer renderer，不把 CPU point splat stub 宣称为完整
+3DGS renderer；下一步应把 `image_render_loss` 接入训练 objective，或在 ADR 后替换为
+真实 3DGS differentiable renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
