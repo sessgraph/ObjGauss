@@ -4,6 +4,8 @@ import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { MODEL_CATALOG, catalogSummary } from "./modelCatalog.js";
+import { browserReadyArtifact } from "./modelArtifactManifest.js";
+import { decodeQuantizedOgcPayload } from "./ogcDecoder.js";
 import { colorForObject, rgbToCss } from "./palette.js";
 import { parsePly } from "./ply.js";
 
@@ -29,6 +31,13 @@ export default function App() {
   const summary = useMemo(() => catalogSummary(MODEL_CATALOG), []);
   const loadedCount = useMemo(
     () => Object.values(models).filter((model) => ["loaded", "compressed"].includes(model.status)).length,
+    [models],
+  );
+  const ogcLoadedCount = useMemo(
+    () =>
+      Object.values(models).filter(
+        (model) => model.status === "loaded" && model.delivery?.source === "quantized-ogc",
+      ).length,
     [models],
   );
   const objectCount = useMemo(
@@ -131,6 +140,40 @@ export default function App() {
     async function loadModels() {
       for (const model of MODEL_CATALOG) {
         if (cancelled) return;
+        if (model.loadMode === "ogc-chunked") {
+          const startedAt = performance.now();
+          patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
+          try {
+            const { artifact, decoded } = await loadOgcModel(model);
+            const rendered = worldApi.current?.upsertModel(model, decoded.points);
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "loaded",
+              message: "ogc chunks",
+              gaussianCount: decoded.points.length,
+              displayCount: rendered?.displayCount ?? 0,
+              objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? model.objectCount,
+              corePoint: rendered?.corePoint ?? null,
+              objects: rendered?.objects ?? [],
+              loadMs: Math.round(performance.now() - startedAt),
+              delivery: {
+                source: "quantized-ogc",
+                role: artifact.role,
+                decodedChunks: decoded.metadata.decodedChunks,
+                decodedGaussians: decoded.metadata.decodedGaussians,
+                recordFormat: decoded.metadata.recordFormat,
+                lodLevel: model.ogc?.lodLevel ?? "full",
+              },
+            });
+          } catch (error) {
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "error",
+              message: error?.message ?? "ogc load failed",
+            });
+          }
+          continue;
+        }
         if (model.loadMode !== "eager") {
           const rendered = worldApi.current?.upsertModel(model, null);
           patchModel(model.id, {
@@ -196,6 +239,7 @@ export default function App() {
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
       data-hidden-objects={hiddenCount}
+      data-ogc-loaded-count={ogcLoadedCount}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -275,6 +319,8 @@ export default function App() {
             <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
             <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
             <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
+            <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
+            <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
           </dl>
         </section>
       ) : null}
@@ -297,6 +343,57 @@ export default function App() {
       </div>
     </main>
   );
+}
+
+async function loadOgcModel(model) {
+  const artifact = browserReadyArtifact(model, "compressed_chunked");
+  if (!artifact) {
+    throw new Error("missing browser-ready compressed_chunked artifact");
+  }
+  const index = await loadOgcIndex(artifact);
+  const payload = await loadOgcPayload(artifact, index);
+  return {
+    artifact,
+    decoded: decodeQuantizedOgcPayload(payload, index, {
+      chunkIds: model.ogc?.chunkIds,
+      lodLevel: model.ogc?.lodLevel,
+    }),
+  };
+}
+
+async function loadOgcIndex(artifact) {
+  if (artifact.inlineIndex) return artifact.inlineIndex;
+  const indexPath = artifact.indexPath ?? artifact.chunk_index?.path;
+  if (!indexPath || isInlineRoute(indexPath)) {
+    throw new Error("missing fetchable OGC chunk index");
+  }
+  const response = await fetch(indexPath);
+  if (!response.ok) throw new Error(`OGC index HTTP ${response.status}`);
+  return response.json();
+}
+
+async function loadOgcPayload(artifact, index) {
+  if (artifact.payloadBase64) return base64ToArrayBuffer(artifact.payloadBase64);
+  const payloadPath = artifact.payloadPath ?? artifact.path ?? index?.payload?.path;
+  if (!payloadPath || isInlineRoute(payloadPath)) {
+    throw new Error("missing fetchable OGC payload");
+  }
+  const response = await fetch(payloadPath);
+  if (!response.ok) throw new Error(`OGC payload HTTP ${response.status}`);
+  return response.arrayBuffer();
+}
+
+function base64ToArrayBuffer(value) {
+  const binary = atob(String(value));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function isInlineRoute(path) {
+  return String(path).startsWith("inline://");
 }
 
 function ThreeWorld({

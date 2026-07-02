@@ -22,6 +22,7 @@ try {
       `selectedModel=${JSON.stringify(summary.selectedModelId)}`,
       `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
       `debugOs=${summary.debugOs}`,
+      `ogcLoaded=${summary.ogcLoadedCount}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
@@ -73,27 +74,40 @@ async function auditWorld(url) {
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
     const pills = await page.locator(".modelPill").count();
-    if (pills < 5) {
-      throw new Error(`expected at least 5 model pills, found ${pills}`);
+    if (pills < 6) {
+      throw new Error(`expected at least 6 model pills, found ${pills}`);
     }
-    await page.locator(".modelPill").nth(2).click();
+    const ogcPill = page.locator(".modelPill[data-model-row-id='ogc-debug']");
+    await ogcPill.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='ogc-debug']");
+      return pill?.getAttribute("data-model-load-state") === "loaded" &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) > 0;
+    }, undefined, { timeout: 15000 });
+    await ogcPill.click();
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
-      return world?.selectedModelId === shell?.getAttribute("data-selected-model");
+      return world?.selectedModelId === "ogc-debug" && world?.selectedModelId === shell?.getAttribute("data-selected-model");
     }, undefined, { timeout: 15000 });
     const objectSelection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const selection = world?.objectSelections?.find(
-        (entry) => entry.modelId === world.selectedModelId,
-      ) ?? world?.objectSelections?.[0];
+        (entry) => entry.modelId === "ogc-debug",
+      );
+      const objectCount = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-debug").length ?? 0;
       return {
         ok: world?.selectObjectForAudit?.(selection?.selectionId) ?? false,
         selectionId: selection?.selectionId ?? null,
+        objectCount,
       };
     });
     if (!objectSelection.ok) {
-      throw new Error("expected audit handle to select a per-object render target");
+      throw new Error("expected audit handle to select an OGC per-object render target");
+    }
+    if (objectSelection.objectCount < 2) {
+      throw new Error(`expected OGC model to expose at least 2 object render targets, found ${objectSelection.objectCount}`);
     }
     await page.waitForFunction((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -156,6 +170,7 @@ async function auditWorld(url) {
     await page.screenshot({ path: screenshotPath, fullPage: false });
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
       return {
         modelCount: handle.modelCount,
         objectCount: handle.objectCount,
@@ -165,6 +180,7 @@ async function auditWorld(url) {
         selectedObjectId: handle.selectedObjectId,
         debugMode: handle.debugMode,
         debugProtocol: handle.debugProtocol,
+        ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
     });
     const assignmentSlots = await page
@@ -180,6 +196,7 @@ async function auditWorld(url) {
       selectedModelId: world.selectedModelId,
       selectedObjectId: world.selectedObjectId,
       debugOs: world.debugProtocol,
+      ogcLoadedCount: world.ogcLoadedCount,
       assignmentSlots,
       selectedGaussian,
       sidebars,

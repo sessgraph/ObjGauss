@@ -234,6 +234,19 @@ artifact 暴露为独立 route；`scripts/audit-ogc-decoder-contract.mjs` 用小
 contract。该步骤不接入真实 near-1M 大资产、不发布 public demo，也不改写或替换
 Gaussian OIT、WebGPU tile / compute、Spark bridge 等前端自有渲染算法。
 
+`OGC-BROWSER-STREAMING-001` 已完成 browser delivery 第一闭环：默认 Three.js
+world viewer 现在能消费 browser-ready `compressed_chunked` artifact，把 quantized
+OGC chunk payload 解码为现有 renderer-compatible points，并继续按 `object_id`
+派生 ObjectState Debug OS 的对象 render targets、assignment heatmap 和 Gaussian
+probe。`src/modelCatalog.js` 新增小型 `ogc-debug` inline fixture，用于验证
+manifest route / chunk index / payload decode / ObjectState overlay 全链路；`src/App.jsx`
+新增 OGC loader，后续真实 artifact 可走 `chunk_index.path + payload path` fetch 路线。
+`scripts/audit-world-viewer.mjs` 现在会选中 `ogc-debug`，要求 `ogcLoaded=1`、
+至少 2 个 OGC object render targets、`assignmentSlots=2` 和 Gaussian probe 成功。
+该步骤仍不提交 near-1M / 4.5M 大资产，不把 full diagnostic PLY 恢复为默认 route，
+也不替换 Gaussian OIT、WebGPU tile / compute、Spark bridge、shader、object-state
+buffer 或 picking 代码。
+
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
 对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：

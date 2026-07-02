@@ -19,18 +19,7 @@
 
 ## Ready
 
-### OGC-BROWSER-STREAMING-001: Load browser-ready OGC chunks in the viewer
-
-- 状态: ready
-- 类型: 标准 PR / browser delivery
-- 目标: 在现有 `compressed_chunked` manifest、quantized OGC payload 和
-  `src/ogcDecoder.js` contract 基础上，让 viewer 能按模型 / 对象路线加载
-  browser-ready OGC chunk，形成真实 chunk / LOD / streaming 交付闭环。
-- 边界:
-  - 不替换 ObjGauss 自有 Gaussian OIT、WebGPU tile / compute、Spark bridge、
-    shader、object-state buffer 或 picking 代码。
-  - 不把 full diagnostic PLY 重新变成默认 browser route。
-  - 不提交 near-1M / 4.5M 大资产；先使用小 fixture 或已有 browser-ready sample。
+当前无 ready PR。下一步如继续 Owner 最新优先级，应回到 trainable v1 MVP 闭环。
 
 ## Planned
 
@@ -53,6 +42,44 @@
 当前无进行中 PR。
 
 ## Done
+
+### OGC-BROWSER-STREAMING-001: Load browser-ready OGC chunks in the viewer
+
+- 状态: done / browser-ogc-delivery-fixture
+- 类型: 标准 PR / browser delivery
+- 目标: 在现有 `compressed_chunked` manifest、quantized OGC payload 和
+  `src/ogcDecoder.js` contract 基础上，让 viewer 能按模型 / 对象路线加载
+  browser-ready OGC chunk，形成真实 chunk / LOD / streaming 交付闭环。
+- 已实施:
+  - `src/modelCatalog.js` 新增小型 `ogc-debug` browser delivery fixture，包含
+    `compressed_chunked` manifest artifact、inline chunk index 和 quantized OGC
+    payload base64，不提交 near-1M / 4.5M 大资产。
+  - `src/App.jsx` 新增 OGC loader，支持从 `compressed_chunked` artifact 读取 inline
+    fixture，也为后续 `chunk_index.path + payload path` fetch route 留出真实浏览器加载
+    路线。
+  - OGC decode 输出继续进入现有 point cloud renderer，并按 `object_id` 派生
+    ObjectState Debug OS 的 object render target、assignment heatmap 和 Gaussian
+    probe。
+  - `scripts/audit-world-viewer.mjs` 现在会选择 `ogc-debug`，断言 OGC 模型 loaded、
+    `ogcLoaded=1`、至少 2 个 OGC object render targets、`assignmentSlots=2` 和
+    Gaussian probe 成功。
+- 边界:
+  - 不替换 ObjGauss 自有 Gaussian OIT、WebGPU tile / compute、Spark bridge、
+    shader、object-state buffer 或 picking 代码。
+  - 不把 full diagnostic PLY 重新变成默认 browser route。
+  - 不提交 near-1M / 4.5M 大资产；当前只使用小型 inline fixture 验证 browser path。
+  - 不启动模型训练，不引入 trainable solver。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:ogc-decoder-contract`: passed；`ogc_decoder_contract=passed`、
+    `compressedRoute=compressed_chunked`。
+  - `npm run audit:world-viewer`: passed；`models=6`、`selectedModel="ogc-debug"`、
+    `ogcLoaded=1`、`assignmentSlots=2`、`selectedGaussian="0"`、`sidebars=0`，
+    截图 `/tmp/objgauss-world-viewer.png`。沙箱内直接启动本地 server 受限，提权重跑通过；
+    日志中出现 existing 5395 app 的 port-in-use 信息，但 audit 成功连接并通过。
+  - `uv run --extra dev pytest`: 106 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### OBJECT-DEBUG-UI-001: Add Phase 1 ObjectState Debug OS overlay
 

@@ -1,3 +1,118 @@
+import {
+  QUANTIZED_OGC_PAYLOAD_SCHEMA,
+  QUANTIZED_OGC_RECORD_BYTE_SIZE,
+  QUANTIZED_OGC_RECORD_FORMAT,
+} from "./ogcDecoder.js";
+import { MODEL_ARTIFACT_MANIFEST_SCHEMA } from "./modelArtifactManifest.js";
+
+const OGC_DEBUG_PAYLOAD_BASE64 =
+  "AIAAAACA7GNY5uAuUEYgTv+VYM0gywhSEKTuzXfX8FVwlJi30FtwyMivsLOwNvi0U9IAgP//AID/6Z7rAIAAAACAJ8LL4YA+mDoIUnHc4s1Qw2hCgLtTod/SOEpYmFDDTNSsxpi3mLeYOpjYgtcAgP//AIDJ9pbo";
+
+const OGC_DEBUG_INDEX = {
+  schema: "objgauss-chunk-index-v1",
+  sort_key: "object_id+morton_xyz",
+  gaussian_count: 12,
+  object_count: 2,
+  chunk_size_target: 6,
+  payload: {
+    schema: QUANTIZED_OGC_PAYLOAD_SCHEMA,
+    path: "inline://ogc-debug.ogc",
+    format: ".ogc",
+    record_format: QUANTIZED_OGC_RECORD_FORMAT,
+    record_byte_size: QUANTIZED_OGC_RECORD_BYTE_SIZE,
+    byte_size: 120,
+    sha256: "673f6782c9c9e4d50318e0dcb41276b2167084a1da8894e820e0e8487ca7ecd9",
+  },
+  compression: {
+    codec: "objgauss-ogc-prototype",
+    layout: "object-aware-chunked-local-quantized",
+    quantization: {
+      schema: "objgauss-local-quantization-v1",
+      policy: "chunk-aabb-uint16-rgb8-opacity8-v0",
+      status: "actual_payload_prototype",
+    },
+  },
+  lod: {
+    schema: "objgauss-object-aware-lod-v1",
+    levels: [
+      { level: 0, ratio: 1.0, gaussian_count: 12 },
+      { level: 1, ratio: 0.5, gaussian_count: 6 },
+    ],
+  },
+  object_id_coverage: {
+    field: "object_id",
+    mode: "complete",
+    has_object_ids: true,
+    object_count: 2,
+  },
+  objects: [
+    { object_id: 0, gaussian_count: 6, chunk_ids: [0] },
+    { object_id: 1, gaussian_count: 6, chunk_ids: [1] },
+  ],
+  chunks: [
+    {
+      chunk_id: 0,
+      object_id: 0,
+      gaussian_count: 6,
+      record_count: 6,
+      record_format: QUANTIZED_OGC_RECORD_FORMAT,
+      byte_offset: 0,
+      byte_length: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+      aabb_min: [-0.6, 0, -0.35],
+      aabb_max: [0.6, 1.2, 0.35],
+      lod: {
+        schema: "objgauss-object-aware-lod-v1",
+        levels: [
+          {
+            level: 0,
+            ratio: 1.0,
+            record_count: 6,
+            byte_offset: 0,
+            byte_length: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+          },
+          {
+            level: 1,
+            ratio: 0.5,
+            record_count: 3,
+            byte_offset: 0,
+            byte_length: 3 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+          },
+        ],
+      },
+    },
+    {
+      chunk_id: 1,
+      object_id: 1,
+      gaussian_count: 6,
+      record_count: 6,
+      record_format: QUANTIZED_OGC_RECORD_FORMAT,
+      byte_offset: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+      byte_length: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+      aabb_min: [1.4, 0, -0.45],
+      aabb_max: [2.4, 1.3, 0.45],
+      lod: {
+        schema: "objgauss-object-aware-lod-v1",
+        levels: [
+          {
+            level: 0,
+            ratio: 1.0,
+            record_count: 6,
+            byte_offset: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+            byte_length: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+          },
+          {
+            level: 1,
+            ratio: 0.5,
+            record_count: 3,
+            byte_offset: 6 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+            byte_length: 3 * QUANTIZED_OGC_RECORD_BYTE_SIZE,
+          },
+        ],
+      },
+    },
+  ],
+};
+
 export const MODEL_CATALOG = [
   {
     id: "plush",
@@ -106,12 +221,88 @@ export const MODEL_CATALOG = [
       chunkRoot: "/models/near1m-lego/objects/",
     },
   },
+  {
+    id: "ogc-debug",
+    name: "OGC chunk debug fixture",
+    label: "OGC chunks",
+    loadMode: "ogc-chunked",
+    kind: "compressed-chunked-ogc",
+    stage: "browser-delivery-fixture",
+    objectCount: 2,
+    galleryPosition: [0.18, 0, 3.25],
+    accent: "#2fd3a6",
+    displayScale: 1.88,
+    pointSize: 0.058,
+    maxDisplayPoints: 1200,
+    ogc: {
+      lodLevel: 0,
+    },
+    compression: {
+      layout: "object-aware-quantized-ogc-chunks",
+      status: "browser-ready",
+      chunkRoot: "/models/ogc-debug/objects/",
+    },
+    modelArtifactManifest: {
+      schema: MODEL_ARTIFACT_MANIFEST_SCHEMA,
+      manifest_id: "ogc-debug-model-artifacts",
+      asset_id: "ogc-debug",
+      name: "OGC chunk debug fixture",
+      stage: "development",
+      source: {
+        type: "object_aware_gaussian_codec_fixture",
+        input: "inline quantized OGC records",
+      },
+      license: "fixture",
+      counts: {
+        gaussians: OGC_DEBUG_INDEX.gaussian_count,
+        objects: OGC_DEBUG_INDEX.object_count,
+      },
+      artifacts: [
+        {
+          role: "compressed_chunked",
+          path: "inline://ogc-debug.ogc",
+          format: ".ogc",
+          delivery_tier: "browser_edit",
+          browser_ready: true,
+          gaussian_count: OGC_DEBUG_INDEX.gaussian_count,
+          object_count: OGC_DEBUG_INDEX.object_count,
+          byte_size: OGC_DEBUG_INDEX.payload.byte_size,
+          sha256: OGC_DEBUG_INDEX.payload.sha256,
+          chunk_index: {
+            schema: OGC_DEBUG_INDEX.schema,
+            path: "inline://ogc-debug.index.json",
+            chunk_count: OGC_DEBUG_INDEX.chunks.length,
+            sort_key: OGC_DEBUG_INDEX.sort_key,
+            chunk_size_target: OGC_DEBUG_INDEX.chunk_size_target,
+          },
+          compression: OGC_DEBUG_INDEX.compression,
+          lod: OGC_DEBUG_INDEX.lod,
+          object_id_coverage: OGC_DEBUG_INDEX.object_id_coverage,
+          inlineIndex: OGC_DEBUG_INDEX,
+          payloadBase64: OGC_DEBUG_PAYLOAD_BASE64,
+        },
+      ],
+      quality_evidence: [
+        {
+          kind: "browser_decoder_contract",
+          status: "fixture",
+          decoded_gaussians: OGC_DEBUG_INDEX.gaussian_count,
+        },
+      ],
+      limitations: ["Tiny inline fixture for browser OGC delivery wiring; not a trained scene."],
+      created_from: {
+        source: "OGC-BROWSER-STREAMING-001",
+      },
+    },
+  },
 ];
 
 export function catalogSummary(models = MODEL_CATALOG) {
   return {
     modelCount: models.length,
-    compressedReadyCount: models.filter((model) => model.compression?.status === "prototype").length,
+    compressedReadyCount: models.filter((model) =>
+      ["prototype", "browser-ready"].includes(model.compression?.status),
+    ).length,
     processedCount: models.filter((model) => model.stage === "processed").length,
   };
 }
