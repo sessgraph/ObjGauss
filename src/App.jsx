@@ -297,6 +297,10 @@ export default function App() {
       data-stability-mean-entropy={selectedStability.meanEntropy}
       data-stability-mixed-slots={selectedStability.mixedSlots}
       data-stability-low-confidence={selectedStability.lowConfidenceSlots}
+      data-stability-purity-available={selectedStability.purityAvailable ? "true" : "false"}
+      data-stability-mean-purity={selectedStability.meanPurity ?? ""}
+      data-stability-temporal-available={selectedStability.temporalAvailable ? "true" : "false"}
+      data-stability-mean-temporal-drift={selectedStability.meanTemporalDrift ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -948,6 +952,10 @@ function StabilityDashboard({ stability }) {
       data-mean-entropy={summary.meanEntropy}
       data-mixed-slots={summary.mixedSlots}
       data-low-confidence-slots={summary.lowConfidenceSlots}
+      data-purity-available={summary.purityAvailable ? "true" : "false"}
+      data-mean-purity={summary.meanPurity ?? ""}
+      data-temporal-available={summary.temporalAvailable ? "true" : "false"}
+      data-mean-temporal-drift={summary.meanTemporalDrift ?? ""}
     >
       <div className="stabilityHead">
         <span>Stability</span>
@@ -1308,6 +1316,8 @@ function createTrainableArtifactGroup(model) {
   const assignmentFrame = artifact.assignments?.[frame?.frame_index ?? 0] ?? artifact.assignments?.[0];
   const matrix = Array.isArray(assignmentFrame?.matrix) ? assignmentFrame.matrix : [];
   const states = Array.isArray(frame?.states) ? frame.states : [];
+  const frameIndex = Number(frame?.frame_index ?? 0) || 0;
+  const derivedIds = Array.isArray(frame?.derived_object_ids) ? frame.derived_object_ids : [];
   if (!states.length || !matrix.length) {
     throw new Error("trainable artifact fixture needs states and assignment matrix");
   }
@@ -1346,6 +1356,8 @@ function createTrainableArtifactGroup(model) {
     const fallback = new THREE.Color(accent);
     const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), Number(state.normalized_assignment_entropy ?? 0) * 0.34);
     const assignment = averageAssignmentVector(stateRows.map((entry) => entry.row), objectIds);
+    const purity = objectPurityForRows(stateRows, derivedIds);
+    const temporalDrift = objectTemporalDrift(artifact, frameIndex, objectId, state.centroid);
 
     stateRows.forEach((entry, index) => {
       const point = artifactPointInBox(box, index, stateRows.length);
@@ -1407,6 +1419,9 @@ function createTrainableArtifactGroup(model) {
       massFraction: round3(state.mass_fraction),
       confidence: round3(state.confidence),
       assignmentEntropy: round3(state.normalized_assignment_entropy ?? state.assignment_entropy ?? 0),
+      objectPurity: purity.value,
+      purityLabel: purity.label,
+      temporalDrift,
       centroid: (state.centroid ?? []).map(round3),
       bbox: (state.bbox ?? []).map(round3),
       status: state.status ?? "trained_artifact_slot",
@@ -1431,6 +1446,8 @@ function createTrainableArtifactGroup(model) {
       assignment,
       assignmentEntropy: objectState.assignmentEntropy,
       assignmentConfidence: objectState.confidence,
+      objectPurity: objectState.objectPurity,
+      temporalDrift: objectState.temporalDrift,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1717,6 +1734,7 @@ function summarizeObjectStability(objectsOrStates = []) {
 
 function firstFinite(...values) {
   for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
     const number = Number(value);
     if (Number.isFinite(number)) return number;
   }
@@ -1752,7 +1770,7 @@ function boxFromBbox(bbox) {
 }
 
 function vectorFromArray(value, fallback = new THREE.Vector3()) {
-  if (!Array.isArray(value) || value.length < 3) return fallback.clone();
+  if (!Array.isArray(value) || value.length < 3) return fallback?.clone?.() ?? null;
   return new THREE.Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
 }
 
@@ -1772,6 +1790,50 @@ function artifactPointInBox(box, index, count) {
     THREE.MathUtils.lerp(box.min.y, box.max.y, 0.34 + 0.22 * ((index + 1) % 2)),
     THREE.MathUtils.lerp(box.min.z, box.max.z, 0.5 + wave),
   );
+}
+
+function objectPurityForRows(rows, derivedIds = []) {
+  const counts = new Map();
+  rows.forEach((entry) => {
+    const label = derivedIds[entry.rowIndex];
+    if (label === null || label === undefined) return;
+    const key = String(label);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  const total = [...counts.values()].reduce((sum, value) => sum + value, 0);
+  if (!total) return { value: null, label: null };
+  let bestLabel = null;
+  let bestCount = 0;
+  for (const [label, count] of counts) {
+    if (count > bestCount) {
+      bestLabel = label;
+      bestCount = count;
+    }
+  }
+  return {
+    value: round3(bestCount / total),
+    label: bestLabel,
+  };
+}
+
+function objectTemporalDrift(artifact, frameIndex, objectId, centroid) {
+  const frames = Array.isArray(artifact?.object_states) ? artifact.object_states : [];
+  const current = vectorFromArray(centroid, null);
+  if (!current) return null;
+  const candidateFrames = frames
+    .filter((frame) => Number(frame?.frame_index) !== frameIndex)
+    .map((frame) => ({
+      frame,
+      distance: Math.abs(Number(frame?.frame_index ?? 0) - frameIndex),
+    }))
+    .filter((entry) => Number.isFinite(entry.distance))
+    .sort((left, right) => left.distance - right.distance);
+  for (const entry of candidateFrames) {
+    const peer = entry.frame?.states?.find((state) => String(state.id) === String(objectId));
+    const peerCentroid = vectorFromArray(peer?.centroid, null);
+    if (peerCentroid) return round3(current.distanceTo(peerCentroid));
+  }
+  return null;
 }
 
 function averageAssignmentVector(rows, objectIds) {

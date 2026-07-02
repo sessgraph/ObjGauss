@@ -72,6 +72,42 @@
 
 ## Done
 
+### OBJECT-STABILITY-METRICS-001: Expose purity and temporal drift in Debug OS
+
+- 状态: done / debug-os-purity-temporal-metrics
+- 类型: 标准 PR / frontend debug metrics
+- 目标: 在已有 stability dashboard、hover highlight、A[N,K] heatmap 和 trainable
+  artifact Debug OS 基础上，让 Phase 1 UI + metrics 系统真正显示 object purity 和
+  temporal consistency evidence，而不是继续把两项显示为 `n/a`。
+- 已实施:
+  - `src/modelCatalog.js` 的 `trainable-mvp-debug` fixture 升级为 2-frame
+    `objgauss-trainable-kernel-model-artifact-v1`，保留小型 static debug fixture
+    定位，并新增相邻帧 assignment matrix / ObjectState centroid。
+  - `src/App.jsx` 在 trainable artifact loader 中从 dominant assignment rows 与
+    `derived_object_ids` 推导 per-object purity，从相邻帧同 id ObjectState centroid
+    推导 temporal drift。
+  - Stability dashboard、`.worldShell` telemetry 和
+    `window.__OBJGAUSS_WORLD__.stabilitySummary` 现在暴露 purity availability、
+    `meanPurity`、temporal availability 和 `meanTemporalDrift`。
+  - `scripts/audit-world-viewer.mjs` 在 `trainable-mvp-debug` 路径上断言 purity /
+    temporal metrics 均可用，并把 `purity` / `temporalDrift` 写入 audit summary。
+- 边界:
+  - 不改变 Python 训练算法，不引入 torch / gsplat / CUDA。
+  - 不提交 `/tmp` model artifact / summary；临时 2-frame 训练输出只用于取数参考。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `purity=1`、`temporalDrift=0.018`、
+    `assignmentSource=trainable_kernel_model_artifact`，截图
+    `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-HOVER-HIGHLIGHT-001: Audit ObjectState hover highlight in Debug OS
 
 - 状态: done / debug-os-hover-highlight

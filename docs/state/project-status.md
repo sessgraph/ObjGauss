@@ -470,6 +470,18 @@ hover 后 `data-hovered-target`、`hoveredGaussianCount` 和
 `hoveredAssignmentSource=trainable_kernel_model_artifact` 一致。该切片不引入 torch /
 gsplat / CUDA，不改变训练 blocker，不替换 viewer renderer，不提交训练输出或大资产。
 
+`OBJECT-STABILITY-METRICS-001` 已完成 Phase 1 Debug OS 的 purity / temporal
+metric evidence：`trainable-mvp-debug` fixture 现在是 2-frame
+`objgauss-trainable-kernel-model-artifact-v1`，携带相邻帧 assignment matrix、
+derived object ids 和 ObjectState centroid。`src/App.jsx` 在加载 trainable artifact
+时从 dominant assignment rows 与 `derived_object_ids` 推导 per-object purity，并从相邻
+ObjectState centroid 推导 temporal drift；Stability dashboard、`.worldShell` telemetry
+和 `window.__OBJGAUSS_WORLD__.stabilitySummary` 都暴露 `meanPurity` 与
+`meanTemporalDrift`。`scripts/audit-world-viewer.mjs` 现在要求 trainable artifact 路径
+下 purity / temporal metrics 均可用，验收输出为 `purity=1`、
+`temporalDrift=0.018`。该切片不改变 Python 训练算法、不引入 torch / gsplat / CUDA、
+不替换 viewer renderer，不提交 `/tmp` 训练产物。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

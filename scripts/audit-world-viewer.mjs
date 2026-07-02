@@ -29,6 +29,8 @@ try {
       `stability=${summary.stabilityStatus}`,
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
+      `purity=${summary.meanPurity}`,
+      `temporalDrift=${summary.meanTemporalDrift}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -205,7 +207,11 @@ async function auditWorld(url) {
         heatmap?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
         stability?.getAttribute("data-stability-status") === shell?.getAttribute("data-stability-status") &&
-        Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0
+        Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0 &&
+        stability?.getAttribute("data-purity-available") === "true" &&
+        stability?.getAttribute("data-temporal-available") === "true" &&
+        Number(stability?.getAttribute("data-mean-purity") ?? 0) > 0 &&
+        Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0) > 0
       );
     }, undefined, { timeout: 15000 });
     if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
@@ -289,6 +295,12 @@ async function auditWorld(url) {
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
+        meanPurity: handle.stabilitySummary?.meanPurity ?? null,
+        meanTemporalDrift: handle.stabilitySummary?.meanTemporalDrift ?? null,
+        shellMeanPurity: Number(shell?.getAttribute("data-stability-mean-purity") ?? 0),
+        shellMeanTemporalDrift: Number(shell?.getAttribute("data-stability-mean-temporal-drift") ?? 0),
+        dashboardMeanPurity: Number(stability?.getAttribute("data-mean-purity") ?? 0),
+        dashboardMeanTemporalDrift: Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0),
         hoveredId: handle.hoveredId,
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
@@ -305,6 +317,16 @@ async function auditWorld(url) {
     }
     if (!(Number(world.slotUtilization) > 0)) {
       throw new Error(`expected positive slot utilization, got ${world.slotUtilization}`);
+    }
+    if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
+      throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      Number(world.meanTemporalDrift) > 0 &&
+      Number(world.dashboardMeanTemporalDrift) > 0 &&
+      Number(world.shellMeanTemporalDrift) > 0
+    )) {
+      throw new Error(`expected temporal drift metric to be available: ${JSON.stringify(world)}`);
     }
     if (world.hoveredId !== world.shellHoveredTarget) {
       throw new Error(`hover audit mismatch: ${JSON.stringify(world)}`);
@@ -331,6 +353,8 @@ async function auditWorld(url) {
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
+      meanPurity: world.meanPurity,
+      meanTemporalDrift: world.meanTemporalDrift,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
