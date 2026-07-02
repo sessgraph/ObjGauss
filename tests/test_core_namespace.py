@@ -9,17 +9,22 @@ from objgauss.core import (
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
+    TrainableKernelCamera,
+    TrainableKernelImageTarget,
     TrainableKernelResult,
     TrainableKernelSample,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
+    bind_image_targets_to_frames,
     bind_object_states_to_artifact,
     build_chunk_index,
     cluster_features,
     dynamic_k_proposal_report,
     initialize_object_field,
+    image_target_contract_summary,
+    make_trainable_image_target,
     make_trainable_kernel_mvp_fixture,
     match_object_states,
     object_state_delivery_summary,
@@ -30,7 +35,9 @@ from objgauss.core import (
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
     trainable_kernel_sample_from_cloud,
+    validate_image_target_contract_summary,
     validate_renderer_loss_boundary_summary,
+    validate_trainable_image_target,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
@@ -187,6 +194,14 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     renderer_report = renderer_loss_boundary_report(sample_result.as_dict())
     assert isinstance(renderer_report, RendererLossBoundaryReport)
     assert validate_renderer_loss_boundary_summary(renderer_report.as_dict()) is True
+    image_target = make_trainable_image_target(make_trainable_kernel_mvp_fixture()[0], width=6, height=5)
+    assert isinstance(image_target, TrainableKernelImageTarget)
+    assert isinstance(image_target.camera, TrainableKernelCamera)
+    assert validate_trainable_image_target(image_target) is True
+    bound_frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=6, height=5)
+    image_contract = image_target_contract_summary(tuple(frame.image_target for frame in bound_frames))
+    assert image_contract["status"] == "image_targets_bound"
+    assert validate_image_target_contract_summary(image_contract) is True
 
 
 def _tiny_cloud() -> GaussianCloud:

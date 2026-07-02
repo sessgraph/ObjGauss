@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -10,7 +11,61 @@ from objgauss.core.features import colors, extract_features, positions
 from objgauss.core.object_state import ObjectStateProjection, project_object_states
 
 TRAINABLE_KERNEL_MVP_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
+TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA = "objgauss-train-image-target-contract-v1"
+TRAINABLE_IMAGE_TARGET_SCHEMA = "objgauss-train-image-target-v1"
 _EPS = 1e-8
+
+
+@dataclass(frozen=True)
+class TrainableKernelCamera:
+    width: int
+    height: int
+    intrinsics: np.ndarray
+    camera_to_world: np.ndarray
+    projection_model: str = "orthographic_xy_debug_v1"
+    convention: str = "pixel_centers_y_down_camera_to_world"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "width": int(self.width),
+            "height": int(self.height),
+            "projection_model": self.projection_model,
+            "convention": self.convention,
+            "intrinsics": np.round(self.intrinsics, 6).tolist(),
+            "camera_to_world": np.round(self.camera_to_world, 6).tolist(),
+        }
+
+
+@dataclass(frozen=True)
+class TrainableKernelImageTarget:
+    image: np.ndarray
+    camera: TrainableKernelCamera
+    visibility_mask: np.ndarray
+    visibility_policy: str = "covered_pixels"
+    color_space: str = "linear_rgb"
+    source: str = "synthetic_point_splat_debug"
+
+    def as_dict(self) -> dict[str, Any]:
+        image = _image_array(self.image, "image_target.image")
+        mask = _visibility_mask_array(
+            self.visibility_mask,
+            "image_target.visibility_mask",
+            height=image.shape[0],
+            width=image.shape[1],
+        )
+        return {
+            "schema": TRAINABLE_IMAGE_TARGET_SCHEMA,
+            "kind": "image_space_rgb",
+            "shape": [int(image.shape[0]), int(image.shape[1]), int(image.shape[2])],
+            "dtype": "float32",
+            "color_space": self.color_space,
+            "visibility_policy": self.visibility_policy,
+            "visibility_coverage": float(np.mean(mask)),
+            "image_sha256": _array_sha256(image),
+            "mean_rgb": np.round(np.mean(image, axis=(0, 1)), 6).tolist(),
+            "camera": self.camera.as_dict(),
+            "source": self.source,
+        }
 
 
 @dataclass(frozen=True)
@@ -19,6 +74,7 @@ class TrainableKernelFrame:
     features: np.ndarray
     target_rgb: np.ndarray
     target_assignment: np.ndarray | None = None
+    image_target: TrainableKernelImageTarget | None = None
 
 
 @dataclass(frozen=True)
@@ -56,8 +112,10 @@ class TrainableKernelResult:
     object_state_projections: tuple[ObjectStateProjection, ...]
     rendered_rgb: tuple[np.ndarray, ...]
     decoder_colors: np.ndarray
+    image_targets: tuple[TrainableKernelImageTarget | None, ...]
 
     def as_dict(self) -> dict[str, Any]:
+        image_contract = image_target_contract_summary(self.image_targets)
         return {
             "schema": self.schema,
             "slots": int(self.slots),
@@ -73,6 +131,12 @@ class TrainableKernelResult:
             "final_loss": self.final_loss.as_dict(),
             "loss_decreased": bool(self.final_loss.total_loss < self.initial_loss.total_loss),
             "render_loss_decreased": bool(self.final_loss.render_loss < self.initial_loss.render_loss),
+            "render_target_mode": (
+                "image_space_targets_bound"
+                if image_contract["status"] == "image_targets_bound"
+                else "point_rgb_rows"
+            ),
+            "image_target_contract": image_contract,
             "decoder_colors": np.round(self.decoder_colors, 6).tolist(),
             "object_states": [
                 [
@@ -106,6 +170,9 @@ class TrainableKernelSample:
             "source_count": int(self.source_count),
             "sampled_count": int(self.sampled_count),
             "target_source": self.target_source,
+            "image_target_contract": image_target_contract_summary(
+                tuple(frame.image_target for frame in self.frames)
+            ),
             "object_id_mapping": {
                 str(object_id): int(slot)
                 for object_id, slot in self.object_id_mapping.items()
@@ -119,6 +186,7 @@ class _ValidatedFrame:
     features: np.ndarray
     target_rgb: np.ndarray
     object_targets: np.ndarray
+    image_target: TrainableKernelImageTarget | None
     cloud: GaussianCloud
 
 
@@ -246,6 +314,7 @@ def train_kernel_mvp(
         object_state_projections=final.projections,
         rendered_rgb=final.rendered_rgb,
         decoder_colors=final.decoder_colors,
+        image_targets=tuple(frame.image_target for frame in validated),
     )
 
 
@@ -257,6 +326,11 @@ def train_kernel_mvp_from_cloud(
     max_points: int | None = 24,
     object_id_field: str = "object_id",
     temporal_offset: float = 0.01,
+    bind_image_targets: bool = False,
+    image_width: int = 16,
+    image_height: int = 16,
+    point_radius: int = 1,
+    visibility_policy: str = "covered_pixels",
     seed: int = 0,
     iterations: int = 40,
     learning_rate: float = 0.35,
@@ -273,6 +347,11 @@ def train_kernel_mvp_from_cloud(
         max_points=max_points,
         object_id_field=object_id_field,
         temporal_offset=temporal_offset,
+        bind_image_targets=bind_image_targets,
+        image_width=image_width,
+        image_height=image_height,
+        point_radius=point_radius,
+        visibility_policy=visibility_policy,
         seed=seed,
     )
     result = train_kernel_mvp(
@@ -298,6 +377,11 @@ def trainable_kernel_sample_from_cloud(
     max_points: int | None = 24,
     object_id_field: str = "object_id",
     temporal_offset: float = 0.01,
+    bind_image_targets: bool = False,
+    image_width: int = 16,
+    image_height: int = 16,
+    point_radius: int = 1,
+    visibility_policy: str = "covered_pixels",
     seed: int = 0,
 ) -> TrainableKernelSample:
     if cloud.count == 0:
@@ -308,6 +392,12 @@ def trainable_kernel_sample_from_cloud(
         raise ValueError("max_points must be >= 1")
     if temporal_offset < 0:
         raise ValueError("temporal_offset must be >= 0")
+    if image_width < 1:
+        raise ValueError("image_width must be >= 1")
+    if image_height < 1:
+        raise ValueError("image_height must be >= 1")
+    if point_radius < 0:
+        raise ValueError("point_radius must be >= 0")
 
     object_ids = _object_ids_or_none(cloud, object_id_field)
     resolved_slots, object_mapping, target_source = _resolve_sample_slots(
@@ -344,6 +434,15 @@ def trainable_kernel_sample_from_cloud(
         )
         for frame_index in range(frame_count)
     )
+    if bind_image_targets:
+        frames = bind_image_targets_to_frames(
+            frames,
+            width=image_width,
+            height=image_height,
+            point_radius=point_radius,
+            visibility_policy=visibility_policy,
+            source="sampled_gaussian_point_splat_debug",
+        )
     return TrainableKernelSample(
         frames=frames,
         slots=resolved_slots,
@@ -386,6 +485,179 @@ def make_trainable_kernel_mvp_fixture() -> tuple[TrainableKernelFrame, ...]:
         TrainableKernelFrame(positions=positions_0, features=features_0, target_rgb=target),
         TrainableKernelFrame(positions=positions_1, features=features_1, target_rgb=target),
     )
+
+
+def bind_image_targets_to_frames(
+    frames: Sequence[TrainableKernelFrame],
+    *,
+    width: int = 16,
+    height: int = 16,
+    point_radius: int = 1,
+    visibility_policy: str = "covered_pixels",
+    source: str = "synthetic_point_splat_debug",
+) -> tuple[TrainableKernelFrame, ...]:
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    if height < 1:
+        raise ValueError("height must be >= 1")
+    if point_radius < 0:
+        raise ValueError("point_radius must be >= 0")
+    return tuple(
+        TrainableKernelFrame(
+            positions=frame.positions,
+            features=frame.features,
+            target_rgb=frame.target_rgb,
+            target_assignment=frame.target_assignment,
+            image_target=make_trainable_image_target(
+                frame,
+                width=width,
+                height=height,
+                point_radius=point_radius,
+                visibility_policy=visibility_policy,
+                source=source,
+            ),
+        )
+        for frame in frames
+    )
+
+
+def make_trainable_image_target(
+    frame: TrainableKernelFrame,
+    *,
+    width: int = 16,
+    height: int = 16,
+    point_radius: int = 1,
+    visibility_policy: str = "covered_pixels",
+    source: str = "synthetic_point_splat_debug",
+) -> TrainableKernelImageTarget:
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    if height < 1:
+        raise ValueError("height must be >= 1")
+    if point_radius < 0:
+        raise ValueError("point_radius must be >= 0")
+    positions_2d = _array2d(frame.positions, "frame.positions", columns=3)
+    target_rgb = _array2d(frame.target_rgb, "frame.target_rgb", columns=3)
+    if positions_2d.shape[0] != target_rgb.shape[0]:
+        raise ValueError("frame.target_rgb rows must match positions")
+
+    pixels, intrinsics = _orthographic_pixels(positions_2d, width=width, height=height)
+    image = np.zeros((height, width, 3), dtype=np.float32)
+    counts = np.zeros((height, width), dtype=np.float32)
+    for pixel, color in zip(pixels, np.clip(target_rgb, 0.0, 1.0), strict=True):
+        px, py = int(pixel[0]), int(pixel[1])
+        for y in range(max(0, py - point_radius), min(height, py + point_radius + 1)):
+            for x in range(max(0, px - point_radius), min(width, px + point_radius + 1)):
+                image[y, x] += color
+                counts[y, x] += 1.0
+    covered = counts > 0
+    image[covered] = image[covered] / counts[covered, None]
+    if visibility_policy == "covered_pixels":
+        visibility_mask = covered
+    elif visibility_policy == "all_pixels":
+        visibility_mask = np.ones((height, width), dtype=bool)
+    else:
+        raise ValueError("visibility_policy must be 'covered_pixels' or 'all_pixels'")
+    camera = TrainableKernelCamera(
+        width=width,
+        height=height,
+        intrinsics=intrinsics,
+        camera_to_world=np.eye(4, dtype=np.float32),
+    )
+    target = TrainableKernelImageTarget(
+        image=image,
+        camera=camera,
+        visibility_mask=visibility_mask,
+        visibility_policy=visibility_policy,
+        source=source,
+    )
+    validate_trainable_image_target(target)
+    return target
+
+
+def image_target_contract_summary(
+    image_targets: Sequence[TrainableKernelImageTarget | None],
+) -> dict[str, Any]:
+    targets = [
+        target.as_dict() if target is not None else None
+        for target in image_targets
+    ]
+    bound = [target for target in targets if target is not None]
+    blockers: list[str] = []
+    if not targets:
+        blockers.append("no_frames")
+    elif len(bound) != len(targets):
+        blockers.append("missing_image_target_for_some_frames")
+    status = "image_targets_bound" if targets and not blockers else "point_targets_only"
+    visibility_policies = sorted(
+        {str(target["visibility_policy"]) for target in bound}
+    )
+    return {
+        "schema": TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA,
+        "status": status,
+        "frame_count": len(targets),
+        "target_kind": "image_space_rgb",
+        "targets_bound": len(bound),
+        "targets": targets,
+        "camera_contract": {
+            "required": ["width", "height", "intrinsics", "camera_to_world", "projection_model"],
+            "projection_model": "orthographic_xy_debug_v1",
+            "extrinsics_convention": "camera_to_world_4x4",
+        },
+        "visibility_policies": visibility_policies,
+        "loss_telemetry_contract": {
+            "required_terms": ["image_render_loss", "visibility_policy", "renderer_name"],
+            "still_required_for_training": ["renderer_gradient_path"],
+        },
+        "blockers": blockers,
+    }
+
+
+def validate_trainable_image_target(target: TrainableKernelImageTarget) -> bool:
+    image = _image_array(target.image, "image_target.image")
+    mask = _visibility_mask_array(
+        target.visibility_mask,
+        "image_target.visibility_mask",
+        height=image.shape[0],
+        width=image.shape[1],
+    )
+    camera = target.camera
+    if camera.width != image.shape[1] or camera.height != image.shape[0]:
+        raise ValueError("image_target camera width/height must match image shape")
+    intrinsics = np.asarray(camera.intrinsics, dtype=np.float32)
+    camera_to_world = np.asarray(camera.camera_to_world, dtype=np.float32)
+    if intrinsics.shape != (3, 3):
+        raise ValueError("image_target camera intrinsics must have shape 3x3")
+    if camera_to_world.shape != (4, 4):
+        raise ValueError("image_target camera_to_world must have shape 4x4")
+    if not np.isfinite(intrinsics).all() or not np.isfinite(camera_to_world).all():
+        raise ValueError("image_target camera matrices must be finite")
+    if target.visibility_policy not in {"covered_pixels", "all_pixels"}:
+        raise ValueError("image_target visibility_policy is unsupported")
+    if not mask.any():
+        raise ValueError("image_target visibility_mask must supervise at least one pixel")
+    return True
+
+
+def validate_image_target_contract_summary(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        raise TypeError("image target contract summary must be a dict")
+    if payload.get("schema") != TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA:
+        raise ValueError(f"unsupported image target contract schema: {payload.get('schema')}")
+    required = (
+        "status",
+        "frame_count",
+        "target_kind",
+        "targets_bound",
+        "camera_contract",
+        "visibility_policies",
+        "loss_telemetry_contract",
+        "blockers",
+    )
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise ValueError(f"image target contract missing keys: {', '.join(missing)}")
+    return True
 
 
 def _object_ids_or_none(cloud: GaussianCloud, field: str) -> np.ndarray | None:
@@ -557,10 +829,25 @@ def _validate_frames(frames: Sequence[TrainableKernelFrame], *, slots: int) -> t
                 features=features,
                 target_rgb=np.clip(target_rgb, 0.0, 1.0),
                 object_targets=object_targets,
+                image_target=_validated_image_target(frame.image_target, index=index),
                 cloud=_cloud_from_positions(positions),
             )
         )
     return tuple(validated)
+
+
+def _validated_image_target(
+    target: TrainableKernelImageTarget | None,
+    *,
+    index: int,
+) -> TrainableKernelImageTarget | None:
+    if target is None:
+        return None
+    try:
+        validate_trainable_image_target(target)
+    except ValueError as exc:
+        raise ValueError(f"frames[{index}].image_target invalid: {exc}") from exc
+    return target
 
 
 def _assignment_targets(
@@ -605,6 +892,68 @@ def _array2d(value: np.ndarray, label: str, *, columns: int | None = None) -> np
     if not np.isfinite(array).all():
         raise ValueError(f"{label} must contain only finite values")
     return array
+
+
+def _image_array(value: np.ndarray, label: str) -> np.ndarray:
+    array = np.asarray(value, dtype=np.float32)
+    if array.ndim != 3 or array.shape[2] != 3:
+        raise ValueError(f"{label} must have shape HxWx3")
+    if array.shape[0] < 1 or array.shape[1] < 1:
+        raise ValueError(f"{label} must have positive width and height")
+    if not np.isfinite(array).all():
+        raise ValueError(f"{label} must contain only finite values")
+    if np.any(array < 0.0) or np.any(array > 1.0):
+        raise ValueError(f"{label} values must be in [0, 1]")
+    return array
+
+
+def _visibility_mask_array(
+    value: np.ndarray,
+    label: str,
+    *,
+    height: int,
+    width: int,
+) -> np.ndarray:
+    array = np.asarray(value, dtype=bool)
+    if array.shape != (height, width):
+        raise ValueError(f"{label} must have shape {height}x{width}")
+    return array
+
+
+def _orthographic_pixels(
+    positions_xyz: np.ndarray,
+    *,
+    width: int,
+    height: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    xy = np.asarray(positions_xyz[:, :2], dtype=np.float32)
+    min_xy = np.min(xy, axis=0)
+    max_xy = np.max(xy, axis=0)
+    span = np.maximum(max_xy - min_xy, np.array([_EPS, _EPS], dtype=np.float32))
+    scale_x = 0.0 if width == 1 else (width - 1) / float(span[0])
+    scale_y = 0.0 if height == 1 else (height - 1) / float(span[1])
+    px = np.zeros(xy.shape[0], dtype=np.float32) if width == 1 else (xy[:, 0] - min_xy[0]) * scale_x
+    py = np.zeros(xy.shape[0], dtype=np.float32) if height == 1 else (max_xy[1] - xy[:, 1]) * scale_y
+    pixels = np.column_stack(
+        [
+            np.clip(np.rint(px), 0, width - 1).astype(np.int32),
+            np.clip(np.rint(py), 0, height - 1).astype(np.int32),
+        ]
+    )
+    intrinsics = np.array(
+        [
+            [scale_x, 0.0, -float(min_xy[0]) * scale_x],
+            [0.0, -scale_y, float(max_xy[1]) * scale_y],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    return pixels, intrinsics
+
+
+def _array_sha256(array: np.ndarray) -> str:
+    contiguous = np.ascontiguousarray(array.astype(np.float32, copy=False))
+    return hashlib.sha256(contiguous.tobytes()).hexdigest()
 
 
 def _cloud_from_positions(positions: np.ndarray) -> GaussianCloud:

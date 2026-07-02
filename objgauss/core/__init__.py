@@ -19,7 +19,12 @@ _EXPORTS = {
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
     "DynamicKProposal": ("objgauss.core.object_state", "DynamicKProposal"),
     "DynamicKProposalReport": ("objgauss.core.object_state", "DynamicKProposalReport"),
+    "TrainableKernelCamera": ("objgauss.core.trainable_kernel", "TrainableKernelCamera"),
     "TrainableKernelFrame": ("objgauss.core.trainable_kernel", "TrainableKernelFrame"),
+    "TrainableKernelImageTarget": (
+        "objgauss.core.trainable_kernel",
+        "TrainableKernelImageTarget",
+    ),
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
     "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
@@ -35,11 +40,19 @@ _EXPORTS = {
     "compare_baseline_candidates": ("objgauss.core.evaluation", "compare_baseline_candidates"),
     "filter_objects": ("objgauss.core.objects", "filter_objects"),
     "initialize_object_field": ("objgauss.core.object_field", "initialize_object_field"),
+    "bind_image_targets_to_frames": (
+        "objgauss.core.trainable_kernel",
+        "bind_image_targets_to_frames",
+    ),
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
     "dynamic_k_proposal_report": ("objgauss.core.object_state", "dynamic_k_proposal_report"),
     "make_trainable_kernel_mvp_fixture": (
         "objgauss.core.trainable_kernel",
         "make_trainable_kernel_mvp_fixture",
+    ),
+    "make_trainable_image_target": (
+        "objgauss.core.trainable_kernel",
+        "make_trainable_image_target",
     ),
     "match_object_states": ("objgauss.core.object_state", "match_object_states"),
     "object_emergence_metrics": ("objgauss.core.evaluation", "object_emergence_metrics"),
@@ -55,6 +68,10 @@ _EXPORTS = {
         "renderer_loss_boundary_report",
     ),
     "score_mask_manifest_with_clip": ("objgauss.core.semantics", "score_mask_manifest_with_clip"),
+    "image_target_contract_summary": (
+        "objgauss.core.trainable_kernel",
+        "image_target_contract_summary",
+    ),
     "train_kernel_mvp": ("objgauss.core.trainable_kernel", "train_kernel_mvp"),
     "train_kernel_mvp_from_cloud": (
         "objgauss.core.trainable_kernel",
@@ -66,6 +83,14 @@ _EXPORTS = {
     ),
     "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
+    "validate_image_target_contract_summary": (
+        "objgauss.core.trainable_kernel",
+        "validate_image_target_contract_summary",
+    ),
+    "validate_trainable_image_target": (
+        "objgauss.core.trainable_kernel",
+        "validate_trainable_image_target",
+    ),
     "validate_renderer_loss_boundary_summary": (
         "objgauss.core.renderer_loss",
         "validate_renderer_loss_boundary_summary",

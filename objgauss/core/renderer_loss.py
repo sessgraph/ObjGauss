@@ -53,6 +53,17 @@ def renderer_loss_boundary_report(
     status = "point_render_smoke_ready" if point_ready else "contract_defined"
     if kernel_summary is not None and point_blockers:
         status = "point_render_smoke_blocked"
+    upgrade_blockers = []
+    if not evidence.get("image_targets_bound"):
+        upgrade_blockers.append("image_space_targets_not_bound")
+    upgrade_blockers.extend(
+        [
+            "differentiable_gaussian_renderer_not_selected",
+            "renderer_gradient_path_not_defined",
+        ]
+    )
+    if not evidence.get("image_target_visibility_policies"):
+        upgrade_blockers.append("camera_visibility_policy_not_bound")
     return RendererLossBoundaryReport(
         schema=RENDERER_LOSS_BOUNDARY_SCHEMA,
         status=status,
@@ -104,12 +115,7 @@ def renderer_loss_boundary_report(
         },
         evidence=evidence,
         point_smoke_blockers=tuple(point_blockers),
-        upgrade_blockers=(
-            "image_space_targets_not_bound",
-            "differentiable_gaussian_renderer_not_selected",
-            "renderer_gradient_path_not_defined",
-            "camera_visibility_policy_not_bound",
-        ),
+        upgrade_blockers=tuple(upgrade_blockers),
         next_steps=(
             "bind trainable frames to camera/image targets",
             "define image-space renderer API and telemetry",
@@ -158,6 +164,12 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
     if not render_loss_decreased:
         blockers.append("render_loss_not_decreased")
     sample = kernel_summary.get("sample") if isinstance(kernel_summary.get("sample"), dict) else {}
+    image_target_contract = (
+        kernel_summary.get("image_target_contract")
+        if isinstance(kernel_summary.get("image_target_contract"), dict)
+        else {}
+    )
+    image_targets_bound = image_target_contract.get("status") == "image_targets_bound"
     evidence = {
         "kind": "trainable_kernel_summary",
         "schema": kernel_summary.get("schema"),
@@ -166,6 +178,9 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         "sampled_count": _optional_int(sample.get("sampled_count")),
         "source_count": _optional_int(sample.get("source_count")),
         "target_source": sample.get("target_source"),
+        "image_targets_bound": image_targets_bound,
+        "image_target_contract_schema": image_target_contract.get("schema"),
+        "image_target_visibility_policies": image_target_contract.get("visibility_policies", []),
         "initial_total_loss": initial["total_loss"],
         "final_total_loss": final["total_loss"],
         "initial_render_loss": initial["render_loss"],

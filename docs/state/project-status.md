@@ -331,6 +331,21 @@ Three.js / viewer renderer。`objgauss training renderer-loss-contract` 可读�
 该步骤仍不引入 torch / GPU renderer / differentiable rasterizer，不提交训练输出，
 不把 point-render smoke 宣称为完整 3DGS training。
 
+`TRAIN-IMAGE-TARGET-001` 已完成 image / camera target ABI 绑定：
+`objgauss/core/trainable_kernel.py` 新增 `objgauss-train-image-target-contract-v1`
+和 `objgauss-train-image-target-v1`，在 `TrainableKernelFrame` 上挂载可选
+`TrainableKernelImageTarget`，包含 `H x W x 3` float32 image target、visibility
+mask / policy、orthographic debug camera intrinsics 和 `camera_to_world`。`kernel-sample`
+新增 `--bind-image-targets`、`--image-width`、`--image-height`、`--point-radius`
+和 `--visibility-policy`，可从小型 object-aware PLY 生成 deterministic image-space
+target summary。`renderer_loss_boundary_report(...)` 现在能识别
+`image_target_contract.status=image_targets_bound`，并移除
+`image_space_targets_not_bound` 与 `camera_visibility_policy_not_bound` blockers；
+剩余 blockers 明确收敛为 `differentiable_gaussian_renderer_not_selected` 和
+`renderer_gradient_path_not_defined`。该步骤仍不引入 torch / GPU renderer /真实
+differentiable rasterizer，不替换 Three.js / Spark / WebGPU viewer renderer，不提交
+训练输出或大资产。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

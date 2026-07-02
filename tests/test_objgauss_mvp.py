@@ -2483,6 +2483,11 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
                 "0.35",
                 "--max-points",
                 "4",
+                "--bind-image-targets",
+                "--image-width",
+                "10",
+                "--image-height",
+                "8",
                 "--seed",
                 "6",
                 "--summary-output",
@@ -2498,10 +2503,15 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
 
     assert "target_source=object_id_one_hot_targets" in output
     assert "sampled_gaussians=4" in output
+    assert "render_target_mode=image_space_targets_bound" in output
+    assert "image_targets_status=image_targets_bound" in output
+    assert "visibility_policy=covered_pixels" in output
     assert "loss_decreased=true" in output
     assert summary["loss_decreased"] is True
     assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
     assert summary["sample"]["sampled_count"] == 4
+    assert summary["image_target_contract"]["status"] == "image_targets_bound"
+    assert summary["image_target_contract"]["targets"][0]["shape"] == [8, 10, 3]
 
     assert (
         main(
@@ -2525,8 +2535,11 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "point_smoke_ready=true" in boundary_output
     assert boundary["schema"] == "objgauss-renderer-loss-boundary-v1"
     assert boundary["point_smoke_ready"] is True
+    assert boundary["evidence"]["image_targets_bound"] is True
     assert boundary["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
     assert boundary["render_target_contract"]["target"]["kind"] == "image_space_render"
+    assert "image_space_targets_not_bound" not in boundary["upgrade_blockers"]
+    assert "camera_visibility_policy_not_bound" not in boundary["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" in boundary["upgrade_blockers"]
 
 

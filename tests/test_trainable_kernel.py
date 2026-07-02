@@ -6,11 +6,15 @@ import pytest
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.trainable_kernel import (
     TRAINABLE_KERNEL_MVP_SCHEMA,
+    TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA,
     TrainableKernelFrame,
+    bind_image_targets_to_frames,
+    image_target_contract_summary,
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
     trainable_kernel_sample_from_cloud,
+    validate_image_target_contract_summary,
 )
 
 
@@ -93,6 +97,50 @@ def test_trainable_kernel_from_cloud_reduces_sample_loss():
     assert result.object_state_projections[0].states[0].status == "active"
 
 
+def test_trainable_image_targets_bind_camera_and_visibility_contract():
+    frames = bind_image_targets_to_frames(
+        make_trainable_kernel_mvp_fixture(),
+        width=12,
+        height=10,
+        point_radius=1,
+    )
+
+    assert all(frame.image_target is not None for frame in frames)
+    target = frames[0].image_target
+    assert target is not None
+    assert target.image.shape == (10, 12, 3)
+    assert target.visibility_mask.shape == (10, 12)
+    assert np.mean(target.visibility_mask) > 0
+    assert target.camera.width == 12
+    assert target.camera.height == 10
+    assert target.camera.intrinsics.shape == (3, 3)
+    assert target.camera.camera_to_world.shape == (4, 4)
+
+    summary = image_target_contract_summary(tuple(frame.image_target for frame in frames))
+    assert summary["schema"] == TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA
+    assert summary["status"] == "image_targets_bound"
+    assert summary["targets_bound"] == 2
+    assert summary["visibility_policies"] == ["covered_pixels"]
+    assert validate_image_target_contract_summary(summary) is True
+
+
+def test_trainable_kernel_summary_marks_bound_image_targets():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    result = train_kernel_mvp(
+        frames,
+        slots=2,
+        iterations=12,
+        learning_rate=0.4,
+        seed=5,
+    )
+    summary = result.as_dict()
+
+    assert summary["render_target_mode"] == "image_space_targets_bound"
+    assert summary["image_target_contract"]["status"] == "image_targets_bound"
+    assert summary["image_target_contract"]["targets"][0]["shape"] == [8, 8, 3]
+    assert result.final_loss.total_loss < result.initial_loss.total_loss
+
+
 def test_trainable_kernel_sample_requires_slots_without_object_ids():
     cloud = _object_cloud(include_object_ids=False)
 
@@ -104,6 +152,24 @@ def test_trainable_kernel_sample_requires_slots_without_object_ids():
     assert sample.target_source == "feature_quantile_pseudo_targets"
     assert sample.object_id_mapping == {}
     assert sample.frames[0].target_assignment is None
+
+
+def test_trainable_kernel_sample_can_bind_image_targets():
+    result, sample = train_kernel_mvp_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=4,
+        bind_image_targets=True,
+        image_width=10,
+        image_height=9,
+        iterations=12,
+        learning_rate=0.4,
+        seed=7,
+    )
+
+    assert sample.frames[0].image_target is not None
+    assert sample.as_dict()["image_target_contract"]["status"] == "image_targets_bound"
+    assert result.as_dict()["image_target_contract"]["targets_bound"] == 2
 
 
 def _object_cloud(*, include_object_ids: bool = True) -> GaussianCloud:

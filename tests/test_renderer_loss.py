@@ -8,7 +8,11 @@ from objgauss.core.renderer_loss import (
     renderer_loss_boundary_report,
     validate_renderer_loss_boundary_summary,
 )
-from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
+from objgauss.core.trainable_kernel import (
+    bind_image_targets_to_frames,
+    make_trainable_kernel_mvp_fixture,
+    train_kernel_mvp,
+)
 
 
 def test_renderer_loss_boundary_accepts_trainable_kernel_summary():
@@ -34,6 +38,25 @@ def test_renderer_loss_boundary_accepts_trainable_kernel_summary():
     assert payload["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
     assert payload["render_target_contract"]["target"]["kind"] == "image_space_render"
     assert validate_renderer_loss_boundary_summary(payload) is True
+
+
+def test_renderer_loss_boundary_clears_image_target_blockers_when_bound():
+    result = train_kernel_mvp(
+        bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8),
+        slots=2,
+        iterations=12,
+        learning_rate=0.4,
+        seed=6,
+    )
+
+    report = renderer_loss_boundary_report(result.as_dict())
+    payload = report.as_dict()
+
+    assert payload["point_smoke_ready"] is True
+    assert payload["evidence"]["image_targets_bound"] is True
+    assert "image_space_targets_not_bound" not in payload["upgrade_blockers"]
+    assert "camera_visibility_policy_not_bound" not in payload["upgrade_blockers"]
+    assert "differentiable_gaussian_renderer_not_selected" in payload["upgrade_blockers"]
 
 
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():

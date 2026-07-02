@@ -1115,6 +1115,11 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         max_points=args.max_points,
         object_id_field=args.object_id_field,
         temporal_offset=args.temporal_offset,
+        bind_image_targets=args.bind_image_targets,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         render_weight=args.render_weight,
@@ -1135,6 +1140,12 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"frames={summary['frame_count']}")
     print(f"slots={summary['slots']}")
     print(f"target_source={sample.target_source}")
+    print(f"render_target_mode={summary['render_target_mode']}")
+    image_contract = summary["image_target_contract"]
+    print(f"image_targets_status={image_contract['status']}")
+    print(f"image_targets_bound={image_contract['targets_bound']}")
+    if image_contract["visibility_policies"]:
+        print(f"visibility_policy={image_contract['visibility_policies'][0]}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
@@ -2006,6 +2017,15 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--max-points", type=int, default=24)
     kernel_sample.add_argument("--object-id-field", default="object_id")
     kernel_sample.add_argument("--temporal-offset", type=float, default=0.01)
+    kernel_sample.add_argument("--bind-image-targets", action="store_true")
+    kernel_sample.add_argument("--image-width", type=int, default=16)
+    kernel_sample.add_argument("--image-height", type=int, default=16)
+    kernel_sample.add_argument("--point-radius", type=int, default=1)
+    kernel_sample.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
     kernel_sample.add_argument("--iterations", type=int, default=40)
     kernel_sample.add_argument("--learning-rate", type=float, default=0.35)
     kernel_sample.add_argument("--render-weight", type=float, default=1.0)
