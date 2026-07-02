@@ -297,29 +297,15 @@ voting for the ignored local `outputs/training/nerf-lego-splatfacto-smoke/`
 handoff. See `docs/training/splatfacto-smoke.md` for CUDA / `gsplat` notes and
 the full output contract.
 
-Run the browser audit for the closure cards:
+Run the browser audit for the current Three.js world viewer:
 
 ```bash
-npm run audit:demo
+npm run audit:world-viewer
 ```
 
-The audit starts a temporary Vite server, loads `Plush 2D 语义 Mask 闭环样例`,
-`ObjGauss v1 闭环样例`, and `NeRF Lego 闭环代理样例`, checks that the splat and
-point-edit canvases are non-empty, and exercises object selection, isolation,
-and delete preview.
-
-Run the full local acceptance loop:
-
-```bash
-npm run acceptance:demo
-```
-
-This rebuilds the Plush v1 closure demo, verifies it, rebuilds the Plush
-semantic closure demo, verifies it, rebuilds the NeRF Lego proxy closure demo,
-verifies it, runs the browser audit, and then runs the semantic emergence
-benchmark suite. Use
-`npm run acceptance:demo -- --pull-assets` on a machine that still needs to
-download the local Plush and NeRF Lego assets.
+The audit starts a temporary Vite server, checks the full-screen Three.js /
+VR-like world shell, verifies that there are no sidebars, confirms the frosted
+HUD and per-object draggable targets, and writes a screenshot to `/tmp/`.
 
 The semantic benchmark acceptance target can also be run directly:
 
@@ -339,11 +325,7 @@ uv run objgauss object-field emergence-benchmark \
 That manifest expects local ignored outputs for Plush semantic, Lego alpha
 proxy, and Lego Splatfacto smoke. If a machine does not yet have the Splatfacto
 smoke output, run `npm run train:splatfacto:smoke -- --dry-run` and then follow
-`docs/training/splatfacto-smoke.md`. For the older demo-only loop:
-
-```bash
-npm run acceptance:demo -- --skip-semantic-benchmark
-```
+`docs/training/splatfacto-smoke.md`.
 
 Audit the current evidence against the phase goal:
 
@@ -362,15 +344,15 @@ but it is no longer the only accepted evidence for the phase goal.
 
 素材库入口：
 
-- Frontend data: `src/assetLibrary.js`
+- Default world viewer catalog: `src/modelCatalog.js`
+- Legacy / pipeline asset registry: `src/assetLibrary.js`
 - Handoff docs: `docs/asset-library.md`
 - Local preview sample: `public/samples/plush_objects.ply`
 
-The viewer shows featured assets in the left-side 素材库 panel. Assets with
-`localPath` can be loaded directly; candidate sources link to their upstream
-dataset pages and should be downloaded outside the git repo.
-Asset entries also distinguish training sources from demo-ready samples so
-research datasets do not get mixed into public demos by accident.
+The default viewer now opens directly into the Three.js world. `src/modelCatalog.js`
+controls the models shown as in-world exhibits. `src/assetLibrary.js` remains a
+pipeline / compatibility registry for asset handoff, historical audits, and
+scripts that still need structured source and license metadata.
 
 Pull localizable samples and training inputs:
 

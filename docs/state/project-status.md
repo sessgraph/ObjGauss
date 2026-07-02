@@ -86,6 +86,15 @@ browser-ready 规则。最后新增 `dynamic_k_proposal_report(...)` /
 birth unmatched proposal，不自动修改 `K`、不改写 object ids、不启动模型训练。本轮仍不引入
 CoTracker / learned tracker / Sinkhorn / Slot Attention，不改 renderer、不移动素材。
 
+同日已完成 `WORLD-PRUNE-001`：默认前端入口已收敛到 Three.js / VR-like world viewer。
+`package.json` 现在只保留 `dev` / `build` / `preview`、`audit:world-viewer`、OGC /
+WebGPU 核心算法验证、semantic acceptance、资产采样、训练和 benchmark 入口；旧产品 UI 的
+`audit:demo`、renderer-route、commercial demo、object-boundary、Spark route 等 npm
+快捷入口已从默认 package scripts 移除。历史 audit 脚本文件暂保留在 `scripts/`，用于
+旧报告复现和后续有边界的迁移；默认 viewer catalog 已改为 `src/modelCatalog.js`，
+`src/assetLibrary.js` 只作为 pipeline / compatibility registry，不再是默认 world viewer
+入口。`scripts/audit-world-viewer.mjs` 默认端口同步为 fixed `5395`。
+
 同日已完成 `VIEWER-MANIFEST-CONSUME-001`：前端素材库现在以最小改动消费 /
 暴露 backend model artifact manifest 的 browser-ready 路线，同时保留现有 renderer
 和对象交互行为。

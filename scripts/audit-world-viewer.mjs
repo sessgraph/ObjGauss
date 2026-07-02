@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
 
-const DEFAULT_PORT = 5396;
+const DEFAULT_PORT = 5395;
 const args = parseArgs(process.argv.slice(2));
 const port = Number(args.port ?? DEFAULT_PORT);
 const baseUrl = String(args.url ?? `http://127.0.0.1:${port}/`);

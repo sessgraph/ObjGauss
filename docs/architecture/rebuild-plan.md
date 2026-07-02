@@ -110,7 +110,8 @@ algorithms:
 | Renderer paths | `src/SplatViewport.jsx`, `src/PointCloudViewport.jsx`, `src/WebGpuTileViewport.jsx` | Viewer renderer implementations. |
 | ObjGauss frontend rendering algorithms | `src/webgpuTileSmoke.js`, `src/webgpuTileStorage.js`, `src/webgpuTileComputeShader.js`, `src/webgpuTileResolveShader.js`, `src/webgpuTextureResolveShader.js`, OIT code in `src/PointCloudViewport.jsx` | Must be preserved and iterated as frontend renderer kernel code. These are not training algorithms, but they are still first-class project algorithms. |
 | Spark interaction support | `src/SplatViewport.jsx`, `src/sparkObjectMask.js`, `src/sparkPackedSh.js` | Renderer-side object masks, packed SH handling, picking probes, and native-splat integration. |
-| Interaction state | `src/App.jsx`, `src/sparkObjectMask.js`, `src/assetLibrary.js` | Product interaction, route selection, object state, local asset catalog. |
+| Interaction state | `src/App.jsx`, `src/modelCatalog.js` | Default Three.js world shell, in-world model catalog, object selection and drag state. |
+| Legacy asset registry | `src/assetLibrary.js`, `src/modelArtifactManifest.js` | Pipeline / compatibility asset metadata and manifest route derivation for historical audits and handoff scripts; not the default world viewer entrypoint. |
 
 ## Target Repository Structure
 

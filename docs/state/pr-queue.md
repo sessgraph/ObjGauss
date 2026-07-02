@@ -19,26 +19,7 @@
 
 ## Ready
 
-### WORLD-PRUNE-001: Prune old non-core UI and historical audit entrypoints
-
-- 状态: ready
-- 类型: 标准 PR / repository restructure
-- 目标: 在 `WORLD-REBUILD-001` 的 Three.js / VR-like 世界入口基础上，删除或归档旧
-  产品 UI、旧侧栏工作台审计和不再服务新入口的历史脚本，保留核心算法与前端自有
-  Gaussian renderer kernels。
-- 范围:
-  - 清理 `package.json` 中旧 UI 审计脚本入口，保留 `dev` / `build` /
-    `audit:world-viewer` / 核心算法验证入口。
-  - 删除或移动不再被新默认入口引用的旧产品 UI glue；不要删除 Gaussian OIT、
-    WebGPU tile / compute、Spark bridge、shader、object-state buffer、picking、
-    OGC decoder 等前端核心渲染算法文件。
-  - 明确新目标结构：frontend world viewer、frontend renderer kernels、backend /
-    pipeline model service、core algorithms。
-  - 不删除训练大资产、不改 core algorithm behavior、不引入外部开源 renderer。
-- 验收:
-  - `npm run audit:world-viewer`
-  - `npm run build`
-  - `uv run --extra dev pytest`
+当前无 ready PR。
 
 ## Planned
 
@@ -69,6 +50,46 @@
 
 ## Done
 
+### WORLD-PRUNE-001: Prune old non-core UI and historical audit entrypoints
+
+- 状态: done / default-world-viewer-prune
+- 类型: 标准 PR / repository restructure
+- 目标: 在 `WORLD-REBUILD-001` 的 Three.js / VR-like 世界入口基础上，删除或归档旧
+  产品 UI、旧侧栏工作台审计和不再服务新入口的历史脚本，保留核心算法与前端自有
+  Gaussian renderer kernels。
+- 已实施:
+  - `package.json` scripts 已收敛到 `dev` / `build` / `preview`、
+    `audit:world-viewer`、OGC / WebGPU 核心验证、semantic acceptance、资产采样、
+    训练和 benchmark 入口。
+  - 从默认 package scripts 移除旧产品 UI 快捷入口，包括 `audit:demo`、
+    renderer-route、commercial demo、object-boundary、Spark route 和历史 browser
+    route acceptance 入口。
+  - `scripts/audit-world-viewer.mjs` 默认端口从 `5396` 收敛到 fixed `5395`，匹配当前
+    `npm run dev` / `preview` 端口策略。
+  - `README.md` 的浏览器审计说明改为 `npm run audit:world-viewer`；默认 viewer catalog
+    说明改为 `src/modelCatalog.js`，`src/assetLibrary.js` 降为 pipeline /
+    compatibility registry。
+  - `docs/architecture/rebuild-plan.md` 同步新 frontend world viewer / legacy asset
+    registry 边界。
+- 边界:
+  - 不删除 Gaussian OIT、WebGPU tile / compute、Spark bridge、shader、
+    object-state buffer、picking、OGC decoder 等前端核心渲染算法文件。
+  - 不删除训练 / benchmark 脚本，不删除训练大资产，不引入外部 renderer。
+  - 历史 audit 脚本文件暂留 `scripts/`，只从默认 npm 入口解除暴露；后续若需要物理移动，
+    单独立项。
+- 验证:
+  - `npm run audit:world-viewer`: passed；`models=5`、`objects=27`、
+    `draggableObjects=27`、`sidebars=0`，截图 `/tmp/objgauss-world-viewer.png`。
+    沙箱内直接启动本地 server 受限，提权重跑通过；日志中出现 existing 5395 app 的
+    port-in-use 信息，但 audit 成功连接并通过。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `uv run --extra dev pytest`: 105 passed。
+  - `npm run audit:ogc-decoder-contract`: passed。
+  - `npm run audit:webgpu-tile-smoke`: passed。
+  - `npm run audit:webgpu-scale-budget`: passed。
+  - `npm run audit:webgpu-edit-cost-budget`: passed。
+- 完成 commit: pending
+
 ### OBJECT-DYNAMIC-K-PROPOSAL-001: Emit birth / merge / split proposals
 
 - 状态: done / v1-object-emergence-phase-5
@@ -96,7 +117,7 @@
   - `python3 -m compileall -q objgauss`: passed。
   - `git diff --check`: passed。
   - trailing whitespace scan: passed。
-  - 完成 commit: pending
+  - 完成 commit: this commit
 
 ### OBJECT-GAUSSIAN-BINDING-001: Bind ObjectState summaries to Gaussian delivery metadata
 
