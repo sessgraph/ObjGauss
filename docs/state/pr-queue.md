@@ -19,16 +19,20 @@
 
 ## Ready
 
-当前无 ready PR。
+### OGC-BROWSER-STREAMING-001: Load browser-ready OGC chunks in the viewer
+
+- 状态: ready
+- 类型: 标准 PR / browser delivery
+- 目标: 在现有 `compressed_chunked` manifest、quantized OGC payload 和
+  `src/ogcDecoder.js` contract 基础上，让 viewer 能按模型 / 对象路线加载
+  browser-ready OGC chunk，形成真实 chunk / LOD / streaming 交付闭环。
+- 边界:
+  - 不替换 ObjGauss 自有 Gaussian OIT、WebGPU tile / compute、Spark bridge、
+    shader、object-state buffer 或 picking 代码。
+  - 不把 full diagnostic PLY 重新变成默认 browser route。
+  - 不提交 near-1M / 4.5M 大资产；先使用小 fixture 或已有 browser-ready sample。
 
 ## Planned
-
-### CLIP-COVERAGE-001: Improve foreground mask coverage for semantic promotion
-
-- 状态: planned
-- 类型: 标准 PR / semantic quality evidence
-- 目标: 在不放宽 promotion threshold 的前提下，改进 CLIP / SAM mask selection 和 foreground coverage，降低 mask-level background dominant，并把 downstream supervised fraction 从当前 `0.114283` 提升到 promotion policy 需要的 `>=0.200000`。
-- 前置: 复用 `CLIP-BALANCE-001` 的 support rebalance 与 comparison policy；继续不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
 
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
@@ -49,6 +53,38 @@
 当前无进行中 PR。
 
 ## Done
+
+### CLIP-COVERAGE-001: Improve foreground mask coverage for semantic promotion
+
+- 状态: done / foreground-coverage-recovery
+- 类型: 标准 PR / semantic quality evidence
+- 目标: 在不放宽 promotion threshold 的前提下，改进 CLIP / SAM mask selection 和
+  foreground coverage，降低 mask-level background dominant，并为 downstream
+  supervised fraction 达到 promotion policy 的 `>=0.200000` 提供可审计机制。
+- 已实施:
+  - `align-slots` 新增显式开关 `--recover-foreground-coverage`。
+  - `objgauss/core/semantic_slots.py` 新增
+    `objgauss-foreground-coverage-recovery-v1` manifest summary。
+  - 当 slot support rebalance 丢弃弱 slot 时，只有 CLIP / mask label top label 为
+    非背景且能安全映射到保留 slot 的 mask 会作为 `coverage_only=true` 恢复到输出
+    manifest。
+  - 恢复后的 mask 不参与 slot 命名、不增加 slot_count，只作为下游
+    `vote-masks` 的 foreground coverage supervision。
+  - CLI 输出 `foreground_coverage_recovery`、`coverage_recovered_masks` 和
+    `coverage_recovered_gaussians`，便于真实 CLIP run 对比。
+- 边界:
+  - 默认行为不变；未传 `--recover-foreground-coverage` 时仍按原 rebalance 结果丢弃弱
+    slot masks。
+  - 不放宽 `compare-baselines` promotion threshold。
+  - 不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
+  - 本 PR 提供机制和 fixture 级 coverage 验证；真实 CLIP route 仍需重新运行
+    `score-clip -> align-slots -> vote-masks -> compare-baselines` 后才能 promotion。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "align_slots or mask_voting"`:
+    9 passed。
+  - `uv run --extra dev pytest`: 106 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: this commit
 
 ### WORLD-PRUNE-001: Prune old non-core UI and historical audit entrypoints
 

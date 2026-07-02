@@ -39,6 +39,7 @@ class SlotAlignmentResult:
     slot_naming_quality: dict[str, Any]
     record_filters: dict[str, Any]
     slot_rebalance: dict[str, Any]
+    foreground_coverage_recovery: dict[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +56,7 @@ class SlotAlignmentResult:
             "slot_naming_quality": self.slot_naming_quality,
             "record_filters": self.record_filters,
             "slot_rebalance": self.slot_rebalance,
+            "foreground_coverage_recovery": self.foreground_coverage_recovery,
         }
 
 
@@ -156,6 +158,7 @@ def align_mask_manifest_slots(
     min_slot_support_gaussians: int = 0,
     min_slot_support_ratio: float = 0.0,
     min_balanced_slots: int = 1,
+    recover_foreground_coverage: bool = False,
 ) -> SlotAlignmentResult:
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be in [0, 1]")
@@ -217,16 +220,22 @@ def align_mask_manifest_slots(
         min_iou=float(min_iou),
         min_shared_gaussians=int(min_shared_gaussians),
     )
-    ordered_clusters = _order_clusters(clusters)
+    candidate_clusters = _order_clusters(clusters)
     if max_slots is not None:
-        ordered_clusters = ordered_clusters[:max_slots]
+        candidate_clusters = candidate_clusters[:max_slots]
     rebalance = _rebalance_slot_support(
-        ordered_clusters,
+        candidate_clusters,
         min_slot_support_gaussians=min_slot_support_gaussians,
         min_slot_support_ratio=min_slot_support_ratio,
         min_balanced_slots=min_balanced_slots,
     )
     ordered_clusters = list(rebalance.clusters)
+    kept_cluster_ids = {id(cluster) for cluster in ordered_clusters}
+    dropped_clusters = [
+        cluster
+        for cluster in candidate_clusters
+        if id(cluster) not in kept_cluster_ids
+    ]
     if not ordered_clusters:
         raise ValueError("slot support rebalance removed all clusters")
     record_to_slot = {
@@ -249,6 +258,17 @@ def align_mask_manifest_slots(
             slot_name_diversity_penalty=slot_name_diversity_penalty,
         )
     )
+    coverage_recovery, coverage_record_metadata = _recover_foreground_coverage_records(
+        dropped_clusters,
+        kept_clusters=ordered_clusters,
+        slot_summaries=summaries,
+        record_to_slot=record_to_slot,
+        background_labels=clean_background_labels,
+        enabled=recover_foreground_coverage,
+        min_shared_gaussians=max(1, int(min_shared_gaussians)),
+    )
+    for key, metadata in coverage_record_metadata.items():
+        record_to_slot[key] = int(metadata["target_slot"])
     slot_naming_quality = _slot_naming_quality(
         summaries,
         background_labels=clean_background_labels,
@@ -268,6 +288,8 @@ def align_mask_manifest_slots(
         slot_rebalance=rebalance.as_dict(),
         slot_naming_quality=slot_naming_quality,
         naming_policy=naming_policy,
+        coverage_record_metadata=coverage_record_metadata,
+        foreground_coverage_recovery=coverage_recovery,
         source_root=manifest_path.parent,
         output_root=output.parent,
     )
@@ -282,6 +304,7 @@ def align_mask_manifest_slots(
     slot_naming_quality = aligned_payload["slot_alignment"]["slot_naming_quality"]
     record_filters = aligned_payload["slot_alignment"]["record_filters"]
     slot_rebalance = aligned_payload["slot_alignment"]["slot_rebalance"]
+    foreground_coverage_recovery = aligned_payload["slot_alignment"]["foreground_coverage_recovery"]
     named_slots = sum(1 for cluster in summaries if cluster["semantic_name_source"] != "unnamed")
     remapped_masks = sum(
         1
@@ -303,6 +326,7 @@ def align_mask_manifest_slots(
         slot_naming_quality=slot_naming_quality,
         record_filters=record_filters,
         slot_rebalance=slot_rebalance,
+        foreground_coverage_recovery=foreground_coverage_recovery,
     )
 
 
@@ -512,6 +536,150 @@ def _rebalance_slot_support(
     )
 
 
+def _recover_foreground_coverage_records(
+    dropped_clusters: list[_SlotCluster],
+    *,
+    kept_clusters: list[_SlotCluster],
+    slot_summaries: tuple[dict[str, Any], ...],
+    record_to_slot: dict[tuple[int, int], int],
+    background_labels: set[str],
+    enabled: bool,
+    min_shared_gaussians: int,
+) -> tuple[dict[str, Any], dict[tuple[int, int], dict[str, Any]]]:
+    summary: dict[str, Any] = {
+        "kind": "objgauss-foreground-coverage-recovery-v1",
+        "enabled": bool(enabled),
+        "candidate_clusters": 0,
+        "candidate_masks": 0,
+        "recovered_clusters": 0,
+        "recovered_masks": 0,
+        "recovered_gaussian_support": 0,
+        "skipped_background_clusters": 0,
+        "skipped_unmatched_clusters": 0,
+        "min_shared_gaussians": int(min_shared_gaussians),
+        "records": [],
+    }
+    if not enabled or not dropped_clusters or not kept_clusters:
+        return summary, {}
+
+    label_to_slot = _foreground_label_to_slot(
+        slot_summaries,
+        background_labels=background_labels,
+    )
+    recovered: dict[tuple[int, int], dict[str, Any]] = {}
+    recovered_gaussians: set[int] = set()
+    for cluster in dropped_clusters:
+        foreground_label = _cluster_foreground_label(cluster, background_labels=background_labels)
+        if foreground_label is None:
+            summary["skipped_background_clusters"] += 1
+            continue
+        summary["candidate_clusters"] += 1
+        summary["candidate_masks"] += len(cluster.records)
+        target_slot = label_to_slot.get(foreground_label.lower())
+        reason = "semantic-label-match"
+        overlap = _best_overlap_slot(cluster, kept_clusters)
+        if target_slot is None:
+            if overlap is None or overlap["shared_gaussians"] < min_shared_gaussians:
+                summary["skipped_unmatched_clusters"] += 1
+                continue
+            target_slot = int(overlap["slot"])
+            reason = "gaussian-overlap"
+        if overlap is None:
+            overlap = {"shared_gaussians": 0, "iou": 0.0}
+        cluster_gaussians = set(int(index) for index in cluster.gaussian_indices)
+        recovered_gaussians.update(cluster_gaussians)
+        summary["recovered_clusters"] += 1
+        for record in cluster.records:
+            key = (record.frame_index, record.mask_index)
+            if key in record_to_slot:
+                continue
+            metadata = {
+                "target_slot": int(target_slot),
+                "coverage_recovery": {
+                    "kind": "foreground-coverage-only-mask-v1",
+                    "source_slot": int(record.source_slot),
+                    "source_label": record.source_label,
+                    "foreground_label": foreground_label,
+                    "target_slot": int(target_slot),
+                    "reason": reason,
+                    "shared_gaussians": int(overlap["shared_gaussians"]),
+                    "iou": float(overlap["iou"]),
+                    "support_gaussians": int(len(record.gaussian_indices)),
+                },
+            }
+            recovered[key] = metadata
+            summary["recovered_masks"] += 1
+            summary["records"].append(metadata["coverage_recovery"])
+    summary["recovered_gaussian_support"] = int(len(recovered_gaussians))
+    return summary, recovered
+
+
+def _foreground_label_to_slot(
+    slot_summaries: tuple[dict[str, Any], ...],
+    *,
+    background_labels: set[str],
+) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for summary in slot_summaries:
+        label = str(summary.get("semantic_label", "")).strip()
+        if not label or label.lower() in background_labels:
+            continue
+        if summary.get("semantic_name_source") == "unnamed":
+            continue
+        result.setdefault(label.lower(), int(summary["slot"]))
+    return result
+
+
+def _cluster_foreground_label(
+    cluster: _SlotCluster,
+    *,
+    background_labels: set[str],
+) -> str | None:
+    candidates = _ranked_items(cluster.clip_scores, limit=None)
+    if not candidates:
+        candidates = _ranked_items(cluster.label_weights, limit=None)
+    if not candidates:
+        return None
+    label = str(candidates[0]["label"]).strip()
+    if not label or label.lower() in background_labels:
+        return None
+    return label
+
+
+def _best_overlap_slot(
+    cluster: _SlotCluster,
+    kept_clusters: list[_SlotCluster],
+) -> dict[str, Any] | None:
+    cluster_set = set(int(index) for index in cluster.gaussian_indices)
+    if not cluster_set:
+        return None
+    best: dict[str, Any] | None = None
+    for slot, kept in enumerate(kept_clusters):
+        kept_set = kept.gaussian_indices
+        shared = len(cluster_set & kept_set)
+        union = len(cluster_set | kept_set)
+        iou = 0.0 if union == 0 else float(shared / union)
+        candidate = {
+            "slot": int(slot),
+            "shared_gaussians": int(shared),
+            "iou": iou,
+            "kept_support_gaussians": int(len(kept_set)),
+        }
+        if best is None or (
+            candidate["shared_gaussians"],
+            candidate["iou"],
+            candidate["kept_support_gaussians"],
+            -candidate["slot"],
+        ) > (
+            best["shared_gaussians"],
+            best["iou"],
+            best["kept_support_gaussians"],
+            -best["slot"],
+        ):
+            best = candidate
+    return best
+
+
 def _rewrite_aligned_manifest(
     payload: dict[str, Any],
     *,
@@ -523,6 +691,8 @@ def _rewrite_aligned_manifest(
     slot_rebalance: dict[str, Any],
     slot_naming_quality: dict[str, Any],
     naming_policy: dict[str, Any],
+    coverage_record_metadata: dict[tuple[int, int], dict[str, Any]],
+    foreground_coverage_recovery: dict[str, Any],
     source_root: Path,
     output_root: Path,
 ) -> dict[str, Any]:
@@ -552,6 +722,10 @@ def _rewrite_aligned_manifest(
             mask["label"] = slot_summary["semantic_label"]
             mask["semantic_name_source"] = slot_summary["semantic_name_source"]
             mask["semantic_name_policy"] = slot_summary["semantic_name_policy"]
+            recovery_metadata = coverage_record_metadata.get((frame_index, mask_index))
+            if recovery_metadata is not None:
+                mask["coverage_only"] = True
+                mask["coverage_recovery"] = recovery_metadata["coverage_recovery"]
             _rewrite_relative_path(
                 mask,
                 "mask_path",
@@ -592,6 +766,7 @@ def _rewrite_aligned_manifest(
         "dropped_masks": int(source_record_count - len(record_to_slot)),
         "record_filters": record_filters,
         "slot_rebalance": slot_rebalance,
+        "foreground_coverage_recovery": foreground_coverage_recovery,
         "naming_policy": naming_policy,
         "slot_naming_quality": slot_naming_quality,
     }

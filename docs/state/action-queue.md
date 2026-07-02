@@ -1,13 +1,13 @@
 # ObjGauss 行动队列
 
-> 最近更新: 2026-06-30
+> 最近更新: 2026-07-02
 
 ## Open
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
-- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，`CLIP-QUALITY-001`、`CLIP-SLOT-QUALITY-002`、`CLIP-BASELINE-003`、`CLIP-QUALITY-004` 和 `CLIP-BALANCE-001` 已落地 mask-level / slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 与 slot support rebalance policy。真实 CLIP 语义路线的 slot balance blocker 已清除，但整体仍保持 `do-not-promote`。
-- 推荐: 不把模型权重放入仓库；下一步优先改进 CLIP / SAM mask selection 和 foreground coverage，降低 mask-level 背景 dominant，并把 downstream supervised fraction 从当前 `0.114283` 提升到 promotion policy 的 `>=0.200000`；promotion 前必须通过 `objgauss masks compare-baselines`。
+- 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，`CLIP-QUALITY-001`、`CLIP-SLOT-QUALITY-002`、`CLIP-BASELINE-003`、`CLIP-QUALITY-004`、`CLIP-BALANCE-001` 和 `CLIP-COVERAGE-001` 已落地 mask-level / slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy、slot support rebalance policy 与显式 foreground coverage recovery 机制。真实 CLIP 语义路线的 slot balance blocker 已清除，但整体仍保持 `do-not-promote`。
+- 推荐: 不把模型权重放入仓库；下一步用 `objgauss masks align-slots --recover-foreground-coverage` 重跑真实 CLIP / SAM 证据链，检查 foreground coverage 是否把 downstream supervised fraction 从当前 `0.114283` 提升到 promotion policy 的 `>=0.200000`，同时继续降低 mask-level 背景 dominant；promotion 前必须通过 `objgauss masks compare-baselines`。
 - 退出条件: 真实 SAM / CLIP 小场景 mask manifest 被真实 CLIP 分数稳定语义命名、跨视角对齐，并通过 mask-level / slot-level 命名覆盖率、slot balance、vote quality、training summary 与 color-mask / KMeans baseline 对比。
 
 ### ACTION-004: 建立 Poly Haven mesh 到 3DGS 的 Demo 转换链

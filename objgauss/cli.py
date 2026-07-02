@@ -792,6 +792,7 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
         min_slot_support_gaussians=args.min_slot_support_gaussians,
         min_slot_support_ratio=args.min_slot_support_ratio,
         min_balanced_slots=args.min_balanced_slots,
+        recover_foreground_coverage=args.recover_foreground_coverage,
     )
     quality = result.slot_naming_quality
     filters = result.record_filters
@@ -813,6 +814,10 @@ def _masks_align_slots(args: argparse.Namespace) -> None:
     print(f"dropped_unbalanced_slots={rebalance.get('dropped_slots', 0)}")
     print(f"dropped_unbalanced_masks={rebalance.get('dropped_masks', 0)}")
     print(f"support_balance_score={float(rebalance.get('support_balance_score', 0.0)):.6f}")
+    recovery = result.foreground_coverage_recovery
+    print(f"foreground_coverage_recovery={'enabled' if recovery.get('enabled') else 'disabled'}")
+    print(f"coverage_recovered_masks={recovery.get('recovered_masks', 0)}")
+    print(f"coverage_recovered_gaussians={recovery.get('recovered_gaussian_support', 0)}")
     if quality.get("blockers"):
         print(f"slot_quality_blockers={quality['blockers']}")
     for cluster in result.clusters:
@@ -1642,6 +1647,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
         help="minimum slots to keep even when support rebalance thresholds would drop them",
+    )
+    align_slots.add_argument(
+        "--recover-foreground-coverage",
+        action="store_true",
+        help=(
+            "keep foreground, non-background masks dropped by slot rebalance as coverage-only "
+            "supervision by mapping them to a compatible kept slot"
+        ),
     )
     align_slots.add_argument(
         "--require-slot-quality",

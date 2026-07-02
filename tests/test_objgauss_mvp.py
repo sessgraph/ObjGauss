@@ -1603,6 +1603,65 @@ def test_masks_align_slots_rebalances_weak_slot_support(tmp_path, capsys):
     assert [mask["slot"] for mask in aligned["frames"][0]["masks"]] == [0, 1]
 
 
+def test_masks_align_slots_recovers_foreground_coverage_after_rebalance(tmp_path, capsys):
+    input_path = tmp_path / "recoverable_camera_cloud.ply"
+    manifest_path = _write_recoverable_slot_mask_manifest(tmp_path / "recoverable-mask-manifest.json")
+    aligned_path = tmp_path / "aligned-mask-manifest.json"
+    write_ply(input_path, _imbalanced_camera_cloud(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "masks",
+                "align-slots",
+                str(manifest_path),
+                "--cloud",
+                str(input_path),
+                "--output",
+                str(aligned_path),
+                "--min-slot-support-ratio",
+                "0.4",
+                "--min-balanced-slots",
+                "2",
+                "--recover-foreground-coverage",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    aligned = json.loads(aligned_path.read_text(encoding="utf-8"))
+    recovery = aligned["slot_alignment"]["foreground_coverage_recovery"]
+    votes = vote_masks_to_gaussians(_imbalanced_camera_cloud(), aligned_path, slots=2)
+    vote_quality = votes.as_dict()["vote_quality"]
+
+    assert "foreground_coverage_recovery=enabled" in output
+    assert "coverage_recovered_masks=1" in output
+    assert "coverage_recovered_gaussians=1" in output
+    assert aligned["slot_count"] == 2
+    assert [slot["label"] for slot in aligned["slots"]] == ["large tread", "black tire"]
+    assert [mask["slot"] for mask in aligned["frames"][0]["masks"]] == [0, 1, 1]
+    assert aligned["frames"][0]["masks"][2]["coverage_only"] is True
+    assert aligned["frames"][0]["masks"][2]["coverage_recovery"]["reason"] == (
+        "semantic-label-match"
+    )
+    assert aligned["frames"][0]["masks"][2]["coverage_recovery"]["foreground_label"] == (
+        "black tire"
+    )
+    assert recovery["kind"] == "objgauss-foreground-coverage-recovery-v1"
+    assert recovery["enabled"] is True
+    assert recovery["candidate_masks"] == 1
+    assert recovery["recovered_masks"] == 1
+    assert recovery["recovered_gaussian_support"] == 1
+    assert recovery["records"][0]["target_slot"] == 1
+    assert recovery["records"][0]["support_gaussians"] == 1
+    assert aligned["slot_alignment"]["slot_rebalance"]["dropped_masks"] == 1
+    assert aligned["slot_alignment"]["dropped_masks"] == 0
+    assert votes.supervised_gaussians == 7
+    assert vote_quality["supervised_fraction"] == 1.0
+    assert [slot["winner_gaussians"] for slot in vote_quality["per_slot"]] == [4, 3]
+
+
 def test_masks_align_slots_rewrites_relative_mask_paths_for_export_dir(tmp_path):
     cloud_path = tmp_path / "camera_cloud.ply"
     source_dir = tmp_path / "source"
@@ -3423,6 +3482,46 @@ def _write_imbalanced_slot_mask_manifest(path):
                         "rect": [65, 0, 100, 100],
                         "area": 3500,
                         "clip_scores": {"tiny hub": 0.9, "black tire": 0.1},
+                    },
+                ],
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _write_recoverable_slot_mask_manifest(path):
+    payload = {
+        "width": 100,
+        "height": 100,
+        "camera_angle_x": float(np.pi / 2.0),
+        "source_type": "sam-automatic-mask-generator",
+        "frames": [
+            {
+                "name": "frame-0",
+                "transform_matrix": np.eye(4, dtype=float).tolist(),
+                "masks": [
+                    {
+                        "slot": 0,
+                        "label": "sam-area-rank-0",
+                        "rect": [0, 0, 50, 100],
+                        "area": 5000,
+                        "clip_scores": {"large tread": 0.9, "white background": 0.1},
+                    },
+                    {
+                        "slot": 1,
+                        "label": "sam-area-rank-1",
+                        "rect": [50, 0, 65, 100],
+                        "area": 1500,
+                        "clip_scores": {"black tire": 0.9, "large tread": 0.1},
+                    },
+                    {
+                        "slot": 2,
+                        "label": "sam-area-rank-2",
+                        "rect": [65, 0, 100, 100],
+                        "area": 3500,
+                        "clip_scores": {"black tire": 0.85, "white background": 0.15},
                     },
                 ],
             }
