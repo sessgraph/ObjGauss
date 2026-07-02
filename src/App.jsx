@@ -283,6 +283,10 @@ export default function App() {
       data-debug-os="object-state"
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
+      data-hovered-target={hoveredTarget?.selectionId ?? ""}
+      data-hovered-model={hoveredTarget?.modelId ?? ""}
+      data-hovered-object={hoveredTarget?.objectId ?? ""}
+      data-hovered-gaussians={hoveredTarget?.gaussianCount ?? ""}
       data-hidden-objects={hiddenCount}
       data-ogc-loaded-count={ogcLoadedCount}
       data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
@@ -530,6 +534,7 @@ function ThreeWorld({
         selectedObject?.userData.objectState?.source ??
         selectedModel?.userData.assignmentSource ??
         "derived_from_object_id";
+      const hoveredTarget = objectTarget(hoveredObject);
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
         ui: "frosted-glass-in-world",
@@ -542,6 +547,10 @@ function ThreeWorld({
         selectedModelId,
         selectedObjectId: selectedObject?.userData.objectId ?? null,
         hoveredId: hoveredObject?.userData.selectionId ?? null,
+        hoveredModelId: hoveredTarget?.modelId ?? null,
+        hoveredObjectId: hoveredTarget?.objectId ?? null,
+        hoveredGaussianCount: hoveredTarget?.gaussianCount ?? 0,
+        hoveredAssignmentSource: hoveredTarget?.assignmentSource ?? null,
         debugMode: debugRef.current,
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
@@ -563,6 +572,7 @@ function ThreeWorld({
             objectId: object.userData.objectId,
             position: worldPosition.toArray().map(round3),
             visible: object.visible,
+            gaussianCount: objectGaussianCount(object),
             confidence: object.userData.objectState?.confidence ?? null,
             entropy: object.userData.objectState?.assignmentEntropy ?? null,
           };
@@ -584,6 +594,25 @@ function ThreeWorld({
           const probe = cloud?.userData.gaussianDebug?.[gaussianIndex];
           selectObjectGroup(object, probe ? { gaussian: probe } : null);
           return Boolean(probe);
+        },
+        hoverObjectForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()].find((entry) => entry.visible);
+          if (!object) return { ok: false, selectionId: null, gaussianCount: 0 };
+          const target = setHoveredObjectGroup(object);
+          return {
+            ok: Boolean(target?.selectionId),
+            selectionId: target?.selectionId ?? null,
+            modelId: target?.modelId ?? null,
+            objectId: target?.objectId ?? null,
+            gaussianCount: target?.gaussianCount ?? 0,
+            assignmentSource: target?.assignmentSource ?? null,
+          };
+        },
+        clearHoverForAudit() {
+          setHoveredObjectGroup(null);
+          return true;
         },
         toggleObjectVisibilityForAudit(selectionId = null) {
           const object =
@@ -667,6 +696,20 @@ function ThreeWorld({
       publishAuditHandle();
     };
 
+    const setHoveredObjectGroup = (object) => {
+      const nextHover = object?.visible === false ? null : object;
+      if (nextHover === hoveredObject) {
+        publishAuditHandle();
+        return objectTarget(hoveredObject);
+      }
+      hoveredObject = nextHover;
+      api.setHover(hoveredObject?.userData.selectionId ?? null);
+      const target = objectTarget(hoveredObject);
+      callbacksRef.current.onHoverObject?.(target);
+      publishAuditHandle();
+      return target;
+    };
+
     const raycaster = new THREE.Raycaster();
     raycaster.params.Points.threshold = 0.12;
     const pointer = new THREE.Vector2();
@@ -691,10 +734,7 @@ function ThreeWorld({
       const target = pointerTarget(event);
       const nextHover = target.object ?? null;
       if (nextHover === hoveredObject) return;
-      hoveredObject = nextHover;
-      api.setHover(hoveredObject?.userData.selectionId ?? null);
-      callbacksRef.current.onHoverObject?.(hoveredObject ? objectTarget(hoveredObject) : null);
-      publishAuditHandle();
+      setHoveredObjectGroup(nextHover);
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointermove", onPointerMove);
@@ -861,7 +901,14 @@ function DebugPanel({
         <Meta label="gaussian n" value={debugProbe?.gaussianIndex ?? "-"} />
         <Meta label="centroid" value={formatVec(activeState?.centroid)} />
         <Meta label="bbox" value={formatBox(activeState?.bbox)} />
-        <Meta label="hover" value={hoveredTarget ? `${hoveredTarget.modelId} #${hoveredTarget.objectId}` : "-"} />
+        <Meta
+          label="hover"
+          value={
+            hoveredTarget
+              ? `${hoveredTarget.modelId} #${hoveredTarget.objectId} / ${formatNumber(hoveredTarget.gaussianCount)}G`
+              : "-"
+          }
+        />
         <Meta label="hidden" value={hiddenObjects.size} />
       </dl>
 
@@ -1515,6 +1562,11 @@ function firstGaussianCloud(object) {
   return result;
 }
 
+function objectGaussianCount(object) {
+  const cloud = firstGaussianCloud(object);
+  return cloud?.userData?.gaussianDebug?.length ?? cloud?.geometry?.attributes?.position?.count ?? 0;
+}
+
 function gaussianProbeFromIntersection(intersection) {
   if (!intersection?.object?.userData || intersection.index === undefined) return null;
   if (intersection.object.userData.role !== "gaussian-cloud") return null;
@@ -1526,11 +1578,17 @@ function applyObjectVisualState(object, { selected = false, hovered = false, deb
   const selectedOrHovered = Boolean(selected || hovered);
   object.traverse((child) => {
     if (child.userData.role === "gaussian-cloud") {
-      child.material.opacity = selectedOrHovered ? 1 : debug ? 0.82 : 0.64;
-      child.material.size = selectedOrHovered ? child.material.size * 1.0 : child.material.size;
+      const baseSize = child.userData.basePointSize ?? child.material.size;
+      child.userData.basePointSize = baseSize;
+      child.material.opacity = selected ? 1 : hovered ? 0.98 : debug ? 0.62 : 0.5;
+      child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.16 : baseSize;
+      child.material.needsUpdate = true;
     }
     if (child.userData.role === "object-state-bbox") {
-      child.material.opacity = selected ? 0.82 : hovered ? 0.64 : 0.34;
+      child.material.opacity = selected ? 0.86 : hovered ? 0.72 : 0.34;
+    }
+    if (child.userData.role === "selection-ring" || child.userData.role === "core-glow") {
+      child.visible = selectedOrHovered;
     }
   });
 }
@@ -1541,6 +1599,8 @@ function objectTarget(object) {
     modelId: object.userData.modelId,
     objectId: object.userData.objectId,
     selectionId: object.userData.selectionId,
+    gaussianCount: objectGaussianCount(object),
+    assignmentSource: object.userData.objectState?.source ?? null,
   };
 }
 

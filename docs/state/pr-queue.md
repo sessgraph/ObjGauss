@@ -72,6 +72,40 @@
 
 ## Done
 
+### OBJECT-HOVER-HIGHLIGHT-001: Audit ObjectState hover highlight in Debug OS
+
+- 状态: done / debug-os-hover-highlight
+- 类型: 标准 PR / frontend debug interaction
+- 目标: 在已有 ObjectState inspector、A[N,K] heatmap、Gaussian probe、visibility
+  toggle 和 stability dashboard 基础上，补齐“hover object -> highlight assigned
+  Gaussians”的可审计路径，避免 Debug OS 只能看静态选中态。
+- 已实施:
+  - `src/App.jsx` 在 `.worldShell` 暴露 `data-hovered-target`、
+    `data-hovered-model`、`data-hovered-object` 和 `data-hovered-gaussians`。
+  - `window.__OBJGAUSS_WORLD__` 现在暴露 hovered ObjectState target、assigned
+    Gaussian count、assignment source，并提供 `hoverObjectForAudit(...)` /
+    `clearHoverForAudit(...)` helper。
+  - 对象 hover 会提高对应 Gaussian cloud opacity / point size，并显示 ObjectState
+    bbox、selection ring 和 core glow；Debug panel hover 行显示当前对象和 Gaussian 数量。
+  - `scripts/audit-world-viewer.mjs` 在 `trainable-mvp-debug` artifact 上触发
+    `hoverObjectForAudit(...)`，断言 hover telemetry、assigned Gaussian count 和
+    `trainable_kernel_model_artifact` assignment source 一致。
+- 边界:
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出或大模型，不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `hoveredObject=0`、`hoveredGaussians=2`、
+    `assignmentSource=trainable_kernel_model_artifact`，截图
+    `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-STABILITY-DASHBOARD-001: Add ObjectState stability dashboard to Debug OS
 
 - 状态: done / debug-os-stability-dashboard

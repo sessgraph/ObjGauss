@@ -459,6 +459,17 @@ trainable artifact 路径下 dashboard status 与 audit handle 一致，`slotUti
 不替换 viewer renderer、不提交训练输出；缺失的 purity / temporal drift 会明确显示为
 `n/a`，不伪装成已计算指标。
 
+`OBJECT-HOVER-HIGHLIGHT-001` 已完成 Phase 1 Debug OS 的 object-hover 高亮审计：
+`src/App.jsx` 现在把 hovered ObjectState target 暴露为 `.worldShell` telemetry 和
+`window.__OBJGAUSS_WORLD__` audit handle，包括 hovered model / object / selection id、
+assigned Gaussian count 和 assignment source。对象 hover 时对应 Gaussian cloud 会提高
+opacity / point size，并显示 ObjectState bbox / selection ring / core glow；Debug panel
+的 hover 行会显示当前 hover 对象和 Gaussian 数量。`scripts/audit-world-viewer.mjs`
+新增 `hoverObjectForAudit(...)` 路径验证，在 `trainable-mvp-debug` artifact 上断言
+hover 后 `data-hovered-target`、`hoveredGaussianCount` 和
+`hoveredAssignmentSource=trainable_kernel_model_artifact` 一致。该切片不引入 torch /
+gsplat / CUDA，不改变训练 blocker，不替换 viewer renderer，不提交训练输出或大资产。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

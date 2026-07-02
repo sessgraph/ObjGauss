@@ -29,6 +29,8 @@ try {
       `stability=${summary.stabilityStatus}`,
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
+      `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
+      `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
@@ -212,6 +214,38 @@ async function auditWorld(url) {
     if (trainableGaussian.trainableArtifactLoadedCount < 1) {
       throw new Error("expected trainable artifact load count to be visible in audit handle");
     }
+    const hoverSelection = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const result = world?.hoverObjectForAudit?.(selectionId) ?? null;
+      return {
+        result,
+        hoveredId: window.__OBJGAUSS_WORLD__?.hoveredId ?? null,
+        hoveredGaussianCount: window.__OBJGAUSS_WORLD__?.hoveredGaussianCount ?? 0,
+        hoveredAssignmentSource: window.__OBJGAUSS_WORLD__?.hoveredAssignmentSource ?? null,
+      };
+    }, trainableSelection.selectionId);
+    if (!hoverSelection.result?.ok) {
+      throw new Error(`expected audit handle to hover a trainable ObjectState target: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (hoverSelection.result.selectionId !== trainableSelection.selectionId) {
+      throw new Error(`hovered wrong ObjectState target: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (!(hoverSelection.result.gaussianCount > 0)) {
+      throw new Error(`expected hover target to expose assigned Gaussians: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (hoverSelection.hoveredAssignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`unexpected hover assignment source: ${hoverSelection.hoveredAssignmentSource}`);
+    }
+    await page.waitForFunction((selectionId) => {
+      const shell = document.querySelector(".worldShell");
+      const world = window.__OBJGAUSS_WORLD__;
+      return (
+        world?.hoveredId === selectionId &&
+        shell?.getAttribute("data-hovered-target") === selectionId &&
+        shell?.getAttribute("data-hovered-model") === "trainable-mvp-debug" &&
+        Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0
+      );
+    }, trainableSelection.selectionId, { timeout: 15000 });
     const visibilityToggle = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const selection = world?.objectSelections?.[0];
@@ -255,6 +289,12 @@ async function auditWorld(url) {
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
+        hoveredId: handle.hoveredId,
+        hoveredModelId: handle.hoveredModelId,
+        hoveredObjectId: handle.hoveredObjectId,
+        hoveredGaussianCount: handle.hoveredGaussianCount,
+        shellHoveredTarget: shell?.getAttribute("data-hovered-target") ?? null,
+        shellHoveredGaussians: Number(shell?.getAttribute("data-hovered-gaussians") ?? 0),
         dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
@@ -265,6 +305,12 @@ async function auditWorld(url) {
     }
     if (!(Number(world.slotUtilization) > 0)) {
       throw new Error(`expected positive slot utilization, got ${world.slotUtilization}`);
+    }
+    if (world.hoveredId !== world.shellHoveredTarget) {
+      throw new Error(`hover audit mismatch: ${JSON.stringify(world)}`);
+    }
+    if (!(Number(world.hoveredGaussianCount) > 0 && Number(world.shellHoveredGaussians) > 0)) {
+      throw new Error(`expected hovered ObjectState target to expose assigned Gaussians: ${JSON.stringify(world)}`);
     }
     const assignmentSlots = await page
       .locator("[data-assignment-heatmap='true']")
@@ -285,6 +331,8 @@ async function auditWorld(url) {
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
+      hoveredObjectId: world.hoveredObjectId,
+      hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
       selectedGaussian,
       sidebars,
