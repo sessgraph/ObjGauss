@@ -33,6 +33,7 @@ try {
       `temporalDrift=${summary.meanTemporalDrift}`,
       `compactness=${summary.meanSpatialCompactness}`,
       `assignmentJitter=${summary.meanAssignmentJitter}`,
+      `bboxStability=${summary.meanBboxStability}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -214,10 +215,12 @@ async function auditWorld(url) {
         stability?.getAttribute("data-temporal-available") === "true" &&
         stability?.getAttribute("data-spatial-available") === "true" &&
         stability?.getAttribute("data-jitter-available") === "true" &&
+        stability?.getAttribute("data-bbox-available") === "true" &&
         Number(stability?.getAttribute("data-mean-purity") ?? 0) > 0 &&
         Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0) > 0 &&
         Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0) > 0 &&
-        Number(stability?.getAttribute("data-mean-assignment-jitter") ?? -1) >= 0
+        Number(stability?.getAttribute("data-mean-assignment-jitter") ?? -1) >= 0 &&
+        Number(stability?.getAttribute("data-mean-bbox-stability") ?? 0) > 0
       );
     }, undefined, { timeout: 15000 });
     if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
@@ -305,14 +308,17 @@ async function auditWorld(url) {
         meanTemporalDrift: handle.stabilitySummary?.meanTemporalDrift ?? null,
         meanSpatialCompactness: handle.stabilitySummary?.meanSpatialCompactness ?? null,
         meanAssignmentJitter: handle.stabilitySummary?.meanAssignmentJitter ?? null,
+        meanBboxStability: handle.stabilitySummary?.meanBboxStability ?? null,
         shellMeanPurity: Number(shell?.getAttribute("data-stability-mean-purity") ?? 0),
         shellMeanTemporalDrift: Number(shell?.getAttribute("data-stability-mean-temporal-drift") ?? 0),
         shellMeanSpatialCompactness: Number(shell?.getAttribute("data-stability-mean-spatial-compactness") ?? 0),
         shellMeanAssignmentJitter: Number(shell?.getAttribute("data-stability-mean-assignment-jitter") ?? -1),
+        shellMeanBboxStability: Number(shell?.getAttribute("data-stability-mean-bbox-stability") ?? 0),
         dashboardMeanPurity: Number(stability?.getAttribute("data-mean-purity") ?? 0),
         dashboardMeanTemporalDrift: Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0),
         dashboardMeanSpatialCompactness: Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0),
         dashboardMeanAssignmentJitter: Number(stability?.getAttribute("data-mean-assignment-jitter") ?? -1),
+        dashboardMeanBboxStability: Number(stability?.getAttribute("data-mean-bbox-stability") ?? 0),
         hoveredId: handle.hoveredId,
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
@@ -354,6 +360,13 @@ async function auditWorld(url) {
     )) {
       throw new Error(`expected assignment jitter metric to be available: ${JSON.stringify(world)}`);
     }
+    if (!(
+      Number(world.meanBboxStability) > 0 &&
+      Number(world.dashboardMeanBboxStability) > 0 &&
+      Number(world.shellMeanBboxStability) > 0
+    )) {
+      throw new Error(`expected bbox stability metric to be available: ${JSON.stringify(world)}`);
+    }
     if (world.hoveredId !== world.shellHoveredTarget) {
       throw new Error(`hover audit mismatch: ${JSON.stringify(world)}`);
     }
@@ -383,6 +396,7 @@ async function auditWorld(url) {
       meanTemporalDrift: world.meanTemporalDrift,
       meanSpatialCompactness: world.meanSpatialCompactness,
       meanAssignmentJitter: world.meanAssignmentJitter,
+      meanBboxStability: world.meanBboxStability,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,

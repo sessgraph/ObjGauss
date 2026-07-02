@@ -305,6 +305,8 @@ export default function App() {
       data-stability-mean-spatial-compactness={selectedStability.meanSpatialCompactness ?? ""}
       data-stability-jitter-available={selectedStability.jitterAvailable ? "true" : "false"}
       data-stability-mean-assignment-jitter={selectedStability.meanAssignmentJitter ?? ""}
+      data-stability-bbox-available={selectedStability.bboxAvailable ? "true" : "false"}
+      data-stability-mean-bbox-stability={selectedStability.meanBboxStability ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -585,6 +587,7 @@ function ThreeWorld({
             entropy: object.userData.objectState?.assignmentEntropy ?? null,
             spatialCompactness: object.userData.objectState?.spatialCompactness ?? null,
             assignmentJitter: object.userData.objectState?.assignmentJitter ?? null,
+            bboxStability: object.userData.objectState?.bboxStability ?? null,
           };
         }),
         selectObjectForAudit(selectionId = null) {
@@ -966,6 +969,8 @@ function StabilityDashboard({ stability }) {
       data-mean-spatial-compactness={summary.meanSpatialCompactness ?? ""}
       data-jitter-available={summary.jitterAvailable ? "true" : "false"}
       data-mean-assignment-jitter={summary.meanAssignmentJitter ?? ""}
+      data-bbox-available={summary.bboxAvailable ? "true" : "false"}
+      data-mean-bbox-stability={summary.meanBboxStability ?? ""}
     >
       <div className="stabilityHead">
         <span>Stability</span>
@@ -988,6 +993,7 @@ function StabilityDashboard({ stability }) {
         <Meta label="spatial" value={summary.spatialAvailable ? formatRatio(summary.meanSpatialCompactness) : "n/a"} />
         <Meta label="drift" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
         <Meta label="jitter" value={summary.jitterAvailable ? formatRatio(summary.meanAssignmentJitter) : "n/a"} />
+        <Meta label="bbox" value={summary.bboxAvailable ? formatRatio(summary.meanBboxStability) : "n/a"} />
       </dl>
     </div>
   );
@@ -1379,6 +1385,7 @@ function createTrainableArtifactGroup(model) {
     const purity = objectPurityForRows(stateRows, derivedIds);
     const temporalDrift = objectTemporalDrift(artifact, frameIndex, objectId, state.centroid);
     const assignmentJitter = objectAssignmentJitter(artifact, frameIndex, stateRows);
+    const bboxStability = objectBboxStability(artifact, frameIndex, objectId, state.bbox);
 
     stateRows.forEach((entry, index) => {
       const point = artifactPointInBox(box, index, stateRows.length);
@@ -1445,6 +1452,7 @@ function createTrainableArtifactGroup(model) {
       temporalDrift,
       spatialCompactness: spatialCompactnessForGeometry(geometry),
       assignmentJitter,
+      bboxStability,
       centroid: (state.centroid ?? []).map(round3),
       bbox: (state.bbox ?? []).map(round3),
       status: state.status ?? "trained_artifact_slot",
@@ -1473,6 +1481,7 @@ function createTrainableArtifactGroup(model) {
       temporalDrift: objectState.temporalDrift,
       spatialCompactness: objectState.spatialCompactness,
       assignmentJitter: objectState.assignmentJitter,
+      bboxStability: objectState.bboxStability,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1730,6 +1739,9 @@ function summarizeObjectStability(objectsOrStates = []) {
   const jitters = states
     .map((state) => firstFinite(state.assignmentJitter, state.jitter, state.assignmentDrift))
     .filter(Number.isFinite);
+  const bboxStabilities = states
+    .map((state) => firstFinite(state.bboxStability, state.bboxIoU, state.bboxConvergence))
+    .filter(Number.isFinite);
   const mixedSlots = states.filter((state) => {
     const entropy = finiteOrZero(state.assignmentEntropy);
     return entropy >= 0.55 || String(state.status ?? "").includes("mixed");
@@ -1766,6 +1778,8 @@ function summarizeObjectStability(objectsOrStates = []) {
     meanSpatialCompactness: compactness.length ? round3(average(compactness)) : null,
     jitterAvailable: jitters.length > 0,
     meanAssignmentJitter: jitters.length ? round3(average(jitters)) : null,
+    bboxAvailable: bboxStabilities.length > 0,
+    meanBboxStability: bboxStabilities.length ? round3(average(bboxStabilities)) : null,
   };
 }
 
@@ -1903,6 +1917,50 @@ function objectAssignmentJitter(artifact, frameIndex, rows) {
     deltas.push(Math.min(1, l1 * 0.5));
   });
   return deltas.length ? round3(average(deltas)) : null;
+}
+
+function objectBboxStability(artifact, frameIndex, objectId, bbox) {
+  const frames = Array.isArray(artifact?.object_states) ? artifact.object_states : [];
+  const currentBox = validBoxFromBbox(bbox);
+  if (!currentBox) return null;
+  const candidateFrames = frames
+    .filter((frame) => Number(frame?.frame_index) !== frameIndex)
+    .map((frame) => ({
+      frame,
+      distance: Math.abs(Number(frame?.frame_index ?? 0) - frameIndex),
+    }))
+    .filter((entry) => Number.isFinite(entry.distance))
+    .sort((left, right) => left.distance - right.distance);
+  for (const entry of candidateFrames) {
+    const peer = entry.frame?.states?.find((state) => String(state.id) === String(objectId));
+    const peerBox = validBoxFromBbox(peer?.bbox);
+    if (peerBox) return round3(bboxIoU(currentBox, peerBox));
+  }
+  return null;
+}
+
+function bboxIoU(left, right) {
+  const intersection = left.clone().intersect(right);
+  if (intersection.isEmpty()) return 0;
+  const intersectionVolume = boxVolume(intersection);
+  const unionVolume = boxVolume(left) + boxVolume(right) - intersectionVolume;
+  return unionVolume > 0 ? Math.max(0, Math.min(1, intersectionVolume / unionVolume)) : 0;
+}
+
+function validBoxFromBbox(bbox) {
+  if (!Array.isArray(bbox) || bbox.length < 6) return null;
+  const values = bbox.slice(0, 6).map(Number);
+  if (!values.every(Number.isFinite)) return null;
+  const box = new THREE.Box3(
+    new THREE.Vector3(values[0], values[1], values[2]),
+    new THREE.Vector3(values[3], values[4], values[5]),
+  );
+  return box.isEmpty() ? null : box;
+}
+
+function boxVolume(box) {
+  const size = box.getSize(new THREE.Vector3());
+  return Math.max(0, size.x) * Math.max(0, size.y) * Math.max(0, size.z);
 }
 
 function spatialCompactnessForGeometry(geometry) {

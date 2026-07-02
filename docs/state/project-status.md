@@ -503,6 +503,16 @@ jitter metric 可用，验收输出为 `assignmentJitter=0.023`。该切片只�
 debug evidence，不改变 Python 训练算法、不引入 torch / gsplat / CUDA、不替换 viewer
 renderer。
 
+`OBJECT-BBOX-STABILITY-001` 已完成 Phase 1 Debug OS 的 bbox convergence 指标：
+`src/App.jsx` 在 trainable artifact 路径上比较当前帧和相邻帧同一 ObjectState 的
+3D bbox IoU，派生 per-object `bboxStability`，并在
+`objgauss-stability-dashboard-v1` 中汇总为 `meanBboxStability`。Stability dashboard
+新增 `bbox` meta；缺少相邻 ObjectState frame 的普通模型继续显示 `n/a`，不把缺失
+evidence 伪装成稳定。`.worldShell` telemetry、`window.__OBJGAUSS_WORLD__` 和
+`scripts/audit-world-viewer.mjs` 均暴露并验证该指标，验收输出为
+`bboxStability=0.899`。该切片只补 viewer-side bbox stability evidence，不改变 Python
+训练算法、不引入 torch / gsplat / CUDA、不替换 viewer renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
