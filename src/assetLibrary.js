@@ -1,4 +1,6 @@
-export const ASSET_LIBRARY = [
+import { withModelArtifactManifest } from "./modelArtifactManifest.js";
+
+const RAW_ASSET_LIBRARY = [
   {
     id: "plush-3dgs-local",
     name: "Plush 3DGS 示例",
@@ -315,6 +317,8 @@ export const ASSET_LIBRARY = [
     bestFor: "复杂真实场景重建 benchmark，适合后期质量评估。",
   },
 ];
+
+export const ASSET_LIBRARY = RAW_ASSET_LIBRARY.map(withModelArtifactManifest);
 
 export const FEATURED_ASSET_IDS = [
   "nerf-lego-trained-near1m-random1300k-local",

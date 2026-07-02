@@ -11,6 +11,8 @@
     "audit:commercial-demo-readiness": "node scripts/audit-commercial-demo-readiness.mjs",
     "audit:hard-mask-quality": "node scripts/audit-hard-mask-quality.mjs",
     "audit:large-model-viewer-route": "node scripts/audit-large-model-viewer-route.mjs",
+    "audit:ogc-decoder-contract": "node scripts/audit-ogc-decoder-contract.mjs",
+    "audit:world-viewer": "node scripts/audit-world-viewer.mjs",
     "audit:object-mask-boundary": "node scripts/audit-object-mask-boundary.mjs",
     "audit:object-boundary-cleanup": "node scripts/audit-object-mask-boundary.mjs --assets nerf-lego-alpha-closure-local,plush-semantic-closure-local,polyhaven-chair-commercial-demo-local --output-dir /tmp/objgauss-object-boundary-cleanup",
     "audit:object-boundary-remap-preview": "node scripts/export-object-boundary-remap-preview.mjs --output-dir /tmp/objgauss-object-boundary-remap-preview",

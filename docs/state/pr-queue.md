@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-06-30
+> 最近更新: 2026-07-02
 
 ## 队列规则
 
@@ -19,7 +19,26 @@
 
 ## Ready
 
-当前无 ready PR。
+### WORLD-PRUNE-001: Prune old non-core UI and historical audit entrypoints
+
+- 状态: ready
+- 类型: 标准 PR / repository restructure
+- 目标: 在 `WORLD-REBUILD-001` 的 Three.js / VR-like 世界入口基础上，删除或归档旧
+  产品 UI、旧侧栏工作台审计和不再服务新入口的历史脚本，保留核心算法与前端自有
+  Gaussian renderer kernels。
+- 范围:
+  - 清理 `package.json` 中旧 UI 审计脚本入口，保留 `dev` / `build` /
+    `audit:world-viewer` / 核心算法验证入口。
+  - 删除或移动不再被新默认入口引用的旧产品 UI glue；不要删除 Gaussian OIT、
+    WebGPU tile / compute、Spark bridge、shader、object-state buffer、picking、
+    OGC decoder 等前端核心渲染算法文件。
+  - 明确新目标结构：frontend world viewer、frontend renderer kernels、backend /
+    pipeline model service、core algorithms。
+  - 不删除训练大资产、不改 core algorithm behavior、不引入外部开源 renderer。
+- 验收:
+  - `npm run audit:world-viewer`
+  - `npm run build`
+  - `uv run --extra dev pytest`
 
 ## Planned
 
@@ -37,13 +56,6 @@
 - 目标: 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto 输出推进成许可干净、可浏览器验收的公开 demo 候选。
 - 前置: 明确质量阈值、训练成本和公开展示文案；不可复用 Plush 混合许可样例作为公开 demo 承诺。
 
-### PERF-BUNDLE-001: Split Spark / Three viewer bundles
-
-- 状态: planned
-- 类型: 标准 PR / frontend performance
-- 目标: 对 Spark / Three 相关 viewer 代码做按需加载或拆包，降低当前 Vite bundle size warning 对首屏体验的影响。
-- 前置: 不改变 renderer route contract；需要保留 `audit:demo`、Spark route 和 WebGPU route 验收。
-
 ### RENDER-NATIVE-PICK-001: Renderer-native object picking feasibility
 
 - 状态: planned / blocked-by-spark-metadata
@@ -56,6 +68,671 @@
 当前无进行中 PR。
 
 ## Done
+
+### WORLD-REBUILD-001: Replace default viewer with VR-like Three.js model world
+
+- 状态: done / default-world-entry
+- 类型: 标准 PR / frontend product rebuild
+- 目标: 清掉旧侧栏工作台默认入口，改为打开即进入 Three.js / VR-like 3D 世界；
+  所有模型作为展品出现在三维场景中，对象可拖动，信息通过磨砂玻璃浮层显示。
+- 已实施:
+  - `src/App.jsx` 已替换为全屏 Three.js world；默认入口不再渲染 left/right sidebar。
+  - 使用 `OrbitControls` 导航、`DragControls` 拖动模型展品；root DOM 暴露
+    `data-sidebars="none"`、`data-frosted-ui="enabled"` 和 selected model telemetry。
+  - 新增 `src/modelCatalog.js`，记录模型展品、load mode、核心点、展示位置、
+    per-object corepoint chunk 压缩计划。
+  - near-1M diagnostic asset 作为 `compressed-placeholder` 展品出现，不在首屏请求
+    full diagnostic PLY。
+  - `src/styles.css` 已改为全屏 canvas + frosted-glass top HUD / floating inspector /
+    bottom object dock。
+  - 新增 `scripts/audit-world-viewer.mjs` 与 `npm run audit:world-viewer`。
+  - 新增 `docs/architecture/open-source-reference-map.md`，登记 GaussianSplats3D、
+    antimatter15/splat、SuperSplat、A-Frame 和 Hubs 的可借鉴点与不照搬边界。
+- 边界:
+  - 不删除 ObjGauss 自有前端 Gaussian renderer algorithms；Gaussian OIT、WebGPU
+    tile / compute、Spark bridge、shader、object-state buffer、picking、OGC decoder
+    继续作为前端核心渲染算法保留，后续以 renderer module 形式迭代。
+  - 不引入外部开源 renderer 依赖，不复制外部项目代码。
+  - 尚未完成旧非核心脚本 / 历史审计入口的物理删除；该工作进入
+    `WORLD-PRUNE-001`。
+- 验证:
+  - `npm run audit:world-viewer`: passed；`models=5`、`draggable=5`、
+    `sidebars=0`，截图 `/tmp/objgauss-world-viewer.png`。
+  - `npm run build`: passed；主入口 JS `671.05 kB` / gzip `179.63 kB`，当前主要来自
+    Three.js 默认世界入口。
+  - `uv run --extra dev pytest`: 93 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
+### OGR-BROWSER-DECODER-001: Add browser decoder contract for quantized OGC artifacts
+
+- 状态: done / browser-decoder-contract
+- 类型: 标准 PR / frontend-rendering performance
+- 目标: 在前端增加 quantized OGC index / payload decoder contract，让 viewer 后续可以
+  从 `compressed_chunked` artifact 读取 chunk-local quantized records，而不是请求
+  full diagnostic PLY。
+- 已实施:
+  - 新增 `src/ogcDecoder.js`，暴露
+    `decodeQuantizedOgcPayload(...)`、`decodeQuantizedOgcChunk(...)` 和
+    `validateQuantizedOgcIndex(...)`。
+  - decoder 支持 `objgauss-ogc-quantized-payload-v0` /
+    `objgauss-ogc-quantized-record-v0`，把 chunk-local `xyz uint16x3`、RGB
+    `uint8x3`、opacity `uint8` 解码为现有 renderer-compatible point records。
+  - 解码结果保留 object id、object color、chunk id、LOD metadata、payload metadata
+    和 chunk/object summaries，供后续 viewer route / streaming 接入。
+  - `src/modelArtifactManifest.js` 现在会解析 browser-ready `compressed_chunked`
+    artifact，并通过 `browserReadyArtifact(..., "compressed_chunked")` 暴露 route。
+  - 新增 `scripts/audit-ogc-decoder-contract.mjs` 和
+    `npm run audit:ogc-decoder-contract`，用小 fixture 验证 decoded x/y/z、RGB、
+    opacity、object_id、chunk id、LOD metadata 和 manifest route contract。
+- 边界:
+  - 不接入真实 near-1M 大资产，不发布 public demo。
+  - 不重写 renderer，不移动或删除 Gaussian OIT、WebGPU tile / compute、Spark
+    bridge、shader、object-state buffer 和 picking 等前端自有渲染算法。
+  - 不实现 streaming scheduler、WebGPU decoder、VQ、adaptive SH 或 entropy coding。
+- 验证:
+  - `npm run audit:ogc-decoder-contract`: passed。
+  - `node --check src/ogcDecoder.js`: passed。
+  - `node --check scripts/audit-ogc-decoder-contract.mjs`: passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 93 passed。
+  - `npm run build`: passed；主入口 JS `254.87 kB` / gzip `79.80 kB`，
+    lazy `SplatViewport` chunk `5,017.81 kB` / gzip `1,783.46 kB` 仍按需加载。
+  - UI smoke: `http://127.0.0.1:5395/` with system Chrome passed；截图
+    `/tmp/objgauss-ui-smoke.png`。
+- 完成 commit: pending
+
+### OGC-QUANTIZED-PAYLOAD-WRITER-001: Write chunk-local quantized OGC payload prototype
+
+- 状态: done / quantized-payload-prototype
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 基于 `objgauss-local-quantization-v1` 写第一个 chunk-local quantized payload
+  prototype，让 `.ogc` 不再只是 raw fixed-size records。
+- 已实施:
+  - `objgauss/core/quantization.py` 新增 `write_quantized_ogc_payload(...)`、
+    `read_quantized_ogc_payload(...)`、`QUANTIZED_RECORD_DTYPE`、
+    `QUANTIZED_RECORD_FORMAT` 和 `objgauss-ogc-quantized-payload-v0`。
+  - quantized record 当前为 `xyz uint16x3`、RGB `uint8x3`、opacity `uint8`；
+    `object_id` 保存在 chunk metadata，因为 chunk 不跨 object。
+  - writer 复用 `build_chunk_index(...)` 的 `object_id+morton_xyz` 排序、object
+    boundary、LOD metadata 和 chunk byte range metadata。
+  - diagnostic reader 可按 index chunk byte ranges 读回并反量化 sorted records。
+  - `objgauss/quantization.py` compatibility wrapper 与 `objgauss.core` lazy exports
+    已暴露 `write_quantized_ogc_payload`。
+  - `tests/test_quantization.py` 增加 raw vs quantized payload 对比、bounded
+    roundtrip error、object id / chunk / LOD metadata preservation 和 wrapper
+    identity 测试。
+  - `docs/architecture/rebuild-plan.md` 与 `docs/state/project-status.md` 已登记
+    quantized writer 边界。
+- 边界:
+  - 不改前端 loader，不移动或删除前端自有 Gaussian renderer 算法。
+  - 不实现 VQ、adaptive SH、entropy coding、WebGPU decoder 或 streaming loader。
+  - 不发布 public demo，不移动训练大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_quantization.py tests/test_ogc_payload.py tests/test_model_manifest.py tests/test_core_namespace.py`:
+    25 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 93 passed。
+  - `npm run build`: passed；主入口 JS `254.72 kB` / gzip `79.77 kB`，
+    lazy `SplatViewport` chunk `5,017.81 kB` / gzip `1,783.46 kB` 仍按需加载。
+- 完成 commit: pending
+
+### OGC-QUANTIZATION-SCHEMA-001: Define local quantization metadata and size estimator
+
+- 状态: done / quantization-metadata-estimator
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 在 OGC payload prototype 上定义 chunk-local quantization metadata 和
+  deterministic size estimator，为后续把 raw `.ogc` payload 替换成压缩 payload
+  做准备。
+- 已实施:
+  - 新增 `objgauss/core/quantization.py`，实现 `objgauss-local-quantization-v1`、
+    `objgauss-quantization-estimate-v1`、`attach_quantization_metadata(...)`、
+    `estimate_quantized_payload_size(...)` 和 `default_quantization_policy(...)`。
+  - 新增 `objgauss/quantization.py` compatibility wrapper，并在 `objgauss.core`
+    lazy exports 中暴露 `attach_quantization_metadata`。
+  - 当前 policy 为 `chunk-aabb-uint16-rgb8-opacity8-v0`：`xyz` 计划用 chunk AABB
+    内 `uint16 x3`，RGB 用 `uint8 x3`，opacity 用 `uint8`，`object_id` 保存在
+    chunk metadata。
+  - `write_ogc_payload(...)` 现在会把 quantization estimate 写入 index 的
+    `quantization` 与 `compression.quantization` metadata；当前 `.ogc` bytes 仍是
+    raw prototype。
+  - `tests/test_quantization.py` 覆盖估算 size 小于 raw payload、chunk estimated
+    byte offsets、LOD estimated byte lengths、object id / chunk / LOD metadata
+    preservation 和历史 wrapper identity。
+  - `tests/test_ogc_payload.py` 与 `tests/test_model_manifest.py` 已覆盖 OGC payload
+    和 compressed_chunked manifest 能消费 quantization summary。
+  - `docs/architecture/rebuild-plan.md` 与 `docs/state/project-status.md` 已登记
+    quantization metadata 边界。
+- 边界:
+  - 不改前端 loader，不移动或删除前端自有 Gaussian renderer 算法。
+  - 不实现实际 quantized payload writer、VQ、adaptive SH、entropy coding 或
+    WebGPU decoder。
+  - 不发布 public demo，不移动训练大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_quantization.py tests/test_ogc_payload.py tests/test_model_manifest.py tests/test_core_namespace.py`:
+    24 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 92 passed。
+  - `npm run build`: passed；主入口 JS `254.72 kB` / gzip `79.77 kB`，
+    lazy `SplatViewport` chunk `5,017.81 kB` / gzip `1,783.46 kB` 仍按需加载。
+- 完成 commit: pending
+
+### OGC-LOD-SAMPLING-001: Emit deterministic object-aware LOD metadata
+
+- 状态: done / object-aware-lod-metadata
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 在 OGC chunk index / payload contract 上增加 deterministic object-aware
+  LOD metadata，让后续浏览器 streaming loader 可以先拉粗层级，再按对象 / 视角补细节。
+- 已实施:
+  - 新增 `objgauss/core/lod.py`，实现 `objgauss-object-aware-lod-v1`、
+    `attach_object_aware_lod_metadata(...)`、`annotate_lod_byte_ranges(...)`、
+    `normalize_lod_ratios(...)` 和 `lod_counts_for_count(...)`。
+  - 默认 LOD ratios 按附件 OGC / OGR 方向设为 full / 50% / 20% / 5% preview。
+  - `build_chunk_index(...)` 现在会给 top-level index、object summaries 和 chunk
+    summaries 写入 LOD metadata；每个正向 level 对每个 object 至少保留 1 个
+    Gaussian，level counts 单调不增。
+  - `write_ogc_payload(...)` 在写出 chunk byte ranges 后，会给每个 chunk LOD level
+    标注 `byte_offset` / `byte_length`，为未来 prefix-record streaming loader 提供
+    读取窗口。
+  - 新增 `objgauss/lod.py` compatibility wrapper，并在 `objgauss.core` lazy exports
+    中暴露 `attach_object_aware_lod_metadata`。
+  - `tests/test_chunk_index.py`、`tests/test_ogc_payload.py`、`tests/test_model_manifest.py`
+    和 `tests/test_core_namespace.py` 已覆盖 LOD counts、object guarantee、chunk
+    prefix ranges、OGC byte windows 和 manifest consumption。
+  - `docs/architecture/rebuild-plan.md` 与 `docs/state/project-status.md` 已登记
+    LOD metadata 边界。
+- 边界:
+  - 不改前端 loader，不移动或删除前端自有 Gaussian renderer 算法。
+  - 不实现剪枝 / 量化 / VQ / adaptive SH / entropy coding / WebGPU streaming
+    loader。
+  - 不发布 public demo，不移动训练大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_chunk_index.py tests/test_ogc_payload.py tests/test_model_manifest.py tests/test_core_namespace.py`:
+    27 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 89 passed。
+  - `npm run build`: passed；主入口 JS `254.72 kB` / gzip `79.77 kB`，
+    lazy `SplatViewport` chunk `5,017.81 kB` / gzip `1,783.46 kB` 仍按需加载。
+- 完成 commit: pending
+
+### OGC-MANIFEST-ADAPTER-001: Attach OGC payloads to model artifact manifests
+
+- 状态: done / ogc-manifest-adapter
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 将 `.ogc` payload 和 `.index.json` 绑定为 `compressed_chunked` model
+  artifact，让 manifest 能直接引用后端生成的 chunked browser artifact。
+- 已实施:
+  - `objgauss/model_manifest.py` 新增 `build_compressed_chunked_artifact(...)`。
+  - adapter 可读取 `objgauss-chunk-index-v1` `.index.json`，并从 OGC payload
+    metadata 派生 `gaussian_count`、`object_count`、`byte_size`、`sha256`、
+    `chunk_index` summary、`compression`、`lod` 和 `object_id_coverage`。
+  - adapter 要求 inline chunk index 必须提供 `chunk_index_path`，防止 manifest
+    中出现不可追踪的 chunk index。
+  - `tests/test_model_manifest.py` 增加真实 `.ogc` payload -> model artifact
+    manifest 绑定测试，并继续证明 diagnostic full PLY 保持 `browser_ready=false`。
+  - `docs/architecture/rebuild-plan.md` 与 `docs/state/project-status.md` 已登记
+    OGC manifest handoff 边界。
+- 边界:
+  - 不改前端 loader，不移动或删除前端自有 Gaussian renderer 算法。
+  - 不发布 public demo，不移动训练大资产。
+  - 不实现剪枝 / 量化 / VQ / adaptive SH / entropy coding / WebGPU streaming
+    loader。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py tests/test_ogc_payload.py`:
+    15 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 88 passed。
+  - `npm run build`: passed；主入口 JS `254.72 kB` / gzip `79.77 kB`，
+    lazy `SplatViewport` chunk `5,017.81 kB` / gzip `1,783.46 kB` 仍按需加载。
+- 完成 commit: pending
+
+### ARCH-REBUILD-001: Establish rebuild architecture baseline
+
+- 状态: done / planning-baseline
+- 类型: 文档 / architecture planning
+- 目标: 按 Owner 新方向重新划分项目职责：前端是体验、交互和渲染层；后端 /
+  pipeline 提供 3D 模型资产、训练输出登记和模型处理；核心算法先抽取为可测试
+  kernel。
+- 已实施:
+  - 新增 `docs/architecture/rebuild-plan.md`，记录 product split、当前核心算法
+    inventory、目标文件结构、最小抽取方案、核心数据 contracts 和迁移 PR 顺序。
+  - 明确前端不是无算法层：ObjGauss 自有 Gaussian OIT、WebGPU tile / compute
+    renderer、shader、object-state buffer、picking 和 Spark bridge 都必须保留并
+    继续迭代，只是不和训练 / 分割 / 模型处理算法混在一起。
+  - `project-status.md` 已登记该架构重梳理基线。
+- 边界:
+  - 本项不移动源码、不改 CLI / UI 行为、不新增依赖、不改素材布局。
+  - 后续代码重构从 `CORE-EXTRACT-001` 开始。
+- 验证:
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 66 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### CORE-EXTRACT-001: Add objgauss.core algorithm facade
+
+- 状态: done / core-namespace-facade
+- 类型: 标准 PR / architecture refactor
+- 目标: 先建立最小核心算法入口，让后续代码可以面向 `objgauss.core` 编程，
+  避免一次性大搬文件导致 CLI、测试和训练脚本大面积破坏。
+- 已实施:
+  - 新增 `objgauss/core/` 命名空间，按领域暴露 `gaussian`、`io`、`features`、
+    `objects`、`object_field`、`masks`、`projection`、`semantics`、`evaluation`
+    和 `training` 入口。
+  - 当前实现采用 facade / re-export 方式复用历史模块；后续 CORE-MOVE 系列再
+    逐步移动实现。
+  - 新增 `tests/test_core_namespace.py`，覆盖 core namespace 与历史
+    `GaussianCloud` 模型一致性、最小 object workflow、Object Field kernel 和
+    property append helper。
+- 边界:
+  - 不移动前端代码，不删除或弱化 ObjGauss 自有 Gaussian renderer 算法。
+  - 不改 CLI 行为，不改训练 / 素材输出路径。
+- 验证:
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 4 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 66 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### CORE-MOVE-001: Move bottom Gaussian kernel behind objgauss.core
+
+- 状态: done / bottom-kernel-moved
+- 类型: 标准 PR / architecture refactor
+- 目标: 把最底层、最稳定的 Gaussian kernel 实现移到 `objgauss/core/` 后面，
+  让旧路径只保留兼容 wrapper，为后续 Object Field、mask voting 和 slot alignment
+  迁移建立模式。
+- 已实施:
+  - `objgauss/core/gaussian.py` 承载 `GaussianCloud` 数据模型实现；旧
+    `objgauss/gaussians.py` 改为 wrapper。
+  - `objgauss/core/io_ply.py` 和 `objgauss/core/io_splat.py` 承载 PLY / `.splat`
+    IO 实现；旧 `objgauss/ply.py`、`objgauss/splat.py` 改为 wrapper。
+  - `objgauss/core/features.py` 承载 feature extraction 实现；旧
+    `objgauss/features.py` 改为 wrapper。
+  - `objgauss/core/clustering.py` 承载 baseline clustering 实现；旧
+    `objgauss/clustering.py` 改为 wrapper。
+  - `objgauss/core/objects.py` 承载 `object_id` attachment、object colors、
+    object filtering 和 object id parsing；旧 `objgauss/segment.py` 改为 wrapper。
+  - `objgauss/core/__init__.py` 改为 lazy export，避免迁移期间和旧兼容路径形成
+    circular import。
+  - `tests/test_core_namespace.py` 增加 wrapper identity 检查，证明历史路径导出的
+    函数 / 类型来自 core 实现。
+- 边界:
+  - 不移动 Object Field、mask voting、semantic slot alignment 或 CLIP scoring；
+    这些留给 `CORE-MOVE-002`。
+  - 不移动或修改前端 Gaussian renderer 算法，不触碰 `src/`。
+  - 不改 CLI 命令、训练输出路径或素材布局。
+- 验证:
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 5 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 67 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### CORE-MOVE-002: Move Object Field and projection algorithms behind objgauss.core
+
+- 状态: done / object-field-projection-moved
+- 类型: 标准 PR / architecture refactor
+- 目标: 在底层 Gaussian kernel 已迁移后，继续移动训练算法核心：Object Field、
+  camera projection、mask voting、depth visibility diagnostic 和 projection-loss
+  training。
+- 已实施:
+  - `objgauss/core/object_field.py` 承载 `ObjectField`、soft labels、hard label
+    export、metrics、smoothness、save/load、NeRF dataset inspect 和 Object Field
+    初始化实现。
+  - 旧 `objgauss/object_field.py` 改为 compatibility wrapper，保持 CLI、demo、
+    training 和测试里的历史 import 可用。
+  - `objgauss/core/projection.py` 承载 `Projection`、`project_points`、
+    `vote_masks_to_gaussians`、depth-buffer visibility、projection loss、
+    `train_object_field_from_votes`、vote quality audit 和 quality check 实现。
+  - 旧 `objgauss/mask_voting.py` 改为 compatibility wrapper。
+  - core 实现内部 import 已改为 core 路径，避免实现层回流到 wrapper。
+  - `tests/test_core_namespace.py` 增加 Object Field 和 projection wrapper identity
+    检查，证明历史路径导出的类型 / 函数来自 core 实现。
+- 边界:
+  - 不移动 mask manifest、semantic slot alignment、CLIP scoring adapter 或
+    comparison policy；这些留给 `CORE-MOVE-003`。
+  - 不移动或修改前端 Gaussian renderer 算法，不触碰 `src/`。
+  - 不改 CLI 命令、训练输出路径或素材布局。
+- 验证:
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 5 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 67 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### CORE-MOVE-003: Move mask manifests and semantic / evaluation algorithms behind objgauss.core
+
+- 状态: done / masks-semantics-evaluation-moved
+- 类型: 标准 PR / architecture refactor
+- 目标: 在 Object Field 和 projection / voting 已迁移后，继续移动 mask manifest、
+  semantic slot alignment、CLIP scoring adapter、comparison policy 和 object
+  emergence evaluation。
+- 已实施:
+  - `objgauss/core/masks.py` 承载 mask manifest build / split / validate、
+    Lego RGBA color classification、PNG / RGBA image readers 和 SAM manifest
+    adapter 实现；旧 `objgauss/masks.py` 改为 compatibility wrapper。
+  - `objgauss/core/clip_scoring.py` 承载 CLIP label presets、hash diagnostic
+    scorer、optional transformers scorer、mask crop scoring、cache signature 和
+    naming quality gate；旧 `objgauss/clip_scoring.py` 改为 wrapper。
+  - `objgauss/core/semantic_slots.py` 承载 cross-view slot alignment、record
+    filtering、slot naming quality、foreground-only / unique naming policy 和 slot
+    support rebalance；旧 `objgauss/semantic_slots.py` 改为 wrapper。
+  - `objgauss/core/baseline_comparison.py` 承载 baseline comparison 和 promotion
+    policy；旧 `objgauss/baseline_comparison.py` 改为 wrapper。
+  - `objgauss/core/emergence.py` 承载 object emergence metrics、emergence curve、
+    adjusted Rand index 和 mask proxy occlusion delta；旧 `objgauss/emergence.py`
+    改为 wrapper。
+  - `objgauss/core/semantics.py` 和 `objgauss/core/evaluation.py` 聚合入口已改为
+    从 core 实现导出。
+  - `objgauss/core/__init__.py` 增加 `validate_mask_manifest`、
+    `compare_baseline_candidates` 和 `object_emergence_metrics` lazy exports。
+  - `tests/test_core_namespace.py` 增加 mask、slot、CLIP、comparison 和 emergence
+    wrapper identity 检查，证明历史路径来自 core 实现。
+- 边界:
+  - 不移动训练 output registration、sample bundle、assets ingestion、demo builder
+    或 external trainer wrappers；这些属于后端 / pipeline contract 后续工作。
+  - 不移动或修改前端 Gaussian renderer 算法，不触碰 `src/`。
+  - 不改 CLI 命令、训练输出路径或素材布局。
+- 验证:
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 5 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 67 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### BACKEND-CONTRACT-001: Define backend model artifact manifest
+
+- 状态: done / model-artifact-manifest-contract
+- 类型: 标准 PR / backend contract
+- 目标: 在核心算法入口已抽取后，定义后端向前端提供 3D 模型的稳定 artifact
+  manifest，明确 quick splat、object-aware edit artifact、diagnostic full artifact、
+  source / license / hash / Gaussian count / object count / quality evidence 和
+  browser-ready delivery tier。
+- 已实施:
+  - 新增 `objgauss/model_manifest.py`，实现
+    `objgauss-model-artifact-manifest-v1` 静态 JSON/file contract。
+  - 新增 artifact roles: `quick_splat`、`object_edit`、`diagnostic_full`、
+    `source_gaussian`、`object_field`、`training_summary`、`quality_report`、
+    `compressed_chunked`。
+  - 新增 delivery tiers: `browser_quick`、`browser_edit`、`diagnostic`、
+    `training_internal`、`quality_evidence`。
+  - `build_model_artifact` 可记录 path、format、tier、browser readiness、
+    Gaussian/object counts、byte size、sha256、label 和 note。
+  - `build_model_artifact_manifest` / `write_model_artifact_manifest` /
+    `read_model_artifact_manifest` / `validate_model_artifact_manifest` 提供构建、
+    写入、读取和校验入口。
+  - `manifest_from_training_output` 可从现有 `training-output-manifest.json`
+    派生 model artifact manifest。
+  - 校验器强制 viewer-facing manifest 至少包含一个 `browser_ready` artifact，
+    并禁止 `diagnostic_full` / `source_gaussian` 被标记为 browser-ready。
+  - `docs/architecture/rebuild-plan.md` 已记录 model artifact manifest 字段、
+    roles、delivery tiers 和安全规则。
+  - 新增 `tests/test_model_manifest.py`，覆盖 roundtrip、training-output 派生、
+    browser-ready requirement 和 diagnostic full safety rule。
+- 边界:
+  - 不引入 HTTP 服务，不移动训练大资产，不发布 public demo。
+  - 不把 front-end asset library 改为 manifest 消费；这留给
+    `BACKEND-MANIFEST-ADAPTER-001`。
+  - 不移动或修改前端 Gaussian renderer 算法，不触碰 `src/`。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py`: 4 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 71 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### BACKEND-MANIFEST-ADAPTER-001: Map existing assets to model artifact manifests
+
+- 状态: done / model-artifact-adapters
+- 类型: 标准 PR / backend contract
+- 目标: 将现有 `training-output-manifest.json`、sample bundle 和 asset library entry
+  映射到 `objgauss-model-artifact-manifest-v1`，为后续 viewer 从 manifest 消费模型
+  资产做准备。
+- 已实施:
+  - `manifest_from_training_output(...)` 已可从现有 `training-output-manifest.json`
+    派生 quick splat、object edit、diagnostic full、object field 和 training quality
+    evidence。
+  - `manifest_from_sample_bundle(...)` 已可从 sample bundle 派生 quick splat、
+    object edit、source Gaussian、object field 和 sample training evidence。
+  - `manifest_from_asset_library_entry(...)` 已可从 asset library entry dict 派生
+    backend model artifact manifest。
+  - asset library adapter 会把 normal object-aware PLY 映射为 `object_edit` /
+    `browser_edit`，把 `deferObjectPly` 或 GB 级 object PLY 映射为
+    `diagnostic_full` / `browser_ready=false`。
+  - `tests/test_model_manifest.py` 增加 sample bundle adapter、regular asset entry
+    adapter 和 near-1M asset entry adapter fixtures；near-1M full PLY 被证明不会成为
+    browser-ready default artifact。
+  - `docs/architecture/rebuild-plan.md`、`project-status.md` 已记录 adapter 规则。
+- 边界:
+  - 不引入 HTTP 服务，不移动训练大资产，不发布 public demo。
+  - 不把前端 asset library 改为 manifest 消费；这留给
+    `VIEWER-MANIFEST-CONSUME-001`。
+  - 不移动或修改前端 Gaussian renderer 算法，不触碰 `src/`。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py`: 7 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 74 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,844.42 kB` / gzip `2,004.02 kB`)。
+- 完成 commit: pending
+
+### VIEWER-MANIFEST-CONSUME-001: Let viewer consume browser-ready manifest routes
+
+- 状态: done / viewer-manifest-routes
+- 类型: 标准 PR / frontend-backend boundary
+- 目标: 让前端素材库以最小改动消费 / 暴露 `objgauss-model-artifact-manifest-v1`
+  中的 browser-ready routes，保持 quick splat 和对象 / 诊断 PLY 入口清晰，避免
+  默认请求 diagnostic full artifact。
+- 已实施:
+  - 新增 `src/modelArtifactManifest.js`，在 viewer 侧按
+    `objgauss-model-artifact-manifest-v1` 从本地 asset library 派生
+    model artifact manifest 和 routes。
+  - `src/assetLibrary.js` 在模块加载时给可加载 Gaussian assets 绑定
+    `modelArtifactManifest` 与 `modelArtifactRoutes`；非 viewer 训练源 / mesh
+    候选保持原有资产信息。
+  - `src/App.jsx` 的 `loadAsset` 先解析 `quick_splat`、`object_edit` 和
+    `diagnostic_full` artifact，再选择 quick view、browser object-edit 或显式诊断
+    PLY 路线。
+  - near-1M full object PLY 暴露为 `diagnostic_full` / `browser_ready=false`；
+    quick view 激活 `quick_splat` / `browser_quick`，不会默认请求 full PLY。
+  - root DOM 和素材 card 增加 model manifest / active artifact telemetry，供
+    route audit 证明当前激活的是 browser-ready quick artifact 还是显式 diagnostic
+    artifact。
+  - `scripts/audit-large-model-viewer-route.mjs` 增加 manifest schema、quick
+    artifact、diagnostic artifact 和 active artifact role 检查。
+- 边界:
+  - 不引入 HTTP 服务；当前使用本地 static manifest / adapter result。
+  - 不移动训练大资产，不发布 public demo。
+  - 不重写或移动 Spark、Gaussian OIT、WebGPU tile / compute、shader、
+    object-state buffer、picking 等前端渲染算法。
+- 验证:
+  - `node --check src/modelArtifactManifest.js`: passed。
+  - `node --check src/assetLibrary.js`: passed。
+  - `node --check scripts/audit-large-model-viewer-route.mjs`: passed。
+  - near-1M asset route smoke: quick=`quick_splat/browser_ready=true`，
+    objectEdit=`null`，diagnostic=`diagnostic_full/browser_ready=false`。
+  - `npm run audit:large-model-viewer-route -- --url http://127.0.0.1:5400/ --no-server`:
+    passed，`quickObjectPlyRequests=0`、`editObjectPlyRequests=1`、
+    `directObjectPlyRequests=1`、`quickArtifactRole=quick_splat`、
+    `diagnosticArtifactRole=diagnostic_full`。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 74 passed。
+  - `npm run build`: passed，仍有当前回退基线既有 Vite chunk size warning
+    (`index` JS `5,850.87 kB` / gzip `2,005.89 kB`)。
+- 完成 commit: pending
+
+### PERF-BUNDLE-001: Split Spark / Three viewer bundles
+
+- 状态: done / renderer-bundles-lazy
+- 类型: 标准 PR / frontend performance
+- 目标: 对 Spark / Three 相关 viewer 代码做按需加载或拆包，降低当前 Vite bundle
+  size warning 对首屏体验的影响。
+- 已实施:
+  - `src/App.jsx` 使用 `React.lazy` / `Suspense` 按需加载 `SplatViewport`、
+    `PointCloudViewport` 和 `WebGpuTileViewport`。
+  - 新增轻量 `RendererModuleFallback`，动态 chunk 加载期间保持 viewer stage
+    非空并暴露基础 renderer telemetry。
+  - 新增 `src/sparkObjectMaskConfig.js`，把无 Spark / Three 依赖的 feather 配置
+    normalize 从 `src/sparkObjectMask.js` 拆出，避免 App 首屏静态引入
+    `@sparkjsdev/spark` / `three`。
+  - `src/sparkObjectMask.js` 保持 Spark object mask algorithm、dyno modifier、
+    feather map 和 mask stats 实现，只改为复用纯配置 helper。
+  - 构建结果从单一 `index` JS 约 `5,850.87 kB` 拆成主入口
+    `index-CHYQKagh.js` `254.72 kB` / gzip `79.77 kB`，以及按需的
+    `SplatViewport`、`PointCloudViewport`、`WebGpuTileViewport` chunks。
+- 边界:
+  - 不改变 renderer route contract 或 manifest artifact contract。
+  - 不删除 / 弱化 Spark、Gaussian OIT、WebGPU tile / compute、shader、
+    object-state buffer、picking 等前端渲染算法。
+  - 不移动训练大资产，不发布 public demo。
+  - Vite 仍会提示 lazy `SplatViewport` chunk 大约 `5,017.81 kB`，这是 Spark route
+    的按需成本，不再是首屏主包；后续若要继续优化，需要 renderer-level lazy Spark
+    runtime 或更小的 browser artifact / LOD。
+- 验证:
+  - `node --check src/sparkObjectMaskConfig.js`: passed。
+  - `node --check src/sparkObjectMask.js`: passed。
+  - `node --check src/modelArtifactManifest.js`: passed。
+  - `npm run build`: passed；主入口 JS `254.72 kB` / gzip `79.77 kB`。
+  - `npm run audit:large-model-viewer-route -- --url http://127.0.0.1:5400/ --no-server`:
+    passed，`quickObjectPlyRequests=0`、`editObjectPlyRequests=1`、
+    `directObjectPlyRequests=1`、`quickArtifactRole=quick_splat`、
+    `diagnosticArtifactRole=diagnostic_full`。
+  - `npm run audit:renderer-route-contract`: passed，`checks=16`、`failed=0`，
+    phases=`B-webgl-gaussian-oit:5/5,C-webgpu-tile:6/6,bridge-route-contract:5/5`。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 74 passed。
+- 完成 commit: pending
+
+### CHUNKED-GAUSSIAN-ARTIFACT-001: Define chunked browser Gaussian artifact contract
+
+- 状态: done / chunked-artifact-contract
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 在现有 `objgauss-model-artifact-manifest-v1` 上定义 chunked / compressed
+  browser artifact 的最小 contract，为后端把 4.5M / 1GB+ full PLY 转成可流式 /
+  分块加载的 viewer artifact 做准备。
+- 已实施:
+  - `objgauss/model_manifest.py` 新增 `CHUNK_INDEX_SCHEMA =
+    "objgauss-chunk-index-v1"`。
+  - `build_model_artifact(...)` 支持 `chunk_index`、`compression`、`lod` 和
+    `object_id_coverage` metadata。
+  - validator 对 `compressed_chunked` / `browser_ready=true` artifact 强制要求
+    `gaussian_count`、`object_count`、`byte_size`、`sha256`、`chunk_index`、
+    `compression`、`lod.levels` 和 `object_id_coverage`。
+  - chunk index 必须声明 schema、path、positive chunk count 和 sort key。
+  - object coverage 必须 `has_object_ids=true`，并记录 field、mode 和 object count；
+    object count 必须与 artifact-level `object_count` 一致。
+  - `docs/architecture/rebuild-plan.md` 已记录 chunked / compressed browser
+    artifact contract。
+  - `tests/test_model_manifest.py` 增加 browser-ready chunked artifact 正向 fixture，
+    以及缺 index / LOD / object coverage、缺 hash / bytes / counts 的负向测试。
+- 边界:
+  - 不把 full diagnostic PLY 重新标成 browser-ready。
+  - 不实现完整压缩 codec；本项只定义 manifest fields、chunk index reference、
+    LOD metadata、hash / byte-size / count / object-id coverage 和安全 gate。
+  - 不移动训练大资产，不发布 public demo，不改前端 renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py`: 10 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 77 passed。
+  - `npm run build`: passed，主入口仍为拆包后的 `254.72 kB` / gzip `79.77 kB`；
+    lazy Spark route chunk size warning 仍存在且属预期。
+- 完成 commit: pending
+
+### OGC-CHUNK-INDEX-001: Emit object-aware Gaussian chunk index
+
+- 状态: done / object-aware-chunk-index
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 基于 `GaussianCloud` / `object_id` 输出 `objgauss-chunk-index-v1`，为后续
+  OGC chunk binary writer、LOD 和 browser streaming loader 提供可测试 index。
+- 已实施:
+  - 新增 `objgauss/core/chunk_index.py`，实现 `build_chunk_index(...)`、
+    `validate_chunk_index(...)`、`write_chunk_index(...)`、`read_chunk_index(...)`
+    和 Morton code helper。
+  - 新增兼容 wrapper `objgauss/chunk_index.py`，并在 `objgauss.core` lazy exports
+    中暴露 `build_chunk_index`。
+  - `build_chunk_index(...)` 要求 `GaussianCloud` 带 `x/y/z/object_id` 字段，排序键
+    固定为 `object_id+morton_xyz`。
+  - chunk 不跨 object boundary；每个 chunk 记录 `chunk_id`、`object_id`、
+    `object_ids`、`gaussian_count`、`sorted_index_range`、AABB、center、radius
+    和 per-chunk LOD placeholder。
+  - 顶层 index 记录 schema、sort key、chunk size target、Gaussian/object counts、
+    full bounds、object id coverage、object summaries、global LOD placeholder 和 chunks。
+  - `ChunkIndexResult` 返回 `index` 和 `sorted_indices`；JSON 默认不写
+    per-Gaussian source indices，只有小型诊断显式 `include_source_indices=True` 时
+    才包含。
+  - `objgauss/model_manifest.py` 复用 core chunk index schema 常量，避免 schema
+    字符串分叉。
+- 边界:
+  - 只生成 chunk index metadata，不写 OGC binary，不做剪枝 / 量化 / VQ。
+  - 不移动训练大资产，不发布 public demo，不改前端 renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_chunk_index.py`: 5 passed。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 6 passed。
+  - `uv run --extra dev pytest tests/test_model_manifest.py`: 10 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 83 passed。
+  - `npm run build`: passed，主入口仍为拆包后的 `254.72 kB` / gzip `79.77 kB`；
+    lazy Spark route chunk size warning 仍存在且属预期。
+- 完成 commit: pending
+
+### OGC-BINARY-WRITER-001: Write minimal object-aware chunked Gaussian payload
+
+- 状态: done / minimal-ogc-payload-prototype
+- 类型: 标准 PR / backend-model-artifact performance
+- 目标: 基于 `objgauss-chunk-index-v1` 和 sorted indices 写最小 OGC binary payload
+  prototype，为后续压缩量化和 browser streaming loader 提供稳定输入。
+- 已实施:
+  - 新增 `objgauss/core/ogc_payload.py`，实现 `write_ogc_payload(...)`、
+    `read_ogc_payload(...)` 和 `records_from_cloud(...)`。
+  - 新增兼容 wrapper `objgauss/ogc_payload.py`，并在 `objgauss.core` lazy exports
+    中暴露 `write_ogc_payload`。
+  - `.ogc` payload 当前是 raw concatenated fixed-size records，不带二进制头；
+    `.index.json` 保存 payload schema、path、record format、record byte size、
+    byte size、sha256 和每个 chunk 的 byte range。
+  - prototype record format `objgauss-ogc-record-v0` 保存 `x/y/z`、RGB、opacity
+    和 `object_id`。
+  - writer 复用 `build_chunk_index(...)` 的 object-aware ordering，因此 chunk 不跨
+    object boundary，payload records 按 `object_id+morton_xyz` 排列。
+  - `read_ogc_payload(...)` 作为测试 / diagnostic reader，可按 index byte ranges
+    读回 sorted records。
+- 边界:
+  - 只写未压缩结构化 chunk payload prototype，不做剪枝 / VQ / adaptive SH /
+    entropy coding。
+  - 保留 `object_id` 和 per-chunk count / byte range metadata。
+  - 不把 full diagnostic PLY 标成 browser-ready，不移动训练大资产，不改前端 renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_ogc_payload.py`: 3 passed。
+  - `uv run --extra dev pytest tests/test_chunk_index.py`: 5 passed。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: 6 passed。
+  - `git diff --check`: passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 86 passed。
+  - `npm run build`: passed，主入口仍为拆包后的 `254.72 kB` / gzip `79.77 kB`；
+    lazy Spark route chunk size warning 仍存在且属预期。
+- 完成 commit: pending
 
 ### CLIP-BALANCE-001: Add slot support rebalance policy
 

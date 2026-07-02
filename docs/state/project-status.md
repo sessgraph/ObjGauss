@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-06-30
+> 最近更新: 2026-07-02
 
 ## 当前阶段
 
@@ -10,6 +10,179 @@ MVP 原型可运行，已完成流程化基线提交，已接入真实 3DGS spla
 CLI、资产布局、指标、模型产物和文档都可能在 stable release 前变化；HF 资产与本地
 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
 commercial demo release。
+
+## 架构重梳理基线
+
+2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
+`docs/architecture/rebuild-plan.md`。新的产品边界是：
+
+- 前端作为体验、交互和渲染层，负责加载模型、展示 3DGS 外观、对象选择 /
+  隐藏 / 隔离 / 删除预览、渲染路线和性能 telemetry；同时保留并继续迭代
+  ObjGauss 自有 Gaussian 渲染算法，包括 Gaussian OIT、WebGPU tile / compute
+  renderer、object-state buffer、shader、picking 和 Spark bridge。
+- 后端 / pipeline 层负责提供 3D 模型资产、登记外部训练输出、运行对象级处理
+  pipeline、产出 browser-ready artifact、manifest、hash、质量报告和后续服务接口。
+- 核心算法层优先抽取 Gaussian 数据模型、PLY / `.splat` IO、feature clustering、
+  Object Field、mask manifest、projection voting、cross-view slot alignment、
+  CLIP / semantic scoring adapter 和 promotion / evaluation policy。
+
+同日已完成 `VIEWER-MANIFEST-CONSUME-001`：前端素材库现在以最小改动消费 /
+暴露 backend model artifact manifest 的 browser-ready 路线，同时保留现有 renderer
+和对象交互行为。
+
+同日已完成最小代码切片：新增 `objgauss/core/` facade namespace，按领域暴露
+Gaussian 数据模型、IO、features、objects、Object Field、masks、projection /
+voting、semantics、evaluation 和 training handoff 入口。当前 facade 复用历史模块，
+不改变 CLI / UI 行为。
+
+随后已完成底层 kernel 移动：`GaussianCloud`、PLY / `.splat` IO、feature extraction、
+baseline clustering 和 hard object label 操作已经由 `objgauss/core/` 承载实现，
+旧 `objgauss/gaussians.py`、`ply.py`、`splat.py`、`features.py`、`clustering.py`
+和 `segment.py` 只作为兼容 wrapper。前端自有 Gaussian renderer 算法未移动、未删除。
+
+Object Field 与 projection / voting 也已迁移到 core：`objgauss/core/object_field.py`
+承载 Object Field soft slots、metrics、save/load、hard label export 和 NeRF dataset
+inspect；`objgauss/core/projection.py` 承载 `project_points`、mask voting、
+depth visibility diagnostic、projection loss training 和 vote quality gate。旧
+`objgauss/object_field.py` 与 `objgauss/mask_voting.py` 只作为兼容 wrapper。
+
+Mask / semantic / evaluation algorithms 也已迁移到 core：`objgauss/core/masks.py`
+承载 mask manifest build / validate、image readers、Lego RGBA classification 和
+SAM manifest adapter；`objgauss/core/clip_scoring.py` 承载 CLIP scoring adapter
+与 naming quality gate；`objgauss/core/semantic_slots.py` 承载 cross-view slot
+alignment、slot naming policy 和 slot support rebalance；`objgauss/core/baseline_comparison.py`
+与 `objgauss/core/emergence.py` 承载 comparison / promotion policy 和 object
+emergence metrics。旧 `objgauss/masks.py`、`clip_scoring.py`、`semantic_slots.py`、
+`baseline_comparison.py` 和 `emergence.py` 只作为兼容 wrapper。
+
+后端模型交付契约已定义：`objgauss/model_manifest.py` 实现
+`objgauss-model-artifact-manifest-v1`，用于描述后端提供给前端的 quick splat、
+object-edit artifact、diagnostic full artifact、training/internal artifacts、
+quality evidence、source / license / hash / Gaussian count / object count 和
+browser-ready delivery tier。契约明确禁止 `diagnostic_full` / `source_gaussian`
+被标成 `browser_ready=true`，防止 viewer 默认误拉 full PLY。
+
+同一模块也已提供 adapter：`manifest_from_training_output(...)`、
+`manifest_from_sample_bundle(...)` 和 `manifest_from_asset_library_entry(...)`。
+其中 asset library adapter 会把 deferred / large object PLY（例如 near-1M full PLY）
+映射为 `diagnostic_full` / `browser_ready=false`，只把 `.splat` quick view 和安全的
+object-edit artifact 暴露为 browser-ready。
+
+前端 manifest 消费已接入：`src/modelArtifactManifest.js` 按同一 schema 从本地
+asset library 派生 viewer-side manifest / routes；`src/App.jsx` 的加载入口先解析
+`quick_splat`、`object_edit` 和 `diagnostic_full` artifact，再选择 quick view 或显式
+对象 / 诊断 PLY 路线。near-1M quick view 只激活 `quick_splat` /
+`browser_quick`，full object PLY 暴露为 `diagnostic_full` /
+`browser_ready=false`，不会作为默认 quick route 请求。前端 Spark、Gaussian OIT、
+WebGPU tile / compute、shader、object-state buffer 和 picking 代码未重写。
+
+下一步若继续处理“加载慢”，应进入 `PERF-BUNDLE-001` 或后续 LOD / streaming /
+chunked artifact 设计；不要把 4.5M / 1GB+ full PLY 的显式诊断加载误当成默认交互
+路线。
+
+`PERF-BUNDLE-001` 已完成首轮 bundle 拆分：`src/App.jsx` 使用 `React.lazy`
+按需加载 `SplatViewport`、`PointCloudViewport` 和 `WebGpuTileViewport`；纯配置
+`sparkObjectMaskConfig.js` 从 Spark object mask renderer 中拆出，避免 App 首屏
+静态引入 `@sparkjsdev/spark` / `three`。`npm run build` 结果显示主入口 JS 从
+约 `5,850.87 kB` 降到 `254.72 kB` / gzip `79.77 kB`。Vite 仍会提示 lazy 的
+`SplatViewport` route chunk 约 `5,017.81 kB`，这是 Spark renderer 算法仍被保留并
+按需加载，不再是首屏主包。
+
+加载速度后续剩余问题分两类：首屏 bundle 已明显下降；near-1M full PLY 的显式对象 /
+诊断加载仍需要后端产出 LOD / streaming / chunked / compressed browser artifact 才能
+真正优化。
+
+`CHUNKED-GAUSSIAN-ARTIFACT-001` 已完成 contract 层：`objgauss/model_manifest.py`
+新增 `objgauss-chunk-index-v1` 常量，并允许 `compressed_chunked` artifact 记录
+`chunk_index`、`compression`、`lod` 和 `object_id_coverage` metadata。validator
+要求 browser-ready chunked artifact 必须带 artifact-level Gaussian/object count、
+byte size、sha256、chunk index、codec metadata、LOD levels 和完整 object id 覆盖；
+同时继续禁止把 diagnostic full PLY 标成 browser-ready。该 contract 能容纳 Owner
+提供的 Object-aware Gaussian Codec / OGC 方向；剪枝、量化、VQ、adaptive SH、
+entropy coding 和 WebGPU streaming loader 仍未实现，最小 chunk binary writer
+已在后续 OGC payload prototype 中落地。
+
+`OGC-CHUNK-INDEX-001` 已完成 metadata 生成层：`objgauss/core/chunk_index.py`
+基于 `GaussianCloud` 的 `x/y/z/object_id` 生成 `objgauss-chunk-index-v1`，排序键为
+`object_id+morton_xyz`，chunk 不跨 object，记录每个 chunk 的 object id、count、
+sorted range、AABB、center、radius 和 LOD metadata。该步骤仍不写 OGC binary、
+不做剪枝 / 量化 / VQ、不改变前端 renderer；它为下一步 OGC binary writer 和后续
+browser streaming loader 提供可测试 index。
+
+`OGC-BINARY-WRITER-001` 已完成最小 payload prototype：`objgauss/core/ogc_payload.py`
+使用 chunk index 和 sorted indices 写 `.ogc` raw chunk payload，并在 index chunk
+metadata 中记录 `byte_offset`、`byte_length`、`record_count` 和
+`record_format=objgauss-ogc-record-v0`。当前 record 保存 `x/y/z`、RGB、opacity 和
+`object_id`，用于证明 chunk byte ranges、metadata roundtrip 和 object id preservation。
+该步骤仍不做剪枝 / 实际量化写入 / VQ / adaptive SH / entropy coding，也未接入前端
+streaming loader。
+
+`OGC-MANIFEST-ADAPTER-001` 已完成 manifest 绑定层：`objgauss/model_manifest.py`
+新增 `build_compressed_chunked_artifact(...)`，可从 `.ogc` payload 和
+`objgauss-chunk-index-v1` `.index.json` 派生 `compressed_chunked` model artifact。
+该 adapter 自动登记 `gaussian_count`、`object_count`、`byte_size`、`sha256`、
+`chunk_index` summary、`compression`、`lod` 和 `object_id_coverage`，并继续要求
+diagnostic full PLY 保持 `browser_ready=false`。本步骤不改前端 loader、不发布大
+public demo asset、不移动训练产物。
+
+`OGC-LOD-SAMPLING-001` 已完成 deterministic object-aware LOD metadata：
+`objgauss/core/lod.py` 新增 `objgauss-object-aware-lod-v1` helper，默认 LOD ratios
+为 full / 50% / 20% / 5%。`build_chunk_index(...)` 现在会给 top-level index、
+object summary 和 chunk summary 写入 LOD levels，并保证每个正向 level 对每个
+object 至少保留 1 个 Gaussian，level counts 单调不增。`write_ogc_payload(...)`
+还会给 chunk-level LOD records 标注 `byte_offset` / `byte_length`，为后续 OGR /
+WebGPU streaming loader 提供 prefix-record 读取窗口。该步骤仍不改前端 loader、
+不做剪枝 / 量化 / VQ / entropy coding，也不移动前端 Gaussian OIT、WebGPU tile /
+compute、Spark bridge 等自有渲染算法。
+
+`OGC-QUANTIZATION-SCHEMA-001` 已完成 chunk-local quantization metadata 和 size
+estimator：`objgauss/core/quantization.py` 新增 `objgauss-local-quantization-v1`
+和 `objgauss-quantization-estimate-v1`，当前 policy 为
+`chunk-aabb-uint16-rgb8-opacity8-v0`。metadata 记录未来 payload 中 `xyz` 使用
+chunk AABB 内 `uint16 x3`、RGB 使用 `uint8 x3`、opacity 使用 `uint8`，`object_id`
+保存在 chunk metadata。`write_ogc_payload(...)` 现在会把该估算写入 index 和
+compression metadata，并证明估算 quantized payload 小于当前 raw OGC record payload；
+当前 `.ogc` 文件本身仍是 raw prototype，不是实际量化二进制。本步骤不改前端 loader、
+不做 VQ / adaptive SH / entropy coding，也不移动前端 Gaussian OIT、WebGPU tile /
+compute、Spark bridge 等自有渲染算法。
+
+`OGC-QUANTIZED-PAYLOAD-WRITER-001` 已完成第一个实际 chunk-local quantized OGC
+payload prototype：`objgauss/core/quantization.py` 新增
+`write_quantized_ogc_payload(...)` 和 `read_quantized_ogc_payload(...)`。quantized
+record 当前为 `objgauss-ogc-quantized-record-v0`，每个 Gaussian 写 `xyz uint16x3`
+、RGB `uint8x3` 和 opacity `uint8`，`object_id` 继续保存在 chunk metadata。测试已
+证明 quantized payload 字节数小于 raw OGC payload，diagnostic roundtrip 的位置 /
+opacity 误差有界，object id / chunk / LOD metadata 不丢失。本步骤仍不改前端 loader、
+不做 VQ / adaptive SH / entropy coding / WebGPU decoder，也不移动前端 Gaussian OIT、
+WebGPU tile / compute、Spark bridge 等自有渲染算法。
+
+`OGR-BROWSER-DECODER-001` 已完成 quantized OGC browser decoder contract：
+`src/ogcDecoder.js` 可把 `objgauss-ogc-quantized-payload-v0` chunk-local records
+解码为现有 renderer-compatible points，并保留 object / chunk / LOD metadata；
+`src/modelArtifactManifest.js` 现在会把 browser-ready `compressed_chunked`
+artifact 暴露为独立 route；`scripts/audit-ogc-decoder-contract.mjs` 用小 fixture
+验证 x/y/z、RGB、opacity、object_id、chunk id、LOD metadata 和 manifest route
+contract。该步骤不接入真实 near-1M 大资产、不发布 public demo，也不改写或替换
+Gaussian OIT、WebGPU tile / compute、Spark bridge 等前端自有渲染算法。
+
+Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
+侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
+对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：
+`src/App.jsx` 现在只渲染全屏 Three.js world、底部模型胶囊和浮动 inspector；
+`src/modelCatalog.js` 记录模型展品、核心点、load mode 和 per-object corepoint
+chunk 压缩计划；`scripts/audit-world-viewer.mjs` 验证 no sidebar、Three.js canvas、
+draggable model count、frosted-glass UI 和 selected model telemetry。near-1M
+diagnostic asset 不再作为首屏全量 PLY 拉取，而是作为 compressed-placeholder 展品
+和后续单对象压缩块加载计划出现。
+
+开源参考已写入 `docs/architecture/open-source-reference-map.md`。当前借鉴方向：
+GaussianSplats3D 的 Three.js splat world / `.ksplat` compressed scene / WebXR 思路；
+antimatter15/splat 的极简 browser viewer 和透明排序问题说明；SuperSplat 的 browser
+editor / inspect / optimize / publish workflow；A-Frame 与 Hubs 的 WebXR / in-world UI
+模型。边界仍然明确：不照搬外部 renderer，不删除 ObjGauss 自有前端 Gaussian OIT、
+WebGPU tile / compute、shader、object-state buffer、picking、Spark bridge 和 OGC
+decoder 等前端核心渲染算法；下一步清理的是旧产品 UI、旧审计入口和未再服务新世界
+入口的非核心代码。
 
 ## Hugging Face 开发阶段发布
 

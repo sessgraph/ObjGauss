@@ -4,6 +4,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
 
+import { MODEL_ARTIFACT_MANIFEST_SCHEMA } from "../src/modelArtifactManifest.js";
+
 const DEFAULT_PORT = 5395;
 const ASSET = {
   id: "nerf-lego-trained-near1m-random1300k-local",
@@ -51,6 +53,7 @@ try {
       `filter=${JSON.stringify(summary.filter)} cards=${summary.filteredCardCount} ` +
       `quickSplatRequests=${summary.quickSplatRequests} quickObjectPlyRequests=${summary.quickObjectPlyRequests} ` +
       `editObjectPlyRequests=${summary.editObjectPlyRequests} directObjectPlyRequests=${summary.directObjectPlyRequests} ` +
+      `quickArtifactRole=${summary.quickArtifactRole} diagnosticArtifactRole=${summary.diagnosticArtifactRole} ` +
       `screenshot=${summary.screenshotPath}`,
   );
 } finally {
@@ -101,16 +104,45 @@ async function runAudit(url) {
     if (nearPolicy !== "on-demand") {
       throw new Error(`near-1M card did not expose on-demand PLY policy: ${nearPolicy}`);
     }
+    const manifestSchema = await nearCard.getAttribute("data-model-manifest-schema");
+    const quickRole = await nearCard.getAttribute("data-model-artifact-quick-role");
+    const quickBrowserReady = await nearCard.getAttribute("data-model-artifact-quick-browser-ready");
+    const objectEditRole = await nearCard.getAttribute("data-model-artifact-object-edit-role");
+    const diagnosticRole = await nearCard.getAttribute("data-model-artifact-diagnostic-role");
+    const diagnosticBrowserReady = await nearCard.getAttribute("data-model-artifact-diagnostic-browser-ready");
+    if (manifestSchema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) {
+      throw new Error(`near-1M card did not expose model artifact manifest schema: ${manifestSchema}`);
+    }
+    if (quickRole !== "quick_splat" || quickBrowserReady !== "true") {
+      throw new Error(`near-1M quick artifact is not browser-ready quick_splat: ${quickRole}/${quickBrowserReady}`);
+    }
+    if (objectEditRole) {
+      throw new Error(`near-1M full PLY should not be exposed as browser object_edit: ${objectEditRole}`);
+    }
+    if (diagnosticRole !== "diagnostic_full" || diagnosticBrowserReady !== "false") {
+      throw new Error(`near-1M diagnostic artifact route mismatch: ${diagnosticRole}/${diagnosticBrowserReady}`);
+    }
 
     await nearCard.getByRole("button", { name: "快速查看" }).click();
-    await page.waitForFunction((assetId) => {
+    await page.waitForFunction(({ assetId, schema, splatPath, objectPlyPath }) => {
       const app = document.querySelector(".appShell");
       return (
         app?.getAttribute("data-active-asset-id") === assetId &&
         app?.getAttribute("data-object-ply-load-state") === "deferred" &&
-        app?.getAttribute("data-object-ply-load-mode") === "quick-view"
+        app?.getAttribute("data-object-ply-load-mode") === "quick-view" &&
+        app?.getAttribute("data-model-manifest-schema") === schema &&
+        app?.getAttribute("data-model-artifact-active-role") === "quick_splat" &&
+        app?.getAttribute("data-model-artifact-active-tier") === "browser_quick" &&
+        app?.getAttribute("data-model-artifact-active-browser-ready") === "true" &&
+        app?.getAttribute("data-model-artifact-active-path") === splatPath &&
+        app?.getAttribute("data-model-artifact-diagnostic-path") === objectPlyPath
       );
-    }, ASSET.id, { timeout: 15000 });
+    }, {
+      assetId: ASSET.id,
+      schema: MODEL_ARTIFACT_MANIFEST_SCHEMA,
+      splatPath: ASSET.splatPath,
+      objectPlyPath: ASSET.objectPlyPath,
+    }, { timeout: 15000 });
     await page.waitForFunction((splatPath) => {
       const app = document.querySelector(".appShell");
       return app?.getAttribute("data-splat-path") === splatPath;
@@ -122,14 +154,18 @@ async function runAudit(url) {
     }
 
     await page.locator(".modeTabs").getByRole("button", { name: "对象编辑" }).click();
-    await page.waitForFunction((assetId) => {
+    await page.waitForFunction(({ assetId, objectPlyPath }) => {
       const app = document.querySelector(".appShell");
       return (
         app?.getAttribute("data-active-asset-id") === assetId &&
         app?.getAttribute("data-object-ply-load-state") === "loaded" &&
-        app?.getAttribute("data-object-ply-load-mode") === "object-ply"
+        app?.getAttribute("data-object-ply-load-mode") === "object-ply" &&
+        app?.getAttribute("data-model-artifact-active-role") === "diagnostic_full" &&
+        app?.getAttribute("data-model-artifact-active-tier") === "diagnostic" &&
+        app?.getAttribute("data-model-artifact-active-browser-ready") === "false" &&
+        app?.getAttribute("data-model-artifact-active-path") === objectPlyPath
       );
-    }, ASSET.id, { timeout: 15000 });
+    }, { assetId: ASSET.id, objectPlyPath: ASSET.objectPlyPath }, { timeout: 15000 });
     const editObjectPlyRequests = objectPlyRequestCount - quickObjectPlyRequests;
     if (editObjectPlyRequests !== 1) {
       throw new Error(`object edit requested object PLY ${editObjectPlyRequests} time(s)`);
@@ -139,14 +175,17 @@ async function runAudit(url) {
     await expectReadyPage(page);
     const directCard = page.locator(`article.assetCard[data-asset-id="${ASSET.id}"]`).first();
     await directCard.getByRole("button", { name: "加载对象 PLY" }).click();
-    await page.waitForFunction((assetId) => {
+    await page.waitForFunction(({ assetId, objectPlyPath }) => {
       const app = document.querySelector(".appShell");
       return (
         app?.getAttribute("data-active-asset-id") === assetId &&
         app?.getAttribute("data-object-ply-load-state") === "loaded" &&
-        app?.getAttribute("data-object-ply-load-mode") === "object-ply"
+        app?.getAttribute("data-object-ply-load-mode") === "object-ply" &&
+        app?.getAttribute("data-model-artifact-active-role") === "diagnostic_full" &&
+        app?.getAttribute("data-model-artifact-active-browser-ready") === "false" &&
+        app?.getAttribute("data-model-artifact-active-path") === objectPlyPath
       );
-    }, ASSET.id, { timeout: 15000 });
+    }, { assetId: ASSET.id, objectPlyPath: ASSET.objectPlyPath }, { timeout: 15000 });
     const directObjectPlyRequests = objectPlyRequestCount - quickObjectPlyRequests - editObjectPlyRequests;
     if (directObjectPlyRequests !== 1) {
       throw new Error(`direct load requested object PLY ${directObjectPlyRequests} time(s)`);
@@ -172,6 +211,8 @@ async function runAudit(url) {
       quickObjectPlyRequests,
       editObjectPlyRequests,
       directObjectPlyRequests,
+      quickArtifactRole: "quick_splat",
+      diagnosticArtifactRole: "diagnostic_full",
       screenshotPath,
     };
   } finally {

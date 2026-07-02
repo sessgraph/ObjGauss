@@ -1,5 +1,10 @@
-"""Compatibility wrapper for core object emergence metrics."""
+"""Evaluation and promotion-policy entry points."""
 
+from objgauss.core.baseline_comparison import (
+    compare_baseline_candidates,
+    render_comparison_markdown,
+    write_comparison_markdown,
+)
 from objgauss.core.emergence import (
     adjusted_rand_index,
     mask_proxy_occlusion_delta,
@@ -10,8 +15,11 @@ from objgauss.core.emergence import (
 
 __all__ = [
     "adjusted_rand_index",
+    "compare_baseline_candidates",
     "mask_proxy_occlusion_delta",
     "object_emergence_curve",
     "object_emergence_metrics",
+    "render_comparison_markdown",
+    "write_comparison_markdown",
     "write_emergence_curve_csv",
 ]

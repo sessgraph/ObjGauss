@@ -1,1311 +1,615 @@
-import {
-  BarChart3,
-  Database,
-  Eye,
-  EyeOff,
-  FileUp,
-  Filter,
-  Layers3,
-  LoaderCircle,
-  RefreshCw,
-  Rotate3D,
-  Scissors,
-  Trash2,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+import { DragControls } from "three/examples/jsm/controls/DragControls.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { ASSET_LIBRARY, featuredAssets } from "./assetLibrary.js";
-import { parsePly, parsePlyFile } from "./ply.js";
-import PointCloudViewport from "./PointCloudViewport.jsx";
-import { rgbToCss } from "./palette.js";
-import { createSampleScene } from "./sampleScene.js";
-import SplatViewport from "./SplatViewport.jsx";
-import { normalizeSparkObjectMaskFeathering } from "./sparkObjectMask.js";
-import WebGpuTileViewport from "./WebGpuTileViewport.jsx";
-import {
-  detectWebGpuCapability,
-  editRendererContract,
-  INITIAL_WEBGPU_CAPABILITY,
-} from "./webgpuCapability.js";
-import {
-  normalizeWebGpuRuntimeProbe,
-  WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT,
-  WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
-} from "./webgpuRuntimeProbe.js";
-import {
-  buildWebGpuTileSmoke,
-  normalizeWebGpuCameraTuning,
-  normalizeWebGpuColorTuning,
-  normalizeWebGpuCoverageTuning,
-  normalizeWebGpuDepthSortTuning,
-  WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
-} from "./webgpuTileSmoke.js";
+import { MODEL_CATALOG, catalogSummary } from "./modelCatalog.js";
+import { parsePly } from "./ply.js";
 
-const FEATURED_ASSETS = featuredAssets();
-const LOCAL_SAMPLE_ASSET = ASSET_LIBRARY.find((asset) => asset.id === "plush-3dgs-local");
-const ASSET_FILTERS = [
-  { id: "all", label: "全部" },
-  { id: "trained", label: "训练模型" },
-  { id: "near1m", label: "near-1M" },
-  { id: "commercial", label: "商用" },
-];
-const BENCHMARK_GATES = [
-  { label: "Smoke", value: "pass" },
-  { label: "Candidate", value: "pass" },
-  { label: "Paper", value: "pass" },
-];
-const BENCHMARK_SCENES = [
-  {
-    id: "lego-safe-2000",
-    label: "Lego safe-2000",
-    ari: 0.469787,
-    oes: 0.784051,
-    render: 0.229397,
-    heldout: 0.197505,
-  },
-  {
-    id: "fern-smoke",
-    label: "Fern smoke",
-    ari: 0.790636,
-    oes: 0.780132,
-    render: 0.235029,
-    heldout: 0.233851,
-  },
-  {
-    id: "chair-smoke",
-    label: "Chair smoke",
-    ari: 0.614363,
-    oes: 0.757609,
-    render: 0.248716,
-    heldout: 0.224084,
-  },
-];
-const WEBGPU_RUNTIME_VIEWPORT_SIZE = 256;
-const WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE = 64;
-const WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE = 512;
-const WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE = 16;
-const WEBGPU_RUNTIME_HIGH_MAX_GAUSSIANS = 50_000;
-const WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS = 300_000;
-const WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE = 512;
-const WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE = 384;
-const WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE = 320;
-const UI_SPARK_OBJECT_MASK_FEATHER_OPACITY = 0.55;
-const SKIPPED_WEBGPU_CAPABILITY = Object.freeze({
-  status: "unavailable",
-  reason: "webgpu-capability-probe-skipped",
-  label: "未探测",
-});
-const HARD_MASK_QUALITY_BY_ASSET = {
-  "nerf-lego-alpha-closure-local": {
-    interpretation: "boundary-mixing-dominant",
-    label: "边界混合主导",
-    source: "hard-mask-quality-chain-v1",
-    deletedObjectId: 0,
-    hardMaskGapScore: 0.524659,
-    residualCoverageRatio: 1.170841,
-  },
-  "plush-semantic-closure-local": {
-    interpretation: "boundary-mixing-dominant",
-    label: "边界混合主导",
-    source: "hard-mask-quality-chain-v1",
-    deletedObjectId: 0,
-    hardMaskGapScore: 0.513937,
-    residualCoverageRatio: 1.303149,
-  },
-  "nerf-lego-trained-output-local": {
-    interpretation: "browser-residual-dominant",
-    label: "重建残差主导",
-    source: "hard-mask-quality-chain-v1",
-    deletedObjectId: 0,
-    hardMaskGapScore: 0.377656,
-    residualCoverageRatio: 15.599172,
-  },
-  "polyhaven-chair-commercial-demo-local": {
-    interpretation: "boundary-mixing-dominant",
-    label: "边界混合主导",
-    source: "hard-mask-quality-chain-v1",
-    deletedObjectId: 0,
-    hardMaskGapScore: 0.29813,
-    residualCoverageRatio: 1.075414,
-  },
+const INITIAL_CAMERA = {
+  position: [0, 4.7, 8.4],
+  target: [0, 0.95, 0],
 };
 
 export default function App() {
-  const [scene, setScene] = useState(() => createSampleScene());
-  const initialAssetLoaded = useRef(false);
-  const [viewMode, setViewMode] = useState("edit");
-  const [sideTab, setSideTab] = useState("samples");
-  const [assetFilter, setAssetFilter] = useState(readInitialAssetFilter);
-  const [renderMode, setRenderMode] = useState("original");
-  const [pointSize, setPointSize] = useState(0.018);
-  const [showGrid, setShowGrid] = useState(true);
-  const [showAxes, setShowAxes] = useState(true);
-  const [visibleIds, setVisibleIds] = useState(() => allIds(createSampleScene().points));
-  const [removedIds, setRemovedIds] = useState(() => new Set());
-  const [selectedId, setSelectedId] = useState(null);
-  const [isolatedId, setIsolatedId] = useState(null);
-  const [webGpuCapability, setWebGpuCapability] = useState(INITIAL_WEBGPU_CAPABILITY);
-  const [sparkObjectMaskFeathering, setSparkObjectMaskFeathering] = useState(
-    readInitialSparkObjectMaskFeathering,
+  const worldApi = useRef(null);
+  const loadStarted = useRef(false);
+  const [worldReady, setWorldReady] = useState(false);
+  const [selectedId, setSelectedId] = useState(MODEL_CATALOG[0]?.id ?? "");
+  const [models, setModels] = useState(() => initialModelStates());
+  const summary = useMemo(() => catalogSummary(MODEL_CATALOG), []);
+  const loadedCount = useMemo(
+    () => Object.values(models).filter((model) => model.status === "loaded").length,
+    [models],
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [objectPlyLoad, setObjectPlyLoad] = useState(() => objectPlyLoadState());
-  const webGpuCapabilityProbeEnabled = useMemo(readWebGpuCapabilityProbeEnabled, []);
+  const selected = models[selectedId] ?? Object.values(models)[0];
+
+  const patchModel = useCallback((id, patch) => {
+    setModels((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        ...patch,
+      },
+    }));
+  }, []);
+
+  const selectModel = useCallback((id) => {
+    setSelectedId(id);
+    worldApi.current?.focusModel(id);
+  }, []);
+
+  const handleWorldReady = useCallback((api) => {
+    worldApi.current = api;
+    setWorldReady(true);
+  }, []);
 
   useEffect(() => {
+    if (!worldReady || loadStarted.current) return;
+    loadStarted.current = true;
     let cancelled = false;
-    if (!webGpuCapabilityProbeEnabled) {
-      setWebGpuCapability(SKIPPED_WEBGPU_CAPABILITY);
-      return () => {
-        cancelled = true;
-      };
+
+    async function loadModels() {
+      for (const model of MODEL_CATALOG) {
+        if (cancelled) return;
+        if (model.loadMode !== "eager") {
+          const rendered = worldApi.current?.upsertModel(model, null);
+          patchModel(model.id, {
+            status: "compressed",
+            message: "compressed chunks",
+            displayCount: rendered?.displayCount ?? 0,
+            objectCount: model.objectCount,
+            corePoint: rendered?.corePoint ?? [0, 0, 0],
+          });
+          continue;
+        }
+
+        const startedAt = performance.now();
+        patchModel(model.id, { status: "loading", message: "loading" });
+        try {
+          const response = await fetch(model.sourcePath);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const cloud = parsePly(await response.arrayBuffer());
+          const rendered = worldApi.current?.upsertModel(model, cloud.points);
+          if (cancelled) return;
+          patchModel(model.id, {
+            status: "loaded",
+            message: "ready",
+            gaussianCount: cloud.points.length,
+            displayCount: rendered?.displayCount ?? 0,
+            objectCount: rendered?.objectCount ?? model.objectCount,
+            corePoint: rendered?.corePoint ?? null,
+            loadMs: Math.round(performance.now() - startedAt),
+          });
+        } catch (error) {
+          if (cancelled) return;
+          patchModel(model.id, {
+            status: "error",
+            message: error?.message ?? "load failed",
+          });
+        }
+      }
     }
-    detectWebGpuCapability().then((capability) => {
-      if (!cancelled) setWebGpuCapability(capability);
-    });
+
+    void loadModels();
     return () => {
       cancelled = true;
     };
-  }, [webGpuCapabilityProbeEnabled]);
-
-  const summary = useMemo(() => summarize(scene.points), [scene.points]);
-  const assetFilterCounts = useMemo(() => assetCountsByFilter(FEATURED_ASSETS), []);
-  const filteredAssets = useMemo(
-    () => filterAssets(FEATURED_ASSETS, assetFilter),
-    [assetFilter],
-  );
-  const renderModeText = renderModeLabel(renderMode);
-  const webGpuCoverageTuning = useMemo(readWebGpuCoverageTuning, []);
-  const webGpuDepthSortTuning = useMemo(readWebGpuDepthSortTuning, []);
-  const webGpuCameraTuning = useMemo(readWebGpuCameraTuning, []);
-  const webGpuColorTuning = useMemo(readWebGpuColorTuning, []);
-  const sparkReconstructProbe = useMemo(readSparkReconstructProbe, []);
-  const sparkPlySourceMode = useMemo(readSparkPlySourceMode, []);
-  const sparkNativeMaskMode = useMemo(readSparkNativeMaskMode, []);
-  const sparkFilteredEditEnabled = useMemo(readSparkFilteredEditEnabled, []);
-  const uploadedPlySplatSourceEnabled = useMemo(readUploadedPlySplatSourceEnabled, []);
-  const webGpuTileSmoke = useMemo(
-    () =>
-      buildWebGpuTileSmoke({
-        points: scene.points,
-        shRestCoefficients: scene.shRestCoefficients,
-        shRestCoefficientCount: scene.shRestCoefficientCount,
-        visibleIds,
-        removedIds,
-        isolatedId,
-        selectedId,
-        renderMode,
-        pointSize,
-        coverageTuning: webGpuCoverageTuning,
-        depthSortTuning: webGpuDepthSortTuning,
-        cameraTuning: webGpuCameraTuning,
-        colorTuning: webGpuColorTuning,
-      }),
-    [
-      scene.points,
-      scene.shRestCoefficients,
-      scene.shRestCoefficientCount,
-      visibleIds,
-      removedIds,
-      isolatedId,
-      selectedId,
-      renderMode,
-      pointSize,
-      webGpuCoverageTuning,
-      webGpuDepthSortTuning,
-      webGpuCameraTuning,
-      webGpuColorTuning,
-    ],
-  );
-  const editRenderer = useMemo(
-    () => editRendererContract(webGpuCapability, webGpuTileSmoke),
-    [webGpuCapability, webGpuTileSmoke],
-  );
-  const sceneObjectIds = useMemo(() => allIds(scene.points), [scene.points]);
-  const hasSplatRenderer = Boolean(scene.splatSource);
-  const objectEditActive = useMemo(
-    () =>
-      removedIds.size > 0 ||
-      isolatedId !== null ||
-      sceneObjectIds.size !== visibleIds.size ||
-      [...sceneObjectIds].some((id) => !visibleIds.has(id)),
-    [isolatedId, removedIds, sceneObjectIds, visibleIds],
-  );
-  const canUseSplatRenderer = hasSplatRenderer && renderMode === "original" && !objectEditActive;
-  const canUseSparkPlySourceRenderer =
-    hasSplatRenderer &&
-    renderMode === "original" &&
-    !objectEditActive &&
-    webGpuColorTuning.colorMode === "source" &&
-    sparkPlySourceMode !== "off" &&
-    (sparkPlySourceMode === "force" || sceneHasShRestSource(scene));
-  const canUseSparkFilteredRenderer =
-    hasSplatRenderer &&
-    renderMode === "original" &&
-    (objectEditActive || sparkReconstructProbe) &&
-    sparkFilteredEditEnabled &&
-    webGpuColorTuning.colorMode === "source";
-  const canUseSparkNativeMaskSource = hasSplatRenderer && !sceneHasShRestSource(scene);
-  const useSparkPlySourceRenderer = viewMode === "view" && canUseSparkPlySourceRenderer;
-  const useSplatRenderer = viewMode === "view" && canUseSplatRenderer && !useSparkPlySourceRenderer;
-  const useSparkFilteredRenderer = viewMode === "edit" && canUseSparkFilteredRenderer;
-  const useSparkNativeMaskRenderer =
-    useSparkFilteredRenderer &&
-    objectEditActive &&
-    (sparkNativeMaskMode === "force" ||
-      (sparkNativeMaskMode === "auto" && canUseSparkNativeMaskSource));
-  const useSparkPointRenderer = useSparkPlySourceRenderer || useSparkFilteredRenderer;
-  const waitForEditRenderer =
-    !useSplatRenderer && !useSparkPointRenderer && webGpuCapability.status === "pending";
-  const useWebGpuTileRenderer =
-    !useSplatRenderer && !useSparkPointRenderer && editRenderer.rendererId === "webgpu-tile";
-  const webGpuRuntimeProbe = useMemo(readWebGpuRuntimeProbe, []);
-  const webGpuRuntimeViewportRequest = useMemo(readWebGpuRuntimeViewportRequest, []);
-  const [webGpuRuntimeDisplaySize, setWebGpuRuntimeDisplaySize] = useState({ width: 0, height: 0 });
-  const updateWebGpuRuntimeDisplaySize = useCallback((nextSize) => {
-    const width = Math.max(0, Math.round(Number(nextSize?.width) || 0));
-    const height = Math.max(0, Math.round(Number(nextSize?.height) || 0));
-    setWebGpuRuntimeDisplaySize((current) =>
-      current.width === width && current.height === height ? current : { width, height },
-    );
-  }, []);
-  const webGpuRuntimeViewport = useMemo(
-    () =>
-      buildWebGpuRuntimeViewport({
-        probe: webGpuRuntimeProbe,
-        request: webGpuRuntimeViewportRequest,
-        displaySize: webGpuRuntimeDisplaySize,
-        gaussianCount: scene.points.length,
-      }),
-    [scene.points.length, webGpuRuntimeDisplaySize, webGpuRuntimeProbe, webGpuRuntimeViewportRequest],
-  );
-  const webGpuRuntimeTileSmoke = useMemo(() => {
-    if (!useWebGpuTileRenderer) return webGpuTileSmoke;
-    return buildWebGpuTileSmoke({
-      points: scene.points,
-      shRestCoefficients: scene.shRestCoefficients,
-      shRestCoefficientCount: scene.shRestCoefficientCount,
-      visibleIds,
-      removedIds,
-      isolatedId,
-      selectedId,
-      renderMode,
-      pointSize,
-      viewportWidth: webGpuRuntimeViewport.width,
-      viewportHeight: webGpuRuntimeViewport.height,
-      tileListMode: WEBGPU_TILE_LIST_MODE_OBJECT_STATE,
-      includeTileEntries: true,
-      includePixelOutput: true,
-      computePixelReference: false,
-      maxEntriesPerTile: Math.max(1, webGpuTileSmoke.maxTileOccupancy),
-      coverageTuning: webGpuCoverageTuning,
-      depthSortTuning: webGpuDepthSortTuning,
-      cameraTuning: webGpuCameraTuning,
-      colorTuning: webGpuColorTuning,
-    });
-  }, [
-    scene.points,
-    scene.shRestCoefficients,
-    scene.shRestCoefficientCount,
-    visibleIds,
-    removedIds,
-    isolatedId,
-    selectedId,
-    renderMode,
-    pointSize,
-    useWebGpuTileRenderer,
-    webGpuRuntimeViewport,
-    webGpuTileSmoke,
-    webGpuCoverageTuning,
-    webGpuDepthSortTuning,
-    webGpuCameraTuning,
-    webGpuColorTuning,
-  ]);
-  const activeEditRenderer = useMemo(
-    () =>
-      useWebGpuTileRenderer
-        ? editRendererContract(webGpuCapability, webGpuRuntimeTileSmoke)
-        : editRenderer,
-    [editRenderer, useWebGpuTileRenderer, webGpuCapability, webGpuRuntimeTileSmoke],
-  );
-  const activeRendererText = useSplatRenderer
-    ? "真实 Splat"
-    : useSparkPlySourceRenderer
-      ? "Spark PLY SH 源"
-    : useSparkFilteredRenderer
-      ? objectEditActive
-        ? useSparkNativeMaskRenderer
-          ? "Spark 原生 Splat 过滤"
-          : "Spark 过滤 Splat"
-        : "Spark PLY 重建"
-      : activeEditRenderer.rendererLabel;
-  const modeText = viewMode === "view" ? "真实查看" : "对象编辑";
-  const sparkObjectMaskFeatheringLabel = sparkObjectMaskFeathering.enabled
-    ? `柔化 ${sparkObjectMaskFeathering.opacity.toFixed(2)}`
-    : "关闭";
-  const rendererRoute = useMemo(
-    () =>
-      rendererRouteContract({
-        renderMode,
-        objectEditActive,
-        useSplatRenderer,
-        useSparkPlySourceRenderer,
-        useSparkFilteredRenderer,
-        useSparkNativeMaskRenderer,
-        useWebGpuTileRenderer,
-      }),
-    [
-      renderMode,
-      objectEditActive,
-      useSplatRenderer,
-      useSparkPlySourceRenderer,
-      useSparkFilteredRenderer,
-      useSparkNativeMaskRenderer,
-      useWebGpuTileRenderer,
-    ],
-  );
-  const hardMaskQuality = useMemo(
-    () => hardMaskQualityContract(scene, rendererRoute),
-    [scene, rendererRoute],
-  );
-  const visibleCount = useMemo(
-    () =>
-      scene.points.filter(
-        (point) =>
-          visibleIds.has(point.objectId) &&
-          !removedIds.has(point.objectId) &&
-          (isolatedId === null || point.objectId === isolatedId),
-      ).length,
-    [scene.points, visibleIds, removedIds, isolatedId],
-  );
-  const objectDataDeferred = Boolean(scene.deferredObjectAsset && scene.points.length === 0);
-  const sceneDisplayPointCount =
-    scene.points.length > 0 ? scene.points.length : Number(scene.gaussianCount) || 0;
-  const displayVisibleCount = objectDataDeferred ? sceneDisplayPointCount : visibleCount;
-
-  const applyScene = (next, options = {}) => {
-    setScene(next);
-    const ids = allIds(next.points);
-    setVisibleIds(ids);
-    setRemovedIds(new Set());
-    setSelectedId(null);
-    setIsolatedId(null);
-    setViewMode(options.viewMode ?? (next.splatSource ? "view" : "edit"));
-    setRenderMode("original");
-  };
-
-  const loadFile = async (file) => {
-    if (!file) return;
-    setBusy(true);
-    setError("");
-    try {
-      const next = await parsePlyFile(file);
-      if (!uploadedPlySplatSourceEnabled) {
-        next.splatSource = null;
-      }
-      setObjectPlyLoad(objectPlyLoadState({ state: "uploaded", mode: "file-upload", path: file.name }));
-      applyScene(next);
-    } catch (loadError) {
-      setError(loadError.message || "PLY 加载失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loadAsset = async (asset, options = {}) => {
-    if (!asset?.localPath) return;
-    setBusy(true);
-    setError("");
-    setObjectPlyLoad(
-      objectPlyLoadState({
-        assetId: asset.id,
-        state: asset.deferObjectPly && !options.forceObjectPly ? "deferred" : "loading",
-        mode: asset.deferObjectPly && !options.forceObjectPly ? "quick-view" : "object-ply",
-        path: asset.localPath,
-        splatPath: asset.splatPath,
-      }),
-    );
-    try {
-      if (asset.deferObjectPly && asset.splatPath && !options.forceObjectPly) {
-        applyScene(
-          {
-            assetId: asset.id,
-            name: asset.name,
-            points: [],
-            gaussianCount: asset.gaussianCount ?? 0,
-            deferredObjectAsset: asset,
-            splatSource: {
-              url: asset.splatPath,
-              fileName: asset.splatFileName ?? asset.name,
-            },
-          },
-          { viewMode: "view" },
-        );
-        return true;
-      }
-      const response = await fetch(asset.localPath);
-      if (!response.ok) {
-        throw new Error(`示例 PLY 加载失败 (${response.status})`);
-      }
-      const cloud = parsePly(await response.arrayBuffer());
-      applyScene({
-        assetId: asset.id,
-        name: asset.fileName ?? asset.name,
-        points: cloud.points,
-        gaussianCount: cloud.points.length,
-        shRestCoefficients: cloud.shRestCoefficients,
-        shRestCoefficientCount: cloud.shRestCoefficientCount,
-        shDegree: cloud.shDegree,
-        splatSource: {
-          url: asset.splatPath ?? asset.localPath,
-          fileName: asset.splatFileName ?? asset.fileName ?? asset.name,
-        },
-      });
-      setObjectPlyLoad(
-        objectPlyLoadState({
-          assetId: asset.id,
-          state: "loaded",
-          mode: options.forceObjectPly ? "object-ply" : "asset-load",
-          path: asset.localPath,
-          splatPath: asset.splatPath,
-        }),
-      );
-      return true;
-    } catch (loadError) {
-      setObjectPlyLoad(
-        objectPlyLoadState({
-          assetId: asset.id,
-          state: "error",
-          mode: options.forceObjectPly ? "object-ply" : "asset-load",
-          path: asset.localPath,
-          splatPath: asset.splatPath,
-        }),
-      );
-      setError(loadError.message || "示例 PLY 加载失败");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loadDeferredObjectPly = async ({
-    nextViewMode = "edit",
-    nextRenderMode = "original",
-  } = {}) => {
-    const asset = scene.deferredObjectAsset;
-    if (!asset?.localPath) return;
-    const loaded = await loadAsset(asset, { forceObjectPly: true });
-    if (!loaded) return;
-    setViewMode(nextViewMode);
-    setRenderMode(nextRenderMode);
-  };
-
-  const loadSample = () => loadAsset(LOCAL_SAMPLE_ASSET);
-
-  const loadAssetObjectPly = async (asset) => {
-    const loaded = await loadAsset(asset, { forceObjectPly: true });
-    if (!loaded) return;
-    setViewMode("edit");
-  };
-
-  useEffect(() => {
-    if (initialAssetLoaded.current) return;
-    initialAssetLoaded.current = true;
-    const assetId = readInitialAssetId();
-    if (!assetId) return;
-    const asset = ASSET_LIBRARY.find((item) => item.id === assetId);
-    if (!asset?.localPath) return;
-    setSideTab("samples");
-    void loadAsset(asset);
-  }, []);
-
-  const resetDemo = () => {
-    const next = createSampleScene();
-    setScene(next);
-    setVisibleIds(allIds(next.points));
-    setRemovedIds(new Set());
-    setSelectedId(null);
-    setIsolatedId(null);
-    setViewMode("edit");
-    setRenderMode("original");
-    setError("");
-    setObjectPlyLoad(objectPlyLoadState());
-  };
-
-  const enterViewMode = () => {
-    if (!hasSplatRenderer) return;
-    setVisibleIds(new Set(sceneObjectIds));
-    setRemovedIds(new Set());
-    setIsolatedId(null);
-    setRenderMode("original");
-    setViewMode("view");
-  };
-
-  const enterEditMode = () => {
-    if (objectDataDeferred) {
-      void loadDeferredObjectPly({ nextViewMode: "edit" });
-      return;
-    }
-    setViewMode("edit");
-  };
-
-  const setEditRenderMode = (mode) => {
-    if (mode === "clustered" && objectDataDeferred) {
-      void loadDeferredObjectPly({ nextViewMode: "edit", nextRenderMode: "clustered" });
-      return;
-    }
-    setRenderMode(mode);
-    if (mode === "clustered") {
-      setViewMode("edit");
-    }
-  };
-
-  const toggleSparkObjectMaskFeathering = useCallback((enabled) => {
-    setSparkObjectMaskFeathering((current) =>
-      normalizeSparkObjectMaskFeathering({
-        ...current,
-        enabled,
-        opacity: current.opacity > 0 && current.opacity < 1
-          ? current.opacity
-          : UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
-      }),
-    );
-  }, []);
-
-  const selectObject = (id) => {
-    setSelectedId(id);
-    setViewMode("edit");
-  };
-
-  const toggleVisible = (id) => {
-    setViewMode("edit");
-    setVisibleIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const removeSelected = () => {
-    if (selectedId === null) return;
-    setViewMode("edit");
-    setRenderMode("original");
-    setIsolatedId(null);
-    setRemovedIds((current) => new Set([...current, selectedId]));
-  };
-
-  const restoreRemoved = () => {
-    setRemovedIds(new Set());
-  };
-
-  const isolateSelected = () => {
-    if (selectedId === null) return;
-    setViewMode("edit");
-    setIsolatedId(selectedId);
-  };
+  }, [patchModel, worldReady]);
 
   return (
     <main
-      className="appShell"
-      data-renderer-route={rendererRoute.id}
-      data-renderer-route-kind={rendererRoute.kind}
-      data-color-mode-role={rendererRoute.colorModeRole}
-      data-source-preview-boundary={rendererRoute.sourceBoundary}
-      data-source-preview-result={rendererRoute.sourceResult}
-      data-preview-quality={rendererRoute.qualityId}
-      data-hard-mask-quality-interpretation={hardMaskQuality.interpretation}
-      data-hard-mask-quality-source={hardMaskQuality.source}
-      data-hard-mask-gap-score={hardMaskQuality.hardMaskGapScore ?? ""}
-      data-hard-mask-residual-coverage-ratio={hardMaskQuality.residualCoverageRatio ?? ""}
-      data-hard-mask-deleted-object={hardMaskQuality.deletedObjectId ?? ""}
-      data-spark-object-mask-feather-control="ui-v1"
-      data-spark-object-mask-feather-enabled={String(sparkObjectMaskFeathering.enabled)}
-      data-spark-object-mask-feather-opacity={sparkObjectMaskFeathering.opacity}
-      data-spark-object-mask-feather-radius={sparkObjectMaskFeathering.radius}
-      data-active-asset-id={scene.assetId ?? ""}
-      data-asset-filter={assetFilter}
-      data-asset-filter-count={filteredAssets.length}
-      data-asset-filter-trained-count={assetFilterCounts.trained ?? 0}
-      data-object-ply-load-state={objectPlyLoad.state}
-      data-object-ply-load-mode={objectPlyLoad.mode}
-      data-object-ply-asset-id={objectPlyLoad.assetId}
-      data-object-ply-path={objectPlyLoad.path}
-      data-splat-path={scene.splatSource?.url ?? objectPlyLoad.splatPath}
+      className="worldShell"
+      data-app-mode="vr-three-world"
+      data-three-renderer="enabled"
+      data-sidebars="none"
+      data-frosted-ui="enabled"
+      data-model-count={MODEL_CATALOG.length}
+      data-loaded-count={loadedCount}
+      data-selected-model={selected?.id ?? ""}
+      data-compression-layout="per-object-corepoint-chunks"
     >
-      <header className="topbar">
-        <div className="brand">
-          <div className="brandMark">
-            <Layers3 size={19} />
-          </div>
+      <ThreeWorld
+        models={MODEL_CATALOG}
+        selectedId={selectedId}
+        onReady={handleWorldReady}
+        onSelectModel={setSelectedId}
+        onModelMoved={(id, position) => patchModel(id, { galleryPosition: position })}
+      />
+
+      <div className="glassHud topHud">
+        <div className="brandBlock">
+          <div className="brandMark">OG</div>
           <div>
-            <h1>ObjGauss 查看器</h1>
-            <p>对象级高斯点云预览</p>
+            <h1>ObjGauss</h1>
+            <span>VR 3D Gaussian World</span>
           </div>
         </div>
-
-        <nav className="modeTabs" aria-label="工作模式">
-          <button
-            className={`modeTab ${viewMode === "view" ? "active" : ""}`}
-            type="button"
-            onClick={enterViewMode}
-            disabled={!hasSplatRenderer}
-            title={objectEditActive ? "清除编辑预览并查看真实 splat 外观" : "查看真实 splat 外观"}
-          >
-            <Rotate3D size={17} />
-            <span>真实查看</span>
-          </button>
-          <button
-            className={`modeTab ${viewMode === "edit" ? "active" : ""}`}
-            type="button"
-            onClick={enterEditMode}
-            title="对象操作使用点云编辑预览"
-          >
-            <Scissors size={17} />
-            <span>对象编辑</span>
-          </button>
-        </nav>
-
-        <div className="topActions">
-          <select
-            value={renderMode}
-            onChange={(event) => setEditRenderMode(event.target.value)}
-            aria-label="渲染模式"
-          >
-            <option value="original">自身颜色</option>
-            <option value="clustered">对象色诊断</option>
-          </select>
-          <button className="iconButton" type="button" onClick={resetDemo} title="重置演示">
-            <RefreshCw size={17} />
-          </button>
+        <div className="metricStrip">
+          <Metric label="模型" value={summary.modelCount} />
+          <Metric label="已加载" value={loadedCount} />
+          <Metric label="压缩原型" value={summary.compressedReadyCount} />
         </div>
-      </header>
+        <button className="glassButton" type="button" onClick={() => worldApi.current?.resetCamera()}>
+          重置视角
+        </button>
+      </div>
 
-      <section className="workspace">
-        <aside className="leftPanel">
-          <section className="panelSection">
-            <h2>数据</h2>
-            <label className="loadButton">
-              {busy ? <LoaderCircle className="spin" size={18} /> : <FileUp size={18} />}
-              <span>加载 PLY</span>
-              <input
-                type="file"
-                accept=".ply"
-                onChange={(event) => loadFile(event.target.files?.[0])}
-              />
-            </label>
-            <button
-              className="secondaryButton sampleButton"
-              type="button"
-              disabled={busy}
-              onClick={loadSample}
-            >
-              <Database size={16} />
-              加载示例 3DGS
-            </button>
-            <div className="fileBox">
-              <span>{scene.name}</span>
-              <small>
-                {sceneDisplayPointCount.toLocaleString()} 个高斯点
-                {objectDataDeferred ? " / 对象数据未加载" : ""}
-              </small>
-            </div>
-            {objectDataDeferred && (
-              <>
-                <div className="hintText">
-                  当前使用 {scene.deferredObjectAsset.splatSizeLabel ?? ".splat"} Splat；对象编辑需加载{" "}
-                  {scene.deferredObjectAsset.objectPlySizeLabel ?? "PLY"} PLY。
-                </div>
-                <button
-                  className="secondaryButton"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => loadDeferredObjectPly({ nextViewMode: "edit" })}
-                >
-                  <Database size={16} />
-                  加载对象 PLY
-                </button>
-              </>
-            )}
-            {error && <div className="errorBox">{error}</div>}
-          </section>
-
-          <section className="panelSection">
-            <h2>场景</h2>
-            <ControlRow label="工作模式">
-              <div className="modeToggle" role="group" aria-label="工作模式">
-                <button
-                  className={viewMode === "view" ? "active" : ""}
-                  type="button"
-                  onClick={enterViewMode}
-                  disabled={!hasSplatRenderer}
-                  title={objectEditActive ? "清除编辑预览并查看真实 splat 外观" : "查看真实 splat 外观"}
-                >
-                  真实查看
-                </button>
-                <button
-                  className={viewMode === "edit" ? "active" : ""}
-                  type="button"
-                  onClick={enterEditMode}
-                >
-                  对象编辑
-                </button>
-              </div>
-            </ControlRow>
-            <ControlRow label="颜色模式">
-              <select value={renderMode} onChange={(event) => setEditRenderMode(event.target.value)}>
-                <option value="original">自身颜色</option>
-                <option value="clustered">对象色诊断</option>
-              </select>
-            </ControlRow>
-            <ControlRow label="点大小">
-              <input
-                type="range"
-                min="0.006"
-                max="0.05"
-                step="0.002"
-                value={pointSize}
-                onChange={(event) => setPointSize(Number(event.target.value))}
-              />
-              <span className="value">{pointSize.toFixed(3)}</span>
-            </ControlRow>
-            <label className="checkRow">
-              <input
-                type="checkbox"
-                checked={showGrid}
-                onChange={(event) => setShowGrid(event.target.checked)}
-              />
-              显示网格
-            </label>
-            <label className="checkRow">
-              <input
-                type="checkbox"
-                checked={showAxes}
-                onChange={(event) => setShowAxes(event.target.checked)}
-              />
-              显示坐标轴
-            </label>
-            <label className="checkRow" title="诊断开关：对 Spark 对象 mask 边界使用可审计 feather">
-              <input
-                type="checkbox"
-                checked={sparkObjectMaskFeathering.enabled}
-                disabled={!hasSplatRenderer}
-                onChange={(event) => toggleSparkObjectMaskFeathering(event.target.checked)}
-              />
-              柔化删除边界
-            </label>
-          </section>
-
-          <section className="panelSection assetLibraryPanel">
-            <div className="sectionTitleRow">
-              <h2>素材库</h2>
-              <span>{filteredAssets.length} / {FEATURED_ASSETS.length} 个可加载样例</span>
-            </div>
-            <div className="panelTabs" role="tablist" aria-label="素材库视图">
-              <button
-                className={sideTab === "samples" ? "active" : ""}
-                type="button"
-                role="tab"
-                aria-selected={sideTab === "samples"}
-                onClick={() => setSideTab("samples")}
-              >
-                可打开样例
-              </button>
-              <button
-                className={sideTab === "benchmark" ? "active" : ""}
-                type="button"
-                role="tab"
-                aria-selected={sideTab === "benchmark"}
-                onClick={() => setSideTab("benchmark")}
-              >
-                Benchmark
-              </button>
-            </div>
-            {sideTab === "samples" ? (
-              <>
-                <div className="assetFilterBar" role="group" aria-label="素材筛选">
-                  {ASSET_FILTERS.map((filter) => (
-                    <button
-                      className={assetFilter === filter.id ? "active" : ""}
-                      type="button"
-                      key={filter.id}
-                      data-asset-filter-option={filter.id}
-                      aria-pressed={assetFilter === filter.id}
-                      onClick={() => setAssetFilter(filter.id)}
-                    >
-                      <Filter size={13} />
-                      <span>{filter.label}</span>
-                      <strong>{assetFilterCounts[filter.id] ?? 0}</strong>
-                    </button>
-                  ))}
-                </div>
-                <div className="assetCards">
-                {filteredAssets.map((asset) => (
-                  <article
-                    className="assetCard"
-                    key={asset.id}
-                    data-asset-id={asset.id}
-                    data-asset-filter-trained={String(isTrainedAsset(asset))}
-                    data-asset-filter-near1m={String(isNear1mAsset(asset))}
-                    data-asset-defer-object-ply={String(Boolean(asset.deferObjectPly))}
-                    data-object-ply-policy={asset.deferObjectPly ? "on-demand" : "eager"}
-                  >
-                    <div className="assetMeta">
-                      <span>{asset.category}</span>
-                      <span>{asset.pipelineStage}</span>
-                      <span>{asset.priority}</span>
-                    </div>
-                    <strong>{asset.name}</strong>
-                    <p>{asset.bestFor}</p>
-                    {asset.deferObjectPly && (
-                      <div className="assetLoadPolicy">
-                        <span>快速查看 {asset.splatSizeLabel ?? ".splat"}</span>
-                        <span>对象 PLY 按需 {asset.objectPlySizeLabel ?? ""}</span>
-                      </div>
-                    )}
-                    <div className="assetUseCases" aria-label={`${asset.name} 用途`}>
-                      {asset.useCases.map((useCase) => (
-                        <span key={useCase}>{useCase}</span>
-                      ))}
-                    </div>
-                    <div className="assetTags" aria-label={`${asset.name} 格式`}>
-                      {asset.formats.slice(0, 3).map((format) => (
-                        <span key={format}>{format}</span>
-                      ))}
-                    </div>
-                    <div className="assetFooter">
-                      <span className="assetStatus ready">{asset.status}</span>
-                      <div className="assetActions">
-                        <button
-                          className="assetActionButton"
-                          type="button"
-                          disabled={busy}
-                          onClick={() => loadAsset(asset)}
-                        >
-                          {asset.deferObjectPly ? "快速查看" : "加载"}
-                        </button>
-                        {asset.deferObjectPly && (
-                          <button
-                            className="assetActionButton secondary"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => loadAssetObjectPly(asset)}
-                          >
-                            加载对象 PLY
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                ))}
-                {filteredAssets.length === 0 && (
-                  <div className="emptyAssetState">当前筛选没有可加载样例</div>
-                )}
-                </div>
-              </>
-            ) : (
-              <BenchmarkPanel />
-            )}
-          </section>
-
-          <section className="panelSection">
-            <h2>视图</h2>
-            <button className="secondaryButton" type="button" onClick={resetDemo}>
-              <RefreshCw size={16} />
-              重置演示
-            </button>
-            <div className="hintText">
-              路线：{rendererRoute.label} / {rendererRoute.qualityLabel}。
-            </div>
-          </section>
-        </aside>
-
-        <section className="viewerStage" aria-label="3D 视图">
-          <div
-            className={`routeBadge ${rendererRoute.tone}`}
-            title={rendererRoute.title}
-            aria-hidden="true"
+      <div className="glassHud objectDock" aria-label="模型入口">
+        {Object.values(models).map((model) => (
+          <button
+            className={`modelPill ${selectedId === model.id ? "selected" : ""}`}
+            type="button"
+            key={model.id}
+            data-model-row-id={model.id}
+            data-model-load-state={model.status}
+            onClick={() => selectModel(model.id)}
           >
-            <span>{rendererRoute.label}</span>
-            <strong>{rendererRoute.qualityLabel}</strong>
-          </div>
-          {!useSplatRenderer && !useSparkPlySourceRenderer && (
-            <div className="viewportBanner">
-              <strong>{rendererRoute.bannerTitle}</strong>
-              <span>{renderModeText} / {activeRendererText}</span>
-              {hasSplatRenderer && objectEditActive ? (
-                <button className="bannerAction" type="button" onClick={enterViewMode}>
-                  <Rotate3D size={15} />
-                  真实 Splat
-                </button>
-              ) : null}
+            <span className="modelAccent" style={{ background: model.accent }} />
+            <span>{model.label}</span>
+            <small>{model.status}</small>
+          </button>
+        ))}
+      </div>
+
+      {selected ? (
+        <section className="glassHud floatingInspector" data-floating-inspector="true">
+          <div className="inspectorHead">
+            <span className="modelAccent large" style={{ background: selected.accent }} />
+            <div>
+              <h2>{selected.name}</h2>
+              <span>{selected.kind}</span>
             </div>
-          )}
-          {useSplatRenderer || useSparkPointRenderer ? (
-            <SplatViewport
-              source={scene.splatSource}
-              points={useSparkPointRenderer ? scene.points : null}
-              shRestCoefficients={useSparkPointRenderer ? scene.shRestCoefficients : null}
-              shRestCoefficientCount={useSparkPointRenderer ? scene.shRestCoefficientCount : 0}
-              visibleIds={useSparkFilteredRenderer ? visibleIds : null}
-              removedIds={useSparkFilteredRenderer ? removedIds : null}
-              isolatedId={useSparkFilteredRenderer ? isolatedId : null}
-              renderMode={renderMode}
-              filtered={useSparkPointRenderer}
-              reconstructRole={useSparkPlySourceRenderer ? "source" : "filter"}
-              filterSource={useSparkNativeMaskRenderer ? "native-splat" : "ply-packed"}
-              objectMaskFeathering={sparkObjectMaskFeathering}
-              showGrid={showGrid}
-              showAxes={showAxes}
-              pointCount={useSparkFilteredRenderer ? visibleCount : sceneDisplayPointCount}
-              rendererLabel={activeRendererText}
-              selectedId={useSparkFilteredRenderer ? selectedId : null}
-              onSelectObject={useSparkFilteredRenderer ? selectObject : null}
-            />
-          ) : waitForEditRenderer ? (
-            <RendererPendingViewport
-              rendererContract={activeEditRenderer}
-              visibleCount={visibleCount}
-              renderModeLabel={renderModeText}
-            />
-          ) : useWebGpuTileRenderer ? (
-            <WebGpuTileViewport
-              points={scene.points}
-              visibleIds={visibleIds}
-              removedIds={removedIds}
-              isolatedId={isolatedId}
-              tileSmoke={webGpuRuntimeTileSmoke}
-              rendererContract={activeEditRenderer}
-              onSelectObject={selectObject}
-              renderModeLabel={renderModeText}
-              runtimeViewportAspectMode={webGpuRuntimeViewport.aspectMode}
-              runtimeViewportQuality={webGpuRuntimeViewport.quality}
-              runtimeViewportPixelBudget={webGpuRuntimeViewport.pixelBudget}
-              onDisplaySizeChange={updateWebGpuRuntimeDisplaySize}
-            />
-          ) : (
-            <PointCloudViewport
-              points={scene.points}
-              visibleIds={visibleIds}
-              removedIds={removedIds}
-              renderMode={renderMode}
-              pointSize={pointSize}
-              showGrid={showGrid}
-              showAxes={showAxes}
-              isolatedId={isolatedId}
-              selectedId={selectedId}
-              onSelectObject={selectObject}
-              renderModeLabel={renderModeText}
-              rendererContract={activeEditRenderer}
-            />
-          )}
+          </div>
+          <dl className="metaGrid">
+            <Meta label="加载状态" value={selected.message ?? selected.status} />
+            <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
+            <Meta label="展示点" value={formatNumber(selected.displayCount)} />
+            <Meta label="对象" value={formatNumber(selected.objectCount)} />
+            <Meta label="核心点" value={formatVec(selected.corePoint)} />
+            <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
+            <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
+            <Meta label="分块根" value={selected.compression?.chunkRoot ?? "-"} />
+          </dl>
         </section>
+      ) : null}
 
-        <aside className="rightPanel">
-          <section className="panelSection inspectorHead">
-            <h2>对象检查器</h2>
-            <div className="metricGrid">
-              <Metric label="对象" value={objectDataDeferred ? "待加载" : summary.length} />
-              <Metric label="高斯点" value={sceneDisplayPointCount.toLocaleString()} />
-              <Metric label="可见" value={displayVisibleCount.toLocaleString()} />
-            </div>
-          </section>
-
-          <section className="objectList" aria-label="对象列表">
-            <div className="objectListHead">
-              <span>对象 ID</span>
-              <span>对象色</span>
-              <span>点数</span>
-              <span>可见</span>
-            </div>
-            {summary.map((item) => (
-              <div
-                key={item.id}
-                className={`objectRow ${selectedId === item.id ? "selected" : ""} ${
-                  removedIds.has(item.id) ? "removed" : ""
-                }`}
-              >
-                <button
-                  className="objectSelectButton"
-                  type="button"
-                  aria-pressed={selectedId === item.id}
-                  onClick={() => selectObject(item.id)}
-                >
-                  <span className="idCell">{item.id}</span>
-                  <span
-                    className="swatch"
-                    style={{ backgroundColor: rgbToCss(item.color) }}
-                    aria-hidden="true"
-                  />
-                  <span>{item.count.toLocaleString()}</span>
-                </button>
-                <button
-                  className="eyeButton"
-                  type="button"
-                  aria-pressed={visibleIds.has(item.id)}
-                  aria-label={`${visibleIds.has(item.id) ? "隐藏" : "显示"}对象 ${item.id}`}
-                  onClick={() => toggleVisible(item.id)}
-                >
-                  {visibleIds.has(item.id) ? <Eye size={16} /> : <EyeOff size={16} />}
-                </button>
-              </div>
-            ))}
-          </section>
-
-          <section className="panelSection actionPanel">
-            <h2>对象操作</h2>
-            <button
-              className="accentButton"
-              type="button"
-              disabled={selectedId === null}
-              onClick={isolateSelected}
-            >
-              <Scissors size={16} />
-              只看所选
-            </button>
-            <button className="secondaryButton" type="button" onClick={() => setIsolatedId(null)}>
-              <Eye size={16} />
-              取消隔离
-            </button>
-            <button
-              className="dangerButton"
-              type="button"
-              disabled={selectedId === null || removedIds.has(selectedId)}
-              onClick={removeSelected}
-            >
-              <Trash2 size={16} />
-              预览删除
-            </button>
-          </section>
-
-          <section className="panelSection statePanel">
-            <h2>渲染状态</h2>
-            <StateRow label="工作模式" value={modeText} />
-            <StateRow label="展示路线" value={rendererRoute.label} />
-            <StateRow label="渲染器" value={activeRendererText} />
-            <StateRow label="颜色用途" value={rendererRoute.colorRoleLabel} />
-            <StateRow label="预览边界" value={rendererRoute.sourceBoundaryLabel} />
-            <StateRow label="删除结果" value={rendererRoute.sourceResultLabel} />
-            <StateRow label="边界柔化" value={sparkObjectMaskFeatheringLabel} />
-            <StateRow label="质量解释" value={hardMaskQuality.label} />
-            <StateRow label="目标渲染器" value={activeEditRenderer.targetRendererLabel} />
-            <StateRow label="目标状态" value={`${activeEditRenderer.targetGate} / ${activeEditRenderer.targetGateReason}`} />
-            <StateRow
-              label="存储门禁"
-              value={`${activeEditRenderer.storageLimitGate} / ${activeEditRenderer.storageEstimatedMaxBufferKey || "none"} ${formatBytes(activeEditRenderer.storageEstimatedMaxBufferByteSize)}`}
-            />
-            <StateRow label="WebGPU" value={activeEditRenderer.webGpuLabel} />
-            <StateRow label="回退原因" value={activeEditRenderer.fallbackReason} />
-            <StateRow
-              label="WebGPU pack"
-              value={`${activeEditRenderer.packedGaussians.toLocaleString()} / ${activeEditRenderer.objectCount}`}
-            />
-            <StateRow
-              label="Tile bins"
-              value={`${activeEditRenderer.activeTileCount.toLocaleString()} / ${activeEditRenderer.tileCount.toLocaleString()}`}
-            />
-            <StateRow
-              label="Tile capacity"
-              value={`${activeEditRenderer.tileCapacityStatus} / ${activeEditRenderer.tileOverflowTileCount.toLocaleString()} tiles`}
-            />
-            <StateRow
-              label="Tile resolve"
-              value={`${activeEditRenderer.resolvedTileCount.toLocaleString()} / ${activeEditRenderer.resolveChecksum}`}
-            />
-            <StateRow
-              label="Object state"
-              value={`${activeEditRenderer.objectStateVisibleObjects.toLocaleString()} / ${activeEditRenderer.objectStateChecksum}`}
-            />
-            <StateRow label="Tile overflow" value={activeEditRenderer.tileOverflowCount} />
-            <StateRow label="模式" value={renderModeText} />
-            <StateRow label="所选对象" value={selectedId ?? "无"} />
-            <StateRow label="已删除对象" value={removedIds.size} />
-            <StateRow label="已删除点数" value={removedPointCount(summary, removedIds)} />
-            <button className="secondaryButton" type="button" onClick={restoreRemoved}>
-              清空删除预览
-            </button>
-          </section>
-        </aside>
-      </section>
-
-      <footer className="statusBar">
-        <span>状态：{busy ? "加载中" : error ? "错误" : "就绪"}</span>
-        <span>模式：{modeText}</span>
-        <span>路线：{rendererRoute.label}</span>
-        <span>渲染器：{activeRendererText}</span>
-        <span>WebGPU：{activeEditRenderer.webGpuLabel}</span>
-        <span>高斯点：{sceneDisplayPointCount.toLocaleString()}</span>
-        <span>可见：{displayVisibleCount.toLocaleString()}</span>
-        <span>所选：{selectedId ?? "无"}</span>
-      </footer>
+      <div className="glassHud bottomStatus">
+        <span>拖动展品即可移动对象</span>
+        <span>核心点为每个处理后 Gaussian 对象的加载锚点</span>
+        <span>后端负责单对象压缩块与按需加载</span>
+      </div>
     </main>
   );
 }
 
-function readInitialSparkObjectMaskFeathering() {
-  if (typeof window === "undefined") {
-    return normalizeSparkObjectMaskFeathering({
-      enabled: false,
-      opacity: UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
-    });
-  }
-  const params = new URLSearchParams(window.location.search);
-  const mode = String(params.get("spark-object-mask-feather") ?? "off").toLowerCase();
-  const enabled = ["1", "true", "yes", "on"].includes(mode);
-  return normalizeSparkObjectMaskFeathering({
-    enabled,
-    radius: Number(params.get("spark-object-mask-feather-radius") ?? 0),
-    opacity: Number(
-      params.get("spark-object-mask-feather-opacity") ?? UI_SPARK_OBJECT_MASK_FEATHER_OPACITY,
-    ),
+function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }) {
+  const mountRef = useRef(null);
+  const apiRef = useRef(null);
+  const selectedRef = useRef(selectedId);
+  const callbacksRef = useRef({ onSelectModel, onModelMoved });
+
+  useEffect(() => {
+    selectedRef.current = selectedId;
+    apiRef.current?.setSelected(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
+    callbacksRef.current = { onSelectModel, onModelMoved };
+  }, [onSelectModel, onModelMoved]);
+
+  useEffect(() => {
+    if (!mountRef.current) return undefined;
+
+    const mount = mountRef.current;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#070b11");
+    scene.fog = new THREE.Fog("#070b11", 10, 30);
+
+    const camera = new THREE.PerspectiveCamera(48, 1, 0.01, 100);
+    camera.position.fromArray(INITIAL_CAMERA.position);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.domElement.dataset.threeWorldCanvas = "true";
+    mount.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.fromArray(INITIAL_CAMERA.target);
+
+    buildWorldShell(scene);
+
+    const modelObjects = new Map();
+    let dragControls = null;
+    let animationFrame = 0;
+
+    const publishAuditHandle = () => {
+      window.__OBJGAUSS_WORLD__ = {
+        renderer: "three.js",
+        ui: "frosted-glass-in-world",
+        sidebars: false,
+        modelCount: models.length,
+        draggableCount: modelObjects.size,
+        selectedId: selectedRef.current,
+        modelPositions: [...modelObjects.values()].map((object) => ({
+          id: object.userData.modelId,
+          position: object.position.toArray().map(round3),
+        })),
+      };
+    };
+
+    const rebuildDragControls = () => {
+      dragControls?.dispose();
+      dragControls = new DragControls([...modelObjects.values()], camera, renderer.domElement);
+      dragControls.transformGroup = true;
+      dragControls.addEventListener("dragstart", (event) => {
+        controls.enabled = false;
+        selectObject(event.object.userData.modelId);
+      });
+      dragControls.addEventListener("drag", (event) => {
+        event.object.position.y = 0;
+      });
+      dragControls.addEventListener("dragend", (event) => {
+        controls.enabled = true;
+        callbacksRef.current.onModelMoved?.(event.object.userData.modelId, [
+          round3(event.object.position.x),
+          round3(event.object.position.y),
+          round3(event.object.position.z),
+        ]);
+        publishAuditHandle();
+      });
+      publishAuditHandle();
+    };
+
+    const disposeObject = (object) => {
+      object.traverse((child) => {
+        child.geometry?.dispose?.();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((material) => material.dispose?.());
+        } else {
+          child.material?.dispose?.();
+        }
+      });
+    };
+
+    const upsertModel = (model, points = null) => {
+      const previous = modelObjects.get(model.id);
+      if (previous) {
+        scene.remove(previous);
+        disposeObject(previous);
+      }
+      const result = points?.length ? createPointCloudGroup(model, points) : createCompressedModelGroup(model);
+      scene.add(result.group);
+      modelObjects.set(model.id, result.group);
+      rebuildDragControls();
+      api.setSelected(selectedRef.current);
+      return result.summary;
+    };
+
+    const selectObject = (id) => {
+      if (!id) return;
+      selectedRef.current = id;
+      api.setSelected(id);
+      callbacksRef.current.onSelectModel?.(id);
+      publishAuditHandle();
+    };
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const onPointerDown = (event) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const intersections = raycaster.intersectObjects([...modelObjects.values()], true);
+      const hit = intersections[0]?.object;
+      const modelId = nearestModelId(hit);
+      selectObject(modelId);
+    };
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+
+    const api = {
+      upsertModel,
+      focusModel(id) {
+        const object = modelObjects.get(id);
+        if (!object) return;
+        selectedRef.current = id;
+        api.setSelected(id);
+        controls.target.copy(object.position.clone().add(new THREE.Vector3(0, 0.9, 0)));
+      },
+      resetCamera() {
+        camera.position.fromArray(INITIAL_CAMERA.position);
+        controls.target.fromArray(INITIAL_CAMERA.target);
+      },
+      setSelected(id) {
+        for (const [modelId, object] of modelObjects) {
+          const selected = modelId === id;
+          object.userData.selected = selected;
+          object.traverse((child) => {
+            if (child.userData.role === "selection-ring" || child.userData.role === "core-glow") {
+              child.visible = selected;
+            }
+          });
+        }
+        publishAuditHandle();
+      },
+    };
+
+    const resize = () => {
+      const width = mount.clientWidth || 1;
+      const height = mount.clientHeight || 1;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    };
+    const animate = () => {
+      controls.update();
+      renderer.render(scene, camera);
+      animationFrame = requestAnimationFrame(animate);
+    };
+
+    models.forEach((model) => upsertModel(model));
+    resize();
+    animate();
+    window.addEventListener("resize", resize);
+    apiRef.current = api;
+    onReady(api);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("resize", resize);
+      dragControls?.dispose();
+      controls.dispose();
+      modelObjects.forEach(disposeObject);
+      renderer.dispose();
+      mount.removeChild(renderer.domElement);
+      if (window.__OBJGAUSS_WORLD__?.renderer === "three.js") {
+        delete window.__OBJGAUSS_WORLD__;
+      }
+    };
+  }, [models, onReady]);
+
+  return <div className="threeWorldMount" ref={mountRef} />;
+}
+
+function buildWorldShell(scene) {
+  const ambient = new THREE.AmbientLight("#7e91a1", 1.1);
+  const key = new THREE.DirectionalLight("#e9fbff", 2.2);
+  key.position.set(4, 8, 5);
+  const rim = new THREE.DirectionalLight("#36d7ff", 0.95);
+  rim.position.set(-7, 4, -4);
+  scene.add(ambient, key, rim);
+
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(8.6, 96),
+    new THREE.MeshBasicMaterial({
+      color: "#0c141b",
+      transparent: true,
+      opacity: 0.98,
+      side: THREE.DoubleSide,
+    }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.01;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(15, 30, "#2a5f6a", "#152932");
+  grid.material.transparent = true;
+  grid.material.opacity = 0.58;
+  scene.add(grid);
+
+  const halo = new THREE.Mesh(
+    new THREE.RingGeometry(4.4, 4.45, 128),
+    new THREE.MeshBasicMaterial({
+      color: "#1bc7d6",
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+    }),
+  );
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.y = 0.02;
+  scene.add(halo);
+}
+
+function createPointCloudGroup(model, points) {
+  const sampled = samplePoints(points, model.maxDisplayPoints ?? 32000);
+  const bounds = pointBounds(sampled);
+  const center = bounds.center;
+  const span = Math.max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001);
+  const scale = 1.45 / span;
+  const positions = new Float32Array(sampled.length * 3);
+  const colors = new Float32Array(sampled.length * 3);
+  const fallback = new THREE.Color(model.accent);
+  let minY = Infinity;
+
+  sampled.forEach((point, index) => {
+    const x = (Number(point.x) - center.x) * scale;
+    const y = (Number(point.y) - center.y) * scale;
+    const z = (Number(point.z) - center.z) * scale;
+    positions[index * 3] = x;
+    positions[index * 3 + 1] = y;
+    positions[index * 3 + 2] = z;
+    minY = Math.min(minY, y);
+    const color = Array.isArray(point.color) ? point.color : null;
+    colors[index * 3] = color ? color[0] / 255 : fallback.r;
+    colors[index * 3 + 1] = color ? color[1] / 255 : fallback.g;
+    colors[index * 3 + 2] = color ? color[2] / 255 : fallback.b;
   });
+
+  for (let index = 1; index < positions.length; index += 3) {
+    positions[index] -= minY;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.computeBoundingSphere();
+
+  const material = new THREE.PointsMaterial({
+    size: 0.026,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+  });
+
+  const group = baseModelGroup(model);
+  const cloud = new THREE.Points(geometry, material);
+  cloud.userData.role = "gaussian-cloud";
+  group.add(cloud);
+  group.add(corePointMesh(-minY, model.accent));
+  group.add(coreGlow(-minY, model.accent));
+  group.add(selectionRing(model.accent));
+
+  const objectIds = new Set(sampled.map((point) => Number(point.objectId ?? 0)));
+  return {
+    group,
+    summary: {
+      displayCount: sampled.length,
+      objectCount: objectIds.size,
+      corePoint: [round3(center.x), round3(center.y), round3(center.z)],
+    },
+  };
 }
 
-function readInitialAssetId() {
-  if (typeof window === "undefined") return "";
-  return new URLSearchParams(window.location.search).get("asset") ?? "";
+function createCompressedModelGroup(model) {
+  const group = baseModelGroup(model);
+  const points = syntheticGaussianShell(model.id, 1800);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(points.positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(points.colors, 3));
+  const material = new THREE.PointsMaterial({
+    size: 0.038,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.48,
+    depthWrite: false,
+  });
+  group.add(new THREE.Points(geometry, material));
+  group.add(corePointMesh(0.72, model.accent));
+  group.add(coreGlow(0.72, model.accent));
+  group.add(selectionRing(model.accent));
+  return {
+    group,
+    summary: {
+      displayCount: points.positions.length / 3,
+      objectCount: model.objectCount,
+      corePoint: [0, 0, 0],
+    },
+  };
 }
 
-function readInitialAssetFilter() {
-  if (typeof window === "undefined") return "all";
-  const value = new URLSearchParams(window.location.search).get("asset-filter") ?? "all";
-  return ASSET_FILTERS.some((filter) => filter.id === value) ? value : "all";
+function baseModelGroup(model) {
+  const group = new THREE.Group();
+  group.name = model.name;
+  group.position.set(...model.galleryPosition);
+  group.userData = { modelId: model.id, draggable: true };
+  return group;
 }
 
-function objectPlyLoadState({
-  assetId = "",
-  state = "none",
-  mode = "none",
-  path = "",
-  splatPath = "",
-} = {}) {
-  return { assetId, state, mode, path, splatPath };
-}
-
-function assetCountsByFilter(assets) {
-  return ASSET_FILTERS.reduce((counts, filter) => {
-    counts[filter.id] = filterAssets(assets, filter.id).length;
-    return counts;
-  }, {});
-}
-
-function filterAssets(assets, filter) {
-  if (filter === "trained") return assets.filter(isTrainedAsset);
-  if (filter === "near1m") return assets.filter(isNear1mAsset);
-  if (filter === "commercial") return assets.filter(isCommercialAsset);
-  return assets;
-}
-
-function isTrainedAsset(asset) {
-  const text = assetSearchText(asset);
-  return (
-    text.includes("trained") ||
-    text.includes("训练输出") ||
-    text.includes("splatfacto") ||
-    text.includes("near-1m") ||
-    text.includes("near1m") ||
-    Boolean(asset.deferObjectPly)
+function corePointMesh(y, accent) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 20, 20),
+    new THREE.MeshBasicMaterial({ color: accent }),
   );
+  mesh.position.set(0, y, 0);
+  mesh.userData.role = "core-point";
+  return mesh;
 }
 
-function isNear1mAsset(asset) {
-  const text = assetSearchText(asset);
-  return text.includes("near-1m") || text.includes("near1m") || text.includes("1m");
-}
-
-function isCommercialAsset(asset) {
-  return asset.category === "可商用展示" || String(asset.license ?? "").includes("CC0");
-}
-
-function assetSearchText(asset) {
-  return [
-    asset.id,
-    asset.name,
-    asset.category,
-    asset.pipelineStage,
-    asset.sourceName,
-    ...(asset.useCases ?? []),
-    ...(asset.formats ?? []),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-function RendererPendingViewport({ rendererContract, visibleCount, renderModeLabel }) {
-  return (
-    <div
-      className="viewport"
-      data-renderer="renderer-pending"
-      data-renderer-target={rendererContract?.targetRendererId ?? "webgpu-tile"}
-      data-renderer-fallback-reason=""
-      data-webgpu-target-gate={rendererContract?.targetGate ?? "blocked"}
-      data-webgpu-target-gate-reason={rendererContract?.targetGateReason ?? "webgpu-capability-detecting"}
-      data-webgpu-target-gate-blocker={rendererContract?.targetGateBlocker ?? "webgpu-capability"}
-      data-webgpu-status="pending"
-      data-visible-count={visibleCount}
-    >
-      <div className="viewportHud">
-        <div>
-          <span className="hudLabel">可见</span>
-          <strong>{visibleCount.toLocaleString()}</strong>
-        </div>
-        <div>
-          <span className="hudLabel">模式</span>
-          <strong>{renderModeLabel}</strong>
-        </div>
-        <div>
-          <span className="hudLabel">WebGPU</span>
-          <strong>pending</strong>
-        </div>
-      </div>
-    </div>
+function coreGlow(y, accent) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: accent,
+      transparent: true,
+      opacity: 0.18,
+    }),
   );
+  mesh.position.set(0, y, 0);
+  mesh.visible = false;
+  mesh.userData.role = "core-glow";
+  return mesh;
 }
 
-function BenchmarkPanel() {
-  return (
-    <div className="benchmarkPanel">
-      <div className="benchmarkGates" aria-label="SEMANTIC benchmark gates">
-        {BENCHMARK_GATES.map((gate) => (
-          <div className="benchmarkGate" key={gate.label}>
-            <span>{gate.label}</span>
-            <strong>{gate.value}</strong>
-          </div>
-        ))}
-      </div>
-      <div className="benchmarkStatLine">
-        <BarChart3 size={15} />
-        <span>Cross-scene rows: 9</span>
-      </div>
-      <div className="benchmarkTable" aria-label="Splatfacto scene benchmark">
-        <div className="benchmarkTableHead">
-          <span>Scene</span>
-          <span>ARI</span>
-          <span>Render</span>
-          <span>Held</span>
-        </div>
-        {BENCHMARK_SCENES.map((scene) => (
-          <div className="benchmarkRow" key={scene.id}>
-            <strong>{scene.label}</strong>
-            <span>{scene.ari.toFixed(3)}</span>
-            <span>{scene.render.toFixed(3)}</span>
-            <span>{scene.heldout.toFixed(3)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="benchmarkFootnote">SEMANTIC-003 / paper gate passed</div>
-    </div>
+function selectionRing(accent) {
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.86, 0.9, 80),
+    new THREE.MeshBasicMaterial({
+      color: accent,
+      transparent: true,
+      opacity: 0.88,
+      side: THREE.DoubleSide,
+    }),
   );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.018;
+  ring.visible = false;
+  ring.userData.role = "selection-ring";
+  return ring;
 }
 
-function ControlRow({ label, children }) {
-  return (
-    <label className="controlRow">
-      <span>{label}</span>
-      <div>{children}</div>
-    </label>
-  );
+function nearestModelId(object) {
+  let cursor = object;
+  while (cursor) {
+    if (cursor.userData?.modelId) return cursor.userData.modelId;
+    cursor = cursor.parent;
+  }
+  return null;
+}
+
+function samplePoints(points, maxPoints) {
+  if (points.length <= maxPoints) return points;
+  const stride = Math.ceil(points.length / maxPoints);
+  const sampled = [];
+  for (let index = 0; index < points.length && sampled.length < maxPoints; index += stride) {
+    sampled.push(points[index]);
+  }
+  return sampled;
+}
+
+function pointBounds(points) {
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  for (const point of points) {
+    min.x = Math.min(min.x, Number(point.x) || 0);
+    min.y = Math.min(min.y, Number(point.y) || 0);
+    min.z = Math.min(min.z, Number(point.z) || 0);
+    max.x = Math.max(max.x, Number(point.x) || 0);
+    max.y = Math.max(max.y, Number(point.y) || 0);
+    max.z = Math.max(max.z, Number(point.z) || 0);
+  }
+  const center = min.clone().add(max).multiplyScalar(0.5);
+  const size = max.clone().sub(min);
+  return { min, max, center, size };
+}
+
+function syntheticGaussianShell(seedText, count) {
+  const seed = [...seedText].reduce((total, char) => total + char.charCodeAt(0), 0);
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const colorA = new THREE.Color("#1fd1d9");
+  const colorB = new THREE.Color("#8e6cff");
+  for (let index = 0; index < count; index += 1) {
+    const t = index / count;
+    const angle = t * Math.PI * 9 + seed * 0.021;
+    const radius = 0.35 + 0.5 * Math.sin(t * Math.PI);
+    positions[index * 3] = Math.cos(angle) * radius;
+    positions[index * 3 + 1] = 0.18 + t * 1.15 + Math.sin(angle * 1.7) * 0.11;
+    positions[index * 3 + 2] = Math.sin(angle) * radius * 0.78;
+    const mix = (Math.sin(angle) + 1) / 2;
+    const color = colorA.clone().lerp(colorB, mix);
+    colors[index * 3] = color.r;
+    colors[index * 3 + 1] = color.g;
+    colors[index * 3 + 2] = color.b;
+  }
+  return { positions, colors };
 }
 
 function Metric({ label, value }) {
@@ -1317,429 +621,41 @@ function Metric({ label, value }) {
   );
 }
 
-function StateRow({ label, value }) {
+function Meta({ label, value }) {
   return (
-    <div className="stateRow">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <>
+      <dt>{label}</dt>
+      <dd>{value || "-"}</dd>
+    </>
   );
 }
 
-function allIds(points) {
-  return new Set(points.map((point) => point.objectId));
-}
-
-function renderModeLabel(mode) {
-  if (mode === "original") return "原始颜色（编辑预览）";
-  return "对象色（编辑预览）";
-}
-
-function rendererRouteContract({
-  renderMode,
-  objectEditActive,
-  useSplatRenderer,
-  useSparkPlySourceRenderer,
-  useSparkFilteredRenderer,
-  useSparkNativeMaskRenderer,
-  useWebGpuTileRenderer,
-}) {
-  const colorModeRole =
-    renderMode === "clustered" ? "diagnostic-object-color" : "source-color";
-  const colorRoleLabel = renderMode === "clustered" ? "对象色诊断" : "自身颜色";
-  const sourceBoundary =
-    renderMode === "clustered"
-      ? "diagnostic-object-color"
-      : objectEditActive
-        ? "hard-object-mask-no-reoptimize"
-        : "source-splat";
-  const sourceBoundaryLabel =
-    sourceBoundary === "hard-object-mask-no-reoptimize"
-      ? "硬 mask，无补洞"
-      : sourceBoundary === "source-splat"
-        ? "原始 Splat"
-        : "调试色";
-  const sourceResult =
-    sourceBoundary === "hard-object-mask-no-reoptimize"
-      ? "hard-mask-no-inpaint"
-      : sourceBoundary === "source-splat"
-        ? "source-splat"
-        : "diagnostic-preview";
-  const sourceResultLabel =
-    sourceResult === "hard-mask-no-inpaint"
-      ? "源色 mask 预览"
-      : sourceResult === "source-splat"
-        ? "完整源 Splat"
-        : "诊断预览";
-
-  const base = {
-    colorModeRole,
-    colorRoleLabel,
-    sourceBoundary,
-    sourceBoundaryLabel,
-    sourceResult,
-    sourceResultLabel,
-  };
-
-  if (renderMode === "clustered") {
-    return {
-      ...base,
-      id: "diagnostic-object-color",
-      kind: "diagnostic",
-      label: "对象色诊断",
-      qualityId: "debug-object-color",
-      qualityLabel: "调试分组",
-      bannerTitle: "对象色诊断",
-      tone: "diagnostic",
-      title: "诊断路线：用于检查 object_id 分组，不代表商用展示外观",
-    };
-  }
-
-  if (useSplatRenderer) {
-    return {
-      ...base,
-      id: "spark-original-view",
-      kind: "commercial",
-      label: "商用 Spark",
-      qualityId: "source-splat",
-      qualityLabel: "原始 Splat",
-      bannerTitle: "Spark 源色",
-      tone: "commercial",
-      title: "商业展示默认路线：Spark 原始 Splat",
-    };
-  }
-
-  if (useSparkPlySourceRenderer) {
-    return {
-      ...base,
-      id: "spark-ply-sh-source",
-      kind: "commercial",
-      label: "商用 Spark SH",
-      qualityId: "ply-sh-source",
-      qualityLabel: "PLY SH 源",
-      bannerTitle: "Spark SH 源",
-      tone: "commercial",
-      title: "商业展示路线：保留 SH-heavy 本地训练输出的 SH 系数",
-    };
-  }
-
-  if (useSparkFilteredRenderer) {
-    return {
-      ...base,
-      id: useSparkNativeMaskRenderer ? "spark-native-mask" : "spark-packed-sh-mask",
-      kind: "commercial",
-      label: "商用 Spark",
-      qualityId: useSparkNativeMaskRenderer ? "native-splat-mask" : "packed-sh-mask",
-      qualityLabel: useSparkNativeMaskRenderer ? "原生 Splat mask" : "SH packed mask",
-      bannerTitle: "Spark 源色编辑",
-      tone: "commercial",
-      title: "商业展示路线：自身颜色 + hard object mask；删除后不补洞、不重优化",
-    };
-  }
-
-  if (useWebGpuTileRenderer) {
-    return {
-      ...base,
-      id: "webgpu-c-path-diagnostic",
-      kind: "diagnostic",
-      label: "WebGPU C-path",
-      qualityId: "tile-diagnostic-preview",
-      qualityLabel: "诊断预览",
-      bannerTitle: "WebGPU 诊断预览",
-      tone: "diagnostic",
-      title: "C-path 诊断路线：验证 tile renderer，不是当前商用默认外观",
-    };
-  }
-
-  return {
-    ...base,
-    id: "gaussian-oit-fallback",
-    kind: "fallback",
-    label: "Fallback",
-    qualityId: "gaussian-oit-preview",
-    qualityLabel: "Gaussian OIT",
-    bannerTitle: "Fallback 预览",
-    tone: "fallback",
-    title: "兼容回退路线：近似编辑预览",
-  };
-}
-
-function hardMaskQualityContract(scene, rendererRoute) {
-  if (rendererRoute.sourceBoundary === "source-splat") {
-    return {
-      interpretation: "source-splat",
-      label: "原始 Spark 高斯",
-      source: "route-state",
-    };
-  }
-  if (rendererRoute.sourceBoundary === "diagnostic-object-color") {
-    return {
-      interpretation: "diagnostic-object-color",
-      label: "对象色诊断",
-      source: "route-state",
-    };
-  }
-
-  const reportBacked = HARD_MASK_QUALITY_BY_ASSET[scene?.assetId];
-  if (reportBacked) return reportBacked;
-
-  return {
-    interpretation: "hard-mask-quality-unmeasured",
-    label: "硬 mask 待审计",
-    source: "route-state",
-  };
-}
-
-function readWebGpuRuntimeProbe() {
-  if (typeof window === "undefined") return "full";
-  return normalizeWebGpuRuntimeProbe(
-    new URLSearchParams(window.location.search).get("webgpu-probe"),
+function initialModelStates() {
+  return Object.fromEntries(
+    MODEL_CATALOG.map((model) => [
+      model.id,
+      {
+        ...model,
+        status: "queued",
+        message: "queued",
+        gaussianCount: 0,
+        displayCount: 0,
+        corePoint: null,
+        loadMs: 0,
+      },
+    ]),
   );
 }
 
-function readWebGpuCapabilityProbeEnabled() {
-  if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
-  const explicit = String(params.get("webgpu") ?? params.get("webgpu-capability") ?? "").toLowerCase();
-  if (["1", "true", "yes", "on", "probe", "force"].includes(explicit)) return true;
-  if (["0", "false", "no", "off", "skip"].includes(explicit)) return false;
-  return [
-    "webgpu-probe",
-    "webgpu-viewport-size",
-    "webgpu-footprint-scale",
-    "webgpu-covariance-max-anisotropy",
-    "webgpu-depth-bins",
-    "webgpu-depth-alpha-mode",
-    "webgpu-camera-mode",
-    "webgpu-color-mode",
-    "webgpu-alpha-presentation-floor",
-  ].some((key) => params.has(key));
+function formatNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number.toLocaleString() : "-";
 }
 
-function readWebGpuRuntimeViewportRequest() {
-  if (typeof window === "undefined") {
-    return { size: WEBGPU_RUNTIME_VIEWPORT_SIZE, explicit: false };
-  }
-  const value = Number(
-    new URLSearchParams(window.location.search).get("webgpu-viewport-size"),
-  );
-  if (!Number.isFinite(value) || value <= 0) {
-    return { size: WEBGPU_RUNTIME_VIEWPORT_SIZE, explicit: false };
-  }
-  return {
-    size: Math.min(
-      WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE,
-      Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, Math.round(value)),
-    ),
-    explicit: true,
-  };
+function formatVec(value) {
+  return Array.isArray(value) ? value.map((entry) => Number(entry).toFixed(3)).join(", ") : "-";
 }
 
-function readWebGpuCoverageTuning() {
-  if (typeof window === "undefined") {
-    return normalizeWebGpuCoverageTuning();
-  }
-  const params = new URLSearchParams(window.location.search);
-  return normalizeWebGpuCoverageTuning({
-    footprintScale: params.get("webgpu-footprint-scale"),
-    maxAnisotropy: params.get("webgpu-covariance-max-anisotropy"),
-  });
-}
-
-function readWebGpuDepthSortTuning() {
-  if (typeof window === "undefined") {
-    return normalizeWebGpuDepthSortTuning();
-  }
-  const params = new URLSearchParams(window.location.search);
-  return normalizeWebGpuDepthSortTuning({
-    depthBins: params.get("webgpu-depth-bins"),
-    depthAlphaMode: params.get("webgpu-depth-alpha-mode"),
-  });
-}
-
-function readWebGpuCameraTuning() {
-  if (typeof window === "undefined") {
-    return normalizeWebGpuCameraTuning();
-  }
-  const params = new URLSearchParams(window.location.search);
-  return normalizeWebGpuCameraTuning({
-    cameraMode: params.get("webgpu-camera-mode"),
-  });
-}
-
-function readWebGpuColorTuning() {
-  if (typeof window === "undefined") {
-    return normalizeWebGpuColorTuning();
-  }
-  const params = new URLSearchParams(window.location.search);
-  return normalizeWebGpuColorTuning({
-    colorMode: params.get("webgpu-color-mode"),
-  });
-}
-
-function readSparkReconstructProbe() {
-  if (typeof window === "undefined") return false;
-  const value = new URLSearchParams(window.location.search).get("spark-reconstruct-probe");
-  return ["1", "true", "yes", "on"].includes(String(value ?? "").toLowerCase());
-}
-
-function readSparkPlySourceMode() {
-  if (typeof window === "undefined") return "auto";
-  const value = String(
-    new URLSearchParams(window.location.search).get("spark-ply-source") ?? "auto",
-  ).toLowerCase();
-  if (["0", "false", "no", "off"].includes(value)) return "off";
-  if (["1", "true", "yes", "on", "force"].includes(value)) return "force";
-  return "auto";
-}
-
-function readSparkNativeMaskMode() {
-  if (typeof window === "undefined") return "auto";
-  const params = new URLSearchParams(window.location.search);
-  const value = String(
-    params.get("spark-native-mask") ?? params.get("spark-object-source") ?? "auto",
-  ).toLowerCase();
-  if (["0", "false", "no", "off", "packed", "ply", "ply-packed"].includes(value)) {
-    return "off";
-  }
-  if (["1", "true", "yes", "on", "native", "force"].includes(value)) return "force";
-  return "auto";
-}
-
-function readSparkFilteredEditEnabled() {
-  if (typeof window === "undefined") return true;
-  const value = String(
-    new URLSearchParams(window.location.search).get("spark-filtered-edit") ?? "auto",
-  ).toLowerCase();
-  return !["0", "false", "no", "off"].includes(value);
-}
-
-function readUploadedPlySplatSourceEnabled() {
-  if (typeof window === "undefined") return true;
-  const value = String(
-    new URLSearchParams(window.location.search).get("uploaded-ply-splat-source") ?? "auto",
-  ).toLowerCase();
-  return !["0", "false", "no", "off"].includes(value);
-}
-
-function sceneHasShRestSource(scene) {
-  const coefficientCount = Number(scene?.shRestCoefficientCount ?? 0);
-  if (!Number.isFinite(coefficientCount) || coefficientCount < 9) return false;
-  const gaussianCount = scene?.points?.length ?? 0;
-  const shRestCoefficients = scene?.shRestCoefficients;
-  return Boolean(
-    shRestCoefficients &&
-      typeof shRestCoefficients.length === "number" &&
-      shRestCoefficients.length >= gaussianCount * coefficientCount,
-  );
-}
-
-function buildWebGpuRuntimeViewport({ probe, request, displaySize, gaussianCount }) {
-  if (probe === WEBGPU_RUNTIME_PROBE_TINY_PIXEL_OUTPUT) {
-    return {
-      width: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
-      height: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE,
-      aspectMode: "tiny-square",
-      quality: "diagnostic-tiny",
-      pixelBudget: WEBGPU_RUNTIME_PROBE_TINY_VIEWPORT_SIZE ** 2,
-    };
-  }
-  if (request.explicit) {
-    return {
-      width: request.size,
-      height: request.size,
-      aspectMode: "explicit-square",
-      quality: "explicit-square",
-      pixelBudget: request.size ** 2,
-    };
-  }
-  const quality = webGpuRuntimeQuality(gaussianCount);
-  const displayWidth = Number(displaySize?.width) || 0;
-  const displayHeight = Number(displaySize?.height) || 0;
-  if (displayWidth <= 0 || displayHeight <= 0) {
-    return {
-      width: quality.size,
-      height: quality.size,
-      aspectMode: "adaptive-square-pending-display",
-      quality: quality.label,
-      pixelBudget: quality.pixelBudget,
-    };
-  }
-  const aspect = Math.min(4, Math.max(0.25, displayWidth / displayHeight));
-  const displayArea = Math.max(
-    WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE ** 2,
-    displayWidth * displayHeight,
-  );
-  const area = Math.min(quality.pixelBudget, displayArea);
-  return {
-    width: clampViewportSize(roundToViewportTile(Math.sqrt(area * aspect))),
-    height: clampViewportSize(roundToViewportTile(Math.sqrt(area / aspect))),
-    aspectMode: "display-aspect-adaptive",
-    quality: quality.label,
-    pixelBudget: quality.pixelBudget,
-  };
-}
-
-function webGpuRuntimeQuality(gaussianCount) {
-  const count = Math.max(0, Number(gaussianCount) || 0);
-  if (count <= WEBGPU_RUNTIME_HIGH_MAX_GAUSSIANS) {
-    return {
-      label: "adaptive-high-512",
-      size: WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE,
-      pixelBudget: WEBGPU_RUNTIME_HIGH_VIEWPORT_SIZE ** 2,
-    };
-  }
-  if (count <= WEBGPU_RUNTIME_MEDIUM_MAX_GAUSSIANS) {
-    return {
-      label: "adaptive-medium-384",
-      size: WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE,
-      pixelBudget: WEBGPU_RUNTIME_MEDIUM_VIEWPORT_SIZE ** 2,
-    };
-  }
-  return {
-    label: "adaptive-safe-320",
-    size: WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE,
-    pixelBudget: WEBGPU_RUNTIME_SAFE_VIEWPORT_SIZE ** 2,
-  };
-}
-
-function roundToViewportTile(value) {
-  return Math.max(
-    WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE,
-    Math.round(value / WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE) * WEBGPU_RUNTIME_VIEWPORT_TILE_SIZE,
-  );
-}
-
-function clampViewportSize(value) {
-  return Math.min(
-    WEBGPU_RUNTIME_MAX_VIEWPORT_SIZE,
-    Math.max(WEBGPU_RUNTIME_MIN_VIEWPORT_SIZE, value),
-  );
-}
-
-function formatBytes(value) {
-  const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${Math.round(bytes)} B`;
-}
-
-function summarize(points) {
-  const counts = new Map();
-  const colors = new Map();
-  for (const point of points) {
-    counts.set(point.objectId, (counts.get(point.objectId) ?? 0) + 1);
-    colors.set(point.objectId, point.objectColor);
-  }
-  return [...counts.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([id, count]) => ({ id, count, color: colors.get(id) }));
-}
-
-function removedPointCount(summary, removedIds) {
-  return summary
-    .filter((item) => removedIds.has(item.id))
-    .reduce((total, item) => total + item.count, 0)
-    .toLocaleString();
+function round3(value) {
+  return Math.round(Number(value) * 1000) / 1000;
 }

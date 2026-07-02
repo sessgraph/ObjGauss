@@ -1,9 +1,6 @@
-"""Compatibility wrapper for core CLIP mask scoring algorithms."""
+"""Semantic slot and optional CLIP scoring entry points."""
 
 from objgauss.core.clip_scoring import (
-    CLIP_LABEL_PRESETS,
-    DEFAULT_BACKGROUND_LABELS,
-    DEFAULT_PROMPT_TEMPLATES,
     ClipMaskScorer,
     ClipScoringResult,
     HashClipMaskScorer,
@@ -11,15 +8,15 @@ from objgauss.core.clip_scoring import (
     read_clip_labels,
     score_mask_manifest_with_clip,
 )
+from objgauss.core.semantic_slots import SlotAlignmentResult, align_mask_manifest_slots
 
 __all__ = [
-    "CLIP_LABEL_PRESETS",
-    "DEFAULT_BACKGROUND_LABELS",
-    "DEFAULT_PROMPT_TEMPLATES",
     "ClipMaskScorer",
     "ClipScoringResult",
     "HashClipMaskScorer",
+    "SlotAlignmentResult",
     "TransformersClipMaskScorer",
+    "align_mask_manifest_slots",
     "read_clip_labels",
     "score_mask_manifest_with_clip",
 ]

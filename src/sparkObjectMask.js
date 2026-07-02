@@ -1,11 +1,14 @@
 import { dyno } from "@sparkjsdev/spark";
 import * as THREE from "three";
 
+import { normalizeSparkObjectMaskFeathering } from "./sparkObjectMaskConfig.js";
+
+export { normalizeSparkObjectMaskFeathering } from "./sparkObjectMaskConfig.js";
+
 export const SPARK_OBJECT_MASK_MODE = "object-opacity-texture-v1";
 
 const MASK_TEXTURE_WIDTH = 4096;
 const MASK_OPACITY_FULL = 255;
-const DEFAULT_FEATHER_OPACITY = 0.62;
 const DEFAULT_FEATHER_RADIUS_RATIO = 0.008;
 const DEFAULT_FEATHER_SCALE_MULTIPLIER = 2.0;
 const MAX_NEIGHBOR_CANDIDATES_PER_CELL = 4096;
@@ -156,23 +159,6 @@ function pointVisible(point, visibleIds, removedIds, isolatedId) {
   if (removedIds?.has(point.objectId)) return false;
   if (isolatedId !== null && isolatedId !== undefined && point.objectId !== isolatedId) return false;
   return true;
-}
-
-export function normalizeSparkObjectMaskFeathering(value = null) {
-  if (!value || value === "off" || value.enabled === false) {
-    return {
-      enabled: false,
-      radius: 0,
-      opacity: 1,
-    };
-  }
-  const radius = finiteNumber(value.radius, 0);
-  const opacity = clampFinite(value.opacity, 0.05, 0.98, DEFAULT_FEATHER_OPACITY);
-  return {
-    enabled: true,
-    radius,
-    opacity,
-  };
 }
 
 function buildFeatherMap({ points, visibleIds, removedIds, isolatedId, feather }) {
@@ -337,9 +323,4 @@ function emptyMaskStats() {
 function finiteNumber(value, fallback) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clampFinite(value, min, max, fallback) {
-  const numeric = finiteNumber(value, fallback);
-  return Math.min(Math.max(numeric, min), max);
 }
