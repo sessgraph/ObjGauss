@@ -1,0 +1,201 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+RENDERER_LOSS_BOUNDARY_SCHEMA = "objgauss-renderer-loss-boundary-v1"
+POINT_RENDER_SMOKE_RENDERER = "cpu-point-rgb-smoke"
+TARGET_IMAGE_RENDERER = "differentiable-gaussian-image-renderer"
+TRAINABLE_KERNEL_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
+
+
+@dataclass(frozen=True)
+class RendererLossBoundaryReport:
+    schema: str
+    status: str
+    current_renderer: str
+    target_renderer: str
+    point_smoke_ready: bool
+    input_frame_contract: dict[str, Any]
+    render_target_contract: dict[str, Any]
+    loss_telemetry_contract: dict[str, Any]
+    integration_contract: dict[str, Any]
+    evidence: dict[str, Any]
+    point_smoke_blockers: tuple[str, ...]
+    upgrade_blockers: tuple[str, ...]
+    next_steps: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "status": self.status,
+            "current_renderer": self.current_renderer,
+            "target_renderer": self.target_renderer,
+            "point_smoke_ready": bool(self.point_smoke_ready),
+            "input_frame_contract": self.input_frame_contract,
+            "render_target_contract": self.render_target_contract,
+            "loss_telemetry_contract": self.loss_telemetry_contract,
+            "integration_contract": self.integration_contract,
+            "evidence": self.evidence,
+            "point_smoke_blockers": list(self.point_smoke_blockers),
+            "upgrade_blockers": list(self.upgrade_blockers),
+            "next_steps": list(self.next_steps),
+        }
+
+
+def renderer_loss_boundary_report(
+    kernel_summary: dict[str, Any] | None = None,
+    *,
+    target_renderer: str = TARGET_IMAGE_RENDERER,
+) -> RendererLossBoundaryReport:
+    evidence, point_blockers = _kernel_summary_evidence(kernel_summary)
+    point_ready = bool(kernel_summary is not None and not point_blockers)
+    status = "point_render_smoke_ready" if point_ready else "contract_defined"
+    if kernel_summary is not None and point_blockers:
+        status = "point_render_smoke_blocked"
+    return RendererLossBoundaryReport(
+        schema=RENDERER_LOSS_BOUNDARY_SCHEMA,
+        status=status,
+        current_renderer=POINT_RENDER_SMOKE_RENDERER,
+        target_renderer=target_renderer,
+        point_smoke_ready=point_ready,
+        input_frame_contract={
+            "current": {
+                "positions": "float32[N,3]",
+                "features": "float32[N,D]",
+                "target_rgb": "float32[N,3]",
+                "target_assignment": "optional float32[N,K]",
+            },
+            "renderer_loss_upgrade_requires": {
+                "camera": "per-frame intrinsics/extrinsics",
+                "image_target": "float32[H,W,3] or equivalent image-space target",
+                "gaussian_parameters": "renderer-native GaussianToken fields, not only object colors",
+                "visibility": "defined alpha/depth/mask policy for supervised pixels",
+            },
+        },
+        render_target_contract={
+            "current": {
+                "kind": "point_rgb_rows",
+                "shape": "N x 3",
+                "loss": "mean squared RGB reconstruction at Gaussian/evidence rows",
+            },
+            "target": {
+                "kind": "image_space_render",
+                "shape": "H x W x 3",
+                "loss": "photometric image reconstruction plus object and temporal terms",
+            },
+            "non_goal": "Do not claim point_rgb_rows is a full 3DGS differentiable renderer.",
+        },
+        loss_telemetry_contract={
+            "required_terms": ["render_loss", "object_loss", "temporal_loss", "total_loss"],
+            "required_deltas": ["initial_loss", "final_loss", "loss_decreased"],
+            "upgrade_terms": [
+                "image_render_loss",
+                "visibility_policy",
+                "renderer_name",
+                "renderer_gradient_path",
+            ],
+        },
+        integration_contract={
+            "viewer_renderer_role": "debug visualization and browser audit only",
+            "training_renderer_role": "separate loss producer behind a stable contract",
+            "replacement_policy": "training renderer must not replace Three.js / viewer renderer by default",
+            "artifact_policy": "large training outputs stay outside git and ignored outputs stay separated",
+        },
+        evidence=evidence,
+        point_smoke_blockers=tuple(point_blockers),
+        upgrade_blockers=(
+            "image_space_targets_not_bound",
+            "differentiable_gaussian_renderer_not_selected",
+            "renderer_gradient_path_not_defined",
+            "camera_visibility_policy_not_bound",
+        ),
+        next_steps=(
+            "bind trainable frames to camera/image targets",
+            "define image-space renderer API and telemetry",
+            "decide whether GPU/torch/differentiable rasterizer requires ADR",
+            "keep viewer renderer as debug consumer, not the training renderer default",
+        ),
+    )
+
+
+def validate_renderer_loss_boundary_summary(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        raise TypeError("renderer loss boundary payload must be a dict")
+    if payload.get("schema") != RENDERER_LOSS_BOUNDARY_SCHEMA:
+        raise ValueError(f"unsupported renderer loss boundary schema: {payload.get('schema')}")
+    required = (
+        "status",
+        "current_renderer",
+        "target_renderer",
+        "input_frame_contract",
+        "render_target_contract",
+        "loss_telemetry_contract",
+        "integration_contract",
+        "upgrade_blockers",
+    )
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise ValueError(f"renderer loss boundary payload missing keys: {', '.join(missing)}")
+    return True
+
+
+def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dict[str, Any], list[str]]:
+    if kernel_summary is None:
+        return {"kind": "no_kernel_summary"}, ["missing_kernel_summary"]
+    if not isinstance(kernel_summary, dict):
+        raise TypeError("kernel_summary must be a dict")
+    if kernel_summary.get("schema") != TRAINABLE_KERNEL_SCHEMA:
+        raise ValueError(f"unsupported trainable kernel schema: {kernel_summary.get('schema')}")
+
+    initial = _loss_record(kernel_summary, "initial_loss")
+    final = _loss_record(kernel_summary, "final_loss")
+    loss_decreased = final["total_loss"] < initial["total_loss"]
+    render_loss_decreased = final["render_loss"] < initial["render_loss"]
+    blockers: list[str] = []
+    if not loss_decreased:
+        blockers.append("total_loss_not_decreased")
+    if not render_loss_decreased:
+        blockers.append("render_loss_not_decreased")
+    sample = kernel_summary.get("sample") if isinstance(kernel_summary.get("sample"), dict) else {}
+    evidence = {
+        "kind": "trainable_kernel_summary",
+        "schema": kernel_summary.get("schema"),
+        "frame_count": _optional_int(kernel_summary.get("frame_count")),
+        "slots": _optional_int(kernel_summary.get("slots")),
+        "sampled_count": _optional_int(sample.get("sampled_count")),
+        "source_count": _optional_int(sample.get("source_count")),
+        "target_source": sample.get("target_source"),
+        "initial_total_loss": initial["total_loss"],
+        "final_total_loss": final["total_loss"],
+        "initial_render_loss": initial["render_loss"],
+        "final_render_loss": final["render_loss"],
+        "loss_decreased": loss_decreased,
+        "render_loss_decreased": render_loss_decreased,
+    }
+    return evidence, blockers
+
+
+def _loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:
+    value = summary.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    required = ("total_loss", "render_loss", "object_loss", "temporal_loss")
+    missing = [field for field in required if field not in value]
+    if missing:
+        raise ValueError(f"{key} missing loss fields: {', '.join(missing)}")
+    return {field: _finite_float(value[field], f"{key}.{field}") for field in required}
+
+
+def _finite_float(value: Any, label: str) -> float:
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError(f"{label} must be finite")
+    return number
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    number = int(value)
+    return number

@@ -315,6 +315,22 @@ object-aware sampling，再运行同一 `L_render + L_object + L_temporal` smoke
 4.5M 大资产，不提交训练输出，不引入 torch / SAM / CLIP，也不把 point-render smoke
 升级表述为真实 renderer loss。
 
+`TRAIN-RENDER-LOSS-001` 已完成 renderer-loss upgrade boundary contract：
+`objgauss/core/renderer_loss.py` 新增 `objgauss-renderer-loss-boundary-v1` 报告，
+用于区分当前 `cpu-point-rgb-smoke` 和后续 `differentiable-gaussian-image-renderer`
+目标。该 contract 明确 input frame、image-space render target、loss telemetry 和
+viewer / training renderer 分工：viewer renderer 继续作为 debug visualization /
+browser audit，training renderer 必须作为独立 loss producer 接入，不能默认替换
+Three.js / viewer renderer。`objgauss training renderer-loss-contract` 可读取
+`kernel-sample` summary，检查 point smoke 是否 ready，并列出升级 blockers：
+`image_space_targets_not_bound`、`differentiable_gaussian_renderer_not_selected`、
+`renderer_gradient_path_not_defined` 和 `camera_visibility_policy_not_bound`。已用
+`public/samples/lego_alpha_v1_objects.ply` 的 kernel summary 验证：
+`status=point_render_smoke_ready`、`point_smoke_ready=true`、
+`evidence_initial_render_loss=0.084134 -> evidence_final_render_loss=0.061294`。
+该步骤仍不引入 torch / GPU renderer / differentiable rasterizer，不提交训练输出，
+不把 point-render smoke 宣称为完整 3DGS training。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

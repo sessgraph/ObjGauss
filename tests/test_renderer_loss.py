@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+import pytest
+
+from objgauss.core.renderer_loss import (
+    RENDERER_LOSS_BOUNDARY_SCHEMA,
+    RendererLossBoundaryReport,
+    renderer_loss_boundary_report,
+    validate_renderer_loss_boundary_summary,
+)
+from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
+
+
+def test_renderer_loss_boundary_accepts_trainable_kernel_summary():
+    result = train_kernel_mvp(
+        make_trainable_kernel_mvp_fixture(),
+        slots=2,
+        iterations=12,
+        learning_rate=0.4,
+        seed=4,
+    )
+
+    report = renderer_loss_boundary_report(result.as_dict())
+    payload = report.as_dict()
+
+    assert isinstance(report, RendererLossBoundaryReport)
+    assert payload["schema"] == RENDERER_LOSS_BOUNDARY_SCHEMA
+    assert payload["status"] == "point_render_smoke_ready"
+    assert payload["point_smoke_ready"] is True
+    assert payload["current_renderer"] == "cpu-point-rgb-smoke"
+    assert payload["target_renderer"] == "differentiable-gaussian-image-renderer"
+    assert payload["point_smoke_blockers"] == []
+    assert "image_space_targets_not_bound" in payload["upgrade_blockers"]
+    assert payload["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
+    assert payload["render_target_contract"]["target"]["kind"] == "image_space_render"
+    assert validate_renderer_loss_boundary_summary(payload) is True
+
+
+def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():
+    report = renderer_loss_boundary_report()
+
+    assert report.status == "contract_defined"
+    assert report.point_smoke_ready is False
+    assert report.point_smoke_blockers == ("missing_kernel_summary",)
+
+
+def test_renderer_loss_boundary_rejects_incomplete_loss_telemetry():
+    payload = {
+        "schema": "objgauss-v1-trainable-kernel-mvp-v1",
+        "initial_loss": {"total_loss": 1.0, "render_loss": 1.0, "object_loss": 0.0, "temporal_loss": 0.0},
+        "final_loss": {"total_loss": 0.5},
+    }
+
+    with pytest.raises(ValueError, match="final_loss missing loss fields"):
+        renderer_loss_boundary_report(payload)

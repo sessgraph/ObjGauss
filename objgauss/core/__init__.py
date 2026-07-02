@@ -23,6 +23,7 @@ _EXPORTS = {
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
     "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
+    "RendererLossBoundaryReport": ("objgauss.core.renderer_loss", "RendererLossBoundaryReport"),
     "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
     "assign_object_ids": ("objgauss.core.objects", "assign_object_ids"),
@@ -49,6 +50,10 @@ _EXPORTS = {
     "project_points": ("objgauss.core.projection", "project_points"),
     "read_ply": ("objgauss.core.io", "read_ply"),
     "read_splat": ("objgauss.core.io", "read_splat"),
+    "renderer_loss_boundary_report": (
+        "objgauss.core.renderer_loss",
+        "renderer_loss_boundary_report",
+    ),
     "score_mask_manifest_with_clip": ("objgauss.core.semantics", "score_mask_manifest_with_clip"),
     "train_kernel_mvp": ("objgauss.core.trainable_kernel", "train_kernel_mvp"),
     "train_kernel_mvp_from_cloud": (
@@ -61,6 +66,10 @@ _EXPORTS = {
     ),
     "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
+    "validate_renderer_loss_boundary_summary": (
+        "objgauss.core.renderer_loss",
+        "validate_renderer_loss_boundary_summary",
+    ),
     "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
     "write_ply": ("objgauss.core.io", "write_ply"),

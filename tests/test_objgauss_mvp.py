@@ -2468,6 +2468,7 @@ def test_training_kernel_mvp_cli_runs_end_to_end_smoke(tmp_path, capsys):
 def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     input_path = tmp_path / "object_aware_sample.ply"
     summary_path = tmp_path / "kernel-sample-summary.json"
+    boundary_path = tmp_path / "renderer-loss-boundary.json"
     write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
 
     assert (
@@ -2501,6 +2502,32 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert summary["loss_decreased"] is True
     assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
     assert summary["sample"]["sampled_count"] == 4
+
+    assert (
+        main(
+            [
+                "training",
+                "renderer-loss-contract",
+                "--kernel-summary",
+                str(summary_path),
+                "--output",
+                str(boundary_path),
+                "--require-point-smoke-ready",
+            ]
+        )
+        == 0
+    )
+
+    boundary_output = capsys.readouterr().out
+    boundary = json.loads(boundary_path.read_text(encoding="utf-8"))
+
+    assert "status=point_render_smoke_ready" in boundary_output
+    assert "point_smoke_ready=true" in boundary_output
+    assert boundary["schema"] == "objgauss-renderer-loss-boundary-v1"
+    assert boundary["point_smoke_ready"] is True
+    assert boundary["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
+    assert boundary["render_target_contract"]["target"]["kind"] == "image_space_render"
+    assert "differentiable_gaussian_renderer_not_selected" in boundary["upgrade_blockers"]
 
 
 def test_training_register_output_can_export_unknown_object_policy(tmp_path, capsys):

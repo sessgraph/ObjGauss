@@ -8,6 +8,7 @@ from objgauss.core import (
     ObjectState,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
+    RendererLossBoundaryReport,
     TrainableKernelResult,
     TrainableKernelSample,
     append_or_replace_property,
@@ -25,9 +26,11 @@ from objgauss.core import (
     object_state_stability_report,
     project_object_states_from_field,
     read_ply,
+    renderer_loss_boundary_report,
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
     trainable_kernel_sample_from_cloud,
+    validate_renderer_loss_boundary_summary,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
@@ -181,6 +184,9 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert isinstance(sample_result, TrainableKernelResult)
     assert sample_again.target_source == "object_id_one_hot_targets"
+    renderer_report = renderer_loss_boundary_report(sample_result.as_dict())
+    assert isinstance(renderer_report, RendererLossBoundaryReport)
+    assert validate_renderer_loss_boundary_summary(renderer_report.as_dict()) is True
 
 
 def _tiny_cloud() -> GaussianCloud:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +78,7 @@ from objgauss.core.trainable_kernel import (
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
 )
+from objgauss.core.renderer_loss import renderer_loss_boundary_report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1148,6 +1150,34 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         raise ValueError("trainable kernel sample loss did not decrease")
 
 
+def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
+    kernel_summary = None
+    if args.kernel_summary:
+        kernel_summary = json.loads(args.kernel_summary.read_text(encoding="utf-8"))
+    report = renderer_loss_boundary_report(
+        kernel_summary,
+        target_renderer=args.target_renderer,
+    )
+    summary = report.as_dict()
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"current_renderer={summary['current_renderer']}")
+    print(f"target_renderer={summary['target_renderer']}")
+    print(f"point_smoke_ready={str(summary['point_smoke_ready']).lower()}")
+    print(f"point_smoke_blockers={summary['point_smoke_blockers']}")
+    print(f"upgrade_blockers={summary['upgrade_blockers']}")
+    evidence = summary["evidence"]
+    if evidence.get("kind") == "trainable_kernel_summary":
+        print(f"evidence_target_source={evidence.get('target_source')}")
+        print(f"evidence_initial_render_loss={evidence['initial_render_loss']:.6f}")
+        print(f"evidence_final_render_loss={evidence['final_render_loss']:.6f}")
+    if args.output:
+        write_json(args.output, summary)
+        print(f"summary={args.output}")
+    if args.require_point_smoke_ready and not report.point_smoke_ready:
+        raise ValueError(f"renderer loss boundary point smoke is not ready: {report.point_smoke_blockers}")
+
+
 def _training_write_sample_bundle(args: argparse.Namespace) -> None:
     result = write_sample_bundle(
         output=args.output,
@@ -1986,6 +2016,19 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--summary-output", type=Path)
     kernel_sample.add_argument("--require-loss-decrease", action="store_true")
     kernel_sample.set_defaults(handler=_training_kernel_sample)
+
+    renderer_loss_contract = training_subparsers.add_parser(
+        "renderer-loss-contract",
+        help="write the boundary between point-render smoke and real renderer loss",
+    )
+    renderer_loss_contract.add_argument("--kernel-summary", type=Path)
+    renderer_loss_contract.add_argument("--output", "-o", type=Path)
+    renderer_loss_contract.add_argument(
+        "--target-renderer",
+        default="differentiable-gaussian-image-renderer",
+    )
+    renderer_loss_contract.add_argument("--require-point-smoke-ready", action="store_true")
+    renderer_loss_contract.set_defaults(handler=_training_renderer_loss_contract)
 
     write_bundle = training_subparsers.add_parser(
         "write-sample-bundle",

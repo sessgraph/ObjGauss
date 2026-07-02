@@ -19,17 +19,19 @@
 
 ## Ready
 
-### TRAIN-RENDER-LOSS-001: Define renderer-loss upgrade boundary
+### TRAIN-IMAGE-TARGET-001: Bind image/camera targets for renderer training
 
 - 状态: ready
-- 类型: 标准 PR / training renderer contract
-- 目标: 在 `TRAIN-MVP-001` 和 `TRAIN-SAMPLE-ADAPTER-001` 之后，定义从 CPU
-  point-render smoke 到真实 renderer loss 的升级边界，包括 input frame contract、
-  render target、loss telemetry 和不替换现有 viewer renderer 的集成方式。
+- 类型: 标准 PR / training renderer input contract
+- 目标: 在 `TRAIN-RENDER-LOSS-001` 边界明确后，把 trainable kernel frame 从
+  point RGB target 扩展到 image/camera target contract，形成真实 renderer loss
+  接入前的输入 ABI。
 - 边界:
-  - 不直接把 point-render smoke 宣称为完整 3DGS training。
-  - 不引入 near-1M / 4.5M 大资产作为默认训练样例。
-  - 若需要 torch / GPU renderer / differentiable rasterizer，先写 contract 或 ADR。
+  - 不直接引入 torch / GPU differentiable rasterizer。
+  - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
+  - 不默认加载 near-1M / 4.5M 大资产；先用小 fixture 或 sample-derived targets。
+  - image target、camera intrinsics / extrinsics、visibility policy 和 loss telemetry
+    必须可序列化、可测试、可由 CLI 输出 summary。
 
 ## Planned
 
@@ -52,6 +54,51 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-RENDER-LOSS-001: Define renderer-loss upgrade boundary
+
+- 状态: done / renderer-loss-boundary
+- 类型: 标准 PR / training renderer contract
+- 目标: 在 `TRAIN-MVP-001` 和 `TRAIN-SAMPLE-ADAPTER-001` 之后，定义从 CPU
+  point-render smoke 到真实 renderer loss 的升级边界，包括 input frame contract、
+  render target、loss telemetry 和不替换现有 viewer renderer 的集成方式。
+- 已实施:
+  - `objgauss/core/renderer_loss.py` 新增
+    `objgauss-renderer-loss-boundary-v1`，输出当前 `cpu-point-rgb-smoke`
+    与目标 `differentiable-gaussian-image-renderer` 的边界报告。
+  - boundary report 明确 input frame、image-space render target、loss telemetry、
+    viewer renderer / training renderer 分工和升级 blockers。
+  - `objgauss.core` lazy namespace 暴露 `RendererLossBoundaryReport`、
+    `renderer_loss_boundary_report(...)` 和
+    `validate_renderer_loss_boundary_summary(...)`。
+  - `objgauss training renderer-loss-contract` 新增 CLI，可读取 `kernel-sample`
+    summary、检查 point smoke readiness、写出 JSON summary，并在需要时强制
+    `--require-point-smoke-ready`。
+- 边界:
+  - 不把 point-render smoke 宣称为完整 3DGS training。
+  - 不引入 torch / GPU renderer / differentiable rasterizer。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer；viewer renderer 仍是 debug
+    visualization / browser audit，training renderer 后续必须作为独立 loss producer。
+  - 不提交训练输出，不移动 public samples，不默认拉 near-1M / 4.5M 大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_renderer_loss.py tests/test_core_namespace.py`:
+    10 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel_sample"`:
+    1 passed, 64 deselected。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 12 --learning-rate 0.35 --max-points 8 --seed 8 --summary-output /tmp/objgauss-kernel-sample-summary.json --require-loss-decrease`:
+    passed；`source_gaussians=5696`、`sampled_gaussians=8`、`slots=4`、
+    `target_source=object_id_one_hot_targets`、`initial_total_loss=1.516573`、
+    `final_total_loss=1.309766`、`initial_render_loss=0.084134`、
+    `final_render_loss=0.061294`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-kernel-sample-summary.json --output /tmp/objgauss-renderer-loss-boundary.json --require-point-smoke-ready`:
+    passed；`status=point_render_smoke_ready`、`point_smoke_ready=true`、
+    `current_renderer=cpu-point-rgb-smoke`、
+    `target_renderer=differentiable-gaussian-image-renderer`。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `uv run --extra dev pytest`: 117 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-SAMPLE-ADAPTER-001: Run trainable kernel on object-aware Gaussian samples
 
