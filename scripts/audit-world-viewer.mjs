@@ -24,6 +24,8 @@ try {
       `debugOs=${summary.debugOs}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
+      `trainableRoute=${summary.trainableArtifactLoadRoute}`,
+      `trainableArtifact=${JSON.stringify(summary.trainableArtifactPath)}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -170,7 +172,9 @@ async function auditWorld(url) {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
       return world?.selectedModelId === "trainable-mvp-debug" &&
-        world?.selectedModelId === shell?.getAttribute("data-selected-model");
+        world?.selectedModelId === shell?.getAttribute("data-selected-model") &&
+        shell?.getAttribute("data-trainable-artifact-load-route") === "fetch-json" &&
+        shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json";
     }, undefined, { timeout: 15000 });
     const trainableSelection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -326,6 +330,8 @@ async function auditWorld(url) {
         shellHoveredTarget: shell?.getAttribute("data-hovered-target") ?? null,
         shellHoveredGaussians: Number(shell?.getAttribute("data-hovered-gaussians") ?? 0),
         dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
+        trainableArtifactLoadRoute: shell?.getAttribute("data-trainable-artifact-load-route") ?? null,
+        trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
@@ -335,6 +341,12 @@ async function auditWorld(url) {
     }
     if (!(Number(world.slotUtilization) > 0)) {
       throw new Error(`expected positive slot utilization, got ${world.slotUtilization}`);
+    }
+    if (
+      world.trainableArtifactLoadRoute !== "fetch-json" ||
+      world.trainableArtifactPath !== "/models/trainable-mvp-debug/model-artifact.json"
+    ) {
+      throw new Error(`expected fetched trainable artifact route: ${JSON.stringify(world)}`);
     }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
@@ -388,6 +400,8 @@ async function auditWorld(url) {
       debugOs: world.debugProtocol,
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
+      trainableArtifactLoadRoute: world.trainableArtifactLoadRoute,
+      trainableArtifactPath: world.trainableArtifactPath,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,

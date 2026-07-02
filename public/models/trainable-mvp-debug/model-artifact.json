@@ -1,0 +1,147 @@
+{
+  "artifact_policy": {
+    "git_policy": "small_static_browser_fixture_only",
+    "intended_location": "public/models/trainable-mvp-debug/model-artifact.json",
+    "viewer_policy": "ObjectState Debug OS fetch fixture, not production model"
+  },
+  "assignments": [
+    {
+      "frame_index": 0,
+      "matrix": [
+        [0.82, 0.18],
+        [0.74, 0.26],
+        [0.21, 0.79],
+        [0.12, 0.88]
+      ],
+      "shape": [4, 2]
+    },
+    {
+      "frame_index": 1,
+      "matrix": [
+        [0.8, 0.2],
+        [0.72, 0.28],
+        [0.24, 0.76],
+        [0.14, 0.86]
+      ],
+      "shape": [4, 2]
+    }
+  ],
+  "kind": "trainable_kernel_mvp_model",
+  "label": "trainable-mvp-debug-fetch-fixture",
+  "learned_parameters": {
+    "decoder_colors": [
+      [0.899, 0.246, 0.162],
+      [0.118, 0.686, 0.841]
+    ]
+  },
+  "object_states": [
+    {
+      "derived_object_ids": [0, 0, 1, 1],
+      "frame_index": 0,
+      "states": [
+        {
+          "assignment_entropy": 0.515,
+          "bbox": [-1.14, 0, -0.34, -0.36, 0.86, 0.28],
+          "centroid": [-0.78, 0.42, -0.04],
+          "confidence": 0.78,
+          "diagnostics": [],
+          "id": 0,
+          "mass_fraction": 0.545,
+          "normalized_assignment_entropy": 0.743,
+          "slot_mass": 2.18,
+          "status": "active_trained_slot"
+        },
+        {
+          "assignment_entropy": 0.421,
+          "bbox": [0.34, 0, -0.3, 1.18, 0.92, 0.34],
+          "centroid": [0.78, 0.46, 0.04],
+          "confidence": 0.835,
+          "diagnostics": [],
+          "id": 1,
+          "mass_fraction": 0.455,
+          "normalized_assignment_entropy": 0.607,
+          "slot_mass": 1.82,
+          "status": "active_trained_slot"
+        }
+      ]
+    },
+    {
+      "derived_object_ids": [0, 0, 1, 1],
+      "frame_index": 1,
+      "states": [
+        {
+          "assignment_entropy": 0.535,
+          "bbox": [-1.12, 0, -0.33, -0.34, 0.87, 0.29],
+          "centroid": [-0.762, 0.422, -0.034],
+          "confidence": 0.76,
+          "diagnostics": [],
+          "id": 0,
+          "mass_fraction": 0.54,
+          "normalized_assignment_entropy": 0.772,
+          "slot_mass": 2.16,
+          "status": "active_trained_slot"
+        },
+        {
+          "assignment_entropy": 0.439,
+          "bbox": [0.36, 0, -0.28, 1.2, 0.93, 0.36],
+          "centroid": [0.796, 0.462, 0.046],
+          "confidence": 0.81,
+          "diagnostics": [],
+          "id": 1,
+          "mass_fraction": 0.46,
+          "normalized_assignment_entropy": 0.633,
+          "slot_mass": 1.84,
+          "status": "active_trained_slot"
+        }
+      ]
+    }
+  ],
+  "renderer_api": {
+    "differentiable_fields": ["decoder_colors", "assignments"],
+    "frozen_fields": ["positions", "camera", "visibility_mask", "point_radius"],
+    "gradient_path": "analytic-color-assignment-gradient-v1",
+    "image_render_loss": 0.053806,
+    "renderer_name": "cpu-image-point-splat-differentiable-v1",
+    "schema": "objgauss-training-renderer-api-v1",
+    "status": "ready"
+  },
+  "schema": "objgauss-trainable-kernel-model-artifact-v1",
+  "source": {
+    "input": "fixture://trainable-mvp-debug",
+    "sample": {
+      "frame_count": 2,
+      "sampled_count": 4,
+      "slots": 2,
+      "source_count": 4,
+      "target_source": "object_id_one_hot_targets"
+    }
+  },
+  "training": {
+    "final_loss": {
+      "image_render_loss": 0.053806,
+      "object_loss": 1.248721,
+      "render_loss": 0.057232,
+      "temporal_loss": 0.00012,
+      "total_loss": 0.053806
+    },
+    "frame_count": 2,
+    "image_render_loss_decreased": true,
+    "initial_loss": {
+      "image_render_loss": 0.082205,
+      "object_loss": 1.248721,
+      "render_loss": 0.084134,
+      "temporal_loss": 0.00018,
+      "total_loss": 0.082205
+    },
+    "iterations": 18,
+    "render_target_mode": "image_space_targets_bound",
+    "schema": "objgauss-v1-trainable-kernel-mvp-v1",
+    "slots": 2,
+    "weights": {
+      "image_render": 1,
+      "object": 0,
+      "render": 0,
+      "temporal": 0.02
+    }
+  }
+}

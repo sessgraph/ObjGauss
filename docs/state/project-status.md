@@ -402,6 +402,17 @@ assignment heatmap、renderer loss 和 source metadata。前端 inspector / debu
 `trainableArtifacts=1` 和 Gaussian probe 成功。该步骤不替换 Three.js / Spark /
 WebGPU viewer renderer，不提交真实训练输出，不默认加载 near-1M / 4.5M 大资产。
 
+`TRAINABLE-ARTIFACT-FETCH-001` 已完成 Debug OS 的 fetchable trainable artifact delivery：
+`src/modelCatalog.js` 不再内联 `trainable-mvp-debug` artifact，而是指向
+`/models/trainable-mvp-debug/model-artifact.json`；`src/App.jsx` 在
+`loadMode="trainable-artifact"` 路径上会先 fetch 并校验
+`objgauss-trainable-kernel-model-artifact-v1`，再把 artifact 注入 Three.js ObjectState
+Debug OS。前端 inspector、`.worldShell` telemetry 和
+`scripts/audit-world-viewer.mjs` 现在暴露并验证 `loadRoute=fetch-json` 与 artifact path。
+新增的 public JSON 仍是 4KB 小型 browser fixture，用于证明“算法处理后的 artifact
+文件可以被 viewer 加载”；不提交真实训练输出、不发布大模型、不改变 gsplat / CUDA
+blocker。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

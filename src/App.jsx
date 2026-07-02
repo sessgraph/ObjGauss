@@ -191,11 +191,14 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading trained artifact" });
           try {
-            const rendered = worldApi.current?.upsertModel(model, null);
+            const artifact = await loadTrainableArtifact(model);
+            const hydratedModel = { ...model, trainableArtifact: artifact };
+            const rendered = worldApi.current?.upsertModel(hydratedModel, null);
             if (cancelled) return;
             patchModel(model.id, {
+              trainableArtifact: artifact,
               status: "loaded",
-              message: "trained artifact",
+              message: "trained artifact json",
               gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? 0,
               displayCount: rendered?.displayCount ?? 0,
               objectCount: rendered?.objectCount ?? model.objectCount,
@@ -204,10 +207,12 @@ export default function App() {
               loadMs: Math.round(performance.now() - startedAt),
               delivery: {
                 source: "trainable-kernel-model-artifact",
-                schema: model.trainableArtifact?.schema,
-                rendererName: model.trainableArtifact?.renderer_api?.renderer_name,
-                imageRenderLoss: model.trainableArtifact?.renderer_api?.image_render_loss,
-                gradientPath: model.trainableArtifact?.renderer_api?.gradient_path,
+                loadRoute: model.trainableArtifactPath ? "fetch-json" : "inline",
+                artifactPath: model.trainableArtifactPath ?? "inline://trainable-artifact",
+                schema: artifact.schema,
+                rendererName: artifact.renderer_api?.renderer_name,
+                imageRenderLoss: artifact.renderer_api?.image_render_loss,
+                gradientPath: artifact.renderer_api?.gradient_path,
               },
             });
           } catch (error) {
@@ -307,6 +312,8 @@ export default function App() {
       data-stability-mean-assignment-jitter={selectedStability.meanAssignmentJitter ?? ""}
       data-stability-bbox-available={selectedStability.bboxAvailable ? "true" : "false"}
       data-stability-mean-bbox-stability={selectedStability.meanBboxStability ?? ""}
+      data-trainable-artifact-load-route={selected?.delivery?.loadRoute ?? ""}
+      data-trainable-artifact-path={selected?.delivery?.artifactPath ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -387,6 +394,7 @@ export default function App() {
             <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
             <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
             <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
+            <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
             <Meta label="assignment" value={selectedAssignmentSource} />
             <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
@@ -429,6 +437,31 @@ async function loadOgcModel(model) {
       lodLevel: model.ogc?.lodLevel,
     }),
   };
+}
+
+async function loadTrainableArtifact(model) {
+  if (model.trainableArtifactPath) {
+    const response = await fetch(model.trainableArtifactPath);
+    if (!response.ok) throw new Error(`trainable artifact HTTP ${response.status}`);
+    return validateTrainableArtifact(await response.json());
+  }
+  return validateTrainableArtifact(model.trainableArtifact);
+}
+
+function validateTrainableArtifact(artifact) {
+  if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") {
+    throw new Error("unsupported trainable kernel model artifact schema");
+  }
+  if (artifact.kind !== "trainable_kernel_mvp_model") {
+    throw new Error("unsupported trainable kernel model artifact kind");
+  }
+  if (!Array.isArray(artifact.assignments) || !artifact.assignments.length) {
+    throw new Error("trainable artifact missing assignments");
+  }
+  if (!Array.isArray(artifact.object_states) || !artifact.object_states.length) {
+    throw new Error("trainable artifact missing object states");
+  }
+  return artifact;
 }
 
 async function loadOgcIndex(artifact) {
@@ -839,7 +872,9 @@ function ThreeWorld({
       animationFrame = requestAnimationFrame(animate);
     };
 
-    models.forEach((model) => upsertModel(model));
+    models
+      .filter((model) => model.loadMode !== "trainable-artifact")
+      .forEach((model) => upsertModel(model));
     resize();
     animate();
     window.addEventListener("resize", resize);

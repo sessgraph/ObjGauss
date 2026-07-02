@@ -72,6 +72,42 @@
 
 ## Done
 
+### TRAINABLE-ARTIFACT-FETCH-001: Load trainable artifact from browser JSON route
+
+- 状态: done / trainable-artifact-fetch-route
+- 类型: 标准 PR / frontend debug artifact delivery
+- 目标: 把 `trainable-mvp-debug` 从 JS 内联对象升级为可 fetch 的 browser JSON
+  artifact，证明 ObjectState Debug OS 可以加载算法处理后的 artifact 文件，而不是只能消费
+  bundle 内 fixture。
+- 已实施:
+  - 新增 `public/models/trainable-mvp-debug/model-artifact.json`，小型
+    `objgauss-trainable-kernel-model-artifact-v1` browser fixture，保留 assignments、
+    ObjectState summary、decoder colors、renderer API telemetry 和 loss summary。
+  - `src/modelCatalog.js` 的 `trainable-mvp-debug` 改为
+    `trainableArtifactPath=/models/trainable-mvp-debug/model-artifact.json`，不再内联
+    artifact payload。
+  - `src/App.jsx` 在 `loadMode="trainable-artifact"` 路径上 fetch 并校验 artifact
+    schema / kind / assignments / object states，再注入 Three.js Debug OS。
+  - Inspector、`.worldShell` telemetry 和 `scripts/audit-world-viewer.mjs` 暴露并验证
+    `loadRoute=fetch-json` 与 artifact path。
+- 边界:
+  - public JSON 是 4KB 小型 browser fixture，不是真实训练输出发布物。
+  - 不提交 `public/samples/` 里的未跟踪大样本，不提交 checkpoint / rendered image。
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `trainableRoute=fetch-json`、
+    `trainableArtifact="/models/trainable-mvp-debug/model-artifact.json"`、
+    `assignmentSource=trainable_kernel_model_artifact`、`assignmentSlots=2`、
+    `bboxStability=0.899`，截图 `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-BBOX-STABILITY-001: Expose bbox convergence in Debug OS
 
 - 状态: done / debug-os-bbox-stability
