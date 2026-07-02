@@ -19,17 +19,17 @@
 
 ## Ready
 
-### TRAIN-MODEL-VIEWER-BINDING-001: Load trainable MVP model artifact in Debug OS
+### TRAIN-FULL-3DGS-RENDERER-ADR-001: Decide full differentiable 3DGS renderer path
 
 - 状态: ready
-- 类型: 标准 PR / frontend debug artifact
-- 目标: 在 trainable kernel MVP model artifact 已可持久化后，让 ObjectState Debug OS
-  能消费小型 artifact fixture，显示 trained assignments / ObjectState summary /
-  renderer loss telemetry，而不是只显示 derived_from_object_id debug projection。
+- 类型: ADR / training renderer dependency
+- 目标: 在 CPU image-space point splat MVP 已完成后，明确下一步真实 3DGS
+  differentiable renderer 的 dependency path、GPU / torch 边界、训练产物位置和
+  与现有 viewer renderer 的隔离方式。
 - 边界:
-  - 默认仍不引入 torch / GPU differentiable rasterizer。
+  - 先写 ADR，不直接引入 torch / CUDA / 大型 renderer 依赖。
   - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
-  - 不提交真实训练输出；若需前端 fixture，必须小型、静态、明确为 debug fixture。
+  - 不提交训练输出；所有大产物继续留在 ignored `outputs/` 或 HF handoff。
   - 不默认加载 near-1M / 4.5M 大资产。
 
 ## Planned
@@ -53,6 +53,44 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-MODEL-VIEWER-BINDING-001: Load trainable MVP model artifact in Debug OS
+
+- 状态: done / trainable-artifact-debug-os
+- 类型: 标准 PR / frontend debug artifact
+- 目标: 在 trainable kernel MVP model artifact 已可持久化后，让 ObjectState Debug OS
+  能消费小型 artifact fixture，显示 trained assignments / ObjectState summary /
+  renderer loss telemetry，而不是只显示 derived_from_object_id debug projection。
+- 已实施:
+  - `src/modelCatalog.js` 新增 `trainable-mvp-debug` 小型 static fixture，schema 为
+    `objgauss-trainable-kernel-model-artifact-v1`，明确用于 Debug OS，不是真实训练输出发布物。
+  - `src/App.jsx` 新增 `loadMode="trainable-artifact"` 路径，使用 artifact 的
+    assignment matrix、ObjectState summary、decoder colors 和 renderer API telemetry
+    生成 per-object render targets。
+  - Debug panel / inspector 现在能显示
+    `assignment=trainable_kernel_model_artifact`、renderer name、
+    `renderer loss=0.053806`、trained assignment heatmap 和 Gaussian probe vector。
+  - `window.__OBJGAUSS_WORLD__` 和 `.worldShell` 暴露 trainable artifact loaded count
+    与当前 assignment source，供 browser audit 验证。
+  - `scripts/audit-world-viewer.mjs` 先验证 OGC 仍是 `derived_from_object_id`，再选择
+    `trainable-mvp-debug`，断言 trained artifact source、2-slot heatmap 和 Gaussian
+    probe 成功。
+- 边界:
+  - 不引入 torch / GPU renderer /真实 3DGS differentiable rasterizer。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交真实训练输出；前端只提交小型 static debug fixture。
+  - 不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: passed；`models=7`、`objects=31`、
+    `selectedModel="trainable-mvp-debug"`、`trainableArtifacts=1`、
+    `assignmentSource=trainable_kernel_model_artifact`、`assignmentSlots=2`、
+    `selectedGaussian="0"`、`sidebars=0`，截图 `/tmp/objgauss-world-viewer.png`。
+    Browser plugin not available；按 frontend-testing-debugging 技能要求使用常规
+    Playwright / repo audit fallback。沙箱内本地端口访问失败，提权重跑通过。
+  - `uv run --extra dev pytest`: 129 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-MVP-MODEL-ARTIFACT-001: Persist trainable kernel MVP model artifact
 

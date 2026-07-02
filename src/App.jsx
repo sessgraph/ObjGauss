@@ -40,6 +40,13 @@ export default function App() {
       ).length,
     [models],
   );
+  const trainableArtifactLoadedCount = useMemo(
+    () =>
+      Object.values(models).filter(
+        (model) => model.status === "loaded" && model.delivery?.source === "trainable-kernel-model-artifact",
+      ).length,
+    [models],
+  );
   const objectCount = useMemo(
     () =>
       Object.values(models).reduce(
@@ -53,6 +60,8 @@ export default function App() {
   const selectedObject =
     selected?.objects?.find((object) => String(object.objectId) === String(selection.objectId)) ?? null;
   const selectedObjectKey = selectedObject?.selectionId ?? "";
+  const selectedAssignmentSource =
+    debugProbe?.source ?? selectedObject?.objectState?.source ?? selected?.delivery?.source ?? "";
   const hiddenCount = hiddenObjects.size;
 
   const patchModel = useCallback((id, patch) => {
@@ -174,6 +183,38 @@ export default function App() {
           }
           continue;
         }
+        if (model.loadMode === "trainable-artifact") {
+          const startedAt = performance.now();
+          patchModel(model.id, { status: "loading", message: "loading trained artifact" });
+          try {
+            const rendered = worldApi.current?.upsertModel(model, null);
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "loaded",
+              message: "trained artifact",
+              gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? 0,
+              displayCount: rendered?.displayCount ?? 0,
+              objectCount: rendered?.objectCount ?? model.objectCount,
+              corePoint: rendered?.corePoint ?? null,
+              objects: rendered?.objects ?? [],
+              loadMs: Math.round(performance.now() - startedAt),
+              delivery: {
+                source: "trainable-kernel-model-artifact",
+                schema: model.trainableArtifact?.schema,
+                rendererName: model.trainableArtifact?.renderer_api?.renderer_name,
+                imageRenderLoss: model.trainableArtifact?.renderer_api?.image_render_loss,
+                gradientPath: model.trainableArtifact?.renderer_api?.gradient_path,
+              },
+            });
+          } catch (error) {
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "error",
+              message: error?.message ?? "trainable artifact load failed",
+            });
+          }
+          continue;
+        }
         if (model.loadMode !== "eager") {
           const rendered = worldApi.current?.upsertModel(model, null);
           patchModel(model.id, {
@@ -240,6 +281,8 @@ export default function App() {
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
       data-hidden-objects={hiddenCount}
       data-ogc-loaded-count={ogcLoadedCount}
+      data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
+      data-assignment-source={selectedAssignmentSource}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -321,6 +364,8 @@ export default function App() {
             <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
             <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
+            <Meta label="assignment" value={selectedAssignmentSource} />
+            <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
           </dl>
         </section>
       ) : null}
@@ -466,6 +511,11 @@ function ThreeWorld({
       const selectedModelId =
         selectedObject?.userData.modelId ??
         (modelRoots.has(selectedRef.current) ? selectedRef.current : null);
+      const selectedModel = selectedModelId ? modelRoots.get(selectedModelId) : null;
+      const selectedAssignmentSource =
+        selectedObject?.userData.objectState?.source ??
+        selectedModel?.userData.assignmentSource ??
+        "derived_from_object_id";
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
         ui: "frosted-glass-in-world",
@@ -480,7 +530,10 @@ function ThreeWorld({
         hoveredId: hoveredObject?.userData.selectionId ?? null,
         debugMode: debugRef.current,
         debugProtocol: "object-state-debug-os-v1",
-        assignmentSource: "derived_from_object_id",
+        assignmentSource: selectedAssignmentSource,
+        trainableArtifactLoadedCount: [...modelRoots.values()].filter(
+          (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
+        ).length,
         visibleObjectCount: [...draggableObjects.values()].filter((object) => object.visible).length,
         modelPositions: [...modelRoots.values()].map((object) => ({
           id: object.userData.modelId,
@@ -572,7 +625,12 @@ function ThreeWorld({
       for (const [selectionId, object] of draggableObjects) {
         if (object.userData.modelId === model.id) draggableObjects.delete(selectionId);
       }
-      const result = points?.length ? createPointCloudGroup(model, points) : createCompressedModelGroup(model);
+      const result =
+        model.loadMode === "trainable-artifact"
+          ? createTrainableArtifactGroup(model)
+          : points?.length
+            ? createPointCloudGroup(model, points)
+            : createCompressedModelGroup(model);
       scene.add(result.group);
       modelRoots.set(model.id, result.group);
       result.objectGroups.forEach((object) => {
@@ -755,6 +813,7 @@ function DebugPanel({
   const assignment = debugProbe?.assignment ?? selectedObject?.assignment ?? activeState?.assignment ?? [];
   const probeEntropy = debugProbe?.entropy ?? activeState?.assignmentEntropy ?? 0;
   const probeConfidence = debugProbe?.confidence ?? activeState?.confidence ?? 0;
+  const rendererLoss = selected?.delivery?.imageRenderLoss;
   return (
     <section
       className="glassHud debugPanel"
@@ -774,12 +833,14 @@ function DebugPanel({
         <Metric label="conf" value={formatRatio(probeConfidence)} />
         <Metric label="entropy" value={formatRatio(probeEntropy)} />
         <Metric label="mass" value={formatNumber(activeState?.slotMass)} />
+        <Metric label="img loss" value={formatLoss(rendererLoss)} />
       </div>
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
 
       <dl className="debugStateGrid">
         <Meta label="source" value={debugProbe?.source ?? activeState?.source} />
+        <Meta label="renderer" value={selected.delivery?.rendererName} />
         <Meta label="gaussian n" value={debugProbe?.gaussianIndex ?? "-"} />
         <Meta label="centroid" value={formatVec(activeState?.centroid)} />
         <Meta label="bbox" value={formatBox(activeState?.bbox)} />
@@ -1126,6 +1187,159 @@ function createCompressedModelGroup(model) {
   };
 }
 
+function createTrainableArtifactGroup(model) {
+  const artifact = model.trainableArtifact;
+  if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") {
+    throw new Error("missing trainable kernel model artifact fixture");
+  }
+  const frame = artifact.object_states?.[model.trainableFrameIndex ?? 0] ?? artifact.object_states?.[0];
+  const assignmentFrame = artifact.assignments?.[frame?.frame_index ?? 0] ?? artifact.assignments?.[0];
+  const matrix = Array.isArray(assignmentFrame?.matrix) ? assignmentFrame.matrix : [];
+  const states = Array.isArray(frame?.states) ? frame.states : [];
+  if (!states.length || !matrix.length) {
+    throw new Error("trainable artifact fixture needs states and assignment matrix");
+  }
+
+  const group = baseModelGroup(model);
+  group.userData.assignmentSource = "trainable_kernel_model_artifact";
+  group.userData.artifactSchema = artifact.schema;
+  const objectGroups = [];
+  const objects = [];
+  const objectIds = states.map((state) => state.id);
+  const allCorners = states.flatMap((state) => bboxCorners(state.bbox));
+  const globalBounds = pointBounds(allCorners);
+  const span = Math.max(globalBounds.size.x, globalBounds.size.y, globalBounds.size.z, 0.001);
+  const scale = (model.displayScale ?? 1.9) / span;
+  const decoderColors = artifact.learned_parameters?.decoder_colors ?? [];
+  let displayCount = 0;
+
+  states.forEach((state, slot) => {
+    const objectId = state.id;
+    const accent = objectAccent(objectId, model.accent);
+    const rows = matrix
+      .map((row, rowIndex) => ({ row, rowIndex, dominantSlot: dominantIndex(row) }))
+      .filter((entry) => entry.dominantSlot === slot);
+    const stateRows = rows.length ? rows : [{ row: oneHot(slot, states.length), rowIndex: slot, dominantSlot: slot }];
+    const box = boxFromBbox(state.bbox);
+    const centroid = vectorFromArray(state.centroid, box.getCenter(new THREE.Vector3()));
+    const normalizedCenter = normalizeArtifactVector(centroid, globalBounds.center, scale);
+    const objectGroup = baseObjectGroup(model, objectId, {
+      x: normalizedCenter.x,
+      y: 0,
+      z: normalizedCenter.z,
+    });
+    const positions = new Float32Array(stateRows.length * 3);
+    const originalColors = new Float32Array(stateRows.length * 3);
+    const assignmentColors = new Float32Array(stateRows.length * 3);
+    const fallback = new THREE.Color(accent);
+    const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), Number(state.normalized_assignment_entropy ?? 0) * 0.34);
+    const assignment = averageAssignmentVector(stateRows.map((entry) => entry.row), objectIds);
+
+    stateRows.forEach((entry, index) => {
+      const point = artifactPointInBox(box, index, stateRows.length);
+      const normalized = normalizeArtifactVector(point, globalBounds.center, scale);
+      positions[index * 3] = normalized.x - objectGroup.position.x;
+      positions[index * 3 + 1] = normalized.y - globalBounds.min.y * scale;
+      positions[index * 3 + 2] = normalized.z - objectGroup.position.z;
+      const learnedColor = decoderColors[entry.dominantSlot] ?? null;
+      originalColors[index * 3] = Number(learnedColor?.[0]) || fallback.r;
+      originalColors[index * 3 + 1] = Number(learnedColor?.[1]) || fallback.g;
+      originalColors[index * 3 + 2] = Number(learnedColor?.[2]) || fallback.b;
+      assignmentColors[index * 3] = debugColor.r;
+      assignmentColors[index * 3 + 1] = debugColor.g;
+      assignmentColors[index * 3 + 2] = debugColor.b;
+    });
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const originalColorAttr = new THREE.BufferAttribute(originalColors, 3);
+    const assignmentColorAttr = new THREE.BufferAttribute(assignmentColors, 3);
+    geometry.setAttribute("color", assignmentColorAttr);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+
+    const material = new THREE.PointsMaterial({
+      size: model.pointSize ?? 0.08,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: false,
+    });
+    const cloud = new THREE.Points(geometry, material);
+    cloud.userData.role = "gaussian-cloud";
+    cloud.userData.originalColor = originalColorAttr;
+    cloud.userData.assignmentColor = assignmentColorAttr;
+    cloud.userData.gaussianDebug = stateRows.map((entry, index) => {
+      const vector = assignmentVectorFromProbabilities(entry.row, objectIds);
+      return {
+        protocol: "object-state-debug-os-v1",
+        source: "trainable_kernel_model_artifact",
+        gaussianIndex: entry.rowIndex,
+        objectId,
+        slot,
+        confidence: round3(Math.max(...entry.row.map((value) => Number(value) || 0))),
+        entropy: round3(normalizedEntropy(entry.row.map((value) => Number(value) || 0))),
+        assignment: vector,
+        position: Array.from(positions.slice(index * 3, index * 3 + 3)).map(round3),
+        opacity: 0.96,
+      };
+    });
+
+    const objectState = {
+      schema: "objgauss-object-state-debug-v1",
+      source: "trainable_kernel_model_artifact",
+      objectId,
+      slot,
+      slotMass: round3(state.slot_mass),
+      massFraction: round3(state.mass_fraction),
+      confidence: round3(state.confidence),
+      assignmentEntropy: round3(state.normalized_assignment_entropy ?? state.assignment_entropy ?? 0),
+      centroid: (state.centroid ?? []).map(round3),
+      bbox: (state.bbox ?? []).map(round3),
+      status: state.status ?? "trained_artifact_slot",
+      assignment,
+    };
+    objectGroup.userData.objectState = objectState;
+    objectGroup.add(cloud);
+    objectGroup.add(objectStateWireBox(geometry.boundingBox, accent));
+    objectGroup.add(corePointMesh(Math.max(0.42, geometry.boundingBox.getCenter(new THREE.Vector3()).y), accent));
+    objectGroup.add(coreGlow(Math.max(0.42, geometry.boundingBox.getCenter(new THREE.Vector3()).y), accent));
+    objectGroup.add(selectionRing(accent, ringRadiusForBounds(geometryBoundsInfo(geometry.boundingBox), 1)));
+    group.add(objectGroup);
+    objectGroups.push(objectGroup);
+    displayCount += stateRows.length;
+    objects.push({
+      objectId,
+      selectionId: selectionIdForObject(model.id, objectId),
+      displayCount: stateRows.length,
+      corePoint: objectState.centroid,
+      bbox: objectState.bbox,
+      objectState,
+      assignment,
+      assignmentEntropy: objectState.assignmentEntropy,
+      assignmentConfidence: objectState.confidence,
+      slotMass: objectState.slotMass,
+      massFraction: objectState.massFraction,
+      galleryPosition: objectGroup.position.toArray().map(round3),
+      chunkPath: objectChunkPath(model, objectId),
+      accent,
+    });
+  });
+
+  return {
+    group,
+    objectGroups,
+    summary: {
+      displayCount,
+      gaussianCount: matrix.length,
+      objectCount: objects.length,
+      corePoint: states[0]?.centroid?.map(round3) ?? [0, 0, 0],
+      objects,
+    },
+  };
+}
+
 function baseModelGroup(model) {
   const group = new THREE.Group();
   group.name = model.name;
@@ -1326,6 +1540,93 @@ function objectStateSummary({
   };
 }
 
+function bboxCorners(bbox) {
+  const box = boxFromBbox(bbox);
+  return [
+    { x: box.min.x, y: box.min.y, z: box.min.z },
+    { x: box.min.x, y: box.min.y, z: box.max.z },
+    { x: box.min.x, y: box.max.y, z: box.min.z },
+    { x: box.max.x, y: box.min.y, z: box.min.z },
+    { x: box.max.x, y: box.max.y, z: box.max.z },
+  ];
+}
+
+function boxFromBbox(bbox) {
+  const values = Array.isArray(bbox) && bbox.length >= 6 ? bbox.map(Number) : [-0.5, 0, -0.5, 0.5, 1, 0.5];
+  return new THREE.Box3(
+    new THREE.Vector3(values[0] || 0, values[1] || 0, values[2] || 0),
+    new THREE.Vector3(values[3] || 0, values[4] || 0, values[5] || 0),
+  );
+}
+
+function vectorFromArray(value, fallback = new THREE.Vector3()) {
+  if (!Array.isArray(value) || value.length < 3) return fallback.clone();
+  return new THREE.Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+}
+
+function normalizeArtifactVector(vector, center, scale) {
+  return new THREE.Vector3(
+    (vector.x - center.x) * scale,
+    (vector.y - center.y) * scale,
+    (vector.z - center.z) * scale,
+  );
+}
+
+function artifactPointInBox(box, index, count) {
+  const t = count <= 1 ? 0.5 : index / (count - 1);
+  const wave = Math.sin((index + 1) * 1.73) * 0.18;
+  return new THREE.Vector3(
+    THREE.MathUtils.lerp(box.min.x, box.max.x, 0.24 + 0.52 * t),
+    THREE.MathUtils.lerp(box.min.y, box.max.y, 0.34 + 0.22 * ((index + 1) % 2)),
+    THREE.MathUtils.lerp(box.min.z, box.max.z, 0.5 + wave),
+  );
+}
+
+function averageAssignmentVector(rows, objectIds) {
+  const width = Math.max(objectIds.length, ...rows.map((row) => row.length));
+  const totals = Array.from({ length: width }, () => 0);
+  rows.forEach((row) => {
+    row.forEach((value, index) => {
+      totals[index] += Number(value) || 0;
+    });
+  });
+  const divisor = Math.max(1, rows.length);
+  return assignmentVectorFromProbabilities(totals.map((value) => value / divisor), objectIds);
+}
+
+function assignmentVectorFromProbabilities(probabilities, objectIds) {
+  return probabilities.map((value, slot) => ({
+    slot,
+    objectId: objectIds[slot] ?? slot,
+    probability: round3(Number(value) || 0),
+  }));
+}
+
+function dominantIndex(values) {
+  let bestIndex = 0;
+  let bestValue = -Infinity;
+  values.forEach((value, index) => {
+    const number = Number(value) || 0;
+    if (number > bestValue) {
+      bestValue = number;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function oneHot(index, width) {
+  return Array.from({ length: width }, (_item, slot) => (slot === index ? 1 : 0));
+}
+
+function geometryBoundsInfo(box) {
+  const size = new THREE.Vector3();
+  box?.getSize?.(size);
+  return {
+    size,
+  };
+}
+
 function samplePoints(points, maxPoints) {
   if (points.length <= maxPoints) return points;
   const byObject = new Map();
@@ -1501,6 +1802,11 @@ function formatBox(value) {
 function formatRatio(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(3) : "-";
+}
+
+function formatLoss(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(6) : "-";
 }
 
 function round3(value) {

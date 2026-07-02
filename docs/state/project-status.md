@@ -388,6 +388,20 @@ ObjectState summary、decoder colors、rendered RGB、loss telemetry、renderer 
 sample provenance。该步骤仍不引入 torch / GPU renderer，不替换 viewer renderer，
 不把该 JSON 产物标记为 browser artifact。
 
+`TRAIN-MODEL-VIEWER-BINDING-001` 已完成 trainable MVP model artifact 的 Debug OS
+前端绑定：`src/modelCatalog.js` 新增小型 `trainable-mvp-debug` static fixture，
+明确标记为 `objgauss-trainable-kernel-model-artifact-v1` debug fixture，不是真实训练
+输出发布物。`src/App.jsx` 现在支持 `loadMode="trainable-artifact"`，可从 artifact
+中的 assignment matrix、ObjectState summary、decoder colors 和 renderer API telemetry
+生成 ObjectState Debug OS render targets、Gaussian probe、bbox overlay、2-slot
+assignment heatmap、renderer loss 和 source metadata。前端 inspector / debug panel
+会显示 `assignment=trainable_kernel_model_artifact`、renderer name 和
+`renderer loss=0.053806`。`scripts/audit-world-viewer.mjs` 已扩展为先验证 OGC
+仍是 `derived_from_object_id`，再选择 `trainable-mvp-debug`，断言
+`assignmentSource=trainable_kernel_model_artifact`、`assignmentSlots=2`、
+`trainableArtifacts=1` 和 Gaussian probe 成功。该步骤不替换 Three.js / Spark /
+WebGPU viewer renderer，不提交真实训练输出，不默认加载 near-1M / 4.5M 大资产。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

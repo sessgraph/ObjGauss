@@ -23,7 +23,9 @@ try {
       `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
       `debugOs=${summary.debugOs}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
+      `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
       `assignmentSlots=${summary.assignmentSlots}`,
+      `assignmentSource=${summary.assignmentSource}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
@@ -74,8 +76,8 @@ async function auditWorld(url) {
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
     const pills = await page.locator(".modelPill").count();
-    if (pills < 6) {
-      throw new Error(`expected at least 6 model pills, found ${pills}`);
+    if (pills < 7) {
+      throw new Error(`expected at least 7 model pills, found ${pills}`);
     }
     const ogcPill = page.locator(".modelPill[data-model-row-id='ogc-debug']");
     await ogcPill.waitFor({ timeout: 15000 });
@@ -143,6 +145,65 @@ async function auditWorld(url) {
     if (gaussianSelection.assignmentSource !== "derived_from_object_id") {
       throw new Error(`unexpected assignment source: ${gaussianSelection.assignmentSource}`);
     }
+    const trainablePill = page.locator(".modelPill[data-model-row-id='trainable-mvp-debug']");
+    await trainablePill.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-mvp-debug']");
+      return pill?.getAttribute("data-model-load-state") === "loaded" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) > 0;
+    }, undefined, { timeout: 15000 });
+    await trainablePill.click();
+    await page.waitForFunction(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
+      return world?.selectedModelId === "trainable-mvp-debug" &&
+        world?.selectedModelId === shell?.getAttribute("data-selected-model");
+    }, undefined, { timeout: 15000 });
+    const trainableSelection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const selection = world?.objectSelections?.find(
+        (entry) => entry.modelId === "trainable-mvp-debug",
+      );
+      const objectCount = world?.objectSelections?.filter((entry) => entry.modelId === "trainable-mvp-debug").length ?? 0;
+      return {
+        ok: world?.selectObjectForAudit?.(selection?.selectionId) ?? false,
+        selectionId: selection?.selectionId ?? null,
+        objectCount,
+      };
+    });
+    if (!trainableSelection.ok) {
+      throw new Error("expected audit handle to select a trainable artifact object");
+    }
+    if (trainableSelection.objectCount < 2) {
+      throw new Error(`expected trainable artifact to expose at least 2 object render targets, found ${trainableSelection.objectCount}`);
+    }
+    const trainableGaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+        trainableArtifactLoadedCount: window.__OBJGAUSS_WORLD__?.trainableArtifactLoadedCount ?? 0,
+      };
+    }, trainableSelection.selectionId);
+    if (!trainableGaussian.ok) {
+      throw new Error("expected audit handle to select a trainable artifact Gaussian probe");
+    }
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      return (
+        shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        heatmap?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, undefined, { timeout: 15000 });
+    if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`unexpected trainable assignment source: ${trainableGaussian.assignmentSource}`);
+    }
+    if (trainableGaussian.trainableArtifactLoadedCount < 1) {
+      throw new Error("expected trainable artifact load count to be visible in audit handle");
+    }
     const visibilityToggle = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const selection = world?.objectSelections?.[0];
@@ -180,6 +241,8 @@ async function auditWorld(url) {
         selectedObjectId: handle.selectedObjectId,
         debugMode: handle.debugMode,
         debugProtocol: handle.debugProtocol,
+        assignmentSource: handle.assignmentSource,
+        trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
     });
@@ -197,6 +260,8 @@ async function auditWorld(url) {
       selectedObjectId: world.selectedObjectId,
       debugOs: world.debugProtocol,
       ogcLoadedCount: world.ogcLoadedCount,
+      trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
+      assignmentSource: world.assignmentSource,
       assignmentSlots,
       selectedGaussian,
       sidebars,
