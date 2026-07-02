@@ -9,6 +9,7 @@ from objgauss.core import (
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     TrainableKernelResult,
+    TrainableKernelSample,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
@@ -25,6 +26,8 @@ from objgauss.core import (
     project_object_states_from_field,
     read_ply,
     train_kernel_mvp,
+    train_kernel_mvp_from_cloud,
+    trainable_kernel_sample_from_cloud,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
@@ -169,6 +172,15 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert isinstance(result, TrainableKernelResult)
     assert result.schema == "objgauss-v1-trainable-kernel-mvp-v1"
     assert result.frame_count == 2
+    sample = trainable_kernel_sample_from_cloud(_tiny_object_cloud(), frame_count=1)
+    assert isinstance(sample, TrainableKernelSample)
+    sample_result, sample_again = train_kernel_mvp_from_cloud(
+        _tiny_object_cloud(),
+        iterations=2,
+        frame_count=1,
+    )
+    assert isinstance(sample_result, TrainableKernelResult)
+    assert sample_again.target_source == "object_id_one_hot_targets"
 
 
 def _tiny_cloud() -> GaussianCloud:
@@ -191,4 +203,15 @@ def _tiny_cloud() -> GaussianCloud:
     vertices["green"] = np.array([20, 30, 230, 240], dtype=np.uint8)
     vertices["blue"] = np.array([20, 30, 20, 30], dtype=np.uint8)
     vertices["opacity"] = np.ones(4, dtype=np.float32)
+    return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _tiny_object_cloud() -> GaussianCloud:
+    cloud = _tiny_cloud()
+    vertices = append_or_replace_property(
+        cloud.vertices,
+        "object_id",
+        np.array([0, 0, 1, 1], dtype=np.int32),
+        "i4",
+    )
     return GaussianCloud(vertices=vertices, source_format="ascii")

@@ -6,6 +6,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from objgauss.core.gaussian import GaussianCloud
+from objgauss.core.features import colors, extract_features, positions
 from objgauss.core.object_state import ObjectStateProjection, project_object_states
 
 TRAINABLE_KERNEL_MVP_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
@@ -86,6 +87,29 @@ class TrainableKernelResult:
                 ]
                 for projection in self.object_state_projections
             ],
+        }
+
+
+@dataclass(frozen=True)
+class TrainableKernelSample:
+    frames: tuple[TrainableKernelFrame, ...]
+    slots: int
+    source_count: int
+    sampled_count: int
+    target_source: str
+    object_id_mapping: dict[int, int]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "slots": int(self.slots),
+            "frame_count": len(self.frames),
+            "source_count": int(self.source_count),
+            "sampled_count": int(self.sampled_count),
+            "target_source": self.target_source,
+            "object_id_mapping": {
+                str(object_id): int(slot)
+                for object_id, slot in self.object_id_mapping.items()
+            },
         }
 
 
@@ -225,6 +249,111 @@ def train_kernel_mvp(
     )
 
 
+def train_kernel_mvp_from_cloud(
+    cloud: GaussianCloud,
+    *,
+    slots: int | None = None,
+    frame_count: int = 2,
+    max_points: int | None = 24,
+    object_id_field: str = "object_id",
+    temporal_offset: float = 0.01,
+    seed: int = 0,
+    iterations: int = 40,
+    learning_rate: float = 0.35,
+    render_weight: float = 1.0,
+    object_weight: float = 1.0,
+    temporal_weight: float = 0.02,
+    finite_difference_epsilon: float = 1e-3,
+    record_every: int | None = None,
+) -> tuple[TrainableKernelResult, TrainableKernelSample]:
+    sample = trainable_kernel_sample_from_cloud(
+        cloud,
+        slots=slots,
+        frame_count=frame_count,
+        max_points=max_points,
+        object_id_field=object_id_field,
+        temporal_offset=temporal_offset,
+        seed=seed,
+    )
+    result = train_kernel_mvp(
+        sample.frames,
+        slots=sample.slots,
+        iterations=iterations,
+        learning_rate=learning_rate,
+        render_weight=render_weight,
+        object_weight=object_weight,
+        temporal_weight=temporal_weight,
+        finite_difference_epsilon=finite_difference_epsilon,
+        seed=seed,
+        record_every=record_every,
+    )
+    return result, sample
+
+
+def trainable_kernel_sample_from_cloud(
+    cloud: GaussianCloud,
+    *,
+    slots: int | None = None,
+    frame_count: int = 2,
+    max_points: int | None = 24,
+    object_id_field: str = "object_id",
+    temporal_offset: float = 0.01,
+    seed: int = 0,
+) -> TrainableKernelSample:
+    if cloud.count == 0:
+        raise ValueError("cloud must contain at least one Gaussian")
+    if frame_count < 1:
+        raise ValueError("frame_count must be >= 1")
+    if max_points is not None and max_points < 1:
+        raise ValueError("max_points must be >= 1")
+    if temporal_offset < 0:
+        raise ValueError("temporal_offset must be >= 0")
+
+    object_ids = _object_ids_or_none(cloud, object_id_field)
+    resolved_slots, object_mapping, target_source = _resolve_sample_slots(
+        object_ids,
+        slots=slots,
+        object_id_field=object_id_field,
+    )
+    selected = _sample_indices(
+        cloud.count,
+        object_ids=object_ids,
+        max_points=max_points,
+        seed=seed,
+    )
+    xyz = positions(cloud)[selected]
+    feature_matrix = extract_features(cloud)[selected]
+    target_rgb = colors(cloud)[selected]
+    target_assignment = (
+        _one_hot_object_targets(object_ids[selected], object_mapping, resolved_slots)
+        if object_ids is not None and object_mapping
+        else None
+    )
+    frames = tuple(
+        TrainableKernelFrame(
+            positions=_temporal_positions(
+                xyz,
+                frame_index=frame_index,
+                frame_count=frame_count,
+                temporal_offset=temporal_offset,
+                target_assignment=target_assignment,
+            ),
+            features=feature_matrix,
+            target_rgb=target_rgb,
+            target_assignment=target_assignment,
+        )
+        for frame_index in range(frame_count)
+    )
+    return TrainableKernelSample(
+        frames=frames,
+        slots=resolved_slots,
+        source_count=cloud.count,
+        sampled_count=len(selected),
+        target_source=target_source,
+        object_id_mapping=object_mapping,
+    )
+
+
 def make_trainable_kernel_mvp_fixture() -> tuple[TrainableKernelFrame, ...]:
     positions_0 = np.array(
         [
@@ -257,6 +386,143 @@ def make_trainable_kernel_mvp_fixture() -> tuple[TrainableKernelFrame, ...]:
         TrainableKernelFrame(positions=positions_0, features=features_0, target_rgb=target),
         TrainableKernelFrame(positions=positions_1, features=features_1, target_rgb=target),
     )
+
+
+def _object_ids_or_none(cloud: GaussianCloud, field: str) -> np.ndarray | None:
+    if field not in cloud.fields:
+        return None
+    values = np.asarray(cloud.vertices[field], dtype=np.int32)
+    if values.shape[0] != cloud.count:
+        raise ValueError(f"{field} has {values.shape[0]} values for {cloud.count} gaussians")
+    return values
+
+
+def _resolve_sample_slots(
+    object_ids: np.ndarray | None,
+    *,
+    slots: int | None,
+    object_id_field: str,
+) -> tuple[int, dict[int, int], str]:
+    if slots is not None and slots < 1:
+        raise ValueError("slots must be >= 1")
+    if object_ids is None:
+        if slots is None:
+            raise ValueError("slots is required when the cloud has no object_id field")
+        return int(slots), {}, "feature_quantile_pseudo_targets"
+
+    unique_ids = tuple(int(value) for value in np.unique(object_ids))
+    if not unique_ids:
+        raise ValueError(f"{object_id_field} field did not contain any object ids")
+    resolved_slots = int(slots) if slots is not None else len(unique_ids)
+    if len(unique_ids) > resolved_slots:
+        raise ValueError(
+            f"{object_id_field} has {len(unique_ids)} unique ids but slots={resolved_slots}"
+        )
+    mapping = {object_id: index for index, object_id in enumerate(unique_ids)}
+    return resolved_slots, mapping, f"{object_id_field}_one_hot_targets"
+
+
+def _sample_indices(
+    count: int,
+    *,
+    object_ids: np.ndarray | None,
+    max_points: int | None,
+    seed: int,
+) -> np.ndarray:
+    if max_points is None or count <= max_points:
+        return np.arange(count, dtype=np.int64)
+    if object_ids is None:
+        return _even_sample(np.arange(count, dtype=np.int64), max_points)
+
+    selected: list[int] = []
+    unique_ids = np.unique(object_ids)
+    rng = np.random.default_rng(seed)
+    quotas = _balanced_object_quotas(object_ids, max_points=max_points)
+    for object_id in unique_ids:
+        object_indices = np.flatnonzero(object_ids == object_id).astype(np.int64, copy=False)
+        quota = min(int(quotas[int(object_id)]), object_indices.shape[0])
+        if quota <= 0:
+            continue
+        if object_indices.shape[0] <= quota:
+            chosen = object_indices
+        else:
+            shuffled = object_indices.copy()
+            rng.shuffle(shuffled)
+            chosen = np.sort(shuffled[:quota])
+        selected.extend(int(index) for index in chosen)
+    if len(selected) < max_points:
+        missing = max_points - len(selected)
+        remaining = np.setdiff1d(np.arange(count, dtype=np.int64), np.asarray(selected, dtype=np.int64))
+        selected.extend(int(index) for index in _even_sample(remaining, missing))
+    return np.asarray(sorted(selected[:max_points]), dtype=np.int64)
+
+
+def _balanced_object_quotas(object_ids: np.ndarray, *, max_points: int) -> dict[int, int]:
+    unique_ids, counts = np.unique(object_ids, return_counts=True)
+    quotas: dict[int, int] = {}
+    remaining = max_points
+    total = int(np.sum(counts))
+    for object_id, count in zip(unique_ids, counts, strict=True):
+        proportional = int(np.floor((int(count) / max(total, 1)) * max_points))
+        quota = max(1, proportional)
+        quotas[int(object_id)] = min(quota, int(count))
+        remaining -= quotas[int(object_id)]
+    cursor = 0
+    while remaining > 0 and unique_ids.size:
+        object_id = int(unique_ids[cursor % unique_ids.size])
+        if quotas[object_id] < int(counts[cursor % counts.size]):
+            quotas[object_id] += 1
+            remaining -= 1
+        cursor += 1
+        if cursor > unique_ids.size * max_points:
+            break
+    return quotas
+
+
+def _even_sample(indices: np.ndarray, count: int) -> np.ndarray:
+    if count <= 0 or indices.size == 0:
+        return np.empty(0, dtype=np.int64)
+    if indices.size <= count:
+        return indices.astype(np.int64, copy=False)
+    positions = np.linspace(0, indices.size - 1, count, dtype=np.int64)
+    return indices[positions].astype(np.int64, copy=False)
+
+
+def _one_hot_object_targets(
+    object_ids: np.ndarray,
+    mapping: dict[int, int],
+    slots: int,
+) -> np.ndarray:
+    targets = np.zeros((object_ids.shape[0], slots), dtype=np.float32)
+    for row, object_id in enumerate(object_ids):
+        targets[row, mapping[int(object_id)]] = 1.0
+    return targets
+
+
+def _temporal_positions(
+    xyz: np.ndarray,
+    *,
+    frame_index: int,
+    frame_count: int,
+    temporal_offset: float,
+    target_assignment: np.ndarray | None,
+) -> np.ndarray:
+    if temporal_offset <= 0 or frame_count <= 1:
+        return xyz.copy()
+    centered_index = frame_index - (frame_count - 1) / 2.0
+    if target_assignment is None:
+        direction = np.ones((xyz.shape[0], 1), dtype=np.float32)
+    else:
+        slot = np.argmax(target_assignment, axis=1).astype(np.float32, copy=False)
+        direction = (slot[:, None] * 2.0 - 1.0).astype(np.float32, copy=False)
+    offset = np.column_stack(
+        [
+            direction[:, 0] * temporal_offset * centered_index,
+            np.zeros(xyz.shape[0], dtype=np.float32),
+            np.zeros(xyz.shape[0], dtype=np.float32),
+        ]
+    )
+    return (xyz + offset).astype(np.float32, copy=False)
 
 
 def _validate_frames(frames: Sequence[TrainableKernelFrame], *, slots: int) -> tuple[_ValidatedFrame, ...]:

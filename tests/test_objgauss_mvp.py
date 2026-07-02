@@ -2465,6 +2465,44 @@ def test_training_kernel_mvp_cli_runs_end_to_end_smoke(tmp_path, capsys):
     assert summary["final_loss"]["total_loss"] < summary["initial_loss"]["total_loss"]
 
 
+def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
+    input_path = tmp_path / "object_aware_sample.ply"
+    summary_path = tmp_path / "kernel-sample-summary.json"
+    write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
+
+    assert (
+        main(
+            [
+                "training",
+                "kernel-sample",
+                str(input_path),
+                "--iterations",
+                "20",
+                "--learning-rate",
+                "0.35",
+                "--max-points",
+                "4",
+                "--seed",
+                "6",
+                "--summary-output",
+                str(summary_path),
+                "--require-loss-decrease",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "target_source=object_id_one_hot_targets" in output
+    assert "sampled_gaussians=4" in output
+    assert "loss_decreased=true" in output
+    assert summary["loss_decreased"] is True
+    assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
+    assert summary["sample"]["sampled_count"] == 4
+
+
 def test_training_register_output_can_export_unknown_object_policy(tmp_path, capsys):
     input_path = tmp_path / "external_trainer" / "point_cloud.ply"
     masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")

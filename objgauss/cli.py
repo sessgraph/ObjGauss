@@ -75,6 +75,7 @@ from objgauss.training import register_training_output
 from objgauss.core.trainable_kernel import (
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
+    train_kernel_mvp_from_cloud,
 )
 
 
@@ -1103,6 +1104,50 @@ def _training_kernel_mvp(args: argparse.Namespace) -> None:
         raise ValueError("trainable kernel MVP loss did not decrease")
 
 
+def _training_kernel_sample(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    result, sample = train_kernel_mvp_from_cloud(
+        cloud,
+        slots=args.slots,
+        frame_count=args.frames,
+        max_points=args.max_points,
+        object_id_field=args.object_id_field,
+        temporal_offset=args.temporal_offset,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        render_weight=args.render_weight,
+        object_weight=args.object_weight,
+        temporal_weight=args.temporal_weight,
+        seed=args.seed,
+        record_every=args.record_every,
+    )
+    summary = {
+        **result.as_dict(),
+        "sample": sample.as_dict(),
+        "input": str(args.input),
+    }
+    print(f"schema={summary['schema']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={sample.source_count}")
+    print(f"sampled_gaussians={sample.sampled_count}")
+    print(f"frames={summary['frame_count']}")
+    print(f"slots={summary['slots']}")
+    print(f"target_source={sample.target_source}")
+    print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
+    print(f"final_total_loss={result.final_loss.total_loss:.6f}")
+    print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
+    print(f"final_render_loss={result.final_loss.render_loss:.6f}")
+    print(f"final_object_loss={result.final_loss.object_loss:.6f}")
+    print(f"final_temporal_loss={result.final_loss.temporal_loss:.6f}")
+    print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
+    print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_loss_decrease and not summary["loss_decreased"]:
+        raise ValueError("trainable kernel sample loss did not decrease")
+
+
 def _training_write_sample_bundle(args: argparse.Namespace) -> None:
     result = write_sample_bundle(
         output=args.output,
@@ -1920,6 +1965,27 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_mvp.add_argument("--summary-output", type=Path)
     kernel_mvp.add_argument("--require-loss-decrease", action="store_true")
     kernel_mvp.set_defaults(handler=_training_kernel_mvp)
+
+    kernel_sample = training_subparsers.add_parser(
+        "kernel-sample",
+        help="run the trainable kernel MVP on a small Gaussian PLY sample",
+    )
+    kernel_sample.add_argument("input", type=Path)
+    kernel_sample.add_argument("--slots", type=int)
+    kernel_sample.add_argument("--frames", type=int, default=2)
+    kernel_sample.add_argument("--max-points", type=int, default=24)
+    kernel_sample.add_argument("--object-id-field", default="object_id")
+    kernel_sample.add_argument("--temporal-offset", type=float, default=0.01)
+    kernel_sample.add_argument("--iterations", type=int, default=40)
+    kernel_sample.add_argument("--learning-rate", type=float, default=0.35)
+    kernel_sample.add_argument("--render-weight", type=float, default=1.0)
+    kernel_sample.add_argument("--object-weight", type=float, default=1.0)
+    kernel_sample.add_argument("--temporal-weight", type=float, default=0.02)
+    kernel_sample.add_argument("--seed", type=int, default=0)
+    kernel_sample.add_argument("--record-every", type=int)
+    kernel_sample.add_argument("--summary-output", type=Path)
+    kernel_sample.add_argument("--require-loss-decrease", action="store_true")
+    kernel_sample.set_defaults(handler=_training_kernel_sample)
 
     write_bundle = training_subparsers.add_parser(
         "write-sample-bundle",

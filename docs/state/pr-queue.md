@@ -19,9 +19,17 @@
 
 ## Ready
 
-当前无 ready PR。下一步如继续训练主线，应从 `TRAIN-MVP-001` 扩到真实 sample
-adapter：把小型训练样例或已有 browser-ready artifact 接入 trainable kernel，并定义
-从 point-render smoke 到真实 renderer loss 的升级边界。
+### TRAIN-RENDER-LOSS-001: Define renderer-loss upgrade boundary
+
+- 状态: ready
+- 类型: 标准 PR / training renderer contract
+- 目标: 在 `TRAIN-MVP-001` 和 `TRAIN-SAMPLE-ADAPTER-001` 之后，定义从 CPU
+  point-render smoke 到真实 renderer loss 的升级边界，包括 input frame contract、
+  render target、loss telemetry 和不替换现有 viewer renderer 的集成方式。
+- 边界:
+  - 不直接把 point-render smoke 宣称为完整 3DGS training。
+  - 不引入 near-1M / 4.5M 大资产作为默认训练样例。
+  - 若需要 torch / GPU renderer / differentiable rasterizer，先写 contract 或 ADR。
 
 ## Planned
 
@@ -44,6 +52,42 @@ adapter：把小型训练样例或已有 browser-ready artifact 接入 trainable
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-SAMPLE-ADAPTER-001: Run trainable kernel on object-aware Gaussian samples
+
+- 状态: done / trainable-sample-adapter
+- 类型: 标准 PR / training MVP
+- 目标: 将 `TRAIN-MVP-001` 从内置 toy fixture 扩到真实小型 Gaussian sample /
+  object-aware PLY 输入，让 trainable kernel 能消费仓库内算法处理后的数据。
+- 已实施:
+  - `objgauss/core/trainable_kernel.py` 新增 `TrainableKernelSample`、
+    `trainable_kernel_sample_from_cloud(...)` 和 `train_kernel_mvp_from_cloud(...)`。
+  - adapter 可从 `GaussianCloud` 提取 positions、features、RGB render target；
+    若输入含 `object_id`，则生成 one-hot assignment targets；否则要求显式
+    `slots` 并使用 feature-quantile pseudo targets。
+  - adapter 支持 `frame_count`、`temporal_offset` 和 `max_points`，并对 object-aware
+    PLY 做 deterministic / object-aware sampling，防止有限差分训练成本随大 PLY 爆炸。
+  - `objgauss.core` lazy namespace 暴露 sample adapter API。
+  - `objgauss training kernel-sample <ply>` 新增真实 PLY smoke CLI，输出 source /
+    sampled Gaussian count、slots、target source 和 loss telemetry。
+- 边界:
+  - 不提交训练输出，不移动 public samples，不默认拉 near-1M / 4.5M 大资产。
+  - 不引入 torch / SAM / CLIP / differentiable 3DGS rasterizer。
+  - 当前仍是 point-render smoke，真实 renderer loss 另行定义。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_kernel.py tests/test_core_namespace.py`:
+    12 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel"`:
+    2 passed。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 12 --learning-rate 0.35 --max-points 8 --seed 8 --require-loss-decrease`:
+    passed；`source_gaussians=5696`、`sampled_gaussians=8`、`slots=4`、
+    `target_source=object_id_one_hot_targets`、`initial_total_loss=1.516573`、
+    `final_total_loss=1.309766`、`initial_render_loss=0.084134`、
+    `final_render_loss=0.061294`。
+  - `uv run --extra dev pytest`: 114 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-MVP-001: Add dependency-free trainable v1 kernel smoke loop
 

@@ -301,6 +301,20 @@ total loss 与 render loss 均下降。该步骤不引入 torch / SAM / CLIP / r
 training，不改 viewer renderer，不提交训练产物或大资产，也不把 CPU point-render
 MVP 表述为完整 3DGS rasterizer。
 
+`TRAIN-SAMPLE-ADAPTER-001` 已完成 trainable kernel 的真实样例入口：
+`objgauss/core/trainable_kernel.py` 新增 `TrainableKernelSample`、
+`trainable_kernel_sample_from_cloud(...)` 和 `train_kernel_mvp_from_cloud(...)`，
+可从 `GaussianCloud` / object-aware PLY 生成 trainable frames。若输入带
+`object_id` 字段，adapter 会映射为 one-hot assignment targets；若没有 object id，
+则要求显式 `slots` 并回退到 feature-quantile pseudo targets。`objgauss training
+kernel-sample <ply>` 现在可直接读取小型 PLY，按 `max_points` 做 deterministic /
+object-aware sampling，再运行同一 `L_render + L_object + L_temporal` smoke loop。
+已用 `public/samples/lego_alpha_v1_objects.ply` 验证真实仓库样例路径：
+`source_gaussians=5696`、`sampled_gaussians=8`、`slots=4`、`target_source=object_id_one_hot_targets`、
+`initial_total_loss=1.516573 -> final_total_loss=1.309766`。该步骤仍不接 near-1M /
+4.5M 大资产，不提交训练输出，不引入 torch / SAM / CLIP，也不把 point-render smoke
+升级表述为真实 renderer loss。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

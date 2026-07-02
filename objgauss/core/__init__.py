@@ -22,6 +22,7 @@ _EXPORTS = {
     "TrainableKernelFrame": ("objgauss.core.trainable_kernel", "TrainableKernelFrame"),
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
+    "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
     "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
     "assign_object_ids": ("objgauss.core.objects", "assign_object_ids"),
@@ -50,6 +51,14 @@ _EXPORTS = {
     "read_splat": ("objgauss.core.io", "read_splat"),
     "score_mask_manifest_with_clip": ("objgauss.core.semantics", "score_mask_manifest_with_clip"),
     "train_kernel_mvp": ("objgauss.core.trainable_kernel", "train_kernel_mvp"),
+    "train_kernel_mvp_from_cloud": (
+        "objgauss.core.trainable_kernel",
+        "train_kernel_mvp_from_cloud",
+    ),
+    "trainable_kernel_sample_from_cloud": (
+        "objgauss.core.trainable_kernel",
+        "trainable_kernel_sample_from_cloud",
+    ),
     "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
     "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
