@@ -19,18 +19,20 @@
 
 ## Ready
 
-### TRAIN-FULL-3DGS-RENDERER-ADR-001: Decide full differentiable 3DGS renderer path
+### TRAIN-GSPLAT-ADAPTER-001: Optional gsplat training renderer adapter
 
 - 状态: ready
-- 类型: ADR / training renderer dependency
-- 目标: 在 CPU image-space point splat MVP 已完成后，明确下一步真实 3DGS
-  differentiable renderer 的 dependency path、GPU / torch 边界、训练产物位置和
-  与现有 viewer renderer 的隔离方式。
+- 类型: 标准 PR / optional training renderer adapter
+- 目标: 按 ADR 0006，在不改变基础依赖和默认训练路径的前提下，新增
+  `gsplat-rasterization-v1` training renderer adapter 的 import-guarded smoke path，
+  让 full 3DGS renderer 能输出现有 `objgauss-training-renderer-api-v1` summary。
 - 边界:
-  - 先写 ADR，不直接引入 torch / CUDA / 大型 renderer 依赖。
-  - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
-  - 不提交训练输出；所有大产物继续留在 ignored `outputs/` 或 HF handoff。
-  - 不默认加载 near-1M / 4.5M 大资产。
+  - `torch` / `gsplat` 只能作为 optional extra 或 import-guarded runtime dependency，
+    不进入基础 dependencies。
+  - 无 CUDA / 无 gsplat 环境下相关测试 skip，不影响默认 `uv run --extra dev pytest`。
+  - 不接入 optimizer，不改 CLI 默认行为，不替换 CPU point splat MVP。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出、大模型或 near-1M / 4.5M 大资产。
 
 ## Planned
 
@@ -53,6 +55,37 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-FULL-3DGS-RENDERER-ADR-001: Decide full differentiable 3DGS renderer path
+
+- 状态: done / ADR accepted
+- 类型: ADR / training renderer dependency
+- 目标: 在 CPU image-space point splat MVP 已完成后，明确下一步真实 3DGS
+  differentiable renderer 的 dependency path、GPU / torch 边界、训练产物位置和
+  与现有 viewer renderer 的隔离方式。
+- 已实施:
+  - 新增 `docs/adr/0006-full-3dgs-training-renderer.md`。
+  - 决策选择 `gsplat-rasterization-v1` 作为 ObjGauss v1 full differentiable 3DGS
+    training renderer 的第一优先实验路径。
+  - 明确 `torch` / `gsplat` 不进入基础 dependencies，只能通过 optional extra 或
+    import-guarded adapter 引入。
+  - 明确第一版 full renderer 只训练 `assignments` 和 `decoder_colors`，冻结
+    `means`、`quats`、`scales`、`opacities` 和 cameras。
+  - 明确 viewer renderer 与 training renderer 隔离：Three.js / Spark / WebGPU
+    继续作为 Debug OS / browser audit consumer，gsplat 只作为 Python training loss
+    producer。
+  - 后续 PR 顺序收敛为 `TRAIN-GSPLAT-ADAPTER-001`、
+    `TRAIN-GSPLAT-LOSS-001`、`TRAIN-GSPLAT-MVP-001` 和
+    `TRAIN-GAUSSIAN-PARAMS-001`。
+- 边界:
+  - 本 PR 不修改 `pyproject.toml`。
+  - 不安装 torch / gsplat，不引入 CUDA build step。
+  - 不替换现有 viewer renderer，不提交训练输出或大模型。
+- 验证:
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 129 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: this commit
 
 ### TRAIN-MODEL-VIEWER-BINDING-001: Load trainable MVP model artifact in Debug OS
 

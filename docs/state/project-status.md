@@ -402,6 +402,16 @@ assignment heatmap、renderer loss 和 source metadata。前端 inspector / debu
 `trainableArtifacts=1` 和 Gaussian probe 成功。该步骤不替换 Three.js / Spark /
 WebGPU viewer renderer，不提交真实训练输出，不默认加载 near-1M / 4.5M 大资产。
 
+`TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
+`docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
+作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。
+ADR 明确 `torch` / `gsplat` 只能作为 optional extra 或 import-guarded adapter 引入，
+不进入基础 dependencies；第一版 full renderer 只训练 `assignments` 和
+`decoder_colors`，冻结 Gaussian geometry / opacity / cameras；Three.js / Spark /
+WebGPU viewer renderer 继续作为 ObjectState Debug OS consumer，不被训练 renderer
+替换。下一步代码切片是 `TRAIN-GSPLAT-ADAPTER-001`，只做可选 gsplat adapter 的
+smoke path，不接入 optimizer、不改 CLI 默认行为、不提交训练输出。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
