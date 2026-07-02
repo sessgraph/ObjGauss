@@ -89,6 +89,34 @@ def test_renderer_loss_boundary_accepts_renderer_api_gradient_path():
     assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]
 
 
+def test_renderer_loss_boundary_accepts_full_gsplat_renderer_evidence():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    result = train_kernel_mvp(
+        frames,
+        slots=2,
+        iterations=8,
+        learning_rate=0.4,
+        seed=10,
+    )
+    summary = result.as_dict()
+    renderer_api = evaluate_training_renderer_loss(
+        frames,
+        result.assignments,
+        result.decoder_colors,
+    ).as_dict()
+    renderer_api["renderer_name"] = "gsplat-rasterization-v1"
+    renderer_api["gradient_path"] = "torch-autograd-gsplat-rasterization-v1"
+    summary["renderer_api"] = renderer_api
+
+    payload = renderer_loss_boundary_report(summary).as_dict()
+
+    assert payload["status"] == "full_3dgs_renderer_ready"
+    assert payload["current_renderer"] == "gsplat-rasterization-v1"
+    assert "full_3dgs_renderer_not_selected" not in payload["upgrade_blockers"]
+    assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
+    assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
+
+
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():
     report = renderer_loss_boundary_report()
 

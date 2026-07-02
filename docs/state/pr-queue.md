@@ -19,21 +19,24 @@
 
 ## Ready
 
-### TRAIN-GSPLAT-LOSS-001: Wire optional gsplat renderer into trainable loss producer
+### TRAIN-GSPLAT-MVP-001: Run first small full renderer training MVP
 
 - 状态: ready
-- 类型: 标准 PR / optional training loss integration
-- 目标: 在 `TRAIN-GSPLAT-ADAPTER-001` 已提供 import-guarded adapter 后，把
-  trainable kernel 的 image renderer loss producer 做成可选 `point|gsplat` 路线。
-  默认仍是 CPU point renderer；显式选择 gsplat 时才调用
-  `gsplat-rasterization-v1`。
+- 类型: 标准 PR / full renderer training smoke
+- 目标: 在 `TRAIN-GSPLAT-LOSS-001` 已把 image renderer loss producer 做成
+  `point|gsplat` 可选路线后，使用显式 gsplat 路线跑第一个小规模 full renderer
+  training MVP，证明 `image_render_loss`、`L_object` 和 artifact 输出可以在 full
+  renderer evidence 下闭环。
 - 边界:
-  - `point` 必须保持默认，保证无 torch / gsplat / CUDA 环境仍可运行。
-  - 显式 `gsplat` 路线不可静默 fallback；不可用时必须暴露 adapter blockers。
+  - 必须显式选择 gsplat；不可静默 fallback 到 point。
+  - 如果当前环境没有 torch / gsplat / CUDA，先记录 adapter blockers，不把缺依赖伪装
+    为训练成功。
   - 不训练 Gaussian geometry / opacity / rotation，只延续 `assignments` +
     `decoder_colors` 路线。
+  - 训练输出只写 `/tmp` 或 ignored `outputs/`；不提交 artifact / checkpoint / rendered
+    image。
   - 不替换 Three.js / Spark / WebGPU viewer renderer。
-  - 不提交训练输出、大模型或 near-1M / 4.5M 大资产。
+  - 不默认加载 near-1M / 4.5M 大资产。
 
 ## Planned
 
@@ -56,6 +59,40 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-GSPLAT-LOSS-001: Wire optional gsplat renderer into trainable loss producer
+
+- 状态: done / optional-loss-route
+- 类型: 标准 PR / optional training loss integration
+- 目标: 在 `TRAIN-GSPLAT-ADAPTER-001` 已提供 import-guarded adapter 后，把
+  trainable kernel 的 image renderer loss producer 做成可选 `point|gsplat` 路线。
+  默认仍是 CPU point renderer；显式选择 gsplat 时才调用
+  `gsplat-rasterization-v1`。
+- 已实施:
+  - `train_kernel_mvp(...)` / `train_kernel_mvp_from_cloud(...)` 新增
+    `image_renderer="point|gsplat"` 参数，默认保持 `point`。
+  - `TrainableKernelResult.as_dict()` 现在记录 `image_renderer`，CLI 输出也打印该字段。
+  - `objgauss training kernel-mvp` 和 `kernel-sample` 新增
+    `--image-renderer point|gsplat`；默认 point 路径不需要 torch / gsplat / CUDA。
+  - image render loss producer 现在按 `image_renderer` 路由到
+    `evaluate_training_renderer_loss(...)` 或
+    `evaluate_gsplat_training_renderer_loss(...)`；显式 gsplat 不可用时会暴露 adapter
+    blockers，而不是静默 fallback。
+  - `renderer_loss_boundary_report(...)` 现在识别 `gsplat-rasterization-v1` 为 full
+    3DGS renderer evidence；该 evidence 下不再保留
+    `full_3dgs_renderer_not_selected` blocker。
+- 边界:
+  - 不修改基础 dependencies，不安装 torch / gsplat。
+  - 不训练 Gaussian geometry / opacity / rotation，只保留 assignment + decoder colors
+    路线。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不提交训练输出或大模型。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_kernel.py tests/test_renderer_loss.py tests/test_objgauss_mvp.py -k "trainable_kernel or renderer_loss or training_kernel"`: 20 passed, 63 deselected。
+  - `uv run --extra dev pytest tests/test_gsplat_training_renderer.py tests/test_training_renderer.py tests/test_core_namespace.py tests/test_trainable_kernel.py tests/test_renderer_loss.py`: 33 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: this commit
 
 ### TRAIN-GSPLAT-ADAPTER-001: Optional gsplat training renderer adapter
 

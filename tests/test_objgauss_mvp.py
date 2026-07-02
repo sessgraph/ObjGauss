@@ -2509,6 +2509,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "target_source=object_id_one_hot_targets" in output
     assert "sampled_gaussians=4" in output
     assert "render_target_mode=image_space_targets_bound" in output
+    assert "image_renderer=point" in output
     assert "image_targets_status=image_targets_bound" in output
     assert "visibility_policy=covered_pixels" in output
     assert "renderer_api_status=ready" in output
@@ -2521,6 +2522,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert summary["loss_decreased"] is True
     assert summary["image_render_loss_decreased"] is True
     assert summary["weights"]["image_render"] == 0.5
+    assert summary["image_renderer"] == "point"
     assert summary["final_loss"]["image_render_loss"] < summary["initial_loss"]["image_render_loss"]
     assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
     assert summary["sample"]["sampled_count"] == 4

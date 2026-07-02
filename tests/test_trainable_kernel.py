@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -28,6 +30,7 @@ def test_trainable_kernel_mvp_reduces_end_to_end_loss():
     )
 
     assert result.schema == TRAINABLE_KERNEL_MVP_SCHEMA
+    assert result.image_renderer == "point"
     assert result.frame_count == 2
     assert result.slots == 2
     assert result.final_loss.total_loss < result.initial_loss.total_loss
@@ -161,7 +164,58 @@ def test_trainable_kernel_can_optimize_image_render_loss():
     assert result.final_loss.image_render_loss < result.initial_loss.image_render_loss
     assert result.final_loss.total_loss < result.initial_loss.total_loss
     assert summary["weights"]["image_render"] == 1.0
+    assert summary["image_renderer"] == "point"
     assert summary["image_render_loss_decreased"] is True
+
+
+def test_trainable_kernel_can_route_image_loss_to_gsplat_adapter(monkeypatch):
+    calls = []
+
+    def fake_gsplat_renderer(frames, assignments, decoder_colors):
+        calls.append(
+            {
+                "frames": len(frames),
+                "assignment_shape": assignments[0].shape,
+                "decoder_shape": decoder_colors.shape,
+            }
+        )
+        return SimpleNamespace(image_render_loss=0.123)
+
+    monkeypatch.setattr(
+        "objgauss.core.gsplat_training_renderer.evaluate_gsplat_training_renderer_loss",
+        fake_gsplat_renderer,
+    )
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    result = train_kernel_mvp(
+        frames,
+        slots=2,
+        iterations=1,
+        learning_rate=0.25,
+        render_weight=0.0,
+        image_render_weight=1.0,
+        object_weight=0.0,
+        temporal_weight=0.0,
+        image_renderer="gsplat",
+        seed=12,
+    )
+
+    assert result.image_renderer == "gsplat"
+    assert result.as_dict()["image_renderer"] == "gsplat"
+    assert result.final_loss.image_render_loss == pytest.approx(0.123)
+    assert calls
+    assert calls[0]["frames"] == 2
+    assert calls[0]["assignment_shape"] == (6, 2)
+    assert calls[0]["decoder_shape"] == (2, 3)
+
+
+def test_trainable_kernel_rejects_unknown_image_renderer():
+    with pytest.raises(ValueError, match="image_renderer must be one of"):
+        train_kernel_mvp(
+            make_trainable_kernel_mvp_fixture(),
+            slots=2,
+            iterations=2,
+            image_renderer="spark",
+        )
 
 
 def test_trainable_kernel_image_render_weight_requires_targets():

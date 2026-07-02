@@ -424,6 +424,19 @@ viewer renderer；无 optional dependency 环境下测试覆盖 unavailable bloc
 contract。下一步是 `TRAIN-GSPLAT-LOSS-001`，把 trainable kernel image renderer loss
 producer 做成可选 `point|gsplat`，默认继续使用 CPU point path。
 
+`TRAIN-GSPLAT-LOSS-001` 已完成 optional gsplat loss route：`train_kernel_mvp(...)`
+和 `train_kernel_mvp_from_cloud(...)` 新增 `image_renderer="point|gsplat"`，默认仍为
+CPU point renderer；CLI `objgauss training kernel-mvp` / `kernel-sample` 新增
+`--image-renderer point|gsplat` 并在 summary / stdout 中记录 `image_renderer`。
+image render loss producer 现在按该字段路由到 CPU point renderer 或
+`evaluate_gsplat_training_renderer_loss(...)`；显式 gsplat 不可用时暴露 adapter
+blockers，不静默 fallback。`renderer_loss_boundary_report(...)` 同时识别
+`gsplat-rasterization-v1` 为 full 3DGS renderer evidence，该 evidence 下会关闭
+`full_3dgs_renderer_not_selected` blocker。本步骤仍不安装 torch / gsplat、不训练
+Gaussian geometry / opacity / rotation、不替换 viewer renderer、不提交训练输出。
+下一步是 `TRAIN-GSPLAT-MVP-001`：在可用 optional deps / CUDA 环境下跑第一个小规模
+full renderer training MVP；如果当前环境不可用，必须记录 blockers。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

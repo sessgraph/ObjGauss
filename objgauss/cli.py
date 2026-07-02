@@ -80,6 +80,7 @@ from objgauss.core.trainable_kernel import (
 )
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
+from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 
 
@@ -1086,6 +1087,7 @@ def _training_kernel_mvp(args: argparse.Namespace) -> None:
         image_render_weight=args.image_render_weight,
         object_weight=args.object_weight,
         temporal_weight=args.temporal_weight,
+        image_renderer=args.image_renderer,
         seed=args.seed,
         record_every=args.record_every,
     )
@@ -1094,6 +1096,7 @@ def _training_kernel_mvp(args: argparse.Namespace) -> None:
     print(f"frames={summary['frame_count']}")
     print(f"slots={summary['slots']}")
     print(f"iterations={summary['iterations']}")
+    print(f"image_renderer={summary['image_renderer']}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
@@ -1132,6 +1135,7 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         image_render_weight=args.image_render_weight,
         object_weight=args.object_weight,
         temporal_weight=args.temporal_weight,
+        image_renderer=args.image_renderer,
         seed=args.seed,
         record_every=args.record_every,
     )
@@ -1141,10 +1145,11 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         "input": str(args.input),
     }
     if summary["image_target_contract"]["status"] == "image_targets_bound":
-        renderer_api = evaluate_training_renderer_loss(
+        renderer_api = _evaluate_training_renderer_api(
             sample.frames,
             result.assignments,
             result.decoder_colors,
+            image_renderer=args.image_renderer,
         )
         summary["renderer_api"] = renderer_api.as_dict()
     print(f"schema={summary['schema']}")
@@ -1155,6 +1160,7 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"slots={summary['slots']}")
     print(f"target_source={sample.target_source}")
     print(f"render_target_mode={summary['render_target_mode']}")
+    print(f"image_renderer={summary['image_renderer']}")
     image_contract = summary["image_target_contract"]
     print(f"image_targets_status={image_contract['status']}")
     print(f"image_targets_bound={image_contract['targets_bound']}")
@@ -1197,6 +1203,20 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         print(f"summary={args.summary_output}")
     if args.require_loss_decrease and not summary["loss_decreased"]:
         raise ValueError("trainable kernel sample loss did not decrease")
+
+
+def _evaluate_training_renderer_api(
+    frames,
+    assignments,
+    decoder_colors,
+    *,
+    image_renderer: str,
+):
+    if image_renderer == "point":
+        return evaluate_training_renderer_loss(frames, assignments, decoder_colors)
+    if image_renderer == "gsplat":
+        return evaluate_gsplat_training_renderer_loss(frames, assignments, decoder_colors)
+    raise ValueError("image_renderer must be one of: point, gsplat")
 
 
 def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
@@ -2044,6 +2064,7 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_mvp.add_argument("--learning-rate", type=float, default=0.35)
     kernel_mvp.add_argument("--render-weight", type=float, default=1.0)
     kernel_mvp.add_argument("--image-render-weight", type=float, default=0.0)
+    kernel_mvp.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
     kernel_mvp.add_argument("--object-weight", type=float, default=1.0)
     kernel_mvp.add_argument("--temporal-weight", type=float, default=0.02)
     kernel_mvp.add_argument("--seed", type=int, default=0)
@@ -2075,6 +2096,7 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--learning-rate", type=float, default=0.35)
     kernel_sample.add_argument("--render-weight", type=float, default=1.0)
     kernel_sample.add_argument("--image-render-weight", type=float, default=0.0)
+    kernel_sample.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
     kernel_sample.add_argument("--object-weight", type=float, default=1.0)
     kernel_sample.add_argument("--temporal-weight", type=float, default=0.02)
     kernel_sample.add_argument("--seed", type=int, default=0)

@@ -7,6 +7,7 @@ RENDERER_LOSS_BOUNDARY_SCHEMA = "objgauss-renderer-loss-boundary-v1"
 POINT_RENDER_SMOKE_RENDERER = "cpu-point-rgb-smoke"
 TARGET_IMAGE_RENDERER = "differentiable-gaussian-image-renderer"
 TRAINABLE_KERNEL_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
+FULL_3DGS_RENDERERS = {"gsplat-rasterization-v1"}
 
 
 @dataclass(frozen=True)
@@ -55,11 +56,18 @@ def renderer_loss_boundary_report(
         status = "point_render_smoke_blocked"
     if point_ready and evidence.get("renderer_api_ready"):
         status = "renderer_api_ready"
+    full_renderer_ready = (
+        bool(evidence.get("renderer_api_ready"))
+        and evidence.get("renderer_name") in FULL_3DGS_RENDERERS
+    )
+    if point_ready and full_renderer_ready:
+        status = "full_3dgs_renderer_ready"
     upgrade_blockers = []
     if not evidence.get("image_targets_bound"):
         upgrade_blockers.append("image_space_targets_not_bound")
     if evidence.get("renderer_api_ready"):
-        upgrade_blockers.append("full_3dgs_renderer_not_selected")
+        if not full_renderer_ready:
+            upgrade_blockers.append("full_3dgs_renderer_not_selected")
     else:
         upgrade_blockers.extend(
             [
@@ -70,6 +78,13 @@ def renderer_loss_boundary_report(
     if not evidence.get("image_target_visibility_policies"):
         upgrade_blockers.append("camera_visibility_policy_not_bound")
     next_steps = (
+        (
+            "run small full 3DGS trainable renderer MVP",
+            "persist renderer_api evidence into trainable model artifact",
+            "keep viewer renderer as debug consumer, not the training renderer default",
+        )
+        if full_renderer_ready
+        else
         (
             "select or implement full 3DGS image renderer behind the training renderer API",
             "wire image_render_loss into the trainable optimization objective",
