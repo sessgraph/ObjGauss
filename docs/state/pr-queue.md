@@ -98,7 +98,7 @@
   - `uv run --extra dev pytest`: 93 passed。
   - `python3 -m compileall -q objgauss`: passed。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `56116d9`
 
 ### WORLD-REBUILD-001: Replace default viewer with VR-like Three.js model world
 
