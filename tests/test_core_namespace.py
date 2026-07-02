@@ -5,6 +5,8 @@ import numpy as np
 from objgauss.core import (
     GaussianCloud,
     DynamicKProposalReport,
+    GsplatRendererAvailability,
+    GsplatTrainingInput,
     ObjectState,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
@@ -21,9 +23,12 @@ from objgauss.core import (
     bind_image_targets_to_frames,
     bind_object_states_to_artifact,
     build_chunk_index,
+    build_gsplat_training_input,
     cluster_features,
     dynamic_k_proposal_report,
     evaluate_training_renderer_loss,
+    evaluate_gsplat_training_renderer_loss,
+    gsplat_renderer_availability,
     initialize_object_field,
     image_target_contract_summary,
     make_trainable_image_target,
@@ -216,6 +221,16 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert isinstance(renderer_result, TrainingRendererLossResult)
     assert validate_training_renderer_summary(renderer_result.as_dict()) is True
+    gsplat_availability = gsplat_renderer_availability(_importer=_missing_importer)
+    assert isinstance(gsplat_availability, GsplatRendererAvailability)
+    assert gsplat_availability.available is False
+    gsplat_input = build_gsplat_training_input(
+        bound_frames[0],
+        assignment,
+        np.asarray([[0.2, 0.3, 0.4], [0.6, 0.7, 0.8]], dtype=np.float32),
+    )
+    assert isinstance(gsplat_input, GsplatTrainingInput)
+    assert evaluate_gsplat_training_renderer_loss is not None
     artifact = trainable_kernel_model_artifact(
         result,
         input_path="fixture://namespace",
@@ -257,3 +272,7 @@ def _tiny_object_cloud() -> GaussianCloud:
         "i4",
     )
     return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _missing_importer(name: str):
+    raise ImportError(name)

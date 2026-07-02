@@ -19,18 +19,19 @@
 
 ## Ready
 
-### TRAIN-GSPLAT-ADAPTER-001: Optional gsplat training renderer adapter
+### TRAIN-GSPLAT-LOSS-001: Wire optional gsplat renderer into trainable loss producer
 
 - 状态: ready
-- 类型: 标准 PR / optional training renderer adapter
-- 目标: 按 ADR 0006，在不改变基础依赖和默认训练路径的前提下，新增
-  `gsplat-rasterization-v1` training renderer adapter 的 import-guarded smoke path，
-  让 full 3DGS renderer 能输出现有 `objgauss-training-renderer-api-v1` summary。
+- 类型: 标准 PR / optional training loss integration
+- 目标: 在 `TRAIN-GSPLAT-ADAPTER-001` 已提供 import-guarded adapter 后，把
+  trainable kernel 的 image renderer loss producer 做成可选 `point|gsplat` 路线。
+  默认仍是 CPU point renderer；显式选择 gsplat 时才调用
+  `gsplat-rasterization-v1`。
 - 边界:
-  - `torch` / `gsplat` 只能作为 optional extra 或 import-guarded runtime dependency，
-    不进入基础 dependencies。
-  - 无 CUDA / 无 gsplat 环境下相关测试 skip，不影响默认 `uv run --extra dev pytest`。
-  - 不接入 optimizer，不改 CLI 默认行为，不替换 CPU point splat MVP。
+  - `point` 必须保持默认，保证无 torch / gsplat / CUDA 环境仍可运行。
+  - 显式 `gsplat` 路线不可静默 fallback；不可用时必须暴露 adapter blockers。
+  - 不训练 Gaussian geometry / opacity / rotation，只延续 `assignments` +
+    `decoder_colors` 路线。
   - 不替换 Three.js / Spark / WebGPU viewer renderer。
   - 不提交训练输出、大模型或 near-1M / 4.5M 大资产。
 
@@ -55,6 +56,42 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-GSPLAT-ADAPTER-001: Optional gsplat training renderer adapter
+
+- 状态: done / import-guarded-adapter
+- 类型: 标准 PR / optional training renderer adapter
+- 目标: 按 ADR 0006，在不改变基础依赖和默认训练路径的前提下，新增
+  `gsplat-rasterization-v1` training renderer adapter 的 import-guarded smoke path，
+  让 full 3DGS renderer 能输出现有 `objgauss-training-renderer-api-v1` summary。
+- 已实施:
+  - 新增 `objgauss/core/gsplat_training_renderer.py`，定义
+    `gsplat-rasterization-v1`、`torch-autograd-gsplat-rasterization-v1`、availability
+    summary 和 `objgauss-gsplat-training-input-v1`。
+  - `build_gsplat_training_input(...)` 可把现有 `TrainableKernelFrame`、`A[N,K]`
+    和 `decoder_colors` 映射为 gsplat 所需的 means / quats / scales / opacities /
+    colors / viewmats / intrinsics / target image / visibility mask。
+  - `evaluate_gsplat_training_renderer_loss(...)` 复用
+    `objgauss-training-renderer-api-v1`，真正调用 gsplat 前会检查 `torch`、`gsplat`
+    和 CUDA availability；不可用时抛出明确 blockers。
+  - `objgauss.core` lazy namespace 暴露 `GsplatRendererAvailability`、
+    `GsplatTrainingInput`、`gsplat_renderer_availability(...)`、
+    `build_gsplat_training_input(...)` 和
+    `evaluate_gsplat_training_renderer_loss(...)`。
+  - 新增测试覆盖 missing optional dependency blockers、gsplat input shape /
+    assignment color mapping、未绑定 image target failure 和 core namespace exposure。
+- 边界:
+  - 本 PR 不修改 `pyproject.toml`，不安装 torch / gsplat，不引入 CUDA build step。
+  - 不接入 optimizer，不改 CLI 默认行为，不替换 CPU point splat MVP。
+  - 当前环境未执行真实 gsplat rasterization；该路径需要后续可用 CUDA / gsplat
+    环境或显式 optional dependency 安装。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不提交训练输出或大模型。
+- 验证:
+  - `uv run --extra dev pytest tests/test_gsplat_training_renderer.py tests/test_core_namespace.py tests/test_training_renderer.py`: 15 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 133 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: this commit
 
 ### TRAIN-FULL-3DGS-RENDERER-ADR-001: Decide full differentiable 3DGS renderer path
 

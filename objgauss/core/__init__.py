@@ -28,6 +28,14 @@ _EXPORTS = {
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
     "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
+    "GsplatRendererAvailability": (
+        "objgauss.core.gsplat_training_renderer",
+        "GsplatRendererAvailability",
+    ),
+    "GsplatTrainingInput": (
+        "objgauss.core.gsplat_training_renderer",
+        "GsplatTrainingInput",
+    ),
     "TrainingRendererFrameLoss": (
         "objgauss.core.training_renderer",
         "TrainingRendererFrameLoss",
@@ -44,6 +52,10 @@ _EXPORTS = {
     "attach_object_aware_lod_metadata": ("objgauss.core.lod", "attach_object_aware_lod_metadata"),
     "attach_quantization_metadata": ("objgauss.core.quantization", "attach_quantization_metadata"),
     "build_chunk_index": ("objgauss.core.chunk_index", "build_chunk_index"),
+    "build_gsplat_training_input": (
+        "objgauss.core.gsplat_training_renderer",
+        "build_gsplat_training_input",
+    ),
     "cluster_features": ("objgauss.core.clustering", "cluster_features"),
     "compare_baseline_candidates": ("objgauss.core.evaluation", "compare_baseline_candidates"),
     "filter_objects": ("objgauss.core.objects", "filter_objects"),
@@ -57,6 +69,14 @@ _EXPORTS = {
     "evaluate_training_renderer_loss": (
         "objgauss.core.training_renderer",
         "evaluate_training_renderer_loss",
+    ),
+    "evaluate_gsplat_training_renderer_loss": (
+        "objgauss.core.gsplat_training_renderer",
+        "evaluate_gsplat_training_renderer_loss",
+    ),
+    "gsplat_renderer_availability": (
+        "objgauss.core.gsplat_training_renderer",
+        "gsplat_renderer_availability",
     ),
     "make_trainable_kernel_mvp_fixture": (
         "objgauss.core.trainable_kernel",

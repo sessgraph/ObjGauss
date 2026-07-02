@@ -412,6 +412,18 @@ WebGPU viewer renderer 继续作为 ObjectState Debug OS consumer，不被训练
 替换。下一步代码切片是 `TRAIN-GSPLAT-ADAPTER-001`，只做可选 gsplat adapter 的
 smoke path，不接入 optimizer、不改 CLI 默认行为、不提交训练输出。
 
+`TRAIN-GSPLAT-ADAPTER-001` 已完成 optional gsplat training renderer adapter 的
+import-guarded contract：新增 `objgauss/core/gsplat_training_renderer.py`，定义
+`gsplat-rasterization-v1`、`torch-autograd-gsplat-rasterization-v1`、availability
+summary 和 `objgauss-gsplat-training-input-v1`。该模块可把现有
+`TrainableKernelFrame + A[N,K] + decoder_colors` 映射为 gsplat 所需的 means /
+quats / scales / opacities / colors / viewmats / intrinsics / target image /
+visibility mask，并在真实调用 gsplat 前检查 `torch`、`gsplat` 和 CUDA blockers。
+当前仍不修改 `pyproject.toml`、不安装依赖、不改 CLI 默认行为、不接 optimizer、不替换
+viewer renderer；无 optional dependency 环境下测试覆盖 unavailable blockers 和 input
+contract。下一步是 `TRAIN-GSPLAT-LOSS-001`，把 trainable kernel image renderer loss
+producer 做成可选 `point|gsplat`，默认继续使用 CPU point path。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
