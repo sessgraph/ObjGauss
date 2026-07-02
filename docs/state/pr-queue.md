@@ -19,7 +19,9 @@
 
 ## Ready
 
-当前无 ready PR。下一步如继续 Owner 最新优先级，应回到 trainable v1 MVP 闭环。
+当前无 ready PR。下一步如继续训练主线，应从 `TRAIN-MVP-001` 扩到真实 sample
+adapter：把小型训练样例或已有 browser-ready artifact 接入 trainable kernel，并定义
+从 point-render smoke 到真实 renderer loss 的升级边界。
 
 ## Planned
 
@@ -42,6 +44,46 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-MVP-001: Add dependency-free trainable v1 kernel smoke loop
+
+- 状态: done / trainable-kernel-smoke
+- 类型: 标准 PR / training MVP
+- 目标: 在不引入大训练系统的前提下，先形成可执行、可测试的
+  `frames -> perceive -> A -> ObjectState -> Gaussian decode -> render -> loss`
+  最小训练闭环，并同时输出 `L_render + L_object + L_temporal`。
+- 已实施:
+  - `objgauss/core/trainable_kernel.py` 新增
+    `objgauss-v1-trainable-kernel-mvp-v1`，用 `numpy` 数值梯度优化 assignment
+    logits 和 object color decoder。
+  - MVP forward path 显式调用 `project_object_states(...)`，把 soft assignment
+    `A[N,K]` 投影为 `ObjectStateProjection`，再解码为 point-render RGB。
+  - loss 拆为 point RGB reconstruction `L_render`、evidence-derived pseudo
+    assignment / balance `L_object` 和跨帧 ObjectState centroid smoothness
+    `L_temporal`。
+  - `objgauss.core` lazy namespace 暴露 `TrainableKernelFrame`、
+    `TrainableKernelLoss`、`TrainableKernelResult`、`make_trainable_kernel_mvp_fixture`
+    和 `train_kernel_mvp(...)`。
+  - `objgauss training kernel-mvp` 新增可执行 smoke CLI，可输出 initial / final
+    total loss、render loss、object loss、temporal loss，并可写 summary JSON。
+- 边界:
+  - 不引入 torch / SAM / CLIP / DINO / CoTracker / Mamba。
+  - 不启动真实视频训练，不接 near-1M / 4.5M 大资产，不提交训练输出。
+  - 当前 render 是 CPU point-render smoke，不是完整 3DGS rasterizer 或 viewer renderer。
+  - 不替换现有 mask-vote ObjectField 训练路线；该切片只证明 v1 kernel contract
+    可端到端优化。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_kernel.py tests/test_core_namespace.py`:
+    9 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel_mvp"`:
+    1 passed。
+  - `uv run objgauss training kernel-mvp --iterations 20 --learning-rate 0.35 --seed 5 --require-loss-decrease`:
+    passed；`initial_total_loss=0.925081`、`final_total_loss=0.627900`、
+    `initial_render_loss=0.183243`、`final_render_loss=0.109327`。
+  - `uv run --extra dev pytest`: 110 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### OGC-BROWSER-STREAMING-001: Load browser-ready OGC chunks in the viewer
 

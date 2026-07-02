@@ -2432,6 +2432,39 @@ def test_training_register_output_ingests_external_gaussians_and_votes_masks(tmp
     assert (public_dir / "nerf_lego_trained_objects.ply").exists()
 
 
+def test_training_kernel_mvp_cli_runs_end_to_end_smoke(tmp_path, capsys):
+    summary_path = tmp_path / "kernel-mvp-summary.json"
+
+    assert (
+        main(
+            [
+                "training",
+                "kernel-mvp",
+                "--iterations",
+                "20",
+                "--learning-rate",
+                "0.35",
+                "--seed",
+                "5",
+                "--summary-output",
+                str(summary_path),
+                "--require-loss-decrease",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "schema=objgauss-v1-trainable-kernel-mvp-v1" in output
+    assert "loss_decreased=true" in output
+    assert "render_loss_decreased=true" in output
+    assert summary["loss_decreased"] is True
+    assert summary["render_loss_decreased"] is True
+    assert summary["final_loss"]["total_loss"] < summary["initial_loss"]["total_loss"]
+
+
 def test_training_register_output_can_export_unknown_object_policy(tmp_path, capsys):
     input_path = tmp_path / "external_trainer" / "point_cloud.ply"
     masks_path = _write_rect_mask_manifest(tmp_path / "masks.json")

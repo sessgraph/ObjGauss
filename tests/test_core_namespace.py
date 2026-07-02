@@ -8,6 +8,7 @@ from objgauss.core import (
     ObjectState,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
+    TrainableKernelResult,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
@@ -17,11 +18,13 @@ from objgauss.core import (
     cluster_features,
     dynamic_k_proposal_report,
     initialize_object_field,
+    make_trainable_kernel_mvp_fixture,
     match_object_states,
     object_state_delivery_summary,
     object_state_stability_report,
     project_object_states_from_field,
     read_ply,
+    train_kernel_mvp,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
@@ -153,6 +156,19 @@ def test_core_namespace_exposes_chunk_index_builder():
     assert attach_object_aware_lod_metadata is not None
     assert attach_quantization_metadata is not None
     assert write_quantized_ogc_payload is not None
+
+
+def test_core_namespace_exposes_trainable_kernel_mvp():
+    result = train_kernel_mvp(
+        make_trainable_kernel_mvp_fixture(),
+        slots=2,
+        iterations=4,
+        learning_rate=0.25,
+    )
+
+    assert isinstance(result, TrainableKernelResult)
+    assert result.schema == "objgauss-v1-trainable-kernel-mvp-v1"
+    assert result.frame_count == 2
 
 
 def _tiny_cloud() -> GaussianCloud:

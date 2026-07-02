@@ -72,6 +72,10 @@ from objgauss.sample_bundle import write_sample_bundle
 from objgauss.semantic_slots import align_mask_manifest_slots
 from objgauss.splat import read_splat
 from objgauss.training import register_training_output
+from objgauss.core.trainable_kernel import (
+    make_trainable_kernel_mvp_fixture,
+    train_kernel_mvp,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1067,6 +1071,38 @@ def _training_register_output(args: argparse.Namespace) -> None:
         print(f"final_loss={result.final_loss:.6f}")
 
 
+def _training_kernel_mvp(args: argparse.Namespace) -> None:
+    result = train_kernel_mvp(
+        make_trainable_kernel_mvp_fixture(),
+        slots=args.slots,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        render_weight=args.render_weight,
+        object_weight=args.object_weight,
+        temporal_weight=args.temporal_weight,
+        seed=args.seed,
+        record_every=args.record_every,
+    )
+    summary = result.as_dict()
+    print(f"schema={summary['schema']}")
+    print(f"frames={summary['frame_count']}")
+    print(f"slots={summary['slots']}")
+    print(f"iterations={summary['iterations']}")
+    print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
+    print(f"final_total_loss={result.final_loss.total_loss:.6f}")
+    print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
+    print(f"final_render_loss={result.final_loss.render_loss:.6f}")
+    print(f"final_object_loss={result.final_loss.object_loss:.6f}")
+    print(f"final_temporal_loss={result.final_loss.temporal_loss:.6f}")
+    print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
+    print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_loss_decrease and not summary["loss_decreased"]:
+        raise ValueError("trainable kernel MVP loss did not decrease")
+
+
 def _training_write_sample_bundle(args: argparse.Namespace) -> None:
     result = write_sample_bundle(
         output=args.output,
@@ -1868,6 +1904,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     register_output.add_argument("--no-colorize", action="store_true")
     register_output.set_defaults(handler=_training_register_output)
+
+    kernel_mvp = training_subparsers.add_parser(
+        "kernel-mvp",
+        help="run the dependency-free ObjGauss v1 trainable kernel smoke loop",
+    )
+    kernel_mvp.add_argument("--slots", type=int, default=2)
+    kernel_mvp.add_argument("--iterations", type=int, default=40)
+    kernel_mvp.add_argument("--learning-rate", type=float, default=0.35)
+    kernel_mvp.add_argument("--render-weight", type=float, default=1.0)
+    kernel_mvp.add_argument("--object-weight", type=float, default=1.0)
+    kernel_mvp.add_argument("--temporal-weight", type=float, default=0.02)
+    kernel_mvp.add_argument("--seed", type=int, default=0)
+    kernel_mvp.add_argument("--record-every", type=int)
+    kernel_mvp.add_argument("--summary-output", type=Path)
+    kernel_mvp.add_argument("--require-loss-decrease", action="store_true")
+    kernel_mvp.set_defaults(handler=_training_kernel_mvp)
 
     write_bundle = training_subparsers.add_parser(
         "write-sample-bundle",

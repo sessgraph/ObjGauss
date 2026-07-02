@@ -288,6 +288,19 @@ visual sanity check，不伪装成 trainable solver 输出。`scripts/audit-worl
 已经把 Debug OS 纳入 world viewer 验收，检查 debug panel、assignment heatmap、
 Gaussian probe、debug protocol 和 object visibility toggle。
 
+`TRAIN-MVP-001` 已完成 ObjGauss v1 trainable kernel smoke loop：
+`objgauss/core/trainable_kernel.py` 新增 dependency-free CPU MVP，用 `numpy`
+数值梯度优化 assignment logits 和 Gaussian color decoder。该闭环显式走
+`frames -> PerceptionEvidence(features/positions) -> A -> ObjectStateProjection ->
+Gaussian decode -> point render -> L_render + L_object + L_temporal`，其中
+`L_render` 是 point RGB reconstruction MSE，`L_object` 是 evidence-derived
+pseudo assignment cross entropy / balance，`L_temporal` 是跨帧 ObjectState centroid
+smoothness。`objgauss training kernel-mvp` 可运行内置 toy fixture 并输出
+initial / final total loss、render loss、object loss 和 temporal loss；测试证明
+total loss 与 render loss 均下降。该步骤不引入 torch / SAM / CLIP / real video
+training，不改 viewer renderer，不提交训练产物或大资产，也不把 CPU point-render
+MVP 表述为完整 3DGS rasterizer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
