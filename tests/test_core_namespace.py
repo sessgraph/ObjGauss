@@ -4,13 +4,23 @@ import numpy as np
 
 from objgauss.core import (
     GaussianCloud,
+    DynamicKProposalReport,
+    ObjectState,
+    ObjectStabilityReport,
+    ObjectTemporalMatchReport,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
+    bind_object_states_to_artifact,
     build_chunk_index,
     cluster_features,
+    dynamic_k_proposal_report,
     initialize_object_field,
+    match_object_states,
+    object_state_delivery_summary,
+    object_state_stability_report,
+    project_object_states_from_field,
     read_ply,
     write_ogc_payload,
     write_ply,
@@ -97,6 +107,21 @@ def test_core_namespace_exposes_object_field_kernel():
     assert field.gaussian_count == 4
     assert field.slots == 2
     assert field.labels().tolist() == [0, 0, 1, 1]
+    projection = project_object_states_from_field(_tiny_cloud(), field)
+    assert isinstance(projection.states[0], ObjectState)
+    assert projection.derived_object_ids.tolist() == [0, 0, 1, 1]
+    report = object_state_stability_report(projection)
+    assert isinstance(report, ObjectStabilityReport)
+    assert report.evidence_count == 4
+    assert report.slots == 2
+    temporal = match_object_states(projection, projection)
+    assert isinstance(temporal, ObjectTemporalMatchReport)
+    summary = object_state_delivery_summary(projection)
+    assert summary["schema"] == "objgauss-object-state-delivery-binding-v1"
+    bound = bind_object_states_to_artifact({"role": "object_edit"}, projection)
+    assert bound["object_state_summary"] == summary
+    proposals = dynamic_k_proposal_report(projection)
+    assert isinstance(proposals, DynamicKProposalReport)
 
     initialized = initialize_object_field(_tiny_cloud(), slots=2, seed=3, max_iter=10)
     assert initialized.field.gaussian_count == 4

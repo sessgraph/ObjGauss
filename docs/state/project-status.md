@@ -26,6 +26,66 @@ commercial demo release。
   Object Field、mask manifest、projection voting、cross-view slot alignment、
   CLIP / semantic scoring adapter 和 promotion / evaluation policy。
 
+同日 Owner 将 token-system 讨论收敛为 ObjGauss v1 Kernel Contract，事实源为
+`docs/architecture/objgauss-v1-kernel-contract.md`。该 contract 冻结三层链路：
+`PerceptionEvidence -> ObjectState -> GaussianToken`，其中 `ObjectState` 是唯一
+核心 reasoning unit；dynamics 降级为 `ObjectState` 的时间字段或状态历史，不再作为
+并列 token 系统。`docs/myobjgausstoken/` 下的原始讨论保留为 Research Spec，不作为
+Architecture Spec。该归档不引入新训练依赖、不重构 renderer、不发布素材。
+
+同日进一步将 v1 的 `PerceptionEvidence -> ObjectState` 阶段规划为 Object Emergence
+Plan，事实源为 `docs/architecture/objgauss-v1-object-emergence-plan.md`。该规划把
+slot / clustering / tracking 收敛为同一个 assignment matrix `A` 的不同约束或视图；
+v1 先走 fixed-K 的 `A[N,K] + evidence[N] -> ObjectState[K]`，再做 stability metrics、
+temporal matching、Gaussian delivery binding，最后才进入 birth / merge / split proposal。
+该规划仍为 docs-only，不新增 `objgauss/core/object_state.py`，不引入新 ML 依赖。
+
+同日 Owner 进一步要求中文化并补齐 KERNEL-001 solver 规范。上述两个 kernel 文档现已
+以中文写作，并在 Object Emergence Plan 中明确 cost matrix `C[N,K]`、assignment
+solver 顺序、object pooling、`L_object` 组成、非训练闭环和后续 trainable loop 边界。
+关键约束同步为：`object_id` 是从 `A` / matching / export policy 派生的 renderer
+address，不是 primary state；`ObjectState` 实现层可拆成 semantic / geometric /
+temporal 子状态，但对外仍是单一 reasoning unit。本步骤仍未改代码、未引入 Sinkhorn /
+Hungarian / Gumbel-softmax 依赖、未改 renderer 或素材。
+
+同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
+Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用
+`ObjectField.probabilities()`，将 Gaussian evidence weighted reduction 为
+`ObjectState[K]`，输出 `slot_mass` / `confidence`、`mass_fraction`、
+`assignment_entropy`、`centroid`、`bbox`、`feature`、status diagnostics 和派生
+`object_id` export address。`objgauss.core` lazy namespace 已暴露 `ObjectState`、
+`ObjectStateProjection`、`project_object_states(...)`、
+`project_object_states_from_field(...)` 和 `validate_assignment_matrix(...)`。测试覆盖
+empty、uniform、sparse、single-dominant 和 noisy assignment failure modes。该切片不做
+temporal matching、不做 dynamic K、不引入 Slot Attention / Sinkhorn / SAM / DINO /
+CoTracker / Mamba，不改 renderer 或素材。
+
+同日已完成 `OBJECT-STABILITY-001`：`objgauss/core/object_state.py` 在 Phase 1
+`ObjectStateProjection` 上新增 `ObjectStabilityReport` 和
+`object_state_stability_report(...)`。该报告计算 `assignment_confidence`、
+`mean_normalized_entropy`、`slot_mass`、`slot_mass_fraction`、`effective_slots`、
+inactive / low-confidence / mixed slots、single-slot collapse、dominant slot 和可选
+`purity_labels` 的 object purity / per-slot purity。`objgauss.core` lazy namespace 已暴露
+`ObjectStabilityReport` 与 `object_state_stability_report(...)`。测试覆盖 healthy sparse
+assignment、uniform collapse risk、single dominant slot、noisy high-entropy assignment、
+empty evidence 和 purity label validation。本切片仍不做 temporal matching、不自动修改
+dynamic K、不放宽 semantic promotion threshold、不改 renderer 或素材。
+
+同日已完成剩余 v1 kernel 非训练阶段：`OBJECT-TEMPORAL-MATCH-001`、
+`OBJECT-GAUSSIAN-BINDING-001` 和 `OBJECT-DYNAMIC-K-PROPOSAL-001`。`objgauss/core/object_state.py`
+现在提供 `match_object_states(...)` / `ObjectTemporalMatchReport`，使用 centroid、bbox、
+feature 和 mass cost 做 dependency-free greedy matching，显式输出 matched pairs、
+unmatched previous / current、ignored inactive states、cost matrix 和 temporal drift；
+slot permutation 不再依赖 hard id equality。该模块同时提供
+`object_state_delivery_summary(...)` 和 `bind_object_states_to_artifact(...)`，把
+`ObjectStateProjection` 汇总为 renderer-facing metadata：derived `object_id` 来源、
+Gaussian children count、per-state summary、stability 摘要和可选 chunk binding；viewer
+仍消费 Gaussian artifact，不消费 ObjectState tensor，也不改变 diagnostic full PLY 的
+browser-ready 规则。最后新增 `dynamic_k_proposal_report(...)` /
+`DynamicKProposalReport`，只输出 remove inactive、split mixed、merge duplicate 和
+birth unmatched proposal，不自动修改 `K`、不改写 object ids、不启动模型训练。本轮仍不引入
+CoTracker / learned tracker / Sinkhorn / Slot Attention，不改 renderer、不移动素材。
+
 同日已完成 `VIEWER-MANIFEST-CONSUME-001`：前端素材库现在以最小改动消费 /
 暴露 backend model artifact manifest 的 browser-ready 路线，同时保留现有 renderer
 和对象交互行为。

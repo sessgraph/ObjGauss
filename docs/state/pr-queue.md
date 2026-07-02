@@ -69,6 +69,233 @@
 
 ## Done
 
+### OBJECT-DYNAMIC-K-PROPOSAL-001: Emit birth / merge / split proposals
+
+- 状态: done / v1-object-emergence-phase-5
+- 类型: 研究 PR / object slot policy
+- 目标: 在 fixed-K assignment、stability metrics 和 temporal matching 稳定后，输出
+  inactive slot removal、mixed slot split、near-duplicate merge 和 unmatched evidence
+  birth proposal。
+- 已实施:
+  - `objgauss/core/object_state.py` 新增 `DynamicKProposal`、
+    `DynamicKProposalReport` 和 `dynamic_k_proposal_report(...)`。
+  - proposal 类型覆盖 `remove_inactive`、`split_mixed`、`merge_duplicate` 和
+    `birth_unmatched`。
+  - 每个 proposal 记录 `source_ids`、可选 `target_id`、score、threshold、reason、
+    evidence 和固定 `action="proposal_only"`。
+  - 在 `objgauss.core` lazy namespace 暴露 proposal API。
+- 边界:
+  - 不自动修改 dynamic K，不自动改写 assignment / object ids / artifacts。
+  - 不做 open-ended dynamic slot attention，不引入 learned policy。
+  - 不启动模型训练，不改 renderer，不移动素材。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    18 passed。
+  - `uv run --extra dev pytest`: 105 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+  - 完成 commit: pending
+
+### OBJECT-GAUSSIAN-BINDING-001: Bind ObjectState summaries to Gaussian delivery metadata
+
+- 状态: done / v1-object-emergence-phase-4
+- 类型: 标准 PR / backend-model-artifact contract
+- 目标: 将 ObjectState summaries 与现有 `object_id`、chunk index、LOD 和 OGC /
+  browser delivery metadata 对齐，保持 renderer-facing 数据仍为 Gaussian artifact。
+- 已实施:
+  - `objgauss/core/object_state.py` 新增
+    `OBJECT_STATE_DELIVERY_BINDING_SCHEMA`、
+    `object_state_delivery_summary(...)` 和 `bind_object_states_to_artifact(...)`。
+  - summary 输出 derived `object_id` 来源、object id coverage、Gaussian children
+    count、per-state summary、stability 摘要和可选 chunk binding。
+  - artifact binding 只给现有 Gaussian artifact dict 附加 `object_state_summary` /
+    `object_id_coverage`，不替换 manifest schema 或前端 route。
+  - 在 `objgauss.core` lazy namespace 暴露 delivery binding API。
+- 边界:
+  - 不替换 renderer，不让 viewer 直接消费 ObjectState tensor。
+  - 不修改 diagnostic full PLY 的 browser-ready 禁止规则。
+  - 不启动模型训练，不移动素材。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    18 passed。
+  - `uv run --extra dev pytest`: 105 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+  - 完成 commit: pending
+
+### OBJECT-TEMPORAL-MATCH-001: Match ObjectState across observations
+
+- 状态: done / v1-object-emergence-phase-3
+- 类型: 标准 PR / temporal identity
+- 目标: 用 centroid / bbox / feature / confidence 等信号做 assignment-based matching，
+  让 object identity 稳定性不依赖 hard ID equality loss。
+- 已实施:
+  - `objgauss/core/object_state.py` 新增 `ObjectStateMatch`、
+    `ObjectTemporalMatchReport` 和 `match_object_states(...)`。
+  - 使用 dependency-free greedy matching；cost 由 centroid drift、bbox IoU、
+    feature cosine distance 和 normalized mass delta 组成。
+  - report 显式输出 matched pairs、unmatched previous / current、ignored inactive
+    states、mean / max temporal drift、cost matrix 和 diagnostics。
+  - 在 `objgauss.core` lazy namespace 暴露 temporal matching API。
+- 边界:
+  - 不引入 CoTracker、learned tracker、dynamics model 或模型训练。
+  - 不引入 Hungarian 依赖；后续大规模 matching 需要时另行立项。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    18 passed。
+  - `uv run --extra dev pytest`: 105 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+  - 完成 commit: pending
+
+### OBJECT-STABILITY-001: Add ObjectState stability metrics and collapse diagnostics
+
+- 状态: done / v1-object-emergence-phase-2
+- 类型: 标准 PR / core evaluation
+- 目标: 在 Phase 1 的 ObjectState pooling 之上，定义 assignment confidence、
+  slot mass、effective slots、object purity、inactive slot 和 collapse diagnostics。
+- 已实施:
+  - `objgauss/core/object_state.py` 新增 `ObjectStabilityReport` 和
+    `object_state_stability_report(...)`。
+  - 基于 `ObjectStateProjection.assignment` 计算 `assignment_confidence`、
+    `mean_normalized_entropy`、`slot_mass`、`slot_mass_fraction`、`effective_slots`、
+    inactive / low-confidence / mixed slots、single-slot collapse、dominant slot。
+  - 支持可选 `purity_labels`，输出 object purity 和 per-slot purity；无 mask / vote
+    evidence 时 purity 显式为 `None`。
+  - 在 `objgauss.core` lazy namespace 暴露 `ObjectStabilityReport` 与
+    `object_state_stability_report(...)`。
+  - 更新 `docs/architecture/objgauss-v1-object-emergence-plan.md`，明确
+    `temporal_drift` 留到 Phase 3 matching。
+- 边界:
+  - 不做 temporal matching、不自动修改 dynamic K。
+  - 不放宽 semantic promotion threshold，不把 report diagnostics 当作 promotion。
+  - 不改 renderer、不移动素材、不引入新 ML 依赖。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    14 passed。
+  - `uv run --extra dev pytest`: 101 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+- 完成 commit: pending
+
+### OBJECT-ASSIGNMENT-001: Add assignment matrix and ObjectState pooling contract
+
+- 状态: done / v1-object-emergence-phase-1
+- 类型: 标准 PR / core algorithm contract
+- 目标: 按 KERNEL-001 solver 规范，基于现有 `ObjectField.probabilities()` 建立
+  fixed-K assignment matrix `A[N,K]` 和 `ObjectState[K]` pooling API，让
+  `PerceptionEvidence -> ObjectState` 先有一个可测试的最小实现。
+- 已实施:
+  - 新增 `objgauss/core/object_state.py`，实现 `validate_assignment_matrix(...)`、
+    `project_object_states(...)` 和 `project_object_states_from_field(...)`。
+  - 新增 `ObjectState` 与 `ObjectStateProjection`，输出 `slot_mass` /
+    `confidence`、`mass_fraction`、`assignment_entropy`、`centroid`、`bbox`、
+    `feature`、status diagnostics 和派生 `object_id` export address。
+  - 强制 `A[N,K]` 行归一化、非负、finite，并要求行数匹配 Gaussian evidence。
+  - 复用 `ObjectField.probabilities()` 作为第一版 Gaussian-level `A` 来源。
+  - 在 `objgauss.core` lazy namespace 暴露新 API。
+  - 新增 `tests/test_object_state.py` 覆盖 empty、uniform、sparse、single-dominant
+    和 noisy assignment failure modes。
+- 边界:
+  - 不做 temporal matching、不做 dynamic K、不做 Slot Attention。
+  - 不引入 Sinkhorn / Hungarian / Gumbel-softmax / SAM / DINO / CoTracker / Mamba。
+  - 不改 renderer、不移动素材、不跑训练。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    12 passed。
+  - `uv run --extra dev pytest`: 99 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+- 完成 commit: pending
+
+### KERNEL-SOLVER-SPEC-001: Chinese Object Emergence solver spec
+
+- 状态: done / kernel-solver-spec
+- 类型: 微改动 / architecture documentation
+- 目标: 按 Owner 最新校正，将 v1 kernel / object emergence 文档改为中文，并把
+  `infer_object` 从抽象接口补成 KERNEL-001 Object Emergence Solver 规范。
+- 已实施:
+  - `docs/architecture/objgauss-v1-kernel-contract.md` 已改为中文 Kernel ABI，
+    明确 `object_id` 是派生变量，不是 primary state，避免 `slot_prob` /
+    hard id 双真相。
+  - 同一 contract 明确 `ObjectState` 对外仍是唯一 reasoning unit；实现层可以拆成
+    semantic / geometric / temporal 子状态，避免 learning signal 混杂。
+  - `docs/architecture/objgauss-v1-object-emergence-plan.md` 已改为中文，并补充
+    cost matrix `C[N,K]`、assignment solver 顺序、object pooling、`L_object`
+    组成、非训练闭环和 trainable loop 边界。
+  - `docs/architecture/rebuild-plan.md` 和 `docs/state/project-status.md` 已同步
+    中文说明。
+- 边界:
+  - 不改 Python / JavaScript 实现。
+  - 不引入 Sinkhorn / Hungarian / Gumbel-softmax / Slot Attention 依赖。
+  - 不改 renderer、不移动素材、不跑训练。
+- 验证:
+  - `git diff --check`: passed。
+  - trailing whitespace scan: passed。
+  - `uv run --extra dev pytest`: not run；docs-only change。
+  - `npm run build`: not run；docs-only change。
+- 完成 commit: pending
+
+### OBJECT-EMERGENCE-PLAN-001: Plan v1 ObjectState emergence phases
+
+- 状态: done / architecture-plan
+- 类型: 微改动 / architecture documentation
+- 目标: 将 “ObjectState 如何稳定涌现” 收敛为 v1 分阶段计划，明确 slot /
+  clustering / tracking 不是三套并列模块，而是同一个 assignment matrix `A` 的
+  约束或视图。
+- 已实施:
+  - 新增 `docs/architecture/objgauss-v1-object-emergence-plan.md`，定义
+    `f(PerceptionEvidence) -> A -> ObjectState` 的 v1 实现顺序。
+  - 明确 v1 先 fixed-K，动态 K 只在后期作为 birth / merge / split proposal。
+  - 在 `docs/architecture/objgauss-v1-kernel-contract.md` 和
+    `docs/state/project-status.md` 中链接该规划。
+  - 在本队列登记 `OBJECT-ASSIGNMENT-001` 到 `OBJECT-DYNAMIC-K-PROPOSAL-001`
+    五个后续实现阶段。
+- 边界:
+  - 不改代码、不新增 `objgauss/core/object_state.py`。
+  - 不引入新 ML 依赖、不改 renderer、不移动素材。
+- 验证:
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: not run；docs-only change。
+  - `npm run build`: not run；docs-only change。
+- 完成 commit: pending
+
+### KERNEL-CONTRACT-001: Freeze ObjGauss v1 object-state kernel contract
+
+- 状态: done / architecture-contract
+- 类型: 微改动 / architecture documentation
+- 目标: 将 `docs/myobjgausstoken/` 中发散的 token-system 研究讨论收敛为仓库可执行的
+  ObjGauss v1 Kernel Contract，明确 ObjGauss 是 `Object State Kernel + Gaussian
+  Renderer` 的分层状态机，而不是四套并列 token 系统。
+- 已实施:
+  - 新增 `docs/architecture/objgauss-v1-kernel-contract.md`，冻结
+    `PerceptionEvidence -> ObjectState -> GaussianToken` 三层链路。
+  - 明确 `ObjectState` 是唯一核心 reasoning unit；`velocity`、`acceleration`
+    和 `latent_motion` 属于 object temporal fields 或 state history，不作为独立
+    `DynamicsToken`。
+  - 明确 Gaussian 是 renderer primitive，不是 reasoning unit；object-aware chunk /
+    LOD / quantized browser delivery 继续服务 renderer handoff。
+  - 在 `docs/architecture/rebuild-plan.md` 和 `docs/state/project-status.md`
+    中登记该 contract 为 Architecture Spec，原始 token 讨论保留为 Research Spec。
+- 边界:
+  - 不改代码、不引入 DINOv2 / SAM2 / CoTracker / Mamba 等新依赖。
+  - 不重构 renderer、不移动训练产物、不发布 public demo asset。
+- 验证:
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: not run；docs-only change。
+  - `npm run build`: not run；docs-only change。
+- 完成 commit: pending
+
 ### WORLD-OBJECT-RENDER-001: Render draggable objects inside the Three.js world
 
 - 状态: done / object-level-world-rendering

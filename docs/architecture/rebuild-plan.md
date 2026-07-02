@@ -226,6 +226,13 @@ business logic.
 
 The rebuild should stabilize these contracts before major UI work resumes.
 
+对象状态方向已经冻结在
+`docs/architecture/objgauss-v1-kernel-contract.md`。该文档将 v1 kernel 定义为
+`PerceptionEvidence -> ObjectState -> GaussianToken`，其中 `ObjectState` 是唯一
+reasoning unit；temporal / dynamics 字段只能保存在 object state 或 state history
+中。`docs/myobjgausstoken/` 下的原始 token-system 讨论是 research input，不是
+architecture contract。
+
 ### Gaussian artifact
 
 Required fields:
@@ -244,6 +251,11 @@ Target output:
 - count and byte-size metadata
 
 ### Object assignment
+
+v1 分阶段实现记录在
+`docs/architecture/objgauss-v1-object-emergence-plan.md`。核心规则是：slot assignment、
+clustering 和 tracking 都是同一个 assignment matrix `A` 上的约束或视图，不是三套互相
+竞争的 object emergence 系统。
 
 Required concepts:
 
