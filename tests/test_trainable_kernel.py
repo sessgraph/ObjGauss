@@ -141,6 +141,39 @@ def test_trainable_kernel_summary_marks_bound_image_targets():
     assert result.final_loss.total_loss < result.initial_loss.total_loss
 
 
+def test_trainable_kernel_can_optimize_image_render_loss():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    result = train_kernel_mvp(
+        frames,
+        slots=2,
+        iterations=18,
+        learning_rate=0.35,
+        render_weight=0.0,
+        image_render_weight=1.0,
+        object_weight=0.0,
+        temporal_weight=0.0,
+        seed=10,
+    )
+    summary = result.as_dict()
+
+    assert result.initial_loss.render_loss > 0
+    assert result.initial_loss.image_render_loss > 0
+    assert result.final_loss.image_render_loss < result.initial_loss.image_render_loss
+    assert result.final_loss.total_loss < result.initial_loss.total_loss
+    assert summary["weights"]["image_render"] == 1.0
+    assert summary["image_render_loss_decreased"] is True
+
+
+def test_trainable_kernel_image_render_weight_requires_targets():
+    with pytest.raises(ValueError, match="requires every frame to bind image_target"):
+        train_kernel_mvp(
+            make_trainable_kernel_mvp_fixture(),
+            slots=2,
+            iterations=2,
+            image_render_weight=1.0,
+        )
+
+
 def test_trainable_kernel_sample_requires_slots_without_object_ids():
     cloud = _object_cloud(include_object_ids=False)
 

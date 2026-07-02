@@ -84,6 +84,7 @@ class TrainableKernelLoss:
     iteration: int
     total_loss: float
     render_loss: float
+    image_render_loss: float
     object_loss: float
     temporal_loss: float
 
@@ -92,6 +93,7 @@ class TrainableKernelLoss:
             "iteration": int(self.iteration),
             "total_loss": float(self.total_loss),
             "render_loss": float(self.render_loss),
+            "image_render_loss": float(self.image_render_loss),
             "object_loss": float(self.object_loss),
             "temporal_loss": float(self.temporal_loss),
         }
@@ -105,6 +107,7 @@ class TrainableKernelResult:
     iterations: int
     learning_rate: float
     render_weight: float
+    image_render_weight: float
     object_weight: float
     temporal_weight: float
     initial_loss: TrainableKernelLoss
@@ -126,6 +129,7 @@ class TrainableKernelResult:
             "learning_rate": float(self.learning_rate),
             "weights": {
                 "render": float(self.render_weight),
+                "image_render": float(self.image_render_weight),
                 "object": float(self.object_weight),
                 "temporal": float(self.temporal_weight),
             },
@@ -133,6 +137,9 @@ class TrainableKernelResult:
             "final_loss": self.final_loss.as_dict(),
             "loss_decreased": bool(self.final_loss.total_loss < self.initial_loss.total_loss),
             "render_loss_decreased": bool(self.final_loss.render_loss < self.initial_loss.render_loss),
+            "image_render_loss_decreased": bool(
+                self.final_loss.image_render_loss < self.initial_loss.image_render_loss
+            ),
             "render_target_mode": (
                 "image_space_targets_bound"
                 if image_contract["status"] == "image_targets_bound"
@@ -208,6 +215,7 @@ def train_kernel_mvp(
     iterations: int = 40,
     learning_rate: float = 0.35,
     render_weight: float = 1.0,
+    image_render_weight: float = 0.0,
     object_weight: float = 1.0,
     temporal_weight: float = 0.02,
     finite_difference_epsilon: float = 1e-3,
@@ -233,11 +241,14 @@ def train_kernel_mvp(
         raise ValueError("finite_difference_epsilon must be > 0")
     for name, weight in {
         "render_weight": render_weight,
+        "image_render_weight": image_render_weight,
         "object_weight": object_weight,
         "temporal_weight": temporal_weight,
     }.items():
         if weight < 0:
             raise ValueError(f"{name} must be >= 0")
+    if image_render_weight > 0 and not all(frame.image_target is not None for frame in validated):
+        raise ValueError("image_render_weight requires every frame to bind image_target")
 
     rng = np.random.default_rng(seed)
     logits = [
@@ -256,6 +267,7 @@ def train_kernel_mvp(
         slots,
         iteration=0,
         render_weight=render_weight,
+        image_render_weight=image_render_weight,
         object_weight=object_weight,
         temporal_weight=temporal_weight,
     )
@@ -268,6 +280,7 @@ def train_kernel_mvp(
             slots,
             epsilon=finite_difference_epsilon,
             render_weight=render_weight,
+            image_render_weight=image_render_weight,
             object_weight=object_weight,
             temporal_weight=temporal_weight,
         )
@@ -281,6 +294,7 @@ def train_kernel_mvp(
                     slots,
                     iteration=iteration,
                     render_weight=render_weight,
+                    image_render_weight=image_render_weight,
                     object_weight=object_weight,
                     temporal_weight=temporal_weight,
                 ).loss
@@ -292,6 +306,7 @@ def train_kernel_mvp(
         slots,
         iteration=iterations,
         render_weight=render_weight,
+        image_render_weight=image_render_weight,
         object_weight=object_weight,
         temporal_weight=temporal_weight,
     )
@@ -307,6 +322,7 @@ def train_kernel_mvp(
         iterations=int(iterations),
         learning_rate=float(learning_rate),
         render_weight=float(render_weight),
+        image_render_weight=float(image_render_weight),
         object_weight=float(object_weight),
         temporal_weight=float(temporal_weight),
         initial_loss=initial.loss,
@@ -337,6 +353,7 @@ def train_kernel_mvp_from_cloud(
     iterations: int = 40,
     learning_rate: float = 0.35,
     render_weight: float = 1.0,
+    image_render_weight: float = 0.0,
     object_weight: float = 1.0,
     temporal_weight: float = 0.02,
     finite_difference_epsilon: float = 1e-3,
@@ -362,6 +379,7 @@ def train_kernel_mvp_from_cloud(
         iterations=iterations,
         learning_rate=learning_rate,
         render_weight=render_weight,
+        image_render_weight=image_render_weight,
         object_weight=object_weight,
         temporal_weight=temporal_weight,
         finite_difference_epsilon=finite_difference_epsilon,
@@ -1008,6 +1026,7 @@ def _forward(
     *,
     iteration: int,
     render_weight: float,
+    image_render_weight: float,
     object_weight: float,
     temporal_weight: float,
 ) -> _ForwardPass:
@@ -1019,10 +1038,12 @@ def _forward(
         for frame, assignment in zip(frames, assignments, strict=True)
     )
     render_loss = _render_loss(rendered, frames)
+    image_render_loss = _image_render_loss(frames, assignments, colors)
     object_loss = _object_assignment_loss(assignments, frames)
     temporal_loss = _temporal_centroid_loss(projections)
     total_loss = (
         render_weight * render_loss
+        + image_render_weight * image_render_loss
         + object_weight * object_loss
         + temporal_weight * temporal_loss
     )
@@ -1030,6 +1051,7 @@ def _forward(
         iteration=int(iteration),
         total_loss=float(total_loss),
         render_loss=float(render_loss),
+        image_render_loss=float(image_render_loss),
         object_loss=float(object_loss),
         temporal_loss=float(temporal_loss),
     )
@@ -1049,6 +1071,7 @@ def _finite_difference_gradient(
     *,
     epsilon: float,
     render_weight: float,
+    image_render_weight: float,
     object_weight: float,
     temporal_weight: float,
 ) -> np.ndarray:
@@ -1064,6 +1087,7 @@ def _finite_difference_gradient(
             slots,
             iteration=-1,
             render_weight=render_weight,
+            image_render_weight=image_render_weight,
             object_weight=object_weight,
             temporal_weight=temporal_weight,
         ).loss.total_loss
@@ -1073,6 +1097,7 @@ def _finite_difference_gradient(
             slots,
             iteration=-1,
             render_weight=render_weight,
+            image_render_weight=image_render_weight,
             object_weight=object_weight,
             temporal_weight=temporal_weight,
         ).loss.total_loss
@@ -1086,6 +1111,37 @@ def _render_loss(rendered: Sequence[np.ndarray], frames: Sequence[_ValidatedFram
         for predicted, frame in zip(rendered, frames, strict=True)
     ]
     return float(np.mean(losses))
+
+
+def _image_render_loss(
+    frames: Sequence[_ValidatedFrame],
+    assignments: Sequence[np.ndarray],
+    decoder_colors: np.ndarray,
+) -> float:
+    if not any(frame.image_target is not None for frame in frames):
+        return 0.0
+    if not all(frame.image_target is not None for frame in frames):
+        raise ValueError("image renderer loss requires every frame to bind image_target")
+
+    from objgauss.core.training_renderer import evaluate_training_renderer_loss
+
+    trainable_frames = tuple(
+        TrainableKernelFrame(
+            positions=frame.positions,
+            features=frame.features,
+            target_rgb=frame.target_rgb,
+            target_assignment=frame.object_targets,
+            image_target=frame.image_target,
+        )
+        for frame in frames
+    )
+    return float(
+        evaluate_training_renderer_loss(
+            trainable_frames,
+            assignments,
+            decoder_colors,
+        ).image_render_loss
+    )
 
 
 def _object_assignment_loss(

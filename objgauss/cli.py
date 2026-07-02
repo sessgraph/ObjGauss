@@ -1082,6 +1082,7 @@ def _training_kernel_mvp(args: argparse.Namespace) -> None:
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         render_weight=args.render_weight,
+        image_render_weight=args.image_render_weight,
         object_weight=args.object_weight,
         temporal_weight=args.temporal_weight,
         seed=args.seed,
@@ -1096,10 +1097,13 @@ def _training_kernel_mvp(args: argparse.Namespace) -> None:
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
     print(f"final_render_loss={result.final_loss.render_loss:.6f}")
+    print(f"initial_image_render_loss={result.initial_loss.image_render_loss:.6f}")
+    print(f"final_image_render_loss={result.final_loss.image_render_loss:.6f}")
     print(f"final_object_loss={result.final_loss.object_loss:.6f}")
     print(f"final_temporal_loss={result.final_loss.temporal_loss:.6f}")
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
+    print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -1124,6 +1128,7 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         iterations=args.iterations,
         learning_rate=args.learning_rate,
         render_weight=args.render_weight,
+        image_render_weight=args.image_render_weight,
         object_weight=args.object_weight,
         temporal_weight=args.temporal_weight,
         seed=args.seed,
@@ -1164,10 +1169,13 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
     print(f"final_render_loss={result.final_loss.render_loss:.6f}")
+    print(f"initial_image_render_loss={result.initial_loss.image_render_loss:.6f}")
+    print(f"final_image_render_loss={result.final_loss.image_render_loss:.6f}")
     print(f"final_object_loss={result.final_loss.object_loss:.6f}")
     print(f"final_temporal_loss={result.final_loss.temporal_loss:.6f}")
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
+    print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -1196,6 +1204,8 @@ def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
         print(f"evidence_target_source={evidence.get('target_source')}")
         print(f"evidence_initial_render_loss={evidence['initial_render_loss']:.6f}")
         print(f"evidence_final_render_loss={evidence['final_render_loss']:.6f}")
+        print(f"evidence_initial_image_render_loss={evidence['initial_image_render_loss']:.6f}")
+        print(f"evidence_final_image_render_loss={evidence['final_image_render_loss']:.6f}")
         if evidence.get("renderer_api_ready"):
             print(f"evidence_renderer_name={evidence.get('renderer_name')}")
             print(f"evidence_renderer_gradient_path={evidence.get('renderer_gradient_path')}")
@@ -2017,6 +2027,7 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_mvp.add_argument("--iterations", type=int, default=40)
     kernel_mvp.add_argument("--learning-rate", type=float, default=0.35)
     kernel_mvp.add_argument("--render-weight", type=float, default=1.0)
+    kernel_mvp.add_argument("--image-render-weight", type=float, default=0.0)
     kernel_mvp.add_argument("--object-weight", type=float, default=1.0)
     kernel_mvp.add_argument("--temporal-weight", type=float, default=0.02)
     kernel_mvp.add_argument("--seed", type=int, default=0)
@@ -2047,6 +2058,7 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--iterations", type=int, default=40)
     kernel_sample.add_argument("--learning-rate", type=float, default=0.35)
     kernel_sample.add_argument("--render-weight", type=float, default=1.0)
+    kernel_sample.add_argument("--image-render-weight", type=float, default=0.0)
     kernel_sample.add_argument("--object-weight", type=float, default=1.0)
     kernel_sample.add_argument("--temporal-weight", type=float, default=0.02)
     kernel_sample.add_argument("--seed", type=int, default=0)

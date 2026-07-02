@@ -19,19 +19,18 @@
 
 ## Ready
 
-### TRAIN-IMAGE-LOSS-OPTIM-001: Use image renderer loss in trainable optimization
+### TRAIN-MVP-MODEL-ARTIFACT-001: Persist trainable kernel MVP model artifact
 
 - 状态: ready
-- 类型: 标准 PR / training objective
-- 目标: 在 `TRAIN-RENDERER-API-001` 已提供 image-space renderer loss producer 后，
-  将 `image_render_loss` 作为可配置项接入 trainable kernel objective，使训练不只输出
-  telemetry，而能真正优化 image-space target。
+- 类型: 标准 PR / training artifact
+- 目标: 在 image-space renderer loss 已进入 objective 后，把 trainable kernel MVP
+  的输出保存为可追踪 model artifact，记录 assignments、ObjectState summary、
+  decoder colors、loss telemetry、renderer API summary 和 source sample provenance。
 - 边界:
   - 默认仍不引入 torch / GPU differentiable rasterizer。
   - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出；artifact 默认写到用户指定路径或 ignored `outputs/`。
   - 不默认加载 near-1M / 4.5M 大资产；先用 fixture 和小型 public sample 验证。
-  - 继续保留 point `L_render`、`L_object`、`L_temporal` telemetry，不把 CPU point splat
-    stub 宣称为完整 3DGS renderer。
 
 ## Planned
 
@@ -54,6 +53,48 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-IMAGE-LOSS-OPTIM-001: Use image renderer loss in trainable optimization
+
+- 状态: done / image-render-loss-objective
+- 类型: 标准 PR / training objective
+- 目标: 在 `TRAIN-RENDERER-API-001` 已提供 image-space renderer loss producer 后，
+  将 `image_render_loss` 作为可配置项接入 trainable kernel objective，使训练不只输出
+  telemetry，而能真正优化 image-space target。
+- 已实施:
+  - `TrainableKernelLoss` 新增 `image_render_loss`，summary 输出
+    `image_render_loss_decreased`。
+  - `train_kernel_mvp(...)` 和 `train_kernel_mvp_from_cloud(...)` 新增
+    `image_render_weight`，total loss 支持
+    `render_weight * L_render + image_render_weight * image_render_loss +
+    object_weight * L_object + temporal_weight * L_temporal`。
+  - 当 `image_render_weight > 0` 时，每一帧必须绑定 `TrainableKernelImageTarget`；
+    未绑定时会显式报错。
+  - `objgauss training kernel-sample` 新增 `--image-render-weight`，并打印
+    initial / final image render loss 与 image loss 是否下降。
+  - renderer boundary evidence 现在记录 initial / final image render loss。
+- 边界:
+  - 不引入 torch / GPU renderer /真实 3DGS differentiable rasterizer。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出，不移动 public samples，不默认拉 near-1M / 4.5M 大资产。
+  - CPU point splat renderer API 仍只是 MVP loss producer，不宣称为完整 3DGS training。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_kernel.py tests/test_training_renderer.py tests/test_renderer_loss.py tests/test_core_namespace.py`:
+    26 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel_sample"`:
+    1 passed, 64 deselected。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 12 --learning-rate 0.35 --max-points 8 --bind-image-targets --image-width 16 --image-height 12 --image-render-weight 0.5 --seed 8 --summary-output /tmp/objgauss-kernel-image-loss-optim-summary.json --require-loss-decrease`:
+    passed；`initial_image_render_loss=0.082205`、
+    `final_image_render_loss=0.053806`、`image_render_loss_decreased=true`、
+    `initial_total_loss=1.557675`、`final_total_loss=1.332860`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-kernel-image-loss-optim-summary.json --output /tmp/objgauss-image-loss-optim-boundary.json --require-point-smoke-ready`:
+    passed；`status=renderer_api_ready`、
+    `evidence_initial_image_render_loss=0.082205`、
+    `evidence_final_image_render_loss=0.053806`。
+  - `uv run --extra dev pytest`: 128 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-RENDERER-API-001: Define differentiable renderer API and gradient path
 

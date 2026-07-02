@@ -2488,6 +2488,8 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
                 "10",
                 "--image-height",
                 "8",
+                "--image-render-weight",
+                "0.5",
                 "--seed",
                 "6",
                 "--summary-output",
@@ -2510,8 +2512,12 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "renderer_name=cpu-image-point-splat-differentiable-v1" in output
     assert "renderer_gradient_path=analytic-color-assignment-gradient-v1" in output
     assert "image_render_loss=" in output
+    assert "image_render_loss_decreased=true" in output
     assert "loss_decreased=true" in output
     assert summary["loss_decreased"] is True
+    assert summary["image_render_loss_decreased"] is True
+    assert summary["weights"]["image_render"] == 0.5
+    assert summary["final_loss"]["image_render_loss"] < summary["initial_loss"]["image_render_loss"]
     assert summary["sample"]["target_source"] == "object_id_one_hot_targets"
     assert summary["sample"]["sampled_count"] == 4
     assert summary["image_target_contract"]["status"] == "image_targets_bound"
@@ -2540,6 +2546,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "status=renderer_api_ready" in boundary_output
     assert "point_smoke_ready=true" in boundary_output
     assert "evidence_renderer_gradient_path=analytic-color-assignment-gradient-v1" in boundary_output
+    assert "evidence_final_image_render_loss=" in boundary_output
     assert boundary["schema"] == "objgauss-renderer-loss-boundary-v1"
     assert boundary["point_smoke_ready"] is True
     assert boundary["evidence"]["image_targets_bound"] is True

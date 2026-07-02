@@ -83,6 +83,7 @@ def test_renderer_loss_boundary_accepts_renderer_api_gradient_path():
     assert payload["current_renderer"] == "cpu-image-point-splat-differentiable-v1"
     assert payload["evidence"]["renderer_api_ready"] is True
     assert payload["evidence"]["renderer_gradient_path"] == "analytic-color-assignment-gradient-v1"
+    assert payload["evidence"]["final_image_render_loss"] >= 0
     assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]

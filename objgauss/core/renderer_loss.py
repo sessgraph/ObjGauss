@@ -210,6 +210,8 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         "final_total_loss": final["total_loss"],
         "initial_render_loss": initial["render_loss"],
         "final_render_loss": final["render_loss"],
+        "initial_image_render_loss": initial["image_render_loss"],
+        "final_image_render_loss": final["image_render_loss"],
         "loss_decreased": loss_decreased,
         "render_loss_decreased": render_loss_decreased,
     }
@@ -224,7 +226,13 @@ def _loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:
     missing = [field for field in required if field not in value]
     if missing:
         raise ValueError(f"{key} missing loss fields: {', '.join(missing)}")
-    return {field: _finite_float(value[field], f"{key}.{field}") for field in required}
+    record = {field: _finite_float(value[field], f"{key}.{field}") for field in required}
+    record["image_render_loss"] = (
+        _finite_float(value["image_render_loss"], f"{key}.image_render_loss")
+        if "image_render_loss" in value
+        else 0.0
+    )
+    return record
 
 
 def _finite_float(value: Any, label: str) -> float:

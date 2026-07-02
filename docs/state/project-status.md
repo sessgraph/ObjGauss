@@ -363,6 +363,19 @@ torch / GPU rasterizer，不替换 viewer renderer，不把 CPU point splat stub
 3DGS renderer；下一步应把 `image_render_loss` 接入训练 objective，或在 ADR 后替换为
 真实 3DGS differentiable renderer。
 
+`TRAIN-IMAGE-LOSS-OPTIM-001` 已完成 image-space renderer loss 的训练接入：
+`TrainableKernelLoss` 新增 `image_render_loss`，`train_kernel_mvp(...)` /
+`train_kernel_mvp_from_cloud(...)` 新增 `image_render_weight`，总损失现在可配置为
+`point L_render + image_render_loss + L_object + L_temporal` 的加权组合。默认
+`image_render_weight=0.0`，保持旧 smoke 行为；当该权重大于 0 时，每一帧必须绑定
+`TrainableKernelImageTarget`。`objgauss training kernel-sample` 新增
+`--image-render-weight`，并输出 initial / final image render loss 与
+`image_render_loss_decreased`。已用 `public/samples/lego_alpha_v1_objects.ply` 验证：
+`initial_image_render_loss=0.082205 -> final_image_render_loss=0.053806`，
+同时 `initial_total_loss=1.557675 -> final_total_loss=1.332860`。该步骤仍使用
+dependency-free CPU point splat renderer API，不引入 torch / GPU rasterizer，不提交
+训练输出或大资产，也不替换 viewer renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
