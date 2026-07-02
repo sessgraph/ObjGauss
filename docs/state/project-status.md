@@ -413,6 +413,16 @@ Debug OS。前端 inspector、`.worldShell` telemetry 和
 文件可以被 viewer 加载”；不提交真实训练输出、不发布大模型、不改变 gsplat / CUDA
 blocker。
 
+`TRAINABLE-FRAME-DEBUG-001` 已完成 Debug OS 的 trainable artifact 多帧调试：
+`src/App.jsx` 在 `trainable-mvp-debug` 上新增紧凑 frame selector，可在同一 fetched
+`objgauss-trainable-kernel-model-artifact-v1` 内切换 `object_states[n]` /
+`assignments[n]`，并重新注入 Three.js ObjectState render targets、assignment heatmap
+和 stability telemetry。`.worldShell`、Debug panel 和 `window.__OBJGAUSS_WORLD__`
+同步暴露 frame index / frame count；`scripts/audit-world-viewer.mjs` 现在在桌面与移动
+viewport 中选择 Trainable MVP、点击 `f1`，并验证 `trainableFrame=1/2`、Gaussian probe
+和 hover highlight 仍来自 `trainable_kernel_model_artifact`。该切片只增强已加载 artifact
+的可交互调试，不改变训练算法、不引入 torch / gsplat / CUDA、不提交训练输出。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

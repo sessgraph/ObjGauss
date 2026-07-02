@@ -26,6 +26,7 @@ try {
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
       `trainableRoute=${summary.trainableArtifactLoadRoute}`,
       `trainableArtifact=${JSON.stringify(summary.trainableArtifactPath)}`,
+      `trainableFrame=${summary.trainableFrameIndex}/${summary.trainableFrameCount}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -174,7 +175,9 @@ async function auditWorld(url) {
       return world?.selectedModelId === "trainable-mvp-debug" &&
         world?.selectedModelId === shell?.getAttribute("data-selected-model") &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "fetch-json" &&
-        shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json";
+        shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
+        shell?.getAttribute("data-trainable-artifact-frame-index") === "0" &&
+        shell?.getAttribute("data-trainable-artifact-frame-count") === "2";
     }, undefined, { timeout: 15000 });
     const trainableSelection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -232,6 +235,42 @@ async function auditWorld(url) {
     }
     if (trainableGaussian.trainableArtifactLoadedCount < 1) {
       throw new Error("expected trainable artifact load count to be visible in audit handle");
+    }
+    await page.locator("[data-trainable-frame-button='1']").click();
+    const frameSwitch = await page.waitForFunction(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const selector = document.querySelector("[data-trainable-frame-selector='true']");
+      const frameObject = world?.objectSelections?.find(
+        (entry) => entry.modelId === "trainable-mvp-debug" && entry.frameIndex === 1,
+      );
+      return {
+        ok:
+          shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
+          shell?.getAttribute("data-trainable-artifact-frame-count") === "2" &&
+          panel?.getAttribute("data-trainable-frame-index") === "1" &&
+          selector?.getAttribute("data-selected-frame") === "1" &&
+          world?.selectedTrainableFrameIndex === 1 &&
+          world?.selectedTrainableFrameCount === 2 &&
+          Boolean(frameObject),
+        selectionId: frameObject?.selectionId ?? null,
+        frameIndex: world?.selectedTrainableFrameIndex ?? null,
+        frameCount: world?.selectedTrainableFrameCount ?? null,
+      };
+    }, undefined, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    if (!frameSwitch.ok) {
+      throw new Error(`expected trainable artifact frame switch to frame 1: ${JSON.stringify(frameSwitch)}`);
+    }
+    const frameGaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+      };
+    }, frameSwitch.selectionId);
+    if (!frameGaussian.ok || frameGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`expected frame 1 Gaussian probe to remain trainable artifact sourced: ${JSON.stringify(frameGaussian)}`);
     }
     const hoverSelection = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -332,6 +371,10 @@ async function auditWorld(url) {
         dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadRoute: shell?.getAttribute("data-trainable-artifact-load-route") ?? null,
         trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
+        trainableFrameIndex: Number(shell?.getAttribute("data-trainable-artifact-frame-index") ?? -1),
+        trainableFrameCount: Number(shell?.getAttribute("data-trainable-artifact-frame-count") ?? -1),
+        worldTrainableFrameIndex: handle.selectedTrainableFrameIndex ?? null,
+        worldTrainableFrameCount: handle.selectedTrainableFrameCount ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
@@ -347,6 +390,14 @@ async function auditWorld(url) {
       world.trainableArtifactPath !== "/models/trainable-mvp-debug/model-artifact.json"
     ) {
       throw new Error(`expected fetched trainable artifact route: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.trainableFrameIndex === 1 &&
+      world.trainableFrameCount === 2 &&
+      world.worldTrainableFrameIndex === 1 &&
+      world.worldTrainableFrameCount === 2
+    )) {
+      throw new Error(`expected trainable artifact frame 1 telemetry: ${JSON.stringify(world)}`);
     }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
@@ -402,6 +453,8 @@ async function auditWorld(url) {
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
       trainableArtifactLoadRoute: world.trainableArtifactLoadRoute,
       trainableArtifactPath: world.trainableArtifactPath,
+      trainableFrameIndex: world.trainableFrameIndex,
+      trainableFrameCount: world.trainableFrameCount,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
@@ -435,10 +488,20 @@ async function auditMobileWorld(browser, url) {
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
+      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-mvp-debug']");
+      return pill?.getAttribute("data-model-load-state") === "loaded";
+    }, undefined, { timeout: 15000 });
+    await page.locator(".modelPill[data-model-row-id='trainable-mvp-debug']").click();
+    await page.locator("[data-trainable-frame-button='1']").click();
+    await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const dashboard = document.querySelector("[data-stability-dashboard='true']");
+      const frameSelector = document.querySelector("[data-trainable-frame-selector='true']");
       return shell?.getAttribute("data-stability-dashboard") === "enabled" &&
-        dashboard?.getAttribute("data-stability-status") !== "";
+        dashboard?.getAttribute("data-stability-status") !== "" &&
+        shell?.getAttribute("data-selected-model") === "trainable-mvp-debug" &&
+        shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
+        frameSelector?.getAttribute("data-selected-frame") === "1";
     }, undefined, { timeout: 15000 });
     const screenshotPath = "/tmp/objgauss-world-viewer-mobile.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });

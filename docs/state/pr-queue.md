@@ -72,6 +72,43 @@
 
 ## Done
 
+### TRAINABLE-FRAME-DEBUG-001: Add trainable artifact frame selector to Debug OS
+
+- 状态: done / trainable-artifact-frame-debug
+- 类型: 标准 PR / frontend debug artifact interaction
+- 目标: 让 ObjectState Debug OS 不只固定查看 fetched trainable artifact 的 frame 0，而是
+  可以切换 artifact 内相邻帧，直接检查 A[N,K]、ObjectState centroid / bbox 和 stability
+  telemetry 在不同 frame 下是否一致。
+- 已实施:
+  - `src/App.jsx` 在 trainable artifact Debug panel 中新增 frame selector；切换 frame
+    会复用同一 fetched JSON artifact，重新把对应 `object_states[n]` 和 `assignments[n]`
+    注入 Three.js scene。
+  - `.worldShell`、Debug panel 和 `window.__OBJGAUSS_WORLD__` 暴露
+    frame index / frame count；object selection telemetry 也携带 per-object frame index。
+  - Inspector 新增 `frame` meta，Debug panel 在 frame 1 下显示对应 confidence /
+    entropy / mass / heatmap / bbox。
+  - `scripts/audit-world-viewer.mjs` 在桌面和移动 viewport 中选择 Trainable MVP、点击
+    `f1`，并验证 `trainableFrame=1/2`、frame selector telemetry、Gaussian probe 和
+    hover highlight 仍来自 `trainable_kernel_model_artifact`。
+- 边界:
+  - 不改变 Python 训练算法、artifact schema 或训练输出 writer。
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交真实训练输出或大模型，不默认加载 near-1M / 4.5M 大资产。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `trainableFrame=1/2`、
+    `trainableArtifact="/models/trainable-mvp-debug/model-artifact.json"`、
+    `assignmentSource=trainable_kernel_model_artifact`、`assignmentSlots=2`、
+    `bboxStability=0.899`，桌面和移动截图均显示 Trainable MVP frame 1：
+    `/tmp/objgauss-world-viewer.png`、
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-ARTIFACT-FETCH-001: Load trainable artifact from browser JSON route
 
 - 状态: done / trainable-artifact-fetch-route

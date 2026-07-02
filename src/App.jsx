@@ -126,6 +126,33 @@ export default function App() {
     });
   }, []);
 
+  const selectTrainableFrame = useCallback(
+    (frameIndex) => {
+      const current = models[selectedId];
+      const artifact = current?.trainableArtifact;
+      const frames = Array.isArray(artifact?.object_states) ? artifact.object_states : [];
+      if (current?.loadMode !== "trainable-artifact" || !frames.length) return;
+      const nextFrameIndex = Math.max(0, Math.min(frames.length - 1, Number(frameIndex) || 0));
+      const nextModel = { ...current, trainableFrameIndex: nextFrameIndex };
+      const rendered = worldApi.current?.upsertModel(nextModel, null);
+      setDebugProbe(null);
+      patchModel(current.id, (latest) => ({
+        trainableFrameIndex: nextFrameIndex,
+        gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? latest.gaussianCount ?? 0,
+        displayCount: rendered?.displayCount ?? latest.displayCount ?? 0,
+        objectCount: rendered?.objectCount ?? latest.objectCount,
+        corePoint: rendered?.corePoint ?? latest.corePoint ?? null,
+        objects: rendered?.objects ?? latest.objects ?? [],
+        delivery: {
+          ...(latest.delivery ?? {}),
+          frameIndex: nextFrameIndex,
+          frameCount: frames.length,
+        },
+      }));
+    },
+    [models, patchModel, selectedId],
+  );
+
   const handleObjectMoved = useCallback(
     (target, position) => {
       if (!target?.modelId) return;
@@ -209,6 +236,8 @@ export default function App() {
                 source: "trainable-kernel-model-artifact",
                 loadRoute: model.trainableArtifactPath ? "fetch-json" : "inline",
                 artifactPath: model.trainableArtifactPath ?? "inline://trainable-artifact",
+                frameIndex: rendered?.trainableFrameIndex ?? 0,
+                frameCount: rendered?.trainableFrameCount ?? artifact.object_states?.length ?? 0,
                 schema: artifact.schema,
                 rendererName: artifact.renderer_api?.renderer_name,
                 imageRenderLoss: artifact.renderer_api?.image_render_loss,
@@ -314,6 +343,8 @@ export default function App() {
       data-stability-mean-bbox-stability={selectedStability.meanBboxStability ?? ""}
       data-trainable-artifact-load-route={selected?.delivery?.loadRoute ?? ""}
       data-trainable-artifact-path={selected?.delivery?.artifactPath ?? ""}
+      data-trainable-artifact-frame-index={selected?.delivery?.frameIndex ?? ""}
+      data-trainable-artifact-frame-count={selected?.delivery?.frameCount ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -395,6 +426,7 @@ export default function App() {
             <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
             <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
             <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
+            <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
             <Meta label="assignment" value={selectedAssignmentSource} />
             <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
@@ -412,6 +444,7 @@ export default function App() {
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         onToggleObjectVisibility={toggleObjectVisibility}
+        onSelectTrainableFrame={selectTrainableFrame}
       />
 
       <div className="glassHud bottomStatus">
@@ -598,6 +631,8 @@ function ThreeWorld({
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
         stabilitySummary: selectedStability,
+        selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
+        selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
         trainableArtifactLoadedCount: [...modelRoots.values()].filter(
           (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
         ).length,
@@ -621,6 +656,7 @@ function ThreeWorld({
             spatialCompactness: object.userData.objectState?.spatialCompactness ?? null,
             assignmentJitter: object.userData.objectState?.assignmentJitter ?? null,
             bboxStability: object.userData.objectState?.bboxStability ?? null,
+            frameIndex: object.userData.objectState?.frameIndex ?? null,
           };
         }),
         selectObjectForAudit(selectionId = null) {
@@ -910,6 +946,7 @@ function DebugPanel({
   hiddenObjects,
   stability,
   onToggleObjectVisibility,
+  onSelectTrainableFrame,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -918,12 +955,16 @@ function DebugPanel({
   const probeEntropy = debugProbe?.entropy ?? activeState?.assignmentEntropy ?? 0;
   const probeConfidence = debugProbe?.confidence ?? activeState?.confidence ?? 0;
   const rendererLoss = selected?.delivery?.imageRenderLoss;
+  const frameCount = selected.delivery?.frameCount ?? selected.trainableArtifact?.object_states?.length ?? 0;
+  const selectedFrameIndex = Number(selected.delivery?.frameIndex ?? selected.trainableFrameIndex ?? 0) || 0;
   return (
     <section
       className="glassHud debugPanel"
       data-object-debug-panel="true"
       data-debug-mode={debugMode ? "assignment" : "appearance"}
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
+      data-trainable-frame-index={selectedFrameIndex}
+      data-trainable-frame-count={frameCount}
     >
       <div className="debugHeader">
         <div>
@@ -939,6 +980,29 @@ function DebugPanel({
         <Metric label="mass" value={formatNumber(activeState?.slotMass)} />
         <Metric label="img loss" value={formatLoss(rendererLoss)} />
       </div>
+
+      {frameCount > 1 ? (
+        <div
+          className="trainableFrameSelector"
+          data-trainable-frame-selector="true"
+          data-selected-frame={selectedFrameIndex}
+          data-frame-count={frameCount}
+        >
+          <span>frame</span>
+          {Array.from({ length: frameCount }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              className={index === selectedFrameIndex ? "active" : ""}
+              data-trainable-frame-button={index}
+              data-active={index === selectedFrameIndex ? "true" : "false"}
+              onClick={() => onSelectTrainableFrame?.(index)}
+            >
+              f{index}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
       <StabilityDashboard stability={stability} />
@@ -1386,6 +1450,8 @@ function createTrainableArtifactGroup(model) {
   const group = baseModelGroup(model);
   group.userData.assignmentSource = "trainable_kernel_model_artifact";
   group.userData.artifactSchema = artifact.schema;
+  group.userData.trainableFrameIndex = frameIndex;
+  group.userData.trainableFrameCount = artifact.object_states?.length ?? 0;
   const objectGroups = [];
   const objects = [];
   const objectIds = states.map((state) => state.id);
@@ -1488,6 +1554,7 @@ function createTrainableArtifactGroup(model) {
       spatialCompactness: spatialCompactnessForGeometry(geometry),
       assignmentJitter,
       bboxStability,
+      frameIndex,
       centroid: (state.centroid ?? []).map(round3),
       bbox: (state.bbox ?? []).map(round3),
       status: state.status ?? "trained_artifact_slot",
@@ -1517,6 +1584,7 @@ function createTrainableArtifactGroup(model) {
       spatialCompactness: objectState.spatialCompactness,
       assignmentJitter: objectState.assignmentJitter,
       bboxStability: objectState.bboxStability,
+      frameIndex,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1532,6 +1600,8 @@ function createTrainableArtifactGroup(model) {
       displayCount,
       gaussianCount: matrix.length,
       objectCount: objects.length,
+      trainableFrameIndex: frameIndex,
+      trainableFrameCount: artifact.object_states?.length ?? 0,
       corePoint: states[0]?.centroid?.map(round3) ?? [0, 0, 0],
       objects,
     },
@@ -2245,6 +2315,13 @@ function formatRatio(value) {
 function formatLoss(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(6) : "-";
+}
+
+function formatFrame(index, count) {
+  const frameIndex = Number(index);
+  const frameCount = Number(count);
+  if (!Number.isFinite(frameIndex) || !Number.isFinite(frameCount) || frameCount <= 0) return "-";
+  return `${Math.trunc(frameIndex)} / ${Math.trunc(frameCount)}`;
 }
 
 function round3(value) {
