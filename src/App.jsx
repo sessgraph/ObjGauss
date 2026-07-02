@@ -189,7 +189,7 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
           try {
-            const { artifact, decoded } = await loadOgcModel(model);
+            const { artifact, decoded, index } = await loadOgcModel(model);
             const rendered = worldApi.current?.upsertModel(model, decoded.points);
             if (cancelled) return;
             patchModel(model.id, {
@@ -208,6 +208,9 @@ export default function App() {
                 decodedGaussians: decoded.metadata.decodedGaussians,
                 recordFormat: decoded.metadata.recordFormat,
                 lodLevel: model.ogc?.lodLevel ?? "full",
+                loadRoute: artifact.inlineIndex || artifact.payloadBase64 ? "inline-ogc" : "fetch-ogc",
+                indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
+                payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
               },
             });
           } catch (error) {
@@ -328,6 +331,10 @@ export default function App() {
       data-hovered-gaussians={hoveredTarget?.gaussianCount ?? ""}
       data-hidden-objects={hiddenCount}
       data-ogc-loaded-count={ogcLoadedCount}
+      data-ogc-artifact-load-route={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.loadRoute ?? "" : ""}
+      data-ogc-artifact-index-path={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.indexPath ?? "" : ""}
+      data-ogc-artifact-payload-path={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.payloadPath ?? "" : ""}
+      data-ogc-artifact-lod-level={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.lodLevel ?? "" : ""}
       data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
       data-assignment-source={selectedAssignmentSource}
       data-stability-dashboard="enabled"
@@ -470,6 +477,7 @@ async function loadOgcModel(model) {
   const payload = await loadOgcPayload(artifact, index);
   return {
     artifact,
+    index,
     decoded: decodeQuantizedOgcPayload(payload, index, {
       chunkIds: model.ogc?.chunkIds,
       lodLevel: model.ogc?.lodLevel,

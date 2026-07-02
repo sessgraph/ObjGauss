@@ -247,6 +247,18 @@ manifest route / chunk index / payload decode / ObjectState overlay 全链路；
 也不替换 Gaussian OIT、WebGPU tile / compute、Spark bridge、shader、object-state
 buffer 或 picking 代码。
 
+`OGC-URL-ARTIFACT-001` 已完成 browser delivery 的运行时 URL OGC 注入入口：
+`src/modelCatalog.js` 现在支持同源
+`?ogcIndex=/path/to/scene.index.json&ogcPayload=/path/to/scene.ogc`，并追加
+`ogc-url-artifact` 临时模型；无 trainable URL artifact 时会默认选中该模型。该入口
+继续走 `compressed_chunked` manifest route、现有 quantized OGC decoder、ObjectState
+Debug OS、assignment heatmap 和 Gaussian probe，并支持可选 `ogcLod` / `ogcChunks`。
+`src/App.jsx` 为 selected OGC artifact 暴露 `fetch-ogc`、index path、payload path 和
+LOD telemetry。新增 `public/models/ogc-url-fixture/` 下的小型 index / `.ogc` fixture
+只用于验证同源 fetch path，不是训练输出或大资产；`scripts/audit-world-viewer.mjs`
+现在额外打开 URL OGC route，验证模型数变为 8、默认选中 URL OGC artifact、
+`urlOgc=fetch-ogc`，且 LOD 1 解码后仍有 2 个 ObjectState render targets。
+
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
 对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：

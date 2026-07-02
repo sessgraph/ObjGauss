@@ -72,6 +72,45 @@
 
 ## Done
 
+### OGC-URL-ARTIFACT-001: Inject compressed OGC artifact through URL parameters
+
+- 状态: done / url-ogc-browser-delivery
+- 类型: 标准 PR / browser delivery
+- 目标: 让默认 Three.js world viewer 可以通过 URL 参数加载新的算法处理后
+  `compressed_chunked` OGC index / payload，不需要每次修改 `src/modelCatalog.js`。
+- 已实施:
+  - `src/modelCatalog.js` 的运行时 catalog builder 新增同源
+    `?ogcIndex=/path/to/scene.index.json&ogcPayload=/path/to/scene.ogc` 注入。
+  - URL OGC artifact 会追加为 `ogc-url-artifact` 临时模型；无 trainable URL artifact
+    时默认选中该模型。
+  - 支持可选 `ogcLod` 和 `ogcChunks` 参数，继续复用现有
+    `compressed_chunked` manifest route、`decodeQuantizedOgcPayload(...)`、
+    ObjectState Debug OS、assignment heatmap 和 Gaussian probe。
+  - `src/App.jsx` 为 selected OGC artifact 暴露 `fetch-ogc` route telemetry，包括
+    index path、payload path 和 LOD level。
+  - 新增小型同源 fixture：
+    `public/models/ogc-url-fixture/scene.index.json` 与
+    `public/models/ogc-url-fixture/scene.ogc`，用于验证 fetch path；不是训练输出或大资产。
+  - `scripts/audit-world-viewer.mjs` 新增 URL OGC route 验收，打开
+    `?ogcIndex=/models/ogc-url-fixture/scene.index.json&ogcPayload=/models/ogc-url-fixture/scene.ogc&ogcLod=1`，
+    断言模型数为 8、默认选中 `ogc-url-artifact`、`urlOgc=fetch-ogc`、
+    LOD 1 解码后仍有 2 个 ObjectState render targets 和 assignment heatmap。
+- 边界:
+  - 只接受同源 `.json` index 和 `.ogc` payload 路径；不支持远程 URL、不支持任意协议。
+  - 不改变 OGC writer / quantization schema / decoder record format。
+  - 不提交 near-1M / 4.5M 大资产，不恢复 full diagnostic PLY 默认加载。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不启动训练或引入 torch / gsplat。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `urlOgc=fetch-ogc`、`urlArtifact=fetch-json`、`trainableFrame=1/2`、
+    `assignmentSource=trainable_kernel_model_artifact`。新增截图
+    `/tmp/objgauss-world-viewer-url-ogc.png` 显示 URL OGC artifact 默认选中，模型数为 8。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-URL-ARTIFACT-001: Inject trainable artifact through URL parameter
 
 - 状态: done / trainable-url-artifact-debug

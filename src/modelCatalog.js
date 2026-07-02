@@ -328,45 +328,162 @@ export function catalogSummary(models = MODEL_CATALOG) {
 }
 
 export function modelCatalogFromSearch(search = "") {
-  const artifactPath = trainableArtifactPathFromSearch(search);
-  if (!artifactPath) return MODEL_CATALOG;
+  const params = new URLSearchParams(String(search ?? "").replace(/^\?/, ""));
+  const trainableArtifactPath = trainableArtifactPathFromParams(params);
+  const ogcArtifact = ogcArtifactFromParams(params);
+  if (!trainableArtifactPath && !ogcArtifact) return MODEL_CATALOG;
   return [
     ...MODEL_CATALOG,
-    {
-      id: "trainable-url-artifact",
-      name: "URL trainable artifact",
-      label: "URL Artifact",
-      loadMode: "trainable-artifact",
-      kind: "trainable-kernel-model-artifact",
-      stage: "url-debug-artifact",
-      objectCount: 0,
-      galleryPosition: [-5.55, 0, 4.52],
-      accent: "#9eeaf2",
-      displayScale: 1.92,
-      pointSize: 0.082,
-      maxDisplayPoints: 256,
-      trainableArtifactPath: artifactPath,
-      compression: {
-        layout: "trainable-kernel-artifact-json",
-        status: "url-debug-artifact",
-        chunkRoot: "/models/url-trainable-artifact/objects/",
-      },
-    },
+    ...(trainableArtifactPath ? [trainableUrlArtifactModel(trainableArtifactPath)] : []),
+    ...(ogcArtifact ? [ogcUrlArtifactModel(ogcArtifact)] : []),
   ];
 }
 
 export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
-  return models.find((model) => model.id === "trainable-url-artifact")?.id ?? models[0]?.id ?? "";
+  return models.find((model) => model.id === "trainable-url-artifact")?.id
+    ?? models.find((model) => model.id === "ogc-url-artifact")?.id
+    ?? models[0]?.id
+    ?? "";
 }
 
-function trainableArtifactPathFromSearch(search) {
-  const params = new URLSearchParams(String(search ?? "").replace(/^\?/, ""));
-  const rawPath = params.get("trainableArtifact") ?? params.get("trainable-artifact");
+function trainableArtifactPathFromParams(params) {
+  return sameOriginPathParam(params, ["trainableArtifact", "trainable-artifact"], ".json");
+}
+
+function ogcArtifactFromParams(params) {
+  const indexPath = sameOriginPathParam(params, ["ogcIndex", "ogc-index"], ".json");
+  const payloadPath = sameOriginPathParam(params, ["ogcPayload", "ogc-payload"], ".ogc");
+  if (!indexPath || !payloadPath) return null;
+  return {
+    indexPath,
+    payloadPath,
+    lodLevel: ogcLodLevelFromParams(params),
+    chunkIds: ogcChunkIdsFromParams(params),
+  };
+}
+
+function trainableUrlArtifactModel(artifactPath) {
+  return {
+    id: "trainable-url-artifact",
+    name: "URL trainable artifact",
+    label: "URL Artifact",
+    loadMode: "trainable-artifact",
+    kind: "trainable-kernel-model-artifact",
+    stage: "url-debug-artifact",
+    objectCount: 0,
+    galleryPosition: [-5.55, 0, 4.52],
+    accent: "#9eeaf2",
+    displayScale: 1.92,
+    pointSize: 0.082,
+    maxDisplayPoints: 256,
+    trainableArtifactPath: artifactPath,
+    compression: {
+      layout: "trainable-kernel-artifact-json",
+      status: "url-debug-artifact",
+      chunkRoot: "/models/url-trainable-artifact/objects/",
+    },
+  };
+}
+
+function ogcUrlArtifactModel({ indexPath, payloadPath, lodLevel, chunkIds }) {
+  return {
+    id: "ogc-url-artifact",
+    name: "URL OGC artifact",
+    label: "URL OGC",
+    loadMode: "ogc-chunked",
+    kind: "compressed-chunked-ogc",
+    stage: "url-browser-delivery-artifact",
+    objectCount: 0,
+    galleryPosition: [2.9, 0, 4.48],
+    accent: "#6ee7f8",
+    displayScale: 1.72,
+    pointSize: 0.07,
+    maxDisplayPoints: 2400,
+    ogc: {
+      lodLevel,
+      chunkIds,
+      indexPath,
+      payloadPath,
+    },
+    compression: {
+      layout: "object-aware-quantized-ogc-chunks",
+      status: "url-debug-artifact",
+      chunkRoot: "/models/url-ogc-artifact/objects/",
+    },
+    modelArtifactManifest: {
+      schema: MODEL_ARTIFACT_MANIFEST_SCHEMA,
+      manifest_id: "ogc-url-artifact-model-artifacts",
+      asset_id: "ogc-url-artifact",
+      name: "URL OGC artifact",
+      stage: "development",
+      source: {
+        type: "url_injected_compressed_chunked_artifact",
+        index: indexPath,
+        payload: payloadPath,
+      },
+      license: "local-debug-artifact",
+      counts: {
+        gaussians: 0,
+        objects: 0,
+      },
+      artifacts: [
+        {
+          role: "compressed_chunked",
+          path: payloadPath,
+          format: ".ogc",
+          delivery_tier: "browser_edit",
+          browser_ready: true,
+          chunk_index: {
+            path: indexPath,
+          },
+          compression: {
+            codec: "objgauss-ogc-prototype",
+            layout: "object-aware-chunked-local-quantized",
+            status: "url-debug-artifact",
+          },
+        },
+      ],
+      quality_evidence: [
+        {
+          kind: "url-ogc-browser-route",
+          status: "requires-runtime-decode",
+        },
+      ],
+      limitations: [
+        "Runtime URL artifact for local browser delivery debugging; not a published model.",
+      ],
+      created_from: {
+        source: "OGC-URL-ARTIFACT-001",
+      },
+    },
+  };
+}
+
+function sameOriginPathParam(params, names, extension) {
+  const rawPath = names.map((name) => params.get(name)).find(Boolean);
   if (!rawPath) return "";
   const path = rawPath.trim();
   if (!path || path.length > 240) return "";
   if (!path.startsWith("/") || path.startsWith("//")) return "";
   if (path.includes("\n") || path.includes("\r")) return "";
-  if (!path.endsWith(".json")) return "";
+  if (path.includes("?") || path.includes("#")) return "";
+  if (!path.endsWith(extension)) return "";
   return path;
+}
+
+function ogcLodLevelFromParams(params) {
+  const rawValue = params.get("ogcLod") ?? params.get("ogc-lod");
+  if (rawValue === null || rawValue === "") return 0;
+  const level = Number(rawValue);
+  return Number.isInteger(level) && level >= 0 && level <= 16 ? level : 0;
+}
+
+function ogcChunkIdsFromParams(params) {
+  const rawValue = params.get("ogcChunks") ?? params.get("ogc-chunks");
+  if (!rawValue) return undefined;
+  const ids = rawValue
+    .split(",")
+    .map((entry) => Number(entry.trim()))
+    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 1_000_000);
+  return ids.length ? [...new Set(ids)] : undefined;
 }
