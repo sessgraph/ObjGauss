@@ -184,6 +184,17 @@ WebGPU tile / compute、shader、object-state buffer、picking、Spark bridge �
 decoder 等前端核心渲染算法；下一步清理的是旧产品 UI、旧审计入口和未再服务新世界
 入口的非核心代码。
 
+`WORLD-OBJECT-RENDER-001` 已完成对象级 viewer 优化：默认 Three.js 世界不再把每个
+PLY 作为单个 draggable model mesh，而是按 `objectId` 拆成独立 `THREE.Group` /
+`THREE.Points` render target。每个对象都有自己的 selection id、核心点、选中环、
+拖拽句柄、viewer-side 位置和 per-object chunk path；near-1M 仍不拉 full diagnostic
+PLY，只用 compressed-placeholder 为每个对象生成独立占位 Gaussian cloud。前端 HUD
+现在暴露 object count、selected object 和 per-object corepoint chunk 路线；小对象
+仅在 viewer 层做最小显示跨度放大，训练数据、压缩 contract 和后端 artifact 不变。
+该切片继续保留 ObjGauss 自有 Gaussian OIT、WebGPU tile / compute、Spark bridge、
+shader、object-state buffer、picking 和 OGC decoder 等核心渲染算法，未引入外部
+renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

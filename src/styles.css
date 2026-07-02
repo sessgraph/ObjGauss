@@ -24,10 +24,7 @@ body {
   margin: 0;
   min-width: 320px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 22% 18%, rgba(39, 194, 203, 0.16), transparent 30%),
-    radial-gradient(circle at 78% 14%, rgba(142, 108, 255, 0.13), transparent 32%),
-    #070b11;
+  background: linear-gradient(180deg, #071017 0%, #070b11 58%, #05070b 100%);
 }
 
 button {

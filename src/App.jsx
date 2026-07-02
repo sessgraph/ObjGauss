@@ -4,40 +4,85 @@ import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { MODEL_CATALOG, catalogSummary } from "./modelCatalog.js";
+import { colorForObject, rgbToCss } from "./palette.js";
 import { parsePly } from "./ply.js";
 
 const INITIAL_CAMERA = {
-  position: [0, 4.7, 8.4],
-  target: [0, 0.95, 0],
+  position: [0, 5.4, 10.8],
+  target: [0, 1.15, 0],
 };
 
 export default function App() {
   const worldApi = useRef(null);
   const loadStarted = useRef(false);
   const [worldReady, setWorldReady] = useState(false);
-  const [selectedId, setSelectedId] = useState(MODEL_CATALOG[0]?.id ?? "");
+  const [selection, setSelection] = useState(() => ({
+    modelId: MODEL_CATALOG[0]?.id ?? "",
+    objectId: null,
+    selectionId: MODEL_CATALOG[0]?.id ?? "",
+  }));
   const [models, setModels] = useState(() => initialModelStates());
   const summary = useMemo(() => catalogSummary(MODEL_CATALOG), []);
   const loadedCount = useMemo(
-    () => Object.values(models).filter((model) => model.status === "loaded").length,
+    () => Object.values(models).filter((model) => ["loaded", "compressed"].includes(model.status)).length,
     [models],
   );
+  const objectCount = useMemo(
+    () =>
+      Object.values(models).reduce(
+        (total, model) => total + (model.objects?.length || Number(model.objectCount) || 0),
+        0,
+      ),
+    [models],
+  );
+  const selectedId = selection.modelId;
   const selected = models[selectedId] ?? Object.values(models)[0];
+  const selectedObject =
+    selected?.objects?.find((object) => String(object.objectId) === String(selection.objectId)) ?? null;
 
   const patchModel = useCallback((id, patch) => {
-    setModels((current) => ({
-      ...current,
-      [id]: {
-        ...current[id],
-        ...patch,
-      },
-    }));
+    setModels((current) => {
+      const previous = current[id];
+      if (!previous) return current;
+      const nextPatch = typeof patch === "function" ? patch(previous) : patch;
+      if (!nextPatch) return current;
+      return {
+        ...current,
+        [id]: {
+          ...previous,
+          ...nextPatch,
+        },
+      };
+    });
   }, []);
 
   const selectModel = useCallback((id) => {
-    setSelectedId(id);
+    setSelection({ modelId: id, objectId: null, selectionId: id });
     worldApi.current?.focusModel(id);
   }, []);
+
+  const selectObject = useCallback((target) => {
+    if (!target?.modelId) return;
+    setSelection({
+      modelId: target.modelId,
+      objectId: target.objectId,
+      selectionId: target.selectionId,
+    });
+  }, []);
+
+  const handleObjectMoved = useCallback(
+    (target, position) => {
+      if (!target?.modelId) return;
+      patchModel(target.modelId, (current) => ({
+        objects: (current.objects ?? []).map((object) =>
+          String(object.objectId) === String(target.objectId)
+            ? { ...object, galleryPosition: position }
+            : object,
+        ),
+      }));
+    },
+    [patchModel],
+  );
 
   const handleWorldReady = useCallback((api) => {
     worldApi.current = api;
@@ -60,6 +105,7 @@ export default function App() {
             displayCount: rendered?.displayCount ?? 0,
             objectCount: model.objectCount,
             corePoint: rendered?.corePoint ?? [0, 0, 0],
+            objects: rendered?.objects ?? [],
           });
           continue;
         }
@@ -79,6 +125,7 @@ export default function App() {
             displayCount: rendered?.displayCount ?? 0,
             objectCount: rendered?.objectCount ?? model.objectCount,
             corePoint: rendered?.corePoint ?? null,
+            objects: rendered?.objects ?? [],
             loadMs: Math.round(performance.now() - startedAt),
           });
         } catch (error) {
@@ -107,14 +154,17 @@ export default function App() {
       data-model-count={MODEL_CATALOG.length}
       data-loaded-count={loadedCount}
       data-selected-model={selected?.id ?? ""}
+      data-object-count={objectCount}
+      data-selected-object={selection.objectId ?? ""}
+      data-selected-target={selection.selectionId ?? selected?.id ?? ""}
       data-compression-layout="per-object-corepoint-chunks"
     >
       <ThreeWorld
         models={MODEL_CATALOG}
-        selectedId={selectedId}
+        selectedTargetId={selection.selectionId || selectedId}
         onReady={handleWorldReady}
-        onSelectModel={setSelectedId}
-        onModelMoved={(id, position) => patchModel(id, { galleryPosition: position })}
+        onSelectObject={selectObject}
+        onObjectMoved={handleObjectMoved}
       />
 
       <div className="glassHud topHud">
@@ -127,8 +177,8 @@ export default function App() {
         </div>
         <div className="metricStrip">
           <Metric label="模型" value={summary.modelCount} />
-          <Metric label="已加载" value={loadedCount} />
-          <Metric label="压缩原型" value={summary.compressedReadyCount} />
+          <Metric label="可交互" value={loadedCount} />
+          <Metric label="对象" value={objectCount} />
         </div>
         <button className="glassButton" type="button" onClick={() => worldApi.current?.resetCamera()}>
           重置视角
@@ -158,24 +208,28 @@ export default function App() {
             <span className="modelAccent large" style={{ background: selected.accent }} />
             <div>
               <h2>{selected.name}</h2>
-              <span>{selected.kind}</span>
+              <span>
+                {selectedObject ? `Object ${selectedObject.objectId} / ${selected.kind}` : selected.kind}
+              </span>
             </div>
           </div>
           <dl className="metaGrid">
             <Meta label="加载状态" value={selected.message ?? selected.status} />
             <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
-            <Meta label="展示点" value={formatNumber(selected.displayCount)} />
+            <Meta label={selectedObject ? "对象展示点" : "展示点"} value={formatNumber(selectedObject?.displayCount ?? selected.displayCount)} />
             <Meta label="对象" value={formatNumber(selected.objectCount)} />
-            <Meta label="核心点" value={formatVec(selected.corePoint)} />
+            <Meta label="对象 ID" value={selectedObject ? String(selectedObject.objectId) : "-"} />
+            <Meta label="核心点" value={formatVec(selectedObject?.corePoint ?? selected.corePoint)} />
+            <Meta label="对象位置" value={formatVec(selectedObject?.galleryPosition)} />
             <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
             <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
-            <Meta label="分块根" value={selected.compression?.chunkRoot ?? "-"} />
+            <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
           </dl>
         </section>
       ) : null}
 
       <div className="glassHud bottomStatus">
-        <span>拖动展品即可移动对象</span>
+        <span>拖动任意对象即可独立移动</span>
         <span>核心点为每个处理后 Gaussian 对象的加载锚点</span>
         <span>后端负责单对象压缩块与按需加载</span>
       </div>
@@ -183,20 +237,20 @@ export default function App() {
   );
 }
 
-function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }) {
+function ThreeWorld({ models, selectedTargetId, onReady, onSelectObject, onObjectMoved }) {
   const mountRef = useRef(null);
   const apiRef = useRef(null);
-  const selectedRef = useRef(selectedId);
-  const callbacksRef = useRef({ onSelectModel, onModelMoved });
+  const selectedRef = useRef(selectedTargetId);
+  const callbacksRef = useRef({ onSelectObject, onObjectMoved });
 
   useEffect(() => {
-    selectedRef.current = selectedId;
-    apiRef.current?.setSelected(selectedId);
-  }, [selectedId]);
+    selectedRef.current = selectedTargetId;
+    apiRef.current?.setSelected(selectedTargetId);
+  }, [selectedTargetId]);
 
   useEffect(() => {
-    callbacksRef.current = { onSelectModel, onModelMoved };
-  }, [onSelectModel, onModelMoved]);
+    callbacksRef.current = { onSelectObject, onObjectMoved };
+  }, [onSelectObject, onObjectMoved]);
 
   useEffect(() => {
     if (!mountRef.current) return undefined;
@@ -221,39 +275,66 @@ function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }
 
     buildWorldShell(scene);
 
-    const modelObjects = new Map();
+    const modelRoots = new Map();
+    const draggableObjects = new Map();
     let dragControls = null;
     let animationFrame = 0;
 
     const publishAuditHandle = () => {
+      const selectedObject = draggableObjects.get(selectedRef.current);
+      const selectedModelId =
+        selectedObject?.userData.modelId ??
+        (modelRoots.has(selectedRef.current) ? selectedRef.current : null);
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
         ui: "frosted-glass-in-world",
         sidebars: false,
         modelCount: models.length,
-        draggableCount: modelObjects.size,
+        objectCount: draggableObjects.size,
+        draggableCount: draggableObjects.size,
+        draggableObjectCount: draggableObjects.size,
         selectedId: selectedRef.current,
-        modelPositions: [...modelObjects.values()].map((object) => ({
+        selectedModelId,
+        selectedObjectId: selectedObject?.userData.objectId ?? null,
+        modelPositions: [...modelRoots.values()].map((object) => ({
           id: object.userData.modelId,
           position: object.position.toArray().map(round3),
         })),
+        objectSelections: [...draggableObjects.values()].map((object) => {
+          const worldPosition = new THREE.Vector3();
+          object.getWorldPosition(worldPosition);
+          return {
+            selectionId: object.userData.selectionId,
+            modelId: object.userData.modelId,
+            objectId: object.userData.objectId,
+            position: worldPosition.toArray().map(round3),
+          };
+        }),
+        selectObjectForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()][0];
+          if (!object) return false;
+          selectObjectGroup(object);
+          return true;
+        },
       };
     };
 
     const rebuildDragControls = () => {
       dragControls?.dispose();
-      dragControls = new DragControls([...modelObjects.values()], camera, renderer.domElement);
+      dragControls = new DragControls([...draggableObjects.values()], camera, renderer.domElement);
       dragControls.transformGroup = true;
       dragControls.addEventListener("dragstart", (event) => {
         controls.enabled = false;
-        selectObject(event.object.userData.modelId);
+        selectObjectGroup(event.object);
       });
       dragControls.addEventListener("drag", (event) => {
         event.object.position.y = 0;
       });
       dragControls.addEventListener("dragend", (event) => {
         controls.enabled = true;
-        callbacksRef.current.onModelMoved?.(event.object.userData.modelId, [
+        callbacksRef.current.onObjectMoved?.(objectTarget(event.object), [
           round3(event.object.position.x),
           round3(event.object.position.y),
           round3(event.object.position.z),
@@ -275,24 +356,31 @@ function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }
     };
 
     const upsertModel = (model, points = null) => {
-      const previous = modelObjects.get(model.id);
+      const previous = modelRoots.get(model.id);
       if (previous) {
         scene.remove(previous);
         disposeObject(previous);
       }
+      for (const [selectionId, object] of draggableObjects) {
+        if (object.userData.modelId === model.id) draggableObjects.delete(selectionId);
+      }
       const result = points?.length ? createPointCloudGroup(model, points) : createCompressedModelGroup(model);
       scene.add(result.group);
-      modelObjects.set(model.id, result.group);
+      modelRoots.set(model.id, result.group);
+      result.objectGroups.forEach((object) => {
+        draggableObjects.set(object.userData.selectionId, object);
+      });
       rebuildDragControls();
       api.setSelected(selectedRef.current);
       return result.summary;
     };
 
-    const selectObject = (id) => {
-      if (!id) return;
-      selectedRef.current = id;
-      api.setSelected(id);
-      callbacksRef.current.onSelectModel?.(id);
+    const selectObjectGroup = (object) => {
+      const target = objectTarget(object);
+      if (!target?.selectionId) return;
+      selectedRef.current = target.selectionId;
+      api.setSelected(target.selectionId);
+      callbacksRef.current.onSelectObject?.(target);
       publishAuditHandle();
     };
 
@@ -303,17 +391,17 @@ function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const intersections = raycaster.intersectObjects([...modelObjects.values()], true);
+      const intersections = raycaster.intersectObjects([...draggableObjects.values()], true);
       const hit = intersections[0]?.object;
-      const modelId = nearestModelId(hit);
-      selectObject(modelId);
+      const object = nearestObjectGroup(hit);
+      if (object) selectObjectGroup(object);
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
 
     const api = {
       upsertModel,
       focusModel(id) {
-        const object = modelObjects.get(id);
+        const object = modelRoots.get(id);
         if (!object) return;
         selectedRef.current = id;
         api.setSelected(id);
@@ -324,8 +412,8 @@ function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }
         controls.target.fromArray(INITIAL_CAMERA.target);
       },
       setSelected(id) {
-        for (const [modelId, object] of modelObjects) {
-          const selected = modelId === id;
+        for (const object of draggableObjects.values()) {
+          const selected = object.userData.selectionId === id || object.userData.modelId === id;
           object.userData.selected = selected;
           object.traverse((child) => {
             if (child.userData.role === "selection-ring" || child.userData.role === "core-glow") {
@@ -363,7 +451,7 @@ function ThreeWorld({ models, selectedId, onReady, onSelectModel, onModelMoved }
       window.removeEventListener("resize", resize);
       dragControls?.dispose();
       controls.dispose();
-      modelObjects.forEach(disposeObject);
+      modelRoots.forEach(disposeObject);
       renderer.dispose();
       mount.removeChild(renderer.domElement);
       if (window.__OBJGAUSS_WORLD__?.renderer === "three.js") {
@@ -384,7 +472,7 @@ function buildWorldShell(scene) {
   scene.add(ambient, key, rim);
 
   const floor = new THREE.Mesh(
-    new THREE.CircleGeometry(8.6, 96),
+    new THREE.CircleGeometry(12.6, 128),
     new THREE.MeshBasicMaterial({
       color: "#0c141b",
       transparent: true,
@@ -396,13 +484,13 @@ function buildWorldShell(scene) {
   floor.position.y = -0.01;
   scene.add(floor);
 
-  const grid = new THREE.GridHelper(15, 30, "#2a5f6a", "#152932");
+  const grid = new THREE.GridHelper(22, 44, "#2a5f6a", "#152932");
   grid.material.transparent = true;
   grid.material.opacity = 0.58;
   scene.add(grid);
 
   const halo = new THREE.Mesh(
-    new THREE.RingGeometry(4.4, 4.45, 128),
+    new THREE.RingGeometry(6.2, 6.25, 128),
     new THREE.MeshBasicMaterial({
       color: "#1bc7d6",
       transparent: true,
@@ -420,87 +508,151 @@ function createPointCloudGroup(model, points) {
   const bounds = pointBounds(sampled);
   const center = bounds.center;
   const span = Math.max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001);
-  const scale = 1.45 / span;
-  const positions = new Float32Array(sampled.length * 3);
-  const colors = new Float32Array(sampled.length * 3);
-  const fallback = new THREE.Color(model.accent);
+  const scale = (model.displayScale ?? 2.35) / span;
+  const normalizedByObject = new Map();
   let minY = Infinity;
 
-  sampled.forEach((point, index) => {
+  sampled.forEach((point) => {
+    const objectId = normalizedObjectId(point);
     const x = (Number(point.x) - center.x) * scale;
     const y = (Number(point.y) - center.y) * scale;
     const z = (Number(point.z) - center.z) * scale;
-    positions[index * 3] = x;
-    positions[index * 3 + 1] = y;
-    positions[index * 3 + 2] = z;
     minY = Math.min(minY, y);
-    const color = Array.isArray(point.color) ? point.color : null;
-    colors[index * 3] = color ? color[0] / 255 : fallback.r;
-    colors[index * 3 + 1] = color ? color[1] / 255 : fallback.g;
-    colors[index * 3 + 2] = color ? color[2] / 255 : fallback.b;
-  });
-
-  for (let index = 1; index < positions.length; index += 3) {
-    positions[index] -= minY;
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geometry.computeBoundingSphere();
-
-  const material = new THREE.PointsMaterial({
-    size: 0.026,
-    sizeAttenuation: true,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.92,
-    depthWrite: false,
+    if (!normalizedByObject.has(objectId)) normalizedByObject.set(objectId, []);
+    normalizedByObject.get(objectId).push({ point, x, y, z });
   });
 
   const group = baseModelGroup(model);
-  const cloud = new THREE.Points(geometry, material);
-  cloud.userData.role = "gaussian-cloud";
-  group.add(cloud);
-  group.add(corePointMesh(-minY, model.accent));
-  group.add(coreGlow(-minY, model.accent));
-  group.add(selectionRing(model.accent));
+  const objectGroups = [];
+  const objects = [];
 
-  const objectIds = new Set(sampled.map((point) => Number(point.objectId ?? 0)));
+  for (const [objectId, entries] of [...normalizedByObject.entries()].sort(sortObjectEntries)) {
+    entries.forEach((entry) => {
+      entry.y -= minY;
+    });
+    const normalizedBounds = pointBounds(entries);
+    const originalBounds = pointBounds(entries.map((entry) => entry.point));
+    const objectBoost = objectDisplayBoost(normalizedBounds, model);
+    const accent = objectAccent(objectId, model.accent);
+    const objectGroup = baseObjectGroup(model, objectId, {
+      x: normalizedBounds.center.x,
+      y: 0,
+      z: normalizedBounds.center.z,
+    });
+    const positions = new Float32Array(entries.length * 3);
+    const colors = new Float32Array(entries.length * 3);
+    const fallback = new THREE.Color(accent);
+
+    entries.forEach((entry, index) => {
+      positions[index * 3] = (entry.x - objectGroup.position.x) * objectBoost;
+      positions[index * 3 + 1] = (entry.y - normalizedBounds.min.y) * objectBoost;
+      positions[index * 3 + 2] = (entry.z - objectGroup.position.z) * objectBoost;
+      const color = Array.isArray(entry.point.color) ? entry.point.color : null;
+      colors[index * 3] = color ? color[0] / 255 : fallback.r;
+      colors[index * 3 + 1] = color ? color[1] / 255 : fallback.g;
+      colors[index * 3 + 2] = color ? color[2] / 255 : fallback.b;
+    });
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geometry.computeBoundingSphere();
+
+    const material = new THREE.PointsMaterial({
+      size: model.pointSize ?? 0.033,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.94,
+      depthWrite: false,
+    });
+
+    const cloud = new THREE.Points(geometry, material);
+    cloud.userData.role = "gaussian-cloud";
+    objectGroup.add(cloud);
+    objectGroup.add(corePointMesh((normalizedBounds.center.y - normalizedBounds.min.y) * objectBoost, accent));
+    objectGroup.add(coreGlow((normalizedBounds.center.y - normalizedBounds.min.y) * objectBoost, accent));
+    objectGroup.add(selectionRing(accent, ringRadiusForBounds(normalizedBounds, objectBoost)));
+    group.add(objectGroup);
+    objectGroups.push(objectGroup);
+    objects.push({
+      objectId,
+      selectionId: selectionIdForObject(model.id, objectId),
+      displayCount: entries.length,
+      corePoint: [
+        round3(originalBounds.center.x),
+        round3(originalBounds.center.y),
+        round3(originalBounds.center.z),
+      ],
+      galleryPosition: objectGroup.position.toArray().map(round3),
+      chunkPath: objectChunkPath(model, objectId),
+      accent,
+    });
+  }
+
   return {
     group,
+    objectGroups,
     summary: {
       displayCount: sampled.length,
-      objectCount: objectIds.size,
+      objectCount: objects.length,
       corePoint: [round3(center.x), round3(center.y), round3(center.z)],
+      objects,
     },
   };
 }
 
 function createCompressedModelGroup(model) {
   const group = baseModelGroup(model);
-  const points = syntheticGaussianShell(model.id, 1800);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(points.positions, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(points.colors, 3));
-  const material = new THREE.PointsMaterial({
-    size: 0.038,
-    sizeAttenuation: true,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.48,
-    depthWrite: false,
-  });
-  group.add(new THREE.Points(geometry, material));
-  group.add(corePointMesh(0.72, model.accent));
-  group.add(coreGlow(0.72, model.accent));
-  group.add(selectionRing(model.accent));
+  const objectCount = Math.max(1, Number(model.objectCount) || 1);
+  const objectGroups = [];
+  const objects = [];
+  let displayCount = 0;
+  for (let index = 0; index < objectCount; index += 1) {
+    const objectId = index;
+    const accent = objectAccent(objectId, model.accent);
+    const position = compressedObjectPosition(index, objectCount, model.displayScale ?? 2.1);
+    const objectGroup = baseObjectGroup(model, objectId, position);
+    const points = syntheticGaussianShell(`${model.id}-${objectId}`, model.placeholderPointsPerObject ?? 760, accent);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(points.positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(points.colors, 3));
+    geometry.computeBoundingSphere();
+    const material = new THREE.PointsMaterial({
+      size: model.pointSize ?? 0.04,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.58,
+      depthWrite: false,
+    });
+    const cloud = new THREE.Points(geometry, material);
+    cloud.userData.role = "gaussian-cloud";
+    objectGroup.add(cloud);
+    objectGroup.add(corePointMesh(0.72, accent));
+    objectGroup.add(coreGlow(0.72, accent));
+    objectGroup.add(selectionRing(accent, 0.54));
+    group.add(objectGroup);
+    objectGroups.push(objectGroup);
+    displayCount += points.positions.length / 3;
+    objects.push({
+      objectId,
+      selectionId: selectionIdForObject(model.id, objectId),
+      displayCount: points.positions.length / 3,
+      corePoint: [0, 0, 0],
+      galleryPosition: objectGroup.position.toArray().map(round3),
+      chunkPath: objectChunkPath(model, objectId),
+      accent,
+    });
+  }
   return {
     group,
+    objectGroups,
     summary: {
-      displayCount: points.positions.length / 3,
-      objectCount: model.objectCount,
+      displayCount,
+      objectCount: objects.length,
       corePoint: [0, 0, 0],
+      objects,
     },
   };
 }
@@ -509,7 +661,20 @@ function baseModelGroup(model) {
   const group = new THREE.Group();
   group.name = model.name;
   group.position.set(...model.galleryPosition);
-  group.userData = { modelId: model.id, draggable: true };
+  group.userData = { modelId: model.id, draggable: false };
+  return group;
+}
+
+function baseObjectGroup(model, objectId, position) {
+  const group = new THREE.Group();
+  group.name = `${model.name} / object ${objectId}`;
+  group.position.set(position.x, position.y ?? 0, position.z);
+  group.userData = {
+    modelId: model.id,
+    objectId,
+    selectionId: selectionIdForObject(model.id, objectId),
+    draggable: true,
+  };
   return group;
 }
 
@@ -538,9 +703,9 @@ function coreGlow(y, accent) {
   return mesh;
 }
 
-function selectionRing(accent) {
+function selectionRing(accent, radius = 0.86) {
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.86, 0.9, 80),
+    new THREE.RingGeometry(radius, radius + 0.045, 80),
     new THREE.MeshBasicMaterial({
       color: accent,
       transparent: true,
@@ -555,23 +720,97 @@ function selectionRing(accent) {
   return ring;
 }
 
-function nearestModelId(object) {
+function nearestObjectGroup(object) {
   let cursor = object;
   while (cursor) {
-    if (cursor.userData?.modelId) return cursor.userData.modelId;
+    if (cursor.userData?.selectionId) return cursor;
     cursor = cursor.parent;
   }
   return null;
 }
 
+function objectTarget(object) {
+  if (!object?.userData?.selectionId) return null;
+  return {
+    modelId: object.userData.modelId,
+    objectId: object.userData.objectId,
+    selectionId: object.userData.selectionId,
+  };
+}
+
 function samplePoints(points, maxPoints) {
   if (points.length <= maxPoints) return points;
-  const stride = Math.ceil(points.length / maxPoints);
+  const byObject = new Map();
+  points.forEach((point) => {
+    const objectId = normalizedObjectId(point);
+    if (!byObject.has(objectId)) byObject.set(objectId, []);
+    byObject.get(objectId).push(point);
+  });
   const sampled = [];
-  for (let index = 0; index < points.length && sampled.length < maxPoints; index += stride) {
-    sampled.push(points[index]);
+  const total = points.length;
+  const entries = [...byObject.entries()].sort(sortObjectEntries);
+  for (const [, objectPoints] of entries) {
+    const quota = Math.max(1, Math.floor((objectPoints.length / total) * maxPoints));
+    const stride = Math.max(1, Math.ceil(objectPoints.length / quota));
+    for (let index = 0; index < objectPoints.length && sampled.length < maxPoints; index += stride) {
+      sampled.push(objectPoints[index]);
+    }
+  }
+  let cursor = 0;
+  while (sampled.length < maxPoints && sampled.length < points.length) {
+    sampled.push(points[cursor]);
+    cursor = (cursor + Math.ceil(points.length / maxPoints)) % points.length;
   }
   return sampled;
+}
+
+function normalizedObjectId(point) {
+  const objectId = Number(point?.objectId ?? 0);
+  return Number.isFinite(objectId) ? Math.trunc(objectId) : 0;
+}
+
+function sortObjectEntries(left, right) {
+  return Number(left[0]) - Number(right[0]);
+}
+
+function selectionIdForObject(modelId, objectId) {
+  return `${modelId}::object-${objectId}`;
+}
+
+function objectChunkPath(model, objectId) {
+  const root = model.compression?.chunkRoot ?? `/models/${model.id}/objects/`;
+  return `${root.replace(/\/?$/, "/")}${objectId}/`;
+}
+
+function objectAccent(objectId, fallback) {
+  const rgb = colorForObject(objectId);
+  return Array.isArray(rgb) ? rgbToCss(rgb) : fallback;
+}
+
+function objectDisplayBoost(bounds, model) {
+  const span = Math.max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001);
+  const targetSpan = model.minObjectDisplaySpan ?? 1.02;
+  const maxBoost = model.maxObjectDisplayBoost ?? 4.2;
+  return Math.max(1, Math.min(maxBoost, targetSpan / span));
+}
+
+function ringRadiusForBounds(bounds, boost = 1) {
+  const horizontal = Math.max(bounds.size.x, bounds.size.z) * boost;
+  return Math.max(0.42, Math.min(1.36, horizontal * 0.58 + 0.2));
+}
+
+function compressedObjectPosition(index, count, displayScale) {
+  if (count === 1) return { x: 0, y: 0, z: 0 };
+  const columns = Math.ceil(Math.sqrt(count));
+  const row = Math.floor(index / columns);
+  const column = index % columns;
+  const rows = Math.ceil(count / columns);
+  const spacing = Math.max(0.56, Math.min(0.82, displayScale / Math.max(columns, rows)));
+  return {
+    x: (column - (columns - 1) / 2) * spacing,
+    y: 0,
+    z: (row - (rows - 1) / 2) * spacing,
+  };
 }
 
 function pointBounds(points) {
@@ -590,19 +829,19 @@ function pointBounds(points) {
   return { min, max, center, size };
 }
 
-function syntheticGaussianShell(seedText, count) {
+function syntheticGaussianShell(seedText, count, accent) {
   const seed = [...seedText].reduce((total, char) => total + char.charCodeAt(0), 0);
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const colorA = new THREE.Color("#1fd1d9");
-  const colorB = new THREE.Color("#8e6cff");
+  const colorA = new THREE.Color(accent);
+  const colorB = new THREE.Color("#dffaff");
   for (let index = 0; index < count; index += 1) {
     const t = index / count;
     const angle = t * Math.PI * 9 + seed * 0.021;
     const radius = 0.35 + 0.5 * Math.sin(t * Math.PI);
-    positions[index * 3] = Math.cos(angle) * radius;
-    positions[index * 3 + 1] = 0.18 + t * 1.15 + Math.sin(angle * 1.7) * 0.11;
-    positions[index * 3 + 2] = Math.sin(angle) * radius * 0.78;
+    positions[index * 3] = Math.cos(angle) * radius * 1.08;
+    positions[index * 3 + 1] = 0.18 + t * 1.24 + Math.sin(angle * 1.7) * 0.11;
+    positions[index * 3 + 2] = Math.sin(angle) * radius * 0.86;
     const mix = (Math.sin(angle) + 1) / 2;
     const color = colorA.clone().lerp(colorB, mix);
     colors[index * 3] = color.r;
@@ -622,10 +861,11 @@ function Metric({ label, value }) {
 }
 
 function Meta({ label, value }) {
+  const displayValue = value === null || value === undefined || value === "" ? "-" : value;
   return (
     <>
       <dt>{label}</dt>
-      <dd>{value || "-"}</dd>
+      <dd>{displayValue}</dd>
     </>
   );
 }
@@ -640,6 +880,7 @@ function initialModelStates() {
         message: "queued",
         gaussianCount: 0,
         displayCount: 0,
+        objects: [],
         corePoint: null,
         loadMs: 0,
       },

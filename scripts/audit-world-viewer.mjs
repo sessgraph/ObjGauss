@@ -17,8 +17,10 @@ try {
     [
       "world_viewer=passed",
       `models=${summary.modelCount}`,
-      `draggable=${summary.draggableCount}`,
-      `selected=${JSON.stringify(summary.selectedId)}`,
+      `objects=${summary.objectCount}`,
+      `draggableObjects=${summary.draggableObjectCount}`,
+      `selectedModel=${JSON.stringify(summary.selectedModelId)}`,
+      `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
     ].join(" "),
@@ -42,7 +44,10 @@ async function auditWorld(url) {
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
     const app = page.locator(".worldShell");
     await app.waitFor({ timeout: 15000 });
-    await page.waitForFunction(() => window.__OBJGAUSS_WORLD__?.draggableCount >= 5, undefined, {
+    await page.waitForFunction(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return world?.draggableObjectCount > world?.modelCount && world?.objectSelections?.length > world?.modelCount;
+    }, undefined, {
       timeout: 15000,
     });
     await page.waitForFunction(() => {
@@ -69,8 +74,30 @@ async function auditWorld(url) {
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
-      return world?.selectedId === shell?.getAttribute("data-selected-model");
+      return world?.selectedModelId === shell?.getAttribute("data-selected-model");
     }, undefined, { timeout: 15000 });
+    const objectSelection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const selection = world?.objectSelections?.find(
+        (entry) => entry.modelId === world.selectedModelId,
+      ) ?? world?.objectSelections?.[0];
+      return {
+        ok: world?.selectObjectForAudit?.(selection?.selectionId) ?? false,
+        selectionId: selection?.selectionId ?? null,
+      };
+    });
+    if (!objectSelection.ok) {
+      throw new Error("expected audit handle to select a per-object render target");
+    }
+    await page.waitForFunction((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
+      return (
+        world?.selectedId === selectionId &&
+        shell?.getAttribute("data-selected-target") === selectionId &&
+        shell?.getAttribute("data-selected-object") !== ""
+      );
+    }, objectSelection.selectionId, { timeout: 15000 });
 
     const relevantIssues = consoleIssues.filter(
       (issue) =>
@@ -85,11 +112,23 @@ async function auditWorld(url) {
 
     const screenshotPath = "/tmp/objgauss-world-viewer.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });
-    const world = await page.evaluate(() => window.__OBJGAUSS_WORLD__);
+    const world = await page.evaluate(() => {
+      const handle = window.__OBJGAUSS_WORLD__;
+      return {
+        modelCount: handle.modelCount,
+        objectCount: handle.objectCount,
+        draggableObjectCount: handle.draggableObjectCount,
+        selectedId: handle.selectedId,
+        selectedModelId: handle.selectedModelId,
+        selectedObjectId: handle.selectedObjectId,
+      };
+    });
     return {
       modelCount: world.modelCount,
-      draggableCount: world.draggableCount,
-      selectedId: world.selectedId,
+      objectCount: world.objectCount,
+      draggableObjectCount: world.draggableObjectCount,
+      selectedModelId: world.selectedModelId,
+      selectedObjectId: world.selectedObjectId,
       sidebars,
       screenshotPath,
     };

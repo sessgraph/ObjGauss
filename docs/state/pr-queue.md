@@ -69,6 +69,37 @@
 
 ## Done
 
+### WORLD-OBJECT-RENDER-001: Render draggable objects inside the Three.js world
+
+- 状态: done / object-level-world-rendering
+- 类型: 标准 PR / frontend product rebuild
+- 目标: 在 `WORLD-REBUILD-001` 的默认 Three.js 世界里，把交互粒度从“一个模型一个
+  draggable target”推进到“一个 objectId 一个 draggable render target”，并把偏小对象
+  做 viewer-only 显示放大，方便后续单对象压缩块加载和编辑。
+- 已实施:
+  - `src/App.jsx` 现在按 PLY `objectId` 拆分 `THREE.Group` / `THREE.Points`，
+    每个对象拥有 selection id、核心点、选中环、拖拽句柄、位置 telemetry 和
+    per-object chunk path。
+  - `near1m-lego` 继续作为 compressed-placeholder，不请求 full diagnostic PLY；
+    placeholder 也按对象生成独立 Gaussian cloud。
+  - `src/modelCatalog.js` 增加 viewer display scale、point size 和小对象显示 boost；
+    这些只影响前端展览尺度，不改变训练数据、后端 artifact 或压缩 contract。
+  - `scripts/audit-world-viewer.mjs` 现在验证 object count、draggable object count、
+    selected object telemetry 和 no-sidebar world shell。
+- 边界:
+  - 不删除、不替换 ObjGauss 自有 Gaussian renderer algorithms；Gaussian OIT、
+    WebGPU tile / compute、Spark bridge、shader、object-state buffer、picking 和
+    OGC decoder 继续保留。
+  - 不引入外部 renderer 依赖，不发布或提交 near-1M full PLY / 大训练产物。
+- 验证:
+  - `npm run audit:world-viewer`: passed；`models=5`、`objects=27`、
+    `draggableObjects=27`、`sidebars=0`，截图 `/tmp/objgauss-world-viewer.png`。
+  - `npm run build`: passed；主入口 JS `676.07 kB` / gzip `181.22 kB`。
+  - `uv run --extra dev pytest`: 93 passed。
+  - `python3 -m compileall -q objgauss`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### WORLD-REBUILD-001: Replace default viewer with VR-like Three.js model world
 
 - 状态: done / default-world-entry
@@ -103,7 +134,7 @@
   - `uv run --extra dev pytest`: 93 passed。
   - `python3 -m compileall -q objgauss`: passed。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `d4b6164`
 
 ### OGR-BROWSER-DECODER-001: Add browser decoder contract for quantized OGC artifacts
 
