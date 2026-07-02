@@ -492,6 +492,17 @@ dashboard 新增 compactness bar 和 `spatial` meta，`.worldShell` telemetry �
 ObjectState Debug panel。该切片只补 viewer-side debug evidence，不改 Python 训练算法、
 不引入 torch / gsplat / CUDA、不替换 viewer renderer。
 
+`OBJECT-ASSIGNMENT-JITTER-001` 已完成 Phase 1 Debug OS 的 assignment stability
+指标：`src/App.jsx` 在 trainable artifact 路径上比较当前帧和相邻帧同一 Gaussian
+row 的 A[n,k] vector，使用 half-L1 distance 派生 per-object `assignmentJitter`，并在
+`objgauss-stability-dashboard-v1` 中汇总为 `meanAssignmentJitter`。Stability dashboard
+新增 jitter bar / meta，缺少相邻 assignment frame 的普通模型明确显示 `n/a`，不会把缺失
+evidence 伪装成 0。`.worldShell` telemetry 与 `window.__OBJGAUSS_WORLD__.stabilitySummary`
+同步暴露该指标。`scripts/audit-world-viewer.mjs` 现在要求 trainable artifact 路径下
+jitter metric 可用，验收输出为 `assignmentJitter=0.023`。该切片只补 A[N,K] stability
+debug evidence，不改变 Python 训练算法、不引入 torch / gsplat / CUDA、不替换 viewer
+renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

@@ -303,6 +303,8 @@ export default function App() {
       data-stability-mean-temporal-drift={selectedStability.meanTemporalDrift ?? ""}
       data-stability-spatial-available={selectedStability.spatialAvailable ? "true" : "false"}
       data-stability-mean-spatial-compactness={selectedStability.meanSpatialCompactness ?? ""}
+      data-stability-jitter-available={selectedStability.jitterAvailable ? "true" : "false"}
+      data-stability-mean-assignment-jitter={selectedStability.meanAssignmentJitter ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -582,6 +584,7 @@ function ThreeWorld({
             confidence: object.userData.objectState?.confidence ?? null,
             entropy: object.userData.objectState?.assignmentEntropy ?? null,
             spatialCompactness: object.userData.objectState?.spatialCompactness ?? null,
+            assignmentJitter: object.userData.objectState?.assignmentJitter ?? null,
           };
         }),
         selectObjectForAudit(selectionId = null) {
@@ -961,6 +964,8 @@ function StabilityDashboard({ stability }) {
       data-mean-temporal-drift={summary.meanTemporalDrift ?? ""}
       data-spatial-available={summary.spatialAvailable ? "true" : "false"}
       data-mean-spatial-compactness={summary.meanSpatialCompactness ?? ""}
+      data-jitter-available={summary.jitterAvailable ? "true" : "false"}
+      data-mean-assignment-jitter={summary.meanAssignmentJitter ?? ""}
     >
       <div className="stabilityHead">
         <span>Stability</span>
@@ -975,27 +980,31 @@ function StabilityDashboard({ stability }) {
       <div className="stabilityBars">
         <StabilityBar label="confidence" value={summary.meanConfidence} invert={false} />
         <StabilityBar label="entropy" value={summary.meanEntropy} invert />
-        <StabilityBar label="compact" value={summary.meanSpatialCompactness} invert={false} />
+        <StabilityBar label="compact" value={summary.meanSpatialCompactness} available={summary.spatialAvailable} />
+        <StabilityBar label="jitter" value={summary.meanAssignmentJitter} available={summary.jitterAvailable} invert />
       </div>
       <dl className="stabilityMeta">
         <Meta label="purity" value={summary.purityAvailable ? formatRatio(summary.meanPurity) : "n/a"} />
         <Meta label="spatial" value={summary.spatialAvailable ? formatRatio(summary.meanSpatialCompactness) : "n/a"} />
         <Meta label="drift" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
+        <Meta label="jitter" value={summary.jitterAvailable ? formatRatio(summary.meanAssignmentJitter) : "n/a"} />
       </dl>
     </div>
   );
 }
 
-function StabilityBar({ label, value, invert = false }) {
-  const clean = Math.max(0, Math.min(1, Number(value) || 0));
-  const width = `${Math.max(3, clean * 100)}%`;
+function StabilityBar({ label, value, invert = false, available = true }) {
+  const number = Number(value);
+  const hasValue = Boolean(available && Number.isFinite(number));
+  const clean = hasValue ? Math.max(0, Math.min(1, number)) : 0;
+  const width = hasValue ? `${Math.max(3, clean * 100)}%` : "0%";
   return (
-    <div className="stabilityBar">
+    <div className={`stabilityBar ${hasValue ? "" : "missing"}`}>
       <span>{label}</span>
       <div className={invert ? "stabilityTrack invert" : "stabilityTrack"}>
         <b style={{ width }} />
       </div>
-      <strong>{formatRatio(clean)}</strong>
+      <strong>{hasValue ? formatRatio(clean) : "n/a"}</strong>
     </div>
   );
 }
@@ -1369,6 +1378,7 @@ function createTrainableArtifactGroup(model) {
     const assignment = averageAssignmentVector(stateRows.map((entry) => entry.row), objectIds);
     const purity = objectPurityForRows(stateRows, derivedIds);
     const temporalDrift = objectTemporalDrift(artifact, frameIndex, objectId, state.centroid);
+    const assignmentJitter = objectAssignmentJitter(artifact, frameIndex, stateRows);
 
     stateRows.forEach((entry, index) => {
       const point = artifactPointInBox(box, index, stateRows.length);
@@ -1434,6 +1444,7 @@ function createTrainableArtifactGroup(model) {
       purityLabel: purity.label,
       temporalDrift,
       spatialCompactness: spatialCompactnessForGeometry(geometry),
+      assignmentJitter,
       centroid: (state.centroid ?? []).map(round3),
       bbox: (state.bbox ?? []).map(round3),
       status: state.status ?? "trained_artifact_slot",
@@ -1461,6 +1472,7 @@ function createTrainableArtifactGroup(model) {
       objectPurity: objectState.objectPurity,
       temporalDrift: objectState.temporalDrift,
       spatialCompactness: objectState.spatialCompactness,
+      assignmentJitter: objectState.assignmentJitter,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1715,6 +1727,9 @@ function summarizeObjectStability(objectsOrStates = []) {
   const compactness = states
     .map((state) => firstFinite(state.spatialCompactness, state.compactness, state.spatialContinuity))
     .filter(Number.isFinite);
+  const jitters = states
+    .map((state) => firstFinite(state.assignmentJitter, state.jitter, state.assignmentDrift))
+    .filter(Number.isFinite);
   const mixedSlots = states.filter((state) => {
     const entropy = finiteOrZero(state.assignmentEntropy);
     return entropy >= 0.55 || String(state.status ?? "").includes("mixed");
@@ -1749,6 +1764,8 @@ function summarizeObjectStability(objectsOrStates = []) {
     meanTemporalDrift: drifts.length ? round3(average(drifts)) : null,
     spatialAvailable: compactness.length > 0,
     meanSpatialCompactness: compactness.length ? round3(average(compactness)) : null,
+    jitterAvailable: jitters.length > 0,
+    meanAssignmentJitter: jitters.length ? round3(average(jitters)) : null,
   };
 }
 
@@ -1859,6 +1876,33 @@ function objectTemporalDrift(artifact, frameIndex, objectId, centroid) {
     if (peerCentroid) return round3(current.distanceTo(peerCentroid));
   }
   return null;
+}
+
+function objectAssignmentJitter(artifact, frameIndex, rows) {
+  const frames = Array.isArray(artifact?.assignments) ? artifact.assignments : [];
+  const candidateFrames = frames
+    .filter((frame) => Number(frame?.frame_index) !== frameIndex && Array.isArray(frame?.matrix))
+    .map((frame) => ({
+      frame,
+      distance: Math.abs(Number(frame?.frame_index ?? 0) - frameIndex),
+    }))
+    .filter((entry) => Number.isFinite(entry.distance))
+    .sort((left, right) => left.distance - right.distance);
+  const peer = candidateFrames[0]?.frame;
+  if (!peer) return null;
+  const deltas = [];
+  rows.forEach((entry) => {
+    const current = Array.isArray(entry.row) ? entry.row : [];
+    const next = Array.isArray(peer.matrix?.[entry.rowIndex]) ? peer.matrix[entry.rowIndex] : [];
+    const width = Math.max(current.length, next.length);
+    if (!width) return;
+    let l1 = 0;
+    for (let index = 0; index < width; index += 1) {
+      l1 += Math.abs((Number(current[index]) || 0) - (Number(next[index]) || 0));
+    }
+    deltas.push(Math.min(1, l1 * 0.5));
+  });
+  return deltas.length ? round3(average(deltas)) : null;
 }
 
 function spatialCompactnessForGeometry(geometry) {

@@ -72,6 +72,41 @@
 
 ## Done
 
+### OBJECT-ASSIGNMENT-JITTER-001: Expose assignment stability in Debug OS
+
+- 状态: done / debug-os-assignment-jitter
+- 类型: 标准 PR / frontend debug metrics
+- 目标: 在 Phase 1 Debug OS 已具备 entropy、purity、temporal drift、compactness 和
+  slot utilization 后，补齐 “A[n,k] 是否 jitter” 的可审计指标，让 UI 能直接验证
+  assignment stability，而不是只看 ObjectState centroid drift。
+- 已实施:
+  - `src/App.jsx` 在 trainable artifact loader 中比较当前帧和相邻帧同一 Gaussian
+    row 的 assignment vector，用 half-L1 distance 派生 per-object
+    `assignmentJitter`。
+  - `summarizeObjectStability(...)` 现在汇总 `meanAssignmentJitter`，并暴露
+    `jitterAvailable`。
+  - Stability dashboard 新增 `jitter` bar / meta；缺少相邻 assignment frame 的普通
+    模型显示 `n/a`，不把缺失 evidence 伪装成 0。
+  - `.worldShell` telemetry、`window.__OBJGAUSS_WORLD__.stabilitySummary` 和
+    `scripts/audit-world-viewer.mjs` 都暴露并验证 assignment jitter。
+- 边界:
+  - 这是 viewer-side A[N,K] stability evidence，不改变 Python 训练算法或
+    ObjectState solver。
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出或大模型，不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `assignmentJitter=0.023`、`compactness=0.5`、`purity=1`、
+    `temporalDrift=0.018`、`assignmentSource=trainable_kernel_model_artifact`，截图
+    `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-SPATIAL-COMPACTNESS-001: Expose spatial continuity in Debug OS
 
 - 状态: done / debug-os-spatial-compactness
