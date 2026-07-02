@@ -445,6 +445,20 @@ blockers，没有静默 fallback 到 point renderer。该状态说明 full rende
 具备 torch / gsplat / CUDA 的环境，或先由 Owner 明确批准安装 / 配置 optional training
 renderer 依赖。
 
+`OBJECT-STABILITY-DASHBOARD-001` 已完成 Phase 1 Debug OS 的 stability dashboard：
+`src/App.jsx` 新增 `objgauss-stability-dashboard-v1` summary，按 selected model 的
+ObjectState metadata 计算 slot utilization、mean / max entropy、mean / min
+confidence、mixed slots、low-confidence slots，并在 metadata 存在时显示 purity /
+temporal drift。Debug panel 现在在 assignment heatmap 下方显示 Stability dashboard；
+移动端布局优先保留 Debug OS 面板，隐藏会重叠的 floating inspector / bottom status；
+`.worldShell` 和 `window.__OBJGAUSS_WORLD__` 暴露 stability status / slot utilization /
+mean entropy / mixed slots / low-confidence slots。`scripts/audit-world-viewer.mjs` 已验证
+trainable artifact 路径下 dashboard status 与 audit handle 一致，`slotUtil=1`，
+`mixedSlots=2`，截图为 `/tmp/objgauss-world-viewer.png` 和
+`/tmp/objgauss-world-viewer-mobile.png`。该切片不改变训练依赖、
+不替换 viewer renderer、不提交训练输出；缺失的 purity / temporal drift 会明确显示为
+`n/a`，不伪装成已计算指标。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

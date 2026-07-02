@@ -26,9 +26,13 @@ try {
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
+      `stability=${summary.stabilityStatus}`,
+      `slotUtil=${summary.slotUtilization}`,
+      `mixedSlots=${summary.mixedSlots}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
+      `mobileScreenshot=${summary.mobileScreenshotPath}`,
     ].join(" "),
   );
 } finally {
@@ -75,6 +79,7 @@ async function auditWorld(url) {
     await page.locator(".glassHud.floatingInspector").waitFor({ timeout: 15000 });
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
     const pills = await page.locator(".modelPill").count();
     if (pills < 7) {
       throw new Error(`expected at least 7 model pills, found ${pills}`);
@@ -192,10 +197,13 @@ async function auditWorld(url) {
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const stability = document.querySelector("[data-stability-dashboard='true']");
       return (
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         heatmap?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
-        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
+        stability?.getAttribute("data-stability-status") === shell?.getAttribute("data-stability-status") &&
+        Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0
       );
     }, undefined, { timeout: 15000 });
     if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
@@ -229,9 +237,11 @@ async function auditWorld(url) {
 
     const screenshotPath = "/tmp/objgauss-world-viewer.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });
+    const mobileScreenshotPath = await auditMobileWorld(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
+      const stability = document.querySelector("[data-stability-dashboard='true']");
       return {
         modelCount: handle.modelCount,
         objectCount: handle.objectCount,
@@ -242,10 +252,20 @@ async function auditWorld(url) {
         debugMode: handle.debugMode,
         debugProtocol: handle.debugProtocol,
         assignmentSource: handle.assignmentSource,
+        stabilityStatus: handle.stabilitySummary?.status ?? null,
+        slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
+        mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
+        dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
     });
+    if (world.stabilityStatus !== world.dashboardStatus) {
+      throw new Error(`stability dashboard mismatch: ${JSON.stringify(world)}`);
+    }
+    if (!(Number(world.slotUtilization) > 0)) {
+      throw new Error(`expected positive slot utilization, got ${world.slotUtilization}`);
+    }
     const assignmentSlots = await page
       .locator("[data-assignment-heatmap='true']")
       .evaluate((node) => Number(node.getAttribute("data-assignment-slots") ?? 0));
@@ -262,13 +282,41 @@ async function auditWorld(url) {
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
       assignmentSource: world.assignmentSource,
+      stabilityStatus: world.stabilityStatus,
+      slotUtilization: world.slotUtilization,
+      mixedSlots: world.mixedSlots,
       assignmentSlots,
       selectedGaussian,
       sidebars,
       screenshotPath,
+      mobileScreenshotPath,
     };
   } finally {
     await closeBrowserWithTimeout(browser);
+  }
+}
+
+async function auditMobileWorld(browser, url) {
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+  });
+  try {
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const dashboard = document.querySelector("[data-stability-dashboard='true']");
+      return shell?.getAttribute("data-stability-dashboard") === "enabled" &&
+        dashboard?.getAttribute("data-stability-status") !== "";
+    }, undefined, { timeout: 15000 });
+    const screenshotPath = "/tmp/objgauss-world-viewer-mobile.png";
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    return screenshotPath;
+  } finally {
+    await page.close();
   }
 }
 

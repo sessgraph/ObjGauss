@@ -72,6 +72,45 @@
 
 ## Done
 
+### OBJECT-STABILITY-DASHBOARD-001: Add ObjectState stability dashboard to Debug OS
+
+- 状态: done / debug-os-stability-dashboard
+- 类型: 标准 PR / frontend debug metrics
+- 目标: 在已有 A[N,K] heatmap、ObjectState inspector、Gaussian probe 和 visibility
+  toggle 基础上，补齐 Phase 1 Debug OS 的 `entropy + stability dashboard`，让 viewer
+  能直接审计 assignment 是否稳定，而不是只看渲染外观。
+- 已实施:
+  - `src/App.jsx` 新增 `objgauss-stability-dashboard-v1` summary，按 selected model
+    的 ObjectState metadata 计算 slot utilization、mean / max entropy、mean / min
+    confidence、mixed slots、low-confidence slots，以及可选 purity / temporal drift
+    availability。
+  - Debug panel 新增 Stability dashboard，显示 `slot util`、`mean H`、`mixed`、
+    `low conf`、confidence / entropy bars 和 purity / drift 缺口状态。
+  - 移动端布局现在优先保留 Debug OS 面板，隐藏重叠的 floating inspector / bottom
+    status，避免 stability dashboard 被覆盖。
+  - `.worldShell` 和 `window.__OBJGAUSS_WORLD__` 暴露 stability status、slot
+    utilization、mean entropy、mixed slots 和 low-confidence slots，供 browser audit
+    验证。
+  - `scripts/audit-world-viewer.mjs` 现在要求 stability dashboard 存在，并在
+    trainable artifact 路径上断言 dashboard status 与 audit handle 一致、slot
+    utilization 为正。
+- 边界:
+  - 不引入 torch / gsplat / CUDA，不改训练 renderer blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出或大模型，不加载 near-1M / 4.5M 大资产。
+  - purity / temporal drift 当前只在 metadata 存在时显示；缺失时明确显示 `n/a`。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `stability=mixed`、`slotUtil=1`、`mixedSlots=2`、
+    `assignmentSource=trainable_kernel_model_artifact`，截图
+    `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAIN-GSPLAT-LOSS-001: Wire optional gsplat renderer into trainable loss producer
 
 - 状态: done / optional-loss-route

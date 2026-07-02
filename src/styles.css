@@ -227,6 +227,8 @@ button:focus-visible {
   left: 26px;
   top: 126px;
   width: min(390px, calc(100vw - 52px));
+  max-height: calc(100vh - 186px);
+  overflow: auto;
   padding: 16px;
   border-radius: 22px;
 }
@@ -298,6 +300,114 @@ button:focus-visible {
   color: #eefbff;
   font-size: 11px;
   text-align: right;
+}
+
+.stabilityDashboard {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.stabilityHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stabilityHead span {
+  color: #9fb1bd;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.stabilityHead strong {
+  color: #dffaff;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.stabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.stabilityGrid .metric {
+  min-height: 40px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+
+.stabilityGrid .metric span,
+.stabilityBar span,
+.stabilityBar strong,
+.stabilityMeta dt,
+.stabilityMeta dd {
+  font-size: 10px;
+}
+
+.stabilityGrid .metric strong {
+  font-size: 13px;
+}
+
+.stabilityBars {
+  display: grid;
+  gap: 7px;
+}
+
+.stabilityBar {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  color: #9fb1bd;
+}
+
+.stabilityTrack {
+  position: relative;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stabilityTrack b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #57e4e8, #f3df5d);
+}
+
+.stabilityTrack.invert b {
+  background: linear-gradient(90deg, #f3df5d, #ff8c6b);
+}
+
+.stabilityBar strong {
+  color: #edf9fb;
+  text-align: right;
+}
+
+.stabilityMeta {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 42px minmax(0, 1fr);
+  gap: 6px 8px;
+  margin: 0;
+}
+
+.stabilityMeta dt {
+  color: #8ea0aa;
+}
+
+.stabilityMeta dd {
+  min-width: 0;
+  margin: 0;
+  color: #edf9fb;
+  font-weight: 700;
 }
 
 .debugStateGrid {
@@ -430,27 +540,23 @@ button:focus-visible {
   }
 
   .debugPanel {
-    top: auto;
+    top: 224px;
     left: 14px;
-    bottom: 304px;
+    bottom: 90px;
     width: calc(100vw - 28px);
-    max-height: 28vh;
+    max-height: none;
     overflow: auto;
   }
 
   .floatingInspector {
-    top: auto;
-    right: 14px;
-    bottom: 154px;
-    width: calc(100vw - 28px);
+    display: none;
   }
 
   .objectDock {
-    bottom: 70px;
+    bottom: 16px;
   }
 
   .bottomStatus {
-    justify-content: flex-start;
-    overflow-x: auto;
+    display: none;
   }
 }

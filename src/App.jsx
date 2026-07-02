@@ -60,6 +60,10 @@ export default function App() {
   const selectedObject =
     selected?.objects?.find((object) => String(object.objectId) === String(selection.objectId)) ?? null;
   const selectedObjectKey = selectedObject?.selectionId ?? "";
+  const selectedStability = useMemo(
+    () => summarizeObjectStability(selected?.objects ?? []),
+    [selected?.objects],
+  );
   const selectedAssignmentSource =
     debugProbe?.source ?? selectedObject?.objectState?.source ?? selected?.delivery?.source ?? "";
   const hiddenCount = hiddenObjects.size;
@@ -283,6 +287,12 @@ export default function App() {
       data-ogc-loaded-count={ogcLoadedCount}
       data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
       data-assignment-source={selectedAssignmentSource}
+      data-stability-dashboard="enabled"
+      data-stability-status={selectedStability.status}
+      data-stability-slot-utilization={selectedStability.slotUtilization}
+      data-stability-mean-entropy={selectedStability.meanEntropy}
+      data-stability-mixed-slots={selectedStability.mixedSlots}
+      data-stability-low-confidence={selectedStability.lowConfidenceSlots}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -378,6 +388,7 @@ export default function App() {
         debugProbe={debugProbe}
         debugMode={debugMode}
         hiddenObjects={hiddenObjects}
+        stability={selectedStability}
         onToggleObjectVisibility={toggleObjectVisibility}
       />
 
@@ -512,6 +523,9 @@ function ThreeWorld({
         selectedObject?.userData.modelId ??
         (modelRoots.has(selectedRef.current) ? selectedRef.current : null);
       const selectedModel = selectedModelId ? modelRoots.get(selectedModelId) : null;
+      const selectedStability = summarizeObjectStability(
+        [...draggableObjects.values()].filter((object) => object.userData.modelId === selectedModelId),
+      );
       const selectedAssignmentSource =
         selectedObject?.userData.objectState?.source ??
         selectedModel?.userData.assignmentSource ??
@@ -531,6 +545,7 @@ function ThreeWorld({
         debugMode: debugRef.current,
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
+        stabilitySummary: selectedStability,
         trainableArtifactLoadedCount: [...modelRoots.values()].filter(
           (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
         ).length,
@@ -805,6 +820,7 @@ function DebugPanel({
   debugProbe,
   debugMode,
   hiddenObjects,
+  stability,
   onToggleObjectVisibility,
 }) {
   if (!selected) return null;
@@ -837,6 +853,7 @@ function DebugPanel({
       </div>
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
+      <StabilityDashboard stability={stability} />
 
       <dl className="debugStateGrid">
         <Meta label="source" value={debugProbe?.source ?? activeState?.source} />
@@ -870,6 +887,54 @@ function DebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function StabilityDashboard({ stability }) {
+  const summary = stability ?? summarizeObjectStability([]);
+  return (
+    <div
+      className="stabilityDashboard"
+      data-stability-dashboard="true"
+      data-stability-status={summary.status}
+      data-slot-utilization={summary.slotUtilization}
+      data-mean-entropy={summary.meanEntropy}
+      data-mixed-slots={summary.mixedSlots}
+      data-low-confidence-slots={summary.lowConfidenceSlots}
+    >
+      <div className="stabilityHead">
+        <span>Stability</span>
+        <strong>{summary.status}</strong>
+      </div>
+      <div className="stabilityGrid">
+        <Metric label="slot util" value={formatRatio(summary.slotUtilization)} />
+        <Metric label="mean H" value={formatRatio(summary.meanEntropy)} />
+        <Metric label="mixed" value={formatCount(summary.mixedSlots)} />
+        <Metric label="low conf" value={formatCount(summary.lowConfidenceSlots)} />
+      </div>
+      <div className="stabilityBars">
+        <StabilityBar label="confidence" value={summary.meanConfidence} invert={false} />
+        <StabilityBar label="entropy" value={summary.meanEntropy} invert />
+      </div>
+      <dl className="stabilityMeta">
+        <Meta label="purity" value={summary.purityAvailable ? formatRatio(summary.meanPurity) : "n/a"} />
+        <Meta label="drift" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
+      </dl>
+    </div>
+  );
+}
+
+function StabilityBar({ label, value, invert = false }) {
+  const clean = Math.max(0, Math.min(1, Number(value) || 0));
+  const width = `${Math.max(3, clean * 100)}%`;
+  return (
+    <div className="stabilityBar">
+      <span>{label}</span>
+      <div className={invert ? "stabilityTrack invert" : "stabilityTrack"}>
+        <b style={{ width }} />
+      </div>
+      <strong>{formatRatio(clean)}</strong>
+    </div>
   );
 }
 
@@ -1540,6 +1605,73 @@ function objectStateSummary({
   };
 }
 
+function summarizeObjectStability(objectsOrStates = []) {
+  const states = objectsOrStates
+    .map((entry) => entry?.objectState ?? entry?.userData?.objectState ?? entry)
+    .filter((state) => state && typeof state === "object");
+  const totalSlots = states.length;
+  const activeStates = states.filter((state) => state.status !== "inactive" && Number(state.slotMass ?? 0) > 0);
+  const count = Math.max(1, states.length);
+  const entropies = states.map((state) => finiteOrZero(state.assignmentEntropy));
+  const confidences = states.map((state) => finiteOrZero(state.confidence));
+  const purities = states
+    .map((state) => firstFinite(state.objectPurity, state.purity, state.maskPurity))
+    .filter(Number.isFinite);
+  const drifts = states
+    .map((state) => firstFinite(state.temporalDrift, state.drift, state.centroidDrift))
+    .filter(Number.isFinite);
+  const mixedSlots = states.filter((state) => {
+    const entropy = finiteOrZero(state.assignmentEntropy);
+    return entropy >= 0.55 || String(state.status ?? "").includes("mixed");
+  }).length;
+  const lowConfidenceSlots = states.filter((state) => finiteOrZero(state.confidence) < 0.7).length;
+  const meanEntropy = average(entropies);
+  const meanConfidence = average(confidences);
+  const slotUtilization = totalSlots === 0 ? 0 : activeStates.length / totalSlots;
+  const status =
+    totalSlots === 0
+      ? "empty"
+      : mixedSlots > 0
+        ? "mixed"
+        : lowConfidenceSlots > 0
+          ? "low-confidence"
+          : "stable";
+  return {
+    schema: "objgauss-stability-dashboard-v1",
+    status,
+    slotCount: totalSlots,
+    activeSlots: activeStates.length,
+    slotUtilization: round3(slotUtilization),
+    meanEntropy: round3(meanEntropy),
+    maxEntropy: round3(Math.max(0, ...entropies)),
+    meanConfidence: round3(meanConfidence),
+    minConfidence: round3(confidences.length ? Math.min(...confidences) : 0),
+    mixedSlots,
+    lowConfidenceSlots,
+    purityAvailable: purities.length > 0,
+    meanPurity: purities.length ? round3(average(purities)) : null,
+    temporalAvailable: drifts.length > 0,
+    meanTemporalDrift: drifts.length ? round3(average(drifts)) : null,
+  };
+}
+
+function firstFinite(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return NaN;
+}
+
+function finiteOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function average(values) {
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+}
+
 function bboxCorners(bbox) {
   const box = boxFromBbox(bbox);
   return [
@@ -1785,6 +1917,11 @@ function initialModelStates() {
 function formatNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number.toLocaleString() : "-";
+}
+
+function formatCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.trunc(number).toLocaleString() : "-";
 }
 
 function formatVec(value) {
