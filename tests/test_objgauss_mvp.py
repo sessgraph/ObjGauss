@@ -2469,6 +2469,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     input_path = tmp_path / "object_aware_sample.ply"
     summary_path = tmp_path / "kernel-sample-summary.json"
     boundary_path = tmp_path / "renderer-loss-boundary.json"
+    model_path = tmp_path / "trainable-kernel-model.json"
     write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
 
     assert (
@@ -2494,6 +2495,8 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
                 "6",
                 "--summary-output",
                 str(summary_path),
+                "--model-output",
+                str(model_path),
                 "--require-loss-decrease",
             ]
         )
@@ -2513,6 +2516,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert "renderer_gradient_path=analytic-color-assignment-gradient-v1" in output
     assert "image_render_loss=" in output
     assert "image_render_loss_decreased=true" in output
+    assert "model_artifact_schema=objgauss-trainable-kernel-model-artifact-v1" in output
     assert "loss_decreased=true" in output
     assert summary["loss_decreased"] is True
     assert summary["image_render_loss_decreased"] is True
@@ -2524,6 +2528,14 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert summary["image_target_contract"]["targets"][0]["shape"] == [8, 10, 3]
     assert summary["renderer_api"]["status"] == "ready"
     assert summary["renderer_api"]["gradient_path"] == "analytic-color-assignment-gradient-v1"
+    assert summary["model_artifact"]["path"] == str(model_path)
+    model_artifact = json.loads(model_path.read_text(encoding="utf-8"))
+    assert model_artifact["schema"] == "objgauss-trainable-kernel-model-artifact-v1"
+    assert model_artifact["source"]["input"] == str(input_path)
+    assert model_artifact["source"]["sample"]["sampled_count"] == 4
+    assert model_artifact["renderer_api"]["status"] == "ready"
+    assert model_artifact["assignments"][0]["shape"] == [4, 2]
+    assert len(model_artifact["object_states"][0]["states"]) == 2
 
     assert (
         main(

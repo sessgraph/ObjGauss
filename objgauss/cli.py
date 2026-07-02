@@ -80,6 +80,7 @@ from objgauss.core.trainable_kernel import (
 )
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
+from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1176,6 +1177,21 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
     print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
+    if args.model_output:
+        model_artifact = write_trainable_kernel_model_artifact(
+            args.model_output,
+            result,
+            sample=sample,
+            input_path=args.input,
+            renderer_api=summary.get("renderer_api") if isinstance(summary.get("renderer_api"), dict) else None,
+        )
+        summary["model_artifact"] = {
+            "schema": model_artifact["schema"],
+            "path": str(args.model_output),
+            "kind": model_artifact["kind"],
+        }
+        print(f"model_artifact_schema={model_artifact['schema']}")
+        print(f"model_artifact={args.model_output}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -2064,6 +2080,7 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--seed", type=int, default=0)
     kernel_sample.add_argument("--record-every", type=int)
     kernel_sample.add_argument("--summary-output", type=Path)
+    kernel_sample.add_argument("--model-output", type=Path)
     kernel_sample.add_argument("--require-loss-decrease", action="store_true")
     kernel_sample.set_defaults(handler=_training_kernel_sample)
 

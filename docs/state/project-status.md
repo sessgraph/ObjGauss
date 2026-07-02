@@ -376,6 +376,18 @@ torch / GPU rasterizer，不替换 viewer renderer，不把 CPU point splat stub
 dependency-free CPU point splat renderer API，不引入 torch / GPU rasterizer，不提交
 训练输出或大资产，也不替换 viewer renderer。
 
+`TRAIN-MVP-MODEL-ARTIFACT-001` 已完成 trainable kernel MVP model artifact：
+`objgauss/core/trainable_artifact.py` 新增
+`objgauss-trainable-kernel-model-artifact-v1`，可把训练后的 assignments、
+ObjectState summary、decoder colors、rendered RGB、loss telemetry、renderer API summary
+和 source sample provenance 写成可追踪 JSON artifact。`objgauss training kernel-sample`
+新增 `--model-output`，默认写到用户指定路径；训练输出仍不提交进 git。已用
+`public/samples/lego_alpha_v1_objects.ply` 验证 `/tmp/objgauss-trainable-kernel-model.json`
+写出成功，summary 中记录 `model_artifact_schema=objgauss-trainable-kernel-model-artifact-v1`，
+同时保留 `renderer_api_status=ready`、`image_render_loss_decreased=true` 和 source
+sample provenance。该步骤仍不引入 torch / GPU renderer，不替换 viewer renderer，
+不把该 JSON 产物标记为 browser artifact。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

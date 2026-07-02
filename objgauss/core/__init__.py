@@ -89,6 +89,10 @@ _EXPORTS = {
         "objgauss.core.trainable_kernel",
         "train_kernel_mvp_from_cloud",
     ),
+    "trainable_kernel_model_artifact": (
+        "objgauss.core.trainable_artifact",
+        "trainable_kernel_model_artifact",
+    ),
     "trainable_kernel_sample_from_cloud": (
         "objgauss.core.trainable_kernel",
         "trainable_kernel_sample_from_cloud",
@@ -107,6 +111,10 @@ _EXPORTS = {
         "objgauss.core.training_renderer",
         "validate_training_renderer_summary",
     ),
+    "validate_trainable_kernel_model_artifact": (
+        "objgauss.core.trainable_artifact",
+        "validate_trainable_kernel_model_artifact",
+    ),
     "validate_renderer_loss_boundary_summary": (
         "objgauss.core.renderer_loss",
         "validate_renderer_loss_boundary_summary",
@@ -115,6 +123,10 @@ _EXPORTS = {
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
     "write_ply": ("objgauss.core.io", "write_ply"),
     "write_quantized_ogc_payload": ("objgauss.core.quantization", "write_quantized_ogc_payload"),
+    "write_trainable_kernel_model_artifact": (
+        "objgauss.core.trainable_artifact",
+        "write_trainable_kernel_model_artifact",
+    ),
     "write_splat": ("objgauss.core.io", "write_splat"),
 }
 

@@ -36,14 +36,17 @@ from objgauss.core import (
     renderer_loss_boundary_report,
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
+    trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
     validate_renderer_loss_boundary_summary,
+    validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
     validate_training_renderer_summary,
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
+    write_trainable_kernel_model_artifact,
 )
 from objgauss.core.features import extract_features
 from objgauss.core.object_field import field_from_labels
@@ -213,6 +216,13 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert isinstance(renderer_result, TrainingRendererLossResult)
     assert validate_training_renderer_summary(renderer_result.as_dict()) is True
+    artifact = trainable_kernel_model_artifact(
+        result,
+        input_path="fixture://namespace",
+        renderer_api=renderer_result.as_dict(),
+    )
+    assert validate_trainable_kernel_model_artifact(artifact) is True
+    assert write_trainable_kernel_model_artifact is not None
 
 
 def _tiny_cloud() -> GaussianCloud:

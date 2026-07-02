@@ -19,18 +19,18 @@
 
 ## Ready
 
-### TRAIN-MVP-MODEL-ARTIFACT-001: Persist trainable kernel MVP model artifact
+### TRAIN-MODEL-VIEWER-BINDING-001: Load trainable MVP model artifact in Debug OS
 
 - 状态: ready
-- 类型: 标准 PR / training artifact
-- 目标: 在 image-space renderer loss 已进入 objective 后，把 trainable kernel MVP
-  的输出保存为可追踪 model artifact，记录 assignments、ObjectState summary、
-  decoder colors、loss telemetry、renderer API summary 和 source sample provenance。
+- 类型: 标准 PR / frontend debug artifact
+- 目标: 在 trainable kernel MVP model artifact 已可持久化后，让 ObjectState Debug OS
+  能消费小型 artifact fixture，显示 trained assignments / ObjectState summary /
+  renderer loss telemetry，而不是只显示 derived_from_object_id debug projection。
 - 边界:
   - 默认仍不引入 torch / GPU differentiable rasterizer。
   - 不替换现有 Three.js / Spark / WebGPU viewer renderer。
-  - 不提交训练输出；artifact 默认写到用户指定路径或 ignored `outputs/`。
-  - 不默认加载 near-1M / 4.5M 大资产；先用 fixture 和小型 public sample 验证。
+  - 不提交真实训练输出；若需前端 fixture，必须小型、静态、明确为 debug fixture。
+  - 不默认加载 near-1M / 4.5M 大资产。
 
 ## Planned
 
@@ -53,6 +53,49 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-MVP-MODEL-ARTIFACT-001: Persist trainable kernel MVP model artifact
+
+- 状态: done / trainable-kernel-model-artifact
+- 类型: 标准 PR / training artifact
+- 目标: 在 image-space renderer loss 已进入 objective 后，把 trainable kernel MVP
+  的输出保存为可追踪 model artifact，记录 assignments、ObjectState summary、
+  decoder colors、loss telemetry、renderer API summary 和 source sample provenance。
+- 已实施:
+  - `objgauss/core/trainable_artifact.py` 新增
+    `objgauss-trainable-kernel-model-artifact-v1`。
+  - artifact 记录 source input / sample provenance、training summary、renderer API
+    summary、decoder colors、per-frame assignment matrix、ObjectState summary、
+    derived object ids、rendered RGB 和 artifact policy。
+  - `objgauss.core` lazy namespace 暴露
+    `trainable_kernel_model_artifact(...)`、
+    `write_trainable_kernel_model_artifact(...)` 和
+    `validate_trainable_kernel_model_artifact(...)`。
+  - `objgauss training kernel-sample` 新增 `--model-output`，写出 artifact 后会在
+    summary 中登记 `model_artifact` path / schema / kind。
+- 边界:
+  - 不引入 torch / GPU renderer /真实 3DGS differentiable rasterizer。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出；artifact 默认写到用户指定路径或 ignored `outputs/`。
+  - 当前 JSON artifact 不是 browser-ready model artifact，前端消费需下一 PR 绑定。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_artifact.py tests/test_core_namespace.py`:
+    8 passed。
+  - `uv run --extra dev pytest tests/test_trainable_artifact.py tests/test_core_namespace.py tests/test_trainable_kernel.py tests/test_training_renderer.py`:
+    22 passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "training_kernel_sample"`:
+    1 passed, 64 deselected。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 12 --learning-rate 0.35 --max-points 8 --bind-image-targets --image-width 16 --image-height 12 --image-render-weight 0.5 --seed 8 --summary-output /tmp/objgauss-kernel-model-artifact-summary.json --model-output /tmp/objgauss-trainable-kernel-model.json --require-loss-decrease`:
+    passed；`model_artifact_schema=objgauss-trainable-kernel-model-artifact-v1`、
+    `model_artifact=/tmp/objgauss-trainable-kernel-model.json`、
+    `image_render_loss_decreased=true`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-kernel-model-artifact-summary.json --output /tmp/objgauss-model-artifact-boundary.json --require-point-smoke-ready`:
+    passed；`status=renderer_api_ready`、
+    `upgrade_blockers=['full_3dgs_renderer_not_selected']`。
+  - `uv run --extra dev pytest`: 129 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### TRAIN-IMAGE-LOSS-OPTIM-001: Use image renderer loss in trainable optimization
 
