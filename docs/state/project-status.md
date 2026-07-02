@@ -257,7 +257,19 @@ Debug OS、assignment heatmap 和 Gaussian probe，并支持可选 `ogcLod` / `o
 LOD telemetry。新增 `public/models/ogc-url-fixture/` 下的小型 index / `.ogc` fixture
 只用于验证同源 fetch path，不是训练输出或大资产；`scripts/audit-world-viewer.mjs`
 现在额外打开 URL OGC route，验证模型数变为 8、默认选中 URL OGC artifact、
-`urlOgc=fetch-ogc`，且 LOD 1 解码后仍有 2 个 ObjectState render targets。
+URL OGC route telemetry 可审计，且 LOD 1 解码后仍有 2 个 ObjectState render targets。
+
+`OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
+`src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
+`decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window
+contract 解码全量 payload 或 range payload。`src/App.jsx` 对 fetchable OGC artifact
+会先按 `Range: bytes=start-end` 拉取 `chunk_index` 选中的 LOD byte windows；成功时
+delivery route 记录为 `range-ogc`，不支持 range 的环境才回退 `fetch-ogc`。selected
+OGC telemetry 和 inspector 现在显示 fetched bytes、requested bytes、decoded windows、
+`OGC route` 与 `OGC bytes`。`scripts/audit-world-viewer.mjs` 在 URL OGC fixture 上验证
+LOD 1 只请求 2 个 byte windows / 20 bytes，并仍能生成 2 个 ObjectState render targets、
+assignment heatmap 和 Gaussian probe。该切片不改变 OGC writer、record format、
+manifest contract，不实现 VQ / entropy / WebGPU decoder，也不提交大资产。
 
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /

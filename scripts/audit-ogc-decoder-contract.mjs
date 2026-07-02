@@ -1,9 +1,11 @@
 import {
   decodeQuantizedOgcChunk,
   decodeQuantizedOgcPayload,
+  decodeQuantizedOgcPayloadWindows,
   QUANTIZED_OGC_PAYLOAD_SCHEMA,
   QUANTIZED_OGC_RECORD_BYTE_SIZE,
   QUANTIZED_OGC_RECORD_FORMAT,
+  quantizedOgcReadWindows,
   validateQuantizedOgcIndex,
 } from "../src/ogcDecoder.js";
 import {
@@ -65,6 +67,26 @@ assertEqual(lodChunk.points.length, 1, "LOD chunk point count");
 assertEqual(lodChunk.points[0].lodLevel, 1, "LOD point marker");
 assertEqual(lodChunk.chunk.lod.schema, "objgauss-object-aware-lod-v1", "chunk LOD metadata preserved");
 
+const windows = quantizedOgcReadWindows(index, { lodLevel: 1 });
+assertEqual(windows.length, 2, "LOD read window count");
+assertEqual(windows[0].byteOffset, 0, "LOD read window 0 offset");
+assertEqual(windows[0].byteLength, QUANTIZED_OGC_RECORD_BYTE_SIZE, "LOD read window 0 length");
+assertEqual(windows[1].byteOffset, 2 * QUANTIZED_OGC_RECORD_BYTE_SIZE, "LOD read window 1 offset");
+assertEqual(windows[1].byteLength, QUANTIZED_OGC_RECORD_BYTE_SIZE, "LOD read window 1 length");
+const windowDecoded = decodeQuantizedOgcPayloadWindows(
+  windows.map((window) => ({
+    chunkId: window.chunkId,
+    byteOffset: window.byteOffset,
+    buffer: payload.slice(window.byteOffset, window.byteOffset + window.byteLength),
+  })),
+  index,
+  { lodLevel: 1 },
+);
+assertEqual(windowDecoded.points.length, 2, "windowed LOD decode point count");
+assertEqual(windowDecoded.metadata.decodedWindows, 2, "windowed LOD decode window count");
+assertEqual(windowDecoded.points[0].objectId, 0, "windowed LOD first object id");
+assertEqual(windowDecoded.points[1].objectId, 1, "windowed LOD second object id");
+
 const routes = resolveModelArtifactRoutes(fixtureManifest());
 assertEqual(routes.compressedChunked.role, "compressed_chunked", "compressed chunked route role");
 assertEqual(browserReadyArtifact({ modelArtifactRoutes: routes }, "compressed_chunked").path, "/samples/fixture.ogc", "browserReadyArtifact compressed path");
@@ -76,6 +98,7 @@ console.log(
     `chunks=${decoded.chunks.length}`,
     `objects=${decoded.objects.length}`,
     `lodLevelPoints=${lodChunk.points.length}`,
+    `windows=${windows.length}`,
     `compressedRoute=${routes.compressedChunked.role}`,
   ].join(" "),
 );

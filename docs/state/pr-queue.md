@@ -72,6 +72,44 @@
 
 ## Done
 
+### OGC-RANGE-LOADER-001: Load OGC LOD chunks through byte-range windows
+
+- 状态: done / browser-ogc-range-loader
+- 类型: 标准 PR / browser delivery
+- 目标: 将 URL OGC route 从“fetch 整个 payload 后本地选 chunk”推进到按
+  `chunk_index` / LOD byte window 拉取 payload 范围，证明 viewer 能真正走
+  chunk loader 路径。
+- 已实施:
+  - `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
+    `decodeQuantizedOgcPayloadWindows(...)`，同一套 chunk / LOD window 解析同时服务
+    全量 payload 和 range payload。
+  - `src/App.jsx` 的 fetchable OGC loader 现在先按 `Range: bytes=start-end`
+    拉取 `chunk_index` 选中的 LOD byte windows；浏览器支持 range 时使用
+    `loadRoute=range-ogc`，否则回退 `fetch-ogc`。
+  - selected OGC telemetry 新增 fetched bytes、requested bytes 和 decoded windows；
+    inspector 显示 `OGC route` 与 `OGC bytes`，便于审查是否真的按窗口加载。
+  - `scripts/audit-ogc-decoder-contract.mjs` 验证 LOD 1 read windows 和 windowed decode。
+  - `scripts/audit-world-viewer.mjs` 在 URL OGC route 下断言
+    `data-ogc-artifact-load-route=range-ogc`、`decodedWindows=2`、`fetchedBytes=20`、
+    `requestedBytes=20`，并继续验证 ObjectState render target、assignment heatmap
+    和 Gaussian probe。
+- 边界:
+  - 不改变 OGC writer、quantization schema、record format、chunk index schema 或
+    manifest contract。
+  - 不实现 VQ / adaptive SH / entropy coding / WebGPU decoder。
+  - 不提交 near-1M / 4.5M 大资产；继续使用小型 URL OGC fixture 验证 browser path。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不启动训练或引入 torch / gsplat。
+- 验证:
+  - `npm run audit:ogc-decoder-contract`: passed；输出 `windows=2`。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `urlOgc=range-ogc`；截图 `/tmp/objgauss-world-viewer-url-ogc.png` 显示
+    `OGC route range-ogc` 与 `OGC bytes 20 / 20`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-URL-ARTIFACT-001: Inject compressed OGC artifact through URL parameters
 
 - 状态: done / url-ogc-browser-delivery

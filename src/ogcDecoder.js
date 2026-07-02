@@ -34,22 +34,72 @@ export function decodeQuantizedOgcPayload(payloadBuffer, index, options = {}) {
   };
 }
 
+export function quantizedOgcReadWindows(index, options = {}) {
+  validateQuantizedOgcIndex(index);
+  return selectChunks(index, options).map((chunk) => chunkReadWindow(chunk, options));
+}
+
+export function decodeQuantizedOgcPayloadWindows(payloadWindows, index, options = {}) {
+  validateQuantizedOgcIndex(index);
+  const windowsByChunk = new Map(
+    payloadWindows.map((window) => [Number(window.chunkId), window]),
+  );
+  const chunks = selectChunks(index, options);
+  const points = [];
+  const decodedChunks = [];
+  for (const chunk of chunks) {
+    const window = chunkReadWindow(chunk, options);
+    const payloadWindow = windowsByChunk.get(Number(chunk.chunk_id));
+    if (!payloadWindow) {
+      throw new Error(`OGC payload window for chunk ${chunk.chunk_id} is missing`);
+    }
+    const result = decodeQuantizedOgcChunk(payloadWindow.buffer, index, chunk, {
+      ...options,
+      payloadByteOffsetBase: Number(payloadWindow.byteOffset ?? window.byteOffset),
+    });
+    points.push(...result.points);
+    decodedChunks.push(result.chunk);
+  }
+  return {
+    points,
+    chunks: decodedChunks,
+    objects: Array.isArray(index.objects) ? index.objects : [],
+    lod: index.lod ?? null,
+    payload: index.payload,
+    metadata: {
+      schema: index.schema ?? "",
+      sortKey: index.sort_key ?? "",
+      gaussianCount: index.gaussian_count ?? points.length,
+      objectCount: index.object_count ?? 0,
+      decodedGaussians: points.length,
+      decodedChunks: decodedChunks.length,
+      decodedWindows: payloadWindows.length,
+      recordFormat: index.payload.record_format,
+    },
+  };
+}
+
 export function decodeQuantizedOgcChunk(payloadBuffer, index, chunkOrId, options = {}) {
   validateQuantizedOgcIndex(index);
   const chunk = resolveChunk(index, chunkOrId);
-  const level = resolveChunkLodLevel(chunk, options.lodLevel);
-  const byteOffset = Number(level?.byte_offset ?? chunk.byte_offset);
-  const byteLength = Number(level?.byte_length ?? chunk.byte_length);
-  const recordCount = Number(level?.record_count ?? level?.gaussian_count ?? chunk.record_count);
-  validateChunkReadWindow({ chunk, byteOffset, byteLength, recordCount, payloadBuffer });
+  const window = chunkReadWindow(chunk, options);
+  const byteOffsetBase = Number(options.payloadByteOffsetBase ?? 0);
+  const localByteOffset = window.byteOffset - byteOffsetBase;
+  validateChunkReadWindow({
+    chunk,
+    byteOffset: localByteOffset,
+    byteLength: window.byteLength,
+    recordCount: window.recordCount,
+    payloadBuffer,
+  });
 
   const view = new DataView(payloadBuffer);
   const points = [];
   const aabbMin = numericVec3(chunk.aabb_min, `chunk ${chunk.chunk_id} aabb_min`);
   const aabbMax = numericVec3(chunk.aabb_max, `chunk ${chunk.chunk_id} aabb_max`);
   const span = aabbMax.map((value, axis) => value - aabbMin[axis]);
-  for (let row = 0; row < recordCount; row += 1) {
-    const offset = byteOffset + row * QUANTIZED_OGC_RECORD_BYTE_SIZE;
+  for (let row = 0; row < window.recordCount; row += 1) {
+    const offset = localByteOffset + row * QUANTIZED_OGC_RECORD_BYTE_SIZE;
     const xq = view.getUint16(offset, true);
     const yq = view.getUint16(offset + 2, true);
     const zq = view.getUint16(offset + 4, true);
@@ -75,7 +125,7 @@ export function decodeQuantizedOgcChunk(payloadBuffer, index, chunkOrId, options
       shDegree: 0,
       objectColor: colorForObject(objectId),
       chunkId: chunk.chunk_id,
-      lodLevel: level?.level ?? null,
+      lodLevel: window.lodLevel,
     });
   }
   return {
@@ -83,9 +133,9 @@ export function decodeQuantizedOgcChunk(payloadBuffer, index, chunkOrId, options
     chunk: {
       chunkId: chunk.chunk_id,
       objectId: chunk.object_id,
-      recordCount,
-      byteOffset,
-      byteLength,
+      recordCount: window.recordCount,
+      byteOffset: window.byteOffset,
+      byteLength: window.byteLength,
       lod: chunk.lod ?? null,
       aabbMin,
       aabbMax,
@@ -117,6 +167,23 @@ export function validateQuantizedOgcIndex(index) {
     validateChunkMetadata(chunk);
   }
   return true;
+}
+
+function chunkReadWindow(chunk, options) {
+  const level = resolveChunkLodLevel(chunk, options.lodLevel);
+  const byteOffset = Number(level?.byte_offset ?? chunk.byte_offset);
+  const byteLength = Number(level?.byte_length ?? chunk.byte_length);
+  const recordCount = Number(level?.record_count ?? level?.gaussian_count ?? chunk.record_count);
+  validateReadWindowShape({ chunk, byteOffset, byteLength, recordCount });
+  return {
+    chunkId: Number(chunk.chunk_id),
+    objectId: Number(chunk.object_id),
+    byteOffset,
+    byteLength,
+    byteEnd: byteOffset + Math.max(0, byteLength - 1),
+    recordCount,
+    lodLevel: level?.level ?? null,
+  };
 }
 
 function selectChunks(index, options) {
@@ -170,7 +237,7 @@ function validateChunkMetadata(chunk) {
   numericVec3(chunk.aabb_max, `chunk ${chunk.chunk_id} aabb_max`);
 }
 
-function validateChunkReadWindow({ chunk, byteOffset, byteLength, recordCount, payloadBuffer }) {
+function validateReadWindowShape({ chunk, byteOffset, byteLength, recordCount }) {
   if (!Number.isInteger(byteOffset) || byteOffset < 0) {
     throw new Error(`OGC chunk ${chunk.chunk_id} read byte_offset is invalid`);
   }
@@ -183,6 +250,10 @@ function validateChunkReadWindow({ chunk, byteOffset, byteLength, recordCount, p
   if (byteLength !== recordCount * QUANTIZED_OGC_RECORD_BYTE_SIZE) {
     throw new Error(`OGC chunk ${chunk.chunk_id} byte_length does not match record_count`);
   }
+}
+
+function validateChunkReadWindow({ chunk, byteOffset, byteLength, recordCount, payloadBuffer }) {
+  validateReadWindowShape({ chunk, byteOffset, byteLength, recordCount });
   if (byteOffset + byteLength > payloadBuffer.byteLength) {
     throw new Error(`OGC chunk ${chunk.chunk_id} read window exceeds payload byteLength`);
   }

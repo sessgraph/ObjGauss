@@ -584,10 +584,13 @@ async function auditUrlOgcArtifact(browser, url) {
         pill?.getAttribute("data-model-load-state") === "loaded" &&
         shell?.getAttribute("data-model-count") === "8" &&
         shell?.getAttribute("data-selected-model") === "ogc-url-artifact" &&
-        shell?.getAttribute("data-ogc-artifact-load-route") === "fetch-ogc" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
         shell?.getAttribute("data-ogc-artifact-index-path") === "/models/ogc-url-fixture/scene.index.json" &&
         shell?.getAttribute("data-ogc-artifact-payload-path") === "/models/ogc-url-fixture/scene.ogc" &&
         shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
     }, undefined, { timeout: 15000 });
@@ -627,7 +630,7 @@ async function auditUrlOgcArtifact(browser, url) {
       throw new Error(`expected URL OGC Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc.png", fullPage: false });
-    return { status: "fetch-ogc" };
+    return { status: "range-ogc" };
   } finally {
     await page.close();
   }

@@ -5,7 +5,11 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { catalogSummary, defaultModelIdForCatalog, modelCatalogFromSearch } from "./modelCatalog.js";
 import { browserReadyArtifact } from "./modelArtifactManifest.js";
-import { decodeQuantizedOgcPayload } from "./ogcDecoder.js";
+import {
+  decodeQuantizedOgcPayload,
+  decodeQuantizedOgcPayloadWindows,
+  quantizedOgcReadWindows,
+} from "./ogcDecoder.js";
 import { colorForObject, rgbToCss } from "./palette.js";
 import { parsePly } from "./ply.js";
 
@@ -189,7 +193,7 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
           try {
-            const { artifact, decoded, index } = await loadOgcModel(model);
+            const { artifact, decoded, index, delivery } = await loadOgcModel(model);
             const rendered = worldApi.current?.upsertModel(model, decoded.points);
             if (cancelled) return;
             patchModel(model.id, {
@@ -208,9 +212,12 @@ export default function App() {
                 decodedGaussians: decoded.metadata.decodedGaussians,
                 recordFormat: decoded.metadata.recordFormat,
                 lodLevel: model.ogc?.lodLevel ?? "full",
-                loadRoute: artifact.inlineIndex || artifact.payloadBase64 ? "inline-ogc" : "fetch-ogc",
+                loadRoute: delivery.loadRoute,
                 indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
                 payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
+                fetchedBytes: delivery.fetchedBytes,
+                requestedBytes: delivery.requestedBytes,
+                decodedWindows: delivery.decodedWindows,
               },
             });
           } catch (error) {
@@ -335,6 +342,9 @@ export default function App() {
       data-ogc-artifact-index-path={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.indexPath ?? "" : ""}
       data-ogc-artifact-payload-path={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.payloadPath ?? "" : ""}
       data-ogc-artifact-lod-level={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.lodLevel ?? "" : ""}
+      data-ogc-artifact-fetched-bytes={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.fetchedBytes ?? "" : ""}
+      data-ogc-artifact-requested-bytes={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.requestedBytes ?? "" : ""}
+      data-ogc-artifact-decoded-windows={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.decodedWindows ?? "" : ""}
       data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
       data-assignment-source={selectedAssignmentSource}
       data-stability-dashboard="enabled"
@@ -440,6 +450,8 @@ export default function App() {
             <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
             <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
+            <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
+            <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
             <Meta label="assignment" value={selectedAssignmentSource} />
             <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
           </dl>
@@ -474,14 +486,18 @@ async function loadOgcModel(model) {
     throw new Error("missing browser-ready compressed_chunked artifact");
   }
   const index = await loadOgcIndex(artifact);
-  const payload = await loadOgcPayload(artifact, index);
+  const options = {
+    chunkIds: model.ogc?.chunkIds,
+    lodLevel: model.ogc?.lodLevel,
+  };
+  const payload = await loadOgcPayload(artifact, index, options);
   return {
     artifact,
     index,
-    decoded: decodeQuantizedOgcPayload(payload, index, {
-      chunkIds: model.ogc?.chunkIds,
-      lodLevel: model.ogc?.lodLevel,
-    }),
+    delivery: payload.delivery,
+    decoded: payload.windows
+      ? decodeQuantizedOgcPayloadWindows(payload.windows, index, options)
+      : decodeQuantizedOgcPayload(payload.buffer, index, options),
   };
 }
 
@@ -521,15 +537,80 @@ async function loadOgcIndex(artifact) {
   return response.json();
 }
 
-async function loadOgcPayload(artifact, index) {
-  if (artifact.payloadBase64) return base64ToArrayBuffer(artifact.payloadBase64);
+async function loadOgcPayload(artifact, index, options) {
+  if (artifact.payloadBase64) {
+    const buffer = base64ToArrayBuffer(artifact.payloadBase64);
+    return {
+      buffer,
+      delivery: {
+        loadRoute: "inline-ogc",
+        fetchedBytes: buffer.byteLength,
+        requestedBytes: buffer.byteLength,
+        decodedWindows: 0,
+      },
+    };
+  }
   const payloadPath = artifact.payloadPath ?? artifact.path ?? index?.payload?.path;
   if (!payloadPath || isInlineRoute(payloadPath)) {
     throw new Error("missing fetchable OGC payload");
   }
+  const rangeResult = await tryLoadOgcPayloadWindows(payloadPath, index, options);
+  if (rangeResult) return rangeResult;
   const response = await fetch(payloadPath);
   if (!response.ok) throw new Error(`OGC payload HTTP ${response.status}`);
-  return response.arrayBuffer();
+  const buffer = await response.arrayBuffer();
+  return {
+    buffer,
+    delivery: {
+      loadRoute: "fetch-ogc",
+      fetchedBytes: buffer.byteLength,
+      requestedBytes: buffer.byteLength,
+      decodedWindows: 0,
+    },
+  };
+}
+
+async function tryLoadOgcPayloadWindows(payloadPath, index, options) {
+  const readWindows = quantizedOgcReadWindows(index, options);
+  if (!readWindows.length) return null;
+  try {
+    const windows = await Promise.all(
+      readWindows.map((window) => fetchOgcPayloadWindow(payloadPath, window)),
+    );
+    return {
+      windows,
+      delivery: {
+        loadRoute: "range-ogc",
+        fetchedBytes: windows.reduce((total, window) => total + window.buffer.byteLength, 0),
+        requestedBytes: readWindows.reduce((total, window) => total + window.byteLength, 0),
+        decodedWindows: windows.length,
+      },
+    };
+  } catch (error) {
+    console.warn(`OGC range payload load failed; falling back to full payload fetch: ${error.message}`);
+    return null;
+  }
+}
+
+async function fetchOgcPayloadWindow(payloadPath, window) {
+  const response = await fetch(payloadPath, {
+    headers: {
+      Range: `bytes=${window.byteOffset}-${window.byteEnd}`,
+    },
+  });
+  if (response.status !== 206) {
+    throw new Error(`OGC payload range ${window.chunkId} HTTP ${response.status}`);
+  }
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength !== window.byteLength) {
+    throw new Error(`OGC payload range ${window.chunkId} returned ${buffer.byteLength}/${window.byteLength} bytes`);
+  }
+  return {
+    chunkId: window.chunkId,
+    byteOffset: window.byteOffset,
+    byteLength: window.byteLength,
+    buffer,
+  };
 }
 
 function base64ToArrayBuffer(value) {
@@ -2335,6 +2416,13 @@ function formatFrame(index, count) {
   const frameCount = Number(count);
   if (!Number.isFinite(frameIndex) || !Number.isFinite(frameCount) || frameCount <= 0) return "-";
   return `${Math.trunc(frameIndex)} / ${Math.trunc(frameCount)}`;
+}
+
+function formatByteWindow(fetched, requested) {
+  const fetchedBytes = Number(fetched);
+  const requestedBytes = Number(requested);
+  if (!Number.isFinite(fetchedBytes) || !Number.isFinite(requestedBytes)) return "-";
+  return `${Math.trunc(fetchedBytes)} / ${Math.trunc(requestedBytes)}`;
 }
 
 function round3(value) {
