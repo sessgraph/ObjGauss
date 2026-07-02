@@ -160,10 +160,17 @@ button:focus-visible {
 }
 
 .glassButton:hover,
+.glassButton.active,
 .modelPill:hover,
 .modelPill.selected {
   border-color: rgba(93, 238, 249, 0.58);
   background: rgba(36, 209, 219, 0.16);
+}
+
+.topActions {
+  display: flex;
+  justify-self: end;
+  gap: 8px;
 }
 
 .objectDock {
@@ -213,6 +220,146 @@ button:focus-visible {
   width: min(386px, calc(100vw - 52px));
   padding: 18px;
   border-radius: 22px;
+}
+
+.debugPanel {
+  left: 26px;
+  top: 126px;
+  width: min(390px, calc(100vw - 52px));
+  padding: 16px;
+  border-radius: 22px;
+}
+
+.debugHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.debugHeader h2 {
+  margin: 0;
+  color: #f3fbfd;
+  font-size: 16px;
+  font-weight: 780;
+}
+
+.debugHeader span {
+  color: #9fb1bd;
+  font-size: 12px;
+}
+
+.debugHeader strong {
+  color: #9ff5ff;
+  font-size: 15px;
+}
+
+.debugMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.assignmentHeatmap {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 14px;
+}
+
+.assignmentRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 48px;
+  min-height: 22px;
+  align-items: center;
+  gap: 8px;
+  color: #aabdc7;
+  font-size: 11px;
+}
+
+.assignmentTrack {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.assignmentTrack b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  box-shadow: 0 0 14px rgba(139, 246, 255, 0.24);
+}
+
+.assignmentRow strong {
+  color: #eefbff;
+  font-size: 11px;
+  text-align: right;
+}
+
+.debugStateGrid {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0 0 14px;
+}
+
+.debugStateGrid dt {
+  color: #8ea0aa;
+  font-size: 11px;
+}
+
+.debugStateGrid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #edf9fb;
+  font-size: 11px;
+  font-weight: 640;
+}
+
+.objectStateList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.objectStateRow {
+  display: grid;
+  min-height: 34px;
+  grid-template-columns: 12px minmax(0, 1fr) 42px 28px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 10px;
+  color: #eaf8fb;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.objectStateRow.selected {
+  border-color: rgba(93, 238, 249, 0.62);
+}
+
+.objectStateRow.hidden {
+  opacity: 0.48;
+}
+
+.objectStateRow span:nth-child(2),
+.objectStateRow small,
+.objectStateRow i {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.objectStateRow i {
+  color: #9fb1bd;
+  font-style: normal;
+  text-align: right;
 }
 
 .inspectorHead {
@@ -271,6 +418,23 @@ button:focus-visible {
 
   .glassButton {
     justify-self: stretch;
+  }
+
+  .topActions {
+    justify-self: stretch;
+  }
+
+  .topActions .glassButton {
+    flex: 1 1 0;
+  }
+
+  .debugPanel {
+    top: auto;
+    left: 14px;
+    bottom: 304px;
+    width: calc(100vw - 28px);
+    max-height: 28vh;
+    overflow: auto;
   }
 
   .floatingInspector {

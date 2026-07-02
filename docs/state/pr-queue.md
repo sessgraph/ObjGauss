@@ -54,6 +54,41 @@
 
 ## Done
 
+### OBJECT-DEBUG-UI-001: Add Phase 1 ObjectState Debug OS overlay
+
+- 状态: done / phase1-debug-os
+- 类型: 标准 PR / frontend debugging workflow
+- 目标: 将默认 Three.js world viewer 从“好看的模型世界”推进为 Phase 1
+  ObjectState 调试器，能直接查看 `A[N,K]` debug projection、ObjectState overlay、
+  Gaussian probe 和对象级 hide / show。
+- 已实施:
+  - `src/App.jsx` 新增 ObjectState Debug panel，显示 confidence、normalized
+    assignment entropy、slot mass、centroid、bbox、hover target、hidden object count。
+  - Three.js scene 为每个 object render target 绑定 `objgauss-object-state-debug-v1`
+    metadata，并显示 ObjectState centroid / bbox overlay。
+  - 当前 Phase 1 assignment source 明确为 `derived_from_object_id` 或
+    `compressed_placeholder_assignment`，不伪装成 trainable solver 输出。
+  - Gaussian click / audit probe 可显示单个 Gaussian 的 `A[n,k]` vector；
+    heatmap 使用 object assignment color grouping。
+  - Debug panel 提供 per-object visibility toggle，用于检查 cluster 是否可独立隐藏。
+  - `scripts/audit-world-viewer.mjs` 已把 Debug OS 纳入验收：检查 debug panel、
+    assignment heatmap、Gaussian probe、debug protocol 和 object visibility toggle。
+- 边界:
+  - 不启动模型训练，不引入 trainable solver，不新增 torch / SAM / DINO / CLIP 依赖。
+  - 不把 hard `object_id` 当 primary state；前端只把它标记为 Phase 1 debug
+    projection source。
+  - 不替换 Spark、Gaussian OIT、WebGPU tile / compute、OGC decoder 或现有 renderer
+    kernels。
+  - 不提交大资产或 ignored `outputs/` 训练产物。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: passed；`debugOs=object-state-debug-os-v1`、
+    `assignmentSlots=4`、`selectedGaussian="0"`、`sidebars=0`，截图
+    `/tmp/objgauss-world-viewer.png`。沙箱内直接启动本地 server 受限，提权重跑通过；
+    日志中出现 existing 5395 app 的 port-in-use 信息，但 audit 成功连接并通过。
+  - `uv run --extra dev pytest`: 106 passed。
+- 完成 commit: this commit
+
 ### CLIP-COVERAGE-001: Improve foreground mask coverage for semantic promotion
 
 - 状态: done / foreground-coverage-recovery

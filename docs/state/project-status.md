@@ -264,6 +264,17 @@ PLY，只用 compressed-placeholder 为每个对象生成独立占位 Gaussian c
 shader、object-state buffer、picking 和 OGC decoder 等核心渲染算法，未引入外部
 renderer。
 
+`OBJECT-DEBUG-UI-001` 已完成 Phase 1 ObjectState Debug OS 第一切片：默认 Three.js
+world viewer 现在不仅展示对象，还显示 `objgauss-object-state-debug-v1` 调试协议。
+`src/App.jsx` 为每个 object render target 派生 ObjectState debug metadata，显示
+centroid / bbox overlay、confidence、normalized assignment entropy、slot mass、
+mass fraction、centroid、bbox 和 per-object visibility toggle。Gaussian click / audit
+probe 能显示单个 Gaussian 的 `A[n,k]` vector，assignment heatmap 当前明确标记为
+`derived_from_object_id` 或 `compressed_placeholder_assignment`，用于 Phase 1
+visual sanity check，不伪装成 trainable solver 输出。`scripts/audit-world-viewer.mjs`
+已经把 Debug OS 纳入 world viewer 验收，检查 debug panel、assignment heatmap、
+Gaussian probe、debug protocol 和 object visibility toggle。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

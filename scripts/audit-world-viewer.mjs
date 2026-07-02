@@ -21,6 +21,9 @@ try {
       `draggableObjects=${summary.draggableObjectCount}`,
       `selectedModel=${JSON.stringify(summary.selectedModelId)}`,
       `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
+      `debugOs=${summary.debugOs}`,
+      `assignmentSlots=${summary.assignmentSlots}`,
+      `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
     ].join(" "),
@@ -55,7 +58,8 @@ async function auditWorld(url) {
       return (
         shell?.getAttribute("data-sidebars") === "none" &&
         shell?.getAttribute("data-frosted-ui") === "enabled" &&
-        shell?.getAttribute("data-app-mode") === "vr-three-world"
+        shell?.getAttribute("data-app-mode") === "vr-three-world" &&
+        shell?.getAttribute("data-debug-os") === "object-state"
       );
     }, undefined, { timeout: 15000 });
 
@@ -66,6 +70,8 @@ async function auditWorld(url) {
     const canvas = page.locator("canvas[data-three-world-canvas='true']");
     await canvas.waitFor({ timeout: 15000 });
     await page.locator(".glassHud.floatingInspector").waitFor({ timeout: 15000 });
+    await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
     const pills = await page.locator(".modelPill").count();
     if (pills < 5) {
       throw new Error(`expected at least 5 model pills, found ${pills}`);
@@ -98,6 +104,42 @@ async function auditWorld(url) {
         shell?.getAttribute("data-selected-object") !== ""
       );
     }, objectSelection.selectionId, { timeout: 15000 });
+    const gaussianSelection = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        protocol: world?.debugProtocol ?? null,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, objectSelection.selectionId);
+    if (!gaussianSelection.ok) {
+      throw new Error("expected audit handle to select a Gaussian assignment probe");
+    }
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      return (
+        shell?.getAttribute("data-selected-gaussian") !== "" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) > 0
+      );
+    }, undefined, { timeout: 15000 });
+    if (gaussianSelection.protocol !== "object-state-debug-os-v1") {
+      throw new Error(`unexpected debug protocol: ${gaussianSelection.protocol}`);
+    }
+    if (gaussianSelection.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`unexpected assignment source: ${gaussianSelection.assignmentSource}`);
+    }
+    const visibilityToggle = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const selection = world?.objectSelections?.[0];
+      const before = world?.visibleObjectCount ?? null;
+      const visibleAfterToggle = world?.toggleObjectVisibilityForAudit?.(selection?.selectionId) ?? null;
+      const after = window.__OBJGAUSS_WORLD__?.visibleObjectCount ?? null;
+      return { before, after, visibleAfterToggle };
+    });
+    if (!(visibilityToggle.after < visibilityToggle.before)) {
+      throw new Error(`expected object visibility toggle to reduce visible count: ${JSON.stringify(visibilityToggle)}`);
+    }
 
     const relevantIssues = consoleIssues.filter(
       (issue) =>
@@ -121,14 +163,25 @@ async function auditWorld(url) {
         selectedId: handle.selectedId,
         selectedModelId: handle.selectedModelId,
         selectedObjectId: handle.selectedObjectId,
+        debugMode: handle.debugMode,
+        debugProtocol: handle.debugProtocol,
       };
     });
+    const assignmentSlots = await page
+      .locator("[data-assignment-heatmap='true']")
+      .evaluate((node) => Number(node.getAttribute("data-assignment-slots") ?? 0));
+    const selectedGaussian = await page
+      .locator(".worldShell")
+      .evaluate((node) => node.getAttribute("data-selected-gaussian"));
     return {
       modelCount: world.modelCount,
       objectCount: world.objectCount,
       draggableObjectCount: world.draggableObjectCount,
       selectedModelId: world.selectedModelId,
       selectedObjectId: world.selectedObjectId,
+      debugOs: world.debugProtocol,
+      assignmentSlots,
+      selectedGaussian,
       sidebars,
       screenshotPath,
     };
