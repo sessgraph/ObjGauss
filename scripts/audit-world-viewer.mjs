@@ -27,6 +27,7 @@ try {
       `trainableRoute=${summary.trainableArtifactLoadRoute}`,
       `trainableArtifact=${JSON.stringify(summary.trainableArtifactPath)}`,
       `trainableFrame=${summary.trainableFrameIndex}/${summary.trainableFrameCount}`,
+      `urlArtifact=${summary.urlArtifactStatus}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -330,6 +331,7 @@ async function auditWorld(url) {
     const screenshotPath = "/tmp/objgauss-world-viewer.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });
     const mobileScreenshotPath = await auditMobileWorld(browser, url);
+    const urlArtifact = await auditUrlTrainableArtifact(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -455,6 +457,7 @@ async function auditWorld(url) {
       trainableArtifactPath: world.trainableArtifactPath,
       trainableFrameIndex: world.trainableFrameIndex,
       trainableFrameCount: world.trainableFrameCount,
+      urlArtifactStatus: urlArtifact.status,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
@@ -506,6 +509,57 @@ async function auditMobileWorld(browser, url) {
     const screenshotPath = "/tmp/objgauss-world-viewer-mobile.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });
     return screenshotPath;
+  } finally {
+    await page.close();
+  }
+}
+
+async function auditUrlTrainableArtifact(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    const artifactUrl = new URL(url);
+    artifactUrl.searchParams.set("trainableArtifact", "/models/trainable-mvp-debug/model-artifact.json");
+    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-url-artifact']");
+      return (
+        pill?.getAttribute("data-model-load-state") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "8" &&
+        shell?.getAttribute("data-selected-model") === "trainable-url-artifact" &&
+        shell?.getAttribute("data-trainable-artifact-load-route") === "fetch-json" &&
+        shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = world?.objectSelections?.find((entry) => entry.modelId === "trainable-url-artifact");
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+      };
+    });
+    if (!selection.ok || selection.modelId !== "trainable-url-artifact") {
+      throw new Error(`expected URL artifact object selection: ${JSON.stringify(selection)}`);
+    }
+    await page.locator("[data-trainable-frame-button='1']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const frameSelector = document.querySelector("[data-trainable-frame-selector='true']");
+      return (
+        shell?.getAttribute("data-selected-model") === "trainable-url-artifact" &&
+        shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
+        frameSelector?.getAttribute("data-selected-frame") === "1" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-artifact.png", fullPage: false });
+    return { status: "fetch-json" };
   } finally {
     await page.close();
   }

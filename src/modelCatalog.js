@@ -326,3 +326,47 @@ export function catalogSummary(models = MODEL_CATALOG) {
     processedCount: models.filter((model) => model.stage === "processed").length,
   };
 }
+
+export function modelCatalogFromSearch(search = "") {
+  const artifactPath = trainableArtifactPathFromSearch(search);
+  if (!artifactPath) return MODEL_CATALOG;
+  return [
+    ...MODEL_CATALOG,
+    {
+      id: "trainable-url-artifact",
+      name: "URL trainable artifact",
+      label: "URL Artifact",
+      loadMode: "trainable-artifact",
+      kind: "trainable-kernel-model-artifact",
+      stage: "url-debug-artifact",
+      objectCount: 0,
+      galleryPosition: [-5.55, 0, 4.52],
+      accent: "#9eeaf2",
+      displayScale: 1.92,
+      pointSize: 0.082,
+      maxDisplayPoints: 256,
+      trainableArtifactPath: artifactPath,
+      compression: {
+        layout: "trainable-kernel-artifact-json",
+        status: "url-debug-artifact",
+        chunkRoot: "/models/url-trainable-artifact/objects/",
+      },
+    },
+  ];
+}
+
+export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
+  return models.find((model) => model.id === "trainable-url-artifact")?.id ?? models[0]?.id ?? "";
+}
+
+function trainableArtifactPathFromSearch(search) {
+  const params = new URLSearchParams(String(search ?? "").replace(/^\?/, ""));
+  const rawPath = params.get("trainableArtifact") ?? params.get("trainable-artifact");
+  if (!rawPath) return "";
+  const path = rawPath.trim();
+  if (!path || path.length > 240) return "";
+  if (!path.startsWith("/") || path.startsWith("//")) return "";
+  if (path.includes("\n") || path.includes("\r")) return "";
+  if (!path.endsWith(".json")) return "";
+  return path;
+}

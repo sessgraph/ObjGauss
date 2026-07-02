@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { MODEL_CATALOG, catalogSummary } from "./modelCatalog.js";
+import { catalogSummary, defaultModelIdForCatalog, modelCatalogFromSearch } from "./modelCatalog.js";
 import { browserReadyArtifact } from "./modelArtifactManifest.js";
 import { decodeQuantizedOgcPayload } from "./ogcDecoder.js";
 import { colorForObject, rgbToCss } from "./palette.js";
@@ -15,20 +15,25 @@ const INITIAL_CAMERA = {
 };
 
 export default function App() {
+  const modelCatalog = useMemo(
+    () => modelCatalogFromSearch(typeof window === "undefined" ? "" : window.location.search),
+    [],
+  );
+  const initialModelId = useMemo(() => defaultModelIdForCatalog(modelCatalog), [modelCatalog]);
   const worldApi = useRef(null);
   const loadStarted = useRef(false);
   const [worldReady, setWorldReady] = useState(false);
   const [selection, setSelection] = useState(() => ({
-    modelId: MODEL_CATALOG[0]?.id ?? "",
+    modelId: initialModelId,
     objectId: null,
-    selectionId: MODEL_CATALOG[0]?.id ?? "",
+    selectionId: initialModelId,
   }));
-  const [models, setModels] = useState(() => initialModelStates());
+  const [models, setModels] = useState(() => initialModelStates(modelCatalog));
   const [debugMode, setDebugMode] = useState(true);
   const [hoveredTarget, setHoveredTarget] = useState(null);
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
-  const summary = useMemo(() => catalogSummary(MODEL_CATALOG), []);
+  const summary = useMemo(() => catalogSummary(modelCatalog), [modelCatalog]);
   const loadedCount = useMemo(
     () => Object.values(models).filter((model) => ["loaded", "compressed"].includes(model.status)).length,
     [models],
@@ -178,7 +183,7 @@ export default function App() {
     let cancelled = false;
 
     async function loadModels() {
-      for (const model of MODEL_CATALOG) {
+      for (const model of modelCatalog) {
         if (cancelled) return;
         if (model.loadMode === "ogc-chunked") {
           const startedAt = performance.now();
@@ -298,7 +303,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [patchModel, worldReady]);
+  }, [modelCatalog, patchModel, worldReady]);
 
   return (
     <main
@@ -307,7 +312,7 @@ export default function App() {
       data-three-renderer="enabled"
       data-sidebars="none"
       data-frosted-ui="enabled"
-      data-model-count={MODEL_CATALOG.length}
+      data-model-count={modelCatalog.length}
       data-loaded-count={loadedCount}
       data-selected-model={selected?.id ?? ""}
       data-object-count={objectCount}
@@ -347,7 +352,7 @@ export default function App() {
       data-trainable-artifact-frame-count={selected?.delivery?.frameCount ?? ""}
     >
       <ThreeWorld
-        models={MODEL_CATALOG}
+        models={modelCatalog}
         selectedTargetId={selection.selectionId || selectedId}
         debugMode={debugMode}
         hiddenSelectionIds={hiddenObjects}
@@ -2267,9 +2272,9 @@ function Meta({ label, value }) {
   );
 }
 
-function initialModelStates() {
+function initialModelStates(models = []) {
   return Object.fromEntries(
-    MODEL_CATALOG.map((model) => [
+    models.map((model) => [
       model.id,
       {
         ...model,

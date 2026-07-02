@@ -423,6 +423,15 @@ viewport 中选择 Trainable MVP、点击 `f1`，并验证 `trainableFrame=1/2`�
 和 hover highlight 仍来自 `trainable_kernel_model_artifact`。该切片只增强已加载 artifact
 的可交互调试，不改变训练算法、不引入 torch / gsplat / CUDA、不提交训练输出。
 
+`TRAINABLE-URL-ARTIFACT-001` 已完成 Debug OS 的 URL trainable artifact 注入入口：
+`src/modelCatalog.js` 新增运行时 catalog builder，当前同源 URL 参数
+`?trainableArtifact=/path/to/model-artifact.json` 会追加 `trainable-url-artifact` 临时模型；
+`src/App.jsx` 使用运行时 catalog，并在 URL artifact 存在时默认选中该模型。该入口仍复用
+`loadMode="trainable-artifact"` 的 schema 校验、frame selector、ObjectState render
+targets、heatmap、stability telemetry 和 Gaussian probe。`scripts/audit-world-viewer.mjs`
+现在额外打开 URL 注入路径，验证模型数变为 8、默认选中 URL artifact、`urlArtifact=fetch-json`
+且 frame 1 可审计。该切片只支持同源 `.json` 路径，不支持远程 URL，不提交训练输出或大模型。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

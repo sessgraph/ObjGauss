@@ -72,6 +72,40 @@
 
 ## Done
 
+### TRAINABLE-URL-ARTIFACT-001: Inject trainable artifact through URL parameter
+
+- 状态: done / trainable-url-artifact-debug
+- 类型: 标准 PR / frontend debug artifact delivery
+- 目标: 让 Debug OS 可以通过 URL 参数加载新的算法处理后 trainable artifact JSON，
+  不需要每次手动修改 `src/modelCatalog.js`。
+- 已实施:
+  - `src/modelCatalog.js` 新增运行时 catalog builder，支持同源
+    `?trainableArtifact=/path/to/model-artifact.json` 注入。
+  - URL artifact 会追加为 `trainable-url-artifact` 临时模型；`src/App.jsx` 使用运行时
+    catalog，并在 URL artifact 存在时默认选中该模型。
+  - URL artifact 复用现有 trainable artifact fetch、schema 校验、frame selector、
+    ObjectState render targets、assignment heatmap、stability dashboard 和 Gaussian probe。
+  - `scripts/audit-world-viewer.mjs` 新增 URL route 验收，打开
+    `?trainableArtifact=/models/trainable-mvp-debug/model-artifact.json`，断言模型数变为 8、
+    默认选中 `trainable-url-artifact`、`urlArtifact=fetch-json`、frame 1 heatmap 可用。
+- 边界:
+  - 只接受同源 `.json` 路径；不支持远程 URL、不支持任意协议。
+  - 不改变 Python 训练算法、artifact schema 或训练输出 writer。
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交真实训练输出或大模型，不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `urlArtifact=fetch-json`、`trainableFrame=1/2`、
+    `trainableArtifact="/models/trainable-mvp-debug/model-artifact.json"`、
+    `assignmentSource=trainable_kernel_model_artifact`。新增截图
+    `/tmp/objgauss-world-viewer-url-artifact.png` 显示 URL artifact 默认选中，模型数为 8。
+    Browser plugin not available；按 frontend-testing-debugging 技能要求使用常规 Playwright /
+    repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-FRAME-DEBUG-001: Add trainable artifact frame selector to Debug OS
 
 - 状态: done / trainable-artifact-frame-debug
