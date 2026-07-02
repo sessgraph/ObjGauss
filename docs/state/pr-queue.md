@@ -72,6 +72,41 @@
 
 ## Done
 
+### OBJECT-SPATIAL-COMPACTNESS-001: Expose spatial continuity in Debug OS
+
+- 状态: done / debug-os-spatial-compactness
+- 类型: 标准 PR / frontend debug metrics
+- 目标: 在 Phase 1 Debug OS 已具备 entropy、purity、temporal drift 和 slot
+  utilization 后，补齐“同一 object 的 Gaussians 是否空间连续”的可审计指标，避免只靠
+  视觉外观判断 cluster 是否碎片化。
+- 已实施:
+  - `src/App.jsx` 在 point cloud、compressed placeholder 和 trainable artifact 三条
+    object render target 路径中，从 Gaussian positions 与 bbox 计算
+    `spatialCompactness`。
+  - ObjectState debug metadata、selected object summaries 和
+    `window.__OBJGAUSS_WORLD__.objectSelections` 现在携带 spatial compactness。
+  - Stability dashboard 新增 `compact` bar 和 `spatial` meta；`.worldShell`
+    telemetry 和 `window.__OBJGAUSS_WORLD__.stabilitySummary` 暴露
+    `meanSpatialCompactness`。
+  - `scripts/audit-world-viewer.mjs` 在 `trainable-mvp-debug` 路径上断言 compactness
+    metric 可用，并把 `compactness` 写入 audit summary。
+- 边界:
+  - 这是 viewer-side debug evidence，不改变 Python 训练算法或 ObjectState solver。
+  - 不引入 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不提交训练输出或大模型，不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `compactness=0.5`、`purity=1`、`temporalDrift=0.018`、
+    `assignmentSource=trainable_kernel_model_artifact`，截图
+    `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。Browser plugin not available；按
+    frontend-testing-debugging 技能要求使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-STABILITY-METRICS-001: Expose purity and temporal drift in Debug OS
 
 - 状态: done / debug-os-purity-temporal-metrics

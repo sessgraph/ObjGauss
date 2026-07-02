@@ -301,6 +301,8 @@ export default function App() {
       data-stability-mean-purity={selectedStability.meanPurity ?? ""}
       data-stability-temporal-available={selectedStability.temporalAvailable ? "true" : "false"}
       data-stability-mean-temporal-drift={selectedStability.meanTemporalDrift ?? ""}
+      data-stability-spatial-available={selectedStability.spatialAvailable ? "true" : "false"}
+      data-stability-mean-spatial-compactness={selectedStability.meanSpatialCompactness ?? ""}
     >
       <ThreeWorld
         models={MODEL_CATALOG}
@@ -579,6 +581,7 @@ function ThreeWorld({
             gaussianCount: objectGaussianCount(object),
             confidence: object.userData.objectState?.confidence ?? null,
             entropy: object.userData.objectState?.assignmentEntropy ?? null,
+            spatialCompactness: object.userData.objectState?.spatialCompactness ?? null,
           };
         }),
         selectObjectForAudit(selectionId = null) {
@@ -956,6 +959,8 @@ function StabilityDashboard({ stability }) {
       data-mean-purity={summary.meanPurity ?? ""}
       data-temporal-available={summary.temporalAvailable ? "true" : "false"}
       data-mean-temporal-drift={summary.meanTemporalDrift ?? ""}
+      data-spatial-available={summary.spatialAvailable ? "true" : "false"}
+      data-mean-spatial-compactness={summary.meanSpatialCompactness ?? ""}
     >
       <div className="stabilityHead">
         <span>Stability</span>
@@ -970,9 +975,11 @@ function StabilityDashboard({ stability }) {
       <div className="stabilityBars">
         <StabilityBar label="confidence" value={summary.meanConfidence} invert={false} />
         <StabilityBar label="entropy" value={summary.meanEntropy} invert />
+        <StabilityBar label="compact" value={summary.meanSpatialCompactness} invert={false} />
       </div>
       <dl className="stabilityMeta">
         <Meta label="purity" value={summary.purityAvailable ? formatRatio(summary.meanPurity) : "n/a"} />
+        <Meta label="spatial" value={summary.spatialAvailable ? formatRatio(summary.meanSpatialCompactness) : "n/a"} />
         <Meta label="drift" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
       </dl>
     </div>
@@ -1160,6 +1167,7 @@ function createPointCloudGroup(model, points) {
       totalMass: sampled.length,
       bounds: originalBounds,
       centroid: originalBounds.center,
+      spatialCompactness: spatialCompactnessForGeometry(geometry),
       displayBounds: geometry.boundingBox,
       source: "derived_from_object_id",
     });
@@ -1185,6 +1193,7 @@ function createPointCloudGroup(model, points) {
       assignment,
       assignmentEntropy: objectState.assignmentEntropy,
       assignmentConfidence: objectState.confidence,
+      spatialCompactness: objectState.spatialCompactness,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1266,6 +1275,7 @@ function createCompressedModelGroup(model) {
       totalMass: objectCount * (model.placeholderPointsPerObject ?? 760),
       bounds,
       centroid: bounds.getCenter(new THREE.Vector3()),
+      spatialCompactness: spatialCompactnessForGeometry(geometry),
       displayBounds: bounds,
       source: "compressed_placeholder_assignment",
     });
@@ -1288,6 +1298,7 @@ function createCompressedModelGroup(model) {
       assignment,
       assignmentEntropy: objectState.assignmentEntropy,
       assignmentConfidence: objectState.confidence,
+      spatialCompactness: objectState.spatialCompactness,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1422,6 +1433,7 @@ function createTrainableArtifactGroup(model) {
       objectPurity: purity.value,
       purityLabel: purity.label,
       temporalDrift,
+      spatialCompactness: spatialCompactnessForGeometry(geometry),
       centroid: (state.centroid ?? []).map(round3),
       bbox: (state.bbox ?? []).map(round3),
       status: state.status ?? "trained_artifact_slot",
@@ -1448,6 +1460,7 @@ function createTrainableArtifactGroup(model) {
       assignmentConfidence: objectState.confidence,
       objectPurity: objectState.objectPurity,
       temporalDrift: objectState.temporalDrift,
+      spatialCompactness: objectState.spatialCompactness,
       slotMass: objectState.slotMass,
       massFraction: objectState.massFraction,
       galleryPosition: objectGroup.position.toArray().map(round3),
@@ -1649,6 +1662,7 @@ function objectStateSummary({
   totalMass,
   bounds,
   centroid,
+  spatialCompactness,
   source,
 }) {
   const box = bounds?.isBox3
@@ -1668,6 +1682,7 @@ function objectStateSummary({
     massFraction: round3(mass / total),
     confidence: round3(assignmentConfidence),
     assignmentEntropy: round3(assignmentEntropy),
+    spatialCompactness: optionalRound3(spatialCompactness),
     centroid: [round3(center.x), round3(center.y), round3(center.z)],
     bbox: [
       round3(min.x),
@@ -1696,6 +1711,9 @@ function summarizeObjectStability(objectsOrStates = []) {
     .filter(Number.isFinite);
   const drifts = states
     .map((state) => firstFinite(state.temporalDrift, state.drift, state.centroidDrift))
+    .filter(Number.isFinite);
+  const compactness = states
+    .map((state) => firstFinite(state.spatialCompactness, state.compactness, state.spatialContinuity))
     .filter(Number.isFinite);
   const mixedSlots = states.filter((state) => {
     const entropy = finiteOrZero(state.assignmentEntropy);
@@ -1729,6 +1747,8 @@ function summarizeObjectStability(objectsOrStates = []) {
     meanPurity: purities.length ? round3(average(purities)) : null,
     temporalAvailable: drifts.length > 0,
     meanTemporalDrift: drifts.length ? round3(average(drifts)) : null,
+    spatialAvailable: compactness.length > 0,
+    meanSpatialCompactness: compactness.length ? round3(average(compactness)) : null,
   };
 }
 
@@ -1748,6 +1768,11 @@ function finiteOrZero(value) {
 
 function average(values) {
   return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+}
+
+function optionalRound3(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? round3(number) : null;
 }
 
 function bboxCorners(bbox) {
@@ -1834,6 +1859,23 @@ function objectTemporalDrift(artifact, frameIndex, objectId, centroid) {
     if (peerCentroid) return round3(current.distanceTo(peerCentroid));
   }
   return null;
+}
+
+function spatialCompactnessForGeometry(geometry) {
+  const position = geometry?.attributes?.position;
+  const box = geometry?.boundingBox?.isBox3 ? geometry.boundingBox : null;
+  if (!position || !position.count || !box) return null;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const halfDiagonal = Math.max(size.length() / 2, 1e-6);
+  const point = new THREE.Vector3();
+  let distance = 0;
+  for (let index = 0; index < position.count; index += 1) {
+    point.fromBufferAttribute(position, index);
+    distance += point.distanceTo(center);
+  }
+  const normalizedSpread = distance / (position.count * halfDiagonal);
+  return round3(Math.max(0, Math.min(1, 1 / (1 + normalizedSpread))));
 }
 
 function averageAssignmentVector(rows, objectIds) {

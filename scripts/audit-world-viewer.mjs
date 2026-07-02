@@ -31,6 +31,7 @@ try {
       `mixedSlots=${summary.mixedSlots}`,
       `purity=${summary.meanPurity}`,
       `temporalDrift=${summary.meanTemporalDrift}`,
+      `compactness=${summary.meanSpatialCompactness}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -210,8 +211,10 @@ async function auditWorld(url) {
         Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0 &&
         stability?.getAttribute("data-purity-available") === "true" &&
         stability?.getAttribute("data-temporal-available") === "true" &&
+        stability?.getAttribute("data-spatial-available") === "true" &&
         Number(stability?.getAttribute("data-mean-purity") ?? 0) > 0 &&
-        Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0) > 0
+        Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0) > 0 &&
+        Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0) > 0
       );
     }, undefined, { timeout: 15000 });
     if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
@@ -297,10 +300,13 @@ async function auditWorld(url) {
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
         meanPurity: handle.stabilitySummary?.meanPurity ?? null,
         meanTemporalDrift: handle.stabilitySummary?.meanTemporalDrift ?? null,
+        meanSpatialCompactness: handle.stabilitySummary?.meanSpatialCompactness ?? null,
         shellMeanPurity: Number(shell?.getAttribute("data-stability-mean-purity") ?? 0),
         shellMeanTemporalDrift: Number(shell?.getAttribute("data-stability-mean-temporal-drift") ?? 0),
+        shellMeanSpatialCompactness: Number(shell?.getAttribute("data-stability-mean-spatial-compactness") ?? 0),
         dashboardMeanPurity: Number(stability?.getAttribute("data-mean-purity") ?? 0),
         dashboardMeanTemporalDrift: Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0),
+        dashboardMeanSpatialCompactness: Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0),
         hoveredId: handle.hoveredId,
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
@@ -327,6 +333,13 @@ async function auditWorld(url) {
       Number(world.shellMeanTemporalDrift) > 0
     )) {
       throw new Error(`expected temporal drift metric to be available: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      Number(world.meanSpatialCompactness) > 0 &&
+      Number(world.dashboardMeanSpatialCompactness) > 0 &&
+      Number(world.shellMeanSpatialCompactness) > 0
+    )) {
+      throw new Error(`expected spatial compactness metric to be available: ${JSON.stringify(world)}`);
     }
     if (world.hoveredId !== world.shellHoveredTarget) {
       throw new Error(`hover audit mismatch: ${JSON.stringify(world)}`);
@@ -355,6 +368,7 @@ async function auditWorld(url) {
       mixedSlots: world.mixedSlots,
       meanPurity: world.meanPurity,
       meanTemporalDrift: world.meanTemporalDrift,
+      meanSpatialCompactness: world.meanSpatialCompactness,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,

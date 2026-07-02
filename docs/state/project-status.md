@@ -482,6 +482,16 @@ ObjectState centroid 推导 temporal drift；Stability dashboard、`.worldShell`
 `temporalDrift=0.018`。该切片不改变 Python 训练算法、不引入 torch / gsplat / CUDA、
 不替换 viewer renderer，不提交 `/tmp` 训练产物。
 
+`OBJECT-SPATIAL-COMPACTNESS-001` 已完成 Phase 1 Debug OS 的空间连续性指标：
+`src/App.jsx` 现在在每个 object render target 生成时，从对象 Gaussian positions 和
+bbox 派生 `spatialCompactness`，并把该字段写入 ObjectState debug metadata。Stability
+dashboard 新增 compactness bar 和 `spatial` meta，`.worldShell` telemetry 与
+`window.__OBJGAUSS_WORLD__.stabilitySummary` 同步暴露 `meanSpatialCompactness`。
+`scripts/audit-world-viewer.mjs` 现在要求 trainable artifact 路径下 compactness metric
+可用，验收输出为 `compactness=0.5`；桌面和移动截图证明新增指标没有遮挡现有
+ObjectState Debug panel。该切片只补 viewer-side debug evidence，不改 Python 训练算法、
+不引入 torch / gsplat / CUDA、不替换 viewer renderer。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face
