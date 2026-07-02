@@ -88,7 +88,7 @@
   - `npm run audit:webgpu-tile-smoke`: passed。
   - `npm run audit:webgpu-scale-budget`: passed。
   - `npm run audit:webgpu-edit-cost-budget`: passed。
-- 完成 commit: pending
+- 完成 commit: 3ceb8ee
 
 ### OBJECT-DYNAMIC-K-PROPOSAL-001: Emit birth / merge / split proposals
 
