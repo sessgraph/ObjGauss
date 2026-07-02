@@ -437,6 +437,14 @@ Gaussian geometry / opacity / rotation、不替换 viewer renderer、不提交�
 下一步是 `TRAIN-GSPLAT-MVP-001`：在可用 optional deps / CUDA 环境下跑第一个小规模
 full renderer training MVP；如果当前环境不可用，必须记录 blockers。
 
+当前本机环境已验证无法执行 `TRAIN-GSPLAT-MVP-001`：`gsplat_renderer_availability()`
+返回 `available=False`，blockers 为 `optional_dependency_missing:torch` 和
+`optional_dependency_missing:gsplat`；`nvidia-smi` 无法连接 NVIDIA driver。显式运行
+`objgauss training kernel-sample ... --image-renderer gsplat` 会按设计失败并输出同样
+blockers，没有静默 fallback 到 point renderer。该状态说明 full renderer MVP 需要转到
+具备 torch / gsplat / CUDA 的环境，或先由 Owner 明确批准安装 / 配置 optional training
+renderer 依赖。
+
 ## Hugging Face 开发阶段发布
 
 2026-06-29 已为 near-1M NeRF Lego trained candidate 建立 Hugging Face

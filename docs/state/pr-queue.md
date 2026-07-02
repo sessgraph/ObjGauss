@@ -19,9 +19,13 @@
 
 ## Ready
 
+当前无 ready PR；训练主线的下一步需要可用 torch / gsplat / CUDA 环境。
+
+## Blocked
+
 ### TRAIN-GSPLAT-MVP-001: Run first small full renderer training MVP
 
-- 状态: ready
+- 状态: blocked / current-env-missing-gsplat-cuda
 - 类型: 标准 PR / full renderer training smoke
 - 目标: 在 `TRAIN-GSPLAT-LOSS-001` 已把 image renderer loss producer 做成
   `point|gsplat` 可选路线后，使用显式 gsplat 路线跑第一个小规模 full renderer
@@ -37,6 +41,14 @@
     image。
   - 不替换 Three.js / Spark / WebGPU viewer renderer。
   - 不默认加载 near-1M / 4.5M 大资产。
+- 当前阻塞证据:
+  - `uv run python -c "from objgauss.core.gsplat_training_renderer import gsplat_renderer_availability; print(gsplat_renderer_availability().as_dict())"`:
+    `available=False`，blockers 为 `optional_dependency_missing:torch`、
+    `optional_dependency_missing:gsplat`。
+  - `nvidia-smi`: failed，无法连接 NVIDIA driver。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 2 --learning-rate 0.35 --max-points 4 --bind-image-targets --image-width 8 --image-height 8 --image-render-weight 0.5 --image-renderer gsplat --seed 4 --summary-output /tmp/objgauss-gsplat-mvp-blocked-summary.json`:
+    failed as expected，错误为 `gsplat training renderer unavailable:
+    optional_dependency_missing:torch, optional_dependency_missing:gsplat`。
 
 ## Planned
 
