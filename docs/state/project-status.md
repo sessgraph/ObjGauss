@@ -364,6 +364,20 @@ probe source。`scripts/audit-world-viewer.mjs` 现在同时验证同一 session
 changed fields 至少包含 `model/source/training/delivery`。该步骤不改 session schema、
 不做场景 replay、不拉 payload、不写训练输出。
 
+`OBJECTSTATE-BENCH-001` 已完成训练前 ObjectState stability gate：
+`objgauss/core/object_state_benchmark.py` 新增
+`objgauss-object-state-stability-benchmark-v1` synthetic pressure suite，固定覆盖 clean sparse、
+uniform mixed、single-slot collapse、soft noise、slot permutation、temporal jitter、birth
+unmatched 和 duplicate fragment。该 suite 复用现有 `project_object_states(...)`、
+`object_state_stability_report(...)`、`match_object_states(...)` 与
+`dynamic_k_proposal_report(...)`，输出 assignment confidence、entropy、effective slots、
+object purity、label fragmentation、bbox diagonal、raw assignment jitter、matched temporal
+drift、bbox drift、temporal matches 和 dynamic-K proposal kinds。CLI 入口为
+`objgauss object-state stability-benchmark --output <json> --strict`；默认 gate 当前输出
+`status=pass`、`cases=8`、`observed_warn_count=6`、`warn_count=0`。该步骤不改 solver /
+renderer / trainable kernel loop，不触碰 viewer UI，不引入 torch / gsplat / CUDA / SAM /
+CLIP，也不提交训练输出或大资产。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

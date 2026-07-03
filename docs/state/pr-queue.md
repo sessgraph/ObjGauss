@@ -104,6 +104,42 @@
   - `git diff --check`: passed。
 - 完成 commit: `456f3d7`
 
+### OBJECTSTATE-BENCH-001: Deterministic ObjectState stability benchmark
+
+- 状态: done / pre-training-objectstate-stability-gate
+- 类型: 标准 PR / ObjectState kernel benchmark
+- 目标: 将分散的 `A[N,K] -> ObjectState`、stability、temporal matching 和 dynamic-K proposal
+  能力收敛为 dependency-free 的训练前压力测试系统，用于验证已知 failure mode 是否能稳定
+  触发诊断证据。
+- 已实施:
+  - `objgauss/core/object_state_benchmark.py` 新增
+    `objgauss-object-state-stability-benchmark-v1` 报告，固定 synthetic suite 覆盖
+    `clean_sparse`、`uniform_mixed`、`single_slot_collapse`、`soft_noise`、
+    `slot_permutation`、`temporal_jitter`、`birth_unmatched` 和 `duplicate_fragment`。
+  - suite 复用 `project_object_states(...)`、`object_state_stability_report(...)`、
+    `match_object_states(...)` 和 `dynamic_k_proposal_report(...)`；报告区分 benchmark
+    期望是否通过的 `status` 与 case 自身健康度的 `observed_status`。
+  - 报告显式输出 assignment confidence、entropy、effective slots、object purity、
+    label fragmentation、bbox diagonal、raw assignment jitter、matched temporal drift、
+    bbox drift、temporal matches 和 dynamic-K proposal kinds。
+  - `objgauss object-state stability-benchmark --output <json> --strict` 新增 CLI gate；
+    `objgauss.core` lazy namespace 暴露 schema、run / write / validate helper。
+- 边界:
+  - 不改 solver，不改 renderer，不改 trainable kernel loop。
+  - 不触碰当前 viewer UI 改动，不修改 `src/App.jsx`、`src/styles.css` 或
+    `scripts/audit-world-viewer.mjs` 的 UI 逻辑。
+  - 不引入 torch / gsplat / CUDA / SAM / CLIP，不提交训练输出、checkpoint、rendered image、
+    ignored `outputs/` 产物或大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state_benchmark.py tests/test_core_namespace.py`:
+    12 passed。
+  - `uv run objgauss object-state stability-benchmark --output /tmp/objgauss-objectstate-bench.json --strict`:
+    passed，输出 `status=pass`、`cases=8`、`observed_warn_count=6`、`warn_count=0`。
+  - `uv run --extra dev pytest`: 145 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: pending local commit
+
 ### DEBUG-SESSION-DIFF-001: Compare live snapshots against imported debug sessions
 
 - 状态: done / debug-session-live-archive-diff

@@ -19,6 +19,10 @@ _EXPORTS = {
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
     "DynamicKProposal": ("objgauss.core.object_state", "DynamicKProposal"),
     "DynamicKProposalReport": ("objgauss.core.object_state", "DynamicKProposalReport"),
+    "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA": (
+        "objgauss.core.object_state_benchmark",
+        "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA",
+    ),
     "TrainableKernelCamera": ("objgauss.core.trainable_kernel", "TrainableKernelCamera"),
     "TrainableKernelFrame": ("objgauss.core.trainable_kernel", "TrainableKernelFrame"),
     "TrainableKernelImageTarget": (
@@ -93,6 +97,10 @@ _EXPORTS = {
     "match_object_states": ("objgauss.core.object_state", "match_object_states"),
     "object_emergence_metrics": ("objgauss.core.evaluation", "object_emergence_metrics"),
     "object_state_delivery_summary": ("objgauss.core.object_state", "object_state_delivery_summary"),
+    "object_state_stability_benchmark": (
+        "objgauss.core.object_state_benchmark",
+        "object_state_stability_benchmark",
+    ),
     "object_state_stability_report": ("objgauss.core.object_state", "object_state_stability_report"),
     "project_object_states": ("objgauss.core.object_state", "project_object_states"),
     "project_object_states_from_field": ("objgauss.core.object_state", "project_object_states_from_field"),
@@ -127,6 +135,10 @@ _EXPORTS = {
     ),
     "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
+    "validate_object_state_stability_benchmark": (
+        "objgauss.core.object_state_benchmark",
+        "validate_object_state_stability_benchmark",
+    ),
     "validate_image_target_contract_summary": (
         "objgauss.core.trainable_kernel",
         "validate_image_target_contract_summary",
@@ -154,6 +166,10 @@ _EXPORTS = {
     "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
     "write_ply": ("objgauss.core.io", "write_ply"),
+    "write_object_state_stability_benchmark": (
+        "objgauss.core.object_state_benchmark",
+        "write_object_state_stability_benchmark",
+    ),
     "write_quantized_ogc_payload": ("objgauss.core.quantization", "write_quantized_ogc_payload"),
     "write_trainable_kernel_model_artifact": (
         "objgauss.core.trainable_artifact",

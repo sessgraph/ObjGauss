@@ -84,6 +84,7 @@ from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 from objgauss.core.trainable_quality import write_trainable_quality_report
+from objgauss.core.object_state_benchmark import write_object_state_stability_benchmark
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
     write_model_artifact_manifest,
@@ -1346,6 +1347,21 @@ def _training_write_sample_bundle(args: argparse.Namespace) -> None:
         print(f"slots={result.slot_count}")
 
 
+def _object_state_stability_benchmark(args: argparse.Namespace) -> None:
+    report = write_object_state_stability_benchmark(
+        args.output,
+        report_id=args.report_id,
+        strict=args.strict,
+    )
+    aggregate = report["aggregate"]
+    print(f"schema={report['schema']}")
+    print(f"status={report['status']}")
+    print(f"cases={aggregate['case_count']}")
+    print(f"observed_warn_count={aggregate['observed_warn_count']}")
+    print(f"warn_count={aggregate['warn_count']}")
+    print(f"output={args.output}")
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -1453,6 +1469,30 @@ def _build_parser() -> argparse.ArgumentParser:
     assets_pull.add_argument("--clusters", type=int)
     assets_pull.add_argument("--force", action="store_true")
     assets_pull.set_defaults(handler=_assets_pull)
+
+    object_state = subparsers.add_parser(
+        "object-state",
+        help="run ObjectState kernel diagnostics",
+    )
+    object_state_subparsers = object_state.add_subparsers(
+        dest="object_state_command",
+        required=True,
+    )
+    state_benchmark = object_state_subparsers.add_parser(
+        "stability-benchmark",
+        help="run the deterministic pre-training ObjectState stability benchmark",
+    )
+    state_benchmark.add_argument("--output", "-o", required=True, type=Path)
+    state_benchmark.add_argument(
+        "--report-id",
+        default="objectstate-stability-synthetic-v1",
+    )
+    state_benchmark.add_argument(
+        "--strict",
+        action="store_true",
+        help="fail if the benchmark suite does not satisfy its expected diagnostics",
+    )
+    state_benchmark.set_defaults(handler=_object_state_stability_benchmark)
 
     object_field = subparsers.add_parser(
         "object-field",
