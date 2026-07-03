@@ -378,6 +378,18 @@ drift、bbox drift、temporal matches 和 dynamic-K proposal kinds。CLI 入口�
 renderer / trainable kernel loop，不触碰 viewer UI，不引入 torch / gsplat / CUDA / SAM /
 CLIP，也不提交训练输出或大资产。
 
+`OBJECTSTATE-BENCH-HANDOFF-001` 已将上述训练前 stability benchmark 接入 browser
+handoff：`objgauss-model-artifact-manifest-v1` 新增 browser-ready
+`object_state_benchmark` artifact role，algorithm bundle fixture 现在包含
+`public/models/algorithm-bundle-fixture/object-state-benchmark.json`，schema 为
+`objgauss-object-state-stability-benchmark-v1`，状态为 `pass`、case 数 `8`、
+observed warn 数 `6`、warn 数 `0`。`src/App.jsx` 会随 model artifact manifest 加载
+benchmark report，并在 ObjectState Debug 面板显示 Benchmark 卡片，同时将摘要写入 root
+telemetry 和 debug snapshot / session archive。`scripts/audit-world-viewer.mjs` 同时验证
+远程 manifest 和本地 package import 的 benchmark telemetry，输出
+`objectStateBenchmark=pass`。该切片不改变 solver、renderer、训练 loop，不引入 torch /
+gsplat / CUDA，也不提交训练输出或大资产。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

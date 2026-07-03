@@ -19,6 +19,7 @@ const INITIAL_CAMERA = {
 };
 
 const OGC_CHUNK_INDEX_SCHEMA = "objgauss-chunk-index-v1";
+const OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA = "objgauss-object-state-stability-benchmark-v1";
 const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
 const DEBUG_EVENT_LIMIT = 12;
 
@@ -134,6 +135,7 @@ export default function App() {
       ? trainableEvidenceSummary(selected.trainableArtifact)
       : null;
   const selectedQualityReport = qualityReportSummary(selected?.qualityReport);
+  const selectedObjectStateBenchmark = objectStateBenchmarkSummary(selected?.objectStateBenchmark);
   const selectedDebugSnapshot = objectStateDebugSnapshot({
     selected,
     selectedObject,
@@ -146,6 +148,7 @@ export default function App() {
     assignmentSource: selectedAssignmentSource,
     trainingEvidence: selectedTrainingEvidence,
     qualityReport: selectedQualityReport,
+    objectStateBenchmark: selectedObjectStateBenchmark,
     debugEvents,
   });
   const selectedDebugSession = objectStateDebugSession({
@@ -602,7 +605,8 @@ export default function App() {
       const parentId = "model-local-manifest";
       setModelImport({ status: "loading", modelId: parentId, fileName, error: "" });
       try {
-        const { manifest, parentModel, children, qualityReport } = await localModelArtifactBundleModelsFromFiles(files);
+        const { manifest, parentModel, children, qualityReport, objectStateBenchmark } =
+          await localModelArtifactBundleModelsFromFiles(files);
         if (!children.length) {
           throw new Error("local model manifest has no Debug OS browser routes");
         }
@@ -619,6 +623,7 @@ export default function App() {
               message: `${children.length} local debug routes`,
               modelArtifactManifest: manifest,
               qualityReport,
+              objectStateBenchmark,
               delivery: {
                 source: "local-model-artifact-manifest",
                 loadRoute: "local-file",
@@ -909,7 +914,8 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading model manifest" });
           try {
-            const { manifest, children, qualityReport } = await loadModelArtifactManifestModels(model);
+            const { manifest, children, qualityReport, objectStateBenchmark } =
+              await loadModelArtifactManifestModels(model);
             if (!children.length) {
               throw new Error("model artifact manifest has no Debug OS browser routes");
             }
@@ -924,6 +930,7 @@ export default function App() {
                 message: `${children.length} debug routes`,
                 modelArtifactManifest: manifest,
                 qualityReport,
+                objectStateBenchmark,
                 loadMs: Math.round(performance.now() - startedAt),
                 delivery: {
                   source: "model-artifact-manifest",
@@ -1197,6 +1204,12 @@ export default function App() {
       data-quality-report-temporal-drift={selectedQualityReport?.temporalDrift ?? ""}
       data-quality-report-assignment-jitter={selectedQualityReport?.assignmentJitter ?? ""}
       data-quality-report-gate-count={selectedQualityReport?.gateCount ?? ""}
+      data-object-state-benchmark-status={selectedObjectStateBenchmark?.status ?? ""}
+      data-object-state-benchmark-schema={selectedObjectStateBenchmark?.schema ?? ""}
+      data-object-state-benchmark-case-count={selectedObjectStateBenchmark?.caseCount ?? ""}
+      data-object-state-benchmark-warn-count={selectedObjectStateBenchmark?.warnCount ?? ""}
+      data-object-state-benchmark-observed-warn-count={selectedObjectStateBenchmark?.observedWarnCount ?? ""}
+      data-object-state-benchmark-failure-mode-count={selectedObjectStateBenchmark?.failureModeCount ?? ""}
       data-trainable-import-status={artifactImport.status}
       data-trainable-import-model={artifactImport.modelId}
       data-trainable-import-file={artifactImport.fileName}
@@ -1399,6 +1412,7 @@ export default function App() {
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
+        objectStateBenchmark={selectedObjectStateBenchmark}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
         onSelectTrainableFrame={selectTrainableFrame}
@@ -1454,6 +1468,10 @@ async function loadModelArtifactManifestModels(model) {
   const qualityReport = qualityReportArtifact
     ? await loadQualityReportArtifact(qualityReportArtifact, manifestPath)
     : null;
+  const objectStateBenchmarkArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_state_benchmark");
+  const objectStateBenchmark = objectStateBenchmarkArtifact
+    ? await loadObjectStateBenchmarkArtifact(objectStateBenchmarkArtifact, manifestPath)
+    : null;
   const children = [];
   if (browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel")) {
     children.push(trainableManifestModelFromManifest(model, manifest, manifestPath));
@@ -1463,8 +1481,9 @@ async function loadModelArtifactManifestModels(model) {
   }
   return {
     manifest,
-    children: qualityReport ? children.map((child) => attachQualityReport(child, qualityReport)) : children,
+    children: children.map((child) => attachDebugEvidence(child, { qualityReport, objectStateBenchmark })),
     qualityReport,
+    objectStateBenchmark,
   };
 }
 
@@ -1495,12 +1514,31 @@ async function loadQualityReportArtifact(artifact, manifestPath) {
   return validateQualityReport(await response.json(), reportPath);
 }
 
+async function loadObjectStateBenchmarkArtifact(artifact, manifestPath) {
+  const reportPath = resolveSameOriginManifestRoute(artifact.reportPath ?? artifact.path, manifestPath);
+  const response = await fetch(reportPath);
+  if (!response.ok) throw new Error(`object state benchmark HTTP ${response.status}`);
+  return validateObjectStateBenchmark(await response.json(), reportPath);
+}
+
 function attachQualityReport(model, qualityReport) {
   if (!qualityReport) return model;
   return {
     ...model,
     qualityReport,
   };
+}
+
+function attachObjectStateBenchmark(model, objectStateBenchmark) {
+  if (!objectStateBenchmark) return model;
+  return {
+    ...model,
+    objectStateBenchmark,
+  };
+}
+
+function attachDebugEvidence(model, { qualityReport, objectStateBenchmark } = {}) {
+  return attachObjectStateBenchmark(attachQualityReport(model, qualityReport), objectStateBenchmark);
 }
 
 function trainableManifestModelFromManifest(model, manifest, manifestPath) {
@@ -1560,6 +1598,22 @@ function validateQualityReport(report, path = "") {
   }
   if (typeof report.metrics !== "object" || report.metrics === null) {
     throw new Error("quality report missing metrics");
+  }
+  return {
+    ...report,
+    path,
+  };
+}
+
+function validateObjectStateBenchmark(report, path = "") {
+  if (report?.schema !== OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA) {
+    throw new Error("unsupported ObjectState benchmark schema");
+  }
+  if (!Array.isArray(report.cases) || !report.cases.length) {
+    throw new Error("ObjectState benchmark missing cases");
+  }
+  if (typeof report.aggregate !== "object" || report.aggregate === null) {
+    throw new Error("ObjectState benchmark missing aggregate");
   }
   return {
     ...report,
@@ -1710,6 +1764,13 @@ async function localModelArtifactBundleModelsFromFiles(files) {
   const qualityReport = qualityReportEntry
     ? validateQualityReport(qualityReportEntry.json, localFileRoute(qualityReportEntry.file.name))
     : null;
+  const objectStateBenchmarkArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_state_benchmark");
+  const objectStateBenchmarkEntry = objectStateBenchmarkArtifact
+    ? findObjectStateBenchmarkEntry(jsonEntries, objectStateBenchmarkArtifact.reportPath ?? objectStateBenchmarkArtifact.path)
+    : null;
+  const objectStateBenchmark = objectStateBenchmarkEntry
+    ? validateObjectStateBenchmark(objectStateBenchmarkEntry.json, localFileRoute(objectStateBenchmarkEntry.file.name))
+    : null;
   const trainableArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel");
   if (trainableArtifact) {
     const trainableEntry = findTrainableArtifactEntry(
@@ -1717,14 +1778,14 @@ async function localModelArtifactBundleModelsFromFiles(files) {
       trainableArtifact.artifactPath ?? trainableArtifact.path,
     );
     children.push(
-      attachQualityReport(
+      attachDebugEvidence(
         trainableLocalManifestModelFromManifest({
           manifest,
           artifact: trainableArtifact,
           trainableArtifact: trainableEntry.json,
           artifactFileName: trainableEntry.file.name,
         }),
-        qualityReport,
+        { qualityReport, objectStateBenchmark },
       ),
     );
   }
@@ -1742,7 +1803,7 @@ async function localModelArtifactBundleModelsFromFiles(files) {
       payloadFileName: payloadFile.name,
     });
     children.push(
-      attachQualityReport(
+      attachDebugEvidence(
         {
           ...ogcModel,
           id: "model-local-manifest-ogc-artifact",
@@ -1755,15 +1816,16 @@ async function localModelArtifactBundleModelsFromFiles(files) {
             status: "local-model-manifest-debug-artifact",
           },
         },
-        qualityReport,
+        { qualityReport, objectStateBenchmark },
       ),
     );
   }
   return {
     manifest,
-    parentModel: attachQualityReport(parentModel, qualityReport),
+    parentModel: attachDebugEvidence(parentModel, { qualityReport, objectStateBenchmark }),
     children,
     qualityReport,
+    objectStateBenchmark,
   };
 }
 
@@ -2094,6 +2156,22 @@ function findQualityReportEntry(jsonEntries, expectedRoute = "") {
     throw new Error(expectedName
       ? `select ObjectState quality report file ${expectedName}`
       : "select one ObjectState quality report JSON file");
+  }
+  return matched;
+}
+
+function findObjectStateBenchmarkEntry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter(
+    (entry) => entry.json?.schema === OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA,
+  );
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName) ?? candidates[0]
+    : candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select ObjectState benchmark report file ${expectedName}`
+      : "select one ObjectState benchmark report JSON file");
   }
   return matched;
 }
@@ -2746,6 +2824,7 @@ function DebugPanel({
   hiddenObjects,
   stability,
   qualityReport,
+  objectStateBenchmark,
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectTrainableFrame,
@@ -2919,6 +2998,7 @@ function DebugPanel({
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <QualityReportPanel report={qualityReport} />
+      <ObjectStateBenchmarkPanel benchmark={objectStateBenchmark} />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
       <dl className="debugStateGrid">
@@ -3242,6 +3322,63 @@ function QualityReportPanel({ report }) {
               <span>{gate.name}</span>
               <small>{formatGateValue(gate)}</small>
               <strong>{gate.status}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ObjectStateBenchmarkPanel({ benchmark }) {
+  const summary = benchmark ?? null;
+  if (!summary) return null;
+  return (
+    <div
+      className="stabilityDashboard objectStateBenchmark"
+      data-object-state-benchmark="true"
+      data-object-state-benchmark-status={summary.status}
+      data-object-state-benchmark-schema={summary.schema}
+      data-object-state-benchmark-case-count={summary.caseCount}
+      data-object-state-benchmark-warn-count={summary.warnCount}
+      data-object-state-benchmark-observed-warn-count={summary.observedWarnCount}
+      data-object-state-benchmark-failure-mode-count={summary.failureModeCount}
+      data-object-state-benchmark-first-case={summary.cases[0]?.name ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Benchmark</span>
+        <strong>{summary.status}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="cases" value={formatCount(summary.caseCount)} />
+        <Metric label="warn" value={formatCount(summary.warnCount)} />
+        <Metric label="observed" value={formatCount(summary.observedWarnCount)} />
+        <Metric label="modes" value={formatCount(summary.failureModeCount)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="schema" value={summary.schema} />
+        <Meta label="report" value={summary.reportId} />
+        <Meta label="coverage" value={formatCount(summary.failureModeCount)} />
+        <Meta label="path" value={summary.path || "-"} />
+      </dl>
+      {summary.cases.length ? (
+        <div
+          className="qualityGateRows"
+          data-object-state-benchmark-cases="true"
+          data-object-state-benchmark-case-row-count={summary.cases.length}
+        >
+          {summary.cases.map((testCase) => (
+            <div
+              className={`qualityGateRow ${testCase.status}`}
+              key={testCase.name}
+              data-object-state-benchmark-case-row="true"
+              data-object-state-benchmark-case-name={testCase.name}
+              data-object-state-benchmark-case-status={testCase.status}
+              data-object-state-benchmark-case-observed-status={testCase.observedStatus}
+            >
+              <span>{testCase.name}</span>
+              <small>{testCase.observedStatus}</small>
+              <strong>{testCase.status}</strong>
             </div>
           ))}
         </div>
@@ -4591,6 +4728,7 @@ function objectStateDebugSnapshot({
   assignmentSource,
   trainingEvidence,
   qualityReport,
+  objectStateBenchmark,
   debugEvents,
 }) {
   const objects = selected?.objects ?? [];
@@ -4670,6 +4808,16 @@ function objectStateDebugSnapshot({
           failingGates: qualityReport.failingGates,
           failingGateNames: qualityReport.failingGateNames,
           gates: compactQualityGates(qualityReport.gates),
+        }
+      : null,
+    benchmark: objectStateBenchmark
+      ? {
+          schema: objectStateBenchmark.schema,
+          status: objectStateBenchmark.status,
+          caseCount: objectStateBenchmark.caseCount,
+          warnCount: objectStateBenchmark.warnCount,
+          observedWarnCount: objectStateBenchmark.observedWarnCount,
+          failureModeCount: objectStateBenchmark.failureModeCount,
         }
       : null,
     delivery: {
@@ -4787,6 +4935,16 @@ function validateDebugSessionArchive(session, path = "") {
               ? snapshot.quality.failingGateNames.map(cleanString).filter(Boolean)
               : [],
             gates: compactQualityGates(snapshot.quality.gates),
+          }
+        : null,
+      benchmark: snapshot.benchmark
+        ? {
+            schema: cleanString(snapshot.benchmark.schema),
+            status: cleanString(snapshot.benchmark.status),
+            caseCount: finiteNumber(snapshot.benchmark.caseCount),
+            warnCount: finiteNumber(snapshot.benchmark.warnCount),
+            observedWarnCount: finiteNumber(snapshot.benchmark.observedWarnCount),
+            failureModeCount: finiteNumber(snapshot.benchmark.failureModeCount),
           }
         : null,
       delivery: {
@@ -5082,6 +5240,36 @@ function qualityReportSummary(report) {
     gates,
     path: report.path ?? "",
   };
+}
+
+function objectStateBenchmarkSummary(report) {
+  if (report?.schema !== OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA) return null;
+  const aggregate = report.aggregate ?? {};
+  const failureModes = Array.isArray(aggregate.failure_mode_coverage)
+    ? aggregate.failure_mode_coverage.filter(Boolean)
+    : [];
+  const cases = compactObjectStateBenchmarkCases(report.cases);
+  return {
+    schema: report.schema,
+    reportId: cleanString(report.report_id || "object-state-benchmark"),
+    status: cleanString(report.status || "unknown"),
+    caseCount: finiteNumber(aggregate.case_count ?? cases.length) ?? cases.length,
+    warnCount: finiteNumber(aggregate.warn_count) ?? 0,
+    observedWarnCount: finiteNumber(aggregate.observed_warn_count) ?? 0,
+    failureModeCount: failureModes.length,
+    failureModes: failureModes.slice(0, 16),
+    cases,
+    path: report.path ?? "",
+  };
+}
+
+function compactObjectStateBenchmarkCases(cases) {
+  if (!Array.isArray(cases)) return [];
+  return cases.slice(0, 8).map((testCase, index) => ({
+    name: cleanString(testCase?.name || `case_${index}`),
+    status: cleanString(testCase?.status || "unknown"),
+    observedStatus: cleanString(testCase?.observed_status || "unknown"),
+  }));
 }
 
 function compactQualityGates(gates) {

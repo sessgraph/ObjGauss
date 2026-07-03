@@ -78,6 +78,39 @@
 
 ## Done
 
+### OBJECTSTATE-BENCH-HANDOFF-001: Browser handoff for ObjectState stability benchmark
+
+- 状态: done / browser-visible-pre-training-benchmark
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 让 `OBJECTSTATE-BENCH-001` 的 dependency-free stability benchmark 不只停留在 CLI，
+  而是作为 model artifact manifest 可加载的 browser-ready evidence，进入 Debug OS、
+  debug snapshot 和 session handoff。
+- 已实施:
+  - `objgauss-model-artifact-manifest-v1` 允许 `object_state_benchmark` browser artifact
+    role；JS route resolver 同步支持 `browserReadyArtifact(..., "object_state_benchmark")`。
+  - `public/models/algorithm-bundle-fixture/object-state-benchmark.json` 新增确定性 benchmark
+    fixture，schema 为 `objgauss-object-state-stability-benchmark-v1`，`status=pass`、
+    `case_count=8`、`observed_warn_count=6`、`warn_count=0`。
+  - `src/App.jsx` 在 URL manifest 和 local package manifest 路径加载 benchmark report，
+    将其附到 parent / trainable / OGC children，并在 ObjectState Debug 面板新增
+    Benchmark 卡片、root telemetry 和 debug snapshot / session archive 摘要。
+  - `scripts/audit-world-viewer.mjs` 验证 algorithm manifest 与 local package import
+    都显示 `objectStateBenchmark=pass`，并检查 snapshot / session export-import 不丢该摘要。
+- 边界:
+  - 不改变 solver、renderer、ObjectState projection、trainable kernel loop 或 OGC decoder。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不解除 `TRAIN-GSPLAT-MVP-001` 挂起状态。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py tests/test_object_state_benchmark.py`:
+    21 passed。
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `algorithmManifest=manifest-trainable-ogc-debug-os`、`localModelManifest=local-manifest-trainable-ogc-debug-os`、
+    `qualityReport=warn` 和 `objectStateBenchmark=pass`。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### DEBUG-SESSION-DRIFT-001: Surface changed fields in live/archive debug session diff
 
 - 状态: done / debug-session-drift-fields

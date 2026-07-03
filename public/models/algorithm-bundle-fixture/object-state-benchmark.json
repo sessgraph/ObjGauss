@@ -1,0 +1,732 @@
+{
+  "aggregate": {
+    "case_count": 8,
+    "failure_mode_coverage": [
+      "birth_unmatched",
+      "duplicate_fragment",
+      "low_confidence_slot",
+      "low_object_purity",
+      "merge_proposal",
+      "mixed_slots",
+      "raw_slot_jitter",
+      "slot_collapse",
+      "slot_permutation",
+      "soft_assignment_noise",
+      "temporal_jitter",
+      "uniform_assignment"
+    ],
+    "observed_warn_count": 6,
+    "warn_count": 0
+  },
+  "cases": [
+    {
+      "checks": [
+        {
+          "expected": [],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [],
+          "passed": true
+        }
+      ],
+      "description": "one-hot two-object assignment should remain healthy",
+      "dynamic_k": {
+        "diagnostics": [
+          "no_dynamic_k_proposals"
+        ],
+        "proposal_count": 0,
+        "proposal_kinds": []
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [],
+      "metrics": {
+        "assignment_confidence": 1.0,
+        "bbox_diagonal_mean": 0.223607,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "label_fragmentation": 0.0,
+        "mean_normalized_entropy": 0.0,
+        "object_purity": 1.0
+      },
+      "name": "clean_sparse",
+      "observed_status": "pass",
+      "stability": {
+        "assignment_confidence": 1.0,
+        "diagnostics": [],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.0,
+        "mixed_slots": [],
+        "object_purity": 1.0,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": null
+    },
+    {
+      "checks": [
+        {
+          "expected": [
+            "low_assignment_confidence",
+            "mixed_slots",
+            "low_object_purity"
+          ],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [
+            "low_assignment_confidence",
+            "mixed_slots",
+            "low_object_purity"
+          ],
+          "passed": true
+        }
+      ],
+      "description": "uniform A should expose high entropy, mixed slots, and low purity",
+      "dynamic_k": {
+        "diagnostics": [
+          "has_merge_duplicate",
+          "has_split_mixed"
+        ],
+        "proposal_count": 3,
+        "proposal_kinds": [
+          "split_mixed",
+          "split_mixed",
+          "merge_duplicate"
+        ]
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [
+          "low_assignment_confidence",
+          "mixed_slots",
+          "low_object_purity"
+        ],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [
+        "uniform_assignment",
+        "mixed_slots",
+        "low_object_purity"
+      ],
+      "metrics": {
+        "assignment_confidence": 0.0,
+        "bbox_diagonal_mean": 2.009975,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "label_fragmentation": 0.5,
+        "mean_normalized_entropy": 1.0,
+        "object_purity": 0.5
+      },
+      "name": "uniform_mixed",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 0.0,
+        "diagnostics": [
+          "low_assignment_confidence",
+          "mixed_slots",
+          "low_object_purity"
+        ],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 1.0,
+        "mixed_slots": [
+          0,
+          1
+        ],
+        "object_purity": 0.5,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": null
+    },
+    {
+      "checks": [
+        {
+          "expected": [
+            "low_confidence_slots",
+            "slot_collapse:0"
+          ],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [
+            "low_confidence_slots",
+            "slot_collapse:0"
+          ],
+          "passed": true
+        }
+      ],
+      "description": "dominant slot should emit collapse and low-confidence diagnostics",
+      "dynamic_k": {
+        "diagnostics": [
+          "has_merge_duplicate"
+        ],
+        "proposal_count": 1,
+        "proposal_kinds": [
+          "merge_duplicate"
+        ]
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [
+          "low_confidence_slots",
+          "slot_collapse:0"
+        ],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [
+        "slot_collapse",
+        "low_confidence_slot"
+      ],
+      "metrics": {
+        "assignment_confidence": 0.805608,
+        "bbox_diagonal_mean": 2.009975,
+        "dominant_slot_mass_fraction": 0.97,
+        "effective_slots": 1.144242,
+        "label_fragmentation": 0.03,
+        "mean_normalized_entropy": 0.194392,
+        "object_purity": null
+      },
+      "name": "single_slot_collapse",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 0.805608,
+        "diagnostics": [
+          "low_confidence_slots",
+          "slot_collapse:0"
+        ],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.97,
+        "effective_slots": 1.144242,
+        "inactive_slots": [],
+        "low_confidence_slots": [
+          1
+        ],
+        "mean_normalized_entropy": 0.194392,
+        "mixed_slots": [],
+        "object_purity": null,
+        "slot_collapse": true
+      },
+      "status": "pass",
+      "temporal": null
+    },
+    {
+      "checks": [
+        {
+          "expected": [
+            "low_assignment_confidence",
+            "mixed_slots",
+            "low_object_purity"
+          ],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [
+            "low_assignment_confidence",
+            "mixed_slots",
+            "low_object_purity"
+          ],
+          "passed": true
+        }
+      ],
+      "description": "ambiguous soft assignment should surface entropy and purity warnings",
+      "dynamic_k": {
+        "diagnostics": [
+          "has_split_mixed"
+        ],
+        "proposal_count": 2,
+        "proposal_kinds": [
+          "split_mixed",
+          "split_mixed"
+        ]
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [
+          "low_assignment_confidence",
+          "mixed_slots",
+          "low_object_purity"
+        ],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [
+        "soft_assignment_noise",
+        "mixed_slots",
+        "low_object_purity"
+      ],
+      "metrics": {
+        "assignment_confidence": 0.018137,
+        "bbox_diagonal_mean": 2.009975,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "label_fragmentation": 0.425,
+        "mean_normalized_entropy": 0.981863,
+        "object_purity": 0.575
+      },
+      "name": "soft_noise",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 0.018137,
+        "diagnostics": [
+          "low_assignment_confidence",
+          "mixed_slots",
+          "low_object_purity"
+        ],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.981863,
+        "mixed_slots": [
+          0,
+          1
+        ],
+        "object_purity": 0.575,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": null
+    },
+    {
+      "checks": [
+        {
+          "expected": [],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [],
+          "passed": true
+        },
+        {
+          "expected": [],
+          "missing": [],
+          "name": "temporal_diagnostics",
+          "observed": [],
+          "passed": true
+        },
+        {
+          "name": "raw_assignment_jitter_gte",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        },
+        {
+          "name": "max_temporal_drift_lte",
+          "passed": true,
+          "threshold": 1e-06,
+          "value": 0.0
+        },
+        {
+          "expected": true,
+          "name": "slot_permutation_resolved",
+          "passed": true,
+          "value": true
+        }
+      ],
+      "description": "slot id swap should be stable after ObjectState matching",
+      "dynamic_k": {
+        "diagnostics": [
+          "no_dynamic_k_proposals"
+        ],
+        "proposal_count": 0,
+        "proposal_kinds": []
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [
+        "slot_permutation",
+        "raw_slot_jitter"
+      ],
+      "metrics": {
+        "assignment_confidence": 1.0,
+        "bbox_diagonal_mean": 0.223607,
+        "bbox_drift_mean": 0.0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "label_fragmentation": 0.0,
+        "matched_identity_count": 2,
+        "max_temporal_drift": 0.0,
+        "mean_normalized_entropy": 0.0,
+        "mean_temporal_drift": 0.0,
+        "object_purity": 1.0,
+        "raw_assignment_jitter": 1.0,
+        "slot_permutation_resolved": true
+      },
+      "name": "slot_permutation",
+      "observed_status": "pass",
+      "stability": {
+        "assignment_confidence": 1.0,
+        "diagnostics": [],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.0,
+        "mixed_slots": [],
+        "object_purity": 1.0,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": {
+        "current_count": 2,
+        "diagnostics": [],
+        "ignored_current": [],
+        "ignored_previous": [],
+        "matches": [
+          {
+            "bbox_iou": 1.0,
+            "cost": 0.0,
+            "current_id": 1,
+            "feature_distance": 0.0,
+            "mass_delta": 0.0,
+            "previous_id": 0,
+            "temporal_drift": 0.0
+          },
+          {
+            "bbox_iou": 1.0,
+            "cost": 0.0,
+            "current_id": 0,
+            "feature_distance": 0.0,
+            "mass_delta": 0.0,
+            "previous_id": 1,
+            "temporal_drift": 0.0
+          }
+        ],
+        "max_temporal_drift": 0.0,
+        "mean_temporal_drift": 0.0,
+        "previous_count": 2,
+        "unmatched_current": [],
+        "unmatched_previous": []
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected": [],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [],
+          "passed": true
+        },
+        {
+          "expected": [
+            "high_temporal_drift"
+          ],
+          "missing": [],
+          "name": "temporal_diagnostics",
+          "observed": [
+            "high_temporal_drift"
+          ],
+          "passed": true
+        },
+        {
+          "name": "max_temporal_drift_gte",
+          "passed": true,
+          "threshold": 0.03,
+          "value": 0.08
+        }
+      ],
+      "description": "small geometry drift should be reported by temporal matching",
+      "dynamic_k": {
+        "diagnostics": [
+          "no_dynamic_k_proposals"
+        ],
+        "proposal_count": 0,
+        "proposal_kinds": []
+      },
+      "expected": {
+        "dynamic_proposals": [],
+        "stability_diagnostics": [],
+        "temporal_diagnostics": [
+          "high_temporal_drift"
+        ]
+      },
+      "failure_modes": [
+        "temporal_jitter"
+      ],
+      "metrics": {
+        "assignment_confidence": 1.0,
+        "bbox_diagonal_mean": 0.223607,
+        "bbox_drift_mean": 0.113137,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "label_fragmentation": 0.0,
+        "matched_identity_count": 2,
+        "max_temporal_drift": 0.08,
+        "mean_normalized_entropy": 0.0,
+        "mean_temporal_drift": 0.08,
+        "object_purity": null,
+        "raw_assignment_jitter": 0.0,
+        "slot_permutation_resolved": false
+      },
+      "name": "temporal_jitter",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 1.0,
+        "diagnostics": [],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.5,
+        "effective_slots": 2.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.0,
+        "mixed_slots": [],
+        "object_purity": null,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": {
+        "current_count": 2,
+        "diagnostics": [
+          "high_temporal_drift"
+        ],
+        "ignored_current": [],
+        "ignored_previous": [],
+        "matches": [
+          {
+            "bbox_iou": 0.0,
+            "cost": 0.58,
+            "current_id": 0,
+            "feature_distance": 0.0,
+            "mass_delta": 0.0,
+            "previous_id": 0,
+            "temporal_drift": 0.08
+          },
+          {
+            "bbox_iou": 0.0,
+            "cost": 0.58,
+            "current_id": 1,
+            "feature_distance": 0.0,
+            "mass_delta": 0.0,
+            "previous_id": 1,
+            "temporal_drift": 0.08
+          }
+        ],
+        "max_temporal_drift": 0.08,
+        "mean_temporal_drift": 0.08,
+        "previous_count": 2,
+        "unmatched_current": [],
+        "unmatched_previous": []
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected": [],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [],
+          "passed": true
+        },
+        {
+          "expected": [
+            "unmatched_current"
+          ],
+          "missing": [],
+          "name": "temporal_diagnostics",
+          "observed": [
+            "unmatched_current"
+          ],
+          "passed": true
+        },
+        {
+          "expected": [
+            "birth_unmatched"
+          ],
+          "missing": [],
+          "name": "dynamic_proposals",
+          "observed": [
+            "birth_unmatched"
+          ],
+          "passed": true
+        }
+      ],
+      "description": "new current object should remain unmatched and emit birth proposal",
+      "dynamic_k": {
+        "diagnostics": [
+          "has_birth_unmatched"
+        ],
+        "proposal_count": 1,
+        "proposal_kinds": [
+          "birth_unmatched"
+        ]
+      },
+      "expected": {
+        "dynamic_proposals": [
+          "birth_unmatched"
+        ],
+        "stability_diagnostics": [],
+        "temporal_diagnostics": [
+          "unmatched_current"
+        ]
+      },
+      "failure_modes": [
+        "birth_unmatched"
+      ],
+      "metrics": {
+        "assignment_confidence": 1.0,
+        "bbox_diagonal_mean": 0.223607,
+        "bbox_drift_mean": 0.0,
+        "dominant_slot_mass_fraction": 0.333333,
+        "effective_slots": 3.0,
+        "label_fragmentation": 0.0,
+        "matched_identity_count": 2,
+        "max_temporal_drift": 0.0,
+        "mean_normalized_entropy": 0.0,
+        "mean_temporal_drift": 0.0,
+        "object_purity": null,
+        "raw_assignment_jitter": null,
+        "slot_permutation_resolved": false
+      },
+      "name": "birth_unmatched",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 1.0,
+        "diagnostics": [],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.333333,
+        "effective_slots": 3.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.0,
+        "mixed_slots": [],
+        "object_purity": null,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": {
+        "current_count": 3,
+        "diagnostics": [
+          "unmatched_current"
+        ],
+        "ignored_current": [],
+        "ignored_previous": [],
+        "matches": [
+          {
+            "bbox_iou": 1.0,
+            "cost": 1.0,
+            "current_id": 0,
+            "feature_distance": 1.0,
+            "mass_delta": 0.0,
+            "previous_id": 0,
+            "temporal_drift": 0.0
+          },
+          {
+            "bbox_iou": 1.0,
+            "cost": 1.0,
+            "current_id": 1,
+            "feature_distance": 1.0,
+            "mass_delta": 0.0,
+            "previous_id": 1,
+            "temporal_drift": 0.0
+          }
+        ],
+        "max_temporal_drift": 0.0,
+        "mean_temporal_drift": 0.0,
+        "previous_count": 2,
+        "unmatched_current": [
+          2
+        ],
+        "unmatched_previous": []
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected": [],
+          "missing": [],
+          "name": "stability_diagnostics",
+          "observed": [],
+          "passed": true
+        },
+        {
+          "expected": [
+            "merge_duplicate"
+          ],
+          "missing": [],
+          "name": "dynamic_proposals",
+          "observed": [
+            "merge_duplicate"
+          ],
+          "passed": true
+        }
+      ],
+      "description": "near-duplicate slots should emit merge proposal without mutating K",
+      "dynamic_k": {
+        "diagnostics": [
+          "has_merge_duplicate"
+        ],
+        "proposal_count": 1,
+        "proposal_kinds": [
+          "merge_duplicate"
+        ]
+      },
+      "expected": {
+        "dynamic_proposals": [
+          "merge_duplicate"
+        ],
+        "stability_diagnostics": [],
+        "temporal_diagnostics": []
+      },
+      "failure_modes": [
+        "duplicate_fragment",
+        "merge_proposal"
+      ],
+      "metrics": {
+        "assignment_confidence": 1.0,
+        "bbox_diagonal_mean": 0.0,
+        "dominant_slot_mass_fraction": 0.333333,
+        "effective_slots": 3.0,
+        "label_fragmentation": 0.0,
+        "mean_normalized_entropy": 0.0,
+        "object_purity": 1.0
+      },
+      "name": "duplicate_fragment",
+      "observed_status": "warn",
+      "stability": {
+        "assignment_confidence": 1.0,
+        "diagnostics": [],
+        "dominant_slot": 0,
+        "dominant_slot_mass_fraction": 0.333333,
+        "effective_slots": 3.0,
+        "inactive_slots": [],
+        "low_confidence_slots": [],
+        "mean_normalized_entropy": 0.0,
+        "mixed_slots": [],
+        "object_purity": 1.0,
+        "slot_collapse": false
+      },
+      "status": "pass",
+      "temporal": null
+    }
+  ],
+  "limitations": [
+    "Synthetic dependency-free pressure suite for ObjectState kernel regression.",
+    "This is a pre-training stability gate, not a production quality certificate.",
+    "Renderer, SAM, CLIP, torch, gsplat, CUDA, and large scene assets are intentionally out of scope."
+  ],
+  "report_id": "objectstate-stability-synthetic-v1",
+  "schema": "objgauss-object-state-stability-benchmark-v1",
+  "status": "pass",
+  "thresholds": {
+    "assignment_confidence_floor": 0.5,
+    "collapse_mass_fraction": 0.9,
+    "duplicate_centroid_distance": 0.05,
+    "duplicate_feature_distance": 0.01,
+    "mixed_entropy_threshold": 0.8,
+    "purity_floor": 0.8,
+    "temporal_drift_warning": 0.03
+  }
+}

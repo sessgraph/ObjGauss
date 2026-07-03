@@ -45,6 +45,7 @@ try {
       `localModelManifest=${summary.localModelManifestStatus}`,
       `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
+      `objectStateBenchmark=${summary.objectStateBenchmarkStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
       `localOgcManifest=${summary.localOgcManifestStatus}`,
@@ -675,6 +676,7 @@ async function auditWorld(url) {
       localModelManifestStatus: localModelManifest.status,
       localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
+      objectStateBenchmarkStatus: algorithmManifest.objectStateBenchmarkStatus,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
       localOgcManifestStatus: localOgcManifest.status,
@@ -1325,6 +1327,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
+      const benchmark = document.querySelector("[data-object-state-benchmark='true']");
       const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
       const gateRows = document.querySelector("[data-quality-gates='true']");
       const entropyGate = document.querySelector("[data-quality-gate-name='assignment_entropy']");
@@ -1345,14 +1348,24 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-quality-report-status") === "warn" &&
         shell?.getAttribute("data-quality-report-schema") === "objgauss-object-state-quality-report-v1" &&
         shell?.getAttribute("data-quality-report-object-purity") === "1" &&
+        shell?.getAttribute("data-object-state-benchmark-status") === "pass" &&
+        shell?.getAttribute("data-object-state-benchmark-schema") === "objgauss-object-state-stability-benchmark-v1" &&
+        shell?.getAttribute("data-object-state-benchmark-case-count") === "8" &&
+        shell?.getAttribute("data-object-state-benchmark-warn-count") === "0" &&
+        shell?.getAttribute("data-object-state-benchmark-observed-warn-count") === "6" &&
+        shell?.getAttribute("data-object-state-benchmark-failure-mode-count") === "12" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
         quality?.getAttribute("data-quality-report-failing-gate-names") === "assignment_entropy" &&
+        benchmark?.getAttribute("data-object-state-benchmark-status") === "pass" &&
+        benchmark?.getAttribute("data-object-state-benchmark-case-count") === "8" &&
+        benchmark?.getAttribute("data-object-state-benchmark-first-case") === "clean_sparse" &&
         gateRows?.getAttribute("data-quality-gate-count") === "3" &&
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         entropyGate?.getAttribute("data-quality-gate-threshold") === "0.5" &&
         slotGate?.getAttribute("data-quality-gate-status") === "pass" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
+        window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
@@ -1469,6 +1482,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.model?.id !== "model-manifest-ogc-artifact" ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
+        parsed?.benchmark?.status !== "pass" ||
+        parsed?.benchmark?.caseCount !== 8 ||
         parsed?.delivery?.chunkIds?.[0] !== 0 ||
         !fileName.endsWith(".json") ||
         !parsed?.export?.fileName ||
@@ -1516,6 +1531,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.snapshot?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
         parsed?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
+        parsed?.snapshot?.benchmark?.status !== "pass" ||
+        parsed?.snapshot?.benchmark?.caseCount !== 8 ||
         parsed?.summary?.modelCount !== 10 ||
         parsed?.summary?.trainableArtifactCount < 2 ||
         parsed?.summary?.ogcArtifactCount < 2 ||
@@ -1588,6 +1605,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         archive?.schema !== "objgauss-object-state-debug-session-v1" ||
         archive?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
+        archive?.snapshot?.benchmark?.status !== "pass" ||
+        archive?.snapshot?.benchmark?.caseCount !== 8 ||
         archive?.summary?.modelCount !== 10 ||
         !eventTypes.has("import-session")
       ) {
@@ -1639,6 +1658,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       sessionImportStatus: sessionImport.status,
       sessionDiffStatus: sessionImport.diffStatus,
       sessionDriftStatus: sessionDrift.status,
+      objectStateBenchmarkStatus: "pass",
     };
   } finally {
     await page.close();
@@ -1653,6 +1673,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
     await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
       "public/models/algorithm-bundle-fixture/model-artifact.json",
       "public/models/algorithm-bundle-fixture/quality-report.json",
+      "public/models/algorithm-bundle-fixture/object-state-benchmark.json",
       "public/models/trainable-mvp-debug/model-artifact.json",
       "public/models/ogc-url-fixture/scene.index.json",
       "public/models/ogc-url-fixture/scene.ogc",
@@ -1660,6 +1681,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
+      const benchmark = document.querySelector("[data-object-state-benchmark='true']");
       const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
       const entropyGate = document.querySelector("[data-quality-gate-name='assignment_entropy']");
       const button = document.querySelector("[data-model-artifact-import-button='true']");
@@ -1679,6 +1701,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         shell?.getAttribute("data-model-manifest-import-model") === "model-local-manifest" &&
         importedFile.includes("model-artifact.json") &&
         importedFile.includes("quality-report.json") &&
+        importedFile.includes("object-state-benchmark.json") &&
         importedFile.includes("scene.index.json") &&
         importedFile.includes("scene.ogc") &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "local-manifest-file" &&
@@ -1686,10 +1709,15 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
         shell?.getAttribute("data-quality-report-status") === "warn" &&
+        shell?.getAttribute("data-object-state-benchmark-status") === "pass" &&
+        shell?.getAttribute("data-object-state-benchmark-case-count") === "8" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        benchmark?.getAttribute("data-object-state-benchmark-status") === "pass" &&
+        benchmark?.getAttribute("data-object-state-benchmark-first-case") === "clean_sparse" &&
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
+        window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
@@ -1784,7 +1812,11 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       );
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-model-manifest.png", fullPage: false });
-    return { status: "local-manifest-trainable-ogc-debug-os", qualityReportStatus: "warn" };
+    return {
+      status: "local-manifest-trainable-ogc-debug-os",
+      qualityReportStatus: "warn",
+      objectStateBenchmarkStatus: "pass",
+    };
   } finally {
     await page.close();
   }

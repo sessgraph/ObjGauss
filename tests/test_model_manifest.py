@@ -186,6 +186,35 @@ def test_model_artifact_manifest_allows_browser_ready_quality_report(tmp_path):
     assert validation.browser_ready_artifacts == 1
 
 
+def test_model_artifact_manifest_allows_browser_ready_object_state_benchmark(tmp_path):
+    report_path = tmp_path / "object-state-benchmark.json"
+    report_path.write_text('{"schema":"objgauss-object-state-stability-benchmark-v1"}', encoding="utf-8")
+    manifest = build_model_artifact_manifest(
+        manifest_id="benchmark-debug-model-artifacts",
+        asset_id="benchmark-debug",
+        name="Benchmark Debug",
+        source={"type": "object_state_benchmark_debug_fixture"},
+        license="fixture",
+        artifacts=[
+            build_model_artifact(
+                role="object_state_benchmark",
+                path=report_path,
+                format=".json",
+                delivery_tier="browser_edit",
+                compute_hash=True,
+            )
+        ],
+        limitations=["Small ObjectState benchmark report for Debug OS handoff."],
+    )
+
+    roles = {artifact["role"]: artifact for artifact in manifest["artifacts"]}
+    assert roles["object_state_benchmark"]["browser_ready"] is True
+    assert roles["object_state_benchmark"]["delivery_tier"] == "browser_edit"
+    validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
+    assert validation.passed
+    assert validation.browser_ready_artifacts == 1
+
+
 def test_manifest_from_trainable_kernel_model_artifact(tmp_path):
     result = train_kernel_mvp(
         make_trainable_kernel_mvp_fixture(),

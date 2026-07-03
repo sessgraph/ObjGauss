@@ -80,6 +80,17 @@
       "sha256": "4dfbc42c38ee816ca2338054e185ddbdbd2b98d3b8a10940713e7ae57979c0af",
       "artifact_schema": "objgauss-object-state-quality-report-v1",
       "label": "ObjectState quality report"
+    },
+    {
+      "role": "object_state_benchmark",
+      "path": "object-state-benchmark.json",
+      "format": ".json",
+      "delivery_tier": "browser_edit",
+      "browser_ready": true,
+      "byte_size": 19492,
+      "sha256": "1bc065c8cc0b7739f5df6bad886b84556f49128295a05411473c935e13f23abf",
+      "artifact_schema": "objgauss-object-state-stability-benchmark-v1",
+      "label": "ObjectState stability benchmark"
     }
   ],
   "quality_evidence": [
@@ -87,7 +98,8 @@
       "kind": "object_state_debug_os_bundle_fixture",
       "status": "fixture",
       "trainable_artifact": "objgauss-trainable-kernel-model-artifact-v1",
-      "browser_artifact": "compressed_chunked"
+      "browser_artifact": "compressed_chunked",
+      "benchmark_artifact": "objgauss-object-state-stability-benchmark-v1"
     }
   ],
   "limitations": [
