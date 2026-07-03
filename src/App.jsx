@@ -133,6 +133,16 @@ export default function App() {
     debugProbe?.assignment ?? selectedObject?.assignment ?? selectedObject?.objectState?.assignment ?? [],
     debugProbe,
   );
+  const selectedAssignmentTimeline = useMemo(
+    () =>
+      assignmentTimelineSummary({
+        artifact: selected?.trainableArtifact,
+        debugProbe,
+        selectedObject,
+        frameIndex: selected?.delivery?.frameIndex ?? selected?.trainableFrameIndex ?? 0,
+      }),
+    [debugProbe, selected?.delivery?.frameIndex, selected?.trainableArtifact, selected?.trainableFrameIndex, selectedObject],
+  );
   const selectedContinuity = objectContinuitySummary(selectedObject ?? selected?.objects?.[0] ?? null);
   const selectedTemporal = objectTemporalSummary(selectedObject ?? selected?.objects?.[0] ?? null);
   const selectedExplainability = objectExplainabilitySummary({
@@ -192,6 +202,7 @@ export default function App() {
     stability: selectedStability,
     assignmentSource: selectedAssignmentSource,
     assignmentProbe: selectedAssignmentProbe,
+    assignmentTimeline: selectedAssignmentTimeline,
     trainingEvidence: selectedTrainingEvidence,
     qualityReport: selectedQualityReport,
     objectStateBenchmark: selectedObjectStateBenchmark,
@@ -1214,6 +1225,12 @@ export default function App() {
       data-assignment-probe-margin={selectedAssignmentProbe.margin ?? ""}
       data-assignment-probe-ambiguous={selectedAssignmentProbe.ambiguous ? "true" : "false"}
       data-assignment-probe-collapse-risk={selectedAssignmentProbe.collapseRisk ? "true" : "false"}
+      data-assignment-timeline-status={selectedAssignmentTimeline.status}
+      data-assignment-timeline-frame-count={selectedAssignmentTimeline.frameCount}
+      data-assignment-timeline-current-frame={selectedAssignmentTimeline.currentFrameIndex ?? ""}
+      data-assignment-timeline-gaussian-index={selectedAssignmentTimeline.gaussianIndex ?? ""}
+      data-assignment-timeline-jitter={selectedAssignmentTimeline.meanDelta ?? ""}
+      data-assignment-timeline-max-delta={selectedAssignmentTimeline.maxDelta ?? ""}
       data-object-continuity-status={selectedContinuity.status}
       data-object-continuity-spatial-compactness={selectedContinuity.spatialCompactness ?? ""}
       data-object-continuity-bbox-diagonal={selectedContinuity.bboxDiagonal ?? ""}
@@ -1528,6 +1545,7 @@ export default function App() {
         hoverExplainability={hoveredExplainability}
         debugProbe={debugProbe}
         assignmentProbe={selectedAssignmentProbe}
+        assignmentTimeline={selectedAssignmentTimeline}
         debugMode={debugMode}
         debugLens={debugLens}
         objectOverlayMode={selectedObjectOverlayMode}
@@ -3128,6 +3146,7 @@ function DebugPanel({
   hoverExplainability,
   debugProbe,
   assignmentProbe,
+  assignmentTimeline,
   debugMode,
   debugLens,
   objectOverlayMode,
@@ -3190,6 +3209,12 @@ function DebugPanel({
       data-assignment-probe-margin={assignmentProbe?.margin ?? ""}
       data-assignment-probe-ambiguous={assignmentProbe?.ambiguous ? "true" : "false"}
       data-assignment-probe-collapse-risk={assignmentProbe?.collapseRisk ? "true" : "false"}
+      data-assignment-timeline-status={assignmentTimeline?.status ?? "none"}
+      data-assignment-timeline-frame-count={assignmentTimeline?.frameCount ?? 0}
+      data-assignment-timeline-current-frame={assignmentTimeline?.currentFrameIndex ?? ""}
+      data-assignment-timeline-gaussian-index={assignmentTimeline?.gaussianIndex ?? ""}
+      data-assignment-timeline-jitter={assignmentTimeline?.meanDelta ?? ""}
+      data-assignment-timeline-max-delta={assignmentTimeline?.maxDelta ?? ""}
       data-object-continuity-status={objectContinuity?.status ?? "none"}
       data-object-continuity-spatial-compactness={objectContinuity?.spatialCompactness ?? ""}
       data-object-continuity-bbox-diagonal={objectContinuity?.bboxDiagonal ?? ""}
@@ -3382,6 +3407,7 @@ function DebugPanel({
         debugProbe={debugProbe}
         assignmentProbe={assignmentProbe}
       />
+      <AssignmentTimelinePanel timeline={assignmentTimeline} />
       <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
       <HoverAssignmentHeatmap
         hoveredTarget={hoveredTarget}
@@ -3632,6 +3658,11 @@ function DebugSnapshotPanel({
       data-debug-snapshot-assignment-probe-margin={snapshot.assignment.probe?.margin ?? ""}
       data-debug-snapshot-assignment-probe-ambiguous={snapshot.assignment.probe?.ambiguous ? "true" : "false"}
       data-debug-snapshot-assignment-probe-collapse-risk={snapshot.assignment.probe?.collapseRisk ? "true" : "false"}
+      data-debug-snapshot-assignment-timeline-status={snapshot.assignment.timeline?.status ?? ""}
+      data-debug-snapshot-assignment-timeline-frame-count={snapshot.assignment.timeline?.frameCount ?? ""}
+      data-debug-snapshot-assignment-timeline-gaussian-index={snapshot.assignment.timeline?.gaussianIndex ?? ""}
+      data-debug-snapshot-assignment-timeline-jitter={snapshot.assignment.timeline?.meanDelta ?? ""}
+      data-debug-snapshot-assignment-timeline-max-delta={snapshot.assignment.timeline?.maxDelta ?? ""}
       data-debug-snapshot-hidden-objects={snapshot.visibility?.hiddenObjectCount ?? ""}
       data-debug-snapshot-hidden-gaussians={snapshot.visibility?.hiddenGaussianCount ?? ""}
       data-debug-snapshot-continuity-status={snapshot.continuity?.status ?? ""}
@@ -3712,6 +3743,8 @@ function DebugSnapshotPanel({
         <Meta label="source" value={snapshot.assignment.source} />
         <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
         <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
+        <Meta label="timeline" value={snapshot.assignment.timeline?.status ?? "-"} />
+        <Meta label="A jitter" value={formatRatio(snapshot.assignment.timeline?.meanDelta)} />
         <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
         <Meta label="spatial" value={snapshot.continuity?.status ?? "-"} />
         <Meta label="diag" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
@@ -4167,6 +4200,72 @@ function GaussianProbePanel({ debugProbe, assignmentProbe }) {
           <small>{formatRatio(assignmentProbe?.topProbability)}</small>
           <strong>{collapseRisk ? "true" : "false"}</strong>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignmentTimelinePanel({ timeline }) {
+  if (!timeline || timeline.status === "none" || !timeline.frames?.length) return null;
+  return (
+    <div
+      className="stabilityDashboard assignmentTimelinePanel"
+      data-assignment-timeline-panel="true"
+      data-assignment-timeline-schema={timeline.schema}
+      data-assignment-timeline-status={timeline.status}
+      data-assignment-timeline-frame-count={timeline.frameCount}
+      data-assignment-timeline-current-frame={timeline.currentFrameIndex ?? ""}
+      data-assignment-timeline-gaussian-index={timeline.gaussianIndex ?? ""}
+      data-assignment-timeline-jitter={timeline.meanDelta ?? ""}
+      data-assignment-timeline-max-delta={timeline.maxDelta ?? ""}
+      data-assignment-timeline-slot-count={timeline.slotCount ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Assignment Timeline</span>
+        <strong>{timeline.status}</strong>
+      </div>
+      <div className="stabilityGrid timelineGrid">
+        <Metric label="frames" value={timeline.frameCount} />
+        <Metric label="n" value={timeline.gaussianIndex ?? "-"} />
+        <Metric label="jitter" value={formatRatio(timeline.meanDelta)} />
+        <Metric label="max d" value={formatRatio(timeline.maxDelta)} />
+      </div>
+      <div className="assignmentTimelineRows">
+        {timeline.frames.map((frame) => (
+          <div
+            className={`assignmentTimelineRow ${frame.current ? "current" : ""}`}
+            key={`timeline-${frame.frameIndex}`}
+            data-assignment-timeline-row="true"
+            data-assignment-timeline-row-frame={frame.frameIndex}
+            data-assignment-timeline-row-current={frame.current ? "true" : "false"}
+            data-assignment-timeline-row-top-slot={frame.topSlot ?? ""}
+            data-assignment-timeline-row-margin={frame.margin ?? ""}
+            data-assignment-timeline-row-delta={frame.deltaFromPrevious ?? ""}
+          >
+            <span>f{frame.frameIndex}</span>
+            <div className="assignmentTimelineSlots">
+              {frame.assignment.map((slot) => {
+                const width = `${Math.max(2, Math.min(100, Number(slot.probability) * 100))}%`;
+                const color = objectAccent(slot.objectId ?? slot.slot, "#9eeaf2");
+                return (
+                  <div
+                    className="assignmentTimelineSlot"
+                    key={`${frame.frameIndex}-${slot.slot}`}
+                    data-assignment-timeline-slot={slot.slot}
+                    data-assignment-timeline-probability={slot.probability ?? ""}
+                  >
+                    <small>k{slot.slot}</small>
+                    <b>
+                      <i style={{ width, background: color }} />
+                    </b>
+                    <strong>{formatRatio(slot.probability)}</strong>
+                  </div>
+                );
+              })}
+            </div>
+            <strong>{frame.deltaFromPrevious === null ? "base" : formatRatio(frame.deltaFromPrevious)}</strong>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -5897,6 +5996,7 @@ function objectStateDebugSnapshot({
   stability,
   assignmentSource,
   assignmentProbe,
+  assignmentTimeline,
   trainingEvidence,
   qualityReport,
   objectStateBenchmark,
@@ -5938,6 +6038,7 @@ function objectStateDebugSnapshot({
       entropy: finiteNumber(debugProbe?.entropy ?? activeState?.assignmentEntropy),
       vector: compactAssignmentVector(assignment),
       probe: compactAssignmentProbe(assignmentProbe),
+      timeline: compactAssignmentTimeline(assignmentTimeline),
     },
     hover: hoveredTarget
       ? {
@@ -6125,6 +6226,7 @@ function validateDebugSessionArchive(session, path = "") {
         entropy: finiteNumber(snapshot.assignment?.entropy),
         vector: compactAssignmentVector(snapshot.assignment?.vector),
         probe: compactAssignmentProbe(snapshot.assignment?.probe),
+        timeline: compactAssignmentTimeline(snapshot.assignment?.timeline),
       },
       hover: snapshot.hover
         ? {
@@ -6252,12 +6354,19 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
   const deliveryMatch = cleanString(liveSnapshot.delivery?.loadRoute) === cleanString(archiveSnapshot.delivery?.loadRoute);
   const probeStatusMatch =
     cleanString(liveSnapshot.assignment?.probe?.status) === cleanString(archiveSnapshot.assignment?.probe?.status);
+  const timelineMatch =
+    cleanString(liveSnapshot.assignment?.timeline?.status) ===
+    cleanString(archiveSnapshot.assignment?.timeline?.status);
   const slotDelta = numericDelta(liveSnapshot.assignment?.slotCount, archiveSnapshot.assignment?.slotCount);
   const entropyDelta = numericDelta(liveSnapshot.assignment?.entropy, archiveSnapshot.assignment?.entropy);
   const confidenceDelta = numericDelta(liveSnapshot.assignment?.confidence, archiveSnapshot.assignment?.confidence);
   const probeMarginDelta = numericDelta(
     liveSnapshot.assignment?.probe?.margin,
     archiveSnapshot.assignment?.probe?.margin,
+  );
+  const timelineJitterDelta = numericDelta(
+    liveSnapshot.assignment?.timeline?.meanDelta,
+    archiveSnapshot.assignment?.timeline?.meanDelta,
   );
   const qualityEntropyDelta = numericDelta(
     liveSnapshot.quality?.assignmentEntropy,
@@ -6278,10 +6387,12 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     !explainabilityMatch ? "explainability" : "",
     !deliveryMatch ? "delivery" : "",
     !probeStatusMatch ? "probe_status" : "",
+    !timelineMatch ? "timeline" : "",
     deltaChanged(slotDelta) ? "slots" : "",
     deltaChanged(entropyDelta) ? "entropy" : "",
     deltaChanged(confidenceDelta) ? "confidence" : "",
     deltaChanged(probeMarginDelta) ? "probe_margin" : "",
+    deltaChanged(timelineJitterDelta) ? "timeline_jitter" : "",
     deltaChanged(qualityEntropyDelta) ? "quality_entropy" : "",
   ].filter(Boolean);
   return {
@@ -6296,10 +6407,12 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     explainabilityMatch,
     deliveryMatch,
     probeStatusMatch,
+    timelineMatch,
     slotDelta,
     entropyDelta,
     confidenceDelta,
     probeMarginDelta,
+    timelineJitterDelta,
     qualityEntropyDelta,
     eventDelta,
     changedFields,
@@ -6497,6 +6610,115 @@ function assignmentProbeSummary(assignment, debugProbe = null) {
   };
 }
 
+function assignmentTimelineSummary({ artifact, debugProbe, selectedObject, frameIndex } = {}) {
+  const frames = Array.isArray(artifact?.assignments) ? artifact.assignments : [];
+  const currentFrameIndex = Math.trunc(finiteNumber(frameIndex) ?? 0);
+  const rowIndex =
+    cleanInteger(debugProbe?.gaussianIndex) ?? representativeGaussianIndex(artifact, currentFrameIndex, selectedObject);
+  if (!frames.length || rowIndex === null || rowIndex === undefined) {
+    return {
+      schema: "objgauss-assignment-timeline-v1",
+      status: "none",
+      frameCount: frames.length,
+      currentFrameIndex,
+      gaussianIndex: rowIndex ?? null,
+      slotCount: 0,
+      meanDelta: null,
+      maxDelta: null,
+      frames: [],
+    };
+  }
+  const objectIds = objectIdsForArtifactFrame(artifact, currentFrameIndex);
+  let previousRow = null;
+  const deltas = [];
+  const timelineFrames = frames
+    .slice()
+    .sort((left, right) => Number(left?.frame_index ?? 0) - Number(right?.frame_index ?? 0))
+    .map((frame) => {
+      const row = Array.isArray(frame?.matrix?.[rowIndex]) ? frame.matrix[rowIndex] : [];
+      const assignment = assignmentVectorFromProbabilities(row, objectIds);
+      const probe = assignmentProbeSummary(assignment);
+      const deltaFromPrevious = previousRow ? assignmentRowDelta(previousRow, row) : null;
+      previousRow = row;
+      if (deltaFromPrevious !== null) deltas.push(deltaFromPrevious);
+      return {
+        frameIndex: Math.trunc(Number(frame?.frame_index ?? 0) || 0),
+        current: Math.trunc(Number(frame?.frame_index ?? 0) || 0) === currentFrameIndex,
+        slotCount: assignment.length,
+        topSlot: probe.topSlot,
+        topObjectId: probe.topObjectId,
+        topProbability: probe.topProbability,
+        secondProbability: probe.secondProbability,
+        margin: probe.margin,
+        entropy: probe.entropy,
+        deltaFromPrevious,
+        assignment,
+      };
+    });
+  const validFrames = timelineFrames.filter((frame) => frame.slotCount > 0);
+  const meanDelta = deltas.length ? round3(average(deltas)) : null;
+  const maxDelta = deltas.length ? round3(Math.max(...deltas)) : null;
+  const status = !validFrames.length
+    ? "missing-row"
+    : validFrames.length < 2
+      ? "single-frame"
+      : maxDelta !== null && maxDelta > 0.08
+        ? "jitter"
+        : "stable";
+  return {
+    schema: "objgauss-assignment-timeline-v1",
+    status,
+    frameCount: validFrames.length,
+    currentFrameIndex,
+    gaussianIndex: rowIndex,
+    slotCount: Math.max(0, ...validFrames.map((frame) => frame.slotCount)),
+    meanDelta,
+    maxDelta,
+    frames: validFrames.slice(0, 8),
+  };
+}
+
+function representativeGaussianIndex(artifact, frameIndex, selectedObject) {
+  const objectId = selectedObject?.objectId ?? selectedObject?.objectState?.objectId;
+  const slot = cleanInteger(selectedObject?.objectState?.slot);
+  if (objectId === null || objectId === undefined) return null;
+  const stateFrame = artifactFrameByIndex(artifact?.object_states, frameIndex);
+  const derivedIds = Array.isArray(stateFrame?.derived_object_ids) ? stateFrame.derived_object_ids : [];
+  const derivedIndex = derivedIds.findIndex((id) => String(id) === String(objectId));
+  if (derivedIndex >= 0) return derivedIndex;
+  const assignmentFrame = artifactFrameByIndex(artifact?.assignments, frameIndex);
+  if (slot === null || !Array.isArray(assignmentFrame?.matrix)) return null;
+  const dominantRowIndex = assignmentFrame.matrix.findIndex((row) => dominantIndex(row) === slot);
+  return dominantRowIndex >= 0 ? dominantRowIndex : null;
+}
+
+function artifactFrameByIndex(frames, frameIndex) {
+  if (!Array.isArray(frames) || !frames.length) return null;
+  const wanted = Math.trunc(Number(frameIndex) || 0);
+  return frames.find((frame) => Math.trunc(Number(frame?.frame_index ?? 0) || 0) === wanted) ?? frames[0];
+}
+
+function objectIdsForArtifactFrame(artifact, frameIndex) {
+  const frame = artifactFrameByIndex(artifact?.object_states, frameIndex);
+  const stateIds = Array.isArray(frame?.states)
+    ? frame.states.map((state, index) => cleanNullable(state?.id) ?? index)
+    : [];
+  if (stateIds.length) return stateIds;
+  const assignmentFrame = artifactFrameByIndex(artifact?.assignments, frameIndex);
+  const width = Array.isArray(assignmentFrame?.shape) ? Number(assignmentFrame.shape[1]) : 0;
+  return Array.from({ length: Math.max(0, width) }, (_item, index) => index);
+}
+
+function assignmentRowDelta(left, right) {
+  const width = Math.max(left?.length ?? 0, right?.length ?? 0);
+  if (!width) return null;
+  let l1 = 0;
+  for (let index = 0; index < width; index += 1) {
+    l1 += Math.abs((Number(left?.[index]) || 0) - (Number(right?.[index]) || 0));
+  }
+  return round3(Math.min(1, l1 * 0.5));
+}
+
 function compactAssignmentProbe(probe) {
   if (!probe || typeof probe !== "object") return null;
   return {
@@ -6515,6 +6737,32 @@ function compactAssignmentProbe(probe) {
   };
 }
 
+function compactAssignmentTimeline(timeline) {
+  if (!timeline || typeof timeline !== "object" || timeline.status === "none") return null;
+  return {
+    schema: cleanString(timeline.schema || "objgauss-assignment-timeline-v1"),
+    status: cleanString(timeline.status || "none"),
+    frameCount: finiteNumber(timeline.frameCount),
+    currentFrameIndex: cleanNullable(timeline.currentFrameIndex),
+    gaussianIndex: cleanNullable(timeline.gaussianIndex),
+    slotCount: finiteNumber(timeline.slotCount),
+    meanDelta: finiteNumber(timeline.meanDelta),
+    maxDelta: finiteNumber(timeline.maxDelta),
+    frames: Array.isArray(timeline.frames)
+      ? timeline.frames.slice(0, 8).map((frame) => ({
+          frameIndex: cleanNullable(frame.frameIndex),
+          current: Boolean(frame.current),
+          topSlot: cleanNullable(frame.topSlot),
+          topObjectId: cleanNullable(frame.topObjectId),
+          topProbability: finiteNumber(frame.topProbability),
+          margin: finiteNumber(frame.margin),
+          entropy: finiteNumber(frame.entropy),
+          deltaFromPrevious: finiteNumber(frame.deltaFromPrevious),
+        }))
+      : [],
+  };
+}
+
 function cleanNumberArray(value) {
   return Array.isArray(value)
     ? value.map((entry) => finiteNumber(entry)).filter((entry) => entry !== null)
@@ -6529,6 +6777,12 @@ function cleanNullable(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : String(value);
+}
+
+function cleanInteger(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.trunc(number) : null;
 }
 
 function trainableEvidenceSummary(artifact) {

@@ -73,6 +73,8 @@ try {
       `gaussianProbe=${summary.probePanelStatus}`,
       `gaussianProbeSource=${summary.probePanelSource}`,
       `gaussianProbeMargin=${summary.probePanelMargin}`,
+      `assignmentTimeline=${summary.assignmentTimelineStatus}`,
+      `assignmentTimelineJitter=${summary.assignmentTimelineJitter}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
@@ -247,6 +249,7 @@ async function auditWorld(url) {
       const panel = document.querySelector("[data-object-debug-panel='true']");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
+      const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
@@ -270,7 +273,22 @@ async function auditWorld(url) {
         Number(probePanel?.getAttribute("data-gaussian-probe-entropy") ?? 0) > 0 &&
         Number(probePanel?.getAttribute("data-gaussian-probe-opacity") ?? 0) > 0 &&
         probePanel?.getAttribute("data-gaussian-probe-position") !== "-" &&
+        shell?.getAttribute("data-assignment-timeline-status") === "stable" &&
+        panel?.getAttribute("data-assignment-timeline-status") === "stable" &&
+        timelinePanel?.getAttribute("data-assignment-timeline-status") === "stable" &&
+        timelinePanel?.getAttribute("data-assignment-timeline-frame-count") === "2" &&
+        timelinePanel?.getAttribute("data-assignment-timeline-current-frame") === "0" &&
+        timelinePanel?.getAttribute("data-assignment-timeline-gaussian-index") === "0" &&
+        Number(timelinePanel?.getAttribute("data-assignment-timeline-jitter") ?? 0) > 0 &&
+        Number(timelinePanel?.getAttribute("data-assignment-timeline-jitter") ?? 1) < 0.05 &&
+        timelinePanel?.querySelectorAll("[data-assignment-timeline-row='true']").length === 2 &&
+        timelinePanel?.querySelector("[data-assignment-timeline-row-current='true']")?.getAttribute("data-assignment-timeline-row-frame") === "0" &&
         snapshot?.assignment?.probe?.status === "confident" &&
+        snapshot?.assignment?.timeline?.status === "stable" &&
+        snapshot?.assignment?.timeline?.frameCount === 2 &&
+        snapshot?.assignment?.timeline?.gaussianIndex === 0 &&
+        snapshot?.assignment?.timeline?.meanDelta > 0 &&
+        snapshot?.assignment?.timeline?.meanDelta < 0.05 &&
         world?.assignmentProbeStatus === "confident" &&
         shell?.getAttribute("data-object-continuity-status") === "continuous" &&
         panel?.getAttribute("data-object-continuity-status") === "continuous" &&
@@ -951,6 +969,7 @@ async function auditWorld(url) {
       const training = document.querySelector("[data-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
       const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
+      const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -979,6 +998,9 @@ async function auditWorld(url) {
         debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
         debugSnapshotAssignmentProbeStatus: snapshot?.assignment?.probe?.status ?? null,
         debugSnapshotAssignmentProbeMargin: snapshot?.assignment?.probe?.margin ?? null,
+        debugSnapshotAssignmentTimelineStatus: snapshot?.assignment?.timeline?.status ?? null,
+        debugSnapshotAssignmentTimelineJitter: snapshot?.assignment?.timeline?.meanDelta ?? null,
+        debugSnapshotAssignmentTimelineFrameCount: snapshot?.assignment?.timeline?.frameCount ?? null,
         debugSnapshotContinuityStatus: snapshot?.continuity?.status ?? null,
         debugSnapshotContinuityBboxDiagonal: snapshot?.continuity?.bboxDiagonal ?? null,
         debugSnapshotContinuityCentroidContained: snapshot?.continuity?.centroidContained ?? false,
@@ -1012,6 +1034,8 @@ async function auditWorld(url) {
         panelDebugSnapshotLens: snapshotPanel?.getAttribute("data-debug-snapshot-lens") ?? null,
         panelDebugSnapshotSlots: Number(snapshotPanel?.getAttribute("data-debug-snapshot-slots") ?? 0),
         panelDebugSnapshotAssignmentProbeStatus: snapshotPanel?.getAttribute("data-debug-snapshot-assignment-probe-status") ?? null,
+        panelDebugSnapshotAssignmentTimelineStatus: snapshotPanel?.getAttribute("data-debug-snapshot-assignment-timeline-status") ?? null,
+        panelDebugSnapshotAssignmentTimelineJitter: Number(snapshotPanel?.getAttribute("data-debug-snapshot-assignment-timeline-jitter") ?? 0),
         panelDebugSnapshotContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") ?? null,
         panelDebugSnapshotContinuityBboxDiagonal: Number(snapshotPanel?.getAttribute("data-debug-snapshot-continuity-bbox-diagonal") ?? 0),
         panelDebugSnapshotContinuityCentroidContained: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-centroid-contained") ?? null,
@@ -1029,6 +1053,18 @@ async function auditWorld(url) {
         assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
         shellAssignmentProbeStatus: shell?.getAttribute("data-assignment-probe-status") ?? null,
         shellAssignmentProbeMargin: Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0),
+        shellAssignmentTimelineStatus: shell?.getAttribute("data-assignment-timeline-status") ?? null,
+        shellAssignmentTimelineFrameCount: Number(shell?.getAttribute("data-assignment-timeline-frame-count") ?? 0),
+        shellAssignmentTimelineJitter: Number(shell?.getAttribute("data-assignment-timeline-jitter") ?? 0),
+        panelAssignmentTimelineStatus: debugPanel?.getAttribute("data-assignment-timeline-status") ?? null,
+        panelAssignmentTimelineFrameCount: Number(debugPanel?.getAttribute("data-assignment-timeline-frame-count") ?? 0),
+        timelinePanelStatus: timelinePanel?.getAttribute("data-assignment-timeline-status") ?? null,
+        timelinePanelFrameCount: Number(timelinePanel?.getAttribute("data-assignment-timeline-frame-count") ?? 0),
+        timelinePanelCurrentFrame: timelinePanel?.getAttribute("data-assignment-timeline-current-frame") ?? null,
+        timelinePanelGaussianIndex: timelinePanel?.getAttribute("data-assignment-timeline-gaussian-index") ?? null,
+        timelinePanelJitter: Number(timelinePanel?.getAttribute("data-assignment-timeline-jitter") ?? 0),
+        timelinePanelMaxDelta: Number(timelinePanel?.getAttribute("data-assignment-timeline-max-delta") ?? 0),
+        timelinePanelRows: timelinePanel?.querySelectorAll("[data-assignment-timeline-row='true']").length ?? 0,
         probePanelStatus: probePanel?.getAttribute("data-gaussian-probe-status") ?? null,
         probePanelSource: probePanel?.getAttribute("data-gaussian-probe-source") ?? null,
         probePanelIndex: probePanel?.getAttribute("data-gaussian-probe-index") ?? null,
@@ -1400,10 +1436,32 @@ async function auditWorld(url) {
       world.panelDebugSnapshotLens === world.debugSnapshotLens &&
       world.panelDebugSnapshotSlots === world.debugSnapshotAssignmentSlots &&
       world.panelDebugSnapshotAssignmentProbeStatus === world.debugSnapshotAssignmentProbeStatus &&
+      world.debugSnapshotAssignmentTimelineStatus === "stable" &&
+      world.debugSnapshotAssignmentTimelineFrameCount === 2 &&
+      world.debugSnapshotAssignmentTimelineJitter > 0 &&
+      world.debugSnapshotAssignmentTimelineJitter < 0.05 &&
+      world.panelDebugSnapshotAssignmentTimelineStatus === world.debugSnapshotAssignmentTimelineStatus &&
+      world.panelDebugSnapshotAssignmentTimelineJitter > 0 &&
+      world.panelDebugSnapshotAssignmentTimelineJitter < 0.05 &&
       world.assignmentProbeStatus === "confident" &&
       world.assignmentProbeMargin > 0.55 &&
       world.shellAssignmentProbeStatus === "confident" &&
       world.shellAssignmentProbeMargin > 0.55 &&
+      world.shellAssignmentTimelineStatus === "stable" &&
+      world.shellAssignmentTimelineFrameCount === 2 &&
+      world.shellAssignmentTimelineJitter > 0 &&
+      world.shellAssignmentTimelineJitter < 0.05 &&
+      world.panelAssignmentTimelineStatus === world.shellAssignmentTimelineStatus &&
+      world.panelAssignmentTimelineFrameCount === 2 &&
+      world.timelinePanelStatus === "stable" &&
+      world.timelinePanelFrameCount === 2 &&
+      world.timelinePanelCurrentFrame === "1" &&
+      world.timelinePanelGaussianIndex === "0" &&
+      world.timelinePanelJitter > 0 &&
+      world.timelinePanelJitter < 0.05 &&
+      world.timelinePanelMaxDelta > 0 &&
+      world.timelinePanelMaxDelta < 0.05 &&
+      world.timelinePanelRows === 2 &&
       world.probePanelStatus === "confident" &&
       world.probePanelSource === "trainable_kernel_model_artifact" &&
       world.probePanelIndex === "0" &&
@@ -1668,6 +1726,8 @@ async function auditWorld(url) {
       probePanelStatus: world.probePanelStatus,
       probePanelSource: world.probePanelSource,
       probePanelMargin: world.probePanelMargin,
+      assignmentTimelineStatus: world.timelinePanelStatus,
+      assignmentTimelineJitter: world.timelinePanelJitter,
       assignmentSlots,
       selectedGaussian,
       sidebars,

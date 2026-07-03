@@ -334,6 +334,90 @@ button:focus-visible {
   gap: 5px;
 }
 
+.assignmentTimelinePanel {
+  border-color: rgba(243, 223, 93, 0.2);
+  background: rgba(243, 223, 93, 0.04);
+}
+
+.timelineGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.assignmentTimelineRows {
+  display: grid;
+  gap: 7px;
+}
+
+.assignmentTimelineRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px;
+  border: 1px solid rgba(153, 214, 222, 0.12);
+  border-radius: 9px;
+  background: rgba(9, 17, 24, 0.26);
+}
+
+.assignmentTimelineRow.current {
+  border-color: rgba(127, 241, 215, 0.3);
+  background: rgba(127, 241, 215, 0.07);
+}
+
+.assignmentTimelineRow > span,
+.assignmentTimelineRow > strong {
+  color: #eefbff;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.assignmentTimelineRow > strong {
+  text-align: right;
+}
+
+.assignmentTimelineSlots {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.assignmentTimelineSlot {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.assignmentTimelineSlot small,
+.assignmentTimelineSlot strong {
+  overflow: hidden;
+  color: #9fb1bd;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignmentTimelineSlot strong {
+  color: #eefbff;
+  text-align: right;
+}
+
+.assignmentTimelineSlot b {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.assignmentTimelineSlot i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  box-shadow: 0 0 12px rgba(243, 223, 93, 0.18);
+}
+
 .assignmentProbeMeta {
   display: grid;
   min-height: 28px;
