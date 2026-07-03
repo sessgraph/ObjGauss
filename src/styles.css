@@ -409,11 +409,11 @@ button:focus-visible {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .snapshotActions button {
-  min-width: 44px;
+  min-width: 40px;
   min-height: 26px;
   border: 1px solid rgba(182, 151, 255, 0.28);
   border-radius: 8px;
@@ -586,6 +586,10 @@ button:focus-visible {
 
 .debugTracePanel {
   border-color: rgba(127, 222, 255, 0.2);
+}
+
+.debugSessionArchivePanel {
+  border-color: rgba(127, 241, 214, 0.2);
 }
 
 .debugEventRows {

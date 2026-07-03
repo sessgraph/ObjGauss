@@ -33,6 +33,7 @@ export default function App() {
   const artifactInputRef = useRef(null);
   const modelBundleInputRef = useRef(null);
   const ogcInputRef = useRef(null);
+  const debugSessionInputRef = useRef(null);
   const [worldReady, setWorldReady] = useState(false);
   const [selection, setSelection] = useState(() => ({
     modelId: initialModelId,
@@ -77,6 +78,13 @@ export default function App() {
     schema: "",
     error: "",
   }));
+  const [sessionImport, setSessionImport] = useState(() => ({
+    status: "idle",
+    fileName: "",
+    schema: "",
+    error: "",
+  }));
+  const [debugSessionArchive, setDebugSessionArchive] = useState(null);
   const modelList = useMemo(() => Object.values(models), [models]);
   const summary = useMemo(() => catalogSummary(modelList), [modelList]);
   const loadedCount = useMemo(
@@ -175,6 +183,20 @@ export default function App() {
       }
     };
   }, [selectedDebugSession]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (debugSessionArchive) {
+      window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__ = debugSessionArchive;
+    } else {
+      delete window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__;
+    }
+    return () => {
+      if (window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__ === debugSessionArchive) {
+        delete window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__;
+      }
+    };
+  }, [debugSessionArchive]);
 
   const recordDebugEvent = useCallback((type, detail = {}) => {
     const seq = debugEventSeq.current + 1;
@@ -323,6 +345,47 @@ export default function App() {
       });
     }
   }, [recordDebugEvent, selectedDebugSession]);
+
+  const importDebugSessionFile = useCallback(
+    async (event) => {
+      const file = event.target.files?.[0] ?? null;
+      event.target.value = "";
+      if (!file) return;
+      setSessionImport({ status: "loading", fileName: file.name, schema: "", error: "" });
+      try {
+        const archive = validateDebugSessionArchive(JSON.parse(await file.text()), file.name);
+        setDebugSessionArchive(archive);
+        setSessionImport({
+          status: "loaded",
+          fileName: file.name,
+          schema: archive.schema,
+          error: "",
+        });
+        recordDebugEvent("import-session", {
+          modelId: archive.snapshot.model.id,
+          objectId: archive.snapshot.selection.objectId,
+          selectionId: archive.snapshot.selection.selectionId,
+          gaussianIndex: archive.snapshot.selection.gaussianIndex,
+          fileName: file.name,
+          source: "debug-panel",
+        });
+      } catch (error) {
+        const message = error?.message ?? "debug session import failed";
+        setDebugSessionArchive(null);
+        setSessionImport({
+          status: "error",
+          fileName: file.name,
+          schema: "",
+          error: message,
+        });
+        recordDebugEvent("import-session-error", {
+          fileName: file.name,
+          source: "debug-panel",
+        });
+      }
+    },
+    [recordDebugEvent],
+  );
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -1056,6 +1119,15 @@ export default function App() {
       data-debug-session-export-file={sessionExport.fileName}
       data-debug-session-export-schema={sessionExport.schema}
       data-debug-session-export-error={sessionExport.error}
+      data-debug-session-import-status={sessionImport.status}
+      data-debug-session-import-file={sessionImport.fileName}
+      data-debug-session-import-schema={sessionImport.schema}
+      data-debug-session-import-error={sessionImport.error}
+      data-debug-session-archive-schema={debugSessionArchive?.schema ?? ""}
+      data-debug-session-archive-model={debugSessionArchive?.snapshot?.model?.id ?? ""}
+      data-debug-session-archive-quality={debugSessionArchive?.snapshot?.quality?.status ?? ""}
+      data-debug-session-archive-event-count={debugSessionArchive?.events?.length ?? ""}
+      data-debug-session-archive-model-count={debugSessionArchive?.models?.length ?? ""}
       data-debug-event-count={debugEvents.length}
       data-debug-event-last={debugEvents[0]?.type ?? ""}
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
@@ -1179,6 +1251,14 @@ export default function App() {
             data-model-artifact-file-input="true"
             onChange={importModelArtifactBundleFiles}
           />
+          <input
+            ref={debugSessionInputRef}
+            className="fileInputHidden"
+            type="file"
+            accept="application/json,.json"
+            data-debug-session-file-input="true"
+            onChange={importDebugSessionFile}
+          />
           <button
             className={`glassButton ${artifactImport.status === "loaded" ? "active" : ""}`}
             type="button"
@@ -1301,6 +1381,8 @@ export default function App() {
         debugSnapshot={selectedDebugSnapshot}
         snapshotExport={snapshotExport}
         sessionExport={sessionExport}
+        sessionImport={sessionImport}
+        debugSessionArchive={debugSessionArchive}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
@@ -1311,6 +1393,7 @@ export default function App() {
         onSelectOgcChunks={selectOgcChunks}
         onExportDebugSnapshot={exportDebugSnapshot}
         onExportDebugSession={exportDebugSession}
+        onImportDebugSession={() => debugSessionInputRef.current?.click()}
       />
 
       <div className="glassHud bottomStatus">
@@ -2644,6 +2727,8 @@ function DebugPanel({
   debugSnapshot,
   snapshotExport,
   sessionExport,
+  sessionImport,
+  debugSessionArchive,
   hiddenObjects,
   stability,
   qualityReport,
@@ -2654,6 +2739,7 @@ function DebugPanel({
   onSelectOgcChunks,
   onExportDebugSnapshot,
   onExportDebugSession,
+  onImportDebugSession,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -2806,9 +2892,12 @@ function DebugPanel({
         snapshot={debugSnapshot}
         snapshotExport={snapshotExport}
         sessionExport={sessionExport}
+        sessionImport={sessionImport}
         onExportDebugSnapshot={onExportDebugSnapshot}
         onExportDebugSession={onExportDebugSession}
+        onImportDebugSession={onImportDebugSession}
       />
+      <DebugSessionArchivePanel archive={debugSessionArchive} sessionImport={sessionImport} />
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <QualityReportPanel report={qualityReport} />
@@ -2892,8 +2981,10 @@ function DebugSnapshotPanel({
   snapshot,
   snapshotExport,
   sessionExport,
+  sessionImport,
   onExportDebugSnapshot,
   onExportDebugSession,
+  onImportDebugSession,
 }) {
   if (!snapshot) return null;
   return (
@@ -2916,6 +3007,9 @@ function DebugSnapshotPanel({
       data-debug-session-export-status={sessionExport?.status ?? "idle"}
       data-debug-session-export-file={sessionExport?.fileName ?? ""}
       data-debug-session-export-schema={sessionExport?.schema ?? ""}
+      data-debug-session-import-status={sessionImport?.status ?? "idle"}
+      data-debug-session-import-file={sessionImport?.fileName ?? ""}
+      data-debug-session-import-schema={sessionImport?.schema ?? ""}
     >
       <div className="stabilityHead">
         <span>Protocol</span>
@@ -2937,6 +3031,14 @@ function DebugSnapshotPanel({
           >
             SESSION
           </button>
+          <button
+            type="button"
+            data-debug-session-import-button="true"
+            data-import-status={sessionImport?.status ?? "idle"}
+            onClick={() => onImportDebugSession?.()}
+          >
+            LOAD
+          </button>
         </div>
       </div>
       <dl className="stabilityMeta snapshotMeta">
@@ -2948,7 +3050,55 @@ function DebugSnapshotPanel({
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
+        <Meta label="archive" value={sessionImport?.fileName || sessionImport?.status || "idle"} />
       </dl>
+    </div>
+  );
+}
+
+function DebugSessionArchivePanel({ archive, sessionImport }) {
+  if (!archive && !["loading", "error"].includes(sessionImport?.status)) return null;
+  const recent = Array.isArray(archive?.events) ? archive.events.slice(0, 3) : [];
+  return (
+    <div
+      className="stabilityDashboard debugSessionArchivePanel"
+      data-debug-session-archive="true"
+      data-debug-session-archive-status={sessionImport?.status ?? "idle"}
+      data-debug-session-archive-file={sessionImport?.fileName ?? ""}
+      data-debug-session-archive-schema={archive?.schema ?? ""}
+      data-debug-session-archive-model={archive?.snapshot?.model?.id ?? ""}
+      data-debug-session-archive-quality={archive?.snapshot?.quality?.status ?? ""}
+      data-debug-session-archive-events={archive?.events?.length ?? ""}
+      data-debug-session-archive-models={archive?.models?.length ?? ""}
+      data-debug-session-archive-error={sessionImport?.error ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Archive</span>
+        <strong>{archive?.snapshot?.model?.id ?? sessionImport?.status ?? "-"}</strong>
+      </div>
+      <dl className="stabilityMeta snapshotMeta">
+        <Meta label="file" value={sessionImport?.fileName || "-"} />
+        <Meta label="schema" value={archive?.schema || sessionImport?.schema || "-"} />
+        <Meta label="models" value={formatCount(archive?.models?.length)} />
+        <Meta label="events" value={formatCount(archive?.events?.length)} />
+        <Meta label="quality" value={archive?.snapshot?.quality?.status ?? "-"} />
+        <Meta label="error" value={sessionImport?.error || "-"} />
+      </dl>
+      {recent.length ? (
+        <div className="debugEventRows">
+          {recent.map((event, index) => (
+            <div
+              className="debugEventRow"
+              key={`${event.seq}-${event.type}-${index}`}
+              data-debug-session-archive-event-row="true"
+              data-debug-event-type={event.type}
+            >
+              <span>{event.type}</span>
+              <small>{debugEventDetailLabel(event)}</small>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -4519,6 +4669,112 @@ function objectStateDebugSession({ snapshot, models, debugEvents }) {
   };
 }
 
+function validateDebugSessionArchive(session, path = "") {
+  if (session?.schema !== "objgauss-object-state-debug-session-v1") {
+    throw new Error("unsupported ObjectState debug session schema");
+  }
+  if (session.protocol !== "object-state-debug-os-v1") {
+    throw new Error("unsupported ObjectState debug session protocol");
+  }
+  const snapshot = session.snapshot;
+  if (snapshot?.schema !== "objgauss-object-state-debug-snapshot-v1") {
+    throw new Error("debug session missing ObjectState snapshot");
+  }
+  const models = Array.isArray(session.models) ? session.models.map(compactDebugModel) : [];
+  const events = compactDebugEvents(Array.isArray(session.events) ? session.events : snapshot.events);
+  return {
+    schema: session.schema,
+    protocol: session.protocol,
+    path,
+    snapshot: {
+      schema: snapshot.schema,
+      protocol: snapshot.protocol ?? session.protocol,
+      model: {
+        id: cleanString(snapshot.model?.id),
+        kind: cleanString(snapshot.model?.kind),
+        loadMode: cleanString(snapshot.model?.loadMode),
+        status: cleanString(snapshot.model?.status),
+        deliverySource: cleanString(snapshot.model?.deliverySource),
+      },
+      selection: {
+        selectionId: cleanString(snapshot.selection?.selectionId),
+        objectId: cleanNullable(snapshot.selection?.objectId),
+        gaussianIndex: cleanNullable(snapshot.selection?.gaussianIndex),
+        hiddenObjectCount: finiteNumber(snapshot.selection?.hiddenObjectCount),
+      },
+      debug: {
+        enabled: Boolean(snapshot.debug?.enabled),
+        lens: normalizeDebugLens(snapshot.debug?.lens),
+        probeSource: cleanString(snapshot.debug?.probeSource),
+      },
+      assignment: {
+        source: cleanString(snapshot.assignment?.source),
+        slotCount: finiteNumber(snapshot.assignment?.slotCount),
+        confidence: finiteNumber(snapshot.assignment?.confidence),
+        entropy: finiteNumber(snapshot.assignment?.entropy),
+        vector: compactAssignmentVector(snapshot.assignment?.vector),
+      },
+      stability: {
+        status: cleanString(snapshot.stability?.status),
+        slotUtilization: finiteNumber(snapshot.stability?.slotUtilization),
+        meanEntropy: finiteNumber(snapshot.stability?.meanEntropy),
+        mixedSlots: finiteNumber(snapshot.stability?.mixedSlots),
+      },
+      training: snapshot.training
+        ? {
+            status: cleanString(snapshot.training.status),
+            iterations: finiteNumber(snapshot.training.iterations),
+            finalTotalLoss: finiteNumber(snapshot.training.finalTotalLoss),
+            totalLossDelta: finiteNumber(snapshot.training.totalLossDelta),
+            finalImageLoss: finiteNumber(snapshot.training.finalImageLoss),
+            imageLossDelta: finiteNumber(snapshot.training.imageLossDelta),
+            rendererName: cleanString(snapshot.training.rendererName),
+            gradientPath: cleanString(snapshot.training.gradientPath),
+          }
+        : null,
+      quality: snapshot.quality
+        ? {
+            schema: cleanString(snapshot.quality.schema),
+            status: cleanString(snapshot.quality.status),
+            assignmentEntropy: finiteNumber(snapshot.quality.assignmentEntropy),
+            objectPurity: finiteNumber(snapshot.quality.objectPurity),
+            temporalDrift: finiteNumber(snapshot.quality.temporalDrift),
+            assignmentJitter: finiteNumber(snapshot.quality.assignmentJitter),
+            gateCount: finiteNumber(snapshot.quality.gateCount),
+            failingGates: finiteNumber(snapshot.quality.failingGates),
+            failingGateNames: Array.isArray(snapshot.quality.failingGateNames)
+              ? snapshot.quality.failingGateNames.map(cleanString).filter(Boolean)
+              : [],
+            gates: compactQualityGates(snapshot.quality.gates),
+          }
+        : null,
+      delivery: {
+        loadRoute: cleanString(snapshot.delivery?.loadRoute),
+        frameIndex: cleanNullable(snapshot.delivery?.frameIndex),
+        frameCount: cleanNullable(snapshot.delivery?.frameCount),
+        lodLevel: cleanNullable(snapshot.delivery?.lodLevel),
+        chunkIds: Array.isArray(snapshot.delivery?.chunkIds) ? snapshot.delivery.chunkIds.slice(0, 16) : [],
+      },
+      events,
+    },
+    summary: {
+      modelCount: finiteNumber(session.summary?.modelCount) ?? models.length,
+      loadedModelCount: finiteNumber(session.summary?.loadedModelCount),
+      trainableArtifactCount: finiteNumber(session.summary?.trainableArtifactCount),
+      ogcArtifactCount: finiteNumber(session.summary?.ogcArtifactCount),
+      eventCount: finiteNumber(session.summary?.eventCount) ?? events.length,
+    },
+    models,
+    events,
+    exportPolicy: {
+      scope: cleanString(session.exportPolicy?.scope),
+      repositoryWrite: cleanString(session.exportPolicy?.repositoryWrite),
+      trainingOutputs: cleanString(session.exportPolicy?.trainingOutputs),
+      payloadPolicy: cleanString(session.exportPolicy?.payloadPolicy),
+    },
+  };
+}
+
 function compactDebugModel(model) {
   return {
     id: cleanString(model?.id),
@@ -4598,6 +4854,8 @@ function debugEventDetailLabel(event) {
     event.type === "import-model-manifest-error" ||
     event.type === "import-ogc" ||
     event.type === "import-ogc-error" ||
+    event.type === "import-session" ||
+    event.type === "import-session-error" ||
     event.type === "export-snapshot" ||
     event.type === "export-snapshot-error" ||
     event.type === "export-session" ||

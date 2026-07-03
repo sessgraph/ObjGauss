@@ -334,6 +334,16 @@ root shell 同步暴露 `data-debug-session-*` telemetry，浏览器会话中保
 model list、`export-snapshot` / `ogc-chunks` trace 和 `export-session` event。该步骤仍不改
 训练 loop、artifact schema、OGC decoder 或 renderer，不写训练输出或大资产。
 
+`DEBUG-SESSION-IMPORT-001` 已把 debug session handoff 补成前端可审计闭环：
+`src/App.jsx` 的 `Protocol` 面板新增 `LOAD` 按钮，可导入
+`objgauss-object-state-debug-session-v1` 并显示为只读 `Archive` 面板。导入路径会校验
+session / snapshot schema，压缩 models / events / quality gates 为 debug metadata，
+并暴露 `data-debug-session-import-*`、`data-debug-session-archive-*` 与
+`window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__`。`scripts/audit-world-viewer.mjs` 现在用刚导出的
+session JSON 重新导入，验证 `debugSessionImport=loaded`、archive model、quality warn、
+model count、event count 和 `import-session` trace。该步骤不做场景 replay，不重新拉
+OGC payload，不改训练 loop、不写训练输出或大资产。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

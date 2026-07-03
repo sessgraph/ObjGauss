@@ -39,6 +39,7 @@ try {
       `algorithmManifest=${summary.algorithmManifestStatus}`,
       `debugSnapshotExport=${summary.debugSnapshotExportStatus}`,
       `debugSessionExport=${summary.debugSessionExportStatus}`,
+      `debugSessionImport=${summary.debugSessionImportStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
       `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
@@ -666,6 +667,7 @@ async function auditWorld(url) {
       algorithmManifestStatus: algorithmManifest.status,
       debugSnapshotExportStatus: algorithmManifest.snapshotExportStatus,
       debugSessionExportStatus: algorithmManifest.sessionExportStatus,
+      debugSessionImportStatus: algorithmManifest.sessionImportStatus,
       localModelManifestStatus: localModelManifest.status,
       localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
@@ -1533,12 +1535,58 @@ async function auditAlgorithmManifestBundle(browser, url) {
       };
     }, undefined, { timeout: 15000 });
     const sessionExport = await sessionExportHandle.jsonValue();
+    const sessionText = await page.evaluate(() => window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION_TEXT__ ?? "");
+    await page.locator("[data-debug-session-file-input='true']").setInputFiles({
+      name: "objgauss-debug-session-import.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(sessionText, "utf8"),
+    });
+    const sessionImportHandle = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-debug-session-archive='true']");
+      const protocol = document.querySelector("[data-debug-snapshot-panel='true']");
+      const button = document.querySelector("[data-debug-session-import-button='true']");
+      const archive = window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__;
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const eventTypes = new Set(events.map((event) => event.type));
+      if (
+        shell?.getAttribute("data-debug-session-import-status") !== "loaded" ||
+        shell?.getAttribute("data-debug-session-import-schema") !== "objgauss-object-state-debug-session-v1" ||
+        shell?.getAttribute("data-debug-session-import-file") !== "objgauss-debug-session-import.json" ||
+        shell?.getAttribute("data-debug-session-archive-schema") !== "objgauss-object-state-debug-session-v1" ||
+        shell?.getAttribute("data-debug-session-archive-model") !== "model-manifest-ogc-artifact" ||
+        shell?.getAttribute("data-debug-session-archive-quality") !== "warn" ||
+        Number(shell?.getAttribute("data-debug-session-archive-event-count") ?? 0) < 2 ||
+        Number(shell?.getAttribute("data-debug-session-archive-model-count") ?? 0) !== 10 ||
+        panel?.getAttribute("data-debug-session-archive-status") !== "loaded" ||
+        panel?.getAttribute("data-debug-session-archive-file") !== "objgauss-debug-session-import.json" ||
+        panel?.getAttribute("data-debug-session-archive-schema") !== "objgauss-object-state-debug-session-v1" ||
+        panel?.getAttribute("data-debug-session-archive-model") !== "model-manifest-ogc-artifact" ||
+        panel?.getAttribute("data-debug-session-archive-quality") !== "warn" ||
+        protocol?.getAttribute("data-debug-session-import-status") !== "loaded" ||
+        button?.getAttribute("data-import-status") !== "loaded" ||
+        archive?.schema !== "objgauss-object-state-debug-session-v1" ||
+        archive?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
+        archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
+        archive?.summary?.modelCount !== 10 ||
+        !eventTypes.has("import-session")
+      ) {
+        return null;
+      }
+      return {
+        status: shell.getAttribute("data-debug-session-import-status"),
+        schema: archive.schema,
+        model: archive.snapshot.model.id,
+      };
+    }, undefined, { timeout: 15000 });
+    const sessionImport = await sessionImportHandle.jsonValue();
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
     return {
       status: "manifest-trainable-ogc-debug-os",
       qualityReportStatus: "warn",
       snapshotExportStatus: snapshotExport.status,
       sessionExportStatus: sessionExport.status,
+      sessionImportStatus: sessionImport.status,
     };
   } finally {
     await page.close();

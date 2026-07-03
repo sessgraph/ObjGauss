@@ -72,6 +72,37 @@
 
 ## Done
 
+### DEBUG-SESSION-IMPORT-001: Import ObjectState Debug sessions as read-only archives
+
+- 状态: done / debug-session-archive-import
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 让 `objgauss-object-state-debug-session-v1` 不只可导出，也可在前端重新导入为只读
+  Archive 面板，用于审计训练机或浏览器会话导出的 debug session。
+- 已实施:
+  - `src/App.jsx` 新增 debug session file input、`LOAD` 按钮、session validator、
+    `window.__OBJGAUSS_IMPORTED_DEBUG_SESSION__` 和 `data-debug-session-import-*` /
+    `data-debug-session-archive-*` telemetry。
+  - Debug panel 新增 `Archive` 只读面板，显示导入 session 的 schema、模型、quality 状态、
+    event count、model count 和 recent trace。
+  - `scripts/audit-world-viewer.mjs` 在组合 algorithm manifest 场景中导出 session 后，
+    用同一份 JSON 作为虚拟本地文件重新导入，验证 archive schema、model、quality gate、
+    model count、event count 和 `import-session` event。
+- 边界:
+  - 不把 session 导入当作场景 replay；不重新拉取 OGC payload、不恢复 Three.js camera /
+    visibility state、不改写当前 models。
+  - 不改变训练 loop，不训练 gsplat，不安装 torch / gsplat / CUDA，不改变
+    `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `debugSessionExport=exported`、`debugSessionImport=loaded`、
+    `algorithmManifest=manifest-trainable-ogc-debug-os` 和 `qualityReport=warn`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 140 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### DEBUG-SESSION-EXPORT-001: Export ObjectState Debug sessions from viewer
 
 - 状态: done / debug-session-json-export
