@@ -106,7 +106,7 @@
     `objectContinuity=continuous`、`hoverContinuity=continuous`、`debugSessionDiff=match`
     和 `debugSessionDrift=changed`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `5473078`
 
 ### OBJECTSTATE-HOVER-ASSIGNMENT-001: Hover ObjectState assignment preview
 
