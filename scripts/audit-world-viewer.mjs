@@ -70,6 +70,9 @@ try {
       `hoverVerdict=${summary.hoverVerdictStatus}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
+      `gaussianProbe=${summary.probePanelStatus}`,
+      `gaussianProbeSource=${summary.probePanelSource}`,
+      `gaussianProbeMargin=${summary.probePanelMargin}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
       `sidebars=${summary.sidebars}`,
       `screenshot=${summary.screenshotPath}`,
@@ -243,6 +246,7 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
@@ -255,6 +259,17 @@ async function auditWorld(url) {
         shell?.getAttribute("data-assignment-probe-status") === "confident" &&
         panel?.getAttribute("data-assignment-probe-status") === "confident" &&
         heatmap?.getAttribute("data-assignment-probe-status") === "confident" &&
+        probePanel?.getAttribute("data-gaussian-probe-source") === "trainable_kernel_model_artifact" &&
+        probePanel?.getAttribute("data-gaussian-probe-index") === "0" &&
+        probePanel?.getAttribute("data-gaussian-probe-status") === "confident" &&
+        probePanel?.getAttribute("data-gaussian-probe-top-slot") === shell?.getAttribute("data-assignment-probe-top-slot") &&
+        probePanel?.getAttribute("data-gaussian-probe-ambiguous") === "false" &&
+        probePanel?.getAttribute("data-gaussian-probe-collapse-risk") === "false" &&
+        Number(probePanel?.getAttribute("data-gaussian-probe-margin") ?? 0) > 0.55 &&
+        Number(probePanel?.getAttribute("data-gaussian-probe-confidence") ?? 0) > 0.7 &&
+        Number(probePanel?.getAttribute("data-gaussian-probe-entropy") ?? 0) > 0 &&
+        Number(probePanel?.getAttribute("data-gaussian-probe-opacity") ?? 0) > 0 &&
+        probePanel?.getAttribute("data-gaussian-probe-position") !== "-" &&
         snapshot?.assignment?.probe?.status === "confident" &&
         world?.assignmentProbeStatus === "confident" &&
         shell?.getAttribute("data-object-continuity-status") === "continuous" &&
@@ -935,6 +950,7 @@ async function auditWorld(url) {
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
+      const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -1013,6 +1029,16 @@ async function auditWorld(url) {
         assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
         shellAssignmentProbeStatus: shell?.getAttribute("data-assignment-probe-status") ?? null,
         shellAssignmentProbeMargin: Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0),
+        probePanelStatus: probePanel?.getAttribute("data-gaussian-probe-status") ?? null,
+        probePanelSource: probePanel?.getAttribute("data-gaussian-probe-source") ?? null,
+        probePanelIndex: probePanel?.getAttribute("data-gaussian-probe-index") ?? null,
+        probePanelTopSlot: probePanel?.getAttribute("data-gaussian-probe-top-slot") ?? null,
+        probePanelMargin: Number(probePanel?.getAttribute("data-gaussian-probe-margin") ?? 0),
+        probePanelConfidence: Number(probePanel?.getAttribute("data-gaussian-probe-confidence") ?? 0),
+        probePanelEntropy: Number(probePanel?.getAttribute("data-gaussian-probe-entropy") ?? 0),
+        probePanelAmbiguous: probePanel?.getAttribute("data-gaussian-probe-ambiguous") ?? null,
+        probePanelCollapseRisk: probePanel?.getAttribute("data-gaussian-probe-collapse-risk") ?? null,
+        probePanelOpacity: Number(probePanel?.getAttribute("data-gaussian-probe-opacity") ?? 0),
         objectContinuityStatus: handle.objectContinuityStatus ?? null,
         objectContinuityBboxDiagonal: handle.objectContinuityBboxDiagonal ?? null,
         objectContinuityCentroidContained: handle.objectContinuityCentroidContained ?? false,
@@ -1377,7 +1403,16 @@ async function auditWorld(url) {
       world.assignmentProbeStatus === "confident" &&
       world.assignmentProbeMargin > 0.55 &&
       world.shellAssignmentProbeStatus === "confident" &&
-      world.shellAssignmentProbeMargin > 0.55
+      world.shellAssignmentProbeMargin > 0.55 &&
+      world.probePanelStatus === "confident" &&
+      world.probePanelSource === "trainable_kernel_model_artifact" &&
+      world.probePanelIndex === "0" &&
+      world.probePanelMargin > 0.55 &&
+      world.probePanelConfidence > 0.7 &&
+      world.probePanelEntropy > 0 &&
+      world.probePanelAmbiguous === "false" &&
+      world.probePanelCollapseRisk === "false" &&
+      world.probePanelOpacity > 0
     )) {
       throw new Error(`expected stable ObjectState debug snapshot protocol: ${JSON.stringify(world)}`);
     }
@@ -1630,6 +1665,9 @@ async function auditWorld(url) {
       hoverVerdictStatus: world.hoverVerdictStatus,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
+      probePanelStatus: world.probePanelStatus,
+      probePanelSource: world.probePanelSource,
+      probePanelMargin: world.probePanelMargin,
       assignmentSlots,
       selectedGaussian,
       sidebars,

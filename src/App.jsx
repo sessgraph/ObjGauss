@@ -3382,6 +3382,7 @@ function DebugPanel({
         debugProbe={debugProbe}
         assignmentProbe={assignmentProbe}
       />
+      <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
       <HoverAssignmentHeatmap
         hoveredTarget={hoveredTarget}
         hoverAssignmentProbe={hoverAssignmentProbe}
@@ -4104,6 +4105,69 @@ function AssignmentHeatmap({ assignment, selectedObject, debugProbe, assignmentP
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function GaussianProbePanel({ debugProbe, assignmentProbe }) {
+  const rows = Array.isArray(debugProbe?.assignment) ? debugProbe.assignment : [];
+  const slotCount = assignmentProbe?.slotCount ?? rows.length;
+  if (!debugProbe && !slotCount) return null;
+  const source = debugProbe?.source ?? "none";
+  const index = debugProbe?.gaussianIndex ?? "";
+  const status = assignmentProbe?.status ?? "none";
+  const ambiguous = Boolean(assignmentProbe?.ambiguous);
+  const collapseRisk = Boolean(assignmentProbe?.collapseRisk);
+  return (
+    <div
+      className="stabilityDashboard gaussianProbePanel"
+      data-gaussian-probe-panel="true"
+      data-gaussian-probe-source={source}
+      data-gaussian-probe-index={index}
+      data-gaussian-probe-status={status}
+      data-gaussian-probe-slot-count={slotCount}
+      data-gaussian-probe-top-slot={assignmentProbe?.topSlot ?? ""}
+      data-gaussian-probe-top-object={assignmentProbe?.topObjectId ?? ""}
+      data-gaussian-probe-top-probability={assignmentProbe?.topProbability ?? ""}
+      data-gaussian-probe-second-probability={assignmentProbe?.secondProbability ?? ""}
+      data-gaussian-probe-margin={assignmentProbe?.margin ?? ""}
+      data-gaussian-probe-confidence={assignmentProbe?.confidence ?? ""}
+      data-gaussian-probe-entropy={assignmentProbe?.entropy ?? ""}
+      data-gaussian-probe-ambiguous={ambiguous ? "true" : "false"}
+      data-gaussian-probe-collapse-risk={collapseRisk ? "true" : "false"}
+      data-gaussian-probe-opacity={debugProbe?.opacity ?? ""}
+      data-gaussian-probe-position={formatVec(debugProbe?.position)}
+    >
+      <div className="stabilityHead">
+        <span>Gaussian Probe</span>
+        <strong>{status}</strong>
+      </div>
+      <div className="stabilityGrid probeGrid">
+        <Metric label="n" value={index === "" ? "-" : index} />
+        <Metric label="top k" value={assignmentProbe?.topSlot ?? "-"} />
+        <Metric label="margin" value={formatRatio(assignmentProbe?.margin)} />
+        <Metric label="conf" value={formatRatio(assignmentProbe?.confidence)} />
+      </div>
+      <dl className="metaGrid trainingMeta probeMetaGrid">
+        <Meta label="source" value={source} />
+        <Meta label="position" value={formatVec(debugProbe?.position)} />
+        <Meta label="opacity" value={formatRatio(debugProbe?.opacity)} />
+        <Meta label="entropy" value={formatRatio(assignmentProbe?.entropy)} />
+        <Meta label="top prob" value={formatRatio(assignmentProbe?.topProbability)} />
+        <Meta label="second" value={formatRatio(assignmentProbe?.secondProbability)} />
+      </dl>
+      <div className="qualityGateRows probeFlagRows" data-gaussian-probe-flags="true">
+        <div className={`qualityGateRow ${ambiguous ? "warn" : "pass"}`}>
+          <span>ambiguous</span>
+          <small>{assignmentProbe?.margin !== null && assignmentProbe?.margin !== undefined ? formatRatio(assignmentProbe.margin) : "n/a"}</small>
+          <strong>{ambiguous ? "true" : "false"}</strong>
+        </div>
+        <div className={`qualityGateRow ${collapseRisk ? "warn" : "pass"}`}>
+          <span>collapse</span>
+          <small>{formatRatio(assignmentProbe?.topProbability)}</small>
+          <strong>{collapseRisk ? "true" : "false"}</strong>
+        </div>
+      </div>
     </div>
   );
 }

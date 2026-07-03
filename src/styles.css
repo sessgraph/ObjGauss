@@ -317,6 +317,23 @@ button:focus-visible {
   border-color: rgba(127, 241, 215, 0.2);
 }
 
+.gaussianProbePanel {
+  border-color: rgba(127, 222, 255, 0.22);
+  background: rgba(127, 222, 255, 0.045);
+}
+
+.probeGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.probeMetaGrid {
+  grid-template-columns: 60px minmax(0, 1fr);
+}
+
+.probeFlagRows {
+  gap: 5px;
+}
+
 .assignmentProbeMeta {
   display: grid;
   min-height: 28px;
