@@ -104,7 +104,7 @@
   - `npm run audit:world-viewer`: passed，输出包含 `hoveredObject=0`、`hoveredGaussians=2`、
     `debugSessionDiff=match` 和 `debugSessionDrift=changed`。
   - `git diff --check`: passed。
-- 完成 commit: `pending`
+- 完成 commit: `64c3e19`
 
 ### OBJECTSTATE-PROBE-DIAGNOSTIC-001: Auditable assignment probe diagnostics
 
