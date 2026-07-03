@@ -15,47 +15,17 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: full renderer training 继续因 torch / gsplat / CUDA 环境挂起；当前先推进 dependency-free Object Emergence Solver，使 `PerceptionEvidence -> A[N,K] -> ObjectState` 成为可训练、可导出、可被 Debug OS 审计的模型主线。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；下一步从环境恢复转入真正算法模型训练设计，使 `ObjectState -> Gaussian decode -> gsplat/image loss` 成为可优化主线。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-当前无 ready PR；训练模型主线已挂起，恢复前需要可用 torch / gsplat / CUDA 环境。
+当前无 ready PR；`TRAIN-GSPLAT-MVP-001` 环境阻塞已解除并完成最小 smoke。
 
 ## Suspended
 
-### TRAIN-GSPLAT-MVP-001: Run first small full renderer training MVP
-
-- 状态: suspended / current-env-missing-torch-gsplat-cuda
-- 类型: 标准 PR / full renderer training smoke
-- 目标: 在 `TRAIN-GSPLAT-LOSS-001` 已把 image renderer loss producer 做成
-  `point|gsplat` 可选路线后，使用显式 gsplat 路线跑第一个小规模 full renderer
-  training MVP，证明 `image_render_loss`、`L_object` 和 artifact 输出可以在 full
-  renderer evidence 下闭环。
-- 边界:
-  - 必须显式选择 gsplat；不可静默 fallback 到 point。
-  - 如果当前环境没有 torch / gsplat / CUDA，先记录 adapter blockers，不把缺依赖伪装
-    为训练成功。
-  - 不训练 Gaussian geometry / opacity / rotation，只延续 `assignments` +
-    `decoder_colors` 路线。
-  - 训练输出只写 `/tmp` 或 ignored `outputs/`；不提交 artifact / checkpoint / rendered
-    image。
-  - 不替换 Three.js / Spark / WebGPU viewer renderer。
-  - 不默认加载 near-1M / 4.5M 大资产。
-- 当前阻塞证据:
-  - `uv run python -c "from objgauss.core.gsplat_training_renderer import gsplat_renderer_availability; print(gsplat_renderer_availability().as_dict())"`:
-    `available=False`，blockers 为 `optional_dependency_missing:torch`、
-    `optional_dependency_missing:gsplat`。
-  - `nvidia-smi`: failed，无法连接 NVIDIA driver。
-  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 2 --learning-rate 0.35 --max-points 4 --bind-image-targets --image-width 8 --image-height 8 --image-render-weight 0.5 --image-renderer gsplat --seed 4 --summary-output /tmp/objgauss-gsplat-mvp-blocked-summary.json`:
-    failed as expected，错误为 `gsplat training renderer unavailable:
-    optional_dependency_missing:torch, optional_dependency_missing:gsplat`。
-- 挂起策略:
-  - 当前 Codex 环境不再重复尝试 full renderer training MVP。
-  - 仅在切换到已确认具备 torch / gsplat / CUDA / NVIDIA driver 的环境，或 Owner 明确批准安装
-    optional training renderer 依赖后恢复。
-  - 挂起期间继续推进非训练闭环、browser delivery、debug handoff、quality gate 和
-    pre-training benchmark。
+当前无 suspended PR。注意：默认沙箱内 `/dev` 视图不暴露 `/dev/nvidia*`，GPU preflight
+需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
 
@@ -78,6 +48,57 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-GSPLAT-MVP-001: Run first small full renderer training MVP
+
+- 状态: done / host-gpu-env-and-gsplat-smoke
+- 类型: 标准 PR / full renderer training smoke
+- 目标: 在 `TRAIN-GSPLAT-LOSS-001` 已把 image renderer loss producer 做成
+  `point|gsplat` 可选路线后，使用显式 gsplat 路线跑第一个小规模 full renderer
+  training MVP，证明 `image_render_loss`、`L_object` 和 renderer-loss handoff 可以在
+  full renderer evidence 下闭环。
+- 已实施:
+  - 重新诊断 GPU 环境：沙箱内 `/dev` 不暴露 `/dev/nvidia*`，导致 `nvidia-smi`
+    和 CUDA preflight 误报失败；host / 提权环境中 `nvidia-smi` 正常。
+  - host GPU 为 `NVIDIA GeForce RTX 5060 Ti`，driver `595.71.05`，CUDA `13.2`，
+    smoke 前显存 `815MiB / 16311MiB`，满足预留 1GB 策略。
+  - 临时 uv 环境验证 `torch 2.12.1+cu130`、`gsplat 1.5.3`、`cuda_available=True`。
+  - 复用 `/tmp/objgauss-cuda13` CUDA wrapper，并显式加入
+    `nvidia-cuda-nvcc==13.0.*`、`nvidia-cuda-cccl==13.0.*`、
+    `nvidia-nvvm==13.0.*`、`nvidia-cuda-crt==13.0.*`，使 gsplat JIT 能找到 CUDA
+    toolkit 和 `libcudart.so`。
+  - 显式 `--image-renderer gsplat` 的 2-iteration / 4-point smoke 已通过，并写出
+    `/tmp/objgauss-gsplat-mvp-env-smoke-summary.json`。
+  - `renderer-loss-contract` 消费该 summary 后输出
+    `status=full_3dgs_renderer_ready`、`current_renderer=gsplat-rasterization-v1`、
+    `upgrade_blockers=[]`、`decoder_handoff_status=full_renderer_decoder_ready`。
+- 边界:
+  - 不把 torch / gsplat 加入基础 dependencies；继续作为 optional / `uv --with`
+    训练环境。
+  - 不提交 `/tmp` summary、训练 artifact、checkpoint、rendered image 或 ignored
+    `outputs/` 产物。
+  - 不训练 Gaussian geometry / opacity / rotation；本 smoke 只延续当前
+    `assignments` + `decoder_colors` 路线。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - host `nvidia-smi`: passed，`NVIDIA GeForce RTX 5060 Ti`，driver `595.71.05`，
+    CUDA `13.2`。
+  - `uv run --with torch --with gsplat python -c "..."`
+    passed，`torch 2.12.1+cu130`，`cuda_available=True`，`gsplat 1.5.3`。
+  - `uv run --with torch --with gsplat python -c "from objgauss.core.gsplat_training_renderer import gsplat_renderer_availability; ..."`:
+    passed，`available=True`，`blockers=[]`。
+  - `env CUDA_HOME=/tmp/objgauss-cuda13 PATH=/tmp/objgauss-cuda13/bin:$PATH LD_LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LD_LIBRARY_PATH LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LIBRARY_PATH MAX_JOBS=2 uv run --with torch --with gsplat --with nvidia-cuda-nvcc==13.0.* --with nvidia-cuda-cccl==13.0.* --with nvidia-nvvm==13.0.* --with nvidia-cuda-crt==13.0.* objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 2 --learning-rate 0.35 --max-points 4 --bind-image-targets --image-width 8 --image-height 8 --image-render-weight 0.5 --image-renderer gsplat --seed 4 --summary-output /tmp/objgauss-gsplat-mvp-env-smoke-summary.json`:
+    passed，`renderer_api_status=ready`，
+    `renderer_name=gsplat-rasterization-v1`，
+    `renderer_gradient_path=torch-autograd-gsplat-rasterization-v1`，
+    `initial_total_loss=1.651442 -> final_total_loss=1.584998`，
+    `initial_image_render_loss=0.319775 -> final_image_render_loss=0.319773`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-gsplat-mvp-env-smoke-summary.json --output /tmp/objgauss-gsplat-mvp-env-renderer-loss-boundary.json --require-point-smoke-ready`:
+    passed，`status=full_3dgs_renderer_ready`，`upgrade_blockers=[]`。
+  - host post-smoke `nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv,noheader,nounits`:
+    `NVIDIA GeForce RTX 5060 Ti, 16311, 829, 15013`。
+- 完成 commit: pending
 
 ### DECODER-HANDOFF-CONTRACT-001: Freeze solver checkpoint to renderer loss handoff
 

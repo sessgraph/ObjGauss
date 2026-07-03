@@ -11,16 +11,20 @@ CLI、资产布局、指标、模型产物和文档都可能在 stable release �
 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
 commercial demo release。
 
-账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 当前保持
-`suspended / current-env-missing-torch-gsplat-cuda`。当前环境缺少可用 torch /
-gsplat / CUDA / NVIDIA driver 组合，full renderer training MVP 不再作为本环境的
-进行中工作；恢复条件见 `docs/state/pr-queue.md` 的 Suspended 条目。
+账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
+`suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
+真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
+`torch 2.12.1+cu130` 和 `gsplat 1.5.3`；需要在 host shell 或提权命令中执行 GPU
+preflight，因为默认沙箱 `/dev` 视图不暴露 `/dev/nvidia*`，会误报 `nvidia-smi` /
+CUDA 不可用。
 
 算法模型主线已重新启动，但目标已从 full renderer training 拆分为先训练
 `Object Emergence Solver`。当前事实源为
 `docs/architecture/object-emergence-model-v1.md`：先在 dependency-free 环境中推进
 `PerceptionEvidence -> A[N,K] -> ObjectState`，再在 torch / gsplat / CUDA 环境恢复后
 把 full renderer loss 接回训练目标。
+当前 torch / gsplat / CUDA 环境已经恢复到可运行 smoke 的状态，下一阶段应从“环境阻塞”
+转入真正算法模型训练设计：`ObjectState -> Gaussian decode -> gsplat/image loss`。
 
 ## 架构重梳理基线
 
@@ -126,6 +130,21 @@ CUDA full renderer training，也不提交 checkpoint 产物。
 和 `full_renderer_decoder_ready` 四类状态。该合约只是训练前置 handoff，不启动 GPU
 训练，不绑定真实 Gaussian decoder 参数，也不把 point / CPU smoke 伪装成 full 3DGS
 renderer training。
+
+随后完成 `TRAIN-GSPLAT-MVP-001` 环境恢复与最小 full renderer smoke：host GPU preflight
+通过，`nvidia-smi` 显示 RTX 5060 Ti / driver `595.71.05` / CUDA `13.2`；临时 uv
+环境加载 `torch 2.12.1+cu130`、`gsplat 1.5.3` 并确认 CUDA 可用。由于默认 Codex
+沙箱 `/dev` 不暴露 `/dev/nvidia*`，GPU 命令需要 host shell 或提权命令执行。复用
+`/tmp/objgauss-cuda13` wrapper 和 CUDA 13.0 uv package set 后，显式
+`--image-renderer gsplat` 的 2-iteration / 4-point `kernel-sample` smoke 通过：
+`renderer_api_status=ready`，`renderer_name=gsplat-rasterization-v1`，
+`initial_total_loss=1.651442 -> final_total_loss=1.584998`，
+`initial_image_render_loss=0.319775 -> final_image_render_loss=0.319773`。对应
+`renderer-loss-contract` 输出 `status=full_3dgs_renderer_ready`、`upgrade_blockers=[]`、
+`decoder_handoff_status=full_renderer_decoder_ready`。本步骤不把 torch / gsplat 加入基础
+dependencies，不提交 `/tmp` summary / checkpoint / rendered image / ignored
+`outputs/` 产物，不训练 Gaussian geometry / opacity / rotation，也不替换 viewer
+renderer。
 
 同日已完成 `DEBUG-UI-HIERARCHY-001`：ObjectState Debug OS 左侧调试面板从平铺信息流
 收敛为可折叠目录结构，默认打开概览、常用操作、Assignment / Gaussian、对象诊断和
