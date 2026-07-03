@@ -103,7 +103,7 @@
     fallback。
   - `uv run --extra dev pytest`: 140 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `afae023`
 
 ### DEBUG-SESSION-IMPORT-001: Import ObjectState Debug sessions as read-only archives
 
