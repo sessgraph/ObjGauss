@@ -263,6 +263,8 @@ def evaluate_gsplat_training_renderer_loss(
     *,
     require_cuda: bool = True,
     device: str | None = None,
+    default_scale: float = 0.01,
+    default_opacity: float = 1.0,
     _importer: Callable[[str], Any] = import_module,
 ) -> TrainingRendererLossResult:
     if not frames:
@@ -276,6 +278,8 @@ def evaluate_gsplat_training_renderer_loss(
             assignment,
             colors,
             frame_index=frame_index,
+            default_scale=default_scale,
+            default_opacity=default_opacity,
         )
         for frame_index, (frame, assignment) in enumerate(zip(frames, assignments, strict=True))
     )

@@ -16,6 +16,18 @@ _EXPORTS = {
         "objgauss.core.gaussian_decoder",
         "ObjectStateGaussianDecode",
     ),
+    "ObjectStateGaussianDecoderLoss": (
+        "objgauss.core.gaussian_decoder_training",
+        "ObjectStateGaussianDecoderLoss",
+    ),
+    "ObjectStateGaussianDecoderState": (
+        "objgauss.core.gaussian_decoder_training",
+        "ObjectStateGaussianDecoderState",
+    ),
+    "ObjectStateGaussianDecoderTrainingResult": (
+        "objgauss.core.gaussian_decoder_training",
+        "ObjectStateGaussianDecoderTrainingResult",
+    ),
     "ObjectState": ("objgauss.core.object_state", "ObjectState"),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -137,6 +149,10 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "initialize_object_emergence_solver",
     ),
+    "initialize_object_state_gaussian_decoder": (
+        "objgauss.core.gaussian_decoder_training",
+        "initialize_object_state_gaussian_decoder",
+    ),
     "make_trainable_kernel_mvp_fixture": (
         "objgauss.core.trainable_kernel",
         "make_trainable_kernel_mvp_fixture",
@@ -188,6 +204,10 @@ _EXPORTS = {
         "objgauss.core.trainable_kernel",
         "train_kernel_mvp_from_cloud",
     ),
+    "train_object_state_gaussian_decoder": (
+        "objgauss.core.gaussian_decoder_training",
+        "train_object_state_gaussian_decoder",
+    ),
     "trainable_kernel_model_artifact": (
         "objgauss.core.trainable_artifact",
         "trainable_kernel_model_artifact",
@@ -217,6 +237,10 @@ _EXPORTS = {
     "validate_object_emergence_solver_checkpoint": (
         "objgauss.core.object_emergence_solver",
         "validate_object_emergence_solver_checkpoint",
+    ),
+    "validate_object_state_gaussian_decoder_state": (
+        "objgauss.core.gaussian_decoder_training",
+        "validate_object_state_gaussian_decoder_state",
     ),
     "validate_object_state_stability_benchmark": (
         "objgauss.core.object_state_benchmark",
