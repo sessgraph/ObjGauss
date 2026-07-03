@@ -98,7 +98,7 @@
     passed，`status=full_3dgs_renderer_ready`，`upgrade_blockers=[]`。
   - host post-smoke `nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv,noheader,nounits`:
     `NVIDIA GeForce RTX 5060 Ti, 16311, 829, 15013`。
-- 完成 commit: pending
+- 完成 commit: `de32e26`
 
 ### DECODER-HANDOFF-CONTRACT-001: Freeze solver checkpoint to renderer loss handoff
 
