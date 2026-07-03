@@ -103,7 +103,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 140 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `cd70122`
 
 ### QUALITY-GATE-UI-001: Surface quality gates in ObjectState Debug OS
 
