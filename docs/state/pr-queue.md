@@ -72,6 +72,45 @@
 
 ## Done
 
+### OGC-LOCAL-MANIFEST-PACKAGE-001: Import local OGC model artifact manifest packages
+
+- 状态: done / ogc-local-manifest-package-import
+- 类型: 标准 PR / browser delivery + local debug artifact delivery
+- 目标: 将本地 OGC 导入从裸 `.index.json + .ogc` 文件对扩展到
+  `objgauss-model-artifact-manifest-v1 + .index.json + .ogc` 包，让后端 / 算法产出的
+  browser-ready `compressed_chunked` manifest 可以直接加载进 ObjectState Debug OS。
+- 已实施:
+  - `src/App.jsx` 的 `导入OGC` 入口现在会解析所选 JSON 文件，优先识别
+    `objgauss-model-artifact-manifest-v1`，并从其中选出 browser-ready
+    `compressed_chunked` artifact。
+  - 本地 manifest package 会按 artifact 的 `chunk_index.path` 和 payload `path`
+    匹配用户选择的 `.index.json` / `.ogc` 文件，然后把该 artifact 本地化为
+    `local://<file>` route、内联 chunk index 和内存 payload buffer。
+  - 裸 `.index.json + .ogc` 导入路径保持兼容；两条路径最终都复用
+    `loadOgcModel -> decode -> upsertModel`，并继续支持 LOD selector、chunk selector、
+    assignment heatmap、Gaussian probe、snapshot 和 event trace。
+  - `scripts/audit-world-viewer.mjs` 运行时写入 `/tmp/objgauss-local-ogc-model-artifact.json`
+    小型 manifest fixture，并通过 Playwright `setInputFiles(...)` 同时导入 manifest、
+    index 和 payload，验证 manifest package route。
+- 边界:
+  - 不改变 OGC writer、chunk index schema、quantized record format 或 manifest
+    validator。
+  - 不提交新的 OGC payload、训练输出、checkpoint、rendered image 或大资产。
+  - 不实现目录批量导入、网络缓存、progressive scheduler、VQ / entropy / WebGPU
+    decoder。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `localOgcManifest=local-manifest-file-lod-chunk-ui`、
+    `localOgc=local-file-lod-chunk-ui` 和 `debugEvents=12`；截图
+    `/tmp/objgauss-world-viewer-local-ogc-manifest.png` 显示本地 manifest package、
+    LOD1、单 chunk scope、`local-file` route 与 `OGC bytes 41 / 10`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### CLIP-COVERAGE-RERUN-001: Rerun real CLIP foreground coverage recovery evidence
 
 - 状态: done / recovery-rerun-still-do-not-promote

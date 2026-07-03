@@ -307,6 +307,19 @@ assignment heatmap、Gaussian probe 和 `import-ogc` event trace。该切片不�
 writer、chunk index schema、quantized record format、manifest validator 或训练系统；
 本地 OGC artifact 只作为 browser-session debug input，不写入 `public/` 或 git。
 
+`OGC-LOCAL-MANIFEST-PACKAGE-001` 已将上述本地 OGC 导入升级为 manifest package 入口：
+同一个 `导入OGC` 文件选择器现在支持
+`objgauss-model-artifact-manifest-v1 + .index.json + .ogc`。前端会优先识别 model
+artifact manifest，选出 browser-ready `compressed_chunked` artifact，再根据
+artifact 的 `chunk_index.path` 与 payload `path` 匹配用户选择的本地文件，并把 artifact
+本地化为 `local://<file>` route、内联 chunk index 和内存 payload buffer。裸
+`.index.json + .ogc` 路径保持兼容；manifest package 和裸 file-pair 最终都走
+`loadOgcModel -> decode -> upsertModel`，并继续支持 LOD / chunk selector、assignment
+heatmap、Gaussian probe、snapshot 和 event trace。`scripts/audit-world-viewer.mjs`
+现在运行时生成 `/tmp/objgauss-local-ogc-model-artifact.json` 小型 manifest fixture，
+并验证 `localOgcManifest=local-manifest-file-lod-chunk-ui`。该切片不改变 OGC writer /
+schema / manifest validator，不提交新的 payload 或训练产物。
+
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
 对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { chromium } from "playwright";
@@ -37,6 +37,7 @@ try {
       `urlOgc=${summary.urlOgcStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
+      `localOgcManifest=${summary.localOgcManifestStatus}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -411,6 +412,7 @@ async function auditWorld(url) {
     const urlOgc = await auditUrlOgcArtifact(browser, url);
     const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
     const localOgc = await auditLocalOgcArtifactImport(browser, url);
+    const localOgcManifest = await auditLocalOgcManifestPackageImport(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
@@ -651,6 +653,7 @@ async function auditWorld(url) {
       urlOgcStatus: urlOgc.status,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
+      localOgcManifestStatus: localOgcManifest.status,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
@@ -970,6 +973,102 @@ async function auditLocalOgcArtifactImport(browser, url) {
   }
 }
 
+async function auditLocalOgcManifestPackageImport(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    const manifestPath = writeLocalOgcManifestFixture();
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-ogc-artifact-file-input='true']").setInputFiles([
+      manifestPath,
+      "public/models/ogc-url-fixture/scene.index.json",
+      "public/models/ogc-url-fixture/scene.ogc",
+    ]);
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='ogc-local-artifact']");
+      const button = document.querySelector("[data-ogc-artifact-import-button='true']");
+      const importedFile = shell?.getAttribute("data-ogc-import-file") ?? "";
+      return (
+        pill?.getAttribute("data-model-load-state") === "loaded" &&
+        button?.getAttribute("data-import-status") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "8" &&
+        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-ogc-import-status") === "loaded" &&
+        shell?.getAttribute("data-ogc-import-model") === "ogc-local-artifact" &&
+        importedFile.includes("objgauss-local-ogc-model-artifact.json") &&
+        importedFile.includes("scene.index.json") &&
+        importedFile.includes("scene.ogc") &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-index-path") === "local://scene.index.json" &&
+        shell?.getAttribute("data-ogc-artifact-payload-path") === "local://scene.ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-local-artifact") ?? [];
+      const target = targets[0];
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+        objectCount: targets.length,
+        modelCount: world?.modelCount ?? 0,
+      };
+    });
+    if (
+      !selection.ok ||
+      selection.modelId !== "ogc-local-artifact" ||
+      selection.objectCount !== 2 ||
+      selection.modelCount !== 8
+    ) {
+      throw new Error(`expected local OGC manifest package object selection: ${JSON.stringify(selection)}`);
+    }
+    const gaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, selection.selectionId);
+    if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`expected local OGC manifest package Gaussian probe: ${JSON.stringify(gaussian)}`);
+    }
+    await page.locator("[data-ogc-lod-button='1']").click();
+    await page.locator("[data-ogc-chunk-button='0']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "10" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "0" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1 &&
+        types.has("import-ogc") &&
+        types.has("gaussian-probe") &&
+        types.has("ogc-lod") &&
+        types.has("ogc-chunks")
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-ogc-manifest.png", fullPage: false });
+    return { status: "local-manifest-file-lod-chunk-ui" };
+  } finally {
+    await page.close();
+  }
+}
+
 async function auditUrlOgcArtifact(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
@@ -1115,6 +1214,60 @@ async function auditUrlOgcArtifact(browser, url) {
   } finally {
     await page.close();
   }
+}
+
+function writeLocalOgcManifestFixture() {
+  const index = JSON.parse(readFileSync("public/models/ogc-url-fixture/scene.index.json", "utf8"));
+  const manifestPath = "/tmp/objgauss-local-ogc-model-artifact.json";
+  const manifest = {
+    schema: "objgauss-model-artifact-manifest-v1",
+    manifest_id: "objgauss-local-ogc-package-fixture",
+    asset_id: "objgauss-local-ogc-package-fixture",
+    name: "OGC manifest package fixture",
+    stage: "audit-fixture",
+    source: {
+      type: "audit_local_manifest_package",
+      index: "scene.index.json",
+      payload: "scene.ogc",
+    },
+    license: "fixture",
+    counts: {
+      gaussians: index.gaussian_count,
+      objects: index.object_count,
+    },
+    artifacts: [
+      {
+        role: "compressed_chunked",
+        path: "scene.ogc",
+        format: ".ogc",
+        delivery_tier: "browser_edit",
+        browser_ready: true,
+        gaussian_count: index.gaussian_count,
+        object_count: index.object_count,
+        byte_size: index.payload.byte_size,
+        sha256: index.payload.sha256,
+        chunk_index: {
+          schema: index.schema,
+          path: "scene.index.json",
+          chunk_count: index.chunks.length,
+          sort_key: index.sort_key,
+          chunk_size_target: index.chunk_size_target,
+        },
+        compression: index.compression,
+        lod: index.lod,
+        object_id_coverage: index.object_id_coverage,
+      },
+    ],
+    quality_evidence: [
+      {
+        kind: "audit-local-ogc-package-fixture",
+        status: "fixture",
+      },
+    ],
+    limitations: ["Tiny audit fixture for local model artifact manifest package import."],
+  };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  return manifestPath;
 }
 
 function launchOptions() {

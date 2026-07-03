@@ -18,6 +18,7 @@ const INITIAL_CAMERA = {
   target: [0, 1.15, 0],
 };
 
+const OGC_CHUNK_INDEX_SCHEMA = "objgauss-chunk-index-v1";
 const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
 const DEBUG_EVENT_LIMIT = 12;
 
@@ -361,15 +362,7 @@ export default function App() {
       const startedAt = performance.now();
       setOgcImport({ status: "loading", modelId, fileName, error: "" });
       try {
-        const { indexFile, payloadFile } = ogcFilePair(files);
-        const index = JSON.parse(await indexFile.text());
-        const payloadBuffer = await payloadFile.arrayBuffer();
-        const model = ogcLocalArtifactModel({
-          index,
-          payloadBuffer,
-          indexFileName: indexFile.name,
-          payloadFileName: payloadFile.name,
-        });
+        const model = await ogcLocalArtifactModelFromFiles(files);
         const { artifact, decoded, index: loadedIndex, delivery } = await loadOgcModel(model);
         const imported = upsertDecodedOgcModel(model, decoded, loadedIndex, delivery, artifact, {
           startedAt,
@@ -974,14 +967,39 @@ function trainableLocalArtifactModel(fileName) {
   };
 }
 
-function ogcFilePair(files) {
-  const indexFile = files.find((file) => /\.index\.json$/i.test(file.name)) ??
-    files.find((file) => /\.json$/i.test(file.name));
-  const payloadFile = files.find((file) => /\.ogc$/i.test(file.name));
-  if (!indexFile || !payloadFile) {
-    throw new Error("select one .index.json and one .ogc file");
+async function ogcLocalArtifactModelFromFiles(files) {
+  const entries = Array.from(files ?? []);
+  const jsonEntries = await Promise.all(
+    entries
+      .filter((file) => /\.json$/i.test(file.name))
+      .map(async (file) => ({ file, json: JSON.parse(await file.text()) })),
+  );
+  const manifestEntry = jsonEntries.find((entry) => entry.json?.schema === MODEL_ARTIFACT_MANIFEST_SCHEMA);
+  if (manifestEntry) {
+    const artifact = browserReadyArtifact({ modelArtifactManifest: manifestEntry.json }, "compressed_chunked");
+    if (!artifact) {
+      throw new Error("local model manifest missing browser-ready compressed_chunked artifact");
+    }
+    const indexEntry = findOgcIndexEntry(jsonEntries, artifact.indexPath ?? artifact.chunk_index?.path);
+    const payloadFile = findOgcPayloadFile(entries, artifact.payloadPath ?? artifact.path);
+    return ogcLocalArtifactModelFromManifest({
+      manifest: manifestEntry.json,
+      artifact,
+      index: indexEntry.json,
+      payloadBuffer: await payloadFile.arrayBuffer(),
+      indexFileName: indexEntry.file.name,
+      payloadFileName: payloadFile.name,
+    });
   }
-  return { indexFile, payloadFile };
+
+  const indexEntry = findOgcIndexEntry(jsonEntries);
+  const payloadFile = findOgcPayloadFile(entries);
+  return ogcLocalArtifactModel({
+    index: indexEntry.json,
+    payloadBuffer: await payloadFile.arrayBuffer(),
+    indexFileName: indexEntry.file.name,
+    payloadFileName: payloadFile.name,
+  });
 }
 
 function ogcLocalArtifactModel({ index, payloadBuffer, indexFileName, payloadFileName }) {
@@ -1059,6 +1077,135 @@ function ogcLocalArtifactModel({ index, payloadBuffer, indexFileName, payloadFil
       },
     },
   };
+}
+
+function ogcLocalArtifactModelFromManifest({
+  manifest,
+  artifact,
+  index,
+  payloadBuffer,
+  indexFileName,
+  payloadFileName,
+}) {
+  const payloadPath = localFileRoute(payloadFileName);
+  const indexPath = localFileRoute(indexFileName);
+  const localizedArtifact = {
+    ...artifact,
+    path: payloadPath,
+    payloadPath,
+    indexPath,
+    byte_size: payloadBuffer.byteLength,
+    gaussian_count: ogcPositiveInteger(artifact.gaussian_count ?? index?.gaussian_count),
+    object_count: ogcPositiveInteger(artifact.object_count ?? index?.object_count),
+    sha256: artifact.sha256 ?? index?.payload?.sha256,
+    chunk_index: {
+      ...(artifact.chunk_index ?? {}),
+      schema: artifact.chunk_index?.schema ?? index?.schema,
+      path: indexPath,
+      chunk_count: artifact.chunk_index?.chunk_count ?? (Array.isArray(index?.chunks) ? index.chunks.length : undefined),
+      sort_key: artifact.chunk_index?.sort_key ?? index?.sort_key,
+      chunk_size_target: artifact.chunk_index?.chunk_size_target ?? index?.chunk_size_target,
+    },
+    compression: artifact.compression ?? index?.compression,
+    lod: artifact.lod ?? index?.lod,
+    object_id_coverage: artifact.object_id_coverage ?? index?.object_id_coverage,
+    inlineIndex: index,
+    payloadBuffer,
+  };
+  return {
+    id: "ogc-local-artifact",
+    name: manifest.name ? `Local ${manifest.name}` : "Local OGC artifact",
+    label: "Local OGC",
+    loadMode: "ogc-chunked",
+    kind: "compressed-chunked-ogc",
+    stage: "local-manifest-debug-artifact",
+    objectCount: ogcPositiveInteger(index?.object_count ?? manifest.counts?.objects) ?? 0,
+    galleryPosition: [2.85, 0, 4.56],
+    accent: "#5df2df",
+    displayScale: 1.88,
+    pointSize: 0.058,
+    maxDisplayPoints: 1200,
+    license: manifest.license ?? "local-file-debug",
+    ogc: { lodLevel: 0 },
+    compression: {
+      layout: localizedArtifact.compression?.layout ?? "object-aware-chunked-local-quantized",
+      status: "local-manifest-debug-artifact",
+      chunkRoot: indexPath,
+    },
+    modelArtifactManifest: localizeOgcManifest(manifest, artifact, localizedArtifact, {
+      indexPath,
+      payloadPath,
+      indexFileName,
+      payloadFileName,
+    }),
+  };
+}
+
+function localizeOgcManifest(manifest, sourceArtifact, localizedArtifact, files) {
+  let replaced = false;
+  const artifacts = Array.isArray(manifest?.artifacts)
+    ? manifest.artifacts.map((entry) => {
+        if (replaced || entry !== sourceArtifact) return entry;
+        replaced = true;
+        return localizedArtifact;
+      })
+    : [localizedArtifact];
+  return {
+    ...manifest,
+    source: {
+      ...(manifest?.source ?? {}),
+      local_import: {
+        type: "local_model_artifact_manifest_package",
+        index_path: files.indexPath,
+        payload_path: files.payloadPath,
+      },
+    },
+    artifacts: replaced ? artifacts : [localizedArtifact, ...artifacts],
+    created_from: {
+      ...(manifest?.created_from ?? {}),
+      local_index_file: files.indexFileName,
+      local_payload_file: files.payloadFileName,
+    },
+  };
+}
+
+function findOgcIndexEntry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter((entry) => isOgcChunkIndex(entry.json));
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName)
+    : candidates.find((entry) => /\.index\.json$/i.test(entry.file.name)) ?? candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select OGC chunk index file ${expectedName}`
+      : "select one OGC .index.json file");
+  }
+  return matched;
+}
+
+function findOgcPayloadFile(files, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const payloadFiles = Array.from(files ?? []).filter((file) => /\.ogc$/i.test(file.name));
+  const matched = expectedName
+    ? payloadFiles.find((file) => file.name === expectedName)
+    : payloadFiles[0];
+  if (!matched) {
+    throw new Error(expectedName ? `select OGC payload file ${expectedName}` : "select one .ogc file");
+  }
+  return matched;
+}
+
+function isOgcChunkIndex(value) {
+  return value?.schema === OGC_CHUNK_INDEX_SCHEMA || (
+    Array.isArray(value?.chunks) &&
+    typeof value?.payload === "object" &&
+    value.payload !== null
+  );
+}
+
+function fileNameFromRoute(route) {
+  const clean = String(route ?? "").split("?")[0].split("#")[0];
+  return clean.split(/[\\/]/).filter(Boolean).pop() ?? "";
 }
 
 function localFileRoute(fileName) {
