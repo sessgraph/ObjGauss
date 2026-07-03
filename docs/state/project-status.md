@@ -11,6 +11,11 @@ CLI、资产布局、指标、模型产物和文档都可能在 stable release �
 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
 commercial demo release。
 
+账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 当前保持
+`suspended / current-env-missing-torch-gsplat-cuda`。当前环境缺少可用 torch /
+gsplat / CUDA / NVIDIA driver 组合，full renderer training MVP 不再作为本环境的
+进行中工作；恢复条件见 `docs/state/pr-queue.md` 的 Suspended 条目。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
