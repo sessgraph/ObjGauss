@@ -138,7 +138,7 @@
   - `uv run --extra dev pytest`: 145 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
   - `git diff --check`: passed。
-- 完成 commit: pending local commit
+- 完成 commit: `558911f`
 
 ### DEBUG-SESSION-DIFF-001: Compare live snapshots against imported debug sessions
 
