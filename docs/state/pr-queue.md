@@ -101,7 +101,7 @@
   - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
     `objectOverlay=full`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `3ef5221`
 
 ### OBJECTSTATE-BENCH-CASE-INSPECT-001: Case-level ObjectState benchmark inspector
 
