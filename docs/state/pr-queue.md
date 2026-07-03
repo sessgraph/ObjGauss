@@ -104,7 +104,7 @@
   - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，内部验证
     benchmark case click、active telemetry 和 snapshot/session handoff。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `12a0d92`
 
 ### OBJECTSTATE-BENCH-HANDOFF-001: Browser handoff for ObjectState stability benchmark
 
