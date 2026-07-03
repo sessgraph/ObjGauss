@@ -655,6 +655,7 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
+      const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const world = window.__OBJGAUSS_WORLD__;
@@ -752,6 +753,14 @@ async function auditWorld(url) {
         panel?.getAttribute("data-hover-explainable") === "true" &&
         Number(panel?.getAttribute("data-hover-explainability-score") ?? 0) > 0.6 &&
         panel?.getAttribute("data-hover-explainability-reasons") === "" &&
+        hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-target") === selectionId &&
+        hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-model") === "trainable-mvp-debug" &&
+        hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-source") === "trainable_kernel_model_artifact" &&
+        hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-slots") === "2" &&
+        hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-status") === "confident" &&
+        Number(hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-margin") ?? 0) > 0.45 &&
+        hoverHeatmap?.querySelectorAll("[data-hover-assignment-row='true']").length === 2 &&
+        hoverHeatmap?.querySelector("[data-hover-assignment-row-slot='0']") !== null &&
         verdict?.getAttribute("data-object-verdict-status") === "explainable" &&
         verdict?.getAttribute("data-object-verdict-explainable") === "true" &&
         Number(verdict?.getAttribute("data-object-verdict-score") ?? 0) > 0.6 &&
@@ -927,6 +936,7 @@ async function auditWorld(url) {
       const training = document.querySelector("[data-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
+      const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const tracePanel = document.querySelector("[data-debug-event-trace='true']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -1133,6 +1143,17 @@ async function auditWorld(url) {
         panelHoverExplainable: debugPanel?.getAttribute("data-hover-explainable") ?? null,
         panelHoverExplainabilityScore: Number(debugPanel?.getAttribute("data-hover-explainability-score") ?? 0),
         panelHoverExplainabilityReasons: debugPanel?.getAttribute("data-hover-explainability-reasons") ?? null,
+        hoverHeatmapTarget: hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-target") ?? null,
+        hoverHeatmapModel: hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-model") ?? null,
+        hoverHeatmapSource: hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-source") ?? null,
+        hoverHeatmapSlots: Number(hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-slots") ?? 0),
+        hoverHeatmapStatus: hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-status") ?? null,
+        hoverHeatmapTopSlot: Number(hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-top-slot") ?? -1),
+        hoverHeatmapMargin: Number(hoverHeatmap?.getAttribute("data-hover-assignment-heatmap-margin") ?? 0),
+        hoverHeatmapRowCount: hoverHeatmap?.querySelectorAll("[data-hover-assignment-row='true']").length ?? 0,
+        hoverHeatmapTopRowProbability: Number(
+          hoverHeatmap?.querySelector("[data-hover-assignment-row-slot='0']")?.getAttribute("data-hover-assignment-row-probability") ?? 0,
+        ),
         hoverVerdictStatus: verdict?.getAttribute("data-hover-verdict-status") ?? null,
         hoverVerdictExplainable: verdict?.getAttribute("data-hover-verdict-explainable") ?? null,
         hoverVerdictScore: Number(verdict?.getAttribute("data-hover-verdict-score") ?? 0),
@@ -1486,6 +1507,15 @@ async function auditWorld(url) {
       world.panelHoverExplainable === "true" &&
       world.panelHoverExplainabilityScore > 0.6 &&
       world.panelHoverExplainabilityReasons === "" &&
+      world.hoverHeatmapTarget === world.hoveredId &&
+      world.hoverHeatmapModel === world.hoveredModelId &&
+      world.hoverHeatmapSource === world.hoveredAssignmentSource &&
+      world.hoverHeatmapSlots === world.hoveredAssignmentSlotCount &&
+      world.hoverHeatmapStatus === world.hoveredAssignmentProbeStatus &&
+      world.hoverHeatmapTopSlot === world.hoveredAssignmentTopSlot &&
+      world.hoverHeatmapMargin > 0.45 &&
+      world.hoverHeatmapRowCount === world.hoveredAssignmentSlotCount &&
+      world.hoverHeatmapTopRowProbability > 0.7 &&
       world.snapshotHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
       world.snapshotHoverExplainable === true &&
       world.snapshotHoverExplainabilityScore > 0.6 &&

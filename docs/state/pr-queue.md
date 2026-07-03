@@ -78,6 +78,35 @@
 
 ## Done
 
+### OBJECTSTATE-HOVER-HEATMAP-001: Visible hover assignment heatmap
+
+- 状态: done / hover-assignment-heatmap
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 hover ObjectState 的 `A[n,k]` preview 从 meta / telemetry 升级为可见 heatmap，
+  让 `hover object -> show assignment distribution` 成为 Debug OS 的直接交互证据。
+- 已实施:
+  - `src/App.jsx` 新增 `HoverAssignmentHeatmap`，在 selected `AssignmentHeatmap` 后显示
+    hovered ObjectState 的 compact assignment vector、top slot、top probability、margin
+    和 per-slot probability bars。
+  - `src/styles.css` 为 hover heatmap 增加轻量边框和背景，复用现有 assignment row /
+    probe meta 结构。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture hover 后，hover heatmap 的
+    target / model / source / slot count / status / margin / row count 与
+    `window.__OBJGAUSS_WORLD__` 的 hover assignment contract 一致。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed；内部验证
+    hover heatmap 的 target / model / source / slot count / status / margin / row count
+    与 `window.__OBJGAUSS_WORLD__` hover assignment contract 一致。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-OPACITY-LENS-001: Gaussian opacity debug lens
 
 - 状态: done / gaussian-opacity-debug-lens

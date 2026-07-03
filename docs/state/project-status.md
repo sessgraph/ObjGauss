@@ -515,6 +515,17 @@ assignment preview，并保持 hover highlight、visibility、snapshot/session h
 该切片只强化 Phase 1 “hover 显示 A / ObjectState 快速预览”，不改变 solver、
 projection、renderer artifact schema 或训练 loop。
 
+`OBJECTSTATE-HOVER-HEATMAP-001` 已将 hover assignment preview 进一步升级为可见
+`A[n,k]` heatmap：`src/App.jsx` 新增 `HoverAssignmentHeatmap`，在 selected
+Assignment Heatmap 后显示 hovered ObjectState 的 compact assignment vector、top slot、
+top probability、margin 和 per-slot probability bars；`src/styles.css` 复用现有
+assignment row / probe meta 样式，只增加轻量 hover 边框。`scripts/audit-world-viewer.mjs`
+已验证 trainable fixture hover 后，hover heatmap 的 target、model、source、slot count、
+status、margin 和 row count 与 `window.__OBJGAUSS_WORLD__` 的 hover assignment contract
+一致。该切片只强化 Phase 1 Layer 3 的交互显微镜，不改变 assignment solver、
+ObjectState projection、renderer artifact schema、OGC decoder 或 trainable kernel loop；
+训练模型主线仍保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

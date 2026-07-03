@@ -3382,6 +3382,10 @@ function DebugPanel({
         debugProbe={debugProbe}
         assignmentProbe={assignmentProbe}
       />
+      <HoverAssignmentHeatmap
+        hoveredTarget={hoveredTarget}
+        hoverAssignmentProbe={hoverAssignmentProbe}
+      />
       <ObjectStateVerdictPanel
         objectExplainability={objectExplainability}
         hoverExplainability={hoverExplainability}
@@ -4092,6 +4096,59 @@ function AssignmentHeatmap({ assignment, selectedObject, debugProbe, assignmentP
         const color = objectAccent(slot.objectId, "#9eeaf2");
         return (
           <div className="assignmentRow" key={`${slot.slot}-${slot.objectId}`}>
+            <span>k{slot.slot}</span>
+            <div className="assignmentTrack">
+              <b style={{ width, background: color }} />
+            </div>
+            <strong>{formatRatio(slot.probability)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HoverAssignmentHeatmap({ hoveredTarget, hoverAssignmentProbe }) {
+  const rows = Array.isArray(hoveredTarget?.assignment) ? hoveredTarget.assignment : [];
+  if (!hoveredTarget?.selectionId || !rows.length) return null;
+  return (
+    <div
+      className="assignmentHeatmap hoverAssignmentHeatmap"
+      data-hover-assignment-heatmap="true"
+      data-hover-assignment-heatmap-object={hoveredTarget.objectId ?? ""}
+      data-hover-assignment-heatmap-target={hoveredTarget.selectionId}
+      data-hover-assignment-heatmap-model={hoveredTarget.modelId ?? ""}
+      data-hover-assignment-heatmap-source={hoveredTarget.assignmentSource ?? ""}
+      data-hover-assignment-heatmap-slots={rows.length}
+      data-hover-assignment-heatmap-status={hoverAssignmentProbe?.status ?? "none"}
+      data-hover-assignment-heatmap-top-slot={hoverAssignmentProbe?.topSlot ?? ""}
+      data-hover-assignment-heatmap-top-probability={hoverAssignmentProbe?.topProbability ?? ""}
+      data-hover-assignment-heatmap-margin={hoverAssignmentProbe?.margin ?? ""}
+      data-hover-assignment-heatmap-ambiguous={hoverAssignmentProbe?.ambiguous ? "true" : "false"}
+      data-hover-assignment-heatmap-collapse-risk={hoverAssignmentProbe?.collapseRisk ? "true" : "false"}
+    >
+      <div
+        className="assignmentProbeMeta hoverProbeMeta"
+        data-hover-assignment-probe="true"
+        data-hover-assignment-probe-status={hoverAssignmentProbe?.status ?? "none"}
+      >
+        <span>hover A</span>
+        <strong>k{hoverAssignmentProbe?.topSlot ?? "-"}</strong>
+        <small>{formatRatio(hoverAssignmentProbe?.topProbability)}</small>
+        <small>{formatRatio(hoverAssignmentProbe?.margin)}</small>
+      </div>
+      {rows.map((slot) => {
+        const width = `${Math.max(2, Math.min(100, Number(slot.probability) * 100))}%`;
+        const color = objectAccent(slot.objectId, "#9eeaf2");
+        return (
+          <div
+            className="assignmentRow hoverAssignmentRow"
+            key={`hover-${hoveredTarget.selectionId}-${slot.slot}-${slot.objectId}`}
+            data-hover-assignment-row="true"
+            data-hover-assignment-row-slot={slot.slot}
+            data-hover-assignment-row-object={slot.objectId}
+            data-hover-assignment-row-probability={slot.probability ?? ""}
+          >
             <span>k{slot.slot}</span>
             <div className="assignmentTrack">
               <b style={{ width, background: color }} />

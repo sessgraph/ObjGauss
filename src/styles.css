@@ -306,6 +306,17 @@ button:focus-visible {
   margin: 0 0 14px;
 }
 
+.hoverAssignmentHeatmap {
+  padding: 8px;
+  border: 1px solid rgba(127, 241, 215, 0.16);
+  border-radius: 10px;
+  background: rgba(127, 241, 215, 0.04);
+}
+
+.hoverProbeMeta {
+  border-color: rgba(127, 241, 215, 0.2);
+}
+
 .assignmentProbeMeta {
   display: grid;
   min-height: 28px;
