@@ -101,7 +101,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 140 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `665ca8a`
 
 ### DEBUG-SESSION-EXPORT-001: Export ObjectState Debug sessions from viewer
 
