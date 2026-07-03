@@ -22,6 +22,7 @@ try {
       `selectedModel=${JSON.stringify(summary.selectedModelId)}`,
       `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
       `debugOs=${summary.debugOs}`,
+      `debugSnapshot=${summary.debugSnapshotSchema}`,
       `debugLens=${summary.debugLens}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
@@ -389,9 +390,11 @@ async function auditWorld(url) {
     const urlOgc = await auditUrlOgcArtifact(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const shell = document.querySelector(".worldShell");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
+      const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       return {
         modelCount: handle.modelCount,
         objectCount: handle.objectCount,
@@ -402,6 +405,22 @@ async function auditWorld(url) {
         debugMode: handle.debugMode,
         debugLens: handle.debugLens,
         debugProtocol: handle.debugProtocol,
+        debugSnapshotSchema: snapshot?.schema ?? null,
+        debugSnapshotProtocol: snapshot?.protocol ?? null,
+        debugSnapshotModel: snapshot?.model?.id ?? null,
+        debugSnapshotObject: snapshot?.selection?.objectId ?? null,
+        debugSnapshotLens: snapshot?.debug?.lens ?? null,
+        debugSnapshotAssignmentSource: snapshot?.assignment?.source ?? null,
+        debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
+        debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
+        shellDebugSnapshotSchema: shell?.getAttribute("data-debug-snapshot-schema") ?? null,
+        shellDebugSnapshotModel: shell?.getAttribute("data-debug-snapshot-model") ?? null,
+        shellDebugSnapshotSlots: Number(shell?.getAttribute("data-debug-snapshot-assignment-slots") ?? 0),
+        shellDebugSnapshotStability: shell?.getAttribute("data-debug-snapshot-stability") ?? null,
+        panelDebugSnapshotSchema: snapshotPanel?.getAttribute("data-debug-snapshot-schema") ?? null,
+        panelDebugSnapshotModel: snapshotPanel?.getAttribute("data-debug-snapshot-model") ?? null,
+        panelDebugSnapshotLens: snapshotPanel?.getAttribute("data-debug-snapshot-lens") ?? null,
+        panelDebugSnapshotSlots: Number(snapshotPanel?.getAttribute("data-debug-snapshot-slots") ?? 0),
         assignmentSource: handle.assignmentSource,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
@@ -495,6 +514,25 @@ async function auditWorld(url) {
     )) {
       throw new Error(`expected entropy debug lens telemetry: ${JSON.stringify(world)}`);
     }
+    if (!(
+      world.debugSnapshotSchema === "objgauss-object-state-debug-snapshot-v1" &&
+      world.debugSnapshotProtocol === "object-state-debug-os-v1" &&
+      world.debugSnapshotModel === "trainable-mvp-debug" &&
+      world.debugSnapshotLens === "entropy" &&
+      world.debugSnapshotAssignmentSource === "trainable_kernel_model_artifact" &&
+      world.debugSnapshotAssignmentSlots === 2 &&
+      world.debugSnapshotTrainingStatus === "loss_down" &&
+      world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
+      world.shellDebugSnapshotModel === world.debugSnapshotModel &&
+      world.shellDebugSnapshotSlots === world.debugSnapshotAssignmentSlots &&
+      world.shellDebugSnapshotStability === world.stabilityStatus &&
+      world.panelDebugSnapshotSchema === world.debugSnapshotSchema &&
+      world.panelDebugSnapshotModel === world.debugSnapshotModel &&
+      world.panelDebugSnapshotLens === world.debugSnapshotLens &&
+      world.panelDebugSnapshotSlots === world.debugSnapshotAssignmentSlots
+    )) {
+      throw new Error(`expected stable ObjectState debug snapshot protocol: ${JSON.stringify(world)}`);
+    }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
     }
@@ -545,6 +583,7 @@ async function auditWorld(url) {
       selectedModelId: world.selectedModelId,
       selectedObjectId: world.selectedObjectId,
       debugOs: world.debugProtocol,
+      debugSnapshotSchema: world.debugSnapshotSchema,
       debugLens: world.debugLens,
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,

@@ -72,6 +72,41 @@
 
 ## Done
 
+### OBJECT-DEBUG-SNAPSHOT-001: Expose ObjectState Debug snapshot protocol
+
+- 状态: done / object-debug-snapshot
+- 类型: 标准 PR / ObjectState Debug OS protocol
+- 目标: 将当前 selected ObjectState 调试状态收敛成稳定的
+  `objgauss-object-state-debug-snapshot-v1`，让 Debug OS 像 profiler 一样能被机器读取，
+  而不是只靠散落 DOM telemetry 和视觉观察。
+- 已实施:
+  - `src/App.jsx` 新增 `objectStateDebugSnapshot(...)`，从 selected model、selected
+    object、Gaussian probe、debug lens、assignment vector、stability、training evidence
+    和 delivery 摘要生成只读 snapshot。
+  - snapshot 同步暴露到 `window.__OBJGAUSS_DEBUG_SNAPSHOT__`，并通过 root
+    `.worldShell` 的 `data-debug-snapshot-*` 属性暴露 schema、model、object、slot
+    count、stability 和 training status。
+  - ObjectState Debug panel 新增 `Protocol` 面板，显示 `snapshot-v1`、model、object、
+    lens、slots、assignment source 和 stability state。
+  - `scripts/audit-world-viewer.mjs` 在 trainable artifact + entropy lens 路径下断言
+    global snapshot、root attributes 和 Protocol panel 三者一致，且 snapshot 绑定
+    `trainable_kernel_model_artifact`、2-slot assignment 和 `loss_down` training evidence。
+- 边界:
+  - 不改变 trainable artifact schema、OGC schema、Python 训练算法或 loss 计算。
+  - 不新增 export/download/clipboard，不把 snapshot 写入仓库或输出目录。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不引入新的 renderer 依赖。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `debugSnapshot=objgauss-object-state-debug-snapshot-v1`、
+    `debugLens=entropy`、`trainLoss=0.053806`；截图
+    `/tmp/objgauss-world-viewer.png` 显示 Protocol panel。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-DEBUG-LENS-001: Add assignment confidence and entropy debug lenses
 
 - 状态: done / object-debug-lens

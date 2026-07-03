@@ -87,6 +87,28 @@ export default function App() {
     selected?.delivery?.source === "trainable-kernel-model-artifact"
       ? trainableEvidenceSummary(selected.trainableArtifact)
       : null;
+  const selectedDebugSnapshot = objectStateDebugSnapshot({
+    selected,
+    selectedObject,
+    selection,
+    debugMode,
+    debugLens,
+    debugProbe,
+    hiddenCount,
+    stability: selectedStability,
+    assignmentSource: selectedAssignmentSource,
+    trainingEvidence: selectedTrainingEvidence,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    window.__OBJGAUSS_DEBUG_SNAPSHOT__ = selectedDebugSnapshot;
+    return () => {
+      if (window.__OBJGAUSS_DEBUG_SNAPSHOT__ === selectedDebugSnapshot) {
+        delete window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      }
+    };
+  }, [selectedDebugSnapshot]);
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -455,6 +477,12 @@ export default function App() {
       data-selected-target={selection.selectionId ?? selected?.id ?? ""}
       data-compression-layout="per-object-corepoint-chunks"
       data-debug-os="object-state"
+      data-debug-snapshot-schema={selectedDebugSnapshot.schema}
+      data-debug-snapshot-model={selectedDebugSnapshot.model.id}
+      data-debug-snapshot-object={selectedDebugSnapshot.selection.objectId ?? ""}
+      data-debug-snapshot-assignment-slots={selectedDebugSnapshot.assignment.slotCount}
+      data-debug-snapshot-stability={selectedDebugSnapshot.stability.status}
+      data-debug-snapshot-training-status={selectedDebugSnapshot.training?.status ?? ""}
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
@@ -608,6 +636,7 @@ export default function App() {
         debugProbe={debugProbe}
         debugMode={debugMode}
         debugLens={debugLens}
+        debugSnapshot={selectedDebugSnapshot}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         onToggleObjectVisibility={toggleObjectVisibility}
@@ -1240,6 +1269,7 @@ function DebugPanel({
   debugProbe,
   debugMode,
   debugLens,
+  debugSnapshot,
   hiddenObjects,
   stability,
   onToggleObjectVisibility,
@@ -1395,6 +1425,7 @@ function DebugPanel({
       ) : null}
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
+      <DebugSnapshotPanel snapshot={debugSnapshot} />
       <StabilityDashboard stability={stability} />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
@@ -1437,6 +1468,38 @@ function DebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function DebugSnapshotPanel({ snapshot }) {
+  if (!snapshot) return null;
+  return (
+    <div
+      className="stabilityDashboard debugSnapshotPanel"
+      data-debug-snapshot-panel="true"
+      data-debug-snapshot-schema={snapshot.schema}
+      data-debug-snapshot-model={snapshot.model.id}
+      data-debug-snapshot-object={snapshot.selection.objectId ?? ""}
+      data-debug-snapshot-gaussian={snapshot.selection.gaussianIndex ?? ""}
+      data-debug-snapshot-lens={snapshot.debug.lens}
+      data-debug-snapshot-source={snapshot.assignment.source}
+      data-debug-snapshot-slots={snapshot.assignment.slotCount}
+      data-debug-snapshot-stability={snapshot.stability.status}
+      data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Protocol</span>
+        <strong>snapshot-v1</strong>
+      </div>
+      <dl className="stabilityMeta snapshotMeta">
+        <Meta label="model" value={snapshot.model.id} />
+        <Meta label="object" value={snapshot.selection.objectId ?? "-"} />
+        <Meta label="lens" value={snapshot.debug.lens} />
+        <Meta label="slots" value={formatCount(snapshot.assignment.slotCount)} />
+        <Meta label="source" value={snapshot.assignment.source} />
+        <Meta label="state" value={snapshot.stability.status} />
+      </dl>
+    </div>
   );
 }
 
@@ -2810,6 +2873,108 @@ function initialModelStates(models = []) {
       },
     ]),
   );
+}
+
+function objectStateDebugSnapshot({
+  selected,
+  selectedObject,
+  selection,
+  debugMode,
+  debugLens,
+  debugProbe,
+  hiddenCount,
+  stability,
+  assignmentSource,
+  trainingEvidence,
+}) {
+  const objects = selected?.objects ?? [];
+  const activeObject = selectedObject ?? objects[0] ?? null;
+  const activeState = activeObject?.objectState ?? null;
+  const assignment = debugProbe?.assignment ?? activeObject?.assignment ?? activeState?.assignment ?? [];
+  return {
+    schema: "objgauss-object-state-debug-snapshot-v1",
+    protocol: "object-state-debug-os-v1",
+    model: {
+      id: selected?.id ?? "",
+      kind: selected?.kind ?? "",
+      loadMode: selected?.loadMode ?? "",
+      status: selected?.status ?? "",
+      deliverySource: selected?.delivery?.source ?? "",
+    },
+    selection: {
+      selectionId: selection?.selectionId ?? selected?.id ?? "",
+      objectId: activeObject?.objectId ?? selection?.objectId ?? null,
+      gaussianIndex: debugProbe?.gaussianIndex ?? null,
+      hiddenObjectCount: hiddenCount,
+    },
+    debug: {
+      enabled: Boolean(debugMode),
+      lens: debugMode ? normalizeDebugLens(debugLens) : "appearance",
+      probeSource: debugProbe?.source ?? activeState?.source ?? "none",
+    },
+    assignment: {
+      source: assignmentSource || activeState?.source || selected?.delivery?.source || "none",
+      slotCount: Array.isArray(assignment) ? assignment.length : 0,
+      confidence: finiteNumber(debugProbe?.confidence ?? activeState?.confidence),
+      entropy: finiteNumber(debugProbe?.entropy ?? activeState?.assignmentEntropy),
+      vector: compactAssignmentVector(assignment),
+    },
+    objectState: {
+      objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
+      status: activeState?.status ?? "",
+      confidence: finiteNumber(activeState?.confidence),
+      entropy: finiteNumber(activeState?.assignmentEntropy),
+      slotMass: finiteNumber(activeState?.slotMass),
+      massFraction: finiteNumber(activeState?.massFraction),
+      centroid: cleanNumberArray(activeState?.centroid),
+      bbox: cleanNumberArray(activeState?.bbox),
+    },
+    stability: {
+      status: stability?.status ?? "unknown",
+      slotUtilization: finiteNumber(stability?.slotUtilization),
+      meanEntropy: finiteNumber(stability?.meanEntropy),
+      mixedSlots: finiteNumber(stability?.mixedSlots),
+      meanPurity: finiteNumber(stability?.meanPurity),
+      meanTemporalDrift: finiteNumber(stability?.meanTemporalDrift),
+      meanSpatialCompactness: finiteNumber(stability?.meanSpatialCompactness),
+      meanAssignmentJitter: finiteNumber(stability?.meanAssignmentJitter),
+      meanBboxStability: finiteNumber(stability?.meanBboxStability),
+    },
+    training: trainingEvidence
+      ? {
+          status: trainingEvidence.status,
+          iterations: trainingEvidence.iterations,
+          finalTotalLoss: trainingEvidence.finalTotalLoss,
+          totalLossDelta: trainingEvidence.totalLossDelta,
+          finalImageLoss: trainingEvidence.finalImageLoss,
+          imageLossDelta: trainingEvidence.imageLossDelta,
+          rendererName: trainingEvidence.rendererName,
+          gradientPath: trainingEvidence.gradientPath,
+        }
+      : null,
+    delivery: {
+      loadRoute: selected?.delivery?.loadRoute ?? "",
+      frameIndex: selected?.delivery?.frameIndex ?? null,
+      frameCount: selected?.delivery?.frameCount ?? null,
+      lodLevel: selected?.delivery?.lodLevel ?? null,
+      chunkIds: Array.isArray(selected?.delivery?.chunkIds) ? selected.delivery.chunkIds : [],
+    },
+  };
+}
+
+function compactAssignmentVector(assignment) {
+  if (!Array.isArray(assignment)) return [];
+  return assignment.slice(0, 16).map((slot) => ({
+    slot: Number.isFinite(Number(slot?.slot)) ? Number(slot.slot) : null,
+    objectId: slot?.objectId ?? null,
+    probability: finiteNumber(slot?.probability),
+  }));
+}
+
+function cleanNumberArray(value) {
+  return Array.isArray(value)
+    ? value.map((entry) => finiteNumber(entry)).filter((entry) => entry !== null)
+    : [];
 }
 
 function trainableEvidenceSummary(artifact) {

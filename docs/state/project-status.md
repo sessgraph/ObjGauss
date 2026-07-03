@@ -504,6 +504,18 @@ debugging。`scripts/audit-world-viewer.mjs` 在 trainable artifact 路径下点
 entropy lens。该切片不改变训练算法、artifact schema、OGC schema 或 renderer 依赖，
 也不解除 gsplat / CUDA blocker。
 
+`OBJECT-DEBUG-SNAPSHOT-001` 已完成 ObjectState Debug OS 的 snapshot protocol：
+`src/App.jsx` 新增 `objgauss-object-state-debug-snapshot-v1`，从当前 selected model /
+object、Gaussian probe、debug lens、assignment vector、ObjectState、stability、
+training evidence 和 delivery 摘要生成只读调试快照。该 snapshot 同步暴露到
+`window.__OBJGAUSS_DEBUG_SNAPSHOT__`、root `.worldShell` 的 `data-debug-snapshot-*`
+attributes，以及 Debug panel 的 `Protocol` 面板。`scripts/audit-world-viewer.mjs`
+现在在 trainable artifact + entropy lens 路径下断言 global snapshot、root attributes
+和 Protocol panel 三者一致，并验证 snapshot 绑定
+`trainable_kernel_model_artifact`、2-slot assignment、`loss_down` training evidence 和
+当前 stability 状态。该切片不写出 snapshot 文件、不改变训练 / OGC artifact schema、
+不替换 viewer renderer，也不解除 gsplat / CUDA blocker。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

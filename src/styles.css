@@ -467,6 +467,18 @@ button:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.debugSnapshotPanel {
+  border-color: rgba(182, 151, 255, 0.2);
+}
+
+.snapshotMeta {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
+.snapshotMeta dd {
+  overflow-wrap: anywhere;
+}
+
 .debugStateGrid {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
