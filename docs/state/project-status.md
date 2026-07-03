@@ -33,6 +33,19 @@ smoke 已验证 renderer API、image render loss 和 decoder handoff 均可用�
 产物，也不训练 Gaussian geometry / opacity / rotation。下一阶段进入 solver checkpoint
 到 decoder 参数的训练绑定与 full loop 设计。
 
+随后完成 `SOLVER-DECODER-TRAIN-001`：新增
+`objgauss-object-state-gaussian-decoder-training-v1`，把
+`ObjectStateProjection.assignment -> object_colors -> Gaussian decode -> image renderer loss`
+变成最小可训练闭环。当前 trainer 只更新 `object_colors`，冻结 assignment、means、
+quats、scales、opacities 和 cameras；CLI 新增
+`objgauss training decoder-mvp`，可使用 object_id one-hot assignment，也可通过
+`--solver-checkpoint` 读取 Object Emergence Solver checkpoint 生成 `A[N,K]`。CPU point
+renderer smoke 验证 `image_render_loss=0.029535 -> 0.004649`；host GPU / gsplat smoke
+验证 `image_render_loss=0.075436 -> 0.061272`，`renderer-loss-contract` 对应输出
+`status=full_3dgs_decoder_training_ready`、`decoder_handoff_status=full_renderer_decoder_training_ready`。
+该步骤仍不训练 Gaussian geometry / opacity / rotation，不提交 `/tmp` summary、
+checkpoint、rendered image 或 ignored `outputs/` 产物。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
