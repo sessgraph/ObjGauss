@@ -554,6 +554,15 @@ manifest package 可以同时导入训练 artifact 与 quality report，输出
 snapshot quality 状态存在。该步骤仍不引入 torch / gsplat / CUDA，不提交 `/tmp` 或
 ignored `outputs/` 训练产物，不改变 viewer renderer。
 
+`QUALITY-GATE-UI-001` 已完成 Debug OS 的 quality gate 可视化：`src/App.jsx` 的
+`Quality` 面板现在不仅显示 report status 与核心 metrics，还会逐条显示 gate
+name、status、value 和 threshold；root / panel telemetry 新增 failing gate names，
+`objgauss-object-state-debug-snapshot-v1.quality` 也携带 compact gate rows。`scripts/audit-world-viewer.mjs`
+现在验证 algorithm manifest、本地组合 manifest 与 trainable-only local manifest package
+中的 `assignment_entropy=warn`、`slot_utilization=pass` / `temporal_drift=pass` 等具体
+gate 判定，并确认 snapshot export 中保留 gate 信息。该步骤只增强 viewer-side metrics
+debugging，不改变 quality report schema、不改训练算法、不引入 torch / gsplat / CUDA。
+
 `TRAIN-MODEL-VIEWER-BINDING-001` 已完成 trainable MVP model artifact 的 Debug OS
 前端绑定：`src/modelCatalog.js` 新增小型 `trainable-mvp-debug` static fixture，
 明确标记为 `objgauss-trainable-kernel-model-artifact-v1` debug fixture，不是真实训练

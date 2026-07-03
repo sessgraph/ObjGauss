@@ -2891,6 +2891,7 @@ function QualityReportPanel({ report }) {
       data-quality-report-bbox-stability={summary.bboxStability ?? ""}
       data-quality-report-gate-count={summary.gateCount}
       data-quality-report-failing-gates={summary.failingGates}
+      data-quality-report-failing-gate-names={summary.failingGateNames}
     >
       <div className="stabilityHead">
         <span>Quality</span>
@@ -2908,6 +2909,30 @@ function QualityReportPanel({ report }) {
         <Meta label="slot" value={formatRatio(summary.slotUtilization)} />
         <Meta label="bbox" value={formatRatio(summary.bboxStability)} />
       </dl>
+      {summary.gates.length ? (
+        <div
+          className="qualityGateRows"
+          data-quality-gates="true"
+          data-quality-gate-count={summary.gates.length}
+          data-quality-failing-gate-names={summary.failingGateNames}
+        >
+          {summary.gates.map((gate) => (
+            <div
+              className={`qualityGateRow ${gate.status}`}
+              key={gate.name}
+              data-quality-gate-row="true"
+              data-quality-gate-name={gate.name}
+              data-quality-gate-status={gate.status}
+              data-quality-gate-value={gate.value ?? ""}
+              data-quality-gate-threshold={gate.threshold ?? ""}
+            >
+              <span>{gate.name}</span>
+              <small>{formatGateValue(gate)}</small>
+              <strong>{gate.status}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -4330,6 +4355,8 @@ function objectStateDebugSnapshot({
           assignmentJitter: qualityReport.assignmentJitter,
           gateCount: qualityReport.gateCount,
           failingGates: qualityReport.failingGates,
+          failingGateNames: qualityReport.failingGateNames,
+          gates: compactQualityGates(qualityReport.gates),
         }
       : null,
     delivery: {
@@ -4488,9 +4515,13 @@ function trainableEvidenceSummary(artifact) {
 function qualityReportSummary(report) {
   if (report?.schema !== "objgauss-object-state-quality-report-v1") return null;
   const metrics = report.metrics ?? {};
-  const gates = Array.isArray(report.gates) ? report.gates : [];
+  const gates = compactQualityGates(report.gates);
   const failingGates = gates.filter((gate) => gate?.status && gate.status !== "pass").length;
   const passingGates = gates.filter((gate) => gate?.status === "pass").length;
+  const failingGateNames = gates
+    .filter((gate) => gate.status && gate.status !== "pass")
+    .map((gate) => gate.name)
+    .join(",");
   return {
     schema: report.schema,
     status: report.status ?? (failingGates ? "warn" : "pass"),
@@ -4504,8 +4535,26 @@ function qualityReportSummary(report) {
     gateCount: gates.length,
     passingGates,
     failingGates,
+    failingGateNames,
+    gates,
     path: report.path ?? "",
   };
+}
+
+function compactQualityGates(gates) {
+  if (!Array.isArray(gates)) return [];
+  return gates.slice(0, 8).map((gate, index) => ({
+    name: cleanString(gate?.name || `gate_${index}`),
+    status: cleanString(gate?.status || "unknown"),
+    value: finiteNumber(gate?.value),
+    threshold: finiteNumber(gate?.threshold),
+  }));
+}
+
+function formatGateValue(gate) {
+  const value = gate?.value === null || gate?.value === undefined ? "-" : formatRatio(gate.value);
+  const threshold = gate?.threshold === null || gate?.threshold === undefined ? "-" : formatRatio(gate.threshold);
+  return `${value} / ${threshold}`;
 }
 
 function finiteNumber(value) {

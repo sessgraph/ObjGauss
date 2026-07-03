@@ -1318,6 +1318,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
       const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
+      const gateRows = document.querySelector("[data-quality-gates='true']");
+      const entropyGate = document.querySelector("[data-quality-gate-name='assignment_entropy']");
+      const slotGate = document.querySelector("[data-quality-gate-name='slot_utilization']");
       const manifestPill = document.querySelector(".modelPill[data-model-row-id='model-artifact-manifest']");
       const trainablePill = document.querySelector(".modelPill[data-model-row-id='model-manifest-trainable-artifact']");
       const ogcPill = document.querySelector(".modelPill[data-model-row-id='model-manifest-ogc-artifact']");
@@ -1336,6 +1339,11 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-quality-report-object-purity") === "1" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        quality?.getAttribute("data-quality-report-failing-gate-names") === "assignment_entropy" &&
+        gateRows?.getAttribute("data-quality-gate-count") === "3" &&
+        entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
+        entropyGate?.getAttribute("data-quality-gate-threshold") === "0.5" &&
+        slotGate?.getAttribute("data-quality-gate-status") === "pass" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
@@ -1452,6 +1460,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.export?.schema !== "objgauss-debug-snapshot-export-v1" ||
         parsed?.model?.id !== "model-manifest-ogc-artifact" ||
         parsed?.quality?.status !== "warn" ||
+        parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.delivery?.chunkIds?.[0] !== 0 ||
         !fileName.endsWith(".json") ||
         !parsed?.export?.fileName ||
@@ -1494,6 +1503,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
       const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
+      const entropyGate = document.querySelector("[data-quality-gate-name='assignment_entropy']");
       const button = document.querySelector("[data-model-artifact-import-button='true']");
       const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
       const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
@@ -1520,6 +1530,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         shell?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
@@ -1636,6 +1647,8 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
       const shell = document.querySelector(".worldShell");
       const training = document.querySelector("[data-training-evidence='true']");
       const quality = document.querySelector("[data-quality-report='true']");
+      const entropyGate = document.querySelector("[data-quality-gate-name='assignment_entropy']");
+      const driftGate = document.querySelector("[data-quality-gate-name='temporal_drift']");
       const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
       const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -1654,6 +1667,9 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
         training?.getAttribute("data-training-status") === "loss_down" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        quality?.getAttribute("data-quality-report-failing-gate-names") === "assignment_entropy" &&
+        entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
+        driftGate?.getAttribute("data-quality-gate-status") === "pass" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         types.has("import-model-manifest")
       );

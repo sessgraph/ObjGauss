@@ -72,6 +72,39 @@
 
 ## Done
 
+### QUALITY-GATE-UI-001: Surface quality gates in ObjectState Debug OS
+
+- 状态: done / quality-gate-debug-ui
+- 类型: 标准 PR / ObjectState Debug OS metrics UI + browser audit
+- 目标: 让已经加载进 Debug OS 的 `objgauss-object-state-quality-report-v1` 不只显示
+  `pass/warn` 总状态，而是把每个 gate 的 name / status / value / threshold 作为可审计
+  UI 行显示出来。
+- 已实施:
+  - `src/App.jsx` 的 `Quality` 面板新增 compact gate rows，逐条显示 gate name、status、
+    value 和 threshold。
+  - root shell / panel telemetry 新增 failing gate names，便于 Playwright 与人工检查直接定位
+    哪个 gate 触发 warn。
+  - `objgauss-object-state-debug-snapshot-v1.quality` 现在携带 compact gate rows；
+    snapshot export 会保留该 gate evidence。
+  - `scripts/audit-world-viewer.mjs` 现在验证 algorithm manifest、本地组合 manifest 和
+    trainable-only local manifest package 的具体 gate 行，例如 `assignment_entropy=warn`、
+    `slot_utilization=pass`、`temporal_drift=pass`。
+- 边界:
+  - 不改变 `objgauss-object-state-quality-report-v1` schema 或生成器。
+  - 不改变训练 loop、trainable artifact schema、manifest schema、OGC decoder 或 renderer。
+  - 不训练 gsplat，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `localTrainableManifest=local-trainable-manifest-quality-debug-os`、
+    `qualityReport=warn` 和 `debugSnapshotExport=exported`；DOM audit 验证具体 gate rows
+    与 snapshot export gate evidence。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 140 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-QUALITY-REPORT-001: Generate quality reports for trainable kernel packages
 
 - 状态: done / trainable-kernel-quality-report-handoff

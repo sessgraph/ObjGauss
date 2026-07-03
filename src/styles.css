@@ -517,6 +517,57 @@ button:focus-visible {
   border-color: rgba(243, 223, 93, 0.2);
 }
 
+.qualityGateRows {
+  display: grid;
+  gap: 6px;
+}
+
+.qualityGateRow {
+  display: grid;
+  min-height: 28px;
+  grid-template-columns: minmax(0, 1fr) 70px 46px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1px solid rgba(153, 214, 222, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.qualityGateRow.warn {
+  border-color: rgba(243, 223, 93, 0.26);
+  background: rgba(243, 223, 93, 0.07);
+}
+
+.qualityGateRow span,
+.qualityGateRow small,
+.qualityGateRow strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qualityGateRow span {
+  color: #edf9fb;
+  font-weight: 740;
+}
+
+.qualityGateRow small {
+  color: #9fb1bd;
+  text-align: right;
+}
+
+.qualityGateRow strong {
+  color: #f3df5d;
+  text-align: right;
+}
+
+.qualityGateRow.pass strong {
+  color: #7ff1d6;
+}
+
 .trainingGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
