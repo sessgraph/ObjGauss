@@ -63,6 +63,21 @@ host GPU / gsplat smoke 验证
 长训练，不提交 `/tmp` summary、checkpoint、rendered image 或 ignored `outputs/`
 产物。
 
+随后完成 `SOLVER-DECODER-EXPORT-001`：新增
+`objgauss-solver-decoder-joint-checkpoint-v1`，把 joint training 的最终
+`ObjectEmergenceSolverState` 和 `ObjectStateGaussianDecoderState` 保存为可
+roundtrip / resume 的 checkpoint。CLI `objgauss training solver-decoder-mvp`
+新增 `--checkpoint-output` 与 `--resume-checkpoint`；resume 会同时恢复 solver 与
+decoder，并让两者 `step` 从 checkpoint 继续递增。`--solver-checkpoint` 仍保留旧
+Object Emergence Solver checkpoint 初始化路径，并兼容只读取 joint checkpoint 中的
+solver state。`renderer-loss-contract` 现在可直接消费 joint checkpoint，输出
+`status=solver_decoder_joint_training_ready` 和
+`decoder_handoff_status=solver_decoder_joint_training_ready`。CPU point export smoke
+验证 `image_render_loss=0.052319 -> 0.049218`，resume smoke 验证
+`image_render_loss=0.049218 -> 0.048663`；所有 checkpoint / summary / boundary 输出
+仍只写入 `/tmp` 或 ignored `outputs/`，不提交训练产物。Gaussian geometry / opacity /
+rotation / camera 和 dynamic-K 继续冻结。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop，下一步进入 checkpoint/export 与训练规模控制。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环，下一步进入训练规模控制。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
@@ -48,6 +48,53 @@
 当前无进行中 PR。
 
 ## Done
+
+### SOLVER-DECODER-EXPORT-001: Export and resume solver-decoder joint checkpoints
+
+- 状态: done / joint-checkpoint-export-resume
+- 类型: 标准 PR / algorithm model checkpoint handoff
+- 目标: 将 solver + decoder joint training 的最终状态保存为可 roundtrip 的 checkpoint，
+  并让 CLI 支持从 checkpoint 恢复训练。
+- 已实施:
+  - 新增 `objgauss-solver-decoder-joint-checkpoint-v1`，保存
+    `solver_state`、`decoder_state`、training metadata、renderer API evidence、
+    image target contract、GPU policy 和 export policy。
+  - `ObjectStateGaussianDecoderState` 新增 `from_dict` loader；joint checkpoint 新增
+    validate / states_from_dict API，并通过 `objgauss.core` lazy namespace 暴露。
+  - `train_solver_decoder_joint(...)` 在 resume 时保留并递增 solver / decoder `step`。
+  - `objgauss training solver-decoder-mvp` 新增 `--checkpoint-output` 和
+    `--resume-checkpoint`；`--solver-checkpoint` 继续支持旧 solver-only checkpoint，
+    也能只读取 joint checkpoint 中的 solver state。
+  - `renderer-loss-contract` 现在识别 joint checkpoint evidence，并输出
+    `solver_decoder_joint_training_ready` handoff 状态。
+- 边界:
+  - 不训练 Gaussian geometry / opacity / rotation，不更新 camera，不执行 dynamic-K。
+  - 不把 torch / gsplat 加入基础 dependencies。
+  - 不提交 `/tmp` summary、checkpoint、boundary JSON、rendered image 或 ignored
+    `outputs/` 产物。
+  - 不启动长时间训练，不替换 viewer renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_renderer_loss.py tests/test_core_namespace.py tests/test_gaussian_decoder_training.py`:
+    26 passed。
+  - `uv run python -m py_compile objgauss/core/solver_decoder_training.py objgauss/core/gaussian_decoder_training.py objgauss/core/renderer_loss.py objgauss/cli.py objgauss/core/__init__.py`:
+    passed。
+  - `uv run objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 4 --image-width 8 --image-height 8 --iterations 4 --solver-learning-rate 0.05 --decoder-learning-rate 0.5 --object-weight 0.1 --summary-output /tmp/objgauss-solver-decoder-export-summary.json --checkpoint-output /tmp/objgauss-solver-decoder-export-checkpoint.json --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`image_renderer=point`，
+    `initial_total_loss=0.189146 -> final_total_loss=0.183699`，
+    `initial_image_render_loss=0.052319 -> final_image_render_loss=0.049218`，
+    `initial_object_loss=1.368271 -> final_object_loss=1.344811`。
+  - `uv run objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --resume-checkpoint /tmp/objgauss-solver-decoder-export-checkpoint.json --max-points 4 --image-width 8 --image-height 8 --iterations 2 --solver-learning-rate 0.025 --decoder-learning-rate 0.25 --object-weight 0.1 --summary-output /tmp/objgauss-solver-decoder-resume-summary.json --checkpoint-output /tmp/objgauss-solver-decoder-resume-checkpoint.json --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`assignment_source=solver_decoder_joint_checkpoint_resume`，
+    `initial_total_loss=0.183700 -> final_total_loss=0.182566`，
+    `initial_image_render_loss=0.049218 -> final_image_render_loss=0.048663`，
+    `initial_object_loss=1.344811 -> final_object_loss=1.339032`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-solver-decoder-resume-checkpoint.json --output /tmp/objgauss-solver-decoder-resume-boundary.json`:
+    passed，`status=solver_decoder_joint_training_ready`，
+    `decoder_handoff_status=solver_decoder_joint_training_ready`。
+  - `uv run --extra dev pytest`: 171 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `8fcfbd8`
 
 ### SOLVER-DECODER-JOINT-001: Joint train solver assignment and decoder colors
 
