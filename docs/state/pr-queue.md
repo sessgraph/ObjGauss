@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-02
+> 最近更新: 2026-07-03
 
 ## 队列规则
 
@@ -71,6 +71,42 @@
 当前无进行中 PR。
 
 ## Done
+
+### OGC-LOD-DEBUG-UI-001: Switch OGC LOD windows inside ObjectState Debug OS
+
+- 状态: done / ogc-lod-debug-ui
+- 类型: 标准 PR / browser delivery + debug UI
+- 目标: 把 OGC range loader 暴露成 Debug OS 交互控件，让用户不改 URL 也能在同一
+  artifact 内切换 LOD byte windows，直接观察 ObjectState / assignment heatmap 是否稳定。
+- 已实施:
+  - `src/App.jsx` 在 OGC artifact load 后记录 `lodLevels`，从真实 `chunk_index.lod.levels`
+    派生可用 LOD。
+  - Debug panel 在 selected OGC 模型下新增紧凑 `lod` selector，当前复用
+    ObjectState Debug OS 面板结构，不新增侧栏。
+  - 点击 LOD 按钮会重新调用现有 OGC range loader，按新的 `lodLevel` 重新 fetch byte
+    windows、decode points、upsert Three.js object render targets，并清除该模型旧隐藏状态。
+  - selected OGC telemetry / inspector 继续显示 `OGC route`、`OGC bytes`、
+    fetched / requested bytes 和 decoded windows，切换后可以审计 LOD 0 / LOD 1 是否
+    真正改变请求窗口。
+  - `scripts/audit-world-viewer.mjs` 在 URL OGC route 下先验证 LOD 1 为
+    `20 / 20` bytes，再点击 `L0` 并断言 `range-ogc`、`40 / 40` bytes、2 个 decoded
+    windows、assignment heatmap 和 Gaussian probe 仍可用。
+- 边界:
+  - 不改变 OGC writer、quantization schema、record format、chunk index schema 或
+    manifest contract。
+  - 不实现 progressive streaming scheduler、VQ / entropy / WebGPU decoder。
+  - 不提交 near-1M / 4.5M 大资产；继续用小型 URL OGC fixture 做 browser path 验收。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不启动训练或引入 torch / gsplat。
+- 验证:
+  - `npm run audit:ogc-decoder-contract`: passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `urlOgc=range-ogc-lod-ui`；截图 `/tmp/objgauss-world-viewer-url-ogc.png`
+    显示 LOD selector、`OGC route range-ogc` 和 `OGC bytes 40 / 40`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
 
 ### OGC-RANGE-LOADER-001: Load OGC LOD chunks through byte-range windows
 

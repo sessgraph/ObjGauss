@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-02
+> 最近更新: 2026-07-03
 
 ## 当前阶段
 
@@ -270,6 +270,17 @@ OGC telemetry 和 inspector 现在显示 fetched bytes、requested bytes、decod
 LOD 1 只请求 2 个 byte windows / 20 bytes，并仍能生成 2 个 ObjectState render targets、
 assignment heatmap 和 Gaussian probe。该切片不改变 OGC writer、record format、
 manifest contract，不实现 VQ / entropy / WebGPU decoder，也不提交大资产。
+
+`OGC-LOD-DEBUG-UI-001` 已完成 OGC range loader 的 Debug OS 交互层：`src/App.jsx`
+在 OGC artifact 加载后从 `chunk_index.lod.levels` 记录可用 `lodLevels`，并在 selected
+OGC 模型的 ObjectState Debug panel 中显示紧凑 `lod` selector。点击 LOD 按钮会重新
+调用现有 OGC range loader，按新的 `lodLevel` 重新 fetch byte windows、decode points、
+upsert Three.js object render targets，并清除该模型旧隐藏状态。selected OGC telemetry
+和 inspector 继续显示 `OGC route`、`OGC bytes`、fetched / requested bytes 和 decoded
+windows。`scripts/audit-world-viewer.mjs` 现在在 URL OGC route 下先验证 LOD 1 为
+`20 / 20` bytes，再点击 `L0` 并验证 `range-ogc`、`40 / 40` bytes、2 个 decoded
+windows、assignment heatmap 和 Gaussian probe 仍可用。该切片只是把已存在 range loader
+变成可交互调试控件，不改变 OGC writer / manifest / renderer，不提交大资产。
 
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /

@@ -162,6 +162,72 @@ export default function App() {
     [models, patchModel, selectedId],
   );
 
+  const selectOgcLod = useCallback(
+    async (lodLevel) => {
+      const current = models[selectedId];
+      if (current?.loadMode !== "ogc-chunked") return;
+      const nextLodLevel = Math.max(0, Math.min(16, Number(lodLevel) || 0));
+      const nextModel = {
+        ...current,
+        ogc: {
+          ...(current.ogc ?? {}),
+          lodLevel: nextLodLevel,
+        },
+      };
+      const startedAt = performance.now();
+      patchModel(current.id, {
+        ogc: nextModel.ogc,
+        status: "loading",
+        message: `loading ogc lod ${nextLodLevel}`,
+      });
+      try {
+        const { artifact, decoded, index, delivery } = await loadOgcModel(nextModel);
+        const rendered = worldApi.current?.upsertModel(nextModel, decoded.points);
+        setDebugProbe(null);
+        setHiddenObjects((currentHidden) => {
+          const nextHidden = new Set(
+            [...currentHidden].filter((selectionId) => !String(selectionId).startsWith(`${current.id}::`)),
+          );
+          worldApi.current?.setHiddenObjects(nextHidden);
+          return nextHidden;
+        });
+        patchModel(current.id, {
+          ogc: nextModel.ogc,
+          status: "loaded",
+          message: `ogc lod ${nextLodLevel}`,
+          gaussianCount: decoded.points.length,
+          displayCount: rendered?.displayCount ?? 0,
+          objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? current.objectCount,
+          corePoint: rendered?.corePoint ?? null,
+          objects: rendered?.objects ?? [],
+          loadMs: Math.round(performance.now() - startedAt),
+          delivery: {
+            source: "quantized-ogc",
+            role: artifact.role,
+            decodedChunks: decoded.metadata.decodedChunks,
+            decodedGaussians: decoded.metadata.decodedGaussians,
+            recordFormat: decoded.metadata.recordFormat,
+            lodLevel: nextLodLevel,
+            lodLevels: availableOgcLodLevels(index),
+            loadRoute: delivery.loadRoute,
+            indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
+            payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
+            fetchedBytes: delivery.fetchedBytes,
+            requestedBytes: delivery.requestedBytes,
+            decodedWindows: delivery.decodedWindows,
+          },
+        });
+      } catch (error) {
+        patchModel(current.id, {
+          ogc: nextModel.ogc,
+          status: "error",
+          message: error?.message ?? "ogc lod load failed",
+        });
+      }
+    },
+    [models, patchModel, selectedId],
+  );
+
   const handleObjectMoved = useCallback(
     (target, position) => {
       if (!target?.modelId) return;
@@ -212,6 +278,7 @@ export default function App() {
                 decodedGaussians: decoded.metadata.decodedGaussians,
                 recordFormat: decoded.metadata.recordFormat,
                 lodLevel: model.ogc?.lodLevel ?? "full",
+                lodLevels: availableOgcLodLevels(index),
                 loadRoute: delivery.loadRoute,
                 indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
                 payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
@@ -469,6 +536,7 @@ export default function App() {
         stability={selectedStability}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectTrainableFrame={selectTrainableFrame}
+        onSelectOgcLod={selectOgcLod}
       />
 
       <div className="glassHud bottomStatus">
@@ -524,6 +592,14 @@ function validateTrainableArtifact(artifact) {
     throw new Error("trainable artifact missing object states");
   }
   return artifact;
+}
+
+function availableOgcLodLevels(index) {
+  const levels = Array.isArray(index?.lod?.levels) ? index.lod.levels : [];
+  const ids = levels
+    .map((level) => Number(level?.level))
+    .filter((level) => Number.isInteger(level) && level >= 0);
+  return ids.length ? [...new Set(ids)].sort((left, right) => left - right) : [0];
 }
 
 async function loadOgcIndex(artifact) {
@@ -1041,6 +1117,7 @@ function DebugPanel({
   stability,
   onToggleObjectVisibility,
   onSelectTrainableFrame,
+  onSelectOgcLod,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -1051,6 +1128,10 @@ function DebugPanel({
   const rendererLoss = selected?.delivery?.imageRenderLoss;
   const frameCount = selected.delivery?.frameCount ?? selected.trainableArtifact?.object_states?.length ?? 0;
   const selectedFrameIndex = Number(selected.delivery?.frameIndex ?? selected.trainableFrameIndex ?? 0) || 0;
+  const ogcLodLevels = selected.loadMode === "ogc-chunked" && Array.isArray(selected.delivery?.lodLevels)
+    ? selected.delivery.lodLevels
+    : [];
+  const selectedOgcLod = Number(selected.delivery?.lodLevel ?? selected.ogc?.lodLevel ?? 0) || 0;
   return (
     <section
       className="glassHud debugPanel"
@@ -1059,6 +1140,8 @@ function DebugPanel({
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
+      data-ogc-lod-index={selectedOgcLod}
+      data-ogc-lod-count={ogcLodLevels.length}
     >
       <div className="debugHeader">
         <div>
@@ -1093,6 +1176,29 @@ function DebugPanel({
               onClick={() => onSelectTrainableFrame?.(index)}
             >
               f{index}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {ogcLodLevels.length > 1 ? (
+        <div
+          className="trainableFrameSelector"
+          data-ogc-lod-selector="true"
+          data-selected-lod={selectedOgcLod}
+          data-lod-count={ogcLodLevels.length}
+        >
+          <span>lod</span>
+          {ogcLodLevels.map((level) => (
+            <button
+              key={level}
+              type="button"
+              className={level === selectedOgcLod ? "active" : ""}
+              data-ogc-lod-button={level}
+              data-active={level === selectedOgcLod ? "true" : "false"}
+              onClick={() => onSelectOgcLod?.(level)}
+            >
+              L{level}
             </button>
           ))}
         </div>
