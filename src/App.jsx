@@ -3408,6 +3408,12 @@ function DebugPanel({
         assignmentProbe={assignmentProbe}
       />
       <AssignmentTimelinePanel timeline={assignmentTimeline} />
+      <ObjectFragmentationPanel
+        selectedObject={selectedObject}
+        objectContinuity={objectContinuity}
+        hoveredTarget={hoveredTarget}
+        hoverContinuity={hoverContinuity}
+      />
       <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
       <HoverAssignmentHeatmap
         hoveredTarget={hoveredTarget}
@@ -4267,6 +4273,73 @@ function AssignmentTimelinePanel({ timeline }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ObjectFragmentationPanel({ selectedObject, objectContinuity, hoveredTarget, hoverContinuity }) {
+  const selected = compactObjectContinuity(objectContinuity);
+  const hover = compactObjectContinuity(hoverContinuity);
+  if (!selected || selected.status === "none") return null;
+  const fragmented = selected.status === "fragmented";
+  const centroidOutside = selected.status === "centroid-outside";
+  const degenerate = selected.status === "degenerate" || selected.status === "invalid-bbox" || selected.status === "empty";
+  const hoverActive = Boolean(hoveredTarget?.selectionId && hover?.status && hover.status !== "none");
+  return (
+    <div
+      className={`stabilityDashboard objectFragmentationPanel ${selected.status === "continuous" ? "pass" : "warn"}`}
+      data-object-fragmentation-panel="true"
+      data-object-fragmentation-status={selected.status}
+      data-object-fragmentation-object={selectedObject?.objectId ?? ""}
+      data-object-fragmentation-gaussians={selected.gaussianCount ?? ""}
+      data-object-fragmentation-compactness={selected.spatialCompactness ?? ""}
+      data-object-fragmentation-bbox-diagonal={selected.bboxDiagonal ?? ""}
+      data-object-fragmentation-density={selected.gaussianDensity ?? ""}
+      data-object-fragmentation-centroid-contained={selected.centroidContained ? "true" : "false"}
+      data-object-fragmentation-bbox-valid={selected.bboxValid ? "true" : "false"}
+      data-object-fragmentation-fragmented={fragmented ? "true" : "false"}
+      data-object-fragmentation-centroid-outside={centroidOutside ? "true" : "false"}
+      data-object-fragmentation-degenerate={degenerate ? "true" : "false"}
+      data-hover-fragmentation-status={hoverActive ? hover.status : "none"}
+      data-hover-fragmentation-object={hoverActive ? hoveredTarget.objectId : ""}
+      data-hover-fragmentation-gaussians={hoverActive ? hover.gaussianCount : ""}
+      data-hover-fragmentation-centroid-contained={hoverActive && hover.centroidContained ? "true" : "false"}
+    >
+      <div className="stabilityHead">
+        <span>Object Fragmentation</span>
+        <strong>{selected.status}</strong>
+      </div>
+      <div className="stabilityGrid fragmentationGrid">
+        <Metric label="G" value={formatCount(selected.gaussianCount)} />
+        <Metric label="compact" value={formatRatio(selected.spatialCompactness)} />
+        <Metric label="diag" value={formatRatio(selected.bboxDiagonal)} />
+        <Metric label="density" value={formatRatio(selected.gaussianDensity)} />
+      </div>
+      <div className="qualityGateRows fragmentFlagRows" data-object-fragmentation-flags="true">
+        <div className={`qualityGateRow ${selected.bboxValid ? "pass" : "warn"}`}>
+          <span>bbox</span>
+          <small>{formatBox(selected.bbox)}</small>
+          <strong>{selected.bboxValid ? "valid" : "bad"}</strong>
+        </div>
+        <div className={`qualityGateRow ${selected.centroidContained ? "pass" : "warn"}`}>
+          <span>centroid</span>
+          <small>{formatVec(selected.centroid)}</small>
+          <strong>{selected.centroidContained ? "inside" : "outside"}</strong>
+        </div>
+        <div className={`qualityGateRow ${fragmented ? "warn" : "pass"}`}>
+          <span>fragmented</span>
+          <small>{formatRatio(selected.spatialCompactness)}</small>
+          <strong>{fragmented ? "true" : "false"}</strong>
+        </div>
+      </div>
+      {hoverActive ? (
+        <dl className="stabilityMeta trainingMeta fragmentationHoverMeta" data-hover-fragmentation-meta="true">
+          <Meta label="hover" value={`#${hoveredTarget.objectId}`} />
+          <Meta label="status" value={hover.status} />
+          <Meta label="G" value={formatCount(hover.gaussianCount)} />
+          <Meta label="compact" value={formatRatio(hover.spatialCompactness)} />
+        </dl>
+      ) : null}
     </div>
   );
 }

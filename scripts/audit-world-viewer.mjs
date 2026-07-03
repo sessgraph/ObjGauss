@@ -56,6 +56,7 @@ try {
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
       `objectContinuity=${summary.objectContinuityStatus}`,
+      `objectFragmentation=${summary.objectFragmentationStatus}`,
       `objectTemporal=${summary.objectTemporalStatus}`,
       `objectExplainability=${summary.objectExplainabilityStatus}`,
       `objectVerdict=${summary.objectVerdictStatus}`,
@@ -250,6 +251,7 @@ async function auditWorld(url) {
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
       const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
+      const fragmentPanel = document.querySelector("[data-object-fragmentation-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
@@ -300,6 +302,18 @@ async function auditWorld(url) {
         Number(world?.objectContinuityBboxDiagonal ?? 0) > 0 &&
         shell?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
         panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-status") === "continuous" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-object") === "0" &&
+        Number(fragmentPanel?.getAttribute("data-object-fragmentation-gaussians") ?? 0) > 0 &&
+        Number(fragmentPanel?.getAttribute("data-object-fragmentation-compactness") ?? 0) > 0 &&
+        Number(fragmentPanel?.getAttribute("data-object-fragmentation-bbox-diagonal") ?? 0) > 0 &&
+        Number(fragmentPanel?.getAttribute("data-object-fragmentation-density") ?? 0) > 0 &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-centroid-contained") === "true" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-bbox-valid") === "true" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-fragmented") === "false" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-centroid-outside") === "false" &&
+        fragmentPanel?.getAttribute("data-object-fragmentation-degenerate") === "false" &&
+        fragmentPanel?.querySelectorAll("[data-object-fragmentation-flags='true'] [class*='qualityGateRow']").length === 3 &&
         snapshot?.continuity?.centroidContained === true &&
         world?.objectContinuityCentroidContained === true &&
         shell?.getAttribute("data-object-temporal-status") === "stable" &&
@@ -970,6 +984,7 @@ async function auditWorld(url) {
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
       const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
       const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
+      const fragmentPanel = document.querySelector("[data-object-fragmentation-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -1102,6 +1117,18 @@ async function auditWorld(url) {
         panelObjectContinuityStatus: debugPanel?.getAttribute("data-object-continuity-status") ?? null,
         panelObjectContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
         panelObjectContinuityCentroidContained: debugPanel?.getAttribute("data-object-continuity-centroid-contained") ?? null,
+        fragmentPanelStatus: fragmentPanel?.getAttribute("data-object-fragmentation-status") ?? null,
+        fragmentPanelObject: fragmentPanel?.getAttribute("data-object-fragmentation-object") ?? null,
+        fragmentPanelGaussians: Number(fragmentPanel?.getAttribute("data-object-fragmentation-gaussians") ?? 0),
+        fragmentPanelCompactness: Number(fragmentPanel?.getAttribute("data-object-fragmentation-compactness") ?? 0),
+        fragmentPanelBboxDiagonal: Number(fragmentPanel?.getAttribute("data-object-fragmentation-bbox-diagonal") ?? 0),
+        fragmentPanelDensity: Number(fragmentPanel?.getAttribute("data-object-fragmentation-density") ?? 0),
+        fragmentPanelCentroidContained: fragmentPanel?.getAttribute("data-object-fragmentation-centroid-contained") ?? null,
+        fragmentPanelBboxValid: fragmentPanel?.getAttribute("data-object-fragmentation-bbox-valid") ?? null,
+        fragmentPanelFragmented: fragmentPanel?.getAttribute("data-object-fragmentation-fragmented") ?? null,
+        fragmentPanelCentroidOutside: fragmentPanel?.getAttribute("data-object-fragmentation-centroid-outside") ?? null,
+        fragmentPanelDegenerate: fragmentPanel?.getAttribute("data-object-fragmentation-degenerate") ?? null,
+        fragmentPanelFlagRows: fragmentPanel?.querySelectorAll("[data-object-fragmentation-flags='true'] .qualityGateRow").length ?? 0,
         panelObjectTemporalStatus: debugPanel?.getAttribute("data-object-temporal-status") ?? null,
         panelObjectTemporalDrift: Number(debugPanel?.getAttribute("data-object-temporal-drift") ?? 0),
         panelObjectAssignmentJitter: Number(debugPanel?.getAttribute("data-object-assignment-jitter") ?? 0),
@@ -1362,6 +1389,18 @@ async function auditWorld(url) {
       world.panelObjectContinuityStatus === world.objectContinuityStatus &&
       world.panelObjectContinuityBboxDiagonal > 0 &&
       world.panelObjectContinuityCentroidContained === "true" &&
+      world.fragmentPanelStatus === world.objectContinuityStatus &&
+      world.fragmentPanelObject === "0" &&
+      world.fragmentPanelGaussians > 0 &&
+      world.fragmentPanelCompactness > 0 &&
+      world.fragmentPanelBboxDiagonal > 0 &&
+      world.fragmentPanelDensity > 0 &&
+      world.fragmentPanelCentroidContained === "true" &&
+      world.fragmentPanelBboxValid === "true" &&
+      world.fragmentPanelFragmented === "false" &&
+      world.fragmentPanelCentroidOutside === "false" &&
+      world.fragmentPanelDegenerate === "false" &&
+      world.fragmentPanelFlagRows === 3 &&
       world.debugSnapshotContinuityStatus === world.objectContinuityStatus &&
       world.debugSnapshotContinuityBboxDiagonal > 0 &&
       world.debugSnapshotContinuityCentroidContained === true &&
@@ -1709,6 +1748,7 @@ async function auditWorld(url) {
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
       objectContinuityStatus: world.objectContinuityStatus,
+      objectFragmentationStatus: world.fragmentPanelStatus,
       objectTemporalStatus: world.objectTemporalStatus,
       objectExplainabilityStatus: world.objectExplainabilityStatus,
       objectVerdictStatus: world.objectVerdictStatus,
