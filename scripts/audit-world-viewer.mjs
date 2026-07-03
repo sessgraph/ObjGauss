@@ -527,17 +527,65 @@ async function auditWorld(url) {
         panel?.getAttribute("data-hover-highlight-object") === selectionId
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
-    const visibilityToggle = await page.evaluate(() => {
+    const toggleTarget = await page.evaluate((selectedId) => {
       const world = window.__OBJGAUSS_WORLD__;
-      const selection = world?.objectSelections?.[0];
-      const before = world?.visibleObjectCount ?? null;
-      const visibleAfterToggle = world?.toggleObjectVisibilityForAudit?.(selection?.selectionId) ?? null;
-      const after = window.__OBJGAUSS_WORLD__?.visibleObjectCount ?? null;
-      return { before, after, visibleAfterToggle };
-    });
-    if (!(visibilityToggle.after < visibilityToggle.before)) {
-      throw new Error(`expected object visibility toggle to reduce visible count: ${JSON.stringify(visibilityToggle)}`);
+      const target = world?.objectSelections?.find(
+        (entry) => entry.modelId === "trainable-mvp-debug" && entry.selectionId !== selectedId && entry.visible,
+      );
+      return {
+        selectionId: target?.selectionId ?? null,
+        gaussianCount: target?.gaussianCount ?? 0,
+        beforeVisibleObjects: world?.visibleObjectCount ?? null,
+        beforeVisibleGaussians: world?.visibleGaussianCount ?? null,
+        beforeHiddenObjects: world?.hiddenObjectCount ?? 0,
+        beforeHiddenGaussians: world?.hiddenGaussianCount ?? 0,
+      };
+    }, trainableSelection.selectionId);
+    if (!toggleTarget.selectionId || !(toggleTarget.gaussianCount > 0)) {
+      throw new Error(`expected a secondary trainable object toggle target: ${JSON.stringify(toggleTarget)}`);
     }
+    await page.evaluate((selectionId) => {
+      const button = document.querySelector(`[data-object-toggle="${CSS.escape(selectionId)}"]`);
+      button?.click();
+    }, toggleTarget.selectionId);
+    const visibilityToggle = await page.waitForFunction((target) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const row = document.querySelector(`[data-object-toggle="${CSS.escape(target.selectionId)}"]`);
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      const hiddenGaussians = Number(shell?.getAttribute("data-hidden-gaussians") ?? 0);
+      const visibleGaussians = Number(shell?.getAttribute("data-visible-gaussians") ?? 0);
+      const expectedHiddenObjects = Number(target.beforeHiddenObjects ?? 0) + 1;
+      const expectedHiddenGaussians = Number(target.beforeHiddenGaussians ?? 0) + Number(target.gaussianCount ?? 0);
+      const expectedVisibleObjects = Number(target.beforeVisibleObjects ?? 0) - 1;
+      const expectedVisibleGaussians = Number(target.beforeVisibleGaussians ?? 0) - Number(target.gaussianCount ?? 0);
+      if (
+        world?.visibleObjectCount !== expectedVisibleObjects ||
+        world?.hiddenObjectCount !== expectedHiddenObjects ||
+        world?.hiddenGaussianCount !== expectedHiddenGaussians ||
+        world?.visibleGaussianCount !== expectedVisibleGaussians ||
+        shell?.getAttribute("data-object-visibility-contract") !== "enabled" ||
+        shell?.getAttribute("data-hidden-objects") !== String(expectedHiddenObjects) ||
+        hiddenGaussians !== expectedHiddenGaussians ||
+        visibleGaussians !== expectedVisibleGaussians ||
+        panel?.getAttribute("data-object-visibility-contract") !== "enabled" ||
+        panel?.getAttribute("data-hidden-objects") !== String(expectedHiddenObjects) ||
+        Number(panel?.getAttribute("data-hidden-gaussians") ?? 0) !== expectedHiddenGaussians ||
+        row?.getAttribute("data-object-visible") !== "false" ||
+        Number(row?.getAttribute("data-object-hidden-gaussians") ?? 0) !== Number(target.gaussianCount ?? 0) ||
+        snapshot?.visibility?.hiddenObjectCount !== expectedHiddenObjects ||
+        snapshot?.visibility?.hiddenGaussianCount !== expectedHiddenGaussians
+      ) {
+        return null;
+      }
+      return {
+        hiddenObjects: expectedHiddenObjects,
+        hiddenGaussians: expectedHiddenGaussians,
+        visibleObjects: expectedVisibleObjects,
+        visibleGaussians: expectedVisibleGaussians,
+      };
+    }, toggleTarget, { timeout: 15000 }).then((handle) => handle.jsonValue());
     await page.waitForFunction(() => {
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
       const types = new Set(events.map((event) => event.type));
@@ -586,6 +634,7 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
+      const debugPanel = document.querySelector("[data-object-debug-panel='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const tracePanel = document.querySelector("[data-debug-event-trace='true']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -673,6 +722,22 @@ async function auditWorld(url) {
         shellHoverHighlight: shell?.getAttribute("data-hover-highlight") ?? null,
         shellHoverHighlightObject: shell?.getAttribute("data-hover-highlight-object") ?? null,
         shellHoverHighlightGaussians: Number(shell?.getAttribute("data-hover-highlight-gaussians") ?? 0),
+        worldVisibleObjectCount: handle.visibleObjectCount ?? 0,
+        worldHiddenObjectCount: handle.hiddenObjectCount ?? 0,
+        worldVisibleGaussianCount: handle.visibleGaussianCount ?? 0,
+        worldHiddenGaussianCount: handle.hiddenGaussianCount ?? 0,
+        worldHiddenObjectIds: handle.hiddenObjectIds ?? [],
+        objectVisibilitySampleCount: (handle.objectVisibilitySamples ?? []).length,
+        shellVisibilityContract: shell?.getAttribute("data-object-visibility-contract") ?? null,
+        shellHiddenObjects: Number(shell?.getAttribute("data-hidden-objects") ?? 0),
+        shellVisibleObjects: Number(shell?.getAttribute("data-visible-objects") ?? 0),
+        shellVisibleGaussians: Number(shell?.getAttribute("data-visible-gaussians") ?? 0),
+        shellHiddenGaussians: Number(shell?.getAttribute("data-hidden-gaussians") ?? 0),
+        snapshotHiddenObjects: snapshot?.visibility?.hiddenObjectCount ?? null,
+        snapshotHiddenGaussians: snapshot?.visibility?.hiddenGaussianCount ?? null,
+        panelVisibilityContract: debugPanel?.getAttribute("data-object-visibility-contract") ?? null,
+        panelHiddenObjects: Number(debugPanel?.getAttribute("data-hidden-objects") ?? 0),
+        panelHiddenGaussians: Number(debugPanel?.getAttribute("data-hidden-gaussians") ?? 0),
         dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadRoute: shell?.getAttribute("data-trainable-artifact-load-route") ?? null,
         trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
@@ -845,6 +910,24 @@ async function auditWorld(url) {
       world.hoverDimmedSamples.some((sample) => sample.hoverMode === "dimmed" && sample.opacity <= 0.18)
     )) {
       throw new Error(`expected hover highlight to isolate assigned Gaussian cluster: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.shellVisibilityContract === "enabled" &&
+      world.panelVisibilityContract === "enabled" &&
+      world.worldHiddenObjectCount === world.shellHiddenObjects &&
+      world.worldHiddenObjectCount === world.panelHiddenObjects &&
+      world.worldHiddenObjectCount === world.snapshotHiddenObjects &&
+      world.worldHiddenGaussianCount === world.shellHiddenGaussians &&
+      world.worldHiddenGaussianCount === world.panelHiddenGaussians &&
+      world.worldHiddenGaussianCount === world.snapshotHiddenGaussians &&
+      world.worldVisibleObjectCount === world.shellVisibleObjects &&
+      world.worldVisibleGaussianCount === world.shellVisibleGaussians &&
+      world.worldHiddenObjectCount > 0 &&
+      world.worldHiddenGaussianCount > 0 &&
+      world.worldHiddenObjectIds.length === world.worldHiddenObjectCount &&
+      world.objectVisibilitySampleCount >= world.objectCount
+    )) {
+      throw new Error(`expected object toggle to expose Gaussian visibility contract: ${JSON.stringify(world)}`);
     }
     const assignmentSlots = await page
       .locator("[data-assignment-heatmap='true']")

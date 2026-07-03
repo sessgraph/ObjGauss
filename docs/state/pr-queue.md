@@ -78,6 +78,35 @@
 
 ## Done
 
+### OBJECTSTATE-VISIBILITY-CONTRACT-001: Auditable object visibility contract
+
+- 状态: done / object-toggle-gaussian-visibility-contract
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 `object toggle -> hide/show Gaussian cluster` 从单纯可见性变化升级为可审计的
+  Gaussian cluster visibility contract。
+- 已实施:
+  - `src/App.jsx` 新增 `objgauss-object-visibility-summary-v1`，从 `hiddenObjects` 和
+    model object summaries 派生 visible / hidden object count、Gaussian count 和 hidden ids。
+  - Three.js audit handle 同步暴露真实 scene visibility：visible / hidden object count、
+    Gaussian count、hidden object ids 和 per-object visibility samples。
+  - ObjectState Debug panel、object toggle rows、debug snapshot 和 session archive 同步记录
+    hidden object / hidden Gaussian 证据。
+  - `scripts/audit-world-viewer.mjs` 改为点击真实 UI object toggle，并验证 root telemetry、
+    Debug panel、Three.js scene 和 snapshot 的 visibility 统计一致。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: passed，输出包含 `hoveredObject=0`、`hoveredGaussians=2`、
+    `debugSessionDiff=match` 和 `debugSessionDrift=changed`，内部验证 object visibility
+    root / panel / scene / snapshot contract。
+  - `git diff --check`: passed。
+- 完成 commit: `pending`
+
 ### OBJECTSTATE-HOVER-HIGHLIGHT-001: Auditable Gaussian cluster hover highlight
 
 - 状态: done / object-hover-gaussian-focus

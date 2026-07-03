@@ -135,6 +135,10 @@ export default function App() {
   );
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
+  const objectVisibility = useMemo(
+    () => objectVisibilitySummary(modelList, hiddenObjects),
+    [modelList, hiddenObjects],
+  );
   const selectedOgcChunkScope =
     selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "";
   const selectedOgcAvailableChunks =
@@ -155,6 +159,7 @@ export default function App() {
     objectOverlayMode: selectedObjectOverlayMode,
     debugProbe,
     hiddenCount,
+    objectVisibility,
     stability: selectedStability,
     assignmentSource: selectedAssignmentSource,
     assignmentProbe: selectedAssignmentProbe,
@@ -1192,6 +1197,11 @@ export default function App() {
       data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
       data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
       data-hidden-objects={hiddenCount}
+      data-object-visibility-contract="enabled"
+      data-visible-objects={objectVisibility.visibleObjectCount}
+      data-visible-gaussians={objectVisibility.visibleGaussianCount}
+      data-hidden-gaussians={objectVisibility.hiddenGaussianCount}
+      data-hidden-object-ids={objectVisibility.hiddenSelectionIds.join(",")}
       data-ogc-loaded-count={ogcLoadedCount}
       data-ogc-artifact-load-route={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.loadRoute ?? "" : ""}
       data-ogc-artifact-index-path={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.indexPath ?? "" : ""}
@@ -1457,6 +1467,7 @@ export default function App() {
         debugSessionArchive={debugSessionArchive}
         debugSessionDiff={debugSessionDiff}
         hiddenObjects={hiddenObjects}
+        objectVisibility={objectVisibility}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
         objectStateBenchmark={selectedObjectStateBenchmark}
@@ -2512,6 +2523,15 @@ function ThreeWorld({
       });
       const highlightedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverHighlighted);
       const dimmedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverDimmed);
+      const objectVisibilitySamples = [...draggableObjects.values()].map((object) => ({
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        visible: Boolean(object.visible),
+        gaussianCount: objectGaussianCount(object),
+      }));
+      const visibleVisibilitySamples = objectVisibilitySamples.filter((sample) => sample.visible);
+      const hiddenVisibilitySamples = objectVisibilitySamples.filter((sample) => !sample.visible);
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
         ui: "frosted-glass-in-world",
@@ -2561,7 +2581,18 @@ function ThreeWorld({
         trainableArtifactLoadedCount: [...modelRoots.values()].filter(
           (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
         ).length,
-        visibleObjectCount: [...draggableObjects.values()].filter((object) => object.visible).length,
+        visibleObjectCount: visibleVisibilitySamples.length,
+        hiddenObjectCount: hiddenVisibilitySamples.length,
+        visibleGaussianCount: visibleVisibilitySamples.reduce(
+          (total, sample) => total + (Number(sample.gaussianCount) || 0),
+          0,
+        ),
+        hiddenGaussianCount: hiddenVisibilitySamples.reduce(
+          (total, sample) => total + (Number(sample.gaussianCount) || 0),
+          0,
+        ),
+        objectVisibilitySamples,
+        hiddenObjectIds: hiddenVisibilitySamples.map((sample) => sample.selectionId),
         lensOpacitySamples: [...draggableObjects.values()].map((object) => {
           const cloud = firstGaussianCloud(object);
           return {
@@ -2967,6 +2998,7 @@ function DebugPanel({
   debugSessionArchive,
   debugSessionDiff,
   hiddenObjects,
+  objectVisibility,
   stability,
   qualityReport,
   objectStateBenchmark,
@@ -3026,6 +3058,11 @@ function DebugPanel({
       data-hover-highlight={hoveredTarget?.selectionId ? "enabled" : "disabled"}
       data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
       data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
+      data-object-visibility-contract="enabled"
+      data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
+      data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
+      data-hidden-objects={objectVisibility?.hiddenObjectCount ?? hiddenObjects.size}
+      data-hidden-gaussians={objectVisibility?.hiddenGaussianCount ?? 0}
     >
       <div className="debugHeader">
         <div>
@@ -3208,6 +3245,7 @@ function DebugPanel({
         />
         <Meta label="hover focus" value={hoveredTarget?.selectionId ? "enabled" : "-"} />
         <Meta label="hidden" value={hiddenObjects.size} />
+        <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
       </dl>
 
       <div className="objectStateList" data-object-toggle-list="true">
@@ -3221,6 +3259,8 @@ function DebugPanel({
               className={`objectStateRow ${selectedRow ? "selected" : ""} ${hidden ? "hidden" : ""}`}
               data-object-toggle={object.selectionId}
               data-object-visible={hidden ? "false" : "true"}
+              data-object-gaussians={objectGaussianCountForSummary(object)}
+              data-object-hidden-gaussians={hidden ? objectGaussianCountForSummary(object) : 0}
               onClick={() => onToggleObjectVisibility(object)}
             >
               <span className="modelAccent" style={{ background: object.accent }} />
@@ -3294,6 +3334,8 @@ function DebugSnapshotPanel({
       data-debug-snapshot-assignment-probe-margin={snapshot.assignment.probe?.margin ?? ""}
       data-debug-snapshot-assignment-probe-ambiguous={snapshot.assignment.probe?.ambiguous ? "true" : "false"}
       data-debug-snapshot-assignment-probe-collapse-risk={snapshot.assignment.probe?.collapseRisk ? "true" : "false"}
+      data-debug-snapshot-hidden-objects={snapshot.visibility?.hiddenObjectCount ?? ""}
+      data-debug-snapshot-hidden-gaussians={snapshot.visibility?.hiddenGaussianCount ?? ""}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3346,6 +3388,7 @@ function DebugSnapshotPanel({
         <Meta label="source" value={snapshot.assignment.source} />
         <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
         <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
+        <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -4568,6 +4611,48 @@ function objectStateSummary({
   };
 }
 
+function objectGaussianCountForSummary(object) {
+  const candidates = [
+    object?.displayCount,
+    object?.gaussianCount,
+    object?.objectState?.slotMass,
+    object?.objectState?.gaussianCount,
+  ];
+  const count = candidates.map((value) => Number(value)).find((value) => Number.isFinite(value) && value >= 0);
+  return count ? Math.trunc(count) : 0;
+}
+
+function objectVisibilitySummary(models = [], hiddenObjects = new Set()) {
+  const hidden = hiddenObjects instanceof Set ? hiddenObjects : new Set(hiddenObjects ?? []);
+  const samples = [];
+  for (const model of models ?? []) {
+    for (const object of model?.objects ?? []) {
+      const selectionId = object?.selectionId ?? selectionIdForObject(model?.id ?? "", object?.objectId ?? "");
+      const gaussianCount = objectGaussianCountForSummary(object);
+      const visible = !hidden.has(selectionId);
+      samples.push({
+        selectionId,
+        modelId: model?.id ?? "",
+        objectId: object?.objectId ?? null,
+        visible,
+        gaussianCount,
+      });
+    }
+  }
+  const visibleSamples = samples.filter((sample) => sample.visible);
+  const hiddenSamples = samples.filter((sample) => !sample.visible);
+  return {
+    schema: "objgauss-object-visibility-summary-v1",
+    objectCount: samples.length,
+    visibleObjectCount: visibleSamples.length,
+    hiddenObjectCount: hiddenSamples.length,
+    visibleGaussianCount: visibleSamples.reduce((total, sample) => total + sample.gaussianCount, 0),
+    hiddenGaussianCount: hiddenSamples.reduce((total, sample) => total + sample.gaussianCount, 0),
+    hiddenSelectionIds: hiddenSamples.map((sample) => sample.selectionId),
+    samples: samples.slice(0, 64),
+  };
+}
+
 function summarizeObjectStability(objectsOrStates = []) {
   const states = objectsOrStates
     .map((entry) => entry?.objectState ?? entry?.userData?.objectState ?? entry)
@@ -5039,6 +5124,7 @@ function objectStateDebugSnapshot({
   objectOverlayMode,
   debugProbe,
   hiddenCount,
+  objectVisibility,
   stability,
   assignmentSource,
   assignmentProbe,
@@ -5083,6 +5169,15 @@ function objectStateDebugSnapshot({
       entropy: finiteNumber(debugProbe?.entropy ?? activeState?.assignmentEntropy),
       vector: compactAssignmentVector(assignment),
       probe: compactAssignmentProbe(assignmentProbe),
+    },
+    visibility: {
+      hiddenObjectCount: finiteNumber(objectVisibility?.hiddenObjectCount ?? hiddenCount),
+      visibleObjectCount: finiteNumber(objectVisibility?.visibleObjectCount),
+      hiddenGaussianCount: finiteNumber(objectVisibility?.hiddenGaussianCount),
+      visibleGaussianCount: finiteNumber(objectVisibility?.visibleGaussianCount),
+      hiddenSelectionIds: Array.isArray(objectVisibility?.hiddenSelectionIds)
+        ? objectVisibility.hiddenSelectionIds.slice(0, 16)
+        : [],
     },
     objectState: {
       objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
@@ -5241,6 +5336,13 @@ function validateDebugSessionArchive(session, path = "") {
         entropy: finiteNumber(snapshot.assignment?.entropy),
         vector: compactAssignmentVector(snapshot.assignment?.vector),
         probe: compactAssignmentProbe(snapshot.assignment?.probe),
+      },
+      visibility: {
+        hiddenObjectCount: finiteNumber(snapshot.visibility?.hiddenObjectCount),
+        visibleObjectCount: finiteNumber(snapshot.visibility?.visibleObjectCount),
+        hiddenGaussianCount: finiteNumber(snapshot.visibility?.hiddenGaussianCount),
+        visibleGaussianCount: finiteNumber(snapshot.visibility?.visibleGaussianCount),
+        hiddenSelectionIds: cleanStringList(snapshot.visibility?.hiddenSelectionIds).slice(0, 16),
       },
       stability: {
         status: cleanString(snapshot.stability?.status),

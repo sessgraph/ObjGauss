@@ -430,6 +430,16 @@ Gaussians 被高亮、非目标 cluster 被压暗，同时保持 debug lens、ov
 session 和 benchmark handoff 通过。该切片只强化 Phase 1 交互调试能力，不改变
 assignment solver、ObjectState projection、renderer artifact schema 或训练 loop。
 
+`OBJECTSTATE-VISIBILITY-CONTRACT-001` 已将 object toggle 升级为可审计的 Gaussian
+cluster visibility contract：React/root 从 `hiddenObjects + model.objects` 派生
+`objgauss-object-visibility-summary-v1`，Three.js audit handle 从真实 `object.visible`
+派生 visible / hidden object count、Gaussian count、hidden object ids 和 per-object
+visibility samples。ObjectState Debug panel、debug snapshot 和 session archive 现在同步
+记录 hidden object / hidden Gaussian 证据；`scripts/audit-world-viewer.mjs` 通过真实 UI
+toggle 按钮验证 root telemetry、Debug panel、Three.js scene 和 snapshot 的 hidden /
+visible Gaussian 统计一致。该切片只强化 Phase 1 的 hide/show cluster 调试闭环，不改变
+assignment solver、ObjectState projection、renderer artifact schema 或训练 loop。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window
