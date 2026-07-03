@@ -480,6 +480,18 @@ Phase 1 非训练 Debug OS，不改变 assignment solver、ObjectState projectio
 artifact schema、OGC decoder 或 trainable kernel loop；训练模型主线仍保持
 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-VERDICT-PANEL-001` 已将上述 explainability contract 从隐藏 telemetry /
+meta 字段升级为可读 inspector：`src/App.jsx` 新增 `ObjectStateVerdictPanel`，在
+Assignment Heatmap 后显示 selected ObjectState 的 verdict、score、assignment margin、
+A confidence / entropy、spatial / temporal 子状态和 clear / warning reason rows；hover
+ObjectState 激活时同一面板显示 hover verdict，并暴露 `data-object-verdict-*` 与
+`data-hover-verdict-*` telemetry。`scripts/audit-world-viewer.mjs` 已验证 trainable
+fixture 中 selected / hover verdict panel 与 root、Debug panel、scene handle、snapshot
+和 session handoff 的 explainability contract 保持一致。该切片只强化 Phase 1 Debug OS
+的可读性，不改变 assignment solver、ObjectState projection、renderer artifact schema、
+OGC decoder 或 trainable kernel loop；训练模型主线仍保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OBJECTSTATE-HOVER-ASSIGNMENT-001` 已将 hover 从纯视觉 focus 升级为 ObjectState
 assignment preview：`objectTarget(...)` 现在携带 hovered object 的 compact assignment
 vector、confidence、entropy、status、centroid 和 bbox；root telemetry、

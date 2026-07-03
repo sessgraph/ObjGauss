@@ -78,6 +78,35 @@
 
 ## Done
 
+### OBJECTSTATE-VERDICT-PANEL-001: Visible ObjectState verdict inspector
+
+- 状态: done / objectstate-verdict-panel
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 explainability contract 从 meta 字段升级为可读的 Debug OS verdict 面板，
+  让 selected / hovered ObjectState 的 score、assignment margin、spatial / temporal
+  子状态和 reason rows 可直接审计。
+- 已实施:
+  - `src/App.jsx` 新增 `ObjectStateVerdictPanel`，复用
+    `objgauss-object-explainability-summary-v1`，显示 selected ObjectState verdict、
+    score、A confidence / entropy、spatial / temporal 状态和 clear / warning reason rows。
+  - hover ObjectState 激活时，同一 verdict panel 展示 hover verdict，并暴露
+    `data-hover-verdict-*` telemetry。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 的 selected / hover verdict
+    panel 与 root、Debug panel、snapshot 和 scene handle 的 explainability contract 保持一致。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `objectVerdict=explainable`、`hoverVerdict=explainable`、
+    `objectExplainability=explainable` 和 `hoverExplainability=explainable`。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-EXPLAINABILITY-001: Auditable ObjectState explainability summary
 
 - 状态: done / object-explainability-diagnostic

@@ -3382,6 +3382,10 @@ function DebugPanel({
         debugProbe={debugProbe}
         assignmentProbe={assignmentProbe}
       />
+      <ObjectStateVerdictPanel
+        objectExplainability={objectExplainability}
+        hoverExplainability={hoverExplainability}
+      />
       <DebugSnapshotPanel
         snapshot={debugSnapshot}
         snapshotExport={snapshotExport}
@@ -3462,6 +3466,105 @@ function DebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function ObjectStateVerdictPanel({ objectExplainability, hoverExplainability }) {
+  const selected = objectExplainability ?? compactObjectExplainability(null);
+  const hover = hoverExplainability ?? compactObjectExplainability(null);
+  const selectedReasons = verdictReasonRows(selected);
+  const hoverReasons = verdictReasonRows(hover);
+  const hoverActive = hover?.status && hover.status !== "none";
+  return (
+    <div
+      className={`stabilityDashboard objectStateVerdict ${selected?.explainable ? "pass" : "warn"}`}
+      data-object-verdict-panel="true"
+      data-object-verdict-status={selected?.status ?? "none"}
+      data-object-verdict-explainable={selected?.explainable ? "true" : "false"}
+      data-object-verdict-score={selected?.score ?? ""}
+      data-object-verdict-reason-count={selected?.reasons?.length ?? 0}
+      data-object-verdict-reasons={selected?.reasonNames ?? ""}
+      data-object-verdict-clear={selected?.explainable ? "true" : "false"}
+      data-object-verdict-assignment-confidence={selected?.assignmentConfidence ?? ""}
+      data-object-verdict-assignment-margin={selected?.assignmentMargin ?? ""}
+      data-object-verdict-assignment-entropy={selected?.assignmentEntropy ?? ""}
+      data-object-verdict-continuity-status={selected?.continuityStatus ?? ""}
+      data-object-verdict-temporal-status={selected?.temporalStatus ?? ""}
+      data-hover-verdict-status={hover?.status ?? "none"}
+      data-hover-verdict-explainable={hover?.explainable ? "true" : "false"}
+      data-hover-verdict-score={hover?.score ?? ""}
+      data-hover-verdict-reason-count={hover?.reasons?.length ?? 0}
+      data-hover-verdict-reasons={hover?.reasonNames ?? ""}
+      data-hover-verdict-clear={hover?.explainable ? "true" : "false"}
+      data-hover-verdict-assignment-confidence={hover?.assignmentConfidence ?? ""}
+      data-hover-verdict-assignment-margin={hover?.assignmentMargin ?? ""}
+      data-hover-verdict-assignment-entropy={hover?.assignmentEntropy ?? ""}
+      data-hover-verdict-continuity-status={hover?.continuityStatus ?? ""}
+      data-hover-verdict-temporal-status={hover?.temporalStatus ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Verdict</span>
+        <strong>{selected?.status ?? "-"}</strong>
+      </div>
+      <div className="stabilityGrid verdictGrid">
+        <Metric label="score" value={formatRatio(selected?.score)} />
+        <Metric label="margin" value={formatRatio(selected?.assignmentMargin)} />
+        <Metric label="spatial" value={selected?.continuityStatus || "-"} />
+        <Metric label="motion" value={selected?.temporalStatus || "-"} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="A conf" value={formatRatio(selected?.assignmentConfidence)} />
+        <Meta label="A entropy" value={formatRatio(selected?.assignmentEntropy)} />
+        <Meta label="reasons" value={selected?.reasonNames || "clear"} />
+      </dl>
+      <div
+        className="qualityGateRows objectVerdictRows"
+        data-object-verdict-reasons-list="true"
+        data-object-verdict-row-count={selectedReasons.length}
+      >
+        {selectedReasons.map((reason) => (
+          <div
+            className={`qualityGateRow ${reason.status}`}
+            key={reason.name}
+            data-object-verdict-reason-row="true"
+            data-object-verdict-reason-name={reason.name}
+            data-object-verdict-reason-status={reason.status}
+          >
+            <span>{reason.name}</span>
+            <small>{reason.value}</small>
+            <strong>{reason.status}</strong>
+          </div>
+        ))}
+      </div>
+      {hoverActive ? (
+        <>
+          <dl className="stabilityMeta trainingMeta hoverVerdictMeta" data-hover-verdict-meta="true">
+            <Meta label="hover" value={hover.status} />
+            <Meta label="score" value={formatRatio(hover.score)} />
+            <Meta label="reasons" value={hover.reasonNames || "clear"} />
+          </dl>
+          <div
+            className="qualityGateRows objectVerdictRows"
+            data-hover-verdict-reasons-list="true"
+            data-hover-verdict-row-count={hoverReasons.length}
+          >
+            {hoverReasons.map((reason) => (
+              <div
+                className={`qualityGateRow ${reason.status}`}
+                key={`hover-${reason.name}`}
+                data-hover-verdict-reason-row="true"
+                data-hover-verdict-reason-name={reason.name}
+                data-hover-verdict-reason-status={reason.status}
+              >
+                <span>{reason.name}</span>
+                <small>{reason.value}</small>
+                <strong>{reason.status}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -5136,6 +5239,21 @@ function compactObjectExplainability(summary) {
     continuityStatus: cleanString(summary.continuityStatus),
     temporalStatus: cleanString(summary.temporalStatus),
   };
+}
+
+function verdictReasonRows(summary) {
+  if (!summary || typeof summary !== "object" || cleanString(summary.status) === "none") {
+    return [{ name: "no_object", value: "none", status: "warn" }];
+  }
+  const reasons = cleanStringList(summary.reasons).slice(0, 8);
+  if (!reasons.length) {
+    return [{ name: "clear", value: formatRatio(summary.score), status: "pass" }];
+  }
+  return reasons.map((reason) => ({
+    name: reason,
+    value: cleanString(summary.status),
+    status: "warn",
+  }));
 }
 
 function summarizeObjectStability(objectsOrStates = []) {

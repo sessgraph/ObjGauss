@@ -539,6 +539,27 @@ button:focus-visible {
   border-color: rgba(127, 241, 215, 0.18);
 }
 
+.objectStateVerdict {
+  border-color: rgba(127, 241, 215, 0.18);
+}
+
+.objectStateVerdict.warn {
+  border-color: rgba(243, 223, 93, 0.28);
+}
+
+.verdictGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.objectVerdictRows {
+  gap: 5px;
+}
+
+.hoverVerdictMeta {
+  border-top: 1px solid rgba(153, 214, 222, 0.12);
+  padding-top: 8px;
+}
+
 .qualityReport {
   border-color: rgba(243, 223, 93, 0.2);
 }

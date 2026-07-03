@@ -58,6 +58,7 @@ try {
       `objectContinuity=${summary.objectContinuityStatus}`,
       `objectTemporal=${summary.objectTemporalStatus}`,
       `objectExplainability=${summary.objectExplainabilityStatus}`,
+      `objectVerdict=${summary.objectVerdictStatus}`,
       `purity=${summary.meanPurity}`,
       `temporalDrift=${summary.meanTemporalDrift}`,
       `compactness=${summary.meanSpatialCompactness}`,
@@ -66,6 +67,7 @@ try {
       `hoverContinuity=${summary.hoveredContinuityStatus}`,
       `hoverTemporal=${summary.hoveredTemporalStatus}`,
       `hoverExplainability=${summary.hoveredExplainabilityStatus}`,
+      `hoverVerdict=${summary.hoverVerdictStatus}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -241,6 +243,7 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
@@ -302,6 +305,15 @@ async function auditWorld(url) {
         Number(world?.objectExplainabilityScore ?? 0) > 0.6 &&
         shell?.getAttribute("data-object-explainability-reasons") === "" &&
         panel?.getAttribute("data-object-explainability-reasons") === "" &&
+        verdict?.getAttribute("data-object-verdict-status") === "explainable" &&
+        verdict?.getAttribute("data-object-verdict-explainable") === "true" &&
+        Number(verdict?.getAttribute("data-object-verdict-score") ?? 0) > 0.6 &&
+        verdict?.getAttribute("data-object-verdict-reason-count") === "0" &&
+        verdict?.getAttribute("data-object-verdict-clear") === "true" &&
+        verdict?.getAttribute("data-object-verdict-continuity-status") === "continuous" &&
+        verdict?.getAttribute("data-object-verdict-temporal-status") === "stable" &&
+        verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-name") === "clear" &&
+        verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-status") === "pass" &&
         snapshot?.explainability?.reasonNames === "" &&
         world?.objectExplainabilityReasons === "" &&
         Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
@@ -620,6 +632,7 @@ async function auditWorld(url) {
     await page.waitForFunction((selectionId) => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
+      const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const world = window.__OBJGAUSS_WORLD__;
@@ -717,6 +730,20 @@ async function auditWorld(url) {
         panel?.getAttribute("data-hover-explainable") === "true" &&
         Number(panel?.getAttribute("data-hover-explainability-score") ?? 0) > 0.6 &&
         panel?.getAttribute("data-hover-explainability-reasons") === "" &&
+        verdict?.getAttribute("data-object-verdict-status") === "explainable" &&
+        verdict?.getAttribute("data-object-verdict-explainable") === "true" &&
+        Number(verdict?.getAttribute("data-object-verdict-score") ?? 0) > 0.6 &&
+        verdict?.getAttribute("data-object-verdict-reason-count") === "0" &&
+        verdict?.getAttribute("data-object-verdict-clear") === "true" &&
+        verdict?.getAttribute("data-hover-verdict-status") === "explainable" &&
+        verdict?.getAttribute("data-hover-verdict-explainable") === "true" &&
+        Number(verdict?.getAttribute("data-hover-verdict-score") ?? 0) > 0.6 &&
+        verdict?.getAttribute("data-hover-verdict-reason-count") === "0" &&
+        verdict?.getAttribute("data-hover-verdict-clear") === "true" &&
+        verdict?.getAttribute("data-hover-verdict-continuity-status") === "continuous" &&
+        verdict?.getAttribute("data-hover-verdict-temporal-status") === "stable" &&
+        verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-name") === "clear" &&
+        verdict?.querySelector("[data-hover-verdict-reason-row='true']")?.getAttribute("data-hover-verdict-reason-name") === "clear" &&
         snapshot?.continuity?.status === "continuous" &&
         snapshot?.continuity?.centroidContained === true &&
         Number(snapshot?.continuity?.bboxDiagonal ?? 0) > 0 &&
@@ -877,6 +904,7 @@ async function auditWorld(url) {
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
+      const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const tracePanel = document.querySelector("[data-debug-event-trace='true']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -989,6 +1017,16 @@ async function auditWorld(url) {
         panelObjectExplainable: debugPanel?.getAttribute("data-object-explainable") ?? null,
         panelObjectExplainabilityScore: Number(debugPanel?.getAttribute("data-object-explainability-score") ?? 0),
         panelObjectExplainabilityReasons: debugPanel?.getAttribute("data-object-explainability-reasons") ?? null,
+        objectVerdictStatus: verdict?.getAttribute("data-object-verdict-status") ?? null,
+        objectVerdictExplainable: verdict?.getAttribute("data-object-verdict-explainable") ?? null,
+        objectVerdictScore: Number(verdict?.getAttribute("data-object-verdict-score") ?? 0),
+        objectVerdictReasonCount: Number(verdict?.getAttribute("data-object-verdict-reason-count") ?? -1),
+        objectVerdictReasons: verdict?.getAttribute("data-object-verdict-reasons") ?? null,
+        objectVerdictClear: verdict?.getAttribute("data-object-verdict-clear") ?? null,
+        objectVerdictContinuityStatus: verdict?.getAttribute("data-object-verdict-continuity-status") ?? null,
+        objectVerdictTemporalStatus: verdict?.getAttribute("data-object-verdict-temporal-status") ?? null,
+        objectVerdictReasonName: verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-name") ?? null,
+        objectVerdictReasonStatus: verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-status") ?? null,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
@@ -1073,6 +1111,16 @@ async function auditWorld(url) {
         panelHoverExplainable: debugPanel?.getAttribute("data-hover-explainable") ?? null,
         panelHoverExplainabilityScore: Number(debugPanel?.getAttribute("data-hover-explainability-score") ?? 0),
         panelHoverExplainabilityReasons: debugPanel?.getAttribute("data-hover-explainability-reasons") ?? null,
+        hoverVerdictStatus: verdict?.getAttribute("data-hover-verdict-status") ?? null,
+        hoverVerdictExplainable: verdict?.getAttribute("data-hover-verdict-explainable") ?? null,
+        hoverVerdictScore: Number(verdict?.getAttribute("data-hover-verdict-score") ?? 0),
+        hoverVerdictReasonCount: Number(verdict?.getAttribute("data-hover-verdict-reason-count") ?? -1),
+        hoverVerdictReasons: verdict?.getAttribute("data-hover-verdict-reasons") ?? null,
+        hoverVerdictClear: verdict?.getAttribute("data-hover-verdict-clear") ?? null,
+        hoverVerdictContinuityStatus: verdict?.getAttribute("data-hover-verdict-continuity-status") ?? null,
+        hoverVerdictTemporalStatus: verdict?.getAttribute("data-hover-verdict-temporal-status") ?? null,
+        hoverVerdictReasonName: verdict?.querySelector("[data-hover-verdict-reason-row='true']")?.getAttribute("data-hover-verdict-reason-name") ?? null,
+        hoverVerdictReasonStatus: verdict?.querySelector("[data-hover-verdict-reason-row='true']")?.getAttribute("data-hover-verdict-reason-status") ?? null,
         snapshotHoverObject: snapshot?.hover?.selectionId ?? null,
         snapshotHoverAssignmentStatus: snapshot?.hover?.probe?.status ?? null,
         snapshotHoverContinuityStatus: snapshot?.hover?.continuity?.status ?? null,
@@ -1262,6 +1310,16 @@ async function auditWorld(url) {
       world.panelDebugSnapshotExplainable === "true" &&
       world.panelDebugSnapshotExplainabilityScore > 0.6 &&
       world.panelDebugSnapshotExplainabilityReasons === "" &&
+      world.objectVerdictStatus === world.objectExplainabilityStatus &&
+      world.objectVerdictExplainable === "true" &&
+      world.objectVerdictScore > 0.6 &&
+      world.objectVerdictReasonCount === 0 &&
+      world.objectVerdictReasons === "" &&
+      world.objectVerdictClear === "true" &&
+      world.objectVerdictContinuityStatus === "continuous" &&
+      world.objectVerdictTemporalStatus === "stable" &&
+      world.objectVerdictReasonName === "clear" &&
+      world.objectVerdictReasonStatus === "pass" &&
       world.debugSnapshotTrainingStatus === "loss_down" &&
       world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.shellDebugSnapshotModel === world.debugSnapshotModel &&
@@ -1412,7 +1470,17 @@ async function auditWorld(url) {
       world.snapshotHoverExplainabilityReasons === "" &&
       world.panelSnapshotHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
       world.panelSnapshotHoverExplainable === "true" &&
-      world.panelSnapshotHoverExplainabilityScore > 0.6
+      world.panelSnapshotHoverExplainabilityScore > 0.6 &&
+      world.hoverVerdictStatus === world.hoveredExplainabilityStatus &&
+      world.hoverVerdictExplainable === "true" &&
+      world.hoverVerdictScore > 0.6 &&
+      world.hoverVerdictReasonCount === 0 &&
+      world.hoverVerdictReasons === "" &&
+      world.hoverVerdictClear === "true" &&
+      world.hoverVerdictContinuityStatus === "continuous" &&
+      world.hoverVerdictTemporalStatus === "stable" &&
+      world.hoverVerdictReasonName === "clear" &&
+      world.hoverVerdictReasonStatus === "pass"
     )) {
       throw new Error(`expected hover to expose ObjectState assignment preview: ${JSON.stringify(world)}`);
     }
@@ -1498,6 +1566,7 @@ async function auditWorld(url) {
       objectContinuityStatus: world.objectContinuityStatus,
       objectTemporalStatus: world.objectTemporalStatus,
       objectExplainabilityStatus: world.objectExplainabilityStatus,
+      objectVerdictStatus: world.objectVerdictStatus,
       meanPurity: world.meanPurity,
       meanTemporalDrift: world.meanTemporalDrift,
       meanSpatialCompactness: world.meanSpatialCompactness,
@@ -1506,6 +1575,7 @@ async function auditWorld(url) {
       hoveredContinuityStatus: world.hoveredContinuityStatus,
       hoveredTemporalStatus: world.hoveredTemporalStatus,
       hoveredExplainabilityStatus: world.hoveredExplainabilityStatus,
+      hoverVerdictStatus: world.hoverVerdictStatus,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
