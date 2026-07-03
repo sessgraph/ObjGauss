@@ -534,9 +534,27 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.qualityGateRow.caseButton {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qualityGateRow.caseButton.selected {
+  border-color: rgba(127, 241, 215, 0.38);
+  background: rgba(127, 241, 215, 0.09);
+}
+
 .qualityGateRow.warn {
   border-color: rgba(243, 223, 93, 0.26);
   background: rgba(243, 223, 93, 0.07);
+}
+
+.qualityGateRow.caseButton.warn.selected {
+  border-color: rgba(127, 241, 215, 0.38);
+  background: rgba(127, 241, 215, 0.09);
 }
 
 .qualityGateRow span,

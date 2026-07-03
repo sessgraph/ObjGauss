@@ -390,6 +390,16 @@ telemetry 和 debug snapshot / session archive。`scripts/audit-world-viewer.mjs
 `objectStateBenchmark=pass`。该切片不改变 solver、renderer、训练 loop，不引入 torch /
 gsplat / CUDA，也不提交训练输出或大资产。
 
+`OBJECTSTATE-BENCH-CASE-INSPECT-001` 已把 benchmark 从 summary evidence 升级为
+case-level inspector：`src/App.jsx` 的 Benchmark 卡片现在默认选中首个
+`observed_status=warn` case，并支持点击具体 case 查看 assignment confidence、
+normalized entropy、object purity、temporal drift、dynamic-K proposal count、
+failure modes 和 diagnostics。active case 同步写入 root telemetry 和 debug snapshot /
+session archive；`scripts/audit-world-viewer.mjs` 验证默认 `uniform_mixed` case、点击
+`temporal_jitter` 后的 active telemetry，以及 snapshot / session export-import 中的
+active case 摘要。该切片只增强 browser Debug OS，不改变 benchmark 生成逻辑、
+solver、renderer、训练 loop，不引入 torch / gsplat / CUDA。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

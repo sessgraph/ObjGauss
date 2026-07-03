@@ -78,6 +78,34 @@
 
 ## Done
 
+### OBJECTSTATE-BENCH-CASE-INSPECT-001: Case-level ObjectState benchmark inspector
+
+- 状态: done / benchmark-case-drilldown-debug-os
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 将 `object_state_benchmark` 从 pass/warn 总览升级为可点击的 case-level inspector，
+  让前端能直接检查具体 failure mode、diagnostic 和关键 ObjectState stability 指标。
+- 已实施:
+  - `src/App.jsx` 的 Benchmark 卡片默认选中首个 `observed_status=warn` case，并支持点击
+    benchmark case row 切换 active case。
+  - active case 展示 assignment confidence、normalized entropy、object purity、
+    temporal drift、dynamic-K proposal count、failure modes 和 diagnostics。
+  - root `.worldShell` telemetry 新增 `data-object-state-benchmark-active-*` contract；
+    debug snapshot / session archive 同步保留 active case 摘要。
+  - `scripts/audit-world-viewer.mjs` 验证默认 `uniform_mixed` case、点击
+    `temporal_jitter` 后的 telemetry，以及 snapshot / session export-import 不丢 active
+    case。
+- 边界:
+  - 不改变 benchmark JSON schema 或生成逻辑。
+  - 不改变 solver、renderer、ObjectState projection、trainable kernel loop 或 OGC decoder。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，内部验证
+    benchmark case click、active telemetry 和 snapshot/session handoff。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-BENCH-HANDOFF-001: Browser handoff for ObjectState stability benchmark
 
 - 状态: done / browser-visible-pre-training-benchmark

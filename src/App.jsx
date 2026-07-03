@@ -49,6 +49,7 @@ export default function App() {
   const [hoveredTarget, setHoveredTarget] = useState(null);
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
+  const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
     modelId: "",
@@ -136,6 +137,7 @@ export default function App() {
       : null;
   const selectedQualityReport = qualityReportSummary(selected?.qualityReport);
   const selectedObjectStateBenchmark = objectStateBenchmarkSummary(selected?.objectStateBenchmark);
+  const selectedBenchmarkCase = activeObjectStateBenchmarkCase(selectedObjectStateBenchmark, benchmarkCaseName);
   const selectedDebugSnapshot = objectStateDebugSnapshot({
     selected,
     selectedObject,
@@ -149,6 +151,7 @@ export default function App() {
     trainingEvidence: selectedTrainingEvidence,
     qualityReport: selectedQualityReport,
     objectStateBenchmark: selectedObjectStateBenchmark,
+    objectStateBenchmarkCase: selectedBenchmarkCase,
     debugEvents,
   });
   const selectedDebugSession = objectStateDebugSession({
@@ -1210,6 +1213,16 @@ export default function App() {
       data-object-state-benchmark-warn-count={selectedObjectStateBenchmark?.warnCount ?? ""}
       data-object-state-benchmark-observed-warn-count={selectedObjectStateBenchmark?.observedWarnCount ?? ""}
       data-object-state-benchmark-failure-mode-count={selectedObjectStateBenchmark?.failureModeCount ?? ""}
+      data-object-state-benchmark-active-case={selectedBenchmarkCase?.name ?? ""}
+      data-object-state-benchmark-active-status={selectedBenchmarkCase?.status ?? ""}
+      data-object-state-benchmark-active-observed-status={selectedBenchmarkCase?.observedStatus ?? ""}
+      data-object-state-benchmark-active-failure-modes={selectedBenchmarkCase?.failureModeNames ?? ""}
+      data-object-state-benchmark-active-diagnostics={selectedBenchmarkCase?.diagnosticNames ?? ""}
+      data-object-state-benchmark-active-assignment-confidence={selectedBenchmarkCase?.assignmentConfidence ?? ""}
+      data-object-state-benchmark-active-entropy={selectedBenchmarkCase?.meanEntropy ?? ""}
+      data-object-state-benchmark-active-purity={selectedBenchmarkCase?.objectPurity ?? ""}
+      data-object-state-benchmark-active-temporal-drift={selectedBenchmarkCase?.meanTemporalDrift ?? ""}
+      data-object-state-benchmark-active-dynamic-proposals={selectedBenchmarkCase?.dynamicProposalCount ?? ""}
       data-trainable-import-status={artifactImport.status}
       data-trainable-import-model={artifactImport.modelId}
       data-trainable-import-file={artifactImport.fileName}
@@ -1413,6 +1426,8 @@ export default function App() {
         stability={selectedStability}
         qualityReport={selectedQualityReport}
         objectStateBenchmark={selectedObjectStateBenchmark}
+        benchmarkCase={selectedBenchmarkCase}
+        onSelectBenchmarkCase={setBenchmarkCaseName}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
         onSelectTrainableFrame={selectTrainableFrame}
@@ -2825,11 +2840,13 @@ function DebugPanel({
   stability,
   qualityReport,
   objectStateBenchmark,
+  benchmarkCase,
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectTrainableFrame,
   onSelectOgcLod,
   onSelectOgcChunks,
+  onSelectBenchmarkCase,
   onExportDebugSnapshot,
   onExportDebugSession,
   onImportDebugSession,
@@ -2998,7 +3015,11 @@ function DebugPanel({
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <QualityReportPanel report={qualityReport} />
-      <ObjectStateBenchmarkPanel benchmark={objectStateBenchmark} />
+      <ObjectStateBenchmarkPanel
+        benchmark={objectStateBenchmark}
+        activeCase={benchmarkCase}
+        onSelectCase={onSelectBenchmarkCase}
+      />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
       <dl className="debugStateGrid">
@@ -3330,9 +3351,10 @@ function QualityReportPanel({ report }) {
   );
 }
 
-function ObjectStateBenchmarkPanel({ benchmark }) {
+function ObjectStateBenchmarkPanel({ benchmark, activeCase, onSelectCase }) {
   const summary = benchmark ?? null;
   if (!summary) return null;
+  const selectedCase = activeCase ?? activeObjectStateBenchmarkCase(summary, "");
   return (
     <div
       className="stabilityDashboard objectStateBenchmark"
@@ -3344,6 +3366,16 @@ function ObjectStateBenchmarkPanel({ benchmark }) {
       data-object-state-benchmark-observed-warn-count={summary.observedWarnCount}
       data-object-state-benchmark-failure-mode-count={summary.failureModeCount}
       data-object-state-benchmark-first-case={summary.cases[0]?.name ?? ""}
+      data-object-state-benchmark-active-case={selectedCase?.name ?? ""}
+      data-object-state-benchmark-active-status={selectedCase?.status ?? ""}
+      data-object-state-benchmark-active-observed-status={selectedCase?.observedStatus ?? ""}
+      data-object-state-benchmark-active-failure-modes={selectedCase?.failureModeNames ?? ""}
+      data-object-state-benchmark-active-diagnostics={selectedCase?.diagnosticNames ?? ""}
+      data-object-state-benchmark-active-assignment-confidence={selectedCase?.assignmentConfidence ?? ""}
+      data-object-state-benchmark-active-entropy={selectedCase?.meanEntropy ?? ""}
+      data-object-state-benchmark-active-purity={selectedCase?.objectPurity ?? ""}
+      data-object-state-benchmark-active-temporal-drift={selectedCase?.meanTemporalDrift ?? ""}
+      data-object-state-benchmark-active-dynamic-proposals={selectedCase?.dynamicProposalCount ?? ""}
     >
       <div className="stabilityHead">
         <span>Benchmark</span>
@@ -3361,6 +3393,25 @@ function ObjectStateBenchmarkPanel({ benchmark }) {
         <Meta label="coverage" value={formatCount(summary.failureModeCount)} />
         <Meta label="path" value={summary.path || "-"} />
       </dl>
+      {selectedCase ? (
+        <>
+          <div
+            className="stabilityGrid trainingGrid benchmarkCaseGrid"
+            data-object-state-benchmark-active-metrics="true"
+          >
+            <Metric label="conf" value={formatRatio(selectedCase.assignmentConfidence)} />
+            <Metric label="H" value={formatRatio(selectedCase.meanEntropy)} />
+            <Metric label="purity" value={formatRatio(selectedCase.objectPurity)} />
+            <Metric label="drift" value={formatRatio(selectedCase.meanTemporalDrift)} />
+          </div>
+          <dl className="stabilityMeta trainingMeta benchmarkCaseMeta">
+            <Meta label="case" value={selectedCase.name} />
+            <Meta label="diag" value={selectedCase.diagnosticNames || "-"} />
+            <Meta label="modes" value={selectedCase.failureModeNames || "-"} />
+            <Meta label="dynK" value={formatCount(selectedCase.dynamicProposalCount)} />
+          </dl>
+        </>
+      ) : null}
       {summary.cases.length ? (
         <div
           className="qualityGateRows"
@@ -3368,18 +3419,23 @@ function ObjectStateBenchmarkPanel({ benchmark }) {
           data-object-state-benchmark-case-row-count={summary.cases.length}
         >
           {summary.cases.map((testCase) => (
-            <div
-              className={`qualityGateRow ${testCase.status}`}
+            <button
+              type="button"
+              className={`qualityGateRow caseButton ${testCase.status} ${selectedCase?.name === testCase.name ? "selected" : ""}`}
               key={testCase.name}
               data-object-state-benchmark-case-row="true"
               data-object-state-benchmark-case-name={testCase.name}
               data-object-state-benchmark-case-status={testCase.status}
               data-object-state-benchmark-case-observed-status={testCase.observedStatus}
+              data-object-state-benchmark-case-selected={selectedCase?.name === testCase.name ? "true" : "false"}
+              data-object-state-benchmark-case-failure-modes={testCase.failureModeNames}
+              data-object-state-benchmark-case-diagnostics={testCase.diagnosticNames}
+              onClick={() => onSelectCase?.(testCase.name)}
             >
               <span>{testCase.name}</span>
               <small>{testCase.observedStatus}</small>
-              <strong>{testCase.status}</strong>
-            </div>
+              <strong>{testCase.failureModeCount ? formatCount(testCase.failureModeCount) : testCase.status}</strong>
+            </button>
           ))}
         </div>
       ) : null}
@@ -4729,6 +4785,7 @@ function objectStateDebugSnapshot({
   trainingEvidence,
   qualityReport,
   objectStateBenchmark,
+  objectStateBenchmarkCase,
   debugEvents,
 }) {
   const objects = selected?.objects ?? [];
@@ -4818,6 +4875,20 @@ function objectStateDebugSnapshot({
           warnCount: objectStateBenchmark.warnCount,
           observedWarnCount: objectStateBenchmark.observedWarnCount,
           failureModeCount: objectStateBenchmark.failureModeCount,
+          activeCase: objectStateBenchmarkCase
+            ? {
+                name: objectStateBenchmarkCase.name,
+                status: objectStateBenchmarkCase.status,
+                observedStatus: objectStateBenchmarkCase.observedStatus,
+                failureModeNames: objectStateBenchmarkCase.failureModeNames,
+                diagnosticNames: objectStateBenchmarkCase.diagnosticNames,
+                assignmentConfidence: objectStateBenchmarkCase.assignmentConfidence,
+                meanEntropy: objectStateBenchmarkCase.meanEntropy,
+                objectPurity: objectStateBenchmarkCase.objectPurity,
+                meanTemporalDrift: objectStateBenchmarkCase.meanTemporalDrift,
+                dynamicProposalCount: objectStateBenchmarkCase.dynamicProposalCount,
+              }
+            : null,
         }
       : null,
     delivery: {
@@ -4945,6 +5016,20 @@ function validateDebugSessionArchive(session, path = "") {
             warnCount: finiteNumber(snapshot.benchmark.warnCount),
             observedWarnCount: finiteNumber(snapshot.benchmark.observedWarnCount),
             failureModeCount: finiteNumber(snapshot.benchmark.failureModeCount),
+            activeCase: snapshot.benchmark.activeCase
+              ? {
+                  name: cleanString(snapshot.benchmark.activeCase.name),
+                  status: cleanString(snapshot.benchmark.activeCase.status),
+                  observedStatus: cleanString(snapshot.benchmark.activeCase.observedStatus),
+                  failureModeNames: cleanString(snapshot.benchmark.activeCase.failureModeNames),
+                  diagnosticNames: cleanString(snapshot.benchmark.activeCase.diagnosticNames),
+                  assignmentConfidence: finiteNumber(snapshot.benchmark.activeCase.assignmentConfidence),
+                  meanEntropy: finiteNumber(snapshot.benchmark.activeCase.meanEntropy),
+                  objectPurity: finiteNumber(snapshot.benchmark.activeCase.objectPurity),
+                  meanTemporalDrift: finiteNumber(snapshot.benchmark.activeCase.meanTemporalDrift),
+                  dynamicProposalCount: finiteNumber(snapshot.benchmark.activeCase.dynamicProposalCount),
+                }
+              : null,
           }
         : null,
       delivery: {
@@ -5263,13 +5348,60 @@ function objectStateBenchmarkSummary(report) {
   };
 }
 
+function activeObjectStateBenchmarkCase(summary, selectedName) {
+  const cases = Array.isArray(summary?.cases) ? summary.cases : [];
+  if (!cases.length) return null;
+  const requested = cleanString(selectedName);
+  return (
+    (requested ? cases.find((testCase) => testCase.name === requested) : null) ??
+    cases.find((testCase) => testCase.observedStatus && testCase.observedStatus !== "pass") ??
+    cases[0]
+  );
+}
+
 function compactObjectStateBenchmarkCases(cases) {
   if (!Array.isArray(cases)) return [];
-  return cases.slice(0, 8).map((testCase, index) => ({
-    name: cleanString(testCase?.name || `case_${index}`),
-    status: cleanString(testCase?.status || "unknown"),
-    observedStatus: cleanString(testCase?.observed_status || "unknown"),
-  }));
+  return cases.slice(0, 8).map((testCase, index) => {
+    const metrics = testCase?.metrics ?? {};
+    const failureModes = cleanStringList(testCase?.failure_modes);
+    const stabilityDiagnostics = cleanStringList(testCase?.stability?.diagnostics);
+    const temporalDiagnostics = cleanStringList(testCase?.temporal?.diagnostics);
+    const dynamicProposalKinds = cleanStringList(testCase?.dynamic_k?.proposal_kinds);
+    const diagnostics = [...stabilityDiagnostics, ...temporalDiagnostics, ...dynamicProposalKinds];
+    const uniqueDiagnostics = Array.from(new Set(diagnostics));
+    return {
+      name: cleanString(testCase?.name || `case_${index}`),
+      status: cleanString(testCase?.status || "unknown"),
+      observedStatus: cleanString(testCase?.observed_status || "unknown"),
+      assignmentConfidence: finiteNumber(metrics.assignment_confidence),
+      meanEntropy: finiteNumber(metrics.mean_normalized_entropy),
+      objectPurity: finiteNumber(metrics.object_purity),
+      effectiveSlots: finiteNumber(metrics.effective_slots),
+      rawAssignmentJitter: finiteNumber(metrics.raw_assignment_jitter),
+      meanTemporalDrift: finiteNumber(metrics.mean_temporal_drift),
+      maxTemporalDrift: finiteNumber(metrics.max_temporal_drift),
+      bboxDiagonalMean: finiteNumber(metrics.bbox_diagonal_mean),
+      dynamicProposalCount: finiteNumber(testCase?.dynamic_k?.proposal_count) ?? 0,
+      failureModes,
+      failureModeCount: failureModes.length,
+      failureModeNames: formatNameList(failureModes),
+      stabilityDiagnostics,
+      temporalDiagnostics,
+      dynamicProposalKinds,
+      diagnostics: uniqueDiagnostics,
+      diagnosticNames: formatNameList(uniqueDiagnostics),
+    };
+  });
+}
+
+function cleanStringList(value) {
+  return Array.isArray(value)
+    ? value.map((entry) => cleanString(entry)).filter(Boolean)
+    : [];
+}
+
+function formatNameList(value) {
+  return cleanStringList(value).join(",");
 }
 
 function compactQualityGates(gates) {

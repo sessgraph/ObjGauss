@@ -1354,12 +1354,15 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-object-state-benchmark-warn-count") === "0" &&
         shell?.getAttribute("data-object-state-benchmark-observed-warn-count") === "6" &&
         shell?.getAttribute("data-object-state-benchmark-failure-mode-count") === "12" &&
+        shell?.getAttribute("data-object-state-benchmark-active-case") === "uniform_mixed" &&
+        shell?.getAttribute("data-object-state-benchmark-active-failure-modes") === "uniform_assignment,mixed_slots,low_object_purity" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
         quality?.getAttribute("data-quality-report-failing-gate-names") === "assignment_entropy" &&
         benchmark?.getAttribute("data-object-state-benchmark-status") === "pass" &&
         benchmark?.getAttribute("data-object-state-benchmark-case-count") === "8" &&
         benchmark?.getAttribute("data-object-state-benchmark-first-case") === "clean_sparse" &&
+        benchmark?.getAttribute("data-object-state-benchmark-active-case") === "uniform_mixed" &&
         gateRows?.getAttribute("data-quality-gate-count") === "3" &&
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         entropyGate?.getAttribute("data-quality-gate-threshold") === "0.5" &&
@@ -1368,6 +1371,25 @@ async function auditAlgorithmManifestBundle(browser, url) {
         window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-object-state-benchmark-case-name='temporal_jitter']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const benchmark = document.querySelector("[data-object-state-benchmark='true']");
+      const selectedRow = document.querySelector(
+        "[data-object-state-benchmark-case-name='temporal_jitter']",
+      );
+      return (
+        shell?.getAttribute("data-object-state-benchmark-active-case") === "temporal_jitter" &&
+        shell?.getAttribute("data-object-state-benchmark-active-observed-status") === "warn" &&
+        shell?.getAttribute("data-object-state-benchmark-active-failure-modes") === "temporal_jitter" &&
+        shell?.getAttribute("data-object-state-benchmark-active-diagnostics") === "high_temporal_drift" &&
+        shell?.getAttribute("data-object-state-benchmark-active-temporal-drift") === "0.08" &&
+        shell?.getAttribute("data-object-state-benchmark-active-dynamic-proposals") === "0" &&
+        benchmark?.getAttribute("data-object-state-benchmark-active-case") === "temporal_jitter" &&
+        benchmark?.getAttribute("data-object-state-benchmark-active-failure-modes") === "temporal_jitter" &&
+        selectedRow?.getAttribute("data-object-state-benchmark-case-selected") === "true"
       );
     }, undefined, { timeout: 15000 });
     const trainableSelection = await page.evaluate(() => {
@@ -1484,6 +1506,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
         parsed?.benchmark?.caseCount !== 8 ||
+        parsed?.benchmark?.activeCase?.name !== "temporal_jitter" ||
+        parsed?.benchmark?.activeCase?.failureModeNames !== "temporal_jitter" ||
         parsed?.delivery?.chunkIds?.[0] !== 0 ||
         !fileName.endsWith(".json") ||
         !parsed?.export?.fileName ||
@@ -1533,6 +1557,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
+        parsed?.snapshot?.benchmark?.activeCase?.name !== "temporal_jitter" ||
         parsed?.summary?.modelCount !== 10 ||
         parsed?.summary?.trainableArtifactCount < 2 ||
         parsed?.summary?.ogcArtifactCount < 2 ||
@@ -1607,6 +1632,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||
+        archive?.snapshot?.benchmark?.activeCase?.name !== "temporal_jitter" ||
         archive?.summary?.modelCount !== 10 ||
         !eventTypes.has("import-session")
       ) {
@@ -1711,10 +1737,12 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         shell?.getAttribute("data-quality-report-status") === "warn" &&
         shell?.getAttribute("data-object-state-benchmark-status") === "pass" &&
         shell?.getAttribute("data-object-state-benchmark-case-count") === "8" &&
+        shell?.getAttribute("data-object-state-benchmark-active-case") === "uniform_mixed" &&
         quality?.getAttribute("data-quality-report-status") === "warn" &&
         quality?.getAttribute("data-quality-report-gate-count") === "3" &&
         benchmark?.getAttribute("data-object-state-benchmark-status") === "pass" &&
         benchmark?.getAttribute("data-object-state-benchmark-first-case") === "clean_sparse" &&
+        benchmark?.getAttribute("data-object-state-benchmark-active-case") === "uniform_mixed" &&
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
