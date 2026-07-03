@@ -353,6 +353,17 @@ delta、confidence delta 和 event delta。`scripts/audit-world-viewer.mjs` 在�
 同一 session 上验证 `debugSessionDiff=match`，证明该视图可作为后续不同训练 run 的 drift
 检查基础。该步骤不改 session schema、不做场景 replay、不拉 payload、不写训练输出。
 
+`DEBUG-SESSION-DRIFT-001` 已补齐 live-vs-archive diff 的 changed-field 证据：
+`debugSessionSnapshotDiff(...)` 现在输出 `changedFields` / `changedFieldNames`，覆盖
+model、object、assignment source、quality、training、stability、delivery、slots、entropy、
+confidence 和 quality entropy。root shell 与 `Archive` 面板新增
+`data-debug-session-diff-field-count` / `data-debug-session-diff-fields` telemetry，并在 UI 中显示
+compact field list；切换模型时会清除旧 Gaussian probe，避免当前 snapshot 继承前一个模型的
+probe source。`scripts/audit-world-viewer.mjs` 现在同时验证同一 session 的
+`debugSessionDiff=match` 和切换到 trainable route 后的 `debugSessionDrift=changed`，
+changed fields 至少包含 `model/source/training/delivery`。该步骤不改 session schema、
+不做场景 replay、不拉 payload、不写训练输出。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

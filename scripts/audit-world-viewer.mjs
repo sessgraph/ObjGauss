@@ -41,6 +41,7 @@ try {
       `debugSessionExport=${summary.debugSessionExportStatus}`,
       `debugSessionImport=${summary.debugSessionImportStatus}`,
       `debugSessionDiff=${summary.debugSessionDiffStatus}`,
+      `debugSessionDrift=${summary.debugSessionDriftStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
       `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
@@ -670,6 +671,7 @@ async function auditWorld(url) {
       debugSessionExportStatus: algorithmManifest.sessionExportStatus,
       debugSessionImportStatus: algorithmManifest.sessionImportStatus,
       debugSessionDiffStatus: algorithmManifest.sessionDiffStatus,
+      debugSessionDriftStatus: algorithmManifest.sessionDriftStatus,
       localModelManifestStatus: localModelManifest.status,
       localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
@@ -1567,6 +1569,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-debug-session-diff-training-match") !== "true" ||
         Number(shell?.getAttribute("data-debug-session-diff-slot-delta") ?? NaN) !== 0 ||
         Number(shell?.getAttribute("data-debug-session-diff-entropy-delta") ?? NaN) !== 0 ||
+        Number(shell?.getAttribute("data-debug-session-diff-field-count") ?? NaN) !== 0 ||
+        shell?.getAttribute("data-debug-session-diff-fields") !== "" ||
         panel?.getAttribute("data-debug-session-archive-status") !== "loaded" ||
         panel?.getAttribute("data-debug-session-archive-file") !== "objgauss-debug-session-import.json" ||
         panel?.getAttribute("data-debug-session-archive-schema") !== "objgauss-object-state-debug-session-v1" ||
@@ -1577,6 +1581,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         panel?.getAttribute("data-debug-session-diff-source-match") !== "true" ||
         panel?.getAttribute("data-debug-session-diff-quality-match") !== "true" ||
         panel?.getAttribute("data-debug-session-diff-training-match") !== "true" ||
+        Number(panel?.getAttribute("data-debug-session-diff-field-count") ?? NaN) !== 0 ||
+        panel?.getAttribute("data-debug-session-diff-fields") !== "" ||
         protocol?.getAttribute("data-debug-session-import-status") !== "loaded" ||
         button?.getAttribute("data-import-status") !== "loaded" ||
         archive?.schema !== "objgauss-object-state-debug-session-v1" ||
@@ -1595,6 +1601,35 @@ async function auditAlgorithmManifestBundle(browser, url) {
       };
     }, undefined, { timeout: 15000 });
     const sessionImport = await sessionImportHandle.jsonValue();
+    await page.locator(".modelPill[data-model-row-id='model-manifest-trainable-artifact']").click();
+    const sessionDriftHandle = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-debug-session-archive='true']");
+      const fields = shell?.getAttribute("data-debug-session-diff-fields") ?? "";
+      const fieldSet = new Set(fields.split(",").filter(Boolean));
+      if (
+        shell?.getAttribute("data-selected-model") !== "model-manifest-trainable-artifact" ||
+        shell?.getAttribute("data-debug-session-archive-model") !== "model-manifest-ogc-artifact" ||
+        shell?.getAttribute("data-debug-session-diff-status") !== "changed" ||
+        shell?.getAttribute("data-debug-session-diff-model-match") !== "false" ||
+        shell?.getAttribute("data-debug-session-diff-source-match") !== "false" ||
+        shell?.getAttribute("data-debug-session-diff-training-match") !== "false" ||
+        Number(shell?.getAttribute("data-debug-session-diff-field-count") ?? 0) < 3 ||
+        !fieldSet.has("model") ||
+        !fieldSet.has("source") ||
+        !fieldSet.has("training") ||
+        !fieldSet.has("delivery") ||
+        panel?.getAttribute("data-debug-session-diff-status") !== "changed" ||
+        panel?.getAttribute("data-debug-session-diff-fields") !== fields
+      ) {
+        return null;
+      }
+      return {
+        status: shell.getAttribute("data-debug-session-diff-status"),
+        fields,
+      };
+    }, undefined, { timeout: 15000 });
+    const sessionDrift = await sessionDriftHandle.jsonValue();
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
     return {
       status: "manifest-trainable-ogc-debug-os",
@@ -1603,6 +1638,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       sessionExportStatus: sessionExport.status,
       sessionImportStatus: sessionImport.status,
       sessionDiffStatus: sessionImport.diffStatus,
+      sessionDriftStatus: sessionDrift.status,
     };
   } finally {
     await page.close();

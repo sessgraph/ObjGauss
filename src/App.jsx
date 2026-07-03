@@ -485,6 +485,7 @@ export default function App() {
   const selectModel = useCallback(
     (id) => {
       setSelection({ modelId: id, objectId: null, selectionId: id });
+      setDebugProbe(null);
       recordDebugEvent("select-model", { modelId: id, selectionId: id, source: "model-dock" });
       worldApi.current?.focusModel(id);
     },
@@ -1137,6 +1138,8 @@ export default function App() {
       data-debug-session-diff-slot-delta={debugSessionDiff?.slotDelta ?? ""}
       data-debug-session-diff-entropy-delta={debugSessionDiff?.entropyDelta ?? ""}
       data-debug-session-diff-event-delta={debugSessionDiff?.eventDelta ?? ""}
+      data-debug-session-diff-field-count={debugSessionDiff?.changedFields?.length ?? ""}
+      data-debug-session-diff-fields={debugSessionDiff?.changedFieldNames ?? ""}
       data-debug-event-count={debugEvents.length}
       data-debug-event-last={debugEvents[0]?.type ?? ""}
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
@@ -3094,6 +3097,8 @@ function DebugSessionArchivePanel({ archive, sessionImport, diff }) {
       data-debug-session-diff-slot-delta={diff?.slotDelta ?? ""}
       data-debug-session-diff-entropy-delta={diff?.entropyDelta ?? ""}
       data-debug-session-diff-event-delta={diff?.eventDelta ?? ""}
+      data-debug-session-diff-field-count={diff?.changedFields?.length ?? ""}
+      data-debug-session-diff-fields={diff?.changedFieldNames ?? ""}
     >
       <div className="stabilityHead">
         <span>Archive</span>
@@ -3117,6 +3122,7 @@ function DebugSessionArchivePanel({ archive, sessionImport, diff }) {
           <Meta label="d H" value={formatSignedRatio(diff.entropyDelta)} />
           <Meta label="d conf" value={formatSignedRatio(diff.confidenceDelta)} />
           <Meta label="d events" value={formatSignedCount(diff.eventDelta)} />
+          <Meta label="fields" value={diff.changedFieldNames || "-"} />
         </dl>
       ) : null}
       {recent.length ? (
@@ -4830,21 +4836,21 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     Array.isArray(liveSnapshot.events) ? liveSnapshot.events.length : 0,
     Array.isArray(archiveSnapshot.events) ? archiveSnapshot.events.length : 0,
   );
-  const changed = [
-    !modelMatch,
-    !objectMatch,
-    !sourceMatch,
-    !qualityMatch,
-    !trainingMatch,
-    !stabilityMatch,
-    !deliveryMatch,
-    deltaChanged(slotDelta),
-    deltaChanged(entropyDelta),
-    deltaChanged(confidenceDelta),
-    deltaChanged(qualityEntropyDelta),
-  ].some(Boolean);
+  const changedFields = [
+    !modelMatch ? "model" : "",
+    !objectMatch ? "object" : "",
+    !sourceMatch ? "source" : "",
+    !qualityMatch ? "quality" : "",
+    !trainingMatch ? "training" : "",
+    !stabilityMatch ? "stability" : "",
+    !deliveryMatch ? "delivery" : "",
+    deltaChanged(slotDelta) ? "slots" : "",
+    deltaChanged(entropyDelta) ? "entropy" : "",
+    deltaChanged(confidenceDelta) ? "confidence" : "",
+    deltaChanged(qualityEntropyDelta) ? "quality_entropy" : "",
+  ].filter(Boolean);
   return {
-    status: changed ? "changed" : "match",
+    status: changedFields.length ? "changed" : "match",
     modelMatch,
     objectMatch,
     sourceMatch,
@@ -4857,6 +4863,8 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     confidenceDelta,
     qualityEntropyDelta,
     eventDelta,
+    changedFields,
+    changedFieldNames: changedFields.join(","),
   };
 }
 

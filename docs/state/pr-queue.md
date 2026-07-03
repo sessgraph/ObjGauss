@@ -72,6 +72,38 @@
 
 ## Done
 
+### DEBUG-SESSION-DRIFT-001: Surface changed fields in live/archive debug session diff
+
+- 状态: done / debug-session-drift-fields
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 让 live snapshot 与 imported archive snapshot 的 diff 不只区分 `match` / `changed`，
+  还能列出具体漂移字段，用于快速定位训练 / 算法 session 的 ObjectState 变化来源。
+- 已实施:
+  - `src/App.jsx` 的 `debugSessionSnapshotDiff(...)` 新增 `changedFields` /
+    `changedFieldNames`，覆盖 model、object、assignment source、quality、training、
+    stability、delivery、slots、entropy、confidence 和 quality entropy。
+  - root shell 与 `Archive` 面板新增 `data-debug-session-diff-field-count` 和
+    `data-debug-session-diff-fields` telemetry；Archive 面板显示 compact field list。
+  - 切换 model 时清除旧 Gaussian probe，避免 live snapshot 带入前一个模型的 probe source。
+  - `scripts/audit-world-viewer.mjs` 先验证刚导入 session 的 diff 为 `match`，再切到同
+    manifest 的 trainable route，验证 `debugSessionDrift=changed` 且 changed fields 包含
+    `model/source/training/delivery`。
+- 边界:
+  - 不改变 debug session / snapshot schema，不写新的 artifact 文件。
+  - 不做场景 replay，不重新拉 OGC payload，不改写当前 models。
+  - 不改变训练 loop，不训练 gsplat，不安装 torch / gsplat / CUDA，不改变
+    `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `debugSessionDiff=match`、`debugSessionDrift=changed`、
+    `algorithmManifest=manifest-trainable-ogc-debug-os` 和 `qualityReport=warn`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 145 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### DEBUG-SESSION-DIFF-001: Compare live snapshots against imported debug sessions
 
 - 状态: done / debug-session-live-archive-diff
