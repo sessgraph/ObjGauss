@@ -105,7 +105,7 @@
     `debugSessionDiff=match` 和 `debugSessionDrift=changed`，内部验证 hover assignment
     root / panel / scene / snapshot contract。
   - `git diff --check`: passed。
-- 完成 commit: `pending`
+- 完成 commit: `835757f`
 
 ### OBJECTSTATE-VISIBILITY-CONTRACT-001: Auditable object visibility contract
 
