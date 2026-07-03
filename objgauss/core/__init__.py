@@ -12,6 +12,10 @@ from typing import Any
 _EXPORTS = {
     "GaussianCloud": ("objgauss.core.gaussian", "GaussianCloud"),
     "ObjectField": ("objgauss.core.object_field", "ObjectField"),
+    "ObjectStateGaussianDecode": (
+        "objgauss.core.gaussian_decoder",
+        "ObjectStateGaussianDecode",
+    ),
     "ObjectState": ("objgauss.core.object_state", "ObjectState"),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -94,6 +98,10 @@ _EXPORTS = {
         "objgauss.core.gsplat_training_renderer",
         "build_gsplat_training_input",
     ),
+    "build_gsplat_training_input_from_object_state": (
+        "objgauss.core.gsplat_training_renderer",
+        "build_gsplat_training_input_from_object_state",
+    ),
     "cluster_features": ("objgauss.core.clustering", "cluster_features"),
     "compare_baseline_candidates": ("objgauss.core.evaluation", "compare_baseline_candidates"),
     "filter_objects": ("objgauss.core.objects", "filter_objects"),
@@ -105,6 +113,10 @@ _EXPORTS = {
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
     "dynamic_k_proposal_report": ("objgauss.core.object_state", "dynamic_k_proposal_report"),
     "dynamic_k_update_plan": ("objgauss.core.object_state", "dynamic_k_update_plan"),
+    "decode_gaussian_from_object_state": (
+        "objgauss.core.gaussian_decoder",
+        "decode_gaussian_from_object_state",
+    ),
     "evidence_from_gaussian_cloud": (
         "objgauss.core.object_emergence_solver",
         "evidence_from_gaussian_cloud",

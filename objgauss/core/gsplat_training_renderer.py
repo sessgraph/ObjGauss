@@ -6,6 +6,12 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
+from objgauss.core.gaussian import GaussianCloud
+from objgauss.core.gaussian_decoder import (
+    ObjectStateGaussianDecode,
+    decode_gaussian_from_object_state,
+)
+from objgauss.core.object_state import ObjectStateProjection, project_object_states
 from objgauss.core.trainable_kernel import (
     TrainableKernelFrame,
     validate_trainable_image_target,
@@ -20,7 +26,7 @@ GSPLAT_RENDERER = "gsplat-rasterization-v1"
 GSPLAT_GRADIENT_PATH = "torch-autograd-gsplat-rasterization-v1"
 GSPLAT_AVAILABILITY_SCHEMA = "objgauss-gsplat-training-renderer-availability-v1"
 GSPLAT_TRAINING_INPUT_SCHEMA = "objgauss-gsplat-training-input-v1"
-GSPLAT_SYNTHETIC_GAUSSIAN_POLICY = "synthetic-isotropic-gaussian-state-v1"
+GSPLAT_SYNTHETIC_GAUSSIAN_POLICY = "object-state-synthetic-isotropic-gaussian-v1"
 
 
 @dataclass(frozen=True)
@@ -67,6 +73,8 @@ class GsplatTrainingInput:
     target_image: np.ndarray
     visibility_mask: np.ndarray
     gaussian_policy: str
+    decoder_schema: str
+    object_state_slots: int
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +87,8 @@ class GsplatTrainingInput:
             "width": int(self.width),
             "height": int(self.height),
             "gaussian_policy": self.gaussian_policy,
+            "decoder_schema": self.decoder_schema,
+            "object_state_slots": int(self.object_state_slots),
             "shapes": {
                 "means": list(self.means.shape),
                 "quats": list(self.quats.shape),
@@ -161,15 +171,61 @@ def build_gsplat_training_input(
     if not 0.0 <= default_opacity <= 1.0:
         raise ValueError("default_opacity must be in [0, 1]")
 
-    means = _array2d(frame.positions, "frame.positions", columns=3)
     colors = _array2d(decoder_colors, "decoder_colors", columns=3)
     assignment = _array2d(assignment, "assignment", columns=colors.shape[0])
-    if assignment.shape[0] != means.shape[0]:
+    positions = _array2d(frame.positions, "frame.positions", columns=3)
+    if assignment.shape[0] != positions.shape[0]:
         raise ValueError("assignment rows must match frame positions")
     if np.any(assignment < 0.0):
         raise ValueError("assignment must be non-negative")
     if not np.allclose(assignment.sum(axis=1), 1.0, atol=1e-5, rtol=0.0):
         raise ValueError("assignment rows must sum to 1")
+
+    projection = _object_state_projection_from_frame(frame, assignment)
+    return build_gsplat_training_input_from_object_state(
+        frame,
+        projection,
+        colors,
+        frame_index=frame_index,
+        default_scale=default_scale,
+        default_opacity=default_opacity,
+    )
+
+
+def build_gsplat_training_input_from_object_state(
+    frame: TrainableKernelFrame,
+    projection: ObjectStateProjection,
+    decoder_colors: np.ndarray,
+    *,
+    frame_index: int = 0,
+    default_scale: float = 0.01,
+    default_opacity: float = 1.0,
+) -> GsplatTrainingInput:
+    if frame.image_target is None:
+        raise ValueError("gsplat renderer input requires frame.image_target")
+    validate_trainable_image_target(frame.image_target)
+    decoded = decode_gaussian_from_object_state(
+        frame.positions,
+        projection,
+        decoder_colors,
+        default_scale=default_scale,
+        default_opacity=default_opacity,
+    )
+    return _gsplat_input_from_decode(
+        frame,
+        decoded,
+        frame_index=frame_index,
+    )
+
+
+def _gsplat_input_from_decode(
+    frame: TrainableKernelFrame,
+    decoded: ObjectStateGaussianDecode,
+    *,
+    frame_index: int,
+) -> GsplatTrainingInput:
+    if frame.image_target is None:
+        raise ValueError("gsplat renderer input requires frame.image_target")
 
     target = frame.image_target
     image = np.asarray(target.image, dtype=np.float32)
@@ -178,29 +234,25 @@ def build_gsplat_training_input(
     viewmat = np.linalg.inv(camera_to_world).astype(np.float32, copy=False)
     intrinsics = np.asarray(target.camera.intrinsics, dtype=np.float32)
 
-    gaussian_colors = np.clip(assignment @ colors, 0.0, 1.0).astype(np.float32, copy=False)
-    quats = np.zeros((means.shape[0], 4), dtype=np.float32)
-    quats[:, 0] = 1.0
-    scales = np.full((means.shape[0], 3), float(default_scale), dtype=np.float32)
-    opacities = np.full((means.shape[0],), float(default_opacity), dtype=np.float32)
-
     return GsplatTrainingInput(
         schema=GSPLAT_TRAINING_INPUT_SCHEMA,
         renderer_name=GSPLAT_RENDERER,
         gradient_path=GSPLAT_GRADIENT_PATH,
         frame_index=int(frame_index),
-        means=means.astype(np.float32, copy=False),
-        quats=quats,
-        scales=scales,
-        opacities=opacities,
-        colors=gaussian_colors,
+        means=decoded.means,
+        quats=decoded.quats,
+        scales=decoded.scales,
+        opacities=decoded.opacities,
+        colors=decoded.colors,
         viewmats=viewmat[None, :, :],
         intrinsics=intrinsics[None, :, :],
         width=int(target.camera.width),
         height=int(target.camera.height),
         target_image=image,
         visibility_mask=mask,
-        gaussian_policy=GSPLAT_SYNTHETIC_GAUSSIAN_POLICY,
+        gaussian_policy=decoded.gaussian_policy,
+        decoder_schema=decoded.schema,
+        object_state_slots=decoded.object_count,
     )
 
 
@@ -377,6 +429,30 @@ def _rendered_rgb_tensor(render_output: Any) -> Any:
 
 def _torch_tensor(torch: Any, value: np.ndarray, device: str) -> Any:
     return torch.tensor(np.asarray(value, dtype=np.float32), dtype=torch.float32, device=device)
+
+
+def _object_state_projection_from_frame(
+    frame: TrainableKernelFrame,
+    assignment: np.ndarray,
+) -> ObjectStateProjection:
+    positions = _array2d(frame.positions, "frame.positions", columns=3)
+    vertices = np.zeros(
+        positions.shape[0],
+        dtype=[
+            ("x", "f4"),
+            ("y", "f4"),
+            ("z", "f4"),
+        ],
+    )
+    vertices["x"] = positions[:, 0]
+    vertices["y"] = positions[:, 1]
+    vertices["z"] = positions[:, 2]
+    features = np.asarray(frame.features, dtype=np.float32)
+    return project_object_states(
+        GaussianCloud(vertices=vertices, source_format="trainable_frame"),
+        assignment,
+        evidence_features=features,
+    )
 
 
 def _array2d(value: np.ndarray, label: str, *, columns: int | None = None) -> np.ndarray:

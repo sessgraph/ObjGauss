@@ -9,6 +9,7 @@ from objgauss.core import (
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
+    ObjectStateGaussianDecode,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverTrainingResult,
@@ -29,7 +30,9 @@ from objgauss.core import (
     bind_object_states_to_artifact,
     build_chunk_index,
     build_gsplat_training_input,
+    build_gsplat_training_input_from_object_state,
     cluster_features,
+    decode_gaussian_from_object_state,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_training_renderer_loss,
@@ -49,6 +52,7 @@ from objgauss.core import (
     object_emergence_solver_state_from_dict,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
+    project_object_states,
     project_object_states_from_field,
     read_ply,
     renderer_loss_boundary_report,
@@ -153,6 +157,19 @@ def test_core_namespace_exposes_object_field_kernel():
     projection = project_object_states_from_field(_tiny_cloud(), field)
     assert isinstance(projection.states[0], ObjectState)
     assert projection.derived_object_ids.tolist() == [0, 0, 1, 1]
+    decoded = decode_gaussian_from_object_state(
+        np.column_stack(
+            [
+                _tiny_cloud().vertices["x"],
+                _tiny_cloud().vertices["y"],
+                _tiny_cloud().vertices["z"],
+            ]
+        ),
+        projection,
+        np.asarray([[0.9, 0.1, 0.1], [0.1, 0.8, 0.7]], dtype=np.float32),
+    )
+    assert isinstance(decoded, ObjectStateGaussianDecode)
+    assert decoded.as_dict()["schema"] == "objgauss-object-state-gaussian-decode-v1"
     report = object_state_stability_report(projection)
     assert isinstance(report, ObjectStabilityReport)
     assert report.evidence_count == 4
@@ -306,6 +323,20 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
         np.asarray([[0.2, 0.3, 0.4], [0.6, 0.7, 0.8]], dtype=np.float32),
     )
     assert isinstance(gsplat_input, GsplatTrainingInput)
+    object_assignment = np.zeros((bound_frames[0].positions.shape[0], 2), dtype=np.float32)
+    object_assignment[:3, 0] = 1.0
+    object_assignment[3:, 1] = 1.0
+    object_projection = project_object_states(
+        _frame_cloud_from_positions(bound_frames[0].positions),
+        object_assignment,
+        evidence_features=bound_frames[0].features,
+    )
+    object_state_input = build_gsplat_training_input_from_object_state(
+        bound_frames[0],
+        object_projection,
+        np.asarray([[0.2, 0.3, 0.4], [0.6, 0.7, 0.8]], dtype=np.float32),
+    )
+    assert object_state_input.decoder_schema == "objgauss-object-state-gaussian-decode-v1"
     assert evaluate_gsplat_training_renderer_loss is not None
     artifact = trainable_kernel_model_artifact(
         result,
@@ -348,6 +379,22 @@ def _tiny_object_cloud() -> GaussianCloud:
         "i4",
     )
     return GaussianCloud(vertices=vertices, source_format="ascii")
+
+
+def _frame_cloud_from_positions(frame_positions: np.ndarray) -> GaussianCloud:
+    xyz = np.asarray(frame_positions, dtype=np.float32)
+    vertices = np.zeros(
+        xyz.shape[0],
+        dtype=[
+            ("x", "f4"),
+            ("y", "f4"),
+            ("z", "f4"),
+        ],
+    )
+    vertices["x"] = xyz[:, 0]
+    vertices["y"] = xyz[:, 1]
+    vertices["z"] = xyz[:, 2]
+    return GaussianCloud(vertices=vertices, source_format="frame_fixture")
 
 
 def _missing_importer(name: str):

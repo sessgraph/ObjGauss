@@ -8,9 +8,11 @@ from objgauss.core.gsplat_training_renderer import (
     GSPLAT_RENDERER,
     GSPLAT_SYNTHETIC_GAUSSIAN_POLICY,
     build_gsplat_training_input,
+    build_gsplat_training_input_from_object_state,
     evaluate_gsplat_training_renderer_loss,
     gsplat_renderer_availability,
 )
+from objgauss.core.object_state import project_object_states
 from objgauss.core.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
@@ -46,6 +48,8 @@ def test_build_gsplat_training_input_maps_assignment_to_gaussian_state():
     assert payload["schema"] == "objgauss-gsplat-training-input-v1"
     assert payload["renderer_name"] == GSPLAT_RENDERER
     assert payload["gaussian_policy"] == GSPLAT_SYNTHETIC_GAUSSIAN_POLICY
+    assert payload["decoder_schema"] == "objgauss-object-state-gaussian-decode-v1"
+    assert payload["object_state_slots"] == 2
     assert payload["shapes"]["means"] == [6, 3]
     assert payload["shapes"]["quats"] == [6, 4]
     assert payload["shapes"]["scales"] == [6, 3]
@@ -57,6 +61,31 @@ def test_build_gsplat_training_input_maps_assignment_to_gaussian_state():
     np.testing.assert_allclose(record.colors[3:], np.tile(decoder_colors[1], (3, 1)), atol=1e-6)
     np.testing.assert_allclose(record.quats[:, 0], np.ones(6, dtype=np.float32), atol=1e-6)
     np.testing.assert_allclose(record.opacities, np.ones(6, dtype=np.float32), atol=1e-6)
+
+
+def test_build_gsplat_training_input_accepts_object_state_projection():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    assignment = np.zeros((6, 2), dtype=np.float32)
+    assignment[:3, 0] = 1.0
+    assignment[3:, 1] = 1.0
+    projection = project_object_states(
+        _frame_cloud(frames[0].positions),
+        assignment,
+        evidence_features=frames[0].features,
+    )
+    decoder_colors = np.vstack([frames[0].target_rgb[0], frames[0].target_rgb[3]]).astype(np.float32)
+
+    record = build_gsplat_training_input_from_object_state(
+        frames[0],
+        projection,
+        decoder_colors,
+    )
+
+    assert record.decoder_schema == "objgauss-object-state-gaussian-decode-v1"
+    assert record.object_state_slots == 2
+    assert record.gaussian_policy == GSPLAT_SYNTHETIC_GAUSSIAN_POLICY
+    np.testing.assert_allclose(record.colors[:3], np.tile(decoder_colors[0], (3, 1)), atol=1e-6)
+    np.testing.assert_allclose(record.colors[3:], np.tile(decoder_colors[1], (3, 1)), atol=1e-6)
 
 
 def test_build_gsplat_training_input_requires_bound_image_target():
@@ -86,3 +115,20 @@ def test_evaluate_gsplat_training_renderer_loss_fails_with_clear_blockers_when_u
 
 def _missing_importer(name: str):
     raise ImportError(name)
+
+
+def _frame_cloud(positions: np.ndarray):
+    vertices = np.zeros(
+        positions.shape[0],
+        dtype=[
+            ("x", "f4"),
+            ("y", "f4"),
+            ("z", "f4"),
+        ],
+    )
+    vertices["x"] = positions[:, 0]
+    vertices["y"] = positions[:, 1]
+    vertices["z"] = positions[:, 2]
+    from objgauss.core.gaussian import GaussianCloud
+
+    return GaussianCloud(vertices=vertices, source_format="fixture")
