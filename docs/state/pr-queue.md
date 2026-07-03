@@ -105,7 +105,7 @@
     `debugSessionDiff=match` 和 `debugSessionDrift=changed`，内部验证 object visibility
     root / panel / scene / snapshot contract。
   - `git diff --check`: passed。
-- 完成 commit: `pending`
+- 完成 commit: `947f9b3`
 
 ### OBJECTSTATE-HOVER-HIGHLIGHT-001: Auditable Gaussian cluster hover highlight
 
