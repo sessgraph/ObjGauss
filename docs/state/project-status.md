@@ -259,6 +259,19 @@ LOD telemetry。新增 `public/models/ogc-url-fixture/` 下的小型 index / `.o
 现在额外打开 URL OGC route，验证模型数变为 8、默认选中 URL OGC artifact、
 URL OGC route telemetry 可审计，且 LOD 1 解码后仍有 2 个 ObjectState render targets。
 
+`OGC-URL-MANIFEST-ARTIFACT-001` 已把 URL OGC 注入进一步收敛为单 manifest handoff：
+`src/modelCatalog.js` 现在支持同源
+`?ogcManifest=/path/to/model-artifact.json`（兼容 `ogc-manifest`、
+`modelArtifactManifest`、`model-artifact-manifest`），并追加 `ogc-manifest-artifact`
+临时模型；该路径仍限制为 same-origin `.json` 且不接受 query / hash。`src/App.jsx`
+会 fetch `objgauss-model-artifact-manifest-v1`，选出 browser-ready `compressed_chunked`
+artifact，并把 manifest-relative `chunk_index.path` 与 payload `path` 解析为同源绝对
+路径，再走现有 OGC range loader、LOD / chunk selector、ObjectState render targets、
+assignment heatmap、Gaussian probe、snapshot 和 event trace。新增
+`public/models/ogc-url-fixture/model-artifact.json` 小型 fixture 只引用同目录
+`scene.index.json` / `scene.ogc`，不是训练输出或大资产；`scripts/audit-world-viewer.mjs`
+现在验证 `urlOgcManifest=url-manifest-range-lod-chunk-ui`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

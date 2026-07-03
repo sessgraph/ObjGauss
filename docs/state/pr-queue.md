@@ -72,6 +72,48 @@
 
 ## Done
 
+### OGC-URL-MANIFEST-ARTIFACT-001: Load same-origin OGC model artifact manifests by URL
+
+- 状态: done / ogc-url-manifest-artifact
+- 类型: 标准 PR / browser delivery + backend handoff route
+- 目标: 让 ObjectState Debug OS 可以通过单个同源
+  `objgauss-model-artifact-manifest-v1` URL 加载 browser-ready `compressed_chunked` OGC
+  artifact，而不需要调用方分别拼 `ogcIndex` 和 `ogcPayload`。
+- 已实施:
+  - `src/modelCatalog.js` 新增 `?ogcManifest=/path/model-artifact.json` 参数，同时兼容
+    `ogc-manifest`、`modelArtifactManifest` 和 `model-artifact-manifest` 命名；该路径仍受
+    same-origin / `.json` / 无 query/hash 限制。
+  - `src/App.jsx` 新增 `ogc-manifest` load mode：fetch manifest 后验证 schema，选择
+    browser-ready `compressed_chunked` artifact，并把 manifest-relative
+    `chunk_index.path` / payload `path` 解析为同源绝对路径。
+  - URL manifest route 继续复用现有 OGC range loader、LOD selector、chunk selector、
+    ObjectState render targets、assignment heatmap、Gaussian probe、snapshot 和 event
+    trace。
+  - 新增小型 fixture `public/models/ogc-url-fixture/model-artifact.json`，只引用同目录
+    `scene.index.json` 和 `scene.ogc`，用于验证后端 manifest handoff 形态。
+  - `scripts/audit-world-viewer.mjs` 新增 URL manifest route audit，验证默认选中
+    `ogc-manifest-artifact`、relative route 解析为 `/models/ogc-url-fixture/...`、
+    range byte windows、LOD 切换、单 chunk scope、assignment heatmap 和 Gaussian probe。
+- 边界:
+  - 不改变 OGC writer、chunk index schema、quantized record format 或 manifest
+    validator。
+  - 不提交训练输出、checkpoint、rendered image 或大资产；新增 fixture 是 1 个小型
+    JSON manifest，复用既有 tiny OGC fixture。
+  - 不实现跨域 manifest、远程 URL、网络缓存、progressive scheduler、VQ / entropy /
+    WebGPU decoder。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `urlOgcManifest=url-manifest-range-lod-chunk-ui`、
+    `urlOgc=range-ogc-lod-chunk-ui` 和 `debugEvents=12`；截图
+    `/tmp/objgauss-world-viewer-url-ogc-manifest.png` 显示 URL manifest 模型、LOD0、
+    单 chunk scope、`range-ogc` route 与 `OGC bytes 20 / 20`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-LOCAL-MANIFEST-PACKAGE-001: Import local OGC model artifact manifest packages
 
 - 状态: done / ogc-local-manifest-package-import

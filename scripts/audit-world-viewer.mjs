@@ -35,6 +35,7 @@ try {
       `trainImageLoss=${summary.trainableTrainingFinalImageLoss}`,
       `urlArtifact=${summary.urlArtifactStatus}`,
       `urlOgc=${summary.urlOgcStatus}`,
+      `urlOgcManifest=${summary.urlOgcManifestStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
       `localOgcManifest=${summary.localOgcManifestStatus}`,
@@ -410,6 +411,7 @@ async function auditWorld(url) {
     const mobileScreenshotPath = await auditMobileWorld(browser, url);
     const urlArtifact = await auditUrlTrainableArtifact(browser, url);
     const urlOgc = await auditUrlOgcArtifact(browser, url);
+    const urlOgcManifest = await auditUrlOgcManifestArtifact(browser, url);
     const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
     const localOgc = await auditLocalOgcArtifactImport(browser, url);
     const localOgcManifest = await auditLocalOgcManifestPackageImport(browser, url);
@@ -651,6 +653,7 @@ async function auditWorld(url) {
       trainableTrainingFinalImageLoss: world.trainableTrainingFinalImageLoss,
       urlArtifactStatus: urlArtifact.status,
       urlOgcStatus: urlOgc.status,
+      urlOgcManifestStatus: urlOgcManifest.status,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
       localOgcManifestStatus: localOgcManifest.status,
@@ -1211,6 +1214,84 @@ async function auditUrlOgcArtifact(browser, url) {
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc.png", fullPage: false });
     return { status: "range-ogc-lod-chunk-ui" };
+  } finally {
+    await page.close();
+  }
+}
+
+async function auditUrlOgcManifestArtifact(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    const artifactUrl = new URL(url);
+    artifactUrl.searchParams.set("ogcManifest", "/models/ogc-url-fixture/model-artifact.json");
+    artifactUrl.searchParams.set("ogcLod", "1");
+    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='ogc-manifest-artifact']");
+      return (
+        pill?.getAttribute("data-model-load-state") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "8" &&
+        shell?.getAttribute("data-selected-model") === "ogc-manifest-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
+        shell?.getAttribute("data-ogc-artifact-index-path") === "/models/ogc-url-fixture/scene.index.json" &&
+        shell?.getAttribute("data-ogc-artifact-payload-path") === "/models/ogc-url-fixture/scene.ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        document.querySelector("[data-ogc-lod-selector='true']")?.getAttribute("data-selected-lod") === "1" &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-manifest-artifact") ?? [];
+      const target = targets[0];
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+        objectCount: targets.length,
+      };
+    });
+    if (!selection.ok || selection.modelId !== "ogc-manifest-artifact" || selection.objectCount !== 2) {
+      throw new Error(`expected URL OGC manifest object selection: ${JSON.stringify(selection)}`);
+    }
+    const gaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, selection.selectionId);
+    if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`expected URL OGC manifest Gaussian probe: ${JSON.stringify(gaussian)}`);
+    }
+    await page.locator("[data-ogc-lod-button='0']").click();
+    await page.locator("[data-ogc-chunk-button='0']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-manifest-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "0" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1 &&
+        types.has("gaussian-probe") &&
+        types.has("ogc-lod") &&
+        types.has("ogc-chunks")
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc-manifest.png", fullPage: false });
+    return { status: "url-manifest-range-lod-chunk-ui" };
   } finally {
     await page.close();
   }

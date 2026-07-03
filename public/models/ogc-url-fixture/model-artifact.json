@@ -1,0 +1,71 @@
+{
+  "schema": "objgauss-model-artifact-manifest-v1",
+  "manifest_id": "ogc-url-fixture-model-artifacts",
+  "asset_id": "ogc-url-fixture",
+  "name": "URL OGC manifest fixture",
+  "stage": "browser-delivery-fixture",
+  "source": {
+    "type": "ogc_url_fixture",
+    "index": "scene.index.json",
+    "payload": "scene.ogc"
+  },
+  "license": "fixture",
+  "counts": {
+    "gaussians": 4,
+    "objects": 2
+  },
+  "artifacts": [
+    {
+      "role": "compressed_chunked",
+      "path": "scene.ogc",
+      "format": ".ogc",
+      "delivery_tier": "browser_edit",
+      "browser_ready": true,
+      "gaussian_count": 4,
+      "object_count": 2,
+      "byte_size": 41,
+      "sha256": "8b01a129ef970a21900f86877e0d69e32616d087dda7fe333ddb78334f769c5c",
+      "chunk_index": {
+        "schema": "objgauss-chunk-index-v1",
+        "path": "scene.index.json",
+        "chunk_count": 2,
+        "sort_key": "object_id+morton_xyz",
+        "chunk_size_target": 2
+      },
+      "compression": {
+        "codec": "objgauss-ogc-prototype",
+        "layout": "object-aware-chunked-local-quantized",
+        "quantization": {
+          "schema": "objgauss-local-quantization-v1",
+          "policy": "chunk-aabb-uint16-rgb8-opacity8-v0",
+          "status": "url_fixture"
+        }
+      },
+      "lod": {
+        "schema": "objgauss-object-aware-lod-v1",
+        "levels": [
+          { "level": 0, "ratio": 1.0, "gaussian_count": 4 },
+          { "level": 1, "ratio": 0.5, "gaussian_count": 2 }
+        ]
+      },
+      "object_id_coverage": {
+        "field": "object_id",
+        "mode": "complete",
+        "has_object_ids": true,
+        "object_count": 2
+      }
+    }
+  ],
+  "quality_evidence": [
+    {
+      "kind": "ogc-url-manifest-browser-fixture",
+      "status": "fixture"
+    }
+  ],
+  "limitations": [
+    "Tiny fixture for same-origin model artifact manifest URL loading; not a trained scene."
+  ],
+  "created_from": {
+    "source": "OGC-URL-MANIFEST-ARTIFACT-001"
+  }
+}

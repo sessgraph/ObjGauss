@@ -561,6 +561,26 @@ export default function App() {
     async function loadModels() {
       for (const model of modelCatalog) {
         if (cancelled) return;
+        if (model.loadMode === "ogc-manifest") {
+          const startedAt = performance.now();
+          patchModel(model.id, { status: "loading", message: "loading ogc manifest" });
+          try {
+            const resolvedModel = await loadOgcManifestModel(model);
+            const { artifact, decoded, index, delivery } = await loadOgcModel(resolvedModel);
+            if (cancelled) return;
+            upsertDecodedOgcModel(resolvedModel, decoded, index, delivery, artifact, {
+              startedAt,
+              message: "ogc manifest",
+            });
+          } catch (error) {
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "error",
+              message: error?.message ?? "ogc manifest load failed",
+            });
+          }
+          continue;
+        }
         if (model.loadMode === "ogc-chunked") {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
@@ -919,6 +939,17 @@ async function loadOgcModel(model) {
   };
 }
 
+async function loadOgcManifestModel(model) {
+  const manifestPath = model.ogc?.manifestPath;
+  if (!manifestPath) {
+    throw new Error("missing OGC model artifact manifest path");
+  }
+  const response = await fetch(manifestPath);
+  if (!response.ok) throw new Error(`OGC manifest HTTP ${response.status}`);
+  const manifest = await response.json();
+  return ogcUrlManifestModelFromManifest(model, manifest, manifestPath);
+}
+
 async function loadTrainableArtifact(model) {
   if (model.trainableArtifactPath) {
     const response = await fetch(model.trainableArtifactPath);
@@ -942,6 +973,71 @@ function validateTrainableArtifact(artifact) {
     throw new Error("trainable artifact missing object states");
   }
   return artifact;
+}
+
+function ogcUrlManifestModelFromManifest(model, manifest, manifestPath) {
+  if (manifest?.schema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) {
+    throw new Error("unsupported model artifact manifest schema");
+  }
+  const artifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "compressed_chunked");
+  if (!artifact) {
+    throw new Error("OGC manifest missing browser-ready compressed_chunked artifact");
+  }
+  const payloadPath = resolveSameOriginManifestRoute(artifact.payloadPath ?? artifact.path, manifestPath);
+  const indexPath = resolveSameOriginManifestRoute(artifact.indexPath ?? artifact.chunk_index?.path, manifestPath);
+  const resolvedArtifact = {
+    ...artifact,
+    path: payloadPath,
+    payloadPath,
+    indexPath,
+    chunk_index: {
+      ...(artifact.chunk_index ?? {}),
+      path: indexPath,
+    },
+  };
+  return {
+    ...model,
+    name: manifest.name ?? model.name,
+    label: model.label,
+    loadMode: "ogc-chunked",
+    kind: "compressed-chunked-ogc",
+    objectCount: ogcPositiveInteger(manifest.counts?.objects ?? artifact.object_count) ?? model.objectCount,
+    license: manifest.license ?? model.license ?? "url-debug-artifact",
+    ogc: {
+      ...(model.ogc ?? {}),
+      indexPath,
+      payloadPath,
+    },
+    modelArtifactManifest: replaceManifestArtifact(manifest, artifact, resolvedArtifact),
+  };
+}
+
+function replaceManifestArtifact(manifest, sourceArtifact, replacementArtifact) {
+  let replaced = false;
+  const artifacts = Array.isArray(manifest?.artifacts)
+    ? manifest.artifacts.map((entry) => {
+        if (replaced || entry !== sourceArtifact) return entry;
+        replaced = true;
+        return replacementArtifact;
+      })
+    : [replacementArtifact];
+  return {
+    ...manifest,
+    artifacts: replaced ? artifacts : [replacementArtifact, ...artifacts],
+  };
+}
+
+function resolveSameOriginManifestRoute(route, manifestPath) {
+  const value = String(route ?? "");
+  if (!value || isInlineRoute(value) || value.startsWith("local://")) {
+    throw new Error("OGC manifest artifact route must be same-origin fetchable");
+  }
+  const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+  const resolved = new URL(value, new URL(manifestPath, origin));
+  if (resolved.origin !== origin || resolved.search || resolved.hash) {
+    throw new Error("OGC manifest artifact route must stay on the same origin");
+  }
+  return resolved.pathname;
 }
 
 function trainableLocalArtifactModel(fileName) {

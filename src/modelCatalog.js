@@ -330,17 +330,20 @@ export function catalogSummary(models = MODEL_CATALOG) {
 export function modelCatalogFromSearch(search = "") {
   const params = new URLSearchParams(String(search ?? "").replace(/^\?/, ""));
   const trainableArtifactPath = trainableArtifactPathFromParams(params);
+  const ogcManifest = ogcManifestArtifactFromParams(params);
   const ogcArtifact = ogcArtifactFromParams(params);
-  if (!trainableArtifactPath && !ogcArtifact) return MODEL_CATALOG;
+  if (!trainableArtifactPath && !ogcManifest && !ogcArtifact) return MODEL_CATALOG;
   return [
     ...MODEL_CATALOG,
     ...(trainableArtifactPath ? [trainableUrlArtifactModel(trainableArtifactPath)] : []),
+    ...(ogcManifest ? [ogcManifestUrlArtifactModel(ogcManifest)] : []),
     ...(ogcArtifact ? [ogcUrlArtifactModel(ogcArtifact)] : []),
   ];
 }
 
 export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
   return models.find((model) => model.id === "trainable-url-artifact")?.id
+    ?? models.find((model) => model.id === "ogc-manifest-artifact")?.id
     ?? models.find((model) => model.id === "ogc-url-artifact")?.id
     ?? models[0]?.id
     ?? "";
@@ -348,6 +351,20 @@ export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
 
 function trainableArtifactPathFromParams(params) {
   return sameOriginPathParam(params, ["trainableArtifact", "trainable-artifact"], ".json");
+}
+
+function ogcManifestArtifactFromParams(params) {
+  const manifestPath = sameOriginPathParam(
+    params,
+    ["ogcManifest", "ogc-manifest", "modelArtifactManifest", "model-artifact-manifest"],
+    ".json",
+  );
+  if (!manifestPath) return null;
+  return {
+    manifestPath,
+    lodLevel: ogcLodLevelFromParams(params),
+    chunkIds: ogcChunkIdsFromParams(params),
+  };
 }
 
 function ogcArtifactFromParams(params) {
@@ -381,6 +398,33 @@ function trainableUrlArtifactModel(artifactPath) {
       layout: "trainable-kernel-artifact-json",
       status: "url-debug-artifact",
       chunkRoot: "/models/url-trainable-artifact/objects/",
+    },
+  };
+}
+
+function ogcManifestUrlArtifactModel({ manifestPath, lodLevel, chunkIds }) {
+  return {
+    id: "ogc-manifest-artifact",
+    name: "URL OGC manifest",
+    label: "OGC Manifest",
+    loadMode: "ogc-manifest",
+    kind: "compressed-chunked-ogc-manifest",
+    stage: "url-browser-delivery-artifact",
+    objectCount: 0,
+    galleryPosition: [4.18, 0, 4.36],
+    accent: "#58f2c2",
+    displayScale: 1.72,
+    pointSize: 0.07,
+    maxDisplayPoints: 2400,
+    ogc: {
+      manifestPath,
+      lodLevel,
+      chunkIds,
+    },
+    compression: {
+      layout: "object-aware-quantized-ogc-manifest",
+      status: "url-debug-artifact",
+      chunkRoot: "/models/url-ogc-manifest/objects/",
     },
   };
 }
