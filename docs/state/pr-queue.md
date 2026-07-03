@@ -72,6 +72,46 @@
 
 ## Done
 
+### CLIP-COVERAGE-RERUN-001: Rerun real CLIP foreground coverage recovery evidence
+
+- 状态: done / recovery-rerun-still-do-not-promote
+- 类型: 标准 PR / semantic quality evidence rerun
+- 目标: 在 `CLIP-COVERAGE-001` 机制已落地后，用现有真实 CLIP score cache 重跑真实
+  Lego SAM / CLIP balanced route，确认 foreground coverage recovery 是否能清除
+  `supervised_fraction < 0.200000` 的 promotion blocker。
+- 已执行:
+  - `objgauss masks align-slots` 使用上次 `CLIP-BALANCE-001` 的同一参数，并增加
+    `--recover-foreground-coverage`，输出
+    `/tmp/objgauss-clip-coverage-recovery-aligned-mask-manifest.json`。
+  - recovery 恢复 1 个 `coverage_only` foreground mask，`recovered_gaussian_support=225`，
+    frames / masks 从 `3 / 4` 提升到 `4 / 5`，slot labels 仍为
+    `lego wheel tread`、`black rubber tire`、`gray wheel hub`。
+  - `vote-masks` 输出
+    `/tmp/objgauss-clip-coverage-recovery-mask-training-summary.json`，supervised fraction
+    从 `0.114283` 仅提升到 `0.114960`，conflict 为 `0.008196`，slot balance 为
+    `0.028042`。
+  - `compare-baselines` 输出
+    `/tmp/objgauss-clip-coverage-recovery-comparison-summary.json` 和 Markdown report，
+    结论仍为 `promotion_policy=do-not-promote`。
+- 结论:
+  - `CLIP-COVERAGE-001` 的 recovery 机制有效，但当前真实输入只恢复了 225 个 Gaussian，
+    不足以达到 `>=0.200000` supervised fraction。
+  - 当前 blockers 仍是 `mask-naming:background-label-dominant` 和
+    `supervised_fraction-below-threshold:0.114960<0.200000`。
+  - 下一步应改进 SAM / CLIP mask selection、crop 策略或 label policy，不应放宽
+    promotion threshold。
+- 边界:
+  - 不新增 torch / transformers 默认依赖，不运行新的 CLIP inference。
+  - 不提交 CLIP 权重、模型 cache、`/tmp` 输出或 ignored `outputs/` 训练产物。
+  - 不改变 promotion threshold，不把当前 CLIP labels 作为默认语义质量策略。
+- 验证:
+  - `uv run objgauss masks align-slots ... --recover-foreground-coverage`: passed。
+  - `uv run objgauss masks validate /tmp/objgauss-clip-coverage-recovery-aligned-mask-manifest.json --max-overlap-fraction 1 --allow-empty`: passed。
+  - `uv run objgauss object-field vote-masks ... --masks /tmp/objgauss-clip-coverage-recovery-aligned-mask-manifest.json --iterations 20 --visibility-mode depth-buffer`: passed。
+  - `uv run objgauss masks compare-baselines ... --output /tmp/objgauss-clip-coverage-recovery-comparison-summary.json`: passed，`promotion_policy=do-not-promote`。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-LOCAL-ARTIFACT-IMPORT-001: Import local OGC file pairs into Debug OS
 
 - 状态: done / ogc-local-artifact-import

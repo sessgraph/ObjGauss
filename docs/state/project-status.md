@@ -899,8 +899,18 @@ CLIP-score 命名入口；`CLIP-SCORE-001` 已补上 mask crop 的 CLIP score ca
   `slot_count`，不参与 slot 命名，也不放宽 promotion threshold。fixture 验证中，被
   rebalance 丢弃的 1 个 foreground mask 恢复后，downstream supervised fraction 从不完整
   coverage 提升到 `1.0`，winner balance 为 `[4,3]`。真实 Lego SAM / CLIP balanced route
-  仍需重新运行 `score-clip -> align-slots --recover-foreground-coverage -> vote-masks ->
-  compare-baselines` 后，才能更新 `0.114283 < 0.200000` 这一实证 blocker。
+  已用现有真实 CLIP score cache 重跑
+  `align-slots --recover-foreground-coverage -> vote-masks -> compare-baselines`：aligned
+  manifest 写到 `/tmp/objgauss-clip-coverage-recovery-aligned-mask-manifest.json`，恢复
+  1 个 `coverage_only` foreground mask，`recovered_gaussian_support=225`，frames / masks
+  从 `3 / 4` 提升到 `4 / 5`。Manifest validate passed；downstream `vote-masks`
+  写到 `/tmp/objgauss-clip-coverage-recovery-mask-training-summary.json`，supervised
+  fraction 从 `0.114283` 仅提升到 `0.114960`，conflict 为 `0.008196`，slot balance 为
+  `0.028042`。Comparison summary
+  `/tmp/objgauss-clip-coverage-recovery-comparison-summary.json` 仍为
+  `promotion_policy=do-not-promote`，blockers 仍是
+  `mask-naming:background-label-dominant` 和
+  `supervised_fraction-below-threshold:0.114960<0.200000`。
 
 边界：真实 CLIP inference 已通过临时 `uv --with` 依赖环境跑通，但仓库默认依赖仍不包含
 torch / transformers，也不提交 CLIP 权重或模型 cache。当前已落地 mask-level CLIP
@@ -911,7 +921,9 @@ balanced safe-2000 的语义路线仍结论为
 slot balance blocker 也已被 support rebalance 清除；剩余关键问题是 mask-level 背景占比
 仍高，且真实 filtered / balanced run 的 supervised fraction 仍需用新 recovery 机制重跑
 验证。下一步不是把当前 CLIP labels 作为默认语义质量策略或放宽 promotion threshold，而是
-重跑真实 CLIP coverage recovery 证据链并继续检查 mask-level background dominant。
+继续降低 mask-level background dominant，并从 SAM / CLIP mask selection 或 crop /
+label policy 上扩大真实 foreground coverage；当前 recovery 机制本身有效，但现有真实
+输入只恢复了 225 个 Gaussian，不足以清除 supervised fraction blocker。
 
 ## 阶段最终目标
 
