@@ -287,6 +287,19 @@ artifact 与 tiny OGC fixture，不复制 payload、不提交训练输出；同�
 floating inspector 遮挡的问题。`scripts/audit-world-viewer.mjs` 现在验证
 `algorithmManifest=manifest-trainable-ogc-debug-os`。
 
+`LOCAL-MODEL-MANIFEST-BUNDLE-001` 已把上述组合 handoff 扩展到本地 package 导入：
+`src/App.jsx` top HUD 新增 `导入模型` 多文件入口，可一次选择
+`objgauss-model-artifact-manifest-v1 + trainable artifact JSON + .index.json + .ogc`。
+前端会按 manifest 的 `trainable_kernel` role 匹配训练 artifact JSON，按
+`compressed_chunked` role 匹配 OGC chunk index 与 payload，然后自动创建
+`Local Manifest`、`Local Train` 和 `Local OGC` 三个 runtime 模型。默认进入
+`Local Train` 检查 `A[N,K]`、training loss、ObjectState 和 Gaussian probe；`Local OGC`
+继续复用 local-file OGC loader、LOD selector、chunk selector、assignment heatmap、
+Gaussian probe 和 event trace。root shell 新增 `data-model-manifest-import-*` telemetry；
+`scripts/audit-world-viewer.mjs` 现在验证
+`localModelManifest=local-manifest-trainable-ogc-debug-os`。该路径只读取浏览器会话中的
+本地文件，不复制 payload 到 `public/`，不提交 ignored `outputs/` 或训练产物。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

@@ -37,6 +37,7 @@ try {
       `urlOgc=${summary.urlOgcStatus}`,
       `urlOgcManifest=${summary.urlOgcManifestStatus}`,
       `algorithmManifest=${summary.algorithmManifestStatus}`,
+      `localModelManifest=${summary.localModelManifestStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
       `localOgcManifest=${summary.localOgcManifestStatus}`,
@@ -414,6 +415,7 @@ async function auditWorld(url) {
     const urlOgc = await auditUrlOgcArtifact(browser, url);
     const urlOgcManifest = await auditUrlOgcManifestArtifact(browser, url);
     const algorithmManifest = await auditAlgorithmManifestBundle(browser, url);
+    const localModelManifest = await auditLocalModelManifestBundleImport(browser, url);
     const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
     const localOgc = await auditLocalOgcArtifactImport(browser, url);
     const localOgcManifest = await auditLocalOgcManifestPackageImport(browser, url);
@@ -657,6 +659,7 @@ async function auditWorld(url) {
       urlOgcStatus: urlOgc.status,
       urlOgcManifestStatus: urlOgcManifest.status,
       algorithmManifestStatus: algorithmManifest.status,
+      localModelManifestStatus: localModelManifest.status,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
       localOgcManifestStatus: localOgcManifest.status,
@@ -1406,6 +1409,140 @@ async function auditAlgorithmManifestBundle(browser, url) {
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
     return { status: "manifest-trainable-ogc-debug-os" };
+  } finally {
+    await page.close();
+  }
+}
+
+async function auditLocalModelManifestBundleImport(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
+      "public/models/algorithm-bundle-fixture/model-artifact.json",
+      "public/models/trainable-mvp-debug/model-artifact.json",
+      "public/models/ogc-url-fixture/scene.index.json",
+      "public/models/ogc-url-fixture/scene.ogc",
+    ]);
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const button = document.querySelector("[data-model-artifact-import-button='true']");
+      const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
+      const ogc = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-ogc-artifact']");
+      const importedFile = shell?.getAttribute("data-model-manifest-import-file") ?? "";
+      return (
+        button?.getAttribute("data-import-status") === "loaded" &&
+        parent?.getAttribute("data-model-load-state") === "loaded" &&
+        trainable?.getAttribute("data-model-load-state") === "loaded" &&
+        ogc?.getAttribute("data-model-load-state") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "10" &&
+        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        shell?.getAttribute("data-selected-model") === "model-local-manifest-trainable-artifact" &&
+        shell?.getAttribute("data-model-manifest-import-status") === "loaded" &&
+        shell?.getAttribute("data-model-manifest-import-model") === "model-local-manifest" &&
+        importedFile.includes("model-artifact.json") &&
+        importedFile.includes("scene.index.json") &&
+        importedFile.includes("scene.ogc") &&
+        shell?.getAttribute("data-trainable-artifact-load-route") === "local-manifest-file" &&
+        shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
+        shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
+        shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    const trainableSelection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = world?.objectSelections?.find(
+        (entry) => entry.modelId === "model-local-manifest-trainable-artifact",
+      );
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+      };
+    });
+    if (!trainableSelection.ok || trainableSelection.modelId !== "model-local-manifest-trainable-artifact") {
+      throw new Error(`expected local model manifest trainable object selection: ${JSON.stringify(trainableSelection)}`);
+    }
+    const trainableGaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, trainableSelection.selectionId);
+    if (!trainableGaussian.ok || trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`expected local model manifest trainable Gaussian probe: ${JSON.stringify(trainableGaussian)}`);
+    }
+
+    await page.locator(".modelPill[data-model-row-id='model-local-manifest-ogc-artifact']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      return (
+        shell?.getAttribute("data-selected-model") === "model-local-manifest-ogc-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-index-path") === "local://scene.index.json" &&
+        shell?.getAttribute("data-ogc-artifact-payload-path") === "local://scene.ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, undefined, { timeout: 15000 });
+    const ogcSelection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const targets = world?.objectSelections?.filter(
+        (entry) => entry.modelId === "model-local-manifest-ogc-artifact",
+      ) ?? [];
+      const target = targets[0];
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+        objectCount: targets.length,
+      };
+    });
+    if (!ogcSelection.ok || ogcSelection.modelId !== "model-local-manifest-ogc-artifact" || ogcSelection.objectCount !== 2) {
+      throw new Error(`expected local model manifest OGC object selection: ${JSON.stringify(ogcSelection)}`);
+    }
+    const ogcGaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, ogcSelection.selectionId);
+    if (!ogcGaussian.ok || ogcGaussian.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`expected local model manifest OGC Gaussian probe: ${JSON.stringify(ogcGaussian)}`);
+    }
+    await page.locator("[data-ogc-lod-button='1']").click();
+    await page.locator("[data-ogc-chunk-button='0']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      return (
+        shell?.getAttribute("data-selected-model") === "model-local-manifest-ogc-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "10" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "0" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1 &&
+        types.has("import-model-manifest") &&
+        types.has("gaussian-probe") &&
+        types.has("ogc-lod") &&
+        types.has("ogc-chunks")
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-model-manifest.png", fullPage: false });
+    return { status: "local-manifest-trainable-ogc-debug-os" };
   } finally {
     await page.close();
   }

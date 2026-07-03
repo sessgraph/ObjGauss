@@ -72,6 +72,48 @@
 
 ## Done
 
+### LOCAL-MODEL-MANIFEST-BUNDLE-001: Import local combined model artifact packages
+
+- 状态: done / local-model-manifest-debug-os-bundle
+- 类型: 标准 PR / local debug artifact delivery + ObjectState Debug OS handoff
+- 目标: 让 ignored `outputs/` 或 `/tmp` 中的本地算法 package 可以一次性导入
+  `objgauss-model-artifact-manifest-v1 + trainable artifact JSON + .index.json + .ogc`，
+  并自动展开为训练证据视图和 OGC 渲染视图。
+- 已实施:
+  - `src/App.jsx` top HUD 新增 `导入模型` 多文件入口，独立于 `导入训练` 和 `导入OGC`。
+  - 本地组合 manifest 会按 `trainable_kernel` role 匹配训练 artifact JSON，按
+    `compressed_chunked` role 匹配 OGC chunk index 与 `.ogc` payload。
+  - 导入后自动创建 `Local Manifest`、`Local Train` 和 `Local OGC` 三个 runtime 模型；
+    默认选中 `Local Train` 以检查 `A[N,K]`、training loss、ObjectState 和 Gaussian probe。
+  - `Local OGC` 复用现有 local-file OGC loader、LOD selector、chunk selector、
+    assignment heatmap、Gaussian probe 和 event trace；训练与渲染两条视图共享同一个
+    local model artifact manifest 入口。
+  - root shell 新增 `data-model-manifest-import-*` telemetry，便于 audit 和手工调试判断
+    package 是否成功加载。
+  - `scripts/audit-world-viewer.mjs` 新增本地组合 package audit，使用现有小型
+    algorithm bundle fixture、trainable debug artifact 和 tiny OGC fixture，验证
+    `import-model-manifest`、训练 Gaussian probe、OGC local-file route、LOD1 和单 chunk
+    scope。
+- 边界:
+  - 不训练新模型，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不改变 OGC payload record format、chunk index schema、decoder 或 manifest validator。
+  - 不复制本地 payload 到 `public/`，不提交 checkpoint、rendered image、ignored
+    `outputs/` 产物或大资产。
+  - 不实现目录批量导入、跨域 manifest、远程缓存、progressive scheduler、VQ / entropy /
+    WebGPU decoder。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `localModelManifest=local-manifest-trainable-ogc-debug-os`、
+    `algorithmManifest=manifest-trainable-ogc-debug-os` 和
+    `localOgcManifest=local-manifest-file-lod-chunk-ui`；截图
+    `/tmp/objgauss-world-viewer-local-model-manifest.png` 显示本地组合 manifest 的 OGC 模型、
+    LOD1、单 chunk scope、`local-file` route 和可点击 dock。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 137 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### ALGO-MANIFEST-BUNDLE-001: Load combined algorithm model artifact manifests
 
 - 状态: done / algorithm-manifest-debug-os-bundle

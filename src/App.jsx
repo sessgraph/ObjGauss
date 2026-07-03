@@ -31,6 +31,7 @@ export default function App() {
   const worldApi = useRef(null);
   const loadStarted = useRef(false);
   const artifactInputRef = useRef(null);
+  const modelBundleInputRef = useRef(null);
   const ogcInputRef = useRef(null);
   const [worldReady, setWorldReady] = useState(false);
   const [selection, setSelection] = useState(() => ({
@@ -47,6 +48,12 @@ export default function App() {
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [artifactImport, setArtifactImport] = useState(() => ({
+    status: "idle",
+    modelId: "",
+    fileName: "",
+    error: "",
+  }));
+  const [modelImport, setModelImport] = useState(() => ({
     status: "idle",
     modelId: "",
     fileName: "",
@@ -350,6 +357,108 @@ export default function App() {
       }
     },
     [recordDebugEvent, upsertTrainableArtifactModel],
+  );
+
+  const importModelArtifactBundleFiles = useCallback(
+    async (event) => {
+      const files = Array.from(event.target.files ?? []);
+      event.target.value = "";
+      if (!files.length) return;
+      const fileName = files.map((file) => file.name).join(" + ");
+      const parentId = "model-local-manifest";
+      setModelImport({ status: "loading", modelId: parentId, fileName, error: "" });
+      try {
+        const { manifest, parentModel, children } = await localModelArtifactBundleModelsFromFiles(files);
+        if (!children.length) {
+          throw new Error("local model manifest has no Debug OS browser routes");
+        }
+        setModels((current) => {
+          const parentState = initialModelStates([parentModel])[parentModel.id];
+          return {
+            ...current,
+            ...initialModelStates(children),
+            [parentModel.id]: {
+              ...parentState,
+              ...(current[parentModel.id] ?? {}),
+              ...parentModel,
+              status: "loaded",
+              message: `${children.length} local debug routes`,
+              modelArtifactManifest: manifest,
+              delivery: {
+                source: "local-model-artifact-manifest",
+                loadRoute: "local-file",
+                artifactPath: parentModel.manifestPath,
+                childModelIds: children.map((child) => child.id),
+              },
+            },
+          };
+        });
+        recordDebugEvent("import-model-manifest", {
+          modelId: parentModel.id,
+          selectionId: parentModel.id,
+          fileName,
+          childModelIds: children.map((child) => child.id),
+          source: "local-file",
+        });
+
+        let selectedChild = null;
+        for (const child of children) {
+          if (child.loadMode === "trainable-artifact") {
+            const startedAt = performance.now();
+            const artifact = await loadTrainableArtifact(child);
+            const imported = upsertTrainableArtifactModel(child, artifact, {
+              startedAt,
+              loadRoute: "local-manifest-file",
+              artifactPath: child.trainableArtifactRoute ?? "local://trainable-kernel-artifact.json",
+              message: "local manifest trainable artifact",
+            });
+            selectedChild = selectedChild ?? imported;
+            continue;
+          }
+          if (child.loadMode === "ogc-chunked") {
+            const startedAt = performance.now();
+            const { artifact, decoded, index: loadedIndex, delivery } = await loadOgcModel(child);
+            const imported = upsertDecodedOgcModel(child, decoded, loadedIndex, delivery, artifact, {
+              startedAt,
+              message: "local manifest ogc files",
+            });
+            selectedChild = selectedChild ?? imported;
+          }
+        }
+
+        const importedIds = [parentModel.id, ...children.map((child) => child.id)];
+        setDebugProbe(null);
+        setHoveredTarget(null);
+        setHiddenObjects((current) => {
+          const next = new Set(
+            [...current].filter((selectionId) =>
+              importedIds.every((modelId) => !String(selectionId).startsWith(`${modelId}::`)),
+            ),
+          );
+          worldApi.current?.setHiddenObjects(next);
+          return next;
+        });
+        if (selectedChild) {
+          setSelection({ modelId: selectedChild.id, objectId: null, selectionId: selectedChild.id });
+          worldApi.current?.focusModel(selectedChild.id);
+        }
+        setModelImport({ status: "loaded", modelId: parentModel.id, fileName, error: "" });
+      } catch (error) {
+        setModelImport({
+          status: "error",
+          modelId: parentId,
+          fileName,
+          error: error?.message ?? "model manifest import failed",
+        });
+        recordDebugEvent("import-model-manifest-error", {
+          modelId: parentId,
+          selectionId: parentId,
+          fileName,
+          source: "local-file",
+        });
+      }
+    },
+    [recordDebugEvent, upsertDecodedOgcModel, upsertTrainableArtifactModel],
   );
 
   const importOgcArtifactFiles = useCallback(
@@ -819,6 +928,10 @@ export default function App() {
       data-trainable-import-model={artifactImport.modelId}
       data-trainable-import-file={artifactImport.fileName}
       data-trainable-import-error={artifactImport.error}
+      data-model-manifest-import-status={modelImport.status}
+      data-model-manifest-import-model={modelImport.modelId}
+      data-model-manifest-import-file={modelImport.fileName}
+      data-model-manifest-import-error={modelImport.error}
       data-ogc-import-status={ogcImport.status}
       data-ogc-import-model={ogcImport.modelId}
       data-ogc-import-file={ogcImport.fileName}
@@ -868,6 +981,15 @@ export default function App() {
             data-ogc-artifact-file-input="true"
             onChange={importOgcArtifactFiles}
           />
+          <input
+            ref={modelBundleInputRef}
+            className="fileInputHidden"
+            type="file"
+            accept="application/json,.json,.ogc"
+            multiple
+            data-model-artifact-file-input="true"
+            onChange={importModelArtifactBundleFiles}
+          />
           <button
             className={`glassButton ${artifactImport.status === "loaded" ? "active" : ""}`}
             type="button"
@@ -879,7 +1001,20 @@ export default function App() {
               ? "导入中"
               : artifactImport.status === "error"
                 ? "导入失败"
-                : "导入训练"}
+              : "导入训练"}
+          </button>
+          <button
+            className={`glassButton ${modelImport.status === "loaded" ? "active" : ""}`}
+            type="button"
+            data-model-artifact-import-button="true"
+            data-import-status={modelImport.status}
+            onClick={() => modelBundleInputRef.current?.click()}
+          >
+            {modelImport.status === "loading"
+              ? "模型中"
+              : modelImport.status === "error"
+                ? "模型失败"
+                : "导入模型"}
           </button>
           <button
             className={`glassButton ${ogcImport.status === "loaded" ? "active" : ""}`}
@@ -1221,6 +1356,154 @@ function trainableLocalArtifactModel(fileName) {
   };
 }
 
+async function localModelArtifactBundleModelsFromFiles(files) {
+  const entries = Array.from(files ?? []);
+  const jsonEntries = await Promise.all(
+    entries
+      .filter((file) => /\.json$/i.test(file.name))
+      .map(async (file) => ({ file, json: JSON.parse(await file.text()) })),
+  );
+  const manifestEntry = jsonEntries.find((entry) => {
+    if (entry.json?.schema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) return false;
+    return (
+      browserReadyArtifact({ modelArtifactManifest: entry.json }, "trainable_kernel") ||
+      browserReadyArtifact({ modelArtifactManifest: entry.json }, "compressed_chunked")
+    );
+  });
+  if (!manifestEntry) {
+    throw new Error("select one model artifact manifest with trainable_kernel or compressed_chunked artifacts");
+  }
+
+  const manifest = manifestEntry.json;
+  const parentModel = localModelArtifactParentModel(manifest, manifestEntry.file.name);
+  const children = [];
+  const trainableArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel");
+  if (trainableArtifact) {
+    const trainableEntry = findTrainableArtifactEntry(
+      jsonEntries,
+      trainableArtifact.artifactPath ?? trainableArtifact.path,
+    );
+    children.push(
+      trainableLocalManifestModelFromManifest({
+        manifest,
+        artifact: trainableArtifact,
+        trainableArtifact: trainableEntry.json,
+        artifactFileName: trainableEntry.file.name,
+      }),
+    );
+  }
+
+  const ogcArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "compressed_chunked");
+  if (ogcArtifact) {
+    const indexEntry = findOgcIndexEntry(jsonEntries, ogcArtifact.indexPath ?? ogcArtifact.chunk_index?.path);
+    const payloadFile = findOgcPayloadFile(entries, ogcArtifact.payloadPath ?? ogcArtifact.path);
+    const ogcModel = ogcLocalArtifactModelFromManifest({
+      manifest,
+      artifact: ogcArtifact,
+      index: indexEntry.json,
+      payloadBuffer: await payloadFile.arrayBuffer(),
+      indexFileName: indexEntry.file.name,
+      payloadFileName: payloadFile.name,
+    });
+    children.push({
+      ...ogcModel,
+      id: "model-local-manifest-ogc-artifact",
+      name: manifest.name ? `Local ${manifest.name} OGC` : "Local manifest OGC artifact",
+      label: "Local OGC",
+      stage: "local-model-manifest-debug-artifact",
+      galleryPosition: [3.85, 0, 5.02],
+      compression: {
+        ...(ogcModel.compression ?? {}),
+        status: "local-model-manifest-debug-artifact",
+      },
+    });
+  }
+  return { manifest, parentModel, children };
+}
+
+function localModelArtifactParentModel(manifest, fileName) {
+  return {
+    id: "model-local-manifest",
+    name: manifest?.name ? `Local ${manifest.name}` : "Local model manifest",
+    label: "Local Manifest",
+    loadMode: "local-model-artifact-manifest",
+    kind: "algorithm-model-artifact-manifest",
+    stage: "local-model-manifest-debug-artifact",
+    objectCount: ogcPositiveInteger(manifest?.counts?.objects) ?? 0,
+    galleryPosition: [-0.9, 0, 5.18],
+    accent: "#d7f45a",
+    displayScale: 1.62,
+    pointSize: 0.068,
+    maxDisplayPoints: 2400,
+    license: manifest?.license ?? "local-file-debug",
+    manifestPath: localFileRoute(fileName),
+    compression: {
+      layout: "model-artifact-manifest-handoff",
+      status: "local-debug-artifact",
+      chunkRoot: "/models/local-model-artifact-manifest/objects/",
+    },
+  };
+}
+
+function trainableLocalManifestModelFromManifest({
+  manifest,
+  artifact,
+  trainableArtifact,
+  artifactFileName,
+}) {
+  const artifactPath = localFileRoute(artifactFileName);
+  const localizedArtifact = {
+    ...artifact,
+    path: artifactPath,
+    artifactPath,
+    byte_size: artifact.byte_size,
+  };
+  return {
+    id: "model-local-manifest-trainable-artifact",
+    name: manifest.name ? `Local ${manifest.name} trainable` : "Local manifest trainable artifact",
+    label: "Local Train",
+    loadMode: "trainable-artifact",
+    kind: "trainable-kernel-model-artifact",
+    stage: "local-model-manifest-debug-artifact",
+    objectCount: ogcPositiveInteger(manifest.counts?.objects ?? artifact.object_count) ?? 0,
+    galleryPosition: [-3.95, 0, 5.08],
+    accent: "#f7df63",
+    displayScale: 1.92,
+    pointSize: 0.082,
+    maxDisplayPoints: 256,
+    license: manifest.license ?? "local-file-debug",
+    trainableArtifact: validateTrainableArtifact(trainableArtifact),
+    trainableArtifactRoute: artifactPath,
+    compression: {
+      layout: "trainable-kernel-artifact-json",
+      status: "local-model-manifest-debug-artifact",
+      chunkRoot: "/models/local-model-manifest-trainable/objects/",
+    },
+    modelArtifactManifest: localizeTrainableManifest(manifest, artifact, localizedArtifact, {
+      artifactPath,
+      artifactFileName,
+    }),
+  };
+}
+
+function localizeTrainableManifest(manifest, sourceArtifact, localizedArtifact, files) {
+  const replaced = replaceManifestArtifact(manifest, sourceArtifact, localizedArtifact);
+  return {
+    ...replaced,
+    source: {
+      ...(replaced?.source ?? {}),
+      local_trainable_import: {
+        type: "local_trainable_kernel_artifact",
+        artifact_path: files.artifactPath,
+      },
+    },
+    created_from: {
+      ...(replaced?.created_from ?? {}),
+      local_trainable_file: files.artifactFileName,
+    },
+  };
+}
+
 async function ogcLocalArtifactModelFromFiles(files) {
   const entries = Array.from(files ?? []);
   const jsonEntries = await Promise.all(
@@ -1433,6 +1716,22 @@ function findOgcIndexEntry(jsonEntries, expectedRoute = "") {
     throw new Error(expectedName
       ? `select OGC chunk index file ${expectedName}`
       : "select one OGC .index.json file");
+  }
+  return matched;
+}
+
+function findTrainableArtifactEntry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter(
+    (entry) => entry.json?.schema === "objgauss-trainable-kernel-model-artifact-v1",
+  );
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName) ?? candidates[0]
+    : candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select trainable kernel artifact file ${expectedName}`
+      : "select one trainable kernel artifact JSON file");
   }
   return matched;
 }
