@@ -89,6 +89,14 @@ assignment target 并训练 solver weights。已用
 opacity / rotation，不自动执行 dynamic-K，不提交 checkpoint / artifact / rendered
 image 或大资产。
 
+同日已完成 `DYNAMIC-K-UPDATE-001`：`objgauss/core/object_state.py` 新增
+`DynamicKUpdateAction`、`DynamicKUpdatePlan` 和 `dynamic_k_update_plan(...)`，将
+`dynamic_k_proposal_report(...)` 的 remove / merge / split / birth proposal 转成
+epoch-boundary 才能应用的 gated update plan。该 plan 会输出 accepted / blocked action、
+`slot_delta`、`next_slot_count`、block reason 和 diagnostics；它不在 gradient step 中
+修改 `K`，不静默改写 object id，也不直接改变当前 projection / artifact。dynamic-K
+因此仍是可审计的状态更新计划，不是自动在线 slot policy。
+
 同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
 Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用
 `ObjectField.probabilities()`，将 Gaussian evidence weighted reduction 为

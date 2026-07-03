@@ -79,6 +79,32 @@
 
 ## Done
 
+### DYNAMIC-K-UPDATE-001: Gate dynamic-K proposal updates at epoch boundary
+
+- 状态: done / epoch-boundary-update-plan
+- 类型: 标准 PR / object slot policy
+- 目标: 将 `dynamic_k_proposal_report(...)` 输出的 birth / merge / split / death proposal
+  提升为可审计的 gated update plan，但只允许在 epoch / artifact 边界改变 slot count。
+- 已实施:
+  - `objgauss/core/object_state.py` 新增 `DynamicKUpdateAction`、
+    `DynamicKUpdatePlan` 和 `dynamic_k_update_plan(...)`。
+  - update plan 会把 `remove_inactive`、`merge_duplicate`、`split_mixed` 和
+    `birth_unmatched` proposal 转成 accepted / blocked action，并记录 `slot_delta`、
+    `next_slot_count`、reason 和 diagnostics。
+  - `apply_at` 强制为 `epoch_boundary`；非边界调用会被拒绝。
+  - `objgauss.core` lazy namespace 暴露 dynamic-K update plan API。
+- 边界:
+  - 不在每个 gradient step 中改变 K。
+  - 不静默改写已有 object id。
+  - 不直接 mutation 当前 `ObjectStateProjection`、assignment matrix 或 browser artifact。
+  - 不引入 learned slot policy、torch / gsplat / CUDA 或 full renderer training。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_state.py tests/test_core_namespace.py`:
+    22 passed。
+  - `uv run python -m py_compile objgauss/core/object_state.py`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: `727a921`
+
 ### TRAINABLE-SOLVER-NP-001: Train Object Emergence Solver weights
 
 - 状态: done / numpy-solver-training
