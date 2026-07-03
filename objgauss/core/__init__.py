@@ -19,6 +19,22 @@ _EXPORTS = {
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
     "DynamicKProposal": ("objgauss.core.object_state", "DynamicKProposal"),
     "DynamicKProposalReport": ("objgauss.core.object_state", "DynamicKProposalReport"),
+    "ObjectEmergenceAssignmentPrediction": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceAssignmentPrediction",
+    ),
+    "ObjectEmergenceEvidence": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceEvidence",
+    ),
+    "ObjectEmergenceSolverConfig": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceSolverConfig",
+    ),
+    "ObjectEmergenceSolverState": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceSolverState",
+    ),
     "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA": (
         "objgauss.core.object_state_benchmark",
         "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA",
@@ -74,6 +90,10 @@ _EXPORTS = {
     ),
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
     "dynamic_k_proposal_report": ("objgauss.core.object_state", "dynamic_k_proposal_report"),
+    "evidence_from_gaussian_cloud": (
+        "objgauss.core.object_emergence_solver",
+        "evidence_from_gaussian_cloud",
+    ),
     "evaluate_training_renderer_loss": (
         "objgauss.core.training_renderer",
         "evaluate_training_renderer_loss",
@@ -85,6 +105,10 @@ _EXPORTS = {
     "gsplat_renderer_availability": (
         "objgauss.core.gsplat_training_renderer",
         "gsplat_renderer_availability",
+    ),
+    "initialize_object_emergence_solver": (
+        "objgauss.core.object_emergence_solver",
+        "initialize_object_emergence_solver",
     ),
     "make_trainable_kernel_mvp_fixture": (
         "objgauss.core.trainable_kernel",
@@ -102,6 +126,14 @@ _EXPORTS = {
         "object_state_stability_benchmark",
     ),
     "object_state_stability_report": ("objgauss.core.object_state", "object_state_stability_report"),
+    "predict_object_emergence_assignment": (
+        "objgauss.core.object_emergence_solver",
+        "predict_object_emergence_assignment",
+    ),
+    "project_object_emergence_prediction": (
+        "objgauss.core.object_emergence_solver",
+        "project_object_emergence_prediction",
+    ),
     "project_object_states": ("objgauss.core.object_state", "project_object_states"),
     "project_object_states_from_field": ("objgauss.core.object_state", "project_object_states_from_field"),
     "project_points": ("objgauss.core.projection", "project_points"),
@@ -135,6 +167,14 @@ _EXPORTS = {
     ),
     "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
+    "validate_object_emergence_evidence": (
+        "objgauss.core.object_emergence_solver",
+        "validate_object_emergence_evidence",
+    ),
+    "validate_object_emergence_solver_state": (
+        "objgauss.core.object_emergence_solver",
+        "validate_object_emergence_solver_state",
+    ),
     "validate_object_state_stability_benchmark": (
         "objgauss.core.object_state_benchmark",
         "validate_object_state_stability_benchmark",

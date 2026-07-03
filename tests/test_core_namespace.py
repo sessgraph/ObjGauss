@@ -8,6 +8,9 @@ from objgauss.core import (
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
+    ObjectEmergenceAssignmentPrediction,
+    ObjectEmergenceEvidence,
+    ObjectEmergenceSolverState,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
@@ -29,13 +32,17 @@ from objgauss.core import (
     evaluate_training_renderer_loss,
     evaluate_gsplat_training_renderer_loss,
     gsplat_renderer_availability,
+    evidence_from_gaussian_cloud,
     initialize_object_field,
+    initialize_object_emergence_solver,
     image_target_contract_summary,
     make_trainable_image_target,
     make_trainable_kernel_mvp_fixture,
     match_object_states,
     object_state_delivery_summary,
     object_state_stability_report,
+    predict_object_emergence_assignment,
+    project_object_emergence_prediction,
     project_object_states_from_field,
     read_ply,
     renderer_loss_boundary_report,
@@ -44,6 +51,7 @@ from objgauss.core import (
     trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
+    validate_object_emergence_evidence,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -153,6 +161,37 @@ def test_core_namespace_exposes_object_field_kernel():
     initialized = initialize_object_field(_tiny_cloud(), slots=2, seed=3, max_iter=10)
     assert initialized.field.gaussian_count == 4
     assert initialized.field.slots == 2
+
+
+def test_core_namespace_exposes_object_emergence_solver_abi():
+    evidence = evidence_from_gaussian_cloud(_tiny_cloud(), source="namespace-test")
+    assert isinstance(evidence, ObjectEmergenceEvidence)
+    assert validate_object_emergence_evidence(evidence)[0].shape == (4, 3)
+    state = initialize_object_emergence_solver(
+        slots=2,
+        feature_dim=evidence.feature_dim,
+        seed=4,
+        scale=0.0,
+    )
+    assert isinstance(state, ObjectEmergenceSolverState)
+    state = ObjectEmergenceSolverState(
+        config=state.config,
+        feature_weights=np.zeros_like(state.feature_weights),
+        position_weights=np.array([[-3.0, 3.0], [0.0, 0.0], [0.0, 0.0]], dtype=np.float32),
+        bias=np.zeros(2, dtype=np.float32),
+        source="namespace-x-axis-split",
+    )
+    prediction = predict_object_emergence_assignment(evidence, state)
+    assert isinstance(prediction, ObjectEmergenceAssignmentPrediction)
+    assert prediction.assignment.shape == (4, 2)
+    np.testing.assert_allclose(prediction.assignment.sum(axis=1), np.ones(4), atol=1e-6)
+    projection = project_object_emergence_prediction(
+        _tiny_cloud(),
+        prediction,
+        evidence_features=evidence.features,
+    )
+    assert isinstance(projection.states[0], ObjectState)
+    assert projection.states[0].status == "active"
 
 
 def test_core_namespace_exposes_property_append_helper():
