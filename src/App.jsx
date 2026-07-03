@@ -53,6 +53,7 @@ export default function App() {
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
   const [objectOverlayMode, setObjectOverlayMode] = useState("full");
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
     modelId: "",
@@ -1514,7 +1515,11 @@ export default function App() {
       </div>
 
       {selected ? (
-        <section className="glassHud floatingInspector" data-floating-inspector="true">
+        <section
+          className={`glassHud floatingInspector ${inspectorCollapsed ? "collapsed" : ""}`}
+          data-floating-inspector="true"
+          data-inspector-collapsed={inspectorCollapsed ? "true" : "false"}
+        >
           <div className="inspectorHead">
             <span className="modelAccent large" style={{ background: selected.accent }} />
             <div>
@@ -1523,35 +1528,46 @@ export default function App() {
                 {selectedObject ? `Object ${selectedObject.objectId} / ${selected.kind}` : selected.kind}
               </span>
             </div>
+            <button
+              className="inspectorToggle"
+              type="button"
+              aria-expanded={!inspectorCollapsed}
+              data-inspector-collapse-button="true"
+              onClick={() => setInspectorCollapsed((value) => !value)}
+            >
+              {inspectorCollapsed ? "展开" : "收起"}
+            </button>
           </div>
-          <dl className="metaGrid">
-            <Meta label="加载状态" value={selected.message ?? selected.status} />
-            <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
-            <Meta label={selectedObject ? "对象展示点" : "展示点"} value={formatNumber(selectedObject?.displayCount ?? selected.displayCount)} />
-            <Meta label="对象" value={formatNumber(selected.objectCount)} />
-            <Meta label="对象 ID" value={selectedObject ? String(selectedObject.objectId) : "-"} />
-            <Meta label="核心点" value={formatVec(selectedObject?.corePoint ?? selected.corePoint)} />
-            <Meta label="对象位置" value={formatVec(selectedObject?.galleryPosition)} />
-            <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
-            <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
-            <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
-            <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
-            <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
-            <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
-            <Meta label="train loss" value={formatLoss(selectedTrainingEvidence?.finalTotalLoss)} />
-            <Meta label="loss delta" value={formatSignedLoss(selectedTrainingEvidence?.totalLossDelta)} />
-            <Meta label="solver loss" value={formatLoss(selectedSolverEvidence?.finalTotalLoss)} />
-            <Meta label="solver delta" value={formatSignedLoss(selectedSolverEvidence?.totalLossDelta)} />
-            <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
-            <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
-            <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
-            <Meta
-              label="OGC scope"
-              value={selected.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "-"}
-            />
-            <Meta label="assignment" value={selectedAssignmentSource} />
-            <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
-          </dl>
+          {inspectorCollapsed ? null : (
+            <dl className="metaGrid">
+              <Meta label="加载状态" value={selected.message ?? selected.status} />
+              <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
+              <Meta label={selectedObject ? "对象展示点" : "展示点"} value={formatNumber(selectedObject?.displayCount ?? selected.displayCount)} />
+              <Meta label="对象" value={formatNumber(selected.objectCount)} />
+              <Meta label="对象 ID" value={selectedObject ? String(selectedObject.objectId) : "-"} />
+              <Meta label="核心点" value={formatVec(selectedObject?.corePoint ?? selected.corePoint)} />
+              <Meta label="对象位置" value={formatVec(selectedObject?.galleryPosition)} />
+              <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
+              <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
+              <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
+              <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
+              <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
+              <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
+              <Meta label="train loss" value={formatLoss(selectedTrainingEvidence?.finalTotalLoss)} />
+              <Meta label="loss delta" value={formatSignedLoss(selectedTrainingEvidence?.totalLossDelta)} />
+              <Meta label="solver loss" value={formatLoss(selectedSolverEvidence?.finalTotalLoss)} />
+              <Meta label="solver delta" value={formatSignedLoss(selectedSolverEvidence?.totalLossDelta)} />
+              <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
+              <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
+              <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
+              <Meta
+                label="OGC scope"
+                value={selected.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "-"}
+              />
+              <Meta label="assignment" value={selectedAssignmentSource} />
+              <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
+            </dl>
+          )}
         </section>
       ) : null}
 
@@ -3226,6 +3242,8 @@ function DebugPanel({
     : [];
   const selectedOgcChunks = Array.isArray(selected.delivery?.chunkIds) ? selected.delivery.chunkIds : [];
   const selectedOgcChunkScope = formatChunkScope(selectedOgcChunks);
+  const visibleObjectCount = objectVisibility?.visibleObjectCount ?? Math.max(0, objects.length - hiddenObjects.size);
+  const objectToggleStatus = `${formatCount(visibleObjectCount)} / ${formatCount(objects.length)}`;
   return (
     <section
       className="glassHud debugPanel"
@@ -3305,242 +3323,270 @@ function DebugPanel({
     >
       <div className="debugHeader">
         <div>
-          <h2>ObjectState Debug</h2>
-          <span>{debugMode ? "assignment projection" : "appearance view"}</span>
+          <h2>ObjectState 调试</h2>
+          <span>{debugMode ? "Assignment 投影" : "外观视图"}</span>
         </div>
         <strong>{selectedObject ? `#${selectedObject.objectId}` : selected.label}</strong>
       </div>
 
-      <div className="debugMetrics">
-        <Metric label="conf" value={formatRatio(probeConfidence)} />
-        <Metric label="entropy" value={formatRatio(probeEntropy)} />
-        <Metric label="mass" value={formatNumber(activeState?.slotMass)} />
-        <Metric label="img loss" value={formatLoss(rendererLoss)} />
-      </div>
+      <DebugSection title="概览" status={stability?.status ?? "stable"} defaultOpen>
+        <div className="debugMetrics">
+          <Metric label="置信" value={formatRatio(probeConfidence)} />
+          <Metric label="熵" value={formatRatio(probeEntropy)} />
+          <Metric label="质量" value={formatNumber(activeState?.slotMass)} />
+          <Metric label="渲染损失" value={formatLoss(rendererLoss)} />
+        </div>
+        <StabilityDashboard stability={stability} />
+      </DebugSection>
 
-      <div
-        className="trainableFrameSelector debugLensSelector"
-        data-debug-lens-selector="true"
-        data-selected-lens={debugMode ? debugLens : "appearance"}
-        data-debug-enabled={debugMode ? "true" : "false"}
-      >
-        <span>lens</span>
-        {DEBUG_LENSES.map((lens) => (
-          <button
-            key={lens}
-            type="button"
-            className={debugMode && debugLens === lens ? "active" : ""}
-            data-debug-lens-button={lens}
-            data-active={debugMode && debugLens === lens ? "true" : "false"}
-            onClick={() => onSelectDebugLens?.(lens)}
-          >
-            {debugLensLabel(lens)}
-          </button>
-        ))}
-      </div>
-
-      <div
-        className="trainableFrameSelector objectOverlaySelector"
-        data-object-overlay-selector="true"
-        data-selected-overlay={objectOverlayMode}
-        data-overlay-debug-enabled={debugMode ? "true" : "false"}
-      >
-        <span>overlay</span>
-        {OBJECT_OVERLAY_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className={objectOverlayMode === mode ? "active" : ""}
-            data-object-overlay-button={mode}
-            data-active={objectOverlayMode === mode ? "true" : "false"}
-            onClick={() => onSelectObjectOverlayMode?.(mode)}
-          >
-            {objectOverlayLabel(mode)}
-          </button>
-        ))}
-      </div>
-
-      {frameCount > 1 ? (
+      <DebugSection title="常用操作" status={debugMode ? "调试中" : "外观"} defaultOpen>
         <div
-          className="trainableFrameSelector"
-          data-trainable-frame-selector="true"
-          data-selected-frame={selectedFrameIndex}
-          data-frame-count={frameCount}
+          className="trainableFrameSelector debugLensSelector"
+          data-debug-lens-selector="true"
+          data-selected-lens={debugMode ? debugLens : "appearance"}
+          data-debug-enabled={debugMode ? "true" : "false"}
         >
-          <span>frame</span>
-          {Array.from({ length: frameCount }, (_, index) => (
+          <span>视图</span>
+          {DEBUG_LENSES.map((lens) => (
             <button
-              key={index}
+              key={lens}
               type="button"
-              className={index === selectedFrameIndex ? "active" : ""}
-              data-trainable-frame-button={index}
-              data-active={index === selectedFrameIndex ? "true" : "false"}
-              onClick={() => onSelectTrainableFrame?.(index)}
+              className={debugMode && debugLens === lens ? "active" : ""}
+              data-debug-lens-button={lens}
+              data-active={debugMode && debugLens === lens ? "true" : "false"}
+              onClick={() => onSelectDebugLens?.(lens)}
             >
-              f{index}
+              {debugLensLabel(lens)}
             </button>
           ))}
         </div>
-      ) : null}
 
-      {ogcLodLevels.length > 1 ? (
         <div
-          className="trainableFrameSelector"
-          data-ogc-lod-selector="true"
-          data-selected-lod={selectedOgcLod}
-          data-lod-count={ogcLodLevels.length}
+          className="trainableFrameSelector objectOverlaySelector"
+          data-object-overlay-selector="true"
+          data-selected-overlay={objectOverlayMode}
+          data-overlay-debug-enabled={debugMode ? "true" : "false"}
         >
-          <span>lod</span>
-          {ogcLodLevels.map((level) => (
+          <span>叠层</span>
+          {OBJECT_OVERLAY_MODES.map((mode) => (
             <button
-              key={level}
+              key={mode}
               type="button"
-              className={level === selectedOgcLod ? "active" : ""}
-              data-ogc-lod-button={level}
-              data-active={level === selectedOgcLod ? "true" : "false"}
-              onClick={() => onSelectOgcLod?.(level)}
+              className={objectOverlayMode === mode ? "active" : ""}
+              data-object-overlay-button={mode}
+              data-active={objectOverlayMode === mode ? "true" : "false"}
+              onClick={() => onSelectObjectOverlayMode?.(mode)}
             >
-              L{level}
+              {objectOverlayLabel(mode)}
             </button>
           ))}
         </div>
-      ) : null}
 
-      {ogcChunkIds.length > 1 ? (
-        <div
-          className="trainableFrameSelector"
-          data-ogc-chunk-selector="true"
-          data-selected-chunks={selectedOgcChunkScope}
-          data-chunk-count={ogcChunkIds.length}
-        >
-          <span>chunk</span>
-          <button
-            type="button"
-            className={selectedOgcChunkScope === "all" ? "active" : ""}
-            data-ogc-chunk-button="all"
-            data-active={selectedOgcChunkScope === "all" ? "true" : "false"}
-            onClick={() => onSelectOgcChunks?.([])}
+        {frameCount > 1 ? (
+          <div
+            className="trainableFrameSelector"
+            data-trainable-frame-selector="true"
+            data-selected-frame={selectedFrameIndex}
+            data-frame-count={frameCount}
           >
-            all
-          </button>
-          {ogcChunkIds.map((chunkId) => (
+            <span>帧</span>
+            {Array.from({ length: frameCount }, (_, index) => (
+              <button
+                key={index}
+                type="button"
+                className={index === selectedFrameIndex ? "active" : ""}
+                data-trainable-frame-button={index}
+                data-active={index === selectedFrameIndex ? "true" : "false"}
+                onClick={() => onSelectTrainableFrame?.(index)}
+              >
+                f{index}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {ogcLodLevels.length > 1 ? (
+          <div
+            className="trainableFrameSelector"
+            data-ogc-lod-selector="true"
+            data-selected-lod={selectedOgcLod}
+            data-lod-count={ogcLodLevels.length}
+          >
+            <span>LOD</span>
+            {ogcLodLevels.map((level) => (
+              <button
+                key={level}
+                type="button"
+                className={level === selectedOgcLod ? "active" : ""}
+                data-ogc-lod-button={level}
+                data-active={level === selectedOgcLod ? "true" : "false"}
+                onClick={() => onSelectOgcLod?.(level)}
+              >
+                L{level}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {ogcChunkIds.length > 1 ? (
+          <div
+            className="trainableFrameSelector"
+            data-ogc-chunk-selector="true"
+            data-selected-chunks={selectedOgcChunkScope}
+            data-chunk-count={ogcChunkIds.length}
+          >
+            <span>分块</span>
             <button
-              key={chunkId}
               type="button"
-              className={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "active" : ""}
-              data-ogc-chunk-button={chunkId}
-              data-active={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "true" : "false"}
-              onClick={() => onSelectOgcChunks?.([chunkId])}
+              className={selectedOgcChunkScope === "all" ? "active" : ""}
+              data-ogc-chunk-button="all"
+              data-active={selectedOgcChunkScope === "all" ? "true" : "false"}
+              onClick={() => onSelectOgcChunks?.([])}
             >
-              c{chunkId}
+              全部
             </button>
-          ))}
-        </div>
-      ) : null}
+            {ogcChunkIds.map((chunkId) => (
+              <button
+                key={chunkId}
+                type="button"
+                className={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "active" : ""}
+                data-ogc-chunk-button={chunkId}
+                data-active={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "true" : "false"}
+                onClick={() => onSelectOgcChunks?.([chunkId])}
+              >
+                c{chunkId}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </DebugSection>
 
-      <AssignmentHeatmap
-        assignment={assignment}
-        selectedObject={selectedObject}
-        debugProbe={debugProbe}
-        assignmentProbe={assignmentProbe}
-      />
-      <AssignmentTimelinePanel timeline={assignmentTimeline} />
-      <ObjectFragmentationPanel
-        selectedObject={selectedObject}
-        objectContinuity={objectContinuity}
-        hoveredTarget={hoveredTarget}
-        hoverContinuity={hoverContinuity}
-      />
-      <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
-      <HoverAssignmentHeatmap
-        hoveredTarget={hoveredTarget}
-        hoverAssignmentProbe={hoverAssignmentProbe}
-      />
-      <ObjectStateVerdictPanel
-        objectExplainability={objectExplainability}
-        hoverExplainability={hoverExplainability}
-      />
-      <DebugSnapshotPanel
-        snapshot={debugSnapshot}
-        snapshotExport={snapshotExport}
-        sessionExport={sessionExport}
-        sessionImport={sessionImport}
-        onExportDebugSnapshot={onExportDebugSnapshot}
-        onExportDebugSession={onExportDebugSession}
-        onImportDebugSession={onImportDebugSession}
-      />
-      <DebugSessionArchivePanel
-        archive={debugSessionArchive}
-        sessionImport={sessionImport}
-        diff={debugSessionDiff}
-      />
-      <DebugEventTracePanel events={debugEvents} />
-      <StabilityDashboard stability={stability} />
-      <QualityReportPanel report={qualityReport} />
-      <ObjectStateBenchmarkPanel
-        benchmark={objectStateBenchmark}
-        activeCase={benchmarkCase}
-        onSelectCase={onSelectBenchmarkCase}
-      />
-      <TrainingEvidencePanel artifact={selected.trainableArtifact} />
-      <ObjectEmergenceSolverPanel artifact={selected.trainableArtifact} />
-
-      <dl className="debugStateGrid">
-        <Meta label="source" value={debugProbe?.source ?? activeState?.source} />
-        <Meta label="renderer" value={selected.delivery?.rendererName} />
-        <Meta label="gaussian n" value={debugProbe?.gaussianIndex ?? "-"} />
-        <Meta label="centroid" value={formatVec(activeState?.centroid)} />
-        <Meta label="bbox" value={formatBox(activeState?.bbox)} />
-        <Meta label="spatial" value={objectContinuity?.status ?? "-"} />
-        <Meta label="diag" value={formatRatio(objectContinuity?.bboxDiagonal)} />
-        <Meta label="motion" value={objectTemporal?.status ?? "-"} />
-        <Meta label="jitter" value={formatRatio(objectTemporal?.assignmentJitter)} />
-        <Meta label="explain" value={objectExplainability?.status ?? "-"} />
-        <Meta
-          label="hover"
-          value={
-            hoveredTarget
-              ? `${hoveredTarget.modelId} #${hoveredTarget.objectId} / ${formatNumber(hoveredTarget.gaussianCount)}G`
-              : "-"
-          }
+      <DebugSection title="分配 / Gaussian" status={assignmentProbe?.status ?? "none"} defaultOpen>
+        <AssignmentHeatmap
+          assignment={assignment}
+          selectedObject={selectedObject}
+          debugProbe={debugProbe}
+          assignmentProbe={assignmentProbe}
         />
-        <Meta label="hover focus" value={hoveredTarget?.selectionId ? "enabled" : "-"} />
-        <Meta label="hover A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
-        <Meta label="hover H" value={formatRatio(hoverAssignmentProbe?.entropy)} />
-        <Meta label="hover spatial" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
-        <Meta label="hover motion" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
-        <Meta
-          label="hover explain"
-          value={hoverExplainability?.status !== "none" ? hoverExplainability?.status : "-"}
+        <AssignmentTimelinePanel timeline={assignmentTimeline} />
+        <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
+        <HoverAssignmentHeatmap
+          hoveredTarget={hoveredTarget}
+          hoverAssignmentProbe={hoverAssignmentProbe}
         />
-        <Meta label="hidden" value={hiddenObjects.size} />
-        <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
-      </dl>
+      </DebugSection>
 
-      <div className="objectStateList" data-object-toggle-list="true">
-        {objects.map((object) => {
-          const hidden = hiddenObjects.has(object.selectionId);
-          const selectedRow = object.selectionId === selectedObjectKey;
-          return (
-            <button
-              key={object.selectionId}
-              type="button"
-              className={`objectStateRow ${selectedRow ? "selected" : ""} ${hidden ? "hidden" : ""}`}
-              data-object-toggle={object.selectionId}
-              data-object-visible={hidden ? "false" : "true"}
-              data-object-gaussians={objectGaussianCountForSummary(object)}
-              data-object-hidden-gaussians={hidden ? objectGaussianCountForSummary(object) : 0}
-              onClick={() => onToggleObjectVisibility(object)}
-            >
-              <span className="modelAccent" style={{ background: object.accent }} />
-              <span>#{object.objectId}</span>
-              <small>{formatRatio(object.objectState?.confidence)}</small>
-              <i>{hidden ? "off" : "on"}</i>
-            </button>
-          );
-        })}
-      </div>
+      <DebugSection title="对象诊断" status={objectExplainability?.status ?? objectContinuity?.status ?? "-"} defaultOpen>
+        <ObjectFragmentationPanel
+          selectedObject={selectedObject}
+          objectContinuity={objectContinuity}
+          hoveredTarget={hoveredTarget}
+          hoverContinuity={hoverContinuity}
+        />
+        <ObjectStateVerdictPanel
+          objectExplainability={objectExplainability}
+          hoverExplainability={hoverExplainability}
+        />
+        <dl className="debugStateGrid">
+          <Meta label="来源" value={debugProbe?.source ?? activeState?.source} />
+          <Meta label="渲染器" value={selected.delivery?.rendererName} />
+          <Meta label="Gaussian" value={debugProbe?.gaussianIndex ?? "-"} />
+          <Meta label="中心点" value={formatVec(activeState?.centroid)} />
+          <Meta label="包围盒" value={formatBox(activeState?.bbox)} />
+          <Meta label="空间" value={objectContinuity?.status ?? "-"} />
+          <Meta label="对角线" value={formatRatio(objectContinuity?.bboxDiagonal)} />
+          <Meta label="时序" value={objectTemporal?.status ?? "-"} />
+          <Meta label="抖动" value={formatRatio(objectTemporal?.assignmentJitter)} />
+          <Meta label="解释性" value={objectExplainability?.status ?? "-"} />
+          <Meta
+            label="悬停"
+            value={
+              hoveredTarget
+                ? `${hoveredTarget.modelId} #${hoveredTarget.objectId} / ${formatNumber(hoveredTarget.gaussianCount)}G`
+                : "-"
+            }
+          />
+          <Meta label="高亮" value={hoveredTarget?.selectionId ? "启用" : "-"} />
+          <Meta label="悬停 A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
+          <Meta label="悬停熵" value={formatRatio(hoverAssignmentProbe?.entropy)} />
+          <Meta label="悬停空间" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
+          <Meta label="悬停时序" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
+          <Meta
+            label="悬停解释"
+            value={hoverExplainability?.status !== "none" ? hoverExplainability?.status : "-"}
+          />
+          <Meta label="隐藏对象" value={hiddenObjects.size} />
+          <Meta label="隐藏点" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
+        </dl>
+      </DebugSection>
+
+      <DebugSection title="对象开关" status={objectToggleStatus} defaultOpen>
+        <div className="objectStateList" data-object-toggle-list="true">
+          {objects.map((object) => {
+            const hidden = hiddenObjects.has(object.selectionId);
+            const selectedRow = object.selectionId === selectedObjectKey;
+            return (
+              <button
+                key={object.selectionId}
+                type="button"
+                className={`objectStateRow ${selectedRow ? "selected" : ""} ${hidden ? "hidden" : ""}`}
+                data-object-toggle={object.selectionId}
+                data-object-visible={hidden ? "false" : "true"}
+                data-object-gaussians={objectGaussianCountForSummary(object)}
+                data-object-hidden-gaussians={hidden ? objectGaussianCountForSummary(object) : 0}
+                onClick={() => onToggleObjectVisibility(object)}
+              >
+                <span className="modelAccent" style={{ background: object.accent }} />
+                <span>#{object.objectId}</span>
+                <small>{formatRatio(object.objectState?.confidence)}</small>
+                <i>{hidden ? "关" : "开"}</i>
+              </button>
+            );
+          })}
+        </div>
+      </DebugSection>
+
+      <DebugSection title="协议与归档" status={sessionImport?.status ?? "idle"}>
+        <DebugSnapshotPanel
+          snapshot={debugSnapshot}
+          snapshotExport={snapshotExport}
+          sessionExport={sessionExport}
+          sessionImport={sessionImport}
+          onExportDebugSnapshot={onExportDebugSnapshot}
+          onExportDebugSession={onExportDebugSession}
+          onImportDebugSession={onImportDebugSession}
+        />
+        <DebugSessionArchivePanel
+          archive={debugSessionArchive}
+          sessionImport={sessionImport}
+          diff={debugSessionDiff}
+        />
+        <DebugEventTracePanel events={debugEvents} />
+      </DebugSection>
+
+      <DebugSection title="质量 / 训练 / 基准" status={qualityReport?.status ?? objectStateBenchmark?.status ?? "-"}>
+        <QualityReportPanel report={qualityReport} />
+        <ObjectStateBenchmarkPanel
+          benchmark={objectStateBenchmark}
+          activeCase={benchmarkCase}
+          onSelectCase={onSelectBenchmarkCase}
+        />
+        <TrainingEvidencePanel artifact={selected.trainableArtifact} />
+        <ObjectEmergenceSolverPanel artifact={selected.trainableArtifact} />
+      </DebugSection>
     </section>
+  );
+}
+
+function DebugSection({ title, status = "", defaultOpen = false, children }) {
+  return (
+    <details className="debugSection" open={defaultOpen}>
+      <summary>
+        <span>{title}</span>
+        {status ? <strong>{status}</strong> : null}
+      </summary>
+      <div className="debugSectionBody">{children}</div>
+    </details>
   );
 }
 
@@ -3578,19 +3624,19 @@ function ObjectStateVerdictPanel({ objectExplainability, hoverExplainability }) 
       data-hover-verdict-temporal-status={hover?.temporalStatus ?? ""}
     >
       <div className="stabilityHead">
-        <span>Verdict</span>
+        <span>解释判定</span>
         <strong>{selected?.status ?? "-"}</strong>
       </div>
       <div className="stabilityGrid verdictGrid">
-        <Metric label="score" value={formatRatio(selected?.score)} />
-        <Metric label="margin" value={formatRatio(selected?.assignmentMargin)} />
-        <Metric label="spatial" value={selected?.continuityStatus || "-"} />
-        <Metric label="motion" value={selected?.temporalStatus || "-"} />
+        <Metric label="分数" value={formatRatio(selected?.score)} />
+        <Metric label="边际" value={formatRatio(selected?.assignmentMargin)} />
+        <Metric label="空间" value={selected?.continuityStatus || "-"} />
+        <Metric label="时序" value={selected?.temporalStatus || "-"} />
       </div>
       <dl className="stabilityMeta trainingMeta">
-        <Meta label="A conf" value={formatRatio(selected?.assignmentConfidence)} />
-        <Meta label="A entropy" value={formatRatio(selected?.assignmentEntropy)} />
-        <Meta label="reasons" value={selected?.reasonNames || "clear"} />
+        <Meta label="A 置信" value={formatRatio(selected?.assignmentConfidence)} />
+        <Meta label="A 熵" value={formatRatio(selected?.assignmentEntropy)} />
+        <Meta label="原因" value={selected?.reasonNames || "clear"} />
       </dl>
       <div
         className="qualityGateRows objectVerdictRows"
@@ -3614,9 +3660,9 @@ function ObjectStateVerdictPanel({ objectExplainability, hoverExplainability }) 
       {hoverActive ? (
         <>
           <dl className="stabilityMeta trainingMeta hoverVerdictMeta" data-hover-verdict-meta="true">
-            <Meta label="hover" value={hover.status} />
-            <Meta label="score" value={formatRatio(hover.score)} />
-            <Meta label="reasons" value={hover.reasonNames || "clear"} />
+            <Meta label="悬停" value={hover.status} />
+            <Meta label="分数" value={formatRatio(hover.score)} />
+            <Meta label="原因" value={hover.reasonNames || "clear"} />
           </dl>
           <div
             className="qualityGateRows objectVerdictRows"
@@ -3655,7 +3701,7 @@ function DebugEventTracePanel({ events }) {
       data-debug-event-schema={recent[0]?.schema ?? ""}
     >
       <div className="stabilityHead">
-        <span>Trace</span>
+        <span>事件轨迹</span>
         <strong>{recent[0]?.type ?? "-"}</strong>
       </div>
       <div className="debugEventRows">
@@ -3754,7 +3800,7 @@ function DebugSnapshotPanel({
       data-debug-session-import-schema={sessionImport?.schema ?? ""}
     >
       <div className="stabilityHead">
-        <span>Protocol</span>
+        <span>调试协议</span>
         <div className="snapshotActions">
           <strong>snapshot-v1</strong>
           <button
@@ -3784,29 +3830,29 @@ function DebugSnapshotPanel({
         </div>
       </div>
       <dl className="stabilityMeta snapshotMeta">
-        <Meta label="model" value={snapshot.model.id} />
-        <Meta label="object" value={snapshot.selection.objectId ?? "-"} />
-        <Meta label="lens" value={snapshot.debug.lens} />
-        <Meta label="overlay" value={snapshot.debug.overlayMode} />
-        <Meta label="slots" value={formatCount(snapshot.assignment.slotCount)} />
-        <Meta label="source" value={snapshot.assignment.source} />
-        <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
-        <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
-        <Meta label="timeline" value={snapshot.assignment.timeline?.status ?? "-"} />
-        <Meta label="A jitter" value={formatRatio(snapshot.assignment.timeline?.meanDelta)} />
-        <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
-        <Meta label="spatial" value={snapshot.continuity?.status ?? "-"} />
-        <Meta label="diag" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
-        <Meta label="motion" value={snapshot.temporal?.status ?? "-"} />
-        <Meta label="explain" value={snapshot.explainability?.status ?? "-"} />
-        <Meta label="hover A" value={snapshot.hover?.probe?.status ?? "-"} />
-        <Meta label="hover spatial" value={snapshot.hover?.continuity?.status ?? "-"} />
-        <Meta label="hover motion" value={snapshot.hover?.temporal?.status ?? "-"} />
-        <Meta label="hover explain" value={snapshot.hover?.explainability?.status ?? "-"} />
-        <Meta label="state" value={snapshot.stability.status} />
-        <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
-        <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
-        <Meta label="archive" value={sessionImport?.fileName || sessionImport?.status || "idle"} />
+        <Meta label="模型" value={snapshot.model.id} />
+        <Meta label="对象" value={snapshot.selection.objectId ?? "-"} />
+        <Meta label="视图" value={snapshot.debug.lens} />
+        <Meta label="叠层" value={snapshot.debug.overlayMode} />
+        <Meta label="槽位" value={formatCount(snapshot.assignment.slotCount)} />
+        <Meta label="来源" value={snapshot.assignment.source} />
+        <Meta label="探针" value={snapshot.assignment.probe?.status ?? "-"} />
+        <Meta label="边际" value={formatRatio(snapshot.assignment.probe?.margin)} />
+        <Meta label="时间线" value={snapshot.assignment.timeline?.status ?? "-"} />
+        <Meta label="A 抖动" value={formatRatio(snapshot.assignment.timeline?.meanDelta)} />
+        <Meta label="隐藏点" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
+        <Meta label="空间" value={snapshot.continuity?.status ?? "-"} />
+        <Meta label="对角线" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
+        <Meta label="时序" value={snapshot.temporal?.status ?? "-"} />
+        <Meta label="解释性" value={snapshot.explainability?.status ?? "-"} />
+        <Meta label="悬停 A" value={snapshot.hover?.probe?.status ?? "-"} />
+        <Meta label="悬停空间" value={snapshot.hover?.continuity?.status ?? "-"} />
+        <Meta label="悬停时序" value={snapshot.hover?.temporal?.status ?? "-"} />
+        <Meta label="悬停解释" value={snapshot.hover?.explainability?.status ?? "-"} />
+        <Meta label="状态" value={snapshot.stability.status} />
+        <Meta label="导出" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
+        <Meta label="会话" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
+        <Meta label="归档" value={sessionImport?.fileName || sessionImport?.status || "idle"} />
       </dl>
     </div>
   );
@@ -3839,28 +3885,28 @@ function DebugSessionArchivePanel({ archive, sessionImport, diff }) {
       data-debug-session-diff-fields={diff?.changedFieldNames ?? ""}
     >
       <div className="stabilityHead">
-        <span>Archive</span>
+        <span>会话归档</span>
         <strong>{archive?.snapshot?.model?.id ?? sessionImport?.status ?? "-"}</strong>
       </div>
       <dl className="stabilityMeta snapshotMeta">
-        <Meta label="file" value={sessionImport?.fileName || "-"} />
+        <Meta label="文件" value={sessionImport?.fileName || "-"} />
         <Meta label="schema" value={archive?.schema || sessionImport?.schema || "-"} />
-        <Meta label="models" value={formatCount(archive?.models?.length)} />
-        <Meta label="events" value={formatCount(archive?.events?.length)} />
-        <Meta label="quality" value={archive?.snapshot?.quality?.status ?? "-"} />
-        <Meta label="error" value={sessionImport?.error || "-"} />
+        <Meta label="模型" value={formatCount(archive?.models?.length)} />
+        <Meta label="事件" value={formatCount(archive?.events?.length)} />
+        <Meta label="质量" value={archive?.snapshot?.quality?.status ?? "-"} />
+        <Meta label="错误" value={sessionImport?.error || "-"} />
       </dl>
       {diff ? (
         <dl className="stabilityMeta snapshotMeta debugSessionDiffMeta" data-debug-session-diff="true">
-          <Meta label="diff" value={diff.status} />
-          <Meta label="model" value={diff.modelMatch ? "match" : "changed"} />
-          <Meta label="source" value={diff.sourceMatch ? "match" : "changed"} />
-          <Meta label="quality" value={diff.qualityMatch ? "match" : "changed"} />
-          <Meta label="d slots" value={formatSignedCount(diff.slotDelta)} />
-          <Meta label="d H" value={formatSignedRatio(diff.entropyDelta)} />
-          <Meta label="d conf" value={formatSignedRatio(diff.confidenceDelta)} />
-          <Meta label="d events" value={formatSignedCount(diff.eventDelta)} />
-          <Meta label="fields" value={diff.changedFieldNames || "-"} />
+          <Meta label="差异" value={diff.status} />
+          <Meta label="模型" value={diff.modelMatch ? "match" : "changed"} />
+          <Meta label="来源" value={diff.sourceMatch ? "match" : "changed"} />
+          <Meta label="质量" value={diff.qualityMatch ? "match" : "changed"} />
+          <Meta label="槽位差" value={formatSignedCount(diff.slotDelta)} />
+          <Meta label="熵差" value={formatSignedRatio(diff.entropyDelta)} />
+          <Meta label="置信差" value={formatSignedRatio(diff.confidenceDelta)} />
+          <Meta label="事件差" value={formatSignedCount(diff.eventDelta)} />
+          <Meta label="字段" value={diff.changedFieldNames || "-"} />
         </dl>
       ) : null}
       {recent.length ? (
@@ -3906,20 +3952,20 @@ function TrainingEvidencePanel({ artifact }) {
       data-training-final-temporal-loss={summary.finalTemporalLoss ?? ""}
     >
       <div className="stabilityHead">
-        <span>Training</span>
+        <span>训练证据</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid trainingGrid">
-        <Metric label="total" value={formatLoss(summary.finalTotalLoss)} />
-        <Metric label="image" value={formatLoss(summary.finalImageLoss)} />
-        <Metric label="object" value={formatLoss(summary.finalObjectLoss)} />
-        <Metric label="temp" value={formatLoss(summary.finalTemporalLoss)} />
+        <Metric label="总损失" value={formatLoss(summary.finalTotalLoss)} />
+        <Metric label="图像" value={formatLoss(summary.finalImageLoss)} />
+        <Metric label="对象" value={formatLoss(summary.finalObjectLoss)} />
+        <Metric label="时序" value={formatLoss(summary.finalTemporalLoss)} />
       </div>
       <dl className="stabilityMeta trainingMeta">
-        <Meta label="delta" value={formatSignedLoss(summary.totalLossDelta)} />
-        <Meta label="iter" value={formatCount(summary.iterations)} />
-        <Meta label="renderer" value={summary.rendererName} />
-        <Meta label="grad" value={summary.gradientPath} />
+        <Meta label="变化" value={formatSignedLoss(summary.totalLossDelta)} />
+        <Meta label="迭代" value={formatCount(summary.iterations)} />
+        <Meta label="渲染器" value={summary.rendererName} />
+        <Meta label="梯度" value={summary.gradientPath} />
       </dl>
     </div>
   );
@@ -3956,24 +4002,24 @@ function ObjectEmergenceSolverPanel({ artifact }) {
       data-solver-training-target-source={summary.targetSource}
     >
       <div className="stabilityHead">
-        <span>Solver</span>
+        <span>Solver 训练</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid trainingGrid">
-        <Metric label="total" value={formatLoss(summary.finalTotalLoss)} />
-        <Metric label="assign" value={formatLoss(summary.finalAssignmentLoss)} />
-        <Metric label="H" value={formatLoss(summary.finalEntropyLoss)} />
-        <Metric label="balance" value={formatLoss(summary.finalBalanceLoss)} />
+        <Metric label="总损失" value={formatLoss(summary.finalTotalLoss)} />
+        <Metric label="分配" value={formatLoss(summary.finalAssignmentLoss)} />
+        <Metric label="熵" value={formatLoss(summary.finalEntropyLoss)} />
+        <Metric label="均衡" value={formatLoss(summary.finalBalanceLoss)} />
       </div>
       <dl className="stabilityMeta trainingMeta">
-        <Meta label="delta" value={formatSignedLoss(summary.totalLossDelta)} />
-        <Meta label="A delta" value={formatSignedLoss(summary.assignmentLossDelta)} />
-        <Meta label="iter" value={formatCount(summary.iterations)} />
-        <Meta label="slots" value={formatCount(summary.slots)} />
-        <Meta label="sample" value={formatCount(summary.sampledGaussians)} />
-        <Meta label="gpu" value={summary.gpuUsed ? "used" : "false"} />
-        <Meta label="reserve" value={summary.vramReserveGb === null ? "-" : `${summary.vramReserveGb} GB`} />
-        <Meta label="target" value={summary.targetSource} />
+        <Meta label="变化" value={formatSignedLoss(summary.totalLossDelta)} />
+        <Meta label="A 变化" value={formatSignedLoss(summary.assignmentLossDelta)} />
+        <Meta label="迭代" value={formatCount(summary.iterations)} />
+        <Meta label="槽位" value={formatCount(summary.slots)} />
+        <Meta label="样本" value={formatCount(summary.sampledGaussians)} />
+        <Meta label="GPU" value={summary.gpuUsed ? "used" : "false"} />
+        <Meta label="预留" value={summary.vramReserveGb === null ? "-" : `${summary.vramReserveGb} GB`} />
+        <Meta label="目标" value={summary.targetSource} />
       </dl>
     </div>
   );
@@ -3999,19 +4045,19 @@ function QualityReportPanel({ report }) {
       data-quality-report-failing-gate-names={summary.failingGateNames}
     >
       <div className="stabilityHead">
-        <span>Quality</span>
+        <span>质量报告</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid trainingGrid">
-        <Metric label="H" value={formatRatio(summary.assignmentEntropy)} />
-        <Metric label="purity" value={formatRatio(summary.objectPurity)} />
-        <Metric label="drift" value={formatRatio(summary.temporalDrift)} />
-        <Metric label="jitter" value={formatRatio(summary.assignmentJitter)} />
+        <Metric label="熵" value={formatRatio(summary.assignmentEntropy)} />
+        <Metric label="纯度" value={formatRatio(summary.objectPurity)} />
+        <Metric label="漂移" value={formatRatio(summary.temporalDrift)} />
+        <Metric label="抖动" value={formatRatio(summary.assignmentJitter)} />
       </div>
       <dl className="stabilityMeta trainingMeta">
         <Meta label="schema" value={summary.schema} />
-        <Meta label="gates" value={`${formatCount(summary.passingGates)} / ${formatCount(summary.gateCount)}`} />
-        <Meta label="slot" value={formatRatio(summary.slotUtilization)} />
+        <Meta label="门禁" value={`${formatCount(summary.passingGates)} / ${formatCount(summary.gateCount)}`} />
+        <Meta label="槽位" value={formatRatio(summary.slotUtilization)} />
         <Meta label="bbox" value={formatRatio(summary.bboxStability)} />
       </dl>
       {summary.gates.length ? (
@@ -4069,20 +4115,20 @@ function ObjectStateBenchmarkPanel({ benchmark, activeCase, onSelectCase }) {
       data-object-state-benchmark-active-dynamic-proposals={selectedCase?.dynamicProposalCount ?? ""}
     >
       <div className="stabilityHead">
-        <span>Benchmark</span>
+        <span>稳定性基准</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid trainingGrid">
-        <Metric label="cases" value={formatCount(summary.caseCount)} />
-        <Metric label="warn" value={formatCount(summary.warnCount)} />
-        <Metric label="observed" value={formatCount(summary.observedWarnCount)} />
-        <Metric label="modes" value={formatCount(summary.failureModeCount)} />
+        <Metric label="用例" value={formatCount(summary.caseCount)} />
+        <Metric label="警告" value={formatCount(summary.warnCount)} />
+        <Metric label="观测" value={formatCount(summary.observedWarnCount)} />
+        <Metric label="模式" value={formatCount(summary.failureModeCount)} />
       </div>
       <dl className="stabilityMeta trainingMeta">
         <Meta label="schema" value={summary.schema} />
-        <Meta label="report" value={summary.reportId} />
-        <Meta label="coverage" value={formatCount(summary.failureModeCount)} />
-        <Meta label="path" value={summary.path || "-"} />
+        <Meta label="报告" value={summary.reportId} />
+        <Meta label="覆盖" value={formatCount(summary.failureModeCount)} />
+        <Meta label="路径" value={summary.path || "-"} />
       </dl>
       {selectedCase ? (
         <>
@@ -4090,15 +4136,15 @@ function ObjectStateBenchmarkPanel({ benchmark, activeCase, onSelectCase }) {
             className="stabilityGrid trainingGrid benchmarkCaseGrid"
             data-object-state-benchmark-active-metrics="true"
           >
-            <Metric label="conf" value={formatRatio(selectedCase.assignmentConfidence)} />
-            <Metric label="H" value={formatRatio(selectedCase.meanEntropy)} />
-            <Metric label="purity" value={formatRatio(selectedCase.objectPurity)} />
-            <Metric label="drift" value={formatRatio(selectedCase.meanTemporalDrift)} />
+            <Metric label="置信" value={formatRatio(selectedCase.assignmentConfidence)} />
+            <Metric label="熵" value={formatRatio(selectedCase.meanEntropy)} />
+            <Metric label="纯度" value={formatRatio(selectedCase.objectPurity)} />
+            <Metric label="漂移" value={formatRatio(selectedCase.meanTemporalDrift)} />
           </div>
           <dl className="stabilityMeta trainingMeta benchmarkCaseMeta">
-            <Meta label="case" value={selectedCase.name} />
-            <Meta label="diag" value={selectedCase.diagnosticNames || "-"} />
-            <Meta label="modes" value={selectedCase.failureModeNames || "-"} />
+            <Meta label="用例" value={selectedCase.name} />
+            <Meta label="诊断" value={selectedCase.diagnosticNames || "-"} />
+            <Meta label="模式" value={selectedCase.failureModeNames || "-"} />
             <Meta label="dynK" value={formatCount(selectedCase.dynamicProposalCount)} />
           </dl>
         </>
@@ -4157,26 +4203,26 @@ function StabilityDashboard({ stability }) {
       data-mean-bbox-stability={summary.meanBboxStability ?? ""}
     >
       <div className="stabilityHead">
-        <span>Stability</span>
+        <span>稳定性</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid">
-        <Metric label="slot util" value={formatRatio(summary.slotUtilization)} />
-        <Metric label="mean H" value={formatRatio(summary.meanEntropy)} />
-        <Metric label="mixed" value={formatCount(summary.mixedSlots)} />
-        <Metric label="low conf" value={formatCount(summary.lowConfidenceSlots)} />
+        <Metric label="槽利用" value={formatRatio(summary.slotUtilization)} />
+        <Metric label="平均熵" value={formatRatio(summary.meanEntropy)} />
+        <Metric label="混合" value={formatCount(summary.mixedSlots)} />
+        <Metric label="低置信" value={formatCount(summary.lowConfidenceSlots)} />
       </div>
       <div className="stabilityBars">
-        <StabilityBar label="confidence" value={summary.meanConfidence} invert={false} />
-        <StabilityBar label="entropy" value={summary.meanEntropy} invert />
-        <StabilityBar label="compact" value={summary.meanSpatialCompactness} available={summary.spatialAvailable} />
-        <StabilityBar label="jitter" value={summary.meanAssignmentJitter} available={summary.jitterAvailable} invert />
+        <StabilityBar label="置信" value={summary.meanConfidence} invert={false} />
+        <StabilityBar label="熵" value={summary.meanEntropy} invert />
+        <StabilityBar label="紧凑" value={summary.meanSpatialCompactness} available={summary.spatialAvailable} />
+        <StabilityBar label="抖动" value={summary.meanAssignmentJitter} available={summary.jitterAvailable} invert />
       </div>
       <dl className="stabilityMeta">
-        <Meta label="purity" value={summary.purityAvailable ? formatRatio(summary.meanPurity) : "n/a"} />
-        <Meta label="spatial" value={summary.spatialAvailable ? formatRatio(summary.meanSpatialCompactness) : "n/a"} />
-        <Meta label="drift" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
-        <Meta label="jitter" value={summary.jitterAvailable ? formatRatio(summary.meanAssignmentJitter) : "n/a"} />
+        <Meta label="纯度" value={summary.purityAvailable ? formatRatio(summary.meanPurity) : "n/a"} />
+        <Meta label="空间" value={summary.spatialAvailable ? formatRatio(summary.meanSpatialCompactness) : "n/a"} />
+        <Meta label="漂移" value={summary.temporalAvailable ? formatRatio(summary.meanTemporalDrift) : "n/a"} />
+        <Meta label="抖动" value={summary.jitterAvailable ? formatRatio(summary.meanAssignmentJitter) : "n/a"} />
         <Meta label="bbox" value={summary.bboxAvailable ? formatRatio(summary.meanBboxStability) : "n/a"} />
       </dl>
     </div>
@@ -4275,31 +4321,31 @@ function GaussianProbePanel({ debugProbe, assignmentProbe }) {
       data-gaussian-probe-position={formatVec(debugProbe?.position)}
     >
       <div className="stabilityHead">
-        <span>Gaussian Probe</span>
+        <span>Gaussian 探针</span>
         <strong>{status}</strong>
       </div>
       <div className="stabilityGrid probeGrid">
         <Metric label="n" value={index === "" ? "-" : index} />
         <Metric label="top k" value={assignmentProbe?.topSlot ?? "-"} />
-        <Metric label="margin" value={formatRatio(assignmentProbe?.margin)} />
-        <Metric label="conf" value={formatRatio(assignmentProbe?.confidence)} />
+        <Metric label="边际" value={formatRatio(assignmentProbe?.margin)} />
+        <Metric label="置信" value={formatRatio(assignmentProbe?.confidence)} />
       </div>
       <dl className="metaGrid trainingMeta probeMetaGrid">
-        <Meta label="source" value={source} />
-        <Meta label="position" value={formatVec(debugProbe?.position)} />
-        <Meta label="opacity" value={formatRatio(debugProbe?.opacity)} />
-        <Meta label="entropy" value={formatRatio(assignmentProbe?.entropy)} />
-        <Meta label="top prob" value={formatRatio(assignmentProbe?.topProbability)} />
-        <Meta label="second" value={formatRatio(assignmentProbe?.secondProbability)} />
+        <Meta label="来源" value={source} />
+        <Meta label="位置" value={formatVec(debugProbe?.position)} />
+        <Meta label="透明" value={formatRatio(debugProbe?.opacity)} />
+        <Meta label="熵" value={formatRatio(assignmentProbe?.entropy)} />
+        <Meta label="top 概率" value={formatRatio(assignmentProbe?.topProbability)} />
+        <Meta label="第二" value={formatRatio(assignmentProbe?.secondProbability)} />
       </dl>
       <div className="qualityGateRows probeFlagRows" data-gaussian-probe-flags="true">
         <div className={`qualityGateRow ${ambiguous ? "warn" : "pass"}`}>
-          <span>ambiguous</span>
+          <span>歧义</span>
           <small>{assignmentProbe?.margin !== null && assignmentProbe?.margin !== undefined ? formatRatio(assignmentProbe.margin) : "n/a"}</small>
           <strong>{ambiguous ? "true" : "false"}</strong>
         </div>
         <div className={`qualityGateRow ${collapseRisk ? "warn" : "pass"}`}>
-          <span>collapse</span>
+          <span>塌缩</span>
           <small>{formatRatio(assignmentProbe?.topProbability)}</small>
           <strong>{collapseRisk ? "true" : "false"}</strong>
         </div>
@@ -4324,14 +4370,14 @@ function AssignmentTimelinePanel({ timeline }) {
       data-assignment-timeline-slot-count={timeline.slotCount ?? ""}
     >
       <div className="stabilityHead">
-        <span>Assignment Timeline</span>
+        <span>Assignment 时间线</span>
         <strong>{timeline.status}</strong>
       </div>
       <div className="stabilityGrid timelineGrid">
-        <Metric label="frames" value={timeline.frameCount} />
+        <Metric label="帧数" value={timeline.frameCount} />
         <Metric label="n" value={timeline.gaussianIndex ?? "-"} />
-        <Metric label="jitter" value={formatRatio(timeline.meanDelta)} />
-        <Metric label="max d" value={formatRatio(timeline.maxDelta)} />
+        <Metric label="抖动" value={formatRatio(timeline.meanDelta)} />
+        <Metric label="最大差" value={formatRatio(timeline.maxDelta)} />
       </div>
       <div className="assignmentTimelineRows">
         {timeline.frames.map((frame) => (
@@ -4403,14 +4449,14 @@ function ObjectFragmentationPanel({ selectedObject, objectContinuity, hoveredTar
       data-hover-fragmentation-centroid-contained={hoverActive && hover.centroidContained ? "true" : "false"}
     >
       <div className="stabilityHead">
-        <span>Object Fragmentation</span>
+        <span>对象碎片化</span>
         <strong>{selected.status}</strong>
       </div>
       <div className="stabilityGrid fragmentationGrid">
         <Metric label="G" value={formatCount(selected.gaussianCount)} />
-        <Metric label="compact" value={formatRatio(selected.spatialCompactness)} />
-        <Metric label="diag" value={formatRatio(selected.bboxDiagonal)} />
-        <Metric label="density" value={formatRatio(selected.gaussianDensity)} />
+        <Metric label="紧凑" value={formatRatio(selected.spatialCompactness)} />
+        <Metric label="对角线" value={formatRatio(selected.bboxDiagonal)} />
+        <Metric label="密度" value={formatRatio(selected.gaussianDensity)} />
       </div>
       <div className="qualityGateRows fragmentFlagRows" data-object-fragmentation-flags="true">
         <div className={`qualityGateRow ${selected.bboxValid ? "pass" : "warn"}`}>
@@ -4419,22 +4465,22 @@ function ObjectFragmentationPanel({ selectedObject, objectContinuity, hoveredTar
           <strong>{selected.bboxValid ? "valid" : "bad"}</strong>
         </div>
         <div className={`qualityGateRow ${selected.centroidContained ? "pass" : "warn"}`}>
-          <span>centroid</span>
+          <span>中心点</span>
           <small>{formatVec(selected.centroid)}</small>
           <strong>{selected.centroidContained ? "inside" : "outside"}</strong>
         </div>
         <div className={`qualityGateRow ${fragmented ? "warn" : "pass"}`}>
-          <span>fragmented</span>
+          <span>碎片化</span>
           <small>{formatRatio(selected.spatialCompactness)}</small>
           <strong>{fragmented ? "true" : "false"}</strong>
         </div>
       </div>
       {hoverActive ? (
         <dl className="stabilityMeta trainingMeta fragmentationHoverMeta" data-hover-fragmentation-meta="true">
-          <Meta label="hover" value={`#${hoveredTarget.objectId}`} />
-          <Meta label="status" value={hover.status} />
+          <Meta label="悬停" value={`#${hoveredTarget.objectId}`} />
+          <Meta label="状态" value={hover.status} />
           <Meta label="G" value={formatCount(hover.gaussianCount)} />
-          <Meta label="compact" value={formatRatio(hover.spatialCompactness)} />
+          <Meta label="紧凑" value={formatRatio(hover.spatialCompactness)} />
         </dl>
       ) : null}
     </div>
@@ -4465,7 +4511,7 @@ function HoverAssignmentHeatmap({ hoveredTarget, hoverAssignmentProbe }) {
         data-hover-assignment-probe="true"
         data-hover-assignment-probe-status={hoverAssignmentProbe?.status ?? "none"}
       >
-        <span>hover A</span>
+        <span>悬停 A</span>
         <strong>k{hoverAssignmentProbe?.topSlot ?? "-"}</strong>
         <small>{formatRatio(hoverAssignmentProbe?.topProbability)}</small>
         <small>{formatRatio(hoverAssignmentProbe?.margin)}</small>
@@ -5280,17 +5326,17 @@ function objectOverlayShows(mode, target) {
 }
 
 function objectOverlayLabel(mode) {
-  if (mode === "bbox") return "bbox";
-  if (mode === "centroid") return "center";
-  if (mode === "off") return "off";
-  return "full";
+  if (mode === "bbox") return "框";
+  if (mode === "centroid") return "中心";
+  if (mode === "off") return "关闭";
+  return "全部";
 }
 
 function debugLensLabel(lens) {
-  if (lens === "confidence") return "conf";
-  if (lens === "entropy") return "H";
-  if (lens === "opacity") return "opac";
-  return "assign";
+  if (lens === "confidence") return "置信";
+  if (lens === "entropy") return "熵";
+  if (lens === "opacity") return "透明";
+  return "分配";
 }
 
 function debugConfidenceColor(confidence) {

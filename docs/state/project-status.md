@@ -106,6 +106,13 @@ assignment loss delta、slots、sample count、`gpu_used=false` 和 `vram_reserv
 和 1GB 显存预留策略。该步骤只做训练结果 handoff / 可视审计，不启动 torch / gsplat /
 CUDA full renderer training，不提交 checkpoint 或大训练产物。
 
+同日已完成 `DEBUG-UI-HIERARCHY-001`：ObjectState Debug OS 左侧调试面板从平铺信息流
+收敛为可折叠目录结构，默认打开概览、常用操作、Assignment / Gaussian、对象诊断和
+对象开关，低频的协议归档、质量 / 训练 / 基准默认折叠；可见字段同步中文化。右侧
+floating inspector 改为窄版，并新增收起 / 展开机制，收起后仅保留对象标题和 kind。
+本切片只改 viewer UI 与 Playwright audit 对折叠目录的展开步骤，不改变 ObjectState
+算法、assignment projection、manifest / artifact contract、OGC loader 或 renderer。
+
 同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
 Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用
 `ObjectField.probabilities()`，将 Gaussian evidence weighted reduction 为

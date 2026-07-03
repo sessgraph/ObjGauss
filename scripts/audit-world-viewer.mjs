@@ -2535,7 +2535,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-object-state-benchmark-case-name='temporal_jitter']").click();
+    const temporalJitterCase = page.locator("[data-object-state-benchmark-case-name='temporal_jitter']");
+    await openContainingDetails(temporalJitterCase);
+    await temporalJitterCase.click();
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const benchmark = document.querySelector("[data-object-state-benchmark='true']");
@@ -2650,7 +2652,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
         types.has("ogc-chunks")
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-debug-snapshot-export-button='true']").click();
+    const snapshotExportButton = page.locator("[data-debug-snapshot-export-button='true']");
+    await openContainingDetails(snapshotExportButton);
+    await snapshotExportButton.click();
     const snapshotExportHandle = await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -2708,7 +2712,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
       };
     }, undefined, { timeout: 15000 });
     const snapshotExport = await snapshotExportHandle.jsonValue();
-    await page.locator("[data-debug-session-export-button='true']").click();
+    const sessionExportButton = page.locator("[data-debug-session-export-button='true']");
+    await openContainingDetails(sessionExportButton);
+    await sessionExportButton.click();
     const sessionExportHandle = await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -3326,6 +3332,13 @@ async function closeBrowserWithTimeout(browser, timeoutMs = 5000) {
     browser.close(),
     sleep(timeoutMs).then(() => undefined),
   ]);
+}
+
+async function openContainingDetails(locator) {
+  await locator.evaluate((node) => {
+    node.closest("details")?.setAttribute("open", "");
+  });
+  await locator.scrollIntoViewIfNeeded();
 }
 
 function firstExisting(paths) {

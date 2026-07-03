@@ -251,9 +251,14 @@ button:focus-visible {
   right: 26px;
   top: 126px;
   z-index: 6;
-  width: min(386px, calc(100vw - 52px));
-  padding: 18px;
-  border-radius: 22px;
+  width: min(322px, calc(100vw - 52px));
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.floatingInspector.collapsed {
+  width: min(232px, calc(100vw - 52px));
+  padding: 12px 14px;
 }
 
 .debugPanel {
@@ -297,7 +302,75 @@ button:focus-visible {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
+}
+
+.debugSection {
+  overflow: hidden;
+  margin: 0 0 10px;
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.debugSection > summary {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.debugSection > summary::-webkit-details-marker {
+  display: none;
+}
+
+.debugSection > summary::before {
+  content: ">";
+  color: #76f4ff;
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 140ms ease;
+}
+
+.debugSection[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.debugSection > summary span,
+.debugSection > summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debugSection > summary span {
+  color: #e8f7fb;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.debugSection > summary strong {
+  color: #9ff5ff;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.debugSectionBody {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
+}
+
+.debugSectionBody .stabilityDashboard,
+.debugSectionBody .assignmentHeatmap,
+.debugSectionBody .trainableFrameSelector,
+.debugSectionBody .debugStateGrid {
+  margin-bottom: 0;
 }
 
 .assignmentHeatmap {
@@ -914,15 +987,49 @@ button:focus-visible {
 
 .inspectorHead {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  margin-bottom: 16px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.inspectorHead > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.floatingInspector h2,
+.inspectorHead span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspectorToggle {
+  min-height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(153, 214, 222, 0.18);
+  border-radius: 8px;
+  color: #dff7fa;
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 11px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.inspectorToggle:hover {
+  border-color: rgba(93, 238, 249, 0.44);
+  background: rgba(93, 238, 249, 0.12);
+}
+
+.floatingInspector.collapsed .inspectorHead {
+  margin-bottom: 0;
 }
 
 .metaGrid {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 10px 14px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px 10px;
   margin: 0;
 }
 

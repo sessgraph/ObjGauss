@@ -79,6 +79,41 @@
 
 ## Done
 
+### DEBUG-UI-HIERARCHY-001: Tidy ObjectState Debug OS hierarchy and inspector collapse
+
+- 状态: done / ui-hierarchy-and-collapse
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 根据 Owner 对截图的反馈，将左侧 ObjectState Debug 面板从无层级的平铺字段改为
+  可折叠目录，并将右侧 Poly Haven chair / object-aware-ply inspector 从过宽卡片改为
+  可收起的窄版 inspector。
+- 已实施:
+  - `src/App.jsx` 新增 `DebugSection`，将 Debug OS 分为概览、常用操作、Assignment /
+    Gaussian、对象诊断、对象开关、协议与归档、质量 / 训练 / 基准七个目录。
+  - 常用操作、稳定性、Gaussian probe、对象诊断、质量 / 训练 / 基准等可见字段中文化；
+    `data-*` telemetry 和既有交互回调保持不变。
+  - 右侧 `floatingInspector` 新增收起 / 展开按钮、`data-inspector-collapsed` telemetry
+    和窄版 / collapsed 样式，长标题和路径用省略处理。
+  - `scripts/audit-world-viewer.mjs` 在点击折叠目录内部的 benchmark / snapshot /
+    session 控件前显式展开所在 `details`，适配新的 UI 层级。
+- 边界:
+  - 不改变 ObjectState projection、assignment solver、质量指标、artifact manifest、
+    OGC loader、renderer 或训练流程。
+  - 不新增外部依赖，不提交截图或 `/tmp` 临时 Playwright 脚本。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: Browser plugin not available，使用 Playwright fallback；
+    sandbox 本地 fetch 受限，提权重跑 passed，输出包含 `world_viewer=passed`、
+    `debugOs=object-state-debug-os-v1`、`qualityReport=warn`、
+    `objectStateBenchmark=pass`，截图为 `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。
+  - `node /tmp/objgauss-debug-ui-collapse-check.mjs`: passed，右侧 inspector 宽度
+    `322 -> 232`，左侧目录 `5/7` 默认打开，截图为
+    `/tmp/objgauss-debug-ui-collapse.png`。
+  - `uv run --extra dev pytest`: 155 passed。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending / current worktree
+
 ### SOLVER-LOSS-UI-001: Show Object Emergence Solver loss in Debug OS
 
 - 状态: done / solver-loss-debug-handoff
