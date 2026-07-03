@@ -16,6 +16,12 @@ commercial demo release。
 gsplat / CUDA / NVIDIA driver 组合，full renderer training MVP 不再作为本环境的
 进行中工作；恢复条件见 `docs/state/pr-queue.md` 的 Suspended 条目。
 
+算法模型主线已重新启动，但目标已从 full renderer training 拆分为先训练
+`Object Emergence Solver`。当前事实源为
+`docs/architecture/object-emergence-model-v1.md`：先在 dependency-free 环境中推进
+`PerceptionEvidence -> A[N,K] -> ObjectState`，再在 torch / gsplat / CUDA 环境恢复后
+把 full renderer loss 接回训练目标。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
@@ -52,6 +58,19 @@ solver 顺序、object pooling、`L_object` 组成、非训练闭环和后续 tr
 address，不是 primary state；`ObjectState` 实现层可拆成 semantic / geometric /
 temporal 子状态，但对外仍是单一 reasoning unit。本步骤仍未改代码、未引入 Sinkhorn /
 Hungarian / Gumbel-softmax 依赖、未改 renderer 或素材。
+
+随后已完成 `ALGOMODEL-SOLVER-ABI-001`：`docs/architecture/object-emergence-model-v1.md`
+明确算法模型主线先训练 Object Emergence Solver，而 full renderer training 继续等待
+torch / gsplat / CUDA 环境。`objgauss/core/object_emergence_solver.py` 新增
+dependency-free solver ABI，定义 `ObjectEmergenceEvidence`、
+`ObjectEmergenceSolverConfig`、`ObjectEmergenceSolverState` 和
+`ObjectEmergenceAssignmentPrediction`，并提供 `evidence_from_gaussian_cloud(...)`、
+`initialize_object_emergence_solver(...)`、`predict_object_emergence_assignment(...)` 和
+`project_object_emergence_prediction(...)`。当前 solver 是线性 softmax assignment
+state，可从 Gaussian evidence 生成 normalized `A[N,K]` 并复用现有 ObjectState
+projection；它还不是 optimizer，不更新权重，不自动执行 dynamic-K，不引入 torch /
+gsplat / CUDA，不改 viewer renderer 或 artifact schema。下一步算法 PR 是
+`TRAINABLE-SOLVER-NP-001`。
 
 同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
 Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用

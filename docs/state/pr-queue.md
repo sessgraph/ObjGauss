@@ -15,7 +15,8 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
+4. **算法模型线**: full renderer training 继续因 torch / gsplat / CUDA 环境挂起；当前先推进 dependency-free Object Emergence Solver，使 `PerceptionEvidence -> A[N,K] -> ObjectState` 成为可训练、可导出、可被 Debug OS 审计的模型主线。
+5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
@@ -72,11 +73,64 @@
 - 目标: 评估是否能从 Spark raycast 或上游扩展拿到 splat index / object id，替代当前已验收的 `hover-confirm-v1` screen-space picking。
 - 当前判断: Spark `SplatMesh.raycast` 只返回 `distance/object/point`，没有 splat index / object id，因此本项不应阻塞 near-1M terminal proof。
 
+### TRAINABLE-SOLVER-NP-001: Train Object Emergence Solver weights
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model training
+- 目标: 在 `objgauss.core.object_emergence_solver` 的 `SolverState` ABI 上实现
+  dependency-free NumPy 训练器，让 `features/positions -> logits -> A[N,K]` 的权重
+  可由 `L_render + L_object + L_temporal + L_balance` 更新，而不是继续直接优化每帧
+  assignment logits。
+- 边界:
+  - 不引入 torch / gsplat / CUDA；full renderer training 仍保持 suspended。
+  - 不训练 Gaussian geometry / opacity / rotation。
+  - 不自动执行 dynamic-K birth / merge / split；只可输出或消费 gated proposal。
+  - 训练输出只写 `/tmp` 或 ignored `outputs/`，不提交 artifact / checkpoint。
+- 验收:
+  - 小型 fixture 上 total loss 和 assignment/object loss 下降。
+  - 训练后 `ObjectEmergenceSolverState` 可继续通过
+    `predict_object_emergence_assignment(...)` 生成 normalized `A[N,K]`。
+  - 结果能导出为现有 Debug OS 可消费的 trainable artifact 或其下一版 contract。
+
 ## In Progress
 
 当前无进行中 PR。
 
 ## Done
+
+### ALGOMODEL-SOLVER-ABI-001: Object Emergence Model spec and solver ABI
+
+- 状态: done / object-emergence-solver-abi
+- 类型: 标准 PR / algorithm model ABI
+- 目标: 启动算法模型主线，明确当前要训练的是 Object Emergence Solver，而不是因环境阻塞的
+  full renderer training；同时把 `PerceptionEvidence -> A[N,K] -> ObjectState` 的
+  solver state 和 prediction contract 固化到代码。
+- 已实施:
+  - 新增 `docs/architecture/object-emergence-model-v1.md`，冻结
+    `Object Emergence Solver` 与 `Full Renderer Loss` 的边界，明确 full renderer training
+    继续等待 torch / gsplat / CUDA 环境。
+  - 新增 `objgauss/core/object_emergence_solver.py`，定义
+    `ObjectEmergenceEvidence`、`ObjectEmergenceSolverConfig`、
+    `ObjectEmergenceSolverState` 和 `ObjectEmergenceAssignmentPrediction`。
+  - 新增 dependency-free helper：
+    `evidence_from_gaussian_cloud(...)`、`initialize_object_emergence_solver(...)`、
+    `predict_object_emergence_assignment(...)` 和
+    `project_object_emergence_prediction(...)`。
+  - `objgauss.core` lazy namespace 暴露上述 ABI；测试覆盖 normalized softmax
+    assignment、shape validation、slot mass diagnostics、GaussianCloud evidence adapter
+    和 ObjectState projection bridge。
+- 边界:
+  - 不实现 optimizer；`TRAINABLE-SOLVER-NP-001` 作为后续 planned PR。
+  - 不引入 torch / gsplat / CUDA / SAM / DINO / CoTracker / Mamba。
+  - 不自动执行 dynamic-K birth / merge / split。
+  - 不改变 viewer renderer、artifact schema 或训练输出布局。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_emergence_solver.py tests/test_core_namespace.py`:
+    11 passed。
+  - `uv run --extra dev pytest`: 150 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `c61c453`
 
 ### OBJECTSTATE-FRAGMENTATION-PANEL-001: Visible object fragmentation inspector
 
