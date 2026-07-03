@@ -479,6 +479,19 @@ targets、heatmap、stability telemetry 和 Gaussian probe。`scripts/audit-worl
 现在额外打开 URL 注入路径，验证模型数变为 8、默认选中 URL artifact、`urlArtifact=fetch-json`
 且 frame 1 可审计。该切片只支持同源 `.json` 路径，不支持远程 URL，不提交训练输出或大模型。
 
+`TRAINABLE-LOSS-DEBUG-UI-001` 已完成 trainable artifact 的训练证据可视化：
+`src/App.jsx` 从 `objgauss-trainable-kernel-model-artifact-v1.training` 与
+`renderer_api` 只读生成 evidence summary，并把 `loss_down`、iterations、final total loss、
+loss delta、final image loss 和 image loss delta 暴露到 `.worldShell` 的
+`data-trainable-training-*` telemetry。ObjectState Debug panel 现在新增 `Training`
+evidence 面板，显示 total / image / object / temporal loss、delta、iteration、
+renderer 和 gradient path；floating inspector 同步显示 `train loss` 与 `loss delta`。
+`scripts/audit-world-viewer.mjs` 在默认 trainable fixture 与 URL injected trainable artifact
+两条 browser path 下断言 training panel 存在、renderer 为
+`cpu-image-point-splat-differentiable-v1`、image loss decreased、loss delta 为正。该切片
+不改变训练算法、artifact schema、renderer API 或 `TRAIN-GSPLAT-MVP-001` 的 optional
+deps / CUDA blocker，不提交新的训练输出。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

@@ -27,6 +27,9 @@ try {
       `trainableRoute=${summary.trainableArtifactLoadRoute}`,
       `trainableArtifact=${JSON.stringify(summary.trainableArtifactPath)}`,
       `trainableFrame=${summary.trainableFrameIndex}/${summary.trainableFrameCount}`,
+      `trainLoss=${summary.trainableTrainingFinalLoss}`,
+      `trainLossDelta=${summary.trainableTrainingLossDelta}`,
+      `trainImageLoss=${summary.trainableTrainingFinalImageLoss}`,
       `urlArtifact=${summary.urlArtifactStatus}`,
       `urlOgc=${summary.urlOgcStatus}`,
       `assignmentSlots=${summary.assignmentSlots}`,
@@ -214,11 +217,18 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
+      const training = document.querySelector("[data-training-evidence='true']");
       return (
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         heatmap?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
         stability?.getAttribute("data-stability-status") === shell?.getAttribute("data-stability-status") &&
+        training?.getAttribute("data-training-status") === "loss_down" &&
+        training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1" &&
+        training?.getAttribute("data-training-image-loss-decreased") === "true" &&
+        Number(training?.getAttribute("data-training-final-total-loss") ?? 0) > 0 &&
+        Number(training?.getAttribute("data-training-loss-delta") ?? 0) > 0 &&
+        Number(training?.getAttribute("data-training-final-image-loss") ?? 0) > 0 &&
         Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0 &&
         stability?.getAttribute("data-purity-available") === "true" &&
         stability?.getAttribute("data-temporal-available") === "true" &&
@@ -338,6 +348,7 @@ async function auditWorld(url) {
       const handle = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
       const stability = document.querySelector("[data-stability-dashboard='true']");
+      const training = document.querySelector("[data-training-evidence='true']");
       return {
         modelCount: handle.modelCount,
         objectCount: handle.objectCount,
@@ -377,6 +388,17 @@ async function auditWorld(url) {
         trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
         trainableFrameIndex: Number(shell?.getAttribute("data-trainable-artifact-frame-index") ?? -1),
         trainableFrameCount: Number(shell?.getAttribute("data-trainable-artifact-frame-count") ?? -1),
+        trainableTrainingStatus: shell?.getAttribute("data-trainable-training-status") ?? null,
+        trainableTrainingIterations: Number(shell?.getAttribute("data-trainable-training-iterations") ?? 0),
+        trainableTrainingFinalLoss: Number(shell?.getAttribute("data-trainable-training-final-total-loss") ?? 0),
+        trainableTrainingLossDelta: Number(shell?.getAttribute("data-trainable-training-loss-delta") ?? 0),
+        trainableTrainingFinalImageLoss: Number(shell?.getAttribute("data-trainable-training-final-image-loss") ?? 0),
+        trainableTrainingImageLossDelta: Number(shell?.getAttribute("data-trainable-training-image-loss-delta") ?? 0),
+        trainableTrainingImageLossDecreased: shell?.getAttribute("data-trainable-training-image-loss-decreased") ?? null,
+        panelTrainingStatus: training?.getAttribute("data-training-status") ?? null,
+        panelTrainingRenderer: training?.getAttribute("data-training-renderer") ?? null,
+        panelTrainingFinalLoss: Number(training?.getAttribute("data-training-final-total-loss") ?? 0),
+        panelTrainingLossDelta: Number(training?.getAttribute("data-training-loss-delta") ?? 0),
         worldTrainableFrameIndex: handle.selectedTrainableFrameIndex ?? null,
         worldTrainableFrameCount: handle.selectedTrainableFrameCount ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
@@ -402,6 +424,21 @@ async function auditWorld(url) {
       world.worldTrainableFrameCount === 2
     )) {
       throw new Error(`expected trainable artifact frame 1 telemetry: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.trainableTrainingStatus === "loss_down" &&
+      world.panelTrainingStatus === "loss_down" &&
+      world.panelTrainingRenderer === "cpu-image-point-splat-differentiable-v1" &&
+      world.trainableTrainingIterations === 18 &&
+      world.trainableTrainingFinalLoss > 0 &&
+      world.trainableTrainingLossDelta > 0 &&
+      world.trainableTrainingFinalImageLoss > 0 &&
+      world.trainableTrainingImageLossDelta > 0 &&
+      world.trainableTrainingImageLossDecreased === "true" &&
+      world.panelTrainingFinalLoss === world.trainableTrainingFinalLoss &&
+      world.panelTrainingLossDelta === world.trainableTrainingLossDelta
+    )) {
+      throw new Error(`expected trainable loss evidence telemetry: ${JSON.stringify(world)}`);
     }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
@@ -459,6 +496,9 @@ async function auditWorld(url) {
       trainableArtifactPath: world.trainableArtifactPath,
       trainableFrameIndex: world.trainableFrameIndex,
       trainableFrameCount: world.trainableFrameCount,
+      trainableTrainingFinalLoss: world.trainableTrainingFinalLoss,
+      trainableTrainingLossDelta: world.trainableTrainingLossDelta,
+      trainableTrainingFinalImageLoss: world.trainableTrainingFinalImageLoss,
       urlArtifactStatus: urlArtifact.status,
       urlOgcStatus: urlOgc.status,
       assignmentSource: world.assignmentSource,
@@ -533,6 +573,10 @@ async function auditUrlTrainableArtifact(browser, url) {
         shell?.getAttribute("data-selected-model") === "trainable-url-artifact" &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "fetch-json" &&
         shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
+        shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
+        shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        Number(shell?.getAttribute("data-trainable-training-final-total-loss") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-trainable-training-loss-delta") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2
       );
     }, undefined, { timeout: 15000 });
@@ -553,11 +597,15 @@ async function auditUrlTrainableArtifact(browser, url) {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const frameSelector = document.querySelector("[data-trainable-frame-selector='true']");
+      const training = document.querySelector("[data-training-evidence='true']");
       return (
         shell?.getAttribute("data-selected-model") === "trainable-url-artifact" &&
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
         frameSelector?.getAttribute("data-selected-frame") === "1" &&
+        training?.getAttribute("data-training-status") === "loss_down" &&
+        training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1" &&
+        Number(training?.getAttribute("data-training-final-image-loss") ?? 0) > 0 &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
     }, undefined, { timeout: 15000 });

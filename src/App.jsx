@@ -80,6 +80,10 @@ export default function App() {
     selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "";
   const selectedOgcAvailableChunks =
     selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.availableChunkIds) : "";
+  const selectedTrainingEvidence =
+    selected?.delivery?.source === "trainable-kernel-model-artifact"
+      ? trainableEvidenceSummary(selected.trainableArtifact)
+      : null;
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -479,6 +483,13 @@ export default function App() {
       data-trainable-artifact-path={selected?.delivery?.artifactPath ?? ""}
       data-trainable-artifact-frame-index={selected?.delivery?.frameIndex ?? ""}
       data-trainable-artifact-frame-count={selected?.delivery?.frameCount ?? ""}
+      data-trainable-training-status={selectedTrainingEvidence?.status ?? ""}
+      data-trainable-training-iterations={selectedTrainingEvidence?.iterations ?? ""}
+      data-trainable-training-final-total-loss={selectedTrainingEvidence?.finalTotalLoss ?? ""}
+      data-trainable-training-loss-delta={selectedTrainingEvidence?.totalLossDelta ?? ""}
+      data-trainable-training-final-image-loss={selectedTrainingEvidence?.finalImageLoss ?? ""}
+      data-trainable-training-image-loss-delta={selectedTrainingEvidence?.imageLossDelta ?? ""}
+      data-trainable-training-image-loss-decreased={selectedTrainingEvidence?.imageLossDecreased ? "true" : ""}
     >
       <ThreeWorld
         models={modelCatalog}
@@ -561,6 +572,8 @@ export default function App() {
             <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
             <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
             <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
+            <Meta label="train loss" value={formatLoss(selectedTrainingEvidence?.finalTotalLoss)} />
+            <Meta label="loss delta" value={formatSignedLoss(selectedTrainingEvidence?.totalLossDelta)} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
             <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
             <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
@@ -1304,6 +1317,7 @@ function DebugPanel({
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
       <StabilityDashboard stability={stability} />
+      <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
       <dl className="debugStateGrid">
         <Meta label="source" value={debugProbe?.source ?? activeState?.source} />
@@ -1344,6 +1358,49 @@ function DebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function TrainingEvidencePanel({ artifact }) {
+  const summary = trainableEvidenceSummary(artifact);
+  if (!summary) return null;
+  return (
+    <div
+      className="stabilityDashboard trainingEvidence"
+      data-training-evidence="true"
+      data-training-status={summary.status}
+      data-training-schema={summary.schema}
+      data-training-renderer={summary.rendererName}
+      data-training-gradient-path={summary.gradientPath}
+      data-training-iterations={summary.iterations}
+      data-training-initial-total-loss={summary.initialTotalLoss ?? ""}
+      data-training-final-total-loss={summary.finalTotalLoss ?? ""}
+      data-training-loss-delta={summary.totalLossDelta ?? ""}
+      data-training-initial-image-loss={summary.initialImageLoss ?? ""}
+      data-training-final-image-loss={summary.finalImageLoss ?? ""}
+      data-training-image-loss-delta={summary.imageLossDelta ?? ""}
+      data-training-image-loss-decreased={summary.imageLossDecreased ? "true" : "false"}
+      data-training-final-render-loss={summary.finalRenderLoss ?? ""}
+      data-training-final-object-loss={summary.finalObjectLoss ?? ""}
+      data-training-final-temporal-loss={summary.finalTemporalLoss ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Training</span>
+        <strong>{summary.status}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="total" value={formatLoss(summary.finalTotalLoss)} />
+        <Metric label="image" value={formatLoss(summary.finalImageLoss)} />
+        <Metric label="object" value={formatLoss(summary.finalObjectLoss)} />
+        <Metric label="temp" value={formatLoss(summary.finalTemporalLoss)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="delta" value={formatSignedLoss(summary.totalLossDelta)} />
+        <Meta label="iter" value={formatCount(summary.iterations)} />
+        <Meta label="renderer" value={summary.rendererName} />
+        <Meta label="grad" value={summary.gradientPath} />
+      </dl>
+    </div>
   );
 }
 
@@ -2583,12 +2640,53 @@ function initialModelStates(models = []) {
   );
 }
 
+function trainableEvidenceSummary(artifact) {
+  if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") return null;
+  const training = artifact.training;
+  if (!training || typeof training !== "object") return null;
+  const initial = training.initial_loss ?? {};
+  const final = training.final_loss ?? {};
+  const initialTotalLoss = finiteNumber(initial.total_loss);
+  const finalTotalLoss = finiteNumber(final.total_loss);
+  const initialImageLoss = finiteNumber(initial.image_render_loss);
+  const finalImageLoss = finiteNumber(final.image_render_loss ?? artifact.renderer_api?.image_render_loss);
+  const totalLossDelta =
+    initialTotalLoss !== null && finalTotalLoss !== null ? round6(initialTotalLoss - finalTotalLoss) : null;
+  const imageLossDelta =
+    initialImageLoss !== null && finalImageLoss !== null ? round6(initialImageLoss - finalImageLoss) : null;
+  const imageLossDecreased = Boolean(training.image_render_loss_decreased ?? (imageLossDelta !== null && imageLossDelta > 0));
+  const totalLossDecreased = totalLossDelta !== null && totalLossDelta > 0;
+  return {
+    schema: training.schema ?? "",
+    status: imageLossDecreased || totalLossDecreased ? "loss_down" : "loss_flat",
+    iterations: finiteNumber(training.iterations),
+    rendererName: artifact.renderer_api?.renderer_name ?? "-",
+    gradientPath: artifact.renderer_api?.gradient_path ?? "-",
+    imageLossDecreased,
+    initialTotalLoss,
+    finalTotalLoss,
+    totalLossDelta,
+    initialImageLoss,
+    finalImageLoss,
+    imageLossDelta,
+    finalRenderLoss: finiteNumber(final.render_loss),
+    finalObjectLoss: finiteNumber(final.object_loss),
+    finalTemporalLoss: finiteNumber(final.temporal_loss),
+  };
+}
+
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function formatNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number.toLocaleString() : "-";
 }
 
 function formatCount(value) {
+  if (value === null || value === undefined || value === "") return "-";
   const number = Number(value);
   return Number.isFinite(number) ? Math.trunc(number).toLocaleString() : "-";
 }
@@ -2606,13 +2704,22 @@ function formatBox(value) {
 }
 
 function formatRatio(value) {
+  if (value === null || value === undefined || value === "") return "-";
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(3) : "-";
 }
 
 function formatLoss(value) {
+  if (value === null || value === undefined || value === "") return "-";
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(6) : "-";
+}
+
+function formatSignedLoss(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${number >= 0 ? "+" : ""}${number.toFixed(6)}`;
 }
 
 function formatFrame(index, count) {
@@ -2635,4 +2742,8 @@ function formatChunkScope(chunkIds) {
 
 function round3(value) {
   return Math.round(Number(value) * 1000) / 1000;
+}
+
+function round6(value) {
+  return Math.round(Number(value) * 1000000) / 1000000;
 }

@@ -444,6 +444,22 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.trainingEvidence {
+  border-color: rgba(127, 241, 215, 0.18);
+}
+
+.trainingGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.trainingMeta {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
+.trainingMeta dd {
+  overflow-wrap: anywhere;
+}
+
 .debugStateGrid {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);

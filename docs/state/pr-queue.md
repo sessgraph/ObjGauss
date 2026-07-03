@@ -72,6 +72,42 @@
 
 ## Done
 
+### TRAINABLE-LOSS-DEBUG-UI-001: Surface trainable loss evidence in Debug OS
+
+- 状态: done / trainable-loss-debug-ui
+- 类型: 标准 PR / trainable artifact delivery + debug UI
+- 目标: 让 ObjectState Debug OS 不只显示 trainable artifact 的 assignment / frame /
+  stability，还能直接显示训练闭环证据：initial / final loss、loss delta、image render
+  loss、object loss、temporal loss、iterations、renderer API 和 gradient path。
+- 已实施:
+  - `src/App.jsx` 新增 trainable artifact evidence summary，从
+    `objgauss-trainable-kernel-model-artifact-v1.training` 和 `renderer_api` 读取 loss
+    telemetry，不重新计算训练指标。
+  - root `.worldShell` 暴露 `data-trainable-training-*` telemetry，包括 `loss_down`、
+    iterations、final total loss、loss delta、final image loss 和 image loss delta。
+  - ObjectState Debug panel 新增 `Training` evidence 面板，显示 total / image /
+    object / temporal loss，以及 delta、iteration、renderer 和 gradient path。
+  - floating inspector 增加 `train loss` 与 `loss delta`，用于快速确认当前 selected
+    model 是否消费训练产物字段。
+  - `scripts/audit-world-viewer.mjs` 在默认 trainable fixture 和 URL injected
+    trainable artifact 路径下断言 training evidence panel 存在、renderer 为
+    `cpu-image-point-splat-differentiable-v1`、image loss decreased、loss delta 为正。
+- 边界:
+  - 不改变 trainable artifact schema、训练算法、loss 计算方式或 renderer API。
+  - 不安装 torch / gsplat / CUDA，不解除 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交新的训练输出、checkpoint、rendered image 或大资产。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `trainLoss=0.053806`、`trainLossDelta=0.028399`、
+    `trainImageLoss=0.053806`；截图 `/tmp/objgauss-world-viewer.png` 显示 Training
+    evidence panel。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-CHUNK-DEBUG-UI-001: Switch OGC chunk scope inside ObjectState Debug OS
 
 - 状态: done / ogc-chunk-debug-ui
