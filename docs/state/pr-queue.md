@@ -109,7 +109,7 @@
     `algorithmManifest=manifest-trainable-ogc-debug-os`、`localModelManifest=local-manifest-trainable-ogc-debug-os`、
     `qualityReport=warn` 和 `objectStateBenchmark=pass`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `6d77955`
 
 ### DEBUG-SESSION-DRIFT-001: Surface changed fields in live/archive debug session diff
 
