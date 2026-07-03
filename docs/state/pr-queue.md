@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练，下一步进入 solver + decoder 联合训练边界。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop，下一步进入 checkpoint/export 与训练规模控制。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
@@ -48,6 +48,69 @@
 当前无进行中 PR。
 
 ## Done
+
+### SOLVER-DECODER-JOINT-001: Joint train solver assignment and decoder colors
+
+- 状态: done / solver-decoder-joint-mvp
+- 类型: 标准 PR / algorithm model training loop
+- 目标: 将 solver assignment 和 decoder colors 放入同一个最小训练 loop，让
+  `renderer_api image_render_loss` 同时回传到 `A[N,K]` 的 solver 参数和
+  Gaussian decoder colors，同时继续冻结 Gaussian geometry / opacity / camera。
+- 已实施:
+  - 新增 `objgauss/core/solver_decoder_training.py`，定义
+    `objgauss-solver-decoder-joint-training-v1`、
+    `SolverDecoderJointLoss` 和 `SolverDecoderJointTrainingResult`。
+  - `train_solver_decoder_joint(...)` 使用 renderer API 的
+    `gradient_assignments` 通过 softmax assignment 反传到
+    `solver.feature_weights`、`solver.position_weights` 和 `solver.bias`，并使用
+    `gradient_decoder_colors` 更新 `decoder.object_colors`。
+  - joint loop 支持 image render loss、object cross-entropy loss、entropy / balance
+    diagnostics；`temporal_loss` 仍只记录，joint MVP 不优化 temporal gradient。
+  - `objgauss training solver-decoder-mvp <ply>` 新增 CLI smoke 入口，可从 object_id
+    one-hot targets 初始化训练，也可通过 `--solver-checkpoint` 使用已有 solver state。
+  - `renderer-loss-contract` 现在识别 joint training summary，并可输出
+    `solver_decoder_joint_training_ready` 或
+    `full_3dgs_solver_decoder_joint_training_ready`。
+  - `objgauss.core` lazy namespace 暴露 joint training result / train API。
+- 边界:
+  - 不训练 Gaussian geometry / opacity / rotation，不更新 camera，不执行 dynamic-K。
+  - 不把 torch / gsplat 加入基础 dependencies；仍通过 optional / `uv --with` 使用。
+  - 不提交 `/tmp` summary、checkpoint、rendered image 或 ignored `outputs/` 产物。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不启动长时间训练。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_renderer_loss.py tests/test_core_namespace.py tests/test_gaussian_decoder_training.py`:
+    23 passed。
+  - `uv run python -m py_compile objgauss/core/solver_decoder_training.py objgauss/core/renderer_loss.py objgauss/cli.py objgauss/core/__init__.py`:
+    passed。
+  - `uv run objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 4 --image-width 8 --image-height 8 --iterations 4 --solver-learning-rate 0.05 --decoder-learning-rate 0.5 --object-weight 0.1 --summary-output /tmp/objgauss-solver-decoder-mvp-summary.json --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`image_renderer=point`，
+    `initial_total_loss=0.189146 -> final_total_loss=0.183699`，
+    `initial_image_render_loss=0.052319 -> final_image_render_loss=0.049218`，
+    `initial_object_loss=1.368271 -> final_object_loss=1.344811`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-solver-decoder-mvp-summary.json --output /tmp/objgauss-solver-decoder-mvp-renderer-loss-boundary.json`:
+    passed，`status=solver_decoder_joint_training_ready`，
+    `decoder_handoff_status=solver_decoder_joint_training_ready`。
+  - host preflight `nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv,noheader,nounits`:
+    `NVIDIA GeForce RTX 5060 Ti, 16311, 705, 15138`。
+  - `uv run --with torch --with gsplat python -c "from objgauss.core.gsplat_training_renderer import gsplat_renderer_availability; ..."`:
+    passed，`available=True`，`torch_version=2.12.1+cu130`，
+    `gsplat_version=1.5.3`，`cuda_available=True`。
+  - `env CUDA_HOME=/tmp/objgauss-cuda13 PATH=/tmp/objgauss-cuda13/bin:$PATH LD_LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LD_LIBRARY_PATH LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LIBRARY_PATH MAX_JOBS=2 uv run --with torch --with gsplat --with nvidia-cuda-nvcc==13.0.* --with nvidia-cuda-cccl==13.0.* --with nvidia-nvvm==13.0.* --with nvidia-cuda-crt==13.0.* objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 4 --image-width 8 --image-height 8 --iterations 2 --solver-learning-rate 0.05 --decoder-learning-rate 0.5 --object-weight 0.1 --image-renderer gsplat --summary-output /tmp/objgauss-solver-decoder-mvp-gsplat-summary.json --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`renderer_name=gsplat-rasterization-v1`，
+    `initial_total_loss=0.191020 -> final_total_loss=0.188824`，
+    `initial_image_render_loss=0.054193 -> final_image_render_loss=0.052948`，
+    `initial_object_loss=1.368271 -> final_object_loss=1.358761`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-solver-decoder-mvp-gsplat-summary.json --output /tmp/objgauss-solver-decoder-mvp-gsplat-renderer-loss-boundary.json`:
+    passed，`status=full_3dgs_solver_decoder_joint_training_ready`，
+    `decoder_handoff_status=full_renderer_solver_decoder_joint_training_ready`，
+    `upgrade_blockers=[]`。
+  - host post-smoke GPU memory:
+    `NVIDIA GeForce RTX 5060 Ti, 16311, 706, 15136`。
+  - `uv run --extra dev pytest`: 168 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `9d81d1e`
 
 ### SOLVER-DECODER-TRAIN-001: Train ObjectState Gaussian decoder colors
 

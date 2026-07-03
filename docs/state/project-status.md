@@ -46,6 +46,23 @@ renderer smoke 验证 `image_render_loss=0.029535 -> 0.004649`；host GPU / gspl
 该步骤仍不训练 Gaussian geometry / opacity / rotation，不提交 `/tmp` summary、
 checkpoint、rendered image 或 ignored `outputs/` 产物。
 
+随后完成 `SOLVER-DECODER-JOINT-001`：新增
+`objgauss-solver-decoder-joint-training-v1`，把 Object Emergence Solver 的
+`feature_weights / position_weights / bias` 与 Gaussian decoder 的 `object_colors`
+放进同一个最小训练 loop。renderer API 的 `gradient_assignments` 会通过 softmax
+assignment 反传到 solver 权重，`gradient_decoder_colors` 直接更新 decoder colors；
+geometry、opacity、scale、camera 和 dynamic-K 仍冻结。CLI 新增
+`objgauss training solver-decoder-mvp`，支持 object_id one-hot targets 和可选
+`--solver-checkpoint` 初始状态。CPU point smoke 验证
+`image_render_loss=0.052319 -> 0.049218`、`object_loss=1.368271 -> 1.344811`；
+host GPU / gsplat smoke 验证
+`image_render_loss=0.054193 -> 0.052948`、`object_loss=1.368271 -> 1.358761`，
+`renderer-loss-contract` 对应输出
+`status=full_3dgs_solver_decoder_joint_training_ready`、
+`decoder_handoff_status=full_renderer_solver_decoder_joint_training_ready`。该步骤仍不启动
+长训练，不提交 `/tmp` summary、checkpoint、rendered image 或 ignored `outputs/`
+产物。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
