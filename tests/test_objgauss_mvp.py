@@ -2599,6 +2599,8 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
 
     assert "status=renderer_api_ready" in boundary_output
     assert "point_smoke_ready=true" in boundary_output
+    assert "decoder_handoff_status=renderer_api_decoder_smoke_ready" in boundary_output
+    assert "decoder_handoff_starts_real_training=false" in boundary_output
     assert "evidence_renderer_gradient_path=analytic-color-assignment-gradient-v1" in boundary_output
     assert "evidence_final_image_render_loss=" in boundary_output
     assert boundary["schema"] == "objgauss-renderer-loss-boundary-v1"
@@ -2607,6 +2609,8 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert boundary["evidence"]["renderer_api_ready"] is True
     assert boundary["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
     assert boundary["render_target_contract"]["target"]["kind"] == "image_space_render"
+    assert boundary["decoder_handoff_contract"]["status"] == "renderer_api_decoder_smoke_ready"
+    assert boundary["decoder_handoff_contract"]["starts_real_training"] is False
     assert "image_space_targets_not_bound" not in boundary["upgrade_blockers"]
     assert "camera_visibility_policy_not_bound" not in boundary["upgrade_blockers"]
     assert "renderer_gradient_path_not_defined" not in boundary["upgrade_blockers"]

@@ -26,6 +26,7 @@ class RendererLossBoundaryReport:
     input_frame_contract: dict[str, Any]
     render_target_contract: dict[str, Any]
     loss_telemetry_contract: dict[str, Any]
+    decoder_handoff_contract: dict[str, Any]
     integration_contract: dict[str, Any]
     evidence: dict[str, Any]
     point_smoke_blockers: tuple[str, ...]
@@ -42,6 +43,7 @@ class RendererLossBoundaryReport:
             "input_frame_contract": self.input_frame_contract,
             "render_target_contract": self.render_target_contract,
             "loss_telemetry_contract": self.loss_telemetry_contract,
+            "decoder_handoff_contract": self.decoder_handoff_contract,
             "integration_contract": self.integration_contract,
             "evidence": self.evidence,
             "point_smoke_blockers": list(self.point_smoke_blockers),
@@ -173,6 +175,7 @@ def renderer_loss_boundary_report(
                 "renderer_gradient_path",
             ],
         },
+        decoder_handoff_contract=_decoder_handoff_contract(evidence, target_renderer=target_renderer),
         integration_contract={
             "viewer_renderer_role": "debug visualization and browser audit only",
             "training_renderer_role": "separate loss producer behind a stable contract",
@@ -198,6 +201,7 @@ def validate_renderer_loss_boundary_summary(payload: dict[str, Any]) -> bool:
         "input_frame_contract",
         "render_target_contract",
         "loss_telemetry_contract",
+        "decoder_handoff_contract",
         "integration_contract",
         "upgrade_blockers",
     )
@@ -267,6 +271,73 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         "render_loss_decreased": render_loss_decreased,
     }
     return evidence, blockers
+
+
+def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str) -> dict[str, Any]:
+    kind = evidence.get("kind")
+    solver_ready = kind in OBJECT_EMERGENCE_SOLVER_EVIDENCE and bool(
+        evidence.get("solver_loss_decreased") and evidence.get("assignment_loss_decreased")
+    )
+    renderer_ready = bool(evidence.get("renderer_api_ready"))
+    full_renderer_ready = renderer_ready and evidence.get("renderer_name") in FULL_3DGS_RENDERERS
+    if full_renderer_ready:
+        status = "full_renderer_decoder_ready"
+    elif renderer_ready:
+        status = "renderer_api_decoder_smoke_ready"
+    elif solver_ready:
+        status = "solver_checkpoint_ready"
+    else:
+        status = "awaiting_solver_checkpoint"
+    return {
+        "schema": "objgauss-decoder-renderer-handoff-v1",
+        "status": status,
+        "source_evidence": kind,
+        "target_renderer": target_renderer,
+        "state_chain": [
+            "solver_checkpoint",
+            "PerceptionEvidence",
+            "assignment A[N,K]",
+            "ObjectStateProjection",
+            "GaussianToken decode",
+            "renderer_api image_render_loss",
+        ],
+        "object_state_input_contract": {
+            "assignment": "float32[N,K] row-normalized",
+            "evidence": "positions float32[N,3] + features float32[N,D]",
+            "projection": "ObjectStateProjection with derived object_id, centroid, bbox, feature, confidence",
+            "identity": "object_id remains derived from assignment/matching/export policy",
+        },
+        "gaussian_decoder_contract": {
+            "function": "decode_gaussian(ObjectStateProjection, source_gaussian_artifact) -> GaussianArtifact",
+            "token_fields": {
+                "mu": "float32[3]",
+                "covariance": "float32[6] or renderer-native covariance fields",
+                "color": "float32[3] or SH",
+                "opacity": "float32[1]",
+                "object_id": "derived integer renderer address",
+            },
+            "ragged_children": "Gaussian children remain ragged per ObjectState; do not require dense R[B,T,K,N,D].",
+        },
+        "renderer_loss_binding_contract": {
+            "target": "image-space photometric loss plus object and temporal terms",
+            "requires": [
+                "camera intrinsics/extrinsics",
+                "image targets",
+                "visibility/depth/alpha policy",
+                "renderer-native Gaussian parameters",
+                "gradient path from renderer loss back to decoder/solver trainable fields",
+            ],
+        },
+        "ready_without_gpu": bool(solver_ready or renderer_ready),
+        "starts_real_training": False,
+        "remaining_before_full_training": [
+            "bind solver checkpoint output to Gaussian decoder parameters",
+            "bind decoded Gaussian artifact to renderer_api loss producer",
+            "pass torch/gsplat/CUDA/NVIDIA driver preflight",
+        ]
+        if not full_renderer_ready
+        else [],
+    }
 
 
 def _solver_training_evidence(summary: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:

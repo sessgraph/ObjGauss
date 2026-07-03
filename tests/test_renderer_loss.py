@@ -44,6 +44,9 @@ def test_renderer_loss_boundary_accepts_trainable_kernel_summary():
     assert "image_space_targets_not_bound" in payload["upgrade_blockers"]
     assert payload["render_target_contract"]["current"]["kind"] == "point_rgb_rows"
     assert payload["render_target_contract"]["target"]["kind"] == "image_space_render"
+    assert payload["decoder_handoff_contract"]["schema"] == "objgauss-decoder-renderer-handoff-v1"
+    assert payload["decoder_handoff_contract"]["status"] == "awaiting_solver_checkpoint"
+    assert payload["decoder_handoff_contract"]["starts_real_training"] is False
     assert validate_renderer_loss_boundary_summary(payload) is True
 
 
@@ -90,6 +93,8 @@ def test_renderer_loss_boundary_accepts_renderer_api_gradient_path():
     assert payload["evidence"]["renderer_api_ready"] is True
     assert payload["evidence"]["renderer_gradient_path"] == "analytic-color-assignment-gradient-v1"
     assert payload["evidence"]["final_image_render_loss"] >= 0
+    assert payload["decoder_handoff_contract"]["status"] == "renderer_api_decoder_smoke_ready"
+    assert payload["decoder_handoff_contract"]["starts_real_training"] is False
     assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]
@@ -118,6 +123,8 @@ def test_renderer_loss_boundary_accepts_full_gsplat_renderer_evidence():
 
     assert payload["status"] == "full_3dgs_renderer_ready"
     assert payload["current_renderer"] == "gsplat-rasterization-v1"
+    assert payload["decoder_handoff_contract"]["status"] == "full_renderer_decoder_ready"
+    assert payload["decoder_handoff_contract"]["remaining_before_full_training"] == []
     assert "full_3dgs_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
@@ -167,6 +174,19 @@ def test_renderer_loss_boundary_accepts_object_emergence_solver_checkpoint():
     assert payload["evidence"]["assignment_loss_decreased"] is True
     assert payload["evidence"]["gpu_used"] is False
     assert payload["evidence"]["vram_reserve_gb"] == 1
+    decoder_handoff = payload["decoder_handoff_contract"]
+    assert decoder_handoff["schema"] == "objgauss-decoder-renderer-handoff-v1"
+    assert decoder_handoff["status"] == "solver_checkpoint_ready"
+    assert decoder_handoff["source_evidence"] == "object_emergence_solver_checkpoint"
+    assert decoder_handoff["ready_without_gpu"] is True
+    assert decoder_handoff["starts_real_training"] is False
+    assert "GaussianToken decode" in decoder_handoff["state_chain"]
+    assert "renderer_api image_render_loss" in decoder_handoff["state_chain"]
+    assert "bind solver checkpoint output to Gaussian decoder parameters" in (
+        decoder_handoff["remaining_before_full_training"]
+    )
+    assert decoder_handoff["object_state_input_contract"]["assignment"] == "float32[N,K] row-normalized"
+    assert "decode_gaussian" in decoder_handoff["gaussian_decoder_contract"]["function"]
     assert "solver_checkpoint_not_bound_to_renderer_loss" in payload["upgrade_blockers"]
     assert "solver_checkpoint_not_bound_to_gaussian_decoder" in payload["upgrade_blockers"]
 

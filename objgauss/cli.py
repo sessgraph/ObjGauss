@@ -1421,6 +1421,9 @@ def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
     print(f"point_smoke_ready={str(summary['point_smoke_ready']).lower()}")
     print(f"point_smoke_blockers={summary['point_smoke_blockers']}")
     print(f"upgrade_blockers={summary['upgrade_blockers']}")
+    decoder_handoff = summary["decoder_handoff_contract"]
+    print(f"decoder_handoff_status={decoder_handoff['status']}")
+    print(f"decoder_handoff_starts_real_training={str(decoder_handoff['starts_real_training']).lower()}")
     evidence = summary["evidence"]
     if evidence.get("kind") == "trainable_kernel_summary":
         print(f"evidence_target_source={evidence.get('target_source')}")
