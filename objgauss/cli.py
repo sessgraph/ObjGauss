@@ -78,13 +78,19 @@ from objgauss.core.trainable_kernel import (
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
+    trainable_kernel_sample_from_cloud,
 )
 from objgauss.core.object_emergence_solver import (
+    ObjectEmergenceEvidence,
     evidence_from_gaussian_cloud,
     object_emergence_solver_checkpoint,
+    object_emergence_solver_state_from_dict,
     object_id_targets_from_cloud,
+    predict_object_emergence_assignment,
     train_object_emergence_solver,
+    validate_object_emergence_solver_checkpoint,
 )
+from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
@@ -1273,6 +1279,109 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         raise ValueError("trainable kernel sample loss did not decrease")
 
 
+def _training_decoder_mvp(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    sample = trainable_kernel_sample_from_cloud(
+        cloud,
+        slots=args.slots,
+        frame_count=args.frames,
+        max_points=args.max_points,
+        object_id_field=args.object_id_field,
+        temporal_offset=args.temporal_offset,
+        bind_image_targets=True,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+    )
+    assignments, assignment_source = _decoder_training_assignments_from_args(args, sample)
+    result = train_object_state_gaussian_decoder(
+        sample.frames,
+        assignments,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        render_weight=args.render_weight,
+        image_render_weight=args.image_render_weight,
+        object_weight=args.object_weight,
+        temporal_weight=args.temporal_weight,
+        image_renderer=args.image_renderer,
+        gaussian_scale=args.gaussian_scale,
+        gaussian_opacity=args.gaussian_opacity,
+        seed=args.seed,
+        record_every=args.record_every,
+        vram_reserve_gb=1,
+    )
+    summary = {
+        **result.as_dict(),
+        "input": str(args.input),
+        "sample": sample.as_dict(),
+        "assignment_source": assignment_source,
+        "solver_checkpoint": str(args.solver_checkpoint) if args.solver_checkpoint else None,
+    }
+    print(f"schema={summary['schema']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={sample.source_count}")
+    print(f"sampled_gaussians={sample.sampled_count}")
+    print(f"frames={summary['frame_count']}")
+    print(f"slots={summary['slots']}")
+    print(f"iterations={summary['iterations']}")
+    print(f"assignment_source={assignment_source}")
+    print(f"image_renderer={summary['image_renderer']}")
+    print(f"gaussian_scale={summary['gaussian_policy']['default_scale']}")
+    print(f"gaussian_opacity={summary['gaussian_policy']['default_opacity']}")
+    print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
+    print(f"final_total_loss={result.final_loss.total_loss:.6f}")
+    print(f"initial_render_loss={result.initial_loss.render_loss:.6f}")
+    print(f"final_render_loss={result.final_loss.render_loss:.6f}")
+    print(f"initial_image_render_loss={result.initial_loss.image_render_loss:.6f}")
+    print(f"final_image_render_loss={result.final_loss.image_render_loss:.6f}")
+    print(f"final_object_loss={result.final_loss.object_loss:.6f}")
+    print(f"final_temporal_loss={result.final_loss.temporal_loss:.6f}")
+    print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
+    print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
+    print(f"trained_fields={','.join(summary['trained_fields'])}")
+    print(f"frozen_fields={','.join(summary['frozen_fields'])}")
+    print(f"gpu_used={str(summary['gpu_policy']['uses_gpu']).lower()}")
+    print(f"vram_reserve_gb={summary['gpu_policy']['vram_reserve_gb']}")
+    renderer_api = summary.get("renderer_api")
+    if isinstance(renderer_api, dict):
+        print(f"renderer_api_status={renderer_api['status']}")
+        print(f"renderer_name={renderer_api['renderer_name']}")
+        print(f"renderer_gradient_path={renderer_api['gradient_path']}")
+        print(f"renderer_image_render_loss={renderer_api['image_render_loss']:.6f}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_loss_decrease and not summary["loss_decreased"]:
+        raise ValueError("decoder MVP total loss did not decrease")
+    if args.require_image_render_loss_decrease and not summary["image_render_loss_decreased"]:
+        raise ValueError("decoder MVP image render loss did not decrease")
+
+
+def _decoder_training_assignments_from_args(args: argparse.Namespace, sample):
+    if args.solver_checkpoint:
+        checkpoint = json.loads(args.solver_checkpoint.read_text(encoding="utf-8"))
+        validate_object_emergence_solver_checkpoint(checkpoint)
+        solver_state = object_emergence_solver_state_from_dict(checkpoint)
+        assignments = []
+        for frame_index, frame in enumerate(sample.frames):
+            prediction = predict_object_emergence_assignment(
+                ObjectEmergenceEvidence(
+                    positions=frame.positions,
+                    features=frame.features,
+                    frame_index=frame_index,
+                    source=f"solver_checkpoint:{args.solver_checkpoint}",
+                ),
+                solver_state,
+            )
+            assignments.append(prediction.assignment)
+        return tuple(assignments), "solver_checkpoint"
+    if not all(frame.target_assignment is not None for frame in sample.frames):
+        raise ValueError("decoder-mvp requires object_id targets or --solver-checkpoint")
+    return tuple(frame.target_assignment for frame in sample.frames), sample.target_source
+
+
 def _training_object_emergence_solver(args: argparse.Namespace) -> None:
     source_cloud = read_ply(args.input)
     sampled_cloud = _sample_training_cloud(
@@ -1442,6 +1551,18 @@ def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
         print(f"evidence_final_total_loss={evidence['final_total_loss']:.6f}")
         print(f"evidence_initial_assignment_loss={evidence['initial_assignment_loss']:.6f}")
         print(f"evidence_final_assignment_loss={evidence['final_assignment_loss']:.6f}")
+        print(f"evidence_gpu_used={str(evidence.get('gpu_used')).lower()}")
+        print(f"evidence_vram_reserve_gb={evidence.get('vram_reserve_gb')}")
+    if evidence.get("kind") == "object_state_gaussian_decoder_training":
+        print(f"evidence_kind={evidence.get('kind')}")
+        print(f"evidence_target_source={evidence.get('target_source')}")
+        print(f"evidence_initial_total_loss={evidence['initial_total_loss']:.6f}")
+        print(f"evidence_final_total_loss={evidence['final_total_loss']:.6f}")
+        print(f"evidence_initial_image_render_loss={evidence['initial_image_render_loss']:.6f}")
+        print(f"evidence_final_image_render_loss={evidence['final_image_render_loss']:.6f}")
+        print(f"evidence_loss_decreased={str(evidence.get('loss_decreased')).lower()}")
+        print(f"evidence_image_render_loss_decreased={str(evidence.get('image_render_loss_decreased')).lower()}")
+        print(f"evidence_trained_fields={','.join(evidence.get('trained_fields', []))}")
         print(f"evidence_gpu_used={str(evidence.get('gpu_used')).lower()}")
         print(f"evidence_vram_reserve_gb={evidence.get('vram_reserve_gb')}")
     if args.output:
@@ -2360,6 +2481,41 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     kernel_sample.add_argument("--require-loss-decrease", action="store_true")
     kernel_sample.set_defaults(handler=_training_kernel_sample)
+
+    decoder_mvp = training_subparsers.add_parser(
+        "decoder-mvp",
+        help="train only ObjectState Gaussian decoder colors against image renderer loss",
+    )
+    decoder_mvp.add_argument("input", type=Path)
+    decoder_mvp.add_argument("--solver-checkpoint", type=Path)
+    decoder_mvp.add_argument("--slots", type=int)
+    decoder_mvp.add_argument("--frames", type=int, default=2)
+    decoder_mvp.add_argument("--max-points", type=int, default=24)
+    decoder_mvp.add_argument("--object-id-field", default="object_id")
+    decoder_mvp.add_argument("--temporal-offset", type=float, default=0.01)
+    decoder_mvp.add_argument("--image-width", type=int, default=16)
+    decoder_mvp.add_argument("--image-height", type=int, default=16)
+    decoder_mvp.add_argument("--point-radius", type=int, default=1)
+    decoder_mvp.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    decoder_mvp.add_argument("--iterations", type=int, default=8)
+    decoder_mvp.add_argument("--learning-rate", type=float, default=0.5)
+    decoder_mvp.add_argument("--render-weight", type=float, default=0.0)
+    decoder_mvp.add_argument("--image-render-weight", type=float, default=1.0)
+    decoder_mvp.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
+    decoder_mvp.add_argument("--gaussian-scale", type=float, default=0.5)
+    decoder_mvp.add_argument("--gaussian-opacity", type=float, default=1.0)
+    decoder_mvp.add_argument("--object-weight", type=float, default=0.0)
+    decoder_mvp.add_argument("--temporal-weight", type=float, default=0.0)
+    decoder_mvp.add_argument("--seed", type=int, default=0)
+    decoder_mvp.add_argument("--record-every", type=int)
+    decoder_mvp.add_argument("--summary-output", type=Path)
+    decoder_mvp.add_argument("--require-loss-decrease", action="store_true")
+    decoder_mvp.add_argument("--require-image-render-loss-decrease", action="store_true")
+    decoder_mvp.set_defaults(handler=_training_decoder_mvp)
 
     object_emergence_solver = training_subparsers.add_parser(
         "object-emergence-solver",

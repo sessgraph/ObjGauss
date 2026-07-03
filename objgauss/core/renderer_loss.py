@@ -9,11 +9,13 @@ TARGET_IMAGE_RENDERER = "differentiable-gaussian-image-renderer"
 TRAINABLE_KERNEL_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
 OBJECT_EMERGENCE_SOLVER_TRAINING_SCHEMA = "objgauss-object-emergence-solver-training-v1"
 OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-checkpoint-v1"
+OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA = "objgauss-object-state-gaussian-decoder-training-v1"
 FULL_3DGS_RENDERERS = {"gsplat-rasterization-v1"}
 OBJECT_EMERGENCE_SOLVER_EVIDENCE = {
     "object_emergence_solver_training",
     "object_emergence_solver_checkpoint",
 }
+OBJECT_STATE_DECODER_TRAINING_EVIDENCE = {"object_state_gaussian_decoder_training"}
 
 
 @dataclass(frozen=True)
@@ -69,11 +71,19 @@ def renderer_loss_boundary_report(
         and evidence.get("solver_loss_decreased")
         and evidence.get("assignment_loss_decreased")
     )
+    decoder_training_ready = bool(
+        kernel_summary is not None
+        and evidence.get("kind") in OBJECT_STATE_DECODER_TRAINING_EVIDENCE
+        and evidence.get("loss_decreased")
+        and evidence.get("image_render_loss_decreased")
+    )
     status = "point_render_smoke_ready" if point_ready else "contract_defined"
     if kernel_summary is not None and point_blockers:
         status = "point_render_smoke_blocked"
     if solver_ready:
         status = "object_emergence_solver_ready"
+    if decoder_training_ready:
+        status = "object_state_decoder_training_ready"
     if point_ready and evidence.get("renderer_api_ready"):
         status = "renderer_api_ready"
     full_renderer_ready = (
@@ -82,6 +92,8 @@ def renderer_loss_boundary_report(
     )
     if point_ready and full_renderer_ready:
         status = "full_3dgs_renderer_ready"
+    if decoder_training_ready and full_renderer_ready:
+        status = "full_3dgs_decoder_training_ready"
     upgrade_blockers = []
     if not evidence.get("image_targets_bound"):
         upgrade_blockers.append("image_space_targets_not_bound")
@@ -125,6 +137,12 @@ def renderer_loss_boundary_report(
             "run torch/gsplat/CUDA preflight before GPU training",
         )
         if evidence.get("kind") in OBJECT_EMERGENCE_SOLVER_EVIDENCE
+        else (
+            "promote decoder color training smoke to full 3DGS renderer",
+            "bind solver checkpoint assignment generation into the decoder training command",
+            "extend decoder trainable fields only after color-only loss is stable",
+        )
+        if evidence.get("kind") in OBJECT_STATE_DECODER_TRAINING_EVIDENCE
         else (
             "bind trainable frames to camera/image targets",
             "define image-space renderer API and telemetry",
@@ -220,6 +238,8 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         return _solver_training_evidence(kernel_summary)
     if kernel_summary.get("schema") == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA:
         return _solver_checkpoint_evidence(kernel_summary)
+    if kernel_summary.get("schema") == OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA:
+        return _decoder_training_evidence(kernel_summary)
     if kernel_summary.get("schema") != TRAINABLE_KERNEL_SCHEMA:
         raise ValueError(f"unsupported trainable kernel schema: {kernel_summary.get('schema')}")
 
@@ -278,9 +298,16 @@ def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str)
     solver_ready = kind in OBJECT_EMERGENCE_SOLVER_EVIDENCE and bool(
         evidence.get("solver_loss_decreased") and evidence.get("assignment_loss_decreased")
     )
+    decoder_training_ready = kind in OBJECT_STATE_DECODER_TRAINING_EVIDENCE and bool(
+        evidence.get("loss_decreased") and evidence.get("image_render_loss_decreased")
+    )
     renderer_ready = bool(evidence.get("renderer_api_ready"))
     full_renderer_ready = renderer_ready and evidence.get("renderer_name") in FULL_3DGS_RENDERERS
-    if full_renderer_ready:
+    if full_renderer_ready and decoder_training_ready:
+        status = "full_renderer_decoder_training_ready"
+    elif decoder_training_ready:
+        status = "decoder_training_ready"
+    elif full_renderer_ready:
         status = "full_renderer_decoder_ready"
     elif renderer_ready:
         status = "renderer_api_decoder_smoke_ready"
@@ -328,14 +355,19 @@ def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str)
                 "gradient path from renderer loss back to decoder/solver trainable fields",
             ],
         },
-        "ready_without_gpu": bool(solver_ready or renderer_ready),
-        "starts_real_training": False,
+        "ready_without_gpu": bool(solver_ready or renderer_ready or decoder_training_ready),
+        "starts_real_training": bool(decoder_training_ready),
         "remaining_before_full_training": [
             "bind solver checkpoint output to Gaussian decoder parameters",
             "bind decoded Gaussian artifact to renderer_api loss producer",
             "pass torch/gsplat/CUDA/NVIDIA driver preflight",
         ]
-        if not full_renderer_ready
+        if not (full_renderer_ready or decoder_training_ready)
+        else [
+            "switch decoder training smoke to full 3DGS renderer",
+            "keep geometry/opacity/scale frozen until color-only optimization is stable",
+        ]
+        if decoder_training_ready and not full_renderer_ready
         else [],
     }
 
@@ -422,6 +454,65 @@ def _solver_checkpoint_evidence(checkpoint: dict[str, Any]) -> tuple[dict[str, A
         "final_assignment_loss": final["assignment_loss"],
         "solver_loss_decreased": loss_decreased,
         "assignment_loss_decreased": assignment_loss_decreased,
+        "gpu_used": bool(gpu_policy.get("uses_gpu", False)),
+        "vram_reserve_gb": _optional_int(gpu_policy.get("vram_reserve_gb")),
+    }
+    return evidence, blockers
+
+
+def _decoder_training_evidence(summary: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    initial = _loss_record(summary, "initial_loss")
+    final = _loss_record(summary, "final_loss")
+    loss_decreased = final["total_loss"] < initial["total_loss"]
+    image_render_loss_decreased = final["image_render_loss"] < initial["image_render_loss"]
+    render_loss_decreased = final["render_loss"] < initial["render_loss"]
+    blockers: list[str] = ["point_render_smoke_not_present"]
+    if not loss_decreased:
+        blockers.append("decoder_total_loss_not_decreased")
+    if not image_render_loss_decreased:
+        blockers.append("decoder_image_render_loss_not_decreased")
+    sample = summary.get("sample") if isinstance(summary.get("sample"), dict) else {}
+    image_target_contract = (
+        summary.get("image_target_contract")
+        if isinstance(summary.get("image_target_contract"), dict)
+        else {}
+    )
+    renderer_api = (
+        summary.get("renderer_api")
+        if isinstance(summary.get("renderer_api"), dict)
+        else {}
+    )
+    gpu_policy = summary.get("gpu_policy") if isinstance(summary.get("gpu_policy"), dict) else {}
+    renderer_api_ready = renderer_api.get("status") == "ready"
+    evidence = {
+        "kind": "object_state_gaussian_decoder_training",
+        "schema": summary.get("schema"),
+        "decoder_schema": summary.get("decoder_schema"),
+        "iterations": _optional_int(summary.get("iterations")),
+        "frame_count": _optional_int(summary.get("frame_count")),
+        "slots": _optional_int(summary.get("slots")),
+        "sampled_count": _optional_int(sample.get("sampled_count")),
+        "source_count": _optional_int(sample.get("source_count")),
+        "target_source": summary.get("assignment_source") or sample.get("target_source"),
+        "trained_fields": summary.get("trained_fields", []),
+        "frozen_fields": summary.get("frozen_fields", []),
+        "image_targets_bound": image_target_contract.get("status") == "image_targets_bound",
+        "image_target_contract_schema": image_target_contract.get("schema"),
+        "image_target_visibility_policies": image_target_contract.get("visibility_policies", []),
+        "renderer_api_ready": renderer_api_ready,
+        "renderer_api_schema": renderer_api.get("schema"),
+        "renderer_name": renderer_api.get("renderer_name"),
+        "renderer_gradient_path": renderer_api.get("gradient_path"),
+        "image_render_loss": renderer_api.get("image_render_loss"),
+        "initial_total_loss": initial["total_loss"],
+        "final_total_loss": final["total_loss"],
+        "initial_render_loss": initial["render_loss"],
+        "final_render_loss": final["render_loss"],
+        "initial_image_render_loss": initial["image_render_loss"],
+        "final_image_render_loss": final["image_render_loss"],
+        "loss_decreased": loss_decreased,
+        "render_loss_decreased": render_loss_decreased,
+        "image_render_loss_decreased": image_render_loss_decreased,
         "gpu_used": bool(gpu_policy.get("uses_gpu", False)),
         "vram_reserve_gb": _optional_int(gpu_policy.get("vram_reserve_gb")),
     }

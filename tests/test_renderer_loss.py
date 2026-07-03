@@ -19,6 +19,7 @@ from objgauss.core.trainable_kernel import (
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
 )
+from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 
 
@@ -189,6 +190,32 @@ def test_renderer_loss_boundary_accepts_object_emergence_solver_checkpoint():
     assert "decode_gaussian" in decoder_handoff["gaussian_decoder_contract"]["function"]
     assert "solver_checkpoint_not_bound_to_renderer_loss" in payload["upgrade_blockers"]
     assert "solver_checkpoint_not_bound_to_gaussian_decoder" in payload["upgrade_blockers"]
+
+
+def test_renderer_loss_boundary_accepts_decoder_training_summary():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    assignment = np.zeros((6, 2), dtype=np.float32)
+    assignment[:3, 0] = 1.0
+    assignment[3:, 1] = 1.0
+    result = train_object_state_gaussian_decoder(
+        frames,
+        [assignment, assignment],
+        iterations=8,
+        learning_rate=0.7,
+        seed=5,
+    )
+
+    payload = renderer_loss_boundary_report(result.as_dict()).as_dict()
+
+    assert payload["status"] == "object_state_decoder_training_ready"
+    assert payload["point_smoke_ready"] is False
+    assert payload["evidence"]["kind"] == "object_state_gaussian_decoder_training"
+    assert payload["evidence"]["loss_decreased"] is True
+    assert payload["evidence"]["image_render_loss_decreased"] is True
+    assert payload["evidence"]["trained_fields"] == ["object_colors"]
+    assert payload["decoder_handoff_contract"]["status"] == "decoder_training_ready"
+    assert payload["decoder_handoff_contract"]["starts_real_training"] is True
+    assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]
 
 
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():

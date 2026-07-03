@@ -10,6 +10,7 @@ from objgauss.core import (
     GsplatTrainingInput,
     ObjectState,
     ObjectStateGaussianDecode,
+    ObjectStateGaussianDecoderTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverTrainingResult,
@@ -41,6 +42,7 @@ from objgauss.core import (
     evidence_from_gaussian_cloud,
     initialize_object_field,
     initialize_object_emergence_solver,
+    initialize_object_state_gaussian_decoder,
     image_target_contract_summary,
     make_trainable_image_target,
     make_trainable_kernel_mvp_fixture,
@@ -58,12 +60,14 @@ from objgauss.core import (
     renderer_loss_boundary_report,
     train_kernel_mvp,
     train_object_emergence_solver,
+    train_object_state_gaussian_decoder,
     train_kernel_mvp_from_cloud,
     trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
+    validate_object_state_gaussian_decoder_state,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -337,6 +341,17 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
         np.asarray([[0.2, 0.3, 0.4], [0.6, 0.7, 0.8]], dtype=np.float32),
     )
     assert object_state_input.decoder_schema == "objgauss-object-state-gaussian-decode-v1"
+    decoder_state = initialize_object_state_gaussian_decoder(slots=2, seed=1)
+    assert validate_object_state_gaussian_decoder_state(decoder_state) is decoder_state
+    decoder_result = train_object_state_gaussian_decoder(
+        bound_frames[:1],
+        [object_assignment],
+        initial_state=decoder_state,
+        iterations=1,
+        learning_rate=0.2,
+    )
+    assert isinstance(decoder_result, ObjectStateGaussianDecoderTrainingResult)
+    assert decoder_result.as_dict()["trained_fields"] == ["object_colors"]
     assert evaluate_gsplat_training_renderer_loss is not None
     artifact = trainable_kernel_model_artifact(
         result,
