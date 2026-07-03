@@ -73,30 +73,49 @@
 - 目标: 评估是否能从 Spark raycast 或上游扩展拿到 splat index / object id，替代当前已验收的 `hover-confirm-v1` screen-space picking。
 - 当前判断: Spark `SplatMesh.raycast` 只返回 `distance/object/point`，没有 splat index / object id，因此本项不应阻塞 near-1M terminal proof。
 
-### TRAINABLE-SOLVER-NP-001: Train Object Emergence Solver weights
-
-- 状态: planned
-- 类型: 标准 PR / algorithm model training
-- 目标: 在 `objgauss.core.object_emergence_solver` 的 `SolverState` ABI 上实现
-  dependency-free NumPy 训练器，让 `features/positions -> logits -> A[N,K]` 的权重
-  可由 `L_render + L_object + L_temporal + L_balance` 更新，而不是继续直接优化每帧
-  assignment logits。
-- 边界:
-  - 不引入 torch / gsplat / CUDA；full renderer training 仍保持 suspended。
-  - 不训练 Gaussian geometry / opacity / rotation。
-  - 不自动执行 dynamic-K birth / merge / split；只可输出或消费 gated proposal。
-  - 训练输出只写 `/tmp` 或 ignored `outputs/`，不提交 artifact / checkpoint。
-- 验收:
-  - 小型 fixture 上 total loss 和 assignment/object loss 下降。
-  - 训练后 `ObjectEmergenceSolverState` 可继续通过
-    `predict_object_emergence_assignment(...)` 生成 normalized `A[N,K]`。
-  - 结果能导出为现有 Debug OS 可消费的 trainable artifact 或其下一版 contract。
-
 ## In Progress
 
 当前无进行中 PR。
 
 ## Done
+
+### TRAINABLE-SOLVER-NP-001: Train Object Emergence Solver weights
+
+- 状态: done / numpy-solver-training
+- 类型: 标准 PR / algorithm model training
+- 目标: 在 `objgauss.core.object_emergence_solver` 的 `SolverState` ABI 上实现
+  dependency-free NumPy 训练器，让 `features/positions -> logits -> A[N,K]` 的权重
+  可由 pre-render solver loss 更新，而不是继续直接优化每帧 assignment logits。
+- 已实施:
+  - `objgauss/core/object_emergence_solver.py` 新增
+    `ObjectEmergenceSolverLoss`、`ObjectEmergenceSolverTrainingResult` 和
+    `train_object_emergence_solver(...)`。
+  - 当前 loss 为 `L_assignment + L_entropy + L_balance + L_temporal` 的加权组合；
+    `L_render` / `image_render_loss` 仍属于后续 full renderer loss producer，不在本阶段
+    伪装完成。
+  - 新增 `object_id_targets_from_cloud(...)`，可把 object-aware PLY 的 `object_id`
+    映射为 one-hot target assignment。
+  - `objgauss training object-emergence-solver <ply>` 新增 CPU 训练入口，读取小型或采样
+    object-aware PLY，训练 solver weights，输出 summary，并明确 `gpu_used=false`、
+    `vram_reserve_gb=1`。
+  - `docs/architecture/object-emergence-model-v1.md` 增加训练管道资源策略：进入 GPU /
+    full renderer training 前必须 preflight，并固定预留 1GB GPU 显存。
+- 边界:
+  - 不引入 torch / gsplat / CUDA；full renderer training 仍保持 suspended。
+  - 不训练 Gaussian geometry / opacity / rotation。
+  - 不自动执行 dynamic-K birth / merge / split。
+  - 训练输出只写 `/tmp` 或 ignored `outputs/`，不提交 artifact / checkpoint。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_emergence_solver.py tests/test_core_namespace.py`:
+    14 passed。
+  - `uv run objgauss training object-emergence-solver public/samples/lego_alpha_v1_objects.ply --max-points 16 --iterations 8 --learning-rate 0.5 --summary-output /tmp/objgauss-object-emergence-solver-summary.json --require-loss-decrease`:
+    passed，`initial_total_loss=1.386400 -> final_total_loss=0.767572`，
+    `initial_assignment_loss=1.376403 -> final_assignment_loss=0.759329`，
+    `gpu_used=false`，`vram_reserve_gb=1`。
+  - `uv run --extra dev pytest`: 153 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `5aed276`
 
 ### ALGOMODEL-SOLVER-ABI-001: Object Emergence Model spec and solver ABI
 

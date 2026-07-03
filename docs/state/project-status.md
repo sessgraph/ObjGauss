@@ -72,6 +72,23 @@ projection；它还不是 optimizer，不更新权重，不自动执行 dynamic-
 gsplat / CUDA，不改 viewer renderer 或 artifact schema。下一步算法 PR 是
 `TRAINABLE-SOLVER-NP-001`。
 
+随后已完成 `TRAINABLE-SOLVER-NP-001`：`objgauss/core/object_emergence_solver.py`
+现在可用 dependency-free NumPy 有限差分训练 `ObjectEmergenceSolverState` 的 feature
+weights、position weights 和 bias。训练 loss 是 pre-render solver loss：
+`L_assignment + L_entropy + L_balance + L_temporal`，其中 `L_render` /
+`image_render_loss` 仍保留给后续 full renderer loss producer。新增
+`object_id_targets_from_cloud(...)` 和 CLI
+`objgauss training object-emergence-solver <ply>`，可从 object-aware PLY 生成 one-hot
+assignment target 并训练 solver weights。已用
+`public/samples/lego_alpha_v1_objects.ply` 的 16 点采样验证：
+`initial_total_loss=1.386400 -> final_total_loss=0.767572`，且 summary 明确
+`gpu_used=false`、`vram_reserve_gb=1`。同一架构文档已记录 GPU 训练管道策略：
+后续进入 GPU / full renderer training 前必须 preflight torch / gsplat / CUDA /
+`nvidia-smi`，并固定预留 1GB GPU 显存；当前会话不把
+`TRAIN-GSPLAT-MVP-001` 从 suspended 改为 done。本切片不训练 Gaussian geometry /
+opacity / rotation，不自动执行 dynamic-K，不提交 checkpoint / artifact / rendered
+image 或大资产。
+
 同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
 Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用
 `ObjectField.probabilities()`，将 Gaussian evidence weighted reduction 为
