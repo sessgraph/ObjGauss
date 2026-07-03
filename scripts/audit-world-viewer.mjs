@@ -410,6 +410,28 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
+    await page.locator("[data-debug-lens-button='opacity']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const selector = document.querySelector("[data-debug-lens-selector='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.lensOpacitySamples ?? [];
+      return (
+        shell?.getAttribute("data-debug-lens") === "opacity" &&
+        panel?.getAttribute("data-debug-lens") === "opacity" &&
+        selector?.getAttribute("data-selected-lens") === "opacity" &&
+        selector?.querySelector("[data-debug-lens-button='opacity']")?.getAttribute("data-active") === "true" &&
+        world?.debugLens === "opacity" &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.activeLens === "opacity" &&
+          sample.opacityLens === "opacity" &&
+          sample.opacity > 0.85 &&
+          sample.opacity <= 1
+        )
+      );
+    }, undefined, { timeout: 15000 });
     await page.locator("[data-debug-lens-button='entropy']").click();
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");

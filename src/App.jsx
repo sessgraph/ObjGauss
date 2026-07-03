@@ -20,7 +20,7 @@ const INITIAL_CAMERA = {
 
 const OGC_CHUNK_INDEX_SCHEMA = "objgauss-chunk-index-v1";
 const OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA = "objgauss-object-state-stability-benchmark-v1";
-const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
+const DEBUG_LENSES = ["assignment", "confidence", "entropy", "opacity"];
 const OBJECT_OVERLAY_MODES = ["full", "bbox", "centroid", "off"];
 const DEBUG_EVENT_LIMIT = 12;
 const HOVER_DIM_OPACITY = 0.18;
@@ -4189,12 +4189,16 @@ function createPointCloudGroup(model, points) {
     const assignmentColors = new Float32Array(entries.length * 3);
     const confidenceColors = new Float32Array(entries.length * 3);
     const entropyColors = new Float32Array(entries.length * 3);
+    const opacityColors = new Float32Array(entries.length * 3);
     const fallback = new THREE.Color(accent);
     const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), assignmentEntropy * 0.34);
     const confidenceColor = debugConfidenceColor(assignmentConfidence);
     const entropyColor = debugEntropyColor(assignmentEntropy);
+    const opacityValues = [];
 
     entries.forEach((entry, index) => {
+      const opacityValue = normalizedGaussianOpacity(entry.point.opacity, 0.94);
+      opacityValues.push(opacityValue);
       positions[index * 3] = (entry.x - objectGroup.position.x) * objectBoost;
       positions[index * 3 + 1] = (entry.y - normalizedBounds.min.y) * objectBoost;
       positions[index * 3 + 2] = (entry.z - objectGroup.position.z) * objectBoost;
@@ -4207,6 +4211,7 @@ function createPointCloudGroup(model, points) {
       assignmentColors[index * 3 + 2] = debugColor.b;
       writeColor(confidenceColors, index, confidenceColor);
       writeColor(entropyColors, index, entropyColor);
+      writeColor(opacityColors, index, debugOpacityColor(opacityValue));
     });
 
     const geometry = new THREE.BufferGeometry();
@@ -4215,6 +4220,7 @@ function createPointCloudGroup(model, points) {
     const assignmentColorAttr = new THREE.BufferAttribute(assignmentColors, 3);
     const confidenceColorAttr = new THREE.BufferAttribute(confidenceColors, 3);
     const entropyColorAttr = new THREE.BufferAttribute(entropyColors, 3);
+    const opacityColorAttr = new THREE.BufferAttribute(opacityColors, 3);
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -4234,6 +4240,8 @@ function createPointCloudGroup(model, points) {
     cloud.userData.assignmentColor = assignmentColorAttr;
     cloud.userData.confidenceColor = confidenceColorAttr;
     cloud.userData.entropyColor = entropyColorAttr;
+    cloud.userData.opacityColor = opacityColorAttr;
+    cloud.userData.opacityMean = round3(average(opacityValues));
     cloud.userData.gaussianDebug = entries.map((entry, index) => ({
       protocol: "object-state-debug-os-v1",
       source: "derived_from_object_id",
@@ -4244,7 +4252,7 @@ function createPointCloudGroup(model, points) {
       entropy: round3(assignmentEntropy),
       assignment,
       position: [round3(entry.point.x), round3(entry.point.y), round3(entry.point.z)],
-      opacity: round3(entry.point.opacity ?? 0),
+      opacity: round3(opacityValues[index] ?? 0),
     }));
     const objectState = objectStateSummary({
       objectId,
@@ -4255,6 +4263,7 @@ function createPointCloudGroup(model, points) {
       totalMass: sampled.length,
       bounds: originalBounds,
       centroid: originalBounds.center,
+      gaussianOpacityMean: cloud.userData.opacityMean,
       spatialCompactness: spatialCompactnessForGeometry(geometry),
       displayBounds: geometry.boundingBox,
       source: "derived_from_object_id",
@@ -4330,6 +4339,7 @@ function createCompressedModelGroup(model) {
       points.positions.length / 3,
       debugEntropyColor(assignmentEntropy),
     );
+    const opacityColorAttr = uniformColorAttribute(points.positions.length / 3, debugOpacityColor(0.58));
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -4347,6 +4357,8 @@ function createCompressedModelGroup(model) {
     cloud.userData.assignmentColor = assignmentColorAttr;
     cloud.userData.confidenceColor = confidenceColorAttr;
     cloud.userData.entropyColor = entropyColorAttr;
+    cloud.userData.opacityColor = opacityColorAttr;
+    cloud.userData.opacityMean = 0.58;
     cloud.userData.gaussianDebug = Array.from({ length: points.positions.length / 3 }, (_item, gaussianIndex) => ({
       protocol: "object-state-debug-os-v1",
       source: "compressed_placeholder_assignment",
@@ -4373,6 +4385,7 @@ function createCompressedModelGroup(model) {
       totalMass: objectCount * (model.placeholderPointsPerObject ?? 760),
       bounds,
       centroid: bounds.getCenter(new THREE.Vector3()),
+      gaussianOpacityMean: cloud.userData.opacityMean,
       spatialCompactness: spatialCompactnessForGeometry(geometry),
       displayBounds: bounds,
       source: "compressed_placeholder_assignment",
@@ -4466,6 +4479,7 @@ function createTrainableArtifactGroup(model) {
     const assignmentColors = new Float32Array(stateRows.length * 3);
     const confidenceColors = new Float32Array(stateRows.length * 3);
     const entropyColors = new Float32Array(stateRows.length * 3);
+    const opacityColors = new Float32Array(stateRows.length * 3);
     const fallback = new THREE.Color(accent);
     const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), Number(state.normalized_assignment_entropy ?? 0) * 0.34);
     const assignment = averageAssignmentVector(stateRows.map((entry) => entry.row), objectIds);
@@ -4490,6 +4504,7 @@ function createTrainableArtifactGroup(model) {
       const rowValues = entry.row.map((value) => Number(value) || 0);
       writeColor(confidenceColors, index, debugConfidenceColor(Math.max(...rowValues)));
       writeColor(entropyColors, index, debugEntropyColor(normalizedEntropy(rowValues)));
+      writeColor(opacityColors, index, debugOpacityColor(0.96));
     });
 
     const geometry = new THREE.BufferGeometry();
@@ -4498,6 +4513,7 @@ function createTrainableArtifactGroup(model) {
     const assignmentColorAttr = new THREE.BufferAttribute(assignmentColors, 3);
     const confidenceColorAttr = new THREE.BufferAttribute(confidenceColors, 3);
     const entropyColorAttr = new THREE.BufferAttribute(entropyColors, 3);
+    const opacityColorAttr = new THREE.BufferAttribute(opacityColors, 3);
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -4516,6 +4532,8 @@ function createTrainableArtifactGroup(model) {
     cloud.userData.assignmentColor = assignmentColorAttr;
     cloud.userData.confidenceColor = confidenceColorAttr;
     cloud.userData.entropyColor = entropyColorAttr;
+    cloud.userData.opacityColor = opacityColorAttr;
+    cloud.userData.opacityMean = 0.96;
     cloud.userData.gaussianDebug = stateRows.map((entry, index) => {
       const vector = assignmentVectorFromProbabilities(entry.row, objectIds);
       return {
@@ -4541,6 +4559,7 @@ function createTrainableArtifactGroup(model) {
       massFraction: round3(state.mass_fraction),
       confidence: round3(state.confidence),
       assignmentEntropy: round3(state.normalized_assignment_entropy ?? state.assignment_entropy ?? 0),
+      gaussianOpacityMean: cloud.userData.opacityMean,
       objectPurity: purity.value,
       purityLabel: purity.label,
       temporalDrift,
@@ -4740,6 +4759,7 @@ function colorAttributeForDebugLens(cloud, lens, debugEnabled = true) {
   cloud.userData.activeColorLens = normalized;
   if (normalized === "confidence") return cloud.userData.confidenceColor ?? cloud.userData.assignmentColor;
   if (normalized === "entropy") return cloud.userData.entropyColor ?? cloud.userData.assignmentColor;
+  if (normalized === "opacity") return cloud.userData.opacityColor ?? cloud.userData.assignmentColor;
   return cloud.userData.assignmentColor;
 }
 
@@ -4802,6 +4822,9 @@ function opacityForDebugLens(objectState, lens) {
   }
   if (lens === "entropy") {
     return round3(0.32 + 0.58 * clamp01(objectState?.assignmentEntropy ?? 0.5));
+  }
+  if (lens === "opacity") {
+    return round3(0.32 + 0.58 * clamp01(objectState?.gaussianOpacityMean ?? 0.5));
   }
   return 0.62;
 }
@@ -4875,6 +4898,7 @@ function objectOverlayLabel(mode) {
 function debugLensLabel(lens) {
   if (lens === "confidence") return "conf";
   if (lens === "entropy") return "H";
+  if (lens === "opacity") return "opac";
   return "assign";
 }
 
@@ -4884,6 +4908,17 @@ function debugConfidenceColor(confidence) {
 
 function debugEntropyColor(entropy) {
   return new THREE.Color("#53d8da").lerp(new THREE.Color("#ff8a5c"), clamp01(entropy));
+}
+
+function debugOpacityColor(opacity) {
+  return new THREE.Color("#33485d").lerp(new THREE.Color("#eefbff"), clamp01(opacity));
+}
+
+function normalizedGaussianOpacity(value, fallback = 0.62) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return clamp01(fallback);
+  if (number > 1) return clamp01(number / 255);
+  return clamp01(number);
 }
 
 function writeColor(target, index, color) {
@@ -4915,6 +4950,7 @@ function objectStateSummary({
   totalMass,
   bounds,
   centroid,
+  gaussianOpacityMean,
   spatialCompactness,
   source,
 }) {
@@ -4935,6 +4971,7 @@ function objectStateSummary({
     massFraction: round3(mass / total),
     confidence: round3(assignmentConfidence),
     assignmentEntropy: round3(assignmentEntropy),
+    gaussianOpacityMean: optionalRound3(gaussianOpacityMean),
     spatialCompactness: optionalRound3(spatialCompactness),
     centroid: [round3(center.x), round3(center.y), round3(center.z)],
     bbox: [

@@ -78,6 +78,35 @@
 
 ## Done
 
+### OBJECTSTATE-OPACITY-LENS-001: Gaussian opacity debug lens
+
+- 状态: done / gaussian-opacity-debug-lens
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 Phase 1 Layer 1 的 opacity debugging 升级为一等 debug lens，让 Gaussian
+  scene 能直接显示 opacity / transparency 证据，而不是只依赖 assignment、confidence
+  和 entropy 视图。
+- 已实施:
+  - `src/App.jsx` 将 `opacity` 加入 Debug lens selector，并为 point cloud、
+    compressed placeholder 和 trainable artifact Gaussian cloud 写入 `opacityColor`
+    buffer 与 `gaussianOpacityMean`。
+  - `colorAttributeForDebugLens(...)` 和 `opacityForDebugLens(...)` 支持 opacity lens；
+    active lens telemetry 继续写入 `window.__OBJGAUSS_WORLD__.lensOpacitySamples`。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 切换到 opacity lens 后，
+    root、Debug panel、selector 和 scene sample 均显示 `opacity` lens。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed；内部验证
+    `opacity` lens selector、root / panel `data-debug-lens`、scene
+    `lensOpacitySamples.activeLens` 和 `activeOpacityLens` 均为 `opacity`。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-VERDICT-PANEL-001: Visible ObjectState verdict inspector
 
 - 状态: done / objectstate-verdict-panel

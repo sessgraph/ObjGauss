@@ -408,7 +408,7 @@ button:focus-visible {
 }
 
 .debugLensSelector {
-  grid-template-columns: 68px repeat(3, minmax(0, 1fr));
+  grid-template-columns: 68px repeat(4, minmax(0, 1fr));
   margin-bottom: 10px;
 }
 
