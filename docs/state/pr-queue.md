@@ -102,7 +102,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 145 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `456f3d7`
 
 ### DEBUG-SESSION-DIFF-001: Compare live snapshots against imported debug sessions
 
