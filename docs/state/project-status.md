@@ -410,6 +410,16 @@ centroid child visibility，输出 `objectOverlay=full`。该切片只强化 Pha
 调试仪器，不改变 renderer、solver、artifact schema、训练 loop，也不引入 torch /
 gsplat / CUDA。
 
+`OBJECTSTATE-PROBE-DIAGNOSTIC-001` 已将 Gaussian assignment probe 从单纯 heatmap
+升级为可审计诊断：`src/App.jsx` 现在从当前 `A[n,:]` 派生 top-1 / top-2、
+margin、ambiguous 和 collapse-risk summary，并同步写入 ObjectState Debug 面板、
+root telemetry、`window.__OBJGAUSS_WORLD__`、debug snapshot、session archive 和
+live-vs-archive diff changed fields。`scripts/audit-world-viewer.mjs` 验证 trainable
+artifact、local import、algorithm manifest、OGC route、snapshot export 和 session
+import 中的 probe 状态与 margin 保真。该切片仍是 Phase 1 非训练 Debug OS 工作，
+不改变 assignment solver、ObjectState projection、renderer、artifact schema 或训练
+loop；`TRAIN-GSPLAT-MVP-001` 继续因 torch / gsplat / CUDA 环境缺失保持挂起。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

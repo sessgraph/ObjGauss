@@ -233,13 +233,25 @@ async function auditWorld(url) {
     }
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      const world = window.__OBJGAUSS_WORLD__;
       return (
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         heatmap?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
+        shell?.getAttribute("data-assignment-probe-status") === "confident" &&
+        panel?.getAttribute("data-assignment-probe-status") === "confident" &&
+        heatmap?.getAttribute("data-assignment-probe-status") === "confident" &&
+        snapshot?.assignment?.probe?.status === "confident" &&
+        world?.assignmentProbeStatus === "confident" &&
+        Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
+        Number(heatmap?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
+        snapshot?.assignment?.probe?.margin > 0.55 &&
+        world?.assignmentProbeMargin > 0.55 &&
         stability?.getAttribute("data-stability-status") === shell?.getAttribute("data-stability-status") &&
         training?.getAttribute("data-training-status") === "loss_down" &&
         training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1" &&
@@ -297,9 +309,16 @@ async function auditWorld(url) {
       return {
         ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
         assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+        assignmentProbeStatus: window.__OBJGAUSS_WORLD__?.assignmentProbeStatus ?? null,
+        assignmentProbeMargin: window.__OBJGAUSS_WORLD__?.assignmentProbeMargin ?? null,
       };
     }, frameSwitch.selectionId);
-    if (!frameGaussian.ok || frameGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+    if (
+      !frameGaussian.ok ||
+      frameGaussian.assignmentSource !== "trainable_kernel_model_artifact" ||
+      frameGaussian.assignmentProbeStatus !== "confident" ||
+      !(Number(frameGaussian.assignmentProbeMargin) > 0.55)
+    ) {
       throw new Error(`expected frame 1 Gaussian probe to remain trainable artifact sourced: ${JSON.stringify(frameGaussian)}`);
     }
     await page.locator("[data-debug-lens-button='confidence']").click();
@@ -559,12 +578,15 @@ async function auditWorld(url) {
         debugSnapshotOverlayMode: snapshot?.debug?.overlayMode ?? null,
         debugSnapshotAssignmentSource: snapshot?.assignment?.source ?? null,
         debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
+        debugSnapshotAssignmentProbeStatus: snapshot?.assignment?.probe?.status ?? null,
+        debugSnapshotAssignmentProbeMargin: snapshot?.assignment?.probe?.margin ?? null,
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
         debugSnapshotEventCount: Array.isArray(snapshot?.events) ? snapshot.events.length : 0,
         debugSnapshotEventTypes: Array.isArray(snapshot?.events) ? snapshot.events.map((event) => event.type) : [],
         shellDebugSnapshotSchema: shell?.getAttribute("data-debug-snapshot-schema") ?? null,
         shellDebugSnapshotModel: shell?.getAttribute("data-debug-snapshot-model") ?? null,
         shellDebugSnapshotSlots: Number(shell?.getAttribute("data-debug-snapshot-assignment-slots") ?? 0),
+        shellDebugSnapshotAssignmentProbeStatus: shell?.getAttribute("data-debug-snapshot-assignment-probe-status") ?? null,
         shellDebugSnapshotStability: shell?.getAttribute("data-debug-snapshot-stability") ?? null,
         debugEventCount: events.length,
         debugEventLast: events[0]?.type ?? null,
@@ -578,7 +600,12 @@ async function auditWorld(url) {
         panelDebugSnapshotModel: snapshotPanel?.getAttribute("data-debug-snapshot-model") ?? null,
         panelDebugSnapshotLens: snapshotPanel?.getAttribute("data-debug-snapshot-lens") ?? null,
         panelDebugSnapshotSlots: Number(snapshotPanel?.getAttribute("data-debug-snapshot-slots") ?? 0),
+        panelDebugSnapshotAssignmentProbeStatus: snapshotPanel?.getAttribute("data-debug-snapshot-assignment-probe-status") ?? null,
         assignmentSource: handle.assignmentSource,
+        assignmentProbeStatus: handle.assignmentProbeStatus ?? null,
+        assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
+        shellAssignmentProbeStatus: shell?.getAttribute("data-assignment-probe-status") ?? null,
+        shellAssignmentProbeMargin: Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0),
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
@@ -686,15 +713,23 @@ async function auditWorld(url) {
       world.debugSnapshotLens === "entropy" &&
       world.debugSnapshotAssignmentSource === "trainable_kernel_model_artifact" &&
       world.debugSnapshotAssignmentSlots === 2 &&
+      world.debugSnapshotAssignmentProbeStatus === "confident" &&
+      world.debugSnapshotAssignmentProbeMargin > 0.55 &&
       world.debugSnapshotTrainingStatus === "loss_down" &&
       world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.shellDebugSnapshotModel === world.debugSnapshotModel &&
       world.shellDebugSnapshotSlots === world.debugSnapshotAssignmentSlots &&
+      world.shellDebugSnapshotAssignmentProbeStatus === world.debugSnapshotAssignmentProbeStatus &&
       world.shellDebugSnapshotStability === world.stabilityStatus &&
       world.panelDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.panelDebugSnapshotModel === world.debugSnapshotModel &&
       world.panelDebugSnapshotLens === world.debugSnapshotLens &&
-      world.panelDebugSnapshotSlots === world.debugSnapshotAssignmentSlots
+      world.panelDebugSnapshotSlots === world.debugSnapshotAssignmentSlots &&
+      world.panelDebugSnapshotAssignmentProbeStatus === world.debugSnapshotAssignmentProbeStatus &&
+      world.assignmentProbeStatus === "confident" &&
+      world.assignmentProbeMargin > 0.55 &&
+      world.shellAssignmentProbeStatus === "confident" &&
+      world.shellAssignmentProbeMargin > 0.55
     )) {
       throw new Error(`expected stable ObjectState debug snapshot protocol: ${JSON.stringify(world)}`);
     }
@@ -958,9 +993,16 @@ async function auditLocalTrainableArtifactImport(browser, url) {
       return {
         ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
         assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+        assignmentProbeStatus: window.__OBJGAUSS_WORLD__?.assignmentProbeStatus ?? null,
+        assignmentProbeMargin: window.__OBJGAUSS_WORLD__?.assignmentProbeMargin ?? null,
       };
     }, selection.selectionId);
-    if (!gaussian.ok || gaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+    if (
+      !gaussian.ok ||
+      gaussian.assignmentSource !== "trainable_kernel_model_artifact" ||
+      gaussian.assignmentProbeStatus !== "confident" ||
+      !(Number(gaussian.assignmentProbeMargin) > 0.55)
+    ) {
       throw new Error(`expected local artifact Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
     await page.locator("[data-trainable-frame-button='1']").click();
@@ -974,6 +1016,8 @@ async function auditLocalTrainableArtifactImport(browser, url) {
       return (
         shell?.getAttribute("data-selected-model") === "trainable-local-artifact" &&
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        shell?.getAttribute("data-assignment-probe-status") === "confident" &&
+        Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.45 &&
         shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
         frameSelector?.getAttribute("data-selected-frame") === "1" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
@@ -1526,9 +1570,16 @@ async function auditAlgorithmManifestBundle(browser, url) {
       return {
         ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
         assignmentSource: world?.assignmentSource ?? null,
+        assignmentProbeStatus: window.__OBJGAUSS_WORLD__?.assignmentProbeStatus ?? null,
+        assignmentProbeMargin: window.__OBJGAUSS_WORLD__?.assignmentProbeMargin ?? null,
       };
     }, trainableSelection.selectionId);
-    if (!trainableGaussian.ok || trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+    if (
+      !trainableGaussian.ok ||
+      trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact" ||
+      trainableGaussian.assignmentProbeStatus !== "confident" ||
+      !(Number(trainableGaussian.assignmentProbeMargin) > 0.55)
+    ) {
       throw new Error(`expected algorithm manifest trainable Gaussian probe: ${JSON.stringify(trainableGaussian)}`);
     }
 
@@ -1570,9 +1621,16 @@ async function auditAlgorithmManifestBundle(browser, url) {
       return {
         ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
         assignmentSource: world?.assignmentSource ?? null,
+        assignmentProbeStatus: window.__OBJGAUSS_WORLD__?.assignmentProbeStatus ?? null,
+        assignmentProbeMargin: window.__OBJGAUSS_WORLD__?.assignmentProbeMargin ?? null,
       };
     }, ogcSelection.selectionId);
-    if (!ogcGaussian.ok || ogcGaussian.assignmentSource !== "derived_from_object_id") {
+    if (
+      !ogcGaussian.ok ||
+      ogcGaussian.assignmentSource !== "derived_from_object_id" ||
+      ogcGaussian.assignmentProbeStatus !== "confident" ||
+      !(Number(ogcGaussian.assignmentProbeMargin) > 0.85)
+    ) {
       throw new Error(`expected algorithm manifest OGC Gaussian probe: ${JSON.stringify(ogcGaussian)}`);
     }
     await page.locator("[data-ogc-chunk-button='0']").click();
@@ -1618,6 +1676,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.export?.schema !== "objgauss-debug-snapshot-export-v1" ||
         parsed?.model?.id !== "model-manifest-ogc-artifact" ||
         parsed?.debug?.overlayMode !== "full" ||
+        parsed?.assignment?.probe?.status !== "confident" ||
+        !(Number(parsed?.assignment?.probe?.margin) > 0.85) ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
@@ -1671,6 +1731,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.snapshot?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
         parsed?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
         parsed?.snapshot?.debug?.overlayMode !== "full" ||
+        parsed?.snapshot?.assignment?.probe?.status !== "confident" ||
+        !(Number(parsed?.snapshot?.assignment?.probe?.margin) > 0.85) ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
@@ -1747,6 +1809,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         archive?.schema !== "objgauss-object-state-debug-session-v1" ||
         archive?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
         archive?.snapshot?.debug?.overlayMode !== "full" ||
+        archive?.snapshot?.assignment?.probe?.status !== "confident" ||
+        !(Number(archive?.snapshot?.assignment?.probe?.margin) > 0.85) ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||

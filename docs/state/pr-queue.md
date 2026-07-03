@@ -78,6 +78,36 @@
 
 ## Done
 
+### OBJECTSTATE-PROBE-DIAGNOSTIC-001: Auditable assignment probe diagnostics
+
+- 状态: done / assignment-probe-diagnostics
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将点击 Gaussian 后的 `A[n,:]` heatmap 升级为可审计 probe summary，直接暴露
+  top-1 / top-2、margin、ambiguous 和 collapse-risk 诊断。
+- 已实施:
+  - `src/App.jsx` 新增 `assignmentProbeSummary(...)`，从当前 assignment vector 和
+    Gaussian probe 派生 status、top slot、top probability、second probability、margin、
+    entropy、confidence、ambiguous 和 collapse-risk。
+  - root `.worldShell`、ObjectState Debug panel、Assignment heatmap、
+    `window.__OBJGAUSS_WORLD__`、debug snapshot 和 session archive 同步记录 probe
+    诊断；live-vs-archive diff 现在能把 probe status / margin 变化列入 changed fields。
+  - `scripts/audit-world-viewer.mjs` 覆盖 trainable artifact、local artifact import、
+    algorithm manifest、OGC route、snapshot export 和 session import 的 probe status /
+    margin 保真。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer、artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `debugSessionDiff=match`、`debugSessionDrift=changed`、`assignmentSlots=2` 和
+    `assignmentSource=trainable_kernel_model_artifact`。
+  - `git diff --check`: passed。
+- 完成 commit: `pending`
+
 ### OBJECTSTATE-OVERLAY-CONTROLS-001: Auditable ObjectState overlay controls
 
 - 状态: done / objectstate-overlay-layer-controls

@@ -306,6 +306,32 @@ button:focus-visible {
   margin: 0 0 14px;
 }
 
+.assignmentProbeMeta {
+  display: grid;
+  min-height: 28px;
+  grid-template-columns: minmax(0, 1fr) 34px 48px 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 8px;
+  background: rgba(9, 17, 24, 0.38);
+  color: #c8dce2;
+  font-size: 11px;
+}
+
+.assignmentProbeMeta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #89a9b4;
+}
+
+.assignmentProbeMeta strong,
+.assignmentProbeMeta small {
+  text-align: right;
+}
+
 .assignmentRow {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 48px;

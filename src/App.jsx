@@ -128,6 +128,10 @@ export default function App() {
   );
   const selectedAssignmentSource =
     debugProbe?.source ?? selectedObject?.objectState?.source ?? selected?.delivery?.source ?? "";
+  const selectedAssignmentProbe = assignmentProbeSummary(
+    debugProbe?.assignment ?? selectedObject?.assignment ?? selectedObject?.objectState?.assignment ?? [],
+    debugProbe,
+  );
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const selectedOgcChunkScope =
@@ -152,6 +156,7 @@ export default function App() {
     hiddenCount,
     stability: selectedStability,
     assignmentSource: selectedAssignmentSource,
+    assignmentProbe: selectedAssignmentProbe,
     trainingEvidence: selectedTrainingEvidence,
     qualityReport: selectedQualityReport,
     objectStateBenchmark: selectedObjectStateBenchmark,
@@ -1129,6 +1134,7 @@ export default function App() {
       data-debug-snapshot-model={selectedDebugSnapshot.model.id}
       data-debug-snapshot-object={selectedDebugSnapshot.selection.objectId ?? ""}
       data-debug-snapshot-assignment-slots={selectedDebugSnapshot.assignment.slotCount}
+      data-debug-snapshot-assignment-probe-status={selectedDebugSnapshot.assignment.probe?.status ?? ""}
       data-debug-snapshot-stability={selectedDebugSnapshot.stability.status}
       data-debug-snapshot-training-status={selectedDebugSnapshot.training?.status ?? ""}
       data-debug-snapshot-export-status={snapshotExport.status}
@@ -1166,6 +1172,13 @@ export default function App() {
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
+      data-assignment-probe-status={selectedAssignmentProbe.status}
+      data-assignment-probe-top-slot={selectedAssignmentProbe.topSlot ?? ""}
+      data-assignment-probe-top-probability={selectedAssignmentProbe.topProbability ?? ""}
+      data-assignment-probe-second-probability={selectedAssignmentProbe.secondProbability ?? ""}
+      data-assignment-probe-margin={selectedAssignmentProbe.margin ?? ""}
+      data-assignment-probe-ambiguous={selectedAssignmentProbe.ambiguous ? "true" : "false"}
+      data-assignment-probe-collapse-risk={selectedAssignmentProbe.collapseRisk ? "true" : "false"}
       data-object-overlay-mode={selectedObjectOverlayMode}
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "centroid") ? "true" : "false"}
@@ -1428,6 +1441,7 @@ export default function App() {
         selectedObjectKey={selectedObjectKey}
         hoveredTarget={hoveredTarget}
         debugProbe={debugProbe}
+        assignmentProbe={selectedAssignmentProbe}
         debugMode={debugMode}
         debugLens={debugLens}
         objectOverlayMode={selectedObjectOverlayMode}
@@ -2452,6 +2466,8 @@ function ThreeWorld({
     const modelRoots = new Map();
     const draggableObjects = new Map();
     let hoveredObject = null;
+    let selectedGaussianProbe = null;
+    let selectedGaussianProbeSelectionId = null;
     let dragControls = null;
     let animationFrame = 0;
 
@@ -2468,6 +2484,10 @@ function ThreeWorld({
         selectedObject?.userData.objectState?.source ??
         selectedModel?.userData.assignmentSource ??
         "derived_from_object_id";
+      const selectedAssignmentProbe = assignmentProbeSummary(
+        selectedGaussianProbe?.assignment ?? selectedObject?.userData.objectState?.assignment ?? [],
+        selectedGaussianProbe,
+      );
       const hoveredTarget = objectTarget(hoveredObject);
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
@@ -2492,6 +2512,14 @@ function ThreeWorld({
         objectOverlayCentroidVisible: debugRef.current && objectOverlayShows(overlayModeRef.current, "centroid"),
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
+        assignmentProbe: selectedAssignmentProbe,
+        assignmentProbeStatus: selectedAssignmentProbe.status,
+        assignmentProbeTopSlot: selectedAssignmentProbe.topSlot,
+        assignmentProbeTopProbability: selectedAssignmentProbe.topProbability,
+        assignmentProbeSecondProbability: selectedAssignmentProbe.secondProbability,
+        assignmentProbeMargin: selectedAssignmentProbe.margin,
+        assignmentProbeAmbiguous: selectedAssignmentProbe.ambiguous,
+        assignmentProbeCollapseRisk: selectedAssignmentProbe.collapseRisk,
         stabilitySummary: selectedStability,
         selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
         selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
@@ -2655,8 +2683,10 @@ function ThreeWorld({
       const target = objectTarget(object);
       if (!target?.selectionId) return;
       selectedRef.current = target.selectionId;
-      api.setSelected(target.selectionId);
       const gaussian = probe?.gaussian ?? null;
+      selectedGaussianProbe = gaussian;
+      selectedGaussianProbeSelectionId = gaussian ? target.selectionId : null;
+      api.setSelected(target.selectionId);
       callbacksRef.current.onDebugEvent?.(gaussian ? "gaussian-probe" : "select-object", {
         ...target,
         gaussianIndex: gaussian?.gaussianIndex ?? null,
@@ -2779,6 +2809,10 @@ function ThreeWorld({
         publishAuditHandle();
       },
       setSelected(id) {
+        if (selectedGaussianProbeSelectionId && selectedGaussianProbeSelectionId !== id) {
+          selectedGaussianProbe = null;
+          selectedGaussianProbeSelectionId = null;
+        }
         for (const object of draggableObjects.values()) {
           const selected = object.userData.selectionId === id || object.userData.modelId === id;
           object.userData.selected = selected;
@@ -2881,6 +2915,7 @@ function DebugPanel({
   selectedObjectKey,
   hoveredTarget,
   debugProbe,
+  assignmentProbe,
   debugMode,
   debugLens,
   objectOverlayMode,
@@ -2935,6 +2970,13 @@ function DebugPanel({
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(objectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(objectOverlayMode, "centroid") ? "true" : "false"}
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
+      data-assignment-probe-status={assignmentProbe?.status ?? "none"}
+      data-assignment-probe-top-slot={assignmentProbe?.topSlot ?? ""}
+      data-assignment-probe-top-probability={assignmentProbe?.topProbability ?? ""}
+      data-assignment-probe-second-probability={assignmentProbe?.secondProbability ?? ""}
+      data-assignment-probe-margin={assignmentProbe?.margin ?? ""}
+      data-assignment-probe-ambiguous={assignmentProbe?.ambiguous ? "true" : "false"}
+      data-assignment-probe-collapse-risk={assignmentProbe?.collapseRisk ? "true" : "false"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
       data-ogc-lod-index={selectedOgcLod}
@@ -3077,7 +3119,12 @@ function DebugPanel({
         </div>
       ) : null}
 
-      <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
+      <AssignmentHeatmap
+        assignment={assignment}
+        selectedObject={selectedObject}
+        debugProbe={debugProbe}
+        assignmentProbe={assignmentProbe}
+      />
       <DebugSnapshotPanel
         snapshot={debugSnapshot}
         snapshotExport={snapshotExport}
@@ -3198,6 +3245,11 @@ function DebugSnapshotPanel({
       data-debug-snapshot-overlay-mode={snapshot.debug.overlayMode}
       data-debug-snapshot-source={snapshot.assignment.source}
       data-debug-snapshot-slots={snapshot.assignment.slotCount}
+      data-debug-snapshot-assignment-probe-status={snapshot.assignment.probe?.status ?? ""}
+      data-debug-snapshot-assignment-probe-top-slot={snapshot.assignment.probe?.topSlot ?? ""}
+      data-debug-snapshot-assignment-probe-margin={snapshot.assignment.probe?.margin ?? ""}
+      data-debug-snapshot-assignment-probe-ambiguous={snapshot.assignment.probe?.ambiguous ? "true" : "false"}
+      data-debug-snapshot-assignment-probe-collapse-risk={snapshot.assignment.probe?.collapseRisk ? "true" : "false"}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3248,6 +3300,8 @@ function DebugSnapshotPanel({
         <Meta label="overlay" value={snapshot.debug.overlayMode} />
         <Meta label="slots" value={formatCount(snapshot.assignment.slotCount)} />
         <Meta label="source" value={snapshot.assignment.source} />
+        <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
+        <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -3590,7 +3644,7 @@ function StabilityBar({ label, value, invert = false, available = true }) {
   );
 }
 
-function AssignmentHeatmap({ assignment, selectedObject, debugProbe }) {
+function AssignmentHeatmap({ assignment, selectedObject, debugProbe, assignmentProbe }) {
   const rows = assignment?.length ? assignment : [];
   return (
     <div
@@ -3598,7 +3652,27 @@ function AssignmentHeatmap({ assignment, selectedObject, debugProbe }) {
       data-assignment-heatmap="true"
       data-assignment-source={debugProbe?.source ?? selectedObject?.objectState?.source ?? "none"}
       data-assignment-slots={rows.length}
+      data-assignment-probe-status={assignmentProbe?.status ?? "none"}
+      data-assignment-probe-top-slot={assignmentProbe?.topSlot ?? ""}
+      data-assignment-probe-top-object={assignmentProbe?.topObjectId ?? ""}
+      data-assignment-probe-top-probability={assignmentProbe?.topProbability ?? ""}
+      data-assignment-probe-second-probability={assignmentProbe?.secondProbability ?? ""}
+      data-assignment-probe-margin={assignmentProbe?.margin ?? ""}
+      data-assignment-probe-ambiguous={assignmentProbe?.ambiguous ? "true" : "false"}
+      data-assignment-probe-collapse-risk={assignmentProbe?.collapseRisk ? "true" : "false"}
     >
+      {assignmentProbe?.slotCount ? (
+        <div
+          className="assignmentProbeMeta"
+          data-assignment-probe="true"
+          data-assignment-probe-status={assignmentProbe.status}
+        >
+          <span>{assignmentProbe.status}</span>
+          <strong>k{assignmentProbe.topSlot ?? "-"}</strong>
+          <small>{formatRatio(assignmentProbe.topProbability)}</small>
+          <small>{formatRatio(assignmentProbe.margin)}</small>
+        </div>
+      ) : null}
       {rows.map((slot) => {
         const width = `${Math.max(2, Math.min(100, Number(slot.probability) * 100))}%`;
         const color = objectAccent(slot.objectId, "#9eeaf2");
@@ -4905,6 +4979,7 @@ function objectStateDebugSnapshot({
   hiddenCount,
   stability,
   assignmentSource,
+  assignmentProbe,
   trainingEvidence,
   qualityReport,
   objectStateBenchmark,
@@ -4945,6 +5020,7 @@ function objectStateDebugSnapshot({
       confidence: finiteNumber(debugProbe?.confidence ?? activeState?.confidence),
       entropy: finiteNumber(debugProbe?.entropy ?? activeState?.assignmentEntropy),
       vector: compactAssignmentVector(assignment),
+      probe: compactAssignmentProbe(assignmentProbe),
     },
     objectState: {
       objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
@@ -5102,6 +5178,7 @@ function validateDebugSessionArchive(session, path = "") {
         confidence: finiteNumber(snapshot.assignment?.confidence),
         entropy: finiteNumber(snapshot.assignment?.entropy),
         vector: compactAssignmentVector(snapshot.assignment?.vector),
+        probe: compactAssignmentProbe(snapshot.assignment?.probe),
       },
       stability: {
         status: cleanString(snapshot.stability?.status),
@@ -5197,9 +5274,15 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
   const trainingMatch = cleanString(liveSnapshot.training?.status) === cleanString(archiveSnapshot.training?.status);
   const stabilityMatch = cleanString(liveSnapshot.stability?.status) === cleanString(archiveSnapshot.stability?.status);
   const deliveryMatch = cleanString(liveSnapshot.delivery?.loadRoute) === cleanString(archiveSnapshot.delivery?.loadRoute);
+  const probeStatusMatch =
+    cleanString(liveSnapshot.assignment?.probe?.status) === cleanString(archiveSnapshot.assignment?.probe?.status);
   const slotDelta = numericDelta(liveSnapshot.assignment?.slotCount, archiveSnapshot.assignment?.slotCount);
   const entropyDelta = numericDelta(liveSnapshot.assignment?.entropy, archiveSnapshot.assignment?.entropy);
   const confidenceDelta = numericDelta(liveSnapshot.assignment?.confidence, archiveSnapshot.assignment?.confidence);
+  const probeMarginDelta = numericDelta(
+    liveSnapshot.assignment?.probe?.margin,
+    archiveSnapshot.assignment?.probe?.margin,
+  );
   const qualityEntropyDelta = numericDelta(
     liveSnapshot.quality?.assignmentEntropy,
     archiveSnapshot.quality?.assignmentEntropy,
@@ -5216,9 +5299,11 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     !trainingMatch ? "training" : "",
     !stabilityMatch ? "stability" : "",
     !deliveryMatch ? "delivery" : "",
+    !probeStatusMatch ? "probe_status" : "",
     deltaChanged(slotDelta) ? "slots" : "",
     deltaChanged(entropyDelta) ? "entropy" : "",
     deltaChanged(confidenceDelta) ? "confidence" : "",
+    deltaChanged(probeMarginDelta) ? "probe_margin" : "",
     deltaChanged(qualityEntropyDelta) ? "quality_entropy" : "",
   ].filter(Boolean);
   return {
@@ -5230,9 +5315,11 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     trainingMatch,
     stabilityMatch,
     deliveryMatch,
+    probeStatusMatch,
     slotDelta,
     entropyDelta,
     confidenceDelta,
+    probeMarginDelta,
     qualityEntropyDelta,
     eventDelta,
     changedFields,
@@ -5375,6 +5462,77 @@ function compactAssignmentVector(assignment) {
     objectId: slot?.objectId ?? null,
     probability: finiteNumber(slot?.probability),
   }));
+}
+
+function assignmentProbeSummary(assignment, debugProbe = null) {
+  const rows = Array.isArray(assignment)
+    ? assignment
+        .map((slot, index) => ({
+          slot: Number.isFinite(Number(slot?.slot)) ? Number(slot.slot) : index,
+          objectId: cleanNullable(slot?.objectId),
+          probability: Math.max(0, Math.min(1, Number(slot?.probability) || 0)),
+        }))
+        .filter((slot) => Number.isFinite(slot.probability))
+    : [];
+  const sorted = [...rows].sort((left, right) => right.probability - left.probability);
+  const top = sorted[0] ?? null;
+  const second = sorted[1] ?? null;
+  const topProbability = top ? round3(top.probability) : null;
+  const secondProbability = second ? round3(second.probability) : null;
+  const margin =
+    top && second
+      ? round3(top.probability - second.probability)
+      : top
+        ? round3(top.probability)
+        : null;
+  const entropy = finiteNumber(debugProbe?.entropy) ?? round3(normalizedEntropy(rows.map((slot) => slot.probability)));
+  const confidence = finiteNumber(debugProbe?.confidence) ?? topProbability;
+  const ambiguous = Boolean(
+    rows.length > 1 &&
+      ((margin !== null && margin < 0.2) || (entropy > 0.72 && (margin === null || margin < 0.35))),
+  );
+  const collapseRisk = Boolean(rows.length > 1 && topProbability !== null && topProbability >= 0.98 && entropy <= 0.05);
+  const status = !rows.length
+    ? "none"
+    : collapseRisk
+      ? "collapse-risk"
+      : ambiguous
+        ? "ambiguous"
+        : topProbability !== null && topProbability >= 0.7 && margin !== null && margin >= 0.35
+          ? "confident"
+          : "soft";
+  return {
+    status,
+    slotCount: rows.length,
+    topSlot: top?.slot ?? null,
+    topObjectId: top?.objectId ?? null,
+    topProbability,
+    secondProbability,
+    margin,
+    entropy: finiteNumber(entropy),
+    confidence: finiteNumber(confidence),
+    ambiguous,
+    collapseRisk,
+    gaussianIndex: cleanNullable(debugProbe?.gaussianIndex),
+  };
+}
+
+function compactAssignmentProbe(probe) {
+  if (!probe || typeof probe !== "object") return null;
+  return {
+    status: cleanString(probe.status || "none"),
+    slotCount: finiteNumber(probe.slotCount),
+    topSlot: cleanNullable(probe.topSlot),
+    topObjectId: cleanNullable(probe.topObjectId),
+    topProbability: finiteNumber(probe.topProbability),
+    secondProbability: finiteNumber(probe.secondProbability),
+    margin: finiteNumber(probe.margin),
+    entropy: finiteNumber(probe.entropy),
+    confidence: finiteNumber(probe.confidence),
+    ambiguous: Boolean(probe.ambiguous),
+    collapseRisk: Boolean(probe.collapseRisk),
+    gaussianIndex: cleanNullable(probe.gaussianIndex),
+  };
 }
 
 function cleanNumberArray(value) {
