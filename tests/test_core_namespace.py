@@ -11,6 +11,7 @@ from objgauss.core import (
     ObjectState,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
+    ObjectStateGaussianDecoderState,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -53,6 +54,7 @@ from objgauss.core import (
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
     object_emergence_solver_state_from_dict,
+    object_state_gaussian_decoder_state_from_dict,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
     project_object_states,
@@ -70,6 +72,7 @@ from objgauss.core import (
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
+    validate_solver_decoder_joint_checkpoint,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -78,6 +81,8 @@ from objgauss.core import (
     write_ply,
     write_quantized_ogc_payload,
     write_trainable_kernel_model_artifact,
+    solver_decoder_joint_checkpoint,
+    solver_decoder_joint_states_from_dict,
 )
 from objgauss.core.features import extract_features
 from objgauss.core.object_field import field_from_labels
@@ -345,6 +350,9 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert object_state_input.decoder_schema == "objgauss-object-state-gaussian-decode-v1"
     decoder_state = initialize_object_state_gaussian_decoder(slots=2, seed=1)
     assert validate_object_state_gaussian_decoder_state(decoder_state) is decoder_state
+    restored_decoder_state = object_state_gaussian_decoder_state_from_dict(decoder_state.as_dict())
+    assert isinstance(restored_decoder_state, ObjectStateGaussianDecoderState)
+    np.testing.assert_allclose(restored_decoder_state.object_colors, decoder_state.object_colors, atol=1e-6)
     decoder_result = train_object_state_gaussian_decoder(
         bound_frames[:1],
         [object_assignment],
@@ -370,6 +378,18 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert isinstance(joint_result, SolverDecoderJointTrainingResult)
     assert "decoder.object_colors" in joint_result.as_dict()["trained_fields"]
+    joint_checkpoint = solver_decoder_joint_checkpoint(
+        joint_result,
+        input_path="fixture://namespace-joint",
+        source_gaussians=bound_frames[0].positions.shape[0],
+        sampled_gaussians=bound_frames[0].positions.shape[0],
+        target_source="object_id_one_hot_targets",
+        assignment_source="object_id_one_hot_targets",
+    )
+    assert validate_solver_decoder_joint_checkpoint(joint_checkpoint) == joint_checkpoint
+    restored_solver, restored_joint_decoder = solver_decoder_joint_states_from_dict(joint_checkpoint)
+    assert isinstance(restored_solver, ObjectEmergenceSolverState)
+    assert isinstance(restored_joint_decoder, ObjectStateGaussianDecoderState)
     assert evaluate_gsplat_training_renderer_loss is not None
     artifact = trainable_kernel_model_artifact(
         result,

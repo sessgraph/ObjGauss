@@ -11,13 +11,17 @@ OBJECT_EMERGENCE_SOLVER_TRAINING_SCHEMA = "objgauss-object-emergence-solver-trai
 OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-checkpoint-v1"
 OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA = "objgauss-object-state-gaussian-decoder-training-v1"
 SOLVER_DECODER_JOINT_TRAINING_SCHEMA = "objgauss-solver-decoder-joint-training-v1"
+SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA = "objgauss-solver-decoder-joint-checkpoint-v1"
 FULL_3DGS_RENDERERS = {"gsplat-rasterization-v1"}
 OBJECT_EMERGENCE_SOLVER_EVIDENCE = {
     "object_emergence_solver_training",
     "object_emergence_solver_checkpoint",
 }
 OBJECT_STATE_DECODER_TRAINING_EVIDENCE = {"object_state_gaussian_decoder_training"}
-SOLVER_DECODER_JOINT_EVIDENCE = {"solver_decoder_joint_training"}
+SOLVER_DECODER_JOINT_EVIDENCE = {
+    "solver_decoder_joint_training",
+    "solver_decoder_joint_checkpoint",
+}
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,13 @@ def renderer_loss_boundary_report(
             "keep viewer renderer as debug consumer, not the training renderer default",
         )
         if full_renderer_ready
+        else
+        (
+            "run resume/load smoke from solver + decoder joint checkpoint",
+            "scale solver + decoder joint training beyond smoke size",
+            "keep geometry/opacity/camera frozen until assignment and color training are stable",
+        )
+        if evidence.get("kind") == "solver_decoder_joint_checkpoint"
         else
         (
             "select or implement full 3DGS image renderer behind the training renderer API",
@@ -258,7 +269,10 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         return _solver_checkpoint_evidence(kernel_summary)
     if kernel_summary.get("schema") == OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA:
         return _decoder_training_evidence(kernel_summary)
-    if kernel_summary.get("schema") == SOLVER_DECODER_JOINT_TRAINING_SCHEMA:
+    if kernel_summary.get("schema") in {
+        SOLVER_DECODER_JOINT_TRAINING_SCHEMA,
+        SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
+    }:
         return _solver_decoder_joint_evidence(kernel_summary)
     if kernel_summary.get("schema") != TRAINABLE_KERNEL_SCHEMA:
         raise ValueError(f"unsupported trainable kernel schema: {kernel_summary.get('schema')}")
@@ -552,8 +566,12 @@ def _decoder_training_evidence(summary: dict[str, Any]) -> tuple[dict[str, Any],
 
 
 def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    initial = _joint_loss_record(summary, "initial_loss")
-    final = _joint_loss_record(summary, "final_loss")
+    is_checkpoint = summary.get("schema") == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA
+    training = summary.get("training") if is_checkpoint else summary
+    if not isinstance(training, dict):
+        raise ValueError("joint checkpoint missing training")
+    initial = _joint_loss_record(training, "initial_loss")
+    final = _joint_loss_record(training, "final_loss")
     loss_decreased = final["total_loss"] < initial["total_loss"]
     image_render_loss_decreased = final["image_render_loss"] < initial["image_render_loss"]
     object_loss_decreased = final["object_loss"] < initial["object_loss"]
@@ -563,6 +581,7 @@ def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, A
     if not image_render_loss_decreased:
         blockers.append("joint_image_render_loss_not_decreased")
     sample = summary.get("sample") if isinstance(summary.get("sample"), dict) else {}
+    source = summary.get("source") if isinstance(summary.get("source"), dict) else {}
     image_target_contract = (
         summary.get("image_target_contract")
         if isinstance(summary.get("image_target_contract"), dict)
@@ -576,15 +595,23 @@ def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, A
     gpu_policy = summary.get("gpu_policy") if isinstance(summary.get("gpu_policy"), dict) else {}
     renderer_api_ready = renderer_api.get("status") == "ready"
     evidence = {
-        "kind": "solver_decoder_joint_training",
+        "kind": summary.get("kind") or "solver_decoder_joint_training",
         "schema": summary.get("schema"),
         "decoder_schema": summary.get("decoder_schema"),
-        "iterations": _optional_int(summary.get("iterations")),
+        "training_schema": summary.get("training_schema"),
+        "iterations": _optional_int(training.get("iterations")),
         "frame_count": _optional_int(summary.get("frame_count")),
-        "slots": _optional_int(summary.get("slots")),
-        "sampled_count": _optional_int(sample.get("sampled_count")),
-        "source_count": _optional_int(sample.get("source_count")),
-        "target_source": summary.get("assignment_source") or sample.get("target_source"),
+        "slots": _optional_int(summary.get("slots"))
+        if summary.get("slots") is not None
+        else _optional_int(summary.get("solver_state", {}).get("config", {}).get("slots"))
+        if isinstance(summary.get("solver_state"), dict)
+        else None,
+        "sampled_count": _optional_int(sample.get("sampled_count") or source.get("sampled_gaussians")),
+        "source_count": _optional_int(sample.get("source_count") or source.get("source_gaussians")),
+        "target_source": summary.get("assignment_source")
+        or source.get("assignment_source")
+        or sample.get("target_source")
+        or source.get("target_source"),
         "trained_fields": summary.get("trained_fields", []),
         "frozen_fields": summary.get("frozen_fields", []),
         "image_targets_bound": image_target_contract.get("status") == "image_targets_bound",

@@ -91,7 +91,13 @@ from objgauss.core.object_emergence_solver import (
     validate_object_emergence_solver_checkpoint,
 )
 from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
-from objgauss.core.solver_decoder_training import train_solver_decoder_joint
+from objgauss.core.solver_decoder_training import (
+    SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
+    solver_decoder_joint_checkpoint,
+    solver_decoder_joint_states_from_dict,
+    train_solver_decoder_joint,
+    validate_solver_decoder_joint_checkpoint,
+)
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
@@ -1384,6 +1390,8 @@ def _decoder_training_assignments_from_args(args: argparse.Namespace, sample):
 
 
 def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
+    if args.resume_checkpoint and args.solver_checkpoint:
+        raise ValueError("--resume-checkpoint cannot be combined with --solver-checkpoint")
     cloud = read_ply(args.input)
     sample = trainable_kernel_sample_from_cloud(
         cloud,
@@ -1400,16 +1408,21 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         seed=args.seed,
     )
     initial_solver_state = None
+    initial_decoder_state = None
     assignment_source = sample.target_source
-    if args.solver_checkpoint:
+    if args.resume_checkpoint:
+        checkpoint = json.loads(args.resume_checkpoint.read_text(encoding="utf-8"))
+        validate_solver_decoder_joint_checkpoint(checkpoint)
+        initial_solver_state, initial_decoder_state = solver_decoder_joint_states_from_dict(checkpoint)
+        assignment_source = "solver_decoder_joint_checkpoint_resume"
+    elif args.solver_checkpoint:
         checkpoint = json.loads(args.solver_checkpoint.read_text(encoding="utf-8"))
-        validate_object_emergence_solver_checkpoint(checkpoint)
-        initial_solver_state = object_emergence_solver_state_from_dict(checkpoint)
-        assignment_source = "solver_checkpoint_initial_state"
+        initial_solver_state, assignment_source = _solver_decoder_initial_solver_from_checkpoint(checkpoint)
     result = train_solver_decoder_joint(
         sample.frames,
         slots=sample.slots,
         initial_solver_state=initial_solver_state,
+        initial_decoder_state=initial_decoder_state,
         iterations=args.iterations,
         solver_learning_rate=args.solver_learning_rate,
         decoder_learning_rate=args.decoder_learning_rate,
@@ -1434,7 +1447,20 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         "sample": sample.as_dict(),
         "assignment_source": assignment_source,
         "solver_checkpoint": str(args.solver_checkpoint) if args.solver_checkpoint else None,
+        "resume_checkpoint": str(args.resume_checkpoint) if args.resume_checkpoint else None,
     }
+    checkpoint_output = solver_decoder_joint_checkpoint(
+        result,
+        input_path=str(args.input),
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source=assignment_source,
+        object_id_mapping=sample.object_id_mapping,
+        solver_checkpoint=str(args.solver_checkpoint) if args.solver_checkpoint else None,
+        resume_checkpoint=str(args.resume_checkpoint) if args.resume_checkpoint else None,
+        vram_reserve_gb=1,
+    )
     print(f"schema={summary['schema']}")
     print(f"input={args.input}")
     print(f"source_gaussians={sample.source_count}")
@@ -1443,6 +1469,8 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"slots={summary['slots']}")
     print(f"iterations={summary['iterations']}")
     print(f"assignment_source={assignment_source}")
+    if args.resume_checkpoint:
+        print(f"resume_checkpoint={args.resume_checkpoint}")
     print(f"image_renderer={summary['image_renderer']}")
     print(f"gaussian_scale={summary['gaussian_policy']['default_scale']}")
     print(f"gaussian_opacity={summary['gaussian_policy']['default_opacity']}")
@@ -1472,10 +1500,24 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
+    if args.checkpoint_output:
+        write_json(args.checkpoint_output, checkpoint_output)
+        print(f"checkpoint={args.checkpoint_output}")
     if args.require_loss_decrease and not summary["loss_decreased"]:
         raise ValueError("solver-decoder MVP total loss did not decrease")
     if args.require_image_render_loss_decrease and not summary["image_render_loss_decreased"]:
         raise ValueError("solver-decoder MVP image render loss did not decrease")
+
+
+def _solver_decoder_initial_solver_from_checkpoint(
+    checkpoint: dict[str, object],
+):
+    if checkpoint.get("schema") == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA:
+        validate_solver_decoder_joint_checkpoint(checkpoint)
+        solver_state, _decoder_state = solver_decoder_joint_states_from_dict(checkpoint)
+        return solver_state, "solver_decoder_joint_checkpoint_solver_state"
+    validate_object_emergence_solver_checkpoint(checkpoint)
+    return object_emergence_solver_state_from_dict(checkpoint), "solver_checkpoint_initial_state"
 
 
 def _training_object_emergence_solver(args: argparse.Namespace) -> None:
@@ -2634,6 +2676,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     solver_decoder_mvp.add_argument("input", type=Path)
     solver_decoder_mvp.add_argument("--solver-checkpoint", type=Path)
+    solver_decoder_mvp.add_argument("--resume-checkpoint", type=Path)
     solver_decoder_mvp.add_argument("--slots", type=int)
     solver_decoder_mvp.add_argument("--frames", type=int, default=2)
     solver_decoder_mvp.add_argument("--max-points", type=int, default=24)
@@ -2661,6 +2704,7 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--seed", type=int, default=0)
     solver_decoder_mvp.add_argument("--record-every", type=int)
     solver_decoder_mvp.add_argument("--summary-output", type=Path)
+    solver_decoder_mvp.add_argument("--checkpoint-output", type=Path)
     solver_decoder_mvp.add_argument("--include-weights", action="store_true")
     solver_decoder_mvp.add_argument("--include-assignments", action="store_true")
     solver_decoder_mvp.add_argument("--require-loss-decrease", action="store_true")

@@ -12,6 +12,7 @@ from objgauss.core.gaussian_decoder_training import (
     _frame_cloud,
     _temporal_centroid_loss,
     initialize_object_state_gaussian_decoder,
+    object_state_gaussian_decoder_state_from_dict,
     validate_object_state_gaussian_decoder_state,
 )
 from objgauss.core.object_emergence_solver import (
@@ -19,6 +20,7 @@ from objgauss.core.object_emergence_solver import (
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverState,
     initialize_object_emergence_solver,
+    object_emergence_solver_state_from_dict,
     predict_object_emergence_assignment,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_state,
@@ -35,6 +37,7 @@ from objgauss.core.trainable_kernel import (
 from objgauss.core.training_renderer import TrainingRendererLossResult
 
 SOLVER_DECODER_JOINT_TRAINING_SCHEMA = "objgauss-solver-decoder-joint-training-v1"
+SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA = "objgauss-solver-decoder-joint-checkpoint-v1"
 _EPS = 1e-8
 
 
@@ -236,6 +239,8 @@ def train_solver_decoder_joint(
     if decoder_state.slots != solver_state.config.slots:
         raise ValueError("decoder state slots must match solver slots")
 
+    initial_solver_step = int(solver_state.step)
+    initial_decoder_step = int(decoder_state.step)
     history: list[SolverDecoderJointLoss] = []
     colors = decoder_state.object_colors.astype(np.float32, copy=True)
     record_stride = iterations if record_every is None else max(1, int(record_every))
@@ -279,7 +284,7 @@ def train_solver_decoder_joint(
             position_grad,
             bias_grad,
             learning_rate=solver_learning_rate,
-            step=iteration,
+            step=initial_solver_step + iteration,
         )
         colors = np.clip(colors - decoder_learning_rate * current.decoder_gradient, 0.0, 1.0)
         if iteration == iterations or iteration % record_stride == 0:
@@ -342,7 +347,7 @@ def train_solver_decoder_joint(
         initial_decoder_state=decoder_state,
         final_decoder_state=ObjectStateGaussianDecoderState(
             object_colors=colors.astype(np.float32, copy=True),
-            step=int(iterations),
+            step=initial_decoder_step + int(iterations),
             source="joint_trained_renderer_gradient_object_colors",
         ),
         initial_loss=initial_eval.loss,
@@ -362,6 +367,143 @@ def train_solver_decoder_joint(
         gpu_used=image_renderer == TRAINING_IMAGE_RENDERER_GSPLAT,
         vram_reserve_gb=int(vram_reserve_gb),
     )
+
+
+def solver_decoder_joint_checkpoint(
+    result: SolverDecoderJointTrainingResult,
+    *,
+    input_path: str | None = None,
+    source_gaussians: int | None = None,
+    sampled_gaussians: int | None = None,
+    target_source: str | None = None,
+    assignment_source: str | None = None,
+    object_id_mapping: dict[int, int] | dict[str, int] | None = None,
+    solver_checkpoint: str | None = None,
+    resume_checkpoint: str | None = None,
+    vram_reserve_gb: int = 1,
+) -> dict[str, Any]:
+    if result.schema != SOLVER_DECODER_JOINT_TRAINING_SCHEMA:
+        raise ValueError(f"unsupported joint training schema: {result.schema}")
+    if vram_reserve_gb < 0:
+        raise ValueError("vram_reserve_gb must be >= 0")
+    renderer_api = result.final_renderer_api.as_dict() if result.final_renderer_api is not None else None
+    payload = {
+        "schema": SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
+        "kind": "solver_decoder_joint_checkpoint",
+        "training_schema": result.schema,
+        "decoder_schema": result.decoder_schema,
+        "source": {
+            "input": input_path,
+            "source_gaussians": None if source_gaussians is None else int(source_gaussians),
+            "sampled_gaussians": None if sampled_gaussians is None else int(sampled_gaussians),
+            "target_source": target_source,
+            "assignment_source": assignment_source,
+            "object_id_mapping": _string_key_mapping(object_id_mapping),
+            "solver_checkpoint": solver_checkpoint,
+            "resume_checkpoint": resume_checkpoint,
+        },
+        "training": {
+            "iterations": int(result.iterations),
+            "learning_rates": {
+                "solver": float(result.solver_learning_rate),
+                "decoder": float(result.decoder_learning_rate),
+            },
+            "weights": {
+                "image_render": float(result.image_render_weight),
+                "object": float(result.object_weight),
+                "entropy": float(result.entropy_weight),
+                "balance": float(result.balance_weight),
+                "temporal": float(result.temporal_weight),
+            },
+            "image_renderer": result.image_renderer,
+            "gaussian_policy": {
+                "default_scale": float(result.gaussian_scale),
+                "default_opacity": float(result.gaussian_opacity),
+            },
+            "initial_loss": result.initial_loss.as_dict(),
+            "final_loss": result.final_loss.as_dict(),
+            "loss_decreased": bool(result.final_loss.total_loss < result.initial_loss.total_loss),
+            "image_render_loss_decreased": bool(
+                result.final_loss.image_render_loss < result.initial_loss.image_render_loss
+            ),
+            "object_loss_decreased": bool(result.final_loss.object_loss < result.initial_loss.object_loss),
+        },
+        "solver_state": result.final_solver_state.as_dict(include_weights=True),
+        "decoder_state": result.final_decoder_state.as_dict(),
+        "trained_fields": list(result.trained_fields),
+        "frozen_fields": list(result.frozen_fields),
+        "renderer_api": renderer_api,
+        "image_target_contract": image_target_contract_summary(result.image_targets),
+        "gpu_policy": {
+            "uses_gpu": bool(result.gpu_used),
+            "vram_reserve_gb": int(vram_reserve_gb),
+        },
+        "export_policy": {
+            "repository_write": "do_not_commit_training_checkpoints",
+            "intended_locations": ["/tmp", "ignored outputs/"],
+            "large_artifacts": "keep_out_of_git",
+        },
+    }
+    return validate_solver_decoder_joint_checkpoint(payload)
+
+
+def validate_solver_decoder_joint_checkpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("joint checkpoint payload must be a dict")
+    if payload.get("schema") != SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA:
+        raise ValueError(f"unsupported joint checkpoint schema: {payload.get('schema')}")
+    if payload.get("kind") != "solver_decoder_joint_checkpoint":
+        raise ValueError("joint checkpoint kind must be solver_decoder_joint_checkpoint")
+    training = payload.get("training")
+    if not isinstance(training, dict):
+        raise ValueError("joint checkpoint missing training")
+    for key in ("initial_loss", "final_loss"):
+        if not isinstance(training.get(key), dict):
+            raise ValueError(f"joint checkpoint missing training.{key}")
+        for loss_key in (
+            "total_loss",
+            "image_render_loss",
+            "object_loss",
+            "entropy_loss",
+            "balance_loss",
+            "temporal_loss",
+        ):
+            if loss_key not in training[key]:
+                raise ValueError(f"joint checkpoint training.{key} missing {loss_key}")
+            float(training[key][loss_key])
+    solver_state, decoder_state = solver_decoder_joint_states_from_dict(payload)
+    if solver_state.config.slots != decoder_state.slots:
+        raise ValueError("joint checkpoint solver and decoder slots must match")
+    gpu_policy = payload.get("gpu_policy")
+    if not isinstance(gpu_policy, dict):
+        raise ValueError("joint checkpoint missing gpu_policy")
+    if "vram_reserve_gb" not in gpu_policy:
+        raise ValueError("joint checkpoint missing gpu_policy.vram_reserve_gb")
+    if int(gpu_policy["vram_reserve_gb"]) < 0:
+        raise ValueError("gpu_policy.vram_reserve_gb must be >= 0")
+    if not isinstance(payload.get("trained_fields"), list):
+        raise ValueError("joint checkpoint missing trained_fields")
+    if not isinstance(payload.get("frozen_fields"), list):
+        raise ValueError("joint checkpoint missing frozen_fields")
+    return payload
+
+
+def solver_decoder_joint_states_from_dict(
+    payload: dict[str, Any],
+) -> tuple[ObjectEmergenceSolverState, ObjectStateGaussianDecoderState]:
+    if not isinstance(payload, dict):
+        raise TypeError("joint checkpoint payload must be a dict")
+    if payload.get("schema") != SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA:
+        raise ValueError(f"unsupported joint checkpoint schema: {payload.get('schema')}")
+    solver_payload = payload.get("solver_state")
+    decoder_payload = payload.get("decoder_state")
+    if not isinstance(solver_payload, dict):
+        raise ValueError("joint checkpoint missing solver_state")
+    if not isinstance(decoder_payload, dict):
+        raise ValueError("joint checkpoint missing decoder_state")
+    solver_state = object_emergence_solver_state_from_dict(solver_payload)
+    decoder_state = object_state_gaussian_decoder_state_from_dict(decoder_payload)
+    return solver_state, decoder_state
 
 
 def _evaluate_joint(
@@ -635,3 +777,9 @@ def _initial_solver_state(
         feature_dim=evidence_frames[0].feature_dim,
         seed=seed,
     )
+
+
+def _string_key_mapping(mapping: dict[int, int] | dict[str, int] | None) -> dict[str, int] | None:
+    if mapping is None:
+        return None
+    return {str(key): int(value) for key, value in mapping.items()}

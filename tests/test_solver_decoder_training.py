@@ -7,9 +7,13 @@ import numpy as np
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.solver_decoder_training import (
+    SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
     SOLVER_DECODER_JOINT_TRAINING_SCHEMA,
     SolverDecoderJointTrainingResult,
+    solver_decoder_joint_checkpoint,
+    solver_decoder_joint_states_from_dict,
     train_solver_decoder_joint,
+    validate_solver_decoder_joint_checkpoint,
 )
 from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
 from objgauss.ply import write_ply
@@ -57,6 +61,66 @@ def test_solver_decoder_joint_training_updates_solver_and_decoder():
     )
 
 
+def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        bind_image_targets=True,
+        image_width=8,
+        image_height=8,
+        seed=2,
+    )
+    first = train_solver_decoder_joint(
+        sample.frames,
+        iterations=3,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.6,
+        object_weight=0.2,
+        seed=7,
+    )
+
+    checkpoint = solver_decoder_joint_checkpoint(
+        first,
+        input_path="fixture://objects",
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source="object_id_one_hot_targets",
+        object_id_mapping=sample.object_id_mapping,
+        vram_reserve_gb=1,
+    )
+    restored_solver, restored_decoder = solver_decoder_joint_states_from_dict(checkpoint)
+    resumed = train_solver_decoder_joint(
+        sample.frames,
+        initial_solver_state=restored_solver,
+        initial_decoder_state=restored_decoder,
+        iterations=2,
+        solver_learning_rate=0.04,
+        decoder_learning_rate=0.3,
+        object_weight=0.2,
+        seed=8,
+    )
+
+    assert checkpoint["schema"] == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA
+    assert checkpoint["source"]["object_id_mapping"] == {"5": 0, "9": 1}
+    assert checkpoint["solver_state"]["weights"]["bias"] is not None
+    assert checkpoint["decoder_state"]["object_colors"] is not None
+    assert validate_solver_decoder_joint_checkpoint(checkpoint) == checkpoint
+    assert restored_solver.step == first.final_solver_state.step
+    assert restored_decoder.step == first.final_decoder_state.step
+    np.testing.assert_allclose(restored_solver.bias, first.final_solver_state.bias, atol=1e-6)
+    np.testing.assert_allclose(
+        restored_decoder.object_colors,
+        first.final_decoder_state.object_colors,
+        atol=1e-6,
+    )
+    assert resumed.initial_solver_state.step == first.final_solver_state.step
+    assert resumed.initial_decoder_state.step == first.final_decoder_state.step
+    assert resumed.final_solver_state.step == first.final_solver_state.step + 2
+    assert resumed.final_decoder_state.step == first.final_decoder_state.step + 2
+
+
 def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
     input_path = tmp_path / "objects.ply"
     summary_path = tmp_path / "joint-summary.json"
@@ -99,6 +163,92 @@ def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
     assert payload["image_render_loss_decreased"] is True
     assert payload["sample"]["sampled_count"] == 4
     assert payload["assignment_source"] == "object_id_one_hot_targets"
+
+
+def test_solver_decoder_mvp_cli_writes_and_resumes_joint_checkpoint(tmp_path, capsys):
+    input_path = tmp_path / "objects.ply"
+    first_summary_path = tmp_path / "joint-summary.json"
+    checkpoint_path = tmp_path / "joint-checkpoint.json"
+    resumed_summary_path = tmp_path / "resumed-summary.json"
+    resumed_checkpoint_path = tmp_path / "resumed-checkpoint.json"
+    write_ply(input_path, _object_cloud(), fmt="ascii")
+
+    first_status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "3",
+            "--solver-learning-rate",
+            "0.08",
+            "--decoder-learning-rate",
+            "0.6",
+            "--object-weight",
+            "0.2",
+            "--summary-output",
+            str(first_summary_path),
+            "--checkpoint-output",
+            str(checkpoint_path),
+        ]
+    )
+    first_stdout = capsys.readouterr().out
+
+    resumed_status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--resume-checkpoint",
+            str(checkpoint_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "2",
+            "--solver-learning-rate",
+            "0.04",
+            "--decoder-learning-rate",
+            "0.3",
+            "--object-weight",
+            "0.2",
+            "--summary-output",
+            str(resumed_summary_path),
+            "--checkpoint-output",
+            str(resumed_checkpoint_path),
+        ]
+    )
+    resumed_stdout = capsys.readouterr().out
+
+    first_summary = json.loads(first_summary_path.read_text(encoding="utf-8"))
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    resumed_summary = json.loads(resumed_summary_path.read_text(encoding="utf-8"))
+    resumed_checkpoint = json.loads(resumed_checkpoint_path.read_text(encoding="utf-8"))
+    assert first_status == 0
+    assert resumed_status == 0
+    assert f"checkpoint={checkpoint_path}" in first_stdout
+    assert f"resume_checkpoint={checkpoint_path}" in resumed_stdout
+    assert f"checkpoint={resumed_checkpoint_path}" in resumed_stdout
+    assert checkpoint["schema"] == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA
+    assert checkpoint["training_schema"] == SOLVER_DECODER_JOINT_TRAINING_SCHEMA
+    assert checkpoint["gpu_policy"]["vram_reserve_gb"] == 1
+    assert resumed_summary["assignment_source"] == "solver_decoder_joint_checkpoint_resume"
+    assert resumed_summary["resume_checkpoint"] == str(checkpoint_path)
+    assert resumed_summary["initial_solver_state"]["step"] == first_summary["final_solver_state"]["step"]
+    assert resumed_summary["final_solver_state"]["step"] == first_summary["final_solver_state"]["step"] + 2
+    assert resumed_summary["initial_decoder_state"]["step"] == first_summary["final_decoder_state"]["step"]
+    assert resumed_summary["final_decoder_state"]["step"] == first_summary["final_decoder_state"]["step"] + 2
+    assert resumed_checkpoint["source"]["resume_checkpoint"] == str(checkpoint_path)
+    assert validate_solver_decoder_joint_checkpoint(resumed_checkpoint) == resumed_checkpoint
 
 
 def _object_cloud() -> GaussianCloud:

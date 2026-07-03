@@ -36,6 +36,10 @@ _EXPORTS = {
         "objgauss.core.solver_decoder_training",
         "SolverDecoderJointTrainingResult",
     ),
+    "solver_decoder_joint_checkpoint": (
+        "objgauss.core.solver_decoder_training",
+        "solver_decoder_joint_checkpoint",
+    ),
     "ObjectState": ("objgauss.core.object_state", "ObjectState"),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -246,9 +250,21 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "object_emergence_solver_state_from_dict",
     ),
+    "object_state_gaussian_decoder_state_from_dict": (
+        "objgauss.core.gaussian_decoder_training",
+        "object_state_gaussian_decoder_state_from_dict",
+    ),
+    "solver_decoder_joint_states_from_dict": (
+        "objgauss.core.solver_decoder_training",
+        "solver_decoder_joint_states_from_dict",
+    ),
     "validate_object_emergence_solver_checkpoint": (
         "objgauss.core.object_emergence_solver",
         "validate_object_emergence_solver_checkpoint",
+    ),
+    "validate_solver_decoder_joint_checkpoint": (
+        "objgauss.core.solver_decoder_training",
+        "validate_solver_decoder_joint_checkpoint",
     ),
     "validate_object_state_gaussian_decoder_state": (
         "objgauss.core.gaussian_decoder_training",

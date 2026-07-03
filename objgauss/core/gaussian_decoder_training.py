@@ -362,6 +362,25 @@ def validate_object_state_gaussian_decoder_state(
     return state
 
 
+def object_state_gaussian_decoder_state_from_dict(
+    payload: dict[str, Any],
+) -> ObjectStateGaussianDecoderState:
+    if not isinstance(payload, dict):
+        raise TypeError("decoder state payload must be a dict")
+    if payload.get("schema") != OBJECT_STATE_GAUSSIAN_DECODER_STATE_SCHEMA:
+        raise ValueError(f"unsupported decoder state schema: {payload.get('schema')}")
+    colors_payload = payload.get("object_colors")
+    if colors_payload is None:
+        raise ValueError("decoder state missing object_colors")
+    state = ObjectStateGaussianDecoderState(
+        object_colors=np.asarray(colors_payload, dtype=np.float32),
+        step=int(payload.get("step", 0)),
+        source=str(payload.get("source", "checkpoint")),
+        schema=str(payload.get("schema")),
+    )
+    return validate_object_state_gaussian_decoder_state(state)
+
+
 def _validate_frames_and_assignments(
     frames: Sequence[TrainableKernelFrame],
     assignments: Sequence[np.ndarray],
