@@ -765,7 +765,9 @@ full renderer training MVP；如果当前环境不可用，必须记录 blockers
 `objgauss training kernel-sample ... --image-renderer gsplat` 会按设计失败并输出同样
 blockers，没有静默 fallback 到 point renderer。该状态说明 full renderer MVP 需要转到
 具备 torch / gsplat / CUDA 的环境，或先由 Owner 明确批准安装 / 配置 optional training
-renderer 依赖。
+renderer 依赖；训练模型主线当前已在 PR 队列标记为
+`suspended / current-env-missing-torch-gsplat-cuda`，挂起期间不在当前环境重复尝试
+full renderer training MVP。
 
 `OBJECT-STABILITY-DASHBOARD-001` 已完成 Phase 1 Debug OS 的 stability dashboard：
 `src/App.jsx` 新增 `objgauss-stability-dashboard-v1` summary，按 selected model 的
