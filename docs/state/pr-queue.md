@@ -79,6 +79,53 @@
 
 ## Done
 
+### SOLVER-CHECKPOINT-EXPORT-001: Export reusable Object Emergence Solver checkpoint
+
+- 状态: done / checkpoint-export-and-renderer-handoff
+- 类型: 标准 PR / algorithm model checkpoint handoff
+- 目标: 将 CPU Object Emergence Solver 训练结果从“只能看 loss summary”提升为可保存、
+  可加载、可交给下一阶段 renderer loss 的 checkpoint contract。
+- 已实施:
+  - `objgauss/core/object_emergence_solver.py` 新增
+    `objgauss-object-emergence-solver-checkpoint-v1`，并提供
+    `object_emergence_solver_checkpoint(...)`、
+    `object_emergence_solver_state_from_dict(...)` 和
+    `validate_object_emergence_solver_checkpoint(...)`。
+  - checkpoint 保存 solver weights / config / step、initial / final solver loss、
+    source metadata、object id mapping、`gpu_policy.uses_gpu=false` 和
+    `gpu_policy.vram_reserve_gb=1`。
+  - `objgauss training object-emergence-solver` 新增 `--checkpoint-output`，训练 smoke
+    可同时写 summary 与 checkpoint。
+  - `objgauss.core` lazy namespace 暴露 checkpoint/export/load/validate API。
+  - `renderer-loss-contract` 现在识别 solver training summary / solver checkpoint，
+    输出 `status=object_emergence_solver_ready`，并明确
+    `solver_checkpoint_not_bound_to_gaussian_decoder` 与
+    `solver_checkpoint_not_bound_to_renderer_loss` 仍是 full renderer loss 前置阻塞。
+- 边界:
+  - 不启动真正 GPU / torch / gsplat / CUDA full renderer training。
+  - 不提交 `/tmp` checkpoint、ignored `outputs/`、rendered image 或大训练产物。
+  - 不训练 Gaussian geometry / opacity / rotation。
+  - 不把 point smoke 或 solver checkpoint 伪装成 full 3DGS renderer training。
+- 验证:
+  - `uv run --extra dev pytest tests/test_object_emergence_solver.py tests/test_renderer_loss.py tests/test_core_namespace.py`:
+    22 passed。
+  - `uv run objgauss training object-emergence-solver public/samples/lego_alpha_v1_objects.ply --max-points 16 --iterations 8 --learning-rate 0.5 --summary-output /tmp/objgauss-object-emergence-solver-summary.json --checkpoint-output /tmp/objgauss-object-emergence-solver-checkpoint.json --require-loss-decrease`:
+    passed，写出 summary 与 checkpoint，`final_total_loss=0.767572`，
+    `gpu_used=false`，`vram_reserve_gb=1`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-object-emergence-solver-checkpoint.json --output /tmp/objgauss-solver-renderer-loss-boundary.json`:
+    passed，`status=object_emergence_solver_ready`，upgrade blockers 包含
+    `solver_checkpoint_not_bound_to_gaussian_decoder` 和
+    `solver_checkpoint_not_bound_to_renderer_loss`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-object-emergence-solver-summary.json --output /tmp/objgauss-solver-summary-renderer-loss-boundary.json`:
+    passed，solver training summary 同样被识别为
+    `status=object_emergence_solver_ready`。
+  - `uv run --extra dev pytest`: 157 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `uv run python -m py_compile objgauss/core/object_emergence_solver.py objgauss/core/renderer_loss.py objgauss/cli.py`:
+    passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### DEBUG-UI-HIERARCHY-001: Tidy ObjectState Debug OS hierarchy and inspector collapse
 
 - 状态: done / ui-hierarchy-and-collapse
@@ -112,7 +159,7 @@
   - `uv run --extra dev pytest`: 155 passed。
   - `node --check scripts/audit-world-viewer.mjs`: passed。
   - `git diff --check`: passed。
-- 完成 commit: pending / current worktree
+- 完成 commit: `b91a9d4`
 
 ### SOLVER-LOSS-UI-001: Show Object Emergence Solver loss in Debug OS
 

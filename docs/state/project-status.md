@@ -106,6 +106,17 @@ assignment loss delta、slots、sample count、`gpu_used=false` 和 `vram_reserv
 和 1GB 显存预留策略。该步骤只做训练结果 handoff / 可视审计，不启动 torch / gsplat /
 CUDA full renderer training，不提交 checkpoint 或大训练产物。
 
+同日推进 `SOLVER-CHECKPOINT-EXPORT-001`：`objgauss/core/object_emergence_solver.py`
+新增 `objgauss-object-emergence-solver-checkpoint-v1` contract，可将 CPU solver 训练后的
+`ObjectEmergenceSolverState` 权重、config、loss、source metadata 和 GPU policy 导出为
+可 roundtrip 的 checkpoint JSON。`objgauss training object-emergence-solver` 新增
+`--checkpoint-output`，训练 smoke 可同时写 summary 和 checkpoint 到 `/tmp` 或 ignored
+`outputs/`。`renderer-loss-contract` 现在能识别 solver training summary / checkpoint，
+输出 `status=object_emergence_solver_ready`，并明确下一阶段仍被
+`solver_checkpoint_not_bound_to_gaussian_decoder` 和
+`solver_checkpoint_not_bound_to_renderer_loss` 阻塞。本切片仍不启动真正 torch / gsplat /
+CUDA full renderer training，也不提交 checkpoint 产物。
+
 同日已完成 `DEBUG-UI-HIERARCHY-001`：ObjectState Debug OS 左侧调试面板从平铺信息流
 收敛为可折叠目录结构，默认打开概览、常用操作、Assignment / Gaussian、对象诊断和
 对象开关，低频的协议归档、质量 / 训练 / 基准默认折叠；可见字段同步中文化。右侧

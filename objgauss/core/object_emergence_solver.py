@@ -17,6 +17,7 @@ OBJECT_EMERGENCE_MODEL_SCHEMA = "objgauss-object-emergence-model-v1"
 OBJECT_EMERGENCE_SOLVER_STATE_SCHEMA = "objgauss-object-emergence-solver-state-v1"
 OBJECT_EMERGENCE_ASSIGNMENT_SCHEMA = "objgauss-object-emergence-assignment-v1"
 OBJECT_EMERGENCE_TRAINING_SCHEMA = "objgauss-object-emergence-solver-training-v1"
+OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-checkpoint-v1"
 _EPS = 1e-8
 
 
@@ -224,6 +225,130 @@ class _SolverTrainingEval:
     state: ObjectEmergenceSolverState
     loss: ObjectEmergenceSolverLoss
     predictions: tuple[ObjectEmergenceAssignmentPrediction, ...]
+
+
+def object_emergence_solver_checkpoint(
+    result: ObjectEmergenceSolverTrainingResult,
+    *,
+    input_path: str | None = None,
+    source_gaussians: int | None = None,
+    sampled_gaussians: int | None = None,
+    target_source: str | None = None,
+    object_id_mapping: dict[int, int] | dict[str, int] | None = None,
+    vram_reserve_gb: int = 1,
+) -> dict[str, Any]:
+    if result.schema != OBJECT_EMERGENCE_TRAINING_SCHEMA:
+        raise ValueError(f"unsupported solver training schema: {result.schema}")
+    if vram_reserve_gb < 0:
+        raise ValueError("vram_reserve_gb must be >= 0")
+    payload = {
+        "schema": OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA,
+        "kind": "object_emergence_solver_checkpoint",
+        "training_schema": result.schema,
+        "source": {
+            "input": input_path,
+            "source_gaussians": None if source_gaussians is None else int(source_gaussians),
+            "sampled_gaussians": None if sampled_gaussians is None else int(sampled_gaussians),
+            "target_source": target_source,
+            "object_id_mapping": _string_key_mapping(object_id_mapping),
+        },
+        "training": {
+            "iterations": int(result.iterations),
+            "learning_rate": float(result.learning_rate),
+            "finite_difference_epsilon": float(result.finite_difference_epsilon),
+            "weights": {
+                "assignment": float(result.assignment_weight),
+                "entropy": float(result.entropy_weight),
+                "balance": float(result.balance_weight),
+                "temporal": float(result.temporal_weight),
+            },
+            "initial_loss": result.initial_loss.as_dict(),
+            "final_loss": result.final_loss.as_dict(),
+            "loss_decreased": bool(result.final_loss.total_loss < result.initial_loss.total_loss),
+            "assignment_loss_decreased": bool(
+                result.final_loss.assignment_loss < result.initial_loss.assignment_loss
+            ),
+        },
+        "solver_state": result.final_state.as_dict(include_weights=True),
+        "gpu_policy": {
+            "uses_gpu": False,
+            "full_renderer_training": "suspended_until_torch_gsplat_cuda_available",
+            "vram_reserve_gb": int(vram_reserve_gb),
+        },
+        "export_policy": {
+            "repository_write": "do_not_commit_training_checkpoints",
+            "intended_locations": ["/tmp", "ignored outputs/"],
+            "large_artifacts": "keep_out_of_git",
+        },
+    }
+    return validate_object_emergence_solver_checkpoint(payload)
+
+
+def object_emergence_solver_state_from_dict(payload: dict[str, Any]) -> ObjectEmergenceSolverState:
+    if not isinstance(payload, dict):
+        raise TypeError("solver state payload must be a dict")
+    if payload.get("schema") == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA:
+        state_payload = payload.get("solver_state")
+        if not isinstance(state_payload, dict):
+            raise ValueError("solver checkpoint missing solver_state")
+        return object_emergence_solver_state_from_dict(state_payload)
+    if payload.get("schema") != OBJECT_EMERGENCE_SOLVER_STATE_SCHEMA:
+        raise ValueError(f"unsupported solver state schema: {payload.get('schema')}")
+    config_payload = payload.get("config")
+    weights_payload = payload.get("weights")
+    if not isinstance(config_payload, dict):
+        raise ValueError("solver state missing config")
+    if not isinstance(weights_payload, dict):
+        raise ValueError("solver state missing weights")
+    config = ObjectEmergenceSolverConfig(
+        slots=int(config_payload.get("slots")),
+        feature_dim=int(config_payload.get("feature_dim")),
+        position_dim=int(config_payload.get("position_dim", 3)),
+        temperature=float(config_payload.get("temperature", 1.0)),
+        feature_weight=float(config_payload.get("feature_weight", 1.0)),
+        position_weight=float(config_payload.get("position_weight", 1.0)),
+        model_family=str(config_payload.get("model_family", "linear-softmax-assignment")),
+    )
+    state = ObjectEmergenceSolverState(
+        config=config,
+        feature_weights=np.asarray(weights_payload.get("feature_weights"), dtype=np.float32),
+        position_weights=np.asarray(weights_payload.get("position_weights"), dtype=np.float32),
+        bias=np.asarray(weights_payload.get("bias"), dtype=np.float32),
+        step=int(payload.get("step", 0)),
+        source=str(payload.get("source", "checkpoint")),
+        schema=str(payload.get("schema")),
+    )
+    return validate_object_emergence_solver_state(state)
+
+
+def validate_object_emergence_solver_checkpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("solver checkpoint payload must be a dict")
+    if payload.get("schema") != OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA:
+        raise ValueError(f"unsupported solver checkpoint schema: {payload.get('schema')}")
+    if payload.get("kind") != "object_emergence_solver_checkpoint":
+        raise ValueError("solver checkpoint kind must be object_emergence_solver_checkpoint")
+    training = payload.get("training")
+    if not isinstance(training, dict):
+        raise ValueError("solver checkpoint missing training")
+    for key in ("initial_loss", "final_loss"):
+        if not isinstance(training.get(key), dict):
+            raise ValueError(f"solver checkpoint missing training.{key}")
+        for loss_key in ("total_loss", "assignment_loss", "entropy_loss", "balance_loss", "temporal_loss"):
+            if loss_key not in training[key]:
+                raise ValueError(f"solver checkpoint training.{key} missing {loss_key}")
+            float(training[key][loss_key])
+    state = object_emergence_solver_state_from_dict(payload)
+    gpu_policy = payload.get("gpu_policy")
+    if not isinstance(gpu_policy, dict):
+        raise ValueError("solver checkpoint missing gpu_policy")
+    if "vram_reserve_gb" not in gpu_policy:
+        raise ValueError("solver checkpoint missing gpu_policy.vram_reserve_gb")
+    if int(gpu_policy["vram_reserve_gb"]) < 0:
+        raise ValueError("gpu_policy.vram_reserve_gb must be >= 0")
+    if state.config.slots < 1:
+        raise ValueError("solver checkpoint must contain at least one slot")
+    return payload
 
 
 def evidence_from_gaussian_cloud(
@@ -700,6 +825,12 @@ def _finite_difference_solver_gradient(
         ).loss.total_loss
         gradient[index] = (plus_loss - minus_loss) / (2.0 * epsilon)
     return gradient
+
+
+def _string_key_mapping(mapping: dict[int, int] | dict[str, int] | None) -> dict[str, int]:
+    if mapping is None:
+        return {}
+    return {str(key): int(value) for key, value in mapping.items()}
 
 
 def _pack_solver_state(state: ObjectEmergenceSolverState) -> np.ndarray:

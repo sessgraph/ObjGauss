@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import pytest
+import numpy as np
 
 from objgauss.core.renderer_loss import (
     RENDERER_LOSS_BOUNDARY_SCHEMA,
     RendererLossBoundaryReport,
     renderer_loss_boundary_report,
     validate_renderer_loss_boundary_summary,
+)
+from objgauss.core.object_emergence_solver import (
+    ObjectEmergenceEvidence,
+    object_emergence_solver_checkpoint,
+    train_object_emergence_solver,
 )
 from objgauss.core.trainable_kernel import (
     bind_image_targets_to_frames,
@@ -115,6 +121,54 @@ def test_renderer_loss_boundary_accepts_full_gsplat_renderer_evidence():
     assert "full_3dgs_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "differentiable_gaussian_renderer_not_selected" not in payload["upgrade_blockers"]
     assert "renderer_gradient_path_not_defined" not in payload["upgrade_blockers"]
+
+
+def test_renderer_loss_boundary_accepts_object_emergence_solver_checkpoint():
+    result = train_object_emergence_solver(
+        [
+            ObjectEmergenceEvidence(
+                positions=np.array(
+                    [[-1.0, 0.0, 0.0], [-0.8, 0.0, 0.0], [0.8, 0.0, 0.0], [1.0, 0.0, 0.0]],
+                    dtype="float32",
+                ),
+                features=np.array(
+                    [[1.0, 0.0], [0.8, 0.2], [0.2, 0.8], [0.0, 1.0]],
+                    dtype="float32",
+                ),
+                target_assignment=np.array(
+                    [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]],
+                    dtype="float32",
+                ),
+            )
+        ],
+        iterations=8,
+        learning_rate=0.5,
+        assignment_weight=1.0,
+        entropy_weight=0.0,
+        balance_weight=0.0,
+        temporal_weight=0.0,
+        seed=3,
+    )
+    checkpoint = object_emergence_solver_checkpoint(
+        result,
+        input_path="fixture://solver",
+        source_gaussians=4,
+        sampled_gaussians=4,
+        target_source="object_id_one_hot_targets",
+    )
+
+    payload = renderer_loss_boundary_report(checkpoint).as_dict()
+
+    assert payload["status"] == "object_emergence_solver_ready"
+    assert payload["point_smoke_ready"] is False
+    assert "point_render_smoke_not_present" in payload["point_smoke_blockers"]
+    assert payload["evidence"]["kind"] == "object_emergence_solver_checkpoint"
+    assert payload["evidence"]["solver_loss_decreased"] is True
+    assert payload["evidence"]["assignment_loss_decreased"] is True
+    assert payload["evidence"]["gpu_used"] is False
+    assert payload["evidence"]["vram_reserve_gb"] == 1
+    assert "solver_checkpoint_not_bound_to_renderer_loss" in payload["upgrade_blockers"]
+    assert "solver_checkpoint_not_bound_to_gaussian_decoder" in payload["upgrade_blockers"]
 
 
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():

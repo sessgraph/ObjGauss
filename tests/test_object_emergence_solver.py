@@ -10,17 +10,21 @@ from objgauss.core.io import write_ply
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_emergence_solver import (
     OBJECT_EMERGENCE_ASSIGNMENT_SCHEMA,
+    OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA,
     OBJECT_EMERGENCE_TRAINING_SCHEMA,
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverConfig,
     ObjectEmergenceSolverState,
     evidence_from_gaussian_cloud,
     initialize_object_emergence_solver,
+    object_emergence_solver_checkpoint,
+    object_emergence_solver_state_from_dict,
     object_id_targets_from_cloud,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
     train_object_emergence_solver,
     validate_object_emergence_evidence,
+    validate_object_emergence_solver_checkpoint,
 )
 
 
@@ -164,9 +168,49 @@ def test_object_id_targets_from_cloud_bind_solver_training_targets():
     assert result.final_state.config.slots == 2
 
 
+def test_object_emergence_solver_checkpoint_roundtrips_trained_state():
+    cloud = _object_id_cloud()
+    targets, mapping = object_id_targets_from_cloud(cloud)
+    evidence = evidence_from_gaussian_cloud(cloud, target_assignment=targets)
+    result = train_object_emergence_solver(
+        [evidence],
+        iterations=8,
+        learning_rate=0.5,
+        assignment_weight=1.0,
+        entropy_weight=0.0,
+        balance_weight=0.0,
+        temporal_weight=0.0,
+        seed=5,
+    )
+
+    checkpoint = object_emergence_solver_checkpoint(
+        result,
+        input_path="fixture://object-cloud",
+        source_gaussians=cloud.count,
+        sampled_gaussians=cloud.count,
+        target_source="object_id_one_hot_targets",
+        object_id_mapping=mapping,
+        vram_reserve_gb=1,
+    )
+    restored = object_emergence_solver_state_from_dict(checkpoint)
+    original_prediction = predict_object_emergence_assignment(evidence, result.final_state)
+    restored_prediction = predict_object_emergence_assignment(evidence, restored)
+
+    assert checkpoint["schema"] == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA
+    assert checkpoint["source"]["object_id_mapping"] == {"5": 0, "9": 1}
+    assert checkpoint["gpu_policy"]["uses_gpu"] is False
+    assert checkpoint["gpu_policy"]["vram_reserve_gb"] == 1
+    assert checkpoint["solver_state"]["weights"]["feature_weights"]
+    assert validate_object_emergence_solver_checkpoint(checkpoint) == checkpoint
+    assert restored.step == result.final_state.step
+    np.testing.assert_allclose(restored.feature_weights, result.final_state.feature_weights, atol=1e-6)
+    np.testing.assert_allclose(restored_prediction.assignment, original_prediction.assignment, atol=1e-6)
+
+
 def test_object_emergence_solver_cli_writes_cpu_training_summary(tmp_path, capsys):
     input_path = tmp_path / "object_cloud.ply"
     summary_path = tmp_path / "solver-summary.json"
+    checkpoint_path = tmp_path / "solver-checkpoint.json"
     write_ply(input_path, _object_id_cloud(), fmt="ascii")
 
     status = main(
@@ -180,20 +224,26 @@ def test_object_emergence_solver_cli_writes_cpu_training_summary(tmp_path, capsy
             "0.5",
             "--summary-output",
             str(summary_path),
+            "--checkpoint-output",
+            str(checkpoint_path),
             "--require-loss-decrease",
         ]
     )
 
     stdout = capsys.readouterr().out
     payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     assert status == 0
     assert "schema=objgauss-object-emergence-solver-training-v1" in stdout
     assert "gpu_used=false" in stdout
     assert "vram_reserve_gb=1" in stdout
+    assert f"checkpoint={checkpoint_path}" in stdout
     assert payload["loss_decreased"] is True
     assert payload["assignment_loss_decreased"] is True
     assert payload["gpu_policy"]["uses_gpu"] is False
     assert payload["gpu_policy"]["vram_reserve_gb"] == 1
+    assert checkpoint["schema"] == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA
+    assert checkpoint["solver_state"]["weights"]["bias"] is not None
 
 
 def test_solver_abi_validates_shapes_and_targets():

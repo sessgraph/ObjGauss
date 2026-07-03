@@ -45,6 +45,10 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "ObjectEmergenceSolverTrainingResult",
     ),
+    "object_emergence_solver_checkpoint": (
+        "objgauss.core.object_emergence_solver",
+        "object_emergence_solver_checkpoint",
+    ),
     "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA": (
         "objgauss.core.object_state_benchmark",
         "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA",
@@ -193,6 +197,14 @@ _EXPORTS = {
     "validate_object_emergence_solver_state": (
         "objgauss.core.object_emergence_solver",
         "validate_object_emergence_solver_state",
+    ),
+    "object_emergence_solver_state_from_dict": (
+        "objgauss.core.object_emergence_solver",
+        "object_emergence_solver_state_from_dict",
+    ),
+    "validate_object_emergence_solver_checkpoint": (
+        "objgauss.core.object_emergence_solver",
+        "validate_object_emergence_solver_checkpoint",
     ),
     "validate_object_state_stability_benchmark": (
         "objgauss.core.object_state_benchmark",

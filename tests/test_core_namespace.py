@@ -45,6 +45,8 @@ from objgauss.core import (
     object_state_delivery_summary,
     object_state_stability_report,
     object_id_targets_from_cloud,
+    object_emergence_solver_checkpoint,
+    object_emergence_solver_state_from_dict,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
     project_object_states_from_field,
@@ -57,6 +59,7 @@ from objgauss.core import (
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
     validate_object_emergence_evidence,
+    validate_object_emergence_solver_checkpoint,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -213,6 +216,18 @@ def test_core_namespace_exposes_object_emergence_solver_abi():
         seed=2,
     )
     assert isinstance(training, ObjectEmergenceSolverTrainingResult)
+    checkpoint = object_emergence_solver_checkpoint(
+        training,
+        input_path="fixture://namespace",
+        source_gaussians=_tiny_object_cloud().count,
+        sampled_gaussians=_tiny_object_cloud().count,
+        target_source="object_id_one_hot_targets",
+        object_id_mapping=mapping,
+    )
+    assert validate_object_emergence_solver_checkpoint(checkpoint) == checkpoint
+    restored = object_emergence_solver_state_from_dict(checkpoint)
+    assert isinstance(restored, ObjectEmergenceSolverState)
+    assert restored.step == training.final_state.step
     assert mapping == {0: 0, 1: 1}
 
 

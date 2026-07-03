@@ -7,7 +7,13 @@ RENDERER_LOSS_BOUNDARY_SCHEMA = "objgauss-renderer-loss-boundary-v1"
 POINT_RENDER_SMOKE_RENDERER = "cpu-point-rgb-smoke"
 TARGET_IMAGE_RENDERER = "differentiable-gaussian-image-renderer"
 TRAINABLE_KERNEL_SCHEMA = "objgauss-v1-trainable-kernel-mvp-v1"
+OBJECT_EMERGENCE_SOLVER_TRAINING_SCHEMA = "objgauss-object-emergence-solver-training-v1"
+OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-checkpoint-v1"
 FULL_3DGS_RENDERERS = {"gsplat-rasterization-v1"}
+OBJECT_EMERGENCE_SOLVER_EVIDENCE = {
+    "object_emergence_solver_training",
+    "object_emergence_solver_checkpoint",
+}
 
 
 @dataclass(frozen=True)
@@ -50,10 +56,22 @@ def renderer_loss_boundary_report(
     target_renderer: str = TARGET_IMAGE_RENDERER,
 ) -> RendererLossBoundaryReport:
     evidence, point_blockers = _kernel_summary_evidence(kernel_summary)
-    point_ready = bool(kernel_summary is not None and not point_blockers)
+    point_ready = bool(
+        kernel_summary is not None
+        and evidence.get("kind") == "trainable_kernel_summary"
+        and not point_blockers
+    )
+    solver_ready = bool(
+        kernel_summary is not None
+        and evidence.get("kind") in OBJECT_EMERGENCE_SOLVER_EVIDENCE
+        and evidence.get("solver_loss_decreased")
+        and evidence.get("assignment_loss_decreased")
+    )
     status = "point_render_smoke_ready" if point_ready else "contract_defined"
     if kernel_summary is not None and point_blockers:
         status = "point_render_smoke_blocked"
+    if solver_ready:
+        status = "object_emergence_solver_ready"
     if point_ready and evidence.get("renderer_api_ready"):
         status = "renderer_api_ready"
     full_renderer_ready = (
@@ -77,6 +95,13 @@ def renderer_loss_boundary_report(
         )
     if not evidence.get("image_target_visibility_policies"):
         upgrade_blockers.append("camera_visibility_policy_not_bound")
+    if evidence.get("kind") in OBJECT_EMERGENCE_SOLVER_EVIDENCE:
+        upgrade_blockers.extend(
+            [
+                "solver_checkpoint_not_bound_to_gaussian_decoder",
+                "solver_checkpoint_not_bound_to_renderer_loss",
+            ]
+        )
     next_steps = (
         (
             "run small full 3DGS trainable renderer MVP",
@@ -91,6 +116,13 @@ def renderer_loss_boundary_report(
             "keep viewer renderer as debug consumer, not the training renderer default",
         )
         if evidence.get("renderer_api_ready")
+        else (
+            "export Object Emergence Solver checkpoint with weights",
+            "bind solver A[N,K] output to ObjectState -> Gaussian decoder",
+            "connect renderer_api image_render_loss to solver/full renderer training loop",
+            "run torch/gsplat/CUDA preflight before GPU training",
+        )
+        if evidence.get("kind") in OBJECT_EMERGENCE_SOLVER_EVIDENCE
         else (
             "bind trainable frames to camera/image targets",
             "define image-space renderer API and telemetry",
@@ -180,6 +212,10 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
         return {"kind": "no_kernel_summary"}, ["missing_kernel_summary"]
     if not isinstance(kernel_summary, dict):
         raise TypeError("kernel_summary must be a dict")
+    if kernel_summary.get("schema") == OBJECT_EMERGENCE_SOLVER_TRAINING_SCHEMA:
+        return _solver_training_evidence(kernel_summary)
+    if kernel_summary.get("schema") == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA:
+        return _solver_checkpoint_evidence(kernel_summary)
     if kernel_summary.get("schema") != TRAINABLE_KERNEL_SCHEMA:
         raise ValueError(f"unsupported trainable kernel schema: {kernel_summary.get('schema')}")
 
@@ -233,6 +269,94 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
     return evidence, blockers
 
 
+def _solver_training_evidence(summary: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    initial = _solver_loss_record(summary, "initial_loss")
+    final = _solver_loss_record(summary, "final_loss")
+    loss_decreased = final["total_loss"] < initial["total_loss"]
+    assignment_loss_decreased = final["assignment_loss"] < initial["assignment_loss"]
+    blockers: list[str] = ["point_render_smoke_not_present"]
+    if not loss_decreased:
+        blockers.append("solver_total_loss_not_decreased")
+    if not assignment_loss_decreased:
+        blockers.append("solver_assignment_loss_not_decreased")
+    gpu_policy = summary.get("gpu_policy") if isinstance(summary.get("gpu_policy"), dict) else {}
+    evidence = {
+        "kind": "object_emergence_solver_training",
+        "schema": summary.get("schema"),
+        "iterations": _optional_int(summary.get("iterations")),
+        "slots": _optional_int(summary.get("final_solver_state", {}).get("config", {}).get("slots"))
+        if isinstance(summary.get("final_solver_state"), dict)
+        else None,
+        "sampled_count": _optional_int(summary.get("sampled_gaussians")),
+        "source_count": _optional_int(summary.get("source_gaussians")),
+        "target_source": summary.get("target_source"),
+        "image_targets_bound": False,
+        "image_target_contract_schema": None,
+        "image_target_visibility_policies": [],
+        "renderer_api_ready": False,
+        "renderer_api_schema": None,
+        "renderer_name": None,
+        "renderer_gradient_path": None,
+        "image_render_loss": None,
+        "initial_total_loss": initial["total_loss"],
+        "final_total_loss": final["total_loss"],
+        "initial_assignment_loss": initial["assignment_loss"],
+        "final_assignment_loss": final["assignment_loss"],
+        "solver_loss_decreased": loss_decreased,
+        "assignment_loss_decreased": assignment_loss_decreased,
+        "gpu_used": bool(gpu_policy.get("uses_gpu", False)),
+        "vram_reserve_gb": _optional_int(gpu_policy.get("vram_reserve_gb")),
+    }
+    return evidence, blockers
+
+
+def _solver_checkpoint_evidence(checkpoint: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    training = checkpoint.get("training")
+    if not isinstance(training, dict):
+        raise ValueError("solver checkpoint missing training")
+    initial = _solver_loss_record(training, "initial_loss")
+    final = _solver_loss_record(training, "final_loss")
+    loss_decreased = final["total_loss"] < initial["total_loss"]
+    assignment_loss_decreased = final["assignment_loss"] < initial["assignment_loss"]
+    blockers: list[str] = ["point_render_smoke_not_present"]
+    if not loss_decreased:
+        blockers.append("solver_total_loss_not_decreased")
+    if not assignment_loss_decreased:
+        blockers.append("solver_assignment_loss_not_decreased")
+    source = checkpoint.get("source") if isinstance(checkpoint.get("source"), dict) else {}
+    solver_state = checkpoint.get("solver_state") if isinstance(checkpoint.get("solver_state"), dict) else {}
+    config = solver_state.get("config") if isinstance(solver_state.get("config"), dict) else {}
+    gpu_policy = checkpoint.get("gpu_policy") if isinstance(checkpoint.get("gpu_policy"), dict) else {}
+    evidence = {
+        "kind": "object_emergence_solver_checkpoint",
+        "schema": checkpoint.get("schema"),
+        "training_schema": checkpoint.get("training_schema"),
+        "iterations": _optional_int(training.get("iterations")),
+        "slots": _optional_int(config.get("slots")),
+        "feature_dim": _optional_int(config.get("feature_dim")),
+        "sampled_count": _optional_int(source.get("sampled_gaussians")),
+        "source_count": _optional_int(source.get("source_gaussians")),
+        "target_source": source.get("target_source"),
+        "image_targets_bound": False,
+        "image_target_contract_schema": None,
+        "image_target_visibility_policies": [],
+        "renderer_api_ready": False,
+        "renderer_api_schema": None,
+        "renderer_name": None,
+        "renderer_gradient_path": None,
+        "image_render_loss": None,
+        "initial_total_loss": initial["total_loss"],
+        "final_total_loss": final["total_loss"],
+        "initial_assignment_loss": initial["assignment_loss"],
+        "final_assignment_loss": final["assignment_loss"],
+        "solver_loss_decreased": loss_decreased,
+        "assignment_loss_decreased": assignment_loss_decreased,
+        "gpu_used": bool(gpu_policy.get("uses_gpu", False)),
+        "vram_reserve_gb": _optional_int(gpu_policy.get("vram_reserve_gb")),
+    }
+    return evidence, blockers
+
+
 def _loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:
     value = summary.get(key)
     if not isinstance(value, dict):
@@ -248,6 +372,17 @@ def _loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:
         else 0.0
     )
     return record
+
+
+def _solver_loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:
+    value = summary.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    required = ("total_loss", "assignment_loss", "entropy_loss", "balance_loss", "temporal_loss")
+    missing = [field for field in required if field not in value]
+    if missing:
+        raise ValueError(f"{key} missing solver loss fields: {', '.join(missing)}")
+    return {field: _finite_float(value[field], f"{key}.{field}") for field in required}
 
 
 def _finite_float(value: Any, label: str) -> float:

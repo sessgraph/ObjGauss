@@ -81,6 +81,7 @@ from objgauss.core.trainable_kernel import (
 )
 from objgauss.core.object_emergence_solver import (
     evidence_from_gaussian_cloud,
+    object_emergence_solver_checkpoint,
     object_id_targets_from_cloud,
     train_object_emergence_solver,
 )
@@ -1316,6 +1317,15 @@ def _training_object_emergence_solver(args: argparse.Namespace) -> None:
             "vram_reserve_gb": 1,
         },
     }
+    checkpoint = object_emergence_solver_checkpoint(
+        result,
+        input_path=str(args.input),
+        source_gaussians=source_cloud.count,
+        sampled_gaussians=sampled_cloud.count,
+        target_source=f"{args.object_id_field}_one_hot_targets",
+        object_id_mapping=mapping,
+        vram_reserve_gb=1,
+    )
     print(f"schema={summary['schema']}")
     print(f"input={args.input}")
     print(f"source_gaussians={source_cloud.count}")
@@ -1333,6 +1343,9 @@ def _training_object_emergence_solver(args: argparse.Namespace) -> None:
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
+    if args.checkpoint_output:
+        write_json(args.checkpoint_output, checkpoint)
+        print(f"checkpoint={args.checkpoint_output}")
     if args.require_loss_decrease and not summary["loss_decreased"]:
         raise ValueError("object emergence solver loss did not decrease")
 
@@ -1419,6 +1432,15 @@ def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
             print(f"evidence_renderer_name={evidence.get('renderer_name')}")
             print(f"evidence_renderer_gradient_path={evidence.get('renderer_gradient_path')}")
             print(f"evidence_image_render_loss={evidence['image_render_loss']:.6f}")
+    if evidence.get("kind") in {"object_emergence_solver_training", "object_emergence_solver_checkpoint"}:
+        print(f"evidence_kind={evidence.get('kind')}")
+        print(f"evidence_target_source={evidence.get('target_source')}")
+        print(f"evidence_initial_total_loss={evidence['initial_total_loss']:.6f}")
+        print(f"evidence_final_total_loss={evidence['final_total_loss']:.6f}")
+        print(f"evidence_initial_assignment_loss={evidence['initial_assignment_loss']:.6f}")
+        print(f"evidence_final_assignment_loss={evidence['final_assignment_loss']:.6f}")
+        print(f"evidence_gpu_used={str(evidence.get('gpu_used')).lower()}")
+        print(f"evidence_vram_reserve_gb={evidence.get('vram_reserve_gb')}")
     if args.output:
         write_json(args.output, summary)
         print(f"summary={args.output}")
@@ -2354,6 +2376,7 @@ def _build_parser() -> argparse.ArgumentParser:
     object_emergence_solver.add_argument("--seed", type=int, default=0)
     object_emergence_solver.add_argument("--record-every", type=int)
     object_emergence_solver.add_argument("--summary-output", type=Path)
+    object_emergence_solver.add_argument("--checkpoint-output", type=Path)
     object_emergence_solver.add_argument("--include-weights", action="store_true")
     object_emergence_solver.add_argument("--require-loss-decrease", action="store_true")
     object_emergence_solver.set_defaults(handler=_training_object_emergence_solver)
