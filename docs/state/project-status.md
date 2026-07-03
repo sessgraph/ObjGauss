@@ -531,6 +531,19 @@ status、margin 和 row count 与 `window.__OBJGAUSS_WORLD__` 的 hover assignme
 ObjectState projection、renderer artifact schema、OGC decoder 或 trainable kernel loop；
 训练模型主线仍保持 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-GAUSSIAN-PROBE-PANEL-001` 已将 `gaussian click -> show A[n,:]` 从
+heatmap meta 升级为可见 Gaussian Probe inspector：`src/App.jsx` 在 selected
+Assignment Heatmap 后新增 `GaussianProbePanel`，显示 clicked Gaussian index、source、
+top slot、margin、confidence、position、opacity、entropy、top / second probability
+和 ambiguous / collapse-risk flag；`src/styles.css` 为该面板增加紧凑四列 metrics、
+source / position metadata 和 flag rows。`scripts/audit-world-viewer.mjs` 现在验证
+trainable fixture 点击 Gaussian 后，该面板的 source、index、status、margin、
+confidence、entropy、opacity、position 和 flags 与 root / heatmap / world telemetry
+一致，并在 audit 输出中记录 `gaussianProbe=confident`。该切片只强化 Phase 1
+“点击 Gaussian 查看 assignment vector”调试闭环，不改变 assignment solver、
+ObjectState projection、renderer artifact schema、OGC decoder 或 trainable kernel loop；
+训练模型主线仍保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

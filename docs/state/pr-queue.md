@@ -78,6 +78,38 @@
 
 ## Done
 
+### OBJECTSTATE-GAUSSIAN-PROBE-PANEL-001: Visible Gaussian probe inspector
+
+- 状态: done / gaussian-probe-inspector
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 `gaussian click -> show A[n,:]` 从 heatmap meta 升级为可见 inspector，让
+  clicked Gaussian 的 assignment source、index、top slot、margin、confidence、entropy、
+  opacity、position 和 ambiguity / collapse flags 可直接审计。
+- 已实施:
+  - `src/App.jsx` 新增 `GaussianProbePanel`，在 selected `AssignmentHeatmap` 后显示
+    clicked Gaussian 的 probe status、source、index、top slot、margin、confidence、
+    position、opacity、entropy、top / second probability 和 ambiguous / collapse-risk flag。
+  - `src/styles.css` 为 Gaussian Probe 面板补充紧凑 metrics、metadata 和 flag rows，
+    保持 Debug panel 内布局稳定。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 点击 Gaussian 后，probe panel
+    的 source / index / status / margin / confidence / entropy / opacity / position /
+    flags 与 root、heatmap 和 `window.__OBJGAUSS_WORLD__` 的 probe contract 一致，并把
+    `gaussianProbe=confident` 写入 audit 输出。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `gaussianProbe=confident`、`gaussianProbeSource=trainable_kernel_model_artifact` 和
+    `gaussianProbeMargin=0.6`。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: `15c9a2d`
+
 ### OBJECTSTATE-HOVER-HEATMAP-001: Visible hover assignment heatmap
 
 - 状态: done / hover-assignment-heatmap
