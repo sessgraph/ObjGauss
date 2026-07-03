@@ -294,6 +294,19 @@ chunk scope 收缩。`scripts/audit-world-viewer.mjs` 在 URL OGC route 下验�
 decoded window / 1 个 heatmap slot，再切回 `all` 恢复 2 个 slots。该切片不改变 OGC
 writer、chunk index schema、manifest、renderer 或训练系统，不提交大资产。
 
+`OGC-LOCAL-ARTIFACT-IMPORT-001` 已完成 Debug OS 的本地 OGC file-pair 导入入口：
+`src/App.jsx` 的 top HUD 新增 `导入OGC` 多文件入口，可直接读取本地
+`.index.json + .ogc` 文件对，并包装为运行时 `ogc-local-artifact` 模型。该模型复用
+现有 `compressed_chunked` manifest route、quantized OGC decoder、ObjectState render
+targets、assignment heatmap、Gaussian probe、LOD selector 和 chunk selector；delivery
+route 明确标为 `local-file`，index / payload path 标为 `local://<file>`。root
+telemetry 新增 `data-ogc-import-*`，并继续暴露 `data-ogc-artifact-*` route / bytes /
+window 信息。`scripts/audit-world-viewer.mjs` 现在会用小型 OGC fixture 执行
+Playwright `setInputFiles(...)` 导入，验收本地 file route、LOD1、单 chunk scope、
+assignment heatmap、Gaussian probe 和 `import-ogc` event trace。该切片不改变 OGC
+writer、chunk index schema、quantized record format、manifest validator 或训练系统；
+本地 OGC artifact 只作为 browser-session debug input，不写入 `public/` 或 git。
+
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
 对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：

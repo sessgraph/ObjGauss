@@ -72,6 +72,49 @@
 
 ## Done
 
+### OGC-LOCAL-ARTIFACT-IMPORT-001: Import local OGC file pairs into Debug OS
+
+- 状态: done / ogc-local-artifact-import
+- 类型: 标准 PR / browser delivery + local debug artifact delivery
+- 目标: 让 ObjectState Debug OS 可以直接加载本地 `.index.json + .ogc`
+  文件对，用于调试 ignored `outputs/` 或 `/tmp` 里的 OGC browser-ready 产物，而不需要
+  把产物复制到 `public/` 或修改 `src/modelCatalog.js`。
+- 已实施:
+  - `src/App.jsx` 新增 top HUD `导入OGC` 多文件入口，要求同时选择一个 `.index.json`
+    / `.json` 和一个 `.ogc` payload。
+  - 本地 file-pair 会被包装成运行时 `ogc-local-artifact` 模型和
+    `compressed_chunked` browser-ready manifest，index 以内联 JSON 形式保留，
+    payload 以内存 `ArrayBuffer` 形式保留，不写入仓库、不写入 `public/`。
+  - `loadOgcModel(...)` 现在让 catalog inline OGC、URL OGC 和本地 OGC 共享同一条
+    `browserReadyArtifact -> chunk index -> OGC payload -> decode -> upsertModel` 路径。
+    本地 payload route 标记为 `local-file`，仍根据 `quantizedOgcReadWindows(...)`
+    计算 LOD / chunk requested bytes 和 decoded windows。
+  - root `.worldShell` 新增 `data-ogc-import-*` telemetry；本地 OGC 导入后继续生成
+    ObjectState render targets、assignment heatmap、Gaussian probe、LOD selector、
+    chunk selector、snapshot 和 event trace。
+  - `scripts/audit-world-viewer.mjs` 使用 Playwright `setInputFiles(...)` 导入
+    `public/models/ogc-url-fixture/scene.index.json` 与 `scene.ogc`，验证 local-file route、
+    LOD1、单 chunk scope、assignment heatmap、Gaussian probe 和 `import-ogc` event。
+- 边界:
+  - 不改变 OGC writer、chunk index schema、quantized record format 或 manifest
+    validator。
+  - 不提交 near-1M / 4.5M 大资产、训练输出、checkpoint 或 rendered image。
+  - 不实现远程 URL 之外的目录批量导入、progressive scheduler、网络缓存、VQ /
+    entropy / WebGPU decoder。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `localOgc=local-file-lod-chunk-ui`、`urlOgc=range-ogc-lod-chunk-ui`、
+    `localArtifact=local-file` 和 `debugEvents=12`；截图
+    `/tmp/objgauss-world-viewer-local-ogc.png` 显示本地 OGC 模型、LOD1、单 chunk
+    scope、`local-file` route 与 `OGC bytes 41 / 10`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-LOCAL-ARTIFACT-IMPORT-001: Import local trainable artifacts into Debug OS
 
 - 状态: done / trainable-local-artifact-import

@@ -4,7 +4,7 @@ import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { catalogSummary, defaultModelIdForCatalog, modelCatalogFromSearch } from "./modelCatalog.js";
-import { browserReadyArtifact } from "./modelArtifactManifest.js";
+import { MODEL_ARTIFACT_MANIFEST_SCHEMA, browserReadyArtifact } from "./modelArtifactManifest.js";
 import {
   decodeQuantizedOgcPayload,
   decodeQuantizedOgcPayloadWindows,
@@ -30,6 +30,7 @@ export default function App() {
   const worldApi = useRef(null);
   const loadStarted = useRef(false);
   const artifactInputRef = useRef(null);
+  const ogcInputRef = useRef(null);
   const [worldReady, setWorldReady] = useState(false);
   const [selection, setSelection] = useState(() => ({
     modelId: initialModelId,
@@ -45,6 +46,12 @@ export default function App() {
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [artifactImport, setArtifactImport] = useState(() => ({
+    status: "idle",
+    modelId: "",
+    fileName: "",
+    error: "",
+  }));
+  const [ogcImport, setOgcImport] = useState(() => ({
     status: "idle",
     modelId: "",
     fileName: "",
@@ -193,6 +200,47 @@ export default function App() {
     return nextModel;
   }, []);
 
+  const upsertDecodedOgcModel = useCallback((model, decoded, index, delivery, artifact, options = {}) => {
+    const rendered = worldApi.current?.upsertModel(model, decoded.points);
+    const startedAt = Number(options.startedAt);
+    const nextModel = {
+      ...model,
+      status: "loaded",
+      message: options.message ?? "ogc chunks",
+      gaussianCount: decoded.points.length,
+      displayCount: rendered?.displayCount ?? 0,
+      objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? model.objectCount,
+      corePoint: rendered?.corePoint ?? null,
+      objects: rendered?.objects ?? [],
+      loadMs: Number.isFinite(startedAt) ? Math.round(performance.now() - startedAt) : 0,
+      delivery: {
+        source: "quantized-ogc",
+        role: artifact.role,
+        decodedChunks: decoded.metadata.decodedChunks,
+        decodedGaussians: decoded.metadata.decodedGaussians,
+        recordFormat: decoded.metadata.recordFormat,
+        lodLevel: model.ogc?.lodLevel ?? "full",
+        lodLevels: availableOgcLodLevels(index),
+        chunkIds: Array.isArray(model.ogc?.chunkIds) ? model.ogc.chunkIds : [],
+        availableChunkIds: availableOgcChunkIds(index),
+        loadRoute: delivery.loadRoute,
+        indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
+        payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
+        fetchedBytes: delivery.fetchedBytes,
+        requestedBytes: delivery.requestedBytes,
+        decodedWindows: delivery.decodedWindows,
+      },
+    };
+    setModels((current) => ({
+      ...current,
+      [model.id]: {
+        ...(current[model.id] ?? {}),
+        ...nextModel,
+      },
+    }));
+    return nextModel;
+  }, []);
+
   const selectModel = useCallback(
     (id) => {
       setSelection({ modelId: id, objectId: null, selectionId: id });
@@ -303,6 +351,66 @@ export default function App() {
     [recordDebugEvent, upsertTrainableArtifactModel],
   );
 
+  const importOgcArtifactFiles = useCallback(
+    async (event) => {
+      const files = Array.from(event.target.files ?? []);
+      event.target.value = "";
+      if (!files.length) return;
+      const fileName = files.map((file) => file.name).join(" + ");
+      const modelId = "ogc-local-artifact";
+      const startedAt = performance.now();
+      setOgcImport({ status: "loading", modelId, fileName, error: "" });
+      try {
+        const { indexFile, payloadFile } = ogcFilePair(files);
+        const index = JSON.parse(await indexFile.text());
+        const payloadBuffer = await payloadFile.arrayBuffer();
+        const model = ogcLocalArtifactModel({
+          index,
+          payloadBuffer,
+          indexFileName: indexFile.name,
+          payloadFileName: payloadFile.name,
+        });
+        const { artifact, decoded, index: loadedIndex, delivery } = await loadOgcModel(model);
+        const imported = upsertDecodedOgcModel(model, decoded, loadedIndex, delivery, artifact, {
+          startedAt,
+          message: "local ogc files",
+        });
+        setDebugProbe(null);
+        setHoveredTarget(null);
+        setHiddenObjects((current) => {
+          const next = new Set(
+            [...current].filter((selectionId) => !String(selectionId).startsWith(`${model.id}::`)),
+          );
+          worldApi.current?.setHiddenObjects(next);
+          return next;
+        });
+        setSelection({ modelId: model.id, objectId: null, selectionId: model.id });
+        worldApi.current?.focusModel(model.id);
+        setOgcImport({ status: "loaded", modelId: model.id, fileName, error: "" });
+        recordDebugEvent("import-ogc", {
+          modelId: model.id,
+          selectionId: model.id,
+          fileName,
+          source: imported.delivery.loadRoute,
+        });
+      } catch (error) {
+        setOgcImport({
+          status: "error",
+          modelId,
+          fileName,
+          error: error?.message ?? "ogc import failed",
+        });
+        recordDebugEvent("import-ogc-error", {
+          modelId,
+          selectionId: modelId,
+          fileName,
+          source: "local-file",
+        });
+      }
+    },
+    [recordDebugEvent, upsertDecodedOgcModel],
+  );
+
   const selectTrainableFrame = useCallback(
     (frameIndex) => {
       const current = models[selectedId];
@@ -348,7 +456,6 @@ export default function App() {
       });
       try {
         const { artifact, decoded, index, delivery } = await loadOgcModel(nextModel);
-        const rendered = worldApi.current?.upsertModel(nextModel, decoded.points);
         setDebugProbe(null);
         setHiddenObjects((currentHidden) => {
           const nextHidden = new Set(
@@ -357,33 +464,9 @@ export default function App() {
           worldApi.current?.setHiddenObjects(nextHidden);
           return nextHidden;
         });
-        patchModel(current.id, {
-          ogc: nextOgc,
-          status: "loaded",
+        upsertDecodedOgcModel(nextModel, decoded, index, delivery, artifact, {
+          startedAt,
           message: messages.loaded,
-          gaussianCount: decoded.points.length,
-          displayCount: rendered?.displayCount ?? 0,
-          objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? current.objectCount,
-          corePoint: rendered?.corePoint ?? null,
-          objects: rendered?.objects ?? [],
-          loadMs: Math.round(performance.now() - startedAt),
-          delivery: {
-            source: "quantized-ogc",
-            role: artifact.role,
-            decodedChunks: decoded.metadata.decodedChunks,
-            decodedGaussians: decoded.metadata.decodedGaussians,
-            recordFormat: decoded.metadata.recordFormat,
-            lodLevel: nextOgc.lodLevel ?? "full",
-            lodLevels: availableOgcLodLevels(index),
-            chunkIds: Array.isArray(nextOgc.chunkIds) ? nextOgc.chunkIds : [],
-            availableChunkIds: availableOgcChunkIds(index),
-            loadRoute: delivery.loadRoute,
-            indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
-            payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
-            fetchedBytes: delivery.fetchedBytes,
-            requestedBytes: delivery.requestedBytes,
-            decodedWindows: delivery.decodedWindows,
-          },
         });
       } catch (error) {
         patchModel(current.id, {
@@ -393,7 +476,7 @@ export default function App() {
         });
       }
     },
-    [patchModel],
+    [patchModel, upsertDecodedOgcModel],
   );
 
   const selectOgcLod = useCallback(
@@ -490,34 +573,10 @@ export default function App() {
           patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
           try {
             const { artifact, decoded, index, delivery } = await loadOgcModel(model);
-            const rendered = worldApi.current?.upsertModel(model, decoded.points);
             if (cancelled) return;
-            patchModel(model.id, {
-              status: "loaded",
+            upsertDecodedOgcModel(model, decoded, index, delivery, artifact, {
+              startedAt,
               message: "ogc chunks",
-              gaussianCount: decoded.points.length,
-              displayCount: rendered?.displayCount ?? 0,
-              objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? model.objectCount,
-              corePoint: rendered?.corePoint ?? null,
-              objects: rendered?.objects ?? [],
-              loadMs: Math.round(performance.now() - startedAt),
-              delivery: {
-                source: "quantized-ogc",
-                role: artifact.role,
-                decodedChunks: decoded.metadata.decodedChunks,
-                decodedGaussians: decoded.metadata.decodedGaussians,
-                recordFormat: decoded.metadata.recordFormat,
-                lodLevel: model.ogc?.lodLevel ?? "full",
-                lodLevels: availableOgcLodLevels(index),
-                chunkIds: Array.isArray(model.ogc?.chunkIds) ? model.ogc.chunkIds : [],
-                availableChunkIds: availableOgcChunkIds(index),
-                loadRoute: delivery.loadRoute,
-                indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
-                payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
-                fetchedBytes: delivery.fetchedBytes,
-                requestedBytes: delivery.requestedBytes,
-                decodedWindows: delivery.decodedWindows,
-              },
             });
           } catch (error) {
             if (cancelled) return;
@@ -594,7 +653,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [modelCatalog, patchModel, worldReady]);
+  }, [modelCatalog, patchModel, upsertDecodedOgcModel, upsertTrainableArtifactModel, worldReady]);
 
   return (
     <main
@@ -672,6 +731,10 @@ export default function App() {
       data-trainable-import-model={artifactImport.modelId}
       data-trainable-import-file={artifactImport.fileName}
       data-trainable-import-error={artifactImport.error}
+      data-ogc-import-status={ogcImport.status}
+      data-ogc-import-model={ogcImport.modelId}
+      data-ogc-import-file={ogcImport.fileName}
+      data-ogc-import-error={ogcImport.error}
     >
       <ThreeWorld
         models={modelCatalog}
@@ -708,6 +771,15 @@ export default function App() {
             data-trainable-artifact-file-input="true"
             onChange={importTrainableArtifactFile}
           />
+          <input
+            ref={ogcInputRef}
+            className="fileInputHidden"
+            type="file"
+            accept="application/json,.json,.ogc"
+            multiple
+            data-ogc-artifact-file-input="true"
+            onChange={importOgcArtifactFiles}
+          />
           <button
             className={`glassButton ${artifactImport.status === "loaded" ? "active" : ""}`}
             type="button"
@@ -720,6 +792,19 @@ export default function App() {
               : artifactImport.status === "error"
                 ? "导入失败"
                 : "导入训练"}
+          </button>
+          <button
+            className={`glassButton ${ogcImport.status === "loaded" ? "active" : ""}`}
+            type="button"
+            data-ogc-artifact-import-button="true"
+            data-import-status={ogcImport.status}
+            onClick={() => ogcInputRef.current?.click()}
+          >
+            {ogcImport.status === "loading"
+              ? "OGC中"
+              : ogcImport.status === "error"
+                ? "OGC失败"
+                : "导入OGC"}
           </button>
           <button
             className={`glassButton ${debugMode ? "active" : ""}`}
@@ -889,6 +974,102 @@ function trainableLocalArtifactModel(fileName) {
   };
 }
 
+function ogcFilePair(files) {
+  const indexFile = files.find((file) => /\.index\.json$/i.test(file.name)) ??
+    files.find((file) => /\.json$/i.test(file.name));
+  const payloadFile = files.find((file) => /\.ogc$/i.test(file.name));
+  if (!indexFile || !payloadFile) {
+    throw new Error("select one .index.json and one .ogc file");
+  }
+  return { indexFile, payloadFile };
+}
+
+function ogcLocalArtifactModel({ index, payloadBuffer, indexFileName, payloadFileName }) {
+  const payloadPath = localFileRoute(payloadFileName);
+  const indexPath = localFileRoute(indexFileName);
+  const artifact = {
+    role: "compressed_chunked",
+    path: payloadPath,
+    payloadPath,
+    indexPath,
+    format: ".ogc",
+    delivery_tier: "browser_edit",
+    browser_ready: true,
+    gaussian_count: ogcPositiveInteger(index?.gaussian_count),
+    object_count: ogcPositiveInteger(index?.object_count),
+    byte_size: payloadBuffer.byteLength,
+    sha256: index?.payload?.sha256,
+    chunk_index: {
+      schema: index?.schema,
+      path: indexPath,
+      chunk_count: Array.isArray(index?.chunks) ? index.chunks.length : undefined,
+      sort_key: index?.sort_key,
+      chunk_size_target: index?.chunk_size_target,
+    },
+    compression: index?.compression,
+    lod: index?.lod,
+    object_id_coverage: index?.object_id_coverage,
+    inlineIndex: index,
+    payloadBuffer,
+  };
+  return {
+    id: "ogc-local-artifact",
+    name: "Local OGC artifact",
+    label: "Local OGC",
+    loadMode: "ogc-chunked",
+    kind: "compressed-chunked-ogc",
+    stage: "local-debug-artifact",
+    objectCount: ogcPositiveInteger(index?.object_count) ?? 0,
+    galleryPosition: [2.85, 0, 4.56],
+    accent: "#5df2df",
+    displayScale: 1.88,
+    pointSize: 0.058,
+    maxDisplayPoints: 1200,
+    license: "local-file-debug",
+    ogc: { lodLevel: 0 },
+    compression: {
+      layout: index?.compression?.layout ?? "object-aware-chunked-local-quantized",
+      status: "local-debug-artifact",
+      chunkRoot: indexPath,
+    },
+    modelArtifactManifest: {
+      schema: MODEL_ARTIFACT_MANIFEST_SCHEMA,
+      manifest_id: "ogc-local-artifact-manifest",
+      asset_id: "ogc-local-artifact",
+      name: "Local OGC artifact",
+      stage: "local-debug-artifact",
+      source: {
+        type: "local_file_pair",
+        index_path: indexPath,
+        payload_path: payloadPath,
+      },
+      license: "local-file-debug",
+      counts: {
+        gaussians: ogcPositiveInteger(index?.gaussian_count),
+        objects: ogcPositiveInteger(index?.object_count),
+      },
+      artifacts: [artifact],
+      quality_evidence: [],
+      limitations: [
+        "Local OGC artifacts are browser-session debug inputs and are not copied into public assets.",
+      ],
+      created_from: {
+        index_file: indexFileName,
+        payload_file: payloadFileName,
+      },
+    },
+  };
+}
+
+function localFileRoute(fileName) {
+  return `local://${fileName}`;
+}
+
+function ogcPositiveInteger(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : undefined;
+}
+
 function availableOgcLodLevels(index) {
   const levels = Array.isArray(index?.lod?.levels) ? index.lod.levels : [];
   const ids = levels
@@ -917,6 +1098,21 @@ async function loadOgcIndex(artifact) {
 }
 
 async function loadOgcPayload(artifact, index, options) {
+  if (artifact.payloadBuffer) {
+    const buffer = artifact.payloadBuffer;
+    const readWindows = quantizedOgcReadWindows(index, options);
+    return {
+      buffer,
+      delivery: {
+        loadRoute: "local-file",
+        fetchedBytes: buffer.byteLength,
+        requestedBytes: readWindows.length
+          ? readWindows.reduce((total, window) => total + window.byteLength, 0)
+          : buffer.byteLength,
+        decodedWindows: readWindows.length,
+      },
+    };
+  }
   if (artifact.payloadBase64) {
     const buffer = base64ToArrayBuffer(artifact.payloadBase64);
     return {
@@ -3257,7 +3453,12 @@ function debugEventDetailLabel(event) {
   if (event.type === "toggle-visibility") return event.visible ? "visible" : "hidden";
   if (event.type === "ogc-lod") return event.lodLevel === null ? "LOD -" : `L${event.lodLevel}`;
   if (event.type === "ogc-chunks") return event.chunkScope || "all";
-  if (event.type === "import-artifact" || event.type === "import-artifact-error") return event.fileName || "local";
+  if (
+    event.type === "import-artifact" ||
+    event.type === "import-artifact-error" ||
+    event.type === "import-ogc" ||
+    event.type === "import-ogc-error"
+  ) return event.fileName || "local";
   if (event.objectId !== null && event.objectId !== undefined) return `#${event.objectId}`;
   return event.modelId || event.source || "-";
 }

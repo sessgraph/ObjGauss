@@ -36,6 +36,7 @@ try {
       `urlArtifact=${summary.urlArtifactStatus}`,
       `urlOgc=${summary.urlOgcStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
+      `localOgc=${summary.localOgcStatus}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -409,6 +410,7 @@ async function auditWorld(url) {
     const urlArtifact = await auditUrlTrainableArtifact(browser, url);
     const urlOgc = await auditUrlOgcArtifact(browser, url);
     const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
+    const localOgc = await auditLocalOgcArtifactImport(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
@@ -648,6 +650,7 @@ async function auditWorld(url) {
       urlArtifactStatus: urlArtifact.status,
       urlOgcStatus: urlOgc.status,
       localArtifactStatus: localArtifact.status,
+      localOgcStatus: localOgc.status,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
@@ -839,6 +842,129 @@ async function auditLocalTrainableArtifactImport(browser, url) {
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-artifact.png", fullPage: false });
     return { status: "local-file" };
+  } finally {
+    await page.close();
+  }
+}
+
+async function auditLocalOgcArtifactImport(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-ogc-artifact-file-input='true']").setInputFiles([
+      "public/models/ogc-url-fixture/scene.index.json",
+      "public/models/ogc-url-fixture/scene.ogc",
+    ]);
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='ogc-local-artifact']");
+      const button = document.querySelector("[data-ogc-artifact-import-button='true']");
+      const importedFile = shell?.getAttribute("data-ogc-import-file") ?? "";
+      return (
+        pill?.getAttribute("data-model-load-state") === "loaded" &&
+        button?.getAttribute("data-import-status") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "8" &&
+        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-ogc-import-status") === "loaded" &&
+        shell?.getAttribute("data-ogc-import-model") === "ogc-local-artifact" &&
+        importedFile.includes("scene.index.json") &&
+        importedFile.includes("scene.ogc") &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-index-path") === "local://scene.index.json" &&
+        shell?.getAttribute("data-ogc-artifact-payload-path") === "local://scene.ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-local-artifact") ?? [];
+      const target = targets[0];
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+        objectCount: targets.length,
+        modelCount: world?.modelCount ?? 0,
+      };
+    });
+    if (
+      !selection.ok ||
+      selection.modelId !== "ogc-local-artifact" ||
+      selection.objectCount !== 2 ||
+      selection.modelCount !== 8
+    ) {
+      throw new Error(`expected local OGC object selection: ${JSON.stringify(selection)}`);
+    }
+    await page.waitForFunction((selectionId) => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      return (
+        world?.selectedId === selectionId &&
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-assignment-source") === "derived_from_object_id" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, selection.selectionId, { timeout: 15000 });
+    const gaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, selection.selectionId);
+    if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`expected local OGC Gaussian probe: ${JSON.stringify(gaussian)}`);
+    }
+    await page.locator("[data-ogc-lod-button='1']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const selector = document.querySelector("[data-ogc-lod-selector='true']");
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        selector?.getAttribute("data-selected-lod") === "1" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-ogc-chunk-button='0']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const chunkSelector = document.querySelector("[data-ogc-chunk-selector='true']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "10" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "0" &&
+        panel?.getAttribute("data-ogc-chunk-scope") === "0" &&
+        chunkSelector?.getAttribute("data-selected-chunks") === "0" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1 &&
+        types.has("import-ogc") &&
+        types.has("gaussian-probe") &&
+        types.has("ogc-lod") &&
+        types.has("ogc-chunks")
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-ogc.png", fullPage: false });
+    return { status: "local-file-lod-chunk-ui" };
   } finally {
     await page.close();
   }

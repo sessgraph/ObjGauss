@@ -157,6 +157,7 @@ button:focus-visible {
   justify-self: end;
   min-height: 40px;
   padding: 0 18px;
+  white-space: nowrap;
 }
 
 .glassButton:hover,
@@ -169,6 +170,7 @@ button:focus-visible {
 
 .topActions {
   display: flex;
+  flex-wrap: wrap;
   justify-self: end;
   gap: 8px;
 }
