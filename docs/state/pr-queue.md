@@ -105,7 +105,7 @@
     `opacity` lens selector、root / panel `data-debug-lens`、scene
     `lensOpacitySamples.activeLens` 和 `activeOpacityLens` 均为 `opacity`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `701239f`
 
 ### OBJECTSTATE-VERDICT-PANEL-001: Visible ObjectState verdict inspector
 
