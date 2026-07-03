@@ -6,8 +6,10 @@ import pytest
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_field import field_from_labels
 from objgauss.core.object_state import (
+    DynamicKUpdatePlan,
     bind_object_states_to_artifact,
     dynamic_k_proposal_report,
+    dynamic_k_update_plan,
     match_object_states,
     object_state_delivery_summary,
     object_state_stability_report,
@@ -396,6 +398,83 @@ def test_dynamic_k_proposals_emit_remove_split_merge_and_birth_without_mutating_
         proposal.kind == "birth_unmatched" and proposal.source_ids == (2,)
         for proposal in birth_report.proposals
     )
+
+
+def test_dynamic_k_update_plan_applies_gated_epoch_boundary_actions_without_mutating_projection():
+    empty_projection = project_object_states(
+        _empty_cloud(),
+        np.empty((0, 2), dtype=np.float32),
+        evidence_features=np.empty((0, 2), dtype=np.float32),
+    )
+    empty_plan = dynamic_k_update_plan(empty_projection, min_slot_count=1)
+    assert isinstance(empty_plan, DynamicKUpdatePlan)
+    assert empty_plan.schema == "objgauss-dynamic-k-update-plan-v1"
+    assert empty_plan.current_slot_count == 2
+    assert empty_plan.next_slot_count == 1
+    assert empty_plan.accepted_count == 1
+    assert empty_plan.blocked_count == 1
+    assert [action.accepted for action in empty_plan.actions] == [True, False]
+    assert empty_plan.actions[0].slot_delta == -1
+    assert empty_plan.actions[1].reason == "min_slot_count would be violated"
+    assert empty_projection.slots == 2
+
+    mixed_projection = project_object_states(
+        _cloud(),
+        np.full((4, 2), 0.5, dtype=np.float32),
+        evidence_features=_features(),
+    )
+    mixed_plan = dynamic_k_update_plan(mixed_projection, max_slot_count=3)
+    split_actions = [action for action in mixed_plan.actions if action.kind == "split_mixed"]
+    assert [action.accepted for action in split_actions] == [True, False]
+    assert mixed_plan.next_slot_count == 3
+    assert "slot_count_increase" in mixed_plan.diagnostics
+
+    duplicate_projection = project_object_states_from_field(
+        _duplicate_cloud(),
+        field_from_labels(np.array([0, 1, 2], dtype=np.int32), slots=3, confidence=1.0),
+        evidence_features=_duplicate_features(),
+    )
+    duplicate_report = dynamic_k_proposal_report(
+        duplicate_projection,
+        duplicate_feature_distance_threshold=0.01,
+        duplicate_centroid_distance_threshold=0.05,
+    )
+    duplicate_plan = dynamic_k_update_plan(duplicate_projection, proposal_report=duplicate_report)
+    merge_actions = [action for action in duplicate_plan.actions if action.kind == "merge_duplicate"]
+    assert len(merge_actions) == 1
+    assert merge_actions[0].accepted is True
+    assert merge_actions[0].target_id in merge_actions[0].source_ids
+    assert duplicate_plan.next_slot_count == 2
+
+    previous = project_object_states_from_field(
+        _cloud(),
+        field_from_labels(np.array([0, 0, 1, 1], dtype=np.int32), slots=2, confidence=1.0),
+        evidence_features=_features(),
+    )
+    current = project_object_states_from_field(
+        _three_object_cloud(),
+        field_from_labels(np.array([0, 0, 1, 1, 2, 2], dtype=np.int32), slots=3, confidence=1.0),
+        evidence_features=_three_features(),
+    )
+    temporal = match_object_states(previous, current, max_cost=0.05)
+    birth_report = dynamic_k_proposal_report(current, temporal_match=temporal)
+    birth_plan = dynamic_k_update_plan(current, proposal_report=birth_report)
+    birth_actions = [action for action in birth_plan.actions if action.kind == "birth_unmatched"]
+    assert len(birth_actions) == 1
+    assert birth_actions[0].accepted is True
+    assert birth_actions[0].slot_delta == 0
+    assert birth_plan.next_slot_count == 3
+    assert birth_plan.as_dict()["apply_at"] == "epoch_boundary"
+
+
+def test_dynamic_k_update_plan_rejects_non_epoch_boundary_updates():
+    projection = project_object_states(
+        _cloud(),
+        np.full((4, 2), 0.5, dtype=np.float32),
+        evidence_features=_features(),
+    )
+    with pytest.raises(ValueError, match="epoch_boundary"):
+        dynamic_k_update_plan(projection, apply_at="train_step")
 
 
 def _cloud() -> GaussianCloud:

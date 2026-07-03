@@ -5,6 +5,7 @@ import numpy as np
 from objgauss.core import (
     GaussianCloud,
     DynamicKProposalReport,
+    DynamicKUpdatePlan,
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
@@ -30,6 +31,7 @@ from objgauss.core import (
     build_gsplat_training_input,
     cluster_features,
     dynamic_k_proposal_report,
+    dynamic_k_update_plan,
     evaluate_training_renderer_loss,
     evaluate_gsplat_training_renderer_loss,
     gsplat_renderer_availability,
@@ -160,6 +162,9 @@ def test_core_namespace_exposes_object_field_kernel():
     assert bound["object_state_summary"] == summary
     proposals = dynamic_k_proposal_report(projection)
     assert isinstance(proposals, DynamicKProposalReport)
+    update_plan = dynamic_k_update_plan(projection)
+    assert isinstance(update_plan, DynamicKUpdatePlan)
+    assert update_plan.apply_at == "epoch_boundary"
 
     initialized = initialize_object_field(_tiny_cloud(), slots=2, seed=3, max_iter=10)
     assert initialized.field.gaussian_count == 4

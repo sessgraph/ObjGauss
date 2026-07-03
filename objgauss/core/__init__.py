@@ -19,6 +19,8 @@ _EXPORTS = {
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
     "DynamicKProposal": ("objgauss.core.object_state", "DynamicKProposal"),
     "DynamicKProposalReport": ("objgauss.core.object_state", "DynamicKProposalReport"),
+    "DynamicKUpdateAction": ("objgauss.core.object_state", "DynamicKUpdateAction"),
+    "DynamicKUpdatePlan": ("objgauss.core.object_state", "DynamicKUpdatePlan"),
     "ObjectEmergenceAssignmentPrediction": (
         "objgauss.core.object_emergence_solver",
         "ObjectEmergenceAssignmentPrediction",
@@ -98,6 +100,7 @@ _EXPORTS = {
     ),
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
     "dynamic_k_proposal_report": ("objgauss.core.object_state", "dynamic_k_proposal_report"),
+    "dynamic_k_update_plan": ("objgauss.core.object_state", "dynamic_k_update_plan"),
     "evidence_from_gaussian_cloud": (
         "objgauss.core.object_emergence_solver",
         "evidence_from_gaussian_cloud",

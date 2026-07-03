@@ -11,6 +11,7 @@ from objgauss.core.object_field import ObjectField
 
 _EPS = 1e-8
 OBJECT_STATE_DELIVERY_BINDING_SCHEMA = "objgauss-object-state-delivery-binding-v1"
+DYNAMIC_K_UPDATE_PLAN_SCHEMA = "objgauss-dynamic-k-update-plan-v1"
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,54 @@ class DynamicKProposalReport:
     proposal_count: int
     proposals: tuple[DynamicKProposal, ...]
     diagnostics: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DynamicKUpdateAction:
+    kind: str
+    source_ids: tuple[int, ...]
+    target_id: int | None
+    accepted: bool
+    slot_delta: int
+    apply_at: str
+    reason: str
+    evidence: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class DynamicKUpdatePlan:
+    schema: str
+    current_slot_count: int
+    next_slot_count: int
+    actions: tuple[DynamicKUpdateAction, ...]
+    accepted_count: int
+    blocked_count: int
+    apply_at: str
+    diagnostics: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "current_slot_count": int(self.current_slot_count),
+            "next_slot_count": int(self.next_slot_count),
+            "apply_at": self.apply_at,
+            "accepted_count": int(self.accepted_count),
+            "blocked_count": int(self.blocked_count),
+            "diagnostics": list(self.diagnostics),
+            "actions": [
+                {
+                    "kind": action.kind,
+                    "source_ids": list(action.source_ids),
+                    "target_id": action.target_id,
+                    "accepted": bool(action.accepted),
+                    "slot_delta": int(action.slot_delta),
+                    "apply_at": action.apply_at,
+                    "reason": action.reason,
+                    "evidence": action.evidence,
+                }
+                for action in self.actions
+            ],
+        }
 
 
 def validate_assignment_matrix(
@@ -548,6 +597,64 @@ def dynamic_k_proposal_report(
     )
 
 
+def dynamic_k_update_plan(
+    projection: ObjectStateProjection,
+    *,
+    proposal_report: DynamicKProposalReport | None = None,
+    min_slot_count: int = 1,
+    max_slot_count: int | None = None,
+    apply_at: str = "epoch_boundary",
+) -> DynamicKUpdatePlan:
+    if min_slot_count < 1:
+        raise ValueError("min_slot_count must be >= 1")
+    if max_slot_count is not None and max_slot_count < min_slot_count:
+        raise ValueError("max_slot_count must be >= min_slot_count")
+    if apply_at != "epoch_boundary":
+        raise ValueError("dynamic-K updates may only apply at epoch_boundary")
+    report = proposal_report or dynamic_k_proposal_report(projection)
+    if report.slot_count != projection.slots:
+        raise ValueError("proposal_report slot_count must match projection slots")
+
+    current_slots = int(projection.slots)
+    next_slots = current_slots
+    consumed_sources: set[int] = set()
+    actions: list[DynamicKUpdateAction] = []
+    for proposal in report.proposals:
+        action, next_slots = _dynamic_k_action_from_proposal(
+            proposal,
+            next_slot_count=next_slots,
+            consumed_sources=consumed_sources,
+            min_slot_count=min_slot_count,
+            max_slot_count=max_slot_count,
+            apply_at=apply_at,
+        )
+        actions.append(action)
+        if action.accepted:
+            consumed_sources.update(int(source) for source in proposal.source_ids)
+            if action.target_id is not None:
+                consumed_sources.discard(int(action.target_id))
+
+    accepted = sum(1 for action in actions if action.accepted)
+    blocked = len(actions) - accepted
+    diagnostics = _dynamic_k_update_diagnostics(
+        current_slot_count=current_slots,
+        next_slot_count=next_slots,
+        accepted_count=accepted,
+        blocked_count=blocked,
+        proposal_count=report.proposal_count,
+    )
+    return DynamicKUpdatePlan(
+        schema=DYNAMIC_K_UPDATE_PLAN_SCHEMA,
+        current_slot_count=current_slots,
+        next_slot_count=int(next_slots),
+        actions=tuple(actions),
+        accepted_count=int(accepted),
+        blocked_count=int(blocked),
+        apply_at=apply_at,
+        diagnostics=diagnostics,
+    )
+
+
 def _states_tuple(states: ObjectStateProjection | Sequence[ObjectState]) -> tuple[ObjectState, ...]:
     if isinstance(states, ObjectStateProjection):
         return tuple(states.states)
@@ -858,11 +965,187 @@ def _duplicate_merge_proposals(
     return tuple(proposals)
 
 
+def _dynamic_k_action_from_proposal(
+    proposal: DynamicKProposal,
+    *,
+    next_slot_count: int,
+    consumed_sources: set[int],
+    min_slot_count: int,
+    max_slot_count: int | None,
+    apply_at: str,
+) -> tuple[DynamicKUpdateAction, int]:
+    sources = tuple(int(source) for source in proposal.source_ids)
+    if any(source in consumed_sources for source in sources):
+        return (
+            _blocked_dynamic_k_action(
+                proposal,
+                apply_at=apply_at,
+                reason="proposal conflicts with an already accepted action",
+            ),
+            next_slot_count,
+        )
+    if proposal.kind == "remove_inactive":
+        if next_slot_count - 1 < min_slot_count:
+            return (
+                _blocked_dynamic_k_action(
+                    proposal,
+                    apply_at=apply_at,
+                    reason="min_slot_count would be violated",
+                ),
+                next_slot_count,
+            )
+        return (
+            _accepted_dynamic_k_action(
+                proposal,
+                slot_delta=-1,
+                apply_at=apply_at,
+                reason="drop inactive slot at epoch boundary",
+            ),
+            next_slot_count - 1,
+        )
+    if proposal.kind == "merge_duplicate":
+        if proposal.target_id is None or int(proposal.target_id) not in sources:
+            return (
+                _blocked_dynamic_k_action(
+                    proposal,
+                    apply_at=apply_at,
+                    reason="merge_duplicate requires target_id within source_ids",
+                ),
+                next_slot_count,
+            )
+        if next_slot_count - 1 < min_slot_count:
+            return (
+                _blocked_dynamic_k_action(
+                    proposal,
+                    apply_at=apply_at,
+                    reason="min_slot_count would be violated",
+                ),
+                next_slot_count,
+            )
+        return (
+            _accepted_dynamic_k_action(
+                proposal,
+                slot_delta=-1,
+                apply_at=apply_at,
+                reason="merge duplicate slots at epoch boundary",
+            ),
+            next_slot_count - 1,
+        )
+    if proposal.kind == "split_mixed":
+        if max_slot_count is not None and next_slot_count + 1 > max_slot_count:
+            return (
+                _blocked_dynamic_k_action(
+                    proposal,
+                    apply_at=apply_at,
+                    reason="max_slot_count would be violated",
+                ),
+                next_slot_count,
+            )
+        return (
+            _accepted_dynamic_k_action(
+                proposal,
+                slot_delta=1,
+                apply_at=apply_at,
+                reason="allocate one child slot for mixed slot at epoch boundary",
+            ),
+            next_slot_count + 1,
+        )
+    if proposal.kind == "birth_unmatched":
+        return (
+            _accepted_dynamic_k_action(
+                proposal,
+                slot_delta=0,
+                apply_at=apply_at,
+                reason="accept unmatched current slot as born object",
+            ),
+            next_slot_count,
+        )
+    return (
+        _blocked_dynamic_k_action(
+            proposal,
+            apply_at=apply_at,
+            reason=f"unsupported dynamic-K proposal kind: {proposal.kind}",
+        ),
+        next_slot_count,
+    )
+
+
+def _accepted_dynamic_k_action(
+    proposal: DynamicKProposal,
+    *,
+    slot_delta: int,
+    apply_at: str,
+    reason: str,
+) -> DynamicKUpdateAction:
+    return DynamicKUpdateAction(
+        kind=proposal.kind,
+        source_ids=tuple(int(source) for source in proposal.source_ids),
+        target_id=None if proposal.target_id is None else int(proposal.target_id),
+        accepted=True,
+        slot_delta=int(slot_delta),
+        apply_at=apply_at,
+        reason=reason,
+        evidence={
+            **proposal.evidence,
+            "proposal_score": float(proposal.score),
+            "proposal_threshold": float(proposal.threshold),
+            "proposal_reason": proposal.reason,
+        },
+    )
+
+
+def _blocked_dynamic_k_action(
+    proposal: DynamicKProposal,
+    *,
+    apply_at: str,
+    reason: str,
+) -> DynamicKUpdateAction:
+    return DynamicKUpdateAction(
+        kind=proposal.kind,
+        source_ids=tuple(int(source) for source in proposal.source_ids),
+        target_id=None if proposal.target_id is None else int(proposal.target_id),
+        accepted=False,
+        slot_delta=0,
+        apply_at=apply_at,
+        reason=reason,
+        evidence={
+            **proposal.evidence,
+            "proposal_score": float(proposal.score),
+            "proposal_threshold": float(proposal.threshold),
+            "proposal_reason": proposal.reason,
+        },
+    )
+
+
 def _dynamic_k_diagnostics(proposals: list[DynamicKProposal]) -> tuple[str, ...]:
     if not proposals:
         return ("no_dynamic_k_proposals",)
     kinds = tuple(sorted({proposal.kind for proposal in proposals}))
     return tuple(f"has_{kind}" for kind in kinds)
+
+
+def _dynamic_k_update_diagnostics(
+    *,
+    current_slot_count: int,
+    next_slot_count: int,
+    accepted_count: int,
+    blocked_count: int,
+    proposal_count: int,
+) -> tuple[str, ...]:
+    flags: list[str] = ["epoch_boundary_update"]
+    if proposal_count == 0:
+        flags.append("no_dynamic_k_proposals")
+    if accepted_count > 0:
+        flags.append("has_accepted_actions")
+    if blocked_count > 0:
+        flags.append("has_blocked_actions")
+    if next_slot_count > current_slot_count:
+        flags.append("slot_count_increase")
+    elif next_slot_count < current_slot_count:
+        flags.append("slot_count_decrease")
+    else:
+        flags.append("slot_count_stable")
+    return tuple(flags)
 
 
 def _project_slot(
