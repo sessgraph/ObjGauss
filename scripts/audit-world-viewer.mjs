@@ -24,6 +24,7 @@ try {
       `debugOs=${summary.debugOs}`,
       `debugSnapshot=${summary.debugSnapshotSchema}`,
       `debugLens=${summary.debugLens}`,
+      `objectOverlay=${summary.objectOverlayMode}`,
       `debugEvents=${summary.debugEventCount}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
@@ -343,6 +344,106 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const selector = document.querySelector("[data-object-overlay-selector='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.objectOverlaySamples ?? [];
+      return (
+        shell?.getAttribute("data-object-overlay-mode") === "full" &&
+        shell?.getAttribute("data-object-overlay-bbox-visible") === "true" &&
+        shell?.getAttribute("data-object-overlay-centroid-visible") === "true" &&
+        panel?.getAttribute("data-object-overlay-mode") === "full" &&
+        selector?.getAttribute("data-selected-overlay") === "full" &&
+        world?.objectOverlayMode === "full" &&
+        world?.objectOverlayBboxVisible === true &&
+        world?.objectOverlayCentroidVisible === true &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.bboxVisible === true &&
+          sample.centroidVisible === true
+        )
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-object-overlay-button='bbox']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.objectOverlaySamples ?? [];
+      return (
+        shell?.getAttribute("data-object-overlay-mode") === "bbox" &&
+        shell?.getAttribute("data-object-overlay-bbox-visible") === "true" &&
+        shell?.getAttribute("data-object-overlay-centroid-visible") === "false" &&
+        panel?.getAttribute("data-object-overlay-mode") === "bbox" &&
+        world?.objectOverlayMode === "bbox" &&
+        world?.objectOverlayBboxVisible === true &&
+        world?.objectOverlayCentroidVisible === false &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.bboxVisible === true &&
+          sample.centroidVisible === false
+        )
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-object-overlay-button='centroid']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.objectOverlaySamples ?? [];
+      return (
+        shell?.getAttribute("data-object-overlay-mode") === "centroid" &&
+        shell?.getAttribute("data-object-overlay-bbox-visible") === "false" &&
+        shell?.getAttribute("data-object-overlay-centroid-visible") === "true" &&
+        panel?.getAttribute("data-object-overlay-mode") === "centroid" &&
+        world?.objectOverlayMode === "centroid" &&
+        world?.objectOverlayBboxVisible === false &&
+        world?.objectOverlayCentroidVisible === true &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.bboxVisible === false &&
+          sample.centroidVisible === true
+        )
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-object-overlay-button='off']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.objectOverlaySamples ?? [];
+      return (
+        shell?.getAttribute("data-object-overlay-mode") === "off" &&
+        shell?.getAttribute("data-object-overlay-bbox-visible") === "false" &&
+        shell?.getAttribute("data-object-overlay-centroid-visible") === "false" &&
+        panel?.getAttribute("data-object-overlay-mode") === "off" &&
+        world?.objectOverlayMode === "off" &&
+        world?.objectOverlayBboxVisible === false &&
+        world?.objectOverlayCentroidVisible === false &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.bboxVisible === false &&
+          sample.centroidVisible === false
+        )
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-object-overlay-button='full']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      return (
+        shell?.getAttribute("data-object-overlay-mode") === "full" &&
+        shell?.getAttribute("data-object-overlay-bbox-visible") === "true" &&
+        shell?.getAttribute("data-object-overlay-centroid-visible") === "true" &&
+        panel?.getAttribute("data-object-overlay-mode") === "full" &&
+        world?.objectOverlayMode === "full" &&
+        world?.objectOverlayBboxVisible === true &&
+        world?.objectOverlayCentroidVisible === true
+      );
+    }, undefined, { timeout: 15000 });
     const hoverSelection = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
       const result = world?.hoverObjectForAudit?.(selectionId) ?? null;
@@ -446,12 +547,16 @@ async function auditWorld(url) {
         selectedObjectId: handle.selectedObjectId,
         debugMode: handle.debugMode,
         debugLens: handle.debugLens,
+        objectOverlayMode: handle.objectOverlayMode,
+        objectOverlayBboxVisible: handle.objectOverlayBboxVisible,
+        objectOverlayCentroidVisible: handle.objectOverlayCentroidVisible,
         debugProtocol: handle.debugProtocol,
         debugSnapshotSchema: snapshot?.schema ?? null,
         debugSnapshotProtocol: snapshot?.protocol ?? null,
         debugSnapshotModel: snapshot?.model?.id ?? null,
         debugSnapshotObject: snapshot?.selection?.objectId ?? null,
         debugSnapshotLens: snapshot?.debug?.lens ?? null,
+        debugSnapshotOverlayMode: snapshot?.debug?.overlayMode ?? null,
         debugSnapshotAssignmentSource: snapshot?.assignment?.source ?? null,
         debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
@@ -526,6 +631,14 @@ async function auditWorld(url) {
     if (world.stabilityStatus !== world.dashboardStatus) {
       throw new Error(`stability dashboard mismatch: ${JSON.stringify(world)}`);
     }
+    if (
+      world.objectOverlayMode !== "full" ||
+      world.objectOverlayBboxVisible !== true ||
+      world.objectOverlayCentroidVisible !== true ||
+      world.debugSnapshotOverlayMode !== "full"
+    ) {
+      throw new Error(`expected full ObjectState overlay context: ${JSON.stringify(world)}`);
+    }
     if (!(Number(world.slotUtilization) > 0)) {
       throw new Error(`expected positive slot utilization, got ${world.slotUtilization}`);
     }
@@ -595,6 +708,7 @@ async function auditWorld(url) {
       world.panelDebugEventSchema === "objgauss-debug-event-v1" &&
       world.debugEventTypes.includes("gaussian-probe") &&
       world.debugEventTypes.includes("debug-lens") &&
+      world.debugEventTypes.includes("object-overlay") &&
       world.debugEventTypes.includes("frame-select") &&
       world.debugEventTypes.includes("hover-object") &&
       world.debugEventTypes.includes("toggle-visibility") &&
@@ -654,6 +768,7 @@ async function auditWorld(url) {
       debugOs: world.debugProtocol,
       debugSnapshotSchema: world.debugSnapshotSchema,
       debugLens: world.debugLens,
+      objectOverlayMode: world.objectOverlayMode,
       debugEventCount: world.debugEventCount,
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
@@ -1502,6 +1617,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.protocol !== "object-state-debug-os-v1" ||
         parsed?.export?.schema !== "objgauss-debug-snapshot-export-v1" ||
         parsed?.model?.id !== "model-manifest-ogc-artifact" ||
+        parsed?.debug?.overlayMode !== "full" ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
@@ -1554,6 +1670,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.export?.schema !== "objgauss-debug-session-export-v1" ||
         parsed?.snapshot?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
         parsed?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
+        parsed?.snapshot?.debug?.overlayMode !== "full" ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
@@ -1629,6 +1746,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         button?.getAttribute("data-import-status") !== "loaded" ||
         archive?.schema !== "objgauss-object-state-debug-session-v1" ||
         archive?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
+        archive?.snapshot?.debug?.overlayMode !== "full" ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||

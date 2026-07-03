@@ -21,6 +21,7 @@ const INITIAL_CAMERA = {
 const OGC_CHUNK_INDEX_SCHEMA = "objgauss-chunk-index-v1";
 const OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA = "objgauss-object-state-stability-benchmark-v1";
 const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
+const OBJECT_OVERLAY_MODES = ["full", "bbox", "centroid", "off"];
 const DEBUG_EVENT_LIMIT = 12;
 
 export default function App() {
@@ -50,6 +51,7 @@ export default function App() {
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
+  const [objectOverlayMode, setObjectOverlayMode] = useState("full");
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
     modelId: "",
@@ -126,6 +128,7 @@ export default function App() {
   );
   const selectedAssignmentSource =
     debugProbe?.source ?? selectedObject?.objectState?.source ?? selected?.delivery?.source ?? "";
+  const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const selectedOgcChunkScope =
     selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "";
@@ -144,6 +147,7 @@ export default function App() {
     selection,
     debugMode,
     debugLens,
+    objectOverlayMode: selectedObjectOverlayMode,
     debugProbe,
     hiddenCount,
     stability: selectedStability,
@@ -531,6 +535,13 @@ export default function App() {
     worldApi.current?.setDebugMode(true);
     worldApi.current?.setDebugLens(next);
   }, [recordDebugEvent]);
+
+  const selectObjectOverlayMode = useCallback((mode) => {
+    const next = normalizeObjectOverlayMode(mode);
+    setObjectOverlayMode(next);
+    recordDebugEvent("object-overlay", { lens: debugLens, source: next });
+    worldApi.current?.setObjectOverlayMode(next);
+  }, [debugLens, recordDebugEvent]);
 
   const toggleObjectVisibility = useCallback((object) => {
     if (!object?.selectionId) return;
@@ -1155,6 +1166,9 @@ export default function App() {
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
+      data-object-overlay-mode={selectedObjectOverlayMode}
+      data-object-overlay-bbox-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "bbox") ? "true" : "false"}
+      data-object-overlay-centroid-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "centroid") ? "true" : "false"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
       data-hovered-target={hoveredTarget?.selectionId ?? ""}
       data-hovered-model={hoveredTarget?.modelId ?? ""}
@@ -1241,6 +1255,7 @@ export default function App() {
         selectedTargetId={selection.selectionId || selectedId}
         debugMode={debugMode}
         debugLens={debugLens}
+        objectOverlayMode={selectedObjectOverlayMode}
         hiddenSelectionIds={hiddenObjects}
         onReady={handleWorldReady}
         onSelectObject={selectObject}
@@ -1415,6 +1430,7 @@ export default function App() {
         debugProbe={debugProbe}
         debugMode={debugMode}
         debugLens={debugLens}
+        objectOverlayMode={selectedObjectOverlayMode}
         debugEvents={debugEvents}
         debugSnapshot={selectedDebugSnapshot}
         snapshotExport={snapshotExport}
@@ -1430,6 +1446,7 @@ export default function App() {
         onSelectBenchmarkCase={setBenchmarkCaseName}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
+        onSelectObjectOverlayMode={selectObjectOverlayMode}
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
@@ -2361,6 +2378,7 @@ function ThreeWorld({
   selectedTargetId,
   debugMode,
   debugLens,
+  objectOverlayMode,
   hiddenSelectionIds,
   onReady,
   onSelectObject,
@@ -2373,6 +2391,7 @@ function ThreeWorld({
   const selectedRef = useRef(selectedTargetId);
   const debugRef = useRef(debugMode);
   const debugLensRef = useRef(normalizeDebugLens(debugLens));
+  const overlayModeRef = useRef(normalizeObjectOverlayMode(objectOverlayMode));
   const hiddenRef = useRef(hiddenSelectionIds);
   const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved, onDebugEvent });
 
@@ -2391,6 +2410,12 @@ function ThreeWorld({
     debugLensRef.current = next;
     apiRef.current?.setDebugLens(next);
   }, [debugLens]);
+
+  useEffect(() => {
+    const next = normalizeObjectOverlayMode(objectOverlayMode);
+    overlayModeRef.current = next;
+    apiRef.current?.setObjectOverlayMode(next);
+  }, [objectOverlayMode]);
 
   useEffect(() => {
     hiddenRef.current = hiddenSelectionIds;
@@ -2462,6 +2487,9 @@ function ThreeWorld({
         hoveredAssignmentSource: hoveredTarget?.assignmentSource ?? null,
         debugMode: debugRef.current,
         debugLens: debugRef.current ? debugLensRef.current : "appearance",
+        objectOverlayMode: overlayModeRef.current,
+        objectOverlayBboxVisible: debugRef.current && objectOverlayShows(overlayModeRef.current, "bbox"),
+        objectOverlayCentroidVisible: debugRef.current && objectOverlayShows(overlayModeRef.current, "centroid"),
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
         stabilitySummary: selectedStability,
@@ -2482,6 +2510,13 @@ function ThreeWorld({
             opacity: round3(cloud?.material?.opacity ?? 0),
           };
         }),
+        objectOverlaySamples: [...draggableObjects.values()].map((object) => ({
+          selectionId: object.userData.selectionId,
+          modelId: object.userData.modelId,
+          objectId: object.userData.objectId,
+          bboxVisible: objectChildVisible(object, "object-state-bbox"),
+          centroidVisible: objectChildVisible(object, "core-point"),
+        })),
         modelPositions: [...modelRoots.values()].map((object) => ({
           id: object.userData.modelId,
           position: object.position.toArray().map(round3),
@@ -2611,6 +2646,7 @@ function ThreeWorld({
       api.setSelected(selectedRef.current);
       api.setDebugMode(debugRef.current);
       api.setDebugLens(debugLensRef.current);
+      api.setObjectOverlayMode(overlayModeRef.current);
       api.setHiddenObjects(hiddenRef.current);
       return result.summary;
     };
@@ -2697,11 +2733,17 @@ function ThreeWorld({
       setDebugMode(enabled) {
         debugRef.current = Boolean(enabled);
         refreshDebugLens();
+        refreshObjectOverlay();
         publishAuditHandle();
       },
       setDebugLens(lens) {
         debugLensRef.current = normalizeDebugLens(lens);
         refreshDebugLens();
+        publishAuditHandle();
+      },
+      setObjectOverlayMode(mode) {
+        overlayModeRef.current = normalizeObjectOverlayMode(mode);
+        refreshObjectOverlay();
         publishAuditHandle();
       },
       setHover(selectionId) {
@@ -2713,6 +2755,7 @@ function ThreeWorld({
             hovered,
             debug: debugRef.current,
             lens: debugLensRef.current,
+            overlayMode: overlayModeRef.current,
           });
         }
       },
@@ -2749,6 +2792,7 @@ function ThreeWorld({
             hovered: object.userData.hovered,
             debug: debugRef.current,
             lens: debugLensRef.current,
+            overlayMode: overlayModeRef.current,
           });
         }
         publishAuditHandle();
@@ -2767,15 +2811,25 @@ function ThreeWorld({
               child.geometry.attributes.color.needsUpdate = true;
             }
           }
-          if (child.userData.role === "object-state-bbox") {
-            child.visible = Boolean(debugEnabled);
-          }
         });
         applyObjectVisualState(object, {
           selected: object.userData.selected,
           hovered: object.userData.hovered,
           debug: debugEnabled,
           lens,
+          overlayMode: overlayModeRef.current,
+        });
+      }
+    };
+
+    const refreshObjectOverlay = () => {
+      for (const object of draggableObjects.values()) {
+        applyObjectVisualState(object, {
+          selected: object.userData.selected,
+          hovered: object.userData.hovered,
+          debug: debugRef.current,
+          lens: debugLensRef.current,
+          overlayMode: overlayModeRef.current,
         });
       }
     };
@@ -2829,6 +2883,7 @@ function DebugPanel({
   debugProbe,
   debugMode,
   debugLens,
+  objectOverlayMode,
   debugEvents,
   debugSnapshot,
   snapshotExport,
@@ -2843,6 +2898,7 @@ function DebugPanel({
   benchmarkCase,
   onToggleObjectVisibility,
   onSelectDebugLens,
+  onSelectObjectOverlayMode,
   onSelectTrainableFrame,
   onSelectOgcLod,
   onSelectOgcChunks,
@@ -2875,6 +2931,9 @@ function DebugPanel({
       data-object-debug-panel="true"
       data-debug-mode={debugMode ? "assignment" : "appearance"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
+      data-object-overlay-mode={objectOverlayMode}
+      data-object-overlay-bbox-visible={debugMode && objectOverlayShows(objectOverlayMode, "bbox") ? "true" : "false"}
+      data-object-overlay-centroid-visible={debugMode && objectOverlayShows(objectOverlayMode, "centroid") ? "true" : "false"}
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
@@ -2915,6 +2974,27 @@ function DebugPanel({
             onClick={() => onSelectDebugLens?.(lens)}
           >
             {debugLensLabel(lens)}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className="trainableFrameSelector objectOverlaySelector"
+        data-object-overlay-selector="true"
+        data-selected-overlay={objectOverlayMode}
+        data-overlay-debug-enabled={debugMode ? "true" : "false"}
+      >
+        <span>overlay</span>
+        {OBJECT_OVERLAY_MODES.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={objectOverlayMode === mode ? "active" : ""}
+            data-object-overlay-button={mode}
+            data-active={objectOverlayMode === mode ? "true" : "false"}
+            onClick={() => onSelectObjectOverlayMode?.(mode)}
+          >
+            {objectOverlayLabel(mode)}
           </button>
         ))}
       </div>
@@ -3115,6 +3195,7 @@ function DebugSnapshotPanel({
       data-debug-snapshot-object={snapshot.selection.objectId ?? ""}
       data-debug-snapshot-gaussian={snapshot.selection.gaussianIndex ?? ""}
       data-debug-snapshot-lens={snapshot.debug.lens}
+      data-debug-snapshot-overlay-mode={snapshot.debug.overlayMode}
       data-debug-snapshot-source={snapshot.assignment.source}
       data-debug-snapshot-slots={snapshot.assignment.slotCount}
       data-debug-snapshot-stability={snapshot.stability.status}
@@ -3164,6 +3245,7 @@ function DebugSnapshotPanel({
         <Meta label="model" value={snapshot.model.id} />
         <Meta label="object" value={snapshot.selection.objectId ?? "-"} />
         <Meta label="lens" value={snapshot.debug.lens} />
+        <Meta label="overlay" value={snapshot.debug.overlayMode} />
         <Meta label="slots" value={formatCount(snapshot.assignment.slotCount)} />
         <Meta label="source" value={snapshot.assignment.source} />
         <Meta label="state" value={snapshot.stability.status} />
@@ -4146,6 +4228,14 @@ function objectGaussianCount(object) {
   return cloud?.userData?.gaussianDebug?.length ?? cloud?.geometry?.attributes?.position?.count ?? 0;
 }
 
+function objectChildVisible(object, role) {
+  let visible = false;
+  object?.traverse?.((child) => {
+    if (child.userData?.role === role && child.visible !== false) visible = true;
+  });
+  return visible;
+}
+
 function gaussianProbeFromIntersection(intersection) {
   if (!intersection?.object?.userData || intersection.index === undefined) return null;
   if (intersection.object.userData.role !== "gaussian-cloud") return null;
@@ -4165,9 +4255,15 @@ function colorAttributeForDebugLens(cloud, lens, debugEnabled = true) {
   return cloud.userData.assignmentColor;
 }
 
-function applyObjectVisualState(object, { selected = false, hovered = false, debug = true, lens = "assignment" } = {}) {
+function applyObjectVisualState(
+  object,
+  { selected = false, hovered = false, debug = true, lens = "assignment", overlayMode = "full" } = {},
+) {
   const selectedOrHovered = Boolean(selected || hovered);
   const normalizedLens = normalizeDebugLens(lens);
+  const normalizedOverlay = normalizeObjectOverlayMode(overlayMode);
+  const showBbox = Boolean(debug && objectOverlayShows(normalizedOverlay, "bbox"));
+  const showCentroid = Boolean(debug && objectOverlayShows(normalizedOverlay, "centroid"));
   object.traverse((child) => {
     if (child.userData.role === "gaussian-cloud") {
       const baseSize = child.userData.basePointSize ?? child.material.size;
@@ -4179,9 +4275,16 @@ function applyObjectVisualState(object, { selected = false, hovered = false, deb
       child.material.needsUpdate = true;
     }
     if (child.userData.role === "object-state-bbox") {
+      child.visible = showBbox;
       child.material.opacity = selected ? 0.86 : hovered ? 0.72 : 0.34;
     }
-    if (child.userData.role === "selection-ring" || child.userData.role === "core-glow") {
+    if (child.userData.role === "core-point") {
+      child.visible = showCentroid;
+    }
+    if (child.userData.role === "core-glow") {
+      child.visible = selectedOrHovered && showCentroid;
+    }
+    if (child.userData.role === "selection-ring") {
       child.visible = selectedOrHovered;
     }
   });
@@ -4230,6 +4333,25 @@ function normalizedEntropy(probabilities) {
 function normalizeDebugLens(lens) {
   const value = String(lens ?? "assignment");
   return DEBUG_LENSES.includes(value) ? value : "assignment";
+}
+
+function normalizeObjectOverlayMode(mode) {
+  const value = String(mode ?? "full");
+  return OBJECT_OVERLAY_MODES.includes(value) ? value : "full";
+}
+
+function objectOverlayShows(mode, target) {
+  const normalized = normalizeObjectOverlayMode(mode);
+  if (normalized === "off") return false;
+  if (normalized === "full") return true;
+  return normalized === target;
+}
+
+function objectOverlayLabel(mode) {
+  if (mode === "bbox") return "bbox";
+  if (mode === "centroid") return "center";
+  if (mode === "off") return "off";
+  return "full";
 }
 
 function debugLensLabel(lens) {
@@ -4778,6 +4900,7 @@ function objectStateDebugSnapshot({
   selection,
   debugMode,
   debugLens,
+  objectOverlayMode,
   debugProbe,
   hiddenCount,
   stability,
@@ -4811,6 +4934,9 @@ function objectStateDebugSnapshot({
     debug: {
       enabled: Boolean(debugMode),
       lens: debugMode ? normalizeDebugLens(debugLens) : "appearance",
+      overlayMode: normalizeObjectOverlayMode(objectOverlayMode),
+      overlayBboxVisible: Boolean(debugMode && objectOverlayShows(objectOverlayMode, "bbox")),
+      overlayCentroidVisible: Boolean(debugMode && objectOverlayShows(objectOverlayMode, "centroid")),
       probeSource: debugProbe?.source ?? activeState?.source ?? "none",
     },
     assignment: {
@@ -4965,6 +5091,9 @@ function validateDebugSessionArchive(session, path = "") {
       debug: {
         enabled: Boolean(snapshot.debug?.enabled),
         lens: normalizeDebugLens(snapshot.debug?.lens),
+        overlayMode: normalizeObjectOverlayMode(snapshot.debug?.overlayMode),
+        overlayBboxVisible: Boolean(snapshot.debug?.overlayBboxVisible),
+        overlayCentroidVisible: Boolean(snapshot.debug?.overlayCentroidVisible),
         probeSource: cleanString(snapshot.debug?.probeSource),
       },
       assignment: {
@@ -5190,6 +5319,7 @@ function compactDebugEvents(events) {
 function debugEventDetailLabel(event) {
   if (!event) return "-";
   if (event.type === "debug-lens") return event.lens || "-";
+  if (event.type === "object-overlay") return event.source || "-";
   if (event.type === "frame-select") return event.frameIndex === null ? "frame -" : `f${event.frameIndex}`;
   if (event.type === "gaussian-probe") return event.gaussianIndex === null ? "G -" : `G${event.gaussianIndex}`;
   if (event.type === "toggle-visibility") return event.visible ? "visible" : "hidden";

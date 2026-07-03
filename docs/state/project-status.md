@@ -400,6 +400,16 @@ session archive；`scripts/audit-world-viewer.mjs` 验证默认 `uniform_mixed` 
 active case 摘要。该切片只增强 browser Debug OS，不改变 benchmark 生成逻辑、
 solver、renderer、训练 loop，不引入 torch / gsplat / CUDA。
 
+`OBJECTSTATE-OVERLAY-CONTROLS-001` 已将已有 centroid sphere / bbox wireframe 升级为
+可控、可审计的 ObjectState overlay 层：`src/App.jsx` 新增 `full` / `bbox` /
+`centroid` / `off` overlay selector，控制 Three.js scene 中 `object-state-bbox` 和
+`core-point` 的可见性，同时保持 Gaussian 点云、selection ring 和 object toggle 行为不变。
+overlay mode 写入 root telemetry、`window.__OBJGAUSS_WORLD__` audit handle 和
+debug snapshot / session archive；`scripts/audit-world-viewer.mjs` 验证四种模式下 bbox /
+centroid child visibility，输出 `objectOverlay=full`。该切片只强化 Phase 1 Layer 2
+调试仪器，不改变 renderer、solver、artifact schema、训练 loop，也不引入 torch /
+gsplat / CUDA。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

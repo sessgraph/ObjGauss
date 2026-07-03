@@ -78,6 +78,31 @@
 
 ## Done
 
+### OBJECTSTATE-OVERLAY-CONTROLS-001: Auditable ObjectState overlay controls
+
+- 状态: done / objectstate-overlay-layer-controls
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将已有 centroid sphere / bbox wireframe 从隐式 scene decoration 升级为可切换、
+  可审计的 ObjectState overlay 层，强化 Phase 1 的 “ObjectState visualization layer”。
+- 已实施:
+  - `src/App.jsx` 新增 `objectOverlayMode`，支持 `full` / `bbox` / `centroid` / `off`。
+  - ObjectState Debug panel 新增 overlay segmented control；ThreeWorld 根据该模式控制
+    `object-state-bbox` 和 `core-point` 可见性，selection ring 与 Gaussian cluster 仍保持独立。
+  - root `.worldShell`、`window.__OBJGAUSS_WORLD__` 和 debug snapshot / session archive
+    记录 overlay mode、bbox visibility 和 centroid visibility。
+  - `scripts/audit-world-viewer.mjs` 验证 `full`、`bbox`、`centroid`、`off` 四种模式下
+    Three.js child visibility 与 DOM telemetry 一致，并要求最终输出 `objectOverlay=full`。
+- 边界:
+  - 不改变 Gaussian renderer、ObjectState projection、assignment matrix、artifact schema 或 OGC decoder。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `objectOverlay=full`。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-BENCH-CASE-INSPECT-001: Case-level ObjectState benchmark inspector
 
 - 状态: done / benchmark-case-drilldown-debug-os
