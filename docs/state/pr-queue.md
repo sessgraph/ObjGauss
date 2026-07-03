@@ -107,7 +107,7 @@
     `objectTemporal=stable`、`hoverTemporal=stable`、`objectContinuity=continuous`
     和 `hoverContinuity=continuous`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `cf014ae`
 
 ### OBJECTSTATE-CONTINUITY-001: Auditable ObjectState spatial continuity
 
