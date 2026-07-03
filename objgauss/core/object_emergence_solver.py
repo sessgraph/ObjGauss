@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from objgauss.core.object_state import (
 OBJECT_EMERGENCE_MODEL_SCHEMA = "objgauss-object-emergence-model-v1"
 OBJECT_EMERGENCE_SOLVER_STATE_SCHEMA = "objgauss-object-emergence-solver-state-v1"
 OBJECT_EMERGENCE_ASSIGNMENT_SCHEMA = "objgauss-object-emergence-assignment-v1"
+OBJECT_EMERGENCE_TRAINING_SCHEMA = "objgauss-object-emergence-solver-training-v1"
 _EPS = 1e-8
 
 
@@ -149,6 +150,82 @@ class ObjectEmergenceAssignmentPrediction:
         return payload
 
 
+@dataclass(frozen=True)
+class ObjectEmergenceSolverLoss:
+    iteration: int
+    total_loss: float
+    assignment_loss: float
+    entropy_loss: float
+    balance_loss: float
+    temporal_loss: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "iteration": int(self.iteration),
+            "total_loss": float(self.total_loss),
+            "assignment_loss": float(self.assignment_loss),
+            "entropy_loss": float(self.entropy_loss),
+            "balance_loss": float(self.balance_loss),
+            "temporal_loss": float(self.temporal_loss),
+        }
+
+
+@dataclass(frozen=True)
+class ObjectEmergenceSolverTrainingResult:
+    schema: str
+    initial_state: ObjectEmergenceSolverState
+    final_state: ObjectEmergenceSolverState
+    initial_loss: ObjectEmergenceSolverLoss
+    final_loss: ObjectEmergenceSolverLoss
+    history: tuple[ObjectEmergenceSolverLoss, ...]
+    predictions: tuple[ObjectEmergenceAssignmentPrediction, ...]
+    assignment_weight: float
+    entropy_weight: float
+    balance_weight: float
+    temporal_weight: float
+    learning_rate: float
+    iterations: int
+    finite_difference_epsilon: float
+
+    def as_dict(self, *, include_weights: bool = False, include_assignments: bool = False) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "kind": "object_emergence_solver_training",
+            "iterations": int(self.iterations),
+            "learning_rate": float(self.learning_rate),
+            "finite_difference_epsilon": float(self.finite_difference_epsilon),
+            "weights": {
+                "assignment": float(self.assignment_weight),
+                "entropy": float(self.entropy_weight),
+                "balance": float(self.balance_weight),
+                "temporal": float(self.temporal_weight),
+            },
+            "initial_loss": self.initial_loss.as_dict(),
+            "final_loss": self.final_loss.as_dict(),
+            "loss_decreased": bool(self.final_loss.total_loss < self.initial_loss.total_loss),
+            "assignment_loss_decreased": bool(
+                self.final_loss.assignment_loss < self.initial_loss.assignment_loss
+            ),
+            "balance_loss_decreased": bool(
+                self.final_loss.balance_loss < self.initial_loss.balance_loss
+            ),
+            "initial_solver_state": self.initial_state.as_dict(include_weights=include_weights),
+            "final_solver_state": self.final_state.as_dict(include_weights=include_weights),
+            "history": [loss.as_dict() for loss in self.history],
+            "predictions": [
+                prediction.as_dict(include_assignment=include_assignments)
+                for prediction in self.predictions
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class _SolverTrainingEval:
+    state: ObjectEmergenceSolverState
+    loss: ObjectEmergenceSolverLoss
+    predictions: tuple[ObjectEmergenceAssignmentPrediction, ...]
+
+
 def evidence_from_gaussian_cloud(
     cloud: GaussianCloud,
     *,
@@ -163,6 +240,33 @@ def evidence_from_gaussian_cloud(
         frame_index=frame_index,
         source=source or "gaussian_cloud",
     )
+
+
+def object_id_targets_from_cloud(
+    cloud: GaussianCloud,
+    *,
+    object_id_field: str = "object_id",
+    slots: int | None = None,
+) -> tuple[np.ndarray, dict[int, int]]:
+    if object_id_field not in cloud.fields:
+        raise ValueError(f"cloud is missing object id field: {object_id_field}")
+    object_ids = np.asarray(cloud.vertices[object_id_field], dtype=np.int64)
+    unique_ids = tuple(int(value) for value in np.unique(object_ids))
+    if slots is None:
+        resolved_slots = len(unique_ids)
+    else:
+        resolved_slots = int(slots)
+        if resolved_slots < len(unique_ids):
+            raise ValueError(
+                f"slots={resolved_slots} cannot represent {len(unique_ids)} unique object ids"
+            )
+    if resolved_slots < 1:
+        raise ValueError("slots must be >= 1")
+    mapping = {object_id: index for index, object_id in enumerate(unique_ids)}
+    targets = np.zeros((object_ids.shape[0], resolved_slots), dtype=np.float32)
+    for row, object_id in enumerate(object_ids):
+        targets[row, mapping[int(object_id)]] = 1.0
+    return targets, mapping
 
 
 def initialize_object_emergence_solver(
@@ -193,6 +297,129 @@ def initialize_object_emergence_solver(
         position_weights=position_weights,
         bias=bias,
         source="random_linear_softmax_init",
+    )
+
+
+def train_object_emergence_solver(
+    evidence_frames: Sequence[ObjectEmergenceEvidence],
+    *,
+    slots: int | None = None,
+    initial_state: ObjectEmergenceSolverState | None = None,
+    iterations: int = 40,
+    learning_rate: float = 0.35,
+    assignment_weight: float = 1.0,
+    entropy_weight: float = 0.01,
+    balance_weight: float = 0.05,
+    temporal_weight: float = 0.02,
+    finite_difference_epsilon: float = 1e-3,
+    seed: int = 0,
+    record_every: int | None = None,
+) -> ObjectEmergenceSolverTrainingResult:
+    frames = _validate_training_frames(evidence_frames)
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
+    if learning_rate <= 0:
+        raise ValueError("learning_rate must be > 0")
+    if finite_difference_epsilon <= 0:
+        raise ValueError("finite_difference_epsilon must be > 0")
+    for name, weight in {
+        "assignment_weight": assignment_weight,
+        "entropy_weight": entropy_weight,
+        "balance_weight": balance_weight,
+        "temporal_weight": temporal_weight,
+    }.items():
+        if weight < 0:
+            raise ValueError(f"{name} must be >= 0")
+    if assignment_weight > 0 and not all(frame.target_assignment is not None for frame in frames):
+        raise ValueError("assignment_weight requires every evidence frame to bind target_assignment")
+
+    state = initial_state
+    if state is None:
+        resolved_slots = _resolve_training_slots(frames, slots=slots)
+        state = initialize_object_emergence_solver(
+            slots=resolved_slots,
+            feature_dim=frames[0].feature_dim,
+            seed=seed,
+        )
+    state = validate_object_emergence_solver_state(state)
+    for frame in frames:
+        validate_object_emergence_evidence(frame, slots=state.config.slots)
+        if frame.feature_dim != state.config.feature_dim:
+            raise ValueError("all evidence feature dimensions must match solver state")
+    params = _pack_solver_state(state)
+    record_stride = iterations if record_every is None else max(1, int(record_every))
+    history: list[ObjectEmergenceSolverLoss] = []
+
+    initial_eval = _evaluate_solver_training(
+        frames,
+        state,
+        iteration=0,
+        assignment_weight=assignment_weight,
+        entropy_weight=entropy_weight,
+        balance_weight=balance_weight,
+        temporal_weight=temporal_weight,
+    )
+    history.append(initial_eval.loss)
+    for iteration in range(1, iterations + 1):
+        gradient = _finite_difference_solver_gradient(
+            params,
+            state,
+            frames,
+            iteration=iteration - 1,
+            epsilon=finite_difference_epsilon,
+            assignment_weight=assignment_weight,
+            entropy_weight=entropy_weight,
+            balance_weight=balance_weight,
+            temporal_weight=temporal_weight,
+        )
+        params = np.clip(params - learning_rate * gradient, -25.0, 25.0)
+        state = _unpack_solver_state(
+            params,
+            template=state,
+            step=iteration,
+            source="trained_numpy_finite_difference",
+        )
+        if iteration == iterations or iteration % record_stride == 0:
+            history.append(
+                _evaluate_solver_training(
+                    frames,
+                    state,
+                    iteration=iteration,
+                    assignment_weight=assignment_weight,
+                    entropy_weight=entropy_weight,
+                    balance_weight=balance_weight,
+                    temporal_weight=temporal_weight,
+                ).loss
+            )
+
+    final_eval = _evaluate_solver_training(
+        frames,
+        state,
+        iteration=iterations,
+        assignment_weight=assignment_weight,
+        entropy_weight=entropy_weight,
+        balance_weight=balance_weight,
+        temporal_weight=temporal_weight,
+    )
+    if history[-1].iteration != iterations:
+        history.append(final_eval.loss)
+    else:
+        history[-1] = final_eval.loss
+    return ObjectEmergenceSolverTrainingResult(
+        schema=OBJECT_EMERGENCE_TRAINING_SCHEMA,
+        initial_state=initial_eval.state,
+        final_state=state,
+        initial_loss=initial_eval.loss,
+        final_loss=final_eval.loss,
+        history=tuple(history),
+        predictions=final_eval.predictions,
+        assignment_weight=float(assignment_weight),
+        entropy_weight=float(entropy_weight),
+        balance_weight=float(balance_weight),
+        temporal_weight=float(temporal_weight),
+        learning_rate=float(learning_rate),
+        iterations=int(iterations),
+        finite_difference_epsilon=float(finite_difference_epsilon),
     )
 
 
@@ -296,6 +523,227 @@ def validate_object_emergence_solver_state(
     return state
 
 
+def _validate_training_frames(
+    evidence_frames: Sequence[ObjectEmergenceEvidence],
+) -> tuple[ObjectEmergenceEvidence, ...]:
+    frames = tuple(evidence_frames)
+    if not frames:
+        raise ValueError("evidence_frames must contain at least one frame")
+    first_positions, first_features, _first_target = validate_object_emergence_evidence(frames[0])
+    for frame in frames[1:]:
+        positions_array, features_array, _target = validate_object_emergence_evidence(frame)
+        if positions_array.shape[0] != first_positions.shape[0]:
+            raise ValueError("all evidence frames must have the same evidence_count")
+        if features_array.shape[1] != first_features.shape[1]:
+            raise ValueError("all evidence frames must have the same feature_dim")
+    return frames
+
+
+def _resolve_training_slots(
+    frames: tuple[ObjectEmergenceEvidence, ...],
+    *,
+    slots: int | None,
+) -> int:
+    target_slots = {
+        int(frame.target_assignment.shape[1])
+        for frame in frames
+        if frame.target_assignment is not None
+    }
+    if slots is not None:
+        resolved = int(slots)
+        if resolved < 1:
+            raise ValueError("slots must be >= 1")
+        if target_slots and target_slots != {resolved}:
+            raise ValueError("slots must match target_assignment slot count")
+        return resolved
+    if len(target_slots) == 1:
+        return target_slots.pop()
+    if len(target_slots) > 1:
+        raise ValueError("all target_assignment slot counts must match")
+    raise ValueError("slots is required when evidence has no target_assignment")
+
+
+def _evaluate_solver_training(
+    frames: tuple[ObjectEmergenceEvidence, ...],
+    state: ObjectEmergenceSolverState,
+    *,
+    iteration: int,
+    assignment_weight: float,
+    entropy_weight: float,
+    balance_weight: float,
+    temporal_weight: float,
+) -> _SolverTrainingEval:
+    predictions = tuple(predict_object_emergence_assignment(frame, state) for frame in frames)
+    assignment_loss = _assignment_cross_entropy_loss(frames, predictions)
+    entropy_loss = float(np.mean([prediction.mean_normalized_entropy for prediction in predictions]))
+    balance_loss = _balance_loss(predictions)
+    temporal_loss = _temporal_centroid_loss(frames, predictions)
+    total = (
+        assignment_weight * assignment_loss
+        + entropy_weight * entropy_loss
+        + balance_weight * balance_loss
+        + temporal_weight * temporal_loss
+    )
+    return _SolverTrainingEval(
+        state=state,
+        predictions=predictions,
+        loss=ObjectEmergenceSolverLoss(
+            iteration=int(iteration),
+            total_loss=float(total),
+            assignment_loss=float(assignment_loss),
+            entropy_loss=float(entropy_loss),
+            balance_loss=float(balance_loss),
+            temporal_loss=float(temporal_loss),
+        ),
+    )
+
+
+def _assignment_cross_entropy_loss(
+    frames: tuple[ObjectEmergenceEvidence, ...],
+    predictions: tuple[ObjectEmergenceAssignmentPrediction, ...],
+) -> float:
+    losses: list[float] = []
+    for frame, prediction in zip(frames, predictions):
+        if frame.target_assignment is None:
+            continue
+        target = validate_assignment_matrix(
+            frame.target_assignment,
+            evidence_count=prediction.evidence_count,
+        )
+        losses.append(float(-np.mean(np.sum(target * np.log(np.clip(prediction.assignment, _EPS, 1.0)), axis=1))))
+    return float(np.mean(losses)) if losses else 0.0
+
+
+def _balance_loss(predictions: tuple[ObjectEmergenceAssignmentPrediction, ...]) -> float:
+    losses: list[float] = []
+    for prediction in predictions:
+        if prediction.evidence_count == 0:
+            continue
+        mass_fraction = prediction.slot_mass / max(float(prediction.evidence_count), _EPS)
+        target = np.full(prediction.slots, 1.0 / float(prediction.slots), dtype=np.float32)
+        losses.append(float(np.mean((mass_fraction - target) ** 2)))
+    return float(np.mean(losses)) if losses else 0.0
+
+
+def _temporal_centroid_loss(
+    frames: tuple[ObjectEmergenceEvidence, ...],
+    predictions: tuple[ObjectEmergenceAssignmentPrediction, ...],
+) -> float:
+    if len(frames) < 2:
+        return 0.0
+    losses: list[float] = []
+    previous = _prediction_centroids(frames[0], predictions[0])
+    for frame, prediction in zip(frames[1:], predictions[1:]):
+        current = _prediction_centroids(frame, prediction)
+        losses.append(float(np.mean((current - previous) ** 2)))
+        previous = current
+    return float(np.mean(losses)) if losses else 0.0
+
+
+def _prediction_centroids(
+    frame: ObjectEmergenceEvidence,
+    prediction: ObjectEmergenceAssignmentPrediction,
+) -> np.ndarray:
+    positions_array, _features, _target = validate_object_emergence_evidence(
+        frame,
+        slots=prediction.slots,
+    )
+    mass = np.maximum(prediction.slot_mass.astype(np.float32), _EPS)
+    return ((prediction.assignment.T @ positions_array) / mass[:, None]).astype(np.float32, copy=False)
+
+
+def _finite_difference_solver_gradient(
+    params: np.ndarray,
+    template: ObjectEmergenceSolverState,
+    frames: tuple[ObjectEmergenceEvidence, ...],
+    *,
+    iteration: int,
+    epsilon: float,
+    assignment_weight: float,
+    entropy_weight: float,
+    balance_weight: float,
+    temporal_weight: float,
+) -> np.ndarray:
+    gradient = np.zeros_like(params, dtype=np.float32)
+    for index in range(params.shape[0]):
+        plus = params.copy()
+        minus = params.copy()
+        plus[index] += epsilon
+        minus[index] -= epsilon
+        plus_loss = _evaluate_solver_training(
+            frames,
+            _unpack_solver_state(
+                plus,
+                template=template,
+                step=iteration,
+                source=template.source,
+            ),
+            iteration=iteration,
+            assignment_weight=assignment_weight,
+            entropy_weight=entropy_weight,
+            balance_weight=balance_weight,
+            temporal_weight=temporal_weight,
+        ).loss.total_loss
+        minus_loss = _evaluate_solver_training(
+            frames,
+            _unpack_solver_state(
+                minus,
+                template=template,
+                step=iteration,
+                source=template.source,
+            ),
+            iteration=iteration,
+            assignment_weight=assignment_weight,
+            entropy_weight=entropy_weight,
+            balance_weight=balance_weight,
+            temporal_weight=temporal_weight,
+        ).loss.total_loss
+        gradient[index] = (plus_loss - minus_loss) / (2.0 * epsilon)
+    return gradient
+
+
+def _pack_solver_state(state: ObjectEmergenceSolverState) -> np.ndarray:
+    state = validate_object_emergence_solver_state(state)
+    return np.concatenate(
+        [
+            state.feature_weights.reshape(-1),
+            state.position_weights.reshape(-1),
+            state.bias.reshape(-1),
+        ]
+    ).astype(np.float32, copy=False)
+
+
+def _unpack_solver_state(
+    params: np.ndarray,
+    *,
+    template: ObjectEmergenceSolverState,
+    step: int,
+    source: str,
+) -> ObjectEmergenceSolverState:
+    params = np.asarray(params, dtype=np.float32)
+    feature_size = template.config.feature_dim * template.config.slots
+    position_size = template.config.position_dim * template.config.slots
+    expected_size = feature_size + position_size + template.config.slots
+    if params.ndim != 1 or params.shape[0] != expected_size:
+        raise ValueError("packed solver params have unexpected shape")
+    feature_end = feature_size
+    position_end = feature_end + position_size
+    return replace(
+        template,
+        feature_weights=params[:feature_end].reshape(
+            template.config.feature_dim,
+            template.config.slots,
+        ).astype(np.float32, copy=True),
+        position_weights=params[feature_end:position_end].reshape(
+            template.config.position_dim,
+            template.config.slots,
+        ).astype(np.float32, copy=True),
+        bias=params[position_end:].astype(np.float32, copy=True),
+        step=int(step),
+        source=source,
+    )
+
+
 def _validate_solver_config(config: ObjectEmergenceSolverConfig) -> None:
     if config.slots < 1:
         raise ValueError("slots must be >= 1")
@@ -364,4 +812,3 @@ def _prediction_diagnostics(
     if not diagnostics:
         diagnostics.append("ok")
     return tuple(diagnostics)
-

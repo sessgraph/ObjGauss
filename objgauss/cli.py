@@ -79,6 +79,11 @@ from objgauss.core.trainable_kernel import (
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
 )
+from objgauss.core.object_emergence_solver import (
+    evidence_from_gaussian_cloud,
+    object_id_targets_from_cloud,
+    train_object_emergence_solver,
+)
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
@@ -1267,6 +1272,103 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         raise ValueError("trainable kernel sample loss did not decrease")
 
 
+def _training_object_emergence_solver(args: argparse.Namespace) -> None:
+    source_cloud = read_ply(args.input)
+    sampled_cloud = _sample_training_cloud(
+        source_cloud,
+        max_points=args.max_points,
+        object_id_field=args.object_id_field,
+        seed=args.seed,
+    )
+    targets, mapping = object_id_targets_from_cloud(
+        sampled_cloud,
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+    )
+    evidence = evidence_from_gaussian_cloud(
+        sampled_cloud,
+        target_assignment=targets,
+        source=f"object_id_field:{args.object_id_field}",
+    )
+    result = train_object_emergence_solver(
+        [evidence],
+        slots=args.slots,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        assignment_weight=args.assignment_weight,
+        entropy_weight=args.entropy_weight,
+        balance_weight=args.balance_weight,
+        temporal_weight=args.temporal_weight,
+        finite_difference_epsilon=args.finite_difference_epsilon,
+        seed=args.seed,
+        record_every=args.record_every,
+    )
+    summary = {
+        **result.as_dict(include_weights=args.include_weights),
+        "input": str(args.input),
+        "source_gaussians": source_cloud.count,
+        "sampled_gaussians": sampled_cloud.count,
+        "target_source": f"{args.object_id_field}_one_hot_targets",
+        "object_id_mapping": {str(object_id): slot for object_id, slot in mapping.items()},
+        "gpu_policy": {
+            "uses_gpu": False,
+            "full_renderer_training": "suspended_until_torch_gsplat_cuda_available",
+            "vram_reserve_gb": 1,
+        },
+    }
+    print(f"schema={summary['schema']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={source_cloud.count}")
+    print(f"sampled_gaussians={sampled_cloud.count}")
+    print(f"slots={result.final_state.config.slots}")
+    print(f"iterations={result.iterations}")
+    print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
+    print(f"final_total_loss={result.final_loss.total_loss:.6f}")
+    print(f"initial_assignment_loss={result.initial_loss.assignment_loss:.6f}")
+    print(f"final_assignment_loss={result.final_loss.assignment_loss:.6f}")
+    print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
+    print(f"assignment_loss_decreased={str(summary['assignment_loss_decreased']).lower()}")
+    print("gpu_used=false")
+    print("vram_reserve_gb=1")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_loss_decrease and not summary["loss_decreased"]:
+        raise ValueError("object emergence solver loss did not decrease")
+
+
+def _sample_training_cloud(
+    cloud,
+    *,
+    max_points: int | None,
+    object_id_field: str,
+    seed: int,
+):
+    if max_points is None or cloud.count <= max_points:
+        return cloud
+    if max_points < 1:
+        raise ValueError("max_points must be >= 1")
+    rng = np.random.default_rng(seed)
+    if object_id_field not in cloud.fields:
+        selected = np.sort(rng.choice(cloud.count, size=max_points, replace=False))
+        return cloud.with_vertices(cloud.vertices[selected])
+    object_ids = np.asarray(cloud.vertices[object_id_field])
+    selected: list[int] = []
+    unique_ids = tuple(np.unique(object_ids))
+    per_object = max(1, max_points // max(1, len(unique_ids)))
+    for object_id in unique_ids:
+        indices = np.flatnonzero(object_ids == object_id)
+        take = min(indices.shape[0], per_object)
+        selected.extend(rng.choice(indices, size=take, replace=False).astype(int).tolist())
+    remaining = max_points - len(selected)
+    if remaining > 0:
+        pool = np.setdiff1d(np.arange(cloud.count), np.asarray(selected, dtype=np.int64), assume_unique=False)
+        if pool.size:
+            selected.extend(rng.choice(pool, size=min(remaining, pool.size), replace=False).astype(int).tolist())
+    selected_indices = np.asarray(sorted(set(selected))[:max_points], dtype=np.int64)
+    return cloud.with_vertices(cloud.vertices[selected_indices])
+
+
 def _evaluate_training_renderer_api(
     frames,
     assignments,
@@ -2233,6 +2335,28 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     kernel_sample.add_argument("--require-loss-decrease", action="store_true")
     kernel_sample.set_defaults(handler=_training_kernel_sample)
+
+    object_emergence_solver = training_subparsers.add_parser(
+        "object-emergence-solver",
+        help="train the dependency-free Object Emergence Solver on object_id targets",
+    )
+    object_emergence_solver.add_argument("input", type=Path)
+    object_emergence_solver.add_argument("--slots", type=int)
+    object_emergence_solver.add_argument("--object-id-field", default="object_id")
+    object_emergence_solver.add_argument("--max-points", type=int, default=64)
+    object_emergence_solver.add_argument("--iterations", type=int, default=30)
+    object_emergence_solver.add_argument("--learning-rate", type=float, default=0.35)
+    object_emergence_solver.add_argument("--assignment-weight", type=float, default=1.0)
+    object_emergence_solver.add_argument("--entropy-weight", type=float, default=0.01)
+    object_emergence_solver.add_argument("--balance-weight", type=float, default=0.05)
+    object_emergence_solver.add_argument("--temporal-weight", type=float, default=0.0)
+    object_emergence_solver.add_argument("--finite-difference-epsilon", type=float, default=1e-3)
+    object_emergence_solver.add_argument("--seed", type=int, default=0)
+    object_emergence_solver.add_argument("--record-every", type=int)
+    object_emergence_solver.add_argument("--summary-output", type=Path)
+    object_emergence_solver.add_argument("--include-weights", action="store_true")
+    object_emergence_solver.add_argument("--require-loss-decrease", action="store_true")
+    object_emergence_solver.set_defaults(handler=_training_object_emergence_solver)
 
     renderer_loss_contract = training_subparsers.add_parser(
         "renderer-loss-contract",

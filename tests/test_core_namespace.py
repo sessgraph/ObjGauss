@@ -10,6 +10,7 @@ from objgauss.core import (
     ObjectState,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
+    ObjectEmergenceSolverTrainingResult,
     ObjectEmergenceSolverState,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
@@ -41,12 +42,14 @@ from objgauss.core import (
     match_object_states,
     object_state_delivery_summary,
     object_state_stability_report,
+    object_id_targets_from_cloud,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
     project_object_states_from_field,
     read_ply,
     renderer_loss_boundary_report,
     train_kernel_mvp,
+    train_object_emergence_solver,
     train_kernel_mvp_from_cloud,
     trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
@@ -192,6 +195,20 @@ def test_core_namespace_exposes_object_emergence_solver_abi():
     )
     assert isinstance(projection.states[0], ObjectState)
     assert projection.states[0].status == "active"
+    targets, mapping = object_id_targets_from_cloud(_tiny_object_cloud())
+    train_evidence = evidence_from_gaussian_cloud(_tiny_object_cloud(), target_assignment=targets)
+    training = train_object_emergence_solver(
+        [train_evidence],
+        iterations=2,
+        learning_rate=0.25,
+        assignment_weight=1.0,
+        entropy_weight=0.0,
+        balance_weight=0.0,
+        temporal_weight=0.0,
+        seed=2,
+    )
+    assert isinstance(training, ObjectEmergenceSolverTrainingResult)
+    assert mapping == {0: 0, 1: 1}
 
 
 def test_core_namespace_exposes_property_append_helper():

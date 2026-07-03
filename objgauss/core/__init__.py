@@ -31,9 +31,17 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "ObjectEmergenceSolverConfig",
     ),
+    "ObjectEmergenceSolverLoss": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceSolverLoss",
+    ),
     "ObjectEmergenceSolverState": (
         "objgauss.core.object_emergence_solver",
         "ObjectEmergenceSolverState",
+    ),
+    "ObjectEmergenceSolverTrainingResult": (
+        "objgauss.core.object_emergence_solver",
+        "ObjectEmergenceSolverTrainingResult",
     ),
     "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA": (
         "objgauss.core.object_state_benchmark",
@@ -126,6 +134,10 @@ _EXPORTS = {
         "object_state_stability_benchmark",
     ),
     "object_state_stability_report": ("objgauss.core.object_state", "object_state_stability_report"),
+    "object_id_targets_from_cloud": (
+        "objgauss.core.object_emergence_solver",
+        "object_id_targets_from_cloud",
+    ),
     "predict_object_emergence_assignment": (
         "objgauss.core.object_emergence_solver",
         "predict_object_emergence_assignment",
@@ -149,6 +161,10 @@ _EXPORTS = {
         "image_target_contract_summary",
     ),
     "train_kernel_mvp": ("objgauss.core.trainable_kernel", "train_kernel_mvp"),
+    "train_object_emergence_solver": (
+        "objgauss.core.object_emergence_solver",
+        "train_object_emergence_solver",
+    ),
     "train_kernel_mvp_from_cloud": (
         "objgauss.core.trainable_kernel",
         "train_kernel_mvp_from_cloud",
