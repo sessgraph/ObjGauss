@@ -324,6 +324,16 @@ top-level `objgauss-object-state-debug-snapshot-v1` / `object-state-debug-os-v1`
 model、quality status、chunk scope、schema 和 `export-snapshot` event trace。该步骤
 不训练模型、不写训练输出、不复制 OGC payload 或 ignored `outputs/` 到仓库。
 
+`DEBUG-SESSION-EXPORT-001` 已把单帧 snapshot export 扩展为 browser-local debug session
+handoff：`src/App.jsx` 的 `Protocol` 面板新增 `SESSION` 导出按钮，导出
+`objgauss-object-state-debug-session-v1`，其中包含当前 snapshot、compact model delivery
+summary、recent debug events、quality gate evidence 和 browser-local-only export policy。
+root shell 同步暴露 `data-debug-session-*` telemetry，浏览器会话中保留
+`window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION__` 与 JSON 文本。`scripts/audit-world-viewer.mjs`
+现在在组合 algorithm manifest 场景中验证 `debugSessionExport=exported`、session schema、
+model list、`export-snapshot` / `ogc-chunks` trace 和 `export-session` event。该步骤仍不改
+训练 loop、artifact schema、OGC decoder 或 renderer，不写训练输出或大资产。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

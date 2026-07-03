@@ -38,6 +38,7 @@ try {
       `urlOgcManifest=${summary.urlOgcManifestStatus}`,
       `algorithmManifest=${summary.algorithmManifestStatus}`,
       `debugSnapshotExport=${summary.debugSnapshotExportStatus}`,
+      `debugSessionExport=${summary.debugSessionExportStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
       `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
@@ -664,6 +665,7 @@ async function auditWorld(url) {
       urlOgcManifestStatus: urlOgcManifest.status,
       algorithmManifestStatus: algorithmManifest.status,
       debugSnapshotExportStatus: algorithmManifest.snapshotExportStatus,
+      debugSessionExportStatus: algorithmManifest.sessionExportStatus,
       localModelManifestStatus: localModelManifest.status,
       localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
@@ -1476,11 +1478,67 @@ async function auditAlgorithmManifestBundle(browser, url) {
       };
     }, undefined, { timeout: 15000 });
     const snapshotExport = await snapshotExportHandle.jsonValue();
+    await page.locator("[data-debug-session-export-button='true']").click();
+    const sessionExportHandle = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-debug-snapshot-panel='true']");
+      const button = document.querySelector("[data-debug-session-export-button='true']");
+      const exported = window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION__;
+      const text = window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION_TEXT__;
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      let parsed = null;
+      if (typeof text === "string") {
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = null;
+        }
+      }
+      const fileName = shell?.getAttribute("data-debug-session-export-file") ?? "";
+      const eventTypes = new Set((parsed?.events ?? []).map((event) => event.type));
+      const modelIds = new Set((parsed?.models ?? []).map((model) => model.id));
+      const hasExportSessionEvent = events.some((event) => event.type === "export-session");
+      if (
+        shell?.getAttribute("data-debug-session-export-status") !== "exported" ||
+        panel?.getAttribute("data-debug-session-export-status") !== "exported" ||
+        button?.getAttribute("data-export-status") !== "exported" ||
+        shell?.getAttribute("data-debug-session-export-schema") !== "objgauss-object-state-debug-session-v1" ||
+        exported?.schema !== "objgauss-object-state-debug-session-v1" ||
+        parsed?.schema !== "objgauss-object-state-debug-session-v1" ||
+        parsed?.protocol !== "object-state-debug-os-v1" ||
+        parsed?.export?.schema !== "objgauss-debug-session-export-v1" ||
+        parsed?.snapshot?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
+        parsed?.snapshot?.model?.id !== "model-manifest-ogc-artifact" ||
+        parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
+        parsed?.summary?.modelCount !== 10 ||
+        parsed?.summary?.trainableArtifactCount < 2 ||
+        parsed?.summary?.ogcArtifactCount < 2 ||
+        !modelIds.has("model-manifest-trainable-artifact") ||
+        !modelIds.has("model-manifest-ogc-artifact") ||
+        !eventTypes.has("export-snapshot") ||
+        !eventTypes.has("ogc-chunks") ||
+        parsed?.exportPolicy?.scope !== "browser-local-download-only" ||
+        parsed?.exportPolicy?.trainingOutputs !== "not_committed" ||
+        !fileName.endsWith(".json") ||
+        !parsed?.export?.fileName ||
+        !hasExportSessionEvent
+      ) {
+        return null;
+      }
+      return {
+        status: shell.getAttribute("data-debug-session-export-status"),
+        schema: parsed.schema,
+        fileName,
+        eventCount: events.length,
+      };
+    }, undefined, { timeout: 15000 });
+    const sessionExport = await sessionExportHandle.jsonValue();
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
     return {
       status: "manifest-trainable-ogc-debug-os",
       qualityReportStatus: "warn",
       snapshotExportStatus: snapshotExport.status,
+      sessionExportStatus: sessionExport.status,
     };
   } finally {
     await page.close();

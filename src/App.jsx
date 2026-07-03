@@ -71,6 +71,12 @@ export default function App() {
     schema: "",
     error: "",
   }));
+  const [sessionExport, setSessionExport] = useState(() => ({
+    status: "idle",
+    fileName: "",
+    schema: "",
+    error: "",
+  }));
   const modelList = useMemo(() => Object.values(models), [models]);
   const summary = useMemo(() => catalogSummary(modelList), [modelList]);
   const loadedCount = useMemo(
@@ -134,6 +140,11 @@ export default function App() {
     qualityReport: selectedQualityReport,
     debugEvents,
   });
+  const selectedDebugSession = objectStateDebugSession({
+    snapshot: selectedDebugSnapshot,
+    models: modelList,
+    debugEvents,
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -154,6 +165,16 @@ export default function App() {
       }
     };
   }, [debugEvents]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    window.__OBJGAUSS_DEBUG_SESSION__ = selectedDebugSession;
+    return () => {
+      if (window.__OBJGAUSS_DEBUG_SESSION__ === selectedDebugSession) {
+        delete window.__OBJGAUSS_DEBUG_SESSION__;
+      }
+    };
+  }, [selectedDebugSession]);
 
   const recordDebugEvent = useCallback((type, detail = {}) => {
     const seq = debugEventSeq.current + 1;
@@ -232,6 +253,76 @@ export default function App() {
       });
     }
   }, [recordDebugEvent, selectedDebugSnapshot]);
+
+  const exportDebugSession = useCallback(() => {
+    if (!selectedDebugSession) {
+      setSessionExport({
+        status: "error",
+        fileName: "",
+        schema: "",
+        error: "debug session unavailable",
+      });
+      return;
+    }
+    const fileName = debugSessionExportFileName(selectedDebugSession);
+    try {
+      const exportedSession = {
+        ...selectedDebugSession,
+        export: {
+          schema: "objgauss-debug-session-export-v1",
+          fileName,
+          generatedBy: "objgauss-world-viewer",
+          generatedAt: new Date().toISOString(),
+        },
+      };
+      const text = `${JSON.stringify(exportedSession, null, 2)}\n`;
+      if (typeof window !== "undefined") {
+        window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION__ = exportedSession;
+        window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION_TEXT__ = text;
+      }
+      if (typeof document !== "undefined" && typeof URL !== "undefined" && typeof Blob !== "undefined") {
+        const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setSessionExport({
+        status: "exported",
+        fileName,
+        schema: exportedSession.schema,
+        error: "",
+      });
+      recordDebugEvent("export-session", {
+        modelId: selectedDebugSession.snapshot.model.id,
+        objectId: selectedDebugSession.snapshot.selection.objectId,
+        selectionId: selectedDebugSession.snapshot.selection.selectionId,
+        gaussianIndex: selectedDebugSession.snapshot.selection.gaussianIndex,
+        fileName,
+        source: "debug-panel",
+      });
+    } catch (error) {
+      const message = error?.message ?? "debug session export failed";
+      setSessionExport({
+        status: "error",
+        fileName,
+        schema: selectedDebugSession.schema ?? "",
+        error: message,
+      });
+      recordDebugEvent("export-session-error", {
+        modelId: selectedDebugSession.snapshot.model.id,
+        objectId: selectedDebugSession.snapshot.selection.objectId,
+        selectionId: selectedDebugSession.snapshot.selection.selectionId,
+        gaussianIndex: selectedDebugSession.snapshot.selection.gaussianIndex,
+        fileName,
+        source: "debug-panel",
+      });
+    }
+  }, [recordDebugEvent, selectedDebugSession]);
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -958,6 +1049,13 @@ export default function App() {
       data-debug-snapshot-export-file={snapshotExport.fileName}
       data-debug-snapshot-export-schema={snapshotExport.schema}
       data-debug-snapshot-export-error={snapshotExport.error}
+      data-debug-session-schema={selectedDebugSession.schema}
+      data-debug-session-model-count={selectedDebugSession.models.length}
+      data-debug-session-event-count={selectedDebugSession.events.length}
+      data-debug-session-export-status={sessionExport.status}
+      data-debug-session-export-file={sessionExport.fileName}
+      data-debug-session-export-schema={sessionExport.schema}
+      data-debug-session-export-error={sessionExport.error}
       data-debug-event-count={debugEvents.length}
       data-debug-event-last={debugEvents[0]?.type ?? ""}
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
@@ -1202,6 +1300,7 @@ export default function App() {
         debugEvents={debugEvents}
         debugSnapshot={selectedDebugSnapshot}
         snapshotExport={snapshotExport}
+        sessionExport={sessionExport}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
@@ -1211,6 +1310,7 @@ export default function App() {
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
         onExportDebugSnapshot={exportDebugSnapshot}
+        onExportDebugSession={exportDebugSession}
       />
 
       <div className="glassHud bottomStatus">
@@ -2543,6 +2643,7 @@ function DebugPanel({
   debugEvents,
   debugSnapshot,
   snapshotExport,
+  sessionExport,
   hiddenObjects,
   stability,
   qualityReport,
@@ -2552,6 +2653,7 @@ function DebugPanel({
   onSelectOgcLod,
   onSelectOgcChunks,
   onExportDebugSnapshot,
+  onExportDebugSession,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -2703,7 +2805,9 @@ function DebugPanel({
       <DebugSnapshotPanel
         snapshot={debugSnapshot}
         snapshotExport={snapshotExport}
+        sessionExport={sessionExport}
         onExportDebugSnapshot={onExportDebugSnapshot}
+        onExportDebugSession={onExportDebugSession}
       />
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
@@ -2784,7 +2888,13 @@ function DebugEventTracePanel({ events }) {
   );
 }
 
-function DebugSnapshotPanel({ snapshot, snapshotExport, onExportDebugSnapshot }) {
+function DebugSnapshotPanel({
+  snapshot,
+  snapshotExport,
+  sessionExport,
+  onExportDebugSnapshot,
+  onExportDebugSession,
+}) {
   if (!snapshot) return null;
   return (
     <div
@@ -2803,6 +2913,9 @@ function DebugSnapshotPanel({ snapshot, snapshotExport, onExportDebugSnapshot })
       data-debug-snapshot-export-status={snapshotExport?.status ?? "idle"}
       data-debug-snapshot-export-file={snapshotExport?.fileName ?? ""}
       data-debug-snapshot-export-schema={snapshotExport?.schema ?? ""}
+      data-debug-session-export-status={sessionExport?.status ?? "idle"}
+      data-debug-session-export-file={sessionExport?.fileName ?? ""}
+      data-debug-session-export-schema={sessionExport?.schema ?? ""}
     >
       <div className="stabilityHead">
         <span>Protocol</span>
@@ -2816,6 +2929,14 @@ function DebugSnapshotPanel({ snapshot, snapshotExport, onExportDebugSnapshot })
           >
             JSON
           </button>
+          <button
+            type="button"
+            data-debug-session-export-button="true"
+            data-export-status={sessionExport?.status ?? "idle"}
+            onClick={() => onExportDebugSession?.()}
+          >
+            SESSION
+          </button>
         </div>
       </div>
       <dl className="stabilityMeta snapshotMeta">
@@ -2826,6 +2947,7 @@ function DebugSnapshotPanel({ snapshot, snapshotExport, onExportDebugSnapshot })
         <Meta label="source" value={snapshot.assignment.source} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
+        <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
       </dl>
     </div>
   );
@@ -4370,6 +4492,55 @@ function objectStateDebugSnapshot({
   };
 }
 
+function objectStateDebugSession({ snapshot, models, debugEvents }) {
+  const compactModels = Array.isArray(models) ? models.map(compactDebugModel) : [];
+  const loadedModels = compactModels.filter((model) => model.status === "loaded" || model.status === "compressed");
+  const trainableModels = compactModels.filter((model) => model.deliverySource === "trainable-kernel-model-artifact");
+  const ogcModels = compactModels.filter((model) => model.deliverySource === "quantized-ogc");
+  return {
+    schema: "objgauss-object-state-debug-session-v1",
+    protocol: "object-state-debug-os-v1",
+    snapshot,
+    summary: {
+      modelCount: compactModels.length,
+      loadedModelCount: loadedModels.length,
+      trainableArtifactCount: trainableModels.length,
+      ogcArtifactCount: ogcModels.length,
+      eventCount: Array.isArray(debugEvents) ? Math.min(debugEvents.length, DEBUG_EVENT_LIMIT) : 0,
+    },
+    models: compactModels,
+    events: compactDebugEvents(debugEvents),
+    exportPolicy: {
+      scope: "browser-local-download-only",
+      repositoryWrite: "none",
+      trainingOutputs: "not_committed",
+      payloadPolicy: "summaries_only",
+    },
+  };
+}
+
+function compactDebugModel(model) {
+  return {
+    id: cleanString(model?.id),
+    label: cleanString(model?.label),
+    name: cleanString(model?.name),
+    kind: cleanString(model?.kind),
+    loadMode: cleanString(model?.loadMode),
+    status: cleanString(model?.status),
+    gaussianCount: finiteNumber(model?.gaussianCount),
+    objectCount: finiteNumber(model?.objectCount),
+    deliverySource: cleanString(model?.delivery?.source),
+    loadRoute: cleanString(model?.delivery?.loadRoute),
+    artifactPath: cleanString(model?.delivery?.artifactPath),
+    indexPath: cleanString(model?.delivery?.indexPath),
+    payloadPath: cleanString(model?.delivery?.payloadPath),
+    frameIndex: cleanNullable(model?.delivery?.frameIndex),
+    frameCount: cleanNullable(model?.delivery?.frameCount),
+    lodLevel: cleanNullable(model?.delivery?.lodLevel),
+    chunkIds: Array.isArray(model?.delivery?.chunkIds) ? model.delivery.chunkIds.slice(0, 16) : [],
+  };
+}
+
 function debugEventFromDetail(type, detail = {}, seq = 0) {
   const clean = detail && typeof detail === "object" ? detail : {};
   return {
@@ -4428,7 +4599,9 @@ function debugEventDetailLabel(event) {
     event.type === "import-ogc" ||
     event.type === "import-ogc-error" ||
     event.type === "export-snapshot" ||
-    event.type === "export-snapshot-error"
+    event.type === "export-snapshot-error" ||
+    event.type === "export-session" ||
+    event.type === "export-session-error"
   ) return event.fileName || "local";
   if (event.objectId !== null && event.objectId !== undefined) return `#${event.objectId}`;
   return event.modelId || event.source || "-";
@@ -4441,6 +4614,13 @@ function debugSnapshotExportFileName(snapshot) {
     ? "g-none"
     : `g-${sanitizeFileSegment(snapshot.selection.gaussianIndex)}`;
   return `objgauss-debug-snapshot-${model}-object-${object}-${gaussian}.json`;
+}
+
+function debugSessionExportFileName(session) {
+  const model = sanitizeFileSegment(session?.snapshot?.model?.id || "model");
+  const object = sanitizeFileSegment(session?.snapshot?.selection?.objectId ?? "scene");
+  const events = sanitizeFileSegment(session?.summary?.eventCount ?? 0);
+  return `objgauss-debug-session-${model}-object-${object}-events-${events}.json`;
 }
 
 function sanitizeFileSegment(value) {

@@ -72,6 +72,39 @@
 
 ## Done
 
+### DEBUG-SESSION-EXPORT-001: Export ObjectState Debug sessions from viewer
+
+- 状态: done / debug-session-json-export
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 在单帧 `objgauss-object-state-debug-snapshot-v1` 之外，导出完整
+  `objgauss-object-state-debug-session-v1` session，用于归档当前 snapshot、模型交付摘要、
+  quality gate evidence、compact event trace 和本地导出策略。
+- 已实施:
+  - `src/App.jsx` 新增 session protocol helper、`SESSION` 导出按钮、
+    `data-debug-session-*` telemetry，以及
+    `window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SESSION__` / JSON 文本。
+  - session export 保留当前 snapshot，并汇总 loaded / trainable / OGC 模型数量、
+    compact model delivery metadata、recent debug events 和 browser-local-only export policy。
+  - `scripts/audit-world-viewer.mjs` 在组合 algorithm manifest 场景中先导出 snapshot，
+    再导出 session，验证 session schema、export envelope、model list、quality gates、
+    `export-snapshot` / `ogc-chunks` trace 和 `export-session` event。
+- 边界:
+  - 不改变 `objgauss-object-state-debug-snapshot-v1`、model manifest、quality report、
+    trainable artifact 或 OGC schema。
+  - 不改变训练 loop，不训练 gsplat，不安装 torch / gsplat / CUDA，不改变
+    `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不写入 `public/`、ignored `outputs/`、checkpoint、rendered image 或大资产；
+    session 只作为浏览器本地下载。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `debugSnapshotExport=exported`、`debugSessionExport=exported`、
+    `algorithmManifest=manifest-trainable-ogc-debug-os` 和 `qualityReport=warn`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 140 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### QUALITY-GATE-UI-001: Surface quality gates in ObjectState Debug OS
 
 - 状态: done / quality-gate-debug-ui
@@ -103,7 +136,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 140 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `6d86caf`
 
 ### TRAINABLE-QUALITY-REPORT-001: Generate quality reports for trainable kernel packages
 
@@ -144,7 +177,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 140 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `b394e58`
 
 ### TRAINABLE-MANIFEST-OUTPUT-001: Write viewer-ready manifests for trainable kernel artifacts
 
@@ -184,7 +217,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 139 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `d73313c`
 
 ### DEBUG-SNAPSHOT-EXPORT-001: Export ObjectState Debug snapshots from viewer
 
@@ -219,7 +252,7 @@
     Browser plugin not available；使用常规 Playwright / repo audit fallback。
   - `uv run --extra dev pytest`: 138 passed。
   - `git diff --check`: passed。
-- 完成 commit: this commit
+- 完成 commit: `cb04a85`
 
 ### QUALITY-REPORT-HANDOFF-001: Load ObjectState quality reports from model manifests
 

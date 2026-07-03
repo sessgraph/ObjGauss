@@ -409,11 +409,11 @@ button:focus-visible {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .snapshotActions button {
-  min-width: 42px;
+  min-width: 44px;
   min-height: 26px;
   border: 1px solid rgba(182, 151, 255, 0.28);
   border-radius: 8px;
