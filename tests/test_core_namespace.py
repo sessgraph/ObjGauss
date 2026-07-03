@@ -11,6 +11,7 @@ from objgauss.core import (
     ObjectState,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
+    SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverTrainingResult,
@@ -61,6 +62,7 @@ from objgauss.core import (
     train_kernel_mvp,
     train_object_emergence_solver,
     train_object_state_gaussian_decoder,
+    train_solver_decoder_joint,
     train_kernel_mvp_from_cloud,
     trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
@@ -352,6 +354,22 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert isinstance(decoder_result, ObjectStateGaussianDecoderTrainingResult)
     assert decoder_result.as_dict()["trained_fields"] == ["object_colors"]
+    joint_frame = type(bound_frames[0])(
+        positions=bound_frames[0].positions,
+        features=bound_frames[0].features,
+        target_rgb=bound_frames[0].target_rgb,
+        target_assignment=object_assignment,
+        image_target=bound_frames[0].image_target,
+    )
+    joint_result = train_solver_decoder_joint(
+        [joint_frame],
+        iterations=1,
+        solver_learning_rate=0.05,
+        decoder_learning_rate=0.2,
+        object_weight=0.1,
+    )
+    assert isinstance(joint_result, SolverDecoderJointTrainingResult)
+    assert "decoder.object_colors" in joint_result.as_dict()["trained_fields"]
     assert evaluate_gsplat_training_renderer_loss is not None
     artifact = trainable_kernel_model_artifact(
         result,

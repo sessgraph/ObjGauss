@@ -20,6 +20,7 @@ from objgauss.core.trainable_kernel import (
     train_kernel_mvp,
 )
 from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
+from objgauss.core.solver_decoder_training import train_solver_decoder_joint
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 
 
@@ -216,6 +217,41 @@ def test_renderer_loss_boundary_accepts_decoder_training_summary():
     assert payload["decoder_handoff_contract"]["status"] == "decoder_training_ready"
     assert payload["decoder_handoff_contract"]["starts_real_training"] is True
     assert "full_3dgs_renderer_not_selected" in payload["upgrade_blockers"]
+
+
+def test_renderer_loss_boundary_accepts_solver_decoder_joint_summary():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    target = np.zeros((6, 2), dtype=np.float32)
+    target[:3, 0] = 1.0
+    target[3:, 1] = 1.0
+    frames = tuple(
+        type(frame)(
+            positions=frame.positions,
+            features=frame.features,
+            target_rgb=frame.target_rgb,
+            target_assignment=target,
+            image_target=frame.image_target,
+        )
+        for frame in frames
+    )
+    result = train_solver_decoder_joint(
+        frames,
+        iterations=4,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.6,
+        object_weight=0.2,
+        seed=3,
+    )
+
+    payload = renderer_loss_boundary_report(result.as_dict()).as_dict()
+
+    assert payload["status"] == "solver_decoder_joint_training_ready"
+    assert payload["evidence"]["kind"] == "solver_decoder_joint_training"
+    assert payload["evidence"]["loss_decreased"] is True
+    assert payload["evidence"]["image_render_loss_decreased"] is True
+    assert "solver.feature_weights" in payload["evidence"]["trained_fields"]
+    assert payload["decoder_handoff_contract"]["status"] == "solver_decoder_joint_training_ready"
+    assert payload["decoder_handoff_contract"]["starts_real_training"] is True
 
 
 def test_renderer_loss_boundary_marks_missing_summary_as_contract_only():

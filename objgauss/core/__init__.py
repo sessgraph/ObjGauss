@@ -28,6 +28,14 @@ _EXPORTS = {
         "objgauss.core.gaussian_decoder_training",
         "ObjectStateGaussianDecoderTrainingResult",
     ),
+    "SolverDecoderJointLoss": (
+        "objgauss.core.solver_decoder_training",
+        "SolverDecoderJointLoss",
+    ),
+    "SolverDecoderJointTrainingResult": (
+        "objgauss.core.solver_decoder_training",
+        "SolverDecoderJointTrainingResult",
+    ),
     "ObjectState": ("objgauss.core.object_state", "ObjectState"),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -207,6 +215,10 @@ _EXPORTS = {
     "train_object_state_gaussian_decoder": (
         "objgauss.core.gaussian_decoder_training",
         "train_object_state_gaussian_decoder",
+    ),
+    "train_solver_decoder_joint": (
+        "objgauss.core.solver_decoder_training",
+        "train_solver_decoder_joint",
     ),
     "trainable_kernel_model_artifact": (
         "objgauss.core.trainable_artifact",
