@@ -229,6 +229,8 @@ button:focus-visible {
   width: min(390px, calc(100vw - 52px));
   max-height: calc(100vh - 186px);
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(93, 238, 249, 0.38) rgba(255, 255, 255, 0.05);
   padding: 16px;
   border-radius: 22px;
 }
@@ -344,6 +346,11 @@ button:focus-visible {
   border-color: rgba(93, 238, 249, 0.64);
   color: #f4fdff;
   background: rgba(31, 194, 204, 0.2);
+}
+
+.debugLensSelector {
+  grid-template-columns: 68px repeat(3, minmax(0, 1fr));
+  margin-bottom: 10px;
 }
 
 .stabilityHead {

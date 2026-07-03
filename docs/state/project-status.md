@@ -492,6 +492,18 @@ renderer 和 gradient path；floating inspector 同步显示 `train loss` 与 `l
 不改变训练算法、artifact schema、renderer API 或 `TRAIN-GSPLAT-MVP-001` 的 optional
 deps / CUDA blocker，不提交新的训练输出。
 
+`OBJECT-DEBUG-LENS-001` 已完成 Phase 1 Debug OS 的 lens system：`src/App.jsx`
+将原先二元 `A[N,K]` color toggle 扩展为 `assignment / confidence / entropy` 三种
+debug lens。Debug panel 新增紧凑 `lens` selector；root `.worldShell`、Debug panel 和
+`window.__OBJGAUSS_WORLD__` 同步暴露当前 lens。Three.js world 不重建模型，而是在每个
+Gaussian cloud 上保留 assignment、confidence、entropy 三套 color buffer，切换 lens 时
+只替换 active color attribute；confidence / entropy lens 还会根据 ObjectState
+confidence 或 normalized entropy 调整非选中 cloud opacity，形成可审计的 opacity
+debugging。`scripts/audit-world-viewer.mjs` 在 trainable artifact 路径下点击 `conf` 和
+`H`，断言 DOM、audit handle、active lens 和 opacity samples 均同步，最终截图保留
+entropy lens。该切片不改变训练算法、artifact schema、OGC schema 或 renderer 依赖，
+也不解除 gsplat / CUDA blocker。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

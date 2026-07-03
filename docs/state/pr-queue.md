@@ -72,6 +72,39 @@
 
 ## Done
 
+### OBJECT-DEBUG-LENS-001: Add assignment confidence and entropy debug lenses
+
+- 状态: done / object-debug-lens
+- 类型: 标准 PR / ObjectState Debug OS
+- 目标: 将 Debug OS 的二元 `A[N,K]` color toggle 升级为可审计的 lens system，让
+  Gaussian scene 可以在 assignment grouping、confidence 和 entropy 三种视图间切换，
+  直接服务“看 assignment 是否稳定 / 是否歧义”的 Phase 1 验收。
+- 已实施:
+  - `src/App.jsx` 新增 `debugLens` 状态，root `.worldShell`、Debug panel 和
+    `window.__OBJGAUSS_WORLD__` 同步暴露当前 lens。
+  - ObjectState Debug panel 新增紧凑 `lens` selector，支持 `assign`、`conf` 和 `H`。
+  - Three.js world 不重建模型；每个 Gaussian cloud 现在持有 assignment、confidence、
+    entropy 三套 color buffer，切换 lens 时只替换 active color attribute。
+  - confidence / entropy lens 会根据 ObjectState confidence 或 normalized entropy 调整
+    非选中 Gaussian cloud opacity，补上 Phase 1 的 opacity debugging 证据。
+  - `scripts/audit-world-viewer.mjs` 在 trainable artifact 路径下点击 `conf` 和 `H`，
+    断言 DOM / audit handle / active color lens / opacity samples 均同步；最终截图保留
+    entropy lens。
+- 边界:
+  - 不改变 trainable artifact schema、OGC schema、Python 训练算法或 loss 计算。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不引入新的 renderer 依赖。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交训练输出或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `debugLens=entropy`、`trainLoss=0.053806`、`urlOgc=range-ogc-lod-chunk-ui`；
+    截图 `/tmp/objgauss-world-viewer.png` 显示 `lens` selector 且 `H` active。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-LOSS-DEBUG-UI-001: Surface trainable loss evidence in Debug OS
 
 - 状态: done / trainable-loss-debug-ui

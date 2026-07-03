@@ -22,6 +22,7 @@ try {
       `selectedModel=${JSON.stringify(summary.selectedModelId)}`,
       `selectedObject=${JSON.stringify(summary.selectedObjectId)}`,
       `debugOs=${summary.debugOs}`,
+      `debugLens=${summary.debugLens}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
       `trainableRoute=${summary.trainableArtifactLoadRoute}`,
@@ -284,6 +285,48 @@ async function auditWorld(url) {
     if (!frameGaussian.ok || frameGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
       throw new Error(`expected frame 1 Gaussian probe to remain trainable artifact sourced: ${JSON.stringify(frameGaussian)}`);
     }
+    await page.locator("[data-debug-lens-button='confidence']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const selector = document.querySelector("[data-debug-lens-selector='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.lensOpacitySamples ?? [];
+      return (
+        shell?.getAttribute("data-debug-lens") === "confidence" &&
+        panel?.getAttribute("data-debug-lens") === "confidence" &&
+        selector?.getAttribute("data-selected-lens") === "confidence" &&
+        world?.debugLens === "confidence" &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.activeLens === "confidence" &&
+          sample.opacityLens === "confidence" &&
+          sample.opacity > 0.32 &&
+          sample.opacity <= 1
+        )
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-debug-lens-button='entropy']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const selector = document.querySelector("[data-debug-lens-selector='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.lensOpacitySamples ?? [];
+      return (
+        shell?.getAttribute("data-debug-lens") === "entropy" &&
+        panel?.getAttribute("data-debug-lens") === "entropy" &&
+        selector?.getAttribute("data-selected-lens") === "entropy" &&
+        world?.debugLens === "entropy" &&
+        samples.some((sample) =>
+          sample.modelId === "trainable-mvp-debug" &&
+          sample.activeLens === "entropy" &&
+          sample.opacityLens === "entropy" &&
+          sample.opacity > 0.32 &&
+          sample.opacity <= 1
+        )
+      );
+    }, undefined, { timeout: 15000 });
     const hoverSelection = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
       const result = world?.hoverObjectForAudit?.(selectionId) ?? null;
@@ -357,6 +400,7 @@ async function auditWorld(url) {
         selectedModelId: handle.selectedModelId,
         selectedObjectId: handle.selectedObjectId,
         debugMode: handle.debugMode,
+        debugLens: handle.debugLens,
         debugProtocol: handle.debugProtocol,
         assignmentSource: handle.assignmentSource,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
@@ -399,6 +443,9 @@ async function auditWorld(url) {
         panelTrainingRenderer: training?.getAttribute("data-training-renderer") ?? null,
         panelTrainingFinalLoss: Number(training?.getAttribute("data-training-final-total-loss") ?? 0),
         panelTrainingLossDelta: Number(training?.getAttribute("data-training-loss-delta") ?? 0),
+        entropyLensSamples: (handle.lensOpacitySamples ?? []).filter(
+          (sample) => sample.modelId === "trainable-mvp-debug" && sample.activeLens === "entropy",
+        ),
         worldTrainableFrameIndex: handle.selectedTrainableFrameIndex ?? null,
         worldTrainableFrameCount: handle.selectedTrainableFrameCount ?? null,
         trainableArtifactLoadedCount: handle.trainableArtifactLoadedCount,
@@ -439,6 +486,14 @@ async function auditWorld(url) {
       world.panelTrainingLossDelta === world.trainableTrainingLossDelta
     )) {
       throw new Error(`expected trainable loss evidence telemetry: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.debugLens === "entropy" &&
+      world.entropyLensSamples.length >= 2 &&
+      world.entropyLensSamples.every((sample) => sample.opacityLens === "entropy") &&
+      world.entropyLensSamples.some((sample) => sample.opacity > 0.32 && sample.opacity < 1)
+    )) {
+      throw new Error(`expected entropy debug lens telemetry: ${JSON.stringify(world)}`);
     }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
@@ -490,6 +545,7 @@ async function auditWorld(url) {
       selectedModelId: world.selectedModelId,
       selectedObjectId: world.selectedObjectId,
       debugOs: world.debugProtocol,
+      debugLens: world.debugLens,
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
       trainableArtifactLoadRoute: world.trainableArtifactLoadRoute,

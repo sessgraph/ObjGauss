@@ -18,6 +18,8 @@ const INITIAL_CAMERA = {
   target: [0, 1.15, 0],
 };
 
+const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
+
 export default function App() {
   const modelCatalog = useMemo(
     () => modelCatalogFromSearch(typeof window === "undefined" ? "" : window.location.search),
@@ -34,6 +36,7 @@ export default function App() {
   }));
   const [models, setModels] = useState(() => initialModelStates(modelCatalog));
   const [debugMode, setDebugMode] = useState(true);
+  const [debugLens, setDebugLens] = useState("assignment");
   const [hoveredTarget, setHoveredTarget] = useState(null);
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
@@ -126,6 +129,14 @@ export default function App() {
       worldApi.current?.setDebugMode(next);
       return next;
     });
+  }, []);
+
+  const selectDebugLens = useCallback((lens) => {
+    const next = normalizeDebugLens(lens);
+    setDebugLens(next);
+    setDebugMode(true);
+    worldApi.current?.setDebugMode(true);
+    worldApi.current?.setDebugLens(next);
   }, []);
 
   const toggleObjectVisibility = useCallback((object) => {
@@ -445,6 +456,7 @@ export default function App() {
       data-compression-layout="per-object-corepoint-chunks"
       data-debug-os="object-state"
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
+      data-debug-lens={debugMode ? debugLens : "appearance"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
       data-hovered-target={hoveredTarget?.selectionId ?? ""}
       data-hovered-model={hoveredTarget?.modelId ?? ""}
@@ -495,6 +507,7 @@ export default function App() {
         models={modelCatalog}
         selectedTargetId={selection.selectionId || selectedId}
         debugMode={debugMode}
+        debugLens={debugLens}
         hiddenSelectionIds={hiddenObjects}
         onReady={handleWorldReady}
         onSelectObject={selectObject}
@@ -594,9 +607,11 @@ export default function App() {
         hoveredTarget={hoveredTarget}
         debugProbe={debugProbe}
         debugMode={debugMode}
+        debugLens={debugLens}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         onToggleObjectVisibility={toggleObjectVisibility}
+        onSelectDebugLens={selectDebugLens}
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
@@ -777,6 +792,7 @@ function ThreeWorld({
   models,
   selectedTargetId,
   debugMode,
+  debugLens,
   hiddenSelectionIds,
   onReady,
   onSelectObject,
@@ -787,6 +803,7 @@ function ThreeWorld({
   const apiRef = useRef(null);
   const selectedRef = useRef(selectedTargetId);
   const debugRef = useRef(debugMode);
+  const debugLensRef = useRef(normalizeDebugLens(debugLens));
   const hiddenRef = useRef(hiddenSelectionIds);
   const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved });
 
@@ -799,6 +816,12 @@ function ThreeWorld({
     debugRef.current = debugMode;
     apiRef.current?.setDebugMode(debugMode);
   }, [debugMode]);
+
+  useEffect(() => {
+    const next = normalizeDebugLens(debugLens);
+    debugLensRef.current = next;
+    apiRef.current?.setDebugLens(next);
+  }, [debugLens]);
 
   useEffect(() => {
     hiddenRef.current = hiddenSelectionIds;
@@ -869,6 +892,7 @@ function ThreeWorld({
         hoveredGaussianCount: hoveredTarget?.gaussianCount ?? 0,
         hoveredAssignmentSource: hoveredTarget?.assignmentSource ?? null,
         debugMode: debugRef.current,
+        debugLens: debugRef.current ? debugLensRef.current : "appearance",
         debugProtocol: "object-state-debug-os-v1",
         assignmentSource: selectedAssignmentSource,
         stabilitySummary: selectedStability,
@@ -878,6 +902,17 @@ function ThreeWorld({
           (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
         ).length,
         visibleObjectCount: [...draggableObjects.values()].filter((object) => object.visible).length,
+        lensOpacitySamples: [...draggableObjects.values()].map((object) => {
+          const cloud = firstGaussianCloud(object);
+          return {
+            selectionId: object.userData.selectionId,
+            modelId: object.userData.modelId,
+            objectId: object.userData.objectId,
+            activeLens: cloud?.userData?.activeColorLens ?? null,
+            opacityLens: cloud?.userData?.activeOpacityLens ?? null,
+            opacity: round3(cloud?.material?.opacity ?? 0),
+          };
+        }),
         modelPositions: [...modelRoots.values()].map((object) => ({
           id: object.userData.modelId,
           position: object.position.toArray().map(round3),
@@ -1006,6 +1041,7 @@ function ThreeWorld({
       rebuildDragControls();
       api.setSelected(selectedRef.current);
       api.setDebugMode(debugRef.current);
+      api.setDebugLens(debugLensRef.current);
       api.setHiddenObjects(hiddenRef.current);
       return result.summary;
     };
@@ -1077,20 +1113,12 @@ function ThreeWorld({
       },
       setDebugMode(enabled) {
         debugRef.current = Boolean(enabled);
-        for (const object of draggableObjects.values()) {
-          object.traverse((child) => {
-            if (child.userData.role === "gaussian-cloud") {
-              const color = enabled ? child.userData.assignmentColor : child.userData.originalColor;
-              if (color) {
-                child.geometry.setAttribute("color", color);
-                child.geometry.attributes.color.needsUpdate = true;
-              }
-            }
-            if (child.userData.role === "object-state-bbox") {
-              child.visible = Boolean(enabled);
-            }
-          });
-        }
+        refreshDebugLens();
+        publishAuditHandle();
+      },
+      setDebugLens(lens) {
+        debugLensRef.current = normalizeDebugLens(lens);
+        refreshDebugLens();
         publishAuditHandle();
       },
       setHover(selectionId) {
@@ -1101,6 +1129,7 @@ function ThreeWorld({
             selected: object.userData.selected,
             hovered,
             debug: debugRef.current,
+            lens: debugLensRef.current,
           });
         }
       },
@@ -1130,10 +1159,36 @@ function ThreeWorld({
             selected,
             hovered: object.userData.hovered,
             debug: debugRef.current,
+            lens: debugLensRef.current,
           });
         }
         publishAuditHandle();
       },
+    };
+
+    const refreshDebugLens = () => {
+      const lens = debugLensRef.current;
+      const debugEnabled = debugRef.current;
+      for (const object of draggableObjects.values()) {
+        object.traverse((child) => {
+          if (child.userData.role === "gaussian-cloud") {
+            const color = colorAttributeForDebugLens(child, lens, debugEnabled);
+            if (color) {
+              child.geometry.setAttribute("color", color);
+              child.geometry.attributes.color.needsUpdate = true;
+            }
+          }
+          if (child.userData.role === "object-state-bbox") {
+            child.visible = Boolean(debugEnabled);
+          }
+        });
+        applyObjectVisualState(object, {
+          selected: object.userData.selected,
+          hovered: object.userData.hovered,
+          debug: debugEnabled,
+          lens,
+        });
+      }
     };
 
     const resize = () => {
@@ -1184,9 +1239,11 @@ function DebugPanel({
   hoveredTarget,
   debugProbe,
   debugMode,
+  debugLens,
   hiddenObjects,
   stability,
   onToggleObjectVisibility,
+  onSelectDebugLens,
   onSelectTrainableFrame,
   onSelectOgcLod,
   onSelectOgcChunks,
@@ -1214,6 +1271,7 @@ function DebugPanel({
       className="glassHud debugPanel"
       data-object-debug-panel="true"
       data-debug-mode={debugMode ? "assignment" : "appearance"}
+      data-debug-lens={debugMode ? debugLens : "appearance"}
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
@@ -1235,6 +1293,27 @@ function DebugPanel({
         <Metric label="entropy" value={formatRatio(probeEntropy)} />
         <Metric label="mass" value={formatNumber(activeState?.slotMass)} />
         <Metric label="img loss" value={formatLoss(rendererLoss)} />
+      </div>
+
+      <div
+        className="trainableFrameSelector debugLensSelector"
+        data-debug-lens-selector="true"
+        data-selected-lens={debugMode ? debugLens : "appearance"}
+        data-debug-enabled={debugMode ? "true" : "false"}
+      >
+        <span>lens</span>
+        {DEBUG_LENSES.map((lens) => (
+          <button
+            key={lens}
+            type="button"
+            className={debugMode && debugLens === lens ? "active" : ""}
+            data-debug-lens-button={lens}
+            data-active={debugMode && debugLens === lens ? "true" : "false"}
+            onClick={() => onSelectDebugLens?.(lens)}
+          >
+            {debugLensLabel(lens)}
+          </button>
+        ))}
       </div>
 
       {frameCount > 1 ? (
@@ -1578,8 +1657,12 @@ function createPointCloudGroup(model, points) {
     const positions = new Float32Array(entries.length * 3);
     const originalColors = new Float32Array(entries.length * 3);
     const assignmentColors = new Float32Array(entries.length * 3);
+    const confidenceColors = new Float32Array(entries.length * 3);
+    const entropyColors = new Float32Array(entries.length * 3);
     const fallback = new THREE.Color(accent);
     const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), assignmentEntropy * 0.34);
+    const confidenceColor = debugConfidenceColor(assignmentConfidence);
+    const entropyColor = debugEntropyColor(assignmentEntropy);
 
     entries.forEach((entry, index) => {
       positions[index * 3] = (entry.x - objectGroup.position.x) * objectBoost;
@@ -1592,12 +1675,16 @@ function createPointCloudGroup(model, points) {
       assignmentColors[index * 3] = debugColor.r;
       assignmentColors[index * 3 + 1] = debugColor.g;
       assignmentColors[index * 3 + 2] = debugColor.b;
+      writeColor(confidenceColors, index, confidenceColor);
+      writeColor(entropyColors, index, entropyColor);
     });
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     const originalColorAttr = new THREE.BufferAttribute(originalColors, 3);
     const assignmentColorAttr = new THREE.BufferAttribute(assignmentColors, 3);
+    const confidenceColorAttr = new THREE.BufferAttribute(confidenceColors, 3);
+    const entropyColorAttr = new THREE.BufferAttribute(entropyColors, 3);
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -1615,6 +1702,8 @@ function createPointCloudGroup(model, points) {
     cloud.userData.role = "gaussian-cloud";
     cloud.userData.originalColor = originalColorAttr;
     cloud.userData.assignmentColor = assignmentColorAttr;
+    cloud.userData.confidenceColor = confidenceColorAttr;
+    cloud.userData.entropyColor = entropyColorAttr;
     cloud.userData.gaussianDebug = entries.map((entry, index) => ({
       protocol: "object-state-debug-os-v1",
       source: "derived_from_object_id",
@@ -1703,6 +1792,14 @@ function createCompressedModelGroup(model) {
     geometry.setAttribute("position", new THREE.BufferAttribute(points.positions, 3));
     const originalColorAttr = new THREE.BufferAttribute(points.colors, 3);
     const assignmentColorAttr = new THREE.BufferAttribute(points.assignmentColors, 3);
+    const confidenceColorAttr = uniformColorAttribute(
+      points.positions.length / 3,
+      debugConfidenceColor(assignmentConfidence),
+    );
+    const entropyColorAttr = uniformColorAttribute(
+      points.positions.length / 3,
+      debugEntropyColor(assignmentEntropy),
+    );
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -1718,6 +1815,8 @@ function createCompressedModelGroup(model) {
     cloud.userData.role = "gaussian-cloud";
     cloud.userData.originalColor = originalColorAttr;
     cloud.userData.assignmentColor = assignmentColorAttr;
+    cloud.userData.confidenceColor = confidenceColorAttr;
+    cloud.userData.entropyColor = entropyColorAttr;
     cloud.userData.gaussianDebug = Array.from({ length: points.positions.length / 3 }, (_item, gaussianIndex) => ({
       protocol: "object-state-debug-os-v1",
       source: "compressed_placeholder_assignment",
@@ -1835,6 +1934,8 @@ function createTrainableArtifactGroup(model) {
     const positions = new Float32Array(stateRows.length * 3);
     const originalColors = new Float32Array(stateRows.length * 3);
     const assignmentColors = new Float32Array(stateRows.length * 3);
+    const confidenceColors = new Float32Array(stateRows.length * 3);
+    const entropyColors = new Float32Array(stateRows.length * 3);
     const fallback = new THREE.Color(accent);
     const debugColor = fallback.clone().lerp(new THREE.Color("#f1fdff"), Number(state.normalized_assignment_entropy ?? 0) * 0.34);
     const assignment = averageAssignmentVector(stateRows.map((entry) => entry.row), objectIds);
@@ -1856,12 +1957,17 @@ function createTrainableArtifactGroup(model) {
       assignmentColors[index * 3] = debugColor.r;
       assignmentColors[index * 3 + 1] = debugColor.g;
       assignmentColors[index * 3 + 2] = debugColor.b;
+      const rowValues = entry.row.map((value) => Number(value) || 0);
+      writeColor(confidenceColors, index, debugConfidenceColor(Math.max(...rowValues)));
+      writeColor(entropyColors, index, debugEntropyColor(normalizedEntropy(rowValues)));
     });
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     const originalColorAttr = new THREE.BufferAttribute(originalColors, 3);
     const assignmentColorAttr = new THREE.BufferAttribute(assignmentColors, 3);
+    const confidenceColorAttr = new THREE.BufferAttribute(confidenceColors, 3);
+    const entropyColorAttr = new THREE.BufferAttribute(entropyColors, 3);
     geometry.setAttribute("color", assignmentColorAttr);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
@@ -1878,6 +1984,8 @@ function createTrainableArtifactGroup(model) {
     cloud.userData.role = "gaussian-cloud";
     cloud.userData.originalColor = originalColorAttr;
     cloud.userData.assignmentColor = assignmentColorAttr;
+    cloud.userData.confidenceColor = confidenceColorAttr;
+    cloud.userData.entropyColor = entropyColorAttr;
     cloud.userData.gaussianDebug = stateRows.map((entry, index) => {
       const vector = assignmentVectorFromProbabilities(entry.row, objectIds);
       return {
@@ -2085,13 +2193,28 @@ function gaussianProbeFromIntersection(intersection) {
   return probe ?? null;
 }
 
-function applyObjectVisualState(object, { selected = false, hovered = false, debug = true } = {}) {
+function colorAttributeForDebugLens(cloud, lens, debugEnabled = true) {
+  if (!debugEnabled) {
+    cloud.userData.activeColorLens = "appearance";
+    return cloud.userData.originalColor;
+  }
+  const normalized = normalizeDebugLens(lens);
+  cloud.userData.activeColorLens = normalized;
+  if (normalized === "confidence") return cloud.userData.confidenceColor ?? cloud.userData.assignmentColor;
+  if (normalized === "entropy") return cloud.userData.entropyColor ?? cloud.userData.assignmentColor;
+  return cloud.userData.assignmentColor;
+}
+
+function applyObjectVisualState(object, { selected = false, hovered = false, debug = true, lens = "assignment" } = {}) {
   const selectedOrHovered = Boolean(selected || hovered);
+  const normalizedLens = normalizeDebugLens(lens);
   object.traverse((child) => {
     if (child.userData.role === "gaussian-cloud") {
       const baseSize = child.userData.basePointSize ?? child.material.size;
       child.userData.basePointSize = baseSize;
-      child.material.opacity = selected ? 1 : hovered ? 0.98 : debug ? 0.62 : 0.5;
+      const lensOpacity = opacityForDebugLens(object.userData.objectState, normalizedLens);
+      child.userData.activeOpacityLens = debug ? normalizedLens : "appearance";
+      child.material.opacity = selected ? 1 : hovered ? Math.max(0.82, lensOpacity) : debug ? lensOpacity : 0.5;
       child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.16 : baseSize;
       child.material.needsUpdate = true;
     }
@@ -2102,6 +2225,16 @@ function applyObjectVisualState(object, { selected = false, hovered = false, deb
       child.visible = selectedOrHovered;
     }
   });
+}
+
+function opacityForDebugLens(objectState, lens) {
+  if (lens === "confidence") {
+    return round3(0.32 + 0.58 * clamp01(objectState?.confidence ?? 0.5));
+  }
+  if (lens === "entropy") {
+    return round3(0.32 + 0.58 * clamp01(objectState?.assignmentEntropy ?? 0.5));
+  }
+  return 0.62;
 }
 
 function objectTarget(object) {
@@ -2132,6 +2265,45 @@ function normalizedEntropy(probabilities) {
   if (probabilities.length <= 1 || values.length === 0) return 0;
   const entropy = -values.reduce((total, value) => total + value * Math.log(value), 0);
   return Math.max(0, Math.min(1, entropy / Math.log(probabilities.length)));
+}
+
+function normalizeDebugLens(lens) {
+  const value = String(lens ?? "assignment");
+  return DEBUG_LENSES.includes(value) ? value : "assignment";
+}
+
+function debugLensLabel(lens) {
+  if (lens === "confidence") return "conf";
+  if (lens === "entropy") return "H";
+  return "assign";
+}
+
+function debugConfidenceColor(confidence) {
+  return new THREE.Color("#ff4d6d").lerp(new THREE.Color("#5df2df"), clamp01(confidence));
+}
+
+function debugEntropyColor(entropy) {
+  return new THREE.Color("#53d8da").lerp(new THREE.Color("#ff8a5c"), clamp01(entropy));
+}
+
+function writeColor(target, index, color) {
+  target[index * 3] = color.r;
+  target[index * 3 + 1] = color.g;
+  target[index * 3 + 2] = color.b;
+}
+
+function uniformColorAttribute(count, color) {
+  const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
+  const values = new Float32Array(safeCount * 3);
+  for (let index = 0; index < safeCount; index += 1) {
+    writeColor(values, index, color);
+  }
+  return new THREE.BufferAttribute(values, 3);
+}
+
+function clamp01(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
 }
 
 function objectStateSummary({
