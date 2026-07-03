@@ -83,6 +83,7 @@ from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.core.trainable_quality import write_trainable_quality_report
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
     write_model_artifact_manifest,
@@ -1188,6 +1189,7 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"render_loss_decreased={str(summary['render_loss_decreased']).lower()}")
     print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
+    model_artifact = None
     if args.model_output:
         model_artifact = write_trainable_kernel_model_artifact(
             args.model_output,
@@ -1203,13 +1205,41 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         }
         print(f"model_artifact_schema={model_artifact['schema']}")
         print(f"model_artifact={args.model_output}")
+    if args.quality_report_output:
+        if model_artifact is None:
+            raise ValueError("--quality-report-output requires --model-output")
+        quality_report = write_trainable_quality_report(
+            args.quality_report_output,
+            model_artifact,
+            report_id=args.quality_report_id,
+            source={
+                "type": "trainable_kernel_model_artifact",
+                "artifact": str(args.model_output),
+            },
+        )
+        summary["quality_report"] = {
+            "schema": quality_report["schema"],
+            "path": str(args.quality_report_output),
+            "status": quality_report["status"],
+            "gate_count": len(quality_report["gates"]),
+        }
+        print(f"quality_report_schema={quality_report['schema']}")
+        print(f"quality_report={args.quality_report_output}")
+        print(f"quality_report_status={quality_report['status']}")
     if args.manifest_output:
         if not args.model_output:
             raise ValueError("--manifest-output requires --model-output")
         artifact_route = _manifest_relative_path(args.model_output, args.manifest_output)
+        quality_report_route = (
+            _manifest_relative_path(args.quality_report_output, args.manifest_output)
+            if args.quality_report_output
+            else None
+        )
         model_manifest = manifest_from_trainable_kernel_model_artifact(
             args.model_output,
             artifact_path=artifact_route,
+            quality_report_path=quality_report_route,
+            quality_report_file=args.quality_report_output if args.quality_report_output else None,
             manifest_id=args.manifest_id,
             asset_id=args.manifest_asset_id,
             name=args.manifest_name,
@@ -1221,11 +1251,14 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
             "path": str(args.manifest_output),
             "manifest_id": model_manifest["manifest_id"],
             "artifact_path": artifact_route,
+            "quality_report_path": quality_report_route,
         }
         print(f"model_artifact_manifest_schema={model_manifest['schema']}")
         print(f"model_artifact_manifest={args.manifest_output}")
         print(f"model_artifact_manifest_asset={model_manifest['asset_id']}")
         print(f"model_artifact_manifest_trainable={artifact_route}")
+        if quality_report_route:
+            print(f"model_artifact_manifest_quality={quality_report_route}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -2140,6 +2173,12 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--record-every", type=int)
     kernel_sample.add_argument("--summary-output", type=Path)
     kernel_sample.add_argument("--model-output", type=Path)
+    kernel_sample.add_argument(
+        "--quality-report-output",
+        type=Path,
+        help="write an objgauss-object-state-quality-report-v1 derived from --model-output",
+    )
+    kernel_sample.add_argument("--quality-report-id")
     kernel_sample.add_argument(
         "--manifest-output",
         type=Path,

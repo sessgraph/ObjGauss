@@ -25,6 +25,7 @@ from objgauss.model_manifest import (
 )
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
+from objgauss.core.trainable_quality import write_trainable_quality_report
 
 
 def test_model_artifact_manifest_roundtrip(tmp_path):
@@ -199,10 +200,15 @@ def test_manifest_from_trainable_kernel_model_artifact(tmp_path):
         result,
         input_path="fixture://trainable-kernel-mvp",
     )
+    quality_path = tmp_path / "quality-report.json"
+    artifact_payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    write_trainable_quality_report(quality_path, artifact_payload)
 
     manifest = manifest_from_trainable_kernel_model_artifact(
         artifact_path,
         artifact_path="trainable-kernel-model.json",
+        quality_report_path="quality-report.json",
+        quality_report_file=quality_path,
         manifest_id="trainable-kernel-model-artifacts",
         asset_id="trainable-kernel-fixture",
         name="Trainable kernel fixture",
@@ -218,11 +224,14 @@ def test_manifest_from_trainable_kernel_model_artifact(tmp_path):
     assert roles["trainable_kernel"]["delivery_tier"] == "browser_edit"
     assert roles["trainable_kernel"]["byte_size"] == artifact_path.stat().st_size
     assert roles["trainable_kernel"]["sha256"] == hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    assert roles["quality_report"]["path"] == "quality-report.json"
+    assert roles["quality_report"]["browser_ready"] is True
+    assert roles["quality_report"]["sha256"] == hashlib.sha256(quality_path.read_bytes()).hexdigest()
     assert manifest["quality_evidence"][0]["kind"] == "trainable_kernel_training_summary"
     assert manifest["created_from"]["schema"] == "objgauss-trainable-kernel-model-artifact-v1"
     validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
     assert validation.passed
-    assert validation.browser_ready_artifacts == 1
+    assert validation.browser_ready_artifacts == 2
 
 
 def test_manifest_from_training_output(tmp_path):

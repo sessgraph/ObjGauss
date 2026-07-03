@@ -540,6 +540,20 @@ kernel-sample` 新增 `--manifest-output`、`--manifest-asset-id`、`--manifest-
 `localTrainableManifest=local-trainable-manifest-debug-os`。该步骤仍不引入 torch /
 gsplat / CUDA，不提交 `/tmp` 或 ignored `outputs/` 训练产物，不改变 viewer renderer。
 
+`TRAINABLE-QUALITY-REPORT-001` 已完成 trainable kernel MVP 的 metrics report handoff：
+`objgauss/core/trainable_quality.py` 新增
+`objgauss-object-state-quality-report-v1` 生成器，直接从
+`objgauss-trainable-kernel-model-artifact-v1` 计算 assignment entropy、slot utilization、
+object purity proxy、temporal drift、assignment jitter、bbox stability 和 spatial
+compactness，并输出 slot utilization / assignment entropy / temporal drift gates。
+`objgauss training kernel-sample` 新增 `--quality-report-output` 和 `--quality-report-id`；
+当同时写 `--manifest-output` 时，manifest 会把该报告登记为 browser-ready
+`quality_report` artifact。`scripts/audit-world-viewer.mjs` 现在验证本地 trainable-only
+manifest package 可以同时导入训练 artifact 与 quality report，输出
+`localTrainableManifest=local-trainable-manifest-quality-debug-os`，并确认 Quality 面板与
+snapshot quality 状态存在。该步骤仍不引入 torch / gsplat / CUDA，不提交 `/tmp` 或
+ignored `outputs/` 训练产物，不改变 viewer renderer。
+
 `TRAIN-MODEL-VIEWER-BINDING-001` 已完成 trainable MVP model artifact 的 Debug OS
 前端绑定：`src/modelCatalog.js` 新增小型 `trainable-mvp-debug` static fixture，
 明确标记为 `objgauss-trainable-kernel-model-artifact-v1` debug fixture，不是真实训练

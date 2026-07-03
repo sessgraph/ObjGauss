@@ -325,6 +325,8 @@ def manifest_from_trainable_kernel_model_artifact(
     trainable_artifact: str | Path | dict[str, Any],
     *,
     artifact_path: str | Path | None = None,
+    quality_report_path: str | Path | None = None,
+    quality_report_file: str | Path | None = None,
     manifest_id: str | None = None,
     asset_id: str | None = None,
     name: str | None = None,
@@ -355,6 +357,29 @@ def manifest_from_trainable_kernel_model_artifact(
     artifact_route = str(artifact_path)
     byte_size = artifact_file.stat().st_size if artifact_file is not None and artifact_file.exists() else None
     sha256 = _sha256(artifact_file) if compute_hash and artifact_file is not None and artifact_file.exists() else None
+    artifacts = [
+        build_model_artifact(
+            role="trainable_kernel",
+            path=artifact_route,
+            format=".json",
+            delivery_tier="browser_edit",
+            browser_ready=True,
+            gaussian_count=gaussian_count,
+            object_count=object_count,
+            byte_size=byte_size,
+            sha256=sha256,
+            label=str(payload.get("label") or "trainable-kernel-model-artifact"),
+            note="Trainable kernel Debug OS artifact; browser-ready for ObjectState inspection.",
+        )
+    ]
+    if quality_report_path is not None:
+        artifacts.append(
+            _quality_report_artifact(
+                quality_report_path=quality_report_path,
+                quality_report_file=quality_report_file,
+                compute_hash=compute_hash,
+            )
+        )
 
     return build_model_artifact_manifest(
         manifest_id=manifest_id or f"{resolved_asset_id}-trainable-model-artifacts",
@@ -367,21 +392,7 @@ def manifest_from_trainable_kernel_model_artifact(
             "target_source": sample.get("target_source") if isinstance(sample, dict) else None,
         },
         license=license,
-        artifacts=[
-            build_model_artifact(
-                role="trainable_kernel",
-                path=artifact_route,
-                format=".json",
-                delivery_tier="browser_edit",
-                browser_ready=True,
-                gaussian_count=gaussian_count,
-                object_count=object_count,
-                byte_size=byte_size,
-                sha256=sha256,
-                label=str(payload.get("label") or "trainable-kernel-model-artifact"),
-                note="Trainable kernel Debug OS artifact; browser-ready for ObjectState inspection.",
-            )
-        ],
+        artifacts=artifacts,
         gaussian_count=gaussian_count,
         object_count=object_count,
         quality_evidence=[
@@ -533,6 +544,28 @@ def _trainable_asset_id(payload: dict[str, Any], artifact_file: Path | None) -> 
     if artifact_file is not None:
         return f"{artifact_file.stem}-trainable-kernel"
     return "trainable-kernel-model"
+
+
+def _quality_report_artifact(
+    *,
+    quality_report_path: str | Path,
+    quality_report_file: str | Path | None,
+    compute_hash: bool,
+) -> dict[str, Any]:
+    report_file = Path(quality_report_file) if quality_report_file is not None else Path(quality_report_path)
+    byte_size = report_file.stat().st_size if report_file.exists() else None
+    sha256 = _sha256(report_file) if compute_hash and report_file.exists() else None
+    return build_model_artifact(
+        role="quality_report",
+        path=quality_report_path,
+        format=".json",
+        delivery_tier="browser_edit",
+        browser_ready=True,
+        byte_size=byte_size,
+        sha256=sha256,
+        label="ObjectState quality report",
+        note="Debug OS metrics evidence derived from the trainable kernel artifact.",
+    )
 
 
 def manifest_from_asset_library_entry(

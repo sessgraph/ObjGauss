@@ -1624,16 +1624,18 @@ async function auditLocalModelManifestBundleImport(browser, url) {
 async function auditLocalTrainableManifestPackageImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
-    const manifestPath = writeLocalTrainableManifestFixture();
+    const { manifestPath, qualityReportPath } = writeLocalTrainableManifestFixture();
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
       manifestPath,
       "public/models/trainable-mvp-debug/model-artifact.json",
+      qualityReportPath,
     ]);
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const training = document.querySelector("[data-training-evidence='true']");
+      const quality = document.querySelector("[data-quality-report='true']");
       const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
       const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -1647,7 +1649,11 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
         shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
         shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        shell?.getAttribute("data-quality-report-status") === "warn" &&
+        shell?.getAttribute("data-quality-report-schema") === "objgauss-object-state-quality-report-v1" &&
         training?.getAttribute("data-training-status") === "loss_down" &&
+        quality?.getAttribute("data-quality-report-status") === "warn" &&
+        quality?.getAttribute("data-quality-report-gate-count") === "3" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         types.has("import-model-manifest")
       );
@@ -1683,10 +1689,11 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
         shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
         shell?.getAttribute("data-debug-snapshot-model") === "model-local-manifest-trainable-artifact" &&
         snapshot?.model?.id === "model-local-manifest-trainable-artifact" &&
-        snapshot?.training?.status === "loss_down"
+        snapshot?.training?.status === "loss_down" &&
+        snapshot?.quality?.status === "warn"
       );
     }, undefined, { timeout: 15000 });
-    return { status: "local-trainable-manifest-debug-os" };
+    return { status: "local-trainable-manifest-quality-debug-os" };
   } finally {
     await page.close();
   }
@@ -1749,7 +1756,32 @@ function writeLocalOgcManifestFixture() {
 function writeLocalTrainableManifestFixture() {
   const trainable = JSON.parse(readFileSync("public/models/trainable-mvp-debug/model-artifact.json", "utf8"));
   const manifestPath = "/tmp/objgauss-local-trainable-model-artifact.json";
+  const qualityReportPath = "/tmp/objgauss-local-trainable-quality-report.json";
   const sample = trainable.source?.sample ?? {};
+  const qualityReport = {
+    schema: "objgauss-object-state-quality-report-v1",
+    report_id: "objgauss-local-trainable-package-quality",
+    status: "warn",
+    source: {
+      type: "audit_local_trainable_package",
+      artifact: "model-artifact.json",
+    },
+    metrics: {
+      assignment_entropy: 0.68875,
+      slot_utilization: 1.0,
+      object_purity: 0.79625,
+      temporal_drift: 0.017205,
+      assignment_jitter: 0.0225,
+      bbox_stability: 0.960402,
+      spatial_compactness: 0.423428,
+    },
+    gates: [
+      { name: "slot_utilization", status: "pass", value: 1.0, threshold: 0.7 },
+      { name: "assignment_entropy", status: "warn", value: 0.68875, threshold: 0.5 },
+      { name: "temporal_drift", status: "pass", value: 0.017205, threshold: 0.08 },
+    ],
+    limitations: ["Tiny audit fixture for trainable quality report package import."],
+  };
   const manifest = {
     schema: "objgauss-model-artifact-manifest-v1",
     manifest_id: "objgauss-local-trainable-package-fixture",
@@ -1778,6 +1810,14 @@ function writeLocalTrainableManifestFixture() {
         label: "trainable-kernel-model-artifact",
         note: "Audit fixture for trainable-only model manifest package import.",
       },
+      {
+        role: "quality_report",
+        path: "objgauss-local-trainable-quality-report.json",
+        format: ".json",
+        delivery_tier: "browser_edit",
+        browser_ready: true,
+        label: "ObjectState quality report",
+      },
     ],
     quality_evidence: [
       {
@@ -1794,7 +1834,8 @@ function writeLocalTrainableManifestFixture() {
     },
   };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  return manifestPath;
+  writeFileSync(qualityReportPath, `${JSON.stringify(qualityReport, null, 2)}\n`, "utf8");
+  return { manifestPath, qualityReportPath };
 }
 
 function launchOptions() {

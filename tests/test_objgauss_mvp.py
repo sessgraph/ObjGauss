@@ -2470,6 +2470,7 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     summary_path = tmp_path / "kernel-sample-summary.json"
     boundary_path = tmp_path / "renderer-loss-boundary.json"
     model_path = tmp_path / "trainable-kernel-model.json"
+    quality_path = tmp_path / "quality-report.json"
     manifest_path = tmp_path / "model-artifact.json"
     write_ply(input_path, _camera_cloud_with_object_ids(), fmt="ascii")
 
@@ -2498,6 +2499,10 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
                 str(summary_path),
                 "--model-output",
                 str(model_path),
+                "--quality-report-output",
+                str(quality_path),
+                "--quality-report-id",
+                "object-aware-sample-quality",
                 "--manifest-output",
                 str(manifest_path),
                 "--manifest-asset-id",
@@ -2540,8 +2545,11 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert summary["renderer_api"]["status"] == "ready"
     assert summary["renderer_api"]["gradient_path"] == "analytic-color-assignment-gradient-v1"
     assert summary["model_artifact"]["path"] == str(model_path)
+    assert summary["quality_report"]["path"] == str(quality_path)
+    assert summary["quality_report"]["schema"] == "objgauss-object-state-quality-report-v1"
     assert summary["model_artifact_manifest"]["path"] == str(manifest_path)
     assert summary["model_artifact_manifest"]["artifact_path"] == "trainable-kernel-model.json"
+    assert summary["model_artifact_manifest"]["quality_report_path"] == "quality-report.json"
     model_artifact = json.loads(model_path.read_text(encoding="utf-8"))
     assert model_artifact["schema"] == "objgauss-trainable-kernel-model-artifact-v1"
     assert model_artifact["source"]["input"] == str(input_path)
@@ -2549,16 +2557,26 @@ def test_training_kernel_sample_cli_runs_on_object_aware_ply(tmp_path, capsys):
     assert model_artifact["renderer_api"]["status"] == "ready"
     assert model_artifact["assignments"][0]["shape"] == [4, 2]
     assert len(model_artifact["object_states"][0]["states"]) == 2
+    quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
+    assert quality_report["schema"] == "objgauss-object-state-quality-report-v1"
+    assert quality_report["report_id"] == "object-aware-sample-quality"
+    assert quality_report["metrics"]["slot_utilization"] == 1.0
+    assert len(quality_report["gates"]) == 3
     model_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     roles = {artifact["role"]: artifact for artifact in model_manifest["artifacts"]}
     assert "model_artifact_manifest_schema=objgauss-model-artifact-manifest-v1" in output
     assert "model_artifact_manifest_trainable=trainable-kernel-model.json" in output
+    assert "quality_report_schema=objgauss-object-state-quality-report-v1" in output
+    assert "model_artifact_manifest_quality=quality-report.json" in output
     assert model_manifest["schema"] == "objgauss-model-artifact-manifest-v1"
     assert model_manifest["asset_id"] == "object-aware-sample-trainable"
     assert model_manifest["counts"] == {"gaussians": 4, "objects": 2}
     assert roles["trainable_kernel"]["path"] == "trainable-kernel-model.json"
     assert roles["trainable_kernel"]["browser_ready"] is True
     assert roles["trainable_kernel"]["sha256"]
+    assert roles["quality_report"]["path"] == "quality-report.json"
+    assert roles["quality_report"]["browser_ready"] is True
+    assert roles["quality_report"]["sha256"]
     assert model_manifest["quality_evidence"][0]["kind"] == "trainable_kernel_training_summary"
 
     assert (

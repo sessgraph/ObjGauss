@@ -28,6 +28,10 @@ _EXPORTS = {
     "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
     "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
     "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
+    "TRAINABLE_QUALITY_REPORT_SCHEMA": (
+        "objgauss.core.trainable_quality",
+        "TRAINABLE_QUALITY_REPORT_SCHEMA",
+    ),
     "GsplatRendererAvailability": (
         "objgauss.core.gsplat_training_renderer",
         "GsplatRendererAvailability",
@@ -113,6 +117,10 @@ _EXPORTS = {
         "objgauss.core.trainable_artifact",
         "trainable_kernel_model_artifact",
     ),
+    "trainable_quality_report": (
+        "objgauss.core.trainable_quality",
+        "trainable_quality_report",
+    ),
     "trainable_kernel_sample_from_cloud": (
         "objgauss.core.trainable_kernel",
         "trainable_kernel_sample_from_cloud",
@@ -135,6 +143,10 @@ _EXPORTS = {
         "objgauss.core.trainable_artifact",
         "validate_trainable_kernel_model_artifact",
     ),
+    "validate_trainable_quality_report": (
+        "objgauss.core.trainable_quality",
+        "validate_trainable_quality_report",
+    ),
     "validate_renderer_loss_boundary_summary": (
         "objgauss.core.renderer_loss",
         "validate_renderer_loss_boundary_summary",
@@ -146,6 +158,10 @@ _EXPORTS = {
     "write_trainable_kernel_model_artifact": (
         "objgauss.core.trainable_artifact",
         "write_trainable_kernel_model_artifact",
+    ),
+    "write_trainable_quality_report": (
+        "objgauss.core.trainable_quality",
+        "write_trainable_quality_report",
     ),
     "write_splat": ("objgauss.core.io", "write_splat"),
 }

@@ -72,6 +72,47 @@
 
 ## Done
 
+### TRAINABLE-QUALITY-REPORT-001: Generate quality reports for trainable kernel packages
+
+- 状态: done / trainable-kernel-quality-report-handoff
+- 类型: 标准 PR / training metrics handoff + ObjectState Debug OS delivery
+- 目标: 让 `objgauss training kernel-sample` 生成的 trainable package 同时携带
+  `objgauss-object-state-quality-report-v1`，使前端 Debug OS 不仅加载训练 artifact，
+  也能加载对应 metrics evidence。
+- 已实施:
+  - `objgauss/core/trainable_quality.py` 新增 trainable quality report 生成器与 validator，
+    从 `objgauss-trainable-kernel-model-artifact-v1` 计算 assignment entropy、slot
+    utilization、object purity proxy、temporal drift、assignment jitter、bbox stability
+    和 spatial compactness。
+  - 质量报告输出 slot utilization、assignment entropy、temporal drift 三个 gates；
+    status 根据 gates 汇总为 `pass` / `warn`。
+  - `objgauss training kernel-sample` 新增 `--quality-report-output` 与
+    `--quality-report-id`；当同时写 `--manifest-output` 时，model artifact manifest 会把
+    quality report 作为 browser-ready `quality_report` artifact 登记。
+  - `scripts/audit-world-viewer.mjs` 的 trainable-only local manifest package audit 现在
+    同时导入 manifest、trainable artifact 和 quality report，验证 Quality 面板、
+    root telemetry 与 snapshot quality 状态。
+- 边界:
+  - 不改变 `objgauss-trainable-kernel-model-artifact-v1` 本体 schema。
+  - 不训练 gsplat，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不生成或提交 OGC payload、checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_trainable_quality.py tests/test_model_manifest.py::test_manifest_from_trainable_kernel_model_artifact tests/test_objgauss_mvp.py::test_training_kernel_sample_cli_runs_on_object_aware_ply`: 3 passed。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply ... --model-output /tmp/objgauss-trainable-quality-model.json --quality-report-output /tmp/objgauss-trainable-quality-report.json --manifest-output /tmp/objgauss-trainable-quality-model-artifact.json ...`: passed，输出
+    `quality_report_schema=objgauss-object-state-quality-report-v1` 和
+    `model_artifact_manifest_quality=objgauss-trainable-quality-report.json`。
+  - `uv run python -c "... validate_model_artifact_manifest ... validate_trainable_quality_report ..."`:
+    passed，manifest `artifact_count=2`、`browser_ready_artifacts=2`。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `localTrainableManifest=local-trainable-manifest-quality-debug-os`、
+    `qualityReport=warn` 和 `debugSnapshotExport=exported`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 140 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### TRAINABLE-MANIFEST-OUTPUT-001: Write viewer-ready manifests for trainable kernel artifacts
 
 - 状态: done / trainable-kernel-model-manifest-handoff
