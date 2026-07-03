@@ -516,6 +516,17 @@ attributes，以及 Debug panel 的 `Protocol` 面板。`scripts/audit-world-vie
 当前 stability 状态。该切片不写出 snapshot 文件、不改变训练 / OGC artifact schema、
 不替换 viewer renderer，也不解除 gsplat / CUDA blocker。
 
+`OBJECT-DEBUG-TRACE-001` 已完成 ObjectState Debug OS 的 profiler-style event trace：
+`src/App.jsx` 现在维护最近 12 条 `objgauss-debug-event-v1`，覆盖 model / object select、
+Gaussian probe、debug lens、trainable frame、hover、visibility toggle 和 OGC LOD /
+chunk scope 等调试操作。事件同步暴露到
+`window.__OBJGAUSS_DEBUG_EVENTS__`、root `.worldShell` telemetry、Debug panel 的
+`Trace` 面板，以及 `objgauss-object-state-debug-snapshot-v1.events`。world viewer audit
+现在要求 `gaussian-probe`、`debug-lens`、`frame-select`、`hover-object` 和
+`toggle-visibility` 同时出现在 global / root / panel / snapshot 四个入口中，并输出
+`debugEvents=12`。该切片只补可审计调试协议，不改变训练算法、trainable artifact schema、
+OGC schema、renderer 依赖或 gsplat / CUDA blocker。
+
 `TRAIN-FULL-3DGS-RENDERER-ADR-001` 已完成 renderer 依赖路径冻结：新增
 `docs/adr/0006-full-3dgs-training-renderer.md`，选择 `gsplat-rasterization-v1`
 作为 ObjGauss v1 full differentiable 3DGS training renderer 的第一优先实验路径。

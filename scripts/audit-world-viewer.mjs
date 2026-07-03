@@ -24,6 +24,7 @@ try {
       `debugOs=${summary.debugOs}`,
       `debugSnapshot=${summary.debugSnapshotSchema}`,
       `debugLens=${summary.debugLens}`,
+      `debugEvents=${summary.debugEventCount}`,
       `ogcLoaded=${summary.ogcLoadedCount}`,
       `trainableArtifacts=${summary.trainableArtifactLoadedCount}`,
       `trainableRoute=${summary.trainableArtifactLoadRoute}`,
@@ -371,6 +372,24 @@ async function auditWorld(url) {
     if (!(visibilityToggle.after < visibilityToggle.before)) {
       throw new Error(`expected object visibility toggle to reduce visible count: ${JSON.stringify(visibilityToggle)}`);
     }
+    await page.waitForFunction(() => {
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      const shell = document.querySelector(".worldShell");
+      const trace = document.querySelector("[data-debug-event-trace='true']");
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      return (
+        events.length > 0 &&
+        types.has("gaussian-probe") &&
+        types.has("debug-lens") &&
+        types.has("frame-select") &&
+        types.has("hover-object") &&
+        types.has("toggle-visibility") &&
+        shell?.getAttribute("data-debug-event-count") === String(events.length) &&
+        trace?.getAttribute("data-debug-event-count") === String(events.length) &&
+        snapshot?.events?.length === events.length
+      );
+    }, undefined, { timeout: 15000 });
 
     const relevantIssues = consoleIssues.filter(
       (issue) =>
@@ -395,6 +414,8 @@ async function auditWorld(url) {
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
+      const tracePanel = document.querySelector("[data-debug-event-trace='true']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
       return {
         modelCount: handle.modelCount,
         objectCount: handle.objectCount,
@@ -413,10 +434,20 @@ async function auditWorld(url) {
         debugSnapshotAssignmentSource: snapshot?.assignment?.source ?? null,
         debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
+        debugSnapshotEventCount: Array.isArray(snapshot?.events) ? snapshot.events.length : 0,
+        debugSnapshotEventTypes: Array.isArray(snapshot?.events) ? snapshot.events.map((event) => event.type) : [],
         shellDebugSnapshotSchema: shell?.getAttribute("data-debug-snapshot-schema") ?? null,
         shellDebugSnapshotModel: shell?.getAttribute("data-debug-snapshot-model") ?? null,
         shellDebugSnapshotSlots: Number(shell?.getAttribute("data-debug-snapshot-assignment-slots") ?? 0),
         shellDebugSnapshotStability: shell?.getAttribute("data-debug-snapshot-stability") ?? null,
+        debugEventCount: events.length,
+        debugEventLast: events[0]?.type ?? null,
+        debugEventTypes: events.map((event) => event.type),
+        shellDebugEventCount: Number(shell?.getAttribute("data-debug-event-count") ?? 0),
+        shellDebugEventLast: shell?.getAttribute("data-debug-event-last") ?? null,
+        panelDebugEventCount: Number(tracePanel?.getAttribute("data-debug-event-count") ?? 0),
+        panelDebugEventLast: tracePanel?.getAttribute("data-debug-event-last") ?? null,
+        panelDebugEventSchema: tracePanel?.getAttribute("data-debug-event-schema") ?? null,
         panelDebugSnapshotSchema: snapshotPanel?.getAttribute("data-debug-snapshot-schema") ?? null,
         panelDebugSnapshotModel: snapshotPanel?.getAttribute("data-debug-snapshot-model") ?? null,
         panelDebugSnapshotLens: snapshotPanel?.getAttribute("data-debug-snapshot-lens") ?? null,
@@ -533,6 +564,23 @@ async function auditWorld(url) {
     )) {
       throw new Error(`expected stable ObjectState debug snapshot protocol: ${JSON.stringify(world)}`);
     }
+    if (!(
+      world.debugEventCount > 0 &&
+      world.debugEventCount === world.shellDebugEventCount &&
+      world.debugEventCount === world.panelDebugEventCount &&
+      world.debugEventCount === world.debugSnapshotEventCount &&
+      world.debugEventLast === world.shellDebugEventLast &&
+      world.debugEventLast === world.panelDebugEventLast &&
+      world.panelDebugEventSchema === "objgauss-debug-event-v1" &&
+      world.debugEventTypes.includes("gaussian-probe") &&
+      world.debugEventTypes.includes("debug-lens") &&
+      world.debugEventTypes.includes("frame-select") &&
+      world.debugEventTypes.includes("hover-object") &&
+      world.debugEventTypes.includes("toggle-visibility") &&
+      world.debugSnapshotEventTypes.includes("toggle-visibility")
+    )) {
+      throw new Error(`expected ObjectState debug event trace protocol: ${JSON.stringify(world)}`);
+    }
     if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
     }
@@ -585,6 +633,7 @@ async function auditWorld(url) {
       debugOs: world.debugProtocol,
       debugSnapshotSchema: world.debugSnapshotSchema,
       debugLens: world.debugLens,
+      debugEventCount: world.debugEventCount,
       ogcLoadedCount: world.ogcLoadedCount,
       trainableArtifactLoadedCount: world.trainableArtifactLoadedCount,
       trainableArtifactLoadRoute: world.trainableArtifactLoadRoute,

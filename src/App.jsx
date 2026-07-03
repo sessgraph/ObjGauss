@@ -19,6 +19,7 @@ const INITIAL_CAMERA = {
 };
 
 const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
+const DEBUG_EVENT_LIMIT = 12;
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -37,6 +38,8 @@ export default function App() {
   const [models, setModels] = useState(() => initialModelStates(modelCatalog));
   const [debugMode, setDebugMode] = useState(true);
   const [debugLens, setDebugLens] = useState("assignment");
+  const [debugEvents, setDebugEvents] = useState(() => []);
+  const debugEventSeq = useRef(0);
   const [hoveredTarget, setHoveredTarget] = useState(null);
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
@@ -98,6 +101,7 @@ export default function App() {
     stability: selectedStability,
     assignmentSource: selectedAssignmentSource,
     trainingEvidence: selectedTrainingEvidence,
+    debugEvents,
   });
 
   useEffect(() => {
@@ -109,6 +113,24 @@ export default function App() {
       }
     };
   }, [selectedDebugSnapshot]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    window.__OBJGAUSS_DEBUG_EVENTS__ = debugEvents;
+    return () => {
+      if (window.__OBJGAUSS_DEBUG_EVENTS__ === debugEvents) {
+        delete window.__OBJGAUSS_DEBUG_EVENTS__;
+      }
+    };
+  }, [debugEvents]);
+
+  const recordDebugEvent = useCallback((type, detail = {}) => {
+    const seq = debugEventSeq.current + 1;
+    debugEventSeq.current = seq;
+    const event = debugEventFromDetail(type, detail, seq);
+    setDebugEvents((current) => [event, ...current].slice(0, DEBUG_EVENT_LIMIT));
+    return event;
+  }, []);
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -126,10 +148,14 @@ export default function App() {
     });
   }, []);
 
-  const selectModel = useCallback((id) => {
-    setSelection({ modelId: id, objectId: null, selectionId: id });
-    worldApi.current?.focusModel(id);
-  }, []);
+  const selectModel = useCallback(
+    (id) => {
+      setSelection({ modelId: id, objectId: null, selectionId: id });
+      recordDebugEvent("select-model", { modelId: id, selectionId: id, source: "model-dock" });
+      worldApi.current?.focusModel(id);
+    },
+    [recordDebugEvent],
+  );
 
   const selectObject = useCallback((target, probe = null) => {
     if (!target?.modelId) return;
@@ -146,20 +172,24 @@ export default function App() {
   }, []);
 
   const toggleDebugMode = useCallback(() => {
-    setDebugMode((enabled) => {
-      const next = !enabled;
-      worldApi.current?.setDebugMode(next);
-      return next;
+    const next = !debugMode;
+    setDebugMode(next);
+    recordDebugEvent("debug-toggle", {
+      enabled: next,
+      lens: next ? debugLens : "appearance",
+      source: "top-hud",
     });
-  }, []);
+    worldApi.current?.setDebugMode(next);
+  }, [debugLens, debugMode, recordDebugEvent]);
 
   const selectDebugLens = useCallback((lens) => {
     const next = normalizeDebugLens(lens);
     setDebugLens(next);
     setDebugMode(true);
+    recordDebugEvent("debug-lens", { lens: next, enabled: true, source: "debug-panel" });
     worldApi.current?.setDebugMode(true);
     worldApi.current?.setDebugLens(next);
-  }, []);
+  }, [recordDebugEvent]);
 
   const toggleObjectVisibility = useCallback((object) => {
     if (!object?.selectionId) return;
@@ -186,6 +216,12 @@ export default function App() {
       const nextModel = { ...current, trainableFrameIndex: nextFrameIndex };
       const rendered = worldApi.current?.upsertModel(nextModel, null);
       setDebugProbe(null);
+      recordDebugEvent("frame-select", {
+        modelId: current.id,
+        selectionId: current.id,
+        frameIndex: nextFrameIndex,
+        source: "debug-panel",
+      });
       patchModel(current.id, (latest) => ({
         trainableFrameIndex: nextFrameIndex,
         gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? latest.gaussianCount ?? 0,
@@ -200,7 +236,7 @@ export default function App() {
         },
       }));
     },
-    [models, patchModel, selectedId],
+    [models, patchModel, recordDebugEvent, selectedId],
   );
 
   const reloadOgcModel = useCallback(
@@ -268,6 +304,12 @@ export default function App() {
       const current = models[selectedId];
       if (current?.loadMode !== "ogc-chunked") return;
       const nextLodLevel = Math.max(0, Math.min(16, Number(lodLevel) || 0));
+      recordDebugEvent("ogc-lod", {
+        modelId: current.id,
+        selectionId: current.id,
+        lodLevel: nextLodLevel,
+        source: "debug-panel",
+      });
       await reloadOgcModel(
         current,
         {
@@ -281,7 +323,7 @@ export default function App() {
         },
       );
     },
-    [models, reloadOgcModel, selectedId],
+    [models, recordDebugEvent, reloadOgcModel, selectedId],
   );
 
   const selectOgcChunks = useCallback(
@@ -290,6 +332,12 @@ export default function App() {
       if (current?.loadMode !== "ogc-chunked") return;
       const nextChunkIds = Array.isArray(chunkIds) && chunkIds.length ? chunkIds : undefined;
       const label = nextChunkIds?.length ? `chunk ${nextChunkIds.join(",")}` : "all chunks";
+      recordDebugEvent("ogc-chunks", {
+        modelId: current.id,
+        selectionId: current.id,
+        chunkScope: nextChunkIds?.length ? nextChunkIds.join(",") : "all",
+        source: "debug-panel",
+      });
       await reloadOgcModel(
         current,
         {
@@ -303,12 +351,19 @@ export default function App() {
         },
       );
     },
-    [models, reloadOgcModel, selectedId],
+    [models, recordDebugEvent, reloadOgcModel, selectedId],
   );
 
   const handleObjectMoved = useCallback(
     (target, position) => {
       if (!target?.modelId) return;
+      recordDebugEvent("move-object", {
+        modelId: target.modelId,
+        objectId: target.objectId,
+        selectionId: target.selectionId,
+        position,
+        source: "drag",
+      });
       patchModel(target.modelId, (current) => ({
         objects: (current.objects ?? []).map((object) =>
           String(object.objectId) === String(target.objectId)
@@ -317,7 +372,7 @@ export default function App() {
         ),
       }));
     },
-    [patchModel],
+    [patchModel, recordDebugEvent],
   );
 
   const handleWorldReady = useCallback((api) => {
@@ -483,6 +538,9 @@ export default function App() {
       data-debug-snapshot-assignment-slots={selectedDebugSnapshot.assignment.slotCount}
       data-debug-snapshot-stability={selectedDebugSnapshot.stability.status}
       data-debug-snapshot-training-status={selectedDebugSnapshot.training?.status ?? ""}
+      data-debug-event-count={debugEvents.length}
+      data-debug-event-last={debugEvents[0]?.type ?? ""}
+      data-debug-event-schema={debugEvents[0]?.schema ?? ""}
       data-assignment-debug={debugMode ? "enabled" : "disabled"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
       data-selected-gaussian={debugProbe?.gaussianIndex ?? ""}
@@ -541,6 +599,7 @@ export default function App() {
         onSelectObject={selectObject}
         onHoverObject={handleHoverObject}
         onObjectMoved={handleObjectMoved}
+        onDebugEvent={recordDebugEvent}
       />
 
       <div className="glassHud topHud">
@@ -636,6 +695,7 @@ export default function App() {
         debugProbe={debugProbe}
         debugMode={debugMode}
         debugLens={debugLens}
+        debugEvents={debugEvents}
         debugSnapshot={selectedDebugSnapshot}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
@@ -827,6 +887,7 @@ function ThreeWorld({
   onSelectObject,
   onHoverObject,
   onObjectMoved,
+  onDebugEvent,
 }) {
   const mountRef = useRef(null);
   const apiRef = useRef(null);
@@ -834,7 +895,7 @@ function ThreeWorld({
   const debugRef = useRef(debugMode);
   const debugLensRef = useRef(normalizeDebugLens(debugLens));
   const hiddenRef = useRef(hiddenSelectionIds);
-  const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved });
+  const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved, onDebugEvent });
 
   useEffect(() => {
     selectedRef.current = selectedTargetId;
@@ -858,8 +919,8 @@ function ThreeWorld({
   }, [hiddenSelectionIds]);
 
   useEffect(() => {
-    callbacksRef.current = { onSelectObject, onHoverObject, onObjectMoved };
-  }, [onSelectObject, onHoverObject, onObjectMoved]);
+    callbacksRef.current = { onSelectObject, onHoverObject, onObjectMoved, onDebugEvent };
+  }, [onDebugEvent, onHoverObject, onObjectMoved, onSelectObject]);
 
   useEffect(() => {
     if (!mountRef.current) return undefined;
@@ -1080,6 +1141,13 @@ function ThreeWorld({
       if (!target?.selectionId) return;
       selectedRef.current = target.selectionId;
       api.setSelected(target.selectionId);
+      const gaussian = probe?.gaussian ?? null;
+      callbacksRef.current.onDebugEvent?.(gaussian ? "gaussian-probe" : "select-object", {
+        ...target,
+        gaussianIndex: gaussian?.gaussianIndex ?? null,
+        lens: debugRef.current ? debugLensRef.current : "appearance",
+        source: gaussian?.source ?? target.assignmentSource ?? "world",
+      });
       callbacksRef.current.onSelectObject?.(target, probe?.gaussian ?? null);
       publishAuditHandle();
     };
@@ -1093,6 +1161,13 @@ function ThreeWorld({
       hoveredObject = nextHover;
       api.setHover(hoveredObject?.userData.selectionId ?? null);
       const target = objectTarget(hoveredObject);
+      if (target?.selectionId) {
+        callbacksRef.current.onDebugEvent?.("hover-object", {
+          ...target,
+          lens: debugRef.current ? debugLensRef.current : "appearance",
+          source: target.assignmentSource ?? "world",
+        });
+      }
       callbacksRef.current.onHoverObject?.(target);
       publishAuditHandle();
       return target;
@@ -1166,6 +1241,12 @@ function ThreeWorld({
         const object = draggableObjects.get(selectionId);
         if (!object) return;
         object.visible = Boolean(visible);
+        callbacksRef.current.onDebugEvent?.("toggle-visibility", {
+          ...objectTarget(object),
+          visible: object.visible,
+          lens: debugRef.current ? debugLensRef.current : "appearance",
+          source: "object-visibility",
+        });
         publishAuditHandle();
       },
       setHiddenObjects(hiddenIds) {
@@ -1269,6 +1350,7 @@ function DebugPanel({
   debugProbe,
   debugMode,
   debugLens,
+  debugEvents,
   debugSnapshot,
   hiddenObjects,
   stability,
@@ -1426,6 +1508,7 @@ function DebugPanel({
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
       <DebugSnapshotPanel snapshot={debugSnapshot} />
+      <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
@@ -1468,6 +1551,38 @@ function DebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function DebugEventTracePanel({ events }) {
+  const recent = Array.isArray(events) ? events.slice(0, 4) : [];
+  if (!recent.length) return null;
+  return (
+    <div
+      className="stabilityDashboard debugTracePanel"
+      data-debug-event-trace="true"
+      data-debug-event-count={events.length}
+      data-debug-event-last={recent[0]?.type ?? ""}
+      data-debug-event-schema={recent[0]?.schema ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Trace</span>
+        <strong>{recent[0]?.type ?? "-"}</strong>
+      </div>
+      <div className="debugEventRows">
+        {recent.map((event) => (
+          <div
+            className="debugEventRow"
+            key={event.seq}
+            data-debug-event-row="true"
+            data-debug-event-type={event.type}
+          >
+            <span>{event.type}</span>
+            <small>{debugEventDetailLabel(event)}</small>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -2886,6 +3001,7 @@ function objectStateDebugSnapshot({
   stability,
   assignmentSource,
   trainingEvidence,
+  debugEvents,
 }) {
   const objects = selected?.objects ?? [];
   const activeObject = selectedObject ?? objects[0] ?? null;
@@ -2959,7 +3075,60 @@ function objectStateDebugSnapshot({
       lodLevel: selected?.delivery?.lodLevel ?? null,
       chunkIds: Array.isArray(selected?.delivery?.chunkIds) ? selected.delivery.chunkIds : [],
     },
+    events: compactDebugEvents(debugEvents),
   };
+}
+
+function debugEventFromDetail(type, detail = {}, seq = 0) {
+  const clean = detail && typeof detail === "object" ? detail : {};
+  return {
+    schema: "objgauss-debug-event-v1",
+    seq,
+    type: String(type || "debug-event"),
+    modelId: cleanString(clean.modelId),
+    objectId: cleanNullable(clean.objectId),
+    selectionId: cleanString(clean.selectionId),
+    gaussianIndex: cleanNullable(clean.gaussianIndex),
+    lens: cleanString(clean.lens),
+    frameIndex: cleanNullable(clean.frameIndex),
+    lodLevel: cleanNullable(clean.lodLevel),
+    chunkScope: cleanString(clean.chunkScope),
+    visible: typeof clean.visible === "boolean" ? clean.visible : null,
+    source: cleanString(clean.source),
+    position: cleanNumberArray(clean.position),
+  };
+}
+
+function compactDebugEvents(events) {
+  if (!Array.isArray(events)) return [];
+  return events.slice(0, DEBUG_EVENT_LIMIT).map((event) => ({
+    schema: event?.schema ?? "objgauss-debug-event-v1",
+    seq: finiteNumber(event?.seq),
+    type: String(event?.type ?? "debug-event"),
+    modelId: cleanString(event?.modelId),
+    objectId: cleanNullable(event?.objectId),
+    selectionId: cleanString(event?.selectionId),
+    gaussianIndex: cleanNullable(event?.gaussianIndex),
+    lens: cleanString(event?.lens),
+    frameIndex: cleanNullable(event?.frameIndex),
+    lodLevel: cleanNullable(event?.lodLevel),
+    chunkScope: cleanString(event?.chunkScope),
+    visible: typeof event?.visible === "boolean" ? event.visible : null,
+    source: cleanString(event?.source),
+    position: cleanNumberArray(event?.position),
+  }));
+}
+
+function debugEventDetailLabel(event) {
+  if (!event) return "-";
+  if (event.type === "debug-lens") return event.lens || "-";
+  if (event.type === "frame-select") return event.frameIndex === null ? "frame -" : `f${event.frameIndex}`;
+  if (event.type === "gaussian-probe") return event.gaussianIndex === null ? "G -" : `G${event.gaussianIndex}`;
+  if (event.type === "toggle-visibility") return event.visible ? "visible" : "hidden";
+  if (event.type === "ogc-lod") return event.lodLevel === null ? "LOD -" : `L${event.lodLevel}`;
+  if (event.type === "ogc-chunks") return event.chunkScope || "all";
+  if (event.objectId !== null && event.objectId !== undefined) return `#${event.objectId}`;
+  return event.modelId || event.source || "-";
 }
 
 function compactAssignmentVector(assignment) {
@@ -2975,6 +3144,16 @@ function cleanNumberArray(value) {
   return Array.isArray(value)
     ? value.map((entry) => finiteNumber(entry)).filter((entry) => entry !== null)
     : [];
+}
+
+function cleanString(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function cleanNullable(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : String(value);
 }
 
 function trainableEvidenceSummary(artifact) {

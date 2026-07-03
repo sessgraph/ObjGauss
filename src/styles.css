@@ -471,6 +471,46 @@ button:focus-visible {
   border-color: rgba(182, 151, 255, 0.2);
 }
 
+.debugTracePanel {
+  border-color: rgba(127, 222, 255, 0.2);
+}
+
+.debugEventRows {
+  display: grid;
+  gap: 6px;
+}
+
+.debugEventRow {
+  display: grid;
+  min-height: 26px;
+  grid-template-columns: minmax(0, 1fr) minmax(44px, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1px solid rgba(153, 214, 222, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.debugEventRow span,
+.debugEventRow small {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debugEventRow span {
+  color: #edf9fb;
+  font-weight: 760;
+}
+
+.debugEventRow small {
+  color: #9fb1bd;
+  text-align: right;
+}
+
 .snapshotMeta {
   grid-template-columns: 54px minmax(0, 1fr);
 }

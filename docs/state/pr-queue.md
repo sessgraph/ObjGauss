@@ -72,6 +72,41 @@
 
 ## Done
 
+### OBJECT-DEBUG-TRACE-001: Add profiler-style Debug OS event trace
+
+- 状态: done / object-debug-trace
+- 类型: 标准 PR / ObjectState Debug OS protocol
+- 目标: 在 snapshot protocol、lens system 和 training evidence 之后，为 Debug OS 增加
+  bounded event trace，让最近的调试交互像 profiler 事件一样可读、可审计，而不是只看
+  当前静态状态。
+- 已实施:
+  - `src/App.jsx` 新增 `objgauss-debug-event-v1` 最近事件 buffer，保留最近 12 条
+    select / Gaussian probe / lens / frame / hover / visibility / OGC scope 等调试事件。
+  - 事件同步暴露到 `window.__OBJGAUSS_DEBUG_EVENTS__`、root `.worldShell`
+    `data-debug-event-*` telemetry，以及
+    `objgauss-object-state-debug-snapshot-v1.events`。
+  - ObjectState Debug panel 新增 `Trace` 面板，显示最近 4 条事件和紧凑 detail，用于
+    验证当前 debug 操作序列。
+  - `scripts/audit-world-viewer.mjs` 在 trainable artifact 路径下断言
+    `gaussian-probe`、`debug-lens`、`frame-select`、`hover-object` 和
+    `toggle-visibility` 都进入 event trace，并验证 global / root / panel / snapshot
+    四者数量和最新事件一致。
+- 边界:
+  - 不改变 trainable artifact schema、OGC schema、Python 训练算法或 loss 计算。
+  - 不新增事件导出文件、不提交 trace / screenshot / 训练输出。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不引入新的 renderer 依赖。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `debugEvents=12`、`debugSnapshot=objgauss-object-state-debug-snapshot-v1`、
+    `debugLens=entropy` 和 `trainLoss=0.053806`；截图
+    `/tmp/objgauss-world-viewer.png` 显示 Trace panel。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-DEBUG-SNAPSHOT-001: Expose ObjectState Debug snapshot protocol
 
 - 状态: done / object-debug-snapshot
