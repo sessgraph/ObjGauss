@@ -108,7 +108,7 @@
     `objectExplainability=explainable`、`hoverExplainability=explainable`、
     `objectTemporal=stable` 和 `hoverTemporal=stable`。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `9a646c7`
 
 ### OBJECTSTATE-TEMPORAL-INSPECT-001: Auditable per-object temporal stability
 
