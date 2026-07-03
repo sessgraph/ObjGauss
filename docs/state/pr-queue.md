@@ -105,7 +105,7 @@
     hover heatmap 的 target / model / source / slot count / status / margin / row count
     与 `window.__OBJGAUSS_WORLD__` hover assignment contract 一致。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `ac8b4a8`
 
 ### OBJECTSTATE-OPACITY-LENS-001: Gaussian opacity debug lens
 
