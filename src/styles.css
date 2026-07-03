@@ -187,14 +187,34 @@ button:focus-visible {
 
 .objectDock {
   left: 50%;
-  bottom: 72px;
+  bottom: 92px;
   display: flex;
+  z-index: 8;
   max-width: min(980px, calc(100vw - 40px));
   gap: 8px;
   padding: 10px;
   border-radius: 22px;
   transform: translateX(-50%);
   overflow-x: auto;
+}
+
+@media (min-width: 1181px) {
+  .objectDock {
+    max-width: min(980px, max(360px, calc(100vw - 900px)));
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1180px) {
+  .floatingInspector {
+    display: none;
+  }
+
+  .objectDock {
+    right: 20px;
+    left: auto;
+    max-width: max(360px, calc(100vw - 460px));
+    transform: none;
+  }
 }
 
 .modelPill {
@@ -230,6 +250,7 @@ button:focus-visible {
 .floatingInspector {
   right: 26px;
   top: 126px;
+  z-index: 6;
   width: min(386px, calc(100vw - 52px));
   padding: 18px;
   border-radius: 22px;

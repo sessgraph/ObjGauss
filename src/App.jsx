@@ -561,6 +561,81 @@ export default function App() {
     async function loadModels() {
       for (const model of modelCatalog) {
         if (cancelled) return;
+        if (model.loadMode === "model-artifact-manifest") {
+          const startedAt = performance.now();
+          patchModel(model.id, { status: "loading", message: "loading model manifest" });
+          try {
+            const { manifest, children } = await loadModelArtifactManifestModels(model);
+            if (!children.length) {
+              throw new Error("model artifact manifest has no Debug OS browser routes");
+            }
+            if (cancelled) return;
+            setModels((current) => ({
+              ...current,
+              ...initialModelStates(children),
+              [model.id]: {
+                ...(current[model.id] ?? model),
+                ...model,
+                status: "loaded",
+                message: `${children.length} debug routes`,
+                modelArtifactManifest: manifest,
+                loadMs: Math.round(performance.now() - startedAt),
+                delivery: {
+                  source: "model-artifact-manifest",
+                  loadRoute: "fetch-json",
+                  artifactPath: model.manifestPath,
+                  childModelIds: children.map((child) => child.id),
+                },
+              },
+            }));
+            recordDebugEvent("manifest-load", {
+              modelId: model.id,
+              manifestPath: model.manifestPath,
+              childModelIds: children.map((child) => child.id),
+            });
+            let selectedChild = null;
+            for (const child of children) {
+              if (cancelled) return;
+              if (child.loadMode === "trainable-artifact") {
+                const childStartedAt = performance.now();
+                patchModel(child.id, { status: "loading", message: "loading manifest trainable artifact" });
+                const artifact = await loadTrainableArtifact(child);
+                const imported = upsertTrainableArtifactModel(child, artifact, {
+                  startedAt: childStartedAt,
+                  loadRoute: "model-manifest-json",
+                  artifactPath: child.trainableArtifactPath,
+                  message: "manifest trainable artifact",
+                });
+                selectedChild = selectedChild ?? imported;
+                continue;
+              }
+              if (child.loadMode === "ogc-chunked") {
+                const childStartedAt = performance.now();
+                patchModel(child.id, { status: "loading", message: "loading manifest ogc chunks" });
+                const { artifact, decoded, index, delivery } = await loadOgcModel(child);
+                const imported = upsertDecodedOgcModel(child, decoded, index, delivery, artifact, {
+                  startedAt: childStartedAt,
+                  message: "manifest ogc chunks",
+                });
+                selectedChild = selectedChild ?? imported;
+              }
+            }
+            if (selectedChild) {
+              setSelection({
+                modelId: selectedChild.id,
+                objectId: null,
+                selectionId: selectedChild.id,
+              });
+            }
+          } catch (error) {
+            if (cancelled) return;
+            patchModel(model.id, {
+              status: "error",
+              message: error?.message ?? "model artifact manifest load failed",
+            });
+          }
+          continue;
+        }
         if (model.loadMode === "ogc-manifest") {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading ogc manifest" });
@@ -666,7 +741,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [modelCatalog, patchModel, upsertDecodedOgcModel, upsertTrainableArtifactModel, worldReady]);
+  }, [modelCatalog, patchModel, recordDebugEvent, upsertDecodedOgcModel, upsertTrainableArtifactModel, worldReady]);
 
   return (
     <main
@@ -939,6 +1014,27 @@ async function loadOgcModel(model) {
   };
 }
 
+async function loadModelArtifactManifestModels(model) {
+  const manifestPath = model.manifestPath;
+  if (!manifestPath) {
+    throw new Error("missing model artifact manifest path");
+  }
+  const response = await fetch(manifestPath);
+  if (!response.ok) throw new Error(`model artifact manifest HTTP ${response.status}`);
+  const manifest = await response.json();
+  if (manifest?.schema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) {
+    throw new Error("unsupported model artifact manifest schema");
+  }
+  const children = [];
+  if (browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel")) {
+    children.push(trainableManifestModelFromManifest(model, manifest, manifestPath));
+  }
+  if (browserReadyArtifact({ modelArtifactManifest: manifest }, "compressed_chunked")) {
+    children.push(ogcUrlManifestModelFromManifest(ogcManifestChildModel(model), manifest, manifestPath));
+  }
+  return { manifest, children };
+}
+
 async function loadOgcManifestModel(model) {
   const manifestPath = model.ogc?.manifestPath;
   if (!manifestPath) {
@@ -959,6 +1055,41 @@ async function loadTrainableArtifact(model) {
   return validateTrainableArtifact(model.trainableArtifact);
 }
 
+function trainableManifestModelFromManifest(model, manifest, manifestPath) {
+  const artifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel");
+  if (!artifact) {
+    throw new Error("model manifest missing browser-ready trainable_kernel artifact");
+  }
+  const artifactPath = resolveSameOriginManifestRoute(artifact.artifactPath ?? artifact.path, manifestPath);
+  const resolvedArtifact = {
+    ...artifact,
+    path: artifactPath,
+    artifactPath,
+  };
+  return {
+    id: "model-manifest-trainable-artifact",
+    name: manifest.name ? `${manifest.name} trainable` : "Manifest trainable artifact",
+    label: "Manifest Train",
+    loadMode: "trainable-artifact",
+    kind: "trainable-kernel-model-artifact",
+    stage: "algorithm-handoff-artifact",
+    objectCount: ogcPositiveInteger(manifest.counts?.objects ?? artifact.object_count) ?? model.objectCount ?? 0,
+    galleryPosition: [-3.95, 0, 5.08],
+    accent: "#f7df63",
+    displayScale: model.displayScale ?? 1.92,
+    pointSize: model.pointSize ?? 0.082,
+    maxDisplayPoints: 256,
+    license: manifest.license ?? model.license ?? "url-debug-artifact",
+    trainableArtifactPath: artifactPath,
+    compression: {
+      layout: "trainable-kernel-artifact-json",
+      status: "model-manifest-debug-artifact",
+      chunkRoot: "/models/model-manifest-trainable/objects/",
+    },
+    modelArtifactManifest: replaceManifestArtifact(manifest, artifact, resolvedArtifact),
+  };
+}
+
 function validateTrainableArtifact(artifact) {
   if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") {
     throw new Error("unsupported trainable kernel model artifact schema");
@@ -973,6 +1104,33 @@ function validateTrainableArtifact(artifact) {
     throw new Error("trainable artifact missing object states");
   }
   return artifact;
+}
+
+function ogcManifestChildModel(model) {
+  return {
+    id: "model-manifest-ogc-artifact",
+    name: "Manifest OGC artifact",
+    label: "Manifest OGC",
+    loadMode: "ogc-manifest",
+    kind: "compressed-chunked-ogc-manifest",
+    stage: "algorithm-handoff-artifact",
+    objectCount: model.objectCount ?? 0,
+    galleryPosition: [3.85, 0, 5.02],
+    accent: "#58f2c2",
+    displayScale: model.displayScale ?? 1.72,
+    pointSize: 0.07,
+    maxDisplayPoints: 2400,
+    license: model.license,
+    ogc: {
+      ...(model.ogc ?? {}),
+      manifestPath: model.manifestPath,
+    },
+    compression: {
+      layout: "object-aware-quantized-ogc-manifest",
+      status: "model-manifest-debug-artifact",
+      chunkRoot: "/models/model-manifest-ogc/objects/",
+    },
+  };
 }
 
 function ogcUrlManifestModelFromManifest(model, manifest, manifestPath) {

@@ -113,12 +113,19 @@ export function resolveModelArtifactRoutes(manifest) {
       artifact.delivery_tier === "browser_edit" &&
       artifact.browser_ready === true,
   ) ?? null;
+  const trainableKernel = artifacts.find(
+    (artifact) =>
+      artifact.role === "trainable_kernel" &&
+      artifact.delivery_tier === "browser_edit" &&
+      artifact.browser_ready === true,
+  ) ?? null;
   return {
     manifestId: manifest.manifest_id ?? "",
     schema: manifest.schema ?? "",
     browserReadyCount: artifacts.filter((artifact) => artifact.browser_ready === true).length,
     quickSplat,
     objectEdit,
+    trainableKernel,
     compressedChunked,
     diagnosticFull,
   };
@@ -145,6 +152,7 @@ export function browserReadyArtifact(asset, role) {
   const routes = asset?.modelArtifactRoutes ?? resolveModelArtifactRoutes(asset?.modelArtifactManifest);
   if (role === "quick_splat") return routes.quickSplat;
   if (role === "object_edit") return routes.objectEdit;
+  if (role === "trainable_kernel") return routes.trainableKernel;
   if (role === "compressed_chunked") return routes.compressedChunked;
   return null;
 }
@@ -160,6 +168,7 @@ function emptyModelArtifactRoutes() {
     browserReadyCount: 0,
     quickSplat: null,
     objectEdit: null,
+    trainableKernel: null,
     compressedChunked: null,
     diagnosticFull: null,
   };

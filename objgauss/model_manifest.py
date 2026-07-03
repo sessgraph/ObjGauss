@@ -18,6 +18,7 @@ ARTIFACT_ROLES = frozenset(
         "source_gaussian",
         "object_field",
         "training_summary",
+        "trainable_kernel",
         "quality_report",
         "compressed_chunked",
     }
@@ -34,7 +35,7 @@ DELIVERY_TIERS = frozenset(
 )
 
 BROWSER_READY_TIERS = frozenset({"browser_quick", "browser_edit"})
-BROWSER_ARTIFACT_ROLES = frozenset({"quick_splat", "object_edit", "compressed_chunked"})
+BROWSER_ARTIFACT_ROLES = frozenset({"quick_splat", "object_edit", "trainable_kernel", "compressed_chunked"})
 
 
 @dataclass(frozen=True)

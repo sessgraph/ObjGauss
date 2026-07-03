@@ -272,6 +272,21 @@ assignment heatmap、Gaussian probe、snapshot 和 event trace。新增
 `scene.index.json` / `scene.ogc`，不是训练输出或大资产；`scripts/audit-world-viewer.mjs`
 现在验证 `urlOgcManifest=url-manifest-range-lod-chunk-ui`。
 
+`ALGO-MANIFEST-BUNDLE-001` 已把算法产物 handoff 从“单一 OGC manifest”升级为组合
+`modelArtifactManifest` 路径：`objgauss/model_manifest.py` 现在承认
+`trainable_kernel` browser-ready role；`src/modelArtifactManifest.js` 可解析
+`trainableKernel` route；`src/modelCatalog.js` 将
+`?modelArtifactManifest=/path/model-artifact.json` 作为组合入口，而 `?ogcManifest=...`
+继续保留 OGC-only 入口。`src/App.jsx` 新增 `model-artifact-manifest` load mode，会
+fetch `objgauss-model-artifact-manifest-v1` 后自动展开为 `Manifest Train` 和
+`Manifest OGC` 两个 runtime 模型：前者复用 trainable artifact loader，展示
+`A[N,K]`、ObjectState、training loss 和 Gaussian probe；后者复用 OGC range loader、
+LOD selector、chunk selector 与 ObjectState Debug OS。新增
+`public/models/algorithm-bundle-fixture/model-artifact.json` 只引用既有 trainable debug
+artifact 与 tiny OGC fixture，不复制 payload、不提交训练输出；同轮修复多模型 dock 被
+floating inspector 遮挡的问题。`scripts/audit-world-viewer.mjs` 现在验证
+`algorithmManifest=manifest-trainable-ogc-debug-os`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

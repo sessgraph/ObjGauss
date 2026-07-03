@@ -72,6 +72,50 @@
 
 ## Done
 
+### ALGO-MANIFEST-BUNDLE-001: Load combined algorithm model artifact manifests
+
+- 状态: done / algorithm-manifest-debug-os-bundle
+- 类型: 标准 PR / browser delivery + ObjectState Debug OS handoff
+- 目标: 让一个同源 `objgauss-model-artifact-manifest-v1` 同时向前端注册训练
+  ObjectState 证据和 OGC browser-ready 渲染 artifact，避免算法输出被拆成
+  `trainableArtifact` 与 `ogcManifest` 两条手工入口。
+- 已实施:
+  - `objgauss/model_manifest.py` 将 `trainable_kernel` 纳入合法 artifact role，并允许
+    其作为 `browser_edit` / `browser_ready=true` 的 Debug OS 交付 artifact。
+  - `src/modelArtifactManifest.js` 新增 `trainableKernel` route resolution；
+    `browserReadyArtifact(..., "trainable_kernel")` 现在可返回训练 kernel artifact。
+  - `src/modelCatalog.js` 将 `?modelArtifactManifest=/path/model-artifact.json`
+    收敛为组合 handoff 入口；`?ogcManifest=...` 继续保持 OGC-only 入口。
+  - `src/App.jsx` 新增 `model-artifact-manifest` load mode：fetch manifest 后自动展开为
+    `Manifest Train` 和 `Manifest OGC` 两个 runtime 模型，分别复用现有 trainable
+    artifact loader 与 OGC range / LOD / chunk loader。
+  - 新增 `public/models/algorithm-bundle-fixture/model-artifact.json` 小型组合 fixture，
+    只引用现有 trainable debug artifact 和 OGC tiny fixture，不复制 payload、不提交训练输出。
+  - 修复多模型场景下底部 model dock 被 floating inspector 遮挡的问题；桌面 dock 现在限制在
+    中间通道，窄桌面隐藏右侧只读 inspector。
+  - `scripts/audit-world-viewer.mjs` 新增组合 manifest audit，验证 manifest 自动展开、
+    训练 loss / assignment heatmap / Gaussian probe、OGC range route / LOD / chunk scope
+    和 `manifest-load` event trace。
+- 边界:
+  - 不训练新模型，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不改变 OGC payload record format、chunk index schema 或 decoder 数学。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+  - 不实现跨域 manifest、远程缓存、progressive scheduler、VQ / entropy / WebGPU decoder。
+- 验证:
+  - `uv run python -c "... validate_model_artifact_manifest ..."`: algorithm bundle fixture
+    与 OGC URL fixture 均 passed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `algorithmManifest=manifest-trainable-ogc-debug-os`、
+    `urlOgcManifest=url-manifest-range-lod-chunk-ui` 和
+    `localOgcManifest=local-manifest-file-lod-chunk-ui`。截图
+    `/tmp/objgauss-world-viewer-algorithm-manifest.png` 显示组合 manifest 的 OGC 模型、
+    LOD1、单 chunk scope、`range-ogc` 和不重叠的 model dock。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `uv run --extra dev pytest`: 137 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-URL-MANIFEST-ARTIFACT-001: Load same-origin OGC model artifact manifests by URL
 
 - 状态: done / ogc-url-manifest-artifact

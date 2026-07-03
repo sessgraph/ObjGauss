@@ -1,13 +1,14 @@
 {
   "schema": "objgauss-model-artifact-manifest-v1",
-  "manifest_id": "ogc-url-fixture-model-artifacts",
-  "asset_id": "ogc-url-fixture",
-  "name": "URL OGC manifest fixture",
+  "manifest_id": "algorithm-bundle-fixture-model-artifacts",
+  "asset_id": "algorithm-bundle-fixture",
+  "name": "Algorithm bundle fixture",
   "stage": "browser-delivery-fixture",
   "source": {
-    "type": "ogc_url_fixture",
-    "index": "scene.index.json",
-    "payload": "scene.ogc"
+    "type": "algorithm_bundle_fixture",
+    "trainable": "../trainable-mvp-debug/model-artifact.json",
+    "ogc_index": "../ogc-url-fixture/scene.index.json",
+    "ogc_payload": "../ogc-url-fixture/scene.ogc"
   },
   "license": "fixture",
   "counts": {
@@ -16,8 +17,21 @@
   },
   "artifacts": [
     {
+      "role": "trainable_kernel",
+      "path": "../trainable-mvp-debug/model-artifact.json",
+      "format": ".json",
+      "delivery_tier": "browser_edit",
+      "browser_ready": true,
+      "gaussian_count": 4,
+      "object_count": 2,
+      "byte_size": 4030,
+      "sha256": "852356167a38c86bcce600a056cc7eb10cc1228f3e92bd52457b9592eab7971d",
+      "artifact_schema": "objgauss-trainable-kernel-model-artifact-v1",
+      "label": "Trainable ObjectState kernel artifact"
+    },
+    {
       "role": "compressed_chunked",
-      "path": "scene.ogc",
+      "path": "../ogc-url-fixture/scene.ogc",
       "format": ".ogc",
       "delivery_tier": "browser_edit",
       "browser_ready": true,
@@ -27,7 +41,7 @@
       "sha256": "8b01a129ef970a21900f86877e0d69e32616d087dda7fe333ddb78334f769c5c",
       "chunk_index": {
         "schema": "objgauss-chunk-index-v1",
-        "path": "scene.index.json",
+        "path": "../ogc-url-fixture/scene.index.json",
         "chunk_count": 2,
         "sort_key": "object_id+morton_xyz",
         "chunk_size_target": 2
@@ -39,7 +53,7 @@
         "quantization": {
           "schema": "objgauss-local-quantization-v1",
           "policy": "chunk-aabb-uint16-rgb8-opacity8-v0",
-          "status": "url_fixture"
+          "status": "algorithm_bundle_fixture"
         }
       },
       "lod": {
@@ -59,14 +73,17 @@
   ],
   "quality_evidence": [
     {
-      "kind": "ogc-url-manifest-browser-fixture",
-      "status": "fixture"
+      "kind": "object_state_debug_os_bundle_fixture",
+      "status": "fixture",
+      "trainable_artifact": "objgauss-trainable-kernel-model-artifact-v1",
+      "browser_artifact": "compressed_chunked"
     }
   ],
   "limitations": [
-    "Tiny fixture for same-origin model artifact manifest URL loading; not a trained scene."
+    "Tiny fixture proving one model artifact manifest can hand off both trainable ObjectState evidence and OGC browser delivery.",
+    "Not a trained production scene and not a public demo release."
   ],
   "created_from": {
-    "source": "OGC-URL-MANIFEST-ARTIFACT-001"
+    "source": "ALGO-MANIFEST-BUNDLE-001"
   }
 }

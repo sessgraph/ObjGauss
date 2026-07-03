@@ -15,6 +15,7 @@
   },
   "compression": {
     "codec": "objgauss-ogc-prototype",
+    "version": "0.1",
     "layout": "object-aware-chunked-local-quantized",
     "quantization": {
       "schema": "objgauss-local-quantization-v1",

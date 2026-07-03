@@ -120,6 +120,39 @@ def test_model_artifact_manifest_rejects_browser_ready_diagnostic_full(tmp_path)
     assert any("diagnostic_full artifact must not be browser_ready" in error for error in validation.errors)
 
 
+def test_model_artifact_manifest_allows_browser_ready_trainable_kernel(tmp_path):
+    artifact_path = tmp_path / "trainable-model-artifact.json"
+    artifact_path.write_text('{"schema":"objgauss-trainable-kernel-model-artifact-v1"}', encoding="utf-8")
+    manifest = build_model_artifact_manifest(
+        manifest_id="trainable-debug-model-artifacts",
+        asset_id="trainable-debug",
+        name="Trainable Debug",
+        source={"type": "trainable_kernel_debug_fixture"},
+        license="fixture",
+        gaussian_count=4,
+        object_count=2,
+        artifacts=[
+            build_model_artifact(
+                role="trainable_kernel",
+                path=artifact_path,
+                format=".json",
+                delivery_tier="browser_edit",
+                gaussian_count=4,
+                object_count=2,
+                compute_hash=True,
+            )
+        ],
+        limitations=["Small trainable-kernel artifact for ObjectState Debug OS handoff."],
+    )
+
+    roles = {artifact["role"]: artifact for artifact in manifest["artifacts"]}
+    assert roles["trainable_kernel"]["browser_ready"] is True
+    assert roles["trainable_kernel"]["delivery_tier"] == "browser_edit"
+    validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
+    assert validation.passed
+    assert validation.browser_ready_artifacts == 1
+
+
 def test_manifest_from_training_output(tmp_path):
     training_manifest = tmp_path / "training-output-manifest.json"
     training_manifest.write_text(
