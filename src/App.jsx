@@ -29,6 +29,7 @@ export default function App() {
   const initialModelId = useMemo(() => defaultModelIdForCatalog(modelCatalog), [modelCatalog]);
   const worldApi = useRef(null);
   const loadStarted = useRef(false);
+  const artifactInputRef = useRef(null);
   const [worldReady, setWorldReady] = useState(false);
   const [selection, setSelection] = useState(() => ({
     modelId: initialModelId,
@@ -43,7 +44,14 @@ export default function App() {
   const [hoveredTarget, setHoveredTarget] = useState(null);
   const [debugProbe, setDebugProbe] = useState(null);
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
-  const summary = useMemo(() => catalogSummary(modelCatalog), [modelCatalog]);
+  const [artifactImport, setArtifactImport] = useState(() => ({
+    status: "idle",
+    modelId: "",
+    fileName: "",
+    error: "",
+  }));
+  const modelList = useMemo(() => Object.values(models), [models]);
+  const summary = useMemo(() => catalogSummary(modelList), [modelList]);
   const loadedCount = useMemo(
     () => Object.values(models).filter((model) => ["loaded", "compressed"].includes(model.status)).length,
     [models],
@@ -64,11 +72,11 @@ export default function App() {
   );
   const objectCount = useMemo(
     () =>
-      Object.values(models).reduce(
+      modelList.reduce(
         (total, model) => total + (model.objects?.length || Number(model.objectCount) || 0),
         0,
       ),
-    [models],
+    [modelList],
   );
   const selectedId = selection.modelId;
   const selected = models[selectedId] ?? Object.values(models)[0];
@@ -148,6 +156,43 @@ export default function App() {
     });
   }, []);
 
+  const upsertTrainableArtifactModel = useCallback((model, artifact, options = {}) => {
+    const hydratedModel = { ...model, trainableArtifact: artifact, trainableFrameIndex: 0 };
+    const startedAt = Number(options.startedAt);
+    const rendered = worldApi.current?.upsertModel(hydratedModel, null);
+    const loadMs = Number.isFinite(startedAt) ? Math.round(performance.now() - startedAt) : 0;
+    const nextModel = {
+      ...hydratedModel,
+      status: "loaded",
+      message: options.message ?? "trained artifact json",
+      gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? 0,
+      displayCount: rendered?.displayCount ?? 0,
+      objectCount: rendered?.objectCount ?? model.objectCount,
+      corePoint: rendered?.corePoint ?? null,
+      objects: rendered?.objects ?? [],
+      loadMs,
+      delivery: {
+        source: "trainable-kernel-model-artifact",
+        loadRoute: options.loadRoute ?? (model.trainableArtifactPath ? "fetch-json" : "inline"),
+        artifactPath: options.artifactPath ?? model.trainableArtifactPath ?? "inline://trainable-artifact",
+        frameIndex: rendered?.trainableFrameIndex ?? 0,
+        frameCount: rendered?.trainableFrameCount ?? artifact.object_states?.length ?? 0,
+        schema: artifact.schema,
+        rendererName: artifact.renderer_api?.renderer_name,
+        imageRenderLoss: artifact.renderer_api?.image_render_loss,
+        gradientPath: artifact.renderer_api?.gradient_path,
+      },
+    };
+    setModels((current) => ({
+      ...current,
+      [model.id]: {
+        ...(current[model.id] ?? {}),
+        ...nextModel,
+      },
+    }));
+    return nextModel;
+  }, []);
+
   const selectModel = useCallback(
     (id) => {
       setSelection({ modelId: id, objectId: null, selectionId: id });
@@ -205,6 +250,58 @@ export default function App() {
       return next;
     });
   }, []);
+
+  const importTrainableArtifactFile = useCallback(
+    async (event) => {
+      const file = event.target.files?.[0] ?? null;
+      event.target.value = "";
+      if (!file) return;
+      const model = trainableLocalArtifactModel(file.name);
+      const startedAt = performance.now();
+      setArtifactImport({ status: "loading", modelId: model.id, fileName: file.name, error: "" });
+      try {
+        const artifact = validateTrainableArtifact(JSON.parse(await file.text()));
+        const imported = upsertTrainableArtifactModel(model, artifact, {
+          startedAt,
+          loadRoute: "local-file",
+          artifactPath: `local://${file.name}`,
+          message: "local artifact json",
+        });
+        setDebugProbe(null);
+        setHoveredTarget(null);
+        setHiddenObjects((current) => {
+          const next = new Set(
+            [...current].filter((selectionId) => !String(selectionId).startsWith(`${model.id}::`)),
+          );
+          worldApi.current?.setHiddenObjects(next);
+          return next;
+        });
+        setSelection({ modelId: model.id, objectId: null, selectionId: model.id });
+        worldApi.current?.focusModel(model.id);
+        setArtifactImport({ status: "loaded", modelId: model.id, fileName: file.name, error: "" });
+        recordDebugEvent("import-artifact", {
+          modelId: model.id,
+          selectionId: model.id,
+          fileName: file.name,
+          source: imported.delivery.loadRoute,
+        });
+      } catch (error) {
+        setArtifactImport({
+          status: "error",
+          modelId: model.id,
+          fileName: file.name,
+          error: error?.message ?? "artifact import failed",
+        });
+        recordDebugEvent("import-artifact-error", {
+          modelId: model.id,
+          selectionId: model.id,
+          fileName: file.name,
+          source: "local-file",
+        });
+      }
+    },
+    [recordDebugEvent, upsertTrainableArtifactModel],
+  );
 
   const selectTrainableFrame = useCallback(
     (frameIndex) => {
@@ -436,30 +533,12 @@ export default function App() {
           patchModel(model.id, { status: "loading", message: "loading trained artifact" });
           try {
             const artifact = await loadTrainableArtifact(model);
-            const hydratedModel = { ...model, trainableArtifact: artifact };
-            const rendered = worldApi.current?.upsertModel(hydratedModel, null);
             if (cancelled) return;
-            patchModel(model.id, {
-              trainableArtifact: artifact,
-              status: "loaded",
+            upsertTrainableArtifactModel(model, artifact, {
+              startedAt,
+              loadRoute: model.trainableArtifactPath ? "fetch-json" : "inline",
+              artifactPath: model.trainableArtifactPath ?? "inline://trainable-artifact",
               message: "trained artifact json",
-              gaussianCount: rendered?.gaussianCount ?? rendered?.displayCount ?? 0,
-              displayCount: rendered?.displayCount ?? 0,
-              objectCount: rendered?.objectCount ?? model.objectCount,
-              corePoint: rendered?.corePoint ?? null,
-              objects: rendered?.objects ?? [],
-              loadMs: Math.round(performance.now() - startedAt),
-              delivery: {
-                source: "trainable-kernel-model-artifact",
-                loadRoute: model.trainableArtifactPath ? "fetch-json" : "inline",
-                artifactPath: model.trainableArtifactPath ?? "inline://trainable-artifact",
-                frameIndex: rendered?.trainableFrameIndex ?? 0,
-                frameCount: rendered?.trainableFrameCount ?? artifact.object_states?.length ?? 0,
-                schema: artifact.schema,
-                rendererName: artifact.renderer_api?.renderer_name,
-                imageRenderLoss: artifact.renderer_api?.image_render_loss,
-                gradientPath: artifact.renderer_api?.gradient_path,
-              },
             });
           } catch (error) {
             if (cancelled) return;
@@ -524,7 +603,8 @@ export default function App() {
       data-three-renderer="enabled"
       data-sidebars="none"
       data-frosted-ui="enabled"
-      data-model-count={modelCatalog.length}
+      data-model-count={modelList.length}
+      data-catalog-model-count={modelCatalog.length}
       data-loaded-count={loadedCount}
       data-selected-model={selected?.id ?? ""}
       data-object-count={objectCount}
@@ -588,6 +668,10 @@ export default function App() {
       data-trainable-training-final-image-loss={selectedTrainingEvidence?.finalImageLoss ?? ""}
       data-trainable-training-image-loss-delta={selectedTrainingEvidence?.imageLossDelta ?? ""}
       data-trainable-training-image-loss-decreased={selectedTrainingEvidence?.imageLossDecreased ? "true" : ""}
+      data-trainable-import-status={artifactImport.status}
+      data-trainable-import-model={artifactImport.modelId}
+      data-trainable-import-file={artifactImport.fileName}
+      data-trainable-import-error={artifactImport.error}
     >
       <ThreeWorld
         models={modelCatalog}
@@ -616,6 +700,27 @@ export default function App() {
           <Metric label="对象" value={objectCount} />
         </div>
         <div className="topActions">
+          <input
+            ref={artifactInputRef}
+            className="fileInputHidden"
+            type="file"
+            accept="application/json,.json"
+            data-trainable-artifact-file-input="true"
+            onChange={importTrainableArtifactFile}
+          />
+          <button
+            className={`glassButton ${artifactImport.status === "loaded" ? "active" : ""}`}
+            type="button"
+            data-trainable-artifact-import-button="true"
+            data-import-status={artifactImport.status}
+            onClick={() => artifactInputRef.current?.click()}
+          >
+            {artifactImport.status === "loading"
+              ? "导入中"
+              : artifactImport.status === "error"
+                ? "导入失败"
+                : "导入训练"}
+          </button>
           <button
             className={`glassButton ${debugMode ? "active" : ""}`}
             type="button"
@@ -631,7 +736,7 @@ export default function App() {
       </div>
 
       <div className="glassHud objectDock" aria-label="模型入口">
-        {Object.values(models).map((model) => (
+        {modelList.map((model) => (
           <button
             className={`modelPill ${selectedId === model.id ? "selected" : ""}`}
             type="button"
@@ -759,6 +864,29 @@ function validateTrainableArtifact(artifact) {
     throw new Error("trainable artifact missing object states");
   }
   return artifact;
+}
+
+function trainableLocalArtifactModel(fileName) {
+  return {
+    id: "trainable-local-artifact",
+    name: "Local trainable artifact",
+    label: "Local Artifact",
+    loadMode: "trainable-artifact",
+    kind: "trainable-kernel-model-artifact",
+    stage: "local-debug-artifact",
+    objectCount: 0,
+    galleryPosition: [5.45, 0, 4.48],
+    accent: "#7ff1d6",
+    displayScale: 1.92,
+    pointSize: 0.082,
+    maxDisplayPoints: 256,
+    trainableArtifactName: fileName,
+    compression: {
+      layout: "trainable-kernel-artifact-json",
+      status: "local-debug-artifact",
+      chunkRoot: "/models/local-trainable-artifact/objects/",
+    },
+  };
 }
 
 function availableOgcLodLevels(index) {
@@ -969,7 +1097,7 @@ function ThreeWorld({
         renderer: "three.js",
         ui: "frosted-glass-in-world",
         sidebars: false,
-        modelCount: models.length,
+        modelCount: modelRoots.size,
         objectCount: draggableObjects.size,
         draggableCount: draggableObjects.size,
         draggableObjectCount: draggableObjects.size,
@@ -3093,6 +3221,7 @@ function debugEventFromDetail(type, detail = {}, seq = 0) {
     frameIndex: cleanNullable(clean.frameIndex),
     lodLevel: cleanNullable(clean.lodLevel),
     chunkScope: cleanString(clean.chunkScope),
+    fileName: cleanString(clean.fileName),
     visible: typeof clean.visible === "boolean" ? clean.visible : null,
     source: cleanString(clean.source),
     position: cleanNumberArray(clean.position),
@@ -3113,6 +3242,7 @@ function compactDebugEvents(events) {
     frameIndex: cleanNullable(event?.frameIndex),
     lodLevel: cleanNullable(event?.lodLevel),
     chunkScope: cleanString(event?.chunkScope),
+    fileName: cleanString(event?.fileName),
     visible: typeof event?.visible === "boolean" ? event.visible : null,
     source: cleanString(event?.source),
     position: cleanNumberArray(event?.position),
@@ -3127,6 +3257,7 @@ function debugEventDetailLabel(event) {
   if (event.type === "toggle-visibility") return event.visible ? "visible" : "hidden";
   if (event.type === "ogc-lod") return event.lodLevel === null ? "LOD -" : `L${event.lodLevel}`;
   if (event.type === "ogc-chunks") return event.chunkScope || "all";
+  if (event.type === "import-artifact" || event.type === "import-artifact-error") return event.fileName || "local";
   if (event.objectId !== null && event.objectId !== undefined) return `#${event.objectId}`;
   return event.modelId || event.source || "-";
 }

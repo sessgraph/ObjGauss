@@ -479,6 +479,21 @@ targets、heatmap、stability telemetry 和 Gaussian probe。`scripts/audit-worl
 现在额外打开 URL 注入路径，验证模型数变为 8、默认选中 URL artifact、`urlArtifact=fetch-json`
 且 frame 1 可审计。该切片只支持同源 `.json` 路径，不支持远程 URL，不提交训练输出或大模型。
 
+`TRAINABLE-LOCAL-ARTIFACT-IMPORT-001` 已完成 Debug OS 的本地 trainable artifact 导入入口：
+`src/App.jsx` 的 top HUD 新增 `导入训练` 文件入口，可直接读取本地
+`objgauss-trainable-kernel-model-artifact-v1` JSON，复用同一 schema 校验和
+trainable artifact hydrate / upsert helper，把本地文件作为运行时
+`trainable-local-artifact` 注入 Three.js ObjectState Debug OS。该模型会生成同样的
+ObjectState render targets、assignment heatmap、frame selector、Training evidence、
+snapshot 和 event trace；delivery route 明确标为 `local-file`，artifact path 标为
+`local://<file>`。root telemetry 新增 `data-trainable-import-*`，并将
+`data-model-count` / `window.__OBJGAUSS_WORLD__.modelCount` 改为运行时 scene model count，
+同时保留 `data-catalog-model-count`。`scripts/audit-world-viewer.mjs` 现在用
+Playwright `setInputFiles(...)` 导入小型 fixture，验收输出 `localArtifact=local-file`。
+该入口服务 ignored `outputs/` 或 `/tmp` 中的新训练产物调试，不把训练产物复制进
+`public/` 或 git；不改变训练算法、artifact schema、renderer API 或 gsplat / CUDA
+blocker。
+
 `TRAINABLE-LOSS-DEBUG-UI-001` 已完成 trainable artifact 的训练证据可视化：
 `src/App.jsx` 从 `objgauss-trainable-kernel-model-artifact-v1.training` 与
 `renderer_api` 只读生成 evidence summary，并把 `loss_down`、iterations、final total loss、

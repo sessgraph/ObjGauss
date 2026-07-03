@@ -35,6 +35,7 @@ try {
       `trainImageLoss=${summary.trainableTrainingFinalImageLoss}`,
       `urlArtifact=${summary.urlArtifactStatus}`,
       `urlOgc=${summary.urlOgcStatus}`,
+      `localArtifact=${summary.localArtifactStatus}`,
       `assignmentSlots=${summary.assignmentSlots}`,
       `assignmentSource=${summary.assignmentSource}`,
       `stability=${summary.stabilityStatus}`,
@@ -407,6 +408,7 @@ async function auditWorld(url) {
     const mobileScreenshotPath = await auditMobileWorld(browser, url);
     const urlArtifact = await auditUrlTrainableArtifact(browser, url);
     const urlOgc = await auditUrlOgcArtifact(browser, url);
+    const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
@@ -645,6 +647,7 @@ async function auditWorld(url) {
       trainableTrainingFinalImageLoss: world.trainableTrainingFinalImageLoss,
       urlArtifactStatus: urlArtifact.status,
       urlOgcStatus: urlOgc.status,
+      localArtifactStatus: localArtifact.status,
       assignmentSource: world.assignmentSource,
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
@@ -755,6 +758,87 @@ async function auditUrlTrainableArtifact(browser, url) {
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-artifact.png", fullPage: false });
     return { status: "fetch-json" };
+  } finally {
+    await page.close();
+  }
+}
+
+async function auditLocalTrainableArtifactImport(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-trainable-artifact-file-input='true']").setInputFiles(
+      "public/models/trainable-mvp-debug/model-artifact.json",
+    );
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-local-artifact']");
+      const button = document.querySelector("[data-trainable-artifact-import-button='true']");
+      const training = document.querySelector("[data-training-evidence='true']");
+      return (
+        pill?.getAttribute("data-model-load-state") === "loaded" &&
+        button?.getAttribute("data-import-status") === "loaded" &&
+        shell?.getAttribute("data-model-count") === "8" &&
+        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        shell?.getAttribute("data-selected-model") === "trainable-local-artifact" &&
+        shell?.getAttribute("data-trainable-import-status") === "loaded" &&
+        shell?.getAttribute("data-trainable-import-model") === "trainable-local-artifact" &&
+        shell?.getAttribute("data-trainable-import-file") === "model-artifact.json" &&
+        shell?.getAttribute("data-trainable-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
+        shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
+        shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
+        training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1"
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = world?.objectSelections?.find((entry) => entry.modelId === "trainable-local-artifact");
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+        modelCount: world?.modelCount ?? 0,
+      };
+    });
+    if (!selection.ok || selection.modelId !== "trainable-local-artifact" || selection.modelCount !== 8) {
+      throw new Error(`expected local artifact object selection: ${JSON.stringify(selection)}`);
+    }
+    const gaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+      };
+    }, selection.selectionId);
+    if (!gaussian.ok || gaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`expected local artifact Gaussian probe: ${JSON.stringify(gaussian)}`);
+    }
+    await page.locator("[data-trainable-frame-button='1']").click();
+    await page.waitForFunction(() => {
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const frameSelector = document.querySelector("[data-trainable-frame-selector='true']");
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      return (
+        shell?.getAttribute("data-selected-model") === "trainable-local-artifact" &&
+        shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
+        frameSelector?.getAttribute("data-selected-frame") === "1" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2 &&
+        snapshot?.model?.id === "trainable-local-artifact" &&
+        snapshot?.delivery?.loadRoute === "local-file" &&
+        types.has("import-artifact") &&
+        types.has("gaussian-probe") &&
+        types.has("frame-select")
+      );
+    }, undefined, { timeout: 15000 });
+    await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-artifact.png", fullPage: false });
+    return { status: "local-file" };
   } finally {
     await page.close();
   }

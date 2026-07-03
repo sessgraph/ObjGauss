@@ -72,6 +72,47 @@
 
 ## Done
 
+### TRAINABLE-LOCAL-ARTIFACT-IMPORT-001: Import local trainable artifacts into Debug OS
+
+- 状态: done / trainable-local-artifact-import
+- 类型: 标准 PR / frontend debug artifact delivery
+- 目标: 让 ObjectState Debug OS 可以直接加载本地
+  `objgauss-trainable-kernel-model-artifact-v1` JSON 文件，用于调试 ignored
+  `outputs/` 或 `/tmp` 里的新算法训练产物，而不需要把产物复制到 `public/` 或修改
+  `src/modelCatalog.js`。
+- 已实施:
+  - `src/App.jsx` 新增 top HUD `导入训练` 文件入口，只接受 `.json` /
+    `application/json`，并复用现有 `validateTrainableArtifact(...)` schema / kind /
+    assignments / object states 校验。
+  - catalog fetch 路径和本地 file import 路径共用同一个 trainable artifact hydrate /
+    upsert helper，生成同样的 ObjectState render targets、assignment heatmap、frame
+    selector、Training evidence、snapshot 和 event trace。
+  - 本地导入模型以运行时 `trainable-local-artifact` 加入 model dock，不写入仓库、不写入
+    `public/`，delivery route 标记为 `local-file`，artifact path 标记为
+    `local://<file>`。
+  - `.worldShell` 新增 `data-trainable-import-*` telemetry；`window.__OBJGAUSS_WORLD__`
+    model count 改为实际 scene model count，root `data-model-count` 改为运行时模型数，
+    同时保留 `data-catalog-model-count`。
+  - `scripts/audit-world-viewer.mjs` 使用 Playwright `setInputFiles(...)` 导入
+    `public/models/trainable-mvp-debug/model-artifact.json` 作为小型 fixture，验证本地
+    import、selection、Gaussian probe、frame switch、snapshot delivery 和 event trace。
+- 边界:
+  - 不改变 Python 训练算法、artifact schema、训练输出 writer 或 renderer API。
+  - 不提交新的训练输出、checkpoint、rendered image 或大资产。
+  - 不支持远程 URL、本地目录批量导入、OGC index/payload file-pair import。
+  - 不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出包含 `localArtifact=local-file`、`debugEvents=12`、`trainLoss=0.053806`；
+    截图 `/tmp/objgauss-world-viewer-local-artifact.png` 显示本地导入模型和
+    `local://model-artifact.json` route。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 136 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OBJECT-DEBUG-TRACE-001: Add profiler-style Debug OS event trace
 
 - 状态: done / object-debug-trace
