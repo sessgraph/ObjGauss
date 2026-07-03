@@ -440,6 +440,17 @@ toggle 按钮验证 root telemetry、Debug panel、Three.js scene 和 snapshot �
 visible Gaussian 统计一致。该切片只强化 Phase 1 的 hide/show cluster 调试闭环，不改变
 assignment solver、ObjectState projection、renderer artifact schema 或训练 loop。
 
+`OBJECTSTATE-HOVER-ASSIGNMENT-001` 已将 hover 从纯视觉 focus 升级为 ObjectState
+assignment preview：`objectTarget(...)` 现在携带 hovered object 的 compact assignment
+vector、confidence、entropy、status、centroid 和 bbox；root telemetry、
+ObjectState Debug panel、`window.__OBJGAUSS_WORLD__`、debug snapshot 和 session archive
+同步记录 hover assignment source、slot count、top slot、margin、confidence、entropy 和
+probe status。`scripts/audit-world-viewer.mjs` 验证 hover trainable ObjectState 时 root /
+panel / scene handle / snapshot 四层都能看到 `trainable_kernel_model_artifact` 的 2-slot
+assignment preview，并保持 hover highlight、visibility、snapshot/session handoff 通过。
+该切片只强化 Phase 1 “hover 显示 A / ObjectState 快速预览”，不改变 solver、
+projection、renderer artifact schema 或训练 loop。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

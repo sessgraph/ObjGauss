@@ -78,6 +78,35 @@
 
 ## Done
 
+### OBJECTSTATE-HOVER-ASSIGNMENT-001: Hover ObjectState assignment preview
+
+- 状态: done / hover-assignment-preview
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 hover 从纯视觉 Gaussian cluster focus 升级为可审计的 ObjectState assignment
+  快速预览。
+- 已实施:
+  - `src/App.jsx` 的 `objectTarget(...)` 现在携带 hovered object 的 compact assignment
+    vector、confidence、entropy、status、centroid 和 bbox。
+  - root `.worldShell`、ObjectState Debug panel、`window.__OBJGAUSS_WORLD__`、debug snapshot
+    和 session archive 同步记录 hover assignment source、slot count、top slot、margin、
+    confidence、entropy 和 probe status。
+  - `scripts/audit-world-viewer.mjs` 验证 hover trainable ObjectState 时 root / panel /
+    scene handle / snapshot 四层都显示 `trainable_kernel_model_artifact` 的 2-slot assignment
+    preview，并保持 hover highlight、object visibility、snapshot/session handoff 通过。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: passed，输出包含 `hoveredObject=0`、`hoveredGaussians=2`、
+    `debugSessionDiff=match` 和 `debugSessionDrift=changed`，内部验证 hover assignment
+    root / panel / scene / snapshot contract。
+  - `git diff --check`: passed。
+- 完成 commit: `pending`
+
 ### OBJECTSTATE-VISIBILITY-CONTRACT-001: Auditable object visibility contract
 
 - 状态: done / object-toggle-gaussian-visibility-contract

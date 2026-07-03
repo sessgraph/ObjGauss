@@ -471,6 +471,12 @@ async function auditWorld(url) {
         hoveredId: window.__OBJGAUSS_WORLD__?.hoveredId ?? null,
         hoveredGaussianCount: window.__OBJGAUSS_WORLD__?.hoveredGaussianCount ?? 0,
         hoveredAssignmentSource: window.__OBJGAUSS_WORLD__?.hoveredAssignmentSource ?? null,
+        hoveredAssignmentSlotCount: window.__OBJGAUSS_WORLD__?.hoveredAssignment?.length ?? 0,
+        hoveredAssignmentProbeStatus: window.__OBJGAUSS_WORLD__?.hoveredAssignmentProbeStatus ?? null,
+        hoveredAssignmentProbeMargin: window.__OBJGAUSS_WORLD__?.hoveredAssignmentProbeMargin ?? null,
+        hoveredAssignmentConfidence: window.__OBJGAUSS_WORLD__?.hoveredAssignmentConfidence ?? null,
+        hoveredAssignmentEntropy: window.__OBJGAUSS_WORLD__?.hoveredAssignmentEntropy ?? null,
+        hoveredAssignmentTopSlot: window.__OBJGAUSS_WORLD__?.hoveredAssignmentTopSlot ?? null,
         hoverHighlightActive: window.__OBJGAUSS_WORLD__?.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedGaussianCount ?? 0,
@@ -497,6 +503,16 @@ async function auditWorld(url) {
       throw new Error(`unexpected hover assignment source: ${hoverSelection.hoveredAssignmentSource}`);
     }
     if (
+      hoverSelection.hoveredAssignmentSlotCount !== 2 ||
+      hoverSelection.hoveredAssignmentProbeStatus !== "confident" ||
+      !(Number(hoverSelection.hoveredAssignmentProbeMargin) > 0.45) ||
+      !(Number(hoverSelection.hoveredAssignmentConfidence) > 0.7) ||
+      !(Number(hoverSelection.hoveredAssignmentEntropy) > 0) ||
+      hoverSelection.hoveredAssignmentTopSlot !== 0
+    ) {
+      throw new Error(`expected hover assignment preview for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (
       hoverSelection.hoverHighlightActive !== true ||
       hoverSelection.hoverHighlightedObjectCount !== 1 ||
       hoverSelection.hoverHighlightedGaussianCount !== hoverSelection.hoveredGaussianCount ||
@@ -510,9 +526,13 @@ async function auditWorld(url) {
     await page.waitForFunction((selectionId) => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
+      const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const world = window.__OBJGAUSS_WORLD__;
       return (
         world?.hoveredId === selectionId &&
+        world?.hoveredAssignmentProbeStatus === "confident" &&
+        world?.hoveredAssignment?.length === 2 &&
         world?.hoverHighlightActive === true &&
         world?.hoverHighlightedObjectCount === 1 &&
         world?.hoverHighlightedGaussianCount === world?.hoveredGaussianCount &&
@@ -523,8 +543,18 @@ async function auditWorld(url) {
         shell?.getAttribute("data-hover-highlight") === "enabled" &&
         shell?.getAttribute("data-hover-highlight-object") === selectionId &&
         Number(shell?.getAttribute("data-hover-highlight-gaussians") ?? 0) === world?.hoveredGaussianCount &&
+        shell?.getAttribute("data-hover-assignment-source") === "trainable_kernel_model_artifact" &&
+        shell?.getAttribute("data-hover-assignment-slots") === "2" &&
+        shell?.getAttribute("data-hover-assignment-probe-status") === "confident" &&
+        Number(shell?.getAttribute("data-hover-assignment-probe-margin") ?? 0) > 0.45 &&
         panel?.getAttribute("data-hover-highlight") === "enabled" &&
-        panel?.getAttribute("data-hover-highlight-object") === selectionId
+        panel?.getAttribute("data-hover-highlight-object") === selectionId &&
+        panel?.getAttribute("data-hover-assignment-source") === "trainable_kernel_model_artifact" &&
+        panel?.getAttribute("data-hover-assignment-probe-status") === "confident" &&
+        snapshot?.hover?.selectionId === selectionId &&
+        snapshot?.hover?.probe?.status === "confident" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") === selectionId &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") === "confident"
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
     const toggleTarget = await page.evaluate((selectedId) => {
@@ -709,6 +739,13 @@ async function auditWorld(url) {
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
         hoveredGaussianCount: handle.hoveredGaussianCount,
+        hoveredAssignmentSource: handle.hoveredAssignmentSource ?? null,
+        hoveredAssignmentSlotCount: (handle.hoveredAssignment ?? []).length,
+        hoveredAssignmentProbeStatus: handle.hoveredAssignmentProbeStatus ?? null,
+        hoveredAssignmentProbeMargin: handle.hoveredAssignmentProbeMargin ?? null,
+        hoveredAssignmentConfidence: handle.hoveredAssignmentConfidence ?? null,
+        hoveredAssignmentEntropy: handle.hoveredAssignmentEntropy ?? null,
+        hoveredAssignmentTopSlot: handle.hoveredAssignmentTopSlot ?? null,
         hoverHighlightActive: handle.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: handle.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: handle.hoverHighlightedGaussianCount ?? 0,
@@ -722,6 +759,16 @@ async function auditWorld(url) {
         shellHoverHighlight: shell?.getAttribute("data-hover-highlight") ?? null,
         shellHoverHighlightObject: shell?.getAttribute("data-hover-highlight-object") ?? null,
         shellHoverHighlightGaussians: Number(shell?.getAttribute("data-hover-highlight-gaussians") ?? 0),
+        shellHoverAssignmentSource: shell?.getAttribute("data-hover-assignment-source") ?? null,
+        shellHoverAssignmentSlots: Number(shell?.getAttribute("data-hover-assignment-slots") ?? 0),
+        shellHoverAssignmentStatus: shell?.getAttribute("data-hover-assignment-probe-status") ?? null,
+        shellHoverAssignmentMargin: Number(shell?.getAttribute("data-hover-assignment-probe-margin") ?? 0),
+        panelHoverAssignmentSource: debugPanel?.getAttribute("data-hover-assignment-source") ?? null,
+        panelHoverAssignmentStatus: debugPanel?.getAttribute("data-hover-assignment-probe-status") ?? null,
+        snapshotHoverObject: snapshot?.hover?.selectionId ?? null,
+        snapshotHoverAssignmentStatus: snapshot?.hover?.probe?.status ?? null,
+        panelSnapshotHoverObject: snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") ?? null,
+        panelSnapshotHoverAssignmentStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") ?? null,
         worldVisibleObjectCount: handle.visibleObjectCount ?? 0,
         worldHiddenObjectCount: handle.hiddenObjectCount ?? 0,
         worldVisibleGaussianCount: handle.visibleGaussianCount ?? 0,
@@ -895,6 +942,27 @@ async function auditWorld(url) {
     }
     if (!(Number(world.hoveredGaussianCount) > 0 && Number(world.shellHoveredGaussians) > 0)) {
       throw new Error(`expected hovered ObjectState target to expose assigned Gaussians: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.hoveredAssignmentSource === "trainable_kernel_model_artifact" &&
+      world.hoveredAssignmentSlotCount === 2 &&
+      world.hoveredAssignmentProbeStatus === "confident" &&
+      world.hoveredAssignmentProbeMargin > 0.45 &&
+      world.hoveredAssignmentConfidence > 0.7 &&
+      world.hoveredAssignmentEntropy > 0 &&
+      world.hoveredAssignmentTopSlot === 0 &&
+      world.shellHoverAssignmentSource === world.hoveredAssignmentSource &&
+      world.shellHoverAssignmentSlots === world.hoveredAssignmentSlotCount &&
+      world.shellHoverAssignmentStatus === world.hoveredAssignmentProbeStatus &&
+      world.shellHoverAssignmentMargin > 0.45 &&
+      world.panelHoverAssignmentSource === world.hoveredAssignmentSource &&
+      world.panelHoverAssignmentStatus === world.hoveredAssignmentProbeStatus &&
+      world.snapshotHoverObject === world.hoveredId &&
+      world.snapshotHoverAssignmentStatus === world.hoveredAssignmentProbeStatus &&
+      world.panelSnapshotHoverObject === world.hoveredId &&
+      world.panelSnapshotHoverAssignmentStatus === world.hoveredAssignmentProbeStatus
+    )) {
+      throw new Error(`expected hover to expose ObjectState assignment preview: ${JSON.stringify(world)}`);
     }
     if (!(
       world.hoverHighlightActive === true &&

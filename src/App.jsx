@@ -133,6 +133,11 @@ export default function App() {
     debugProbe?.assignment ?? selectedObject?.assignment ?? selectedObject?.objectState?.assignment ?? [],
     debugProbe,
   );
+  const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
+    confidence: hoveredTarget?.confidence,
+    entropy: hoveredTarget?.entropy,
+    source: hoveredTarget?.assignmentSource,
+  });
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const objectVisibility = useMemo(
@@ -158,6 +163,8 @@ export default function App() {
     debugLens,
     objectOverlayMode: selectedObjectOverlayMode,
     debugProbe,
+    hoveredTarget,
+    hoverAssignmentProbe: hoveredAssignmentProbe,
     hiddenCount,
     objectVisibility,
     stability: selectedStability,
@@ -1196,6 +1203,15 @@ export default function App() {
       data-hover-highlight={hoveredTarget?.selectionId ? "enabled" : "disabled"}
       data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
       data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
+      data-hover-assignment-source={hoveredTarget?.assignmentSource ?? ""}
+      data-hover-assignment-slots={hoveredAssignmentProbe.slotCount}
+      data-hover-assignment-confidence={hoveredAssignmentProbe.confidence ?? ""}
+      data-hover-assignment-entropy={hoveredAssignmentProbe.entropy ?? ""}
+      data-hover-assignment-probe-status={hoveredAssignmentProbe.status}
+      data-hover-assignment-probe-margin={hoveredAssignmentProbe.margin ?? ""}
+      data-hover-assignment-top-slot={hoveredAssignmentProbe.topSlot ?? ""}
+      data-hover-assignment-ambiguous={hoveredAssignmentProbe.ambiguous ? "true" : "false"}
+      data-hover-assignment-collapse-risk={hoveredAssignmentProbe.collapseRisk ? "true" : "false"}
       data-hidden-objects={hiddenCount}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility.visibleObjectCount}
@@ -1454,6 +1470,7 @@ export default function App() {
         selectedObject={selectedObject}
         selectedObjectKey={selectedObjectKey}
         hoveredTarget={hoveredTarget}
+        hoverAssignmentProbe={hoveredAssignmentProbe}
         debugProbe={debugProbe}
         assignmentProbe={selectedAssignmentProbe}
         debugMode={debugMode}
@@ -2504,6 +2521,11 @@ function ThreeWorld({
         selectedGaussianProbe,
       );
       const hoveredTarget = objectTarget(hoveredObject);
+      const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
+        confidence: hoveredTarget?.confidence,
+        entropy: hoveredTarget?.entropy,
+        source: hoveredTarget?.assignmentSource,
+      });
       const hoverHighlightSamples = [...draggableObjects.values()].map((object) => {
         const cloud = firstGaussianCloud(object);
         return {
@@ -2548,6 +2570,15 @@ function ThreeWorld({
         hoveredObjectId: hoveredTarget?.objectId ?? null,
         hoveredGaussianCount: hoveredTarget?.gaussianCount ?? 0,
         hoveredAssignmentSource: hoveredTarget?.assignmentSource ?? null,
+        hoveredAssignment: hoveredTarget?.assignment ?? [],
+        hoveredAssignmentConfidence: hoveredAssignmentProbe.confidence,
+        hoveredAssignmentEntropy: hoveredAssignmentProbe.entropy,
+        hoveredAssignmentProbe,
+        hoveredAssignmentProbeStatus: hoveredAssignmentProbe.status,
+        hoveredAssignmentProbeMargin: hoveredAssignmentProbe.margin,
+        hoveredAssignmentTopSlot: hoveredAssignmentProbe.topSlot,
+        hoveredAssignmentAmbiguous: hoveredAssignmentProbe.ambiguous,
+        hoveredAssignmentCollapseRisk: hoveredAssignmentProbe.collapseRisk,
         hoverHighlightActive: Boolean(hoveredTarget?.selectionId),
         hoverHighlightedObjectCount: highlightedHoverSamples.length,
         hoverHighlightedGaussianCount: highlightedHoverSamples.reduce(
@@ -2985,6 +3016,7 @@ function DebugPanel({
   selectedObject,
   selectedObjectKey,
   hoveredTarget,
+  hoverAssignmentProbe,
   debugProbe,
   assignmentProbe,
   debugMode,
@@ -3058,6 +3090,15 @@ function DebugPanel({
       data-hover-highlight={hoveredTarget?.selectionId ? "enabled" : "disabled"}
       data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
       data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
+      data-hover-assignment-source={hoveredTarget?.assignmentSource ?? ""}
+      data-hover-assignment-slots={hoverAssignmentProbe?.slotCount ?? 0}
+      data-hover-assignment-confidence={hoverAssignmentProbe?.confidence ?? ""}
+      data-hover-assignment-entropy={hoverAssignmentProbe?.entropy ?? ""}
+      data-hover-assignment-probe-status={hoverAssignmentProbe?.status ?? "none"}
+      data-hover-assignment-probe-margin={hoverAssignmentProbe?.margin ?? ""}
+      data-hover-assignment-top-slot={hoverAssignmentProbe?.topSlot ?? ""}
+      data-hover-assignment-ambiguous={hoverAssignmentProbe?.ambiguous ? "true" : "false"}
+      data-hover-assignment-collapse-risk={hoverAssignmentProbe?.collapseRisk ? "true" : "false"}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
@@ -3244,6 +3285,8 @@ function DebugPanel({
           }
         />
         <Meta label="hover focus" value={hoveredTarget?.selectionId ? "enabled" : "-"} />
+        <Meta label="hover A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
+        <Meta label="hover H" value={formatRatio(hoverAssignmentProbe?.entropy)} />
         <Meta label="hidden" value={hiddenObjects.size} />
         <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
       </dl>
@@ -3336,6 +3379,9 @@ function DebugSnapshotPanel({
       data-debug-snapshot-assignment-probe-collapse-risk={snapshot.assignment.probe?.collapseRisk ? "true" : "false"}
       data-debug-snapshot-hidden-objects={snapshot.visibility?.hiddenObjectCount ?? ""}
       data-debug-snapshot-hidden-gaussians={snapshot.visibility?.hiddenGaussianCount ?? ""}
+      data-debug-snapshot-hover-object={snapshot.hover?.selectionId ?? ""}
+      data-debug-snapshot-hover-assignment-status={snapshot.hover?.probe?.status ?? ""}
+      data-debug-snapshot-hover-assignment-margin={snapshot.hover?.probe?.margin ?? ""}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3389,6 +3435,7 @@ function DebugSnapshotPanel({
         <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
         <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
         <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
+        <Meta label="hover A" value={snapshot.hover?.probe?.status ?? "-"} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -4481,12 +4528,20 @@ function opacityForDebugLens(objectState, lens) {
 
 function objectTarget(object) {
   if (!object?.userData?.selectionId) return null;
+  const objectState = object.userData.objectState ?? {};
+  const assignment = Array.isArray(objectState.assignment) ? objectState.assignment : [];
   return {
     modelId: object.userData.modelId,
     objectId: object.userData.objectId,
     selectionId: object.userData.selectionId,
     gaussianCount: objectGaussianCount(object),
-    assignmentSource: object.userData.objectState?.source ?? null,
+    assignmentSource: objectState.source ?? null,
+    assignment: compactAssignmentVector(assignment),
+    confidence: finiteNumber(objectState.confidence),
+    entropy: finiteNumber(objectState.assignmentEntropy),
+    status: objectState.status ?? "",
+    centroid: cleanNumberArray(objectState.centroid),
+    bbox: cleanNumberArray(objectState.bbox),
   };
 }
 
@@ -5123,6 +5178,8 @@ function objectStateDebugSnapshot({
   debugLens,
   objectOverlayMode,
   debugProbe,
+  hoveredTarget,
+  hoverAssignmentProbe,
   hiddenCount,
   objectVisibility,
   stability,
@@ -5170,6 +5227,20 @@ function objectStateDebugSnapshot({
       vector: compactAssignmentVector(assignment),
       probe: compactAssignmentProbe(assignmentProbe),
     },
+    hover: hoveredTarget
+      ? {
+          modelId: cleanString(hoveredTarget.modelId),
+          objectId: cleanNullable(hoveredTarget.objectId),
+          selectionId: cleanString(hoveredTarget.selectionId),
+          gaussianCount: finiteNumber(hoveredTarget.gaussianCount),
+          source: cleanString(hoveredTarget.assignmentSource),
+          confidence: finiteNumber(hoveredTarget.confidence),
+          entropy: finiteNumber(hoveredTarget.entropy),
+          status: cleanString(hoveredTarget.status),
+          assignment: compactAssignmentVector(hoveredTarget.assignment),
+          probe: compactAssignmentProbe(hoverAssignmentProbe),
+        }
+      : null,
     visibility: {
       hiddenObjectCount: finiteNumber(objectVisibility?.hiddenObjectCount ?? hiddenCount),
       visibleObjectCount: finiteNumber(objectVisibility?.visibleObjectCount),
@@ -5337,6 +5408,20 @@ function validateDebugSessionArchive(session, path = "") {
         vector: compactAssignmentVector(snapshot.assignment?.vector),
         probe: compactAssignmentProbe(snapshot.assignment?.probe),
       },
+      hover: snapshot.hover
+        ? {
+            modelId: cleanString(snapshot.hover.modelId),
+            objectId: cleanNullable(snapshot.hover.objectId),
+            selectionId: cleanString(snapshot.hover.selectionId),
+            gaussianCount: finiteNumber(snapshot.hover.gaussianCount),
+            source: cleanString(snapshot.hover.source),
+            confidence: finiteNumber(snapshot.hover.confidence),
+            entropy: finiteNumber(snapshot.hover.entropy),
+            status: cleanString(snapshot.hover.status),
+            assignment: compactAssignmentVector(snapshot.hover.assignment),
+            probe: compactAssignmentProbe(snapshot.hover.probe),
+          }
+        : null,
       visibility: {
         hiddenObjectCount: finiteNumber(snapshot.visibility?.hiddenObjectCount),
         visibleObjectCount: finiteNumber(snapshot.visibility?.visibleObjectCount),
