@@ -78,6 +78,37 @@
 
 ## Done
 
+### OBJECTSTATE-TEMPORAL-INSPECT-001: Auditable per-object temporal stability
+
+- 状态: done / object-temporal-stability-diagnostic
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 selected / hovered ObjectState 的 temporal drift、assignment jitter 和 bbox
+  stability 从模型级均值下钻为可审计的单对象 Debug OS contract。
+- 已实施:
+  - `src/App.jsx` 新增 `objgauss-object-temporal-summary-v1`，复用 trainable artifact
+    loader 已计算的 `temporalDrift`、`assignmentJitter` 和 `bboxStability`，派生
+    `stable` / `assignment-jitter` / `temporal-drift` / `bbox-unstable` 状态。
+  - root `.worldShell`、ObjectState Debug panel、`window.__OBJGAUSS_WORLD__`、
+    debug snapshot、hover preview 和 session archive 同步记录 selected / hovered
+    ObjectState temporal summary；live-vs-archive diff 会把 temporal status 变化列入
+    changed fields。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 的 selected / hover temporal
+    stability 在 root / panel / scene handle / snapshot / session handoff 中保真，并把
+    `objectTemporal` / `hoverTemporal` 写入审计输出。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `objectTemporal=stable`、`hoverTemporal=stable`、`objectContinuity=continuous`
+    和 `hoverContinuity=continuous`。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### OBJECTSTATE-CONTINUITY-001: Auditable ObjectState spatial continuity
 
 - 状态: done / object-spatial-continuity-diagnostic

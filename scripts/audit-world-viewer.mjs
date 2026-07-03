@@ -56,12 +56,14 @@ try {
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
       `objectContinuity=${summary.objectContinuityStatus}`,
+      `objectTemporal=${summary.objectTemporalStatus}`,
       `purity=${summary.meanPurity}`,
       `temporalDrift=${summary.meanTemporalDrift}`,
       `compactness=${summary.meanSpatialCompactness}`,
       `assignmentJitter=${summary.meanAssignmentJitter}`,
       `bboxStability=${summary.meanBboxStability}`,
       `hoverContinuity=${summary.hoveredContinuityStatus}`,
+      `hoverTemporal=${summary.hoveredTemporalStatus}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -262,6 +264,28 @@ async function auditWorld(url) {
         panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
         snapshot?.continuity?.centroidContained === true &&
         world?.objectContinuityCentroidContained === true &&
+        shell?.getAttribute("data-object-temporal-status") === "stable" &&
+        panel?.getAttribute("data-object-temporal-status") === "stable" &&
+        snapshot?.temporal?.status === "stable" &&
+        world?.objectTemporalStatus === "stable" &&
+        shell?.getAttribute("data-object-temporal-stable") === "true" &&
+        panel?.getAttribute("data-object-temporal-stable") === "true" &&
+        snapshot?.temporal?.stable === true &&
+        world?.objectTemporalStable === true &&
+        Number(shell?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-object-temporal-drift") ?? 1) < 0.08 &&
+        Number(shell?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-object-assignment-jitter") ?? 1) < 0.08 &&
+        Number(shell?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
+        Number(panel?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
+        snapshot?.temporal?.temporalDrift > 0 &&
+        snapshot?.temporal?.assignmentJitter > 0 &&
+        snapshot?.temporal?.bboxStability > 0.5 &&
+        world?.objectTemporalDrift > 0 &&
+        world?.objectAssignmentJitter > 0 &&
+        world?.objectBboxStability > 0.5 &&
         Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         Number(heatmap?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         snapshot?.assignment?.probe?.margin > 0.55 &&
@@ -494,6 +518,11 @@ async function auditWorld(url) {
         hoveredContinuityStatus: window.__OBJGAUSS_WORLD__?.hoveredContinuityStatus ?? null,
         hoveredContinuityBboxDiagonal: window.__OBJGAUSS_WORLD__?.hoveredContinuityBboxDiagonal ?? null,
         hoveredContinuityCentroidContained: window.__OBJGAUSS_WORLD__?.hoveredContinuityCentroidContained ?? false,
+        hoveredTemporalStatus: window.__OBJGAUSS_WORLD__?.hoveredTemporalStatus ?? null,
+        hoveredTemporalDrift: window.__OBJGAUSS_WORLD__?.hoveredTemporalDrift ?? null,
+        hoveredAssignmentJitter: window.__OBJGAUSS_WORLD__?.hoveredAssignmentJitter ?? null,
+        hoveredBboxStability: window.__OBJGAUSS_WORLD__?.hoveredBboxStability ?? null,
+        hoveredTemporalStable: window.__OBJGAUSS_WORLD__?.hoveredTemporalStable ?? false,
         hoverHighlightActive: window.__OBJGAUSS_WORLD__?.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedGaussianCount ?? 0,
@@ -537,6 +566,17 @@ async function auditWorld(url) {
       throw new Error(`expected hover continuity diagnostic for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
     }
     if (
+      hoverSelection.hoveredTemporalStatus !== "stable" ||
+      hoverSelection.hoveredTemporalStable !== true ||
+      !(Number(hoverSelection.hoveredTemporalDrift) > 0) ||
+      !(Number(hoverSelection.hoveredTemporalDrift) < 0.08) ||
+      !(Number(hoverSelection.hoveredAssignmentJitter) > 0) ||
+      !(Number(hoverSelection.hoveredAssignmentJitter) < 0.08) ||
+      !(Number(hoverSelection.hoveredBboxStability) > 0.5)
+    ) {
+      throw new Error(`expected hover temporal stability diagnostic for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (
       hoverSelection.hoverHighlightActive !== true ||
       hoverSelection.hoverHighlightedObjectCount !== 1 ||
       hoverSelection.hoverHighlightedGaussianCount !== hoverSelection.hoveredGaussianCount ||
@@ -563,6 +603,16 @@ async function auditWorld(url) {
         Number(world?.hoveredContinuityBboxDiagonal ?? 0) > 0 &&
         world?.objectContinuityCentroidContained === true &&
         world?.hoveredContinuityCentroidContained === true &&
+        world?.objectTemporalStatus === "stable" &&
+        world?.hoveredTemporalStatus === "stable" &&
+        world?.objectTemporalStable === true &&
+        world?.hoveredTemporalStable === true &&
+        Number(world?.objectTemporalDrift ?? 0) > 0 &&
+        Number(world?.objectAssignmentJitter ?? 0) > 0 &&
+        Number(world?.objectBboxStability ?? 0) > 0.5 &&
+        Number(world?.hoveredTemporalDrift ?? 0) > 0 &&
+        Number(world?.hoveredAssignmentJitter ?? 0) > 0 &&
+        Number(world?.hoveredBboxStability ?? 0) > 0.5 &&
         world?.hoverHighlightActive === true &&
         world?.hoverHighlightedObjectCount === 1 &&
         world?.hoverHighlightedGaussianCount === world?.hoveredGaussianCount &&
@@ -570,6 +620,11 @@ async function auditWorld(url) {
         shell?.getAttribute("data-object-continuity-status") === "continuous" &&
         shell?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
         Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
+        shell?.getAttribute("data-object-temporal-status") === "stable" &&
+        shell?.getAttribute("data-object-temporal-stable") === "true" &&
+        Number(shell?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
         shell?.getAttribute("data-hovered-target") === selectionId &&
         shell?.getAttribute("data-hovered-model") === "trainable-mvp-debug" &&
         Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0 &&
@@ -583,9 +638,19 @@ async function auditWorld(url) {
         shell?.getAttribute("data-hover-continuity-status") === "continuous" &&
         shell?.getAttribute("data-hover-continuity-centroid-contained") === "true" &&
         Number(shell?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
+        shell?.getAttribute("data-hover-temporal-status") === "stable" &&
+        shell?.getAttribute("data-hover-temporal-stable") === "true" &&
+        Number(shell?.getAttribute("data-hover-temporal-drift") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-hover-assignment-jitter") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-hover-bbox-stability") ?? 0) > 0.5 &&
         panel?.getAttribute("data-object-continuity-status") === "continuous" &&
         panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
         Number(panel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
+        panel?.getAttribute("data-object-temporal-status") === "stable" &&
+        panel?.getAttribute("data-object-temporal-stable") === "true" &&
+        Number(panel?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
         panel?.getAttribute("data-hover-highlight") === "enabled" &&
         panel?.getAttribute("data-hover-highlight-object") === selectionId &&
         panel?.getAttribute("data-hover-assignment-source") === "trainable_kernel_model_artifact" &&
@@ -593,22 +658,46 @@ async function auditWorld(url) {
         panel?.getAttribute("data-hover-continuity-status") === "continuous" &&
         panel?.getAttribute("data-hover-continuity-centroid-contained") === "true" &&
         Number(panel?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
+        panel?.getAttribute("data-hover-temporal-status") === "stable" &&
+        panel?.getAttribute("data-hover-temporal-stable") === "true" &&
+        Number(panel?.getAttribute("data-hover-temporal-drift") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-hover-assignment-jitter") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-hover-bbox-stability") ?? 0) > 0.5 &&
         snapshot?.continuity?.status === "continuous" &&
         snapshot?.continuity?.centroidContained === true &&
         Number(snapshot?.continuity?.bboxDiagonal ?? 0) > 0 &&
+        snapshot?.temporal?.status === "stable" &&
+        snapshot?.temporal?.stable === true &&
+        Number(snapshot?.temporal?.temporalDrift ?? 0) > 0 &&
+        Number(snapshot?.temporal?.assignmentJitter ?? 0) > 0 &&
+        Number(snapshot?.temporal?.bboxStability ?? 0) > 0.5 &&
         snapshot?.hover?.selectionId === selectionId &&
         snapshot?.hover?.probe?.status === "confident" &&
         snapshot?.hover?.continuity?.status === "continuous" &&
         snapshot?.hover?.continuity?.centroidContained === true &&
         Number(snapshot?.hover?.continuity?.bboxDiagonal ?? 0) > 0 &&
+        snapshot?.hover?.temporal?.status === "stable" &&
+        snapshot?.hover?.temporal?.stable === true &&
+        Number(snapshot?.hover?.temporal?.temporalDrift ?? 0) > 0 &&
+        Number(snapshot?.hover?.temporal?.assignmentJitter ?? 0) > 0 &&
+        Number(snapshot?.hover?.temporal?.bboxStability ?? 0) > 0.5 &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") === selectionId &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") === "confident" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") === "continuous" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-continuity-centroid-contained") === "true" &&
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-continuity-bbox-diagonal") ?? 0) > 0 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-temporal-status") === "stable" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-temporal-stable") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-temporal-drift") ?? 0) > 0 &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-assignment-jitter") ?? 0) > 0 &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-bbox-stability") ?? 0) > 0.5 &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") === "continuous" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-centroid-contained") === "true" &&
-        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0) > 0
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-status") === "stable" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-stable") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-drift") ?? 0) > 0 &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-jitter") ?? 0) > 0
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
     const toggleTarget = await page.evaluate((selectedId) => {
@@ -748,6 +837,11 @@ async function auditWorld(url) {
         debugSnapshotContinuityStatus: snapshot?.continuity?.status ?? null,
         debugSnapshotContinuityBboxDiagonal: snapshot?.continuity?.bboxDiagonal ?? null,
         debugSnapshotContinuityCentroidContained: snapshot?.continuity?.centroidContained ?? false,
+        debugSnapshotTemporalStatus: snapshot?.temporal?.status ?? null,
+        debugSnapshotTemporalDrift: snapshot?.temporal?.temporalDrift ?? null,
+        debugSnapshotAssignmentJitter: snapshot?.temporal?.assignmentJitter ?? null,
+        debugSnapshotBboxStability: snapshot?.temporal?.bboxStability ?? null,
+        debugSnapshotTemporalStable: snapshot?.temporal?.stable ?? false,
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
         debugSnapshotEventCount: Array.isArray(snapshot?.events) ? snapshot.events.length : 0,
         debugSnapshotEventTypes: Array.isArray(snapshot?.events) ? snapshot.events.map((event) => event.type) : [],
@@ -772,6 +866,11 @@ async function auditWorld(url) {
         panelDebugSnapshotContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") ?? null,
         panelDebugSnapshotContinuityBboxDiagonal: Number(snapshotPanel?.getAttribute("data-debug-snapshot-continuity-bbox-diagonal") ?? 0),
         panelDebugSnapshotContinuityCentroidContained: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-centroid-contained") ?? null,
+        panelDebugSnapshotTemporalStatus: snapshotPanel?.getAttribute("data-debug-snapshot-temporal-status") ?? null,
+        panelDebugSnapshotTemporalDrift: Number(snapshotPanel?.getAttribute("data-debug-snapshot-temporal-drift") ?? 0),
+        panelDebugSnapshotAssignmentJitter: Number(snapshotPanel?.getAttribute("data-debug-snapshot-assignment-jitter") ?? 0),
+        panelDebugSnapshotBboxStability: Number(snapshotPanel?.getAttribute("data-debug-snapshot-bbox-stability") ?? 0),
+        panelDebugSnapshotTemporalStable: snapshotPanel?.getAttribute("data-debug-snapshot-temporal-stable") ?? null,
         assignmentSource: handle.assignmentSource,
         assignmentProbeStatus: handle.assignmentProbeStatus ?? null,
         assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
@@ -780,12 +879,27 @@ async function auditWorld(url) {
         objectContinuityStatus: handle.objectContinuityStatus ?? null,
         objectContinuityBboxDiagonal: handle.objectContinuityBboxDiagonal ?? null,
         objectContinuityCentroidContained: handle.objectContinuityCentroidContained ?? false,
+        objectTemporalStatus: handle.objectTemporalStatus ?? null,
+        objectTemporalDrift: handle.objectTemporalDrift ?? null,
+        objectAssignmentJitter: handle.objectAssignmentJitter ?? null,
+        objectBboxStability: handle.objectBboxStability ?? null,
+        objectTemporalStable: handle.objectTemporalStable ?? false,
         shellObjectContinuityStatus: shell?.getAttribute("data-object-continuity-status") ?? null,
         shellObjectContinuityBboxDiagonal: Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
         shellObjectContinuityCentroidContained: shell?.getAttribute("data-object-continuity-centroid-contained") ?? null,
+        shellObjectTemporalStatus: shell?.getAttribute("data-object-temporal-status") ?? null,
+        shellObjectTemporalDrift: Number(shell?.getAttribute("data-object-temporal-drift") ?? 0),
+        shellObjectAssignmentJitter: Number(shell?.getAttribute("data-object-assignment-jitter") ?? 0),
+        shellObjectBboxStability: Number(shell?.getAttribute("data-object-bbox-stability") ?? 0),
+        shellObjectTemporalStable: shell?.getAttribute("data-object-temporal-stable") ?? null,
         panelObjectContinuityStatus: debugPanel?.getAttribute("data-object-continuity-status") ?? null,
         panelObjectContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
         panelObjectContinuityCentroidContained: debugPanel?.getAttribute("data-object-continuity-centroid-contained") ?? null,
+        panelObjectTemporalStatus: debugPanel?.getAttribute("data-object-temporal-status") ?? null,
+        panelObjectTemporalDrift: Number(debugPanel?.getAttribute("data-object-temporal-drift") ?? 0),
+        panelObjectAssignmentJitter: Number(debugPanel?.getAttribute("data-object-assignment-jitter") ?? 0),
+        panelObjectBboxStability: Number(debugPanel?.getAttribute("data-object-bbox-stability") ?? 0),
+        panelObjectTemporalStable: debugPanel?.getAttribute("data-object-temporal-stable") ?? null,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
@@ -818,6 +932,11 @@ async function auditWorld(url) {
         hoveredContinuityStatus: handle.hoveredContinuityStatus ?? null,
         hoveredContinuityBboxDiagonal: handle.hoveredContinuityBboxDiagonal ?? null,
         hoveredContinuityCentroidContained: handle.hoveredContinuityCentroidContained ?? false,
+        hoveredTemporalStatus: handle.hoveredTemporalStatus ?? null,
+        hoveredTemporalDrift: handle.hoveredTemporalDrift ?? null,
+        hoveredAssignmentJitter: handle.hoveredAssignmentJitter ?? null,
+        hoveredBboxStability: handle.hoveredBboxStability ?? null,
+        hoveredTemporalStable: handle.hoveredTemporalStable ?? false,
         hoverHighlightActive: handle.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: handle.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: handle.hoverHighlightedGaussianCount ?? 0,
@@ -838,21 +957,40 @@ async function auditWorld(url) {
         shellHoverContinuityStatus: shell?.getAttribute("data-hover-continuity-status") ?? null,
         shellHoverContinuityBboxDiagonal: Number(shell?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0),
         shellHoverContinuityCentroidContained: shell?.getAttribute("data-hover-continuity-centroid-contained") ?? null,
+        shellHoverTemporalStatus: shell?.getAttribute("data-hover-temporal-status") ?? null,
+        shellHoverTemporalDrift: Number(shell?.getAttribute("data-hover-temporal-drift") ?? 0),
+        shellHoverAssignmentJitter: Number(shell?.getAttribute("data-hover-assignment-jitter") ?? 0),
+        shellHoverBboxStability: Number(shell?.getAttribute("data-hover-bbox-stability") ?? 0),
+        shellHoverTemporalStable: shell?.getAttribute("data-hover-temporal-stable") ?? null,
         panelHoverAssignmentSource: debugPanel?.getAttribute("data-hover-assignment-source") ?? null,
         panelHoverAssignmentStatus: debugPanel?.getAttribute("data-hover-assignment-probe-status") ?? null,
         panelHoverContinuityStatus: debugPanel?.getAttribute("data-hover-continuity-status") ?? null,
         panelHoverContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0),
         panelHoverContinuityCentroidContained: debugPanel?.getAttribute("data-hover-continuity-centroid-contained") ?? null,
+        panelHoverTemporalStatus: debugPanel?.getAttribute("data-hover-temporal-status") ?? null,
+        panelHoverTemporalDrift: Number(debugPanel?.getAttribute("data-hover-temporal-drift") ?? 0),
+        panelHoverAssignmentJitter: Number(debugPanel?.getAttribute("data-hover-assignment-jitter") ?? 0),
+        panelHoverBboxStability: Number(debugPanel?.getAttribute("data-hover-bbox-stability") ?? 0),
+        panelHoverTemporalStable: debugPanel?.getAttribute("data-hover-temporal-stable") ?? null,
         snapshotHoverObject: snapshot?.hover?.selectionId ?? null,
         snapshotHoverAssignmentStatus: snapshot?.hover?.probe?.status ?? null,
         snapshotHoverContinuityStatus: snapshot?.hover?.continuity?.status ?? null,
         snapshotHoverContinuityBboxDiagonal: snapshot?.hover?.continuity?.bboxDiagonal ?? null,
         snapshotHoverContinuityCentroidContained: snapshot?.hover?.continuity?.centroidContained ?? false,
+        snapshotHoverTemporalStatus: snapshot?.hover?.temporal?.status ?? null,
+        snapshotHoverTemporalDrift: snapshot?.hover?.temporal?.temporalDrift ?? null,
+        snapshotHoverAssignmentJitter: snapshot?.hover?.temporal?.assignmentJitter ?? null,
+        snapshotHoverBboxStability: snapshot?.hover?.temporal?.bboxStability ?? null,
+        snapshotHoverTemporalStable: snapshot?.hover?.temporal?.stable ?? false,
         panelSnapshotHoverObject: snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") ?? null,
         panelSnapshotHoverAssignmentStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") ?? null,
         panelSnapshotHoverContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") ?? null,
         panelSnapshotHoverContinuityBboxDiagonal: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0),
         panelSnapshotHoverContinuityCentroidContained: snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-centroid-contained") ?? null,
+        panelSnapshotHoverTemporalStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-status") ?? null,
+        panelSnapshotHoverTemporalDrift: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-drift") ?? 0),
+        panelSnapshotHoverAssignmentJitter: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-jitter") ?? 0),
+        panelSnapshotHoverTemporalStable: snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-stable") ?? null,
         worldVisibleObjectCount: handle.visibleObjectCount ?? 0,
         worldHiddenObjectCount: handle.hiddenObjectCount ?? 0,
         worldVisibleGaussianCount: handle.visibleGaussianCount ?? 0,
@@ -969,6 +1107,33 @@ async function auditWorld(url) {
       world.panelDebugSnapshotContinuityStatus === world.objectContinuityStatus &&
       world.panelDebugSnapshotContinuityBboxDiagonal > 0 &&
       world.panelDebugSnapshotContinuityCentroidContained === "true" &&
+      world.objectTemporalStatus === "stable" &&
+      world.objectTemporalDrift > 0 &&
+      world.objectTemporalDrift < 0.08 &&
+      world.objectAssignmentJitter > 0 &&
+      world.objectAssignmentJitter < 0.08 &&
+      world.objectBboxStability > 0.5 &&
+      world.objectTemporalStable === true &&
+      world.shellObjectTemporalStatus === world.objectTemporalStatus &&
+      world.shellObjectTemporalDrift > 0 &&
+      world.shellObjectAssignmentJitter > 0 &&
+      world.shellObjectBboxStability > 0.5 &&
+      world.shellObjectTemporalStable === "true" &&
+      world.panelObjectTemporalStatus === world.objectTemporalStatus &&
+      world.panelObjectTemporalDrift > 0 &&
+      world.panelObjectAssignmentJitter > 0 &&
+      world.panelObjectBboxStability > 0.5 &&
+      world.panelObjectTemporalStable === "true" &&
+      world.debugSnapshotTemporalStatus === world.objectTemporalStatus &&
+      world.debugSnapshotTemporalDrift > 0 &&
+      world.debugSnapshotAssignmentJitter > 0 &&
+      world.debugSnapshotBboxStability > 0.5 &&
+      world.debugSnapshotTemporalStable === true &&
+      world.panelDebugSnapshotTemporalStatus === world.objectTemporalStatus &&
+      world.panelDebugSnapshotTemporalDrift > 0 &&
+      world.panelDebugSnapshotAssignmentJitter > 0 &&
+      world.panelDebugSnapshotBboxStability > 0.5 &&
+      world.panelDebugSnapshotTemporalStable === "true" &&
       world.debugSnapshotTrainingStatus === "loss_down" &&
       world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.shellDebugSnapshotModel === world.debugSnapshotModel &&
@@ -1074,7 +1239,33 @@ async function auditWorld(url) {
       world.snapshotHoverContinuityCentroidContained === true &&
       world.panelSnapshotHoverContinuityStatus === world.hoveredContinuityStatus &&
       world.panelSnapshotHoverContinuityBboxDiagonal > 0 &&
-      world.panelSnapshotHoverContinuityCentroidContained === "true"
+      world.panelSnapshotHoverContinuityCentroidContained === "true" &&
+      world.hoveredTemporalStatus === "stable" &&
+      world.hoveredTemporalDrift > 0 &&
+      world.hoveredTemporalDrift < 0.08 &&
+      world.hoveredAssignmentJitter > 0 &&
+      world.hoveredAssignmentJitter < 0.08 &&
+      world.hoveredBboxStability > 0.5 &&
+      world.hoveredTemporalStable === true &&
+      world.shellHoverTemporalStatus === world.hoveredTemporalStatus &&
+      world.shellHoverTemporalDrift > 0 &&
+      world.shellHoverAssignmentJitter > 0 &&
+      world.shellHoverBboxStability > 0.5 &&
+      world.shellHoverTemporalStable === "true" &&
+      world.panelHoverTemporalStatus === world.hoveredTemporalStatus &&
+      world.panelHoverTemporalDrift > 0 &&
+      world.panelHoverAssignmentJitter > 0 &&
+      world.panelHoverBboxStability > 0.5 &&
+      world.panelHoverTemporalStable === "true" &&
+      world.snapshotHoverTemporalStatus === world.hoveredTemporalStatus &&
+      world.snapshotHoverTemporalDrift > 0 &&
+      world.snapshotHoverAssignmentJitter > 0 &&
+      world.snapshotHoverBboxStability > 0.5 &&
+      world.snapshotHoverTemporalStable === true &&
+      world.panelSnapshotHoverTemporalStatus === world.hoveredTemporalStatus &&
+      world.panelSnapshotHoverTemporalDrift > 0 &&
+      world.panelSnapshotHoverAssignmentJitter > 0 &&
+      world.panelSnapshotHoverTemporalStable === "true"
     )) {
       throw new Error(`expected hover to expose ObjectState assignment preview: ${JSON.stringify(world)}`);
     }
@@ -1158,12 +1349,14 @@ async function auditWorld(url) {
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
       objectContinuityStatus: world.objectContinuityStatus,
+      objectTemporalStatus: world.objectTemporalStatus,
       meanPurity: world.meanPurity,
       meanTemporalDrift: world.meanTemporalDrift,
       meanSpatialCompactness: world.meanSpatialCompactness,
       meanAssignmentJitter: world.meanAssignmentJitter,
       meanBboxStability: world.meanBboxStability,
       hoveredContinuityStatus: world.hoveredContinuityStatus,
+      hoveredTemporalStatus: world.hoveredTemporalStatus,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
@@ -2005,6 +2198,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !(Number(parsed?.assignment?.probe?.margin) > 0.85) ||
         parsed?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
         !parsed?.continuity?.status ||
+        parsed?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
+        !parsed?.temporal?.status ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
@@ -2062,6 +2257,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !(Number(parsed?.snapshot?.assignment?.probe?.margin) > 0.85) ||
         parsed?.snapshot?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
         !parsed?.snapshot?.continuity?.status ||
+        parsed?.snapshot?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
+        !parsed?.snapshot?.temporal?.status ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
@@ -2142,6 +2339,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !(Number(archive?.snapshot?.assignment?.probe?.margin) > 0.85) ||
         archive?.snapshot?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
         !archive?.snapshot?.continuity?.status ||
+        archive?.snapshot?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
+        !archive?.snapshot?.temporal?.status ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||

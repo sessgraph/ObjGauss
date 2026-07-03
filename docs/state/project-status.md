@@ -454,6 +454,18 @@ OS 工作，不改变 assignment solver、ObjectState projection、renderer arti
 OGC decoder 或 trainable kernel loop；训练模型主线继续保持
 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-TEMPORAL-INSPECT-001` 已将 selected / hovered ObjectState 的时间稳定性从
+模型级 dashboard 均值下钻到单对象 inspector：`src/App.jsx` 新增
+`objgauss-object-temporal-summary-v1`，复用 trainable artifact loader 已计算的
+`temporalDrift`、`assignmentJitter` 和 `bboxStability`，派生 `stable` /
+`assignment-jitter` / `temporal-drift` / `bbox-unstable` 等状态。root `.worldShell`、
+ObjectState Debug panel、`window.__OBJGAUSS_WORLD__`、debug snapshot、hover preview 和
+session archive 现在同步记录 selected / hovered temporal stability；session diff 也会把
+temporal status 变化列为 changed field。该切片继续只强化 Phase 1 非训练 Debug OS，
+不改变 assignment solver、ObjectState projection、renderer artifact schema、OGC decoder
+或 trainable kernel loop；训练模型主线仍保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OBJECTSTATE-HOVER-ASSIGNMENT-001` 已将 hover 从纯视觉 focus 升级为 ObjectState
 assignment preview：`objectTarget(...)` 现在携带 hovered object 的 compact assignment
 vector、confidence、entropy、status、centroid 和 bbox；root telemetry、

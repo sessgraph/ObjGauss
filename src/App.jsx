@@ -134,12 +134,14 @@ export default function App() {
     debugProbe,
   );
   const selectedContinuity = objectContinuitySummary(selectedObject ?? selected?.objects?.[0] ?? null);
+  const selectedTemporal = objectTemporalSummary(selectedObject ?? selected?.objects?.[0] ?? null);
   const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
     confidence: hoveredTarget?.confidence,
     entropy: hoveredTarget?.entropy,
     source: hoveredTarget?.assignmentSource,
   });
   const hoveredContinuity = objectContinuitySummary(hoveredTarget);
+  const hoveredTemporal = objectTemporalSummary(hoveredTarget);
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const objectVisibility = useMemo(
@@ -169,6 +171,8 @@ export default function App() {
     hoverAssignmentProbe: hoveredAssignmentProbe,
     objectContinuity: selectedContinuity,
     hoverContinuity: hoveredContinuity,
+    objectTemporal: selectedTemporal,
+    hoverTemporal: hoveredTemporal,
     hiddenCount,
     objectVisibility,
     stability: selectedStability,
@@ -1201,6 +1205,11 @@ export default function App() {
       data-object-continuity-bbox-diagonal={selectedContinuity.bboxDiagonal ?? ""}
       data-object-continuity-density={selectedContinuity.gaussianDensity ?? ""}
       data-object-continuity-centroid-contained={selectedContinuity.centroidContained ? "true" : "false"}
+      data-object-temporal-status={selectedTemporal.status}
+      data-object-temporal-drift={selectedTemporal.temporalDrift ?? ""}
+      data-object-assignment-jitter={selectedTemporal.assignmentJitter ?? ""}
+      data-object-bbox-stability={selectedTemporal.bboxStability ?? ""}
+      data-object-temporal-stable={selectedTemporal.stable ? "true" : "false"}
       data-object-overlay-mode={selectedObjectOverlayMode}
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "centroid") ? "true" : "false"}
@@ -1225,6 +1234,11 @@ export default function App() {
       data-hover-continuity-spatial-compactness={hoveredContinuity.spatialCompactness ?? ""}
       data-hover-continuity-bbox-diagonal={hoveredContinuity.bboxDiagonal ?? ""}
       data-hover-continuity-centroid-contained={hoveredContinuity.centroidContained ? "true" : "false"}
+      data-hover-temporal-status={hoveredTemporal.status}
+      data-hover-temporal-drift={hoveredTemporal.temporalDrift ?? ""}
+      data-hover-assignment-jitter={hoveredTemporal.assignmentJitter ?? ""}
+      data-hover-bbox-stability={hoveredTemporal.bboxStability ?? ""}
+      data-hover-temporal-stable={hoveredTemporal.stable ? "true" : "false"}
       data-hidden-objects={hiddenCount}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility.visibleObjectCount}
@@ -1486,6 +1500,8 @@ export default function App() {
         hoverAssignmentProbe={hoveredAssignmentProbe}
         objectContinuity={selectedContinuity}
         hoverContinuity={hoveredContinuity}
+        objectTemporal={selectedTemporal}
+        hoverTemporal={hoveredTemporal}
         debugProbe={debugProbe}
         assignmentProbe={selectedAssignmentProbe}
         debugMode={debugMode}
@@ -2536,6 +2552,7 @@ function ThreeWorld({
         selectedGaussianProbe,
       );
       const selectedContinuity = objectContinuitySummary(selectedObject ? objectTarget(selectedObject) : null);
+      const selectedTemporal = objectTemporalSummary(selectedObject ? objectTarget(selectedObject) : null);
       const hoveredTarget = objectTarget(hoveredObject);
       const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
         confidence: hoveredTarget?.confidence,
@@ -2543,6 +2560,7 @@ function ThreeWorld({
         source: hoveredTarget?.assignmentSource,
       });
       const hoveredContinuity = objectContinuitySummary(hoveredTarget);
+      const hoveredTemporal = objectTemporalSummary(hoveredTarget);
       const hoverHighlightSamples = [...draggableObjects.values()].map((object) => {
         const cloud = firstGaussianCloud(object);
         return {
@@ -2601,6 +2619,12 @@ function ThreeWorld({
         hoveredContinuityBboxDiagonal: hoveredContinuity.bboxDiagonal,
         hoveredContinuitySpatialCompactness: hoveredContinuity.spatialCompactness,
         hoveredContinuityCentroidContained: hoveredContinuity.centroidContained,
+        hoveredTemporal,
+        hoveredTemporalStatus: hoveredTemporal.status,
+        hoveredTemporalDrift: hoveredTemporal.temporalDrift,
+        hoveredAssignmentJitter: hoveredTemporal.assignmentJitter,
+        hoveredBboxStability: hoveredTemporal.bboxStability,
+        hoveredTemporalStable: hoveredTemporal.stable,
         hoverHighlightActive: Boolean(hoveredTarget?.selectionId),
         hoverHighlightedObjectCount: highlightedHoverSamples.length,
         hoverHighlightedGaussianCount: highlightedHoverSamples.reduce(
@@ -2633,6 +2657,12 @@ function ThreeWorld({
         objectContinuityBboxDiagonal: selectedContinuity.bboxDiagonal,
         objectContinuitySpatialCompactness: selectedContinuity.spatialCompactness,
         objectContinuityCentroidContained: selectedContinuity.centroidContained,
+        objectTemporal: selectedTemporal,
+        objectTemporalStatus: selectedTemporal.status,
+        objectTemporalDrift: selectedTemporal.temporalDrift,
+        objectAssignmentJitter: selectedTemporal.assignmentJitter,
+        objectBboxStability: selectedTemporal.bboxStability,
+        objectTemporalStable: selectedTemporal.stable,
         stabilitySummary: selectedStability,
         selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
         selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
@@ -3046,6 +3076,8 @@ function DebugPanel({
   hoverAssignmentProbe,
   objectContinuity,
   hoverContinuity,
+  objectTemporal,
+  hoverTemporal,
   debugProbe,
   assignmentProbe,
   debugMode,
@@ -3115,6 +3147,11 @@ function DebugPanel({
       data-object-continuity-bbox-diagonal={objectContinuity?.bboxDiagonal ?? ""}
       data-object-continuity-density={objectContinuity?.gaussianDensity ?? ""}
       data-object-continuity-centroid-contained={objectContinuity?.centroidContained ? "true" : "false"}
+      data-object-temporal-status={objectTemporal?.status ?? "none"}
+      data-object-temporal-drift={objectTemporal?.temporalDrift ?? ""}
+      data-object-assignment-jitter={objectTemporal?.assignmentJitter ?? ""}
+      data-object-bbox-stability={objectTemporal?.bboxStability ?? ""}
+      data-object-temporal-stable={objectTemporal?.stable ? "true" : "false"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
       data-ogc-lod-index={selectedOgcLod}
@@ -3137,6 +3174,11 @@ function DebugPanel({
       data-hover-continuity-spatial-compactness={hoverContinuity?.spatialCompactness ?? ""}
       data-hover-continuity-bbox-diagonal={hoverContinuity?.bboxDiagonal ?? ""}
       data-hover-continuity-centroid-contained={hoverContinuity?.centroidContained ? "true" : "false"}
+      data-hover-temporal-status={hoverTemporal?.status ?? "none"}
+      data-hover-temporal-drift={hoverTemporal?.temporalDrift ?? ""}
+      data-hover-assignment-jitter={hoverTemporal?.assignmentJitter ?? ""}
+      data-hover-bbox-stability={hoverTemporal?.bboxStability ?? ""}
+      data-hover-temporal-stable={hoverTemporal?.stable ? "true" : "false"}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
@@ -3316,6 +3358,8 @@ function DebugPanel({
         <Meta label="bbox" value={formatBox(activeState?.bbox)} />
         <Meta label="spatial" value={objectContinuity?.status ?? "-"} />
         <Meta label="diag" value={formatRatio(objectContinuity?.bboxDiagonal)} />
+        <Meta label="motion" value={objectTemporal?.status ?? "-"} />
+        <Meta label="jitter" value={formatRatio(objectTemporal?.assignmentJitter)} />
         <Meta
           label="hover"
           value={
@@ -3328,6 +3372,7 @@ function DebugPanel({
         <Meta label="hover A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
         <Meta label="hover H" value={formatRatio(hoverAssignmentProbe?.entropy)} />
         <Meta label="hover spatial" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
+        <Meta label="hover motion" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
         <Meta label="hidden" value={hiddenObjects.size} />
         <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
       </dl>
@@ -3424,12 +3469,21 @@ function DebugSnapshotPanel({
       data-debug-snapshot-continuity-bbox-diagonal={snapshot.continuity?.bboxDiagonal ?? ""}
       data-debug-snapshot-continuity-spatial-compactness={snapshot.continuity?.spatialCompactness ?? ""}
       data-debug-snapshot-continuity-centroid-contained={snapshot.continuity?.centroidContained ? "true" : "false"}
+      data-debug-snapshot-temporal-status={snapshot.temporal?.status ?? ""}
+      data-debug-snapshot-temporal-drift={snapshot.temporal?.temporalDrift ?? ""}
+      data-debug-snapshot-assignment-jitter={snapshot.temporal?.assignmentJitter ?? ""}
+      data-debug-snapshot-bbox-stability={snapshot.temporal?.bboxStability ?? ""}
+      data-debug-snapshot-temporal-stable={snapshot.temporal?.stable ? "true" : "false"}
       data-debug-snapshot-hover-object={snapshot.hover?.selectionId ?? ""}
       data-debug-snapshot-hover-assignment-status={snapshot.hover?.probe?.status ?? ""}
       data-debug-snapshot-hover-assignment-margin={snapshot.hover?.probe?.margin ?? ""}
       data-debug-snapshot-hover-continuity-status={snapshot.hover?.continuity?.status ?? ""}
       data-debug-snapshot-hover-continuity-bbox-diagonal={snapshot.hover?.continuity?.bboxDiagonal ?? ""}
       data-debug-snapshot-hover-continuity-centroid-contained={snapshot.hover?.continuity?.centroidContained ? "true" : "false"}
+      data-debug-snapshot-hover-temporal-status={snapshot.hover?.temporal?.status ?? ""}
+      data-debug-snapshot-hover-temporal-drift={snapshot.hover?.temporal?.temporalDrift ?? ""}
+      data-debug-snapshot-hover-assignment-jitter={snapshot.hover?.temporal?.assignmentJitter ?? ""}
+      data-debug-snapshot-hover-temporal-stable={snapshot.hover?.temporal?.stable ? "true" : "false"}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3485,8 +3539,10 @@ function DebugSnapshotPanel({
         <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
         <Meta label="spatial" value={snapshot.continuity?.status ?? "-"} />
         <Meta label="diag" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
+        <Meta label="motion" value={snapshot.temporal?.status ?? "-"} />
         <Meta label="hover A" value={snapshot.hover?.probe?.status ?? "-"} />
         <Meta label="hover spatial" value={snapshot.hover?.continuity?.status ?? "-"} />
+        <Meta label="hover motion" value={snapshot.hover?.temporal?.status ?? "-"} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -4590,6 +4646,8 @@ function objectTarget(object) {
     assignment: compactAssignmentVector(assignment),
     confidence: finiteNumber(objectState.confidence),
     entropy: finiteNumber(objectState.assignmentEntropy),
+    temporalDrift: finiteNumber(objectState.temporalDrift),
+    assignmentJitter: finiteNumber(objectState.assignmentJitter),
     spatialCompactness: finiteNumber(objectState.spatialCompactness),
     bboxStability: finiteNumber(objectState.bboxStability),
     status: objectState.status ?? "",
@@ -4847,6 +4905,81 @@ function compactObjectContinuity(summary) {
     gaussianCount: finiteNumber(summary.gaussianCount),
     centroid: cleanNumberArray(summary.centroid),
     bbox: cleanNumberArray(summary.bbox),
+  };
+}
+
+function objectTemporalSummary(object) {
+  if (!object) {
+    return {
+      schema: "objgauss-object-temporal-summary-v1",
+      status: "none",
+      temporalDrift: null,
+      assignmentJitter: null,
+      bboxStability: null,
+      temporalAvailable: false,
+      jitterAvailable: false,
+      bboxAvailable: false,
+      stable: false,
+      thresholds: objectTemporalThresholds(),
+    };
+  }
+  const state = object?.objectState ?? object;
+  const temporalDrift = finiteNumber(state?.temporalDrift ?? object?.temporalDrift ?? state?.drift ?? state?.centroidDrift);
+  const assignmentJitter = finiteNumber(
+    state?.assignmentJitter ?? object?.assignmentJitter ?? state?.jitter ?? state?.assignmentDrift,
+  );
+  const bboxStability = finiteNumber(
+    state?.bboxStability ?? object?.bboxStability ?? state?.bboxIoU ?? state?.bboxConvergence,
+  );
+  const thresholds = objectTemporalThresholds();
+  const temporalAvailable = temporalDrift !== null;
+  const jitterAvailable = assignmentJitter !== null;
+  const bboxAvailable = bboxStability !== null;
+  const status =
+    !temporalAvailable && !jitterAvailable && !bboxAvailable
+      ? "unavailable"
+      : jitterAvailable && assignmentJitter > thresholds.assignmentJitter
+        ? "assignment-jitter"
+        : temporalAvailable && temporalDrift > thresholds.temporalDrift
+          ? "temporal-drift"
+          : bboxAvailable && bboxStability < thresholds.bboxStability
+            ? "bbox-unstable"
+            : "stable";
+  return {
+    schema: "objgauss-object-temporal-summary-v1",
+    status,
+    temporalDrift,
+    assignmentJitter,
+    bboxStability,
+    temporalAvailable,
+    jitterAvailable,
+    bboxAvailable,
+    stable: status === "stable",
+    thresholds,
+  };
+}
+
+function compactObjectTemporal(summary) {
+  if (!summary || typeof summary !== "object") return null;
+  return {
+    schema: "objgauss-object-temporal-summary-v1",
+    status: cleanString(summary.status || "none"),
+    temporalDrift: finiteNumber(summary.temporalDrift),
+    assignmentJitter: finiteNumber(summary.assignmentJitter),
+    bboxStability: finiteNumber(summary.bboxStability),
+    temporalAvailable: Boolean(summary.temporalAvailable),
+    jitterAvailable: Boolean(summary.jitterAvailable),
+    bboxAvailable: Boolean(summary.bboxAvailable),
+    stable: Boolean(summary.stable),
+    thresholds: objectTemporalThresholds(summary.thresholds),
+  };
+}
+
+function objectTemporalThresholds(overrides = {}) {
+  return {
+    temporalDrift: finiteNumber(overrides.temporalDrift) ?? 0.08,
+    assignmentJitter: finiteNumber(overrides.assignmentJitter) ?? 0.08,
+    bboxStability: finiteNumber(overrides.bboxStability) ?? 0.5,
   };
 }
 
@@ -5324,6 +5457,8 @@ function objectStateDebugSnapshot({
   hoverAssignmentProbe,
   objectContinuity,
   hoverContinuity,
+  objectTemporal,
+  hoverTemporal,
   hiddenCount,
   objectVisibility,
   stability,
@@ -5384,6 +5519,7 @@ function objectStateDebugSnapshot({
           assignment: compactAssignmentVector(hoveredTarget.assignment),
           probe: compactAssignmentProbe(hoverAssignmentProbe),
           continuity: compactObjectContinuity(hoverContinuity),
+          temporal: compactObjectTemporal(hoverTemporal),
         }
       : null,
     visibility: {
@@ -5396,6 +5532,7 @@ function objectStateDebugSnapshot({
         : [],
     },
     continuity: compactObjectContinuity(objectContinuity),
+    temporal: compactObjectTemporal(objectTemporal),
     objectState: {
       objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
       status: activeState?.status ?? "",
@@ -5567,6 +5704,7 @@ function validateDebugSessionArchive(session, path = "") {
             assignment: compactAssignmentVector(snapshot.hover.assignment),
             probe: compactAssignmentProbe(snapshot.hover.probe),
             continuity: compactObjectContinuity(snapshot.hover.continuity),
+            temporal: compactObjectTemporal(snapshot.hover.temporal),
           }
         : null,
       visibility: {
@@ -5577,6 +5715,7 @@ function validateDebugSessionArchive(session, path = "") {
         hiddenSelectionIds: cleanStringList(snapshot.visibility?.hiddenSelectionIds).slice(0, 16),
       },
       continuity: compactObjectContinuity(snapshot.continuity),
+      temporal: compactObjectTemporal(snapshot.temporal),
       stability: {
         status: cleanString(snapshot.stability?.status),
         slotUtilization: finiteNumber(snapshot.stability?.slotUtilization),
@@ -5670,6 +5809,7 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
   const qualityMatch = cleanString(liveSnapshot.quality?.status) === cleanString(archiveSnapshot.quality?.status);
   const trainingMatch = cleanString(liveSnapshot.training?.status) === cleanString(archiveSnapshot.training?.status);
   const stabilityMatch = cleanString(liveSnapshot.stability?.status) === cleanString(archiveSnapshot.stability?.status);
+  const temporalMatch = cleanString(liveSnapshot.temporal?.status) === cleanString(archiveSnapshot.temporal?.status);
   const deliveryMatch = cleanString(liveSnapshot.delivery?.loadRoute) === cleanString(archiveSnapshot.delivery?.loadRoute);
   const probeStatusMatch =
     cleanString(liveSnapshot.assignment?.probe?.status) === cleanString(archiveSnapshot.assignment?.probe?.status);
@@ -5695,6 +5835,7 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     !qualityMatch ? "quality" : "",
     !trainingMatch ? "training" : "",
     !stabilityMatch ? "stability" : "",
+    !temporalMatch ? "temporal" : "",
     !deliveryMatch ? "delivery" : "",
     !probeStatusMatch ? "probe_status" : "",
     deltaChanged(slotDelta) ? "slots" : "",
@@ -5711,6 +5852,7 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     qualityMatch,
     trainingMatch,
     stabilityMatch,
+    temporalMatch,
     deliveryMatch,
     probeStatusMatch,
     slotDelta,
