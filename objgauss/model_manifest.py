@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from objgauss.core.chunk_index import CHUNK_INDEX_SCHEMA, read_chunk_index, validate_chunk_index
+from objgauss.core.trainable_artifact import (
+    TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
+    validate_trainable_kernel_model_artifact,
+)
 
 MODEL_ARTIFACT_MANIFEST_SCHEMA = "objgauss-model-artifact-manifest-v1"
 
@@ -317,6 +321,100 @@ def manifest_from_training_output(
     )
 
 
+def manifest_from_trainable_kernel_model_artifact(
+    trainable_artifact: str | Path | dict[str, Any],
+    *,
+    artifact_path: str | Path | None = None,
+    manifest_id: str | None = None,
+    asset_id: str | None = None,
+    name: str | None = None,
+    source: dict[str, Any] | None = None,
+    license: str,
+    compute_hash: bool = True,
+) -> dict[str, Any]:
+    """Wrap a trainable kernel model artifact in a viewer-ready model manifest."""
+
+    if isinstance(trainable_artifact, dict):
+        payload = dict(trainable_artifact)
+        artifact_file: Path | None = None
+    else:
+        artifact_file = Path(trainable_artifact)
+        payload = json.loads(artifact_file.read_text(encoding="utf-8"))
+    validate_trainable_kernel_model_artifact(payload)
+
+    if artifact_path is None:
+        if artifact_file is None:
+            raise ValueError("artifact_path is required when trainable_artifact is provided as a dict")
+        artifact_path = artifact_file
+
+    training = payload["training"]
+    sample = payload.get("source", {}).get("sample")
+    gaussian_count = _trainable_gaussian_count(payload)
+    object_count = _optional_positive_int(training.get("slots"), "slots")
+    resolved_asset_id = asset_id or _trainable_asset_id(payload, artifact_file)
+    artifact_route = str(artifact_path)
+    byte_size = artifact_file.stat().st_size if artifact_file is not None and artifact_file.exists() else None
+    sha256 = _sha256(artifact_file) if compute_hash and artifact_file is not None and artifact_file.exists() else None
+
+    return build_model_artifact_manifest(
+        manifest_id=manifest_id or f"{resolved_asset_id}-trainable-model-artifacts",
+        asset_id=resolved_asset_id,
+        name=name or str(payload.get("label") or resolved_asset_id),
+        source=source
+        or {
+            "type": "trainable_kernel_model_artifact",
+            "input": payload.get("source", {}).get("input"),
+            "target_source": sample.get("target_source") if isinstance(sample, dict) else None,
+        },
+        license=license,
+        artifacts=[
+            build_model_artifact(
+                role="trainable_kernel",
+                path=artifact_route,
+                format=".json",
+                delivery_tier="browser_edit",
+                browser_ready=True,
+                gaussian_count=gaussian_count,
+                object_count=object_count,
+                byte_size=byte_size,
+                sha256=sha256,
+                label=str(payload.get("label") or "trainable-kernel-model-artifact"),
+                note="Trainable kernel Debug OS artifact; browser-ready for ObjectState inspection.",
+            )
+        ],
+        gaussian_count=gaussian_count,
+        object_count=object_count,
+        quality_evidence=[
+            {
+                "kind": "trainable_kernel_training_summary",
+                "source": artifact_route,
+                "summary": training,
+            },
+            *(
+                [
+                    {
+                        "kind": "trainable_kernel_renderer_api",
+                        "source": artifact_route,
+                        "summary": payload["renderer_api"],
+                    }
+                ]
+                if isinstance(payload.get("renderer_api"), dict)
+                else []
+            ),
+        ],
+        limitations=[
+            "Development-stage trainable kernel handoff; source assets remain governed by their original license.",
+            "This manifest exposes a small Debug OS JSON artifact, not a production model release.",
+        ],
+        created_from={
+            "trainable_model_artifact": artifact_route,
+            "schema": TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
+            "input": payload.get("source", {}).get("input"),
+            "sample": sample if isinstance(sample, dict) else None,
+        },
+    )
+
+
 def manifest_from_sample_bundle(
     sample_bundle: str | Path,
     *,
@@ -412,6 +510,29 @@ def manifest_from_sample_bundle(
             "mask_manifest": payload.get("mask_manifest"),
         },
     )
+
+
+def _trainable_gaussian_count(payload: dict[str, Any]) -> int | None:
+    sample = payload.get("source", {}).get("sample")
+    if isinstance(sample, dict):
+        sample_count = _optional_positive_int(sample.get("sampled_count"), "sampled_count")
+        if sample_count is not None:
+            return sample_count
+    assignments = payload.get("assignments")
+    if isinstance(assignments, list) and assignments:
+        shape = assignments[0].get("shape") if isinstance(assignments[0], dict) else None
+        if isinstance(shape, list) and shape:
+            return _optional_positive_int(shape[0], "assignments[0].shape[0]")
+    return None
+
+
+def _trainable_asset_id(payload: dict[str, Any], artifact_file: Path | None) -> str:
+    source_input = payload.get("source", {}).get("input")
+    if source_input:
+        return f"{Path(str(source_input)).stem}-trainable-kernel"
+    if artifact_file is not None:
+        return f"{artifact_file.stem}-trainable-kernel"
+    return "trainable-kernel-model"
 
 
 def manifest_from_asset_library_entry(

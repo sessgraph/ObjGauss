@@ -39,6 +39,7 @@ try {
       `algorithmManifest=${summary.algorithmManifestStatus}`,
       `debugSnapshotExport=${summary.debugSnapshotExportStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
+      `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
@@ -418,6 +419,7 @@ async function auditWorld(url) {
     const urlOgcManifest = await auditUrlOgcManifestArtifact(browser, url);
     const algorithmManifest = await auditAlgorithmManifestBundle(browser, url);
     const localModelManifest = await auditLocalModelManifestBundleImport(browser, url);
+    const localTrainableManifest = await auditLocalTrainableManifestPackageImport(browser, url);
     const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
     const localOgc = await auditLocalOgcArtifactImport(browser, url);
     const localOgcManifest = await auditLocalOgcManifestPackageImport(browser, url);
@@ -663,6 +665,7 @@ async function auditWorld(url) {
       algorithmManifestStatus: algorithmManifest.status,
       debugSnapshotExportStatus: algorithmManifest.snapshotExportStatus,
       localModelManifestStatus: localModelManifest.status,
+      localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
@@ -1618,6 +1621,77 @@ async function auditLocalModelManifestBundleImport(browser, url) {
   }
 }
 
+async function auditLocalTrainableManifestPackageImport(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  try {
+    const manifestPath = writeLocalTrainableManifestFixture();
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
+      manifestPath,
+      "public/models/trainable-mvp-debug/model-artifact.json",
+    ]);
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const training = document.querySelector("[data-training-evidence='true']");
+      const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const types = new Set(events.map((event) => event.type));
+      return (
+        parent?.getAttribute("data-model-load-state") === "loaded" &&
+        trainable?.getAttribute("data-model-load-state") === "loaded" &&
+        shell?.getAttribute("data-selected-model") === "model-local-manifest-trainable-artifact" &&
+        shell?.getAttribute("data-model-manifest-import-status") === "loaded" &&
+        shell?.getAttribute("data-trainable-artifact-load-route") === "local-manifest-file" &&
+        shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
+        shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
+        shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        training?.getAttribute("data-training-status") === "loss_down" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
+        types.has("import-model-manifest")
+      );
+    }, undefined, { timeout: 15000 });
+    const selection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = world?.objectSelections?.find(
+        (entry) => entry.modelId === "model-local-manifest-trainable-artifact",
+      );
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        modelId: target?.modelId ?? null,
+      };
+    });
+    if (!selection.ok || selection.modelId !== "model-local-manifest-trainable-artifact") {
+      throw new Error(`expected local trainable manifest object selection: ${JSON.stringify(selection)}`);
+    }
+    const gaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, selection.selectionId);
+    if (!gaussian.ok || gaussian.assignmentSource !== "trainable_kernel_model_artifact") {
+      throw new Error(`expected local trainable manifest Gaussian probe: ${JSON.stringify(gaussian)}`);
+    }
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
+      return (
+        shell?.getAttribute("data-assignment-source") === "trainable_kernel_model_artifact" &&
+        shell?.getAttribute("data-debug-snapshot-model") === "model-local-manifest-trainable-artifact" &&
+        snapshot?.model?.id === "model-local-manifest-trainable-artifact" &&
+        snapshot?.training?.status === "loss_down"
+      );
+    }, undefined, { timeout: 15000 });
+    return { status: "local-trainable-manifest-debug-os" };
+  } finally {
+    await page.close();
+  }
+}
+
 function writeLocalOgcManifestFixture() {
   const index = JSON.parse(readFileSync("public/models/ogc-url-fixture/scene.index.json", "utf8"));
   const manifestPath = "/tmp/objgauss-local-ogc-model-artifact.json";
@@ -1667,6 +1741,57 @@ function writeLocalOgcManifestFixture() {
       },
     ],
     limitations: ["Tiny audit fixture for local model artifact manifest package import."],
+  };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  return manifestPath;
+}
+
+function writeLocalTrainableManifestFixture() {
+  const trainable = JSON.parse(readFileSync("public/models/trainable-mvp-debug/model-artifact.json", "utf8"));
+  const manifestPath = "/tmp/objgauss-local-trainable-model-artifact.json";
+  const sample = trainable.source?.sample ?? {};
+  const manifest = {
+    schema: "objgauss-model-artifact-manifest-v1",
+    manifest_id: "objgauss-local-trainable-package-fixture",
+    asset_id: "objgauss-local-trainable-package-fixture",
+    name: "Local trainable package fixture",
+    stage: "audit-fixture",
+    source: {
+      type: "audit_local_trainable_package",
+      input: trainable.source?.input,
+      target_source: sample.target_source,
+    },
+    license: "fixture",
+    counts: {
+      gaussians: sample.sampled_count,
+      objects: trainable.training?.slots,
+    },
+    artifacts: [
+      {
+        role: "trainable_kernel",
+        path: "model-artifact.json",
+        format: ".json",
+        delivery_tier: "browser_edit",
+        browser_ready: true,
+        gaussian_count: sample.sampled_count,
+        object_count: trainable.training?.slots,
+        label: "trainable-kernel-model-artifact",
+        note: "Audit fixture for trainable-only model manifest package import.",
+      },
+    ],
+    quality_evidence: [
+      {
+        kind: "trainable_kernel_training_summary",
+        source: "model-artifact.json",
+        summary: trainable.training,
+      },
+    ],
+    limitations: ["Tiny audit fixture for local trainable model artifact manifest package import."],
+    created_from: {
+      trainable_model_artifact: "model-artifact.json",
+      schema: trainable.schema,
+      input: trainable.source?.input,
+    },
   };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   return manifestPath;

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -82,6 +83,10 @@ from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.model_manifest import (
+    manifest_from_trainable_kernel_model_artifact,
+    write_model_artifact_manifest,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1198,6 +1203,29 @@ def _training_kernel_sample(args: argparse.Namespace) -> None:
         }
         print(f"model_artifact_schema={model_artifact['schema']}")
         print(f"model_artifact={args.model_output}")
+    if args.manifest_output:
+        if not args.model_output:
+            raise ValueError("--manifest-output requires --model-output")
+        artifact_route = _manifest_relative_path(args.model_output, args.manifest_output)
+        model_manifest = manifest_from_trainable_kernel_model_artifact(
+            args.model_output,
+            artifact_path=artifact_route,
+            manifest_id=args.manifest_id,
+            asset_id=args.manifest_asset_id,
+            name=args.manifest_name,
+            license=args.manifest_license,
+        )
+        write_model_artifact_manifest(args.manifest_output, model_manifest)
+        summary["model_artifact_manifest"] = {
+            "schema": model_manifest["schema"],
+            "path": str(args.manifest_output),
+            "manifest_id": model_manifest["manifest_id"],
+            "artifact_path": artifact_route,
+        }
+        print(f"model_artifact_manifest_schema={model_manifest['schema']}")
+        print(f"model_artifact_manifest={args.manifest_output}")
+        print(f"model_artifact_manifest_asset={model_manifest['asset_id']}")
+        print(f"model_artifact_manifest_trainable={artifact_route}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -1217,6 +1245,15 @@ def _evaluate_training_renderer_api(
     if image_renderer == "gsplat":
         return evaluate_gsplat_training_renderer_loss(frames, assignments, decoder_colors)
     raise ValueError("image_renderer must be one of: point, gsplat")
+
+
+def _manifest_relative_path(artifact_path: Path, manifest_path: Path) -> str:
+    return Path(
+        os.path.relpath(
+            Path(artifact_path).resolve(),
+            Path(manifest_path).parent.resolve(),
+        )
+    ).as_posix()
 
 
 def _training_renderer_loss_contract(args: argparse.Namespace) -> None:
@@ -2103,6 +2140,18 @@ def _build_parser() -> argparse.ArgumentParser:
     kernel_sample.add_argument("--record-every", type=int)
     kernel_sample.add_argument("--summary-output", type=Path)
     kernel_sample.add_argument("--model-output", type=Path)
+    kernel_sample.add_argument(
+        "--manifest-output",
+        type=Path,
+        help="write an objgauss-model-artifact-manifest-v1 that exposes --model-output as browser-ready trainable_kernel",
+    )
+    kernel_sample.add_argument("--manifest-id")
+    kernel_sample.add_argument("--manifest-asset-id")
+    kernel_sample.add_argument("--manifest-name")
+    kernel_sample.add_argument(
+        "--manifest-license",
+        default="local trainable kernel artifact; verify source license before release",
+    )
     kernel_sample.add_argument("--require-loss-decrease", action="store_true")
     kernel_sample.set_defaults(handler=_training_kernel_sample)
 

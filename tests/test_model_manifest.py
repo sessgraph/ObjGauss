@@ -17,11 +17,14 @@ from objgauss.model_manifest import (
     build_model_artifact_manifest,
     manifest_from_asset_library_entry,
     manifest_from_sample_bundle,
+    manifest_from_trainable_kernel_model_artifact,
     manifest_from_training_output,
     read_model_artifact_manifest,
     validate_model_artifact_manifest,
     write_model_artifact_manifest,
 )
+from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
 
 
 def test_model_artifact_manifest_roundtrip(tmp_path):
@@ -177,6 +180,46 @@ def test_model_artifact_manifest_allows_browser_ready_quality_report(tmp_path):
     roles = {artifact["role"]: artifact for artifact in manifest["artifacts"]}
     assert roles["quality_report"]["browser_ready"] is True
     assert roles["quality_report"]["delivery_tier"] == "browser_edit"
+    validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
+    assert validation.passed
+    assert validation.browser_ready_artifacts == 1
+
+
+def test_manifest_from_trainable_kernel_model_artifact(tmp_path):
+    result = train_kernel_mvp(
+        make_trainable_kernel_mvp_fixture(),
+        slots=2,
+        iterations=4,
+        learning_rate=0.35,
+        seed=7,
+    )
+    artifact_path = tmp_path / "trainable-kernel-model.json"
+    write_trainable_kernel_model_artifact(
+        artifact_path,
+        result,
+        input_path="fixture://trainable-kernel-mvp",
+    )
+
+    manifest = manifest_from_trainable_kernel_model_artifact(
+        artifact_path,
+        artifact_path="trainable-kernel-model.json",
+        manifest_id="trainable-kernel-model-artifacts",
+        asset_id="trainable-kernel-fixture",
+        name="Trainable kernel fixture",
+        license="fixture",
+    )
+
+    roles = {artifact["role"]: artifact for artifact in manifest["artifacts"]}
+    assert manifest["schema"] == MODEL_ARTIFACT_MANIFEST_SCHEMA
+    assert manifest["asset_id"] == "trainable-kernel-fixture"
+    assert manifest["counts"] == {"gaussians": 6, "objects": 2}
+    assert roles["trainable_kernel"]["path"] == "trainable-kernel-model.json"
+    assert roles["trainable_kernel"]["browser_ready"] is True
+    assert roles["trainable_kernel"]["delivery_tier"] == "browser_edit"
+    assert roles["trainable_kernel"]["byte_size"] == artifact_path.stat().st_size
+    assert roles["trainable_kernel"]["sha256"] == hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    assert manifest["quality_evidence"][0]["kind"] == "trainable_kernel_training_summary"
+    assert manifest["created_from"]["schema"] == "objgauss-trainable-kernel-model-artifact-v1"
     validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
     assert validation.passed
     assert validation.browser_ready_artifacts == 1

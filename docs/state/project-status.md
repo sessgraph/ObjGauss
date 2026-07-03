@@ -526,6 +526,20 @@ ObjectState summary、decoder colors、rendered RGB、loss telemetry、renderer 
 sample provenance。该步骤仍不引入 torch / GPU renderer，不替换 viewer renderer，
 不把该 JSON 产物标记为 browser artifact。
 
+`TRAINABLE-MANIFEST-OUTPUT-001` 已完成 trainable kernel MVP 的 viewer-ready manifest
+handoff：`objgauss/model_manifest.py` 新增
+`manifest_from_trainable_kernel_model_artifact(...)`，可把
+`objgauss-trainable-kernel-model-artifact-v1` 包装成
+`objgauss-model-artifact-manifest-v1`，其中 `trainable_kernel` artifact 使用
+`browser_edit / browser_ready=true`，并记录 gaussian / object counts、byte size、
+sha256、training summary 和 renderer API quality evidence。`objgauss training
+kernel-sample` 新增 `--manifest-output`、`--manifest-asset-id`、`--manifest-name` 和
+`--manifest-license`；当同时传 `--model-output` 时，会写出同目录相对 artifact path，
+使输出目录可直接作为 `?modelArtifactManifest=...` 或本地 `导入模型` package 输入。
+`scripts/audit-world-viewer.mjs` 新增 trainable-only local manifest package audit，输出
+`localTrainableManifest=local-trainable-manifest-debug-os`。该步骤仍不引入 torch /
+gsplat / CUDA，不提交 `/tmp` 或 ignored `outputs/` 训练产物，不改变 viewer renderer。
+
 `TRAIN-MODEL-VIEWER-BINDING-001` 已完成 trainable MVP model artifact 的 Debug OS
 前端绑定：`src/modelCatalog.js` 新增小型 `trainable-mvp-debug` static fixture，
 明确标记为 `objgauss-trainable-kernel-model-artifact-v1` debug fixture，不是真实训练

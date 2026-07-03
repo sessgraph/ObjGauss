@@ -72,6 +72,46 @@
 
 ## Done
 
+### TRAINABLE-MANIFEST-OUTPUT-001: Write viewer-ready manifests for trainable kernel artifacts
+
+- 状态: done / trainable-kernel-model-manifest-handoff
+- 类型: 标准 PR / training artifact handoff + ObjectState Debug OS delivery
+- 目标: 让 `objgauss training kernel-sample` 生成的
+  `objgauss-trainable-kernel-model-artifact-v1` 不再只是裸 JSON，而是可同时写出
+  `objgauss-model-artifact-manifest-v1`，使训练输出目录可以直接交给前端 Debug OS。
+- 已实施:
+  - `objgauss/model_manifest.py` 新增
+    `manifest_from_trainable_kernel_model_artifact(...)`，读取并校验 trainable kernel
+    artifact，生成 browser-ready `trainable_kernel` artifact route。
+  - manifest 记录 gaussian / object counts、byte size、sha256、training summary、
+    renderer API quality evidence、source input 和 sample provenance。
+  - `objgauss training kernel-sample` 新增 `--manifest-output`、`--manifest-asset-id`、
+    `--manifest-name` 和 `--manifest-license`；当传入 `--model-output` 时，会写出与
+    manifest 同目录相对的 trainable artifact path，适配同源 URL 和本地 package 导入。
+  - `scripts/audit-world-viewer.mjs` 新增 trainable-only local manifest package audit，
+    用现有小型 trainable fixture 验证 `导入模型` 可以加载只有 `trainable_kernel` 的
+    package，并输出 `localTrainableManifest=local-trainable-manifest-debug-os`。
+- 边界:
+  - 不改变 `objgauss-trainable-kernel-model-artifact-v1` 本体 schema。
+  - 不训练 gsplat，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不生成或提交 OGC payload、checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_model_manifest.py::test_manifest_from_trainable_kernel_model_artifact tests/test_objgauss_mvp.py::test_training_kernel_sample_cli_runs_on_object_aware_ply`: 2 passed。
+  - `uv run objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply ... --model-output /tmp/objgauss-trainable-kernel-model.json --manifest-output /tmp/objgauss-trainable-model-artifact.json ...`: passed，输出
+    `model_artifact_manifest_schema=objgauss-model-artifact-manifest-v1` 和
+    `model_artifact_manifest_trainable=objgauss-trainable-kernel-model.json`。
+  - `uv run python -c "... validate_model_artifact_manifest ..."`: passed，
+    `browser_ready_artifacts=1`。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `localTrainableManifest=local-trainable-manifest-debug-os`、
+    `algorithmManifest=manifest-trainable-ogc-debug-os` 和 `debugSnapshotExport=exported`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 139 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### DEBUG-SNAPSHOT-EXPORT-001: Export ObjectState Debug snapshots from viewer
 
 - 状态: done / debug-snapshot-json-export
