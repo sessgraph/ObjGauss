@@ -78,6 +78,40 @@
 
 ## Done
 
+### OBJECTSTATE-FRAGMENTATION-PANEL-001: Visible object fragmentation inspector
+
+- 状态: done / object-fragmentation-inspector
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 selected ObjectState 的 spatial continuity / fragmentation 从隐藏
+  telemetry 升级为可见 inspector，让对象是否空间连续、是否碎片化、bbox 是否有效和
+  centroid 是否仍在 bbox 内可以直接审计。
+- 已实施:
+  - `src/App.jsx` 新增 `ObjectFragmentationPanel`，复用现有
+    `objgauss-object-continuity-summary-v1`，显示 selected ObjectState 的 Gaussian 数、
+    compactness、bbox diagonal、density、bbox、centroid 和 fragmented flag。
+  - 同一面板暴露 `data-object-fragmentation-*` 与 `data-hover-fragmentation-*`
+    telemetry，并在 hover ObjectState 时补充 hover fragmentation metadata。
+  - `src/styles.css` 为 fragmentation 面板增加稳定四列 metrics、flag rows 和 hover
+    metadata 分隔样式。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 中 fragmentation panel 与
+    root / Debug panel / snapshot 的 continuity contract 一致，并把
+    `objectFragmentation=continuous` 写入 audit 输出。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、artifact schema、Gaussian renderer、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: Browser plugin not available，使用 Playwright fallback；
+    提权重跑 passed，输出包含 `objectFragmentation=continuous`、
+    `objectContinuity=continuous` 和 `hoverContinuity=continuous`。
+  - 截图证据: `/tmp/objgauss-world-viewer.png`、`/tmp/objgauss-world-viewer-mobile.png`。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: `3c4ac94`
+
 ### OBJECTSTATE-ASSIGNMENT-TIMELINE-001: Visible assignment stability timeline
 
 - 状态: done / assignment-timeline-inspector

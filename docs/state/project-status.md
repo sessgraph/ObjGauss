@@ -558,6 +558,18 @@ timeline 为 2-frame `stable`，`meanDelta=0.02`，并在 audit 输出中记录
 decoder 或 trainable kernel loop；训练模型主线仍保持
 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-FRAGMENTATION-PANEL-001` 已将 spatial continuity / fragmentation 从
+summary telemetry 升级为可见 Object Fragmentation inspector：`src/App.jsx` 新增
+`ObjectFragmentationPanel`，复用现有 `objgauss-object-continuity-summary-v1`，显示
+selected ObjectState 的 Gaussian 数、compactness、bbox diagonal、density、bbox、
+centroid 和 fragmented / centroid-contained / bbox-valid flag；hover ObjectState 时
+同一面板也暴露 hover fragmentation metadata。`scripts/audit-world-viewer.mjs` 已验证
+trainable fixture 的 panel、root telemetry、Debug panel 和 snapshot continuity contract
+一致，并在 audit 输出中记录 `objectFragmentation=continuous`。该切片继续只强化 Phase 1
+非训练 Debug OS，不改变 assignment solver、ObjectState projection、artifact schema、
+renderer、OGC decoder 或 trainable kernel loop；训练模型主线仍保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window
