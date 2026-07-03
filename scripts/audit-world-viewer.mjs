@@ -40,6 +40,7 @@ try {
       `debugSnapshotExport=${summary.debugSnapshotExportStatus}`,
       `debugSessionExport=${summary.debugSessionExportStatus}`,
       `debugSessionImport=${summary.debugSessionImportStatus}`,
+      `debugSessionDiff=${summary.debugSessionDiffStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
       `localTrainableManifest=${summary.localTrainableManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
@@ -668,6 +669,7 @@ async function auditWorld(url) {
       debugSnapshotExportStatus: algorithmManifest.snapshotExportStatus,
       debugSessionExportStatus: algorithmManifest.sessionExportStatus,
       debugSessionImportStatus: algorithmManifest.sessionImportStatus,
+      debugSessionDiffStatus: algorithmManifest.sessionDiffStatus,
       localModelManifestStatus: localModelManifest.status,
       localTrainableManifestStatus: localTrainableManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
@@ -1558,11 +1560,23 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-debug-session-archive-quality") !== "warn" ||
         Number(shell?.getAttribute("data-debug-session-archive-event-count") ?? 0) < 2 ||
         Number(shell?.getAttribute("data-debug-session-archive-model-count") ?? 0) !== 10 ||
+        shell?.getAttribute("data-debug-session-diff-status") !== "match" ||
+        shell?.getAttribute("data-debug-session-diff-model-match") !== "true" ||
+        shell?.getAttribute("data-debug-session-diff-source-match") !== "true" ||
+        shell?.getAttribute("data-debug-session-diff-quality-match") !== "true" ||
+        shell?.getAttribute("data-debug-session-diff-training-match") !== "true" ||
+        Number(shell?.getAttribute("data-debug-session-diff-slot-delta") ?? NaN) !== 0 ||
+        Number(shell?.getAttribute("data-debug-session-diff-entropy-delta") ?? NaN) !== 0 ||
         panel?.getAttribute("data-debug-session-archive-status") !== "loaded" ||
         panel?.getAttribute("data-debug-session-archive-file") !== "objgauss-debug-session-import.json" ||
         panel?.getAttribute("data-debug-session-archive-schema") !== "objgauss-object-state-debug-session-v1" ||
         panel?.getAttribute("data-debug-session-archive-model") !== "model-manifest-ogc-artifact" ||
         panel?.getAttribute("data-debug-session-archive-quality") !== "warn" ||
+        panel?.getAttribute("data-debug-session-diff-status") !== "match" ||
+        panel?.getAttribute("data-debug-session-diff-model-match") !== "true" ||
+        panel?.getAttribute("data-debug-session-diff-source-match") !== "true" ||
+        panel?.getAttribute("data-debug-session-diff-quality-match") !== "true" ||
+        panel?.getAttribute("data-debug-session-diff-training-match") !== "true" ||
         protocol?.getAttribute("data-debug-session-import-status") !== "loaded" ||
         button?.getAttribute("data-import-status") !== "loaded" ||
         archive?.schema !== "objgauss-object-state-debug-session-v1" ||
@@ -1577,6 +1591,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         status: shell.getAttribute("data-debug-session-import-status"),
         schema: archive.schema,
         model: archive.snapshot.model.id,
+        diffStatus: shell.getAttribute("data-debug-session-diff-status"),
       };
     }, undefined, { timeout: 15000 });
     const sessionImport = await sessionImportHandle.jsonValue();
@@ -1587,6 +1602,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       snapshotExportStatus: snapshotExport.status,
       sessionExportStatus: sessionExport.status,
       sessionImportStatus: sessionImport.status,
+      sessionDiffStatus: sessionImport.diffStatus,
     };
   } finally {
     await page.close();

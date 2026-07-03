@@ -72,6 +72,39 @@
 
 ## Done
 
+### DEBUG-SESSION-DIFF-001: Compare live snapshots against imported debug sessions
+
+- 状态: done / debug-session-live-archive-diff
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 在导入 `objgauss-object-state-debug-session-v1` 后，将当前 live snapshot 与 archive
+  snapshot 做只读 diff，用于判断训练 / 算法 session 的 ObjectState 核心指标是否漂移。
+- 已实施:
+  - `src/App.jsx` 新增 `debugSessionSnapshotDiff(...)`，比较 model、object、assignment
+    source、slot count、entropy、confidence、quality status、training status、stability
+    status 和 delivery route。
+  - root shell 与 `Archive` 面板新增 `data-debug-session-diff-*` telemetry；Archive 面板
+    显示 diff status、model/source/quality match、slot delta、entropy delta、confidence
+    delta 和 event delta。
+  - `scripts/audit-world-viewer.mjs` 在 session export -> import 闭环后验证
+    `debugSessionDiff=match`，并断言 model/source/quality/training match 与 slot /
+    entropy delta 为 0。
+- 边界:
+  - 不改变 debug session / snapshot schema，不写新的 artifact 文件。
+  - 不做场景 replay，不重新拉 OGC payload，不改写当前 models。
+  - 不改变训练 loop，不训练 gsplat，不安装 torch / gsplat / CUDA，不改变
+    `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `debugSessionExport=exported`、`debugSessionImport=loaded`、
+    `debugSessionDiff=match`、`algorithmManifest=manifest-trainable-ogc-debug-os` 和
+    `qualityReport=warn`。Browser plugin not available；使用常规 Playwright / repo audit
+    fallback。
+  - `uv run --extra dev pytest`: 140 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### DEBUG-SESSION-IMPORT-001: Import ObjectState Debug sessions as read-only archives
 
 - 状态: done / debug-session-archive-import

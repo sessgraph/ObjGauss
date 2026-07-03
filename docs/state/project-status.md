@@ -344,6 +344,15 @@ session JSON 重新导入，验证 `debugSessionImport=loaded`、archive model�
 model count、event count 和 `import-session` trace。该步骤不做场景 replay，不重新拉
 OGC payload，不改训练 loop、不写训练输出或大资产。
 
+`DEBUG-SESSION-DIFF-001` 已把导入的 debug session 进一步变成 live-vs-archive 比较视图：
+`src/App.jsx` 新增 `debugSessionSnapshotDiff(...)`，在当前 live snapshot 与导入 archive
+snapshot 之间比较 model、object、assignment source、slot count、entropy、confidence、
+quality / training / stability status 和 delivery route。root shell 与 `Archive` 面板现在暴露
+`data-debug-session-diff-*` telemetry，并显示 diff status、match flags、slot delta、entropy
+delta、confidence delta 和 event delta。`scripts/audit-world-viewer.mjs` 在刚导出再导入的
+同一 session 上验证 `debugSessionDiff=match`，证明该视图可作为后续不同训练 run 的 drift
+检查基础。该步骤不改 session schema、不做场景 replay、不拉 payload、不写训练输出。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

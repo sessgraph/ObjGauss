@@ -592,6 +592,11 @@ button:focus-visible {
   border-color: rgba(127, 241, 214, 0.2);
 }
 
+.debugSessionDiffMeta {
+  border-top: 1px solid rgba(127, 241, 214, 0.12);
+  padding-top: 8px;
+}
+
 .debugEventRows {
   display: grid;
   gap: 6px;

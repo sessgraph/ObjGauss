@@ -153,6 +153,7 @@ export default function App() {
     models: modelList,
     debugEvents,
   });
+  const debugSessionDiff = debugSessionSnapshotDiff(selectedDebugSnapshot, debugSessionArchive?.snapshot);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1128,6 +1129,14 @@ export default function App() {
       data-debug-session-archive-quality={debugSessionArchive?.snapshot?.quality?.status ?? ""}
       data-debug-session-archive-event-count={debugSessionArchive?.events?.length ?? ""}
       data-debug-session-archive-model-count={debugSessionArchive?.models?.length ?? ""}
+      data-debug-session-diff-status={debugSessionDiff?.status ?? ""}
+      data-debug-session-diff-model-match={debugSessionDiff?.modelMatch ? "true" : debugSessionDiff ? "false" : ""}
+      data-debug-session-diff-source-match={debugSessionDiff?.sourceMatch ? "true" : debugSessionDiff ? "false" : ""}
+      data-debug-session-diff-quality-match={debugSessionDiff?.qualityMatch ? "true" : debugSessionDiff ? "false" : ""}
+      data-debug-session-diff-training-match={debugSessionDiff?.trainingMatch ? "true" : debugSessionDiff ? "false" : ""}
+      data-debug-session-diff-slot-delta={debugSessionDiff?.slotDelta ?? ""}
+      data-debug-session-diff-entropy-delta={debugSessionDiff?.entropyDelta ?? ""}
+      data-debug-session-diff-event-delta={debugSessionDiff?.eventDelta ?? ""}
       data-debug-event-count={debugEvents.length}
       data-debug-event-last={debugEvents[0]?.type ?? ""}
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
@@ -1383,6 +1392,7 @@ export default function App() {
         sessionExport={sessionExport}
         sessionImport={sessionImport}
         debugSessionArchive={debugSessionArchive}
+        debugSessionDiff={debugSessionDiff}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
@@ -2729,6 +2739,7 @@ function DebugPanel({
   sessionExport,
   sessionImport,
   debugSessionArchive,
+  debugSessionDiff,
   hiddenObjects,
   stability,
   qualityReport,
@@ -2897,7 +2908,11 @@ function DebugPanel({
         onExportDebugSession={onExportDebugSession}
         onImportDebugSession={onImportDebugSession}
       />
-      <DebugSessionArchivePanel archive={debugSessionArchive} sessionImport={sessionImport} />
+      <DebugSessionArchivePanel
+        archive={debugSessionArchive}
+        sessionImport={sessionImport}
+        diff={debugSessionDiff}
+      />
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <QualityReportPanel report={qualityReport} />
@@ -3056,7 +3071,7 @@ function DebugSnapshotPanel({
   );
 }
 
-function DebugSessionArchivePanel({ archive, sessionImport }) {
+function DebugSessionArchivePanel({ archive, sessionImport, diff }) {
   if (!archive && !["loading", "error"].includes(sessionImport?.status)) return null;
   const recent = Array.isArray(archive?.events) ? archive.events.slice(0, 3) : [];
   return (
@@ -3071,6 +3086,14 @@ function DebugSessionArchivePanel({ archive, sessionImport }) {
       data-debug-session-archive-events={archive?.events?.length ?? ""}
       data-debug-session-archive-models={archive?.models?.length ?? ""}
       data-debug-session-archive-error={sessionImport?.error ?? ""}
+      data-debug-session-diff-status={diff?.status ?? ""}
+      data-debug-session-diff-model-match={diff?.modelMatch ? "true" : diff ? "false" : ""}
+      data-debug-session-diff-source-match={diff?.sourceMatch ? "true" : diff ? "false" : ""}
+      data-debug-session-diff-quality-match={diff?.qualityMatch ? "true" : diff ? "false" : ""}
+      data-debug-session-diff-training-match={diff?.trainingMatch ? "true" : diff ? "false" : ""}
+      data-debug-session-diff-slot-delta={diff?.slotDelta ?? ""}
+      data-debug-session-diff-entropy-delta={diff?.entropyDelta ?? ""}
+      data-debug-session-diff-event-delta={diff?.eventDelta ?? ""}
     >
       <div className="stabilityHead">
         <span>Archive</span>
@@ -3084,6 +3107,18 @@ function DebugSessionArchivePanel({ archive, sessionImport }) {
         <Meta label="quality" value={archive?.snapshot?.quality?.status ?? "-"} />
         <Meta label="error" value={sessionImport?.error || "-"} />
       </dl>
+      {diff ? (
+        <dl className="stabilityMeta snapshotMeta debugSessionDiffMeta" data-debug-session-diff="true">
+          <Meta label="diff" value={diff.status} />
+          <Meta label="model" value={diff.modelMatch ? "match" : "changed"} />
+          <Meta label="source" value={diff.sourceMatch ? "match" : "changed"} />
+          <Meta label="quality" value={diff.qualityMatch ? "match" : "changed"} />
+          <Meta label="d slots" value={formatSignedCount(diff.slotDelta)} />
+          <Meta label="d H" value={formatSignedRatio(diff.entropyDelta)} />
+          <Meta label="d conf" value={formatSignedRatio(diff.confidenceDelta)} />
+          <Meta label="d events" value={formatSignedCount(diff.eventDelta)} />
+        </dl>
+      ) : null}
       {recent.length ? (
         <div className="debugEventRows">
           {recent.map((event, index) => (
@@ -4775,6 +4810,68 @@ function validateDebugSessionArchive(session, path = "") {
   };
 }
 
+function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
+  if (!liveSnapshot || !archiveSnapshot) return null;
+  const modelMatch = cleanString(liveSnapshot.model?.id) === cleanString(archiveSnapshot.model?.id);
+  const objectMatch = String(liveSnapshot.selection?.objectId ?? "") === String(archiveSnapshot.selection?.objectId ?? "");
+  const sourceMatch = cleanString(liveSnapshot.assignment?.source) === cleanString(archiveSnapshot.assignment?.source);
+  const qualityMatch = cleanString(liveSnapshot.quality?.status) === cleanString(archiveSnapshot.quality?.status);
+  const trainingMatch = cleanString(liveSnapshot.training?.status) === cleanString(archiveSnapshot.training?.status);
+  const stabilityMatch = cleanString(liveSnapshot.stability?.status) === cleanString(archiveSnapshot.stability?.status);
+  const deliveryMatch = cleanString(liveSnapshot.delivery?.loadRoute) === cleanString(archiveSnapshot.delivery?.loadRoute);
+  const slotDelta = numericDelta(liveSnapshot.assignment?.slotCount, archiveSnapshot.assignment?.slotCount);
+  const entropyDelta = numericDelta(liveSnapshot.assignment?.entropy, archiveSnapshot.assignment?.entropy);
+  const confidenceDelta = numericDelta(liveSnapshot.assignment?.confidence, archiveSnapshot.assignment?.confidence);
+  const qualityEntropyDelta = numericDelta(
+    liveSnapshot.quality?.assignmentEntropy,
+    archiveSnapshot.quality?.assignmentEntropy,
+  );
+  const eventDelta = numericDelta(
+    Array.isArray(liveSnapshot.events) ? liveSnapshot.events.length : 0,
+    Array.isArray(archiveSnapshot.events) ? archiveSnapshot.events.length : 0,
+  );
+  const changed = [
+    !modelMatch,
+    !objectMatch,
+    !sourceMatch,
+    !qualityMatch,
+    !trainingMatch,
+    !stabilityMatch,
+    !deliveryMatch,
+    deltaChanged(slotDelta),
+    deltaChanged(entropyDelta),
+    deltaChanged(confidenceDelta),
+    deltaChanged(qualityEntropyDelta),
+  ].some(Boolean);
+  return {
+    status: changed ? "changed" : "match",
+    modelMatch,
+    objectMatch,
+    sourceMatch,
+    qualityMatch,
+    trainingMatch,
+    stabilityMatch,
+    deliveryMatch,
+    slotDelta,
+    entropyDelta,
+    confidenceDelta,
+    qualityEntropyDelta,
+    eventDelta,
+  };
+}
+
+function numericDelta(liveValue, archiveValue) {
+  const live = finiteNumber(liveValue);
+  const archive = finiteNumber(archiveValue);
+  if (live === null && archive === null) return 0;
+  if (live === null || archive === null) return null;
+  return live - archive;
+}
+
+function deltaChanged(delta) {
+  return delta === null || Math.abs(Number(delta)) > 0.0005;
+}
+
 function compactDebugModel(model) {
   return {
     id: cleanString(model?.id),
@@ -5040,6 +5137,20 @@ function formatSignedLoss(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
   return `${number >= 0 ? "+" : ""}${number.toFixed(6)}`;
+}
+
+function formatSignedRatio(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${number >= 0 ? "+" : ""}${number.toFixed(3)}`;
+}
+
+function formatSignedCount(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${number >= 0 ? "+" : ""}${Math.trunc(number)}`;
 }
 
 function formatFrame(index, count) {
