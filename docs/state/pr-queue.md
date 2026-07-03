@@ -124,7 +124,7 @@
   - `uv run python -m py_compile objgauss/core/object_emergence_solver.py objgauss/core/renderer_loss.py objgauss/cli.py`:
     passed。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `3fb909d`
 
 ### DEBUG-UI-HIERARCHY-001: Tidy ObjectState Debug OS hierarchy and inspector collapse
 
