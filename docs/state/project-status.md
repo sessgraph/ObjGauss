@@ -466,6 +466,20 @@ temporal status 变化列为 changed field。该切片继续只强化 Phase 1 �
 或 trainable kernel loop；训练模型主线仍保持
 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-EXPLAINABILITY-001` 已将 selected / hovered ObjectState 的可解释性压成
+单一 Debug OS contract：`src/App.jsx` 新增
+`objgauss-object-explainability-summary-v1`，把 assignment probe 的 confidence /
+margin / entropy、spatial continuity 和 temporal stability 合并为 `explainable`、
+score 和 reason list。root `.worldShell`、ObjectState Debug panel、
+`window.__OBJGAUSS_WORLD__`、debug snapshot、hover preview 和 session archive 现在同步
+记录 selected / hovered explainability summary；session diff 也会把 explainability
+status 变化列为 changed field。`scripts/audit-world-viewer.mjs` 已扩展为验证 trainable
+fixture 的 root / panel / scene handle / snapshot / session handoff 都保留
+explainability schema 和 selected / hover explainability contract。该切片继续只强化
+Phase 1 非训练 Debug OS，不改变 assignment solver、ObjectState projection、renderer
+artifact schema、OGC decoder 或 trainable kernel loop；训练模型主线仍保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OBJECTSTATE-HOVER-ASSIGNMENT-001` 已将 hover 从纯视觉 focus 升级为 ObjectState
 assignment preview：`objectTarget(...)` 现在携带 hovered object 的 compact assignment
 vector、confidence、entropy、status、centroid 和 bbox；root telemetry、
@@ -2149,6 +2163,9 @@ npm run acceptance:demo
 - SAM 入口已用真实 checkpoint 跑通小场景 manifest 和 `vote-masks` 验收；`objgauss masks score-clip --backend transformers --device cuda` 已用临时 `uv --with` 依赖跑通真实 CLIP inference，并已补 mask-level / slot-level naming quality gate，但当前 aligned slot labels 仍未通过语义质量 gate，不能 promotion 为默认语义命名策略。
 - Object Emergence Score 的单点 `emergence` CLI 仍是 partial OES；`emergence-curve` 在提供 cloud 和 mask manifest 时已覆盖 assignment / stability / spatial compactness / scale-aware CPU splat render occlusion。`emergence-benchmark` 当前是本地 smoke suite，依赖 ignored `outputs/` 产物；缺失输入时按 `docs/benchmarks/semantic-smoke.md` 与 `docs/benchmarks/splatfacto-scenes.md` 生成。本 suite 仍不是 CI 固定 public benchmark。gradient coherence 和 covariance-aware 3DGS renderer occlusion 仍未实现，不能据此单独宣称 object emergence 完成。
 - 当前训练循环是 projection supervision，不是完整 3DGS render loss 联合训练。
+- `TRAIN-GSPLAT-MVP-001` 训练模型主线当前挂起：本环境缺少 torch / gsplat optional
+  deps，且 `nvidia-smi` 无法连接 NVIDIA driver；恢复前不重复尝试 full renderer
+  training MVP，也不把 point renderer 或 deterministic Debug OS 结果伪装为 gsplat 训练成功。
 - NeRF Lego 闭环代理样例仍是 posed RGBA 生成的轻量 Gaussian proxy；另有 Nerfstudio Splatfacto 100-step smoke 产物和 TRAIN-003A runbook/script 证明本机可复现真实 3DGS optimization PLY，但尚未作为前端公开样例固化。
 - 外部训练输出接入命令已完成，本机已产出真实 NeRF Lego Splatfacto smoke PLY、500-step resource-safe public sample candidate 和 2000-step higher-quality geometry candidate；safe-2000 经过 8-frame balanced SAM 后已消除近空 object slots、提升 render occlusion effect，并通过当前 public sample 浏览器 audit。
 - Poly Haven mesh Demo 还不能直接进入现有 3DGS viewer；当前已具备 mesh -> NeRF-style render set -> Splatfacto smoke 的 benchmark 链路，但不是公开前端 demo。
@@ -2158,7 +2175,9 @@ npm run acceptance:demo
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
-3. 将三场景 Splatfacto suite 从 smoke 推进到更高质量训练：统一训练步数、质量曲线、held-out view 指标和失败案例分析。
+3. 训练模型线保持挂起：仅在可用 torch / gsplat / CUDA / NVIDIA driver 环境恢复后，再将
+   三场景 Splatfacto suite 从 smoke 推进到更高质量训练，并补统一训练步数、质量曲线、
+   held-out view 指标和失败案例分析。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

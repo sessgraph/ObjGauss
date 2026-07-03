@@ -135,6 +135,12 @@ export default function App() {
   );
   const selectedContinuity = objectContinuitySummary(selectedObject ?? selected?.objects?.[0] ?? null);
   const selectedTemporal = objectTemporalSummary(selectedObject ?? selected?.objects?.[0] ?? null);
+  const selectedExplainability = objectExplainabilitySummary({
+    object: selectedObject ?? selected?.objects?.[0] ?? null,
+    assignmentProbe: selectedAssignmentProbe,
+    continuity: selectedContinuity,
+    temporal: selectedTemporal,
+  });
   const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
     confidence: hoveredTarget?.confidence,
     entropy: hoveredTarget?.entropy,
@@ -142,6 +148,12 @@ export default function App() {
   });
   const hoveredContinuity = objectContinuitySummary(hoveredTarget);
   const hoveredTemporal = objectTemporalSummary(hoveredTarget);
+  const hoveredExplainability = objectExplainabilitySummary({
+    object: hoveredTarget,
+    assignmentProbe: hoveredAssignmentProbe,
+    continuity: hoveredContinuity,
+    temporal: hoveredTemporal,
+  });
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const objectVisibility = useMemo(
@@ -173,6 +185,8 @@ export default function App() {
     hoverContinuity: hoveredContinuity,
     objectTemporal: selectedTemporal,
     hoverTemporal: hoveredTemporal,
+    objectExplainability: selectedExplainability,
+    hoverExplainability: hoveredExplainability,
     hiddenCount,
     objectVisibility,
     stability: selectedStability,
@@ -1210,6 +1224,10 @@ export default function App() {
       data-object-assignment-jitter={selectedTemporal.assignmentJitter ?? ""}
       data-object-bbox-stability={selectedTemporal.bboxStability ?? ""}
       data-object-temporal-stable={selectedTemporal.stable ? "true" : "false"}
+      data-object-explainability-status={selectedExplainability.status}
+      data-object-explainable={selectedExplainability.explainable ? "true" : "false"}
+      data-object-explainability-score={selectedExplainability.score ?? ""}
+      data-object-explainability-reasons={selectedExplainability.reasonNames}
       data-object-overlay-mode={selectedObjectOverlayMode}
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "centroid") ? "true" : "false"}
@@ -1239,6 +1257,10 @@ export default function App() {
       data-hover-assignment-jitter={hoveredTemporal.assignmentJitter ?? ""}
       data-hover-bbox-stability={hoveredTemporal.bboxStability ?? ""}
       data-hover-temporal-stable={hoveredTemporal.stable ? "true" : "false"}
+      data-hover-explainability-status={hoveredExplainability.status}
+      data-hover-explainable={hoveredExplainability.explainable ? "true" : "false"}
+      data-hover-explainability-score={hoveredExplainability.score ?? ""}
+      data-hover-explainability-reasons={hoveredExplainability.reasonNames}
       data-hidden-objects={hiddenCount}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility.visibleObjectCount}
@@ -1502,6 +1524,8 @@ export default function App() {
         hoverContinuity={hoveredContinuity}
         objectTemporal={selectedTemporal}
         hoverTemporal={hoveredTemporal}
+        objectExplainability={selectedExplainability}
+        hoverExplainability={hoveredExplainability}
         debugProbe={debugProbe}
         assignmentProbe={selectedAssignmentProbe}
         debugMode={debugMode}
@@ -2553,6 +2577,12 @@ function ThreeWorld({
       );
       const selectedContinuity = objectContinuitySummary(selectedObject ? objectTarget(selectedObject) : null);
       const selectedTemporal = objectTemporalSummary(selectedObject ? objectTarget(selectedObject) : null);
+      const selectedExplainability = objectExplainabilitySummary({
+        object: selectedObject ? objectTarget(selectedObject) : null,
+        assignmentProbe: selectedAssignmentProbe,
+        continuity: selectedContinuity,
+        temporal: selectedTemporal,
+      });
       const hoveredTarget = objectTarget(hoveredObject);
       const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
         confidence: hoveredTarget?.confidence,
@@ -2561,6 +2591,12 @@ function ThreeWorld({
       });
       const hoveredContinuity = objectContinuitySummary(hoveredTarget);
       const hoveredTemporal = objectTemporalSummary(hoveredTarget);
+      const hoveredExplainability = objectExplainabilitySummary({
+        object: hoveredTarget,
+        assignmentProbe: hoveredAssignmentProbe,
+        continuity: hoveredContinuity,
+        temporal: hoveredTemporal,
+      });
       const hoverHighlightSamples = [...draggableObjects.values()].map((object) => {
         const cloud = firstGaussianCloud(object);
         return {
@@ -2625,6 +2661,11 @@ function ThreeWorld({
         hoveredAssignmentJitter: hoveredTemporal.assignmentJitter,
         hoveredBboxStability: hoveredTemporal.bboxStability,
         hoveredTemporalStable: hoveredTemporal.stable,
+        hoveredExplainability,
+        hoveredExplainabilityStatus: hoveredExplainability.status,
+        hoveredExplainable: hoveredExplainability.explainable,
+        hoveredExplainabilityScore: hoveredExplainability.score,
+        hoveredExplainabilityReasons: hoveredExplainability.reasonNames,
         hoverHighlightActive: Boolean(hoveredTarget?.selectionId),
         hoverHighlightedObjectCount: highlightedHoverSamples.length,
         hoverHighlightedGaussianCount: highlightedHoverSamples.reduce(
@@ -2663,6 +2704,11 @@ function ThreeWorld({
         objectAssignmentJitter: selectedTemporal.assignmentJitter,
         objectBboxStability: selectedTemporal.bboxStability,
         objectTemporalStable: selectedTemporal.stable,
+        objectExplainability: selectedExplainability,
+        objectExplainabilityStatus: selectedExplainability.status,
+        objectExplainable: selectedExplainability.explainable,
+        objectExplainabilityScore: selectedExplainability.score,
+        objectExplainabilityReasons: selectedExplainability.reasonNames,
         stabilitySummary: selectedStability,
         selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
         selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
@@ -3078,6 +3124,8 @@ function DebugPanel({
   hoverContinuity,
   objectTemporal,
   hoverTemporal,
+  objectExplainability,
+  hoverExplainability,
   debugProbe,
   assignmentProbe,
   debugMode,
@@ -3152,6 +3200,10 @@ function DebugPanel({
       data-object-assignment-jitter={objectTemporal?.assignmentJitter ?? ""}
       data-object-bbox-stability={objectTemporal?.bboxStability ?? ""}
       data-object-temporal-stable={objectTemporal?.stable ? "true" : "false"}
+      data-object-explainability-status={objectExplainability?.status ?? "none"}
+      data-object-explainable={objectExplainability?.explainable ? "true" : "false"}
+      data-object-explainability-score={objectExplainability?.score ?? ""}
+      data-object-explainability-reasons={objectExplainability?.reasonNames ?? ""}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
       data-ogc-lod-index={selectedOgcLod}
@@ -3179,6 +3231,10 @@ function DebugPanel({
       data-hover-assignment-jitter={hoverTemporal?.assignmentJitter ?? ""}
       data-hover-bbox-stability={hoverTemporal?.bboxStability ?? ""}
       data-hover-temporal-stable={hoverTemporal?.stable ? "true" : "false"}
+      data-hover-explainability-status={hoverExplainability?.status ?? "none"}
+      data-hover-explainable={hoverExplainability?.explainable ? "true" : "false"}
+      data-hover-explainability-score={hoverExplainability?.score ?? ""}
+      data-hover-explainability-reasons={hoverExplainability?.reasonNames ?? ""}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
@@ -3360,6 +3416,7 @@ function DebugPanel({
         <Meta label="diag" value={formatRatio(objectContinuity?.bboxDiagonal)} />
         <Meta label="motion" value={objectTemporal?.status ?? "-"} />
         <Meta label="jitter" value={formatRatio(objectTemporal?.assignmentJitter)} />
+        <Meta label="explain" value={objectExplainability?.status ?? "-"} />
         <Meta
           label="hover"
           value={
@@ -3373,6 +3430,10 @@ function DebugPanel({
         <Meta label="hover H" value={formatRatio(hoverAssignmentProbe?.entropy)} />
         <Meta label="hover spatial" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
         <Meta label="hover motion" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
+        <Meta
+          label="hover explain"
+          value={hoverExplainability?.status !== "none" ? hoverExplainability?.status : "-"}
+        />
         <Meta label="hidden" value={hiddenObjects.size} />
         <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
       </dl>
@@ -3474,6 +3535,10 @@ function DebugSnapshotPanel({
       data-debug-snapshot-assignment-jitter={snapshot.temporal?.assignmentJitter ?? ""}
       data-debug-snapshot-bbox-stability={snapshot.temporal?.bboxStability ?? ""}
       data-debug-snapshot-temporal-stable={snapshot.temporal?.stable ? "true" : "false"}
+      data-debug-snapshot-explainability-status={snapshot.explainability?.status ?? ""}
+      data-debug-snapshot-explainable={snapshot.explainability?.explainable ? "true" : "false"}
+      data-debug-snapshot-explainability-score={snapshot.explainability?.score ?? ""}
+      data-debug-snapshot-explainability-reasons={snapshot.explainability?.reasonNames ?? ""}
       data-debug-snapshot-hover-object={snapshot.hover?.selectionId ?? ""}
       data-debug-snapshot-hover-assignment-status={snapshot.hover?.probe?.status ?? ""}
       data-debug-snapshot-hover-assignment-margin={snapshot.hover?.probe?.margin ?? ""}
@@ -3484,6 +3549,9 @@ function DebugSnapshotPanel({
       data-debug-snapshot-hover-temporal-drift={snapshot.hover?.temporal?.temporalDrift ?? ""}
       data-debug-snapshot-hover-assignment-jitter={snapshot.hover?.temporal?.assignmentJitter ?? ""}
       data-debug-snapshot-hover-temporal-stable={snapshot.hover?.temporal?.stable ? "true" : "false"}
+      data-debug-snapshot-hover-explainability-status={snapshot.hover?.explainability?.status ?? ""}
+      data-debug-snapshot-hover-explainable={snapshot.hover?.explainability?.explainable ? "true" : "false"}
+      data-debug-snapshot-hover-explainability-score={snapshot.hover?.explainability?.score ?? ""}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3540,9 +3608,11 @@ function DebugSnapshotPanel({
         <Meta label="spatial" value={snapshot.continuity?.status ?? "-"} />
         <Meta label="diag" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
         <Meta label="motion" value={snapshot.temporal?.status ?? "-"} />
+        <Meta label="explain" value={snapshot.explainability?.status ?? "-"} />
         <Meta label="hover A" value={snapshot.hover?.probe?.status ?? "-"} />
         <Meta label="hover spatial" value={snapshot.hover?.continuity?.status ?? "-"} />
         <Meta label="hover motion" value={snapshot.hover?.temporal?.status ?? "-"} />
+        <Meta label="hover explain" value={snapshot.hover?.explainability?.status ?? "-"} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -4983,6 +5053,91 @@ function objectTemporalThresholds(overrides = {}) {
   };
 }
 
+function objectExplainabilitySummary({ object, assignmentProbe, continuity, temporal } = {}) {
+  if (!object) {
+    return {
+      schema: "objgauss-object-explainability-summary-v1",
+      status: "none",
+      explainable: false,
+      score: null,
+      reasonNames: "",
+      reasons: [],
+      assignmentConfidence: null,
+      assignmentMargin: null,
+      assignmentEntropy: null,
+      continuityStatus: continuity?.status ?? "none",
+      temporalStatus: temporal?.status ?? "none",
+    };
+  }
+  const state = object?.objectState ?? object;
+  const confidence = finiteNumber(assignmentProbe?.confidence ?? state?.confidence ?? object?.confidence);
+  const margin = finiteNumber(assignmentProbe?.margin);
+  const entropy = finiteNumber(assignmentProbe?.entropy ?? state?.assignmentEntropy ?? object?.entropy);
+  const continuityStatus = cleanString(continuity?.status ?? "none");
+  const temporalStatus = cleanString(temporal?.status ?? "none");
+  const reasons = [];
+  if (assignmentProbe?.collapseRisk) reasons.push("assignment_collapse_risk");
+  if (assignmentProbe?.ambiguous) reasons.push("assignment_ambiguous");
+  if (confidence !== null && confidence < 0.7) reasons.push("low_assignment_confidence");
+  if (margin !== null && margin < 0.45) reasons.push("low_assignment_margin");
+  if (continuityStatus && !["continuous", "none"].includes(continuityStatus)) {
+    reasons.push(`spatial_${continuityStatus}`);
+  }
+  if (continuity && continuity.centroidContained === false && continuityStatus !== "none") {
+    reasons.push("centroid_outside_bbox");
+  }
+  if (temporalStatus && !["stable", "unavailable", "none"].includes(temporalStatus)) {
+    reasons.push(`temporal_${temporalStatus}`);
+  }
+  const uniqueReasons = [...new Set(reasons)];
+  const explainable = uniqueReasons.length === 0;
+  const status = explainable
+    ? temporalStatus === "unavailable"
+      ? "explainable-static"
+      : "explainable"
+    : uniqueReasons[0];
+  const scoreParts = [
+    confidence,
+    margin,
+    entropy !== null ? 1 - Math.max(0, Math.min(1, entropy)) : null,
+    continuityStatus === "continuous" ? 1 : continuityStatus === "none" ? null : 0,
+    temporal?.stable ? 1 : temporalStatus === "unavailable" || temporalStatus === "none" ? null : 0,
+  ].filter((value) => Number.isFinite(value));
+  const score = scoreParts.length ? round3(average(scoreParts)) : null;
+  return {
+    schema: "objgauss-object-explainability-summary-v1",
+    status,
+    explainable,
+    score,
+    reasonNames: uniqueReasons.join(","),
+    reasons: uniqueReasons,
+    assignmentConfidence: confidence,
+    assignmentMargin: margin,
+    assignmentEntropy: entropy,
+    continuityStatus,
+    temporalStatus,
+  };
+}
+
+function compactObjectExplainability(summary) {
+  if (!summary || typeof summary !== "object") return null;
+  const reasons = cleanStringList(summary.reasons).slice(0, 8);
+  const reasonNames = reasons.length ? reasons.join(",") : cleanString(summary.reasonNames);
+  return {
+    schema: "objgauss-object-explainability-summary-v1",
+    status: cleanString(summary.status || "none"),
+    explainable: Boolean(summary.explainable),
+    score: finiteNumber(summary.score),
+    reasonNames,
+    reasons,
+    assignmentConfidence: finiteNumber(summary.assignmentConfidence),
+    assignmentMargin: finiteNumber(summary.assignmentMargin),
+    assignmentEntropy: finiteNumber(summary.assignmentEntropy),
+    continuityStatus: cleanString(summary.continuityStatus),
+    temporalStatus: cleanString(summary.temporalStatus),
+  };
+}
+
 function summarizeObjectStability(objectsOrStates = []) {
   const states = objectsOrStates
     .map((entry) => entry?.objectState ?? entry?.userData?.objectState ?? entry)
@@ -5459,6 +5614,8 @@ function objectStateDebugSnapshot({
   hoverContinuity,
   objectTemporal,
   hoverTemporal,
+  objectExplainability,
+  hoverExplainability,
   hiddenCount,
   objectVisibility,
   stability,
@@ -5520,6 +5677,7 @@ function objectStateDebugSnapshot({
           probe: compactAssignmentProbe(hoverAssignmentProbe),
           continuity: compactObjectContinuity(hoverContinuity),
           temporal: compactObjectTemporal(hoverTemporal),
+          explainability: compactObjectExplainability(hoverExplainability),
         }
       : null,
     visibility: {
@@ -5533,6 +5691,7 @@ function objectStateDebugSnapshot({
     },
     continuity: compactObjectContinuity(objectContinuity),
     temporal: compactObjectTemporal(objectTemporal),
+    explainability: compactObjectExplainability(objectExplainability),
     objectState: {
       objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
       status: activeState?.status ?? "",
@@ -5705,6 +5864,7 @@ function validateDebugSessionArchive(session, path = "") {
             probe: compactAssignmentProbe(snapshot.hover.probe),
             continuity: compactObjectContinuity(snapshot.hover.continuity),
             temporal: compactObjectTemporal(snapshot.hover.temporal),
+            explainability: compactObjectExplainability(snapshot.hover.explainability),
           }
         : null,
       visibility: {
@@ -5716,6 +5876,7 @@ function validateDebugSessionArchive(session, path = "") {
       },
       continuity: compactObjectContinuity(snapshot.continuity),
       temporal: compactObjectTemporal(snapshot.temporal),
+      explainability: compactObjectExplainability(snapshot.explainability),
       stability: {
         status: cleanString(snapshot.stability?.status),
         slotUtilization: finiteNumber(snapshot.stability?.slotUtilization),
@@ -5810,6 +5971,8 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
   const trainingMatch = cleanString(liveSnapshot.training?.status) === cleanString(archiveSnapshot.training?.status);
   const stabilityMatch = cleanString(liveSnapshot.stability?.status) === cleanString(archiveSnapshot.stability?.status);
   const temporalMatch = cleanString(liveSnapshot.temporal?.status) === cleanString(archiveSnapshot.temporal?.status);
+  const explainabilityMatch =
+    cleanString(liveSnapshot.explainability?.status) === cleanString(archiveSnapshot.explainability?.status);
   const deliveryMatch = cleanString(liveSnapshot.delivery?.loadRoute) === cleanString(archiveSnapshot.delivery?.loadRoute);
   const probeStatusMatch =
     cleanString(liveSnapshot.assignment?.probe?.status) === cleanString(archiveSnapshot.assignment?.probe?.status);
@@ -5836,6 +5999,7 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     !trainingMatch ? "training" : "",
     !stabilityMatch ? "stability" : "",
     !temporalMatch ? "temporal" : "",
+    !explainabilityMatch ? "explainability" : "",
     !deliveryMatch ? "delivery" : "",
     !probeStatusMatch ? "probe_status" : "",
     deltaChanged(slotDelta) ? "slots" : "",
@@ -5853,6 +6017,7 @@ function debugSessionSnapshotDiff(liveSnapshot, archiveSnapshot) {
     trainingMatch,
     stabilityMatch,
     temporalMatch,
+    explainabilityMatch,
     deliveryMatch,
     probeStatusMatch,
     slotDelta,

@@ -57,6 +57,7 @@ try {
       `mixedSlots=${summary.mixedSlots}`,
       `objectContinuity=${summary.objectContinuityStatus}`,
       `objectTemporal=${summary.objectTemporalStatus}`,
+      `objectExplainability=${summary.objectExplainabilityStatus}`,
       `purity=${summary.meanPurity}`,
       `temporalDrift=${summary.meanTemporalDrift}`,
       `compactness=${summary.meanSpatialCompactness}`,
@@ -64,6 +65,7 @@ try {
       `bboxStability=${summary.meanBboxStability}`,
       `hoverContinuity=${summary.hoveredContinuityStatus}`,
       `hoverTemporal=${summary.hoveredTemporalStatus}`,
+      `hoverExplainability=${summary.hoveredExplainabilityStatus}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -286,6 +288,22 @@ async function auditWorld(url) {
         world?.objectTemporalDrift > 0 &&
         world?.objectAssignmentJitter > 0 &&
         world?.objectBboxStability > 0.5 &&
+        shell?.getAttribute("data-object-explainability-status") === "explainable" &&
+        panel?.getAttribute("data-object-explainability-status") === "explainable" &&
+        snapshot?.explainability?.status === "explainable" &&
+        world?.objectExplainabilityStatus === "explainable" &&
+        shell?.getAttribute("data-object-explainable") === "true" &&
+        panel?.getAttribute("data-object-explainable") === "true" &&
+        snapshot?.explainability?.explainable === true &&
+        world?.objectExplainable === true &&
+        Number(shell?.getAttribute("data-object-explainability-score") ?? 0) > 0.6 &&
+        Number(panel?.getAttribute("data-object-explainability-score") ?? 0) > 0.6 &&
+        Number(snapshot?.explainability?.score ?? 0) > 0.6 &&
+        Number(world?.objectExplainabilityScore ?? 0) > 0.6 &&
+        shell?.getAttribute("data-object-explainability-reasons") === "" &&
+        panel?.getAttribute("data-object-explainability-reasons") === "" &&
+        snapshot?.explainability?.reasonNames === "" &&
+        world?.objectExplainabilityReasons === "" &&
         Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         Number(heatmap?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         snapshot?.assignment?.probe?.margin > 0.55 &&
@@ -523,6 +541,10 @@ async function auditWorld(url) {
         hoveredAssignmentJitter: window.__OBJGAUSS_WORLD__?.hoveredAssignmentJitter ?? null,
         hoveredBboxStability: window.__OBJGAUSS_WORLD__?.hoveredBboxStability ?? null,
         hoveredTemporalStable: window.__OBJGAUSS_WORLD__?.hoveredTemporalStable ?? false,
+        hoveredExplainabilityStatus: window.__OBJGAUSS_WORLD__?.hoveredExplainabilityStatus ?? null,
+        hoveredExplainable: window.__OBJGAUSS_WORLD__?.hoveredExplainable ?? false,
+        hoveredExplainabilityScore: window.__OBJGAUSS_WORLD__?.hoveredExplainabilityScore ?? null,
+        hoveredExplainabilityReasons: window.__OBJGAUSS_WORLD__?.hoveredExplainabilityReasons ?? null,
         hoverHighlightActive: window.__OBJGAUSS_WORLD__?.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedGaussianCount ?? 0,
@@ -577,6 +599,14 @@ async function auditWorld(url) {
       throw new Error(`expected hover temporal stability diagnostic for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
     }
     if (
+      hoverSelection.hoveredExplainabilityStatus !== "explainable" ||
+      hoverSelection.hoveredExplainable !== true ||
+      !(Number(hoverSelection.hoveredExplainabilityScore) > 0.6) ||
+      hoverSelection.hoveredExplainabilityReasons !== ""
+    ) {
+      throw new Error(`expected hover explainability diagnostic for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (
       hoverSelection.hoverHighlightActive !== true ||
       hoverSelection.hoverHighlightedObjectCount !== 1 ||
       hoverSelection.hoverHighlightedGaussianCount !== hoverSelection.hoveredGaussianCount ||
@@ -613,6 +643,14 @@ async function auditWorld(url) {
         Number(world?.hoveredTemporalDrift ?? 0) > 0 &&
         Number(world?.hoveredAssignmentJitter ?? 0) > 0 &&
         Number(world?.hoveredBboxStability ?? 0) > 0.5 &&
+        world?.objectExplainabilityStatus === "explainable" &&
+        world?.hoveredExplainabilityStatus === "explainable" &&
+        world?.objectExplainable === true &&
+        world?.hoveredExplainable === true &&
+        Number(world?.objectExplainabilityScore ?? 0) > 0.6 &&
+        Number(world?.hoveredExplainabilityScore ?? 0) > 0.6 &&
+        world?.objectExplainabilityReasons === "" &&
+        world?.hoveredExplainabilityReasons === "" &&
         world?.hoverHighlightActive === true &&
         world?.hoverHighlightedObjectCount === 1 &&
         world?.hoverHighlightedGaussianCount === world?.hoveredGaussianCount &&
@@ -625,6 +663,10 @@ async function auditWorld(url) {
         Number(shell?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
+        shell?.getAttribute("data-object-explainability-status") === "explainable" &&
+        shell?.getAttribute("data-object-explainable") === "true" &&
+        Number(shell?.getAttribute("data-object-explainability-score") ?? 0) > 0.6 &&
+        shell?.getAttribute("data-object-explainability-reasons") === "" &&
         shell?.getAttribute("data-hovered-target") === selectionId &&
         shell?.getAttribute("data-hovered-model") === "trainable-mvp-debug" &&
         Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0 &&
@@ -643,6 +685,10 @@ async function auditWorld(url) {
         Number(shell?.getAttribute("data-hover-temporal-drift") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-hover-assignment-jitter") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-hover-bbox-stability") ?? 0) > 0.5 &&
+        shell?.getAttribute("data-hover-explainability-status") === "explainable" &&
+        shell?.getAttribute("data-hover-explainable") === "true" &&
+        Number(shell?.getAttribute("data-hover-explainability-score") ?? 0) > 0.6 &&
+        shell?.getAttribute("data-hover-explainability-reasons") === "" &&
         panel?.getAttribute("data-object-continuity-status") === "continuous" &&
         panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
         Number(panel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
@@ -651,6 +697,10 @@ async function auditWorld(url) {
         Number(panel?.getAttribute("data-object-temporal-drift") ?? 0) > 0 &&
         Number(panel?.getAttribute("data-object-assignment-jitter") ?? 0) > 0 &&
         Number(panel?.getAttribute("data-object-bbox-stability") ?? 0) > 0.5 &&
+        panel?.getAttribute("data-object-explainability-status") === "explainable" &&
+        panel?.getAttribute("data-object-explainable") === "true" &&
+        Number(panel?.getAttribute("data-object-explainability-score") ?? 0) > 0.6 &&
+        panel?.getAttribute("data-object-explainability-reasons") === "" &&
         panel?.getAttribute("data-hover-highlight") === "enabled" &&
         panel?.getAttribute("data-hover-highlight-object") === selectionId &&
         panel?.getAttribute("data-hover-assignment-source") === "trainable_kernel_model_artifact" &&
@@ -663,6 +713,10 @@ async function auditWorld(url) {
         Number(panel?.getAttribute("data-hover-temporal-drift") ?? 0) > 0 &&
         Number(panel?.getAttribute("data-hover-assignment-jitter") ?? 0) > 0 &&
         Number(panel?.getAttribute("data-hover-bbox-stability") ?? 0) > 0.5 &&
+        panel?.getAttribute("data-hover-explainability-status") === "explainable" &&
+        panel?.getAttribute("data-hover-explainable") === "true" &&
+        Number(panel?.getAttribute("data-hover-explainability-score") ?? 0) > 0.6 &&
+        panel?.getAttribute("data-hover-explainability-reasons") === "" &&
         snapshot?.continuity?.status === "continuous" &&
         snapshot?.continuity?.centroidContained === true &&
         Number(snapshot?.continuity?.bboxDiagonal ?? 0) > 0 &&
@@ -671,6 +725,10 @@ async function auditWorld(url) {
         Number(snapshot?.temporal?.temporalDrift ?? 0) > 0 &&
         Number(snapshot?.temporal?.assignmentJitter ?? 0) > 0 &&
         Number(snapshot?.temporal?.bboxStability ?? 0) > 0.5 &&
+        snapshot?.explainability?.status === "explainable" &&
+        snapshot?.explainability?.explainable === true &&
+        Number(snapshot?.explainability?.score ?? 0) > 0.6 &&
+        snapshot?.explainability?.reasonNames === "" &&
         snapshot?.hover?.selectionId === selectionId &&
         snapshot?.hover?.probe?.status === "confident" &&
         snapshot?.hover?.continuity?.status === "continuous" &&
@@ -681,6 +739,10 @@ async function auditWorld(url) {
         Number(snapshot?.hover?.temporal?.temporalDrift ?? 0) > 0 &&
         Number(snapshot?.hover?.temporal?.assignmentJitter ?? 0) > 0 &&
         Number(snapshot?.hover?.temporal?.bboxStability ?? 0) > 0.5 &&
+        snapshot?.hover?.explainability?.status === "explainable" &&
+        snapshot?.hover?.explainability?.explainable === true &&
+        Number(snapshot?.hover?.explainability?.score ?? 0) > 0.6 &&
+        snapshot?.hover?.explainability?.reasonNames === "" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") === selectionId &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") === "confident" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") === "continuous" &&
@@ -691,13 +753,20 @@ async function auditWorld(url) {
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-temporal-drift") ?? 0) > 0 &&
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-assignment-jitter") ?? 0) > 0 &&
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-bbox-stability") ?? 0) > 0.5 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-explainability-status") === "explainable" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-explainable") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-explainability-score") ?? 0) > 0.6 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-explainability-reasons") === "" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") === "continuous" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-centroid-contained") === "true" &&
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-status") === "stable" &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-stable") === "true" &&
         Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-drift") ?? 0) > 0 &&
-        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-jitter") ?? 0) > 0
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-jitter") ?? 0) > 0 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainability-status") === "explainable" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainable") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainability-score") ?? 0) > 0.6
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
     const toggleTarget = await page.evaluate((selectedId) => {
@@ -842,6 +911,10 @@ async function auditWorld(url) {
         debugSnapshotAssignmentJitter: snapshot?.temporal?.assignmentJitter ?? null,
         debugSnapshotBboxStability: snapshot?.temporal?.bboxStability ?? null,
         debugSnapshotTemporalStable: snapshot?.temporal?.stable ?? false,
+        debugSnapshotExplainabilityStatus: snapshot?.explainability?.status ?? null,
+        debugSnapshotExplainable: snapshot?.explainability?.explainable ?? false,
+        debugSnapshotExplainabilityScore: snapshot?.explainability?.score ?? null,
+        debugSnapshotExplainabilityReasons: snapshot?.explainability?.reasonNames ?? null,
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
         debugSnapshotEventCount: Array.isArray(snapshot?.events) ? snapshot.events.length : 0,
         debugSnapshotEventTypes: Array.isArray(snapshot?.events) ? snapshot.events.map((event) => event.type) : [],
@@ -871,6 +944,10 @@ async function auditWorld(url) {
         panelDebugSnapshotAssignmentJitter: Number(snapshotPanel?.getAttribute("data-debug-snapshot-assignment-jitter") ?? 0),
         panelDebugSnapshotBboxStability: Number(snapshotPanel?.getAttribute("data-debug-snapshot-bbox-stability") ?? 0),
         panelDebugSnapshotTemporalStable: snapshotPanel?.getAttribute("data-debug-snapshot-temporal-stable") ?? null,
+        panelDebugSnapshotExplainabilityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-explainability-status") ?? null,
+        panelDebugSnapshotExplainable: snapshotPanel?.getAttribute("data-debug-snapshot-explainable") ?? null,
+        panelDebugSnapshotExplainabilityScore: Number(snapshotPanel?.getAttribute("data-debug-snapshot-explainability-score") ?? 0),
+        panelDebugSnapshotExplainabilityReasons: snapshotPanel?.getAttribute("data-debug-snapshot-explainability-reasons") ?? null,
         assignmentSource: handle.assignmentSource,
         assignmentProbeStatus: handle.assignmentProbeStatus ?? null,
         assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
@@ -884,6 +961,10 @@ async function auditWorld(url) {
         objectAssignmentJitter: handle.objectAssignmentJitter ?? null,
         objectBboxStability: handle.objectBboxStability ?? null,
         objectTemporalStable: handle.objectTemporalStable ?? false,
+        objectExplainabilityStatus: handle.objectExplainabilityStatus ?? null,
+        objectExplainable: handle.objectExplainable ?? false,
+        objectExplainabilityScore: handle.objectExplainabilityScore ?? null,
+        objectExplainabilityReasons: handle.objectExplainabilityReasons ?? null,
         shellObjectContinuityStatus: shell?.getAttribute("data-object-continuity-status") ?? null,
         shellObjectContinuityBboxDiagonal: Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
         shellObjectContinuityCentroidContained: shell?.getAttribute("data-object-continuity-centroid-contained") ?? null,
@@ -892,6 +973,10 @@ async function auditWorld(url) {
         shellObjectAssignmentJitter: Number(shell?.getAttribute("data-object-assignment-jitter") ?? 0),
         shellObjectBboxStability: Number(shell?.getAttribute("data-object-bbox-stability") ?? 0),
         shellObjectTemporalStable: shell?.getAttribute("data-object-temporal-stable") ?? null,
+        shellObjectExplainabilityStatus: shell?.getAttribute("data-object-explainability-status") ?? null,
+        shellObjectExplainable: shell?.getAttribute("data-object-explainable") ?? null,
+        shellObjectExplainabilityScore: Number(shell?.getAttribute("data-object-explainability-score") ?? 0),
+        shellObjectExplainabilityReasons: shell?.getAttribute("data-object-explainability-reasons") ?? null,
         panelObjectContinuityStatus: debugPanel?.getAttribute("data-object-continuity-status") ?? null,
         panelObjectContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
         panelObjectContinuityCentroidContained: debugPanel?.getAttribute("data-object-continuity-centroid-contained") ?? null,
@@ -900,6 +985,10 @@ async function auditWorld(url) {
         panelObjectAssignmentJitter: Number(debugPanel?.getAttribute("data-object-assignment-jitter") ?? 0),
         panelObjectBboxStability: Number(debugPanel?.getAttribute("data-object-bbox-stability") ?? 0),
         panelObjectTemporalStable: debugPanel?.getAttribute("data-object-temporal-stable") ?? null,
+        panelObjectExplainabilityStatus: debugPanel?.getAttribute("data-object-explainability-status") ?? null,
+        panelObjectExplainable: debugPanel?.getAttribute("data-object-explainable") ?? null,
+        panelObjectExplainabilityScore: Number(debugPanel?.getAttribute("data-object-explainability-score") ?? 0),
+        panelObjectExplainabilityReasons: debugPanel?.getAttribute("data-object-explainability-reasons") ?? null,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
@@ -937,6 +1026,10 @@ async function auditWorld(url) {
         hoveredAssignmentJitter: handle.hoveredAssignmentJitter ?? null,
         hoveredBboxStability: handle.hoveredBboxStability ?? null,
         hoveredTemporalStable: handle.hoveredTemporalStable ?? false,
+        hoveredExplainabilityStatus: handle.hoveredExplainabilityStatus ?? null,
+        hoveredExplainable: handle.hoveredExplainable ?? false,
+        hoveredExplainabilityScore: handle.hoveredExplainabilityScore ?? null,
+        hoveredExplainabilityReasons: handle.hoveredExplainabilityReasons ?? null,
         hoverHighlightActive: handle.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: handle.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: handle.hoverHighlightedGaussianCount ?? 0,
@@ -962,6 +1055,10 @@ async function auditWorld(url) {
         shellHoverAssignmentJitter: Number(shell?.getAttribute("data-hover-assignment-jitter") ?? 0),
         shellHoverBboxStability: Number(shell?.getAttribute("data-hover-bbox-stability") ?? 0),
         shellHoverTemporalStable: shell?.getAttribute("data-hover-temporal-stable") ?? null,
+        shellHoverExplainabilityStatus: shell?.getAttribute("data-hover-explainability-status") ?? null,
+        shellHoverExplainable: shell?.getAttribute("data-hover-explainable") ?? null,
+        shellHoverExplainabilityScore: Number(shell?.getAttribute("data-hover-explainability-score") ?? 0),
+        shellHoverExplainabilityReasons: shell?.getAttribute("data-hover-explainability-reasons") ?? null,
         panelHoverAssignmentSource: debugPanel?.getAttribute("data-hover-assignment-source") ?? null,
         panelHoverAssignmentStatus: debugPanel?.getAttribute("data-hover-assignment-probe-status") ?? null,
         panelHoverContinuityStatus: debugPanel?.getAttribute("data-hover-continuity-status") ?? null,
@@ -972,6 +1069,10 @@ async function auditWorld(url) {
         panelHoverAssignmentJitter: Number(debugPanel?.getAttribute("data-hover-assignment-jitter") ?? 0),
         panelHoverBboxStability: Number(debugPanel?.getAttribute("data-hover-bbox-stability") ?? 0),
         panelHoverTemporalStable: debugPanel?.getAttribute("data-hover-temporal-stable") ?? null,
+        panelHoverExplainabilityStatus: debugPanel?.getAttribute("data-hover-explainability-status") ?? null,
+        panelHoverExplainable: debugPanel?.getAttribute("data-hover-explainable") ?? null,
+        panelHoverExplainabilityScore: Number(debugPanel?.getAttribute("data-hover-explainability-score") ?? 0),
+        panelHoverExplainabilityReasons: debugPanel?.getAttribute("data-hover-explainability-reasons") ?? null,
         snapshotHoverObject: snapshot?.hover?.selectionId ?? null,
         snapshotHoverAssignmentStatus: snapshot?.hover?.probe?.status ?? null,
         snapshotHoverContinuityStatus: snapshot?.hover?.continuity?.status ?? null,
@@ -982,6 +1083,10 @@ async function auditWorld(url) {
         snapshotHoverAssignmentJitter: snapshot?.hover?.temporal?.assignmentJitter ?? null,
         snapshotHoverBboxStability: snapshot?.hover?.temporal?.bboxStability ?? null,
         snapshotHoverTemporalStable: snapshot?.hover?.temporal?.stable ?? false,
+        snapshotHoverExplainabilityStatus: snapshot?.hover?.explainability?.status ?? null,
+        snapshotHoverExplainable: snapshot?.hover?.explainability?.explainable ?? false,
+        snapshotHoverExplainabilityScore: snapshot?.hover?.explainability?.score ?? null,
+        snapshotHoverExplainabilityReasons: snapshot?.hover?.explainability?.reasonNames ?? null,
         panelSnapshotHoverObject: snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") ?? null,
         panelSnapshotHoverAssignmentStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") ?? null,
         panelSnapshotHoverContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") ?? null,
@@ -991,6 +1096,9 @@ async function auditWorld(url) {
         panelSnapshotHoverTemporalDrift: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-drift") ?? 0),
         panelSnapshotHoverAssignmentJitter: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-jitter") ?? 0),
         panelSnapshotHoverTemporalStable: snapshotPanel?.getAttribute("data-debug-snapshot-hover-temporal-stable") ?? null,
+        panelSnapshotHoverExplainabilityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainability-status") ?? null,
+        panelSnapshotHoverExplainable: snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainable") ?? null,
+        panelSnapshotHoverExplainabilityScore: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-explainability-score") ?? 0),
         worldVisibleObjectCount: handle.visibleObjectCount ?? 0,
         worldHiddenObjectCount: handle.hiddenObjectCount ?? 0,
         worldVisibleGaussianCount: handle.visibleGaussianCount ?? 0,
@@ -1134,6 +1242,26 @@ async function auditWorld(url) {
       world.panelDebugSnapshotAssignmentJitter > 0 &&
       world.panelDebugSnapshotBboxStability > 0.5 &&
       world.panelDebugSnapshotTemporalStable === "true" &&
+      world.objectExplainabilityStatus === "explainable" &&
+      world.objectExplainable === true &&
+      world.objectExplainabilityScore > 0.6 &&
+      world.objectExplainabilityReasons === "" &&
+      world.shellObjectExplainabilityStatus === world.objectExplainabilityStatus &&
+      world.shellObjectExplainable === "true" &&
+      world.shellObjectExplainabilityScore > 0.6 &&
+      world.shellObjectExplainabilityReasons === "" &&
+      world.panelObjectExplainabilityStatus === world.objectExplainabilityStatus &&
+      world.panelObjectExplainable === "true" &&
+      world.panelObjectExplainabilityScore > 0.6 &&
+      world.panelObjectExplainabilityReasons === "" &&
+      world.debugSnapshotExplainabilityStatus === world.objectExplainabilityStatus &&
+      world.debugSnapshotExplainable === true &&
+      world.debugSnapshotExplainabilityScore > 0.6 &&
+      world.debugSnapshotExplainabilityReasons === "" &&
+      world.panelDebugSnapshotExplainabilityStatus === world.objectExplainabilityStatus &&
+      world.panelDebugSnapshotExplainable === "true" &&
+      world.panelDebugSnapshotExplainabilityScore > 0.6 &&
+      world.panelDebugSnapshotExplainabilityReasons === "" &&
       world.debugSnapshotTrainingStatus === "loss_down" &&
       world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.shellDebugSnapshotModel === world.debugSnapshotModel &&
@@ -1265,7 +1393,26 @@ async function auditWorld(url) {
       world.panelSnapshotHoverTemporalStatus === world.hoveredTemporalStatus &&
       world.panelSnapshotHoverTemporalDrift > 0 &&
       world.panelSnapshotHoverAssignmentJitter > 0 &&
-      world.panelSnapshotHoverTemporalStable === "true"
+      world.panelSnapshotHoverTemporalStable === "true" &&
+      world.hoveredExplainabilityStatus === "explainable" &&
+      world.hoveredExplainable === true &&
+      world.hoveredExplainabilityScore > 0.6 &&
+      world.hoveredExplainabilityReasons === "" &&
+      world.shellHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
+      world.shellHoverExplainable === "true" &&
+      world.shellHoverExplainabilityScore > 0.6 &&
+      world.shellHoverExplainabilityReasons === "" &&
+      world.panelHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
+      world.panelHoverExplainable === "true" &&
+      world.panelHoverExplainabilityScore > 0.6 &&
+      world.panelHoverExplainabilityReasons === "" &&
+      world.snapshotHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
+      world.snapshotHoverExplainable === true &&
+      world.snapshotHoverExplainabilityScore > 0.6 &&
+      world.snapshotHoverExplainabilityReasons === "" &&
+      world.panelSnapshotHoverExplainabilityStatus === world.hoveredExplainabilityStatus &&
+      world.panelSnapshotHoverExplainable === "true" &&
+      world.panelSnapshotHoverExplainabilityScore > 0.6
     )) {
       throw new Error(`expected hover to expose ObjectState assignment preview: ${JSON.stringify(world)}`);
     }
@@ -1350,6 +1497,7 @@ async function auditWorld(url) {
       mixedSlots: world.mixedSlots,
       objectContinuityStatus: world.objectContinuityStatus,
       objectTemporalStatus: world.objectTemporalStatus,
+      objectExplainabilityStatus: world.objectExplainabilityStatus,
       meanPurity: world.meanPurity,
       meanTemporalDrift: world.meanTemporalDrift,
       meanSpatialCompactness: world.meanSpatialCompactness,
@@ -1357,6 +1505,7 @@ async function auditWorld(url) {
       meanBboxStability: world.meanBboxStability,
       hoveredContinuityStatus: world.hoveredContinuityStatus,
       hoveredTemporalStatus: world.hoveredTemporalStatus,
+      hoveredExplainabilityStatus: world.hoveredExplainabilityStatus,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
@@ -2200,6 +2349,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !parsed?.continuity?.status ||
         parsed?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
         !parsed?.temporal?.status ||
+        parsed?.explainability?.schema !== "objgauss-object-explainability-summary-v1" ||
+        !parsed?.explainability?.status ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
@@ -2259,6 +2410,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !parsed?.snapshot?.continuity?.status ||
         parsed?.snapshot?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
         !parsed?.snapshot?.temporal?.status ||
+        parsed?.snapshot?.explainability?.schema !== "objgauss-object-explainability-summary-v1" ||
+        !parsed?.snapshot?.explainability?.status ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
@@ -2341,6 +2494,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         !archive?.snapshot?.continuity?.status ||
         archive?.snapshot?.temporal?.schema !== "objgauss-object-temporal-summary-v1" ||
         !archive?.snapshot?.temporal?.status ||
+        archive?.snapshot?.explainability?.schema !== "objgauss-object-explainability-summary-v1" ||
+        !archive?.snapshot?.explainability?.status ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||
