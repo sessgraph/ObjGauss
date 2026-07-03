@@ -440,6 +440,20 @@ toggle 按钮验证 root telemetry、Debug panel、Three.js scene 和 snapshot �
 visible Gaussian 统计一致。该切片只强化 Phase 1 的 hide/show cluster 调试闭环，不改变
 assignment solver、ObjectState projection、renderer artifact schema 或训练 loop。
 
+`OBJECTSTATE-CONTINUITY-001` 已将 per-object spatial continuity 从隐式 bbox/centroid
+字段升级为可审计诊断：`src/App.jsx` 新增
+`objgauss-object-continuity-summary-v1`，从 ObjectState 的 `bbox`、`centroid`、
+Gaussian count 和可选 `spatialCompactness` 派生 `continuous` / `fragmented` /
+`degenerate` / `centroid-outside` 等状态、bbox diagonal、Gaussian density 和
+centroid-contained 证据。root `.worldShell`、ObjectState Debug panel、
+`window.__OBJGAUSS_WORLD__`、debug snapshot、hover preview 和 session archive 现在同步
+记录 selected / hovered ObjectState continuity；`scripts/audit-world-viewer.mjs` 验证
+trainable fixture 的 root / panel / scene handle / snapshot / session handoff 都保留
+continuity schema 和 selected / hover spatial contract。该切片仍是 Phase 1 非训练 Debug
+OS 工作，不改变 assignment solver、ObjectState projection、renderer artifact schema、
+OGC decoder 或 trainable kernel loop；训练模型主线继续保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OBJECTSTATE-HOVER-ASSIGNMENT-001` 已将 hover 从纯视觉 focus 升级为 ObjectState
 assignment preview：`objectTarget(...)` 现在携带 hovered object 的 compact assignment
 vector、confidence、entropy、status、centroid 和 bbox；root telemetry、

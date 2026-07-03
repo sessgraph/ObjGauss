@@ -55,11 +55,13 @@ try {
       `stability=${summary.stabilityStatus}`,
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
+      `objectContinuity=${summary.objectContinuityStatus}`,
       `purity=${summary.meanPurity}`,
       `temporalDrift=${summary.meanTemporalDrift}`,
       `compactness=${summary.meanSpatialCompactness}`,
       `assignmentJitter=${summary.meanAssignmentJitter}`,
       `bboxStability=${summary.meanBboxStability}`,
+      `hoverContinuity=${summary.hoveredContinuityStatus}`,
       `hoveredObject=${JSON.stringify(summary.hoveredObjectId)}`,
       `hoveredGaussians=${summary.hoveredGaussianCount}`,
       `selectedGaussian=${JSON.stringify(summary.selectedGaussian)}`,
@@ -248,6 +250,18 @@ async function auditWorld(url) {
         heatmap?.getAttribute("data-assignment-probe-status") === "confident" &&
         snapshot?.assignment?.probe?.status === "confident" &&
         world?.assignmentProbeStatus === "confident" &&
+        shell?.getAttribute("data-object-continuity-status") === "continuous" &&
+        panel?.getAttribute("data-object-continuity-status") === "continuous" &&
+        snapshot?.continuity?.status === "continuous" &&
+        world?.objectContinuityStatus === "continuous" &&
+        Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
+        Number(panel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
+        Number(snapshot?.continuity?.bboxDiagonal ?? 0) > 0 &&
+        Number(world?.objectContinuityBboxDiagonal ?? 0) > 0 &&
+        shell?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
+        panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
+        snapshot?.continuity?.centroidContained === true &&
+        world?.objectContinuityCentroidContained === true &&
         Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         Number(heatmap?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         snapshot?.assignment?.probe?.margin > 0.55 &&
@@ -477,6 +491,9 @@ async function auditWorld(url) {
         hoveredAssignmentConfidence: window.__OBJGAUSS_WORLD__?.hoveredAssignmentConfidence ?? null,
         hoveredAssignmentEntropy: window.__OBJGAUSS_WORLD__?.hoveredAssignmentEntropy ?? null,
         hoveredAssignmentTopSlot: window.__OBJGAUSS_WORLD__?.hoveredAssignmentTopSlot ?? null,
+        hoveredContinuityStatus: window.__OBJGAUSS_WORLD__?.hoveredContinuityStatus ?? null,
+        hoveredContinuityBboxDiagonal: window.__OBJGAUSS_WORLD__?.hoveredContinuityBboxDiagonal ?? null,
+        hoveredContinuityCentroidContained: window.__OBJGAUSS_WORLD__?.hoveredContinuityCentroidContained ?? false,
         hoverHighlightActive: window.__OBJGAUSS_WORLD__?.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedGaussianCount ?? 0,
@@ -513,6 +530,13 @@ async function auditWorld(url) {
       throw new Error(`expected hover assignment preview for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
     }
     if (
+      hoverSelection.hoveredContinuityStatus !== "continuous" ||
+      !(Number(hoverSelection.hoveredContinuityBboxDiagonal) > 0) ||
+      hoverSelection.hoveredContinuityCentroidContained !== true
+    ) {
+      throw new Error(`expected hover continuity diagnostic for trainable ObjectState: ${JSON.stringify(hoverSelection)}`);
+    }
+    if (
       hoverSelection.hoverHighlightActive !== true ||
       hoverSelection.hoverHighlightedObjectCount !== 1 ||
       hoverSelection.hoverHighlightedGaussianCount !== hoverSelection.hoveredGaussianCount ||
@@ -533,10 +557,19 @@ async function auditWorld(url) {
         world?.hoveredId === selectionId &&
         world?.hoveredAssignmentProbeStatus === "confident" &&
         world?.hoveredAssignment?.length === 2 &&
+        world?.objectContinuityStatus === "continuous" &&
+        world?.hoveredContinuityStatus === "continuous" &&
+        Number(world?.objectContinuityBboxDiagonal ?? 0) > 0 &&
+        Number(world?.hoveredContinuityBboxDiagonal ?? 0) > 0 &&
+        world?.objectContinuityCentroidContained === true &&
+        world?.hoveredContinuityCentroidContained === true &&
         world?.hoverHighlightActive === true &&
         world?.hoverHighlightedObjectCount === 1 &&
         world?.hoverHighlightedGaussianCount === world?.hoveredGaussianCount &&
         world?.hoverDimmedObjectCount > 0 &&
+        shell?.getAttribute("data-object-continuity-status") === "continuous" &&
+        shell?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
+        Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
         shell?.getAttribute("data-hovered-target") === selectionId &&
         shell?.getAttribute("data-hovered-model") === "trainable-mvp-debug" &&
         Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0 &&
@@ -547,14 +580,35 @@ async function auditWorld(url) {
         shell?.getAttribute("data-hover-assignment-slots") === "2" &&
         shell?.getAttribute("data-hover-assignment-probe-status") === "confident" &&
         Number(shell?.getAttribute("data-hover-assignment-probe-margin") ?? 0) > 0.45 &&
+        shell?.getAttribute("data-hover-continuity-status") === "continuous" &&
+        shell?.getAttribute("data-hover-continuity-centroid-contained") === "true" &&
+        Number(shell?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
+        panel?.getAttribute("data-object-continuity-status") === "continuous" &&
+        panel?.getAttribute("data-object-continuity-centroid-contained") === "true" &&
+        Number(panel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0) > 0 &&
         panel?.getAttribute("data-hover-highlight") === "enabled" &&
         panel?.getAttribute("data-hover-highlight-object") === selectionId &&
         panel?.getAttribute("data-hover-assignment-source") === "trainable_kernel_model_artifact" &&
         panel?.getAttribute("data-hover-assignment-probe-status") === "confident" &&
+        panel?.getAttribute("data-hover-continuity-status") === "continuous" &&
+        panel?.getAttribute("data-hover-continuity-centroid-contained") === "true" &&
+        Number(panel?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0) > 0 &&
+        snapshot?.continuity?.status === "continuous" &&
+        snapshot?.continuity?.centroidContained === true &&
+        Number(snapshot?.continuity?.bboxDiagonal ?? 0) > 0 &&
         snapshot?.hover?.selectionId === selectionId &&
         snapshot?.hover?.probe?.status === "confident" &&
+        snapshot?.hover?.continuity?.status === "continuous" &&
+        snapshot?.hover?.continuity?.centroidContained === true &&
+        Number(snapshot?.hover?.continuity?.bboxDiagonal ?? 0) > 0 &&
         snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") === selectionId &&
-        snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") === "confident"
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") === "confident" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") === "continuous" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-continuity-centroid-contained") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-continuity-bbox-diagonal") ?? 0) > 0 &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") === "continuous" &&
+        snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-centroid-contained") === "true" &&
+        Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0) > 0
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
     const toggleTarget = await page.evaluate((selectedId) => {
@@ -691,6 +745,9 @@ async function auditWorld(url) {
         debugSnapshotAssignmentSlots: Number(snapshot?.assignment?.slotCount ?? 0),
         debugSnapshotAssignmentProbeStatus: snapshot?.assignment?.probe?.status ?? null,
         debugSnapshotAssignmentProbeMargin: snapshot?.assignment?.probe?.margin ?? null,
+        debugSnapshotContinuityStatus: snapshot?.continuity?.status ?? null,
+        debugSnapshotContinuityBboxDiagonal: snapshot?.continuity?.bboxDiagonal ?? null,
+        debugSnapshotContinuityCentroidContained: snapshot?.continuity?.centroidContained ?? false,
         debugSnapshotTrainingStatus: snapshot?.training?.status ?? null,
         debugSnapshotEventCount: Array.isArray(snapshot?.events) ? snapshot.events.length : 0,
         debugSnapshotEventTypes: Array.isArray(snapshot?.events) ? snapshot.events.map((event) => event.type) : [],
@@ -712,11 +769,23 @@ async function auditWorld(url) {
         panelDebugSnapshotLens: snapshotPanel?.getAttribute("data-debug-snapshot-lens") ?? null,
         panelDebugSnapshotSlots: Number(snapshotPanel?.getAttribute("data-debug-snapshot-slots") ?? 0),
         panelDebugSnapshotAssignmentProbeStatus: snapshotPanel?.getAttribute("data-debug-snapshot-assignment-probe-status") ?? null,
+        panelDebugSnapshotContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-status") ?? null,
+        panelDebugSnapshotContinuityBboxDiagonal: Number(snapshotPanel?.getAttribute("data-debug-snapshot-continuity-bbox-diagonal") ?? 0),
+        panelDebugSnapshotContinuityCentroidContained: snapshotPanel?.getAttribute("data-debug-snapshot-continuity-centroid-contained") ?? null,
         assignmentSource: handle.assignmentSource,
         assignmentProbeStatus: handle.assignmentProbeStatus ?? null,
         assignmentProbeMargin: handle.assignmentProbeMargin ?? null,
         shellAssignmentProbeStatus: shell?.getAttribute("data-assignment-probe-status") ?? null,
         shellAssignmentProbeMargin: Number(shell?.getAttribute("data-assignment-probe-margin") ?? 0),
+        objectContinuityStatus: handle.objectContinuityStatus ?? null,
+        objectContinuityBboxDiagonal: handle.objectContinuityBboxDiagonal ?? null,
+        objectContinuityCentroidContained: handle.objectContinuityCentroidContained ?? false,
+        shellObjectContinuityStatus: shell?.getAttribute("data-object-continuity-status") ?? null,
+        shellObjectContinuityBboxDiagonal: Number(shell?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
+        shellObjectContinuityCentroidContained: shell?.getAttribute("data-object-continuity-centroid-contained") ?? null,
+        panelObjectContinuityStatus: debugPanel?.getAttribute("data-object-continuity-status") ?? null,
+        panelObjectContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-object-continuity-bbox-diagonal") ?? 0),
+        panelObjectContinuityCentroidContained: debugPanel?.getAttribute("data-object-continuity-centroid-contained") ?? null,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
@@ -746,6 +815,9 @@ async function auditWorld(url) {
         hoveredAssignmentConfidence: handle.hoveredAssignmentConfidence ?? null,
         hoveredAssignmentEntropy: handle.hoveredAssignmentEntropy ?? null,
         hoveredAssignmentTopSlot: handle.hoveredAssignmentTopSlot ?? null,
+        hoveredContinuityStatus: handle.hoveredContinuityStatus ?? null,
+        hoveredContinuityBboxDiagonal: handle.hoveredContinuityBboxDiagonal ?? null,
+        hoveredContinuityCentroidContained: handle.hoveredContinuityCentroidContained ?? false,
         hoverHighlightActive: handle.hoverHighlightActive ?? false,
         hoverHighlightedObjectCount: handle.hoverHighlightedObjectCount ?? 0,
         hoverHighlightedGaussianCount: handle.hoverHighlightedGaussianCount ?? 0,
@@ -763,12 +835,24 @@ async function auditWorld(url) {
         shellHoverAssignmentSlots: Number(shell?.getAttribute("data-hover-assignment-slots") ?? 0),
         shellHoverAssignmentStatus: shell?.getAttribute("data-hover-assignment-probe-status") ?? null,
         shellHoverAssignmentMargin: Number(shell?.getAttribute("data-hover-assignment-probe-margin") ?? 0),
+        shellHoverContinuityStatus: shell?.getAttribute("data-hover-continuity-status") ?? null,
+        shellHoverContinuityBboxDiagonal: Number(shell?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0),
+        shellHoverContinuityCentroidContained: shell?.getAttribute("data-hover-continuity-centroid-contained") ?? null,
         panelHoverAssignmentSource: debugPanel?.getAttribute("data-hover-assignment-source") ?? null,
         panelHoverAssignmentStatus: debugPanel?.getAttribute("data-hover-assignment-probe-status") ?? null,
+        panelHoverContinuityStatus: debugPanel?.getAttribute("data-hover-continuity-status") ?? null,
+        panelHoverContinuityBboxDiagonal: Number(debugPanel?.getAttribute("data-hover-continuity-bbox-diagonal") ?? 0),
+        panelHoverContinuityCentroidContained: debugPanel?.getAttribute("data-hover-continuity-centroid-contained") ?? null,
         snapshotHoverObject: snapshot?.hover?.selectionId ?? null,
         snapshotHoverAssignmentStatus: snapshot?.hover?.probe?.status ?? null,
+        snapshotHoverContinuityStatus: snapshot?.hover?.continuity?.status ?? null,
+        snapshotHoverContinuityBboxDiagonal: snapshot?.hover?.continuity?.bboxDiagonal ?? null,
+        snapshotHoverContinuityCentroidContained: snapshot?.hover?.continuity?.centroidContained ?? false,
         panelSnapshotHoverObject: snapshotPanel?.getAttribute("data-debug-snapshot-hover-object") ?? null,
         panelSnapshotHoverAssignmentStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-assignment-status") ?? null,
+        panelSnapshotHoverContinuityStatus: snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-status") ?? null,
+        panelSnapshotHoverContinuityBboxDiagonal: Number(snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-bbox-diagonal") ?? 0),
+        panelSnapshotHoverContinuityCentroidContained: snapshotPanel?.getAttribute("data-debug-snapshot-hover-continuity-centroid-contained") ?? null,
         worldVisibleObjectCount: handle.visibleObjectCount ?? 0,
         worldHiddenObjectCount: handle.hiddenObjectCount ?? 0,
         worldVisibleGaussianCount: handle.visibleGaussianCount ?? 0,
@@ -870,6 +954,21 @@ async function auditWorld(url) {
       world.debugSnapshotAssignmentSlots === 2 &&
       world.debugSnapshotAssignmentProbeStatus === "confident" &&
       world.debugSnapshotAssignmentProbeMargin > 0.55 &&
+      world.objectContinuityStatus === "continuous" &&
+      world.objectContinuityBboxDiagonal > 0 &&
+      world.objectContinuityCentroidContained === true &&
+      world.shellObjectContinuityStatus === world.objectContinuityStatus &&
+      world.shellObjectContinuityBboxDiagonal > 0 &&
+      world.shellObjectContinuityCentroidContained === "true" &&
+      world.panelObjectContinuityStatus === world.objectContinuityStatus &&
+      world.panelObjectContinuityBboxDiagonal > 0 &&
+      world.panelObjectContinuityCentroidContained === "true" &&
+      world.debugSnapshotContinuityStatus === world.objectContinuityStatus &&
+      world.debugSnapshotContinuityBboxDiagonal > 0 &&
+      world.debugSnapshotContinuityCentroidContained === true &&
+      world.panelDebugSnapshotContinuityStatus === world.objectContinuityStatus &&
+      world.panelDebugSnapshotContinuityBboxDiagonal > 0 &&
+      world.panelDebugSnapshotContinuityCentroidContained === "true" &&
       world.debugSnapshotTrainingStatus === "loss_down" &&
       world.shellDebugSnapshotSchema === world.debugSnapshotSchema &&
       world.shellDebugSnapshotModel === world.debugSnapshotModel &&
@@ -960,7 +1059,22 @@ async function auditWorld(url) {
       world.snapshotHoverObject === world.hoveredId &&
       world.snapshotHoverAssignmentStatus === world.hoveredAssignmentProbeStatus &&
       world.panelSnapshotHoverObject === world.hoveredId &&
-      world.panelSnapshotHoverAssignmentStatus === world.hoveredAssignmentProbeStatus
+      world.panelSnapshotHoverAssignmentStatus === world.hoveredAssignmentProbeStatus &&
+      world.hoveredContinuityStatus === "continuous" &&
+      world.hoveredContinuityBboxDiagonal > 0 &&
+      world.hoveredContinuityCentroidContained === true &&
+      world.shellHoverContinuityStatus === world.hoveredContinuityStatus &&
+      world.shellHoverContinuityBboxDiagonal > 0 &&
+      world.shellHoverContinuityCentroidContained === "true" &&
+      world.panelHoverContinuityStatus === world.hoveredContinuityStatus &&
+      world.panelHoverContinuityBboxDiagonal > 0 &&
+      world.panelHoverContinuityCentroidContained === "true" &&
+      world.snapshotHoverContinuityStatus === world.hoveredContinuityStatus &&
+      world.snapshotHoverContinuityBboxDiagonal > 0 &&
+      world.snapshotHoverContinuityCentroidContained === true &&
+      world.panelSnapshotHoverContinuityStatus === world.hoveredContinuityStatus &&
+      world.panelSnapshotHoverContinuityBboxDiagonal > 0 &&
+      world.panelSnapshotHoverContinuityCentroidContained === "true"
     )) {
       throw new Error(`expected hover to expose ObjectState assignment preview: ${JSON.stringify(world)}`);
     }
@@ -1043,11 +1157,13 @@ async function auditWorld(url) {
       stabilityStatus: world.stabilityStatus,
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
+      objectContinuityStatus: world.objectContinuityStatus,
       meanPurity: world.meanPurity,
       meanTemporalDrift: world.meanTemporalDrift,
       meanSpatialCompactness: world.meanSpatialCompactness,
       meanAssignmentJitter: world.meanAssignmentJitter,
       meanBboxStability: world.meanBboxStability,
+      hoveredContinuityStatus: world.hoveredContinuityStatus,
       hoveredObjectId: world.hoveredObjectId,
       hoveredGaussianCount: world.hoveredGaussianCount,
       assignmentSlots,
@@ -1887,6 +2003,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.debug?.overlayMode !== "full" ||
         parsed?.assignment?.probe?.status !== "confident" ||
         !(Number(parsed?.assignment?.probe?.margin) > 0.85) ||
+        parsed?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
+        !parsed?.continuity?.status ||
         parsed?.quality?.status !== "warn" ||
         parsed?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.benchmark?.status !== "pass" ||
@@ -1942,6 +2060,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.snapshot?.debug?.overlayMode !== "full" ||
         parsed?.snapshot?.assignment?.probe?.status !== "confident" ||
         !(Number(parsed?.snapshot?.assignment?.probe?.margin) > 0.85) ||
+        parsed?.snapshot?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
+        !parsed?.snapshot?.continuity?.status ||
         parsed?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
@@ -2020,6 +2140,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         archive?.snapshot?.debug?.overlayMode !== "full" ||
         archive?.snapshot?.assignment?.probe?.status !== "confident" ||
         !(Number(archive?.snapshot?.assignment?.probe?.margin) > 0.85) ||
+        archive?.snapshot?.continuity?.schema !== "objgauss-object-continuity-summary-v1" ||
+        !archive?.snapshot?.continuity?.status ||
         archive?.snapshot?.quality?.gates?.find?.((gate) => gate.name === "assignment_entropy")?.status !== "warn" ||
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||

@@ -133,11 +133,13 @@ export default function App() {
     debugProbe?.assignment ?? selectedObject?.assignment ?? selectedObject?.objectState?.assignment ?? [],
     debugProbe,
   );
+  const selectedContinuity = objectContinuitySummary(selectedObject ?? selected?.objects?.[0] ?? null);
   const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
     confidence: hoveredTarget?.confidence,
     entropy: hoveredTarget?.entropy,
     source: hoveredTarget?.assignmentSource,
   });
+  const hoveredContinuity = objectContinuitySummary(hoveredTarget);
   const selectedObjectOverlayMode = normalizeObjectOverlayMode(objectOverlayMode);
   const hiddenCount = hiddenObjects.size;
   const objectVisibility = useMemo(
@@ -165,6 +167,8 @@ export default function App() {
     debugProbe,
     hoveredTarget,
     hoverAssignmentProbe: hoveredAssignmentProbe,
+    objectContinuity: selectedContinuity,
+    hoverContinuity: hoveredContinuity,
     hiddenCount,
     objectVisibility,
     stability: selectedStability,
@@ -1192,6 +1196,11 @@ export default function App() {
       data-assignment-probe-margin={selectedAssignmentProbe.margin ?? ""}
       data-assignment-probe-ambiguous={selectedAssignmentProbe.ambiguous ? "true" : "false"}
       data-assignment-probe-collapse-risk={selectedAssignmentProbe.collapseRisk ? "true" : "false"}
+      data-object-continuity-status={selectedContinuity.status}
+      data-object-continuity-spatial-compactness={selectedContinuity.spatialCompactness ?? ""}
+      data-object-continuity-bbox-diagonal={selectedContinuity.bboxDiagonal ?? ""}
+      data-object-continuity-density={selectedContinuity.gaussianDensity ?? ""}
+      data-object-continuity-centroid-contained={selectedContinuity.centroidContained ? "true" : "false"}
       data-object-overlay-mode={selectedObjectOverlayMode}
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(selectedObjectOverlayMode, "centroid") ? "true" : "false"}
@@ -1212,6 +1221,10 @@ export default function App() {
       data-hover-assignment-top-slot={hoveredAssignmentProbe.topSlot ?? ""}
       data-hover-assignment-ambiguous={hoveredAssignmentProbe.ambiguous ? "true" : "false"}
       data-hover-assignment-collapse-risk={hoveredAssignmentProbe.collapseRisk ? "true" : "false"}
+      data-hover-continuity-status={hoveredContinuity.status}
+      data-hover-continuity-spatial-compactness={hoveredContinuity.spatialCompactness ?? ""}
+      data-hover-continuity-bbox-diagonal={hoveredContinuity.bboxDiagonal ?? ""}
+      data-hover-continuity-centroid-contained={hoveredContinuity.centroidContained ? "true" : "false"}
       data-hidden-objects={hiddenCount}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility.visibleObjectCount}
@@ -1471,6 +1484,8 @@ export default function App() {
         selectedObjectKey={selectedObjectKey}
         hoveredTarget={hoveredTarget}
         hoverAssignmentProbe={hoveredAssignmentProbe}
+        objectContinuity={selectedContinuity}
+        hoverContinuity={hoveredContinuity}
         debugProbe={debugProbe}
         assignmentProbe={selectedAssignmentProbe}
         debugMode={debugMode}
@@ -2520,12 +2535,14 @@ function ThreeWorld({
         selectedGaussianProbe?.assignment ?? selectedObject?.userData.objectState?.assignment ?? [],
         selectedGaussianProbe,
       );
+      const selectedContinuity = objectContinuitySummary(selectedObject ? objectTarget(selectedObject) : null);
       const hoveredTarget = objectTarget(hoveredObject);
       const hoveredAssignmentProbe = assignmentProbeSummary(hoveredTarget?.assignment ?? [], {
         confidence: hoveredTarget?.confidence,
         entropy: hoveredTarget?.entropy,
         source: hoveredTarget?.assignmentSource,
       });
+      const hoveredContinuity = objectContinuitySummary(hoveredTarget);
       const hoverHighlightSamples = [...draggableObjects.values()].map((object) => {
         const cloud = firstGaussianCloud(object);
         return {
@@ -2579,6 +2596,11 @@ function ThreeWorld({
         hoveredAssignmentTopSlot: hoveredAssignmentProbe.topSlot,
         hoveredAssignmentAmbiguous: hoveredAssignmentProbe.ambiguous,
         hoveredAssignmentCollapseRisk: hoveredAssignmentProbe.collapseRisk,
+        hoveredContinuity,
+        hoveredContinuityStatus: hoveredContinuity.status,
+        hoveredContinuityBboxDiagonal: hoveredContinuity.bboxDiagonal,
+        hoveredContinuitySpatialCompactness: hoveredContinuity.spatialCompactness,
+        hoveredContinuityCentroidContained: hoveredContinuity.centroidContained,
         hoverHighlightActive: Boolean(hoveredTarget?.selectionId),
         hoverHighlightedObjectCount: highlightedHoverSamples.length,
         hoverHighlightedGaussianCount: highlightedHoverSamples.reduce(
@@ -2606,6 +2628,11 @@ function ThreeWorld({
         assignmentProbeMargin: selectedAssignmentProbe.margin,
         assignmentProbeAmbiguous: selectedAssignmentProbe.ambiguous,
         assignmentProbeCollapseRisk: selectedAssignmentProbe.collapseRisk,
+        objectContinuity: selectedContinuity,
+        objectContinuityStatus: selectedContinuity.status,
+        objectContinuityBboxDiagonal: selectedContinuity.bboxDiagonal,
+        objectContinuitySpatialCompactness: selectedContinuity.spatialCompactness,
+        objectContinuityCentroidContained: selectedContinuity.centroidContained,
         stabilitySummary: selectedStability,
         selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
         selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
@@ -3017,6 +3044,8 @@ function DebugPanel({
   selectedObjectKey,
   hoveredTarget,
   hoverAssignmentProbe,
+  objectContinuity,
+  hoverContinuity,
   debugProbe,
   assignmentProbe,
   debugMode,
@@ -3081,6 +3110,11 @@ function DebugPanel({
       data-assignment-probe-margin={assignmentProbe?.margin ?? ""}
       data-assignment-probe-ambiguous={assignmentProbe?.ambiguous ? "true" : "false"}
       data-assignment-probe-collapse-risk={assignmentProbe?.collapseRisk ? "true" : "false"}
+      data-object-continuity-status={objectContinuity?.status ?? "none"}
+      data-object-continuity-spatial-compactness={objectContinuity?.spatialCompactness ?? ""}
+      data-object-continuity-bbox-diagonal={objectContinuity?.bboxDiagonal ?? ""}
+      data-object-continuity-density={objectContinuity?.gaussianDensity ?? ""}
+      data-object-continuity-centroid-contained={objectContinuity?.centroidContained ? "true" : "false"}
       data-trainable-frame-index={selectedFrameIndex}
       data-trainable-frame-count={frameCount}
       data-ogc-lod-index={selectedOgcLod}
@@ -3099,6 +3133,10 @@ function DebugPanel({
       data-hover-assignment-top-slot={hoverAssignmentProbe?.topSlot ?? ""}
       data-hover-assignment-ambiguous={hoverAssignmentProbe?.ambiguous ? "true" : "false"}
       data-hover-assignment-collapse-risk={hoverAssignmentProbe?.collapseRisk ? "true" : "false"}
+      data-hover-continuity-status={hoverContinuity?.status ?? "none"}
+      data-hover-continuity-spatial-compactness={hoverContinuity?.spatialCompactness ?? ""}
+      data-hover-continuity-bbox-diagonal={hoverContinuity?.bboxDiagonal ?? ""}
+      data-hover-continuity-centroid-contained={hoverContinuity?.centroidContained ? "true" : "false"}
       data-object-visibility-contract="enabled"
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
@@ -3276,6 +3314,8 @@ function DebugPanel({
         <Meta label="gaussian n" value={debugProbe?.gaussianIndex ?? "-"} />
         <Meta label="centroid" value={formatVec(activeState?.centroid)} />
         <Meta label="bbox" value={formatBox(activeState?.bbox)} />
+        <Meta label="spatial" value={objectContinuity?.status ?? "-"} />
+        <Meta label="diag" value={formatRatio(objectContinuity?.bboxDiagonal)} />
         <Meta
           label="hover"
           value={
@@ -3287,6 +3327,7 @@ function DebugPanel({
         <Meta label="hover focus" value={hoveredTarget?.selectionId ? "enabled" : "-"} />
         <Meta label="hover A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
         <Meta label="hover H" value={formatRatio(hoverAssignmentProbe?.entropy)} />
+        <Meta label="hover spatial" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
         <Meta label="hidden" value={hiddenObjects.size} />
         <Meta label="hidden G" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
       </dl>
@@ -3379,9 +3420,16 @@ function DebugSnapshotPanel({
       data-debug-snapshot-assignment-probe-collapse-risk={snapshot.assignment.probe?.collapseRisk ? "true" : "false"}
       data-debug-snapshot-hidden-objects={snapshot.visibility?.hiddenObjectCount ?? ""}
       data-debug-snapshot-hidden-gaussians={snapshot.visibility?.hiddenGaussianCount ?? ""}
+      data-debug-snapshot-continuity-status={snapshot.continuity?.status ?? ""}
+      data-debug-snapshot-continuity-bbox-diagonal={snapshot.continuity?.bboxDiagonal ?? ""}
+      data-debug-snapshot-continuity-spatial-compactness={snapshot.continuity?.spatialCompactness ?? ""}
+      data-debug-snapshot-continuity-centroid-contained={snapshot.continuity?.centroidContained ? "true" : "false"}
       data-debug-snapshot-hover-object={snapshot.hover?.selectionId ?? ""}
       data-debug-snapshot-hover-assignment-status={snapshot.hover?.probe?.status ?? ""}
       data-debug-snapshot-hover-assignment-margin={snapshot.hover?.probe?.margin ?? ""}
+      data-debug-snapshot-hover-continuity-status={snapshot.hover?.continuity?.status ?? ""}
+      data-debug-snapshot-hover-continuity-bbox-diagonal={snapshot.hover?.continuity?.bboxDiagonal ?? ""}
+      data-debug-snapshot-hover-continuity-centroid-contained={snapshot.hover?.continuity?.centroidContained ? "true" : "false"}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
@@ -3435,7 +3483,10 @@ function DebugSnapshotPanel({
         <Meta label="probe" value={snapshot.assignment.probe?.status ?? "-"} />
         <Meta label="margin" value={formatRatio(snapshot.assignment.probe?.margin)} />
         <Meta label="hidden G" value={formatCount(snapshot.visibility?.hiddenGaussianCount)} />
+        <Meta label="spatial" value={snapshot.continuity?.status ?? "-"} />
+        <Meta label="diag" value={formatRatio(snapshot.continuity?.bboxDiagonal)} />
         <Meta label="hover A" value={snapshot.hover?.probe?.status ?? "-"} />
+        <Meta label="hover spatial" value={snapshot.hover?.continuity?.status ?? "-"} />
         <Meta label="state" value={snapshot.stability.status} />
         <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
         <Meta label="session" value={sessionExport?.fileName || sessionExport?.status || "idle"} />
@@ -4539,6 +4590,8 @@ function objectTarget(object) {
     assignment: compactAssignmentVector(assignment),
     confidence: finiteNumber(objectState.confidence),
     entropy: finiteNumber(objectState.assignmentEntropy),
+    spatialCompactness: finiteNumber(objectState.spatialCompactness),
+    bboxStability: finiteNumber(objectState.bboxStability),
     status: objectState.status ?? "",
     centroid: cleanNumberArray(objectState.centroid),
     bbox: cleanNumberArray(objectState.bbox),
@@ -4705,6 +4758,95 @@ function objectVisibilitySummary(models = [], hiddenObjects = new Set()) {
     hiddenGaussianCount: hiddenSamples.reduce((total, sample) => total + sample.gaussianCount, 0),
     hiddenSelectionIds: hiddenSamples.map((sample) => sample.selectionId),
     samples: samples.slice(0, 64),
+  };
+}
+
+function objectContinuitySummary(object) {
+  if (!object) {
+    return {
+      schema: "objgauss-object-continuity-summary-v1",
+      status: "none",
+      spatialCompactness: null,
+      bboxDiagonal: null,
+      gaussianDensity: null,
+      centroidContained: false,
+      bboxValid: false,
+      gaussianCount: 0,
+      centroid: [],
+      bbox: [],
+    };
+  }
+  const state = object?.objectState ?? object;
+  const bbox = cleanNumberArray(state?.bbox);
+  const centroid = cleanNumberArray(state?.centroid);
+  const spatialCompactness = finiteNumber(state?.spatialCompactness ?? object?.spatialCompactness);
+  const gaussianCount = Math.trunc(
+    finiteNumber(object?.gaussianCount) ??
+      finiteNumber(state?.gaussianCount) ??
+      finiteNumber(state?.slotMass) ??
+      objectGaussianCountForSummary(object),
+  );
+  const bboxValid = Boolean(
+    bbox.length >= 6 &&
+      bbox.slice(0, 6).every((value) => Number.isFinite(Number(value))) &&
+      bbox[3] >= bbox[0] &&
+      bbox[4] >= bbox[1] &&
+      bbox[5] >= bbox[2],
+  );
+  const dx = bboxValid ? Math.max(0, bbox[3] - bbox[0]) : 0;
+  const dy = bboxValid ? Math.max(0, bbox[4] - bbox[1]) : 0;
+  const dz = bboxValid ? Math.max(0, bbox[5] - bbox[2]) : 0;
+  const bboxDiagonal = bboxValid ? round6(Math.sqrt(dx * dx + dy * dy + dz * dz)) : null;
+  const volume = bboxValid ? dx * dy * dz : 0;
+  const gaussianDensity = volume > 0 && gaussianCount > 0 ? round6(gaussianCount / volume) : null;
+  const centroidContained = Boolean(
+    bboxValid &&
+      centroid.length >= 3 &&
+      centroid[0] >= bbox[0] &&
+      centroid[0] <= bbox[3] &&
+      centroid[1] >= bbox[1] &&
+      centroid[1] <= bbox[4] &&
+      centroid[2] >= bbox[2] &&
+      centroid[2] <= bbox[5],
+  );
+  const status = !bboxValid
+    ? "invalid-bbox"
+    : gaussianCount <= 0
+      ? "empty"
+      : !centroidContained
+        ? "centroid-outside"
+        : spatialCompactness !== null && spatialCompactness < 0.35
+          ? "fragmented"
+          : bboxDiagonal !== null && bboxDiagonal <= 0
+            ? "degenerate"
+            : "continuous";
+  return {
+    schema: "objgauss-object-continuity-summary-v1",
+    status,
+    spatialCompactness,
+    bboxDiagonal,
+    gaussianDensity,
+    centroidContained,
+    bboxValid,
+    gaussianCount,
+    centroid,
+    bbox,
+  };
+}
+
+function compactObjectContinuity(summary) {
+  if (!summary || typeof summary !== "object") return null;
+  return {
+    schema: "objgauss-object-continuity-summary-v1",
+    status: cleanString(summary.status || "none"),
+    spatialCompactness: finiteNumber(summary.spatialCompactness),
+    bboxDiagonal: finiteNumber(summary.bboxDiagonal),
+    gaussianDensity: finiteNumber(summary.gaussianDensity),
+    centroidContained: Boolean(summary.centroidContained),
+    bboxValid: Boolean(summary.bboxValid),
+    gaussianCount: finiteNumber(summary.gaussianCount),
+    centroid: cleanNumberArray(summary.centroid),
+    bbox: cleanNumberArray(summary.bbox),
   };
 }
 
@@ -5180,6 +5322,8 @@ function objectStateDebugSnapshot({
   debugProbe,
   hoveredTarget,
   hoverAssignmentProbe,
+  objectContinuity,
+  hoverContinuity,
   hiddenCount,
   objectVisibility,
   stability,
@@ -5239,6 +5383,7 @@ function objectStateDebugSnapshot({
           status: cleanString(hoveredTarget.status),
           assignment: compactAssignmentVector(hoveredTarget.assignment),
           probe: compactAssignmentProbe(hoverAssignmentProbe),
+          continuity: compactObjectContinuity(hoverContinuity),
         }
       : null,
     visibility: {
@@ -5250,6 +5395,7 @@ function objectStateDebugSnapshot({
         ? objectVisibility.hiddenSelectionIds.slice(0, 16)
         : [],
     },
+    continuity: compactObjectContinuity(objectContinuity),
     objectState: {
       objectId: activeState?.objectId ?? activeObject?.objectId ?? null,
       status: activeState?.status ?? "",
@@ -5420,6 +5566,7 @@ function validateDebugSessionArchive(session, path = "") {
             status: cleanString(snapshot.hover.status),
             assignment: compactAssignmentVector(snapshot.hover.assignment),
             probe: compactAssignmentProbe(snapshot.hover.probe),
+            continuity: compactObjectContinuity(snapshot.hover.continuity),
           }
         : null,
       visibility: {
@@ -5429,6 +5576,7 @@ function validateDebugSessionArchive(session, path = "") {
         visibleGaussianCount: finiteNumber(snapshot.visibility?.visibleGaussianCount),
         hiddenSelectionIds: cleanStringList(snapshot.visibility?.hiddenSelectionIds).slice(0, 16),
       },
+      continuity: compactObjectContinuity(snapshot.continuity),
       stability: {
         status: cleanString(snapshot.stability?.status),
         slotUtilization: finiteNumber(snapshot.stability?.slotUtilization),
