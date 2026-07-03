@@ -79,6 +79,43 @@
 
 ## Done
 
+### DECODER-HANDOFF-CONTRACT-001: Freeze solver checkpoint to renderer loss handoff
+
+- 状态: done / decoder-renderer-handoff-contract
+- 类型: 标准 PR / algorithm model renderer loss handoff
+- 目标: 在不启动真实 GPU 训练的前提下，把 solver checkpoint 到
+  `ObjectState -> GaussianToken decode -> renderer_api image_render_loss` 的边界变成
+  机器可读 contract，供下一阶段 full renderer loss 接入。
+- 已实施:
+  - `renderer-loss-contract` 输出新增 `objgauss-decoder-renderer-handoff-v1`。
+  - handoff state chain 固定为 `solver_checkpoint -> PerceptionEvidence -> A[N,K] ->
+    ObjectStateProjection -> GaussianToken decode -> renderer_api image_render_loss`。
+  - CLI 新增 `decoder_handoff_status` 和
+    `decoder_handoff_starts_real_training=false` 输出。
+  - 测试覆盖 `awaiting_solver_checkpoint`、`solver_checkpoint_ready`、
+    `renderer_api_decoder_smoke_ready` 和 `full_renderer_decoder_ready` 状态。
+  - solver checkpoint 路线继续明确阻塞于
+    `solver_checkpoint_not_bound_to_gaussian_decoder` 和
+    `solver_checkpoint_not_bound_to_renderer_loss`。
+- 边界:
+  - 不启动 GPU / torch / gsplat / CUDA full renderer training。
+  - 不实现或训练真实 Gaussian decoder。
+  - 不提交 `/tmp` checkpoint、ignored `outputs/`、rendered image 或大训练产物。
+  - 不把 point smoke、CPU solver 或 handoff contract 伪装成 full 3DGS renderer training。
+- 验证:
+  - `uv run --extra dev pytest tests/test_renderer_loss.py tests/test_core_namespace.py tests/test_objgauss_mvp.py`:
+    80 passed。
+  - `uv run python -m py_compile objgauss/core/renderer_loss.py objgauss/cli.py`: passed。
+  - `uv run objgauss training object-emergence-solver public/samples/lego_alpha_v1_objects.ply --max-points 16 --iterations 8 --learning-rate 0.5 --summary-output /tmp/objgauss-object-emergence-solver-summary.json --checkpoint-output /tmp/objgauss-object-emergence-solver-checkpoint.json --require-loss-decrease`:
+    passed，`final_total_loss=0.767572`，`gpu_used=false`，`vram_reserve_gb=1`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-object-emergence-solver-checkpoint.json --output /tmp/objgauss-solver-decoder-handoff.json`:
+    passed，`status=object_emergence_solver_ready`，
+    `decoder_handoff_status=solver_checkpoint_ready`，
+    `decoder_handoff_starts_real_training=false`。
+  - `uv run --extra dev pytest`: 157 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: `2eed070`
+
 ### SOLVER-CHECKPOINT-EXPORT-001: Export reusable Object Emergence Solver checkpoint
 
 - 状态: done / checkpoint-export-and-renderer-handoff

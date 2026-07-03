@@ -117,6 +117,16 @@ CUDA full renderer training，不提交 checkpoint 或大训练产物。
 `solver_checkpoint_not_bound_to_renderer_loss` 阻塞。本切片仍不启动真正 torch / gsplat /
 CUDA full renderer training，也不提交 checkpoint 产物。
 
+随后完成 `DECODER-HANDOFF-CONTRACT-001`：`renderer-loss-contract` 输出现在包含
+`objgauss-decoder-renderer-handoff-v1`，把 solver checkpoint 到 full renderer loss 的
+边界固定为 `solver_checkpoint -> PerceptionEvidence -> A[N,K] -> ObjectStateProjection
+-> GaussianToken decode -> renderer_api image_render_loss`。CLI 会打印
+`decoder_handoff_status` 和 `decoder_handoff_starts_real_training=false`，测试覆盖
+`awaiting_solver_checkpoint`、`solver_checkpoint_ready`、`renderer_api_decoder_smoke_ready`
+和 `full_renderer_decoder_ready` 四类状态。该合约只是训练前置 handoff，不启动 GPU
+训练，不绑定真实 Gaussian decoder 参数，也不把 point / CPU smoke 伪装成 full 3DGS
+renderer training。
+
 同日已完成 `DEBUG-UI-HIERARCHY-001`：ObjectState Debug OS 左侧调试面板从平铺信息流
 收敛为可折叠目录结构，默认打开概览、常用操作、Assignment / Gaussian、对象诊断和
 对象开关，低频的协议归档、质量 / 训练 / 基准默认折叠；可见字段同步中文化。右侧
