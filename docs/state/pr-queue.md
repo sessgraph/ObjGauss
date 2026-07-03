@@ -78,6 +78,38 @@
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-TIMELINE-001: Visible assignment stability timeline
+
+- 状态: done / assignment-timeline-inspector
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 Phase 1 的 “assignment 是否 jitter” 从单值指标升级为可见跨帧时间线，让
+  clicked Gaussian 的 `A[n,k]` 在各 frame 的变化可以直接审计。
+- 已实施:
+  - `src/App.jsx` 新增 `objgauss-assignment-timeline-v1` 派生 summary，从 trainable artifact
+    的 `assignments` 中抽取同一个 Gaussian row 在各 frame 的 assignment vector、top slot、
+    margin、entropy 和 adjacent delta。
+  - Debug panel 新增 `AssignmentTimelinePanel`，紧跟 selected `AssignmentHeatmap` 显示
+    frame rows、slot probability bars、current frame、mean jitter 和 max delta；timeline
+    summary 同步写入 root telemetry、Debug panel telemetry、debug snapshot / session archive
+    和 live-vs-archive diff changed fields。
+  - `src/styles.css` 为 timeline 面板补稳定三列行布局和 compact slot probability bars。
+  - `scripts/audit-world-viewer.mjs` 验证 trainable fixture 点击 Gaussian 后，timeline
+    为 2-frame `stable`，current frame / Gaussian index / row count / jitter 与 snapshot
+    和 DOM telemetry 一致，并把 `assignmentTimeline=stable` 写入 audit 输出。
+- 边界:
+  - 不改变 artifact schema、assignment solver、ObjectState projection、Gaussian renderer
+    artifact schema、OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed，输出包含
+    `assignmentTimeline=stable` 和 `assignmentTimelineJitter=0.02`。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: `d2c6bf2`
+
 ### OBJECTSTATE-GAUSSIAN-PROBE-PANEL-001: Visible Gaussian probe inspector
 
 - 状态: done / gaussian-probe-inspector

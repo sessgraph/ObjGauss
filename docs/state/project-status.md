@@ -544,6 +544,20 @@ confidence、entropy、opacity、position 和 flags 与 root / heatmap / world t
 ObjectState projection、renderer artifact schema、OGC decoder 或 trainable kernel loop；
 训练模型主线仍保持 `suspended / current-env-missing-torch-gsplat-cuda`。
 
+`OBJECTSTATE-ASSIGNMENT-TIMELINE-001` 已将 assignment stability 从单值 jitter 指标
+升级为可见跨帧时间线：`src/App.jsx` 新增 `objgauss-assignment-timeline-v1` 派生 summary，
+从 trainable artifact 的 `assignments` 中抽取同一个 Gaussian row 在各 frame 的
+`A[n,k]`、top slot、margin、entropy 和 adjacent delta；Debug panel 在 selected
+Assignment Heatmap 后显示 `Assignment Timeline`，同时将 timeline summary 写入 root
+telemetry、Debug panel telemetry、debug snapshot / session archive 和 live-vs-archive
+diff changed fields。`src/styles.css` 为 timeline 增加稳定三列行布局和 slot probability
+bars；`scripts/audit-world-viewer.mjs` 现在验证 trainable fixture 点击 Gaussian 后，
+timeline 为 2-frame `stable`，`meanDelta=0.02`，并在 audit 输出中记录
+`assignmentTimeline=stable`。该切片强化 Phase 1 “assignment 是否 jitter”调试证据，
+不改变 artifact schema、assignment solver、ObjectState projection、renderer、OGC
+decoder 或 trainable kernel loop；训练模型主线仍保持
+`suspended / current-env-missing-torch-gsplat-cuda`。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window
