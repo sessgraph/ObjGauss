@@ -96,6 +96,62 @@
       ]
     }
   ],
+  "object_emergence_solver_training": {
+    "schema": "objgauss-object-emergence-solver-training-v1",
+    "kind": "object_emergence_solver_training",
+    "input": "public/samples/lego_alpha_v1_objects.ply",
+    "source_gaussians": 5696,
+    "sampled_gaussians": 16,
+    "target_source": "object_id_one_hot_targets",
+    "iterations": 8,
+    "learning_rate": 0.5,
+    "finite_difference_epsilon": 0.001,
+    "weights": {
+      "assignment": 1,
+      "entropy": 0.01,
+      "balance": 0.05,
+      "temporal": 0
+    },
+    "initial_loss": {
+      "iteration": 0,
+      "total_loss": 1.3864004212797054,
+      "assignment_loss": 1.3764028549194336,
+      "entropy_loss": 0.999751091003418,
+      "balance_loss": 0.0000011090047564721317,
+      "temporal_loss": 0
+    },
+    "final_loss": {
+      "iteration": 8,
+      "total_loss": 0.767571611533931,
+      "assignment_loss": 0.7593287825584412,
+      "entropy_loss": 0.8236606121063232,
+      "balance_loss": 0.00012445708853192627,
+      "temporal_loss": 0
+    },
+    "loss_decreased": true,
+    "assignment_loss_decreased": true,
+    "balance_loss_decreased": false,
+    "final_solver_state": {
+      "schema": "objgauss-object-emergence-solver-state-v1",
+      "source": "trained_numpy_finite_difference",
+      "step": 8,
+      "config": {
+        "schema": "objgauss-object-emergence-model-v1",
+        "slots": 4,
+        "feature_dim": 7,
+        "position_dim": 3,
+        "temperature": 1,
+        "feature_weight": 1,
+        "position_weight": 1,
+        "model_family": "linear-softmax-assignment"
+      }
+    },
+    "gpu_policy": {
+      "uses_gpu": false,
+      "full_renderer_training": "suspended_until_torch_gsplat_cuda_available",
+      "vram_reserve_gb": 1
+    }
+  },
   "renderer_api": {
     "differentiable_fields": ["decoder_colors", "assignments"],
     "frozen_fields": ["positions", "camera", "visibility_mask", "point_radius"],

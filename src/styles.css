@@ -788,6 +788,10 @@ button:focus-visible {
   border-color: rgba(182, 151, 255, 0.2);
 }
 
+.solverTrainingEvidence {
+  border-color: rgba(127, 241, 214, 0.24);
+}
+
 .debugTracePanel {
   border-color: rgba(127, 222, 255, 0.2);
 }

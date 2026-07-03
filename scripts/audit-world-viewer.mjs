@@ -34,6 +34,10 @@ try {
       `trainLoss=${summary.trainableTrainingFinalLoss}`,
       `trainLossDelta=${summary.trainableTrainingLossDelta}`,
       `trainImageLoss=${summary.trainableTrainingFinalImageLoss}`,
+      `solverLoss=${summary.solverTrainingFinalLoss}`,
+      `solverLossDelta=${summary.solverTrainingLossDelta}`,
+      `solverGpu=${summary.solverTrainingGpuUsed}`,
+      `solverVramReserveGb=${summary.solverTrainingVramReserveGb}`,
       `urlArtifact=${summary.urlArtifactStatus}`,
       `urlOgc=${summary.urlOgcStatus}`,
       `urlOgcManifest=${summary.urlOgcManifestStatus}`,
@@ -255,6 +259,7 @@ async function auditWorld(url) {
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
+      const solver = document.querySelector("[data-solver-training-evidence='true']");
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const world = window.__OBJGAUSS_WORLD__;
       return (
@@ -374,6 +379,28 @@ async function auditWorld(url) {
         Number(training?.getAttribute("data-training-final-total-loss") ?? 0) > 0 &&
         Number(training?.getAttribute("data-training-loss-delta") ?? 0) > 0 &&
         Number(training?.getAttribute("data-training-final-image-loss") ?? 0) > 0 &&
+        solver?.getAttribute("data-solver-training-status") === "loss_down" &&
+        solver?.getAttribute("data-solver-training-schema") === "objgauss-object-emergence-solver-training-v1" &&
+        solver?.getAttribute("data-solver-training-loss-decreased") === "true" &&
+        solver?.getAttribute("data-solver-training-assignment-loss-decreased") === "true" &&
+        solver?.getAttribute("data-solver-training-gpu-used") === "false" &&
+        solver?.getAttribute("data-solver-training-vram-reserve-gb") === "1" &&
+        shell?.getAttribute("data-solver-training-status") === "loss_down" &&
+        shell?.getAttribute("data-solver-training-gpu-used") === "false" &&
+        shell?.getAttribute("data-solver-training-vram-reserve-gb") === "1" &&
+        panel?.getAttribute("data-solver-training-status") === "loss_down" &&
+        panel?.getAttribute("data-solver-training-gpu-used") === "false" &&
+        panel?.getAttribute("data-solver-training-vram-reserve-gb") === "1" &&
+        snapshot?.solverTraining?.status === "loss_down" &&
+        snapshot?.solverTraining?.gpuUsed === false &&
+        snapshot?.solverTraining?.vramReserveGb === 1 &&
+        Number(solver?.getAttribute("data-solver-training-final-total-loss") ?? 0) > 0 &&
+        Number(solver?.getAttribute("data-solver-training-loss-delta") ?? 0) > 0 &&
+        Number(solver?.getAttribute("data-solver-training-final-assignment-loss") ?? 0) > 0 &&
+        Number(solver?.getAttribute("data-solver-training-assignment-loss-delta") ?? 0) > 0 &&
+        Number(world?.solverTrainingLossDelta ?? 0) > 0 &&
+        world?.solverTrainingGpuUsed === false &&
+        world?.solverTrainingVramReserveGb === 1 &&
         Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0 &&
         stability?.getAttribute("data-purity-available") === "true" &&
         stability?.getAttribute("data-temporal-available") === "true" &&
@@ -981,6 +1008,7 @@ async function auditWorld(url) {
       const shell = document.querySelector(".worldShell");
       const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
+      const solver = document.querySelector("[data-solver-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
       const probePanel = document.querySelector("[data-gaussian-probe-panel='true']");
       const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
@@ -1311,6 +1339,26 @@ async function auditWorld(url) {
         panelTrainingRenderer: training?.getAttribute("data-training-renderer") ?? null,
         panelTrainingFinalLoss: Number(training?.getAttribute("data-training-final-total-loss") ?? 0),
         panelTrainingLossDelta: Number(training?.getAttribute("data-training-loss-delta") ?? 0),
+        solverTrainingStatus: shell?.getAttribute("data-solver-training-status") ?? null,
+        solverTrainingSchema: shell?.getAttribute("data-solver-training-schema") ?? null,
+        solverTrainingFinalLoss: Number(shell?.getAttribute("data-solver-training-final-total-loss") ?? 0),
+        solverTrainingLossDelta: Number(shell?.getAttribute("data-solver-training-loss-delta") ?? 0),
+        solverTrainingFinalAssignmentLoss: Number(shell?.getAttribute("data-solver-training-final-assignment-loss") ?? 0),
+        solverTrainingAssignmentLossDelta: Number(shell?.getAttribute("data-solver-training-assignment-loss-delta") ?? 0),
+        solverTrainingGpuUsed: shell?.getAttribute("data-solver-training-gpu-used") ?? null,
+        solverTrainingVramReserveGb: Number(shell?.getAttribute("data-solver-training-vram-reserve-gb") ?? -1),
+        panelSolverTrainingStatus: solver?.getAttribute("data-solver-training-status") ?? null,
+        panelSolverTrainingFinalLoss: Number(solver?.getAttribute("data-solver-training-final-total-loss") ?? 0),
+        panelSolverTrainingLossDelta: Number(solver?.getAttribute("data-solver-training-loss-delta") ?? 0),
+        panelSolverTrainingGpuUsed: solver?.getAttribute("data-solver-training-gpu-used") ?? null,
+        panelSolverTrainingVramReserveGb: Number(solver?.getAttribute("data-solver-training-vram-reserve-gb") ?? -1),
+        snapshotSolverTrainingStatus: snapshot?.solverTraining?.status ?? null,
+        snapshotSolverTrainingGpuUsed: snapshot?.solverTraining?.gpuUsed ?? null,
+        snapshotSolverTrainingVramReserveGb: snapshot?.solverTraining?.vramReserveGb ?? null,
+        worldSolverTrainingStatus: handle.solverTrainingStatus ?? null,
+        worldSolverTrainingLossDelta: handle.solverTrainingLossDelta ?? null,
+        worldSolverTrainingGpuUsed: handle.solverTrainingGpuUsed ?? null,
+        worldSolverTrainingVramReserveGb: handle.solverTrainingVramReserveGb ?? null,
         entropyLensSamples: (handle.lensOpacitySamples ?? []).filter(
           (sample) => sample.modelId === "trainable-mvp-debug" && sample.activeLens === "entropy",
         ),
@@ -1362,6 +1410,30 @@ async function auditWorld(url) {
       world.panelTrainingLossDelta === world.trainableTrainingLossDelta
     )) {
       throw new Error(`expected trainable loss evidence telemetry: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.solverTrainingStatus === "loss_down" &&
+      world.solverTrainingSchema === "objgauss-object-emergence-solver-training-v1" &&
+      world.solverTrainingFinalLoss > 0 &&
+      world.solverTrainingLossDelta > 0 &&
+      world.solverTrainingFinalAssignmentLoss > 0 &&
+      world.solverTrainingAssignmentLossDelta > 0 &&
+      world.solverTrainingGpuUsed === "false" &&
+      world.solverTrainingVramReserveGb === 1 &&
+      world.panelSolverTrainingStatus === "loss_down" &&
+      world.panelSolverTrainingFinalLoss === world.solverTrainingFinalLoss &&
+      world.panelSolverTrainingLossDelta === world.solverTrainingLossDelta &&
+      world.panelSolverTrainingGpuUsed === "false" &&
+      world.panelSolverTrainingVramReserveGb === 1 &&
+      world.snapshotSolverTrainingStatus === "loss_down" &&
+      world.snapshotSolverTrainingGpuUsed === false &&
+      world.snapshotSolverTrainingVramReserveGb === 1 &&
+      world.worldSolverTrainingStatus === "loss_down" &&
+      world.worldSolverTrainingLossDelta > 0 &&
+      world.worldSolverTrainingGpuUsed === false &&
+      world.worldSolverTrainingVramReserveGb === 1
+    )) {
+      throw new Error(`expected Object Emergence Solver loss evidence telemetry: ${JSON.stringify(world)}`);
     }
     if (!(
       world.debugLens === "entropy" &&
@@ -1727,6 +1799,10 @@ async function auditWorld(url) {
       trainableTrainingFinalLoss: world.trainableTrainingFinalLoss,
       trainableTrainingLossDelta: world.trainableTrainingLossDelta,
       trainableTrainingFinalImageLoss: world.trainableTrainingFinalImageLoss,
+      solverTrainingFinalLoss: world.solverTrainingFinalLoss,
+      solverTrainingLossDelta: world.solverTrainingLossDelta,
+      solverTrainingGpuUsed: world.solverTrainingGpuUsed,
+      solverTrainingVramReserveGb: world.solverTrainingVramReserveGb,
       urlArtifactStatus: urlArtifact.status,
       urlOgcStatus: urlOgc.status,
       urlOgcManifestStatus: urlOgcManifest.status,

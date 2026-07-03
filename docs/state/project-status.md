@@ -97,6 +97,15 @@ epoch-boundary 才能应用的 gated update plan。该 plan 会输出 accepted /
 修改 `K`，不静默改写 object id，也不直接改变当前 projection / artifact。dynamic-K
 因此仍是可审计的状态更新计划，不是自动在线 slot policy。
 
+同日已完成 `SOLVER-LOSS-UI-001`：`public/models/trainable-mvp-debug/model-artifact.json`
+现在携带最小 `objgauss-object-emergence-solver-training-v1` CPU solver training summary；
+`src/App.jsx` 在 ObjectState Debug OS 中新增 Solver loss 面板，并把 total /
+assignment loss delta、slots、sample count、`gpu_used=false` 和 `vram_reserve_gb=1`
+同步到 root telemetry、Debug panel、debug snapshot 和 `window.__OBJGAUSS_WORLD__`。
+`scripts/audit-world-viewer.mjs` 已校验 solver loss 下降、assignment loss 下降、GPU 未使用
+和 1GB 显存预留策略。该步骤只做训练结果 handoff / 可视审计，不启动 torch / gsplat /
+CUDA full renderer training，不提交 checkpoint 或大训练产物。
+
 同日已完成 `OBJECT-ASSIGNMENT-001`：`objgauss/core/object_state.py` 新增 Phase 1
 Object Field Projection Layer。该实现验证 normalized `A[N,K]`，复用
 `ObjectField.probabilities()`，将 Gaussian evidence weighted reduction 为

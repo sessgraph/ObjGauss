@@ -79,6 +79,42 @@
 
 ## Done
 
+### SOLVER-LOSS-UI-001: Show Object Emergence Solver loss in Debug OS
+
+- 状态: done / solver-loss-debug-handoff
+- 类型: 标准 PR / browser debug handoff
+- 目标: 将 `TRAINABLE-SOLVER-NP-001` 的 CPU Object Emergence Solver training summary
+  变成 viewer 中可见、可审计的 loss UI，同时保留 full renderer training 挂起边界。
+- 已实施:
+  - `public/models/trainable-mvp-debug/model-artifact.json` 新增小型
+    `objgauss-object-emergence-solver-training-v1` fixture，记录
+    `initial_total_loss=1.3864004212797054`、`final_total_loss=0.767571611533931`、
+    assignment loss delta、slots、sample count 和 GPU policy。
+  - `src/App.jsx` 新增 Object Emergence Solver summary parser 和 Solver 面板，展示
+    total / assignment / entropy / balance loss，并把 `gpu_used=false`、
+    `vram_reserve_gb=1` 暴露到 root telemetry、Debug panel、debug snapshot 和
+    `window.__OBJGAUSS_WORLD__`。
+  - `scripts/audit-world-viewer.mjs` 新增 solver loss / GPU policy 验收，并在 audit
+    输出中打印 `solverLoss`、`solverLossDelta`、`solverGpu` 和 `solverVramReserveGb`。
+- 边界:
+  - 不启动 GPU / full renderer training。
+  - 不引入 torch / gsplat / CUDA。
+  - 不训练 Gaussian geometry / opacity / rotation。
+  - 不提交 `/tmp` summary、checkpoint、rendered image 或大训练产物。
+- 验证:
+  - `uv run objgauss training object-emergence-solver public/samples/lego_alpha_v1_objects.ply --max-points 16 --iterations 8 --learning-rate 0.5 --summary-output /tmp/objgauss-object-emergence-solver-summary.json --require-loss-decrease`:
+    passed，`initial_total_loss=1.386400 -> final_total_loss=0.767572`，
+    `gpu_used=false`，`vram_reserve_gb=1`。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: Browser plugin not available，使用 Playwright fallback；
+    沙箱本地 fetch 受限，提权重跑 passed，输出包含 `solverLoss=0.767571611533931`、
+    `solverLossDelta=0.618829`、`solverGpu=false`、`solverVramReserveGb=1`。
+  - `uv run --extra dev pytest`: 155 passed。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - JSON parse check for `public/models/trainable-mvp-debug/model-artifact.json`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
 ### DYNAMIC-K-UPDATE-001: Gate dynamic-K proposal updates at epoch boundary
 
 - 状态: done / epoch-boundary-update-plan

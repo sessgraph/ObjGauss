@@ -178,6 +178,10 @@ export default function App() {
     selected?.delivery?.source === "trainable-kernel-model-artifact"
       ? trainableEvidenceSummary(selected.trainableArtifact)
       : null;
+  const selectedSolverEvidence =
+    selected?.delivery?.source === "trainable-kernel-model-artifact"
+      ? objectEmergenceSolverTrainingSummary(selected.trainableArtifact)
+      : null;
   const selectedQualityReport = qualityReportSummary(selected?.qualityReport);
   const selectedObjectStateBenchmark = objectStateBenchmarkSummary(selected?.objectStateBenchmark);
   const selectedBenchmarkCase = activeObjectStateBenchmarkCase(selectedObjectStateBenchmark, benchmarkCaseName);
@@ -204,6 +208,7 @@ export default function App() {
     assignmentProbe: selectedAssignmentProbe,
     assignmentTimeline: selectedAssignmentTimeline,
     trainingEvidence: selectedTrainingEvidence,
+    solverTrainingEvidence: selectedSolverEvidence,
     qualityReport: selectedQualityReport,
     objectStateBenchmark: selectedObjectStateBenchmark,
     objectStateBenchmarkCase: selectedBenchmarkCase,
@@ -1183,6 +1188,7 @@ export default function App() {
       data-debug-snapshot-assignment-probe-status={selectedDebugSnapshot.assignment.probe?.status ?? ""}
       data-debug-snapshot-stability={selectedDebugSnapshot.stability.status}
       data-debug-snapshot-training-status={selectedDebugSnapshot.training?.status ?? ""}
+      data-debug-snapshot-solver-training-status={selectedDebugSnapshot.solverTraining?.status ?? ""}
       data-debug-snapshot-export-status={snapshotExport.status}
       data-debug-snapshot-export-file={snapshotExport.fileName}
       data-debug-snapshot-export-schema={snapshotExport.schema}
@@ -1323,6 +1329,22 @@ export default function App() {
       data-trainable-training-final-image-loss={selectedTrainingEvidence?.finalImageLoss ?? ""}
       data-trainable-training-image-loss-delta={selectedTrainingEvidence?.imageLossDelta ?? ""}
       data-trainable-training-image-loss-decreased={selectedTrainingEvidence?.imageLossDecreased ? "true" : ""}
+      data-solver-training-status={selectedSolverEvidence?.status ?? ""}
+      data-solver-training-schema={selectedSolverEvidence?.schema ?? ""}
+      data-solver-training-iterations={selectedSolverEvidence?.iterations ?? ""}
+      data-solver-training-slots={selectedSolverEvidence?.slots ?? ""}
+      data-solver-training-sampled-gaussians={selectedSolverEvidence?.sampledGaussians ?? ""}
+      data-solver-training-final-total-loss={selectedSolverEvidence?.finalTotalLoss ?? ""}
+      data-solver-training-loss-delta={selectedSolverEvidence?.totalLossDelta ?? ""}
+      data-solver-training-final-assignment-loss={selectedSolverEvidence?.finalAssignmentLoss ?? ""}
+      data-solver-training-assignment-loss-delta={selectedSolverEvidence?.assignmentLossDelta ?? ""}
+      data-solver-training-loss-decreased={selectedSolverEvidence?.lossDecreased ? "true" : ""}
+      data-solver-training-assignment-loss-decreased={selectedSolverEvidence?.assignmentLossDecreased ? "true" : ""}
+      data-solver-training-gpu-used={
+        selectedSolverEvidence ? (selectedSolverEvidence.gpuUsed ? "true" : "false") : ""
+      }
+      data-solver-training-vram-reserve-gb={selectedSolverEvidence?.vramReserveGb ?? ""}
+      data-solver-training-gpu-policy={selectedSolverEvidence?.gpuPolicyStatus ?? ""}
       data-quality-report-status={selectedQualityReport?.status ?? ""}
       data-quality-report-schema={selectedQualityReport?.schema ?? ""}
       data-quality-report-assignment-entropy={selectedQualityReport?.assignmentEntropy ?? ""}
@@ -1518,6 +1540,8 @@ export default function App() {
             <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
             <Meta label="train loss" value={formatLoss(selectedTrainingEvidence?.finalTotalLoss)} />
             <Meta label="loss delta" value={formatSignedLoss(selectedTrainingEvidence?.totalLossDelta)} />
+            <Meta label="solver loss" value={formatLoss(selectedSolverEvidence?.finalTotalLoss)} />
+            <Meta label="solver delta" value={formatSignedLoss(selectedSolverEvidence?.totalLossDelta)} />
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
             <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
             <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
@@ -2589,6 +2613,7 @@ function ThreeWorld({
         selectedObject?.userData.objectState?.source ??
         selectedModel?.userData.assignmentSource ??
         "derived_from_object_id";
+      const selectedSolverTraining = selectedModel?.userData.solverTraining ?? null;
       const selectedAssignmentProbe = assignmentProbeSummary(
         selectedGaussianProbe?.assignment ?? selectedObject?.userData.objectState?.assignment ?? [],
         selectedGaussianProbe,
@@ -2730,6 +2755,14 @@ function ThreeWorld({
         stabilitySummary: selectedStability,
         selectedTrainableFrameIndex: selectedModel?.userData?.trainableFrameIndex ?? null,
         selectedTrainableFrameCount: selectedModel?.userData?.trainableFrameCount ?? null,
+        solverTraining: selectedSolverTraining,
+        solverTrainingStatus: selectedSolverTraining?.status ?? null,
+        solverTrainingFinalTotalLoss: selectedSolverTraining?.finalTotalLoss ?? null,
+        solverTrainingLossDelta: selectedSolverTraining?.totalLossDelta ?? null,
+        solverTrainingFinalAssignmentLoss: selectedSolverTraining?.finalAssignmentLoss ?? null,
+        solverTrainingAssignmentLossDelta: selectedSolverTraining?.assignmentLossDelta ?? null,
+        solverTrainingGpuUsed: selectedSolverTraining?.gpuUsed ?? null,
+        solverTrainingVramReserveGb: selectedSolverTraining?.vramReserveGb ?? null,
         trainableArtifactLoadedCount: [...modelRoots.values()].filter(
           (object) => object.userData?.artifactSchema === "objgauss-trainable-kernel-model-artifact-v1",
         ).length,
@@ -3181,6 +3214,7 @@ function DebugPanel({
   const probeEntropy = debugProbe?.entropy ?? activeState?.assignmentEntropy ?? 0;
   const probeConfidence = debugProbe?.confidence ?? activeState?.confidence ?? 0;
   const rendererLoss = selected?.delivery?.imageRenderLoss;
+  const solverTraining = objectEmergenceSolverTrainingSummary(selected.trainableArtifact);
   const frameCount = selected.delivery?.frameCount ?? selected.trainableArtifact?.object_states?.length ?? 0;
   const selectedFrameIndex = Number(selected.delivery?.frameIndex ?? selected.trainableFrameIndex ?? 0) || 0;
   const ogcLodLevels = selected.loadMode === "ogc-chunked" && Array.isArray(selected.delivery?.lodLevels)
@@ -3265,6 +3299,9 @@ function DebugPanel({
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
       data-hidden-objects={objectVisibility?.hiddenObjectCount ?? hiddenObjects.size}
       data-hidden-gaussians={objectVisibility?.hiddenGaussianCount ?? 0}
+      data-solver-training-status={solverTraining?.status ?? ""}
+      data-solver-training-gpu-used={solverTraining ? (solverTraining.gpuUsed ? "true" : "false") : ""}
+      data-solver-training-vram-reserve-gb={solverTraining?.vramReserveGb ?? ""}
     >
       <div className="debugHeader">
         <div>
@@ -3446,6 +3483,7 @@ function DebugPanel({
         onSelectCase={onSelectBenchmarkCase}
       />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
+      <ObjectEmergenceSolverPanel artifact={selected.trainableArtifact} />
 
       <dl className="debugStateGrid">
         <Meta label="source" value={debugProbe?.source ?? activeState?.source} />
@@ -3699,6 +3737,11 @@ function DebugSnapshotPanel({
       data-debug-snapshot-hover-explainability-score={snapshot.hover?.explainability?.score ?? ""}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
+      data-debug-snapshot-solver-training-status={snapshot.solverTraining?.status ?? ""}
+      data-debug-snapshot-solver-training-loss-delta={snapshot.solverTraining?.totalLossDelta ?? ""}
+      data-debug-snapshot-solver-training-gpu-used={
+        snapshot.solverTraining ? (snapshot.solverTraining.gpuUsed ? "true" : "false") : ""
+      }
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
       data-debug-snapshot-export-status={snapshotExport?.status ?? "idle"}
       data-debug-snapshot-export-file={snapshotExport?.fileName ?? ""}
@@ -3877,6 +3920,60 @@ function TrainingEvidencePanel({ artifact }) {
         <Meta label="iter" value={formatCount(summary.iterations)} />
         <Meta label="renderer" value={summary.rendererName} />
         <Meta label="grad" value={summary.gradientPath} />
+      </dl>
+    </div>
+  );
+}
+
+function ObjectEmergenceSolverPanel({ artifact }) {
+  const summary = objectEmergenceSolverTrainingSummary(artifact);
+  if (!summary) return null;
+  return (
+    <div
+      className="stabilityDashboard solverTrainingEvidence"
+      data-solver-training-evidence="true"
+      data-solver-training-status={summary.status}
+      data-solver-training-schema={summary.schema}
+      data-solver-training-model-family={summary.modelFamily}
+      data-solver-training-iterations={summary.iterations}
+      data-solver-training-slots={summary.slots}
+      data-solver-training-sampled-gaussians={summary.sampledGaussians ?? ""}
+      data-solver-training-source-gaussians={summary.sourceGaussians ?? ""}
+      data-solver-training-initial-total-loss={summary.initialTotalLoss ?? ""}
+      data-solver-training-final-total-loss={summary.finalTotalLoss ?? ""}
+      data-solver-training-loss-delta={summary.totalLossDelta ?? ""}
+      data-solver-training-initial-assignment-loss={summary.initialAssignmentLoss ?? ""}
+      data-solver-training-final-assignment-loss={summary.finalAssignmentLoss ?? ""}
+      data-solver-training-assignment-loss-delta={summary.assignmentLossDelta ?? ""}
+      data-solver-training-loss-decreased={summary.lossDecreased ? "true" : "false"}
+      data-solver-training-assignment-loss-decreased={summary.assignmentLossDecreased ? "true" : "false"}
+      data-solver-training-final-entropy-loss={summary.finalEntropyLoss ?? ""}
+      data-solver-training-final-balance-loss={summary.finalBalanceLoss ?? ""}
+      data-solver-training-final-temporal-loss={summary.finalTemporalLoss ?? ""}
+      data-solver-training-gpu-used={summary.gpuUsed ? "true" : "false"}
+      data-solver-training-vram-reserve-gb={summary.vramReserveGb ?? ""}
+      data-solver-training-gpu-policy={summary.gpuPolicyStatus}
+      data-solver-training-target-source={summary.targetSource}
+    >
+      <div className="stabilityHead">
+        <span>Solver</span>
+        <strong>{summary.status}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="total" value={formatLoss(summary.finalTotalLoss)} />
+        <Metric label="assign" value={formatLoss(summary.finalAssignmentLoss)} />
+        <Metric label="H" value={formatLoss(summary.finalEntropyLoss)} />
+        <Metric label="balance" value={formatLoss(summary.finalBalanceLoss)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="delta" value={formatSignedLoss(summary.totalLossDelta)} />
+        <Meta label="A delta" value={formatSignedLoss(summary.assignmentLossDelta)} />
+        <Meta label="iter" value={formatCount(summary.iterations)} />
+        <Meta label="slots" value={formatCount(summary.slots)} />
+        <Meta label="sample" value={formatCount(summary.sampledGaussians)} />
+        <Meta label="gpu" value={summary.gpuUsed ? "used" : "false"} />
+        <Meta label="reserve" value={summary.vramReserveGb === null ? "-" : `${summary.vramReserveGb} GB`} />
+        <Meta label="target" value={summary.targetSource} />
       </dl>
     </div>
   );
@@ -4742,6 +4839,7 @@ function createTrainableArtifactGroup(model) {
   group.userData.artifactSchema = artifact.schema;
   group.userData.trainableFrameIndex = frameIndex;
   group.userData.trainableFrameCount = artifact.object_states?.length ?? 0;
+  group.userData.solverTraining = objectEmergenceSolverTrainingSummary(artifact);
   const objectGroups = [];
   const objects = [];
   const objectIds = states.map((state) => state.id);
@@ -6071,6 +6169,7 @@ function objectStateDebugSnapshot({
   assignmentProbe,
   assignmentTimeline,
   trainingEvidence,
+  solverTrainingEvidence,
   qualityReport,
   objectStateBenchmark,
   objectStateBenchmarkCase,
@@ -6173,6 +6272,21 @@ function objectStateDebugSnapshot({
           imageLossDelta: trainingEvidence.imageLossDelta,
           rendererName: trainingEvidence.rendererName,
           gradientPath: trainingEvidence.gradientPath,
+        }
+      : null,
+    solverTraining: solverTrainingEvidence
+      ? {
+          status: solverTrainingEvidence.status,
+          iterations: solverTrainingEvidence.iterations,
+          slots: solverTrainingEvidence.slots,
+          sampledGaussians: solverTrainingEvidence.sampledGaussians,
+          finalTotalLoss: solverTrainingEvidence.finalTotalLoss,
+          totalLossDelta: solverTrainingEvidence.totalLossDelta,
+          finalAssignmentLoss: solverTrainingEvidence.finalAssignmentLoss,
+          assignmentLossDelta: solverTrainingEvidence.assignmentLossDelta,
+          gpuUsed: solverTrainingEvidence.gpuUsed,
+          vramReserveGb: solverTrainingEvidence.vramReserveGb,
+          gpuPolicyStatus: solverTrainingEvidence.gpuPolicyStatus,
         }
       : null,
     quality: qualityReport
@@ -6890,6 +7004,58 @@ function trainableEvidenceSummary(artifact) {
     finalRenderLoss: finiteNumber(final.render_loss),
     finalObjectLoss: finiteNumber(final.object_loss),
     finalTemporalLoss: finiteNumber(final.temporal_loss),
+  };
+}
+
+function objectEmergenceSolverTrainingSummary(artifact) {
+  if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") return null;
+  const training = artifact.object_emergence_solver_training ?? artifact.objectEmergenceSolverTraining;
+  if (training?.schema !== "objgauss-object-emergence-solver-training-v1") return null;
+  const initial = training.initial_loss ?? {};
+  const final = training.final_loss ?? {};
+  const initialTotalLoss = finiteNumber(initial.total_loss);
+  const finalTotalLoss = finiteNumber(final.total_loss);
+  const initialAssignmentLoss = finiteNumber(initial.assignment_loss);
+  const finalAssignmentLoss = finiteNumber(final.assignment_loss);
+  const totalLossDelta =
+    initialTotalLoss !== null && finalTotalLoss !== null ? round6(initialTotalLoss - finalTotalLoss) : null;
+  const assignmentLossDelta =
+    initialAssignmentLoss !== null && finalAssignmentLoss !== null
+      ? round6(initialAssignmentLoss - finalAssignmentLoss)
+      : null;
+  const lossDecreased = Boolean(training.loss_decreased ?? (totalLossDelta !== null && totalLossDelta > 0));
+  const assignmentLossDecreased = Boolean(
+    training.assignment_loss_decreased ?? (assignmentLossDelta !== null && assignmentLossDelta > 0),
+  );
+  const gpuPolicy = training.gpu_policy ?? {};
+  const gpuUsed = Boolean(gpuPolicy.uses_gpu ?? training.gpu_used);
+  const vramReserveGb = finiteNumber(gpuPolicy.vram_reserve_gb ?? training.vram_reserve_gb);
+  return {
+    schema: training.schema,
+    status: lossDecreased && assignmentLossDecreased ? "loss_down" : lossDecreased ? "total_loss_down" : "loss_flat",
+    kind: training.kind ?? "",
+    iterations: finiteNumber(training.iterations),
+    learningRate: finiteNumber(training.learning_rate),
+    finiteDifferenceEpsilon: finiteNumber(training.finite_difference_epsilon),
+    slots: finiteNumber(training.final_solver_state?.config?.slots ?? training.slots),
+    sampledGaussians: finiteNumber(training.sampled_gaussians),
+    sourceGaussians: finiteNumber(training.source_gaussians),
+    targetSource: training.target_source ?? "-",
+    modelFamily: training.final_solver_state?.config?.model_family ?? "-",
+    initialTotalLoss,
+    finalTotalLoss,
+    totalLossDelta,
+    initialAssignmentLoss,
+    finalAssignmentLoss,
+    assignmentLossDelta,
+    lossDecreased,
+    assignmentLossDecreased,
+    finalEntropyLoss: finiteNumber(final.entropy_loss),
+    finalBalanceLoss: finiteNumber(final.balance_loss),
+    finalTemporalLoss: finiteNumber(final.temporal_loss),
+    gpuUsed,
+    vramReserveGb,
+    gpuPolicyStatus: gpuPolicy.full_renderer_training ?? (gpuUsed ? "gpu_training" : "cpu_solver_training"),
   };
 }
 
