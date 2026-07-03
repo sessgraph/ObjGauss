@@ -72,6 +72,43 @@
 
 ## Done
 
+### OGC-CHUNK-DEBUG-UI-001: Switch OGC chunk scope inside ObjectState Debug OS
+
+- 状态: done / ogc-chunk-debug-ui
+- 类型: 标准 PR / browser delivery + debug UI
+- 目标: 在现有 OGC range loader / LOD selector 基础上，继续把 chunk scope 暴露到
+  ObjectState Debug OS，让同一个 URL OGC artifact 可以在 `all chunks` 与单个
+  object-aware chunk 之间切换，并直接审计 byte-range window、ObjectState 和 heatmap。
+- 已实施:
+  - `src/App.jsx` 将 OGC reload 逻辑收敛为共享 helper，LOD 与 chunk scope 都复用同一条
+    `loadOgcModel -> range windows -> decode -> upsertModel` 路径。
+  - OGC artifact load / reload 后记录 `chunkIds` 与 `availableChunkIds`；root shell、
+    inspector 和 Debug panel 暴露 `data-ogc-artifact-chunk-scope`、`OGC scope`、
+    `data-ogc-chunk-selector` 等可审计状态。
+  - Debug panel 在 selected OGC 模型下新增紧凑 `chunk` selector，支持 `all` 和
+    单 chunk 按钮；点击 `c0` 会按 `chunkIds=[0]` 重新请求 payload window，点击
+    `all` 恢复全 chunk route。
+  - `scripts/audit-world-viewer.mjs` 在 URL OGC route 下验证 LOD1 初始窗口、切到
+    LOD0 后再点击 `c0`，断言只请求 1 个 decoded window / `20 / 20` bytes、chunk
+    scope 为 `0`、assignment heatmap 只有 1 个 slot，随后切回 `all` 并验证
+    `40 / 40` bytes 和 2 个 slots 恢复。
+- 边界:
+  - 不改变 OGC writer、quantization schema、record format、chunk index schema 或
+    manifest contract。
+  - 不实现 progressive scheduler、视锥加载、网络缓存策略、VQ / entropy / WebGPU decoder。
+  - 不提交 near-1M / 4.5M 大资产；继续使用小型 URL OGC fixture 验证 browser path。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer，不启动训练或引入 torch / gsplat。
+- 验证:
+  - `npm run audit:ogc-decoder-contract`: passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。
+    输出 `urlOgc=range-ogc-lod-chunk-ui`；截图 `/tmp/objgauss-world-viewer-url-ogc.png`
+    显示 chunk selector、`OGC scope all`、`OGC route range-ogc` 和 `OGC bytes 40 / 40`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### OGC-LOD-DEBUG-UI-001: Switch OGC LOD windows inside ObjectState Debug OS
 
 - 状态: done / ogc-lod-debug-ui

@@ -76,6 +76,10 @@ export default function App() {
   const selectedAssignmentSource =
     debugProbe?.source ?? selectedObject?.objectState?.source ?? selected?.delivery?.source ?? "";
   const hiddenCount = hiddenObjects.size;
+  const selectedOgcChunkScope =
+    selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "";
+  const selectedOgcAvailableChunks =
+    selected?.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.availableChunkIds) : "";
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -162,23 +166,15 @@ export default function App() {
     [models, patchModel, selectedId],
   );
 
-  const selectOgcLod = useCallback(
-    async (lodLevel) => {
-      const current = models[selectedId];
+  const reloadOgcModel = useCallback(
+    async (current, nextOgc, messages) => {
       if (current?.loadMode !== "ogc-chunked") return;
-      const nextLodLevel = Math.max(0, Math.min(16, Number(lodLevel) || 0));
-      const nextModel = {
-        ...current,
-        ogc: {
-          ...(current.ogc ?? {}),
-          lodLevel: nextLodLevel,
-        },
-      };
+      const nextModel = { ...current, ogc: nextOgc };
       const startedAt = performance.now();
       patchModel(current.id, {
-        ogc: nextModel.ogc,
+        ogc: nextOgc,
         status: "loading",
-        message: `loading ogc lod ${nextLodLevel}`,
+        message: messages.loading,
       });
       try {
         const { artifact, decoded, index, delivery } = await loadOgcModel(nextModel);
@@ -192,9 +188,9 @@ export default function App() {
           return nextHidden;
         });
         patchModel(current.id, {
-          ogc: nextModel.ogc,
+          ogc: nextOgc,
           status: "loaded",
-          message: `ogc lod ${nextLodLevel}`,
+          message: messages.loaded,
           gaussianCount: decoded.points.length,
           displayCount: rendered?.displayCount ?? 0,
           objectCount: rendered?.objectCount ?? decoded.metadata.objectCount ?? current.objectCount,
@@ -207,8 +203,10 @@ export default function App() {
             decodedChunks: decoded.metadata.decodedChunks,
             decodedGaussians: decoded.metadata.decodedGaussians,
             recordFormat: decoded.metadata.recordFormat,
-            lodLevel: nextLodLevel,
+            lodLevel: nextOgc.lodLevel ?? "full",
             lodLevels: availableOgcLodLevels(index),
+            chunkIds: Array.isArray(nextOgc.chunkIds) ? nextOgc.chunkIds : [],
+            availableChunkIds: availableOgcChunkIds(index),
             loadRoute: delivery.loadRoute,
             indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
             payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
@@ -219,13 +217,56 @@ export default function App() {
         });
       } catch (error) {
         patchModel(current.id, {
-          ogc: nextModel.ogc,
+          ogc: nextOgc,
           status: "error",
-          message: error?.message ?? "ogc lod load failed",
+          message: error?.message ?? messages.error,
         });
       }
     },
-    [models, patchModel, selectedId],
+    [patchModel],
+  );
+
+  const selectOgcLod = useCallback(
+    async (lodLevel) => {
+      const current = models[selectedId];
+      if (current?.loadMode !== "ogc-chunked") return;
+      const nextLodLevel = Math.max(0, Math.min(16, Number(lodLevel) || 0));
+      await reloadOgcModel(
+        current,
+        {
+          ...(current.ogc ?? {}),
+          lodLevel: nextLodLevel,
+        },
+        {
+          loading: `loading ogc lod ${nextLodLevel}`,
+          loaded: `ogc lod ${nextLodLevel}`,
+          error: "ogc lod load failed",
+        },
+      );
+    },
+    [models, reloadOgcModel, selectedId],
+  );
+
+  const selectOgcChunks = useCallback(
+    async (chunkIds) => {
+      const current = models[selectedId];
+      if (current?.loadMode !== "ogc-chunked") return;
+      const nextChunkIds = Array.isArray(chunkIds) && chunkIds.length ? chunkIds : undefined;
+      const label = nextChunkIds?.length ? `chunk ${nextChunkIds.join(",")}` : "all chunks";
+      await reloadOgcModel(
+        current,
+        {
+          ...(current.ogc ?? {}),
+          chunkIds: nextChunkIds,
+        },
+        {
+          loading: `loading ogc ${label}`,
+          loaded: `ogc ${label}`,
+          error: "ogc chunk load failed",
+        },
+      );
+    },
+    [models, reloadOgcModel, selectedId],
   );
 
   const handleObjectMoved = useCallback(
@@ -279,6 +320,8 @@ export default function App() {
                 recordFormat: decoded.metadata.recordFormat,
                 lodLevel: model.ogc?.lodLevel ?? "full",
                 lodLevels: availableOgcLodLevels(index),
+                chunkIds: Array.isArray(model.ogc?.chunkIds) ? model.ogc.chunkIds : [],
+                availableChunkIds: availableOgcChunkIds(index),
                 loadRoute: delivery.loadRoute,
                 indexPath: artifact.indexPath ?? artifact.chunk_index?.path ?? "",
                 payloadPath: artifact.payloadPath ?? artifact.path ?? index?.payload?.path ?? "",
@@ -412,6 +455,8 @@ export default function App() {
       data-ogc-artifact-fetched-bytes={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.fetchedBytes ?? "" : ""}
       data-ogc-artifact-requested-bytes={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.requestedBytes ?? "" : ""}
       data-ogc-artifact-decoded-windows={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.decodedWindows ?? "" : ""}
+      data-ogc-artifact-chunk-scope={selectedOgcChunkScope}
+      data-ogc-artifact-available-chunks={selectedOgcAvailableChunks}
       data-trainable-artifact-loaded-count={trainableArtifactLoadedCount}
       data-assignment-source={selectedAssignmentSource}
       data-stability-dashboard="enabled"
@@ -519,6 +564,10 @@ export default function App() {
             <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
             <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
             <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
+            <Meta
+              label="OGC scope"
+              value={selected.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "-"}
+            />
             <Meta label="assignment" value={selectedAssignmentSource} />
             <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
           </dl>
@@ -537,6 +586,7 @@ export default function App() {
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
+        onSelectOgcChunks={selectOgcChunks}
       />
 
       <div className="glassHud bottomStatus">
@@ -600,6 +650,14 @@ function availableOgcLodLevels(index) {
     .map((level) => Number(level?.level))
     .filter((level) => Number.isInteger(level) && level >= 0);
   return ids.length ? [...new Set(ids)].sort((left, right) => left - right) : [0];
+}
+
+function availableOgcChunkIds(index) {
+  const chunks = Array.isArray(index?.chunks) ? index.chunks : [];
+  const ids = chunks
+    .map((chunk) => Number(chunk?.chunk_id))
+    .filter((chunkId) => Number.isInteger(chunkId) && chunkId >= 0);
+  return [...new Set(ids)].sort((left, right) => left - right);
 }
 
 async function loadOgcIndex(artifact) {
@@ -1118,6 +1176,7 @@ function DebugPanel({
   onToggleObjectVisibility,
   onSelectTrainableFrame,
   onSelectOgcLod,
+  onSelectOgcChunks,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -1132,6 +1191,11 @@ function DebugPanel({
     ? selected.delivery.lodLevels
     : [];
   const selectedOgcLod = Number(selected.delivery?.lodLevel ?? selected.ogc?.lodLevel ?? 0) || 0;
+  const ogcChunkIds = selected.loadMode === "ogc-chunked" && Array.isArray(selected.delivery?.availableChunkIds)
+    ? selected.delivery.availableChunkIds
+    : [];
+  const selectedOgcChunks = Array.isArray(selected.delivery?.chunkIds) ? selected.delivery.chunkIds : [];
+  const selectedOgcChunkScope = formatChunkScope(selectedOgcChunks);
   return (
     <section
       className="glassHud debugPanel"
@@ -1142,6 +1206,8 @@ function DebugPanel({
       data-trainable-frame-count={frameCount}
       data-ogc-lod-index={selectedOgcLod}
       data-ogc-lod-count={ogcLodLevels.length}
+      data-ogc-chunk-scope={selectedOgcChunkScope}
+      data-ogc-chunk-count={ogcChunkIds.length}
     >
       <div className="debugHeader">
         <div>
@@ -1199,6 +1265,38 @@ function DebugPanel({
               onClick={() => onSelectOgcLod?.(level)}
             >
               L{level}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {ogcChunkIds.length > 1 ? (
+        <div
+          className="trainableFrameSelector"
+          data-ogc-chunk-selector="true"
+          data-selected-chunks={selectedOgcChunkScope}
+          data-chunk-count={ogcChunkIds.length}
+        >
+          <span>chunk</span>
+          <button
+            type="button"
+            className={selectedOgcChunkScope === "all" ? "active" : ""}
+            data-ogc-chunk-button="all"
+            data-active={selectedOgcChunkScope === "all" ? "true" : "false"}
+            onClick={() => onSelectOgcChunks?.([])}
+          >
+            all
+          </button>
+          {ogcChunkIds.map((chunkId) => (
+            <button
+              key={chunkId}
+              type="button"
+              className={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "active" : ""}
+              data-ogc-chunk-button={chunkId}
+              data-active={selectedOgcChunks.length === 1 && selectedOgcChunks[0] === chunkId ? "true" : "false"}
+              onClick={() => onSelectOgcChunks?.([chunkId])}
+            >
+              c{chunkId}
             </button>
           ))}
         </div>
@@ -2529,6 +2627,10 @@ function formatByteWindow(fetched, requested) {
   const requestedBytes = Number(requested);
   if (!Number.isFinite(fetchedBytes) || !Number.isFinite(requestedBytes)) return "-";
   return `${Math.trunc(fetchedBytes)} / ${Math.trunc(requestedBytes)}`;
+}
+
+function formatChunkScope(chunkIds) {
+  return Array.isArray(chunkIds) && chunkIds.length ? chunkIds.join(",") : "all";
 }
 
 function round3(value) {

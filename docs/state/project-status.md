@@ -282,6 +282,18 @@ windows。`scripts/audit-world-viewer.mjs` 现在在 URL OGC route 下先验证 
 windows、assignment heatmap 和 Gaussian probe 仍可用。该切片只是把已存在 range loader
 变成可交互调试控件，不改变 OGC writer / manifest / renderer，不提交大资产。
 
+`OGC-CHUNK-DEBUG-UI-001` 已完成 OGC range loader 的 chunk scope 调试层：
+`src/App.jsx` 将 OGC reload 逻辑收敛为共享 helper，LOD 与 chunk scope 都复用同一条
+`loadOgcModel -> range windows -> decode -> upsertModel` 路径。OGC artifact load /
+reload 后记录 `chunkIds` 与 `availableChunkIds`，root shell、inspector 和 Debug panel
+暴露 `data-ogc-artifact-chunk-scope`、`OGC scope` 和 `data-ogc-chunk-selector`。
+selected OGC 模型现在可以在 `all` 与单个 object-aware chunk（如 `c0`）之间切换：
+单 chunk route 只请求对应 byte window，ObjectState / assignment heatmap 会随 decoded
+chunk scope 收缩。`scripts/audit-world-viewer.mjs` 在 URL OGC route 下验证 LOD1 初始
+`20 / 20` bytes、LOD0 全量 `40 / 40` bytes、`c0` 单 chunk `20 / 20` bytes / 1 个
+decoded window / 1 个 heatmap slot，再切回 `all` 恢复 2 个 slots。该切片不改变 OGC
+writer、chunk index schema、manifest、renderer 或训练系统，不提交大资产。
+
 Owner 随后把 viewer 目标更新为“打开即进入 Three.js / VR-like 3D 世界”：不再以
 侧栏工作台作为默认入口，所有模型以展品方式出现在三维场景中，对象可拖动，模型 /
 对象信息通过磨砂玻璃浮层显示。`WORLD-REBUILD-001` 已完成默认前端入口替换：

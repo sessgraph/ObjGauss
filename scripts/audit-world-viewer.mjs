@@ -635,6 +635,7 @@ async function auditUrlOgcArtifact(browser, url) {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
       const selector = document.querySelector("[data-ogc-lod-selector='true']");
+      const chunkSelector = document.querySelector("[data-ogc-chunk-selector='true']");
       return (
         shell?.getAttribute("data-selected-model") === "ogc-url-artifact" &&
         shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
@@ -642,12 +643,73 @@ async function auditUrlOgcArtifact(browser, url) {
         shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "40" &&
         shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
         shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "all" &&
         selector?.getAttribute("data-selected-lod") === "0" &&
+        chunkSelector?.getAttribute("data-selected-chunks") === "all" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
+      );
+    }, undefined, { timeout: 15000 });
+    await page.locator("[data-ogc-chunk-button='0']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const chunkSelector = document.querySelector("[data-ogc-chunk-selector='true']");
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-url-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "1" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "0" &&
+        panel?.getAttribute("data-ogc-chunk-scope") === "0" &&
+        chunkSelector?.getAttribute("data-selected-chunks") === "0" &&
+        Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1
+      );
+    }, undefined, { timeout: 15000 });
+    const chunkSelection = await page.evaluate(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-url-artifact") ?? [];
+      const target = targets[0];
+      return {
+        ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
+        selectionId: target?.selectionId ?? null,
+        objectCount: targets.length,
+      };
+    });
+    if (!chunkSelection.ok || chunkSelection.objectCount !== 1) {
+      throw new Error(`expected single URL OGC chunk selection: ${JSON.stringify(chunkSelection)}`);
+    }
+    const chunkGaussian = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        ok: world?.selectGaussianForAudit?.(selectionId, 0) ?? false,
+        assignmentSource: world?.assignmentSource ?? null,
+      };
+    }, chunkSelection.selectionId);
+    if (!chunkGaussian.ok || chunkGaussian.assignmentSource !== "derived_from_object_id") {
+      throw new Error(`expected URL OGC chunk Gaussian probe: ${JSON.stringify(chunkGaussian)}`);
+    }
+    await page.locator("[data-ogc-chunk-button='all']").click();
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+      const chunkSelector = document.querySelector("[data-ogc-chunk-selector='true']");
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-url-artifact" &&
+        shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
+        shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
+        shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "40" &&
+        shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
+        shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
+        shell?.getAttribute("data-ogc-artifact-chunk-scope") === "all" &&
+        chunkSelector?.getAttribute("data-selected-chunks") === "all" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc.png", fullPage: false });
-    return { status: "range-ogc-lod-ui" };
+    return { status: "range-ogc-lod-chunk-ui" };
   } finally {
     await page.close();
   }
