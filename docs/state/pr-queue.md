@@ -78,6 +78,34 @@
 
 ## Done
 
+### OBJECTSTATE-HOVER-HIGHLIGHT-001: Auditable Gaussian cluster hover highlight
+
+- 状态: done / object-hover-gaussian-focus
+- 类型: 标准 PR / ObjectState Debug OS frontend
+- 目标: 将 `object hover -> highlight assigned Gaussians` 从隐式材质变化升级为可审计的
+  Gaussian cluster focus 交互。
+- 已实施:
+  - `src/App.jsx` 的 Three.js visual state 在 hover 某个 ObjectState target 时标记
+    hovered Gaussian cloud 为 `highlighted`，并将其它未选 cluster 压暗为 `dimmed`。
+  - root `.worldShell`、ObjectState Debug panel 和 `window.__OBJGAUSS_WORLD__` 新增
+    hover highlight telemetry：active state、highlighted / dimmed object count、
+    Gaussian count 和 per-object opacity / point-size samples。
+  - `scripts/audit-world-viewer.mjs` 验证 hover target 的 assigned Gaussians 被高亮、
+    非目标 cluster 被压暗，同时保持 entropy lens、overlay、snapshot、session、
+    benchmark 和 local import handoff 通过。
+- 边界:
+  - 不改变 assignment solver、ObjectState projection、Gaussian renderer artifact schema、
+    OGC decoder 或 trainable kernel loop。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不提交训练输出或大资产。
+  - `TRAIN-GSPLAT-MVP-001` 继续保持 `suspended / current-env-missing-torch-gsplat-cuda`。
+- 验证:
+  - `uv run --extra dev pytest`: 146 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: passed，输出包含 `hoveredObject=0`、`hoveredGaussians=2`、
+    `debugSessionDiff=match` 和 `debugSessionDrift=changed`。
+  - `git diff --check`: passed。
+- 完成 commit: `pending`
+
 ### OBJECTSTATE-PROBE-DIAGNOSTIC-001: Auditable assignment probe diagnostics
 
 - 状态: done / assignment-probe-diagnostics

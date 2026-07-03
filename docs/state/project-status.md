@@ -420,6 +420,16 @@ import 中的 probe 状态与 margin 保真。该切片仍是 Phase 1 非训练 
 不改变 assignment solver、ObjectState projection、renderer、artifact schema 或训练
 loop；`TRAIN-GSPLAT-MVP-001` 继续因 torch / gsplat / CUDA 环境缺失保持挂起。
 
+`OBJECTSTATE-HOVER-HIGHLIGHT-001` 已将 object hover 升级为可审计的 Gaussian cluster
+focus：Three.js 状态层现在在 hover 某个 ObjectState render target 时把该对象的
+Gaussian cloud 标记为 `highlighted`，并将其它未选 cluster 压暗为 `dimmed`；root
+telemetry、ObjectState Debug panel 和 `window.__OBJGAUSS_WORLD__` 同步暴露
+`hoverHighlightActive`、highlighted / dimmed object count、Gaussian count 和 per-object
+opacity samples。`scripts/audit-world-viewer.mjs` 验证 hover target 的 assigned
+Gaussians 被高亮、非目标 cluster 被压暗，同时保持 debug lens、overlay、snapshot、
+session 和 benchmark handoff 通过。该切片只强化 Phase 1 交互调试能力，不改变
+assignment solver、ObjectState projection、renderer artifact schema 或训练 loop。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

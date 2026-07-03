@@ -471,6 +471,17 @@ async function auditWorld(url) {
         hoveredId: window.__OBJGAUSS_WORLD__?.hoveredId ?? null,
         hoveredGaussianCount: window.__OBJGAUSS_WORLD__?.hoveredGaussianCount ?? 0,
         hoveredAssignmentSource: window.__OBJGAUSS_WORLD__?.hoveredAssignmentSource ?? null,
+        hoverHighlightActive: window.__OBJGAUSS_WORLD__?.hoverHighlightActive ?? false,
+        hoverHighlightedObjectCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedObjectCount ?? 0,
+        hoverHighlightedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverHighlightedGaussianCount ?? 0,
+        hoverDimmedObjectCount: window.__OBJGAUSS_WORLD__?.hoverDimmedObjectCount ?? 0,
+        hoverDimmedGaussianCount: window.__OBJGAUSS_WORLD__?.hoverDimmedGaussianCount ?? 0,
+        highlightedSamples: (window.__OBJGAUSS_WORLD__?.hoverHighlightSamples ?? []).filter(
+          (sample) => sample.hoverHighlighted,
+        ),
+        dimmedSamples: (window.__OBJGAUSS_WORLD__?.hoverHighlightSamples ?? []).filter(
+          (sample) => sample.hoverDimmed,
+        ),
       };
     }, trainableSelection.selectionId);
     if (!hoverSelection.result?.ok) {
@@ -485,14 +496,35 @@ async function auditWorld(url) {
     if (hoverSelection.hoveredAssignmentSource !== "trainable_kernel_model_artifact") {
       throw new Error(`unexpected hover assignment source: ${hoverSelection.hoveredAssignmentSource}`);
     }
+    if (
+      hoverSelection.hoverHighlightActive !== true ||
+      hoverSelection.hoverHighlightedObjectCount !== 1 ||
+      hoverSelection.hoverHighlightedGaussianCount !== hoverSelection.hoveredGaussianCount ||
+      hoverSelection.hoverDimmedObjectCount <= 0 ||
+      hoverSelection.hoverDimmedGaussianCount <= 0 ||
+      !hoverSelection.highlightedSamples.every((sample) => sample.hoverMode === "highlighted" && sample.opacity >= 0.86) ||
+      !hoverSelection.dimmedSamples.some((sample) => sample.hoverMode === "dimmed" && sample.opacity <= 0.18)
+    ) {
+      throw new Error(`expected hover to highlight assigned Gaussian cluster and dim others: ${JSON.stringify(hoverSelection)}`);
+    }
     await page.waitForFunction((selectionId) => {
       const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
       const world = window.__OBJGAUSS_WORLD__;
       return (
         world?.hoveredId === selectionId &&
+        world?.hoverHighlightActive === true &&
+        world?.hoverHighlightedObjectCount === 1 &&
+        world?.hoverHighlightedGaussianCount === world?.hoveredGaussianCount &&
+        world?.hoverDimmedObjectCount > 0 &&
         shell?.getAttribute("data-hovered-target") === selectionId &&
         shell?.getAttribute("data-hovered-model") === "trainable-mvp-debug" &&
-        Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0
+        Number(shell?.getAttribute("data-hovered-gaussians") ?? 0) > 0 &&
+        shell?.getAttribute("data-hover-highlight") === "enabled" &&
+        shell?.getAttribute("data-hover-highlight-object") === selectionId &&
+        Number(shell?.getAttribute("data-hover-highlight-gaussians") ?? 0) === world?.hoveredGaussianCount &&
+        panel?.getAttribute("data-hover-highlight") === "enabled" &&
+        panel?.getAttribute("data-hover-highlight-object") === selectionId
       );
     }, trainableSelection.selectionId, { timeout: 15000 });
     const visibilityToggle = await page.evaluate(() => {
@@ -628,8 +660,19 @@ async function auditWorld(url) {
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
         hoveredGaussianCount: handle.hoveredGaussianCount,
+        hoverHighlightActive: handle.hoverHighlightActive ?? false,
+        hoverHighlightedObjectCount: handle.hoverHighlightedObjectCount ?? 0,
+        hoverHighlightedGaussianCount: handle.hoverHighlightedGaussianCount ?? 0,
+        hoverDimmedObjectCount: handle.hoverDimmedObjectCount ?? 0,
+        hoverDimmedGaussianCount: handle.hoverDimmedGaussianCount ?? 0,
+        hoverHighlightSampleCount: (handle.hoverHighlightSamples ?? []).length,
+        hoverHighlightedSamples: (handle.hoverHighlightSamples ?? []).filter((sample) => sample.hoverHighlighted),
+        hoverDimmedSamples: (handle.hoverHighlightSamples ?? []).filter((sample) => sample.hoverDimmed),
         shellHoveredTarget: shell?.getAttribute("data-hovered-target") ?? null,
         shellHoveredGaussians: Number(shell?.getAttribute("data-hovered-gaussians") ?? 0),
+        shellHoverHighlight: shell?.getAttribute("data-hover-highlight") ?? null,
+        shellHoverHighlightObject: shell?.getAttribute("data-hover-highlight-object") ?? null,
+        shellHoverHighlightGaussians: Number(shell?.getAttribute("data-hover-highlight-gaussians") ?? 0),
         dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadRoute: shell?.getAttribute("data-trainable-artifact-load-route") ?? null,
         trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
@@ -702,7 +745,7 @@ async function auditWorld(url) {
       world.debugLens === "entropy" &&
       world.entropyLensSamples.length >= 2 &&
       world.entropyLensSamples.every((sample) => sample.opacityLens === "entropy") &&
-      world.entropyLensSamples.some((sample) => sample.opacity > 0.32 && sample.opacity < 1)
+      world.entropyLensSamples.some((sample) => sample.opacity > 0.32 && sample.opacity <= 1)
     )) {
       throw new Error(`expected entropy debug lens telemetry: ${JSON.stringify(world)}`);
     }
@@ -787,6 +830,21 @@ async function auditWorld(url) {
     }
     if (!(Number(world.hoveredGaussianCount) > 0 && Number(world.shellHoveredGaussians) > 0)) {
       throw new Error(`expected hovered ObjectState target to expose assigned Gaussians: ${JSON.stringify(world)}`);
+    }
+    if (!(
+      world.hoverHighlightActive === true &&
+      world.shellHoverHighlight === "enabled" &&
+      world.shellHoverHighlightObject === world.hoveredId &&
+      world.hoverHighlightedObjectCount === 1 &&
+      world.hoverHighlightedGaussianCount === world.hoveredGaussianCount &&
+      world.shellHoverHighlightGaussians === world.hoveredGaussianCount &&
+      world.hoverDimmedObjectCount > 0 &&
+      world.hoverDimmedGaussianCount > 0 &&
+      world.hoverHighlightSampleCount >= world.objectCount &&
+      world.hoverHighlightedSamples.every((sample) => sample.hoverMode === "highlighted" && sample.opacity >= 0.86) &&
+      world.hoverDimmedSamples.some((sample) => sample.hoverMode === "dimmed" && sample.opacity <= 0.18)
+    )) {
+      throw new Error(`expected hover highlight to isolate assigned Gaussian cluster: ${JSON.stringify(world)}`);
     }
     const assignmentSlots = await page
       .locator("[data-assignment-heatmap='true']")

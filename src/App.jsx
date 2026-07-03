@@ -23,6 +23,7 @@ const OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA = "objgauss-object-state-stability
 const DEBUG_LENSES = ["assignment", "confidence", "entropy"];
 const OBJECT_OVERLAY_MODES = ["full", "bbox", "centroid", "off"];
 const DEBUG_EVENT_LIMIT = 12;
+const HOVER_DIM_OPACITY = 0.18;
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -1187,6 +1188,9 @@ export default function App() {
       data-hovered-model={hoveredTarget?.modelId ?? ""}
       data-hovered-object={hoveredTarget?.objectId ?? ""}
       data-hovered-gaussians={hoveredTarget?.gaussianCount ?? ""}
+      data-hover-highlight={hoveredTarget?.selectionId ? "enabled" : "disabled"}
+      data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
+      data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
       data-hidden-objects={hiddenCount}
       data-ogc-loaded-count={ogcLoadedCount}
       data-ogc-artifact-load-route={selected?.delivery?.source === "quantized-ogc" ? selected?.delivery?.loadRoute ?? "" : ""}
@@ -2489,6 +2493,25 @@ function ThreeWorld({
         selectedGaussianProbe,
       );
       const hoveredTarget = objectTarget(hoveredObject);
+      const hoverHighlightSamples = [...draggableObjects.values()].map((object) => {
+        const cloud = firstGaussianCloud(object);
+        return {
+          selectionId: object.userData.selectionId,
+          modelId: object.userData.modelId,
+          objectId: object.userData.objectId,
+          visible: object.visible,
+          selected: Boolean(object.userData.selected),
+          hovered: Boolean(object.userData.hovered),
+          hoverHighlighted: Boolean(cloud?.userData?.hoverHighlighted),
+          hoverDimmed: Boolean(cloud?.userData?.hoverDimmed),
+          hoverMode: cloud?.userData?.hoverHighlightMode ?? "off",
+          gaussianCount: objectGaussianCount(object),
+          opacity: round3(cloud?.material?.opacity ?? 0),
+          pointSize: round3(cloud?.material?.size ?? 0),
+        };
+      });
+      const highlightedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverHighlighted);
+      const dimmedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverDimmed);
       window.__OBJGAUSS_WORLD__ = {
         renderer: "three.js",
         ui: "frosted-glass-in-world",
@@ -2505,6 +2528,18 @@ function ThreeWorld({
         hoveredObjectId: hoveredTarget?.objectId ?? null,
         hoveredGaussianCount: hoveredTarget?.gaussianCount ?? 0,
         hoveredAssignmentSource: hoveredTarget?.assignmentSource ?? null,
+        hoverHighlightActive: Boolean(hoveredTarget?.selectionId),
+        hoverHighlightedObjectCount: highlightedHoverSamples.length,
+        hoverHighlightedGaussianCount: highlightedHoverSamples.reduce(
+          (total, sample) => total + (Number(sample.gaussianCount) || 0),
+          0,
+        ),
+        hoverDimmedObjectCount: dimmedHoverSamples.length,
+        hoverDimmedGaussianCount: dimmedHoverSamples.reduce(
+          (total, sample) => total + (Number(sample.gaussianCount) || 0),
+          0,
+        ),
+        hoverHighlightSamples,
         debugMode: debugRef.current,
         debugLens: debugRef.current ? debugLensRef.current : "appearance",
         objectOverlayMode: overlayModeRef.current,
@@ -2777,6 +2812,7 @@ function ThreeWorld({
         publishAuditHandle();
       },
       setHover(selectionId) {
+        const hoverFocus = Boolean(selectionId);
         for (const object of draggableObjects.values()) {
           const hovered = object.userData.selectionId === selectionId;
           object.userData.hovered = hovered;
@@ -2786,6 +2822,7 @@ function ThreeWorld({
             debug: debugRef.current,
             lens: debugLensRef.current,
             overlayMode: overlayModeRef.current,
+            hoverFocus,
           });
         }
       },
@@ -2827,6 +2864,7 @@ function ThreeWorld({
             debug: debugRef.current,
             lens: debugLensRef.current,
             overlayMode: overlayModeRef.current,
+            hoverFocus: Boolean(hoveredObject?.userData?.selectionId),
           });
         }
         publishAuditHandle();
@@ -2852,6 +2890,7 @@ function ThreeWorld({
           debug: debugEnabled,
           lens,
           overlayMode: overlayModeRef.current,
+          hoverFocus: Boolean(hoveredObject?.userData?.selectionId),
         });
       }
     };
@@ -2864,6 +2903,7 @@ function ThreeWorld({
           debug: debugRef.current,
           lens: debugLensRef.current,
           overlayMode: overlayModeRef.current,
+          hoverFocus: Boolean(hoveredObject?.userData?.selectionId),
         });
       }
     };
@@ -2983,6 +3023,9 @@ function DebugPanel({
       data-ogc-lod-count={ogcLodLevels.length}
       data-ogc-chunk-scope={selectedOgcChunkScope}
       data-ogc-chunk-count={ogcChunkIds.length}
+      data-hover-highlight={hoveredTarget?.selectionId ? "enabled" : "disabled"}
+      data-hover-highlight-object={hoveredTarget?.selectionId ?? ""}
+      data-hover-highlight-gaussians={hoveredTarget?.gaussianCount ?? ""}
     >
       <div className="debugHeader">
         <div>
@@ -3163,6 +3206,7 @@ function DebugPanel({
               : "-"
           }
         />
+        <Meta label="hover focus" value={hoveredTarget?.selectionId ? "enabled" : "-"} />
         <Meta label="hidden" value={hiddenObjects.size} />
       </dl>
 
@@ -4331,21 +4375,39 @@ function colorAttributeForDebugLens(cloud, lens, debugEnabled = true) {
 
 function applyObjectVisualState(
   object,
-  { selected = false, hovered = false, debug = true, lens = "assignment", overlayMode = "full" } = {},
+  {
+    selected = false,
+    hovered = false,
+    debug = true,
+    lens = "assignment",
+    overlayMode = "full",
+    hoverFocus = false,
+  } = {},
 ) {
   const selectedOrHovered = Boolean(selected || hovered);
   const normalizedLens = normalizeDebugLens(lens);
   const normalizedOverlay = normalizeObjectOverlayMode(overlayMode);
   const showBbox = Boolean(debug && objectOverlayShows(normalizedOverlay, "bbox"));
   const showCentroid = Boolean(debug && objectOverlayShows(normalizedOverlay, "centroid"));
+  const dimmedByHover = Boolean(hoverFocus && !selected && !hovered);
   object.traverse((child) => {
     if (child.userData.role === "gaussian-cloud") {
       const baseSize = child.userData.basePointSize ?? child.material.size;
       child.userData.basePointSize = baseSize;
       const lensOpacity = opacityForDebugLens(object.userData.objectState, normalizedLens);
       child.userData.activeOpacityLens = debug ? normalizedLens : "appearance";
-      child.material.opacity = selected ? 1 : hovered ? Math.max(0.82, lensOpacity) : debug ? lensOpacity : 0.5;
-      child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.16 : baseSize;
+      const baseOpacity = selected ? 1 : hovered ? Math.max(0.86, lensOpacity) : debug ? lensOpacity : 0.5;
+      child.material.opacity = dimmedByHover ? Math.min(baseOpacity, HOVER_DIM_OPACITY) : baseOpacity;
+      child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.2 : dimmedByHover ? baseSize * 0.92 : baseSize;
+      child.userData.hoverHighlighted = Boolean(hovered);
+      child.userData.hoverDimmed = dimmedByHover;
+      child.userData.hoverHighlightMode = hoverFocus
+        ? hovered
+          ? "highlighted"
+          : selected
+            ? "selected"
+            : "dimmed"
+        : "off";
       child.material.needsUpdate = true;
     }
     if (child.userData.role === "object-state-bbox") {
