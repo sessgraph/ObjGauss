@@ -23,8 +23,15 @@ CUDA 不可用。
 `docs/architecture/object-emergence-model-v1.md`：先在 dependency-free 环境中推进
 `PerceptionEvidence -> A[N,K] -> ObjectState`，再在 torch / gsplat / CUDA 环境恢复后
 把 full renderer loss 接回训练目标。
-当前 torch / gsplat / CUDA 环境已经恢复到可运行 smoke 的状态，下一阶段应从“环境阻塞”
-转入真正算法模型训练设计：`ObjectState -> Gaussian decode -> gsplat/image loss`。
+当前 torch / gsplat / CUDA 环境已经恢复到可运行 smoke 的状态，算法模型主线已从
+“环境阻塞”转入真正训练路径设计。`OBJECTSTATE-GAUSSIAN-DECODER-001` 已将
+`ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 固化为可测代码路径：
+v1 decoder 用 `ObjectStateProjection.assignment` 和 object-level decoder colors 生成
+per-Gaussian color，means / quats / scales / opacities / cameras 仍冻结；短程 gsplat
+smoke 已验证 renderer API、image render loss 和 decoder handoff 均可用。本切片不启动
+长时间训练，不提交 `/tmp` summary、checkpoint、rendered image 或 ignored `outputs/`
+产物，也不训练 Gaussian geometry / opacity / rotation。下一阶段进入 solver checkpoint
+到 decoder 参数的训练绑定与 full loop 设计。
 
 ## 架构重梳理基线
 

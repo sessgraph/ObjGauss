@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；下一步从环境恢复转入真正算法模型训练设计，使 `ObjectState -> Gaussian decode -> gsplat/image loss` 成为可优化主线。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径，下一步进入 solver checkpoint 到 decoder 参数的训练绑定。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
@@ -48,6 +48,55 @@
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-GAUSSIAN-DECODER-001: Bind ObjectState projection to gsplat Gaussian decode
+
+- 状态: done / objectstate-decoder-gsplat-loss-path
+- 类型: 标准 PR / algorithm model decoder binding
+- 目标: 将下一阶段算法主线从 handoff 文档推进到可执行代码路径：
+  `ObjectStateProjection -> Gaussian decode -> gsplat/image loss`，同时保持几何 /
+  opacity / camera 冻结，不启动长时间训练。
+- 已实施:
+  - 新增 `objgauss/core/gaussian_decoder.py`，定义
+    `objgauss-object-state-gaussian-decode-v1` 和
+    `ObjectStateGaussianDecode`。
+  - `decode_gaussian_from_object_state(...)` 现在用
+    `ObjectStateProjection.assignment` 与 object-level decoder colors 生成 per-Gaussian
+    `means / quats / scales / opacities / colors / object_ids`。
+  - v1 decoder 明确可微字段为 `object_colors` 和 `assignment`，冻结字段为
+    `means`、`quats`、`scales`、`opacities`。
+  - `build_gsplat_training_input(...)` 内部改为先构造 `ObjectStateProjection`，再通过
+    decoder 生成 gsplat 输入；同时新增
+    `build_gsplat_training_input_from_object_state(...)` 供后续 solver checkpoint 直接接入。
+  - `objgauss.core` lazy namespace 暴露 `ObjectStateGaussianDecode`、
+    `decode_gaussian_from_object_state(...)` 和
+    `build_gsplat_training_input_from_object_state(...)`。
+- 边界:
+  - 不把 torch / gsplat 加入基础 dependencies；仍通过 optional / `uv --with` 使用。
+  - 不提交 `/tmp` summary、checkpoint、rendered image 或 ignored `outputs/` 产物。
+  - 不训练 Gaussian geometry / opacity / rotation，不改变 cameras。
+  - 不替换 Three.js / Spark / WebGPU viewer renderer。
+  - 不默认加载 near-1M / 4.5M 大资产。
+- 验证:
+  - `uv run --extra dev pytest tests/test_gaussian_decoder.py tests/test_gsplat_training_renderer.py tests/test_core_namespace.py tests/test_trainable_kernel.py tests/test_renderer_loss.py`:
+    34 passed。
+  - `uv run python -m py_compile objgauss/core/gaussian_decoder.py objgauss/core/gsplat_training_renderer.py objgauss/core/__init__.py`:
+    passed。
+  - host preflight `nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv,noheader,nounits`:
+    `NVIDIA GeForce RTX 5060 Ti, 16311, 561, 15281`。
+  - `uv run --with torch --with gsplat python -c "from objgauss.core.gsplat_training_renderer import gsplat_renderer_availability; ..."`:
+    passed，`available=True`，`torch_version=2.12.1+cu130`，`gsplat_version=1.5.3`。
+  - `env CUDA_HOME=/tmp/objgauss-cuda13 PATH=/tmp/objgauss-cuda13/bin:$PATH LD_LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LD_LIBRARY_PATH LIBRARY_PATH=/tmp/objgauss-cuda13/lib:$LIBRARY_PATH MAX_JOBS=2 uv run --with torch --with gsplat --with nvidia-cuda-nvcc==13.0.* --with nvidia-cuda-cccl==13.0.* --with nvidia-nvvm==13.0.* --with nvidia-cuda-crt==13.0.* objgauss training kernel-sample public/samples/lego_alpha_v1_objects.ply --iterations 2 --learning-rate 0.35 --max-points 4 --bind-image-targets --image-width 8 --image-height 8 --image-render-weight 0.5 --image-renderer gsplat --seed 4 --summary-output /tmp/objgauss-objectstate-decoder-gsplat-smoke-summary.json`:
+    passed，`renderer_api_status=ready`，
+    `renderer_name=gsplat-rasterization-v1`，
+    `initial_total_loss=1.651442 -> final_total_loss=1.584998`，
+    `initial_image_render_loss=0.319775 -> final_image_render_loss=0.319773`。
+  - `uv run objgauss training renderer-loss-contract --kernel-summary /tmp/objgauss-objectstate-decoder-gsplat-smoke-summary.json --output /tmp/objgauss-objectstate-decoder-renderer-loss-boundary.json --require-point-smoke-ready`:
+    passed，`status=full_3dgs_renderer_ready`，`upgrade_blockers=[]`，
+    `decoder_handoff_status=full_renderer_decoder_ready`。
+  - host post-smoke GPU memory:
+    `NVIDIA GeForce RTX 5060 Ti, 16311, 558, 15285`。
+- 完成 commit: `9bf87e7`
 
 ### TRAIN-GSPLAT-MVP-001: Run first small full renderer training MVP
 
