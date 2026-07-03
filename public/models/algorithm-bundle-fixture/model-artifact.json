@@ -69,6 +69,17 @@
         "has_object_ids": true,
         "object_count": 2
       }
+    },
+    {
+      "role": "quality_report",
+      "path": "quality-report.json",
+      "format": ".json",
+      "delivery_tier": "browser_edit",
+      "browser_ready": true,
+      "byte_size": 975,
+      "sha256": "4dfbc42c38ee816ca2338054e185ddbdbd2b98d3b8a10940713e7ae57979c0af",
+      "artifact_schema": "objgauss-object-state-quality-report-v1",
+      "label": "ObjectState quality report"
     }
   ],
   "quality_evidence": [

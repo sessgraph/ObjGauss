@@ -113,6 +113,7 @@ export default function App() {
     selected?.delivery?.source === "trainable-kernel-model-artifact"
       ? trainableEvidenceSummary(selected.trainableArtifact)
       : null;
+  const selectedQualityReport = qualityReportSummary(selected?.qualityReport);
   const selectedDebugSnapshot = objectStateDebugSnapshot({
     selected,
     selectedObject,
@@ -124,6 +125,7 @@ export default function App() {
     stability: selectedStability,
     assignmentSource: selectedAssignmentSource,
     trainingEvidence: selectedTrainingEvidence,
+    qualityReport: selectedQualityReport,
     debugEvents,
   });
 
@@ -368,7 +370,7 @@ export default function App() {
       const parentId = "model-local-manifest";
       setModelImport({ status: "loading", modelId: parentId, fileName, error: "" });
       try {
-        const { manifest, parentModel, children } = await localModelArtifactBundleModelsFromFiles(files);
+        const { manifest, parentModel, children, qualityReport } = await localModelArtifactBundleModelsFromFiles(files);
         if (!children.length) {
           throw new Error("local model manifest has no Debug OS browser routes");
         }
@@ -384,6 +386,7 @@ export default function App() {
               status: "loaded",
               message: `${children.length} local debug routes`,
               modelArtifactManifest: manifest,
+              qualityReport,
               delivery: {
                 source: "local-model-artifact-manifest",
                 loadRoute: "local-file",
@@ -674,7 +677,7 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading model manifest" });
           try {
-            const { manifest, children } = await loadModelArtifactManifestModels(model);
+            const { manifest, children, qualityReport } = await loadModelArtifactManifestModels(model);
             if (!children.length) {
               throw new Error("model artifact manifest has no Debug OS browser routes");
             }
@@ -688,6 +691,7 @@ export default function App() {
                 status: "loaded",
                 message: `${children.length} debug routes`,
                 modelArtifactManifest: manifest,
+                qualityReport,
                 loadMs: Math.round(performance.now() - startedAt),
                 delivery: {
                   source: "model-artifact-manifest",
@@ -924,6 +928,13 @@ export default function App() {
       data-trainable-training-final-image-loss={selectedTrainingEvidence?.finalImageLoss ?? ""}
       data-trainable-training-image-loss-delta={selectedTrainingEvidence?.imageLossDelta ?? ""}
       data-trainable-training-image-loss-decreased={selectedTrainingEvidence?.imageLossDecreased ? "true" : ""}
+      data-quality-report-status={selectedQualityReport?.status ?? ""}
+      data-quality-report-schema={selectedQualityReport?.schema ?? ""}
+      data-quality-report-assignment-entropy={selectedQualityReport?.assignmentEntropy ?? ""}
+      data-quality-report-object-purity={selectedQualityReport?.objectPurity ?? ""}
+      data-quality-report-temporal-drift={selectedQualityReport?.temporalDrift ?? ""}
+      data-quality-report-assignment-jitter={selectedQualityReport?.assignmentJitter ?? ""}
+      data-quality-report-gate-count={selectedQualityReport?.gateCount ?? ""}
       data-trainable-import-status={artifactImport.status}
       data-trainable-import-model={artifactImport.modelId}
       data-trainable-import-file={artifactImport.fileName}
@@ -1112,6 +1123,7 @@ export default function App() {
         debugSnapshot={selectedDebugSnapshot}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
+        qualityReport={selectedQualityReport}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
         onSelectTrainableFrame={selectTrainableFrame}
@@ -1160,6 +1172,10 @@ async function loadModelArtifactManifestModels(model) {
   if (manifest?.schema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) {
     throw new Error("unsupported model artifact manifest schema");
   }
+  const qualityReportArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "quality_report");
+  const qualityReport = qualityReportArtifact
+    ? await loadQualityReportArtifact(qualityReportArtifact, manifestPath)
+    : null;
   const children = [];
   if (browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel")) {
     children.push(trainableManifestModelFromManifest(model, manifest, manifestPath));
@@ -1167,7 +1183,11 @@ async function loadModelArtifactManifestModels(model) {
   if (browserReadyArtifact({ modelArtifactManifest: manifest }, "compressed_chunked")) {
     children.push(ogcUrlManifestModelFromManifest(ogcManifestChildModel(model), manifest, manifestPath));
   }
-  return { manifest, children };
+  return {
+    manifest,
+    children: qualityReport ? children.map((child) => attachQualityReport(child, qualityReport)) : children,
+    qualityReport,
+  };
 }
 
 async function loadOgcManifestModel(model) {
@@ -1188,6 +1208,21 @@ async function loadTrainableArtifact(model) {
     return validateTrainableArtifact(await response.json());
   }
   return validateTrainableArtifact(model.trainableArtifact);
+}
+
+async function loadQualityReportArtifact(artifact, manifestPath) {
+  const reportPath = resolveSameOriginManifestRoute(artifact.reportPath ?? artifact.path, manifestPath);
+  const response = await fetch(reportPath);
+  if (!response.ok) throw new Error(`quality report HTTP ${response.status}`);
+  return validateQualityReport(await response.json(), reportPath);
+}
+
+function attachQualityReport(model, qualityReport) {
+  if (!qualityReport) return model;
+  return {
+    ...model,
+    qualityReport,
+  };
 }
 
 function trainableManifestModelFromManifest(model, manifest, manifestPath) {
@@ -1239,6 +1274,19 @@ function validateTrainableArtifact(artifact) {
     throw new Error("trainable artifact missing object states");
   }
   return artifact;
+}
+
+function validateQualityReport(report, path = "") {
+  if (report?.schema !== "objgauss-object-state-quality-report-v1") {
+    throw new Error("unsupported ObjectState quality report schema");
+  }
+  if (typeof report.metrics !== "object" || report.metrics === null) {
+    throw new Error("quality report missing metrics");
+  }
+  return {
+    ...report,
+    path,
+  };
 }
 
 function ogcManifestChildModel(model) {
@@ -1377,6 +1425,13 @@ async function localModelArtifactBundleModelsFromFiles(files) {
   const manifest = manifestEntry.json;
   const parentModel = localModelArtifactParentModel(manifest, manifestEntry.file.name);
   const children = [];
+  const qualityReportArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "quality_report");
+  const qualityReportEntry = qualityReportArtifact
+    ? findQualityReportEntry(jsonEntries, qualityReportArtifact.reportPath ?? qualityReportArtifact.path)
+    : null;
+  const qualityReport = qualityReportEntry
+    ? validateQualityReport(qualityReportEntry.json, localFileRoute(qualityReportEntry.file.name))
+    : null;
   const trainableArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel");
   if (trainableArtifact) {
     const trainableEntry = findTrainableArtifactEntry(
@@ -1384,12 +1439,15 @@ async function localModelArtifactBundleModelsFromFiles(files) {
       trainableArtifact.artifactPath ?? trainableArtifact.path,
     );
     children.push(
-      trainableLocalManifestModelFromManifest({
-        manifest,
-        artifact: trainableArtifact,
-        trainableArtifact: trainableEntry.json,
-        artifactFileName: trainableEntry.file.name,
-      }),
+      attachQualityReport(
+        trainableLocalManifestModelFromManifest({
+          manifest,
+          artifact: trainableArtifact,
+          trainableArtifact: trainableEntry.json,
+          artifactFileName: trainableEntry.file.name,
+        }),
+        qualityReport,
+      ),
     );
   }
 
@@ -1405,20 +1463,30 @@ async function localModelArtifactBundleModelsFromFiles(files) {
       indexFileName: indexEntry.file.name,
       payloadFileName: payloadFile.name,
     });
-    children.push({
-      ...ogcModel,
-      id: "model-local-manifest-ogc-artifact",
-      name: manifest.name ? `Local ${manifest.name} OGC` : "Local manifest OGC artifact",
-      label: "Local OGC",
-      stage: "local-model-manifest-debug-artifact",
-      galleryPosition: [3.85, 0, 5.02],
-      compression: {
-        ...(ogcModel.compression ?? {}),
-        status: "local-model-manifest-debug-artifact",
-      },
-    });
+    children.push(
+      attachQualityReport(
+        {
+          ...ogcModel,
+          id: "model-local-manifest-ogc-artifact",
+          name: manifest.name ? `Local ${manifest.name} OGC` : "Local manifest OGC artifact",
+          label: "Local OGC",
+          stage: "local-model-manifest-debug-artifact",
+          galleryPosition: [3.85, 0, 5.02],
+          compression: {
+            ...(ogcModel.compression ?? {}),
+            status: "local-model-manifest-debug-artifact",
+          },
+        },
+        qualityReport,
+      ),
+    );
   }
-  return { manifest, parentModel, children };
+  return {
+    manifest,
+    parentModel: attachQualityReport(parentModel, qualityReport),
+    children,
+    qualityReport,
+  };
 }
 
 function localModelArtifactParentModel(manifest, fileName) {
@@ -1732,6 +1800,22 @@ function findTrainableArtifactEntry(jsonEntries, expectedRoute = "") {
     throw new Error(expectedName
       ? `select trainable kernel artifact file ${expectedName}`
       : "select one trainable kernel artifact JSON file");
+  }
+  return matched;
+}
+
+function findQualityReportEntry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter(
+    (entry) => entry.json?.schema === "objgauss-object-state-quality-report-v1",
+  );
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName) ?? candidates[0]
+    : candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select ObjectState quality report file ${expectedName}`
+      : "select one ObjectState quality report JSON file");
   }
   return matched;
 }
@@ -2378,6 +2462,7 @@ function DebugPanel({
   debugSnapshot,
   hiddenObjects,
   stability,
+  qualityReport,
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectTrainableFrame,
@@ -2534,6 +2619,7 @@ function DebugPanel({
       <DebugSnapshotPanel snapshot={debugSnapshot} />
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
+      <QualityReportPanel report={qualityReport} />
       <TrainingEvidencePanel artifact={selected.trainableArtifact} />
 
       <dl className="debugStateGrid">
@@ -2625,6 +2711,7 @@ function DebugSnapshotPanel({ snapshot }) {
       data-debug-snapshot-slots={snapshot.assignment.slotCount}
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
+      data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
     >
       <div className="stabilityHead">
         <span>Protocol</span>
@@ -2680,6 +2767,44 @@ function TrainingEvidencePanel({ artifact }) {
         <Meta label="iter" value={formatCount(summary.iterations)} />
         <Meta label="renderer" value={summary.rendererName} />
         <Meta label="grad" value={summary.gradientPath} />
+      </dl>
+    </div>
+  );
+}
+
+function QualityReportPanel({ report }) {
+  const summary = report ?? null;
+  if (!summary) return null;
+  return (
+    <div
+      className="stabilityDashboard qualityReport"
+      data-quality-report="true"
+      data-quality-report-status={summary.status}
+      data-quality-report-schema={summary.schema}
+      data-quality-report-assignment-entropy={summary.assignmentEntropy ?? ""}
+      data-quality-report-slot-utilization={summary.slotUtilization ?? ""}
+      data-quality-report-object-purity={summary.objectPurity ?? ""}
+      data-quality-report-temporal-drift={summary.temporalDrift ?? ""}
+      data-quality-report-assignment-jitter={summary.assignmentJitter ?? ""}
+      data-quality-report-bbox-stability={summary.bboxStability ?? ""}
+      data-quality-report-gate-count={summary.gateCount}
+      data-quality-report-failing-gates={summary.failingGates}
+    >
+      <div className="stabilityHead">
+        <span>Quality</span>
+        <strong>{summary.status}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="H" value={formatRatio(summary.assignmentEntropy)} />
+        <Metric label="purity" value={formatRatio(summary.objectPurity)} />
+        <Metric label="drift" value={formatRatio(summary.temporalDrift)} />
+        <Metric label="jitter" value={formatRatio(summary.assignmentJitter)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="schema" value={summary.schema} />
+        <Meta label="gates" value={`${formatCount(summary.passingGates)} / ${formatCount(summary.gateCount)}`} />
+        <Meta label="slot" value={formatRatio(summary.slotUtilization)} />
+        <Meta label="bbox" value={formatRatio(summary.bboxStability)} />
       </dl>
     </div>
   );
@@ -4025,6 +4150,7 @@ function objectStateDebugSnapshot({
   stability,
   assignmentSource,
   trainingEvidence,
+  qualityReport,
   debugEvents,
 }) {
   const objects = selected?.objects ?? [];
@@ -4092,6 +4218,18 @@ function objectStateDebugSnapshot({
           gradientPath: trainingEvidence.gradientPath,
         }
       : null,
+    quality: qualityReport
+      ? {
+          schema: qualityReport.schema,
+          status: qualityReport.status,
+          assignmentEntropy: qualityReport.assignmentEntropy,
+          objectPurity: qualityReport.objectPurity,
+          temporalDrift: qualityReport.temporalDrift,
+          assignmentJitter: qualityReport.assignmentJitter,
+          gateCount: qualityReport.gateCount,
+          failingGates: qualityReport.failingGates,
+        }
+      : null,
     delivery: {
       loadRoute: selected?.delivery?.loadRoute ?? "",
       frameIndex: selected?.delivery?.frameIndex ?? null,
@@ -4156,6 +4294,8 @@ function debugEventDetailLabel(event) {
   if (
     event.type === "import-artifact" ||
     event.type === "import-artifact-error" ||
+    event.type === "import-model-manifest" ||
+    event.type === "import-model-manifest-error" ||
     event.type === "import-ogc" ||
     event.type === "import-ogc-error"
   ) return event.fileName || "local";
@@ -4220,6 +4360,29 @@ function trainableEvidenceSummary(artifact) {
     finalRenderLoss: finiteNumber(final.render_loss),
     finalObjectLoss: finiteNumber(final.object_loss),
     finalTemporalLoss: finiteNumber(final.temporal_loss),
+  };
+}
+
+function qualityReportSummary(report) {
+  if (report?.schema !== "objgauss-object-state-quality-report-v1") return null;
+  const metrics = report.metrics ?? {};
+  const gates = Array.isArray(report.gates) ? report.gates : [];
+  const failingGates = gates.filter((gate) => gate?.status && gate.status !== "pass").length;
+  const passingGates = gates.filter((gate) => gate?.status === "pass").length;
+  return {
+    schema: report.schema,
+    status: report.status ?? (failingGates ? "warn" : "pass"),
+    assignmentEntropy: finiteNumber(metrics.assignment_entropy ?? metrics.mean_entropy),
+    slotUtilization: finiteNumber(metrics.slot_utilization),
+    objectPurity: finiteNumber(metrics.object_purity ?? metrics.mean_purity),
+    temporalDrift: finiteNumber(metrics.temporal_drift ?? metrics.mean_temporal_drift),
+    assignmentJitter: finiteNumber(metrics.assignment_jitter ?? metrics.mean_assignment_jitter),
+    bboxStability: finiteNumber(metrics.bbox_stability ?? metrics.mean_bbox_stability),
+    spatialCompactness: finiteNumber(metrics.spatial_compactness ?? metrics.mean_spatial_compactness),
+    gateCount: gates.length,
+    passingGates,
+    failingGates,
+    path: report.path ?? "",
   };
 }
 

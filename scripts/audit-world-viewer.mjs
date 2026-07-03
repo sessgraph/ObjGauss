@@ -38,6 +38,7 @@ try {
       `urlOgcManifest=${summary.urlOgcManifestStatus}`,
       `algorithmManifest=${summary.algorithmManifestStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
+      `qualityReport=${summary.qualityReportStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
       `localOgc=${summary.localOgcStatus}`,
       `localOgcManifest=${summary.localOgcManifestStatus}`,
@@ -660,6 +661,7 @@ async function auditWorld(url) {
       urlOgcManifestStatus: urlOgcManifest.status,
       algorithmManifestStatus: algorithmManifest.status,
       localModelManifestStatus: localModelManifest.status,
+      qualityReportStatus: algorithmManifest.qualityReportStatus,
       localArtifactStatus: localArtifact.status,
       localOgcStatus: localOgc.status,
       localOgcManifestStatus: localOgcManifest.status,
@@ -1309,6 +1311,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
+      const quality = document.querySelector("[data-quality-report='true']");
+      const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
       const manifestPill = document.querySelector(".modelPill[data-model-row-id='model-artifact-manifest']");
       const trainablePill = document.querySelector(".modelPill[data-model-row-id='model-manifest-trainable-artifact']");
       const ogcPill = document.querySelector(".modelPill[data-model-row-id='model-manifest-ogc-artifact']");
@@ -1322,6 +1326,12 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
         shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        shell?.getAttribute("data-quality-report-status") === "warn" &&
+        shell?.getAttribute("data-quality-report-schema") === "objgauss-object-state-quality-report-v1" &&
+        shell?.getAttribute("data-quality-report-object-purity") === "1" &&
+        quality?.getAttribute("data-quality-report-status") === "warn" &&
+        quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
@@ -1358,6 +1368,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       return (
         shell?.getAttribute("data-selected-model") === "model-manifest-ogc-artifact" &&
         shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
+        shell?.getAttribute("data-quality-report-status") === "warn" &&
         shell?.getAttribute("data-ogc-artifact-index-path") === "/models/ogc-url-fixture/scene.index.json" &&
         shell?.getAttribute("data-ogc-artifact-payload-path") === "/models/ogc-url-fixture/scene.ogc" &&
         shell?.getAttribute("data-ogc-artifact-lod-level") === "1" &&
@@ -1408,7 +1419,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       );
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
-    return { status: "manifest-trainable-ogc-debug-os" };
+    return { status: "manifest-trainable-ogc-debug-os", qualityReportStatus: "warn" };
   } finally {
     await page.close();
   }
@@ -1421,12 +1432,15 @@ async function auditLocalModelManifestBundleImport(browser, url) {
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
       "public/models/algorithm-bundle-fixture/model-artifact.json",
+      "public/models/algorithm-bundle-fixture/quality-report.json",
       "public/models/trainable-mvp-debug/model-artifact.json",
       "public/models/ogc-url-fixture/scene.index.json",
       "public/models/ogc-url-fixture/scene.ogc",
     ]);
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
+      const quality = document.querySelector("[data-quality-report='true']");
+      const snapshot = document.querySelector("[data-debug-snapshot-panel='true']");
       const button = document.querySelector("[data-model-artifact-import-button='true']");
       const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
       const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
@@ -1443,12 +1457,17 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         shell?.getAttribute("data-model-manifest-import-status") === "loaded" &&
         shell?.getAttribute("data-model-manifest-import-model") === "model-local-manifest" &&
         importedFile.includes("model-artifact.json") &&
+        importedFile.includes("quality-report.json") &&
         importedFile.includes("scene.index.json") &&
         importedFile.includes("scene.ogc") &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "local-manifest-file" &&
         shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
         shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
+        shell?.getAttribute("data-quality-report-status") === "warn" &&
+        quality?.getAttribute("data-quality-report-status") === "warn" &&
+        quality?.getAttribute("data-quality-report-gate-count") === "3" &&
+        snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
       );
@@ -1485,6 +1504,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       return (
         shell?.getAttribute("data-selected-model") === "model-local-manifest-ogc-artifact" &&
         shell?.getAttribute("data-ogc-artifact-load-route") === "local-file" &&
+        shell?.getAttribute("data-quality-report-status") === "warn" &&
         shell?.getAttribute("data-ogc-artifact-index-path") === "local://scene.index.json" &&
         shell?.getAttribute("data-ogc-artifact-payload-path") === "local://scene.ogc" &&
         shell?.getAttribute("data-ogc-artifact-lod-level") === "0" &&
@@ -1542,7 +1562,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       );
     }, undefined, { timeout: 15000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-model-manifest.png", fullPage: false });
-    return { status: "local-manifest-trainable-ogc-debug-os" };
+    return { status: "local-manifest-trainable-ogc-debug-os", qualityReportStatus: "warn" };
   } finally {
     await page.close();
   }

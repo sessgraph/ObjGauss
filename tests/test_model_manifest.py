@@ -153,6 +153,35 @@ def test_model_artifact_manifest_allows_browser_ready_trainable_kernel(tmp_path)
     assert validation.browser_ready_artifacts == 1
 
 
+def test_model_artifact_manifest_allows_browser_ready_quality_report(tmp_path):
+    report_path = tmp_path / "quality-report.json"
+    report_path.write_text('{"schema":"objgauss-object-state-quality-report-v1"}', encoding="utf-8")
+    manifest = build_model_artifact_manifest(
+        manifest_id="quality-debug-model-artifacts",
+        asset_id="quality-debug",
+        name="Quality Debug",
+        source={"type": "quality_report_debug_fixture"},
+        license="fixture",
+        artifacts=[
+            build_model_artifact(
+                role="quality_report",
+                path=report_path,
+                format=".json",
+                delivery_tier="browser_edit",
+                compute_hash=True,
+            )
+        ],
+        limitations=["Small ObjectState quality report for Debug OS handoff."],
+    )
+
+    roles = {artifact["role"]: artifact for artifact in manifest["artifacts"]}
+    assert roles["quality_report"]["browser_ready"] is True
+    assert roles["quality_report"]["delivery_tier"] == "browser_edit"
+    validation = validate_model_artifact_manifest(manifest, require_browser_ready=True)
+    assert validation.passed
+    assert validation.browser_ready_artifacts == 1
+
+
 def test_manifest_from_training_output(tmp_path):
     training_manifest = tmp_path / "training-output-manifest.json"
     training_manifest.write_text(

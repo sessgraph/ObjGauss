@@ -488,6 +488,10 @@ button:focus-visible {
   border-color: rgba(127, 241, 215, 0.18);
 }
 
+.qualityReport {
+  border-color: rgba(243, 223, 93, 0.2);
+}
+
 .trainingGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

@@ -300,6 +300,20 @@ Gaussian probe 和 event trace。root shell 新增 `data-model-manifest-import-*
 `localModelManifest=local-manifest-trainable-ogc-debug-os`。该路径只读取浏览器会话中的
 本地文件，不复制 payload 到 `public/`，不提交 ignored `outputs/` 或训练产物。
 
+`QUALITY-REPORT-HANDOFF-001` 已把 Phase 1 “UI + metrics 双系统”继续收敛进同一个
+model manifest handoff：`src/modelArtifactManifest.js` 现在可解析 browser-ready
+`quality_report` artifact；`public/models/algorithm-bundle-fixture/quality-report.json`
+新增小型 `objgauss-object-state-quality-report-v1` fixture，记录 assignment entropy、
+slot utilization、object purity、temporal drift、assignment jitter、bbox stability 和
+quality gates；同目录 `model-artifact.json` 现在同时包含 `trainable_kernel`、
+`compressed_chunked` 和 `quality_report` 三个 browser-ready artifact。`src/App.jsx`
+会在 URL 组合 manifest 和本地组合 package 导入时加载 quality report，并挂到 Train /
+OGC 子模型与父 manifest model；Debug panel 新增 `Quality` 证据面板，root shell 和
+snapshot protocol 暴露 `data-quality-report-*` / `quality` telemetry。
+`scripts/audit-world-viewer.mjs` 现在验证 `qualityReport=warn`，包括 quality schema、
+gate count、object purity 与 snapshot quality 状态。该步骤不生成质量报告、不改 promotion
+policy、不提交训练输出或大资产。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

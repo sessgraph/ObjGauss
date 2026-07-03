@@ -72,6 +72,48 @@
 
 ## Done
 
+### QUALITY-REPORT-HANDOFF-001: Load ObjectState quality reports from model manifests
+
+- 状态: done / quality-report-debug-os-handoff
+- 类型: 标准 PR / metrics evidence handoff + ObjectState Debug OS UI
+- 目标: 让算法产物 manifest 除了训练证据和 OGC browser artifact 之外，还能携带
+  browser-ready `quality_report` JSON，使 Phase 1 Debug OS 同时显示 UI 证据和指标证据。
+- 已实施:
+  - `src/modelArtifactManifest.js` 新增 `qualityReport` route resolution；
+    `browserReadyArtifact(..., "quality_report")` 现在可返回 browser-ready quality report
+    artifact。
+  - `public/models/algorithm-bundle-fixture/quality-report.json` 新增小型
+    `objgauss-object-state-quality-report-v1` fixture，记录 assignment entropy、slot
+    utilization、object purity、temporal drift、assignment jitter、bbox stability 和 gates。
+  - `public/models/algorithm-bundle-fixture/model-artifact.json` 新增 `quality_report`
+    artifact，继续只引用小型 fixture，不提交训练输出或大资产。
+  - `src/App.jsx` 在 URL 组合 manifest 和本地组合 package 导入时加载 quality report，
+    并挂到 `Manifest Train` / `Manifest OGC`、`Local Train` / `Local OGC` 以及父
+    manifest model。
+  - Debug panel 新增 `Quality` 证据面板；root shell 和 snapshot protocol 新增
+    `data-quality-report-*` / `quality` telemetry。
+  - `scripts/audit-world-viewer.mjs` 现在验证 URL 和本地组合 manifest 的 quality report
+    状态、schema、gate count、object purity，以及 snapshot 中的 quality 状态。
+  - `tests/test_model_manifest.py` 增加 browser-ready `quality_report` contract 测试。
+- 边界:
+  - 不改变训练 loop，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001`
+    blocker。
+  - 不改变 OGC payload record format、chunk index schema、decoder 或 existing manifest
+    validator 语义；`quality_report` 使用既有 artifact role / browser_edit tier。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+  - 不实现质量报告生成器、promotion policy 改写、远程缓存或 WebGPU decoder。
+- 验证:
+  - `uv run python -c "... validate_model_artifact_manifest ..."`: algorithm bundle fixture
+    passed，`artifact_count=3`、`browser_ready_artifacts=3`。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `uv run --extra dev pytest`: 138 passed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `qualityReport=warn`、`algorithmManifest=manifest-trainable-ogc-debug-os` 和
+    `localModelManifest=local-manifest-trainable-ogc-debug-os`。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### LOCAL-MODEL-MANIFEST-BUNDLE-001: Import local combined model artifact packages
 
 - 状态: done / local-model-manifest-debug-os-bundle
