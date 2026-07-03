@@ -314,6 +314,16 @@ snapshot protocol 暴露 `data-quality-report-*` / `quality` telemetry。
 gate count、object purity 与 snapshot quality 状态。该步骤不生成质量报告、不改 promotion
 policy、不提交训练输出或大资产。
 
+`DEBUG-SNAPSHOT-EXPORT-001` 已把 Phase 1 Debug OS 的 snapshot protocol 做成可导出的
+browser handoff：`src/App.jsx` 的 `Protocol` 面板新增 `JSON` 导出按钮，导出内容保持
+top-level `objgauss-object-state-debug-snapshot-v1` / `object-state-debug-os-v1` 协议，
+并附带 `objgauss-debug-snapshot-export-v1` export metadata。root shell 新增
+`data-debug-snapshot-export-*` telemetry，浏览器会话中也保留
+`window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT__` 与 JSON 文本，便于 audit / 人工复查。
+`scripts/audit-world-viewer.mjs` 现在在组合算法 manifest 场景中点击导出，验证导出的
+model、quality status、chunk scope、schema 和 `export-snapshot` event trace。该步骤
+不训练模型、不写训练输出、不复制 OGC payload 或 ignored `outputs/` 到仓库。
+
 `OGC-RANGE-LOADER-001` 已完成 browser delivery 的 byte-range chunk loader：
 `src/ogcDecoder.js` 新增 `quantizedOgcReadWindows(...)` 和
 `decodeQuantizedOgcPayloadWindows(...)`，让前端可以从同一个 chunk / LOD window

@@ -37,6 +37,7 @@ try {
       `urlOgc=${summary.urlOgcStatus}`,
       `urlOgcManifest=${summary.urlOgcManifestStatus}`,
       `algorithmManifest=${summary.algorithmManifestStatus}`,
+      `debugSnapshotExport=${summary.debugSnapshotExportStatus}`,
       `localModelManifest=${summary.localModelManifestStatus}`,
       `qualityReport=${summary.qualityReportStatus}`,
       `localArtifact=${summary.localArtifactStatus}`,
@@ -660,6 +661,7 @@ async function auditWorld(url) {
       urlOgcStatus: urlOgc.status,
       urlOgcManifestStatus: urlOgcManifest.status,
       algorithmManifestStatus: algorithmManifest.status,
+      debugSnapshotExportStatus: algorithmManifest.snapshotExportStatus,
       localModelManifestStatus: localModelManifest.status,
       qualityReportStatus: algorithmManifest.qualityReportStatus,
       localArtifactStatus: localArtifact.status,
@@ -1418,8 +1420,56 @@ async function auditAlgorithmManifestBundle(browser, url) {
         types.has("ogc-chunks")
       );
     }, undefined, { timeout: 15000 });
+    await page.locator("[data-debug-snapshot-export-button='true']").click();
+    const snapshotExportHandle = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-debug-snapshot-panel='true']");
+      const button = document.querySelector("[data-debug-snapshot-export-button='true']");
+      const exported = window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT__;
+      const text = window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT_TEXT__;
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      let parsed = null;
+      if (typeof text === "string") {
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = null;
+        }
+      }
+      const fileName = shell?.getAttribute("data-debug-snapshot-export-file") ?? "";
+      const hasExportEvent = events.some((event) => event.type === "export-snapshot");
+      if (
+        shell?.getAttribute("data-debug-snapshot-export-status") !== "exported" ||
+        panel?.getAttribute("data-debug-snapshot-export-status") !== "exported" ||
+        button?.getAttribute("data-export-status") !== "exported" ||
+        shell?.getAttribute("data-debug-snapshot-export-schema") !== "objgauss-object-state-debug-snapshot-v1" ||
+        exported?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
+        parsed?.schema !== "objgauss-object-state-debug-snapshot-v1" ||
+        parsed?.protocol !== "object-state-debug-os-v1" ||
+        parsed?.export?.schema !== "objgauss-debug-snapshot-export-v1" ||
+        parsed?.model?.id !== "model-manifest-ogc-artifact" ||
+        parsed?.quality?.status !== "warn" ||
+        parsed?.delivery?.chunkIds?.[0] !== 0 ||
+        !fileName.endsWith(".json") ||
+        !parsed?.export?.fileName ||
+        !hasExportEvent
+      ) {
+        return null;
+      }
+      return {
+        status: shell.getAttribute("data-debug-snapshot-export-status"),
+        schema: parsed.schema,
+        fileName,
+        eventCount: events.length,
+      };
+    }, undefined, { timeout: 15000 });
+    const snapshotExport = await snapshotExportHandle.jsonValue();
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-algorithm-manifest.png", fullPage: false });
-    return { status: "manifest-trainable-ogc-debug-os", qualityReportStatus: "warn" };
+    return {
+      status: "manifest-trainable-ogc-debug-os",
+      qualityReportStatus: "warn",
+      snapshotExportStatus: snapshotExport.status,
+    };
   } finally {
     await page.close();
   }

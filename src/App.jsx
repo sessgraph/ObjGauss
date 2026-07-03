@@ -65,6 +65,12 @@ export default function App() {
     fileName: "",
     error: "",
   }));
+  const [snapshotExport, setSnapshotExport] = useState(() => ({
+    status: "idle",
+    fileName: "",
+    schema: "",
+    error: "",
+  }));
   const modelList = useMemo(() => Object.values(models), [models]);
   const summary = useMemo(() => catalogSummary(modelList), [modelList]);
   const loadedCount = useMemo(
@@ -156,6 +162,76 @@ export default function App() {
     setDebugEvents((current) => [event, ...current].slice(0, DEBUG_EVENT_LIMIT));
     return event;
   }, []);
+
+  const exportDebugSnapshot = useCallback(() => {
+    if (!selectedDebugSnapshot) {
+      setSnapshotExport({
+        status: "error",
+        fileName: "",
+        schema: "",
+        error: "debug snapshot unavailable",
+      });
+      return;
+    }
+    const fileName = debugSnapshotExportFileName(selectedDebugSnapshot);
+    try {
+      const exportedSnapshot = {
+        ...selectedDebugSnapshot,
+        export: {
+          schema: "objgauss-debug-snapshot-export-v1",
+          fileName,
+          generatedBy: "objgauss-world-viewer",
+          generatedAt: new Date().toISOString(),
+        },
+      };
+      const text = `${JSON.stringify(exportedSnapshot, null, 2)}\n`;
+      if (typeof window !== "undefined") {
+        window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT__ = exportedSnapshot;
+        window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT_TEXT__ = text;
+      }
+      if (typeof document !== "undefined" && typeof URL !== "undefined" && typeof Blob !== "undefined") {
+        const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setSnapshotExport({
+        status: "exported",
+        fileName,
+        schema: exportedSnapshot.schema,
+        error: "",
+      });
+      recordDebugEvent("export-snapshot", {
+        modelId: selectedDebugSnapshot.model.id,
+        objectId: selectedDebugSnapshot.selection.objectId,
+        selectionId: selectedDebugSnapshot.selection.selectionId,
+        gaussianIndex: selectedDebugSnapshot.selection.gaussianIndex,
+        fileName,
+        source: "debug-panel",
+      });
+    } catch (error) {
+      const message = error?.message ?? "debug snapshot export failed";
+      setSnapshotExport({
+        status: "error",
+        fileName,
+        schema: selectedDebugSnapshot.schema ?? "",
+        error: message,
+      });
+      recordDebugEvent("export-snapshot-error", {
+        modelId: selectedDebugSnapshot.model.id,
+        objectId: selectedDebugSnapshot.selection.objectId,
+        selectionId: selectedDebugSnapshot.selection.selectionId,
+        gaussianIndex: selectedDebugSnapshot.selection.gaussianIndex,
+        fileName,
+        source: "debug-panel",
+      });
+    }
+  }, [recordDebugEvent, selectedDebugSnapshot]);
 
   const patchModel = useCallback((id, patch) => {
     setModels((current) => {
@@ -878,6 +954,10 @@ export default function App() {
       data-debug-snapshot-assignment-slots={selectedDebugSnapshot.assignment.slotCount}
       data-debug-snapshot-stability={selectedDebugSnapshot.stability.status}
       data-debug-snapshot-training-status={selectedDebugSnapshot.training?.status ?? ""}
+      data-debug-snapshot-export-status={snapshotExport.status}
+      data-debug-snapshot-export-file={snapshotExport.fileName}
+      data-debug-snapshot-export-schema={snapshotExport.schema}
+      data-debug-snapshot-export-error={snapshotExport.error}
       data-debug-event-count={debugEvents.length}
       data-debug-event-last={debugEvents[0]?.type ?? ""}
       data-debug-event-schema={debugEvents[0]?.schema ?? ""}
@@ -1121,6 +1201,7 @@ export default function App() {
         debugLens={debugLens}
         debugEvents={debugEvents}
         debugSnapshot={selectedDebugSnapshot}
+        snapshotExport={snapshotExport}
         hiddenObjects={hiddenObjects}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
@@ -1129,6 +1210,7 @@ export default function App() {
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
+        onExportDebugSnapshot={exportDebugSnapshot}
       />
 
       <div className="glassHud bottomStatus">
@@ -2460,6 +2542,7 @@ function DebugPanel({
   debugLens,
   debugEvents,
   debugSnapshot,
+  snapshotExport,
   hiddenObjects,
   stability,
   qualityReport,
@@ -2468,6 +2551,7 @@ function DebugPanel({
   onSelectTrainableFrame,
   onSelectOgcLod,
   onSelectOgcChunks,
+  onExportDebugSnapshot,
 }) {
   if (!selected) return null;
   const objects = selected.objects ?? [];
@@ -2616,7 +2700,11 @@ function DebugPanel({
       ) : null}
 
       <AssignmentHeatmap assignment={assignment} selectedObject={selectedObject} debugProbe={debugProbe} />
-      <DebugSnapshotPanel snapshot={debugSnapshot} />
+      <DebugSnapshotPanel
+        snapshot={debugSnapshot}
+        snapshotExport={snapshotExport}
+        onExportDebugSnapshot={onExportDebugSnapshot}
+      />
       <DebugEventTracePanel events={debugEvents} />
       <StabilityDashboard stability={stability} />
       <QualityReportPanel report={qualityReport} />
@@ -2696,7 +2784,7 @@ function DebugEventTracePanel({ events }) {
   );
 }
 
-function DebugSnapshotPanel({ snapshot }) {
+function DebugSnapshotPanel({ snapshot, snapshotExport, onExportDebugSnapshot }) {
   if (!snapshot) return null;
   return (
     <div
@@ -2712,10 +2800,23 @@ function DebugSnapshotPanel({ snapshot }) {
       data-debug-snapshot-stability={snapshot.stability.status}
       data-debug-snapshot-training-status={snapshot.training?.status ?? ""}
       data-debug-snapshot-quality-status={snapshot.quality?.status ?? ""}
+      data-debug-snapshot-export-status={snapshotExport?.status ?? "idle"}
+      data-debug-snapshot-export-file={snapshotExport?.fileName ?? ""}
+      data-debug-snapshot-export-schema={snapshotExport?.schema ?? ""}
     >
       <div className="stabilityHead">
         <span>Protocol</span>
-        <strong>snapshot-v1</strong>
+        <div className="snapshotActions">
+          <strong>snapshot-v1</strong>
+          <button
+            type="button"
+            data-debug-snapshot-export-button="true"
+            data-export-status={snapshotExport?.status ?? "idle"}
+            onClick={() => onExportDebugSnapshot?.()}
+          >
+            JSON
+          </button>
+        </div>
       </div>
       <dl className="stabilityMeta snapshotMeta">
         <Meta label="model" value={snapshot.model.id} />
@@ -2724,6 +2825,7 @@ function DebugSnapshotPanel({ snapshot }) {
         <Meta label="slots" value={formatCount(snapshot.assignment.slotCount)} />
         <Meta label="source" value={snapshot.assignment.source} />
         <Meta label="state" value={snapshot.stability.status} />
+        <Meta label="export" value={snapshotExport?.fileName || snapshotExport?.status || "idle"} />
       </dl>
     </div>
   );
@@ -4297,10 +4399,30 @@ function debugEventDetailLabel(event) {
     event.type === "import-model-manifest" ||
     event.type === "import-model-manifest-error" ||
     event.type === "import-ogc" ||
-    event.type === "import-ogc-error"
+    event.type === "import-ogc-error" ||
+    event.type === "export-snapshot" ||
+    event.type === "export-snapshot-error"
   ) return event.fileName || "local";
   if (event.objectId !== null && event.objectId !== undefined) return `#${event.objectId}`;
   return event.modelId || event.source || "-";
+}
+
+function debugSnapshotExportFileName(snapshot) {
+  const model = sanitizeFileSegment(snapshot?.model?.id || "model");
+  const object = sanitizeFileSegment(snapshot?.selection?.objectId ?? "scene");
+  const gaussian = snapshot?.selection?.gaussianIndex === null || snapshot?.selection?.gaussianIndex === undefined
+    ? "g-none"
+    : `g-${sanitizeFileSegment(snapshot.selection.gaussianIndex)}`;
+  return `objgauss-debug-snapshot-${model}-object-${object}-${gaussian}.json`;
+}
+
+function sanitizeFileSegment(value) {
+  const segment = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return segment || "unknown";
 }
 
 function compactAssignmentVector(assignment) {

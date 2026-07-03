@@ -72,6 +72,41 @@
 
 ## Done
 
+### DEBUG-SNAPSHOT-EXPORT-001: Export ObjectState Debug snapshots from viewer
+
+- 状态: done / debug-snapshot-json-export
+- 类型: 标准 PR / ObjectState Debug OS browser handoff
+- 目标: 将当前隐藏在 `window.__OBJGAUSS_DEBUG_SNAPSHOT__` 的 Phase 1 Debug OS snapshot
+  变成可由 UI 导出的 JSON handoff，用于像 profiler trace 一样归档 ObjectState /
+  assignment / delivery / training / quality 证据。
+- 已实施:
+  - `src/App.jsx` 在 `Protocol` 面板新增 `JSON` 导出按钮，导出内容保留
+    `objgauss-object-state-debug-snapshot-v1` / `object-state-debug-os-v1` top-level
+    协议，并附带 `objgauss-debug-snapshot-export-v1` export metadata。
+  - 导出文件名按当前 model / object / gaussian 生成，浏览器下载本地 JSON，不写入仓库、
+    `public/`、ignored `outputs/` 或训练目录。
+  - root shell 与 snapshot panel 新增 `data-debug-snapshot-export-*` telemetry；
+    浏览器会话中保留 `window.__OBJGAUSS_LAST_EXPORTED_DEBUG_SNAPSHOT__` 和 JSON 文本，
+    便于 Playwright / 人工复查。
+  - `scripts/audit-world-viewer.mjs` 在组合 algorithm manifest 场景中点击导出，
+    验证导出 schema、model id、quality status、chunk scope、文件名和
+    `export-snapshot` event trace。
+- 边界:
+  - 不改变 `objectStateDebugSnapshot(...)` 的核心 contract，不新增后端 manifest schema。
+  - 不训练模型，不安装 torch / gsplat / CUDA，不改变 `TRAIN-GSPLAT-MVP-001` blocker。
+  - 不改变 OGC payload、chunk index、decoder、renderer 或 quality report 生成逻辑。
+  - 不提交 checkpoint、rendered image、ignored `outputs/` 产物或大资产。
+- 验证:
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `npm run audit:world-viewer`: sandbox local port fetch failed；提权重跑 passed。输出包含
+    `debugSnapshotExport=exported`、`algorithmManifest=manifest-trainable-ogc-debug-os` 和
+    `qualityReport=warn`；截图 `/tmp/objgauss-world-viewer-algorithm-manifest.png`
+    显示 `Protocol` 面板的 `JSON` 导出按钮和导出文件名。
+    Browser plugin not available；使用常规 Playwright / repo audit fallback。
+  - `uv run --extra dev pytest`: 138 passed。
+  - `git diff --check`: passed。
+- 完成 commit: this commit
+
 ### QUALITY-REPORT-HANDOFF-001: Load ObjectState quality reports from model manifests
 
 - 状态: done / quality-report-debug-os-handoff
