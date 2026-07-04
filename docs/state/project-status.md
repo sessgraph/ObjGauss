@@ -309,6 +309,20 @@ scale-only path / freeze controls / checkpoint / TensorBoard / eval gate 可用�
 renderer thaw 路线已足够证明管线可运行，下一步应回到 object assignment 主线，进入
 `ASSIGNMENT-SOLVER-V2-CONTRACT-001`。
 
+随后完成 `ASSIGNMENT-SOLVER-V2-CONTRACT-001`：新增
+`docs/architecture/assignment-solver-v2-contract.md`，将下一代 Object Emergence Solver
+冻结为显式 cost-softmax assignment system：
+`Evidence[N] -> C[N,K] -> A[N,K] -> ObjectState[K]`。v2 首个 contract 使用
+`AssignmentEvidenceBatch`，state 包含 `feature_centers`、`position_centers` 和
+`slot_bias`，prediction 输出 `assignment`、`slot_mass`、`confidence`、
+`mean_normalized_entropy`、`effective_slots` 和 diagnostics。首个 v2 cost 只启用
+feature / position / slot bias；mask、temporal、matching、Sinkhorn / OT 和 dynamic-K 均延后。
+loss family 被定义为
+`L_cluster + L_entropy + L_balance + L_temporal + L_matching + optional supervised CE`，
+首个 MVP 只允许 cluster / entropy / balance / optional supervised CE。v1 checkpoint 不自动升级；
+后续只能通过 explicit adapter 迁移。下一步进入 `OBJECT-LOSS-V2-001`，先把 object loss 拆成
+可独立测试的 loss helper，再实现新的 solver state。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

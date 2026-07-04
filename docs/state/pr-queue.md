@@ -15,25 +15,23 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱。下一步回到 object assignment 主线，进入 `ASSIGNMENT-SOLVER-V2-CONTRACT-001`。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract。下一步进入 `OBJECT-LOSS-V2-001`。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### ASSIGNMENT-SOLVER-V2-CONTRACT-001: Define next assignment solver contract
+### OBJECT-LOSS-V2-001: Split assignment objective into explicit loss families
 
 - 状态: ready
 - 类型: 标准 PR / algorithm model contract
-- 目标: 冻结下一代 Object Emergence / Assignment Solver 的接口、状态、checkpoint、
-  metrics 和训练边界，作为后续 `OBJECT-LOSS-V2-001` 与 `TRAIN-ASSIGNMENT-MVP-001`
-  的事实源。
-- 背景: renderer thaw 路线已经补齐到 scale-only smoke，但 opacity / scale 都只能带来很弱的
-  image loss 改善；下一步应回到真正算法主线，把当前 linear softmax solver 的升级方向从
-  “继续调参”收敛为可执行 contract。
-- 验收: 文档明确 v1 solver 的保留/替换边界、v2 solver 输入输出、assignment matrix contract、
-  checkpoint schema 影响、metrics、non-goals 和迁移顺序；不引入训练代码或新依赖。
-- 边界: docs-only contract；不启动 GPU 训练；不修改 renderer / CLI；不做 dynamic-K birth /
-  merge / split；不引入 SAM / CLIP / CoTracker / Mamba / diffusion 默认依赖。
+- 目标: 按 `docs/architecture/assignment-solver-v2-contract.md` 将 object loss 正式拆成
+  `L_cluster + L_entropy + L_balance + L_temporal + L_matching + optional supervised CE`
+  的可执行接口和 summary 字段。
+- 背景: v2 solver contract 已将 solver 定义为 cost-softmax assignment system；下一步需要先把
+  loss family 从当前混合 object loss 中拆清楚，再实现新的 solver state。
+- 验收: 新增或重构 loss helper，使 cluster / entropy / balance 至少可独立计算和测试；
+  temporal / matching 可先作为 disabled summary 字段；现有 solver / joint training 默认行为保持兼容。
+- 边界: 不启动 GPU 训练；不改 renderer thaw；不引入 dynamic-K；不引入重型 perception 依赖。
 
 ## Suspended
 
@@ -92,6 +90,40 @@
 当前无进行中 PR。
 
 ## Done
+
+### ASSIGNMENT-SOLVER-V2-CONTRACT-001: Define next assignment solver contract
+
+- 状态: done / assignment-solver-v2-contract
+- 类型: 标准 PR / algorithm model contract
+- 目标: 冻结下一代 Object Emergence / Assignment Solver 的接口、状态、checkpoint、
+  metrics 和训练边界，作为后续 `OBJECT-LOSS-V2-001` 与 `TRAIN-ASSIGNMENT-MVP-001`
+  的事实源。
+- 已实施:
+  - 新增 `docs/architecture/assignment-solver-v2-contract.md`。
+  - 明确 v2 不改变 kernel 主链路：
+    `Evidence[N] -> C[N,K] -> A[N,K] -> ObjectState[K]`。
+  - 将 v2 solver 冻结为首个 `cost-softmax-assignment-v2` contract，输入为
+    `AssignmentEvidenceBatch`，state 包含 `feature_centers`、`position_centers` 和
+    `slot_bias`，prediction 输出 `assignment`、`slot_mass`、`confidence`、
+    `mean_normalized_entropy` 和 diagnostics。
+  - 明确首个 v2 cost 只启用 feature / position / slot bias；mask、temporal、matching 和
+    Sinkhorn / OT 均延后。
+  - 明确 loss family:
+    `L_cluster + L_entropy + L_balance + L_temporal + L_matching + optional supervised CE`，
+    首个 v2 MVP 只启用 cluster / entropy / balance / optional supervised CE。
+  - 明确 checkpoint / migration：v1 checkpoint 不自动升级，只允许 explicit adapter。
+  - 明确后续顺序:
+    `OBJECT-LOSS-V2-001 -> ASSIGNMENT-FRAMES-EVIDENCE-001 ->
+    TRAIN-ASSIGNMENT-MVP-001 -> EVAL-ASSIGNMENT-STABILITY-001 ->
+    ASSIGNMENT-RENDER-JOINT-001 -> DYNAMIC-K-PROPOSAL-001`。
+- 边界:
+  - docs-only contract，不改训练代码。
+  - 不启动 GPU 训练，不提交 `outputs/` 或 `/tmp` 产物。
+  - 不引入 dynamic-K、Slot Attention、SAM / CLIP / CoTracker、Mamba、diffusion 或
+    transformer world model 依赖。
+- 验证:
+  - `git diff --check`: passed。
+- 完成 commit: pending
 
 ### TRAIN-RUN-006-SCALE-SMOKE: Controlled scale-only GPU smoke
 
