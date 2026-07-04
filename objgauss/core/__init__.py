@@ -114,6 +114,10 @@ _EXPORTS = {
         "objgauss.core.training_scale",
         "TRAINING_SCALE_PLAN_SCHEMA",
     ),
+    "TENSORBOARD_SCALAR_EXPORT_SCHEMA": (
+        "objgauss.core.training_tensorboard",
+        "TENSORBOARD_SCALAR_EXPORT_SCHEMA",
+    ),
     "RendererLossBoundaryReport": ("objgauss.core.renderer_loss", "RendererLossBoundaryReport"),
     "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
@@ -313,6 +317,10 @@ _EXPORTS = {
     "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
     "write_ply": ("objgauss.core.io", "write_ply"),
+    "write_solver_decoder_tensorboard_events": (
+        "objgauss.core.training_tensorboard",
+        "write_solver_decoder_tensorboard_events",
+    ),
     "write_object_state_stability_benchmark": (
         "objgauss.core.object_state_benchmark",
         "write_object_state_stability_benchmark",

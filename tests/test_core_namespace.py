@@ -24,6 +24,7 @@ from objgauss.core import (
     TrainableKernelImageTarget,
     TrainableKernelResult,
     TrainableKernelSample,
+    TENSORBOARD_SCALAR_EXPORT_SCHEMA,
     TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
     append_or_replace_property,
@@ -83,6 +84,7 @@ from objgauss.core import (
     write_ogc_payload,
     write_ply,
     write_quantized_ogc_payload,
+    write_solver_decoder_tensorboard_events,
     write_trainable_kernel_model_artifact,
     solver_decoder_joint_checkpoint,
     solver_decoder_joint_states_from_dict,
@@ -329,6 +331,8 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     )
     assert scale_plan["schema"] == TRAINING_SCALE_PLAN_SCHEMA
     assert validate_solver_decoder_training_scale_plan(scale_plan) == scale_plan
+    assert TENSORBOARD_SCALAR_EXPORT_SCHEMA == "objgauss-tensorboard-scalar-export-v1"
+    assert write_solver_decoder_tensorboard_events is not None
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],

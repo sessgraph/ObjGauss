@@ -100,6 +100,7 @@ from objgauss.core.solver_decoder_training import (
 )
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_scale import solver_decoder_training_scale_plan
+from objgauss.core.training_tensorboard import write_solver_decoder_tensorboard_events
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1395,6 +1396,8 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         raise ValueError("--resume-checkpoint cannot be combined with --solver-checkpoint")
     if args.checkpoint_every and not args.run_output_dir:
         raise ValueError("--checkpoint-every requires --run-output-dir")
+    if args.tensorboard_logdir and not args.run_output_dir:
+        raise ValueError("--tensorboard-logdir requires --run-output-dir")
     record_every = _solver_decoder_record_every(args)
     cloud = read_ply(args.input)
     sample = trainable_kernel_sample_from_cloud(
@@ -1467,6 +1470,9 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         print(f"training_scale_segments={summary['training_scale']['segment_count']}")
         print(f"training_scale_total_iterations={summary['training_scale']['total_iterations']}")
         print(f"training_scale_checkpoint_every={summary['training_scale']['checkpoint_every']}")
+    if "tensorboard" in summary:
+        print(f"tensorboard_logdir={summary['tensorboard']['logdir']}")
+        print(f"tensorboard_scalar_count={summary['tensorboard']['scalar_count']}")
     print(f"image_renderer={summary['image_renderer']}")
     print(f"gaussian_scale={summary['gaussian_policy']['default_scale']}")
     print(f"gaussian_opacity={summary['gaussian_policy']['default_opacity']}")
@@ -1665,12 +1671,19 @@ def _run_solver_decoder_scaled(
         segment_records.append(
             {
                 "segment_id": segment["segment_id"],
+                "start_iteration": segment["start_iteration"],
+                "end_iteration": segment["end_iteration"],
+                "iterations": segment["iterations"],
                 "summary_path": segment["summary_path"],
                 "checkpoint_path": segment["checkpoint_path"],
                 "initial_total_loss": result.initial_loss.total_loss,
                 "final_total_loss": result.final_loss.total_loss,
                 "initial_image_render_loss": result.initial_loss.image_render_loss,
                 "final_image_render_loss": result.final_loss.image_render_loss,
+                "initial_object_loss": result.initial_loss.object_loss,
+                "final_object_loss": result.final_loss.object_loss,
+                "final_entropy_loss": result.final_loss.entropy_loss,
+                "final_balance_loss": result.final_loss.balance_loss,
             }
         )
         first_result = first_result or result
@@ -1706,6 +1719,11 @@ def _run_solver_decoder_scaled(
         "segments": segment_records,
     }
     final_summary["run_loss"] = run_loss
+    if args.tensorboard_logdir:
+        final_summary["tensorboard"] = write_solver_decoder_tensorboard_events(
+            final_summary,
+            args.tensorboard_logdir,
+        )
     boundary = renderer_loss_boundary_report(final_checkpoint).as_dict()
     write_json(Path(plan["outputs"]["final_summary"]), final_summary)
     write_json(Path(plan["outputs"]["final_checkpoint"]), final_checkpoint)
@@ -2910,6 +2928,7 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--loss-log-every", type=int)
     solver_decoder_mvp.add_argument("--checkpoint-every", type=int)
     solver_decoder_mvp.add_argument("--run-output-dir", type=Path)
+    solver_decoder_mvp.add_argument("--tensorboard-logdir", type=Path)
     solver_decoder_mvp.add_argument("--vram-reserve-gb", type=int, default=1)
     solver_decoder_mvp.add_argument("--summary-output", type=Path)
     solver_decoder_mvp.add_argument("--checkpoint-output", type=Path)

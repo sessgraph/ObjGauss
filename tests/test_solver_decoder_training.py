@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -20,6 +21,10 @@ from objgauss.core.training_scale import (
     TRAINING_SCALE_PLAN_SCHEMA,
     solver_decoder_training_scale_plan,
     validate_solver_decoder_training_scale_plan,
+)
+from objgauss.core.training_tensorboard import (
+    TENSORBOARD_SCALAR_EXPORT_SCHEMA,
+    write_solver_decoder_tensorboard_events,
 )
 from objgauss.ply import write_ply
 
@@ -333,6 +338,120 @@ def test_solver_decoder_mvp_cli_writes_scaled_run_outputs(tmp_path, capsys):
     assert segment_checkpoint.exists()
 
 
+def test_solver_decoder_tensorboard_export_writes_scalar_tags(tmp_path):
+    writer = _FakeTensorBoardWriter(tmp_path / "tb")
+    summary = {
+        "training_scale": {
+            "total_iterations": 4,
+            "segments": [
+                {
+                    "start_iteration": 0,
+                    "end_iteration": 2,
+                    "initial_total_loss": 0.4,
+                    "final_total_loss": 0.3,
+                    "initial_image_render_loss": 0.2,
+                    "final_image_render_loss": 0.15,
+                    "initial_object_loss": 1.0,
+                    "final_object_loss": 0.9,
+                    "final_entropy_loss": 0.8,
+                    "final_balance_loss": 0.01,
+                },
+                {
+                    "start_iteration": 2,
+                    "end_iteration": 4,
+                    "initial_total_loss": 0.3,
+                    "final_total_loss": 0.25,
+                    "initial_image_render_loss": 0.15,
+                    "final_image_render_loss": 0.12,
+                    "initial_object_loss": 0.9,
+                    "final_object_loss": 0.85,
+                    "final_entropy_loss": 0.7,
+                    "final_balance_loss": 0.02,
+                },
+            ],
+        },
+        "run_loss": {"final_total_loss": 0.25},
+    }
+
+    export = write_solver_decoder_tensorboard_events(
+        summary,
+        tmp_path / "tb",
+        writer_factory=lambda _logdir: writer,
+    )
+
+    assert export["schema"] == TENSORBOARD_SCALAR_EXPORT_SCHEMA
+    assert export["segment_count"] == 2
+    assert export["scalar_count"] == len(writer.scalars)
+    assert ("loss/total", 0.4, 0) in writer.scalars
+    assert ("loss/total", 0.25, 4) in writer.scalars
+    assert ("loss/image_render", 0.12, 4) in writer.scalars
+    assert ("loss/object", 0.85, 4) in writer.scalars
+    assert ("loss/entropy", 0.7, 4) in writer.scalars
+    assert ("run/final_total_loss", 0.25, 4) in writer.scalars
+    assert writer.flushed is True
+    assert writer.closed is True
+
+
+def test_solver_decoder_mvp_cli_writes_tensorboard_metadata(tmp_path, capsys, monkeypatch):
+    input_path = tmp_path / "objects.ply"
+    run_dir = tmp_path / "scaled-run"
+    tensorboard_logdir = run_dir / "tensorboard"
+    write_ply(input_path, _object_cloud(), fmt="ascii")
+
+    def fake_export(summary, logdir):
+        assert summary["training_scale"]["segment_count"] == 2
+        Path(logdir).mkdir(parents=True, exist_ok=True)
+        (Path(logdir) / "events.out.tfevents.fake").write_text("fake\n", encoding="utf-8")
+        return {
+            "schema": TENSORBOARD_SCALAR_EXPORT_SCHEMA,
+            "kind": "solver_decoder_tensorboard_scalars",
+            "logdir": str(logdir),
+            "segment_count": 2,
+            "scalar_count": 12,
+            "tags": ["loss/total"],
+        }
+
+    monkeypatch.setattr("objgauss.cli.write_solver_decoder_tensorboard_events", fake_export)
+    status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "4",
+            "--checkpoint-every",
+            "2",
+            "--loss-log-every",
+            "1",
+            "--solver-learning-rate",
+            "0.08",
+            "--decoder-learning-rate",
+            "0.6",
+            "--object-weight",
+            "0.2",
+            "--run-output-dir",
+            str(run_dir),
+            "--tensorboard-logdir",
+            str(tensorboard_logdir),
+        ]
+    )
+
+    stdout = capsys.readouterr().out
+    final_summary = json.loads((run_dir / "final-summary.json").read_text(encoding="utf-8"))
+    assert status == 0
+    assert f"tensorboard_logdir={tensorboard_logdir}" in stdout
+    assert "tensorboard_scalar_count=12" in stdout
+    assert final_summary["tensorboard"]["schema"] == TENSORBOARD_SCALAR_EXPORT_SCHEMA
+    assert final_summary["tensorboard"]["logdir"] == str(tensorboard_logdir)
+    assert (tensorboard_logdir / "events.out.tfevents.fake").exists()
+
+
 def _object_cloud() -> GaussianCloud:
     vertices = np.zeros(
         6,
@@ -371,3 +490,20 @@ def _object_cloud() -> GaussianCloud:
     vertices["object_id"][:3] = 5
     vertices["object_id"][3:] = 9
     return GaussianCloud(vertices=vertices, source_format="fixture")
+
+
+class _FakeTensorBoardWriter:
+    def __init__(self, logdir):
+        self.logdir = logdir
+        self.scalars = []
+        self.flushed = False
+        self.closed = False
+
+    def add_scalar(self, tag, scalar_value, global_step):
+        self.scalars.append((tag, float(scalar_value), int(global_step)))
+
+    def flush(self):
+        self.flushed = True
+
+    def close(self):
+        self.closed = True
