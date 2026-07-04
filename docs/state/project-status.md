@@ -255,6 +255,22 @@ isotropic scale multiplier；启用时 decode summary 将
 不提交 ignored `outputs/` 产物。下一步是 `TRAIN-DECODER-SCALE-001`：让 CPU / gsplat
 renderer API 暴露 object-level scale gradient，并加显式 `--train-decoder-scale` gate。
 
+随后完成 `TRAIN-DECODER-SCALE-001`：CPU point renderer 和 gsplat training renderer 的
+`TrainingRendererLossResult` 现在暴露 `gradient_decoder_scale_log_offsets`。默认不传
+`decoder_scale_log_offsets` 时仍保持 frozen scale path；显式启用时，CPU point renderer
+使用 object-level scale multiplier 作为最小可微 smoke proxy，gsplat renderer 则通过
+torch autograd 对 differentiable `scales = default_scale * (assignment @ scale_multiplier)`
+回传真实 renderer scale 梯度。`solver-decoder-mvp` 新增 `--train-decoder-scale`、
+`--decoder-scale-learning-rate` 和 `--decoder-scale-init-log-offset`；summary / checkpoint
+会记录 `train_decoder_scale`、`learning_rates.decoder_scale`、`decoder_scale` summary、
+`decoder.object_scale_log_offsets` trained field 和 `base_scales` frozen field。分段 run
+summary 可写 `final_decoder_scale_multiplier_min/mean/max`，TensorBoard writer 可写
+`decoder/scale_multiplier_min`、`decoder/scale_multiplier_mean` 和
+`decoder/scale_multiplier_max`。本切片不启动 run-006 GPU smoke，不提交 ignored
+`outputs/` 或 `/tmp` 产物，不训练 per-Gaussian means / scales / quats / camera /
+dynamic-K。下一步先做 `FIELD-FREEZE-CONTROLS-001`，使 solver / colors / opacity / scale
+可以独立冻结或训练，再进入 `TRAIN-RUN-006-SCALE-SMOKE`，否则 scale smoke 的结果不可解释。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
