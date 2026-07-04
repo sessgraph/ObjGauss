@@ -4553,17 +4553,21 @@ function buildWorldShell(scene) {
     new THREE.MeshBasicMaterial({
       color: "#0c141b",
       transparent: true,
-      opacity: 0.98,
+      opacity: 0.42,
       side: THREE.DoubleSide,
+      depthWrite: false,
     }),
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.01;
+  floor.renderOrder = -30;
   scene.add(floor);
 
   const grid = new THREE.GridHelper(22, 44, "#2a5f6a", "#152932");
   grid.material.transparent = true;
   grid.material.opacity = 0.58;
+  grid.material.depthWrite = false;
+  grid.renderOrder = -20;
   scene.add(grid);
 
   const halo = new THREE.Mesh(
@@ -4573,10 +4577,12 @@ function buildWorldShell(scene) {
       transparent: true,
       opacity: 0.22,
       side: THREE.DoubleSide,
+      depthWrite: false,
     }),
   );
   halo.rotation.x = -Math.PI / 2;
   halo.position.y = 0.02;
+  halo.renderOrder = -10;
   scene.add(halo);
 }
 

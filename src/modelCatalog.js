@@ -193,7 +193,7 @@ export const MODEL_CATALOG = [
     accent: "#88d498",
     displayScale: 2.14,
     pointSize: 0.033,
-    maxDisplayPoints: 36000,
+    maxDisplayPoints: 50000,
     compression: {
       layout: "per-object-corepoint-chunks",
       status: "planned",

@@ -155,6 +155,32 @@
   - `renderer-loss-contract`: passed with no upgrade blockers。
 - 完成 commit: `8b5bef8`
 
+### WORLD-VIEWER-FLOOR-CHAIR-001: Fix floor occlusion and complete chair preview
+
+- 状态: done / viewer-floor-depth-preview
+- 类型: 微改动 / frontend viewer bugfix
+- 目标: 修正 Three.js world viewer 中地面圆盘在低视角下遮挡 floor 附近 / 以下对象的问题，并让
+  Poly Haven chair 这类 50k 小样例完整展示。
+- 已实施:
+  - `buildWorldShell(...)` 中的 floor / grid / halo 改为不写 depth，并设置低 render order，让它们只作为
+    背景参考层，不再像实体平面遮挡对象、框线或 Gaussian 点。
+  - floor opacity 从 `0.98` 降到 `0.42`，保留地面空间感但降低遮挡感。
+  - `polyhaven-chair.maxDisplayPoints` 从 `36,000` 提升到 `50,000`，主世界预览完整加载该小样例。
+- 边界:
+  - 不改 Spark / WebGPU renderer kernel。
+  - 不改变 Near-1M、Plush、Lego 等大样例的抽样 / placeholder 策略。
+  - 不把 full diagnostic PLY 变成默认浏览器 route。
+- 验证:
+  - Playwright + system Chrome baseline / after screenshots: Chair `displayCount=36,000 -> 50,000`，
+    object 4 `5,706 -> 7,919`，world visible Gaussian `113,812 -> 127,812`。
+  - 低视角截图确认 floor 参考层不再遮挡 floor 附近对象和框线。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `npm run audit:world-viewer`: passed，输出截图 `/tmp/objgauss-world-viewer.png` 和
+    `/tmp/objgauss-world-viewer-mobile.png`。
+  - `uv run --extra dev pytest`: 186 passed。
+  - `git diff --check`: passed。
+- 完成 commit: pending / uncommitted
+
 ### TRAIN-DECODER-OPACITY-001: Wire object-level opacity renderer gradient
 
 - 状态: done / decoder-opacity-gradient-gate
