@@ -336,6 +336,19 @@ frame-level perception adapter，也不启用 temporal / matching 优化。下�
 `ASSIGNMENT-FRAMES-EVIDENCE-001`，补 frame / mask / feature 到 `AssignmentEvidenceBatch`
 的最小 adapter contract。
 
+随后完成 `ASSIGNMENT-FRAMES-EVIDENCE-001`：新增 `objgauss/core/assignment_evidence.py`，
+定义 `AssignmentEvidenceBatch` 和 `objgauss-assignment-evidence-batch-v1` schema。该 batch
+承载 `positions`、`features`、`frame_index`、optional `mask_votes`、optional `track_hints`、
+optional `target_assignment` 和 `source`，并提供
+`assignment_evidence_from_trainable_frame(...)`、
+`assignment_evidence_sequence_from_trainable_frames(...)`、
+`assignment_evidence_from_object_emergence(...)`、`validate_assignment_evidence_batch(...)` 和
+`validate_assignment_evidence_summary(...)`。现有 `TrainableKernelFrame` 与
+`ObjectEmergenceEvidence` 可以无损转换到 v2 evidence contract；mask votes / track hints 只是
+optional adapter 字段，不引入 SAM / CLIP / CoTracker 默认依赖。本切片不启动 GPU 训练、不训练
+solver v2、不接 renderer loss、不做 dynamic-K。下一步进入 `TRAIN-ASSIGNMENT-MVP-001`，训练
+fixed-K assignment MVP，只验证 `A[N,K]` 的 assignment/object loss 能下降。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
