@@ -15,14 +15,21 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval。object assignment v2 阶段队列已收口。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth。object assignment v2 阶段队列已收口，下一步进入 stability foundation 场景和诊断。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-当前无 ready PR。object assignment v2 阶段已完成到 dynamic-K proposal-only gate；下一阶段需
-Owner 确认是进入 v2 stability gate / world-model rollout baseline，还是继续扩大真实 perception
-输入。
+### V2-STABILITY-SCENARIO-002: Expand synthetic stability scenarios
+
+- 状态: ready
+- 类型: 标准 PR / algorithm model evaluation
+- 目标: 基于 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，扩展
+  cross-view、occlusion recovery、perturbation 和 adversarial swap 的 scenario fixtures。
+- 输出: 每类 scenario 都必须保留 oracle identity labels、expected slots、visible/occluded
+  transitions 和可复现 observation batches。
+- 边界: 不启动 GPU 训练；不接 rollout model；不引入外部 perception 依赖；不把 scenario
+  指标做成最终 gate。
 
 ## Suspended
 
@@ -30,6 +37,25 @@ Owner 确认是进入 v2 stability gate / world-model rollout baseline，还是�
 需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
+
+### V2-STABILITY-DIAGNOSTICS-001: Add failure mode diagnostics
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model diagnostics
+- 目标: 增加 `FailureModeClassifier`、slot transition matrix 和 identity confusion graph，
+  让 stability eval 能区分 slot swap、identity fragmentation、object merge、
+  background absorption 和 temporal drift。
+- 前置: `V2-STABILITY-SCENARIO-002`。
+- 边界: 只做 deterministic diagnostics，不训练 solver，不接 renderer loss。
+
+### V2-STABILITY-GATE-001: Build invariant-first stability gate
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model gate
+- 目标: 将 identity invariance 设为 hard gate，将 assignment quality 和 temporal coherence
+  设为 soft diagnostics，避免多指标投票替代 identity invariant。
+- 前置: `V2-STABILITY-SCENARIO-002`、`V2-STABILITY-DIAGNOSTICS-001`。
+- 边界: 不做 rollout model，不改变 dynamic-K proposal-only 约束。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 
@@ -85,6 +111,37 @@ Owner 确认是进入 v2 stability gate / world-model rollout baseline，还是�
 当前无进行中 PR。
 
 ## Done
+
+### V2-STABILITY-FOUNDATION-002: Add identity oracle and synthetic world foundation
+
+- 状态: done / identity-oracle-foundation
+- 类型: 标准 PR / algorithm model evaluation contract
+- 目标: 在 v2 stability gate 前先冻结 evaluation invariant，明确同一个 object 由 synthetic
+  oracle label 定义，而不是由 slot、embedding 或 tracker 推断。
+- 已实施:
+  - 新增 `objgauss/core/v2_stability_foundation.py`。
+  - 新增 `ObjectIdentityOracle`、`ObjectIdentityRecord` 和
+    `ObjectIdentityObservation`。
+  - 新增 `SyntheticWorldState`、`SyntheticWorldFrame` 和 `SyntheticWorldObject`，
+    将 scenario 建模为 observation 前的 object-level world。
+  - 新增 `ObservationModelConfig`、`SyntheticObservationFrame` 和
+    `observe_synthetic_world(...)`，将 world 投影为 `AssignmentEvidenceBatch`，
+    同时保留 `oracle_object_ids`、`lineage_ids` 和 `expected_slots`。
+  - 新增中文架构文档 `docs/architecture/v2-stability-foundation.md`。
+  - `objgauss.core` 暴露 identity oracle / synthetic world / observation model ABI。
+- 边界:
+  - 不启动 GPU 训练。
+  - 不做 rollout model。
+  - 不自动 birth / merge / split。
+  - 不接 SAM2 / CoTracker / DETR 等外部 perception 模型。
+  - 不把 scenario metrics 做成最终 promotion gate。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/v2_stability_foundation.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_v2_stability_foundation.py tests/test_core_namespace.py`: 14 passed。
+  - `uv run --extra dev pytest`: 214 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: `051d667`
 
 ### DYNAMIC-K-PROPOSAL-001: Define v2 dynamic-K proposal gate
 
