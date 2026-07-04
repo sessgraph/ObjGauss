@@ -63,6 +63,26 @@ def test_build_gsplat_training_input_maps_assignment_to_gaussian_state():
     np.testing.assert_allclose(record.opacities, np.ones(6, dtype=np.float32), atol=1e-6)
 
 
+def test_build_gsplat_training_input_accepts_decoder_opacity_logits():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    assignment = np.zeros((6, 2), dtype=np.float32)
+    assignment[:3, 0] = 1.0
+    assignment[3:, 1] = 1.0
+    decoder_colors = np.vstack([frames[0].target_rgb[0], frames[0].target_rgb[3]]).astype(np.float32)
+
+    record = build_gsplat_training_input(
+        frames[0],
+        assignment,
+        decoder_colors,
+        decoder_opacity_logits=np.array([-2.0, 2.0], dtype=np.float32),
+        default_opacity=0.8,
+    )
+
+    assert record.opacities[:3].mean() < record.opacities[3:].mean()
+    assert np.all(record.opacities >= 0.0)
+    assert np.all(record.opacities <= 0.8)
+
+
 def test_build_gsplat_training_input_accepts_object_state_projection():
     frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
     assignment = np.zeros((6, 2), dtype=np.float32)

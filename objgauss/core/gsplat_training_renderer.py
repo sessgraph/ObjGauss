@@ -159,6 +159,7 @@ def build_gsplat_training_input(
     assignment: np.ndarray,
     decoder_colors: np.ndarray,
     *,
+    decoder_opacity_logits: np.ndarray | None = None,
     frame_index: int = 0,
     default_scale: float = 0.01,
     default_opacity: float = 1.0,
@@ -186,6 +187,7 @@ def build_gsplat_training_input(
         frame,
         projection,
         colors,
+        decoder_opacity_logits=decoder_opacity_logits,
         frame_index=frame_index,
         default_scale=default_scale,
         default_opacity=default_opacity,
@@ -197,6 +199,7 @@ def build_gsplat_training_input_from_object_state(
     projection: ObjectStateProjection,
     decoder_colors: np.ndarray,
     *,
+    decoder_opacity_logits: np.ndarray | None = None,
     frame_index: int = 0,
     default_scale: float = 0.01,
     default_opacity: float = 1.0,
@@ -208,6 +211,7 @@ def build_gsplat_training_input_from_object_state(
         frame.positions,
         projection,
         decoder_colors,
+        object_opacity_logits=decoder_opacity_logits,
         default_scale=default_scale,
         default_opacity=default_opacity,
     )
@@ -261,6 +265,7 @@ def evaluate_gsplat_training_renderer_loss(
     assignments: Sequence[np.ndarray],
     decoder_colors: np.ndarray,
     *,
+    decoder_opacity_logits: np.ndarray | None = None,
     require_cuda: bool = True,
     device: str | None = None,
     default_scale: float = 0.01,
@@ -272,11 +277,15 @@ def evaluate_gsplat_training_renderer_loss(
     if len(frames) != len(assignments):
         raise ValueError("assignments must have one matrix per frame")
     colors = _array2d(decoder_colors, "decoder_colors", columns=3)
+    opacity_logits = _optional_array1d(decoder_opacity_logits, "decoder_opacity_logits")
+    if opacity_logits is not None and opacity_logits.shape[0] != colors.shape[0]:
+        raise ValueError("decoder_opacity_logits length must match decoder_colors rows")
     inputs = tuple(
         build_gsplat_training_input(
             frame,
             assignment,
             colors,
+            decoder_opacity_logits=opacity_logits,
             frame_index=frame_index,
             default_scale=default_scale,
             default_opacity=default_opacity,
@@ -297,6 +306,16 @@ def evaluate_gsplat_training_renderer_loss(
     rasterization = _resolve_gsplat_rasterization(_importer)
     resolved_device = device or ("cuda" if require_cuda else "cpu")
     color_params = torch.tensor(colors, dtype=torch.float32, device=resolved_device, requires_grad=True)
+    opacity_params = (
+        None
+        if opacity_logits is None
+        else torch.tensor(
+            opacity_logits,
+            dtype=torch.float32,
+            device=resolved_device,
+            requires_grad=True,
+        )
+    )
     assignment_tensors = [
         torch.tensor(
             np.asarray(assignment, dtype=np.float32),
@@ -315,7 +334,15 @@ def evaluate_gsplat_training_renderer_loss(
         means = _torch_tensor(torch, input_record.means, resolved_device)
         quats = _torch_tensor(torch, input_record.quats, resolved_device)
         scales = _torch_tensor(torch, input_record.scales, resolved_device)
-        opacities = _torch_tensor(torch, input_record.opacities, resolved_device)
+        if opacity_params is None:
+            opacities = _torch_tensor(torch, input_record.opacities, resolved_device)
+        else:
+            opacity_scales = _torch_object_opacity_scales(torch, opacity_params)
+            opacities = torch.clamp(
+                float(default_opacity) * (assignment_tensor @ opacity_scales),
+                0.0,
+                1.0,
+            )
         viewmats = _torch_tensor(torch, input_record.viewmats, resolved_device)
         intrinsics = _torch_tensor(torch, input_record.intrinsics, resolved_device)
         target_image = _torch_tensor(torch, input_record.target_image, resolved_device)
@@ -361,10 +388,20 @@ def evaluate_gsplat_training_renderer_loss(
     total_loss = sum(losses) / len(losses)
     total_loss.backward()
     decoder_gradient = color_params.grad.detach().cpu().numpy().astype(np.float32, copy=False)
+    opacity_gradient = (
+        np.zeros((0,), dtype=np.float32)
+        if opacity_params is None
+        else opacity_params.grad.detach().cpu().numpy().astype(np.float32, copy=False)
+    )
     assignment_gradients = tuple(
         tensor.grad.detach().cpu().numpy().astype(np.float32, copy=False)
         for tensor in assignment_tensors
     )
+    differentiable_fields = ["decoder_colors", "assignments"]
+    frozen_fields = ["means", "quats", "scales", "opacities", "camera"]
+    if opacity_params is not None:
+        differentiable_fields.append("decoder_opacity_logits")
+        frozen_fields = ["means", "quats", "scales", "source_opacities", "camera"]
 
     return TrainingRendererLossResult(
         schema=TRAINING_RENDERER_API_SCHEMA,
@@ -375,9 +412,10 @@ def evaluate_gsplat_training_renderer_loss(
         frame_losses=tuple(frame_losses),
         rendered_images=tuple(rendered_images),
         gradient_decoder_colors=decoder_gradient,
+        gradient_decoder_opacity_logits=opacity_gradient,
         gradient_assignments=assignment_gradients,
-        differentiable_fields=("decoder_colors", "assignments"),
-        frozen_fields=("means", "quats", "scales", "opacities", "camera"),
+        differentiable_fields=tuple(differentiable_fields),
+        frozen_fields=tuple(frozen_fields),
         blockers=(),
     )
 
@@ -435,6 +473,11 @@ def _torch_tensor(torch: Any, value: np.ndarray, device: str) -> Any:
     return torch.tensor(np.asarray(value, dtype=np.float32), dtype=torch.float32, device=device)
 
 
+def _torch_object_opacity_scales(torch: Any, logits: Any) -> Any:
+    clipped = torch.clamp(logits, -60.0, 60.0)
+    return torch.clamp(torch.sigmoid(clipped), 0.05, 1.0)
+
+
 def _object_state_projection_from_frame(
     frame: TrainableKernelFrame,
     assignment: np.ndarray,
@@ -467,6 +510,19 @@ def _array2d(value: np.ndarray, label: str, *, columns: int | None = None) -> np
         raise ValueError(f"{label} must have {columns} columns")
     if array.shape[1] == 0:
         raise ValueError(f"{label} must have at least one column")
+    if not np.isfinite(array).all():
+        raise ValueError(f"{label} must contain only finite values")
+    return array
+
+
+def _optional_array1d(value: np.ndarray | None, label: str) -> np.ndarray | None:
+    if value is None:
+        return None
+    array = np.asarray(value, dtype=np.float32)
+    if array.ndim != 1:
+        raise ValueError(f"{label} must be a 1D array")
+    if array.shape[0] == 0:
+        raise ValueError(f"{label} must contain at least one value")
     if not np.isfinite(array).all():
         raise ValueError(f"{label} must contain only finite values")
     return array

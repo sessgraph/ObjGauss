@@ -5,7 +5,10 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from objgauss.core.gaussian_decoder import OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA
+from objgauss.core.gaussian_decoder import (
+    OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
+    object_opacity_scales_from_logits,
+)
 from objgauss.core.gaussian_decoder_training import (
     ObjectStateGaussianDecoderState,
     _evaluate_image_renderer,
@@ -39,6 +42,7 @@ from objgauss.core.training_renderer import TrainingRendererLossResult
 SOLVER_DECODER_JOINT_TRAINING_SCHEMA = "objgauss-solver-decoder-joint-training-v1"
 SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA = "objgauss-solver-decoder-joint-checkpoint-v1"
 _EPS = 1e-8
+_DEFAULT_OPACITY_INIT_LOGIT = 6.0
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,8 @@ class SolverDecoderJointTrainingResult:
     iterations: int
     solver_learning_rate: float
     decoder_learning_rate: float
+    decoder_opacity_learning_rate: float
+    train_decoder_opacity: bool
     image_render_weight: float
     object_weight: float
     entropy_weight: float
@@ -108,7 +114,9 @@ class SolverDecoderJointTrainingResult:
             "learning_rates": {
                 "solver": float(self.solver_learning_rate),
                 "decoder": float(self.decoder_learning_rate),
+                "decoder_opacity": float(self.decoder_opacity_learning_rate),
             },
+            "train_decoder_opacity": bool(self.train_decoder_opacity),
             "weights": {
                 "image_render": float(self.image_render_weight),
                 "object": float(self.object_weight),
@@ -132,6 +140,9 @@ class SolverDecoderJointTrainingResult:
             "final_solver_state": self.final_solver_state.as_dict(include_weights=include_weights),
             "initial_decoder_state": self.initial_decoder_state.as_dict(),
             "final_decoder_state": self.final_decoder_state.as_dict(),
+            "decoder_opacity": _decoder_opacity_summary(
+                self.final_decoder_state.object_opacity_logits
+            ),
             "history": [loss.as_dict() for loss in self.history],
             "predictions": [
                 prediction.as_dict(include_assignment=include_assignments)
@@ -169,6 +180,7 @@ class _JointEval:
     renderer_api: TrainingRendererLossResult | None
     solver_gradient: tuple[np.ndarray, np.ndarray, np.ndarray]
     decoder_gradient: np.ndarray
+    decoder_opacity_gradient: np.ndarray
 
 
 def train_solver_decoder_joint(
@@ -180,6 +192,9 @@ def train_solver_decoder_joint(
     iterations: int = 4,
     solver_learning_rate: float = 0.05,
     decoder_learning_rate: float = 0.5,
+    train_decoder_opacity: bool = False,
+    decoder_opacity_learning_rate: float = 0.02,
+    decoder_opacity_init_logit: float = _DEFAULT_OPACITY_INIT_LOGIT,
     image_render_weight: float = 1.0,
     object_weight: float = 0.1,
     entropy_weight: float = 0.0,
@@ -200,6 +215,10 @@ def train_solver_decoder_joint(
         raise ValueError("solver_learning_rate must be > 0")
     if decoder_learning_rate <= 0:
         raise ValueError("decoder_learning_rate must be > 0")
+    if train_decoder_opacity and decoder_opacity_learning_rate <= 0:
+        raise ValueError("decoder_opacity_learning_rate must be > 0 when train_decoder_opacity is enabled")
+    if not np.isfinite(decoder_opacity_init_logit):
+        raise ValueError("decoder_opacity_init_logit must be finite")
     if image_renderer not in TRAINING_IMAGE_RENDERERS:
         raise ValueError(f"image_renderer must be one of: {', '.join(TRAINING_IMAGE_RENDERERS)}")
     if gaussian_scale <= 0:
@@ -242,17 +261,34 @@ def train_solver_decoder_joint(
     decoder_state = validate_object_state_gaussian_decoder_state(decoder_state)
     if decoder_state.slots != solver_state.config.slots:
         raise ValueError("decoder state slots must match solver slots")
+    if train_decoder_opacity and decoder_state.object_opacity_logits is None:
+        decoder_state = replace(
+            decoder_state,
+            object_opacity_logits=np.full(
+                solver_state.config.slots,
+                float(decoder_opacity_init_logit),
+                dtype=np.float32,
+            ),
+            source="initialized_object_opacity_logits",
+        )
+        decoder_state = validate_object_state_gaussian_decoder_state(decoder_state)
 
     initial_solver_step = int(solver_state.step)
     initial_decoder_step = int(decoder_state.step)
     history: list[SolverDecoderJointLoss] = []
     colors = decoder_state.object_colors.astype(np.float32, copy=True)
+    opacity_logits = (
+        _copy_optional_array(decoder_state.object_opacity_logits)
+        if train_decoder_opacity
+        else None
+    )
     record_stride = iterations if record_every is None else max(1, int(record_every))
     initial_eval = _evaluate_joint(
         checked_frames,
         evidence_frames,
         solver_state,
         colors,
+        decoder_opacity_logits=opacity_logits,
         iteration=0,
         image_render_weight=image_render_weight,
         object_weight=object_weight,
@@ -271,6 +307,7 @@ def train_solver_decoder_joint(
             evidence_frames,
             solver_state,
             colors,
+            decoder_opacity_logits=opacity_logits,
             iteration=iteration - 1,
             image_render_weight=image_render_weight,
             object_weight=object_weight,
@@ -291,6 +328,14 @@ def train_solver_decoder_joint(
             step=initial_solver_step + iteration,
         )
         colors = np.clip(colors - decoder_learning_rate * current.decoder_gradient, 0.0, 1.0)
+        if train_decoder_opacity:
+            if opacity_logits is None:
+                raise ValueError("train_decoder_opacity requires initialized opacity logits")
+            opacity_logits = np.clip(
+                opacity_logits - decoder_opacity_learning_rate * current.decoder_opacity_gradient,
+                -25.0,
+                25.0,
+            ).astype(np.float32, copy=False)
         if iteration == iterations or iteration % record_stride == 0:
             history.append(
                 _evaluate_joint(
@@ -298,6 +343,7 @@ def train_solver_decoder_joint(
                     evidence_frames,
                     solver_state,
                     colors,
+                    decoder_opacity_logits=opacity_logits,
                     iteration=iteration,
                     image_render_weight=image_render_weight,
                     object_weight=object_weight,
@@ -315,6 +361,7 @@ def train_solver_decoder_joint(
         evidence_frames,
         solver_state,
         colors,
+        decoder_opacity_logits=opacity_logits,
         iteration=iterations,
         image_render_weight=image_render_weight,
         object_weight=object_weight,
@@ -338,6 +385,8 @@ def train_solver_decoder_joint(
         iterations=int(iterations),
         solver_learning_rate=float(solver_learning_rate),
         decoder_learning_rate=float(decoder_learning_rate),
+        decoder_opacity_learning_rate=float(decoder_opacity_learning_rate),
+        train_decoder_opacity=bool(train_decoder_opacity),
         image_render_weight=float(image_render_weight),
         object_weight=float(object_weight),
         entropy_weight=float(entropy_weight),
@@ -351,9 +400,17 @@ def train_solver_decoder_joint(
         initial_decoder_state=decoder_state,
         final_decoder_state=ObjectStateGaussianDecoderState(
             object_colors=colors.astype(np.float32, copy=True),
-            object_opacity_logits=_copy_optional_array(decoder_state.object_opacity_logits),
+            object_opacity_logits=(
+                _copy_optional_array(opacity_logits)
+                if train_decoder_opacity
+                else _copy_optional_array(decoder_state.object_opacity_logits)
+            ),
             step=initial_decoder_step + int(iterations),
-            source="joint_trained_renderer_gradient_object_colors",
+            source=(
+                "joint_trained_renderer_gradient_object_colors_and_opacity"
+                if train_decoder_opacity
+                else "joint_trained_renderer_gradient_object_colors"
+            ),
         ),
         initial_loss=initial_eval.loss,
         final_loss=final_eval.loss,
@@ -367,8 +424,20 @@ def train_solver_decoder_joint(
             "solver.position_weights",
             "solver.bias",
             "decoder.object_colors",
+            *(
+                ("decoder.object_opacity_logits",)
+                if train_decoder_opacity
+                else ()
+            ),
         ),
-        frozen_fields=("means", "quats", "scales", "opacities", "cameras", "dynamic_k"),
+        frozen_fields=(
+            "means",
+            "quats",
+            "scales",
+            "source_opacities" if train_decoder_opacity else "opacities",
+            "cameras",
+            "dynamic_k",
+        ),
         gpu_used=image_renderer == TRAINING_IMAGE_RENDERER_GSPLAT,
         vram_reserve_gb=int(vram_reserve_gb),
     )
@@ -412,7 +481,9 @@ def solver_decoder_joint_checkpoint(
             "learning_rates": {
                 "solver": float(result.solver_learning_rate),
                 "decoder": float(result.decoder_learning_rate),
+                "decoder_opacity": float(result.decoder_opacity_learning_rate),
             },
+            "train_decoder_opacity": bool(result.train_decoder_opacity),
             "weights": {
                 "image_render": float(result.image_render_weight),
                 "object": float(result.object_weight),
@@ -517,6 +588,7 @@ def _evaluate_joint(
     solver_state: ObjectEmergenceSolverState,
     colors: np.ndarray,
     *,
+    decoder_opacity_logits: np.ndarray | None,
     iteration: int,
     image_render_weight: float,
     object_weight: float,
@@ -536,11 +608,17 @@ def _evaluate_joint(
     image_loss = 0.0
     assignment_gradients = tuple(np.zeros_like(assignment, dtype=np.float32) for assignment in assignments)
     decoder_gradient = np.zeros_like(colors, dtype=np.float32)
+    decoder_opacity_gradient = (
+        np.zeros((0,), dtype=np.float32)
+        if decoder_opacity_logits is None
+        else np.zeros_like(decoder_opacity_logits, dtype=np.float32)
+    )
     if image_render_weight > 0:
         renderer_api = _evaluate_image_renderer(
             frames,
             assignments,
             colors,
+            decoder_opacity_logits=decoder_opacity_logits,
             image_renderer=image_renderer,
             gaussian_scale=gaussian_scale,
             gaussian_opacity=gaussian_opacity,
@@ -551,6 +629,10 @@ def _evaluate_joint(
             for gradient in renderer_api.gradient_assignments
         )
         decoder_gradient = image_render_weight * renderer_api.gradient_decoder_colors
+        if decoder_opacity_logits is not None:
+            decoder_opacity_gradient = (
+                image_render_weight * renderer_api.gradient_decoder_opacity_logits
+            )
 
     object_loss, object_assignment_gradients = _object_loss_and_gradient(frames, assignments)
     entropy_loss, entropy_gradients = _entropy_loss_and_gradient(assignments)
@@ -601,6 +683,7 @@ def _evaluate_joint(
         renderer_api=renderer_api,
         solver_gradient=solver_gradient,
         decoder_gradient=decoder_gradient.astype(np.float32, copy=False),
+        decoder_opacity_gradient=decoder_opacity_gradient.astype(np.float32, copy=False),
     )
 
 
@@ -744,6 +827,23 @@ def _copy_optional_array(value: np.ndarray | None) -> np.ndarray | None:
     if value is None:
         return None
     return np.asarray(value, dtype=np.float32).astype(np.float32, copy=True)
+
+
+def _decoder_opacity_summary(object_opacity_logits: np.ndarray | None) -> dict[str, Any]:
+    if object_opacity_logits is None:
+        return {
+            "enabled": False,
+            "scale_min": None,
+            "scale_mean": None,
+            "scale_max": None,
+        }
+    scales = object_opacity_scales_from_logits(np.asarray(object_opacity_logits, dtype=np.float32))
+    return {
+        "enabled": True,
+        "scale_min": float(np.min(scales)),
+        "scale_mean": float(np.mean(scales)),
+        "scale_max": float(np.max(scales)),
+    }
 
 
 def _evidence_from_frames(frames: tuple[TrainableKernelFrame, ...]) -> tuple[ObjectEmergenceEvidence, ...]:

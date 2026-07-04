@@ -187,6 +187,20 @@ differentiable field，同时把 frozen opacity 改写为 `source_opacities`。�
 ignored `outputs/` 产物。下一步是 `TRAIN-DECODER-OPACITY-001`：让 CPU / gsplat renderer API
 暴露 object-level opacity gradient，并加显式 `--train-decoder-opacity` gate。
 
+随后完成 `TRAIN-DECODER-OPACITY-001`：CPU point renderer 和 gsplat training renderer 的
+`TrainingRendererLossResult` 现在暴露 `gradient_decoder_opacity_logits`，默认不传 logits 时
+仍保持旧的 color / assignment 梯度路径和 constant opacity。`solver-decoder-mvp` 新增显式
+`--train-decoder-opacity`、`--decoder-opacity-learning-rate` 和
+`--decoder-opacity-init-logit`；未启用 gate 时 opacity 继续 frozen，启用时会初始化或读取
+`decoder.object_opacity_logits`，通过 renderer loss 更新 object-level opacity multiplier，并在
+summary / checkpoint 的 trained fields 中记录 `decoder.object_opacity_logits`。分段训练
+summary 现在可记录 `final_decoder_opacity_scale_min/mean/max`，TensorBoard writer 可写入
+`decoder/opacity_scale_min`、`decoder/opacity_scale_mean` 和
+`decoder/opacity_scale_max`。本切片只接训练 contract 和 CPU smoke，不启动长时间 GPU run，
+不提交 ignored `outputs/` 产物，Gaussian means / scales / quats / camera / dynamic-K 继续冻结。
+下一步是 `TRAIN-RUN-005-OPACITY-SMOKE`：从 run-004 final checkpoint resume 做受控 GPU /
+gsplat opacity smoke。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

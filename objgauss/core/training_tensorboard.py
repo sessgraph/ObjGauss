@@ -69,6 +69,23 @@ def write_solver_decoder_tensorboard_events(
             if "final_balance_loss" in segment:
                 writer.add_scalar("loss/balance", float(segment["final_balance_loss"]), end)
                 scalar_count += 1
+            if "final_decoder_opacity_scale_mean" in segment:
+                writer.add_scalar(
+                    "decoder/opacity_scale_min",
+                    float(segment["final_decoder_opacity_scale_min"]),
+                    end,
+                )
+                writer.add_scalar(
+                    "decoder/opacity_scale_mean",
+                    float(segment["final_decoder_opacity_scale_mean"]),
+                    end,
+                )
+                writer.add_scalar(
+                    "decoder/opacity_scale_max",
+                    float(segment["final_decoder_opacity_scale_max"]),
+                    end,
+                )
+                scalar_count += 3
         run_loss = summary.get("run_loss") if isinstance(summary.get("run_loss"), dict) else {}
         if "final_total_loss" in run_loss:
             writer.add_scalar(
@@ -92,6 +109,9 @@ def write_solver_decoder_tensorboard_events(
             "loss/object",
             "loss/entropy",
             "loss/balance",
+            "decoder/opacity_scale_min",
+            "decoder/opacity_scale_mean",
+            "decoder/opacity_scale_max",
             "run/final_total_loss",
         ],
     }

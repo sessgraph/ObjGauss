@@ -532,6 +532,7 @@ def _evaluate_image_renderer(
     assignments: tuple[np.ndarray, ...],
     colors: np.ndarray,
     *,
+    decoder_opacity_logits: np.ndarray | None = None,
     image_renderer: str,
     gaussian_scale: float,
     gaussian_opacity: float,
@@ -539,7 +540,13 @@ def _evaluate_image_renderer(
     if image_renderer == TRAINING_IMAGE_RENDERER_POINT:
         from objgauss.core.training_renderer import evaluate_training_renderer_loss
 
-        return evaluate_training_renderer_loss(frames, assignments, colors)
+        return evaluate_training_renderer_loss(
+            frames,
+            assignments,
+            colors,
+            decoder_opacity_logits=decoder_opacity_logits,
+            default_opacity=gaussian_opacity,
+        )
     elif image_renderer == TRAINING_IMAGE_RENDERER_GSPLAT:
         from objgauss.core.gsplat_training_renderer import (
             evaluate_gsplat_training_renderer_loss as evaluate_training_renderer_loss,
@@ -548,6 +555,7 @@ def _evaluate_image_renderer(
             frames,
             assignments,
             colors,
+            decoder_opacity_logits=decoder_opacity_logits,
             default_scale=gaussian_scale,
             default_opacity=gaussian_opacity,
         )
