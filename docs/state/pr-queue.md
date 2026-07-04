@@ -15,26 +15,25 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate。下一步进入 `TRAIN-RUN-005-OPACITY-SMOKE`，仍保持 geometry / camera / dynamic-K 冻结。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱。下一步进入 `RENDER-FIELD-SCALE-PLAN-001`，先规划 scale thaw，不直接解冻 geometry / camera / dynamic-K。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### TRAIN-RUN-005-OPACITY-SMOKE: Controlled opacity-thaw GPU smoke
+### RENDER-FIELD-SCALE-PLAN-001: Plan the next renderer parameter thaw
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model training smoke
-- 目标: 从 run-004 final checkpoint resume，开启 `--train-decoder-opacity` 做一次受控
-  GPU / gsplat opacity smoke，验证 `decoder.object_opacity_logits` 是否带来 run-level
-  image loss 改善，同时保持 ObjectState eval gate。
-- 背景: `TRAIN-DECODER-OPACITY-001` 已让 CPU / gsplat renderer API 暴露
-  `gradient_decoder_opacity_logits`，并给 `solver-decoder-mvp` 加显式训练 gate。
-- 验收: 输出 ignored `outputs/training/train-run-005-*`；TensorBoard 包含
-  `decoder/opacity_scale_min/mean/max`；checkpoint trained fields 包含
-  `decoder.object_opacity_logits`；run-level image loss 下降；`eval-objectstate --require-pass`
-  继续通过；`renderer-loss-contract` 无 blockers。
-- 边界: 不提交 `outputs/` 或 `/tmp` 产物；不训练 Gaussian means / scales / quats /
-  camera / dynamic-K；如果 opacity scale 大面积贴 clamp 边界，应回滚而不是继续解冻 scale。
+- 类型: 标准 PR / algorithm model planning
+- 目标: 在 run-005 的 opacity smoke 基础上，规划下一批最小 renderer 参数解冻切片。
+  候选应优先考虑 object-level scale multiplier，而不是直接解冻 per-Gaussian means /
+  quats / scales / camera / dynamic-K。
+- 背景: run-005 已证明 `decoder.object_opacity_logits` 的 GPU training path、checkpoint、
+  TensorBoard 和 ObjectState eval gate 可用，但 image loss 改善只有
+  `0.0172239579 -> 0.0172238834`，且带 object loss 权重的 opacity 配置未通过 image gate。
+- 验收: 更新 renderer field unfreeze plan，明确 scale thaw 的 field contract、checkpoint ABI、
+  CLI gate、学习率、rollback 条件和 promotion gate；同时说明 run-005 的弱收益不允许直接进入
+  geometry / camera / dynamic-K 解冻。
+- 边界: 不启动 GPU 训练；不改 renderer 数学；不提交 `outputs/` 或 `/tmp` 产物。
 
 ## Suspended
 
@@ -62,6 +61,70 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-RUN-005-OPACITY-SMOKE: Controlled opacity-thaw GPU smoke
+
+- 状态: done / opacity-path-gpu-smoke-weak-pass
+- 类型: 标准 PR / algorithm model training smoke
+- 目标: 从 run-004 final checkpoint resume，开启 `--train-decoder-opacity` 做一次受控
+  GPU / gsplat opacity smoke，验证 `decoder.object_opacity_logits` 是否接入 run output、
+  checkpoint、TensorBoard、renderer loss boundary 和 ObjectState eval。
+- 已执行:
+  - 输入 checkpoint:
+    `outputs/training/train-run-004-solver-temp05-gsplat/final-checkpoint.json`
+  - 正式通过的输出目录:
+    `outputs/training/train-run-005-opacity-gsplat-image/`，保持 ignored，不进 git。
+  - 训练配置: gsplat renderer、128 sampled Gaussians、2 frames、16x16 image target、
+    100 total iterations、checkpoint every 20、`solver_temperature=0.5`、
+    `solver_learning_rate=0.001`、`decoder_learning_rate=0.5`、
+    `train_decoder_opacity=true`、`decoder_opacity_learning_rate=10.0`、
+    `decoder_opacity_init_logit=6.0`、`object_weight=0.0`、`entropy_weight=0.0`、
+    `balance_weight=0.0`、`vram_reserve_gb=1`。
+- 训练结果:
+  - `run_initial_total_loss=0.0172239579 -> run_final_total_loss=0.0172238834`
+  - `run_initial_image_render_loss=0.0172239579 -> run_final_image_render_loss=0.0172238834`
+  - `run_initial_object_loss=0.2084604055 -> run_final_object_loss=0.2084604204`
+  - `decoder_opacity_scale_min=0.9975274205`，
+    `decoder_opacity_scale_mean=0.9975274801`，
+    `decoder_opacity_scale_max=0.9975276589`
+  - `solver_step=600`，`decoder_step=600`，`gpu_used=true`，
+    `renderer_name=gsplat-rasterization-v1`
+  - trained fields 包含
+    `solver.feature_weights, solver.position_weights, solver.bias, decoder.object_colors,
+    decoder.object_opacity_logits`；frozen fields 仍为
+    `means, quats, scales, source_opacities, cameras, dynamic_k`。
+  - TensorBoard: `outputs/training/train-run-005-opacity-gsplat-image/tensorboard`，
+    `tensorboard_scalar_count=56`，包含
+    `decoder/opacity_scale_min`、`decoder/opacity_scale_mean`、
+    `decoder/opacity_scale_max`。
+- ObjectState eval:
+  - 命令:
+    `uv run objgauss training eval-objectstate public/samples/lego_alpha_v1_objects.ply --checkpoint outputs/training/train-run-005-opacity-gsplat-image/final-checkpoint.json --max-points 128 --summary-output /tmp/objgauss-train-run-005-opacity-image-objectstate-eval.json --require-pass`
+  - 结果: `eval_status=objectstate_eval_pass`，
+    `mean_normalized_entropy=0.237402`，`assignment_confidence=0.762598`，
+    `effective_slots=3.178765`，`max_dominant_slot_mass_fraction=0.466883`，
+    `slot_collapse=false`，`object_purity=0.868178`。
+- Renderer boundary:
+  - 命令:
+    `uv run objgauss training renderer-loss-contract --kernel-summary outputs/training/train-run-005-opacity-gsplat-image/final-summary.json --output /tmp/objgauss-train-run-005-opacity-image-boundary.json`
+  - 结果: `status=full_3dgs_solver_decoder_joint_training_ready`，
+    `upgrade_blockers=[]`，
+    `decoder_handoff_status=full_renderer_solver_decoder_joint_training_ready`，
+    `evidence_image_render_loss_decreased=true`。
+- 已发现:
+  - 两次带 object loss 权重的 opacity 配置未通过 image render loss decrease gate。
+  - 正式通过配置使用 image-dominant weights，image loss 改善很小，object loss 未下降；
+    因此 run-005 只能作为 opacity path smoke，不足以证明 opacity thaw 已具备稳定
+    promotion 价值。
+- 边界:
+  - 不提交 `outputs/` training run、TensorBoard event、checkpoint 或 `/tmp` eval summary。
+  - 不训练 Gaussian means / scales / quats / camera / dynamic-K。
+- 验证:
+  - host GPU / gsplat run: passed with `--require-loss-decrease` and
+    `--require-image-render-loss-decrease`。
+  - `eval-objectstate --require-pass`: passed。
+  - `renderer-loss-contract`: passed with no upgrade blockers。
+- 完成 commit: pending / uncommitted
 
 ### TRAIN-DECODER-OPACITY-001: Wire object-level opacity renderer gradient
 

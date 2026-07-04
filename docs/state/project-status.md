@@ -201,6 +201,33 @@ summary 现在可记录 `final_decoder_opacity_scale_min/mean/max`，TensorBoard
 下一步是 `TRAIN-RUN-005-OPACITY-SMOKE`：从 run-004 final checkpoint resume 做受控 GPU /
 gsplat opacity smoke。
 
+随后完成 `TRAIN-RUN-005-OPACITY-SMOKE` 受控 GPU resume run：从
+`outputs/training/train-run-004-solver-temp05-gsplat/final-checkpoint.json` resume，开启
+`--train-decoder-opacity`，使用 gsplat renderer、128 sampled Gaussians、2 frames、16x16
+image target、100 total iterations、checkpoint every 20、1GB VRAM reserve，正式通过的
+输出目录为 ignored `outputs/training/train-run-005-opacity-gsplat-image/`。该 run 使用
+image-dominant smoke 配置：`object_weight=0.0`、`entropy_weight=0.0`、`balance_weight=0.0`、
+`solver_learning_rate=0.001`、`decoder_learning_rate=0.5`、
+`decoder_opacity_learning_rate=10.0`、`decoder_opacity_init_logit=6.0`。run-level image
+loss 仅小幅下降：`0.0172239579 -> 0.0172238834`；`object_loss` 基本不变：
+`0.2084604055 -> 0.2084604204`。final checkpoint 的 solver / decoder step 均为 600，
+trained fields 包含
+`solver.feature_weights, solver.position_weights, solver.bias, decoder.object_colors,
+decoder.object_opacity_logits`，frozen fields 仍为
+`means, quats, scales, source_opacities, cameras, dynamic_k`。TensorBoard logdir 为
+`outputs/training/train-run-005-opacity-gsplat-image/tensorboard`，已写入
+`decoder/opacity_scale_min`、`decoder/opacity_scale_mean`、`decoder/opacity_scale_max`；
+opacity scale 位于 `0.99752742 -> 0.99752766`，未出现大面积 clamp 边界饱和。
+`eval-objectstate --require-pass` 通过：`mean_normalized_entropy=0.237402`、
+`assignment_confidence=0.762598`、`effective_slots=3.178765`、
+`max_dominant_slot_mass_fraction=0.466883`、`slot_collapse=false`、
+`object_purity=0.868178`。`renderer-loss-contract` 输出
+`status=full_3dgs_solver_decoder_joint_training_ready`，`upgrade_blockers=[]`。
+注意：两次带 object loss 权重的 opacity 配置未通过 image render loss decrease gate，因此
+run-005 只能证明 opacity training path / checkpoint / TensorBoard / eval gate 可用，不能证明
+object-level opacity 已经带来稳定可推广收益；下一步进入 renderer scale thaw 前应先做规划和
+更严格的 promotion gate。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
