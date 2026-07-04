@@ -15,22 +15,21 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate。当前 run-003 评估为 entropy borderline / no collapse / purity fail，下一步先做 assignment sharpening，不直接解冻 renderer geometry。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制。当前 run-003 在 `--solver-temperature 0.5` 下只读 eval 已 pass，下一步做受控 GPU resume run 固化该 temperature。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### SOLVER-TEMP-001: Expose solver temperature / sharpening controls
+### TRAIN-RUN-004: Controlled solver-temperature GPU resume run
 
 - 状态: ready
 - 类型: 标准 PR / algorithm model training
-- 目标: 给 `solver-decoder-mvp` 暴露 solver temperature 或等价 assignment sharpening
-  控制，让 ObjectState eval 的 entropy / purity gate 有明确调参路径。
-- 背景: run-003 checkpoint eval 显示 `mean_normalized_entropy=0.601689` 接近 0.6，
-  且 `slot_collapse=false`，但 `object_purity=0.719425` 未达 0.8。下一步应先提高
-  assignment 纯度，再考虑解冻 Gaussian geometry / opacity。
-- 边界: 不引入 Slot Attention / Sinkhorn / dynamic-K，不启动长时间训练，不提交
-  ignored `outputs/` 训练产物。
+- 目标: 从 run-003 final checkpoint resume，使用 `--solver-temperature 0.5` 做一次受控
+  GPU / gsplat 训练 run，产出正式 checkpoint、TensorBoard loss 和 ObjectState eval。
+- 背景: run-003 原始 temperature=1.0 eval fail；只读 temperature=0.5 eval pass：
+  `mean_normalized_entropy=0.192517`，`object_purity=0.866342`，`slot_collapse=false`。
+- 边界: 继续冻结 Gaussian geometry / opacity / camera / dynamic-K；不提交 ignored
+  `outputs/` 训练产物。
 
 ## Suspended
 
@@ -58,6 +57,42 @@
 当前无进行中 PR。
 
 ## Done
+
+### SOLVER-TEMP-001: Expose solver temperature / sharpening controls
+
+- 状态: done / assignment-sharpening-control
+- 类型: 标准 PR / algorithm model training
+- 目标: 给 `solver-decoder-mvp` 和 `eval-objectstate` 暴露 solver temperature 控制，让
+  ObjectState eval 的 entropy / purity gate 有明确调参路径。
+- 已实施:
+  - `train_solver_decoder_joint(...)` 新增 `solver_temperature`，初始化或 resume solver
+    state 时覆盖 `ObjectEmergenceSolverConfig.temperature`，并保留 solver / decoder step。
+  - `objgauss training solver-decoder-mvp` 新增 `--solver-temperature`，summary / checkpoint
+    会写回最终 solver config。
+  - `evaluate_solver_decoder_object_states(...)` 与
+    `objgauss training eval-objectstate` 新增只读 `--solver-temperature` 覆盖，用于不训练地
+    扫描 assignment sharpening gate。
+  - CLI 输出新增 `solver_temperature=...`，便于 TensorBoard run 旁路核对实际配置。
+- run-003 只读扫描:
+  - 命令:
+    `uv run objgauss training eval-objectstate public/samples/lego_alpha_v1_objects.ply --checkpoint outputs/training/train-run-003-solver-decoder-gsplat-sharpen/final-checkpoint.json --max-points 128 --solver-temperature 0.5 --summary-output /tmp/objgauss-train-run-003-objectstate-eval-temp05.json`
+  - 结果: `eval_status=objectstate_eval_pass`，
+    `mean_normalized_entropy=0.192517`，`assignment_confidence=0.807483`，
+    `effective_slots=2.955224`，`max_dominant_slot_mass_fraction=0.469030`，
+    `slot_collapse=false`，`object_purity=0.866342`。
+- 边界:
+  - 不引入 Slot Attention / Sinkhorn / dynamic-K。
+  - 不训练或解冻 Gaussian geometry / opacity / rotation / camera。
+  - 不提交 `/tmp` eval summary 或 ignored `outputs/` training run 产物。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_object_state_eval.py tests/test_core_namespace.py`:
+    19 passed。
+  - `uv run python -m py_compile objgauss/core/solver_decoder_training.py objgauss/core/object_state_eval.py objgauss/cli.py`:
+    passed。
+  - `uv run --extra dev pytest`: 178 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `b394b60`
 
 ### EVAL-OBJECTSTATE-001: Evaluate solver-decoder ObjectState checkpoint stability
 

@@ -119,6 +119,18 @@ ignored `outputs/`。对当前 GPU run
 entropy gate 且没有 collapse，但 purity 未达 0.8，不能据此解冻 Gaussian geometry；
 下一步优先 `SOLVER-TEMP-001` / assignment sharpening，而不是继续盲目加长训练。
 
+随后完成 `SOLVER-TEMP-001`：`solver-decoder-mvp` 新增 `--solver-temperature`，可在
+初始化或 resume joint checkpoint 时覆盖 linear-softmax solver 的 temperature，并把该
+config 写回 summary / checkpoint；`eval-objectstate` 也新增同名只读覆盖，用于快速扫描
+assignment sharpening gate。该参数只改变 `A[N,K]` 的 softmax 温度，不训练或解冻
+Gaussian means / quats / scales / opacities / cameras / dynamic-K。对 run-003 checkpoint 的
+只读扫描显示 `--solver-temperature 0.5` 能让 eval 从 fail 变成
+`objectstate_eval_pass`：`mean_normalized_entropy=0.192517`、
+`assignment_confidence=0.807483`、`effective_slots=2.955224`、
+`max_dominant_slot_mass_fraction=0.469030`、`slot_collapse=false`、
+`object_purity=0.866342`。下一步应做一次受控 GPU resume run，把 temperature=0.5 固化
+进正式 checkpoint，再评估是否进入 renderer 参数解冻计划。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
