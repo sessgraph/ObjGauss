@@ -5,6 +5,11 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from objgauss.core.assignment_losses import (
+    assignment_balance_loss_and_gradient,
+    assignment_entropy_loss_and_gradient,
+    supervised_assignment_loss_and_gradient,
+)
 from objgauss.core.gaussian_decoder import (
     OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
     object_opacity_scales_from_logits,
@@ -29,7 +34,7 @@ from objgauss.core.object_emergence_solver import (
     validate_object_emergence_evidence,
     validate_object_emergence_solver_state,
 )
-from objgauss.core.object_state import ObjectStateProjection, project_object_states, validate_assignment_matrix
+from objgauss.core.object_state import ObjectStateProjection, project_object_states
 from objgauss.core.trainable_kernel import (
     TRAINING_IMAGE_RENDERER_GSPLAT,
     TRAINING_IMAGE_RENDERER_POINT,
@@ -865,52 +870,18 @@ def _object_loss_and_gradient(
     frames: tuple[TrainableKernelFrame, ...],
     assignments: tuple[np.ndarray, ...],
 ) -> tuple[float, tuple[np.ndarray, ...]]:
-    losses: list[float] = []
-    gradients: list[np.ndarray] = []
-    frame_count = max(len(frames), 1)
-    for frame, assignment in zip(frames, assignments, strict=True):
-        if frame.target_assignment is None:
-            gradients.append(np.zeros_like(assignment, dtype=np.float32))
-            continue
-        target = validate_assignment_matrix(frame.target_assignment, evidence_count=assignment.shape[0])
-        if target.shape[1] != assignment.shape[1]:
-            raise ValueError("target_assignment slots must match solver slots")
-        clipped = np.clip(assignment, _EPS, 1.0)
-        losses.append(float(-np.mean(np.sum(target * np.log(clipped), axis=1))))
-        gradients.append((-(target / clipped) / max(float(assignment.shape[0]), _EPS) / frame_count).astype(np.float32))
-    return float(np.mean(losses)) if losses else 0.0, tuple(gradients)
+    return supervised_assignment_loss_and_gradient(
+        assignments,
+        tuple(frame.target_assignment for frame in frames),
+    )
 
 
 def _entropy_loss_and_gradient(assignments: tuple[np.ndarray, ...]) -> tuple[float, tuple[np.ndarray, ...]]:
-    losses: list[float] = []
-    gradients: list[np.ndarray] = []
-    frame_count = max(len(assignments), 1)
-    for assignment in assignments:
-        if assignment.shape[1] <= 1:
-            gradients.append(np.zeros_like(assignment, dtype=np.float32))
-            continue
-        clipped = np.clip(assignment, _EPS, 1.0)
-        normalizer = np.log(float(assignment.shape[1]))
-        entropy = -np.sum(assignment * np.log(clipped), axis=1) / normalizer
-        losses.append(float(np.mean(entropy)))
-        gradients.append((-(np.log(clipped) + 1.0) / normalizer / max(float(assignment.shape[0]), _EPS) / frame_count).astype(np.float32))
-    return float(np.mean(losses)) if losses else 0.0, tuple(gradients)
+    return assignment_entropy_loss_and_gradient(assignments)
 
 
 def _balance_loss_and_gradient(assignments: tuple[np.ndarray, ...]) -> tuple[float, tuple[np.ndarray, ...]]:
-    losses: list[float] = []
-    gradients: list[np.ndarray] = []
-    frame_count = max(len(assignments), 1)
-    for assignment in assignments:
-        evidence_count = max(float(assignment.shape[0]), _EPS)
-        slots = assignment.shape[1]
-        mass_fraction = np.sum(assignment, axis=0) / evidence_count
-        target = np.full(slots, 1.0 / float(slots), dtype=np.float32)
-        delta = mass_fraction - target
-        losses.append(float(np.mean(delta ** 2)))
-        per_slot = (2.0 / float(slots)) * delta / evidence_count / frame_count
-        gradients.append(np.tile(per_slot[None, :], (assignment.shape[0], 1)).astype(np.float32))
-    return float(np.mean(losses)) if losses else 0.0, tuple(gradients)
+    return assignment_balance_loss_and_gradient(assignments)
 
 
 def _validate_frames(frames: Sequence[TrainableKernelFrame]) -> tuple[TrainableKernelFrame, ...]:

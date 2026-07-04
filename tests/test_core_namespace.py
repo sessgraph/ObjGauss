@@ -29,6 +29,10 @@ from objgauss.core import (
     TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
     append_or_replace_property,
+    assignment_balance_loss_and_gradient,
+    assignment_cluster_loss_and_gradient,
+    assignment_entropy_loss_and_gradient,
+    assignment_loss_v2_breakdown,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
@@ -75,6 +79,7 @@ from objgauss.core import (
     trainable_kernel_model_artifact,
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
+    validate_assignment_loss_v2_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
@@ -92,6 +97,7 @@ from objgauss.core import (
     write_trainable_kernel_model_artifact,
     solver_decoder_joint_checkpoint,
     solver_decoder_joint_states_from_dict,
+    supervised_assignment_loss_and_gradient,
 )
 from objgauss.core.features import extract_features
 from objgauss.core.object_field import field_from_labels
@@ -345,7 +351,14 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA == "objgauss-objectstate-checkpoint-eval-v1"
     assert evaluate_solver_decoder_object_states is not None
     assert validate_objectstate_checkpoint_eval is not None
+    assert assignment_loss_v2_breakdown is not None
+    assert assignment_cluster_loss_and_gradient is not None
+    assert assignment_entropy_loss_and_gradient is not None
+    assert assignment_balance_loss_and_gradient is not None
+    assert supervised_assignment_loss_and_gradient is not None
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
+    loss_summary = assignment_loss_v2_breakdown([assignment], entropy_weight=0.1).as_dict()
+    assert validate_assignment_loss_v2_summary(loss_summary) is True
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],

@@ -270,6 +270,26 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "object_emergence_solver_state_from_dict",
     ),
+    "assignment_balance_loss_and_gradient": (
+        "objgauss.core.assignment_losses",
+        "assignment_balance_loss_and_gradient",
+    ),
+    "assignment_cluster_loss_and_gradient": (
+        "objgauss.core.assignment_losses",
+        "assignment_cluster_loss_and_gradient",
+    ),
+    "assignment_entropy_loss_and_gradient": (
+        "objgauss.core.assignment_losses",
+        "assignment_entropy_loss_and_gradient",
+    ),
+    "assignment_loss_v2_breakdown": (
+        "objgauss.core.assignment_losses",
+        "assignment_loss_v2_breakdown",
+    ),
+    "supervised_assignment_loss_and_gradient": (
+        "objgauss.core.assignment_losses",
+        "supervised_assignment_loss_and_gradient",
+    ),
     "object_state_gaussian_decoder_state_from_dict": (
         "objgauss.core.gaussian_decoder_training",
         "object_state_gaussian_decoder_state_from_dict",
@@ -285,6 +305,10 @@ _EXPORTS = {
     "validate_object_emergence_solver_checkpoint": (
         "objgauss.core.object_emergence_solver",
         "validate_object_emergence_solver_checkpoint",
+    ),
+    "validate_assignment_loss_v2_summary": (
+        "objgauss.core.assignment_losses",
+        "validate_assignment_loss_v2_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",
