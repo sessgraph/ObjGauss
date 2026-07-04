@@ -346,8 +346,28 @@ optional `target_assignment` 和 `source`，并提供
 `validate_assignment_evidence_summary(...)`。现有 `TrainableKernelFrame` 与
 `ObjectEmergenceEvidence` 可以无损转换到 v2 evidence contract；mask votes / track hints 只是
 optional adapter 字段，不引入 SAM / CLIP / CoTracker 默认依赖。本切片不启动 GPU 训练、不训练
-solver v2、不接 renderer loss、不做 dynamic-K。下一步进入 `TRAIN-ASSIGNMENT-MVP-001`，训练
-fixed-K assignment MVP，只验证 `A[N,K]` 的 assignment/object loss 能下降。
+solver v2、不接 renderer loss、不做 dynamic-K。该切片之后进入 `TRAIN-ASSIGNMENT-MVP-001`，
+训练 fixed-K assignment MVP，只验证 `A[N,K]` 的 assignment/object loss 能下降。
+
+随后完成 `TRAIN-ASSIGNMENT-MVP-001`：`object-emergence-solver` summary 已嵌入
+`objgauss-assignment-mvp-training-v1`，把 fixed-K `AssignmentEvidenceBatch` 和 v2 loss helper
+接成 assignment MVP 账面训练闭环。新增 `assignment_mvp_training_summary(...)`，会 replay 初始 /
+最终 solver state，并输出 initial / final `assignment_loss_v2_breakdown(...)`；CLI stdout
+新增 `assignment_mvp_schema`、`assignment_mvp_loss_decreased` 和
+`assignment_mvp_supervised_loss_decreased`。该切片仍不接 gsplat renderer loss、不解冻 renderer
+fields、不引入 dynamic-K，也不引入重型 perception 依赖。完成 commit: `3bb9345`。
+
+随后完成 `EVAL-ASSIGNMENT-STABILITY-001`：新增
+`objgauss-assignment-stability-eval-v1`，为 Object Emergence Solver checkpoint 提供 assignment
+专用只读评估。CLI 新增
+`objgauss training eval-assignment <ply> --checkpoint <solver-checkpoint.json>`，会从输入样例构造
+`AssignmentEvidenceBatch` 序列，replay solver 得到 `A[N,K]`，投影为 ObjectState，并输出
+entropy、assignment confidence、effective slots、slot collapse、object purity、temporal drift
+和 ID stability gate。小规模真实样例 smoke 已通过：
+`eval_status=assignment_stability_eval_pass`、`slot_collapse=false`、`id_stability=1.0`。该切片不启动
+GPU 训练、不接 renderer loss、不做 dynamic-K，eval 输出只写 `/tmp` 或 ignored `outputs/`。
+完成 commit: `0375524`。下一步进入 `ASSIGNMENT-RENDER-JOINT-001`，把 assignment stability
+before / after gate 接入 renderer joint run。
 
 ## 架构重梳理基线
 
