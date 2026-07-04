@@ -15,22 +15,21 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval。下一步先修正 segmented run 的 renderer-loss boundary gate，再考虑 renderer 参数解冻。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate。下一步可以规划最小 renderer 参数解冻，但仍需保持 geometry / opacity / camera 的逐项 gate。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### RENDER-LOSS-RUN-GATE-001: Honor segmented run_loss in renderer boundary
+### RENDER-FIELD-UNFREEZE-PLAN-001: Plan the first renderer parameter thaw
 
 - 状态: ready
-- 类型: 标准 PR / training contract
-- 目标: 让 `renderer-loss-contract` 在读取 segmented `final-summary.json` 时优先使用
-  `run_loss`，避免只看最后一个 segment 的 `image_render_loss_decreased=false` 而把整个
-  run 误判为 `point_render_smoke_blocked`。
-- 背景: TRAIN-RUN-004 的 run-level image render loss 为 `0.018028 -> 0.017223`，但最后
-  一个 segment 的 image loss 基本持平，当前 boundary 仍显示
-  `point_render_smoke_blocked`；checkpoint handoff 已是 `full_renderer_decoder_ready`。
-- 边界: 不改变训练数学，不改 checkpoint schema，不解冻 renderer 参数。
+- 类型: 标准 PR / algorithm model planning
+- 目标: 基于 run-004 的 stable ObjectState 和 fixed boundary，定义第一个可解冻 renderer
+  参数切片，优先选择最小 blast radius 的 field、学习率、eval gate 和回滚条件。
+- 背景: run-004 已达到
+  `full_3dgs_solver_decoder_joint_training_ready`、`objectstate_eval_pass`、
+  `upgrade_blockers=[]`，但当前仍只训练 solver assignment 和 decoder object colors。
+- 边界: 本 PR 先规划，不直接长时间训练；dynamic-K、camera、full geometry 大范围更新仍冻结。
 
 ## Suspended
 
@@ -58,6 +57,42 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-LOSS-RUN-GATE-001: Honor segmented run_loss in renderer boundary
+
+- 状态: done / segmented-run-loss-boundary
+- 类型: 标准 PR / training contract
+- 目标: 让 `renderer-loss-contract` 在读取 segmented `final-summary.json` 时优先使用
+  `run_loss`，避免只看最后一个 segment 的 `image_render_loss_decreased=false` 而把整个
+  run 误判为 `point_render_smoke_blocked`。
+- 已实施:
+  - `_solver_decoder_joint_evidence(...)` 对 joint training summary 新增 run-level delta
+    选择：存在 `run_loss` 时用 run-level initial / final total、image render、object loss
+    判定 readiness。
+  - evidence 新增 `loss_delta_source`，并保留最后一个 segment 的
+    `segment_initial_*` / `segment_final_*` 诊断字段。
+  - checkpoint evidence 不变，仍使用 checkpoint 内 `training.initial_loss` /
+    `training.final_loss`。
+- run-004 验证:
+  - 命令:
+    `uv run objgauss training renderer-loss-contract --kernel-summary outputs/training/train-run-004-solver-temp05-gsplat/final-summary.json --output /tmp/objgauss-train-run-004-renderer-loss-boundary-fixed.json`
+  - 结果: `status=full_3dgs_solver_decoder_joint_training_ready`，
+    `point_smoke_blockers=[]`，`upgrade_blockers=[]`，
+    `decoder_handoff_status=full_renderer_solver_decoder_joint_training_ready`，
+    `evidence_image_render_loss_decreased=true`。
+  - 本地 ignored run 目录的
+    `outputs/training/train-run-004-solver-temp05-gsplat/renderer-loss-boundary.json`
+    已重新生成，但不提交。
+- 边界:
+  - 不改变训练数学，不改 checkpoint schema，不解冻 renderer 参数。
+  - 不提交 `outputs/` 或 `/tmp` 产物。
+- 验证:
+  - `uv run --extra dev pytest tests/test_renderer_loss.py`: 11 passed。
+  - `uv run python -m py_compile objgauss/core/renderer_loss.py`: passed。
+  - `uv run --extra dev pytest`: 179 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `684b3fe`
 
 ### TRAIN-RUN-004: Controlled solver-temperature GPU resume run
 

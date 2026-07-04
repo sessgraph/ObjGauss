@@ -150,6 +150,17 @@ checkpoint 通过：`mean_normalized_entropy=0.237402`、`assignment_confidence=
 `decoder_handoff_status=full_renderer_decoder_ready` 且 run-level image loss 已下降；下一步
 应先修正 segmented run boundary gate，再进入 renderer 参数解冻。
 
+随后完成 `RENDER-LOSS-RUN-GATE-001`：`renderer-loss-contract` 在读取
+solver-decoder segmented `final-summary.json` 时优先使用 `run_loss` 作为 readiness
+evidence，同时保留最后一个 segment 的 loss 作为 `segment_*` 诊断字段。对
+`outputs/training/train-run-004-solver-temp05-gsplat/final-summary.json` 重新生成 boundary
+后，状态从 `point_render_smoke_blocked` 修正为
+`full_3dgs_solver_decoder_joint_training_ready`，`point_smoke_blockers=[]`、
+`upgrade_blockers=[]`、`decoder_handoff_status=full_renderer_solver_decoder_joint_training_ready`，
+evidence 使用 run-level delta：`image_render_loss=0.018028 -> 0.017223`、
+`object_loss=0.278156 -> 0.208460`。该修正不改变训练数学、不改 checkpoint schema、不解冻
+Gaussian geometry / opacity / camera / dynamic-K。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
