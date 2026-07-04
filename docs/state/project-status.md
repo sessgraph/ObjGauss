@@ -271,6 +271,20 @@ summary 可写 `final_decoder_scale_multiplier_min/mean/max`，TensorBoard write
 dynamic-K。下一步先做 `FIELD-FREEZE-CONTROLS-001`，使 solver / colors / opacity / scale
 可以独立冻结或训练，再进入 `TRAIN-RUN-006-SCALE-SMOKE`，否则 scale smoke 的结果不可解释。
 
+随后完成 `FIELD-FREEZE-CONTROLS-001`：`train_solver_decoder_joint(...)` 现在支持
+`train_solver` 和 `train_decoder_colors`，默认保持 `True` 以兼容旧命令；CLI 新增
+`--freeze-solver`、`--freeze-decoder-colors`、`--freeze-decoder-opacity` 和
+`--freeze-decoder-scale`。solver 冻结时不会更新 solver weights / bias / step；decoder
+colors 冻结时不会更新 `decoder.object_colors`。如果 checkpoint 已经带有
+`decoder.object_opacity_logits` 或 `decoder.object_scale_log_offsets`，冻结状态下这些字段仍会
+参与 forward，只是不更新，避免 frozen 被误解为 disabled。summary / checkpoint 现在记录
+`train_solver`、`train_decoder_colors`，并让 `trained_fields` / `frozen_fields` 精确反映
+实际更新字段。CPU scale-only smoke 已验证冻结 solver 和 colors 后只训练
+`decoder.object_scale_log_offsets`。本切片不启动 GPU 训练、不提交 ignored `outputs/` 或
+`/tmp` 产物，不训练 per-Gaussian means / scales / quats / camera / dynamic-K。下一步是
+`TRAIN-RUN-006-SCALE-SMOKE`：从 run-005 final checkpoint resume，使用 gsplat renderer 和
+1GB VRAM reserve 做 scale-only GPU smoke。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

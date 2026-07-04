@@ -15,24 +15,25 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate。下一步进入 `FIELD-FREEZE-CONTROLS-001`，补 solver / colors / opacity / scale 的独立 freeze 控制，避免 run-006 的训练结果不可解释。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制。下一步进入 `TRAIN-RUN-006-SCALE-SMOKE`，从 run-005 resume 做 scale-only GPU smoke。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### FIELD-FREEZE-CONTROLS-001: Add explicit train/freeze controls for joint renderer fields
+### TRAIN-RUN-006-SCALE-SMOKE: Controlled scale-only GPU smoke
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model training contract
-- 目标: 给 `solver-decoder-mvp` 增加显式 freeze / train 控制，能单独训练或冻结
-  solver assignment 参数、decoder object colors、decoder opacity logits 和 decoder scale
-  log offsets。
-- 背景: opacity 与 scale 的 renderer thaw gate 已经接入，但当前 joint trainer 默认仍会同时
-  更新 solver 和 object colors。run-006 如果直接开启 scale，会把 assignment / color / scale
-  的贡献混在一起，无法解释 image loss 改善来自哪里。
-- 验收: 默认行为保持兼容；新增 CLI gate 能冻结 solver、colors、opacity、scale 中的任意已支持
-  字段；summary / checkpoint trained_fields 和 frozen_fields 精确反映实际更新字段；
-  scale-only CPU smoke 可运行；已有 opacity / scale 测试继续通过。
+- 类型: 标准 PR / algorithm model training smoke
+- 目标: 从 run-005 final checkpoint resume，开启 `--train-decoder-scale`，并用
+  `--freeze-solver --freeze-decoder-colors` 做一次受控 GPU / gsplat scale-only smoke。
+- 背景: `TRAIN-DECODER-SCALE-001` 已接 scale gradient，`FIELD-FREEZE-CONTROLS-001`
+  已保证 solver / colors 可以冻结。run-006 的目的不是证明最终效果，而是验证 scale path、
+  checkpoint、TensorBoard、ObjectState eval 和 renderer boundary 在真实 gsplat GPU 路径上可用。
+- 验收: run-level image render loss 下降；trained_fields 只包含
+  `decoder.object_scale_log_offsets`；frozen_fields 包含 solver 参数、decoder.object_colors、
+  source opacity / base scale / cameras / dynamic_k；TensorBoard 写出
+  `decoder/scale_multiplier_min/mean/max`；`eval-objectstate --require-pass` 继续通过；
+  renderer boundary 无 upgrade blockers；scale multiplier 未大面积贴边。
 - 边界: 不启动长时间 GPU run；不提交 `outputs/` 或 `/tmp` 产物；不训练 per-Gaussian
   means / scales / quats / camera / dynamic-K；不进入 assignment solver v2。
 
@@ -93,6 +94,39 @@
 当前无进行中 PR。
 
 ## Done
+
+### FIELD-FREEZE-CONTROLS-001: Add explicit train/freeze controls for joint renderer fields
+
+- 状态: done / solver-decoder-freeze-controls
+- 类型: 标准 PR / algorithm model training contract
+- 目标: 给 `solver-decoder-mvp` 增加显式 freeze / train 控制，能单独训练或冻结
+  solver assignment 参数、decoder object colors、decoder opacity logits 和 decoder scale
+  log offsets。
+- 已实施:
+  - `train_solver_decoder_joint(...)` 新增 `train_solver` 和 `train_decoder_colors`，
+    默认值均为 `True`，保持旧命令默认行为不变。
+  - solver 冻结时不更新 solver weights / bias / step；decoder colors 冻结时不更新
+    `decoder.object_colors`。
+  - checkpoint 中已有 `decoder.object_opacity_logits` 或 `decoder.object_scale_log_offsets`
+    时，冻结状态下仍参与 forward，只是不更新，避免 frozen 被误解为 disabled。
+  - summary / checkpoint 新增 `train_solver` 和 `train_decoder_colors`，并让
+    `trained_fields` / `frozen_fields` 精确反映实际更新字段。
+  - CLI 新增 `--freeze-solver`、`--freeze-decoder-colors`、`--freeze-decoder-opacity` 和
+    `--freeze-decoder-scale`；`--train-decoder-opacity` / `--train-decoder-scale` 与对应
+    freeze flag 同时出现时会报错。
+  - 新增 scale-only CPU smoke：冻结 solver 和 colors，只训练
+    `decoder.object_scale_log_offsets`。
+- 边界:
+  - 不启动 run-006 GPU smoke，不提交 `outputs/` 或 `/tmp` 产物。
+  - 不训练 per-Gaussian means / scales / quats / camera / dynamic-K。
+  - 不进入 assignment solver v2。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_training_renderer.py tests/test_gsplat_training_renderer.py`: 29 passed。
+  - `uv run python -m py_compile objgauss/core/solver_decoder_training.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest`: 193 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: `e2fd5e2`
 
 ### TRAIN-DECODER-SCALE-001: Wire object-level scale renderer gradient
 
