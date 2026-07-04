@@ -89,7 +89,7 @@
   - 不解冻 per-Gaussian means / scales / quats / camera / dynamic-K。
 - 验证:
   - `git diff --check`: passed。
-- 完成 commit: pending / uncommitted
+- 完成 commit: `11502cb`
 
 ### TRAIN-RUN-005-OPACITY-SMOKE: Controlled opacity-thaw GPU smoke
 
