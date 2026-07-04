@@ -92,7 +92,7 @@
   - `git diff --check`: passed。
   - `uv run --extra dev pytest`: 182 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
-- 完成 commit: pending
+- 完成 commit: `f259a7b`
 
 ### RENDER-FIELD-UNFREEZE-PLAN-001: Plan the first renderer parameter thaw
 
