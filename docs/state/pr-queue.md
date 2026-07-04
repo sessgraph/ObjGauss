@@ -179,7 +179,7 @@
     `/tmp/objgauss-world-viewer-mobile.png`。
   - `uv run --extra dev pytest`: 186 passed。
   - `git diff --check`: passed。
-- 完成 commit: pending / uncommitted
+- 完成 commit: `b086ad4`
 
 ### TRAIN-DECODER-OPACITY-001: Wire object-level opacity renderer gradient
 
