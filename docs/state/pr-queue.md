@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan，下一步进入真实训练 run 与 eval gate。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出，下一步进入真实 GPU training run 与 eval gate。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
@@ -48,6 +48,45 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-RUN-TB-001: Add TensorBoard scalar export for solver-decoder runs
+
+- 状态: done / tensorboard-scalar-export
+- 类型: 标准 PR / training observability
+- 目标: 修复 TensorBoard 6006 显示 inactive 的根因，让 solver-decoder 分段训练 run
+  可写出 TensorBoard event scalars。
+- 已实施:
+  - 新增 `objgauss/core/training_tensorboard.py`，定义
+    `objgauss-tensorboard-scalar-export-v1` 和
+    `write_solver_decoder_tensorboard_events(...)`。
+  - `objgauss training solver-decoder-mvp` 新增 `--tensorboard-logdir`，必须与
+    `--run-output-dir` 一起使用。
+  - `final-summary.json` 现在可包含 `tensorboard` export metadata；CLI 会打印
+    `tensorboard_logdir` 和 `tensorboard_scalar_count`。
+  - 写入 scalar tags：`loss/total`、`loss/image_render`、`loss/object`、
+    `loss/entropy`、`loss/balance`、`run/final_total_loss`。
+  - TensorBoard writer 是可选依赖：只有传 `--tensorboard-logdir` 时才导入
+    `torch.utils.tensorboard`；真实训练命令需要带 `--with tensorboard`。
+- 边界:
+  - 不改变 solver / decoder 训练数学，不训练 geometry / opacity / camera / dynamic-K。
+  - 不提交 TensorBoard event 文件、checkpoint、summary 或 ignored `outputs/` 产物。
+  - 不新增基础 dependency，不启动长时间训练。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_core_namespace.py`:
+    16 passed。
+  - `uv run python -m py_compile objgauss/core/training_tensorboard.py objgauss/cli.py objgauss/core/__init__.py`:
+    passed。
+  - `uv run --with torch --with tensorboard objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 4 --image-width 8 --image-height 8 --iterations 2 --checkpoint-every 1 --loss-log-every 1 --solver-learning-rate 0.05 --decoder-learning-rate 0.5 --object-weight 0.1 --run-output-dir /tmp/objgauss-tensorboard-smoke-run --tensorboard-logdir /tmp/objgauss-tensorboard-smoke-run/tensorboard --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`tensorboard_scalar_count=17`。
+  - `find /tmp/objgauss-tensorboard-smoke-run/tensorboard -maxdepth 1 -type f -name 'events.out.tfevents*'`:
+    found one event file。
+  - `uv run --with tensorboard python -c "from tensorboard.backend.event_processing.event_accumulator import EventAccumulator; ..."`:
+    scalar tags read back as `loss/total`、`loss/image_render`、`loss/object`、
+    `loss/entropy`、`loss/balance`、`run/final_total_loss`。
+  - `uv run --extra dev pytest`: 175 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `c6eb04c`
 
 ### TRAIN-SCALE-001: Add solver-decoder training scale controls
 

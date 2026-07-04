@@ -92,6 +92,18 @@ CPU point scale smoke 验证 4 iteration / checkpoint every 2 的 run：
 或 ignored `outputs/` 产物，不训练 Gaussian geometry / opacity / rotation / camera /
 dynamic-K。
 
+随后完成 `TRAIN-RUN-TB-001`：`solver-decoder-mvp` 新增可选
+`--tensorboard-logdir`，在 `--run-output-dir` 分段训练结束后写出 TensorBoard scalar
+event。该 writer 只在显式传入 TensorBoard logdir 时导入 `torch.utils.tensorboard`；
+基础依赖不新增 torch / tensorboard。已写入的 scalar tags 包括 `loss/total`、
+`loss/image_render`、`loss/object`、`loss/entropy`、`loss/balance` 和
+`run/final_total_loss`。真实 smoke 使用
+`uv run --with torch --with tensorboard ... --tensorboard-logdir
+/tmp/objgauss-tensorboard-smoke-run/tensorboard` 生成
+`events.out.tfevents.*`，并用 TensorBoard event accumulator 读回上述 scalar tags。
+6006 UI 必须指向实际 run logdir，例如 `$RUN_DIR/tensorboard`；指向 `/tensorboard`
+这类空目录会显示 inactive。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
