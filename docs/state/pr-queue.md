@@ -15,21 +15,22 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制。当前 run-003 在 `--solver-temperature 0.5` 下只读 eval 已 pass，下一步做受控 GPU resume run 固化该 temperature。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval。下一步先修正 segmented run 的 renderer-loss boundary gate，再考虑 renderer 参数解冻。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### TRAIN-RUN-004: Controlled solver-temperature GPU resume run
+### RENDER-LOSS-RUN-GATE-001: Honor segmented run_loss in renderer boundary
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model training
-- 目标: 从 run-003 final checkpoint resume，使用 `--solver-temperature 0.5` 做一次受控
-  GPU / gsplat 训练 run，产出正式 checkpoint、TensorBoard loss 和 ObjectState eval。
-- 背景: run-003 原始 temperature=1.0 eval fail；只读 temperature=0.5 eval pass：
-  `mean_normalized_entropy=0.192517`，`object_purity=0.866342`，`slot_collapse=false`。
-- 边界: 继续冻结 Gaussian geometry / opacity / camera / dynamic-K；不提交 ignored
-  `outputs/` 训练产物。
+- 类型: 标准 PR / training contract
+- 目标: 让 `renderer-loss-contract` 在读取 segmented `final-summary.json` 时优先使用
+  `run_loss`，避免只看最后一个 segment 的 `image_render_loss_decreased=false` 而把整个
+  run 误判为 `point_render_smoke_blocked`。
+- 背景: TRAIN-RUN-004 的 run-level image render loss 为 `0.018028 -> 0.017223`，但最后
+  一个 segment 的 image loss 基本持平，当前 boundary 仍显示
+  `point_render_smoke_blocked`；checkpoint handoff 已是 `full_renderer_decoder_ready`。
+- 边界: 不改变训练数学，不改 checkpoint schema，不解冻 renderer 参数。
 
 ## Suspended
 
@@ -57,6 +58,44 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-RUN-004: Controlled solver-temperature GPU resume run
+
+- 状态: done / solver-temperature-gpu-run
+- 类型: 标准 PR / algorithm model training
+- 目标: 从 run-003 final checkpoint resume，使用 `--solver-temperature 0.5` 做一次受控
+  GPU / gsplat 训练 run，产出正式 checkpoint、TensorBoard loss 和 ObjectState eval。
+- 已执行:
+  - 输入 checkpoint:
+    `outputs/training/train-run-003-solver-decoder-gsplat-sharpen/final-checkpoint.json`
+  - 输出目录: `outputs/training/train-run-004-solver-temp05-gsplat/`，保持 ignored，不进 git。
+  - 训练配置: gsplat renderer、128 sampled Gaussians、2 frames、16x16 image target、
+    100 total iterations、checkpoint every 20、`solver_learning_rate=0.02`、
+    `decoder_learning_rate=0.10`、`solver_temperature=0.5`、`object_weight=0.7`、
+    `entropy_weight=0.03`、`balance_weight=0.02`、`vram_reserve_gb=1`。
+- 训练结果:
+  - `run_initial_total_loss=0.219158 -> run_final_total_loss=0.170798`
+  - `run_initial_image_render_loss=0.018028 -> run_final_image_render_loss=0.017223`
+  - `run_initial_object_loss=0.278156 -> run_final_object_loss=0.208460`
+  - final segment: `final_entropy_loss=0.237402`，`final_balance_loss=0.026554`
+  - `solver_step=500`，`decoder_step=500`，`gpu_used=true`，`renderer_name=gsplat-rasterization-v1`
+  - TensorBoard: `outputs/training/train-run-004-solver-temp05-gsplat/tensorboard`，
+    `tensorboard_scalar_count=41`。
+- ObjectState eval:
+  - 命令:
+    `uv run objgauss training eval-objectstate public/samples/lego_alpha_v1_objects.ply --checkpoint outputs/training/train-run-004-solver-temp05-gsplat/final-checkpoint.json --max-points 128 --summary-output /tmp/objgauss-train-run-004-objectstate-eval.json --require-pass`
+  - 结果: `eval_status=objectstate_eval_pass`，
+    `mean_normalized_entropy=0.237402`，`assignment_confidence=0.762598`，
+    `effective_slots=3.178765`，`max_dominant_slot_mass_fraction=0.466883`，
+    `slot_collapse=false`，`object_purity=0.868178`。
+- 已发现:
+  - `renderer-loss-boundary.json` 对 segmented run 仍读取最后一个 segment 的
+    `image_render_loss_decreased=false`，因此显示 `point_render_smoke_blocked`。
+  - run-level `run_loss.image_render_loss_decreased=true` 且
+    `decoder_handoff_status=full_renderer_decoder_ready`，下一步应修正 boundary gate。
+- 边界:
+  - 不提交 `outputs/` training run、TensorBoard event、checkpoint 或 `/tmp` eval summary。
+  - 不训练 Gaussian geometry / opacity / rotation / camera，不执行 dynamic-K。
 
 ### SOLVER-TEMP-001: Expose solver temperature / sharpening controls
 

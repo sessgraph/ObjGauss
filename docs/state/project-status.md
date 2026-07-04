@@ -131,6 +131,25 @@ Gaussian means / quats / scales / opacities / cameras / dynamic-K。对 run-003 
 `object_purity=0.866342`。下一步应做一次受控 GPU resume run，把 temperature=0.5 固化
 进正式 checkpoint，再评估是否进入 renderer 参数解冻计划。
 
+随后完成 `TRAIN-RUN-004` 受控 GPU resume run：从
+`outputs/training/train-run-003-solver-decoder-gsplat-sharpen/final-checkpoint.json`
+resume，使用 `--solver-temperature 0.5`、gsplat renderer、128 sampled Gaussians、
+2 frames、100 total iterations、checkpoint every 20、1GB VRAM reserve，输出到 ignored
+`outputs/training/train-run-004-solver-temp05-gsplat/`。run-level loss 从
+`0.219158 -> 0.170798`，image render loss 从 `0.018028 -> 0.017223`，object loss 从
+`0.278156 -> 0.208460`；最后一个 segment 的 final loss 为
+`total=0.170798`、`image_render=0.017223`、`object=0.208460`、`entropy=0.237402`。
+final checkpoint 固化 `solver_temperature=0.5`，solver / decoder step 均为 500，trained
+fields 仍只有 solver assignment weights 和 decoder object colors，Gaussian geometry /
+opacity / camera / dynamic-K 继续冻结。`eval-objectstate --require-pass` 对 run-004 final
+checkpoint 通过：`mean_normalized_entropy=0.237402`、`assignment_confidence=0.762598`、
+`effective_slots=3.178765`、`max_dominant_slot_mass_fraction=0.466883`、
+`slot_collapse=false`、`object_purity=0.868178`。注意：当前
+`renderer-loss-boundary.json` 对 segmented run 仍读取最后一个 segment 的
+`image_render_loss_decreased=false`，因此会显示 `point_render_smoke_blocked`，但
+`decoder_handoff_status=full_renderer_decoder_ready` 且 run-level image loss 已下降；下一步
+应先修正 segmented run boundary gate，再进入 renderer 参数解冻。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
