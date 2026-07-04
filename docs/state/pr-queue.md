@@ -94,7 +94,7 @@
   - `git diff --check`: passed。
   - `uv run --extra dev pytest`: 186 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
-- 完成 commit: pending
+- 完成 commit: `809c1e9`
 
 ### DECODER-OPACITY-CONTRACT-001: Add object-level opacity decoder contract
 
