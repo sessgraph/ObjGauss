@@ -329,6 +329,64 @@ def test_solver_decoder_joint_training_updates_decoder_scale_when_enabled():
     assert "decoder.object_scale_log_offsets" in checkpoint["trained_fields"]
 
 
+def test_solver_decoder_joint_training_can_run_scale_only_with_frozen_solver_and_colors():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        bind_image_targets=True,
+        image_width=8,
+        image_height=8,
+        seed=2,
+    )
+    initial_decoder_state = ObjectStateGaussianDecoderState(
+        object_colors=np.array(
+            [
+                [0.2, 0.3, 0.4],
+                [0.6, 0.7, 0.8],
+            ],
+            dtype=np.float32,
+        ),
+        object_scale_log_offsets=np.zeros(2, dtype=np.float32),
+        step=3,
+        source="fixture_scale_only_training",
+    )
+
+    result = train_solver_decoder_joint(
+        sample.frames,
+        initial_decoder_state=initial_decoder_state,
+        iterations=3,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.3,
+        train_solver=False,
+        train_decoder_colors=False,
+        train_decoder_scale=True,
+        decoder_scale_learning_rate=1.0,
+        object_weight=0.2,
+        seed=7,
+    )
+    payload = result.as_dict()
+
+    assert result.train_solver is False
+    assert result.train_decoder_colors is False
+    assert result.train_decoder_scale is True
+    assert payload["trained_fields"] == ["decoder.object_scale_log_offsets"]
+    assert "solver.feature_weights" in payload["frozen_fields"]
+    assert "decoder.object_colors" in payload["frozen_fields"]
+    assert "base_scales" in payload["frozen_fields"]
+    assert result.final_solver_state.step == result.initial_solver_state.step
+    assert result.final_decoder_state.step == initial_decoder_state.step + 3
+    np.testing.assert_allclose(
+        result.final_decoder_state.object_colors,
+        initial_decoder_state.object_colors,
+        atol=1e-6,
+    )
+    assert not np.allclose(
+        result.final_decoder_state.object_scale_log_offsets,
+        initial_decoder_state.object_scale_log_offsets,
+    )
+
+
 def test_solver_decoder_joint_training_can_override_solver_temperature():
     sample = trainable_kernel_sample_from_cloud(
         _object_cloud(),
@@ -535,6 +593,62 @@ def test_solver_decoder_mvp_cli_trains_decoder_scale_when_enabled(tmp_path, caps
     assert "decoder.object_scale_log_offsets" in payload["trained_fields"]
     assert "base_scales" in payload["frozen_fields"]
     assert checkpoint["decoder_state"]["object_scale_log_offsets"] is not None
+    assert checkpoint["training"]["train_decoder_scale"] is True
+
+
+def test_solver_decoder_mvp_cli_supports_scale_only_freeze_controls(tmp_path, capsys):
+    input_path = tmp_path / "objects.ply"
+    summary_path = tmp_path / "joint-summary.json"
+    checkpoint_path = tmp_path / "joint-checkpoint.json"
+    write_ply(input_path, _object_cloud(), fmt="ascii")
+
+    status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "3",
+            "--solver-learning-rate",
+            "0.08",
+            "--decoder-learning-rate",
+            "0.4",
+            "--freeze-solver",
+            "--freeze-decoder-colors",
+            "--train-decoder-scale",
+            "--decoder-scale-learning-rate",
+            "1.0",
+            "--object-weight",
+            "0.2",
+            "--summary-output",
+            str(summary_path),
+            "--checkpoint-output",
+            str(checkpoint_path),
+        ]
+    )
+
+    stdout = capsys.readouterr().out
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert status == 0
+    assert "train_solver=false" in stdout
+    assert "train_decoder_colors=false" in stdout
+    assert "train_decoder_scale=true" in stdout
+    assert "trained_fields=decoder.object_scale_log_offsets" in stdout
+    assert payload["train_solver"] is False
+    assert payload["train_decoder_colors"] is False
+    assert payload["train_decoder_scale"] is True
+    assert payload["trained_fields"] == ["decoder.object_scale_log_offsets"]
+    assert "solver.feature_weights" in payload["frozen_fields"]
+    assert "decoder.object_colors" in payload["frozen_fields"]
+    assert checkpoint["training"]["train_solver"] is False
+    assert checkpoint["training"]["train_decoder_colors"] is False
     assert checkpoint["training"]["train_decoder_scale"] is True
 
 

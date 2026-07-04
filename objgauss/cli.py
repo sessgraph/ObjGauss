@@ -1399,6 +1399,10 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         raise ValueError("--checkpoint-every requires --run-output-dir")
     if args.tensorboard_logdir and not args.run_output_dir:
         raise ValueError("--tensorboard-logdir requires --run-output-dir")
+    if args.train_decoder_opacity and args.freeze_decoder_opacity:
+        raise ValueError("--train-decoder-opacity cannot be combined with --freeze-decoder-opacity")
+    if args.train_decoder_scale and args.freeze_decoder_scale:
+        raise ValueError("--train-decoder-scale cannot be combined with --freeze-decoder-scale")
     record_every = _solver_decoder_record_every(args)
     cloud = read_ply(args.input)
     sample = trainable_kernel_sample_from_cloud(
@@ -1482,6 +1486,8 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"decoder_learning_rate={summary['learning_rates']['decoder']}")
     print(f"decoder_opacity_learning_rate={summary['learning_rates']['decoder_opacity']}")
     print(f"decoder_scale_learning_rate={summary['learning_rates']['decoder_scale']}")
+    print(f"train_solver={str(summary['train_solver']).lower()}")
+    print(f"train_decoder_colors={str(summary['train_decoder_colors']).lower()}")
     print(f"train_decoder_opacity={str(summary['train_decoder_opacity']).lower()}")
     print(f"train_decoder_scale={str(summary['train_decoder_scale']).lower()}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
@@ -1652,10 +1658,12 @@ def _train_solver_decoder_segment(
         iterations=iterations,
         solver_learning_rate=args.solver_learning_rate,
         decoder_learning_rate=args.decoder_learning_rate,
-        train_decoder_opacity=args.train_decoder_opacity,
+        train_solver=not args.freeze_solver,
+        train_decoder_colors=not args.freeze_decoder_colors,
+        train_decoder_opacity=args.train_decoder_opacity and not args.freeze_decoder_opacity,
         decoder_opacity_learning_rate=args.decoder_opacity_learning_rate,
         decoder_opacity_init_logit=args.decoder_opacity_init_logit,
-        train_decoder_scale=args.train_decoder_scale,
+        train_decoder_scale=args.train_decoder_scale and not args.freeze_decoder_scale,
         decoder_scale_learning_rate=args.decoder_scale_learning_rate,
         decoder_scale_init_log_offset=args.decoder_scale_init_log_offset,
         image_render_weight=args.image_render_weight,
@@ -3056,10 +3064,14 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--iterations", type=int, default=4)
     solver_decoder_mvp.add_argument("--solver-learning-rate", type=float, default=0.05)
     solver_decoder_mvp.add_argument("--decoder-learning-rate", type=float, default=0.5)
+    solver_decoder_mvp.add_argument("--freeze-solver", action="store_true")
+    solver_decoder_mvp.add_argument("--freeze-decoder-colors", action="store_true")
     solver_decoder_mvp.add_argument("--train-decoder-opacity", action="store_true")
+    solver_decoder_mvp.add_argument("--freeze-decoder-opacity", action="store_true")
     solver_decoder_mvp.add_argument("--decoder-opacity-learning-rate", type=float, default=0.02)
     solver_decoder_mvp.add_argument("--decoder-opacity-init-logit", type=float, default=6.0)
     solver_decoder_mvp.add_argument("--train-decoder-scale", action="store_true")
+    solver_decoder_mvp.add_argument("--freeze-decoder-scale", action="store_true")
     solver_decoder_mvp.add_argument("--decoder-scale-learning-rate", type=float, default=0.02)
     solver_decoder_mvp.add_argument("--decoder-scale-init-log-offset", type=float, default=0.0)
     solver_decoder_mvp.add_argument("--image-render-weight", type=float, default=1.0)
