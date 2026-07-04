@@ -104,6 +104,21 @@ event。该 writer 只在显式传入 TensorBoard logdir 时导入 `torch.utils.
 6006 UI 必须指向实际 run logdir，例如 `$RUN_DIR/tensorboard`；指向 `/tensorboard`
 这类空目录会显示 inactive。
 
+随后完成 `EVAL-OBJECTSTATE-001`：新增
+`objgauss-objectstate-checkpoint-eval-v1`，把 solver-decoder joint checkpoint 重新投影为
+`ObjectStateProjection` 并输出 assignment entropy、confidence、effective slots、slot
+mass / purity、collapse gate 和 temporal drift。CLI 新增
+`objgauss training eval-objectstate <ply> --checkpoint <final-checkpoint.json>`，默认从
+checkpoint 推断 slots / frame count / sampled gaussians，可写 summary 到 `/tmp` 或
+ignored `outputs/`。对当前 GPU run
+`outputs/training/train-run-003-solver-decoder-gsplat-sharpen/final-checkpoint.json` 的
+只读评估结果为：`mean_normalized_entropy=0.601689`、
+`assignment_confidence=0.398312`、`effective_slots=3.440100`、
+`max_dominant_slot_mass_fraction=0.438636`、`slot_collapse=false`、
+`object_purity=0.719425`，状态为 `objectstate_eval_fail`。结论：run-003 已经接近
+entropy gate 且没有 collapse，但 purity 未达 0.8，不能据此解冻 Gaussian geometry；
+下一步优先 `SOLVER-TEMP-001` / assignment sharpening，而不是继续盲目加长训练。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
