@@ -228,6 +228,19 @@ run-005 只能证明 opacity training path / checkpoint / TensorBoard / eval gat
 object-level opacity 已经带来稳定可推广收益；下一步进入 renderer scale thaw 前应先做规划和
 更严格的 promotion gate。
 
+随后完成 `RENDER-FIELD-SCALE-PLAN-001`：在
+`docs/architecture/renderer-field-unfreeze-plan-v1.md` 中把第二个 renderer 参数解冻切片
+冻结为 `decoder.object_scale_log_offsets: R^K`。该字段是 object-level isotropic scale
+multiplier，`0.0` 初始化必须严格等价于当前 frozen scale path；首个实现只允许
+`[0.75, 1.25]` multiplier bound，不允许 `R^{K x 3}`、per-Gaussian scale、means、quats、
+camera 或 dynamic-K。规划明确下一步先做 `DECODER-SCALE-CONTRACT-001`，只把 scale
+offset 写入 decoder state / checkpoint ABI 和 Gaussian decode summary；之后才允许
+`TRAIN-DECODER-SCALE-001` 接 renderer gradient / CLI gate，最后再进入
+`TRAIN-RUN-006-SCALE-SMOKE`。run-005 的弱收益被记录为 promotion 风险：scale smoke 需要
+更严格的 image loss、ObjectState eval、object loss、scale saturation 和 before / after
+render gate。本步骤是 docs-only planning，不改训练数学、不启动 GPU 训练、不提交 ignored
+`outputs/` 或 `/tmp` 产物。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
