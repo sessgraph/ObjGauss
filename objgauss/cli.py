@@ -1481,7 +1481,9 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"solver_learning_rate={summary['learning_rates']['solver']}")
     print(f"decoder_learning_rate={summary['learning_rates']['decoder']}")
     print(f"decoder_opacity_learning_rate={summary['learning_rates']['decoder_opacity']}")
+    print(f"decoder_scale_learning_rate={summary['learning_rates']['decoder_scale']}")
     print(f"train_decoder_opacity={str(summary['train_decoder_opacity']).lower()}")
+    print(f"train_decoder_scale={str(summary['train_decoder_scale']).lower()}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
     print(f"final_total_loss={result.final_loss.total_loss:.6f}")
     print(f"initial_image_render_loss={result.initial_loss.image_render_loss:.6f}")
@@ -1505,6 +1507,12 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         print(f"decoder_opacity_scale_min={_format_optional_float(decoder_opacity['scale_min'])}")
         print(f"decoder_opacity_scale_mean={_format_optional_float(decoder_opacity['scale_mean'])}")
         print(f"decoder_opacity_scale_max={_format_optional_float(decoder_opacity['scale_max'])}")
+    decoder_scale = summary.get("decoder_scale")
+    if isinstance(decoder_scale, dict):
+        print(f"decoder_scale_enabled={str(decoder_scale['enabled']).lower()}")
+        print(f"decoder_scale_multiplier_min={_format_optional_float(decoder_scale['multiplier_min'])}")
+        print(f"decoder_scale_multiplier_mean={_format_optional_float(decoder_scale['multiplier_mean'])}")
+        print(f"decoder_scale_multiplier_max={_format_optional_float(decoder_scale['multiplier_max'])}")
     print(f"gpu_used={str(summary['gpu_policy']['uses_gpu']).lower()}")
     print(f"vram_reserve_gb={summary['gpu_policy']['vram_reserve_gb']}")
     renderer_api = summary.get("renderer_api")
@@ -1647,6 +1655,9 @@ def _train_solver_decoder_segment(
         train_decoder_opacity=args.train_decoder_opacity,
         decoder_opacity_learning_rate=args.decoder_opacity_learning_rate,
         decoder_opacity_init_logit=args.decoder_opacity_init_logit,
+        train_decoder_scale=args.train_decoder_scale,
+        decoder_scale_learning_rate=args.decoder_scale_learning_rate,
+        decoder_scale_init_log_offset=args.decoder_scale_init_log_offset,
         image_render_weight=args.image_render_weight,
         object_weight=args.object_weight,
         entropy_weight=args.entropy_weight,
@@ -1717,6 +1728,18 @@ def _solver_decoder_opacity_segment_metrics(result) -> dict[str, object]:
         "final_decoder_opacity_scale_min": decoder_opacity["scale_min"],
         "final_decoder_opacity_scale_mean": decoder_opacity["scale_mean"],
         "final_decoder_opacity_scale_max": decoder_opacity["scale_max"],
+    }
+
+
+def _solver_decoder_scale_segment_metrics(result) -> dict[str, object]:
+    summary = result.as_dict()
+    decoder_scale = summary.get("decoder_scale")
+    if not isinstance(decoder_scale, dict) or not decoder_scale.get("enabled"):
+        return {}
+    return {
+        "final_decoder_scale_multiplier_min": decoder_scale["multiplier_min"],
+        "final_decoder_scale_multiplier_mean": decoder_scale["multiplier_mean"],
+        "final_decoder_scale_multiplier_max": decoder_scale["multiplier_max"],
     }
 
 
@@ -1801,6 +1824,7 @@ def _run_solver_decoder_scaled(
                 "final_entropy_loss": result.final_loss.entropy_loss,
                 "final_balance_loss": result.final_loss.balance_loss,
                 **_solver_decoder_opacity_segment_metrics(result),
+                **_solver_decoder_scale_segment_metrics(result),
             }
         )
         first_result = first_result or result
@@ -3035,6 +3059,9 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--train-decoder-opacity", action="store_true")
     solver_decoder_mvp.add_argument("--decoder-opacity-learning-rate", type=float, default=0.02)
     solver_decoder_mvp.add_argument("--decoder-opacity-init-logit", type=float, default=6.0)
+    solver_decoder_mvp.add_argument("--train-decoder-scale", action="store_true")
+    solver_decoder_mvp.add_argument("--decoder-scale-learning-rate", type=float, default=0.02)
+    solver_decoder_mvp.add_argument("--decoder-scale-init-log-offset", type=float, default=0.0)
     solver_decoder_mvp.add_argument("--image-render-weight", type=float, default=1.0)
     solver_decoder_mvp.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
     solver_decoder_mvp.add_argument("--gaussian-scale", type=float, default=0.5)

@@ -5,7 +5,10 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from objgauss.core.gaussian_decoder import object_opacity_scales_from_logits
+from objgauss.core.gaussian_decoder import (
+    object_opacity_scales_from_logits,
+    object_scale_multipliers_from_log_offsets,
+)
 from objgauss.core.trainable_kernel import (
     TrainableKernelFrame,
     TrainableKernelImageTarget,
@@ -52,6 +55,7 @@ class TrainingRendererLossResult:
     rendered_images: tuple[np.ndarray, ...]
     gradient_decoder_colors: np.ndarray
     gradient_decoder_opacity_logits: np.ndarray
+    gradient_decoder_scale_log_offsets: np.ndarray
     gradient_assignments: tuple[np.ndarray, ...]
     differentiable_fields: tuple[str, ...]
     frozen_fields: tuple[str, ...]
@@ -86,6 +90,13 @@ class TrainingRendererLossResult:
                 "decoder_opacity_logits_l2": float(
                     np.linalg.norm(self.gradient_decoder_opacity_logits)
                 ),
+                "decoder_scale_log_offsets_shape": [
+                    int(value)
+                    for value in self.gradient_decoder_scale_log_offsets.shape
+                ],
+                "decoder_scale_log_offsets_l2": float(
+                    np.linalg.norm(self.gradient_decoder_scale_log_offsets)
+                ),
                 "assignment_shapes": assignment_shapes,
                 "assignment_l2": assignment_l2,
             },
@@ -99,6 +110,7 @@ def evaluate_training_renderer_loss(
     decoder_colors: np.ndarray,
     *,
     decoder_opacity_logits: np.ndarray | None = None,
+    decoder_scale_log_offsets: np.ndarray | None = None,
     default_opacity: float = 1.0,
     renderer_name: str = CPU_IMAGE_SPLAT_RENDERER,
     gradient_path: str = CPU_IMAGE_SPLAT_GRADIENT_PATH,
@@ -123,6 +135,9 @@ def evaluate_training_renderer_loss(
     opacity_logits = _optional_array1d(decoder_opacity_logits, "decoder_opacity_logits")
     if opacity_logits is not None and opacity_logits.shape[0] != colors.shape[0]:
         raise ValueError("decoder_opacity_logits length must match decoder_colors rows")
+    scale_log_offsets = _optional_array1d(decoder_scale_log_offsets, "decoder_scale_log_offsets")
+    if scale_log_offsets is not None and scale_log_offsets.shape[0] != colors.shape[0]:
+        raise ValueError("decoder_scale_log_offsets length must match decoder_colors rows")
 
     rendered_images: list[np.ndarray] = []
     frame_losses: list[TrainingRendererFrameLoss] = []
@@ -133,6 +148,11 @@ def evaluate_training_renderer_loss(
         if opacity_logits is None
         else np.zeros_like(opacity_logits, dtype=np.float32)
     )
+    scale_gradient = (
+        np.zeros((0,), dtype=np.float32)
+        if scale_log_offsets is None
+        else np.zeros_like(scale_log_offsets, dtype=np.float32)
+    )
     total_loss = 0.0
 
     for frame_index, (frame, assignment) in enumerate(zip(frames, assignments, strict=True)):
@@ -141,6 +161,7 @@ def evaluate_training_renderer_loss(
             assignment,
             colors,
             opacity_logits=opacity_logits,
+            scale_log_offsets=scale_log_offsets,
             default_opacity=default_opacity,
             frame_index=frame_index,
         )
@@ -150,6 +171,8 @@ def evaluate_training_renderer_loss(
         decoder_gradient += frame_result["gradient_decoder_colors"] / len(frames)
         if opacity_logits is not None:
             opacity_gradient += frame_result["gradient_decoder_opacity_logits"] / len(frames)
+        if scale_log_offsets is not None:
+            scale_gradient += frame_result["gradient_decoder_scale_log_offsets"] / len(frames)
         total_loss += frame_result["frame_loss"].image_render_loss / len(frames)
 
     differentiable_fields = ["decoder_colors", "assignments"]
@@ -157,6 +180,9 @@ def evaluate_training_renderer_loss(
     if opacity_logits is not None:
         differentiable_fields.append("decoder_opacity_logits")
         frozen_fields.append("source_opacities")
+    if scale_log_offsets is not None:
+        differentiable_fields.append("decoder_scale_log_offsets")
+        frozen_fields.append("point_scale_proxy_base")
 
     return TrainingRendererLossResult(
         schema=TRAINING_RENDERER_API_SCHEMA,
@@ -168,6 +194,7 @@ def evaluate_training_renderer_loss(
         rendered_images=tuple(rendered_images),
         gradient_decoder_colors=decoder_gradient,
         gradient_decoder_opacity_logits=opacity_gradient,
+        gradient_decoder_scale_log_offsets=scale_gradient,
         gradient_assignments=tuple(gradient / len(frames) for gradient in assignment_gradients),
         differentiable_fields=tuple(differentiable_fields),
         frozen_fields=tuple(frozen_fields),
@@ -206,6 +233,7 @@ def _evaluate_frame(
     decoder_colors: np.ndarray,
     *,
     opacity_logits: np.ndarray | None,
+    scale_log_offsets: np.ndarray | None,
     default_opacity: float,
     frame_index: int,
 ) -> dict[str, Any]:
@@ -225,17 +253,21 @@ def _evaluate_frame(
 
     point_color = np.clip(assignment @ decoder_colors, 0.0, 1.0)
     opacity_scales = None
-    point_opacity = None
-    if opacity_logits is None:
-        point_rgb = point_color
-    else:
+    scale_multipliers = None
+    point_opacity = np.ones((assignment.shape[0],), dtype=np.float32)
+    point_scale = np.ones((assignment.shape[0],), dtype=np.float32)
+    if opacity_logits is not None:
         opacity_scales = object_opacity_scales_from_logits(opacity_logits)
         point_opacity = np.clip(
             float(default_opacity) * (assignment @ opacity_scales),
             0.0,
             1.0,
         ).astype(np.float32, copy=False)
-        point_rgb = point_color * point_opacity[:, None]
+    if scale_log_offsets is not None:
+        scale_multipliers = object_scale_multipliers_from_log_offsets(scale_log_offsets)
+        point_scale = (assignment @ scale_multipliers).astype(np.float32, copy=False)
+    contribution_scale = (point_opacity * point_scale).astype(np.float32, copy=False)
+    point_rgb = point_color * contribution_scale[:, None]
     rendered_image, counts, point_pixels = _render_point_splat_image(
         positions,
         point_rgb,
@@ -252,27 +284,45 @@ def _evaluate_frame(
     gradient_image = np.zeros_like(rendered_image, dtype=np.float32)
     gradient_image[mask] = (2.0 / supervised.size) * diff[mask]
     gradient_point_rgb = _point_rgb_gradient(point_pixels, counts, gradient_image)
+    gradient_point_color = gradient_point_rgb * contribution_scale[:, None]
+    gradient_decoder_colors = assignment.T @ gradient_point_color
+    gradient_assignment = gradient_point_color @ decoder_colors.T
     if opacity_logits is None:
-        gradient_decoder_colors = assignment.T @ gradient_point_rgb
-        gradient_assignment = gradient_point_rgb @ decoder_colors.T
         gradient_opacity_logits = np.zeros((0,), dtype=np.float32)
     else:
-        assert point_opacity is not None
         assert opacity_scales is not None
-        gradient_point_color = gradient_point_rgb * point_opacity[:, None]
-        gradient_decoder_colors = assignment.T @ gradient_point_color
-        gradient_point_opacity = np.sum(gradient_point_rgb * point_color, axis=1)
+        gradient_point_opacity = np.sum(
+            gradient_point_rgb * point_color * point_scale[:, None],
+            axis=1,
+        )
         gradient_opacity_scales = float(default_opacity) * (assignment.T @ gradient_point_opacity)
         gradient_opacity_logits = gradient_opacity_scales * _object_opacity_logit_derivative(opacity_logits)
-        gradient_assignment = (
-            gradient_point_color @ decoder_colors.T
-            + (float(default_opacity) * gradient_point_opacity)[:, None] * opacity_scales[None, :]
+        gradient_assignment = gradient_assignment + (
+            (float(default_opacity) * gradient_point_opacity)[:, None]
+            * opacity_scales[None, :]
+        )
+    if scale_log_offsets is None:
+        gradient_scale_log_offsets = np.zeros((0,), dtype=np.float32)
+    else:
+        assert scale_multipliers is not None
+        gradient_point_scale = np.sum(
+            gradient_point_rgb * point_color * point_opacity[:, None],
+            axis=1,
+        )
+        gradient_scale_multipliers = assignment.T @ gradient_point_scale
+        gradient_scale_log_offsets = (
+            gradient_scale_multipliers
+            * _object_scale_log_offset_derivative(scale_log_offsets)
+        )
+        gradient_assignment = gradient_assignment + (
+            gradient_point_scale[:, None] * scale_multipliers[None, :]
         )
 
     return {
         "rendered_image": rendered_image,
         "gradient_decoder_colors": gradient_decoder_colors.astype(np.float32, copy=False),
         "gradient_decoder_opacity_logits": gradient_opacity_logits.astype(np.float32, copy=False),
+        "gradient_decoder_scale_log_offsets": gradient_scale_log_offsets.astype(np.float32, copy=False),
         "gradient_assignment": gradient_assignment.astype(np.float32, copy=False),
         "frame_loss": TrainingRendererFrameLoss(
             frame_index=frame_index,
@@ -333,6 +383,15 @@ def _object_opacity_logit_derivative(logits: np.ndarray) -> np.ndarray:
     derivative[sigmoid < 0.05] = 0.0
     derivative[sigmoid > 1.0] = 0.0
     return derivative.astype(np.float32, copy=False)
+
+
+def _object_scale_log_offset_derivative(log_offsets: np.ndarray) -> np.ndarray:
+    values = np.asarray(log_offsets, dtype=np.float32)
+    min_log = np.log(0.75)
+    max_log = np.log(1.25)
+    multipliers = object_scale_multipliers_from_log_offsets(values)
+    active = (values >= min_log) & (values <= max_log)
+    return np.where(active, multipliers, 0.0).astype(np.float32, copy=False)
 
 
 def _optional_array1d(value: np.ndarray | None, label: str) -> np.ndarray | None:

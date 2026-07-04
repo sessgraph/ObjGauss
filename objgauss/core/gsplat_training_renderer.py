@@ -160,6 +160,7 @@ def build_gsplat_training_input(
     decoder_colors: np.ndarray,
     *,
     decoder_opacity_logits: np.ndarray | None = None,
+    decoder_scale_log_offsets: np.ndarray | None = None,
     frame_index: int = 0,
     default_scale: float = 0.01,
     default_opacity: float = 1.0,
@@ -188,6 +189,7 @@ def build_gsplat_training_input(
         projection,
         colors,
         decoder_opacity_logits=decoder_opacity_logits,
+        decoder_scale_log_offsets=decoder_scale_log_offsets,
         frame_index=frame_index,
         default_scale=default_scale,
         default_opacity=default_opacity,
@@ -200,6 +202,7 @@ def build_gsplat_training_input_from_object_state(
     decoder_colors: np.ndarray,
     *,
     decoder_opacity_logits: np.ndarray | None = None,
+    decoder_scale_log_offsets: np.ndarray | None = None,
     frame_index: int = 0,
     default_scale: float = 0.01,
     default_opacity: float = 1.0,
@@ -212,6 +215,7 @@ def build_gsplat_training_input_from_object_state(
         projection,
         decoder_colors,
         object_opacity_logits=decoder_opacity_logits,
+        object_scale_log_offsets=decoder_scale_log_offsets,
         default_scale=default_scale,
         default_opacity=default_opacity,
     )
@@ -266,6 +270,7 @@ def evaluate_gsplat_training_renderer_loss(
     decoder_colors: np.ndarray,
     *,
     decoder_opacity_logits: np.ndarray | None = None,
+    decoder_scale_log_offsets: np.ndarray | None = None,
     require_cuda: bool = True,
     device: str | None = None,
     default_scale: float = 0.01,
@@ -280,12 +285,16 @@ def evaluate_gsplat_training_renderer_loss(
     opacity_logits = _optional_array1d(decoder_opacity_logits, "decoder_opacity_logits")
     if opacity_logits is not None and opacity_logits.shape[0] != colors.shape[0]:
         raise ValueError("decoder_opacity_logits length must match decoder_colors rows")
+    scale_log_offsets = _optional_array1d(decoder_scale_log_offsets, "decoder_scale_log_offsets")
+    if scale_log_offsets is not None and scale_log_offsets.shape[0] != colors.shape[0]:
+        raise ValueError("decoder_scale_log_offsets length must match decoder_colors rows")
     inputs = tuple(
         build_gsplat_training_input(
             frame,
             assignment,
             colors,
             decoder_opacity_logits=opacity_logits,
+            decoder_scale_log_offsets=scale_log_offsets,
             frame_index=frame_index,
             default_scale=default_scale,
             default_opacity=default_opacity,
@@ -316,6 +325,16 @@ def evaluate_gsplat_training_renderer_loss(
             requires_grad=True,
         )
     )
+    scale_params = (
+        None
+        if scale_log_offsets is None
+        else torch.tensor(
+            scale_log_offsets,
+            dtype=torch.float32,
+            device=resolved_device,
+            requires_grad=True,
+        )
+    )
     assignment_tensors = [
         torch.tensor(
             np.asarray(assignment, dtype=np.float32),
@@ -333,7 +352,15 @@ def evaluate_gsplat_training_renderer_loss(
     for input_record, assignment_tensor in zip(inputs, assignment_tensors, strict=True):
         means = _torch_tensor(torch, input_record.means, resolved_device)
         quats = _torch_tensor(torch, input_record.quats, resolved_device)
-        scales = _torch_tensor(torch, input_record.scales, resolved_device)
+        if scale_params is None:
+            scales = _torch_tensor(torch, input_record.scales, resolved_device)
+        else:
+            base_scales = (
+                torch.ones_like(_torch_tensor(torch, input_record.scales, resolved_device))
+                * float(default_scale)
+            )
+            scale_multipliers = _torch_object_scale_multipliers(torch, scale_params)
+            scales = base_scales * (assignment_tensor @ scale_multipliers).unsqueeze(-1)
         if opacity_params is None:
             opacities = _torch_tensor(torch, input_record.opacities, resolved_device)
         else:
@@ -393,6 +420,11 @@ def evaluate_gsplat_training_renderer_loss(
         if opacity_params is None
         else opacity_params.grad.detach().cpu().numpy().astype(np.float32, copy=False)
     )
+    scale_gradient = (
+        np.zeros((0,), dtype=np.float32)
+        if scale_params is None
+        else scale_params.grad.detach().cpu().numpy().astype(np.float32, copy=False)
+    )
     assignment_gradients = tuple(
         tensor.grad.detach().cpu().numpy().astype(np.float32, copy=False)
         for tensor in assignment_tensors
@@ -401,7 +433,15 @@ def evaluate_gsplat_training_renderer_loss(
     frozen_fields = ["means", "quats", "scales", "opacities", "camera"]
     if opacity_params is not None:
         differentiable_fields.append("decoder_opacity_logits")
-        frozen_fields = ["means", "quats", "scales", "source_opacities", "camera"]
+    if scale_params is not None:
+        differentiable_fields.append("decoder_scale_log_offsets")
+    frozen_fields = [
+        "means",
+        "quats",
+        "base_scales" if scale_params is not None else "scales",
+        "source_opacities" if opacity_params is not None else "opacities",
+        "camera",
+    ]
 
     return TrainingRendererLossResult(
         schema=TRAINING_RENDERER_API_SCHEMA,
@@ -413,6 +453,7 @@ def evaluate_gsplat_training_renderer_loss(
         rendered_images=tuple(rendered_images),
         gradient_decoder_colors=decoder_gradient,
         gradient_decoder_opacity_logits=opacity_gradient,
+        gradient_decoder_scale_log_offsets=scale_gradient,
         gradient_assignments=assignment_gradients,
         differentiable_fields=tuple(differentiable_fields),
         frozen_fields=tuple(frozen_fields),
@@ -476,6 +517,11 @@ def _torch_tensor(torch: Any, value: np.ndarray, device: str) -> Any:
 def _torch_object_opacity_scales(torch: Any, logits: Any) -> Any:
     clipped = torch.clamp(logits, -60.0, 60.0)
     return torch.clamp(torch.sigmoid(clipped), 0.05, 1.0)
+
+
+def _torch_object_scale_multipliers(torch: Any, log_offsets: Any) -> Any:
+    clipped = torch.clamp(log_offsets, float(np.log(0.75)), float(np.log(1.25)))
+    return torch.exp(clipped)
 
 
 def _object_state_projection_from_frame(

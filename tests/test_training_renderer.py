@@ -38,6 +38,7 @@ def test_training_renderer_reconstructs_bound_image_target_with_known_assignment
     assert result.image_render_loss == pytest.approx(0.0, abs=1e-12)
     assert payload["gradients"]["decoder_colors_shape"] == [2, 3]
     assert payload["gradients"]["decoder_opacity_logits_shape"] == [0]
+    assert payload["gradients"]["decoder_scale_log_offsets_shape"] == [0]
     assert payload["gradients"]["assignment_shapes"] == [[6, 2]]
     assert payload["gradients"]["decoder_colors_l2"] == pytest.approx(0.0, abs=1e-7)
     assert validate_training_renderer_summary(payload) is True
@@ -70,6 +71,33 @@ def test_training_renderer_exposes_object_opacity_gradient_when_enabled():
     assert "source_opacities" in payload["frozen_fields"]
 
 
+def test_training_renderer_exposes_object_scale_gradient_when_enabled():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    assignment = np.zeros((6, 2), dtype=np.float32)
+    assignment[:3, 0] = 1.0
+    assignment[3:, 1] = 1.0
+    decoder_colors = np.vstack([frames[0].target_rgb[0], frames[0].target_rgb[3]]).astype(np.float32)
+
+    result = evaluate_training_renderer_loss(
+        frames[:1],
+        [assignment],
+        decoder_colors,
+        decoder_scale_log_offsets=np.log(np.array([0.8, 1.2], dtype=np.float32)),
+    )
+    payload = result.as_dict()
+
+    assert result.image_render_loss > 0.0
+    assert result.gradient_decoder_scale_log_offsets.shape == (2,)
+    assert payload["gradients"]["decoder_scale_log_offsets_shape"] == [2]
+    assert payload["gradients"]["decoder_scale_log_offsets_l2"] > 0.0
+    assert payload["differentiable_fields"] == [
+        "decoder_colors",
+        "assignments",
+        "decoder_scale_log_offsets",
+    ]
+    assert "point_scale_proxy_base" in payload["frozen_fields"]
+
+
 def test_training_renderer_evaluates_trainable_result_with_gradients():
     frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
     train_result = train_kernel_mvp(
@@ -92,6 +120,7 @@ def test_training_renderer_evaluates_trainable_result_with_gradients():
     assert render_result.rendered_images[0].shape == (8, 8, 3)
     assert render_result.gradient_decoder_colors.shape == (2, 3)
     assert render_result.gradient_decoder_opacity_logits.shape == (0,)
+    assert render_result.gradient_decoder_scale_log_offsets.shape == (0,)
     assert render_result.gradient_assignments[0].shape == (6, 2)
     assert payload["frame_losses"][0]["supervised_pixels"] > 0
     assert payload["differentiable_fields"] == ["decoder_colors", "assignments"]

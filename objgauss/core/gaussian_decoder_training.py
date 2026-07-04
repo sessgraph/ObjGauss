@@ -570,6 +570,7 @@ def _evaluate_image_renderer(
     colors: np.ndarray,
     *,
     decoder_opacity_logits: np.ndarray | None = None,
+    decoder_scale_log_offsets: np.ndarray | None = None,
     image_renderer: str,
     gaussian_scale: float,
     gaussian_opacity: float,
@@ -582,6 +583,7 @@ def _evaluate_image_renderer(
             assignments,
             colors,
             decoder_opacity_logits=decoder_opacity_logits,
+            decoder_scale_log_offsets=decoder_scale_log_offsets,
             default_opacity=gaussian_opacity,
         )
     elif image_renderer == TRAINING_IMAGE_RENDERER_GSPLAT:
@@ -593,6 +595,7 @@ def _evaluate_image_renderer(
             assignments,
             colors,
             decoder_opacity_logits=decoder_opacity_logits,
+            decoder_scale_log_offsets=decoder_scale_log_offsets,
             default_scale=gaussian_scale,
             default_opacity=gaussian_opacity,
         )

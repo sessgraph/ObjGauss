@@ -86,6 +86,23 @@ def write_solver_decoder_tensorboard_events(
                     end,
                 )
                 scalar_count += 3
+            if "final_decoder_scale_multiplier_mean" in segment:
+                writer.add_scalar(
+                    "decoder/scale_multiplier_min",
+                    float(segment["final_decoder_scale_multiplier_min"]),
+                    end,
+                )
+                writer.add_scalar(
+                    "decoder/scale_multiplier_mean",
+                    float(segment["final_decoder_scale_multiplier_mean"]),
+                    end,
+                )
+                writer.add_scalar(
+                    "decoder/scale_multiplier_max",
+                    float(segment["final_decoder_scale_multiplier_max"]),
+                    end,
+                )
+                scalar_count += 3
         run_loss = summary.get("run_loss") if isinstance(summary.get("run_loss"), dict) else {}
         if "final_total_loss" in run_loss:
             writer.add_scalar(
@@ -112,6 +129,9 @@ def write_solver_decoder_tensorboard_events(
             "decoder/opacity_scale_min",
             "decoder/opacity_scale_mean",
             "decoder/opacity_scale_max",
+            "decoder/scale_multiplier_min",
+            "decoder/scale_multiplier_mean",
+            "decoder/scale_multiplier_max",
             "run/final_total_loss",
         ],
     }

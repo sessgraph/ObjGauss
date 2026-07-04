@@ -83,6 +83,27 @@ def test_build_gsplat_training_input_accepts_decoder_opacity_logits():
     assert np.all(record.opacities <= 0.8)
 
 
+def test_build_gsplat_training_input_accepts_decoder_scale_log_offsets():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    assignment = np.zeros((6, 2), dtype=np.float32)
+    assignment[:3, 0] = 1.0
+    assignment[3:, 1] = 1.0
+    decoder_colors = np.vstack([frames[0].target_rgb[0], frames[0].target_rgb[3]]).astype(np.float32)
+
+    record = build_gsplat_training_input(
+        frames[0],
+        assignment,
+        decoder_colors,
+        decoder_scale_log_offsets=np.log(np.array([0.8, 1.2], dtype=np.float32)),
+        default_scale=0.5,
+    )
+
+    assert record.scales[:3].mean() == pytest.approx(0.4, abs=1e-6)
+    assert record.scales[3:].mean() == pytest.approx(0.6, abs=1e-6)
+    assert np.all(record.scales >= 0.5 * 0.75)
+    assert np.all(record.scales <= 0.5 * 1.25)
+
+
 def test_build_gsplat_training_input_accepts_object_state_projection():
     frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
     assignment = np.zeros((6, 2), dtype=np.float32)

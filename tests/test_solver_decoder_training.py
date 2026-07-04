@@ -268,6 +268,67 @@ def test_solver_decoder_joint_training_updates_decoder_opacity_when_enabled():
     assert "decoder.object_opacity_logits" in checkpoint["trained_fields"]
 
 
+def test_solver_decoder_joint_training_updates_decoder_scale_when_enabled():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        bind_image_targets=True,
+        image_width=8,
+        image_height=8,
+        seed=2,
+    )
+    initial_decoder_state = ObjectStateGaussianDecoderState(
+        object_colors=np.array(
+            [
+                [0.2, 0.3, 0.4],
+                [0.6, 0.7, 0.8],
+            ],
+            dtype=np.float32,
+        ),
+        object_scale_log_offsets=np.zeros(2, dtype=np.float32),
+        step=0,
+        source="fixture_scale_training",
+    )
+
+    result = train_solver_decoder_joint(
+        sample.frames,
+        initial_decoder_state=initial_decoder_state,
+        iterations=4,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.3,
+        train_decoder_scale=True,
+        decoder_scale_learning_rate=1.0,
+        object_weight=0.2,
+        seed=7,
+    )
+    payload = result.as_dict()
+    checkpoint = solver_decoder_joint_checkpoint(
+        result,
+        input_path="fixture://objects",
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source="object_id_one_hot_targets",
+        object_id_mapping=sample.object_id_mapping,
+        vram_reserve_gb=1,
+    )
+
+    assert result.train_decoder_scale is True
+    assert "decoder.object_scale_log_offsets" in payload["trained_fields"]
+    assert "base_scales" in payload["frozen_fields"]
+    assert payload["decoder_scale"]["enabled"] is True
+    assert payload["renderer_api"]["gradients"]["decoder_scale_log_offsets_shape"] == [2]
+    assert payload["renderer_api"]["gradients"]["decoder_scale_log_offsets_l2"] > 0.0
+    assert not np.allclose(
+        result.final_decoder_state.object_scale_log_offsets,
+        initial_decoder_state.object_scale_log_offsets,
+    )
+    assert checkpoint["training"]["train_decoder_scale"] is True
+    assert checkpoint["training"]["learning_rates"]["decoder_scale"] == 1.0
+    assert "decoder.object_scale_log_offsets" in checkpoint["trained_fields"]
+
+
 def test_solver_decoder_joint_training_can_override_solver_temperature():
     sample = trainable_kernel_sample_from_cloud(
         _object_cloud(),
@@ -422,6 +483,59 @@ def test_solver_decoder_mvp_cli_trains_decoder_opacity_when_enabled(tmp_path, ca
     assert "source_opacities" in payload["frozen_fields"]
     assert checkpoint["decoder_state"]["object_opacity_logits"] is not None
     assert checkpoint["training"]["train_decoder_opacity"] is True
+
+
+def test_solver_decoder_mvp_cli_trains_decoder_scale_when_enabled(tmp_path, capsys):
+    input_path = tmp_path / "objects.ply"
+    summary_path = tmp_path / "joint-summary.json"
+    checkpoint_path = tmp_path / "joint-checkpoint.json"
+    write_ply(input_path, _object_cloud(), fmt="ascii")
+
+    status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "3",
+            "--solver-learning-rate",
+            "0.08",
+            "--decoder-learning-rate",
+            "0.4",
+            "--train-decoder-scale",
+            "--decoder-scale-learning-rate",
+            "1.0",
+            "--decoder-scale-init-log-offset",
+            "0.0",
+            "--object-weight",
+            "0.2",
+            "--summary-output",
+            str(summary_path),
+            "--checkpoint-output",
+            str(checkpoint_path),
+        ]
+    )
+
+    stdout = capsys.readouterr().out
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert status == 0
+    assert "train_decoder_scale=true" in stdout
+    assert "decoder_scale_learning_rate=1.0" in stdout
+    assert "decoder.object_scale_log_offsets" in stdout
+    assert payload["train_decoder_scale"] is True
+    assert payload["decoder_scale"]["enabled"] is True
+    assert payload["renderer_api"]["gradients"]["decoder_scale_log_offsets_shape"] == [2]
+    assert "decoder.object_scale_log_offsets" in payload["trained_fields"]
+    assert "base_scales" in payload["frozen_fields"]
+    assert checkpoint["decoder_state"]["object_scale_log_offsets"] is not None
+    assert checkpoint["training"]["train_decoder_scale"] is True
 
 
 def test_solver_decoder_mvp_cli_writes_and_resumes_joint_checkpoint(tmp_path, capsys):
@@ -588,6 +702,9 @@ def test_solver_decoder_tensorboard_export_writes_scalar_tags(tmp_path):
                     "final_decoder_opacity_scale_min": 0.91,
                     "final_decoder_opacity_scale_mean": 0.94,
                     "final_decoder_opacity_scale_max": 0.98,
+                    "final_decoder_scale_multiplier_min": 0.96,
+                    "final_decoder_scale_multiplier_mean": 1.01,
+                    "final_decoder_scale_multiplier_max": 1.08,
                 },
                 {
                     "start_iteration": 2,
@@ -603,6 +720,9 @@ def test_solver_decoder_tensorboard_export_writes_scalar_tags(tmp_path):
                     "final_decoder_opacity_scale_min": 0.92,
                     "final_decoder_opacity_scale_mean": 0.95,
                     "final_decoder_opacity_scale_max": 0.99,
+                    "final_decoder_scale_multiplier_min": 0.97,
+                    "final_decoder_scale_multiplier_mean": 1.02,
+                    "final_decoder_scale_multiplier_max": 1.09,
                 },
             ],
         },
@@ -626,6 +746,9 @@ def test_solver_decoder_tensorboard_export_writes_scalar_tags(tmp_path):
     assert ("decoder/opacity_scale_min", 0.92, 4) in writer.scalars
     assert ("decoder/opacity_scale_mean", 0.95, 4) in writer.scalars
     assert ("decoder/opacity_scale_max", 0.99, 4) in writer.scalars
+    assert ("decoder/scale_multiplier_min", 0.97, 4) in writer.scalars
+    assert ("decoder/scale_multiplier_mean", 1.02, 4) in writer.scalars
+    assert ("decoder/scale_multiplier_max", 1.09, 4) in writer.scalars
     assert ("run/final_total_loss", 0.25, 4) in writer.scalars
     assert writer.flushed is True
     assert writer.closed is True
