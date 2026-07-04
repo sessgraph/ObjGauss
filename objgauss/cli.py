@@ -101,6 +101,7 @@ from objgauss.core.solver_decoder_training import (
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_scale import solver_decoder_training_scale_plan
 from objgauss.core.training_tensorboard import write_solver_decoder_tensorboard_events
+from objgauss.core.object_state_eval import evaluate_solver_decoder_object_states
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1520,6 +1521,94 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         raise ValueError("solver-decoder MVP image render loss did not decrease")
 
 
+def _training_eval_objectstate(args: argparse.Namespace) -> None:
+    checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
+    validate_solver_decoder_joint_checkpoint(checkpoint)
+    cloud = read_ply(args.input)
+    sample = trainable_kernel_sample_from_cloud(
+        cloud,
+        slots=args.slots or _checkpoint_solver_slots(checkpoint),
+        frame_count=args.frames or _checkpoint_frame_count(checkpoint),
+        max_points=args.max_points or _checkpoint_sampled_gaussians(checkpoint),
+        object_id_field=args.object_id_field,
+        temporal_offset=args.temporal_offset,
+        bind_image_targets=False,
+        seed=args.seed,
+    )
+    summary = evaluate_solver_decoder_object_states(
+        sample,
+        checkpoint,
+        entropy_threshold=args.entropy_threshold,
+        purity_threshold=args.purity_threshold,
+        collapse_mass_fraction=args.collapse_mass_fraction,
+        assignment_confidence_floor=args.assignment_confidence_floor,
+    )
+    aggregate = summary["aggregate"]
+    gates = summary["gates"]
+    print(f"schema={summary['schema']}")
+    print(f"input={args.input}")
+    print(f"checkpoint={args.checkpoint}")
+    print(f"sampled_gaussians={sample.sampled_count}")
+    print(f"frames={sample.as_dict()['frame_count']}")
+    print(f"slots={sample.slots}")
+    print(f"solver_step={summary['solver']['step']}")
+    print(f"decoder_step={summary['decoder']['step']}")
+    print(f"eval_status={summary['status']}")
+    print(f"mean_normalized_entropy={aggregate['mean_normalized_entropy']:.6f}")
+    print(f"max_mean_normalized_entropy={aggregate['max_mean_normalized_entropy']:.6f}")
+    print(f"assignment_confidence={aggregate['assignment_confidence']:.6f}")
+    print(f"effective_slots={aggregate['effective_slots']:.6f}")
+    print(f"max_dominant_slot_mass_fraction={aggregate['max_dominant_slot_mass_fraction']:.6f}")
+    print(f"slot_collapse={str(aggregate['slot_collapse']).lower()}")
+    print(f"object_purity={_format_optional_float(aggregate['object_purity'])}")
+    print(f"temporal_mean_drift={aggregate['temporal_mean_drift']:.6f}")
+    print(f"gate_entropy_pass={_format_optional_bool(gates['entropy_pass'])}")
+    print(f"gate_entropy_borderline={_format_optional_bool(gates['entropy_borderline'])}")
+    print(f"gate_no_collapse_pass={_format_optional_bool(gates['no_collapse_pass'])}")
+    print(f"gate_purity_pass={_format_optional_bool(gates['purity_pass'])}")
+    print(f"trained_fields={','.join(summary['trained_fields'])}")
+    print(f"frozen_fields={','.join(summary['frozen_fields'])}")
+    print(f"gpu_used={str(summary['gpu_policy']['uses_gpu']).lower()}")
+    print(f"vram_reserve_gb={summary['gpu_policy']['vram_reserve_gb']}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_pass and summary["status"] != "objectstate_eval_pass":
+        raise ValueError("ObjectState checkpoint eval did not pass")
+
+
+def _checkpoint_solver_slots(checkpoint: dict[str, object]) -> int:
+    solver = checkpoint.get("solver_state")
+    if not isinstance(solver, dict):
+        raise ValueError("checkpoint missing solver_state")
+    config = solver.get("config")
+    if not isinstance(config, dict) or "slots" not in config:
+        raise ValueError("checkpoint solver_state missing config.slots")
+    return int(config["slots"])
+
+
+def _checkpoint_frame_count(checkpoint: dict[str, object]) -> int:
+    contract = checkpoint.get("image_target_contract")
+    if isinstance(contract, dict) and contract.get("frame_count") is not None:
+        return int(contract["frame_count"])
+    return 2
+
+
+def _checkpoint_sampled_gaussians(checkpoint: dict[str, object]) -> int | None:
+    source = checkpoint.get("source")
+    if isinstance(source, dict) and source.get("sampled_gaussians") is not None:
+        return int(source["sampled_gaussians"])
+    return None
+
+
+def _format_optional_float(value: object) -> str:
+    return "none" if value is None else f"{float(value):.6f}"
+
+
+def _format_optional_bool(value: object) -> str:
+    return "none" if value is None else str(bool(value)).lower()
+
+
 def _solver_decoder_record_every(args: argparse.Namespace) -> int | None:
     if args.loss_log_every is not None and args.record_every is not None:
         if int(args.loss_log_every) != int(args.record_every):
@@ -2937,6 +3026,26 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--require-loss-decrease", action="store_true")
     solver_decoder_mvp.add_argument("--require-image-render-loss-decrease", action="store_true")
     solver_decoder_mvp.set_defaults(handler=_training_solver_decoder_mvp)
+
+    eval_objectstate = training_subparsers.add_parser(
+        "eval-objectstate",
+        help="evaluate ObjectState stability from a solver-decoder joint checkpoint",
+    )
+    eval_objectstate.add_argument("input", type=Path)
+    eval_objectstate.add_argument("--checkpoint", required=True, type=Path)
+    eval_objectstate.add_argument("--slots", type=int)
+    eval_objectstate.add_argument("--frames", type=int)
+    eval_objectstate.add_argument("--max-points", type=int)
+    eval_objectstate.add_argument("--object-id-field", default="object_id")
+    eval_objectstate.add_argument("--temporal-offset", type=float, default=0.01)
+    eval_objectstate.add_argument("--seed", type=int, default=0)
+    eval_objectstate.add_argument("--entropy-threshold", type=float, default=0.6)
+    eval_objectstate.add_argument("--purity-threshold", type=float, default=0.8)
+    eval_objectstate.add_argument("--collapse-mass-fraction", type=float, default=0.9)
+    eval_objectstate.add_argument("--assignment-confidence-floor", type=float, default=0.4)
+    eval_objectstate.add_argument("--summary-output", type=Path)
+    eval_objectstate.add_argument("--require-pass", action="store_true")
+    eval_objectstate.set_defaults(handler=_training_eval_objectstate)
 
     object_emergence_solver = training_subparsers.add_parser(
         "object-emergence-solver",

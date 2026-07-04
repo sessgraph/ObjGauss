@@ -44,6 +44,10 @@ _EXPORTS = {
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
     "ObjectStabilityReport": ("objgauss.core.object_state", "ObjectStabilityReport"),
+    "OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA": (
+        "objgauss.core.object_state_eval",
+        "OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA",
+    ),
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
     "DynamicKProposal": ("objgauss.core.object_state", "DynamicKProposal"),
     "DynamicKProposalReport": ("objgauss.core.object_state", "DynamicKProposalReport"),
@@ -189,6 +193,10 @@ _EXPORTS = {
         "object_state_stability_benchmark",
     ),
     "object_state_stability_report": ("objgauss.core.object_state", "object_state_stability_report"),
+    "evaluate_solver_decoder_object_states": (
+        "objgauss.core.object_state_eval",
+        "evaluate_solver_decoder_object_states",
+    ),
     "object_id_targets_from_cloud": (
         "objgauss.core.object_emergence_solver",
         "object_id_targets_from_cloud",
@@ -285,6 +293,10 @@ _EXPORTS = {
     "validate_object_state_stability_benchmark": (
         "objgauss.core.object_state_benchmark",
         "validate_object_state_stability_benchmark",
+    ),
+    "validate_objectstate_checkpoint_eval": (
+        "objgauss.core.object_state_eval",
+        "validate_objectstate_checkpoint_eval",
     ),
     "validate_image_target_contract_summary": (
         "objgauss.core.trainable_kernel",

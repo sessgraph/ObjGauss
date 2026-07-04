@@ -12,6 +12,7 @@ from objgauss.core import (
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
     ObjectStateGaussianDecoderState,
+    OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -40,6 +41,7 @@ from objgauss.core import (
     decode_gaussian_from_object_state,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
+    evaluate_solver_decoder_object_states,
     evaluate_training_renderer_loss,
     evaluate_gsplat_training_renderer_loss,
     gsplat_renderer_availability,
@@ -75,6 +77,7 @@ from objgauss.core import (
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
+    validate_objectstate_checkpoint_eval,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
     validate_renderer_loss_boundary_summary,
@@ -333,6 +336,9 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert validate_solver_decoder_training_scale_plan(scale_plan) == scale_plan
     assert TENSORBOARD_SCALAR_EXPORT_SCHEMA == "objgauss-tensorboard-scalar-export-v1"
     assert write_solver_decoder_tensorboard_events is not None
+    assert OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA == "objgauss-objectstate-checkpoint-eval-v1"
+    assert evaluate_solver_decoder_object_states is not None
+    assert validate_objectstate_checkpoint_eval is not None
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
