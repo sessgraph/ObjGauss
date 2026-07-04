@@ -323,6 +323,19 @@ loss family 被定义为
 后续只能通过 explicit adapter 迁移。下一步进入 `OBJECT-LOSS-V2-001`，先把 object loss 拆成
 可独立测试的 loss helper，再实现新的 solver state。
 
+随后完成 `OBJECT-LOSS-V2-001`：新增 `objgauss/core/assignment_losses.py`，将 assignment
+object loss 拆成可独立计算和测试的 helper：`assignment_cluster_loss_and_gradient(...)`、
+`assignment_entropy_loss_and_gradient(...)`、`assignment_balance_loss_and_gradient(...)` 和
+`supervised_assignment_loss_and_gradient(...)`。新增
+`assignment_loss_v2_breakdown(...)`，summary 显式输出 cluster、entropy、balance、temporal、
+matching、supervised；temporal / matching 当前保持 disabled terms。现有
+`solver_decoder_training` 的 supervised CE、entropy、balance 已改为复用 v2 helper，默认训练行为
+保持兼容。`objgauss.core` 已暴露 v2 loss helper 和
+`validate_assignment_loss_v2_summary(...)`。本切片不启动 GPU 训练、不实现 solver v2 state、不引入
+frame-level perception adapter，也不启用 temporal / matching 优化。下一步进入
+`ASSIGNMENT-FRAMES-EVIDENCE-001`，补 frame / mask / feature 到 `AssignmentEvidenceBatch`
+的最小 adapter contract。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

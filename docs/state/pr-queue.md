@@ -15,23 +15,23 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract。下一步进入 `OBJECT-LOSS-V2-001`。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper。下一步进入 `ASSIGNMENT-FRAMES-EVIDENCE-001`。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### OBJECT-LOSS-V2-001: Split assignment objective into explicit loss families
+### ASSIGNMENT-FRAMES-EVIDENCE-001: Add frame-level evidence adapter contract
 
 - 状态: ready
 - 类型: 标准 PR / algorithm model contract
-- 目标: 按 `docs/architecture/assignment-solver-v2-contract.md` 将 object loss 正式拆成
-  `L_cluster + L_entropy + L_balance + L_temporal + L_matching + optional supervised CE`
-  的可执行接口和 summary 字段。
-- 背景: v2 solver contract 已将 solver 定义为 cost-softmax assignment system；下一步需要先把
-  loss family 从当前混合 object loss 中拆清楚，再实现新的 solver state。
-- 验收: 新增或重构 loss helper，使 cluster / entropy / balance 至少可独立计算和测试；
-  temporal / matching 可先作为 disabled summary 字段；现有 solver / joint training 默认行为保持兼容。
-- 边界: 不启动 GPU 训练；不改 renderer thaw；不引入 dynamic-K；不引入重型 perception 依赖。
+- 目标: 将当前 Gaussian-level evidence 路线扩展为可承载 frame / mask / feature 的
+  `AssignmentEvidenceBatch` adapter contract，为后续固定 K assignment MVP 做输入准备。
+- 背景: v2 solver contract 已定义 `AssignmentEvidenceBatch`，但当前训练入口仍主要从
+  Gaussian records 构造 evidence。下一步要补 frames / masks / features 到 assignment evidence
+  的最小 adapter，不引入重型 perception 依赖。
+- 验收: 文档和/或轻量代码明确 frame-level evidence 字段、shape、source、mask vote optional
+  规则；现有 Gaussian evidence 路线保持兼容；新增测试覆盖 adapter summary / validation。
+- 边界: 不启动 GPU 训练；不引入 SAM / CLIP / CoTracker 默认依赖；不训练 solver v2；不做 dynamic-K。
 
 ## Suspended
 
@@ -90,6 +90,39 @@
 当前无进行中 PR。
 
 ## Done
+
+### OBJECT-LOSS-V2-001: Split assignment objective into explicit loss families
+
+- 状态: done / assignment-loss-v2-helpers
+- 类型: 标准 PR / algorithm model contract
+- 目标: 按 `docs/architecture/assignment-solver-v2-contract.md` 将 object loss 正式拆成
+  `L_cluster + L_entropy + L_balance + L_temporal + L_matching + optional supervised CE`
+  的可执行接口和 summary 字段。
+- 已实施:
+  - 新增 `objgauss/core/assignment_losses.py`。
+  - 新增 `ASSIGNMENT_LOSS_V2_SCHEMA = objgauss-assignment-loss-v2`。
+  - 新增独立 helper:
+    `assignment_cluster_loss_and_gradient(...)`、
+    `assignment_entropy_loss_and_gradient(...)`、
+    `assignment_balance_loss_and_gradient(...)`、
+    `supervised_assignment_loss_and_gradient(...)`。
+  - 新增 `assignment_loss_v2_breakdown(...)`，summary 中显式输出 cluster、entropy、
+    balance、temporal、matching、supervised；temporal / matching 当前为 disabled terms。
+  - 现有 `solver_decoder_training` 的 supervised CE、entropy、balance 已改为复用该 helper，
+    默认训练行为保持兼容。
+  - `objgauss.core` 暴露 v2 loss helper 和 `validate_assignment_loss_v2_summary(...)`。
+- 边界:
+  - 不启动 GPU 训练，不提交 `outputs/` 或 `/tmp` 产物。
+  - 不实现 solver v2 state。
+  - 不引入 frame-level perception adapter。
+  - 不引入 temporal / matching 优化，只在 summary 中显式 disabled。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/assignment_losses.py objgauss/core/solver_decoder_training.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_assignment_losses.py tests/test_solver_decoder_training.py tests/test_core_namespace.py`: 29 passed。
+  - `uv run --extra dev pytest`: 198 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: `8cd2ac3`
 
 ### ASSIGNMENT-SOLVER-V2-CONTRACT-001: Define next assignment solver contract
 
