@@ -9,6 +9,7 @@ from objgauss.core import (
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
+    ASSIGNMENT_MVP_TRAINING_SCHEMA,
     AssignmentEvidenceBatch,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
@@ -36,6 +37,7 @@ from objgauss.core import (
     assignment_evidence_sequence_from_trainable_frames,
     assignment_entropy_loss_and_gradient,
     assignment_loss_v2_breakdown,
+    assignment_mvp_training_summary,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
@@ -357,6 +359,8 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert validate_objectstate_checkpoint_eval is not None
     assert assignment_loss_v2_breakdown is not None
     assert AssignmentEvidenceBatch is not None
+    assert ASSIGNMENT_MVP_TRAINING_SCHEMA == "objgauss-assignment-mvp-training-v1"
+    assert assignment_mvp_training_summary is not None
     assert assignment_evidence_from_trainable_frame is not None
     assert assignment_evidence_sequence_from_trainable_frames is not None
     assert assignment_cluster_loss_and_gradient is not None

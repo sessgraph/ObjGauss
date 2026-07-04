@@ -82,6 +82,7 @@ from objgauss.core.trainable_kernel import (
 )
 from objgauss.core.object_emergence_solver import (
     ObjectEmergenceEvidence,
+    assignment_mvp_training_summary,
     evidence_from_gaussian_cloud,
     object_emergence_solver_checkpoint,
     object_emergence_solver_state_from_dict,
@@ -90,6 +91,7 @@ from objgauss.core.object_emergence_solver import (
     train_object_emergence_solver,
     validate_object_emergence_solver_checkpoint,
 )
+from objgauss.core.assignment_evidence import assignment_evidence_from_object_emergence
 from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
 from objgauss.core.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
@@ -1909,6 +1911,7 @@ def _training_object_emergence_solver(args: argparse.Namespace) -> None:
         target_assignment=targets,
         source=f"object_id_field:{args.object_id_field}",
     )
+    assignment_evidence = assignment_evidence_from_object_emergence(evidence)
     result = train_object_emergence_solver(
         [evidence],
         slots=args.slots,
@@ -1929,6 +1932,10 @@ def _training_object_emergence_solver(args: argparse.Namespace) -> None:
         "sampled_gaussians": sampled_cloud.count,
         "target_source": f"{args.object_id_field}_one_hot_targets",
         "object_id_mapping": {str(object_id): slot for object_id, slot in mapping.items()},
+        "assignment_mvp": assignment_mvp_training_summary(
+            result,
+            [assignment_evidence],
+        ),
         "gpu_policy": {
             "uses_gpu": False,
             "full_renderer_training": "suspended_until_torch_gsplat_cuda_available",
@@ -1956,6 +1963,12 @@ def _training_object_emergence_solver(args: argparse.Namespace) -> None:
     print(f"final_assignment_loss={result.final_loss.assignment_loss:.6f}")
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"assignment_loss_decreased={str(summary['assignment_loss_decreased']).lower()}")
+    print(f"assignment_mvp_schema={summary['assignment_mvp']['schema']}")
+    print(f"assignment_mvp_loss_decreased={str(summary['assignment_mvp']['loss_decreased']).lower()}")
+    print(
+        "assignment_mvp_supervised_loss_decreased="
+        f"{str(summary['assignment_mvp']['supervised_loss_decreased']).lower()}"
+    )
     print("gpu_used=false")
     print("vram_reserve_gb=1")
     if args.summary_output:

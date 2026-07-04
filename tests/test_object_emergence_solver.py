@@ -9,12 +9,14 @@ from objgauss.cli import main
 from objgauss.core.io import write_ply
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_emergence_solver import (
+    ASSIGNMENT_MVP_TRAINING_SCHEMA,
     OBJECT_EMERGENCE_ASSIGNMENT_SCHEMA,
     OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA,
     OBJECT_EMERGENCE_TRAINING_SCHEMA,
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverConfig,
     ObjectEmergenceSolverState,
+    assignment_mvp_training_summary,
     evidence_from_gaussian_cloud,
     initialize_object_emergence_solver,
     object_emergence_solver_checkpoint,
@@ -26,6 +28,7 @@ from objgauss.core.object_emergence_solver import (
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
 )
+from objgauss.core.assignment_evidence import assignment_evidence_from_object_emergence
 
 
 def test_linear_solver_predicts_normalized_assignment():
@@ -147,6 +150,38 @@ def test_train_object_emergence_solver_updates_weights_and_reduces_loss():
     assert len(summary["predictions"][0]["assignment"]) == 4
 
 
+def test_assignment_mvp_training_summary_reports_v2_evidence_and_loss():
+    frames = _training_frames()
+    result = train_object_emergence_solver(
+        frames,
+        slots=2,
+        iterations=12,
+        learning_rate=0.7,
+        assignment_weight=1.0,
+        entropy_weight=0.01,
+        balance_weight=0.05,
+        temporal_weight=0.0,
+        seed=5,
+    )
+    evidence_batches = [
+        assignment_evidence_from_object_emergence(frame)
+        for frame in frames
+    ]
+
+    summary = assignment_mvp_training_summary(result, evidence_batches)
+
+    assert summary["schema"] == ASSIGNMENT_MVP_TRAINING_SCHEMA
+    assert summary["kind"] == "fixed_k_assignment_mvp"
+    assert summary["fixed_k"] is True
+    assert summary["renderer_loss"] == "not_used"
+    assert summary["dynamic_k"] == "disabled"
+    assert summary["loss_decreased"] is True
+    assert summary["supervised_loss_decreased"] is True
+    assert summary["initial_loss_v2"]["schema"] == "objgauss-assignment-loss-v2"
+    assert summary["final_loss_v2"]["losses"]["supervised"] < summary["initial_loss_v2"]["losses"]["supervised"]
+    assert summary["evidence"][0]["schema"] == "objgauss-assignment-evidence-batch-v1"
+
+
 def test_object_id_targets_from_cloud_bind_solver_training_targets():
     cloud = _object_id_cloud()
     targets, mapping = object_id_targets_from_cloud(cloud)
@@ -235,11 +270,17 @@ def test_object_emergence_solver_cli_writes_cpu_training_summary(tmp_path, capsy
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     assert status == 0
     assert "schema=objgauss-object-emergence-solver-training-v1" in stdout
+    assert "assignment_mvp_schema=objgauss-assignment-mvp-training-v1" in stdout
+    assert "assignment_mvp_loss_decreased=true" in stdout
     assert "gpu_used=false" in stdout
     assert "vram_reserve_gb=1" in stdout
     assert f"checkpoint={checkpoint_path}" in stdout
     assert payload["loss_decreased"] is True
     assert payload["assignment_loss_decreased"] is True
+    assert payload["assignment_mvp"]["schema"] == ASSIGNMENT_MVP_TRAINING_SCHEMA
+    assert payload["assignment_mvp"]["loss_decreased"] is True
+    assert payload["assignment_mvp"]["supervised_loss_decreased"] is True
+    assert payload["assignment_mvp"]["evidence"][0]["schema"] == "objgauss-assignment-evidence-batch-v1"
     assert payload["gpu_policy"]["uses_gpu"] is False
     assert payload["gpu_policy"]["vram_reserve_gb"] == 1
     assert checkpoint["schema"] == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA

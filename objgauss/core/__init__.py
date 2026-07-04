@@ -81,6 +81,14 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "ObjectEmergenceSolverTrainingResult",
     ),
+    "ASSIGNMENT_MVP_TRAINING_SCHEMA": (
+        "objgauss.core.object_emergence_solver",
+        "ASSIGNMENT_MVP_TRAINING_SCHEMA",
+    ),
+    "assignment_mvp_training_summary": (
+        "objgauss.core.object_emergence_solver",
+        "assignment_mvp_training_summary",
+    ),
     "object_emergence_solver_checkpoint": (
         "objgauss.core.object_emergence_solver",
         "object_emergence_solver_checkpoint",

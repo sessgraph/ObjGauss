@@ -5,6 +5,11 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from objgauss.core.assignment_evidence import (
+    AssignmentEvidenceBatch,
+    validate_assignment_evidence_batch,
+)
+from objgauss.core.assignment_losses import assignment_loss_v2_breakdown
 from objgauss.core.features import extract_features, positions
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_state import (
@@ -18,6 +23,7 @@ OBJECT_EMERGENCE_SOLVER_STATE_SCHEMA = "objgauss-object-emergence-solver-state-v
 OBJECT_EMERGENCE_ASSIGNMENT_SCHEMA = "objgauss-object-emergence-assignment-v1"
 OBJECT_EMERGENCE_TRAINING_SCHEMA = "objgauss-object-emergence-solver-training-v1"
 OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-checkpoint-v1"
+ASSIGNMENT_MVP_TRAINING_SCHEMA = "objgauss-assignment-mvp-training-v1"
 _EPS = 1e-8
 
 
@@ -284,6 +290,67 @@ def object_emergence_solver_checkpoint(
     return validate_object_emergence_solver_checkpoint(payload)
 
 
+def assignment_mvp_training_summary(
+    result: ObjectEmergenceSolverTrainingResult,
+    evidence_batches: Sequence[AssignmentEvidenceBatch],
+    *,
+    include_solver_summary: bool = False,
+) -> dict[str, Any]:
+    if result.schema != OBJECT_EMERGENCE_TRAINING_SCHEMA:
+        raise ValueError(f"unsupported solver training schema: {result.schema}")
+    batches = tuple(validate_assignment_evidence_batch(batch) for batch in evidence_batches)
+    if not batches:
+        raise ValueError("evidence_batches must contain at least one batch")
+    solver_frames = tuple(_object_emergence_evidence_from_assignment_batch(batch) for batch in batches)
+    for frame in solver_frames:
+        validate_object_emergence_evidence(frame, slots=result.final_state.config.slots)
+    initial_predictions = tuple(
+        predict_object_emergence_assignment(frame, result.initial_state)
+        for frame in solver_frames
+    )
+    final_predictions = tuple(
+        predict_object_emergence_assignment(frame, result.final_state)
+        for frame in solver_frames
+    )
+    target_assignments = tuple(batch.target_assignment for batch in batches)
+    initial_loss = assignment_loss_v2_breakdown(
+        tuple(prediction.assignment for prediction in initial_predictions),
+        target_assignments=target_assignments,
+        entropy_weight=result.entropy_weight,
+        balance_weight=result.balance_weight,
+        supervised_weight=result.assignment_weight,
+    )
+    final_loss = assignment_loss_v2_breakdown(
+        tuple(prediction.assignment for prediction in final_predictions),
+        target_assignments=target_assignments,
+        entropy_weight=result.entropy_weight,
+        balance_weight=result.balance_weight,
+        supervised_weight=result.assignment_weight,
+    )
+    payload: dict[str, Any] = {
+        "schema": ASSIGNMENT_MVP_TRAINING_SCHEMA,
+        "kind": "fixed_k_assignment_mvp",
+        "solver_training_schema": result.schema,
+        "evidence_schema": batches[0].schema,
+        "frame_count": len(batches),
+        "slots": int(result.final_state.config.slots),
+        "iterations": int(result.iterations),
+        "fixed_k": True,
+        "renderer_loss": "not_used",
+        "dynamic_k": "disabled",
+        "initial_loss_v2": initial_loss.as_dict(),
+        "final_loss_v2": final_loss.as_dict(),
+        "loss_decreased": bool(final_loss.total_loss < initial_loss.total_loss),
+        "supervised_loss_decreased": bool(
+            final_loss.supervised_loss < initial_loss.supervised_loss
+        ),
+        "evidence": [batch.as_dict() for batch in batches],
+    }
+    if include_solver_summary:
+        payload["solver_training"] = result.as_dict()
+    return payload
+
+
 def object_emergence_solver_state_from_dict(payload: dict[str, Any]) -> ObjectEmergenceSolverState:
     if not isinstance(payload, dict):
         raise TypeError("solver state payload must be a dict")
@@ -364,6 +431,19 @@ def evidence_from_gaussian_cloud(
         target_assignment=target_assignment,
         frame_index=frame_index,
         source=source or "gaussian_cloud",
+    )
+
+
+def _object_emergence_evidence_from_assignment_batch(
+    batch: AssignmentEvidenceBatch,
+) -> ObjectEmergenceEvidence:
+    checked = validate_assignment_evidence_batch(batch)
+    return ObjectEmergenceEvidence(
+        positions=checked.positions,
+        features=checked.features,
+        target_assignment=checked.target_assignment,
+        frame_index=checked.frame_index,
+        source=f"assignment_evidence_batch:{checked.source}",
     )
 
 
