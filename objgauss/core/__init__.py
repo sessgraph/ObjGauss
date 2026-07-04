@@ -85,6 +85,10 @@ _EXPORTS = {
         "objgauss.core.object_emergence_solver",
         "ASSIGNMENT_MVP_TRAINING_SCHEMA",
     ),
+    "ASSIGNMENT_STABILITY_EVAL_SCHEMA": (
+        "objgauss.core.assignment_stability",
+        "ASSIGNMENT_STABILITY_EVAL_SCHEMA",
+    ),
     "assignment_mvp_training_summary": (
         "objgauss.core.object_emergence_solver",
         "assignment_mvp_training_summary",
@@ -208,6 +212,10 @@ _EXPORTS = {
     "evaluate_solver_decoder_object_states": (
         "objgauss.core.object_state_eval",
         "evaluate_solver_decoder_object_states",
+    ),
+    "evaluate_assignment_stability": (
+        "objgauss.core.assignment_stability",
+        "evaluate_assignment_stability",
     ),
     "object_id_targets_from_cloud": (
         "objgauss.core.object_emergence_solver",
@@ -341,6 +349,10 @@ _EXPORTS = {
     "validate_assignment_evidence_summary": (
         "objgauss.core.assignment_evidence",
         "validate_assignment_evidence_summary",
+    ),
+    "validate_assignment_stability_eval": (
+        "objgauss.core.assignment_stability",
+        "validate_assignment_stability_eval",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

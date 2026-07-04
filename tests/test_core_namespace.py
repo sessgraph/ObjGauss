@@ -10,6 +10,7 @@ from objgauss.core import (
     GsplatTrainingInput,
     ObjectState,
     ASSIGNMENT_MVP_TRAINING_SCHEMA,
+    ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     AssignmentEvidenceBatch,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
@@ -50,6 +51,7 @@ from objgauss.core import (
     decode_gaussian_from_object_state,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
+    evaluate_assignment_stability,
     evaluate_solver_decoder_object_states,
     evaluate_training_renderer_loss,
     evaluate_gsplat_training_renderer_loss,
@@ -86,6 +88,7 @@ from objgauss.core import (
     validate_image_target_contract_summary,
     validate_assignment_loss_v2_summary,
     validate_assignment_evidence_summary,
+    validate_assignment_stability_eval,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
@@ -361,6 +364,9 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert AssignmentEvidenceBatch is not None
     assert ASSIGNMENT_MVP_TRAINING_SCHEMA == "objgauss-assignment-mvp-training-v1"
     assert assignment_mvp_training_summary is not None
+    assert ASSIGNMENT_STABILITY_EVAL_SCHEMA == "objgauss-assignment-stability-eval-v1"
+    assert evaluate_assignment_stability is not None
+    assert validate_assignment_stability_eval is not None
     assert assignment_evidence_from_trainable_frame is not None
     assert assignment_evidence_sequence_from_trainable_frames is not None
     assert assignment_cluster_loss_and_gradient is not None

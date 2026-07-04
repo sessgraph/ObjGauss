@@ -91,7 +91,11 @@ from objgauss.core.object_emergence_solver import (
     train_object_emergence_solver,
     validate_object_emergence_solver_checkpoint,
 )
-from objgauss.core.assignment_evidence import assignment_evidence_from_object_emergence
+from objgauss.core.assignment_evidence import (
+    assignment_evidence_from_object_emergence,
+    assignment_evidence_sequence_from_trainable_frames,
+)
+from objgauss.core.assignment_stability import evaluate_assignment_stability
 from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
 from objgauss.core.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
@@ -1602,6 +1606,70 @@ def _training_eval_objectstate(args: argparse.Namespace) -> None:
         print(f"summary={args.summary_output}")
     if args.require_pass and summary["status"] != "objectstate_eval_pass":
         raise ValueError("ObjectState checkpoint eval did not pass")
+
+
+def _training_eval_assignment(args: argparse.Namespace) -> None:
+    checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
+    cloud = read_ply(args.input)
+    sample = trainable_kernel_sample_from_cloud(
+        cloud,
+        slots=args.slots or _checkpoint_solver_slots(checkpoint),
+        frame_count=args.frames,
+        max_points=args.max_points or _checkpoint_sampled_gaussians(checkpoint),
+        object_id_field=args.object_id_field,
+        temporal_offset=args.temporal_offset,
+        bind_image_targets=False,
+        seed=args.seed,
+    )
+    evidence_batches = assignment_evidence_sequence_from_trainable_frames(
+        sample.frames,
+        source="eval_assignment_trainable_frame",
+    )
+    summary = evaluate_assignment_stability(
+        evidence_batches,
+        checkpoint,
+        entropy_threshold=args.entropy_threshold,
+        purity_threshold=args.purity_threshold,
+        collapse_mass_fraction=args.collapse_mass_fraction,
+        assignment_confidence_floor=args.assignment_confidence_floor,
+        id_stability_threshold=args.id_stability_threshold,
+        temporal_drift_threshold=args.temporal_drift_threshold,
+        solver_temperature=args.solver_temperature,
+    )
+    aggregate = summary["aggregate"]
+    gates = summary["gates"]
+    print(f"schema={summary['schema']}")
+    print(f"input={args.input}")
+    print(f"checkpoint={args.checkpoint}")
+    print(f"sampled_gaussians={sample.sampled_count}")
+    print(f"frames={sample.as_dict()['frame_count']}")
+    print(f"slots={sample.slots}")
+    print(f"solver_step={summary['solver']['step']}")
+    print(f"solver_temperature={summary['solver']['temperature']}")
+    print(f"eval_status={summary['status']}")
+    print(f"mean_normalized_entropy={aggregate['mean_normalized_entropy']:.6f}")
+    print(f"max_mean_normalized_entropy={aggregate['max_mean_normalized_entropy']:.6f}")
+    print(f"assignment_confidence={aggregate['assignment_confidence']:.6f}")
+    print(f"effective_slots={aggregate['effective_slots']:.6f}")
+    print(f"max_dominant_slot_mass_fraction={aggregate['max_dominant_slot_mass_fraction']:.6f}")
+    print(f"slot_collapse={str(aggregate['slot_collapse']).lower()}")
+    print(f"object_purity={_format_optional_float(aggregate['object_purity'])}")
+    print(f"temporal_mean_drift={aggregate['temporal_mean_drift']:.6f}")
+    print(f"temporal_max_drift={aggregate['temporal_max_drift']:.6f}")
+    print(f"id_stability={aggregate['id_stability']:.6f}")
+    print(f"gate_entropy_pass={_format_optional_bool(gates['entropy_pass'])}")
+    print(f"gate_entropy_borderline={_format_optional_bool(gates['entropy_borderline'])}")
+    print(f"gate_no_collapse_pass={_format_optional_bool(gates['no_collapse_pass'])}")
+    print(f"gate_purity_pass={_format_optional_bool(gates['purity_pass'])}")
+    print(f"gate_id_stability_pass={_format_optional_bool(gates['id_stability_pass'])}")
+    print(f"gate_temporal_drift_pass={_format_optional_bool(gates['temporal_drift_pass'])}")
+    print(f"gpu_used={str(summary['gpu_policy']['uses_gpu']).lower()}")
+    print(f"vram_reserve_gb={summary['gpu_policy']['vram_reserve_gb']}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_pass and summary["status"] != "assignment_stability_eval_pass":
+        raise ValueError("assignment stability eval did not pass")
 
 
 def _checkpoint_solver_slots(checkpoint: dict[str, object]) -> int:
@@ -3131,6 +3199,29 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_objectstate.add_argument("--summary-output", type=Path)
     eval_objectstate.add_argument("--require-pass", action="store_true")
     eval_objectstate.set_defaults(handler=_training_eval_objectstate)
+
+    eval_assignment = training_subparsers.add_parser(
+        "eval-assignment",
+        help="evaluate assignment stability from an Object Emergence Solver checkpoint",
+    )
+    eval_assignment.add_argument("input", type=Path)
+    eval_assignment.add_argument("--checkpoint", required=True, type=Path)
+    eval_assignment.add_argument("--slots", type=int)
+    eval_assignment.add_argument("--frames", type=int, default=2)
+    eval_assignment.add_argument("--max-points", type=int)
+    eval_assignment.add_argument("--object-id-field", default="object_id")
+    eval_assignment.add_argument("--temporal-offset", type=float, default=0.01)
+    eval_assignment.add_argument("--seed", type=int, default=0)
+    eval_assignment.add_argument("--solver-temperature", type=float)
+    eval_assignment.add_argument("--entropy-threshold", type=float, default=0.6)
+    eval_assignment.add_argument("--purity-threshold", type=float, default=0.8)
+    eval_assignment.add_argument("--collapse-mass-fraction", type=float, default=0.9)
+    eval_assignment.add_argument("--assignment-confidence-floor", type=float, default=0.4)
+    eval_assignment.add_argument("--id-stability-threshold", type=float, default=0.7)
+    eval_assignment.add_argument("--temporal-drift-threshold", type=float)
+    eval_assignment.add_argument("--summary-output", type=Path)
+    eval_assignment.add_argument("--require-pass", action="store_true")
+    eval_assignment.set_defaults(handler=_training_eval_assignment)
 
     object_emergence_solver = training_subparsers.add_parser(
         "object-emergence-solver",
