@@ -124,7 +124,7 @@
     `--require-image-render-loss-decrease`。
   - `eval-objectstate --require-pass`: passed。
   - `renderer-loss-contract`: passed with no upgrade blockers。
-- 完成 commit: pending / uncommitted
+- 完成 commit: `8b5bef8`
 
 ### TRAIN-DECODER-OPACITY-001: Wire object-level opacity renderer gradient
 
