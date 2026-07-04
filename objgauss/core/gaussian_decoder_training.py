@@ -6,7 +6,10 @@ from typing import Any, Sequence
 import numpy as np
 
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.gaussian_decoder import OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA
+from objgauss.core.gaussian_decoder import (
+    OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
+    object_opacity_scales_from_logits,
+)
 from objgauss.core.object_state import (
     ObjectStateProjection,
     project_object_states,
@@ -30,6 +33,7 @@ _EPS = 1e-8
 @dataclass(frozen=True)
 class ObjectStateGaussianDecoderState:
     object_colors: np.ndarray
+    object_opacity_logits: np.ndarray | None = None
     step: int = 0
     source: str = "initialized"
     schema: str = OBJECT_STATE_GAUSSIAN_DECODER_STATE_SCHEMA
@@ -39,14 +43,34 @@ class ObjectStateGaussianDecoderState:
         return int(self.object_colors.shape[0])
 
     def as_dict(self) -> dict[str, Any]:
-        colors = validate_object_state_gaussian_decoder_state(self).object_colors
+        checked = validate_object_state_gaussian_decoder_state(self)
+        colors = checked.object_colors
+        opacity_logits = _optional_array1d(checked.object_opacity_logits, "object_opacity_logits")
+        opacity_scales = (
+            None
+            if opacity_logits is None
+            else object_opacity_scales_from_logits(opacity_logits)
+        )
         return {
             "schema": self.schema,
             "source": self.source,
             "step": int(self.step),
             "slots": int(colors.shape[0]),
             "trained_fields": ["object_colors"],
+            "available_fields": ["object_colors", "object_opacity_logits"],
+            "frozen_fields": ["object_opacity_logits"],
+            "opacity_policy": (
+                "object-opacity-soft-assignment-v1"
+                if opacity_logits is not None
+                else "constant-opacity-v1"
+            ),
             "object_colors": np.round(colors, 6).tolist(),
+            "object_opacity_logits": (
+                None if opacity_logits is None else np.round(opacity_logits, 6).tolist()
+            ),
+            "object_opacity_scales": (
+                None if opacity_scales is None else np.round(opacity_scales, 6).tolist()
+            ),
         }
 
 
@@ -329,6 +353,7 @@ def train_object_state_gaussian_decoder(
         initial_state=state,
         final_state=ObjectStateGaussianDecoderState(
             object_colors=colors.astype(np.float32, copy=True),
+            object_opacity_logits=_copy_optional_array(state.object_opacity_logits),
             step=int(iterations),
             source="trained_renderer_gradient_object_colors",
         ),
@@ -357,6 +382,9 @@ def validate_object_state_gaussian_decoder_state(
         raise ValueError("object_colors must contain at least one slot")
     if np.any(colors < 0.0) or np.any(colors > 1.0):
         raise ValueError("object_colors must be in [0, 1]")
+    opacity_logits = _optional_array1d(state.object_opacity_logits, "object_opacity_logits")
+    if opacity_logits is not None and opacity_logits.shape[0] != colors.shape[0]:
+        raise ValueError("object_opacity_logits length must match object_colors rows")
     if state.step < 0:
         raise ValueError("step must be >= 0")
     return state
@@ -372,8 +400,14 @@ def object_state_gaussian_decoder_state_from_dict(
     colors_payload = payload.get("object_colors")
     if colors_payload is None:
         raise ValueError("decoder state missing object_colors")
+    opacity_logits_payload = payload.get("object_opacity_logits")
     state = ObjectStateGaussianDecoderState(
         object_colors=np.asarray(colors_payload, dtype=np.float32),
+        object_opacity_logits=(
+            None
+            if opacity_logits_payload is None
+            else np.asarray(opacity_logits_payload, dtype=np.float32)
+        ),
         step=int(payload.get("step", 0)),
         source=str(payload.get("source", "checkpoint")),
         schema=str(payload.get("schema")),
@@ -410,6 +444,25 @@ def _validate_frames_and_assignments(
         if checked.shape[1] != slots:
             raise ValueError("all assignments must have the same slot count")
     return checked_frames, checked_assignments
+
+
+def _optional_array1d(value: np.ndarray | None, label: str) -> np.ndarray | None:
+    if value is None:
+        return None
+    array = np.asarray(value, dtype=np.float32)
+    if array.ndim != 1:
+        raise ValueError(f"{label} must be a 1D array")
+    if array.shape[0] == 0:
+        raise ValueError(f"{label} must contain at least one value")
+    if not np.isfinite(array).all():
+        raise ValueError(f"{label} must contain only finite values")
+    return array
+
+
+def _copy_optional_array(value: np.ndarray | None) -> np.ndarray | None:
+    if value is None:
+        return None
+    return np.asarray(value, dtype=np.float32).astype(np.float32, copy=True)
 
 
 def _evaluate_decoder_training(

@@ -174,6 +174,19 @@ final checkpoint resume，保留 1GB VRAM reserve，优先冻结 solver / colors
 大面积饱和。该步骤是 docs-only planning，不改训练数学、不启动 GPU 训练、不提交 ignored
 `outputs/` 或 `/tmp` 产物。
 
+随后完成 `DECODER-OPACITY-CONTRACT-001`：`ObjectStateGaussianDecoderState` 现在可携带可选
+`object_opacity_logits`，并在 `as_dict()` / checkpoint roundtrip 中输出
+`object_opacity_logits`、`object_opacity_scales`、`available_fields`、`frozen_fields` 和
+`opacity_policy`。旧 decoder / joint checkpoint 缺该字段时会按 disabled /
+`constant-opacity-v1` 加载，保持现有训练结果不被隐式改成半透明；显式传入 logits 时
+`decode_gaussian_from_object_state(...)` 会用 `assignment @ sigmoid(logits)` 生成
+per-Gaussian opacity，并在 decode summary 中把 `decoder.object_opacity_logits` 标为
+differentiable field，同时把 frozen opacity 改写为 `source_opacities`。当前
+`decoder-mvp` 和 `solver-decoder-mvp` 仍只训练 `object_colors` / solver assignment 参数；
+本切片只建立 ABI，不接入 opacity gradient、不新增 CLI 训练开关、不启动 GPU 训练、不提交
+ignored `outputs/` 产物。下一步是 `TRAIN-DECODER-OPACITY-001`：让 CPU / gsplat renderer API
+暴露 object-level opacity gradient，并加显式 `--train-decoder-opacity` gate。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

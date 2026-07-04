@@ -7,6 +7,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
+from objgauss.core.gaussian_decoder_training import ObjectStateGaussianDecoderState
 from objgauss.core.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
     SOLVER_DECODER_JOINT_TRAINING_SCHEMA,
@@ -129,6 +130,64 @@ def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():
     assert resumed.initial_decoder_state.step == first.final_decoder_state.step
     assert resumed.final_solver_state.step == first.final_solver_state.step + 2
     assert resumed.final_decoder_state.step == first.final_decoder_state.step + 2
+
+
+def test_solver_decoder_joint_checkpoint_preserves_decoder_opacity_contract():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        bind_image_targets=True,
+        image_width=8,
+        image_height=8,
+        seed=2,
+    )
+    initial_decoder_state = ObjectStateGaussianDecoderState(
+        object_colors=np.array(
+            [
+                [0.2, 0.3, 0.4],
+                [0.6, 0.7, 0.8],
+            ],
+            dtype=np.float32,
+        ),
+        object_opacity_logits=np.array([-0.5, 0.5], dtype=np.float32),
+        step=9,
+        source="fixture_opacity_contract",
+    )
+
+    result = train_solver_decoder_joint(
+        sample.frames,
+        initial_decoder_state=initial_decoder_state,
+        iterations=2,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.6,
+        object_weight=0.2,
+        seed=7,
+    )
+    checkpoint = solver_decoder_joint_checkpoint(
+        result,
+        input_path="fixture://objects",
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source="object_id_one_hot_targets",
+        object_id_mapping=sample.object_id_mapping,
+        vram_reserve_gb=1,
+    )
+    _restored_solver, restored_decoder = solver_decoder_joint_states_from_dict(checkpoint)
+
+    assert checkpoint["decoder_state"]["object_opacity_logits"] == [-0.5, 0.5]
+    assert checkpoint["decoder_state"]["opacity_policy"] == "object-opacity-soft-assignment-v1"
+    np.testing.assert_allclose(
+        result.final_decoder_state.object_opacity_logits,
+        initial_decoder_state.object_opacity_logits,
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        restored_decoder.object_opacity_logits,
+        initial_decoder_state.object_opacity_logits,
+        atol=1e-6,
+    )
 
 
 def test_solver_decoder_joint_training_can_override_solver_temperature():

@@ -15,24 +15,25 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier。下一步进入 `DECODER-OPACITY-CONTRACT-001`，仍保持 geometry / camera / dynamic-K 冻结。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI。下一步进入 `TRAIN-DECODER-OPACITY-001`，仍保持 geometry / camera / dynamic-K 冻结。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### DECODER-OPACITY-CONTRACT-001: Add object-level opacity decoder contract
+### TRAIN-DECODER-OPACITY-001: Wire object-level opacity renderer gradient
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model contract
-- 目标: 按 `docs/architecture/renderer-field-unfreeze-plan-v1.md` 将
-  `decoder.object_opacity_logits` 加入 decoder state / checkpoint ABI，并让 Gaussian decode
-  能用 object-level opacity multiplier 生成 per-Gaussian opacity。
-- 背景: `RENDER-FIELD-UNFREEZE-PLAN-001` 已确定第一刀不解冻 geometry / camera / dynamic-K，
-  也不直接训练 per-Gaussian opacity。
-- 验收: 旧 joint checkpoint 可无字段加载；新 decoder state 可 roundtrip；decode summary
-  能区分 `decoder.object_colors` 与 `decoder.object_opacity_logits` 的 differentiable / frozen
-  状态；补单元测试，不启动 GPU 训练。
-- 边界: 不接入 renderer opacity gradient，不新增长训练 run，不提交 ignored `outputs/` 产物。
+- 类型: 标准 PR / algorithm model training contract
+- 目标: 在 CPU point renderer 和 gsplat training renderer 的 loss result 中暴露
+  `gradient_decoder_opacity_logits`，并给 `solver-decoder-mvp` 加显式
+  `--train-decoder-opacity` / `--decoder-opacity-learning-rate` gate。
+- 背景: `DECODER-OPACITY-CONTRACT-001` 已让 decoder state / checkpoint ABI 可携带
+  `object_opacity_logits`，但当前训练 loop 仍只更新 solver assignment 和 `decoder.object_colors`。
+- 验收: 默认训练路径行为不变；未传 gate 时 opacity 仍 frozen；传 gate 时 summary /
+  checkpoint 的 trained fields 包含 `decoder.object_opacity_logits`，TensorBoard / summary
+  可记录 opacity scale min / mean / max；补 CPU 单测，不启动长时间 GPU 训练。
+- 边界: 不做 `TRAIN-RUN-005-OPACITY-SMOKE`，不训练 Gaussian means / scales / quats /
+  camera / dynamic-K，不提交 ignored `outputs/` 产物。
 
 ## Suspended
 
@@ -60,6 +61,38 @@
 当前无进行中 PR。
 
 ## Done
+
+### DECODER-OPACITY-CONTRACT-001: Add object-level opacity decoder contract
+
+- 状态: done / decoder-opacity-contract
+- 类型: 标准 PR / algorithm model contract
+- 目标: 按 `docs/architecture/renderer-field-unfreeze-plan-v1.md` 将
+  `decoder.object_opacity_logits` 加入 decoder state / checkpoint ABI，并让 Gaussian decode
+  能用 object-level opacity multiplier 生成 per-Gaussian opacity。
+- 已实施:
+  - `ObjectStateGaussianDecoderState` 新增可选 `object_opacity_logits`，并在 `as_dict()` 中输出
+    `object_opacity_logits`、`object_opacity_scales`、`available_fields`、`frozen_fields` 和
+    `opacity_policy`。
+  - 旧 decoder / joint checkpoint 缺 `object_opacity_logits` 时按 disabled /
+    `constant-opacity-v1` 加载，保持历史 checkpoint 兼容。
+  - `decode_gaussian_from_object_state(...)` 新增显式 `object_opacity_logits` 输入；启用时用
+    `assignment @ sigmoid(logits)` 生成 per-Gaussian opacity，并在 decode summary 中把
+    `decoder.object_opacity_logits` 标为 differentiable field。
+  - `train_object_state_gaussian_decoder(...)` 和 `train_solver_decoder_joint(...)` 会保留
+    initial decoder state 中的 opacity logits，但当前训练仍不更新该字段。
+  - 新增单元测试覆盖 decode opacity logits、decoder state legacy payload、joint checkpoint
+    roundtrip。
+- 边界:
+  - 不接入 renderer opacity gradient，不新增训练 CLI gate。
+  - 不启动 GPU 训练，不提交 `outputs/` 或 `/tmp` 产物。
+  - Gaussian means / quats / scales / camera / dynamic-K 继续冻结。
+- 验证:
+  - `uv run --extra dev pytest tests/test_gaussian_decoder.py tests/test_gaussian_decoder_training.py tests/test_solver_decoder_training.py tests/test_core_namespace.py`: 26 passed。
+  - `uv run python -m py_compile objgauss/core/gaussian_decoder.py objgauss/core/gaussian_decoder_training.py objgauss/core/solver_decoder_training.py`: passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 182 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: pending
 
 ### RENDER-FIELD-UNFREEZE-PLAN-001: Plan the first renderer parameter thaw
 

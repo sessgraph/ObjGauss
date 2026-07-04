@@ -351,6 +351,7 @@ def train_solver_decoder_joint(
         initial_decoder_state=decoder_state,
         final_decoder_state=ObjectStateGaussianDecoderState(
             object_colors=colors.astype(np.float32, copy=True),
+            object_opacity_logits=_copy_optional_array(decoder_state.object_opacity_logits),
             step=initial_decoder_step + int(iterations),
             source="joint_trained_renderer_gradient_object_colors",
         ),
@@ -737,6 +738,12 @@ def _validate_frames(frames: Sequence[TrainableKernelFrame]) -> tuple[TrainableK
         if target_rgb.ndim != 2 or target_rgb.shape != (evidence.evidence_count, 3):
             raise ValueError(f"frames[{index}].target_rgb must have shape N x 3")
     return checked
+
+
+def _copy_optional_array(value: np.ndarray | None) -> np.ndarray | None:
+    if value is None:
+        return None
+    return np.asarray(value, dtype=np.float32).astype(np.float32, copy=True)
 
 
 def _evidence_from_frames(frames: tuple[TrainableKernelFrame, ...]) -> tuple[ObjectEmergenceEvidence, ...]:

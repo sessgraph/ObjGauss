@@ -88,9 +88,9 @@ gaussian_opacity_i = default_opacity * sum_k A[i,k] * object_opacity_scale[k]
 
 需要变更：
 
-- `ObjectStateGaussianDecoderState` 增加可选 `object_opacity_logits`，旧 checkpoint 缺字段时默认全 `0.0`。
+- `ObjectStateGaussianDecoderState` 增加可选 `object_opacity_logits`，旧 checkpoint 缺字段时按 disabled / `constant-opacity-v1` 加载，避免历史 checkpoint 被隐式改成半透明。
 - `as_dict()` / `object_state_gaussian_decoder_state_from_dict(...)` 保持向后兼容。
-- `decode_gaussian_from_object_state(...)` 支持用 `assignment @ object_opacity_scale` 生成 per-Gaussian opacity。
+- `decode_gaussian_from_object_state(...)` 支持在显式传入 `object_opacity_logits` 时用 `assignment @ object_opacity_scale` 生成 per-Gaussian opacity。
 - `ObjectStateGaussianDecode.as_dict()` 将 `decoder.object_opacity_logits` 标为 differentiable field，仅在显式启用时从 frozen list 移除 `opacities`。
 
 ### TRAIN-DECODER-OPACITY-001

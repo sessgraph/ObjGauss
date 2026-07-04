@@ -9,6 +9,8 @@ from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.gaussian_decoder_training import (
     OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA,
+    ObjectStateGaussianDecoderState,
+    object_state_gaussian_decoder_state_from_dict,
     train_object_state_gaussian_decoder,
 )
 from objgauss.core.object_emergence_solver import (
@@ -60,6 +62,40 @@ def test_object_state_gaussian_decoder_requires_image_targets_for_image_loss():
             iterations=2,
             image_render_weight=1.0,
         )
+
+
+def test_object_state_gaussian_decoder_state_roundtrips_object_opacity_logits():
+    state = ObjectStateGaussianDecoderState(
+        object_colors=np.array(
+            [
+                [0.2, 0.3, 0.4],
+                [0.6, 0.7, 0.8],
+            ],
+            dtype=np.float32,
+        ),
+        object_opacity_logits=np.array([-1.0, 1.0], dtype=np.float32),
+        step=7,
+        source="fixture",
+    )
+
+    payload = state.as_dict()
+    restored = object_state_gaussian_decoder_state_from_dict(payload)
+    legacy_payload = dict(payload)
+    legacy_payload.pop("object_opacity_logits")
+    legacy_payload.pop("object_opacity_scales")
+    legacy_payload.pop("available_fields")
+    legacy_payload.pop("frozen_fields")
+    legacy_restored = object_state_gaussian_decoder_state_from_dict(legacy_payload)
+
+    assert payload["available_fields"] == ["object_colors", "object_opacity_logits"]
+    assert payload["trained_fields"] == ["object_colors"]
+    assert payload["frozen_fields"] == ["object_opacity_logits"]
+    assert payload["opacity_policy"] == "object-opacity-soft-assignment-v1"
+    assert payload["object_opacity_logits"] == [-1.0, 1.0]
+    np.testing.assert_allclose(restored.object_colors, state.object_colors, atol=1e-6)
+    np.testing.assert_allclose(restored.object_opacity_logits, state.object_opacity_logits, atol=1e-6)
+    assert legacy_restored.object_opacity_logits is None
+    assert legacy_restored.as_dict()["opacity_policy"] == "constant-opacity-v1"
 
 
 def test_decoder_mvp_cli_writes_summary(tmp_path, capsys):
