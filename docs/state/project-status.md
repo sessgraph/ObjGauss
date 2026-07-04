@@ -241,6 +241,20 @@ offset 写入 decoder state / checkpoint ABI 和 Gaussian decode summary；之�
 render gate。本步骤是 docs-only planning，不改训练数学、不启动 GPU 训练、不提交 ignored
 `outputs/` 或 `/tmp` 产物。
 
+随后完成 `DECODER-SCALE-CONTRACT-001`：`ObjectStateGaussianDecoderState` 现在可携带可选
+`object_scale_log_offsets`，并在 `as_dict()` / checkpoint roundtrip 中输出
+`object_scale_log_offsets`、`object_scale_multipliers`、`scale_policy`、
+`available_fields` 和 `frozen_fields`。旧 decoder / joint checkpoint 缺该字段时会按
+disabled / `constant-scale-v1` 加载，保持历史 checkpoint 的 frozen scale path 不变。
+`decode_gaussian_from_object_state(...)` 新增显式 `object_scale_log_offsets` 输入，使用
+`assignment @ exp(clamp(log_offsets, log(0.75), log(1.25)))` 生成 per-Gaussian
+isotropic scale multiplier；启用时 decode summary 将
+`decoder.object_scale_log_offsets` 标为 differentiable field，并把 frozen scale 改写为
+`base_scales`。joint checkpoint 会保留 scale offsets，但当前 trainer 仍不更新该字段。
+本切片只建立 ABI，不接 renderer scale gradient、不新增 CLI 训练开关、不启动 GPU 训练、
+不提交 ignored `outputs/` 产物。下一步是 `TRAIN-DECODER-SCALE-001`：让 CPU / gsplat
+renderer API 暴露 object-level scale gradient，并加显式 `--train-decoder-scale` gate。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

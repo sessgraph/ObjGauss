@@ -17,6 +17,7 @@ class ObjectStateGaussianDecode:
     gaussian_policy: str
     color_policy: str
     geometry_policy: str
+    scale_policy: str
     opacity_policy: str
     object_count: int
     gaussian_count: int
@@ -29,9 +30,12 @@ class ObjectStateGaussianDecode:
     object_colors: np.ndarray
     object_opacity_logits: np.ndarray | None
     object_opacity_scales: np.ndarray | None
+    object_scale_log_offsets: np.ndarray | None
+    object_scale_multipliers: np.ndarray | None
 
     def as_dict(self) -> dict[str, Any]:
         object_opacity_enabled = self.object_opacity_logits is not None
+        object_scale_enabled = self.object_scale_log_offsets is not None
         shapes: dict[str, list[int] | None] = {
             "means": list(self.means.shape),
             "quats": list(self.quats.shape),
@@ -46,12 +50,19 @@ class ObjectStateGaussianDecode:
             "object_opacity_scales": None
             if self.object_opacity_scales is None
             else list(self.object_opacity_scales.shape),
+            "object_scale_log_offsets": None
+            if self.object_scale_log_offsets is None
+            else list(self.object_scale_log_offsets.shape),
+            "object_scale_multipliers": None
+            if self.object_scale_multipliers is None
+            else list(self.object_scale_multipliers.shape),
         }
         return {
             "schema": self.schema,
             "gaussian_policy": self.gaussian_policy,
             "color_policy": self.color_policy,
             "geometry_policy": self.geometry_policy,
+            "scale_policy": self.scale_policy,
             "opacity_policy": self.opacity_policy,
             "object_count": int(self.object_count),
             "gaussian_count": int(self.gaussian_count),
@@ -65,11 +76,16 @@ class ObjectStateGaussianDecode:
                     if object_opacity_enabled
                     else []
                 ),
+                *(
+                    ["decoder.object_scale_log_offsets"]
+                    if object_scale_enabled
+                    else []
+                ),
             ],
             "frozen_fields": [
                 "means",
                 "quats",
-                "scales",
+                "base_scales" if object_scale_enabled else "scales",
                 *(
                     ["source_opacities"]
                     if object_opacity_enabled
@@ -78,6 +94,9 @@ class ObjectStateGaussianDecode:
             ],
             "object_opacity_scale_policy": (
                 "sigmoid-clamp-object-opacity-v1" if object_opacity_enabled else None
+            ),
+            "object_scale_multiplier_policy": (
+                "exp-clamp-object-scale-v1" if object_scale_enabled else None
             ),
         }
 
@@ -88,10 +107,13 @@ def decode_gaussian_from_object_state(
     object_colors: np.ndarray,
     *,
     object_opacity_logits: np.ndarray | None = None,
+    object_scale_log_offsets: np.ndarray | None = None,
     default_scale: float = 0.01,
     default_opacity: float = 1.0,
     min_object_opacity_scale: float = 0.05,
     max_object_opacity_scale: float = 1.0,
+    min_object_scale_multiplier: float = 0.75,
+    max_object_scale_multiplier: float = 1.25,
 ) -> ObjectStateGaussianDecode:
     """Decode ObjectState slots into renderer-native Gaussian parameter arrays.
 
@@ -116,11 +138,31 @@ def decode_gaussian_from_object_state(
         raise ValueError("default_opacity must be in [0, 1]")
     if not 0.0 <= min_object_opacity_scale <= max_object_opacity_scale <= 1.0:
         raise ValueError("object opacity scale bounds must satisfy 0 <= min <= max <= 1")
+    if not 0.0 < min_object_scale_multiplier <= max_object_scale_multiplier:
+        raise ValueError("object scale multiplier bounds must satisfy 0 < min <= max")
 
     gaussian_colors = np.clip(assignment @ colors, 0.0, 1.0).astype(np.float32, copy=False)
     quats = np.zeros((xyz.shape[0], 4), dtype=np.float32)
     quats[:, 0] = 1.0
-    scales = np.full((xyz.shape[0], 3), float(default_scale), dtype=np.float32)
+    base_scales = np.full((xyz.shape[0], 3), float(default_scale), dtype=np.float32)
+    scale_policy = "constant-scale-v1"
+    scale_log_offsets = None
+    scale_multipliers = None
+    if object_scale_log_offsets is None:
+        scales = base_scales
+    else:
+        scale_log_offsets = _array1d(object_scale_log_offsets, "object_scale_log_offsets")
+        if scale_log_offsets.shape[0] != assignment.shape[1]:
+            raise ValueError("object_scale_log_offsets length must match projection slots")
+        scale_multipliers = object_scale_multipliers_from_log_offsets(
+            scale_log_offsets,
+            min_multiplier=min_object_scale_multiplier,
+            max_multiplier=max_object_scale_multiplier,
+        )
+        scales = (
+            base_scales * (assignment @ scale_multipliers)[:, None]
+        ).astype(np.float32, copy=False)
+        scale_policy = "object-scale-soft-assignment-v1"
     opacity_policy = "constant-opacity-v1"
     opacity_logits = None
     opacity_scales = None
@@ -146,7 +188,12 @@ def decode_gaussian_from_object_state(
         schema=OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
         gaussian_policy=OBJECT_STATE_GAUSSIAN_POLICY,
         color_policy="object-color-soft-assignment-v1",
-        geometry_policy="freeze-source-means-synthetic-isotropic-scale-v1",
+        geometry_policy=(
+            "freeze-source-means-object-isotropic-scale-multiplier-v1"
+            if scale_log_offsets is not None
+            else "freeze-source-means-synthetic-isotropic-scale-v1"
+        ),
+        scale_policy=scale_policy,
         opacity_policy=opacity_policy,
         object_count=int(assignment.shape[1]),
         gaussian_count=int(xyz.shape[0]),
@@ -163,6 +210,12 @@ def decode_gaussian_from_object_state(
         object_opacity_scales=(
             None if opacity_scales is None else opacity_scales.astype(np.float32, copy=True)
         ),
+        object_scale_log_offsets=(
+            None if scale_log_offsets is None else scale_log_offsets.astype(np.float32, copy=True)
+        ),
+        object_scale_multipliers=(
+            None if scale_multipliers is None else scale_multipliers.astype(np.float32, copy=True)
+        ),
     )
 
 
@@ -178,6 +231,21 @@ def object_opacity_scales_from_logits(
     clipped_logits = np.clip(logits, -60.0, 60.0)
     sigmoid = 1.0 / (1.0 + np.exp(-clipped_logits))
     return np.clip(sigmoid, min_scale, max_scale).astype(np.float32, copy=False)
+
+
+def object_scale_multipliers_from_log_offsets(
+    object_scale_log_offsets: np.ndarray,
+    *,
+    min_multiplier: float = 0.75,
+    max_multiplier: float = 1.25,
+) -> np.ndarray:
+    log_offsets = _array1d(object_scale_log_offsets, "object_scale_log_offsets")
+    if not 0.0 < min_multiplier <= max_multiplier:
+        raise ValueError("object scale multiplier bounds must satisfy 0 < min <= max")
+    min_log = np.log(float(min_multiplier))
+    max_log = np.log(float(max_multiplier))
+    clipped = np.clip(log_offsets, min_log, max_log)
+    return np.exp(clipped).astype(np.float32, copy=False)
 
 
 def _array1d(value: np.ndarray, label: str) -> np.ndarray:

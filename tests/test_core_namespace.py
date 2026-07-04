@@ -58,6 +58,7 @@ from objgauss.core import (
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
     object_emergence_solver_state_from_dict,
+    object_scale_multipliers_from_log_offsets,
     object_state_gaussian_decoder_state_from_dict,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
@@ -208,6 +209,11 @@ def test_core_namespace_exposes_object_field_kernel():
     initialized = initialize_object_field(_tiny_cloud(), slots=2, seed=3, max_iter=10)
     assert initialized.field.gaussian_count == 4
     assert initialized.field.slots == 2
+    np.testing.assert_allclose(
+        object_scale_multipliers_from_log_offsets(np.zeros(2, dtype=np.float32)),
+        np.ones(2, dtype=np.float32),
+        atol=1e-6,
+    )
 
 
 def test_core_namespace_exposes_object_emergence_solver_abi():

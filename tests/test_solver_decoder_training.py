@@ -132,7 +132,7 @@ def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():
     assert resumed.final_decoder_state.step == first.final_decoder_state.step + 2
 
 
-def test_solver_decoder_joint_checkpoint_preserves_decoder_opacity_contract():
+def test_solver_decoder_joint_checkpoint_preserves_decoder_renderer_field_contract():
     sample = trainable_kernel_sample_from_cloud(
         _object_cloud(),
         frame_count=2,
@@ -151,6 +151,7 @@ def test_solver_decoder_joint_checkpoint_preserves_decoder_opacity_contract():
             dtype=np.float32,
         ),
         object_opacity_logits=np.array([-0.5, 0.5], dtype=np.float32),
+        object_scale_log_offsets=np.log(np.array([0.9, 1.1], dtype=np.float32)).astype(np.float32),
         step=9,
         source="fixture_opacity_contract",
     )
@@ -178,14 +179,30 @@ def test_solver_decoder_joint_checkpoint_preserves_decoder_opacity_contract():
 
     assert checkpoint["decoder_state"]["object_opacity_logits"] == [-0.5, 0.5]
     assert checkpoint["decoder_state"]["opacity_policy"] == "object-opacity-soft-assignment-v1"
+    assert checkpoint["decoder_state"]["scale_policy"] == "object-scale-soft-assignment-v1"
+    np.testing.assert_allclose(
+        checkpoint["decoder_state"]["object_scale_multipliers"],
+        [0.9, 1.1],
+        atol=1e-6,
+    )
     np.testing.assert_allclose(
         result.final_decoder_state.object_opacity_logits,
         initial_decoder_state.object_opacity_logits,
         atol=1e-6,
     )
     np.testing.assert_allclose(
+        result.final_decoder_state.object_scale_log_offsets,
+        initial_decoder_state.object_scale_log_offsets,
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
         restored_decoder.object_opacity_logits,
         initial_decoder_state.object_opacity_logits,
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        restored_decoder.object_scale_log_offsets,
+        initial_decoder_state.object_scale_log_offsets,
         atol=1e-6,
     )
 

@@ -274,6 +274,10 @@ _EXPORTS = {
         "objgauss.core.gaussian_decoder_training",
         "object_state_gaussian_decoder_state_from_dict",
     ),
+    "object_scale_multipliers_from_log_offsets": (
+        "objgauss.core.gaussian_decoder",
+        "object_scale_multipliers_from_log_offsets",
+    ),
     "solver_decoder_joint_states_from_dict": (
         "objgauss.core.solver_decoder_training",
         "solver_decoder_joint_states_from_dict",

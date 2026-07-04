@@ -64,7 +64,7 @@ def test_object_state_gaussian_decoder_requires_image_targets_for_image_loss():
         )
 
 
-def test_object_state_gaussian_decoder_state_roundtrips_object_opacity_logits():
+def test_object_state_gaussian_decoder_state_roundtrips_object_renderer_fields():
     state = ObjectStateGaussianDecoderState(
         object_colors=np.array(
             [
@@ -74,6 +74,7 @@ def test_object_state_gaussian_decoder_state_roundtrips_object_opacity_logits():
             dtype=np.float32,
         ),
         object_opacity_logits=np.array([-1.0, 1.0], dtype=np.float32),
+        object_scale_log_offsets=np.log(np.array([0.8, 1.2], dtype=np.float32)).astype(np.float32),
         step=7,
         source="fixture",
     )
@@ -83,19 +84,30 @@ def test_object_state_gaussian_decoder_state_roundtrips_object_opacity_logits():
     legacy_payload = dict(payload)
     legacy_payload.pop("object_opacity_logits")
     legacy_payload.pop("object_opacity_scales")
+    legacy_payload.pop("object_scale_log_offsets")
+    legacy_payload.pop("object_scale_multipliers")
     legacy_payload.pop("available_fields")
     legacy_payload.pop("frozen_fields")
     legacy_restored = object_state_gaussian_decoder_state_from_dict(legacy_payload)
 
-    assert payload["available_fields"] == ["object_colors", "object_opacity_logits"]
+    assert payload["available_fields"] == [
+        "object_colors",
+        "object_opacity_logits",
+        "object_scale_log_offsets",
+    ]
     assert payload["trained_fields"] == ["object_colors"]
-    assert payload["frozen_fields"] == ["object_opacity_logits"]
+    assert payload["frozen_fields"] == ["object_opacity_logits", "object_scale_log_offsets"]
     assert payload["opacity_policy"] == "object-opacity-soft-assignment-v1"
+    assert payload["scale_policy"] == "object-scale-soft-assignment-v1"
     assert payload["object_opacity_logits"] == [-1.0, 1.0]
+    np.testing.assert_allclose(payload["object_scale_multipliers"], [0.8, 1.2], atol=1e-6)
     np.testing.assert_allclose(restored.object_colors, state.object_colors, atol=1e-6)
     np.testing.assert_allclose(restored.object_opacity_logits, state.object_opacity_logits, atol=1e-6)
+    np.testing.assert_allclose(restored.object_scale_log_offsets, state.object_scale_log_offsets, atol=1e-6)
     assert legacy_restored.object_opacity_logits is None
+    assert legacy_restored.object_scale_log_offsets is None
     assert legacy_restored.as_dict()["opacity_policy"] == "constant-opacity-v1"
+    assert legacy_restored.as_dict()["scale_policy"] == "constant-scale-v1"
 
 
 def test_decoder_mvp_cli_writes_summary(tmp_path, capsys):

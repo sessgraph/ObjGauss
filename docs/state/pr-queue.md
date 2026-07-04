@@ -15,29 +15,26 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier。下一步进入 `DECODER-SCALE-CONTRACT-001`，先做 ABI，不启动 GPU run。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI。下一步进入 `TRAIN-DECODER-SCALE-001`，接 renderer scale gradient 和显式 training gate。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### DECODER-SCALE-CONTRACT-001: Add object-level scale decoder contract
+### TRAIN-DECODER-SCALE-001: Wire object-level scale renderer gradient
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model contract
-- 目标: 按 `docs/architecture/renderer-field-unfreeze-plan-v1.md` 将
-  `decoder.object_scale_log_offsets` 加入 decoder state / checkpoint ABI，并让 Gaussian
-  decode 能用 object-level scale multiplier 生成 per-Gaussian scale。
-- 背景: `RENDER-FIELD-SCALE-PLAN-001` 已明确第二个 thaw field 只能是 isotropic
-  object-level `R^K` multiplier，identity init 为 `0.0 -> 1.0`，默认 bounds 为
-  `[0.75, 1.25]`。
-- 验收: 旧 checkpoint 缺 scale field 时按 disabled / `constant-scale-v1` 加载；
-  `ObjectStateGaussianDecoderState.as_dict()` 输出 scale policy / multipliers；
-  `decode_gaussian_from_object_state(...)` 显式传入 scale offsets 时把
-  `decoder.object_scale_log_offsets` 标为 differentiable field，并把 frozen scale 改写为
-  `base_scales` 或 `source_scales`；新增单元测试覆盖 legacy roundtrip 和 decode scale path。
-- 边界: 不接 renderer scale gradient；不新增 CLI training gate；不启动 GPU 训练；不提交
-  `outputs/` 或 `/tmp` 产物；不解冻 per-Gaussian means / scales / quats / camera /
-  dynamic-K。
+- 类型: 标准 PR / algorithm model training contract
+- 目标: 在 CPU point renderer 和 gsplat training renderer 的 loss result 中暴露
+  `gradient_decoder_scale_log_offsets`，并给 `solver-decoder-mvp` 加显式
+  `--train-decoder-scale` / `--decoder-scale-learning-rate` gate。
+- 背景: `DECODER-SCALE-CONTRACT-001` 已让 decoder state / checkpoint / Gaussian decode
+  支持 `decoder.object_scale_log_offsets`，但当前 trainer 仍不更新该字段。
+- 验收: 默认不启用 gate 时 scale 继续 frozen；启用 gate 后初始化或读取
+  `decoder.object_scale_log_offsets`，renderer loss 能更新 object-level scale multiplier；
+  summary / checkpoint trained fields 包含 `decoder.object_scale_log_offsets`；
+  TensorBoard 可记录 `decoder/scale_multiplier_min/mean/max`；CPU smoke 通过。
+- 边界: 不启动长时间 GPU run；不提交 `outputs/` 或 `/tmp` 产物；不训练 per-Gaussian
+  means / scales / quats / camera / dynamic-K。
 
 ## Suspended
 
@@ -65,6 +62,39 @@
 当前无进行中 PR。
 
 ## Done
+
+### DECODER-SCALE-CONTRACT-001: Add object-level scale decoder contract
+
+- 状态: done / decoder-scale-contract
+- 类型: 标准 PR / algorithm model contract
+- 目标: 按 `docs/architecture/renderer-field-unfreeze-plan-v1.md` 将
+  `decoder.object_scale_log_offsets` 加入 decoder state / checkpoint ABI，并让 Gaussian
+  decode 能用 object-level scale multiplier 生成 per-Gaussian scale。
+- 已实施:
+  - `ObjectStateGaussianDecode` 新增 `scale_policy`、`object_scale_log_offsets` 和
+    `object_scale_multipliers`。
+  - `decode_gaussian_from_object_state(...)` 新增显式 `object_scale_log_offsets` 输入；
+    启用时使用 `assignment @ exp(clamp(log_offsets, log(0.75), log(1.25)))`
+    生成 per-Gaussian isotropic scale multiplier。
+  - decode summary 会把 `decoder.object_scale_log_offsets` 标为 differentiable field，
+    并把 frozen scale 从 `scales` 改写为 `base_scales`。
+  - `ObjectStateGaussianDecoderState` 新增可选 `object_scale_log_offsets`，并在
+    `as_dict()` 中输出 `scale_policy` 和 `object_scale_multipliers`。
+  - 旧 decoder / joint checkpoint 缺 scale field 时按 disabled / `constant-scale-v1`
+    加载。
+  - joint training / checkpoint 会保留 scale offsets，但当前 trainer 仍不更新该字段。
+  - `objgauss.core` 暴露 `object_scale_multipliers_from_log_offsets(...)`。
+- 边界:
+  - 不接 renderer scale gradient，不新增 CLI training gate。
+  - 不启动 GPU 训练，不提交 `outputs/` 或 `/tmp` 产物。
+  - Gaussian means / quats / per-Gaussian scales / camera / dynamic-K 继续冻结。
+- 验证:
+  - `uv run --extra dev pytest tests/test_gaussian_decoder.py tests/test_gaussian_decoder_training.py tests/test_solver_decoder_training.py tests/test_core_namespace.py`: 29 passed。
+  - `uv run python -m py_compile objgauss/core/gaussian_decoder.py objgauss/core/gaussian_decoder_training.py objgauss/core/solver_decoder_training.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: 187 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending / uncommitted
 
 ### RENDER-FIELD-SCALE-PLAN-001: Plan the next renderer parameter thaw
 

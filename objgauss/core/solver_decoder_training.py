@@ -405,6 +405,7 @@ def train_solver_decoder_joint(
                 if train_decoder_opacity
                 else _copy_optional_array(decoder_state.object_opacity_logits)
             ),
+            object_scale_log_offsets=_copy_optional_array(decoder_state.object_scale_log_offsets),
             step=initial_decoder_step + int(iterations),
             source=(
                 "joint_trained_renderer_gradient_object_colors_and_opacity"

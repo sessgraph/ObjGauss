@@ -10,6 +10,7 @@ from objgauss.core.gaussian_decoder import (
     ObjectStateGaussianDecode,
     decode_gaussian_from_object_state,
     object_opacity_scales_from_logits,
+    object_scale_multipliers_from_log_offsets,
 )
 from objgauss.core.object_state import project_object_states
 
@@ -52,9 +53,12 @@ def test_decode_gaussian_from_object_state_maps_slots_to_gaussian_tokens():
     assert payload["gaussian_count"] == 4
     assert payload["differentiable_fields"] == ["decoder.object_colors", "assignment"]
     assert payload["frozen_fields"] == ["means", "quats", "scales", "opacities"]
+    assert payload["scale_policy"] == "constant-scale-v1"
     assert payload["shapes"]["colors"] == [4, 3]
     assert payload["shapes"]["object_opacity_logits"] is None
+    assert payload["shapes"]["object_scale_log_offsets"] is None
     assert payload["object_opacity_scale_policy"] is None
+    assert payload["object_scale_multiplier_policy"] is None
     np.testing.assert_allclose(decoded.means, _positions(), atol=1e-6)
     np.testing.assert_allclose(decoded.quats[:, 0], np.ones(4, dtype=np.float32), atol=1e-6)
     np.testing.assert_allclose(decoded.scales, np.full((4, 3), 0.025, dtype=np.float32), atol=1e-6)
@@ -108,6 +112,52 @@ def test_decode_gaussian_from_object_state_supports_object_opacity_logits():
     np.testing.assert_allclose(decoded.opacities, 0.8 * (assignment @ expected_scales), atol=1e-6)
 
 
+def test_decode_gaussian_from_object_state_supports_object_scale_offsets():
+    assignment = np.array(
+        [
+            [1.0, 0.0],
+            [0.75, 0.25],
+            [0.0, 1.0],
+            [0.25, 0.75],
+        ],
+        dtype=np.float32,
+    )
+    projection = project_object_states(_cloud(), assignment, evidence_features=_features())
+    object_colors = np.array(
+        [
+            [0.9, 0.1, 0.2],
+            [0.1, 0.8, 0.7],
+        ],
+        dtype=np.float32,
+    )
+    scale_offsets = np.log(np.array([0.8, 1.2], dtype=np.float32)).astype(np.float32)
+
+    decoded = decode_gaussian_from_object_state(
+        _positions(),
+        projection,
+        object_colors,
+        object_scale_log_offsets=scale_offsets,
+        default_scale=0.5,
+    )
+    payload = decoded.as_dict()
+    expected_multipliers = object_scale_multipliers_from_log_offsets(scale_offsets)
+    expected_scale = 0.5 * (assignment @ expected_multipliers)
+
+    assert payload["scale_policy"] == "object-scale-soft-assignment-v1"
+    assert payload["object_scale_multiplier_policy"] == "exp-clamp-object-scale-v1"
+    assert "decoder.object_scale_log_offsets" in payload["differentiable_fields"]
+    assert payload["frozen_fields"] == ["means", "quats", "base_scales", "opacities"]
+    assert payload["shapes"]["object_scale_log_offsets"] == [2]
+    assert payload["shapes"]["object_scale_multipliers"] == [2]
+    np.testing.assert_allclose(decoded.object_scale_log_offsets, scale_offsets, atol=1e-6)
+    np.testing.assert_allclose(decoded.object_scale_multipliers, expected_multipliers, atol=1e-6)
+    np.testing.assert_allclose(
+        decoded.scales,
+        np.repeat(expected_scale[:, None], repeats=3, axis=1),
+        atol=1e-6,
+    )
+
+
 def test_decode_gaussian_from_object_state_validates_shapes():
     projection = project_object_states(_cloud(), np.full((4, 2), 0.5, dtype=np.float32))
 
@@ -137,6 +187,27 @@ def test_decode_gaussian_from_object_state_validates_shapes():
             projection,
             np.zeros((2, 3), dtype=np.float32),
             object_opacity_logits=np.zeros((2, 1), dtype=np.float32),
+        )
+    with pytest.raises(ValueError, match="object_scale_log_offsets length"):
+        decode_gaussian_from_object_state(
+            _positions(),
+            projection,
+            np.zeros((2, 3), dtype=np.float32),
+            object_scale_log_offsets=np.zeros(3, dtype=np.float32),
+        )
+    with pytest.raises(ValueError, match="object_scale_log_offsets must be a 1D array"):
+        decode_gaussian_from_object_state(
+            _positions(),
+            projection,
+            np.zeros((2, 3), dtype=np.float32),
+            object_scale_log_offsets=np.zeros((2, 1), dtype=np.float32),
+        )
+    with pytest.raises(ValueError, match="object scale multiplier bounds"):
+        decode_gaussian_from_object_state(
+            _positions(),
+            projection,
+            np.zeros((2, 3), dtype=np.float32),
+            min_object_scale_multiplier=0.0,
         )
 
 

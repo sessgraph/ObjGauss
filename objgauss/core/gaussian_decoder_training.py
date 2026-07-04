@@ -9,6 +9,7 @@ from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.gaussian_decoder import (
     OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
     object_opacity_scales_from_logits,
+    object_scale_multipliers_from_log_offsets,
 )
 from objgauss.core.object_state import (
     ObjectStateProjection,
@@ -34,6 +35,7 @@ _EPS = 1e-8
 class ObjectStateGaussianDecoderState:
     object_colors: np.ndarray
     object_opacity_logits: np.ndarray | None = None
+    object_scale_log_offsets: np.ndarray | None = None
     step: int = 0
     source: str = "initialized"
     schema: str = OBJECT_STATE_GAUSSIAN_DECODER_STATE_SCHEMA
@@ -51,18 +53,33 @@ class ObjectStateGaussianDecoderState:
             if opacity_logits is None
             else object_opacity_scales_from_logits(opacity_logits)
         )
+        scale_log_offsets = _optional_array1d(checked.object_scale_log_offsets, "object_scale_log_offsets")
+        scale_multipliers = (
+            None
+            if scale_log_offsets is None
+            else object_scale_multipliers_from_log_offsets(scale_log_offsets)
+        )
         return {
             "schema": self.schema,
             "source": self.source,
             "step": int(self.step),
             "slots": int(colors.shape[0]),
             "trained_fields": ["object_colors"],
-            "available_fields": ["object_colors", "object_opacity_logits"],
-            "frozen_fields": ["object_opacity_logits"],
+            "available_fields": [
+                "object_colors",
+                "object_opacity_logits",
+                "object_scale_log_offsets",
+            ],
+            "frozen_fields": ["object_opacity_logits", "object_scale_log_offsets"],
             "opacity_policy": (
                 "object-opacity-soft-assignment-v1"
                 if opacity_logits is not None
                 else "constant-opacity-v1"
+            ),
+            "scale_policy": (
+                "object-scale-soft-assignment-v1"
+                if scale_log_offsets is not None
+                else "constant-scale-v1"
             ),
             "object_colors": np.round(colors, 6).tolist(),
             "object_opacity_logits": (
@@ -70,6 +87,16 @@ class ObjectStateGaussianDecoderState:
             ),
             "object_opacity_scales": (
                 None if opacity_scales is None else np.round(opacity_scales, 6).tolist()
+            ),
+            "object_scale_log_offsets": (
+                None
+                if scale_log_offsets is None
+                else np.round(scale_log_offsets, 6).tolist()
+            ),
+            "object_scale_multipliers": (
+                None
+                if scale_multipliers is None
+                else np.round(scale_multipliers, 6).tolist()
             ),
         }
 
@@ -354,6 +381,7 @@ def train_object_state_gaussian_decoder(
         final_state=ObjectStateGaussianDecoderState(
             object_colors=colors.astype(np.float32, copy=True),
             object_opacity_logits=_copy_optional_array(state.object_opacity_logits),
+            object_scale_log_offsets=_copy_optional_array(state.object_scale_log_offsets),
             step=int(iterations),
             source="trained_renderer_gradient_object_colors",
         ),
@@ -385,6 +413,9 @@ def validate_object_state_gaussian_decoder_state(
     opacity_logits = _optional_array1d(state.object_opacity_logits, "object_opacity_logits")
     if opacity_logits is not None and opacity_logits.shape[0] != colors.shape[0]:
         raise ValueError("object_opacity_logits length must match object_colors rows")
+    scale_log_offsets = _optional_array1d(state.object_scale_log_offsets, "object_scale_log_offsets")
+    if scale_log_offsets is not None and scale_log_offsets.shape[0] != colors.shape[0]:
+        raise ValueError("object_scale_log_offsets length must match object_colors rows")
     if state.step < 0:
         raise ValueError("step must be >= 0")
     return state
@@ -401,12 +432,18 @@ def object_state_gaussian_decoder_state_from_dict(
     if colors_payload is None:
         raise ValueError("decoder state missing object_colors")
     opacity_logits_payload = payload.get("object_opacity_logits")
+    scale_log_offsets_payload = payload.get("object_scale_log_offsets")
     state = ObjectStateGaussianDecoderState(
         object_colors=np.asarray(colors_payload, dtype=np.float32),
         object_opacity_logits=(
             None
             if opacity_logits_payload is None
             else np.asarray(opacity_logits_payload, dtype=np.float32)
+        ),
+        object_scale_log_offsets=(
+            None
+            if scale_log_offsets_payload is None
+            else np.asarray(scale_log_offsets_payload, dtype=np.float32)
         ),
         step=int(payload.get("step", 0)),
         source=str(payload.get("source", "checkpoint")),
