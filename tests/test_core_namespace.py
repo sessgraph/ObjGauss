@@ -24,6 +24,7 @@ from objgauss.core import (
     TrainableKernelImageTarget,
     TrainableKernelResult,
     TrainableKernelSample,
+    TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
     append_or_replace_property,
     attach_object_aware_lod_metadata,
@@ -61,6 +62,7 @@ from objgauss.core import (
     project_object_states_from_field,
     read_ply,
     renderer_loss_boundary_report,
+    solver_decoder_training_scale_plan,
     train_kernel_mvp,
     train_object_emergence_solver,
     train_object_state_gaussian_decoder,
@@ -73,6 +75,7 @@ from objgauss.core import (
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
     validate_solver_decoder_joint_checkpoint,
+    validate_solver_decoder_training_scale_plan,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -317,6 +320,15 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     image_contract = image_target_contract_summary(tuple(frame.image_target for frame in bound_frames))
     assert image_contract["status"] == "image_targets_bound"
     assert validate_image_target_contract_summary(image_contract) is True
+    scale_plan = solver_decoder_training_scale_plan(
+        total_iterations=3,
+        checkpoint_every=2,
+        loss_log_every=1,
+        output_dir="fixture://scaled-run",
+        image_renderer="point",
+    )
+    assert scale_plan["schema"] == TRAINING_SCALE_PLAN_SCHEMA
+    assert validate_solver_decoder_training_scale_plan(scale_plan) == scale_plan
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],

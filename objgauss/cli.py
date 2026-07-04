@@ -99,6 +99,7 @@ from objgauss.core.solver_decoder_training import (
     validate_solver_decoder_joint_checkpoint,
 )
 from objgauss.core.renderer_loss import renderer_loss_boundary_report
+from objgauss.core.training_scale import solver_decoder_training_scale_plan
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1392,6 +1393,9 @@ def _decoder_training_assignments_from_args(args: argparse.Namespace, sample):
 def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     if args.resume_checkpoint and args.solver_checkpoint:
         raise ValueError("--resume-checkpoint cannot be combined with --solver-checkpoint")
+    if args.checkpoint_every and not args.run_output_dir:
+        raise ValueError("--checkpoint-every requires --run-output-dir")
+    record_every = _solver_decoder_record_every(args)
     cloud = read_ply(args.input)
     sample = trainable_kernel_sample_from_cloud(
         cloud,
@@ -1418,49 +1422,36 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     elif args.solver_checkpoint:
         checkpoint = json.loads(args.solver_checkpoint.read_text(encoding="utf-8"))
         initial_solver_state, assignment_source = _solver_decoder_initial_solver_from_checkpoint(checkpoint)
-    result = train_solver_decoder_joint(
-        sample.frames,
-        slots=sample.slots,
-        initial_solver_state=initial_solver_state,
-        initial_decoder_state=initial_decoder_state,
-        iterations=args.iterations,
-        solver_learning_rate=args.solver_learning_rate,
-        decoder_learning_rate=args.decoder_learning_rate,
-        image_render_weight=args.image_render_weight,
-        object_weight=args.object_weight,
-        entropy_weight=args.entropy_weight,
-        balance_weight=args.balance_weight,
-        temporal_weight=args.temporal_weight,
-        image_renderer=args.image_renderer,
-        gaussian_scale=args.gaussian_scale,
-        gaussian_opacity=args.gaussian_opacity,
-        seed=args.seed,
-        record_every=args.record_every,
-        vram_reserve_gb=1,
-    )
-    summary = {
-        **result.as_dict(
-            include_weights=args.include_weights,
-            include_assignments=args.include_assignments,
-        ),
-        "input": str(args.input),
-        "sample": sample.as_dict(),
-        "assignment_source": assignment_source,
-        "solver_checkpoint": str(args.solver_checkpoint) if args.solver_checkpoint else None,
-        "resume_checkpoint": str(args.resume_checkpoint) if args.resume_checkpoint else None,
-    }
-    checkpoint_output = solver_decoder_joint_checkpoint(
-        result,
-        input_path=str(args.input),
-        source_gaussians=sample.source_count,
-        sampled_gaussians=sample.sampled_count,
-        target_source=sample.target_source,
-        assignment_source=assignment_source,
-        object_id_mapping=sample.object_id_mapping,
-        solver_checkpoint=str(args.solver_checkpoint) if args.solver_checkpoint else None,
-        resume_checkpoint=str(args.resume_checkpoint) if args.resume_checkpoint else None,
-        vram_reserve_gb=1,
-    )
+    if args.run_output_dir:
+        result, summary, checkpoint_output = _run_solver_decoder_scaled(
+            args,
+            sample,
+            initial_solver_state=initial_solver_state,
+            initial_decoder_state=initial_decoder_state,
+            assignment_source=assignment_source,
+            record_every=record_every,
+        )
+    else:
+        result = _train_solver_decoder_segment(
+            args,
+            sample,
+            initial_solver_state=initial_solver_state,
+            initial_decoder_state=initial_decoder_state,
+            iterations=args.iterations,
+            record_every=record_every,
+        )
+        summary = _solver_decoder_summary_from_result(
+            args,
+            sample,
+            result,
+            assignment_source=assignment_source,
+        )
+        checkpoint_output = _solver_decoder_checkpoint_from_result(
+            args,
+            sample,
+            result,
+            assignment_source=assignment_source,
+        )
     print(f"schema={summary['schema']}")
     print(f"input={args.input}")
     print(f"source_gaussians={sample.source_count}")
@@ -1471,6 +1462,11 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"assignment_source={assignment_source}")
     if args.resume_checkpoint:
         print(f"resume_checkpoint={args.resume_checkpoint}")
+    if args.run_output_dir:
+        print(f"run_output_dir={args.run_output_dir}")
+        print(f"training_scale_segments={summary['training_scale']['segment_count']}")
+        print(f"training_scale_total_iterations={summary['training_scale']['total_iterations']}")
+        print(f"training_scale_checkpoint_every={summary['training_scale']['checkpoint_every']}")
     print(f"image_renderer={summary['image_renderer']}")
     print(f"gaussian_scale={summary['gaussian_policy']['default_scale']}")
     print(f"gaussian_opacity={summary['gaussian_policy']['default_opacity']}")
@@ -1487,6 +1483,10 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"loss_decreased={str(summary['loss_decreased']).lower()}")
     print(f"image_render_loss_decreased={str(summary['image_render_loss_decreased']).lower()}")
     print(f"object_loss_decreased={str(summary['object_loss_decreased']).lower()}")
+    if "run_loss" in summary:
+        print(f"run_initial_total_loss={summary['run_loss']['initial_total_loss']:.6f}")
+        print(f"run_final_total_loss={summary['run_loss']['final_total_loss']:.6f}")
+        print(f"run_loss_decreased={str(summary['run_loss']['loss_decreased']).lower()}")
     print(f"trained_fields={','.join(summary['trained_fields'])}")
     print(f"frozen_fields={','.join(summary['frozen_fields'])}")
     print(f"gpu_used={str(summary['gpu_policy']['uses_gpu']).lower()}")
@@ -1503,10 +1503,214 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     if args.checkpoint_output:
         write_json(args.checkpoint_output, checkpoint_output)
         print(f"checkpoint={args.checkpoint_output}")
-    if args.require_loss_decrease and not summary["loss_decreased"]:
+    loss_decreased = summary.get("run_loss", {}).get("loss_decreased", summary["loss_decreased"])
+    image_loss_decreased = summary.get("run_loss", {}).get(
+        "image_render_loss_decreased",
+        summary["image_render_loss_decreased"],
+    )
+    if args.require_loss_decrease and not loss_decreased:
         raise ValueError("solver-decoder MVP total loss did not decrease")
-    if args.require_image_render_loss_decrease and not summary["image_render_loss_decreased"]:
+    if args.require_image_render_loss_decrease and not image_loss_decreased:
         raise ValueError("solver-decoder MVP image render loss did not decrease")
+
+
+def _solver_decoder_record_every(args: argparse.Namespace) -> int | None:
+    if args.loss_log_every is not None and args.record_every is not None:
+        if int(args.loss_log_every) != int(args.record_every):
+            raise ValueError("--loss-log-every and --record-every must match when both are provided")
+    return args.loss_log_every if args.loss_log_every is not None else args.record_every
+
+
+def _train_solver_decoder_segment(
+    args: argparse.Namespace,
+    sample,
+    *,
+    initial_solver_state,
+    initial_decoder_state,
+    iterations: int,
+    record_every: int | None,
+):
+    return train_solver_decoder_joint(
+        sample.frames,
+        slots=sample.slots,
+        initial_solver_state=initial_solver_state,
+        initial_decoder_state=initial_decoder_state,
+        iterations=iterations,
+        solver_learning_rate=args.solver_learning_rate,
+        decoder_learning_rate=args.decoder_learning_rate,
+        image_render_weight=args.image_render_weight,
+        object_weight=args.object_weight,
+        entropy_weight=args.entropy_weight,
+        balance_weight=args.balance_weight,
+        temporal_weight=args.temporal_weight,
+        image_renderer=args.image_renderer,
+        gaussian_scale=args.gaussian_scale,
+        gaussian_opacity=args.gaussian_opacity,
+        seed=args.seed,
+        record_every=record_every,
+        vram_reserve_gb=args.vram_reserve_gb,
+    )
+
+
+def _solver_decoder_summary_from_result(
+    args: argparse.Namespace,
+    sample,
+    result,
+    *,
+    assignment_source: str,
+    training_scale: dict[str, object] | None = None,
+) -> dict[str, object]:
+    summary = {
+        **result.as_dict(
+            include_weights=args.include_weights,
+            include_assignments=args.include_assignments,
+        ),
+        "input": str(args.input),
+        "sample": sample.as_dict(),
+        "assignment_source": assignment_source,
+        "solver_checkpoint": str(args.solver_checkpoint) if args.solver_checkpoint else None,
+        "resume_checkpoint": str(args.resume_checkpoint) if args.resume_checkpoint else None,
+    }
+    if training_scale is not None:
+        summary["training_scale"] = training_scale
+    return summary
+
+
+def _solver_decoder_checkpoint_from_result(
+    args: argparse.Namespace,
+    sample,
+    result,
+    *,
+    assignment_source: str,
+    resume_checkpoint: str | None = None,
+) -> dict[str, object]:
+    return solver_decoder_joint_checkpoint(
+        result,
+        input_path=str(args.input),
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source=assignment_source,
+        object_id_mapping=sample.object_id_mapping,
+        solver_checkpoint=str(args.solver_checkpoint) if args.solver_checkpoint else None,
+        resume_checkpoint=resume_checkpoint or (str(args.resume_checkpoint) if args.resume_checkpoint else None),
+        vram_reserve_gb=args.vram_reserve_gb,
+    )
+
+
+def _run_solver_decoder_scaled(
+    args: argparse.Namespace,
+    sample,
+    *,
+    initial_solver_state,
+    initial_decoder_state,
+    assignment_source: str,
+    record_every: int | None,
+):
+    plan = solver_decoder_training_scale_plan(
+        total_iterations=args.iterations,
+        checkpoint_every=args.checkpoint_every,
+        loss_log_every=record_every,
+        output_dir=args.run_output_dir,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+    )
+    write_json(Path(plan["outputs"]["plan"]), plan)
+    current_solver = initial_solver_state
+    current_decoder = initial_decoder_state
+    segment_records: list[dict[str, object]] = []
+    first_result = None
+    final_result = None
+    final_summary = None
+    final_checkpoint = None
+    previous_checkpoint_path = str(args.resume_checkpoint) if args.resume_checkpoint else None
+    for segment in plan["segments"]:
+        segment_source = (
+            assignment_source if not segment_records else "solver_decoder_joint_checkpoint_segment_resume"
+        )
+        result = _train_solver_decoder_segment(
+            args,
+            sample,
+            initial_solver_state=current_solver,
+            initial_decoder_state=current_decoder,
+            iterations=int(segment["iterations"]),
+            record_every=record_every,
+        )
+        summary = _solver_decoder_summary_from_result(
+            args,
+            sample,
+            result,
+            assignment_source=segment_source,
+            training_scale={
+                "plan_schema": plan["schema"],
+                "mode": "segmented",
+                "segment_id": segment["segment_id"],
+                "segment_index": segment["index"],
+                "segment_count": plan["segment_count"],
+                "total_iterations": plan["total_iterations"],
+                "checkpoint_every": plan["checkpoint_every"],
+                "loss_log_every": plan["loss_log_every"],
+                "run_output_dir": plan["outputs"]["root"],
+            },
+        )
+        checkpoint = _solver_decoder_checkpoint_from_result(
+            args,
+            sample,
+            result,
+            assignment_source=segment_source,
+            resume_checkpoint=previous_checkpoint_path,
+        )
+        write_json(Path(segment["summary_path"]), summary)
+        write_json(Path(segment["checkpoint_path"]), checkpoint)
+        segment_records.append(
+            {
+                "segment_id": segment["segment_id"],
+                "summary_path": segment["summary_path"],
+                "checkpoint_path": segment["checkpoint_path"],
+                "initial_total_loss": result.initial_loss.total_loss,
+                "final_total_loss": result.final_loss.total_loss,
+                "initial_image_render_loss": result.initial_loss.image_render_loss,
+                "final_image_render_loss": result.final_loss.image_render_loss,
+            }
+        )
+        first_result = first_result or result
+        final_result = result
+        final_summary = summary
+        final_checkpoint = checkpoint
+        current_solver = result.final_solver_state
+        current_decoder = result.final_decoder_state
+        previous_checkpoint_path = str(segment["checkpoint_path"])
+    if first_result is None or final_result is None or final_summary is None or final_checkpoint is None:
+        raise ValueError("scaled solver-decoder training did not produce any segments")
+    run_loss = {
+        "initial_total_loss": first_result.initial_loss.total_loss,
+        "final_total_loss": final_result.final_loss.total_loss,
+        "initial_image_render_loss": first_result.initial_loss.image_render_loss,
+        "final_image_render_loss": final_result.final_loss.image_render_loss,
+        "initial_object_loss": first_result.initial_loss.object_loss,
+        "final_object_loss": final_result.final_loss.object_loss,
+        "loss_decreased": final_result.final_loss.total_loss < first_result.initial_loss.total_loss,
+        "image_render_loss_decreased": (
+            final_result.final_loss.image_render_loss < first_result.initial_loss.image_render_loss
+        ),
+        "object_loss_decreased": final_result.final_loss.object_loss < first_result.initial_loss.object_loss,
+    }
+    final_summary["training_scale"] = {
+        "plan_schema": plan["schema"],
+        "mode": "segmented",
+        "segment_count": plan["segment_count"],
+        "total_iterations": plan["total_iterations"],
+        "checkpoint_every": plan["checkpoint_every"],
+        "loss_log_every": plan["loss_log_every"],
+        "run_output_dir": plan["outputs"]["root"],
+        "segments": segment_records,
+    }
+    final_summary["run_loss"] = run_loss
+    boundary = renderer_loss_boundary_report(final_checkpoint).as_dict()
+    write_json(Path(plan["outputs"]["final_summary"]), final_summary)
+    write_json(Path(plan["outputs"]["final_checkpoint"]), final_checkpoint)
+    write_json(Path(plan["outputs"]["renderer_loss_boundary"]), boundary)
+    return final_result, final_summary, final_checkpoint
 
 
 def _solver_decoder_initial_solver_from_checkpoint(
@@ -2703,6 +2907,10 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--temporal-weight", type=float, default=0.0)
     solver_decoder_mvp.add_argument("--seed", type=int, default=0)
     solver_decoder_mvp.add_argument("--record-every", type=int)
+    solver_decoder_mvp.add_argument("--loss-log-every", type=int)
+    solver_decoder_mvp.add_argument("--checkpoint-every", type=int)
+    solver_decoder_mvp.add_argument("--run-output-dir", type=Path)
+    solver_decoder_mvp.add_argument("--vram-reserve-gb", type=int, default=1)
     solver_decoder_mvp.add_argument("--summary-output", type=Path)
     solver_decoder_mvp.add_argument("--checkpoint-output", type=Path)
     solver_decoder_mvp.add_argument("--include-weights", action="store_true")

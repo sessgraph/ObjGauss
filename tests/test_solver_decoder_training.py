@@ -16,6 +16,11 @@ from objgauss.core.solver_decoder_training import (
     validate_solver_decoder_joint_checkpoint,
 )
 from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.core.training_scale import (
+    TRAINING_SCALE_PLAN_SCHEMA,
+    solver_decoder_training_scale_plan,
+    validate_solver_decoder_training_scale_plan,
+)
 from objgauss.ply import write_ply
 
 
@@ -119,6 +124,25 @@ def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():
     assert resumed.initial_decoder_state.step == first.final_decoder_state.step
     assert resumed.final_solver_state.step == first.final_solver_state.step + 2
     assert resumed.final_decoder_state.step == first.final_decoder_state.step + 2
+
+
+def test_solver_decoder_training_scale_plan_segments_run_outputs(tmp_path):
+    plan = solver_decoder_training_scale_plan(
+        total_iterations=5,
+        checkpoint_every=2,
+        loss_log_every=1,
+        output_dir=tmp_path / "run",
+        image_renderer="gsplat",
+        vram_reserve_gb=1,
+    )
+
+    assert plan["schema"] == TRAINING_SCALE_PLAN_SCHEMA
+    assert plan["segment_count"] == 3
+    assert [segment["iterations"] for segment in plan["segments"]] == [2, 2, 1]
+    assert plan["gpu_policy"]["preflight_required"] is True
+    assert plan["gpu_policy"]["vram_reserve_gb"] == 1
+    assert plan["outputs"]["final_checkpoint"].endswith("final-checkpoint.json")
+    assert validate_solver_decoder_training_scale_plan(plan) == plan
 
 
 def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
@@ -249,6 +273,64 @@ def test_solver_decoder_mvp_cli_writes_and_resumes_joint_checkpoint(tmp_path, ca
     assert resumed_summary["final_decoder_state"]["step"] == first_summary["final_decoder_state"]["step"] + 2
     assert resumed_checkpoint["source"]["resume_checkpoint"] == str(checkpoint_path)
     assert validate_solver_decoder_joint_checkpoint(resumed_checkpoint) == resumed_checkpoint
+
+
+def test_solver_decoder_mvp_cli_writes_scaled_run_outputs(tmp_path, capsys):
+    input_path = tmp_path / "objects.ply"
+    run_dir = tmp_path / "scaled-run"
+    write_ply(input_path, _object_cloud(), fmt="ascii")
+
+    status = main(
+        [
+            "training",
+            "solver-decoder-mvp",
+            str(input_path),
+            "--max-points",
+            "4",
+            "--image-width",
+            "8",
+            "--image-height",
+            "8",
+            "--iterations",
+            "4",
+            "--checkpoint-every",
+            "2",
+            "--loss-log-every",
+            "1",
+            "--solver-learning-rate",
+            "0.08",
+            "--decoder-learning-rate",
+            "0.6",
+            "--object-weight",
+            "0.2",
+            "--run-output-dir",
+            str(run_dir),
+            "--require-loss-decrease",
+            "--require-image-render-loss-decrease",
+        ]
+    )
+
+    stdout = capsys.readouterr().out
+    plan = json.loads((run_dir / "training-scale-plan.json").read_text(encoding="utf-8"))
+    final_summary = json.loads((run_dir / "final-summary.json").read_text(encoding="utf-8"))
+    final_checkpoint = json.loads((run_dir / "final-checkpoint.json").read_text(encoding="utf-8"))
+    boundary = json.loads((run_dir / "renderer-loss-boundary.json").read_text(encoding="utf-8"))
+    segment_checkpoint = run_dir / "segments" / "segment-0002-checkpoint.json"
+    assert status == 0
+    assert f"run_output_dir={run_dir}" in stdout
+    assert "training_scale_segments=2" in stdout
+    assert "training_scale_total_iterations=4" in stdout
+    assert "run_loss_decreased=true" in stdout
+    assert plan["schema"] == TRAINING_SCALE_PLAN_SCHEMA
+    assert plan["segment_count"] == 2
+    assert plan["checkpoint_every"] == 2
+    assert plan["loss_log_every"] == 1
+    assert final_summary["training_scale"]["segment_count"] == 2
+    assert final_summary["run_loss"]["loss_decreased"] is True
+    assert final_summary["run_loss"]["image_render_loss_decreased"] is True
+    assert final_checkpoint["schema"] == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA
+    assert boundary["status"] == "solver_decoder_joint_training_ready"
+    assert segment_checkpoint.exists()
 
 
 def _object_cloud() -> GaussianCloud:

@@ -110,6 +110,10 @@ _EXPORTS = {
         "objgauss.core.training_renderer",
         "TrainingRendererLossResult",
     ),
+    "TRAINING_SCALE_PLAN_SCHEMA": (
+        "objgauss.core.training_scale",
+        "TRAINING_SCALE_PLAN_SCHEMA",
+    ),
     "RendererLossBoundaryReport": ("objgauss.core.renderer_loss", "RendererLossBoundaryReport"),
     "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
@@ -203,6 +207,10 @@ _EXPORTS = {
         "renderer_loss_boundary_report",
     ),
     "score_mask_manifest_with_clip": ("objgauss.core.semantics", "score_mask_manifest_with_clip"),
+    "solver_decoder_training_scale_plan": (
+        "objgauss.core.training_scale",
+        "solver_decoder_training_scale_plan",
+    ),
     "image_target_contract_summary": (
         "objgauss.core.trainable_kernel",
         "image_target_contract_summary",
@@ -285,6 +293,10 @@ _EXPORTS = {
     "validate_training_renderer_summary": (
         "objgauss.core.training_renderer",
         "validate_training_renderer_summary",
+    ),
+    "validate_solver_decoder_training_scale_plan": (
+        "objgauss.core.training_scale",
+        "validate_solver_decoder_training_scale_plan",
     ),
     "validate_trainable_kernel_model_artifact": (
         "objgauss.core.trainable_artifact",
