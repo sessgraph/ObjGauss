@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-03
+> 最近更新: 2026-07-04
 
 ## 当前阶段
 
@@ -77,6 +77,20 @@ solver state。`renderer-loss-contract` 现在可直接消费 joint checkpoint�
 `image_render_loss=0.049218 -> 0.048663`；所有 checkpoint / summary / boundary 输出
 仍只写入 `/tmp` 或 ignored `outputs/`，不提交训练产物。Gaussian geometry / opacity /
 rotation / camera 和 dynamic-K 继续冻结。
+
+随后完成 `TRAIN-SCALE-001`：新增 `objgauss-training-scale-plan-v1`，把
+solver-decoder joint training 从单次 smoke 推进到可分段、可恢复、可审计的训练 run
+布局。CLI `objgauss training solver-decoder-mvp` 新增 `--run-output-dir`、
+`--checkpoint-every`、`--loss-log-every` 和 `--vram-reserve-gb`；传入
+`--run-output-dir` 时会写出 `training-scale-plan.json`、每段 summary / checkpoint、
+`final-summary.json`、`final-checkpoint.json` 和 `renderer-loss-boundary.json`。分段
+训练通过现有 joint checkpoint 恢复下一段状态，保持 solver / decoder `step` 递增；
+`--checkpoint-every` 只在 run output 模式下启用，避免无输出路径的伪 checkpoint。
+CPU point scale smoke 验证 4 iteration / checkpoint every 2 的 run：
+`run_initial_total_loss=0.189146 -> run_final_total_loss=0.183699`，并确认 1GB
+显存预留策略进入 plan / checkpoint。该步骤不启动长时间训练，不提交 `/tmp` run 输出
+或 ignored `outputs/` 产物，不训练 Gaussian geometry / opacity / rotation / camera /
+dynamic-K。
 
 ## 架构重梳理基线
 

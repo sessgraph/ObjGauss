@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-03
+> 最近更新: 2026-07-04
 
 ## 队列规则
 
@@ -15,7 +15,7 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环，下一步进入训练规模控制。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan，下一步进入真实训练 run 与 eval gate。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
@@ -48,6 +48,45 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAIN-SCALE-001: Add solver-decoder training scale controls
+
+- 状态: done / segmented-training-run-layout
+- 类型: 标准 PR / algorithm model training pipeline
+- 目标: 将 solver-decoder joint training 从单次 smoke 推进到可分段 checkpoint、
+  可恢复、可审计输出目录的训练 run 布局，同时继续避免长训练产物进入 git。
+- 已实施:
+  - 新增 `objgauss/core/training_scale.py`，定义
+    `objgauss-training-scale-plan-v1`，校验 total iterations、checkpoint interval、
+    loss log interval、run output paths、renderer GPU policy 和 artifact policy。
+  - `objgauss training solver-decoder-mvp` 新增 `--run-output-dir`、
+    `--checkpoint-every`、`--loss-log-every` 和 `--vram-reserve-gb`。
+  - `--run-output-dir` 模式会写出 `training-scale-plan.json`、
+    `segments/segment-XXXX-summary.json`、
+    `segments/segment-XXXX-checkpoint.json`、`final-summary.json`、
+    `final-checkpoint.json` 和 `renderer-loss-boundary.json`。
+  - 分段训练复用现有 joint checkpoint state，把下一段的 solver / decoder `step`
+    从上一段继续递增；`--checkpoint-every` 必须绑定 `--run-output-dir`。
+  - `objgauss.core` lazy namespace 暴露 training scale plan / validate API。
+- 边界:
+  - 不启动长时间训练，不运行新的 GPU gsplat 长 run。
+  - 不训练 Gaussian geometry / opacity / rotation，不更新 camera，不执行 dynamic-K。
+  - 不提交 `/tmp` run output、checkpoint、summary、boundary JSON、rendered image 或
+    ignored `outputs/` 产物。
+  - 不把 torch / gsplat 加入基础 dependencies，不替换 viewer renderer。
+- 验证:
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_core_namespace.py tests/test_renderer_loss.py`:
+    24 passed。
+  - `uv run objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 4 --image-width 8 --image-height 8 --iterations 4 --checkpoint-every 2 --loss-log-every 1 --solver-learning-rate 0.05 --decoder-learning-rate 0.5 --object-weight 0.1 --run-output-dir /tmp/objgauss-solver-decoder-scaled-run --require-loss-decrease --require-image-render-loss-decrease`:
+    passed，`training_scale_segments=2`，
+    `run_initial_total_loss=0.189146 -> run_final_total_loss=0.183699`，
+    `run_loss_decreased=true`。
+  - `/tmp/objgauss-solver-decoder-scaled-run` 输出结构确认包含 plan、2 个 segment
+    summary / checkpoint、final summary / checkpoint 和 renderer-loss boundary。
+  - `uv run --extra dev pytest`: 173 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+  - `git diff --check`: passed。
+- 完成 commit: `809419d`
 
 ### SOLVER-DECODER-EXPORT-001: Export and resume solver-decoder joint checkpoints
 
