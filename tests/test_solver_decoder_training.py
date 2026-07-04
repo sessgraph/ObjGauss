@@ -131,6 +131,42 @@ def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():
     assert resumed.final_decoder_state.step == first.final_decoder_state.step + 2
 
 
+def test_solver_decoder_joint_training_can_override_solver_temperature():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        bind_image_targets=True,
+        image_width=8,
+        image_height=8,
+        seed=2,
+    )
+
+    result = train_solver_decoder_joint(
+        sample.frames,
+        iterations=2,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.6,
+        object_weight=0.2,
+        solver_temperature=0.5,
+        seed=7,
+    )
+    checkpoint = solver_decoder_joint_checkpoint(
+        result,
+        input_path="fixture://objects",
+        source_gaussians=sample.source_count,
+        sampled_gaussians=sample.sampled_count,
+        target_source=sample.target_source,
+        assignment_source="object_id_one_hot_targets",
+        object_id_mapping=sample.object_id_mapping,
+        vram_reserve_gb=1,
+    )
+
+    assert result.initial_solver_state.config.temperature == 0.5
+    assert result.final_solver_state.config.temperature == 0.5
+    assert checkpoint["solver_state"]["config"]["temperature"] == 0.5
+
+
 def test_solver_decoder_training_scale_plan_segments_run_outputs(tmp_path):
     plan = solver_decoder_training_scale_plan(
         total_iterations=5,
@@ -174,6 +210,8 @@ def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
             "0.6",
             "--object-weight",
             "0.2",
+            "--solver-temperature",
+            "0.75",
             "--summary-output",
             str(summary_path),
             "--require-loss-decrease",
@@ -192,6 +230,8 @@ def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
     assert payload["image_render_loss_decreased"] is True
     assert payload["sample"]["sampled_count"] == 4
     assert payload["assignment_source"] == "object_id_one_hot_targets"
+    assert payload["final_solver_state"]["config"]["temperature"] == 0.75
+    assert "solver_temperature=0.75" in stdout
 
 
 def test_solver_decoder_mvp_cli_writes_and_resumes_joint_checkpoint(tmp_path, capsys):

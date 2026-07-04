@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -7,7 +8,9 @@ import numpy as np
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_emergence_solver import (
     ObjectEmergenceEvidence,
+    ObjectEmergenceSolverState,
     predict_object_emergence_assignment,
+    validate_object_emergence_solver_state,
 )
 from objgauss.core.object_state import (
     ObjectStabilityReport,
@@ -36,6 +39,7 @@ def evaluate_solver_decoder_object_states(
     purity_threshold: float = 0.8,
     collapse_mass_fraction: float = 0.9,
     assignment_confidence_floor: float = 0.4,
+    solver_temperature: float | None = None,
 ) -> dict[str, Any]:
     """Evaluate ObjectState emergence from a solver-decoder joint checkpoint.
 
@@ -52,6 +56,10 @@ def evaluate_solver_decoder_object_states(
         assignment_confidence_floor=assignment_confidence_floor,
     )
     solver_state, decoder_state = solver_decoder_joint_states_from_dict(checkpoint)
+    solver_state = _solver_state_with_temperature(
+        solver_state,
+        solver_temperature=solver_temperature,
+    )
     if solver_state.config.slots != sample.slots:
         raise ValueError("checkpoint solver slots must match sample slots")
 
@@ -119,6 +127,7 @@ def evaluate_solver_decoder_object_states(
             "slots": int(solver_state.config.slots),
             "feature_dim": int(solver_state.config.feature_dim),
             "temperature": float(solver_state.config.temperature),
+            "temperature_override": solver_temperature is not None,
             "source": solver_state.source,
         },
         "decoder": {
@@ -207,6 +216,25 @@ def _validate_eval_thresholds(
     }.items():
         if not 0.0 <= float(value) <= 1.0:
             raise ValueError(f"{name} must be in [0, 1]")
+
+
+def _solver_state_with_temperature(
+    state: ObjectEmergenceSolverState,
+    *,
+    solver_temperature: float | None,
+) -> ObjectEmergenceSolverState:
+    if solver_temperature is None:
+        return state
+    if solver_temperature <= 0:
+        raise ValueError("solver_temperature must be > 0")
+    config = replace(state.config, temperature=float(solver_temperature))
+    return validate_object_emergence_solver_state(
+        replace(
+            state,
+            config=config,
+            source=f"{state.source}|temperature_eval_override",
+        )
+    )
 
 
 def _frame_eval_summary(

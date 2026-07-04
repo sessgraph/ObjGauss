@@ -188,6 +188,7 @@ def train_solver_decoder_joint(
     image_renderer: str = TRAINING_IMAGE_RENDERER_POINT,
     gaussian_scale: float = 0.5,
     gaussian_opacity: float = 1.0,
+    solver_temperature: float | None = None,
     seed: int = 0,
     record_every: int | None = None,
     vram_reserve_gb: int = 1,
@@ -205,6 +206,8 @@ def train_solver_decoder_joint(
         raise ValueError("gaussian_scale must be > 0")
     if not 0.0 <= gaussian_opacity <= 1.0:
         raise ValueError("gaussian_opacity must be in [0, 1]")
+    if solver_temperature is not None and solver_temperature <= 0:
+        raise ValueError("solver_temperature must be > 0")
     if temporal_weight != 0.0:
         raise ValueError("temporal_weight is tracked but not optimized in joint MVP")
     for name, weight in {
@@ -228,6 +231,7 @@ def train_solver_decoder_joint(
         evidence_frames,
         slots=slots,
         initial_solver_state=initial_solver_state,
+        solver_temperature=solver_temperature,
         seed=seed,
     )
     initial_solver = solver_state
@@ -753,10 +757,14 @@ def _initial_solver_state(
     *,
     slots: int | None,
     initial_solver_state: ObjectEmergenceSolverState | None,
+    solver_temperature: float | None,
     seed: int,
 ) -> ObjectEmergenceSolverState:
     if initial_solver_state is not None:
-        state = validate_object_emergence_solver_state(initial_solver_state)
+        state = _solver_state_with_temperature(
+            validate_object_emergence_solver_state(initial_solver_state),
+            solver_temperature=solver_temperature,
+        )
         for evidence in evidence_frames:
             validate_object_emergence_evidence(evidence, slots=state.config.slots)
             if evidence.feature_dim != state.config.feature_dim:
@@ -775,7 +783,30 @@ def _initial_solver_state(
     return initialize_object_emergence_solver(
         slots=int(resolved_slots),
         feature_dim=evidence_frames[0].feature_dim,
+        temperature=1.0 if solver_temperature is None else float(solver_temperature),
         seed=seed,
+    )
+
+
+def _solver_state_with_temperature(
+    state: ObjectEmergenceSolverState,
+    *,
+    solver_temperature: float | None,
+) -> ObjectEmergenceSolverState:
+    if solver_temperature is None:
+        return state
+    if solver_temperature <= 0:
+        raise ValueError("solver_temperature must be > 0")
+    temperature = float(solver_temperature)
+    if abs(float(state.config.temperature) - temperature) <= _EPS:
+        return state
+    config = replace(state.config, temperature=temperature)
+    return validate_object_emergence_solver_state(
+        replace(
+            state,
+            config=config,
+            source=f"{state.source}|temperature_override",
+        )
     )
 
 

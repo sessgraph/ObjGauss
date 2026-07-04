@@ -54,6 +54,14 @@ def test_evaluate_solver_decoder_object_states_reports_gates():
         purity_threshold=0.0,
         collapse_mass_fraction=1.0,
     )
+    sharpened = evaluate_solver_decoder_object_states(
+        sample,
+        checkpoint,
+        entropy_threshold=1.0,
+        purity_threshold=0.0,
+        collapse_mass_fraction=1.0,
+        solver_temperature=0.5,
+    )
 
     assert summary["schema"] == OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA
     assert summary["status"] == "objectstate_eval_pass"
@@ -65,6 +73,12 @@ def test_evaluate_solver_decoder_object_states_reports_gates():
     assert summary["gates"]["purity_pass"] is True
     assert summary["frames"][0]["slot_summaries"]
     assert validate_objectstate_checkpoint_eval(summary) == summary
+    assert sharpened["solver"]["temperature"] == 0.5
+    assert sharpened["solver"]["temperature_override"] is True
+    assert (
+        sharpened["aggregate"]["mean_normalized_entropy"]
+        <= summary["aggregate"]["mean_normalized_entropy"]
+    )
 
 
 def test_eval_objectstate_cli_writes_summary(tmp_path, capsys):
@@ -109,6 +123,8 @@ def test_eval_objectstate_cli_writes_summary(tmp_path, capsys):
             str(checkpoint_path),
             "--max-points",
             "6",
+            "--solver-temperature",
+            "0.5",
             "--entropy-threshold",
             "1.0",
             "--purity-threshold",
@@ -125,10 +141,13 @@ def test_eval_objectstate_cli_writes_summary(tmp_path, capsys):
     assert status == 0
     assert "schema=objgauss-objectstate-checkpoint-eval-v1" in stdout
     assert "eval_status=objectstate_eval_pass" in stdout
+    assert "solver_temperature=0.5" in stdout
     assert "gate_entropy_pass=true" in stdout
     assert f"summary={summary_path}" in stdout
     assert summary["schema"] == OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA
     assert summary["checkpoint_schema"] == "objgauss-solver-decoder-joint-checkpoint-v1"
+    assert summary["solver"]["temperature"] == 0.5
+    assert summary["solver"]["temperature_override"] is True
 
 
 def _object_cloud() -> GaussianCloud:

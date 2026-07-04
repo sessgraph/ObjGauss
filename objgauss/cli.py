@@ -1477,6 +1477,7 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
     print(f"image_renderer={summary['image_renderer']}")
     print(f"gaussian_scale={summary['gaussian_policy']['default_scale']}")
     print(f"gaussian_opacity={summary['gaussian_policy']['default_opacity']}")
+    print(f"solver_temperature={summary['final_solver_state']['config']['temperature']}")
     print(f"solver_learning_rate={summary['learning_rates']['solver']}")
     print(f"decoder_learning_rate={summary['learning_rates']['decoder']}")
     print(f"initial_total_loss={result.initial_loss.total_loss:.6f}")
@@ -1542,6 +1543,7 @@ def _training_eval_objectstate(args: argparse.Namespace) -> None:
         purity_threshold=args.purity_threshold,
         collapse_mass_fraction=args.collapse_mass_fraction,
         assignment_confidence_floor=args.assignment_confidence_floor,
+        solver_temperature=args.solver_temperature,
     )
     aggregate = summary["aggregate"]
     gates = summary["gates"]
@@ -1552,6 +1554,7 @@ def _training_eval_objectstate(args: argparse.Namespace) -> None:
     print(f"frames={sample.as_dict()['frame_count']}")
     print(f"slots={sample.slots}")
     print(f"solver_step={summary['solver']['step']}")
+    print(f"solver_temperature={summary['solver']['temperature']}")
     print(f"decoder_step={summary['decoder']['step']}")
     print(f"eval_status={summary['status']}")
     print(f"mean_normalized_entropy={aggregate['mean_normalized_entropy']:.6f}")
@@ -1641,6 +1644,7 @@ def _train_solver_decoder_segment(
         image_renderer=args.image_renderer,
         gaussian_scale=args.gaussian_scale,
         gaussian_opacity=args.gaussian_opacity,
+        solver_temperature=args.solver_temperature,
         seed=args.seed,
         record_every=record_every,
         vram_reserve_gb=args.vram_reserve_gb,
@@ -3008,6 +3012,7 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
     solver_decoder_mvp.add_argument("--gaussian-scale", type=float, default=0.5)
     solver_decoder_mvp.add_argument("--gaussian-opacity", type=float, default=1.0)
+    solver_decoder_mvp.add_argument("--solver-temperature", type=float)
     solver_decoder_mvp.add_argument("--object-weight", type=float, default=0.1)
     solver_decoder_mvp.add_argument("--entropy-weight", type=float, default=0.0)
     solver_decoder_mvp.add_argument("--balance-weight", type=float, default=0.0)
@@ -3039,6 +3044,7 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_objectstate.add_argument("--object-id-field", default="object_id")
     eval_objectstate.add_argument("--temporal-offset", type=float, default=0.01)
     eval_objectstate.add_argument("--seed", type=int, default=0)
+    eval_objectstate.add_argument("--solver-temperature", type=float)
     eval_objectstate.add_argument("--entropy-threshold", type=float, default=0.6)
     eval_objectstate.add_argument("--purity-threshold", type=float, default=0.8)
     eval_objectstate.add_argument("--collapse-mass-fraction", type=float, default=0.9)
