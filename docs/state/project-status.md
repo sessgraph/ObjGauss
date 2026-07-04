@@ -382,6 +382,18 @@ assignment stability gate 为 `assignment_stability_gate_ok`，`status_degraded=
 per-Gaussian geometry / camera、不引入 dynamic-K。完成 commit: `e8071c6`。下一步进入
 `DYNAMIC-K-PROPOSAL-001`，但仍只允许 proposal，不允许自动改写 K。
 
+随后完成 `DYNAMIC-K-PROPOSAL-001`：`assignment_stability` summary 新增 `dynamic_k` 章节，
+将现有 `dynamic_k_proposal_report(...)` 接入 assignment eval。输出保持 proposal-only：
+`dynamic_k.mode=proposal_only`、`auto_update=false`、`checkpoint_k_mutation=forbidden`。每个
+proposal 会记录 `kind`、`source_ids`、`target_id`、`score`、`threshold`、`reason`、
+`action` 和 evidence；`eval-assignment` stdout 新增 `dynamic_k_mode`、
+`dynamic_k_auto_update`、`dynamic_k_proposal_count` 和 `dynamic_k_proposal_kinds`。真实样例 smoke
+通过并输出 `dynamic_k_proposal_kinds=merge_duplicate,split_mixed`。该切片不自动
+birth / merge / split、不改变 checkpoint K、不引入 Slot Attention / OT / Sinkhorn、不启动
+GPU 训练。完成 commit: `648f723`。至此 object assignment v2 阶段队列已完成到
+proposal-only dynamic-K gate；下一阶段需 Owner 确认进入 v2 stability gate / world-model
+rollout baseline，或继续扩大真实 perception 输入。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
