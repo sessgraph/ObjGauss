@@ -85,7 +85,7 @@
   - `git diff --check`: passed。
   - `uv run --extra dev pytest`: 179 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
-- 完成 commit: pending
+- 完成 commit: `bde2668`
 
 ### RENDER-LOSS-RUN-GATE-001: Honor segmented run_loss in renderer boundary
 
