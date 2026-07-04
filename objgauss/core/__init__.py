@@ -10,6 +10,10 @@ from importlib import import_module
 from typing import Any
 
 _EXPORTS = {
+    "AssignmentEvidenceBatch": (
+        "objgauss.core.assignment_evidence",
+        "AssignmentEvidenceBatch",
+    ),
     "GaussianCloud": ("objgauss.core.gaussian", "GaussianCloud"),
     "ObjectField": ("objgauss.core.object_field", "ObjectField"),
     "ObjectStateGaussianDecode": (
@@ -274,6 +278,18 @@ _EXPORTS = {
         "objgauss.core.assignment_losses",
         "assignment_balance_loss_and_gradient",
     ),
+    "assignment_evidence_from_object_emergence": (
+        "objgauss.core.assignment_evidence",
+        "assignment_evidence_from_object_emergence",
+    ),
+    "assignment_evidence_from_trainable_frame": (
+        "objgauss.core.assignment_evidence",
+        "assignment_evidence_from_trainable_frame",
+    ),
+    "assignment_evidence_sequence_from_trainable_frames": (
+        "objgauss.core.assignment_evidence",
+        "assignment_evidence_sequence_from_trainable_frames",
+    ),
     "assignment_cluster_loss_and_gradient": (
         "objgauss.core.assignment_losses",
         "assignment_cluster_loss_and_gradient",
@@ -309,6 +325,14 @@ _EXPORTS = {
     "validate_assignment_loss_v2_summary": (
         "objgauss.core.assignment_losses",
         "validate_assignment_loss_v2_summary",
+    ),
+    "validate_assignment_evidence_batch": (
+        "objgauss.core.assignment_evidence",
+        "validate_assignment_evidence_batch",
+    ),
+    "validate_assignment_evidence_summary": (
+        "objgauss.core.assignment_evidence",
+        "validate_assignment_evidence_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

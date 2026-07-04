@@ -9,6 +9,7 @@ from objgauss.core import (
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
+    AssignmentEvidenceBatch,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
     ObjectStateGaussianDecoderState,
@@ -31,6 +32,8 @@ from objgauss.core import (
     append_or_replace_property,
     assignment_balance_loss_and_gradient,
     assignment_cluster_loss_and_gradient,
+    assignment_evidence_from_trainable_frame,
+    assignment_evidence_sequence_from_trainable_frames,
     assignment_entropy_loss_and_gradient,
     assignment_loss_v2_breakdown,
     attach_object_aware_lod_metadata,
@@ -80,6 +83,7 @@ from objgauss.core import (
     trainable_kernel_sample_from_cloud,
     validate_image_target_contract_summary,
     validate_assignment_loss_v2_summary,
+    validate_assignment_evidence_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_state_gaussian_decoder_state,
@@ -352,6 +356,9 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert evaluate_solver_decoder_object_states is not None
     assert validate_objectstate_checkpoint_eval is not None
     assert assignment_loss_v2_breakdown is not None
+    assert AssignmentEvidenceBatch is not None
+    assert assignment_evidence_from_trainable_frame is not None
+    assert assignment_evidence_sequence_from_trainable_frames is not None
     assert assignment_cluster_loss_and_gradient is not None
     assert assignment_entropy_loss_and_gradient is not None
     assert assignment_balance_loss_and_gradient is not None
@@ -359,6 +366,8 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
     loss_summary = assignment_loss_v2_breakdown([assignment], entropy_weight=0.1).as_dict()
     assert validate_assignment_loss_v2_summary(loss_summary) is True
+    evidence_summary = assignment_evidence_from_trainable_frame(bound_frames[0]).as_dict()
+    assert validate_assignment_evidence_summary(evidence_summary) is True
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
