@@ -445,6 +445,7 @@ def test_solver_decoder_training_scale_plan_segments_run_outputs(tmp_path):
 def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
     input_path = tmp_path / "objects.ply"
     summary_path = tmp_path / "joint-summary.json"
+    checkpoint_path = tmp_path / "joint-checkpoint.json"
     write_ply(input_path, _object_cloud(), fmt="ascii")
 
     status = main(
@@ -470,6 +471,8 @@ def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
             "0.75",
             "--summary-output",
             str(summary_path),
+            "--checkpoint-output",
+            str(checkpoint_path),
             "--require-loss-decrease",
             "--require-image-render-loss-decrease",
         ]
@@ -487,7 +490,40 @@ def test_solver_decoder_mvp_cli_writes_joint_summary(tmp_path, capsys):
     assert payload["sample"]["sampled_count"] == 4
     assert payload["assignment_source"] == "object_id_one_hot_targets"
     assert payload["final_solver_state"]["config"]["temperature"] == 0.75
+    assert payload["assignment_stability"]["schema"] == "objgauss-solver-decoder-assignment-stability-gate-v1"
+    assert payload["assignment_stability"]["before"]["schema"] == "objgauss-assignment-stability-eval-v1"
+    assert payload["assignment_stability"]["after"]["schema"] == "objgauss-assignment-stability-eval-v1"
+    assert payload["assignment_stability"]["status_degraded"] is False
     assert "solver_temperature=0.75" in stdout
+    assert "assignment_stability_status=assignment_stability_gate_ok" in stdout
+    assert "assignment_stability_degraded=false" in stdout
+
+    eval_status = main(
+        [
+            "training",
+            "eval-assignment",
+            str(input_path),
+            "--checkpoint",
+            str(checkpoint_path),
+            "--max-points",
+            "4",
+            "--frames",
+            "2",
+            "--entropy-threshold",
+            "1.0",
+            "--purity-threshold",
+            "0.0",
+            "--collapse-mass-fraction",
+            "1.0",
+            "--id-stability-threshold",
+            "0.0",
+            "--require-pass",
+        ]
+    )
+    eval_stdout = capsys.readouterr().out
+    assert eval_status == 0
+    assert "schema=objgauss-assignment-stability-eval-v1" in eval_stdout
+    assert "eval_status=assignment_stability_eval_pass" in eval_stdout
 
 
 def test_solver_decoder_mvp_cli_trains_decoder_opacity_when_enabled(tmp_path, capsys):
@@ -784,6 +820,7 @@ def test_solver_decoder_mvp_cli_writes_scaled_run_outputs(tmp_path, capsys):
     assert "training_scale_segments=2" in stdout
     assert "training_scale_total_iterations=4" in stdout
     assert "run_loss_decreased=true" in stdout
+    assert "run_assignment_stability_status=assignment_stability_gate_ok" in stdout
     assert plan["schema"] == TRAINING_SCALE_PLAN_SCHEMA
     assert plan["segment_count"] == 2
     assert plan["checkpoint_every"] == 2
@@ -791,6 +828,10 @@ def test_solver_decoder_mvp_cli_writes_scaled_run_outputs(tmp_path, capsys):
     assert final_summary["training_scale"]["segment_count"] == 2
     assert final_summary["run_loss"]["loss_decreased"] is True
     assert final_summary["run_loss"]["image_render_loss_decreased"] is True
+    assert final_summary["run_assignment_stability"]["schema"] == (
+        "objgauss-solver-decoder-assignment-stability-gate-v1"
+    )
+    assert final_summary["run_assignment_stability"]["status_degraded"] is False
     assert final_checkpoint["schema"] == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA
     assert boundary["status"] == "solver_decoder_joint_training_ready"
     assert segment_checkpoint.exists()

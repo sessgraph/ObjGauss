@@ -1511,6 +1511,29 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         print(f"run_initial_total_loss={summary['run_loss']['initial_total_loss']:.6f}")
         print(f"run_final_total_loss={summary['run_loss']['final_total_loss']:.6f}")
         print(f"run_loss_decreased={str(summary['run_loss']['loss_decreased']).lower()}")
+    assignment_stability = summary.get("assignment_stability")
+    if isinstance(assignment_stability, dict):
+        after_aggregate = assignment_stability["after"]["aggregate"]
+        print(f"assignment_stability_status={assignment_stability['status']}")
+        print(f"assignment_stability_before_status={assignment_stability['before_status']}")
+        print(f"assignment_stability_after_status={assignment_stability['after_status']}")
+        print(f"assignment_stability_degraded={str(assignment_stability['status_degraded']).lower()}")
+        print(
+            "assignment_stability_after_entropy="
+            f"{after_aggregate['max_mean_normalized_entropy']:.6f}"
+        )
+        print(
+            "assignment_stability_after_purity="
+            f"{_format_optional_float(after_aggregate['object_purity'])}"
+        )
+        print(
+            "assignment_stability_after_id_stability="
+            f"{after_aggregate['id_stability']:.6f}"
+        )
+    run_assignment_stability = summary.get("run_assignment_stability")
+    if isinstance(run_assignment_stability, dict):
+        print(f"run_assignment_stability_status={run_assignment_stability['status']}")
+        print(f"run_assignment_stability_degraded={str(run_assignment_stability['status_degraded']).lower()}")
     print(f"trained_fields={','.join(summary['trained_fields'])}")
     print(f"frozen_fields={','.join(summary['frozen_fields'])}")
     decoder_opacity = summary.get("decoder_opacity")
@@ -1548,6 +1571,13 @@ def _training_solver_decoder_mvp(args: argparse.Namespace) -> None:
         raise ValueError("solver-decoder MVP total loss did not decrease")
     if args.require_image_render_loss_decrease and not image_loss_decreased:
         raise ValueError("solver-decoder MVP image render loss did not decrease")
+    assignment_gate = summary.get("run_assignment_stability") or summary.get("assignment_stability")
+    if (
+        args.require_assignment_stability_not_degrade
+        and isinstance(assignment_gate, dict)
+        and assignment_gate.get("status_degraded")
+    ):
+        raise ValueError("solver-decoder MVP assignment stability degraded")
 
 
 def _training_eval_objectstate(args: argparse.Namespace) -> None:
@@ -1770,9 +1800,88 @@ def _solver_decoder_summary_from_result(
         "solver_checkpoint": str(args.solver_checkpoint) if args.solver_checkpoint else None,
         "resume_checkpoint": str(args.resume_checkpoint) if args.resume_checkpoint else None,
     }
+    summary["assignment_stability"] = _solver_decoder_assignment_stability_gate(
+        sample,
+        before_solver_state=result.initial_solver_state,
+        after_solver_state=result.final_solver_state,
+    )
     if training_scale is not None:
         summary["training_scale"] = training_scale
     return summary
+
+
+def _solver_decoder_assignment_stability_gate(
+    sample,
+    *,
+    before_solver_state,
+    after_solver_state,
+) -> dict[str, object]:
+    evidence_batches = assignment_evidence_sequence_from_trainable_frames(
+        sample.frames,
+        source="solver_decoder_assignment_stability_gate",
+    )
+    before = evaluate_assignment_stability(evidence_batches, before_solver_state)
+    after = evaluate_assignment_stability(evidence_batches, after_solver_state)
+    before_rank = _assignment_stability_status_rank(before["status"])
+    after_rank = _assignment_stability_status_rank(after["status"])
+    degraded = after_rank < before_rank
+    return {
+        "schema": "objgauss-solver-decoder-assignment-stability-gate-v1",
+        "kind": "solver_decoder_assignment_stability_gate",
+        "status": "assignment_stability_gate_degraded"
+        if degraded
+        else "assignment_stability_gate_ok",
+        "status_degraded": bool(degraded),
+        "before_status": before["status"],
+        "after_status": after["status"],
+        "deltas": _assignment_stability_deltas(before, after),
+        "before": before,
+        "after": after,
+    }
+
+
+def _assignment_stability_status_rank(status: object) -> int:
+    return {
+        "assignment_stability_eval_pass": 2,
+        "assignment_stability_eval_borderline": 1,
+        "assignment_stability_eval_fail": 0,
+    }.get(str(status), -1)
+
+
+def _assignment_stability_deltas(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> dict[str, object]:
+    before_aggregate = before["aggregate"]
+    after_aggregate = after["aggregate"]
+    return {
+        "max_mean_normalized_entropy": (
+            float(after_aggregate["max_mean_normalized_entropy"])
+            - float(before_aggregate["max_mean_normalized_entropy"])
+        ),
+        "assignment_confidence": (
+            float(after_aggregate["assignment_confidence"])
+            - float(before_aggregate["assignment_confidence"])
+        ),
+        "object_purity": _optional_float_delta(
+            before_aggregate.get("object_purity"),
+            after_aggregate.get("object_purity"),
+        ),
+        "id_stability": (
+            float(after_aggregate["id_stability"])
+            - float(before_aggregate["id_stability"])
+        ),
+        "temporal_max_drift": (
+            float(after_aggregate["temporal_max_drift"])
+            - float(before_aggregate["temporal_max_drift"])
+        ),
+    }
+
+
+def _optional_float_delta(before: object, after: object) -> float | None:
+    if before is None or after is None:
+        return None
+    return float(after) - float(before)
 
 
 def _solver_decoder_checkpoint_from_result(
@@ -1938,6 +2047,11 @@ def _run_solver_decoder_scaled(
         "segments": segment_records,
     }
     final_summary["run_loss"] = run_loss
+    final_summary["run_assignment_stability"] = _solver_decoder_assignment_stability_gate(
+        sample,
+        before_solver_state=first_result.initial_solver_state,
+        after_solver_state=final_result.final_solver_state,
+    )
     if args.tensorboard_logdir:
         final_summary["tensorboard"] = write_solver_decoder_tensorboard_events(
             final_summary,
@@ -3177,6 +3291,7 @@ def _build_parser() -> argparse.ArgumentParser:
     solver_decoder_mvp.add_argument("--include-assignments", action="store_true")
     solver_decoder_mvp.add_argument("--require-loss-decrease", action="store_true")
     solver_decoder_mvp.add_argument("--require-image-render-loss-decrease", action="store_true")
+    solver_decoder_mvp.add_argument("--require-assignment-stability-not-degrade", action="store_true")
     solver_decoder_mvp.set_defaults(handler=_training_solver_decoder_mvp)
 
     eval_objectstate = training_subparsers.add_parser(

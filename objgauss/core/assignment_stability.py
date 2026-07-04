@@ -28,6 +28,11 @@ from objgauss.core.object_state import (
     project_object_states,
     validate_assignment_matrix,
 )
+from objgauss.core.solver_decoder_training import (
+    SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
+    solver_decoder_joint_states_from_dict,
+    validate_solver_decoder_joint_checkpoint,
+)
 
 ASSIGNMENT_STABILITY_EVAL_SCHEMA = "objgauss-assignment-stability-eval-v1"
 _BORDERLINE_ENTROPY_MARGIN = 0.03
@@ -196,6 +201,10 @@ def _solver_state_from_input(
     schema = str(solver.get("schema"))
     if schema == OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA:
         validate_object_emergence_solver_checkpoint(solver)
+    if schema == SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA:
+        validate_solver_decoder_joint_checkpoint(solver)
+        solver_state, _decoder_state = solver_decoder_joint_states_from_dict(solver)
+        return solver_state, schema, solver
     if schema not in {OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA, OBJECT_EMERGENCE_SOLVER_STATE_SCHEMA}:
         raise ValueError(f"unsupported assignment solver schema: {schema}")
     return object_emergence_solver_state_from_dict(solver), schema, solver
