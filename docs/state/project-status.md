@@ -369,6 +369,19 @@ GPU 训练、不接 renderer loss、不做 dynamic-K，eval 输出只写 `/tmp` 
 完成 commit: `0375524`。下一步进入 `ASSIGNMENT-RENDER-JOINT-001`，把 assignment stability
 before / after gate 接入 renderer joint run。
 
+随后完成 `ASSIGNMENT-RENDER-JOINT-001`：`eval-assignment` 现在可读取
+`objgauss-solver-decoder-joint-checkpoint-v1`，`solver-decoder-mvp` summary 新增
+`objgauss-solver-decoder-assignment-stability-gate-v1`。普通 joint summary 会写入
+`assignment_stability.before` / `assignment_stability.after`；分段 run final summary 会写入
+`run_assignment_stability`，覆盖整段 run 的 before / after。CLI stdout 新增 assignment
+stability status、before / after status、degraded、after entropy / purity / ID stability，
+并新增可选门禁 `--require-assignment-stability-not-degrade`。小规模真实样例 CPU joint smoke
+通过：total loss `0.195038 -> 0.190573`，image render loss `0.057252 -> 0.053990`，
+assignment stability gate 为 `assignment_stability_gate_ok`，`status_degraded=false`；
+同一个 joint checkpoint 可被 `eval-assignment` 单独读取。本切片不改 optimizer、不解冻
+per-Gaussian geometry / camera、不引入 dynamic-K。完成 commit: `e8071c6`。下一步进入
+`DYNAMIC-K-PROPOSAL-001`，但仍只允许 proposal，不允许自动改写 K。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

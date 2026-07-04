@@ -15,26 +15,24 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval。下一步进入 `ASSIGNMENT-RENDER-JOINT-001`。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary。下一步进入 `DYNAMIC-K-PROPOSAL-001`。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### ASSIGNMENT-RENDER-JOINT-001: Wire assignment eval into renderer joint training gate
+### DYNAMIC-K-PROPOSAL-001: Define v2 dynamic-K proposal gate
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model training
-- 目标: 将 assignment stability eval 作为 `solver-decoder-mvp` / renderer joint run 的
-  前置和后置 gate，形成
-  `AssignmentEvidence -> A[N,K] -> ObjectState -> Gaussian decode -> renderer loss`
-  的可审计训练闭环。
-- 背景: fixed-K assignment MVP 已能输出 v2 loss summary；assignment 专用 eval 已能报告
-  entropy、purity、slot collapse、temporal drift 和 ID stability。下一步需要把这些指标
-  接入 renderer joint run，而不是只看 image loss。
-- 验收: joint training summary 或 run output 中记录 assignment stability before / after；
-  `eval-assignment` 可消费训练 checkpoint；renderer loss 下降不能以 assignment eval 退化为代价。
-- 边界: 不解冻 per-Gaussian geometry / camera；不引入 dynamic-K；不引入 SAM / CLIP /
-  CoTracker 默认依赖；不启动长 GPU 训练。
+- 类型: 标准 PR / algorithm model contract
+- 目标: 在 assignment stability gate 和 renderer joint gate 都存在后，定义 v2 dynamic-K 的
+  birth / merge / split proposal 输出，仍只做 proposal，不自动改写 ObjectState 数量。
+- 背景: 当前 fixed-K assignment 已能训练、评估，并接入 renderer joint summary。下一步可以
+  定义 K 变化候选，但不能让 topology update 直接进入训练 loop。
+- 验收: summary 中能从 inactive slot、mixed slot、duplicate slot 或 unmatched evidence 产生
+  dynamic-K proposal；proposal 包含 reason、score、threshold、source ids 和 blocked / accepted
+  gate；默认 action 必须是 `proposal_only`。
+- 边界: 不自动 birth / merge / split；不改变 checkpoint K；不引入 Slot Attention / OT /
+  Sinkhorn；不启动 GPU 训练。
 
 ## Suspended
 
@@ -97,6 +95,36 @@
 当前无进行中 PR。
 
 ## Done
+
+### ASSIGNMENT-RENDER-JOINT-001: Wire assignment eval into renderer joint training gate
+
+- 状态: done / assignment-stability-joint-gate
+- 类型: 标准 PR / algorithm model training
+- 目标: 将 assignment stability eval 作为 `solver-decoder-mvp` / renderer joint run 的
+  前置和后置 gate，形成
+  `AssignmentEvidence -> A[N,K] -> ObjectState -> Gaussian decode -> renderer loss`
+  的可审计训练闭环。
+- 已实施:
+  - `eval-assignment` 现在可读取 `objgauss-solver-decoder-joint-checkpoint-v1`。
+  - `solver-decoder-mvp` summary 新增
+    `objgauss-solver-decoder-assignment-stability-gate-v1`。
+  - 普通 summary 写入 `assignment_stability.before` / `assignment_stability.after`。
+  - 分段 run final summary 写入 `run_assignment_stability`，覆盖整段 run 的 before / after。
+  - CLI stdout 新增 assignment stability status、before / after status、degraded、after
+    entropy / purity / ID stability。
+  - CLI 新增可选门禁 `--require-assignment-stability-not-degrade`。
+- 边界:
+  - 不改 optimizer，不改变 renderer loss。
+  - 不解冻 per-Gaussian geometry / camera。
+  - 不引入 dynamic-K 或重型 perception 依赖。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/assignment_stability.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_solver_decoder_training.py tests/test_assignment_stability.py tests/test_object_state_eval.py`: 20 passed。
+  - `uv run --extra dev pytest`: 207 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `uv run objgauss training solver-decoder-mvp public/samples/lego_alpha_v1_objects.ply --max-points 16 --frames 2 --image-width 16 --image-height 16 --iterations 4 --solver-learning-rate 0.05 --decoder-learning-rate 0.25 --object-weight 0.1 --summary-output /tmp/objgauss-assignment-render-joint-summary.json --checkpoint-output /tmp/objgauss-assignment-render-joint-checkpoint.json --require-loss-decrease --require-image-render-loss-decrease --require-assignment-stability-not-degrade`: passed。
+  - `uv run objgauss training eval-assignment public/samples/lego_alpha_v1_objects.ply --checkpoint /tmp/objgauss-assignment-render-joint-checkpoint.json --max-points 16 --frames 2 --entropy-threshold 1.0 --purity-threshold 0.0 --collapse-mass-fraction 1.0 --id-stability-threshold 0.0 --summary-output /tmp/objgauss-assignment-render-joint-eval.json --require-pass`: passed。
+- 完成 commit: `e8071c6`
 
 ### EVAL-ASSIGNMENT-STABILITY-001: Add assignment stability eval
 
