@@ -15,21 +15,24 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate。下一步可以规划最小 renderer 参数解冻，但仍需保持 geometry / opacity / camera 的逐项 gate。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier。下一步进入 `DECODER-OPACITY-CONTRACT-001`，仍保持 geometry / camera / dynamic-K 冻结。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### RENDER-FIELD-UNFREEZE-PLAN-001: Plan the first renderer parameter thaw
+### DECODER-OPACITY-CONTRACT-001: Add object-level opacity decoder contract
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model planning
-- 目标: 基于 run-004 的 stable ObjectState 和 fixed boundary，定义第一个可解冻 renderer
-  参数切片，优先选择最小 blast radius 的 field、学习率、eval gate 和回滚条件。
-- 背景: run-004 已达到
-  `full_3dgs_solver_decoder_joint_training_ready`、`objectstate_eval_pass`、
-  `upgrade_blockers=[]`，但当前仍只训练 solver assignment 和 decoder object colors。
-- 边界: 本 PR 先规划，不直接长时间训练；dynamic-K、camera、full geometry 大范围更新仍冻结。
+- 类型: 标准 PR / algorithm model contract
+- 目标: 按 `docs/architecture/renderer-field-unfreeze-plan-v1.md` 将
+  `decoder.object_opacity_logits` 加入 decoder state / checkpoint ABI，并让 Gaussian decode
+  能用 object-level opacity multiplier 生成 per-Gaussian opacity。
+- 背景: `RENDER-FIELD-UNFREEZE-PLAN-001` 已确定第一刀不解冻 geometry / camera / dynamic-K，
+  也不直接训练 per-Gaussian opacity。
+- 验收: 旧 joint checkpoint 可无字段加载；新 decoder state 可 roundtrip；decode summary
+  能区分 `decoder.object_colors` 与 `decoder.object_opacity_logits` 的 differentiable / frozen
+  状态；补单元测试，不启动 GPU 训练。
+- 边界: 不接入 renderer opacity gradient，不新增长训练 run，不提交 ignored `outputs/` 产物。
 
 ## Suspended
 
@@ -57,6 +60,32 @@
 当前无进行中 PR。
 
 ## Done
+
+### RENDER-FIELD-UNFREEZE-PLAN-001: Plan the first renderer parameter thaw
+
+- 状态: done / renderer-opacity-first-thaw-plan
+- 类型: 标准 PR / algorithm model planning
+- 目标: 基于 run-004 的 stable ObjectState 和 fixed boundary，定义第一个可解冻 renderer
+  参数切片，优先选择最小 blast radius 的 field、学习率、eval gate 和回滚条件。
+- 已实施:
+  - 新增 `docs/architecture/renderer-field-unfreeze-plan-v1.md`，明确第一刀选择
+    `decoder.object_opacity_logits: R^K`。
+  - 将 direct per-Gaussian opacity、means、scales、quats、camera 和 dynamic-K 排除在第一批
+    解冻之外。
+  - 定义下一步 `DECODER-OPACITY-CONTRACT-001`、`TRAIN-DECODER-OPACITY-001` 和
+    `TRAIN-RUN-005-OPACITY-SMOKE` 的顺序。
+  - 定义首个 opacity smoke 的成功门槛：run-level image loss 下降、ObjectState eval
+    继续 pass、`object_purity >= 0.85`、`mean_normalized_entropy <= 0.30`、无 slot collapse、
+    opacity scale 不在 clamp 边界大面积饱和。
+- 边界:
+  - 不改训练数学，不改 renderer API，不改 checkpoint schema。
+  - 不启动 GPU 训练，不提交 `outputs/` 或 `/tmp` 产物。
+  - Gaussian means / quats / scales / camera / dynamic-K 继续冻结。
+- 验证:
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 179 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning，build completed。
+- 完成 commit: pending
 
 ### RENDER-LOSS-RUN-GATE-001: Honor segmented run_loss in renderer boundary
 

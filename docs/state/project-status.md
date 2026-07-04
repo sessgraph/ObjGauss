@@ -161,6 +161,19 @@ evidence 使用 run-level delta：`image_render_loss=0.018028 -> 0.017223`、
 `object_loss=0.278156 -> 0.208460`。该修正不改变训练数学、不改 checkpoint schema、不解冻
 Gaussian geometry / opacity / camera / dynamic-K。
 
+随后完成 `RENDER-FIELD-UNFREEZE-PLAN-001`：新增
+`docs/architecture/renderer-field-unfreeze-plan-v1.md`，把第一个 renderer 参数解冻切片
+冻结为 `decoder.object_opacity_logits` 这类 object-level opacity multiplier，而不是直接
+解冻 per-Gaussian opacity、means、scales、quats、camera 或 dynamic-K。规划要求下一步先做
+`DECODER-OPACITY-CONTRACT-001`，将 opacity 写入 decoder state / checkpoint ABI，并保持旧
+checkpoint 向后兼容；再做 `TRAIN-DECODER-OPACITY-001`，让 CPU / gsplat renderer API 暴露
+object-level opacity 梯度和显式 `--train-decoder-opacity` 开关。首个训练 run 仍应从 run-004
+final checkpoint resume，保留 1GB VRAM reserve，优先冻结 solver / colors 以隔离 opacity
+效果；成功门槛包括 run-level image loss 下降、ObjectState eval 继续通过、`object_purity >=
+0.85`、`mean_normalized_entropy <= 0.30`、无 slot collapse、opacity scale 不在 clamp 边界
+大面积饱和。该步骤是 docs-only planning，不改训练数学、不启动 GPU 训练、不提交 ignored
+`outputs/` 或 `/tmp` 产物。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
