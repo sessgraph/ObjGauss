@@ -123,7 +123,7 @@
     transformer world model 依赖。
 - 验证:
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `3abe622`
 
 ### TRAIN-RUN-006-SCALE-SMOKE: Controlled scale-only GPU smoke
 
