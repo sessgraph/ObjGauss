@@ -572,9 +572,10 @@ def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, A
         raise ValueError("joint checkpoint missing training")
     initial = _joint_loss_record(training, "initial_loss")
     final = _joint_loss_record(training, "final_loss")
-    loss_decreased = final["total_loss"] < initial["total_loss"]
-    image_render_loss_decreased = final["image_render_loss"] < initial["image_render_loss"]
-    object_loss_decreased = final["object_loss"] < initial["object_loss"]
+    delta = _joint_run_delta(summary, initial=initial, final=final, use_run_loss=not is_checkpoint)
+    loss_decreased = delta["loss_decreased"]
+    image_render_loss_decreased = delta["image_render_loss_decreased"]
+    object_loss_decreased = delta["object_loss_decreased"]
     blockers: list[str] = []
     if not loss_decreased:
         blockers.append("joint_total_loss_not_decreased")
@@ -622,12 +623,19 @@ def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, A
         "renderer_name": renderer_api.get("renderer_name"),
         "renderer_gradient_path": renderer_api.get("gradient_path"),
         "image_render_loss": renderer_api.get("image_render_loss"),
-        "initial_total_loss": initial["total_loss"],
-        "final_total_loss": final["total_loss"],
-        "initial_image_render_loss": initial["image_render_loss"],
-        "final_image_render_loss": final["image_render_loss"],
-        "initial_object_loss": initial["object_loss"],
-        "final_object_loss": final["object_loss"],
+        "loss_delta_source": delta["source"],
+        "initial_total_loss": delta["initial_total_loss"],
+        "final_total_loss": delta["final_total_loss"],
+        "initial_image_render_loss": delta["initial_image_render_loss"],
+        "final_image_render_loss": delta["final_image_render_loss"],
+        "initial_object_loss": delta["initial_object_loss"],
+        "final_object_loss": delta["final_object_loss"],
+        "segment_initial_total_loss": initial["total_loss"],
+        "segment_final_total_loss": final["total_loss"],
+        "segment_initial_image_render_loss": initial["image_render_loss"],
+        "segment_final_image_render_loss": final["image_render_loss"],
+        "segment_initial_object_loss": initial["object_loss"],
+        "segment_final_object_loss": final["object_loss"],
         "loss_decreased": loss_decreased,
         "image_render_loss_decreased": image_render_loss_decreased,
         "object_loss_decreased": object_loss_decreased,
@@ -635,6 +643,64 @@ def _solver_decoder_joint_evidence(summary: dict[str, Any]) -> tuple[dict[str, A
         "vram_reserve_gb": _optional_int(gpu_policy.get("vram_reserve_gb")),
     }
     return evidence, blockers
+
+
+def _joint_run_delta(
+    summary: dict[str, Any],
+    *,
+    initial: dict[str, float],
+    final: dict[str, float],
+    use_run_loss: bool,
+) -> dict[str, Any]:
+    run_loss = summary.get("run_loss") if use_run_loss else None
+    if isinstance(run_loss, dict):
+        required = (
+            "initial_total_loss",
+            "final_total_loss",
+            "initial_image_render_loss",
+            "final_image_render_loss",
+            "initial_object_loss",
+            "final_object_loss",
+        )
+        missing = [field for field in required if field not in run_loss]
+        if missing:
+            raise ValueError(f"run_loss missing fields: {', '.join(missing)}")
+        initial_total = _finite_float(run_loss["initial_total_loss"], "run_loss.initial_total_loss")
+        final_total = _finite_float(run_loss["final_total_loss"], "run_loss.final_total_loss")
+        initial_image = _finite_float(
+            run_loss["initial_image_render_loss"],
+            "run_loss.initial_image_render_loss",
+        )
+        final_image = _finite_float(
+            run_loss["final_image_render_loss"],
+            "run_loss.final_image_render_loss",
+        )
+        initial_object = _finite_float(run_loss["initial_object_loss"], "run_loss.initial_object_loss")
+        final_object = _finite_float(run_loss["final_object_loss"], "run_loss.final_object_loss")
+        return {
+            "source": "run_loss",
+            "initial_total_loss": initial_total,
+            "final_total_loss": final_total,
+            "initial_image_render_loss": initial_image,
+            "final_image_render_loss": final_image,
+            "initial_object_loss": initial_object,
+            "final_object_loss": final_object,
+            "loss_decreased": final_total < initial_total,
+            "image_render_loss_decreased": final_image < initial_image,
+            "object_loss_decreased": final_object < initial_object,
+        }
+    return {
+        "source": "segment_loss",
+        "initial_total_loss": initial["total_loss"],
+        "final_total_loss": final["total_loss"],
+        "initial_image_render_loss": initial["image_render_loss"],
+        "final_image_render_loss": final["image_render_loss"],
+        "initial_object_loss": initial["object_loss"],
+        "final_object_loss": final["object_loss"],
+        "loss_decreased": final["total_loss"] < initial["total_loss"],
+        "image_render_loss_decreased": final["image_render_loss"] < initial["image_render_loss"],
+        "object_loss_decreased": final["object_loss"] < initial["object_loss"],
+    }
 
 
 def _loss_record(summary: dict[str, Any], key: str) -> dict[str, float]:

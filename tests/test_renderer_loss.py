@@ -257,6 +257,58 @@ def test_renderer_loss_boundary_accepts_solver_decoder_joint_summary():
     assert payload["decoder_handoff_contract"]["starts_real_training"] is True
 
 
+def test_renderer_loss_boundary_uses_segmented_run_loss_for_joint_summary():
+    frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
+    target = np.zeros((6, 2), dtype=np.float32)
+    target[:3, 0] = 1.0
+    target[3:, 1] = 1.0
+    frames = tuple(
+        type(frame)(
+            positions=frame.positions,
+            features=frame.features,
+            target_rgb=frame.target_rgb,
+            target_assignment=target,
+            image_target=frame.image_target,
+        )
+        for frame in frames
+    )
+    result = train_solver_decoder_joint(
+        frames,
+        iterations=4,
+        solver_learning_rate=0.08,
+        decoder_learning_rate=0.6,
+        object_weight=0.2,
+        seed=9,
+    )
+    summary = result.as_dict()
+    summary["renderer_api"]["renderer_name"] = "gsplat-rasterization-v1"
+    summary["renderer_api"]["gradient_path"] = "torch-autograd-gsplat-rasterization-v1"
+    summary["final_loss"]["image_render_loss"] = summary["initial_loss"]["image_render_loss"]
+    summary["image_render_loss_decreased"] = False
+    summary["run_loss"] = {
+        "initial_total_loss": summary["initial_loss"]["total_loss"] + 0.1,
+        "final_total_loss": summary["final_loss"]["total_loss"],
+        "initial_image_render_loss": summary["initial_loss"]["image_render_loss"] + 0.01,
+        "final_image_render_loss": summary["final_loss"]["image_render_loss"],
+        "initial_object_loss": summary["initial_loss"]["object_loss"] + 0.1,
+        "final_object_loss": summary["final_loss"]["object_loss"],
+        "loss_decreased": True,
+        "image_render_loss_decreased": True,
+        "object_loss_decreased": True,
+    }
+
+    payload = renderer_loss_boundary_report(summary).as_dict()
+
+    assert payload["status"] == "full_3dgs_solver_decoder_joint_training_ready"
+    assert payload["point_smoke_blockers"] == []
+    assert payload["evidence"]["loss_delta_source"] == "run_loss"
+    assert payload["evidence"]["image_render_loss_decreased"] is True
+    assert payload["evidence"]["initial_image_render_loss"] == summary["run_loss"]["initial_image_render_loss"]
+    assert payload["evidence"]["segment_initial_image_render_loss"] == summary["initial_loss"]["image_render_loss"]
+    assert payload["evidence"]["segment_final_image_render_loss"] == summary["final_loss"]["image_render_loss"]
+    assert payload["decoder_handoff_contract"]["status"] == "full_renderer_solver_decoder_joint_training_ready"
+
+
 def test_renderer_loss_boundary_accepts_solver_decoder_joint_checkpoint():
     frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)
     target = np.zeros((6, 2), dtype=np.float32)
