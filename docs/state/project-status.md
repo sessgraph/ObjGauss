@@ -285,6 +285,30 @@ colors 冻结时不会更新 `decoder.object_colors`。如果 checkpoint 已经�
 `TRAIN-RUN-006-SCALE-SMOKE`：从 run-005 final checkpoint resume，使用 gsplat renderer 和
 1GB VRAM reserve 做 scale-only GPU smoke。
 
+随后完成 `TRAIN-RUN-006-SCALE-SMOKE`：从
+`outputs/training/train-run-005-opacity-gsplat-image/final-checkpoint.json` resume，使用
+gsplat renderer、128 sampled Gaussians、2 frames、16x16 image target、60 total
+iterations、checkpoint every 20、`solver_temperature=0.5`、`freeze_solver=true`、
+`freeze_decoder_colors=true`、`train_decoder_scale=true`、`decoder_scale_learning_rate=5.0`、
+`object_weight=0.0`、`entropy_weight=0.0`、`balance_weight=0.0`、`vram_reserve_gb=1`，
+输出到 ignored `outputs/training/train-run-006-scale-gsplat-smoke/`。run-level image loss
+小幅下降：`0.0172238834 -> 0.0172227919`；object loss 保持
+`0.2084604204 -> 0.2084604204`。trained fields 只有
+`decoder.object_scale_log_offsets`；frozen fields 包含 solver 参数、`decoder.object_colors`、
+`decoder.object_opacity_logits`、`base_scales`、`source_opacities`、cameras 和 dynamic-K。
+final scale multiplier 位于 `0.9982541799 -> 1.0072258711`，未贴近 `[0.75, 1.25]`
+边界。TensorBoard logdir 为
+`outputs/training/train-run-006-scale-gsplat-smoke/tensorboard`，包含
+`decoder/scale_multiplier_min`、`decoder/scale_multiplier_mean` 和
+`decoder/scale_multiplier_max`。`eval-objectstate --require-pass` 通过：
+`mean_normalized_entropy=0.237402`、`assignment_confidence=0.762598`、
+`effective_slots=3.178765`、`max_dominant_slot_mass_fraction=0.466883`、
+`slot_collapse=false`、`object_purity=0.868178`。`renderer-loss-contract` 输出
+`status=full_3dgs_solver_decoder_joint_training_ready`，`upgrade_blockers=[]`。结论：
+scale-only path / freeze controls / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；
+renderer thaw 路线已足够证明管线可运行，下一步应回到 object assignment 主线，进入
+`ASSIGNMENT-SOLVER-V2-CONTRACT-001`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
