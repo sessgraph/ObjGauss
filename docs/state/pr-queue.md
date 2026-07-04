@@ -151,7 +151,7 @@
     `--require-image-render-loss-decrease`。
   - `eval-objectstate --require-pass`: passed。
   - `renderer-loss-contract`: passed with no upgrade blockers。
-- 完成 commit: pending
+- 完成 commit: `8a68b69`
 
 ### FIELD-FREEZE-CONTROLS-001: Add explicit train/freeze controls for joint renderer fields
 
