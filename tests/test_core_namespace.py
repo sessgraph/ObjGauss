@@ -21,9 +21,13 @@ from objgauss.core import (
     ObjectEmergenceEvidence,
     ObjectEmergenceSolverTrainingResult,
     ObjectEmergenceSolverState,
+    ObjectIdentityOracle,
+    ObservationModelConfig,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
+    SyntheticObservationFrame,
+    SyntheticWorldState,
     TrainableKernelCamera,
     TrainableKernelImageTarget,
     TrainableKernelResult,
@@ -31,6 +35,8 @@ from objgauss.core import (
     TENSORBOARD_SCALAR_EXPORT_SCHEMA,
     TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
+    V2_STABILITY_FOUNDATION_SCHEMA,
+    V2_SYNTHETIC_OBSERVATION_SCHEMA,
     append_or_replace_property,
     assignment_balance_loss_and_gradient,
     assignment_cluster_loss_and_gradient,
@@ -61,6 +67,8 @@ from objgauss.core import (
     initialize_object_emergence_solver,
     initialize_object_state_gaussian_decoder,
     image_target_contract_summary,
+    make_object_identity_oracle,
+    make_synthetic_world_state,
     make_trainable_image_target,
     make_trainable_kernel_mvp_fixture,
     match_object_states,
@@ -71,6 +79,7 @@ from objgauss.core import (
     object_emergence_solver_state_from_dict,
     object_scale_multipliers_from_log_offsets,
     object_state_gaussian_decoder_state_from_dict,
+    observe_synthetic_world,
     predict_object_emergence_assignment,
     project_object_emergence_prediction,
     project_object_states,
@@ -91,10 +100,14 @@ from objgauss.core import (
     validate_assignment_stability_eval,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
+    validate_object_identity_oracle,
     validate_object_state_gaussian_decoder_state,
     validate_objectstate_checkpoint_eval,
+    validate_observation_model_config,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
+    validate_synthetic_observation_frame,
+    validate_synthetic_world_state,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
     validate_trainable_image_target,
@@ -286,6 +299,38 @@ def test_core_namespace_exposes_object_emergence_solver_abi():
     assert isinstance(restored, ObjectEmergenceSolverState)
     assert restored.step == training.final_state.step
     assert mapping == {0: 0, 1: 1}
+
+
+def test_core_namespace_exposes_v2_stability_foundation_contract():
+    assert V2_STABILITY_FOUNDATION_SCHEMA == "objgauss-v2-stability-foundation-v1"
+    assert V2_SYNTHETIC_OBSERVATION_SCHEMA == "objgauss-v2-synthetic-observation-v1"
+
+    oracle = make_object_identity_oracle(
+        scenario_id="namespace-v2-stability",
+        object_count=2,
+        frame_count=2,
+    )
+    assert isinstance(oracle, ObjectIdentityOracle)
+    assert validate_object_identity_oracle(oracle) is oracle
+
+    world = make_synthetic_world_state(
+        scenario_id="namespace-v2-stability",
+        scenario_kind="cross_view",
+        object_count=2,
+        frame_count=2,
+        feature_dim=3,
+        seed=3,
+    )
+    assert isinstance(world, SyntheticWorldState)
+    assert validate_synthetic_world_state(world) is world
+
+    config = ObservationModelConfig(points_per_object=1, position_jitter=0.0)
+    assert validate_observation_model_config(config) is config
+    observations = observe_synthetic_world(world, config=config)
+    assert isinstance(observations[0], SyntheticObservationFrame)
+    assert validate_synthetic_observation_frame(observations[0]) is observations[0]
+    assert observations[0].oracle_object_ids.tolist() == [0, 1]
+    assert observations[0].expected_slots.tolist() == [0, 1]
 
 
 def test_core_namespace_exposes_property_append_helper():

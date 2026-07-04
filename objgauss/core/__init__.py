@@ -14,8 +14,24 @@ _EXPORTS = {
         "objgauss.core.assignment_evidence",
         "AssignmentEvidenceBatch",
     ),
+    "ObjectIdentityObservation": (
+        "objgauss.core.v2_stability_foundation",
+        "ObjectIdentityObservation",
+    ),
+    "ObjectIdentityOracle": (
+        "objgauss.core.v2_stability_foundation",
+        "ObjectIdentityOracle",
+    ),
+    "ObjectIdentityRecord": (
+        "objgauss.core.v2_stability_foundation",
+        "ObjectIdentityRecord",
+    ),
     "GaussianCloud": ("objgauss.core.gaussian", "GaussianCloud"),
     "ObjectField": ("objgauss.core.object_field", "ObjectField"),
+    "ObservationModelConfig": (
+        "objgauss.core.v2_stability_foundation",
+        "ObservationModelConfig",
+    ),
     "ObjectStateGaussianDecode": (
         "objgauss.core.gaussian_decoder",
         "ObjectStateGaussianDecode",
@@ -39,6 +55,22 @@ _EXPORTS = {
     "SolverDecoderJointTrainingResult": (
         "objgauss.core.solver_decoder_training",
         "SolverDecoderJointTrainingResult",
+    ),
+    "SyntheticObservationFrame": (
+        "objgauss.core.v2_stability_foundation",
+        "SyntheticObservationFrame",
+    ),
+    "SyntheticWorldFrame": (
+        "objgauss.core.v2_stability_foundation",
+        "SyntheticWorldFrame",
+    ),
+    "SyntheticWorldObject": (
+        "objgauss.core.v2_stability_foundation",
+        "SyntheticWorldObject",
+    ),
+    "SyntheticWorldState": (
+        "objgauss.core.v2_stability_foundation",
+        "SyntheticWorldState",
     ),
     "solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",
@@ -88,6 +120,14 @@ _EXPORTS = {
     "ASSIGNMENT_STABILITY_EVAL_SCHEMA": (
         "objgauss.core.assignment_stability",
         "ASSIGNMENT_STABILITY_EVAL_SCHEMA",
+    ),
+    "V2_STABILITY_FOUNDATION_SCHEMA": (
+        "objgauss.core.v2_stability_foundation",
+        "V2_STABILITY_FOUNDATION_SCHEMA",
+    ),
+    "V2_SYNTHETIC_OBSERVATION_SCHEMA": (
+        "objgauss.core.v2_stability_foundation",
+        "V2_SYNTHETIC_OBSERVATION_SCHEMA",
     ),
     "assignment_mvp_training_summary": (
         "objgauss.core.object_emergence_solver",
@@ -200,6 +240,14 @@ _EXPORTS = {
     "make_trainable_image_target": (
         "objgauss.core.trainable_kernel",
         "make_trainable_image_target",
+    ),
+    "make_object_identity_oracle": (
+        "objgauss.core.v2_stability_foundation",
+        "make_object_identity_oracle",
+    ),
+    "make_synthetic_world_state": (
+        "objgauss.core.v2_stability_foundation",
+        "make_synthetic_world_state",
     ),
     "match_object_states": ("objgauss.core.object_state", "match_object_states"),
     "object_emergence_metrics": ("objgauss.core.evaluation", "object_emergence_metrics"),
@@ -330,6 +378,10 @@ _EXPORTS = {
         "objgauss.core.gaussian_decoder",
         "object_scale_multipliers_from_log_offsets",
     ),
+    "observe_synthetic_world": (
+        "objgauss.core.v2_stability_foundation",
+        "observe_synthetic_world",
+    ),
     "solver_decoder_joint_states_from_dict": (
         "objgauss.core.solver_decoder_training",
         "solver_decoder_joint_states_from_dict",
@@ -366,6 +418,14 @@ _EXPORTS = {
         "objgauss.core.object_state_benchmark",
         "validate_object_state_stability_benchmark",
     ),
+    "validate_object_identity_oracle": (
+        "objgauss.core.v2_stability_foundation",
+        "validate_object_identity_oracle",
+    ),
+    "validate_observation_model_config": (
+        "objgauss.core.v2_stability_foundation",
+        "validate_observation_model_config",
+    ),
     "validate_objectstate_checkpoint_eval": (
         "objgauss.core.object_state_eval",
         "validate_objectstate_checkpoint_eval",
@@ -397,6 +457,14 @@ _EXPORTS = {
     "validate_renderer_loss_boundary_summary": (
         "objgauss.core.renderer_loss",
         "validate_renderer_loss_boundary_summary",
+    ),
+    "validate_synthetic_observation_frame": (
+        "objgauss.core.v2_stability_foundation",
+        "validate_synthetic_observation_frame",
+    ),
+    "validate_synthetic_world_state": (
+        "objgauss.core.v2_stability_foundation",
+        "validate_synthetic_world_state",
     ),
     "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
