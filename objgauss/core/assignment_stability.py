@@ -21,8 +21,10 @@ from objgauss.core.object_emergence_solver import (
     validate_object_emergence_solver_state,
 )
 from objgauss.core.object_state import (
+    DynamicKProposalReport,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
+    dynamic_k_proposal_report,
     match_object_states,
     object_state_stability_report,
     project_object_states,
@@ -71,6 +73,7 @@ def evaluate_assignment_stability(
 
     frames = []
     projections = []
+    stability_reports = []
     for batch in batches:
         evidence = _object_emergence_evidence_from_assignment_batch(batch)
         prediction = predict_object_emergence_assignment(evidence, solver_state)
@@ -88,6 +91,7 @@ def evaluate_assignment_stability(
             assignment_confidence_floor=assignment_confidence_floor,
             purity_floor=purity_threshold,
         )
+        stability_reports.append(stability)
         frames.append(
             _frame_eval_summary(
                 batch=batch,
@@ -98,6 +102,7 @@ def evaluate_assignment_stability(
         )
 
     temporal = _temporal_eval_summary(projections)
+    dynamic_k = _dynamic_k_eval_summary(projections, stability_reports)
     aggregate = _aggregate_eval(frames, temporal=temporal)
     gates = _eval_gates(
         aggregate,
@@ -138,6 +143,7 @@ def evaluate_assignment_stability(
         "gates": gates,
         "frames": frames,
         "temporal": temporal,
+        "dynamic_k": dynamic_k,
         "training_losses": _training_loss_summary(checkpoint),
         "gpu_policy": _gpu_policy_summary(checkpoint),
         "export_policy": {
@@ -162,7 +168,7 @@ def validate_assignment_stability_eval(payload: dict[str, Any]) -> dict[str, Any
         "assignment_stability_eval_fail",
     }:
         raise ValueError("assignment stability eval status is unsupported")
-    for key in ("aggregate", "gates", "frames", "thresholds", "solver", "temporal"):
+    for key in ("aggregate", "gates", "frames", "thresholds", "solver", "temporal", "dynamic_k"):
         if key not in payload:
             raise ValueError(f"assignment stability eval missing {key}")
     if not isinstance(payload["frames"], list) or not payload["frames"]:
@@ -189,6 +195,71 @@ def validate_assignment_stability_eval(payload: dict[str, Any]) -> dict[str, Any
     ):
         float(aggregate[key])
     return payload
+
+
+def _dynamic_k_eval_summary(
+    projections: Sequence[Any],
+    stability_reports: Sequence[ObjectStabilityReport],
+) -> dict[str, Any]:
+    frame_summaries = []
+    proposal_kinds: set[str] = set()
+    proposal_count = 0
+    for index, projection in enumerate(projections):
+        temporal_match = (
+            None
+            if index == 0
+            else match_object_states(projections[index - 1], projection, include_inactive=False)
+        )
+        report = dynamic_k_proposal_report(
+            projection,
+            stability_report=stability_reports[index],
+            temporal_match=temporal_match,
+        )
+        summary = _dynamic_k_report_summary(index, report)
+        frame_summaries.append(summary)
+        proposal_count += int(summary["proposal_count"])
+        proposal_kinds.update(str(kind) for kind in summary["proposal_kinds"])
+    return {
+        "mode": "proposal_only",
+        "auto_update": False,
+        "checkpoint_k_mutation": "forbidden",
+        "frame_count": len(frame_summaries),
+        "proposal_count": int(proposal_count),
+        "proposal_kinds": sorted(proposal_kinds),
+        "frames": frame_summaries,
+        "policy": {
+            "allowed_action": "proposal_only",
+            "apply_at": "not_applied_by_assignment_eval",
+            "requires_separate_update_gate": True,
+        },
+    }
+
+
+def _dynamic_k_report_summary(
+    frame_index: int,
+    report: DynamicKProposalReport,
+) -> dict[str, Any]:
+    proposals = [
+        {
+            "kind": proposal.kind,
+            "source_ids": list(proposal.source_ids),
+            "target_id": proposal.target_id,
+            "score": float(proposal.score),
+            "threshold": float(proposal.threshold),
+            "reason": proposal.reason,
+            "action": proposal.action,
+            "evidence": proposal.evidence,
+        }
+        for proposal in report.proposals
+    ]
+    return {
+        "frame_index": int(frame_index),
+        "slot_count": int(report.slot_count),
+        "proposal_count": int(report.proposal_count),
+        "proposal_kinds": sorted({proposal["kind"] for proposal in proposals}),
+        "diagnostics": list(report.diagnostics),
+        "proposals": proposals,
+    }
 
 
 def _solver_state_from_input(

@@ -14,6 +14,8 @@ from objgauss.core.assignment_stability import (
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_emergence_solver import (
     ObjectEmergenceEvidence,
+    ObjectEmergenceSolverConfig,
+    ObjectEmergenceSolverState,
     object_emergence_solver_checkpoint,
     train_object_emergence_solver,
 )
@@ -72,12 +74,57 @@ def test_evaluate_assignment_stability_reports_temporal_gates():
     assert summary["aggregate"]["frame_count"] == 2
     assert summary["aggregate"]["evidence_count"] == 12
     assert summary["temporal"]["pair_count"] == 1
+    assert summary["dynamic_k"]["mode"] == "proposal_only"
+    assert summary["dynamic_k"]["auto_update"] is False
     assert summary["aggregate"]["id_stability"] >= 0.0
     assert summary["gates"]["entropy_pass"] is True
     assert summary["gates"]["purity_pass"] is True
     assert summary["gates"]["id_stability_pass"] is True
     assert summary["gates"]["temporal_drift_pass"] is True
     assert validate_assignment_stability_eval(summary) == summary
+
+
+def test_assignment_stability_dynamic_k_reports_split_proposals_without_mutating_k():
+    sample = trainable_kernel_sample_from_cloud(
+        _object_cloud(),
+        frame_count=2,
+        max_points=6,
+        seed=3,
+    )
+    evidence = assignment_evidence_sequence_from_trainable_frames(
+        sample.frames,
+        source="assignment_stability_uniform_solver_fixture",
+    )
+    feature_dim = sample.frames[0].features.shape[1]
+    state = ObjectEmergenceSolverState(
+        config=ObjectEmergenceSolverConfig(slots=sample.slots, feature_dim=feature_dim),
+        feature_weights=np.zeros((feature_dim, sample.slots), dtype=np.float32),
+        position_weights=np.zeros((3, sample.slots), dtype=np.float32),
+        bias=np.zeros(sample.slots, dtype=np.float32),
+        source="uniform_assignment_fixture",
+    )
+
+    summary = evaluate_assignment_stability(
+        evidence,
+        state,
+        entropy_threshold=1.0,
+        purity_threshold=0.0,
+        collapse_mass_fraction=1.0,
+        id_stability_threshold=0.0,
+    )
+
+    assert summary["dynamic_k"]["mode"] == "proposal_only"
+    assert summary["dynamic_k"]["auto_update"] is False
+    assert summary["dynamic_k"]["checkpoint_k_mutation"] == "forbidden"
+    assert "split_mixed" in summary["dynamic_k"]["proposal_kinds"]
+    assert summary["dynamic_k"]["proposal_count"] >= 1
+    actions = [
+        proposal["action"]
+        for frame in summary["dynamic_k"]["frames"]
+        for proposal in frame["proposals"]
+    ]
+    assert actions
+    assert set(actions) == {"proposal_only"}
 
 
 def test_eval_assignment_cli_writes_summary(tmp_path, capsys):
@@ -150,10 +197,13 @@ def test_eval_assignment_cli_writes_summary(tmp_path, capsys):
     assert "solver_temperature=0.5" in stdout
     assert "gate_id_stability_pass=true" in stdout
     assert "gate_temporal_drift_pass=true" in stdout
+    assert "dynamic_k_mode=proposal_only" in stdout
+    assert "dynamic_k_auto_update=false" in stdout
     assert f"summary={summary_path}" in stdout
     assert summary["schema"] == ASSIGNMENT_STABILITY_EVAL_SCHEMA
     assert summary["checkpoint_schema"] == "objgauss-object-emergence-solver-checkpoint-v1"
     assert summary["temporal"]["pair_count"] == 1
+    assert summary["dynamic_k"]["mode"] == "proposal_only"
 
 
 def _solver_frames(sample) -> list[ObjectEmergenceEvidence]:

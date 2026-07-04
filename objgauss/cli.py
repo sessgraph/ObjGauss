@@ -1687,6 +1687,11 @@ def _training_eval_assignment(args: argparse.Namespace) -> None:
     print(f"temporal_mean_drift={aggregate['temporal_mean_drift']:.6f}")
     print(f"temporal_max_drift={aggregate['temporal_max_drift']:.6f}")
     print(f"id_stability={aggregate['id_stability']:.6f}")
+    dynamic_k = summary["dynamic_k"]
+    print(f"dynamic_k_mode={dynamic_k['mode']}")
+    print(f"dynamic_k_auto_update={str(dynamic_k['auto_update']).lower()}")
+    print(f"dynamic_k_proposal_count={dynamic_k['proposal_count']}")
+    print(f"dynamic_k_proposal_kinds={','.join(dynamic_k['proposal_kinds'])}")
     print(f"gate_entropy_pass={_format_optional_bool(gates['entropy_pass'])}")
     print(f"gate_entropy_borderline={_format_optional_bool(gates['entropy_borderline'])}")
     print(f"gate_no_collapse_pass={_format_optional_bool(gates['no_collapse_pass'])}")
