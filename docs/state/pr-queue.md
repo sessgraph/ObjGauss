@@ -43,6 +43,37 @@
 
 ## Planned
 
+### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
+
+- 状态: planned / post-v1-model-iteration
+- 类型: 研究 PR / algorithm model training roadmap
+- 目标: 将 ObjGauss v2 world-model 方向登记为后期模型训练迭代规划，在当前
+  `ObjectState -> Gaussian decode -> renderer loss` 训练线稳定后，再分阶段进入
+  identity memory、object-level dynamics、future rollout 和可选 diffusion world model。
+- 背景: 附件 v2 方案提出
+  `Gaussian Splatting + Object-centric World Model + Diffusion Dynamics +
+  Identity Memory System`。该方向与当前 `ObjectState` 作为唯一 reasoning unit 的架构
+  一致，但 diffusion dynamics、memory bank、SAM2 / CoTracker / flow 和自生成 replay
+  loop 都属于后期研究能力，不能直接插入当前 `TRAIN-DECODER-SCALE-001` 或 renderer
+  field thaw 队列。
+- 建议分解:
+  - `IDENTITY-MEMORY-SPEC-001`: 定义 `ObjectState.z_id`、memory bank、identity
+    matching 和 contrastive / consistency loss；先作为 architecture spec，不引入新依赖。
+  - `OBJECT-ROLLOUT-BASELINE-001`: 先做 deterministic object transition baseline，
+    预测 centroid / bbox / confidence / slot stability，并建立 rollout eval gate。
+  - `DYNAMICS-DATASET-PLAN-001`: 明确多帧 / 视频训练资产、tracking evidence manifest、
+    license 边界和 replay buffer 输出位置。
+  - `DIFFUSION-WORLD-MODEL-ADR-001`: 只有 deterministic rollout、identity gate 和
+    dataset plan 通过后，才评估 PyTorch diffusion / transformer dynamics 依赖。
+  - `SELF-GENERATED-REPLAY-ADR-001`: 只有 future rollout 具备可验证过滤指标后，才允许
+    讨论 generate futures -> filter -> retrain 的自生成数据循环。
+- 前置: 当前 `TRAIN-DECODER-SCALE-001`、`TRAIN-RUN-006-SCALE-SMOKE` 和后续 renderer
+  field promotion gate 完成；ObjectState eval 继续通过；语义 / tracking evidence 仍走
+  optional adapter 和 manifest，不成为 kernel 强依赖。
+- 边界: 不替换 v1 kernel contract；不把 diffusion world model 记为已落地能力；不引入
+  SAM2 / CoTracker / optical flow / PyTorch diffusion 默认依赖；不提交 generated futures、
+  replay buffer、大 checkpoint 或训练输出；不改变当前 public demo 或 HF release 口径。
+
 ### DEMO-POLYHAVEN-001: License-clean public demo candidate
 
 - 状态: planned
