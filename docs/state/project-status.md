@@ -669,6 +669,28 @@ GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation。本步�
 `uv run --extra dev pytest` 256 passed，`npm run build` passed，`git diff --check` passed；
 代码完成 commit 为 `d8d6b2f`。
 
+随后完成 `REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001`：新增
+`objgauss-real-sample-v2-sample-aware-weight-policy-v1`，把上一张的 cross-sample
+negative evidence 收敛为 per-sample gate。CLI 新增
+`objgauss training real-sample-v2-sample-aware-weight-policy`，在同一个 handoff
+checkpoint 下评估 baseline `feature_weight=1.0, position_weight=1.0` 与 promoted
+`feature_weight=2.0, position_weight=1.0`，只有 promoted 同时满足 hard mixed 非回归、
+direct slot match 非回归、对象数稳定和 soft purity 非回归时才选 promoted；否则选 baseline
+并把 `evidence_normalization_gate.status` 标为
+`required_before_global_weight_promotion`。该 CLI 导出 selected policy PLY，并添加
+`sample_aware_baseline_object_id`、`sample_aware_baseline_confidence`、
+`sample_aware_baseline_entropy`、`sample_aware_selected_index`、`sample_aware_changed`、
+`sample_aware_hard_fix`、`sample_aware_hard_regression` audit fields。Polyhaven Chair
+结果选择 baseline：baseline `mixed_gaussians=3840`、`direct_slot_match=0.923200`；
+promoted 被 gate 阻断，因 `mixed_delta=78`、`direct_delta=-0.001560`、
+`hard_fix=1736`、`hard_regression=1814`，虽然 soft purity / confidence 改善。Lego
+结果选择 promoted：baseline `mixed_gaussians=59`、`direct_slot_match=0.989642`；
+promoted `mixed_gaussians=0`、`direct_slot_match=1.000000`、`hard_fix=59`、
+`hard_regression=0`。本步骤不改变既有 `real-sample-v2-viewer-preview` 默认、不改 public
+demo / HF release / renderer / manifest / checkpoint schema，也不表示 evidence normalization
+数学已实现。验证通过：targeted pytest 14 passed，`uv run --extra dev pytest` 259 passed，
+`npm run build` passed，`git diff --check` passed；代码完成 commit 为 `45afd2d`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
