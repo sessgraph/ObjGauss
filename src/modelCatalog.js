@@ -130,6 +130,13 @@ const RAW_MODEL_CATALOG = [
     updatedAt: "2026-07-06",
     description: "本机生成的样本自适应强化策略预览 PLY，用于查看当前阶段对象分割效果；缺少该文件时自动回退到 Lego alpha。",
     objectCount: 4,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/lego_alpha_proxy.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "Lego 原始 splat",
+    },
     galleryPosition: [-2.35, 0, -3.58],
     accent: "#35d0c8",
     displayScale: 2.46,
@@ -152,6 +159,13 @@ const RAW_MODEL_CATALOG = [
     kind: "object-aware-ply",
     stage: "processed",
     objectCount: 3,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/plush.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "完整 splat",
+    },
     galleryPosition: [-6.2, 0, -1.35],
     accent: "#ff6b7a",
     displayScale: 2.42,
@@ -174,6 +188,13 @@ const RAW_MODEL_CATALOG = [
     kind: "object-aware-ply",
     stage: "processed",
     objectCount: 4,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/plush.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "完整 splat",
+    },
     galleryPosition: [-3.15, 0, 1.55],
     accent: "#f7b267",
     displayScale: 2.34,
@@ -199,6 +220,13 @@ const RAW_MODEL_CATALOG = [
     displayOrder: 0,
     updatedAt: "2026-06-22",
     objectCount: 5,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/lego_alpha_proxy.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "原始 splat",
+    },
     galleryPosition: [0.05, 0, -1.25],
     accent: "#27c2cb",
     displayScale: 2.46,
@@ -221,6 +249,13 @@ const RAW_MODEL_CATALOG = [
     kind: "object-aware-ply",
     stage: "processed",
     objectCount: 1,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/polyhaven_chair_demo.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "完整 splat",
+    },
     galleryPosition: [3.25, 0, 1.42],
     accent: "#88d498",
     displayScale: 2.14,
@@ -241,6 +276,20 @@ const RAW_MODEL_CATALOG = [
     kind: "diagnostic-ply",
     stage: "diagnostic",
     objectCount: 5,
+    sourceLayer: {
+      status: "available",
+      path: "/samples/nerf_lego_trained_near1m_bgslot4.splat",
+      format: ".splat",
+      renderer: "Spark splat",
+      label: "Near-1M splat",
+    },
+    objectLayer: {
+      status: "registered",
+      path: "/samples/nerf_lego_trained_near1m_bgslot4_objects.ply",
+      format: ".ply",
+      renderer: "Three.js Points",
+      label: "Near-1M 对象层",
+    },
     galleryPosition: [6.35, 0, -1.42],
     accent: "#8e6cff",
     displayScale: 2.28,
@@ -349,7 +398,7 @@ const RAW_MODEL_CATALOG = [
   },
 ];
 
-export const MODEL_CATALOG = sortModelCatalog(RAW_MODEL_CATALOG);
+export const MODEL_CATALOG = sortModelCatalog(RAW_MODEL_CATALOG.map(normalizeModelCatalogEntry));
 
 export function catalogSummary(models = MODEL_CATALOG) {
   return {
@@ -376,7 +425,7 @@ export function modelCatalogFromSearch(search = "") {
     ...(modelArtifactManifest ? [modelArtifactManifestBundleModel(modelArtifactManifest)] : []),
     ...(ogcManifest ? [ogcManifestUrlArtifactModel(ogcManifest)] : []),
     ...(ogcArtifact ? [ogcUrlArtifactModel(ogcArtifact)] : []),
-  ]);
+  ].map(normalizeModelCatalogEntry));
 }
 
 export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
@@ -417,6 +466,95 @@ function modelDisplayOrder(model) {
 function modelUpdatedTime(model) {
   const value = Date.parse(model?.updatedAt ?? "");
   return Number.isFinite(value) ? value : 0;
+}
+
+function normalizeModelCatalogEntry(model = {}) {
+  return {
+    ...model,
+    renderSurface: {
+      contract: "three-world-point-preview-v1",
+      renderer: "Three.js Points",
+      label: renderSurfaceLabel(model),
+      purpose: "object-edit-stage",
+      completeGaussian: false,
+      ...(model.renderSurface ?? {}),
+    },
+    sourceLayer: normalizeSourceLayer(model.sourceLayer),
+    objectLayer: normalizeObjectLayer(model.objectLayer ?? inferredObjectLayer(model)),
+  };
+}
+
+function renderSurfaceLabel(model = {}) {
+  if (model.loadMode === "ogc-chunked" || model.loadMode === "ogc-manifest") return "OGC 点预览";
+  if (model.loadMode === "trainable-artifact") return "训练点预览";
+  if (model.loadMode === "compressed-placeholder") return "压缩占位点";
+  return "点云预览";
+}
+
+function normalizeSourceLayer(layer = null) {
+  if (!layer) {
+    return {
+      status: "not-registered",
+      path: "",
+      format: "",
+      renderer: "",
+      label: "未登记",
+    };
+  }
+  return {
+    status: layer.status ?? (layer.path ? "available" : "not-registered"),
+    path: layer.path ?? "",
+    format: layer.format ?? "",
+    renderer: layer.renderer ?? "",
+    label: layer.label ?? (layer.path ? "完整高斯" : "未登记"),
+  };
+}
+
+function inferredObjectLayer(model = {}) {
+  if (model.sourcePath) {
+    return {
+      status: "registered",
+      path: model.sourcePath,
+      format: ".ply",
+      renderer: "Three.js Points",
+      label: "对象层 PLY",
+    };
+  }
+  if (model.loadMode === "trainable-artifact") {
+    return {
+      status: "registered",
+      path: model.trainableArtifactPath ?? "inline://trainable-artifact",
+      format: ".json",
+      renderer: "Three.js Points",
+      label: "训练对象层",
+    };
+  }
+  if (model.loadMode === "ogc-chunked" || model.loadMode === "ogc-manifest") {
+    return {
+      status: "registered",
+      path: model.ogc?.payloadPath ?? model.ogc?.manifestPath ?? "inline://ogc",
+      format: ".ogc",
+      renderer: "Three.js Points",
+      label: "OGC 对象层",
+    };
+  }
+  return {
+    status: "not-registered",
+    path: "",
+    format: "",
+    renderer: "",
+    label: "未登记",
+  };
+}
+
+function normalizeObjectLayer(layer = null) {
+  return {
+    status: layer?.status ?? "not-registered",
+    path: layer?.path ?? "",
+    format: layer?.format ?? "",
+    renderer: layer?.renderer ?? "",
+    label: layer?.label ?? "未登记",
+  };
 }
 
 function trainableArtifactPathFromParams(params) {

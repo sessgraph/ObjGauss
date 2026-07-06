@@ -122,9 +122,9 @@ button:focus-visible {
 
 .metricStrip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
+  grid-template-columns: repeat(4, minmax(76px, 1fr));
   gap: 8px;
-  min-width: min(430px, 38vw);
+  min-width: min(520px, 46vw);
 }
 
 .metric {
@@ -833,7 +833,7 @@ button:focus-visible {
 .modelVersionRow {
   display: grid;
   min-height: 40px;
-  grid-template-columns: minmax(0, 1fr) 58px 48px;
+  grid-template-columns: minmax(0, 1fr) 118px 48px;
   align-items: center;
   gap: 7px;
   padding: 6px 7px;
@@ -895,7 +895,6 @@ button:focus-visible {
 }
 
 .modelProcessBadge {
-  justify-self: stretch;
   padding: 4px 6px;
   border: 1px solid rgba(127, 241, 215, 0.18);
   border-radius: 999px;
@@ -904,6 +903,45 @@ button:focus-visible {
   font-size: 9px;
   font-weight: 760;
   text-align: center;
+}
+
+.modelLayerBadges {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.modelLayerBadge {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 999px;
+  color: #cdeaf0;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 9px;
+  font-weight: 760;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelLayerBadge.source.available {
+  border-color: rgba(127, 241, 215, 0.24);
+  color: #bafaf0;
+  background: rgba(127, 241, 215, 0.075);
+}
+
+.modelLayerBadge.source.missing {
+  border-color: rgba(243, 223, 93, 0.22);
+  color: #f7e98f;
+  background: rgba(243, 223, 93, 0.075);
+}
+
+.modelLayerBadge.render {
+  border-color: rgba(127, 222, 255, 0.2);
+  color: #bceeff;
+  background: rgba(127, 222, 255, 0.065);
 }
 
 .modelProcessBadge.raw-gaussian,

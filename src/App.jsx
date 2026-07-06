@@ -30,6 +30,7 @@ const OBJECT_TRANSFORM_MODES = ["translate", "rotate", "scale"];
 const OBJECT_TRANSFORM_SNAP_STEP = 0.25;
 const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
 const OBJECT_SCALE_SNAP_STEP = 0.1;
+const THREE_WORLD_POINT_PREVIEW_CONTRACT = "three-world-point-preview-v1";
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -1322,6 +1323,11 @@ export default function App() {
       className="worldShell"
       data-app-mode="vr-three-world"
       data-three-renderer="enabled"
+      data-render-surface-contract={THREE_WORLD_POINT_PREVIEW_CONTRACT}
+      data-gaussian-display-mode={selected?.renderSurface?.label ?? "点云预览"}
+      data-full-gaussian-source-count={stageSummary.fullGaussianCount}
+      data-object-layer-registered-count={stageSummary.objectLayerRegisteredCount}
+      data-object-layer-loaded-count={stageSummary.objectLayerLoadedCount}
       data-sidebars="none"
       data-frosted-ui="enabled"
       data-model-count={modelList.length}
@@ -1566,6 +1572,7 @@ export default function App() {
         </div>
         <div className="metricStrip">
           <Metric label="Three.js" value={worldReady ? "已加载" : "加载中"} />
+          <Metric label="高斯展示" value="点预览" />
           <Metric label="展示版本" value={`${stageSummary.visibleCount}/${modelList.length}`} />
           <Metric label="对象层" value={stagedObjectCount > 0 ? "已生成" : "未生成"} />
         </div>
@@ -3918,6 +3925,7 @@ function DebugPanel({
   const selectedOgcChunkScope = formatChunkScope(selectedOgcChunks);
   const visibleObjectCount = objectVisibility?.visibleObjectCount ?? Math.max(0, objects.length - hiddenObjects.size);
   const objectToggleStatus = `${formatCount(visibleObjectCount)} / ${formatCount(objects.length)}`;
+  const selectedLayerState = modelLayerState(selected, selected.status, objects.length);
   return (
     <section
       className="glassHud debugPanel"
@@ -3989,6 +3997,14 @@ function DebugPanel({
       data-object-visibility-contract="enabled"
       data-object-move-contract="object-group-position-v1"
       data-object-move-selected={selectedObject?.selectionId ?? ""}
+      data-render-surface-contract={selectedLayerState.renderSurfaceContract}
+      data-render-surface-label={selectedLayerState.renderSurfaceLabel}
+      data-source-layer-status={selectedLayerState.sourceLayerStatus}
+      data-source-layer-label={selectedLayerState.sourceLayerLabel}
+      data-source-layer-path={selectedLayerState.sourceLayerPath}
+      data-object-layer-status={selectedLayerState.objectLayerStatus}
+      data-object-layer-label={selectedLayerState.objectLayerLabel}
+      data-object-layer-path={selectedLayerState.objectLayerPath}
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
       data-hidden-objects={objectVisibility?.hiddenObjectCount ?? hiddenObjects.size}
@@ -4008,6 +4024,9 @@ function DebugPanel({
       <DebugSection title="Three.js 世界" status={selected.status ?? "queued"} defaultOpen>
         <div className="worldPlaneGrid" data-world-plane-panel="true">
           <Metric label="渲染" value="Three.js" />
+          <Metric label="展示形态" value={selectedLayerState.renderSurfaceLabel} />
+          <Metric label="完整高斯" value={selectedLayerState.sourceLayerLabel} />
+          <Metric label="处理结果" value={selectedLayerState.objectLayerLabel} />
           <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
           <Metric label="对象层" value={objects.length ? "已生成" : "未生成"} />
           <Metric label="可见对象" value={formatCount(visibleObjectCount)} />
@@ -4483,6 +4502,11 @@ function TrainingStagePanel({
       data-training-stage-panel="true"
       data-training-stage-schema="model-version-processing-v1"
       data-stage-visible-models={summary?.visibleCount ?? 0}
+      data-stage-render-surface-contract={THREE_WORLD_POINT_PREVIEW_CONTRACT}
+      data-stage-full-gaussian-sources={summary?.fullGaussianCount ?? 0}
+      data-stage-point-preview-models={summary?.pointPreviewCount ?? 0}
+      data-stage-object-layer-registered={summary?.objectLayerRegisteredCount ?? 0}
+      data-stage-object-layer-loaded={summary?.objectLayerLoadedCount ?? 0}
       data-stage-processed-models={summary?.processedCount ?? 0}
       data-stage-pending-models={summary?.pendingCount ?? 0}
     >
@@ -4491,8 +4515,10 @@ function TrainingStagePanel({
         <strong>{formatCount(summary?.visibleCount ?? 0)} / {formatCount(models?.length ?? 0)}</strong>
       </div>
       <dl className="stagePipelineSummary">
-        <Meta label="输入" value="高斯云" />
-        <Meta label="输出" value="对象层" />
+        <Meta label="完整高斯" value={formatCount(summary?.fullGaussianCount ?? 0)} />
+        <Meta label="展示" value="点预览" />
+        <Meta label="对象登记" value={formatCount(summary?.objectLayerRegisteredCount ?? 0)} />
+        <Meta label="已加载" value={formatCount(summary?.objectLayerLoadedCount ?? 0)} />
         <Meta label="对象层" value={formatCount(summary?.processedCount ?? 0)} />
         <Meta label="未生成" value={formatCount(summary?.pendingCount ?? 0)} />
       </dl>
@@ -4520,6 +4546,9 @@ function TrainingStagePanel({
               data-model-version-visible={visible ? "true" : "false"}
               data-model-process-status={entry.processStatus}
               data-model-processed={entry.processed ? "true" : "false"}
+              data-model-render-surface={entry.renderSurfaceLabel}
+              data-model-source-layer-status={entry.sourceLayerStatus}
+              data-model-object-layer-status={entry.objectLayerStatus}
             >
               <label className="modelVersionCheck">
                 <input
@@ -4534,7 +4563,13 @@ function TrainingStagePanel({
                   <small>{entry.versionLabel}</small>
                 </span>
               </label>
-              <span className={`modelProcessBadge ${entry.processStatus}`}>{entry.processLabel}</span>
+              <div className="modelLayerBadges" data-model-layer-badges="true">
+                <span className={`modelLayerBadge source ${entry.sourceLayerStatus}`}>
+                  {entry.sourceLayerLabel}
+                </span>
+                <span className="modelLayerBadge render">{entry.renderSurfaceLabel}</span>
+                <span className={`modelProcessBadge ${entry.processStatus}`}>{entry.processLabel}</span>
+              </div>
               <button
                 type="button"
                 className="modelProcessButton"
@@ -7224,6 +7259,14 @@ function trainingStageSummary(models = [], stageModelIds = new Set()) {
   const visibleEntries = entries.filter((entry) => entry.visible);
   const processedEntries = entries.filter((entry) => entry.processed);
   const pendingEntries = entries.filter((entry) => !entry.processed);
+  const fullGaussianEntries = entries.filter((entry) => entry.sourceLayerStatus === "available");
+  const pointPreviewEntries = entries.filter(
+    (entry) => entry.renderSurfaceContract === THREE_WORLD_POINT_PREVIEW_CONTRACT,
+  );
+  const objectLayerRegisteredEntries = entries.filter((entry) =>
+    ["registered", "loaded"].includes(entry.objectLayerStatus),
+  );
+  const objectLayerLoadedEntries = entries.filter((entry) => entry.objectLayerStatus === "loaded");
   return {
     schema: "objgauss-training-stage-model-version-processing-v1",
     entries,
@@ -7233,6 +7276,10 @@ function trainingStageSummary(models = [], stageModelIds = new Set()) {
       (total, entry) => total + (Number(entry.objectCount) || 0),
       0,
     ),
+    fullGaussianCount: fullGaussianEntries.length,
+    pointPreviewCount: pointPreviewEntries.length,
+    objectLayerRegisteredCount: objectLayerRegisteredEntries.length,
+    objectLayerLoadedCount: objectLayerLoadedEntries.length,
     processedCount: processedEntries.length,
     pendingCount: pendingEntries.length,
   };
@@ -7243,12 +7290,14 @@ function trainingStageModelEntry(model, visible = false) {
   const objectCount = model?.objects?.length || Number(model?.objectCount) || 0;
   const loadedObjectLayer = objectCount > 0 && ["loaded", "compressed"].includes(status);
   const cacheMissing = model?.optionalLocalPreview && status === "skipped";
+  const layerState = modelLayerState(model, status, objectCount);
   const declaredObjectLayer = Boolean(
     model?.kind === "object-aware-ply" ||
       model?.loadMode === "trainable-artifact" ||
       model?.loadMode === "ogc-chunked" ||
       model?.stage === "processed" ||
-      model?.stage === "sample-aware-preview",
+      model?.stage === "sample-aware-preview" ||
+      layerState.objectLayerRegistered,
   );
   const processed = !cacheMissing && (loadedObjectLayer || declaredObjectLayer);
   const processing = status === "loading" || status === "processing";
@@ -7279,8 +7328,44 @@ function trainingStageModelEntry(model, visible = false) {
     processLabel: modelProcessStatusLabel(processStatus),
     processAction,
     processActionLabel: modelProcessActionLabel(processAction),
+    renderSurfaceContract: layerState.renderSurfaceContract,
+    renderSurfaceLabel: layerState.renderSurfaceLabel,
+    sourceLayerStatus: layerState.sourceLayerStatus,
+    sourceLayerLabel: layerState.sourceLayerLabel,
+    sourceLayerPath: layerState.sourceLayerPath,
+    objectLayerStatus: layerState.objectLayerStatus,
+    objectLayerLabel: layerState.objectLayerLabel,
+    objectLayerPath: layerState.objectLayerPath,
     versionLabel: modelVersionLabel(model),
   };
+}
+
+function modelLayerState(model = {}, status = model?.status, objectCount = model?.objects?.length ?? 0) {
+  const renderSurface = model?.renderSurface ?? {};
+  const sourceLayer = model?.sourceLayer ?? {};
+  const objectLayer = model?.objectLayer ?? {};
+  const sourceAvailable = sourceLayer.status === "available" && Boolean(sourceLayer.path);
+  const objectRegistered = objectLayer.status === "registered" && Boolean(objectLayer.path);
+  const objectLoaded = Number(objectCount) > 0 && ["loaded", "compressed"].includes(String(status ?? ""));
+  const objectLayerStatus = objectLoaded ? "loaded" : objectRegistered ? "registered" : "missing";
+  return {
+    renderSurfaceContract: renderSurface.contract ?? THREE_WORLD_POINT_PREVIEW_CONTRACT,
+    renderSurfaceLabel: renderSurface.label ?? modelRenderSurfaceFallbackLabel(model),
+    sourceLayerStatus: sourceAvailable ? "available" : "missing",
+    sourceLayerLabel: sourceAvailable ? (sourceLayer.label ?? "完整高斯") : "未登记",
+    sourceLayerPath: sourceLayer.path ?? "",
+    objectLayerStatus,
+    objectLayerRegistered: objectRegistered,
+    objectLayerLabel: objectLoaded ? "对象层已加载" : objectRegistered ? (objectLayer.label ?? "对象层已登记") : "未生成",
+    objectLayerPath: objectLayer.path ?? "",
+  };
+}
+
+function modelRenderSurfaceFallbackLabel(model = {}) {
+  if (model.loadMode === "ogc-chunked" || model.loadMode === "ogc-manifest") return "OGC 点预览";
+  if (model.loadMode === "trainable-artifact") return "训练点预览";
+  if (model.loadMode === "compressed-placeholder") return "压缩占位点";
+  return "点云预览";
 }
 
 function modelVersionLabel(model) {

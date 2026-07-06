@@ -65,6 +65,9 @@ try {
       `objectTransformState=${summary.objectTransformStateStatus}`,
       `objectPick=${summary.objectPickStatus}`,
       `trainingStage=${summary.trainingStageStatus}`,
+      `gaussianDisplay=${summary.gaussianDisplayMode}`,
+      `fullGaussianSources=${summary.fullGaussianSourceCount}`,
+      `objectLayers=${summary.objectLayerLoadedCount}/${summary.objectLayerRegisteredCount}`,
       `stageModels=${summary.stageVisibleModelCount}/${summary.modelCount}`,
       `stageProcessed=${summary.stageProcessedModelCount}`,
       `objectFragmentation=${summary.objectFragmentationStatus}`,
@@ -219,11 +222,15 @@ async function auditWorld(url) {
         interactionLayer?.getAttribute("data-object-transform-primary") !== "three-transform-controls-v1" ||
         interactionLayer?.getAttribute("data-object-move-contract") !== "object-group-position-v1" ||
         interactionLayer?.getAttribute("data-object-move-selected") !== selectionId ||
+        shell?.getAttribute("data-render-surface-contract") !== "three-world-point-preview-v1" ||
+        shell?.getAttribute("data-gaussian-display-mode") !== "点云预览" ||
+        worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-render-surface-contract") !== "three-world-point-preview-v1" ||
+        worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-object-layer-status") !== "loaded" ||
         actionButtons.length !== 3 ||
         modeButtons.length !== 3 ||
         !systemDrawer ||
         document.querySelectorAll(".bottomStatus").length !== 0 ||
-        topMetricLabels.join("|") !== "Three.js|展示版本|对象层"
+        topMetricLabels.join("|") !== "Three.js|高斯展示|展示版本|对象层"
       ) {
         return null;
       }
@@ -234,6 +241,9 @@ async function auditWorld(url) {
         pickingDecoupledFromRenderer: world.objectPickingDecoupledFromRenderer,
         gizmoObject: world.transformGizmoObject,
         mode: world.objectTransformMode,
+        renderSurfaceContract: shell.getAttribute("data-render-surface-contract"),
+        gaussianDisplayMode: shell.getAttribute("data-gaussian-display-mode"),
+        objectLayerStatus: worldPlane.closest("[data-object-debug-panel='true']").getAttribute("data-object-layer-status"),
         interactionLayer: interactionLayer.getAttribute("data-object-transform-primary"),
         actionButtonCount: actionButtons.length,
         modeButtonCount: modeButtons.length,
@@ -1246,11 +1256,22 @@ async function auditWorld(url) {
         shellStageVisibleModelCount: Number(shell?.getAttribute("data-stage-visible-model-count") ?? 0),
         shellStageProcessedModelCount: Number(shell?.getAttribute("data-stage-processed-model-count") ?? 0),
         shellStagePendingModelCount: Number(shell?.getAttribute("data-stage-pending-model-count") ?? 0),
+        shellRenderSurfaceContract: shell?.getAttribute("data-render-surface-contract") ?? null,
+        shellGaussianDisplayMode: shell?.getAttribute("data-gaussian-display-mode") ?? null,
+        shellFullGaussianSourceCount: Number(shell?.getAttribute("data-full-gaussian-source-count") ?? 0),
+        shellObjectLayerRegisteredCount: Number(shell?.getAttribute("data-object-layer-registered-count") ?? 0),
+        shellObjectLayerLoadedCount: Number(shell?.getAttribute("data-object-layer-loaded-count") ?? 0),
         panelTrainingStageSchema: trainingStagePanel?.getAttribute("data-training-stage-schema") ?? null,
         panelStageVisibleModelCount: Number(trainingStagePanel?.getAttribute("data-stage-visible-models") ?? 0),
+        panelStageRenderSurfaceContract: trainingStagePanel?.getAttribute("data-stage-render-surface-contract") ?? null,
+        panelStageFullGaussianSources: Number(trainingStagePanel?.getAttribute("data-stage-full-gaussian-sources") ?? 0),
+        panelStagePointPreviewModels: Number(trainingStagePanel?.getAttribute("data-stage-point-preview-models") ?? 0),
+        panelStageObjectLayerRegistered: Number(trainingStagePanel?.getAttribute("data-stage-object-layer-registered") ?? 0),
+        panelStageObjectLayerLoaded: Number(trainingStagePanel?.getAttribute("data-stage-object-layer-loaded") ?? 0),
         panelStageProcessedModelCount: Number(trainingStagePanel?.getAttribute("data-stage-processed-models") ?? 0),
         panelStagePendingModelCount: Number(trainingStagePanel?.getAttribute("data-stage-pending-models") ?? 0),
         panelModelVersionRows: trainingStagePanel?.querySelectorAll("[data-model-version-row-id]").length ?? 0,
+        panelLayerBadgeRows: trainingStagePanel?.querySelectorAll("[data-model-layer-badges='true']").length ?? 0,
         worldPlanePresent: Boolean(worldPlane),
         systemDrawerPresent: Boolean(systemDrawer),
         objectTransformContract: handle.objectTransformContract ?? null,
@@ -2076,6 +2097,9 @@ async function auditWorld(url) {
         objectTransform.engine === "object-transform-state-v1" &&
         objectTransform.pickingContract === "projected-object-centroid-picker-v1" &&
         objectTransform.pickingDecoupledFromRenderer === true &&
+        objectTransform.renderSurfaceContract === "three-world-point-preview-v1" &&
+        objectTransform.gaussianDisplayMode === "点云预览" &&
+        objectTransform.objectLayerStatus === "loaded" &&
         objectTransform.gizmoObject === objectSelection.selectionId &&
         objectTransform.interactionLayer === "three-transform-controls-v1" &&
         objectTransform.actionButtonCount === 3 &&
@@ -2089,9 +2113,23 @@ async function auditWorld(url) {
       trainingStageStatus:
         world.shellTrainingStage === "model-version-processing-v1" &&
         world.panelTrainingStageSchema === "model-version-processing-v1" &&
+        world.shellRenderSurfaceContract === "three-world-point-preview-v1" &&
+        world.shellGaussianDisplayMode === "点云预览" &&
+        world.panelStageRenderSurfaceContract === "three-world-point-preview-v1" &&
+        world.shellFullGaussianSourceCount >= 1 &&
+        world.panelStageFullGaussianSources >= 1 &&
+        world.shellObjectLayerRegisteredCount >= 1 &&
+        world.panelStageObjectLayerRegistered >= 1 &&
+        world.shellObjectLayerLoadedCount >= 1 &&
+        world.panelStageObjectLayerLoaded >= 1 &&
+        world.panelLayerBadgeRows >= world.panelModelVersionRows &&
         world.panelModelVersionRows >= 7
           ? "passed"
           : "failed",
+      gaussianDisplayMode: world.shellGaussianDisplayMode,
+      fullGaussianSourceCount: world.shellFullGaussianSourceCount,
+      objectLayerRegisteredCount: world.shellObjectLayerRegisteredCount,
+      objectLayerLoadedCount: world.shellObjectLayerLoadedCount,
       stageVisibleModelCount: world.stageVisibleModelCount,
       stageProcessedModelCount: world.panelStageProcessedModelCount,
       objectFragmentationStatus: world.fragmentPanelStatus,

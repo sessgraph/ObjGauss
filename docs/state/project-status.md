@@ -18,6 +18,13 @@ ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shif
 对象不再直接依赖 Gaussian renderer raycast hit-test。训练证据、Gaussian probe 和协议
 诊断仍保留在高级系统区，不作为主流程第一入口。
 
+Viewer 已新增 `完整高斯 / 点预览 / 对象层` 状态展示：catalog entry 现在显式区分
+`sourceLayer`（例如 `.splat` 原始完整高斯来源）、`renderSurface`
+（当前 Three.js stage 的 `three-world-point-preview-v1` 点预览）和 `objectLayer`
+（处理后的 object-aware PLY / OGC / trainable artifact）。默认真实样例 V2 在 UI 上显示
+`Lego 原始 splat` 可用、当前 stage 为 `点云预览`、处理结果为 `对象层已加载`。这一步只
+澄清和展示现有资产事实，不替换主 stage renderer，也不生成新的训练 / Demo 产物。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
