@@ -643,6 +643,32 @@ soft `object_purity=0.951687`、hard `direct_slot_match=1.0`，quality diagnosti
 screenshot，不改变 public demo / HF release 口径，不解冻 geometry / camera，不进入 GPU 长训、
 diffusion、rollout、replay buffer 或 dynamic-K mutation。
 
+随后完成 `REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001`：新增
+`objgauss-real-sample-v2-promoted-weights-cross-sample-v1`，把 promoted weights
+`feature_weight=2.0, position_weight=1.0` 与 baseline `1.0/1.0` 固化为可复跑
+cross-sample diagnostic。CLI 新增
+`objgauss training real-sample-v2-promoted-weights-cross-sample`，复用同一个
+real-sample v2 handoff checkpoint，对第二样例做 baseline / promoted full-cloud viewer
+preview 对比，并导出 promoted PLY audit fields：
+`baseline_object_id`、`baseline_assignment_confidence`、`baseline_assignment_entropy`、
+`promotion_changed`、`promotion_hard_fix`、`promotion_hard_regression`。Polyhaven Chair
+样例 `public/samples/polyhaven_chair_demo_objects.ply` 为 `50,000` Gaussians / 6 个
+`object_id`，baseline hard metrics 为 `mixed_gaussians=3840`、
+`direct_slot_match=0.923200`，promoted hard metrics 为 `mixed_gaussians=3918`、
+`direct_slot_match=0.921640`；虽然 soft metrics 改善
+`object_purity=0.844726 -> 0.905148`、confidence `0.792748 -> 0.918182`、
+entropy `0.207252 -> 0.081818`，但 hard delta 为
+`mixed_gaussians_delta=78`、`direct_slot_match_delta=-0.001560`、
+`hard_fix_count=1736`、`hard_regression_count=1814`。补充本地 Plush 复查同样显示
+soft metrics 改善但 hard boundary 回退：baseline `mixed_gaussians=3849`、
+`direct_slot_match=0.986327`，promoted `mixed_gaussians=6283`、
+`direct_slot_match=0.977680`。结论：promoted weights 是当前 Lego viewer preview 的
+sample-specific 候选，不是已通过跨样例 hard-boundary 非回归的全局默认策略；下一步应做
+sample-aware weight policy / evidence normalization gate，不应解冻 geometry / camera 或进入
+GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation。本步骤验证通过：
+`uv run --extra dev pytest` 256 passed，`npm run build` passed，`git diff --check` passed；
+代码完成 commit 为 `d8d6b2f`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
