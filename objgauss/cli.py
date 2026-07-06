@@ -121,6 +121,9 @@ from objgauss.core.real_sample_v2_full_cloud_purity import (
 from objgauss.core.real_sample_v2_segmentation_quality import (
     real_sample_v2_segmentation_quality_from_cloud,
 )
+from objgauss.core.real_sample_v2_weak_boundary_opt import (
+    real_sample_v2_weak_boundary_opt_from_cloud,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1917,6 +1920,76 @@ def _training_real_sample_v2_segmentation_quality(args: argparse.Namespace) -> N
         print(f"viewer_route={summary['viewer']['debug_route']}")
     if args.require_pass and summary["status"] != "real_sample_v2_segmentation_quality_pass":
         raise ValueError("real sample v2 segmentation quality did not pass")
+
+
+def _training_real_sample_v2_weak_boundary_opt(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    report = real_sample_v2_weak_boundary_opt_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        max_points=args.max_points,
+        solver_temperature=args.solver_temperature,
+        candidate_feature_weight=args.candidate_feature_weight,
+        candidate_position_weight=args.candidate_position_weight,
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+        viewer_path=args.viewer_path,
+    )
+    summary = report.as_dict()
+    baseline_quality = summary["baseline"]["global_quality"]
+    candidate_quality = summary["candidate"]["global_quality"]
+    delta = summary["quality_delta"]
+    changed = summary["changed_gaussians"]
+    recommendation = summary["recommendation"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['source']['source_gaussians']}")
+    print(f"max_points={summary['fixed_target']['max_points']}")
+    print(f"solver_temperature={summary['fixed_target']['solver_temperature']}")
+    print(f"candidate_feature_weight={summary['candidate_policy']['feature_weight']}")
+    print(f"candidate_position_weight={summary['candidate_policy']['position_weight']}")
+    print(f"baseline_direct_slot_match={baseline_quality['direct_slot_match']:.6f}")
+    print(f"candidate_direct_slot_match={candidate_quality['direct_slot_match']:.6f}")
+    print(f"direct_slot_match_delta={delta['direct_slot_match_delta']:.6f}")
+    print(f"baseline_mixed_gaussians={baseline_quality['mixed_gaussians']}")
+    print(f"candidate_mixed_gaussians={candidate_quality['mixed_gaussians']}")
+    print(f"mixed_gaussians_delta={delta['mixed_gaussians_delta']}")
+    print(f"baseline_min_target_recall={baseline_quality['min_target_recall']:.6f}")
+    print(f"candidate_min_target_recall={candidate_quality['min_target_recall']:.6f}")
+    print(f"min_target_recall_delta={delta['min_target_recall_delta']:.6f}")
+    print(f"changed_gaussians={changed['changed_count']}")
+    for pair in changed["pairs"]:
+        print(
+            "changed_pair="
+            f"baseline:{pair['baseline_object_id']},"
+            f"candidate:{pair['candidate_object_id']},"
+            f"count:{pair['count']}"
+        )
+    print(f"recommendation_decision={recommendation['decision']}")
+    print(f"recommendation_action={recommendation['action']}")
+    write_ply(args.preview_ply_output, report.candidate_cloud, fmt=_output_format(args))
+    print(f"preview_ply={args.preview_ply_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if summary["viewer"]["debug_route"]:
+        print(f"viewer_route={summary['viewer']['debug_route']}")
+    if args.require_pass and summary["status"] != "real_sample_v2_weak_boundary_opt_pass":
+        raise ValueError("real sample v2 weak-boundary optimization did not pass")
 
 
 def _training_eval_assignment(args: argparse.Namespace) -> None:
@@ -3756,6 +3829,41 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_segmentation_quality.add_argument("--summary-output", type=Path)
     real_sample_segmentation_quality.add_argument("--require-pass", action="store_true")
     real_sample_segmentation_quality.set_defaults(handler=_training_real_sample_v2_segmentation_quality)
+
+    real_sample_weak_boundary_opt = training_subparsers.add_parser(
+        "real-sample-v2-weak-boundary-opt",
+        help="try fixed-target cost-weight normalization for the real-sample v2 weak boundary",
+    )
+    real_sample_weak_boundary_opt.add_argument("input", type=Path)
+    real_sample_weak_boundary_opt.add_argument("--preview-ply-output", required=True, type=Path)
+    real_sample_weak_boundary_opt.add_argument("--viewer-path")
+    real_sample_weak_boundary_opt.add_argument("--slots", type=int)
+    real_sample_weak_boundary_opt.add_argument("--frames", type=int, default=2)
+    real_sample_weak_boundary_opt.add_argument("--max-points", type=int, default=128)
+    real_sample_weak_boundary_opt.add_argument("--solver-temperature", type=float, default=0.35)
+    real_sample_weak_boundary_opt.add_argument("--candidate-feature-weight", type=float, default=2.0)
+    real_sample_weak_boundary_opt.add_argument("--candidate-position-weight", type=float, default=1.0)
+    real_sample_weak_boundary_opt.add_argument("--object-id-field", default="object_id")
+    real_sample_weak_boundary_opt.add_argument("--temporal-offset", type=float, default=0.01)
+    real_sample_weak_boundary_opt.add_argument("--image-width", type=int, default=12)
+    real_sample_weak_boundary_opt.add_argument("--image-height", type=int, default=12)
+    real_sample_weak_boundary_opt.add_argument("--point-radius", type=int, default=1)
+    real_sample_weak_boundary_opt.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_weak_boundary_opt.add_argument("--iterations", type=int, default=100)
+    real_sample_weak_boundary_opt.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_weak_boundary_opt.add_argument("--baseline-temperature", type=float, default=1.0)
+    real_sample_weak_boundary_opt.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
+    real_sample_weak_boundary_opt.add_argument("--seed", type=int, default=4)
+    real_sample_weak_boundary_opt.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_weak_boundary_opt.add_argument("--rewrite-sh", action="store_true")
+    real_sample_weak_boundary_opt.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    real_sample_weak_boundary_opt.add_argument("--summary-output", type=Path)
+    real_sample_weak_boundary_opt.add_argument("--require-pass", action="store_true")
+    real_sample_weak_boundary_opt.set_defaults(handler=_training_real_sample_v2_weak_boundary_opt)
 
     eval_assignment = training_subparsers.add_parser(
         "eval-assignment",

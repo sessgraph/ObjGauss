@@ -70,6 +70,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_segmentation_quality",
         "RealSampleV2SegmentationQualityReport",
     ),
+    "RealSampleV2WeakBoundaryOptReport": (
+        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "RealSampleV2WeakBoundaryOptReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -260,6 +264,10 @@ _EXPORTS = {
     "REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA": (
         "objgauss.core.real_sample_v2_segmentation_quality",
         "REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA",
+    ),
+    "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA": (
+        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -541,6 +549,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_segmentation_quality",
         "real_sample_v2_segmentation_quality_from_purity_report",
     ),
+    "real_sample_v2_weak_boundary_opt_from_cloud": (
+        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "real_sample_v2_weak_boundary_opt_from_cloud",
+    ),
     "render_real_sample_v2_model_handoff_html": (
         "objgauss.core.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
@@ -741,6 +753,10 @@ _EXPORTS = {
     "validate_real_sample_v2_segmentation_quality_summary": (
         "objgauss.core.real_sample_v2_segmentation_quality",
         "validate_real_sample_v2_segmentation_quality_summary",
+    ),
+    "validate_real_sample_v2_weak_boundary_opt_summary": (
+        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "validate_real_sample_v2_weak_boundary_opt_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

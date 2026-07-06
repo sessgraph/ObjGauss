@@ -15,32 +15,34 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步应围绕 weak boundary 做 evidence normalization / local export policy 的最小实验。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步应把 weighted candidate 接入 viewer preview / handoff promotion 路径。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001: Try minimal slot 1/2 boundary optimization
+### REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001: Promote weak-boundary weights into viewer preview
 
 - 状态: ready
-- 类型: 标准 PR / algorithm diagnostics + export policy experiment
-- 前置: `REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001`
-- 目标: 针对 `target_slot=1 -> predicted_object=2` 的 52 个混淆 Gaussian 和
-  `predicted_object=1` 的低置信 / 高熵现象，做一个最小可复跑优化实验，判断 evidence
-  normalization 是否能改善弱边界，或是否只需要局部 export policy 标注。
+- 类型: 标准 PR / algorithm promotion + viewer evidence
+- 前置: `REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001`
+- 目标: 把已验证的 `feature_weight=2.0, position_weight=1.0` weak-boundary candidate
+  接入 real-sample v2 viewer preview / handoff promotion 路径，让下一次效果展示默认看到
+  `mixed_gaussians=0` 的对象分割，而不是只停留在优化实验 CLI。
 - 建议范围:
-  - 固定 `max_points=128` 和 `solver_temperature=0.35`，不要继续扫 coverage 或 sharpening。
-  - 比较 baseline vs 一个最小 normalization 候选，例如 position / feature cost reweight、
-    confidence-aware boundary flag 或 per-object uncertainty export field。
-  - 输出同一 segmentation quality summary delta，重点看 `target_slot=1` recall、`mixed_gaussians`、
-    `predicted_object=1` confidence / entropy 是否改善。
-  - 生成 `/tmp` viewer PLY 证据，保留低质量对象可见，不用 UI 掩盖。
+  - 为 real-sample v2 viewer preview / handoff builder 增加受控 cost weight 参数，默认仍保持
+    可审计，不静默改写旧 summary schema。
+  - 输出可复跑 summary，记录 baseline weights、promoted weights、`max_points=128`、
+    `solver_temperature=0.35` 和 hard segmentation counts。
+  - 继续导出 `/tmp` viewer PLY，预期 `object_id` counts 为 `736/581/1787/2592`，并在
+    `?ply=` route 里做 desktop / mobile 浏览器验证。
+  - 保留 audit 字段或 summary evidence，使后续能追踪本次 promotion 是否只修复了当前 public
+    sample 的局部边界。
 - 边界:
-  - 不提交 generated checkpoint / summary / preview PLY。
+  - 不提交 generated checkpoint / summary / preview PLY / screenshot。
   - 不把低质量对象用 UI 颜色或阈值掩盖。
+  - 不改变 public demo / HF release 口径。
   - 不进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation、geometry / camera
     unfreeze。
-  - 不改变 public demo / HF release 口径。
 
 ## Suspended
 
@@ -108,6 +110,63 @@
 当前无进行中 PR。
 
 ## Done
+
+### REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001: Try minimal slot 1/2 boundary optimization
+
+- 状态: done / cost-weight-candidate-promoted
+- 类型: 标准 PR / algorithm diagnostics + export policy experiment
+- 前置: `REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001`
+- 目标: 针对 `target_slot=1 -> predicted_object=2` 的 52 个混淆 Gaussian 和
+  `predicted_object=1` 的低置信 / 高熵现象，做一个最小可复跑优化实验，判断 evidence
+  normalization 是否能改善弱边界，或是否只需要局部 export policy 标注。
+- 已实施:
+  - 新增 `objgauss-real-sample-v2-weak-boundary-opt-v1` schema。
+  - 新增 `RealSampleV2WeakBoundaryOptReport`、
+    `real_sample_v2_weak_boundary_opt_from_cloud(...)` 和 summary validator。
+  - CLI 新增 `objgauss training real-sample-v2-weak-boundary-opt`，默认固定
+    `max_points=128`、`solver_temperature=0.35`，比较 baseline weights 与候选
+    `feature_weight=2.0, position_weight=1.0`。
+  - 候选 PLY 保留 low-quality object 可见，并新增 `baseline_object_id`、
+    `baseline_assignment_confidence`、`baseline_assignment_entropy`、
+    `weak_boundary_candidate` 和 `boundary_changed` audit fields。
+  - `objgauss.core` lazy namespace 暴露 schema、report、builder 和 validator。
+- 真实样例结果:
+  - baseline: `direct_slot_match=0.989642`、`mixed_gaussians=59`、
+    `min_target_recall=0.910499`。
+  - candidate: `direct_slot_match=1.0`、`hard_argmax_object_purity=1.0`、
+    `min_predicted_object_purity=1.0`、`min_target_recall=1.0`、`mixed_gaussians=0`。
+  - `changed_gaussians=59`，其中 `52` 个 `baseline_object_id=2 -> candidate_object_id=1`，
+    `7` 个 `baseline_object_id=3 -> candidate_object_id=0`。
+  - candidate confusion matrix:
+    `[[736,0,0,0],[0,581,0,0],[0,0,1787,0],[0,0,0,2592]]`。
+  - 结论: promote cost-weight normalization candidate；下一步接入 viewer preview /
+    handoff promotion 路径。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/real_sample_v2_weak_boundary_opt.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_real_sample_v2_weak_boundary_opt.py tests/test_real_sample_v2_segmentation_quality.py tests/test_core_namespace.py`: 13 passed。
+  - `uv run objgauss training real-sample-v2-weak-boundary-opt public/samples/lego_alpha_v1_objects.ply --preview-ply-output /tmp/objgauss-real-sample-v2-weak-boundary-opt.ply --summary-output /tmp/objgauss-real-sample-v2-weak-boundary-opt-summary.json --viewer-path /samples/objgauss-real-sample-v2-weak-boundary-opt.ply --require-pass`: passed。
+  - `uv run objgauss stats /tmp/objgauss-real-sample-v2-weak-boundary-opt.ply`: passed，
+    `5696` Gaussians，candidate `object_id` counts 为 `736/581/1787/2592`。
+  - Playwright + system Chrome 验证
+    `/?ply=/samples/objgauss-real-sample-v2-weak-boundary-opt.ply` desktop / mobile：
+    URL PLY route 已被拦截到 `/tmp` PLY，`ply-url-artifact` loaded，ObjectState debug snapshot
+    source 为 `derived_from_object_id`，4 个对象开关为 `736/581/1787/2592`；desktop 点击
+    object #1 后 `hiddenObjects=1`、`hiddenGaussians=581`，再次点击恢复为 0。截图：
+    `/tmp/objgauss-real-sample-v2-weak-boundary-opt-route.png`、
+    `/tmp/objgauss-real-sample-v2-weak-boundary-opt-route-object1-hidden.png`、
+    `/tmp/objgauss-real-sample-v2-weak-boundary-opt-route-mobile.png`。截图像素检查通过：
+    desktop `unique_colors=50980`、`non_dark_pixels=185903`；hidden screenshot
+    `unique_colors=49517`、`non_dark_pixels=156263`；mobile `unique_colors=8254`、
+    `non_dark_pixels=53358`。Browser plugin 不可用，使用普通 Playwright fallback。
+  - `uv run --extra dev pytest`: 254 passed。
+  - `npm run build`: passed；仍有既有 Vite chunk size warning。
+  - `git diff --check`: passed。
+- 边界:
+  - 未提交 generated checkpoint / summary / preview PLY / screenshot。
+  - 未把低质量对象用 UI 颜色或阈值掩盖。
+  - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
+    camera unfreeze。
+- 完成 commit: pending
 
 ### REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001: Inspect 128-target object segmentation quality
 

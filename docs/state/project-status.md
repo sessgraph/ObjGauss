@@ -603,6 +603,28 @@ diffusion、replay 或 rollout。
 PLY / summary / screenshot，不解冻 geometry / camera，不进入 GPU 长训、diffusion、replay
 或 rollout。
 
+随后完成 `REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001`：新增
+`objgauss-real-sample-v2-weak-boundary-opt-v1`，在固定 `max_points=128` 和
+`solver_temperature=0.35` 下比较 baseline cost weights 与一个最小候选
+`feature_weight=2.0, position_weight=1.0`。该候选只改变 assignment v2 预测时的
+cost 权重配置，不改 checkpoint，不使用 target labels 做推理。真实 public sample 结果为：
+baseline `mixed_gaussians=59`、`direct_slot_match=0.989642`、
+`min_target_recall=0.910499`；candidate `mixed_gaussians=0`、
+`direct_slot_match=1.0`、`hard_argmax_object_purity=1.0`、
+`min_predicted_object_purity=1.0`、`min_target_recall=1.0`。变更的 `59` 个 Gaussian 为
+`52` 个 `baseline_object_id=2 -> candidate_object_id=1` 和 `7` 个
+`baseline_object_id=3 -> candidate_object_id=0`；导出的候选 PLY `object_id` counts 为
+`736/581/1787/2592`，并附带 `baseline_object_id`、
+`baseline_assignment_confidence`、`baseline_assignment_entropy`、
+`weak_boundary_candidate` 和 `boundary_changed` audit 字段。CLI
+`objgauss training real-sample-v2-weak-boundary-opt` 可生成 `/tmp` preview PLY / summary；
+Playwright + system Chrome 已验证 `/?ply=/samples/objgauss-real-sample-v2-weak-boundary-opt.ply`
+desktop / mobile 可加载 `ply-url-artifact`，ObjectState source 为
+`derived_from_object_id`，4 个对象开关分别为 `736/581/1787/2592`，对象 #1 的 `581`
+个 Gaussian 可隐藏并恢复。结论：下一步应把该 weighted candidate 作为受控 viewer
+preview / handoff promotion 路径，而不是继续 coverage / sharpening 或进入 geometry /
+camera unfreeze、GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
@@ -2936,9 +2958,12 @@ npm run acceptance:demo
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
 3. 算法模型线：`CORE-MODEL-TRAIN-VALIDATE-001` 已聚合 v2 assignment training、synthetic
    stability hard gate、failure diagnostics、ObjectState eval、renderer joint smoke、
-   checkpoint roundtrip 和 renderer-loss-contract evidence。当前已达到 development-stage
-   “核心模型可训练、可验证、可失败定位”阶段；promotion 前下一步应先做小型 real / public
-   sample 重复验证和受控 GPU smoke，而不是直接跳到 rollout、replay buffer 或 diffusion。
+   checkpoint roundtrip 和 renderer-loss-contract evidence。当前 public sample 已跑到
+   可训练、可验证、可 3D 查看对象分割效果阶段；`feature_weight=2.0` 的 weak-boundary
+   candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`。
+   下一步应把该 weighted candidate 接入 viewer preview / handoff promotion 路径，并继续
+   小型 real / public sample 重复验证；不要直接跳到 rollout、replay buffer、diffusion 或
+   geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

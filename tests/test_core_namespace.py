@@ -25,6 +25,7 @@ from objgauss.core import (
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA,
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
+    REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentV2RendererJointValidationReport,
     AssignmentSolverV2Config,
@@ -55,6 +56,7 @@ from objgauss.core import (
     RealSampleV2ModelHandoffReport,
     RealSampleV2SegmentationQualityReport,
     RealSampleV2SmokeReport,
+    RealSampleV2WeakBoundaryOptReport,
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
     SyntheticStabilityDiagnosticsReport,
@@ -148,6 +150,7 @@ from objgauss.core import (
     real_sample_v2_segmentation_quality_from_cloud,
     real_sample_v2_segmentation_quality_from_projected_cloud,
     real_sample_v2_segmentation_quality_from_purity_report,
+    real_sample_v2_weak_boundary_opt_from_cloud,
     real_sample_v2_smoke_from_cloud,
     render_real_sample_v2_model_handoff_html,
     renderer_loss_boundary_report,
@@ -177,6 +180,7 @@ from objgauss.core import (
     validate_real_sample_v2_model_handoff_summary,
     validate_real_sample_v2_segmentation_quality_summary,
     validate_real_sample_v2_smoke_summary,
+    validate_real_sample_v2_weak_boundary_opt_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_identity_oracle,
@@ -645,6 +649,12 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert real_sample_v2_segmentation_quality_from_projected_cloud is not None
     assert real_sample_v2_segmentation_quality_from_purity_report is not None
     assert validate_real_sample_v2_segmentation_quality_summary is not None
+    assert REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA == (
+        "objgauss-real-sample-v2-weak-boundary-opt-v1"
+    )
+    assert RealSampleV2WeakBoundaryOptReport is not None
+    assert real_sample_v2_weak_boundary_opt_from_cloud is not None
+    assert validate_real_sample_v2_weak_boundary_opt_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
