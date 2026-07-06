@@ -166,7 +166,7 @@
   - 未把低质量对象用 UI 颜色或阈值掩盖。
   - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
     camera unfreeze。
-- 完成 commit: pending
+- 完成 commit: `6a21aeb`
 
 ### REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001: Inspect 128-target object segmentation quality
 
