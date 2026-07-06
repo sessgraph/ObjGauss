@@ -177,7 +177,7 @@
   - 未改训练输出、generated PLY、renderer、manifest、checkpoint schema 或 public demo 口径。
   - 完整 `npm run audit:world-viewer` 当前仍卡在既有 URL trainable artifact `data-model-count`
     断言；本切片使用 targeted Playwright 验证对象移动和 UI 精简。
-- 完成 commit: `ac30e1b`
+- 完成 commit: `b6dc5e1`
 
 ### MODEL-CATALOG-LATEST-SLOT-ORDER-001: Sort same-position models by recency
 
