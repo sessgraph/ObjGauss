@@ -33,6 +33,8 @@ const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
 const OBJECT_SCALE_SNAP_STEP = 0.1;
 const THREE_WORLD_POINT_PREVIEW_CONTRACT = "three-world-point-preview-v1";
 const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
+const OBJECT_PICKING_CONTRACT = "projected-object-bbox-picker-v2";
+const OBJECT_PICK_BOX_SCREEN_PADDING_PX = 4;
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -2787,7 +2789,7 @@ function ThreeWorld({
     let transformSnapEnabled = false;
     let lastTransformEvent = null;
     let lastPickSummary = {
-      contract: "projected-object-centroid-picker-v1",
+      contract: OBJECT_PICKING_CONTRACT,
       source: "init",
       candidateCount: 0,
       hit: false,
@@ -3083,7 +3085,7 @@ function ThreeWorld({
         draggableCount: draggableObjects.size,
         draggableObjectCount: draggableObjects.size,
         objectMoveContract: "object-group-position-v1",
-        objectPickingContract: "projected-object-centroid-picker-v1",
+        objectPickingContract: OBJECT_PICKING_CONTRACT,
         objectPickingDecoupledFromRenderer: true,
         objectPickingLast: lastPickSummary,
         sourceSplatStageContract: SOURCE_SPLAT_STAGE_CONTRACT,
@@ -3357,6 +3359,30 @@ function ThreeWorld({
             pick: lastPickSummary,
           };
         },
+        pickOutsideObjectForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()].find((entry) => entry.visible);
+          if (!object) return { ok: false, reason: "missing-object", pick: lastPickSummary };
+          const bounds = objectScreenBounds(object);
+          if (!bounds) return { ok: false, reason: "offscreen-object", pick: lastPickSummary };
+          const missPoint = objectScreenMissPoint(bounds);
+          if (!missPoint) {
+            return { ok: false, reason: "missing-empty-screen-point", bounds, pick: lastPickSummary };
+          }
+          const pick = pickObjectAt(missPoint.clientX, missPoint.clientY, {
+            source: "audit-outside-bbox",
+          });
+          publishAuditHandle();
+          return {
+            ok: pick.object === null,
+            requested: object.userData.selectionId,
+            picked: pick.object?.userData?.selectionId ?? null,
+            bounds,
+            missPoint,
+            pick: lastPickSummary,
+          };
+        },
       };
     };
 
@@ -3495,8 +3521,6 @@ function ThreeWorld({
     };
 
     const pickBox = new THREE.Box3();
-    const pickCenter = new THREE.Vector3();
-    const pickSize = new THREE.Vector3();
     const pickCorner = new THREE.Vector3();
     const pickProjected = new THREE.Vector3();
     const boxCorners = [
@@ -3510,48 +3534,79 @@ function ThreeWorld({
       [1, 1, 1],
     ];
     const objectScreenCenter = (object) => {
+      const bounds = objectScreenBounds(object);
+      if (!bounds) return null;
+      return {
+        clientX: bounds.centerX,
+        clientY: bounds.centerY,
+        depth: bounds.depth,
+      };
+    };
+    const objectScreenBounds = (object) => {
       const rect = renderer.domElement.getBoundingClientRect();
       if (!rect.width || !rect.height || !object) return null;
-      pickBox.setFromObject(object);
-      if (pickBox.isEmpty()) {
-        object.getWorldPosition(pickCenter);
-      } else {
-        pickBox.getCenter(pickCenter);
+      const frame = objectFrameBox(object);
+      if (!frame || frame.isEmpty()) return null;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      let depthTotal = 0;
+      let projectedCount = 0;
+      for (const corner of boxCorners) {
+        pickCorner.set(
+          corner[0] ? frame.max.x : frame.min.x,
+          corner[1] ? frame.max.y : frame.min.y,
+          corner[2] ? frame.max.z : frame.min.z,
+        );
+        pickProjected.copy(pickCorner).project(camera);
+        if (pickProjected.z < -1 || pickProjected.z > 1) continue;
+        const screenX = rect.left + ((pickProjected.x + 1) / 2) * rect.width;
+        const screenY = rect.top + ((1 - pickProjected.y) / 2) * rect.height;
+        minX = Math.min(minX, screenX);
+        minY = Math.min(minY, screenY);
+        maxX = Math.max(maxX, screenX);
+        maxY = Math.max(maxY, screenY);
+        depthTotal += pickProjected.z;
+        projectedCount += 1;
       }
-      pickProjected.copy(pickCenter).project(camera);
-      if (pickProjected.z < -1 || pickProjected.z > 1) return null;
+      if (!projectedCount || !Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+      const width = Math.max(1, maxX - minX);
+      const height = Math.max(1, maxY - minY);
       return {
-        clientX: rect.left + ((pickProjected.x + 1) / 2) * rect.width,
-        clientY: rect.top + ((1 - pickProjected.y) / 2) * rect.height,
-        depth: round3(pickProjected.z),
+        minX: round3(minX),
+        minY: round3(minY),
+        maxX: round3(maxX),
+        maxY: round3(maxY),
+        width: round3(width),
+        height: round3(height),
+        centerX: round3(minX + width / 2),
+        centerY: round3(minY + height / 2),
+        depth: round3(depthTotal / projectedCount),
       };
+    };
+    const objectFrameBox = (object) => {
+      let frame = null;
+      object?.traverse?.((child) => {
+        if (!frame && child.userData?.role === "object-state-bbox") frame = child;
+      });
+      pickBox.setFromObject(frame ?? object);
+      return pickBox;
     };
     const projectedPickCandidate = (object, clientX, clientY) => {
       const modelRoot = object ? modelRoots.get(object.userData.modelId) : null;
       if (!object || object.visible === false || modelRoot?.visible === false) return null;
-      const rect = renderer.domElement.getBoundingClientRect();
-      const center = objectScreenCenter(object);
-      if (!center) return null;
-      pickBox.setFromObject(object);
-      let radius = 22;
-      if (!pickBox.isEmpty()) {
-        pickBox.getSize(pickSize);
-        const maxSpan = Math.max(pickSize.x, pickSize.y, pickSize.z);
-        const worldRadius = Math.max(0.08, maxSpan * 0.5);
-        const maxScreenRadius = boxCorners.reduce((current, corner) => {
-          pickCorner.set(
-            corner[0] ? pickBox.max.x : pickBox.min.x,
-            corner[1] ? pickBox.max.y : pickBox.min.y,
-            corner[2] ? pickBox.max.z : pickBox.min.z,
-          );
-          pickProjected.copy(pickCorner).project(camera);
-          const screenX = rect.left + ((pickProjected.x + 1) / 2) * rect.width;
-          const screenY = rect.top + ((1 - pickProjected.y) / 2) * rect.height;
-          return Math.max(current, Math.hypot(screenX - center.clientX, screenY - center.clientY));
-        }, 0);
-        radius = Math.max(18, Math.min(96, maxScreenRadius || worldRadius * 24));
-      }
-      const distance = Math.hypot(clientX - center.clientX, clientY - center.clientY);
+      const bounds = objectScreenBounds(object);
+      if (!bounds) return null;
+      const padding = OBJECT_PICK_BOX_SCREEN_PADDING_PX;
+      const inside =
+        clientX >= bounds.minX - padding &&
+        clientX <= bounds.maxX + padding &&
+        clientY >= bounds.minY - padding &&
+        clientY <= bounds.maxY + padding;
+      if (!inside) return null;
+      const distance = Math.hypot(clientX - bounds.centerX, clientY - bounds.centerY);
+      const radius = Math.max(bounds.width, bounds.height) / 2;
       return {
         object,
         selectionId: object.userData.selectionId,
@@ -3560,9 +3615,39 @@ function ThreeWorld({
         distance: round3(distance),
         radius: round3(radius),
         score: round3(distance / Math.max(1, radius)),
-        depth: center.depth,
-        screen: [round3(center.clientX), round3(center.clientY)],
+        depth: bounds.depth,
+        screen: [bounds.centerX, bounds.centerY],
+        bounds,
       };
+    };
+    const objectScreenMissPoint = (bounds) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const offset = OBJECT_PICK_BOX_SCREEN_PADDING_PX + 18;
+      const withinScreen = ([clientX, clientY]) =>
+        clientX >= rect.left + 8 &&
+        clientX <= rect.right - 8 &&
+        clientY >= rect.top + 8 &&
+        clientY <= rect.bottom - 8;
+      const missesAllObjectFrames = ([clientX, clientY]) =>
+        ![...draggableObjects.values()].some((object) => projectedPickCandidate(object, clientX, clientY));
+      const candidates = [
+        [bounds.maxX + offset, bounds.centerY],
+        [bounds.minX - offset, bounds.centerY],
+        [bounds.centerX, bounds.maxY + offset],
+        [bounds.centerX, bounds.minY - offset],
+        [rect.left + 36, rect.top + 36],
+        [rect.right - 36, rect.top + 36],
+        [rect.left + 36, rect.bottom - 36],
+        [rect.right - 36, rect.bottom - 36],
+        [rect.left + rect.width * 0.5, rect.top + 36],
+        [rect.left + rect.width * 0.5, rect.bottom - 36],
+      ];
+      for (const point of candidates) {
+        if (withinScreen(point) && missesAllObjectFrames(point)) {
+          return { clientX: round3(point[0]), clientY: round3(point[1]) };
+        }
+      }
+      return null;
     };
     const pickObjectAt = (clientX, clientY, options = {}) => {
       const candidates = [...draggableObjects.values()]
@@ -3574,13 +3659,15 @@ function ThreeWorld({
             left.depth - right.depth ||
             left.distance - right.distance,
         );
-      const hit = candidates.find((candidate) => candidate.distance <= Math.max(candidate.radius, 28)) ?? null;
+      const hit = candidates[0] ?? null;
       const second = candidates.find((candidate) => candidate.selectionId !== hit?.selectionId) ?? null;
       const ambiguous = Boolean(hit && second && Math.abs(hit.score - second.score) < 0.18);
       lastPickSummary = {
-        contract: "projected-object-centroid-picker-v1",
+        contract: OBJECT_PICKING_CONTRACT,
         source: options.source ?? "pointer",
         decoupledFromRenderer: true,
+        hitTest: "projected-object-bbox",
+        screenPaddingPx: OBJECT_PICK_BOX_SCREEN_PADDING_PX,
         candidateCount: candidates.length,
         hit: Boolean(hit),
         ambiguous,
@@ -3590,11 +3677,13 @@ function ThreeWorld({
         distance: hit?.distance ?? null,
         radius: hit?.radius ?? null,
         score: hit?.score ?? null,
+        bounds: hit?.bounds ?? null,
         nearest: candidates.slice(0, 3).map((candidate) => ({
           selectionId: candidate.selectionId,
           distance: candidate.distance,
           radius: candidate.radius,
           score: candidate.score,
+          bounds: candidate.bounds,
         })),
       };
       return {
@@ -6392,6 +6481,7 @@ function objectStateWireBox(bounds, accent) {
   );
   line.position.copy(center);
   line.userData.role = "object-state-bbox";
+  line.userData.accent = accent;
   return line;
 }
 
@@ -6455,16 +6545,16 @@ function applyObjectVisualState(
       const baseOpacity = selected ? 1 : hovered ? Math.max(0.86, lensOpacity) : debug ? lensOpacity : 0.5;
       const sourceOverlayOpacity = child.userData.sourceSplatOverlay
         ? selected
-          ? 0.5
+          ? 0.96
           : hovered
-            ? 0.42
-            : 0.2
+            ? 0.72
+            : 0.14
         : baseOpacity;
       const opacity = child.userData.sourceSplatOverlay
-        ? Math.min(baseOpacity, sourceOverlayOpacity)
+        ? sourceOverlayOpacity
         : baseOpacity;
       child.material.opacity = dimmedByHover ? Math.min(opacity, HOVER_DIM_OPACITY) : opacity;
-      child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.2 : dimmedByHover ? baseSize * 0.92 : baseSize;
+      child.material.size = selected ? baseSize * 1.6 : hovered ? baseSize * 1.32 : dimmedByHover ? baseSize * 0.92 : baseSize;
       child.userData.hoverHighlighted = Boolean(hovered);
       child.userData.hoverDimmed = dimmedByHover;
       child.userData.hoverHighlightMode = hoverFocus
@@ -6477,17 +6567,21 @@ function applyObjectVisualState(
       child.material.needsUpdate = true;
     }
     if (child.userData.role === "object-state-bbox") {
-      child.visible = showBbox;
-      child.material.opacity = selected ? 0.86 : hovered ? 0.72 : 0.34;
+      child.visible = showBbox || selectedOrHovered;
+      child.material.opacity = selected ? 1 : hovered ? 0.82 : 0.34;
+      child.material.color.set(selected ? "#ffffff" : hovered ? "#f3df5d" : child.userData.accent ?? "#76f4ff");
+      child.scale.setScalar(selected ? 1.025 : hovered ? 1.012 : 1);
     }
     if (child.userData.role === "core-point") {
-      child.visible = showCentroid;
+      child.visible = showCentroid || selectedOrHovered;
     }
     if (child.userData.role === "core-glow") {
-      child.visible = selectedOrHovered && showCentroid;
+      child.visible = selectedOrHovered;
     }
     if (child.userData.role === "selection-ring") {
       child.visible = selectedOrHovered;
+      child.material.opacity = selected ? 1 : 0.72;
+      child.scale.setScalar(selected ? 1.08 : hovered ? 1.03 : 1);
     }
   });
 }

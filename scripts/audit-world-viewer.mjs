@@ -244,7 +244,7 @@ async function auditWorld(url) {
       if (
         world?.objectTransformContract !== "three-transform-controls-v1" ||
         world?.objectTransformEngine !== "object-transform-state-v1" ||
-        world?.objectPickingContract !== "projected-object-centroid-picker-v1" ||
+        world?.objectPickingContract !== "projected-object-bbox-picker-v2" ||
         world?.objectPickingDecoupledFromRenderer !== true ||
         typeof world?.pickObjectForAudit !== "function" ||
         world?.transformGizmoAttached !== true ||
@@ -293,15 +293,35 @@ async function auditWorld(url) {
       };
     }, objectSelection.selectionId);
     if (
-      objectPick.contract !== "projected-object-centroid-picker-v1" ||
+      objectPick.contract !== "projected-object-bbox-picker-v2" ||
       objectPick.decoupledFromRenderer !== true ||
       objectPick.result?.ok !== true ||
-      objectPick.result?.pick?.contract !== "projected-object-centroid-picker-v1" ||
+      objectPick.result?.pick?.contract !== "projected-object-bbox-picker-v2" ||
       objectPick.result?.pick?.decoupledFromRenderer !== true ||
       objectPick.result?.pick?.selectionId !== objectSelection.selectionId ||
+      objectPick.result?.pick?.hitTest !== "projected-object-bbox" ||
+      !objectPick.result?.pick?.bounds ||
       !(Number(objectPick.result?.pick?.candidateCount) > 0)
     ) {
-      throw new Error(`expected decoupled projected object picking to select ObjectState target: ${JSON.stringify(objectPick)}`);
+      throw new Error(`expected bbox object picking to select ObjectState target: ${JSON.stringify(objectPick)}`);
+    }
+    const objectPickOutside = await page.evaluate((selectionId) => {
+      const result = window.__OBJGAUSS_WORLD__?.pickOutsideObjectForAudit?.(selectionId) ?? null;
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        result,
+        contract: world?.objectPickingContract ?? null,
+        last: world?.objectPickingLast ?? null,
+      };
+    }, objectSelection.selectionId);
+    if (
+      objectPickOutside.contract !== "projected-object-bbox-picker-v2" ||
+      objectPickOutside.result?.ok !== true ||
+      objectPickOutside.result?.pick?.contract !== "projected-object-bbox-picker-v2" ||
+      objectPickOutside.result?.pick?.hit !== false ||
+      objectPickOutside.result?.pick?.hitTest !== "projected-object-bbox"
+    ) {
+      throw new Error(`expected bbox object picking to miss outside ObjectState frame: ${JSON.stringify(objectPickOutside)}`);
     }
     const beforeMove = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -2133,7 +2153,7 @@ async function auditWorld(url) {
       objectTransformStatus:
         objectTransform.contract === "three-transform-controls-v1" &&
         objectTransform.engine === "object-transform-state-v1" &&
-        objectTransform.pickingContract === "projected-object-centroid-picker-v1" &&
+        objectTransform.pickingContract === "projected-object-bbox-picker-v2" &&
         objectTransform.pickingDecoupledFromRenderer === true &&
         objectTransform.renderSurfaceContract === "three-world-point-preview-v1" &&
         (objectTransform.gaussianDisplayMode.endsWith("点预览") ||

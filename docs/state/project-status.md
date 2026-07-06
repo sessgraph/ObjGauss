@@ -25,6 +25,14 @@ Viewer 已把 `sourceLayer` 的真实 `.splat` 接进主 Three.js world：默认
 移动和调试证据；它不再作为主视觉的完整高斯替代品。当前实现不生成新的训练 / Demo 产物，
 不引入 native `.splat` object mask，也不改变 ObjectState / manifest / training contract。
 
+Viewer 对象交互随后补齐 `projected-object-bbox-picker-v2`：主鼠标选择现在只按
+ObjectState bbox 的 screen-space 投影命中，空白区域不会再被中心点半径误选；选中对象会强制
+显示高亮 bbox、centroid / glow / selection ring，并把 object-aware Gaussian overlay 提亮，
+方便确认“选中了哪个对象”和“移动的是对象层”。模型版本列表改为两行布局，避免完整高斯、
+点预览、对象层和处理按钮挤在一行。边界不变：完整原始 `.splat` 仍是 source layer 背景，
+不会随单个对象移动；真正让 native splat 子集按对象移动，需要后续 object mask / per-splat
+object id route。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

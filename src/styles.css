@@ -827,21 +827,22 @@ button:focus-visible {
 
 .modelVersionRows {
   display: grid;
-  max-height: min(176px, 22vh);
-  gap: 7px;
+  max-height: min(248px, 30vh);
+  gap: 8px;
   overflow-y: auto;
-  padding-right: 3px;
+  padding-right: 5px;
   scrollbar-width: thin;
   scrollbar-color: rgba(93, 238, 249, 0.34) rgba(255, 255, 255, 0.05);
 }
 
 .modelVersionRow {
   display: grid;
-  min-height: 40px;
-  grid-template-columns: minmax(0, 1fr) 118px 48px;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 7px;
+  min-height: 62px;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 6px 8px;
+  padding: 8px;
   border: 1px solid rgba(153, 214, 222, 0.12);
   border-radius: 10px;
   background: rgba(9, 17, 24, 0.3);
@@ -859,6 +860,8 @@ button:focus-visible {
 
 .modelVersionCheck {
   display: grid;
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
   grid-template-columns: 14px 10px minmax(0, 1fr);
   align-items: center;
@@ -900,6 +903,8 @@ button:focus-visible {
 }
 
 .modelProcessBadge {
+  flex: 0 0 auto;
+  min-width: 42px;
   padding: 4px 6px;
   border: 1px solid rgba(127, 241, 215, 0.18);
   border-radius: 999px;
@@ -911,15 +916,21 @@ button:focus-visible {
 }
 
 .modelLayerBadges {
-  display: grid;
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
   min-width: 0;
   gap: 4px;
+  padding-left: 31px;
 }
 
 .modelLayerBadge {
+  flex: 1 1 58px;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  padding: 3px 6px;
+  padding: 3px 7px;
   border: 1px solid rgba(153, 214, 222, 0.14);
   border-radius: 999px;
   color: #cdeaf0;
@@ -929,6 +940,10 @@ button:focus-visible {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.modelLayerBadge.source {
+  flex-basis: 88px;
 }
 
 .modelLayerBadge.source.available {
@@ -965,6 +980,13 @@ button:focus-visible {
 .modelProcessButton:disabled {
   cursor: default;
   opacity: 0.52;
+}
+
+.modelProcessButton {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  min-height: 30px;
 }
 
 .stabilityHead {
