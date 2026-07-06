@@ -68,7 +68,67 @@ Video / multi-view frames
   -> Gaussian decoder / renderer validation
 ```
 
-### 1.3 MVP 必须删除的系统
+### 1.3 Gaussian Input Encoder Contract
+
+Object extraction 的输入不是 voxel block、image tensor 或 mesh，而是 Gaussian set：
+
+```text
+G = {G_1, G_2, ..., G_N}
+
+G_i = {
+  mu: R^3
+  covariance_or_scale_rotation
+  opacity
+  color_or_sh
+  feature optional
+  time optional
+}
+```
+
+核心约束：
+
+- Gaussian cloud 是 continuous field 的 irregular basis parameterization。
+- 输入必须按 unordered set 处理，模型不能依赖原始文件顺序。
+- `A[N,K]` 的 `N` 是 Gaussian records 或 evidence units，不是规则 voxel cells。
+- 每个 object 的 Gaussian children 是 ragged subset，不要求 dense global tensor。
+
+MVP primary input:
+
+```text
+X[N,D] = Gaussian tokens
+```
+
+推荐 token fields:
+
+- position `xyz`。
+- scale / covariance / rotation summary。
+- opacity。
+- color / SH summary。
+- optional feature embedding。
+- optional frame / time encoding。
+
+允许的工程编码顺序：
+
+1. Gaussian token set: MVP primary path。
+2. kNN graph over Gaussian positions / features: v2 structural path。
+3. Rasterized multi-view feature maps: auxiliary perception evidence only。
+
+禁止作为 primary object input:
+
+- voxelization。
+- fixed grid encoding。
+- dense block tensor。
+- raster-only object binding。
+
+原因：
+
+- voxel / fixed grid 会硬切 object boundary。
+- memory 随分辨率爆炸。
+- identity 和 ragged object children 容易被 grid cell ownership 污染。
+- rasterized feature 会丢失部分 3D identity，需要回投到 `A[N,K]` 才能进入
+  ObjectState。
+
+### 1.4 MVP 必须删除的系统
 
 MVP 不包含：
 
@@ -81,7 +141,7 @@ MVP 不包含：
 
 这些不是永久不要，而是必须先故意留空，避免第一版训练被多系统耦合拖崩。
 
-### 1.4 MVP 学什么
+### 1.5 MVP 学什么
 
 MVP 只学习短期对象状态转移：
 
@@ -103,7 +163,7 @@ O_t -> O_t+1
 3. Lightweight object-token diffusion。
 4. Transformer diffusion, only after baseline gates pass。
 
-### 1.5 为什么 MVP 不容易崩
+### 1.6 为什么 MVP 不容易崩
 
 因为它没有复杂耦合结构：
 
@@ -112,8 +172,9 @@ O_t -> O_t+1
 - 没有 self-generated feedback loop。
 - 数据来自 real trajectory。
 - 训练目标只看短期 prediction。
+- Gaussian input 保持 set / token contract，不引入 voxel ownership。
 
-### 1.6 MVP 必然存在的问题
+### 1.7 MVP 必然存在的问题
 
 MVP 应该允许这些问题暴露出来：
 
@@ -125,7 +186,7 @@ MVP 应该允许这些问题暴露出来：
 这些不是 MVP 失败本身；它们是进入 v2 的依据。MVP 的验收重点是短期预测能跑、
 训练曲线稳定、collapse 可见，而不是长时段世界模拟。
 
-### 1.7 MVP 成功标准
+### 1.8 MVP 成功标准
 
 MVP 成功必须满足：
 
@@ -142,6 +203,14 @@ renderer_boundary_upgrade_blockers = []
 identity_drift_report_available = true
 object_swap_report_available = true
 multi_step_rollout_report_available = true
+```
+
+Input encoder 同时必须满足：
+
+```text
+input_kind = gaussian_token_set
+permutation_invariance_checked = true
+voxelized_primary_input = false
 ```
 
 ## 2. v2: 结构增强版
@@ -161,12 +230,41 @@ stable object-centric dynamics model
 
 ```text
 MVP temporal model
+  -> optional kNN Gaussian graph / object similarity graph
   -> weak identity graph
   -> real-only memory / replay buffer
   -> soft conditioning dynamics / diffusion
 ```
 
-### 2.3 Weak Identity Graph
+### 2.3 Gaussian Graph Encoder
+
+v2 可以把 MVP 的 Gaussian token set 升级为 graph input：
+
+```text
+node = Gaussian token
+edge = kNN(mu_i, mu_j) or feature-neighborhood relation
+```
+
+用途：
+
+- 表达局部连续性。
+- 支持 object binding 的 smoothness / compactness。
+- 为 identity propagation 提供辅助邻域。
+
+规则：
+
+- graph 是 encoding structure，不是 object truth。
+- kNN edge 是 soft locality prior，不是 segmentation boundary。
+- temporal edge 只能来自 optional tracking evidence 或 high-confidence local matching。
+- graph removal must not crash assignment / rollout baseline。
+
+禁止：
+
+- 用 graph connected components 直接定义 object。
+- 用 graph edge 静默覆盖 `A[N,K]`。
+- 把 Gaussian kNN graph 和 identity graph 混成同一个 truth source。
+
+### 2.4 Weak Identity Graph
 
 Weak identity graph 不是 truth graph，而是 similarity graph：
 
@@ -195,7 +293,7 @@ w(i,j) = similarity(ObjectState_i_t, ObjectState_j_t+1)
 - 用 graph 静默改写 `object_id`、slot identity 或 artifact。
 - 让 graph 成为训练代码的硬依赖。
 
-### 2.4 Real-only Replay Buffer
+### 2.5 Real-only Replay Buffer
 
 v2 replay buffer 只保存真实 object episodes：
 
@@ -227,7 +325,7 @@ ObjectEpisode = {
 - generated futures 进入 training replay。
 - 无 filter policy 的 episode 进入 buffer。
 
-### 2.5 Identity Embedding
+### 2.6 Identity Embedding
 
 v2 可以引入软身份 embedding：
 
@@ -243,7 +341,7 @@ z_id = learned embedding
 - `ObjectState.id` 和 renderer-facing `object_id` 继续由 assignment / matching /
   export policy 派生。
 
-### 2.6 v2 Training Objective
+### 2.7 v2 Training Objective
 
 v2 可以在 MVP prediction loss 上加入轻量稳定项：
 
@@ -260,7 +358,7 @@ L_v2 =
 - graph loss 不能成为主约束。
 - ambiguous match 必须 down-weight 或输出 diagnostics。
 
-### 2.7 v2 解决的问题
+### 2.8 v2 解决的问题
 
 v2 应该改善：
 
@@ -418,26 +516,35 @@ v3:  learn world expansion
 
 不要跳级：
 
-1. `OBJECT-ROLLOUT-BASELINE-001`
+1. `GAUSSIAN-INPUT-ENCODER-SPEC-001`
+   - 冻结 Gaussian token set contract。
+   - 明确 kNN graph 是 v2 optional encoder，不是 MVP truth。
+   - 禁止 voxel / fixed grid 作为 primary object input。
+
+2. `OBJECT-ROLLOUT-BASELINE-001`
    - 跑通 deterministic object prediction。
    - 记录 drift / swap / rollout collapse negative evidence。
 
-2. `OBJECT-LATENT-DIFFUSION-MVP-001`
+3. `OBJECT-LATENT-DIFFUSION-MVP-001`
    - 只在 object latent space 做 diffusion。
    - 不加 graph，不加 replay buffer。
 
-3. `WEAK-IDENTITY-GRAPH-001`
+4. `GAUSSIAN-KNN-GRAPH-ENCODER-001`
+   - v2 阶段加入 Gaussian kNN graph encoder。
+   - graph removal 不应导致训练或 eval 崩溃。
+
+5. `WEAK-IDENTITY-GRAPH-001`
    - 加 local weak graph。
    - 只做 soft stabilizer。
 
-4. `OBJECT-EPISODE-BUFFER-001`
+6. `OBJECT-EPISODE-BUFFER-001`
    - 加 real-only replay buffer。
    - 写 verifier 和 filter policy。
 
-5. `V2-STABILITY-GATE-001`
+7. `V2-STABILITY-GATE-001`
    - 验证 object swap、short-term consistency 和 graph noise。
 
-6. `V3-SELF-GENERATED-ADR-001`
+8. `V3-SELF-GENERATED-ADR-001`
    - 只有 v2 stability gate 通过后，才讨论 self-generated loop。
 
 ## 7. 与当前 v1 主线的关系
@@ -452,12 +559,24 @@ v3:  learn world expansion
 MVP / v2 / v3 world-model 路线是后期训练迭代规划。它依赖 v1 输出稳定的
 ObjectState 序列和 Gaussian decoder / renderer validation，而不是替换它们。
 
+在进入本文件的 rollout / diffusion / replay buffer 路线之前，近期必须先完成
+`docs/architecture/core-model-train-validate-plan.md` 中的 core model train / validate
+阶段：
+
+```text
+Assignment Solver v2 -> A[N,K] -> ObjectState -> renderer loss validation
+```
+
+也就是说，先证明 object binding / assignment 可训练、可验证、可失败定位，再讨论
+world-model prediction。
+
 ## 8. 非目标
 
 本文不能用来合理化以下事项：
 
 - 立即引入 SAM2 / CoTracker / optical flow / PyTorch diffusion 默认依赖。
 - 在 MVP 阶段加入 identity graph 或 replay buffer。
+- 用 voxelization / fixed grid 作为 primary object input。
 - 在 v2 阶段加入 self-generated rollout training。
 - 训练或提交 generated futures。
 - 把 diffusion world model 记为当前已落地能力。

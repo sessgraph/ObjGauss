@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-04
+> 最近更新: 2026-07-06
 
 ## 队列规则
 
@@ -15,21 +15,20 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth。object assignment v2 阶段队列已收口，下一步进入 stability foundation 场景和诊断。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation。下一步进入 failure diagnostics。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### V2-STABILITY-SCENARIO-002: Expand synthetic stability scenarios
+### V2-STABILITY-DIAGNOSTICS-001: Add failure mode diagnostics
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model evaluation
-- 目标: 基于 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，扩展
-  cross-view、occlusion recovery、perturbation 和 adversarial swap 的 scenario fixtures。
-- 输出: 每类 scenario 都必须保留 oracle identity labels、expected slots、visible/occluded
-  transitions 和可复现 observation batches。
-- 边界: 不启动 GPU 训练；不接 rollout model；不引入外部 perception 依赖；不把 scenario
-  指标做成最终 gate。
+- 类型: 标准 PR / algorithm model diagnostics
+- 目标: 增加 `FailureModeClassifier`、slot transition matrix 和 identity confusion graph，
+  让 stability eval 能区分 slot swap、identity fragmentation、object merge、
+  background absorption 和 temporal drift。
+- 前置: `V2-STABILITY-SCENARIO-002`。
+- 边界: 只做 deterministic diagnostics，不训练 solver，不接 renderer loss。
 
 ## Suspended
 
@@ -37,16 +36,6 @@
 需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
-
-### V2-STABILITY-DIAGNOSTICS-001: Add failure mode diagnostics
-
-- 状态: planned
-- 类型: 标准 PR / algorithm model diagnostics
-- 目标: 增加 `FailureModeClassifier`、slot transition matrix 和 identity confusion graph，
-  让 stability eval 能区分 slot swap、identity fragmentation、object merge、
-  background absorption 和 temporal drift。
-- 前置: `V2-STABILITY-SCENARIO-002`。
-- 边界: 只做 deterministic diagnostics，不训练 solver，不接 renderer loss。
 
 ### V2-STABILITY-GATE-001: Build invariant-first stability gate
 
@@ -56,6 +45,53 @@
   设为 soft diagnostics，避免多指标投票替代 identity invariant。
 - 前置: `V2-STABILITY-SCENARIO-002`、`V2-STABILITY-DIAGNOSTICS-001`。
 - 边界: 不做 rollout model，不改变 dynamic-K proposal-only 约束。
+
+### ASSIGNMENT-SOLVER-V2-TRAIN-001: Train cost-softmax assignment solver
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model training
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 实现可训练 `AssignmentSolverV2State`，使用 `feature_centers`、
+  `position_centers` 和 `slot_bias` 产生 cost-softmax assignment `A[N,K]`，先在
+  synthetic fixtures 上验证 fixed-K assignment training。
+- 前置: `V2-STABILITY-GATE-001`。
+- 边界: 不启用 temporal / matching loss；不接 GPU；不接 renderer；不引入 Slot Attention /
+  Sinkhorn / OT。
+
+### ASSIGNMENT-SOLVER-V2-EVAL-001: Validate v2 solver training with stability suite
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model evaluation
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 用 synthetic stability suite 验证训练前后，输出 training summary、eval summary、
+  checkpoint roundtrip 和 diagnostics before / after；明确 loss 下降不能替代 identity gate。
+- 前置: `ASSIGNMENT-SOLVER-V2-TRAIN-001`。
+- 边界: 不接 renderer loss；不扩大到 diffusion / rollout / replay buffer。
+
+### ASSIGNMENT-V2-RENDER-JOINT-001: Bind v2 assignment checkpoint to renderer validation
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model renderer handoff
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 将 v2 solver checkpoint 接回
+  `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss`，先 CPU point smoke，再
+  gsplat smoke，并让 renderer-loss-contract 可消费 v2 checkpoint。
+- 前置: `ASSIGNMENT-SOLVER-V2-EVAL-001`。
+- 边界: 不追求大幅 image loss；不解冻 per-Gaussian geometry；不把 renderer loss 作为绕过
+  identity gate 的理由。
+
+### CORE-MODEL-TRAIN-VALIDATE-001: Core model train/validate milestone
+
+- 状态: planned
+- 类型: 标准 PR / algorithm model milestone
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 将核心模型推进到可训练、可验证、可失败定位的阶段；要求 v2 assignment loss
+  下降、synthetic stability hard gate 通过、failure diagnostics 可解释失败样例、real sample
+  small smoke 不退化、ObjectState eval 通过、renderer joint smoke 通过、checkpoint /
+  summary / boundary report 可复现。
+- 前置: `ASSIGNMENT-V2-RENDER-JOINT-001`。
+- 边界: 失败也可接受，但必须能分类 failure mode；不得跳到 diffusion / world model 来掩盖
+  assignment failure。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 
@@ -70,13 +106,19 @@
   diffusion world model。最新收敛口径要求 MVP 不带 identity graph、replay buffer、
   synthetic data 或 canonical space；v2 的 identity graph 只能作为 soft stabilizer，
   replay buffer 只存 real / high-confidence object episodes；v3 才能在通过稳定性 gate
-  后讨论 self-generated rollout training。
+  后讨论 self-generated rollout training。Gaussian cloud 进入 object model 时按
+  continuous unordered set / token sequence 处理；voxel / fixed grid 不能作为 primary
+  object input，kNN graph 只能作为 v2 optional encoder。
 - 建议分解:
+  - `GAUSSIAN-INPUT-ENCODER-SPEC-001`: 冻结 Gaussian token set contract，明确
+    `X[N,D]` 的 token fields、permutation-invariant 约束和 voxel / raster-only 非目标。
   - `OBJECT-ROLLOUT-BASELINE-001`: 先做 deterministic `O_t -> O_t+1` baseline，
     预测 centroid / bbox / confidence / slot stability，并记录 drift / swap / rollout
     collapse negative evidence；不引入 graph、replay buffer 或 diffusion。
   - `OBJECT-LATENT-DIFFUSION-MVP-001`: 在 object latent space 训练 diffusion /
     transformer temporal model；仍不加 graph、不加 replay buffer、不做 synthetic data。
+  - `GAUSSIAN-KNN-GRAPH-ENCODER-001`: v2 阶段将 Gaussian token set 升级为 optional
+    kNN graph encoder，edge 只表示 soft locality prior，不定义 object truth。
   - `WEAK-IDENTITY-GRAPH-001`: v2 阶段定义 local weak graph、`ObjectState.z_id`、
     ambiguous match diagnostics 和 identity smoothing regularizer。
   - `OBJECT-EPISODE-BUFFER-001`: v2 阶段定义 real-only replay buffer schema、filter
@@ -85,9 +127,8 @@
     graph removal safety。
   - `V3-SELF-GENERATED-ADR-001`: 只有 v2 stability gate 通过后，才允许讨论 generated
     futures -> filter -> retrain。
-- 前置: 当前 `TRAIN-DECODER-SCALE-001`、`TRAIN-RUN-006-SCALE-SMOKE` 和后续 renderer
-  field promotion gate 完成；ObjectState eval 继续通过；语义 / tracking evidence 仍走
-  optional adapter 和 manifest，不成为 kernel 强依赖。
+- 前置: `CORE-MODEL-TRAIN-VALIDATE-001` 完成；ObjectState eval 继续通过；语义 /
+  tracking evidence 仍走 optional adapter 和 manifest，不成为 kernel 强依赖。
 - 边界: 不替换 v1 kernel contract；不把 diffusion world model 记为已落地能力；不引入
   SAM2 / CoTracker / optical flow / PyTorch diffusion 默认依赖；不提交 generated futures、
   replay buffer、大 checkpoint 或训练输出；不改变当前 public demo 或 HF release 口径。
@@ -111,6 +152,61 @@
 当前无进行中 PR。
 
 ## Done
+
+### CORE-MODEL-TRAIN-VALIDATE-PLAN-001: Register core model train/validate route
+
+- 状态: done / docs-only-core-model-training-roadmap
+- 类型: 研究 PR / algorithm model planning
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 将近期算法主线规划到“核心模型可训练、可验证、可失败定位”，并明确核心模型边界为
+  `Gaussian / AssignmentEvidence -> Assignment Solver v2 -> A[N,K] -> ObjectState ->
+  Gaussian decoder / renderer loss validation`。
+- 已实施:
+  - 新增 core model train / validate plan。
+  - 将阶段路线固定为
+    `V2-STABILITY-DIAGNOSTICS-001 -> V2-STABILITY-GATE-001 ->
+    ASSIGNMENT-SOLVER-V2-TRAIN-001 -> ASSIGNMENT-SOLVER-V2-EVAL-001 ->
+    ASSIGNMENT-V2-RENDER-JOINT-001 -> CORE-MODEL-TRAIN-VALIDATE-001`。
+  - 将 `MODEL-V2-TRAINING-ROADMAP-001` 明确后移到 core model validation 之后。
+  - 在 `assignment-solver-v2-contract.md` 中补充后续路线引用。
+- 边界:
+  - 不实现训练代码。
+  - 不启动 GPU / renderer training。
+  - 不引入 diffusion / rollout / weak identity graph / replay buffer / self-generated data。
+  - 不改变 public demo / HF release 口径。
+- 验证:
+  - `git diff --check`: passed。
+- 完成 commit: pending
+
+### V2-STABILITY-SCENARIO-002: Expand synthetic stability scenarios
+
+- 状态: done / synthetic-stability-scenario-fixtures
+- 类型: 标准 PR / algorithm model evaluation
+- 目标: 基于 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，扩展
+  cross-view、occlusion recovery、perturbation 和 adversarial swap 的可复现 scenario
+  fixtures。
+- 已实施:
+  - 新增 `SyntheticStabilityScenarioFixture` 和
+    `objgauss-v2-stability-scenario-fixture-v1` schema。
+  - 新增 `make_synthetic_stability_scenario_fixture(...)` 和
+    `make_synthetic_stability_scenario_suite(...)`，固定四类 scenario 的输出顺序。
+  - fixture 输出保留 oracle identity labels、expected slots、visible / occluded
+    transitions、world seed、observation config 和 observation batches。
+  - `adversarial_swap` 会交换 object 0 / 1 的 appearance feature / RGB，但保留
+    `oracle_object_id`、`lineage_id` 和 `expected_slot` 不变。
+  - `objgauss.core` 暴露 scenario fixture schema、kind tuple、builder 和 validator。
+- 边界:
+  - 不启动 GPU 训练。
+  - 不接 rollout model。
+  - 不引入外部 perception 依赖。
+  - 不把 scenario 指标做成最终 gate。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/v2_stability_foundation.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_v2_stability_foundation.py tests/test_core_namespace.py`: 19 passed。
+  - `uv run --extra dev pytest`: 219 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: `2e24a96`
 
 ### V2-STABILITY-FOUNDATION-002: Add identity oracle and synthetic world foundation
 

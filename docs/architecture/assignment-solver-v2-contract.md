@@ -346,7 +346,7 @@ checkpoint = {
 
 ## 10. Implementation Order
 
-后续 PR 顺序固定为：
+`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 当时的后续 PR 顺序为：
 
 ```text
 1. OBJECT-LOSS-V2-001
@@ -362,6 +362,18 @@ checkpoint = {
 - 先拆 loss，再扩大 evidence。
 - 先 fixed-K assignment MVP，再接 renderer joint loss。
 - dynamic-K 最后，只做 proposal，不自动改写状态。
+
+上述队列已推进到 `DYNAMIC-K-PROPOSAL-001`。后续到“核心模型可训练验证”的新路线以
+`docs/architecture/core-model-train-validate-plan.md` 为准：
+
+```text
+V2-STABILITY-DIAGNOSTICS-001
+  -> V2-STABILITY-GATE-001
+  -> ASSIGNMENT-SOLVER-V2-TRAIN-001
+  -> ASSIGNMENT-SOLVER-V2-EVAL-001
+  -> ASSIGNMENT-V2-RENDER-JOINT-001
+  -> CORE-MODEL-TRAIN-VALIDATE-001
+```
 
 ## 11. Non-Goals
 

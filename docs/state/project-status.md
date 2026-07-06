@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-04
+> 最近更新: 2026-07-06
 
 ## 当前阶段
 
@@ -407,6 +407,32 @@ object-level world；新增 `ObservationModelConfig`、`SyntheticObservationFram
 rollout model、不接外部 perception 模型、不自动 birth / merge / split。完成 commit:
 `051d667`。下一步进入 `V2-STABILITY-SCENARIO-002`，扩展 cross-view、occlusion recovery、
 perturbation 和 adversarial swap 的可复现 synthetic fixtures。
+
+随后完成 `V2-STABILITY-SCENARIO-002`：新增
+`objgauss-v2-stability-scenario-fixture-v1`，把 `SyntheticWorldState`、oracle
+identity labels、expected slots、visible / occluded transitions 和
+`SyntheticObservationFrame` batches 绑定成可复现 scenario fixture。新增
+`make_synthetic_stability_scenario_fixture(...)` 和
+`make_synthetic_stability_scenario_suite(...)`，覆盖 `cross_view`、
+`occlusion_recovery`、`perturbation` 和 `adversarial_swap` 四类场景；其中
+`adversarial_swap` 会交换 object 0 / 1 的 appearance feature / RGB，但保留
+`oracle_object_id`、`lineage_id` 和 `expected_slot` 不变。`objgauss.core` 已暴露
+scenario fixture schema、kind tuple、builder 和 validator。该切片不启动 GPU 训练、
+不接 rollout model、不引入外部 perception 依赖、不把 scenario 指标做成最终 gate。
+下一步进入 `V2-STABILITY-DIAGNOSTICS-001`，补 failure mode classifier、slot transition
+matrix 和 identity confusion graph。
+
+随后完成 `CORE-MODEL-TRAIN-VALIDATE-PLAN-001` docs-only planning：新增
+`docs/architecture/core-model-train-validate-plan.md`，把近期算法路线收敛到
+“核心模型可训练、可验证、可失败定位”。当前核心模型边界定义为
+`Gaussian / AssignmentEvidence -> Assignment Solver v2 -> A[N,K] -> ObjectState ->
+Gaussian decoder / renderer loss validation`，先验证 object binding / assignment，不跳到
+rollout、identity graph、replay buffer、diffusion 或 self-generated world loop。近期阶段固定为
+`V2-STABILITY-DIAGNOSTICS-001 -> V2-STABILITY-GATE-001 ->
+ASSIGNMENT-SOLVER-V2-TRAIN-001 -> ASSIGNMENT-SOLVER-V2-EVAL-001 ->
+ASSIGNMENT-V2-RENDER-JOINT-001 -> CORE-MODEL-TRAIN-VALIDATE-001`；
+`MODEL-V2-TRAINING-ROADMAP-001` 后移到 core model validation 完成之后。本步骤不实现训练代码、
+不启动 GPU / renderer training、不引入 diffusion / rollout / replay buffer。
 
 ## 架构重梳理基线
 
