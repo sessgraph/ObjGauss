@@ -129,6 +129,9 @@ from objgauss.core.real_sample_v2_weak_boundary_opt import (
 from objgauss.core.real_sample_v2_promoted_weights_cross_sample import (
     real_sample_v2_promoted_weights_cross_sample_from_cloud,
 )
+from objgauss.core.real_sample_v2_sample_aware_weight_policy import (
+    real_sample_v2_sample_aware_weight_policy_from_cloud,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -2100,6 +2103,84 @@ def _training_real_sample_v2_promoted_weights_cross_sample(args: argparse.Namesp
         raise ValueError("real sample v2 promoted weights cross-sample check did not pass")
 
 
+def _training_real_sample_v2_sample_aware_weight_policy(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    report = real_sample_v2_sample_aware_weight_policy_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        max_points=args.max_points,
+        solver_temperature=args.solver_temperature,
+        baseline_feature_weight=args.baseline_feature_weight,
+        baseline_position_weight=args.baseline_position_weight,
+        promoted_feature_weight=args.promoted_feature_weight,
+        promoted_position_weight=args.promoted_position_weight,
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+        viewer_path=args.viewer_path,
+    )
+    summary = report.as_dict()
+    selected = summary["selected_policy"]
+    evidence_gate = summary["evidence_normalization_gate"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['source']['source_gaussians']}")
+    print(f"max_points={summary['fixed_target']['max_points']}")
+    print(f"solver_temperature={summary['fixed_target']['solver_temperature']}")
+    print(f"selected_candidate={selected['candidate_name']}")
+    print(f"selected_feature_weight={selected['feature_weight']}")
+    print(f"selected_position_weight={selected['position_weight']}")
+    print(f"selection_reason={selected['selection_reason']}")
+    print(f"evidence_normalization_status={evidence_gate['status']}")
+    print(
+        "evidence_normalization_required="
+        f"{str(evidence_gate['requires_evidence_normalization']).lower()}"
+    )
+    for candidate in summary["candidates"]:
+        metrics = candidate["metrics"]
+        delta = candidate["delta_vs_baseline"]
+        gate = candidate["sample_policy_gate"]
+        print(
+            "candidate="
+            f"name:{candidate['candidate']['name']},"
+            f"feature_weight:{candidate['candidate']['feature_weight']},"
+            f"position_weight:{candidate['candidate']['position_weight']},"
+            f"eligible:{str(gate['eligible_for_sample']).lower()},"
+            f"mixed:{metrics['mixed_gaussians']},"
+            f"direct:{metrics['direct_slot_match']:.6f},"
+            f"purity:{_format_optional_float(metrics['object_purity'])},"
+            f"confidence:{metrics['assignment_confidence']:.6f},"
+            f"entropy:{metrics['mean_normalized_entropy']:.6f},"
+            f"mixed_delta:{delta['mixed_gaussians_delta']},"
+            f"direct_delta:{delta['direct_slot_match_delta']:.6f},"
+            f"confidence_delta:{delta['assignment_confidence_delta']:.6f},"
+            f"hard_fix:{gate['hard_fix_count']},"
+            f"hard_regression:{gate['hard_regression_count']}"
+        )
+    write_ply(args.preview_ply_output, report.selected_cloud, fmt=_output_format(args))
+    print(f"preview_ply={args.preview_ply_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if summary["viewer"]["debug_route"]:
+        print(f"viewer_route={summary['viewer']['debug_route']}")
+    if args.require_pass and summary["status"] != "real_sample_v2_sample_aware_weight_policy_pass":
+        raise ValueError("real sample v2 sample-aware weight policy did not pass")
+
+
 def _training_eval_assignment(args: argparse.Namespace) -> None:
     checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
     cloud = read_ply(args.input)
@@ -4067,6 +4148,85 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_promoted_weights_cross_sample.add_argument("--require-pass", action="store_true")
     real_sample_promoted_weights_cross_sample.set_defaults(
         handler=_training_real_sample_v2_promoted_weights_cross_sample
+    )
+
+    real_sample_sample_aware_weight_policy = training_subparsers.add_parser(
+        "real-sample-v2-sample-aware-weight-policy",
+        help="select baseline or promoted assignment weights per real sample using hard-boundary gates",
+    )
+    real_sample_sample_aware_weight_policy.add_argument("input", type=Path)
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--preview-ply-output",
+        required=True,
+        type=Path,
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--viewer-path")
+    real_sample_sample_aware_weight_policy.add_argument("--slots", type=int)
+    real_sample_sample_aware_weight_policy.add_argument("--frames", type=int, default=2)
+    real_sample_sample_aware_weight_policy.add_argument("--max-points", type=int, default=128)
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--solver-temperature",
+        type=float,
+        default=0.35,
+    )
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--baseline-feature-weight",
+        type=float,
+        default=1.0,
+    )
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--baseline-position-weight",
+        type=float,
+        default=1.0,
+    )
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--promoted-feature-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
+    )
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--promoted-position-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--object-id-field", default="object_id")
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--temporal-offset",
+        type=float,
+        default=0.01,
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--image-width", type=int, default=12)
+    real_sample_sample_aware_weight_policy.add_argument("--image-height", type=int, default=12)
+    real_sample_sample_aware_weight_policy.add_argument("--point-radius", type=int, default=1)
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--iterations", type=int, default=100)
+    real_sample_sample_aware_weight_policy.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--baseline-temperature",
+        type=float,
+        default=1.0,
+    )
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--image-renderer",
+        choices=("point", "gsplat"),
+        default="point",
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--seed", type=int, default=4)
+    real_sample_sample_aware_weight_policy.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_sample_aware_weight_policy.add_argument("--rewrite-sh", action="store_true")
+    real_sample_sample_aware_weight_policy.add_argument(
+        "--ascii",
+        action="store_true",
+        help="write ASCII PLY",
+    )
+    real_sample_sample_aware_weight_policy.add_argument("--summary-output", type=Path)
+    real_sample_sample_aware_weight_policy.add_argument("--require-pass", action="store_true")
+    real_sample_sample_aware_weight_policy.set_defaults(
+        handler=_training_real_sample_v2_sample_aware_weight_policy
     )
 
     eval_assignment = training_subparsers.add_parser(

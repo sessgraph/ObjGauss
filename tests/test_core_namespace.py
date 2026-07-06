@@ -24,6 +24,7 @@ from objgauss.core import (
     REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA,
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA,
+    REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA,
     REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA,
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA,
@@ -56,6 +57,7 @@ from objgauss.core import (
     RealSampleV2FullCloudPurityReport,
     RealSampleV2ModelHandoffReport,
     RealSampleV2PromotedWeightsCrossSampleReport,
+    RealSampleV2SampleAwareWeightPolicyReport,
     RealSampleV2SegmentationQualityReport,
     RealSampleV2SmokeReport,
     RealSampleV2WeakBoundaryOptReport,
@@ -150,6 +152,7 @@ from objgauss.core import (
     real_sample_v2_full_cloud_purity_from_cloud,
     real_sample_v2_model_handoff_from_cloud,
     real_sample_v2_promoted_weights_cross_sample_from_cloud,
+    real_sample_v2_sample_aware_weight_policy_from_cloud,
     real_sample_v2_segmentation_quality_from_cloud,
     real_sample_v2_segmentation_quality_from_projected_cloud,
     real_sample_v2_segmentation_quality_from_purity_report,
@@ -182,6 +185,7 @@ from objgauss.core import (
     validate_real_sample_v2_full_cloud_purity_summary,
     validate_real_sample_v2_model_handoff_summary,
     validate_real_sample_v2_promoted_weights_cross_sample_summary,
+    validate_real_sample_v2_sample_aware_weight_policy_summary,
     validate_real_sample_v2_segmentation_quality_summary,
     validate_real_sample_v2_smoke_summary,
     validate_real_sample_v2_weak_boundary_opt_summary,
@@ -665,6 +669,12 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert RealSampleV2PromotedWeightsCrossSampleReport is not None
     assert real_sample_v2_promoted_weights_cross_sample_from_cloud is not None
     assert validate_real_sample_v2_promoted_weights_cross_sample_summary is not None
+    assert REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA == (
+        "objgauss-real-sample-v2-sample-aware-weight-policy-v1"
+    )
+    assert RealSampleV2SampleAwareWeightPolicyReport is not None
+    assert real_sample_v2_sample_aware_weight_policy_from_cloud is not None
+    assert validate_real_sample_v2_sample_aware_weight_policy_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
