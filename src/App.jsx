@@ -1542,7 +1542,9 @@ export default function App() {
             <div>
               <h2>{selected.name}</h2>
               <span>
-                {selectedObject ? `Object ${selectedObject.objectId} / ${selected.kind}` : selected.kind}
+                {selectedObject
+                  ? `对象 ${selectedObject.objectId} / ${selected.kindLabel ?? selected.kind}`
+                  : selected.kindLabel ?? selected.kind}
               </span>
             </div>
             <button
@@ -1558,6 +1560,7 @@ export default function App() {
           {inspectorCollapsed ? null : (
             <dl className="metaGrid">
               <Meta label="加载状态" value={selected.message ?? selected.status} />
+              {selected.description ? <Meta label="模型说明" value={selected.description} /> : null}
               <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
               <Meta label={selectedObject ? "对象展示点" : "展示点"} value={formatNumber(selectedObject?.displayCount ?? selected.displayCount)} />
               <Meta label="对象" value={formatNumber(selected.objectCount)} />

@@ -116,12 +116,14 @@ const OGC_DEBUG_INDEX = {
 export const MODEL_CATALOG = [
   {
     id: "real-sample-v2-sample-aware-lego",
-    name: "Real Sample V2 sample-aware Lego preview",
-    label: "Real Sample V2",
+    name: "真实样例 V2 样本自适应 Lego 预览",
+    label: "真实样例 V2",
     sourcePath: "/samples/objgauss-real-sample-v2-sample-aware-lego.ply",
     loadMode: "eager",
     kind: "object-aware-ply",
+    kindLabel: "对象感知 PLY",
     stage: "sample-aware-preview",
+    description: "本机生成的样本自适应强化策略预览 PLY，用于查看当前阶段对象分割效果；缺少该文件时自动回退到 Lego alpha。",
     objectCount: 4,
     galleryPosition: [-2.35, 0, -3.58],
     accent: "#35d0c8",
