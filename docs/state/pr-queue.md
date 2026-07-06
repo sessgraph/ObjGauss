@@ -159,6 +159,7 @@
   - 未提交 generated checkpoint / summary / preview PLY / screenshot。
   - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
     camera unfreeze。
+- 完成 commit: `2c4e0f2`
 
 ### REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001: Diagnose full-cloud assignment purity gap
 
