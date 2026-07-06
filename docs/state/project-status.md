@@ -691,6 +691,22 @@ demo / HF release / renderer / manifest / checkpoint schema，也不表示 evide
 数学已实现。验证通过：targeted pytest 14 passed，`uv run --extra dev pytest` 259 passed，
 `npm run build` passed，`git diff --check` passed；代码完成 commit 为 `45afd2d`。
 
+随后完成 `REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001`：viewer catalog 新增本机
+`real-sample-v2-sample-aware-lego` 预览模型，默认指向 ignored
+`public/samples/objgauss-real-sample-v2-sample-aware-lego.ply`，让根路径 UI 优先展示
+sample-aware promoted Lego 分割效果，而不是停在 Trainable MVP fixture 日志。该本地
+PLY 由
+`objgauss training real-sample-v2-sample-aware-weight-policy public/samples/lego_alpha_v1_objects.ply`
+生成，本轮结果为 selected `promoted`、`mixed_gaussians=0`、`direct_slot_match=1.000000`、
+`hard_fix=59`、`hard_regression=0`；生成 PLY 被现有 `*.ply` ignore 规则排除，不提交。
+缺少本地 PLY 时，该 catalog 条目会标记为 `skipped` 并回退选中 `lego-alpha`，避免其他
+开发机首屏坏默认。Playwright + system Chrome 已验证 `http://127.0.0.1:5395/` 根路径
+桌面与移动端首屏均选中 `real-sample-v2-sample-aware-lego`，模型 dock 可切到
+`lego-alpha` 再切回，canvas 元素截图像素非空；截图保存在
+`/tmp/objgauss-real-sample-v2-auto-load-{desktop,canvas,mobile}.png`。验证通过：
+`uv run --extra dev pytest` 259 passed，`npm run build` passed（保留既有 Vite chunk
+size warning），`git diff --check` passed；代码完成 commit 为 `36731a8`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
