@@ -10,6 +10,7 @@ from objgauss.core.assignment_evidence import (
 )
 from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2TrainingResult,
+    initialize_assignment_solver_v2,
     train_assignment_solver_v2,
 )
 from objgauss.core.assignment_solver_v2_eval import (
@@ -170,6 +171,7 @@ def real_sample_v2_smoke_from_cloud(
     entropy_weight: float = 0.0,
     balance_weight: float = 0.0,
     supervised_weight: float = 1.0,
+    solver_temperature: float = 1.0,
     image_renderer: str = TRAINING_IMAGE_RENDERER_POINT,
     vram_reserve_gb: int = 1,
 ) -> RealSampleV2SmokeReport:
@@ -202,6 +204,7 @@ def real_sample_v2_smoke_from_cloud(
         entropy_weight=entropy_weight,
         balance_weight=balance_weight,
         supervised_weight=supervised_weight,
+        solver_temperature=solver_temperature,
         image_renderer=image_renderer,
         vram_reserve_gb=vram_reserve_gb,
     )
@@ -223,6 +226,7 @@ def evaluate_real_sample_v2_smoke(
     entropy_weight: float = 0.0,
     balance_weight: float = 0.0,
     supervised_weight: float = 1.0,
+    solver_temperature: float = 1.0,
     image_renderer: str = TRAINING_IMAGE_RENDERER_POINT,
     vram_reserve_gb: int = 1,
 ) -> RealSampleV2SmokeReport:
@@ -234,6 +238,8 @@ def evaluate_real_sample_v2_smoke(
         raise ValueError("learning_rate must be > 0")
     if supervised_weight <= 0:
         raise ValueError("supervised_weight must be > 0")
+    if solver_temperature <= 0:
+        raise ValueError("solver_temperature must be > 0")
     checked_sample = _validate_real_sample(sample)
     if not all(frame.image_target is not None for frame in checked_sample.frames):
         checked_sample = _sample_with_bound_image_targets(
@@ -247,9 +253,16 @@ def evaluate_real_sample_v2_smoke(
         checked_sample.frames,
         source="real_sample_v2_smoke",
     )
+    initial_state = initialize_assignment_solver_v2(
+        slots=checked_sample.slots,
+        feature_dim=batches[0].feature_dim,
+        position_dim=batches[0].positions.shape[1],
+        temperature=solver_temperature,
+        seed=seed,
+    )
     training_result = train_assignment_solver_v2(
         batches,
-        slots=checked_sample.slots,
+        initial_state=initial_state,
         iterations=iterations,
         learning_rate=learning_rate,
         cluster_weight=cluster_weight,

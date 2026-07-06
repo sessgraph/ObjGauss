@@ -50,6 +50,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_smoke",
         "RealSampleV2SmokeReport",
     ),
+    "RealSampleV2DiagnosticsReport": (
+        "objgauss.core.real_sample_v2_diagnostics",
+        "RealSampleV2DiagnosticsReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -220,6 +224,10 @@ _EXPORTS = {
     "REAL_SAMPLE_V2_SMOKE_SCHEMA": (
         "objgauss.core.real_sample_v2_smoke",
         "REAL_SAMPLE_V2_SMOKE_SCHEMA",
+    ),
+    "REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA": (
+        "objgauss.core.real_sample_v2_diagnostics",
+        "REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -425,6 +433,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_smoke",
         "evaluate_real_sample_v2_smoke",
     ),
+    "evaluate_real_sample_v2_diagnostics": (
+        "objgauss.core.real_sample_v2_diagnostics",
+        "evaluate_real_sample_v2_diagnostics",
+    ),
     "core_model_train_validate_report": (
         "objgauss.core.core_model_validation",
         "core_model_train_validate_report",
@@ -460,6 +472,10 @@ _EXPORTS = {
     "real_sample_v2_smoke_from_cloud": (
         "objgauss.core.real_sample_v2_smoke",
         "real_sample_v2_smoke_from_cloud",
+    ),
+    "real_sample_v2_diagnostics_from_cloud": (
+        "objgauss.core.real_sample_v2_diagnostics",
+        "real_sample_v2_diagnostics_from_cloud",
     ),
     "read_splat": ("objgauss.core.io", "read_splat"),
     "renderer_loss_boundary_report": (
@@ -633,6 +649,10 @@ _EXPORTS = {
     "validate_real_sample_v2_smoke_summary": (
         "objgauss.core.real_sample_v2_smoke",
         "validate_real_sample_v2_smoke_summary",
+    ),
+    "validate_real_sample_v2_diagnostics_summary": (
+        "objgauss.core.real_sample_v2_diagnostics",
+        "validate_real_sample_v2_diagnostics_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

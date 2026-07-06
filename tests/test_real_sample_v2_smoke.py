@@ -117,6 +117,29 @@ def test_real_public_sample_smoke_exposes_objectstate_gap():
     assert {"low_assignment_confidence", "low_object_purity"} <= diagnostics
 
 
+def test_real_public_sample_smoke_passes_with_temperature_sharpening():
+    cloud = read_ply("public/samples/lego_alpha_v1_objects.ply")
+
+    report = real_sample_v2_smoke_from_cloud(
+        cloud,
+        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        frame_count=2,
+        max_points=24,
+        image_width=12,
+        image_height=12,
+        iterations=100,
+        learning_rate=0.4,
+        solver_temperature=0.5,
+        seed=4,
+    )
+    summary = report.as_dict()
+
+    assert summary["status"] == "real_sample_v2_smoke_pass"
+    assert summary["training"]["final_state"]["config"]["temperature"] == 0.5
+    assert summary["renderer_joint"]["object_state_eval"]["status"] == "objectstate_eval_pass"
+    assert summary["renderer_joint"]["object_state_eval"]["object_purity"] >= 0.8
+
+
 def test_real_sample_v2_smoke_rejects_feature_pseudo_targets():
     sample = trainable_kernel_sample_from_cloud(
         _object_cloud(include_object_ids=False),
