@@ -23,6 +23,7 @@ from objgauss.core import (
     REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA,
     REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA,
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
+    REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA,
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentV2RendererJointValidationReport,
@@ -52,6 +53,7 @@ from objgauss.core import (
     RealSampleV2DiagnosticsReport,
     RealSampleV2FullCloudPurityReport,
     RealSampleV2ModelHandoffReport,
+    RealSampleV2SegmentationQualityReport,
     RealSampleV2SmokeReport,
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
@@ -143,6 +145,9 @@ from objgauss.core import (
     real_sample_v2_diagnostics_from_cloud,
     real_sample_v2_full_cloud_purity_from_cloud,
     real_sample_v2_model_handoff_from_cloud,
+    real_sample_v2_segmentation_quality_from_cloud,
+    real_sample_v2_segmentation_quality_from_projected_cloud,
+    real_sample_v2_segmentation_quality_from_purity_report,
     real_sample_v2_smoke_from_cloud,
     render_real_sample_v2_model_handoff_html,
     renderer_loss_boundary_report,
@@ -170,6 +175,7 @@ from objgauss.core import (
     validate_real_sample_v2_effect_preview,
     validate_real_sample_v2_full_cloud_purity_summary,
     validate_real_sample_v2_model_handoff_summary,
+    validate_real_sample_v2_segmentation_quality_summary,
     validate_real_sample_v2_smoke_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
@@ -631,6 +637,14 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert RealSampleV2FullCloudPurityReport is not None
     assert real_sample_v2_full_cloud_purity_from_cloud is not None
     assert validate_real_sample_v2_full_cloud_purity_summary is not None
+    assert REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA == (
+        "objgauss-real-sample-v2-segmentation-quality-v1"
+    )
+    assert RealSampleV2SegmentationQualityReport is not None
+    assert real_sample_v2_segmentation_quality_from_cloud is not None
+    assert real_sample_v2_segmentation_quality_from_projected_cloud is not None
+    assert real_sample_v2_segmentation_quality_from_purity_report is not None
+    assert validate_real_sample_v2_segmentation_quality_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],

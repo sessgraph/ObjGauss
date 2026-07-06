@@ -587,6 +587,22 @@ viewer 可加载 debug PLY。当前结果显示：`max_points=24` 仍为
 误分割定位；当前不需要 evidence normalization，不解冻 geometry / camera，不进入 GPU 长训、
 diffusion、replay 或 rollout。
 
+随后完成 `REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001`：新增
+`objgauss-real-sample-v2-segmentation-quality-v1`，把 `max_points=128` 的 full-cloud
+对象分割结果拆成 per-object counts、target-vs-predicted confusion、confidence / entropy
+分布和优化建议。CLI 新增
+`objgauss training real-sample-v2-segmentation-quality`，可生成 viewer PLY 与 summary 到
+`/tmp` 或 ignored `outputs/`。当前真实样例 hard argmax 分割已通过：
+`direct_slot_match=0.989642`、`hard_argmax_object_purity=0.989642`、
+`min_predicted_object_purity=0.971724`、`min_target_recall=0.910499`、`mixed_gaussians=59`。
+具体弱点是 `target_slot=1` 有 `52` 个 Gaussian 漏到 `predicted_object=2`；同时
+`predicted_object=1` 置信度均值只有 `0.583306`、熵均值 `0.599941`，触发
+`low_confidence_predicted_object` / `high_entropy_predicted_object`。包含
+`temperature=0.25` 的复查仍选择 `0.35`，结论是不继续 sharpening，也不继续加覆盖；下一步应
+围绕 slot 1/2 边界做 evidence normalization 或局部 export policy 诊断。仍不提交 generated
+PLY / summary / screenshot，不解冻 geometry / camera，不进入 GPU 长训、diffusion、replay
+或 rollout。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

@@ -118,6 +118,9 @@ from objgauss.core.real_sample_v2_viewer_preview import (
 from objgauss.core.real_sample_v2_full_cloud_purity import (
     real_sample_v2_full_cloud_purity_from_cloud,
 )
+from objgauss.core.real_sample_v2_segmentation_quality import (
+    real_sample_v2_segmentation_quality_from_cloud,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1836,6 +1839,84 @@ def _training_real_sample_v2_full_cloud_purity(args: argparse.Namespace) -> None
         print(f"viewer_route={summary['viewer']['debug_route']}")
     if args.require_pass and summary["status"] != "real_sample_v2_full_cloud_purity_pass":
         raise ValueError("real sample v2 full-cloud purity did not pass")
+
+
+def _training_real_sample_v2_segmentation_quality(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    temperatures = (
+        tuple(args.temperature_candidates)
+        if args.temperature_candidates is not None
+        else (1.0, 0.75, 0.5, 0.35, 0.25)
+    )
+    report = real_sample_v2_segmentation_quality_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        max_points=args.max_points,
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        temperature_candidates=temperatures,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+        viewer_path=args.viewer_path,
+    )
+    summary = report.as_dict()
+    quality = summary["global_quality"]
+    recommendation = summary["recommendation"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['source']['source_gaussians']}")
+    print(f"max_points={summary['segmentation_target']['max_points']}")
+    print(f"solver_temperature={summary['segmentation_target']['solver_temperature']}")
+    print(f"direct_slot_match={quality['direct_slot_match']:.6f}")
+    print(f"hard_argmax_object_purity={quality['hard_argmax_object_purity']:.6f}")
+    print(f"min_predicted_object_purity={quality['min_predicted_object_purity']:.6f}")
+    print(f"min_target_recall={quality['min_target_recall']:.6f}")
+    print(f"mixed_gaussians={quality['mixed_gaussians']}")
+    print(f"quality_diagnostics={','.join(quality['diagnostics']) or 'none'}")
+    for row in summary["confusion"]["rows"]:
+        counts = ",".join(
+            f"{item['object_id']}:{item['count']}" for item in row["predicted_counts"]
+        )
+        print(f"confusion_row=target_slot:{row['target_slot']},counts:{counts},total:{row['total']}")
+    for predicted in summary["per_predicted_object"]:
+        print(
+            "predicted_object="
+            f"id:{predicted['object_id']},"
+            f"count:{predicted['gaussian_count']},"
+            f"purity:{predicted['purity']:.6f},"
+            f"mixed:{predicted['mixed_count']},"
+            f"confidence_mean:{predicted['confidence']['mean']:.6f},"
+            f"entropy_mean:{predicted['entropy']['mean']:.6f},"
+            f"diagnostics:{','.join(predicted['diagnostics']) or 'none'}"
+        )
+    print(f"recommendation_decision={recommendation['decision']}")
+    print(f"recommendation_action={recommendation['action']}")
+    print(f"weak_target_slots={','.join(str(value) for value in recommendation['weak_target_slots']) or 'none'}")
+    print(
+        "mixed_predicted_objects="
+        f"{','.join(str(value) for value in recommendation['mixed_predicted_objects']) or 'none'}"
+    )
+    write_ply(args.preview_ply_output, report.projected_cloud, fmt=_output_format(args))
+    print(f"preview_ply={args.preview_ply_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if summary["viewer"]["debug_route"]:
+        print(f"viewer_route={summary['viewer']['debug_route']}")
+    if args.require_pass and summary["status"] != "real_sample_v2_segmentation_quality_pass":
+        raise ValueError("real sample v2 segmentation quality did not pass")
 
 
 def _training_eval_assignment(args: argparse.Namespace) -> None:
@@ -3637,6 +3718,44 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_full_cloud_purity.add_argument("--summary-output", type=Path)
     real_sample_full_cloud_purity.add_argument("--require-pass", action="store_true")
     real_sample_full_cloud_purity.set_defaults(handler=_training_real_sample_v2_full_cloud_purity)
+
+    real_sample_segmentation_quality = training_subparsers.add_parser(
+        "real-sample-v2-segmentation-quality",
+        help="inspect 128-target real-sample v2 object segmentation confusion and uncertainty",
+    )
+    real_sample_segmentation_quality.add_argument("input", type=Path)
+    real_sample_segmentation_quality.add_argument("--preview-ply-output", required=True, type=Path)
+    real_sample_segmentation_quality.add_argument("--viewer-path")
+    real_sample_segmentation_quality.add_argument("--slots", type=int)
+    real_sample_segmentation_quality.add_argument("--frames", type=int, default=2)
+    real_sample_segmentation_quality.add_argument("--max-points", type=int, default=128)
+    real_sample_segmentation_quality.add_argument("--object-id-field", default="object_id")
+    real_sample_segmentation_quality.add_argument("--temporal-offset", type=float, default=0.01)
+    real_sample_segmentation_quality.add_argument("--image-width", type=int, default=12)
+    real_sample_segmentation_quality.add_argument("--image-height", type=int, default=12)
+    real_sample_segmentation_quality.add_argument("--point-radius", type=int, default=1)
+    real_sample_segmentation_quality.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_segmentation_quality.add_argument("--iterations", type=int, default=100)
+    real_sample_segmentation_quality.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_segmentation_quality.add_argument(
+        "--temperature-candidates",
+        type=float,
+        nargs="+",
+        help="temperature sweep candidates; defaults to 1.0 0.75 0.5 0.35 0.25",
+    )
+    real_sample_segmentation_quality.add_argument("--baseline-temperature", type=float, default=1.0)
+    real_sample_segmentation_quality.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
+    real_sample_segmentation_quality.add_argument("--seed", type=int, default=4)
+    real_sample_segmentation_quality.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_segmentation_quality.add_argument("--rewrite-sh", action="store_true")
+    real_sample_segmentation_quality.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    real_sample_segmentation_quality.add_argument("--summary-output", type=Path)
+    real_sample_segmentation_quality.add_argument("--require-pass", action="store_true")
+    real_sample_segmentation_quality.set_defaults(handler=_training_real_sample_v2_segmentation_quality)
 
     eval_assignment = training_subparsers.add_parser(
         "eval-assignment",
