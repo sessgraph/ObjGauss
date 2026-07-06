@@ -15,31 +15,14 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training。下一步进入 v2 solver stability suite eval。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip。下一步进入 v2 assignment renderer joint validation。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### ASSIGNMENT-SOLVER-V2-EVAL-001: Validate v2 solver training with stability suite
-
-- 状态: ready
-- 类型: 标准 PR / algorithm model evaluation
-- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
-- 目标: 用 synthetic stability suite 验证训练前后，输出 training summary、eval summary、
-  state roundtrip 和 diagnostics before / after；明确 loss 下降不能替代 identity gate。
-- 前置: `ASSIGNMENT-SOLVER-V2-TRAIN-001`。
-- 边界: 不接 renderer loss；不扩大到 diffusion / rollout / replay buffer。
-
-## Suspended
-
-当前无 suspended PR。注意：默认沙箱内 `/dev` 视图不暴露 `/dev/nvidia*`，GPU preflight
-需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
-
-## Planned
-
 ### ASSIGNMENT-V2-RENDER-JOINT-001: Bind v2 assignment checkpoint to renderer validation
 
-- 状态: planned
+- 状态: ready
 - 类型: 标准 PR / algorithm model renderer handoff
 - 架构规格: `docs/architecture/core-model-train-validate-plan.md`
 - 目标: 将 v2 solver checkpoint 接回
@@ -48,6 +31,13 @@
 - 前置: `ASSIGNMENT-SOLVER-V2-EVAL-001`。
 - 边界: 不追求大幅 image loss；不解冻 per-Gaussian geometry；不把 renderer loss 作为绕过
   identity gate 的理由。
+
+## Suspended
+
+当前无 suspended PR。注意：默认沙箱内 `/dev` 视图不暴露 `/dev/nvidia*`，GPU preflight
+需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
+
+## Planned
 
 ### CORE-MODEL-TRAIN-VALIDATE-001: Core model train/validate milestone
 
@@ -121,6 +111,41 @@
 当前无进行中 PR。
 
 ## Done
+
+### ASSIGNMENT-SOLVER-V2-EVAL-001: Validate v2 solver training with stability suite
+
+- 状态: done / v2-solver-stability-eval-checkpoint-roundtrip
+- 类型: 标准 PR / algorithm model evaluation
+- 架构规格: `docs/architecture/core-model-train-validate-plan.md`
+- 目标: 用 synthetic stability suite 验证训练前后，输出 training summary、eval summary、
+  state roundtrip 和 diagnostics before / after；明确 loss 下降不能替代 identity gate。
+- 已实施:
+  - 新增 `objgauss-assignment-solver-v2-checkpoint` 和
+    `objgauss-assignment-solver-v2-stability-eval-v1` schema。
+  - 新增 `AssignmentSolverV2StabilityEvalReport`。
+  - 新增 `assignment_solver_v2_checkpoint(...)` 和
+    `assignment_solver_v2_state_from_checkpoint(...)`，支持 final state checkpoint roundtrip。
+  - 新增 `evaluate_assignment_solver_v2_stability(...)`，对训练前 / 训练后的 assignment
+    prediction 分别运行 synthetic stability suite hard gate。
+  - eval summary 输出 loss decrease、before / after gate status、diagnostics delta、
+    checkpoint roundtrip 和 non-goals。
+  - two-object synthetic stability suite smoke 验证 swapped 初始化训练后可让 slot swap
+    failure count 从非零降到 0，并让 after hard gate pass。
+  - `objgauss.core` 暴露 eval schema、report、checkpoint builder、state loader 和
+    validators。
+- 边界:
+  - 不接 renderer loss。
+  - 不接 GPU。
+  - 不做 rollout model。
+  - 不做 replay buffer。
+  - 不改变 dynamic-K proposal-only 约束。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/assignment_solver_v2_eval.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_assignment_solver_v2_eval.py tests/test_assignment_solver_v2.py tests/test_core_namespace.py`: 15 passed。
+  - `uv run --extra dev pytest`: 236 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending
 
 ### ASSIGNMENT-SOLVER-V2-TRAIN-001: Train cost-softmax assignment solver
 

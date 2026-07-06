@@ -465,8 +465,20 @@ entropy、balance 和 supervised CE 权重。synthetic fixture smoke 将 swapped
 supervised loss 从 `8.569320` 降到 `0.002646`，final assignment 匹配 oracle expected
 slots。该切片只做 fixed-K synthetic / CPU NumPy training，不接 GPU、不接 renderer loss、
 不启用 temporal / matching loss、不引入 Slot Attention / Sinkhorn / OT、不改变 dynamic-K
-proposal-only 约束。下一步进入 `ASSIGNMENT-SOLVER-V2-EVAL-001`，用 stability suite 做训练前后
-hard gate / diagnostics / state roundtrip 验证。
+proposal-only 约束。
+
+随后完成 `ASSIGNMENT-SOLVER-V2-EVAL-001`：新增
+`objgauss-assignment-solver-v2-checkpoint` 和
+`objgauss-assignment-solver-v2-stability-eval-v1`。`evaluate_assignment_solver_v2_stability(...)`
+会对同一组 synthetic stability fixtures 分别运行训练前 / 训练后 hard gate，并输出 loss
+decrease、before / after diagnostics delta、hard blockers、checkpoint summary 和 final state
+roundtrip。当前 two-object stability suite smoke 证明 swapped 初始化训练后可从
+`synthetic_stability_suite_gate_fail` 变成 `synthetic_stability_suite_gate_pass`，slot swap
+failure count 从非零降到 0；eval status 只有在 loss 下降、after hard gate 通过且 checkpoint
+roundtrip 通过时才 pass，明确 loss 下降不能替代 identity gate。本切片不接 renderer loss、
+不接 GPU、不做 rollout / replay buffer、不改变 dynamic-K proposal-only 约束。下一步进入
+`ASSIGNMENT-V2-RENDER-JOINT-001`，把 v2 assignment checkpoint 接回
+`A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss` 验证。
 
 ## 架构重梳理基线
 
@@ -2799,10 +2811,11 @@ npm run acceptance:demo
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
-3. 算法模型线：`V2-STABILITY-FOUNDATION-002` 已冻结 identity oracle 和 synthetic world
-   generator；下一步先做 `V2-STABILITY-SCENARIO-002`，再做 failure diagnostics 和
-   invariant-first gate。rollout model 和更大规模 GPU 训练必须等 ObjectState 稳定性证据
-   通过后再推进。
+3. 算法模型线：`ASSIGNMENT-SOLVER-V2-EVAL-001` 已用 synthetic stability suite 验证
+   v2 assignment solver 的 loss / hard gate / diagnostics / checkpoint roundtrip；下一步做
+   `ASSIGNMENT-V2-RENDER-JOINT-001`，把 v2 checkpoint 接回
+   `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss`。rollout model、replay
+   buffer、diffusion 和更大规模 GPU 训练必须等 core model train / validate milestone 通过后再推进。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

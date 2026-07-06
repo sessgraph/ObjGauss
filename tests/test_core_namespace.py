@@ -13,12 +13,15 @@ from objgauss.core import (
     ASSIGNMENT_SOLVER_V2_COST_TERMS,
     ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA,
     ASSIGNMENT_SOLVER_V2_STATE_SCHEMA,
+    ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA,
+    ASSIGNMENT_SOLVER_V2_STABILITY_EVAL_SCHEMA,
     ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA,
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentSolverV2Config,
     AssignmentSolverV2Prediction,
     AssignmentSolverV2State,
+    AssignmentSolverV2StabilityEvalReport,
     AssignmentSolverV2TrainingResult,
     FailureModeClassifier,
     FailureModeEvent,
@@ -67,7 +70,9 @@ from objgauss.core import (
     assignment_entropy_loss_and_gradient,
     assignment_loss_v2_breakdown,
     assignment_mvp_training_summary,
+    assignment_solver_v2_checkpoint,
     assignment_solver_v2_state_from_dict,
+    assignment_solver_v2_state_from_checkpoint,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
@@ -84,6 +89,7 @@ from objgauss.core import (
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_assignment_stability,
+    evaluate_assignment_solver_v2_stability,
     initialize_assignment_solver_v2,
     expected_slots_for_synthetic_fixture,
     evaluate_solver_decoder_object_states,
@@ -131,7 +137,9 @@ from objgauss.core import (
     validate_assignment_evidence_summary,
     validate_assignment_stability_eval,
     validate_assignment_solver_v2_config,
+    validate_assignment_solver_v2_checkpoint,
     validate_assignment_solver_v2_state,
+    validate_assignment_solver_v2_stability_eval_summary,
     validate_assignment_solver_v2_training_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
@@ -544,6 +552,21 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert isinstance(solver_v2_training, AssignmentSolverV2TrainingResult)
     solver_v2_summary = solver_v2_training.as_dict()
     assert validate_assignment_solver_v2_training_summary(solver_v2_summary) is solver_v2_summary
+    assert ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA == "objgauss-assignment-solver-v2-checkpoint"
+    assert ASSIGNMENT_SOLVER_V2_STABILITY_EVAL_SCHEMA == (
+        "objgauss-assignment-solver-v2-stability-eval-v1"
+    )
+    solver_v2_checkpoint = assignment_solver_v2_checkpoint(
+        solver_v2_training,
+        source="fixture://namespace",
+    )
+    assert validate_assignment_solver_v2_checkpoint(solver_v2_checkpoint) is solver_v2_checkpoint
+    restored_solver_v2_checkpoint = assignment_solver_v2_state_from_checkpoint(solver_v2_checkpoint)
+    assert isinstance(restored_solver_v2_checkpoint, AssignmentSolverV2State)
+    assert restored_solver_v2_checkpoint.step == solver_v2_training.final_state.step
+    assert AssignmentSolverV2StabilityEvalReport is not None
+    assert evaluate_assignment_solver_v2_stability is not None
+    assert validate_assignment_solver_v2_stability_eval_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
