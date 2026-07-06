@@ -537,6 +537,24 @@ evidence normalization，也不解冻 geometry / camera / dynamic-K，不进入 
 replay / rollout。diagnostics summary 已携带 best v2 solver state 小矩阵 checkpoint，可用于
 下一步 handoff / resume 验证；训练输出仍不进 git。
 
+随后完成 `REAL-SAMPLE-V2-MODEL-HANDOFF-001`：新增
+`objgauss-real-sample-v2-model-handoff-v1` 和
+`objgauss-real-sample-v2-effect-preview-v1`，把 diagnostics 选出的
+`solver_temperature=0.5` 训练模型导出为可复跑 handoff。CLI 新增
+`objgauss training real-sample-v2-handoff`，可从
+`public/samples/lego_alpha_v1_objects.ply` 生成 summary、assignment v2 checkpoint 和
+HTML/SVG effect preview 到 `/tmp` 或 ignored `outputs/`。handoff 会对 checkpoint 做 JSON
+roundtrip，再从 checkpoint restore 后重新运行
+`AssignmentV2RendererJointValidation`，验证结果为
+`real_sample_v2_model_handoff_pass`、`assignment_v2_renderer_joint_validation_pass`、
+`objectstate_eval_pass`，关键指标仍为 `mean_normalized_entropy=0.423937`、
+`assignment_confidence=0.576063`、`object_purity=0.815958`。效果展示文件
+`/tmp/objgauss-real-sample-v2-handoff-preview.html` 显示 baseline `temperature=1.0`
+fail 与 trained `temperature=0.5` pass 的采样 assignment 对比；浏览器验证使用系统
+Chrome 截图到 `/tmp/objgauss-real-sample-v2-handoff-preview.png`，确认页面标题正确且有
+2 个 SVG 面板。本切片仍不提交 checkpoint / summary / preview 产物，不解冻 geometry /
+camera / dynamic-K，不进入 GPU 长训、diffusion、replay 或 rollout。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
