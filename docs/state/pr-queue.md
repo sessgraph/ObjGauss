@@ -156,7 +156,7 @@
   - `uv run --extra dev pytest`: 234 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `9b43a2d`
 
 ### V2-STABILITY-GATE-001: Build invariant-first stability gate
 
