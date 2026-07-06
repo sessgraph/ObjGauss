@@ -170,7 +170,7 @@
   - `uv run --extra dev pytest`: 225 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `0e9d973`
 
 ### CORE-MODEL-TRAIN-VALIDATE-PLAN-001: Register core model train/validate route
 
