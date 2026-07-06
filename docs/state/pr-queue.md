@@ -164,7 +164,7 @@
   - `uv run --extra dev pytest`: 230 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `fe2a5fc`
 
 ### V2-STABILITY-DIAGNOSTICS-001: Add failure mode diagnostics
 
