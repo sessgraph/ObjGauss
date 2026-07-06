@@ -123,7 +123,7 @@ roadmap 规划。
   - `uv run --extra dev pytest`: 238 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `8b32e41`
 
 ### ASSIGNMENT-V2-RENDER-JOINT-001: Bind v2 assignment checkpoint to renderer validation
 
