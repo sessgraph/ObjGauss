@@ -42,6 +42,10 @@ _EXPORTS = {
         "objgauss.core.assignment_v2_renderer_validation",
         "AssignmentV2RendererJointValidationReport",
     ),
+    "CoreModelTrainValidateReport": (
+        "objgauss.core.core_model_validation",
+        "CoreModelTrainValidateReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -204,6 +208,10 @@ _EXPORTS = {
     "ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA": (
         "objgauss.core.assignment_v2_renderer_validation",
         "ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA",
+    ),
+    "CORE_MODEL_TRAIN_VALIDATE_SCHEMA": (
+        "objgauss.core.core_model_validation",
+        "CORE_MODEL_TRAIN_VALIDATE_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -405,6 +413,10 @@ _EXPORTS = {
         "objgauss.core.assignment_v2_renderer_validation",
         "evaluate_assignment_v2_renderer_joint",
     ),
+    "core_model_train_validate_report": (
+        "objgauss.core.core_model_validation",
+        "core_model_train_validate_report",
+    ),
     "initialize_assignment_solver_v2": (
         "objgauss.core.assignment_solver_v2",
         "initialize_assignment_solver_v2",
@@ -597,6 +609,10 @@ _EXPORTS = {
     "validate_assignment_v2_renderer_joint_summary": (
         "objgauss.core.assignment_v2_renderer_validation",
         "validate_assignment_v2_renderer_joint_summary",
+    ),
+    "validate_core_model_train_validate_summary": (
+        "objgauss.core.core_model_validation",
+        "validate_core_model_train_validate_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

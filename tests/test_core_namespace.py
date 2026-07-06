@@ -18,6 +18,7 @@ from objgauss.core import (
     ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA,
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
+    CORE_MODEL_TRAIN_VALIDATE_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentV2RendererJointValidationReport,
     AssignmentSolverV2Config,
@@ -25,6 +26,7 @@ from objgauss.core import (
     AssignmentSolverV2State,
     AssignmentSolverV2StabilityEvalReport,
     AssignmentSolverV2TrainingResult,
+    CoreModelTrainValidateReport,
     FailureModeClassifier,
     FailureModeEvent,
     ObjectStateGaussianDecode,
@@ -84,6 +86,7 @@ from objgauss.core import (
     build_gsplat_training_input,
     build_gsplat_training_input_from_object_state,
     cluster_features,
+    core_model_train_validate_report,
     decode_gaussian_from_object_state,
     diagnose_synthetic_stability_fixture,
     evaluate_synthetic_stability_gate,
@@ -145,6 +148,7 @@ from objgauss.core import (
     validate_assignment_solver_v2_stability_eval_summary,
     validate_assignment_solver_v2_training_summary,
     validate_assignment_v2_renderer_joint_summary,
+    validate_core_model_train_validate_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_identity_oracle,
@@ -577,6 +581,10 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert AssignmentV2RendererJointValidationReport is not None
     assert evaluate_assignment_v2_renderer_joint is not None
     assert validate_assignment_v2_renderer_joint_summary is not None
+    assert CORE_MODEL_TRAIN_VALIDATE_SCHEMA == "objgauss-core-model-train-validate-v1"
+    assert CoreModelTrainValidateReport is not None
+    assert core_model_train_validate_report is not None
+    assert validate_core_model_train_validate_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],

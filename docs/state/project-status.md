@@ -494,6 +494,18 @@ assignment loss、ObjectState eval、checkpoint roundtrip、identity gate policy
 的理由。下一步进入 `CORE-MODEL-TRAIN-VALIDATE-001`，汇总核心模型可训练、可验证、可失败定位的
 milestone 证据。
 
+随后完成 `CORE-MODEL-TRAIN-VALIDATE-001`：新增
+`objgauss-core-model-train-validate-v1` milestone summary，把
+`ASSIGNMENT-SOLVER-V2-TRAIN-001`、`ASSIGNMENT-SOLVER-V2-EVAL-001` 和
+`ASSIGNMENT-V2-RENDER-JOINT-001` 的 evidence 聚合为同一份可审计报告。gate 覆盖
+assignment training loss 下降、synthetic stability hard gate 通过、failure diagnostics
+可用、assignment / renderer checkpoint roundtrip、ObjectState eval、renderer joint smoke、
+small sample smoke 不退化、renderer-loss-contract 消费 summary，以及 identity gate 未被
+renderer loss 覆盖。该 milestone 明确当前 small sample smoke 仍是 dependency-free fixture /
+contract proof，promotion 前必须在小型 real / public sample 上重复；同时继续禁止长 GPU 训练、
+diffusion / rollout / replay buffer、dynamic-K 自动 mutation 和 Gaussian geometry 解冻。至此
+近期路线已推进到“核心模型可训练、可验证、可失败定位”的 development-stage 阶段。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
@@ -2825,12 +2837,11 @@ npm run acceptance:demo
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
-3. 算法模型线：`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回
-   `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss` validation path，并让
-   `renderer-loss-contract` 消费该 summary；下一步做 `CORE-MODEL-TRAIN-VALIDATE-001`，
-   汇总 loss、hard gate、diagnostics、ObjectState eval、renderer joint smoke 和 checkpoint
-   roundtrip 证据。rollout model、replay buffer、diffusion 和更大规模 GPU 训练必须等 core
-   model train / validate milestone 通过后再推进。
+3. 算法模型线：`CORE-MODEL-TRAIN-VALIDATE-001` 已聚合 v2 assignment training、synthetic
+   stability hard gate、failure diagnostics、ObjectState eval、renderer joint smoke、
+   checkpoint roundtrip 和 renderer-loss-contract evidence。当前已达到 development-stage
+   “核心模型可训练、可验证、可失败定位”阶段；promotion 前下一步应先做小型 real / public
+   sample 重复验证和受控 GPU smoke，而不是直接跳到 rollout、replay buffer 或 diffusion。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
