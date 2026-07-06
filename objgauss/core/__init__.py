@@ -58,6 +58,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_model_handoff",
         "RealSampleV2ModelHandoffReport",
     ),
+    "RealSampleV2ViewerPreviewReport": (
+        "objgauss.core.real_sample_v2_viewer_preview",
+        "RealSampleV2ViewerPreviewReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -497,6 +501,14 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_model_handoff",
         "real_sample_v2_model_handoff_from_cloud",
     ),
+    "real_sample_v2_viewer_preview_from_cloud": (
+        "objgauss.core.real_sample_v2_viewer_preview",
+        "real_sample_v2_viewer_preview_from_cloud",
+    ),
+    "real_sample_v2_viewer_preview_from_handoff": (
+        "objgauss.core.real_sample_v2_viewer_preview",
+        "real_sample_v2_viewer_preview_from_handoff",
+    ),
     "render_real_sample_v2_model_handoff_html": (
         "objgauss.core.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
@@ -685,6 +697,10 @@ _EXPORTS = {
     "validate_real_sample_v2_model_handoff_summary": (
         "objgauss.core.real_sample_v2_model_handoff",
         "validate_real_sample_v2_model_handoff_summary",
+    ),
+    "validate_real_sample_v2_viewer_preview_summary": (
+        "objgauss.core.real_sample_v2_viewer_preview",
+        "validate_real_sample_v2_viewer_preview_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

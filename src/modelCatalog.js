@@ -330,13 +330,15 @@ export function catalogSummary(models = MODEL_CATALOG) {
 export function modelCatalogFromSearch(search = "") {
   const params = new URLSearchParams(String(search ?? "").replace(/^\?/, ""));
   const trainableArtifactPath = trainableArtifactPathFromParams(params);
+  const plyPath = plyPathFromParams(params);
   const modelArtifactManifest = modelArtifactManifestFromParams(params);
   const ogcManifest = ogcManifestArtifactFromParams(params);
   const ogcArtifact = ogcArtifactFromParams(params);
-  if (!trainableArtifactPath && !modelArtifactManifest && !ogcManifest && !ogcArtifact) return MODEL_CATALOG;
+  if (!trainableArtifactPath && !plyPath && !modelArtifactManifest && !ogcManifest && !ogcArtifact) return MODEL_CATALOG;
   return [
     ...MODEL_CATALOG,
     ...(trainableArtifactPath ? [trainableUrlArtifactModel(trainableArtifactPath)] : []),
+    ...(plyPath ? [plyUrlArtifactModel(plyPath)] : []),
     ...(modelArtifactManifest ? [modelArtifactManifestBundleModel(modelArtifactManifest)] : []),
     ...(ogcManifest ? [ogcManifestUrlArtifactModel(ogcManifest)] : []),
     ...(ogcArtifact ? [ogcUrlArtifactModel(ogcArtifact)] : []),
@@ -345,6 +347,7 @@ export function modelCatalogFromSearch(search = "") {
 
 export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
   return models.find((model) => model.id === "trainable-url-artifact")?.id
+    ?? models.find((model) => model.id === "ply-url-artifact")?.id
     ?? models.find((model) => model.id === "model-artifact-manifest")?.id
     ?? models.find((model) => model.id === "ogc-manifest-artifact")?.id
     ?? models.find((model) => model.id === "ogc-url-artifact")?.id
@@ -354,6 +357,10 @@ export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
 
 function trainableArtifactPathFromParams(params) {
   return sameOriginPathParam(params, ["trainableArtifact", "trainable-artifact"], ".json");
+}
+
+function plyPathFromParams(params) {
+  return sameOriginPathParam(params, ["ply", "debugPly", "debug-ply", "objectPly", "object-ply"], ".ply");
 }
 
 function modelArtifactManifestFromParams(params) {
@@ -415,6 +422,29 @@ function trainableUrlArtifactModel(artifactPath) {
       layout: "trainable-kernel-artifact-json",
       status: "url-debug-artifact",
       chunkRoot: "/models/url-trainable-artifact/objects/",
+    },
+  };
+}
+
+function plyUrlArtifactModel(plyPath) {
+  return {
+    id: "ply-url-artifact",
+    name: "URL object-aware PLY",
+    label: "URL PLY",
+    sourcePath: plyPath,
+    loadMode: "eager",
+    kind: "object-aware-ply",
+    stage: "url-debug-artifact",
+    objectCount: 0,
+    galleryPosition: [-4.25, 0, 4.24],
+    accent: "#6ee7f8",
+    displayScale: 2.46,
+    pointSize: 0.035,
+    maxDisplayPoints: 50000,
+    compression: {
+      layout: "url-object-aware-ply",
+      status: "url-debug-artifact",
+      chunkRoot: "/models/url-ply-artifact/objects/",
     },
   };
 }
