@@ -15,28 +15,30 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity。近期路线已到可训练、可验证、可失败定位阶段；下一步优先 real-sample diagnostics / sharpening，不解冻 geometry，也不进入 diffusion / replay / rollout。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation。近期路线已到真实 public sample 上可训练、可验证、可定位阶段；下一步优先 checkpoint / CLI handoff，让 Owner 能直接复跑训练模型验证，不解冻 geometry，也不进入 diffusion / replay / rollout。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### REAL-SAMPLE-V2-DIAGNOSTICS-001: Diagnose public-sample low confidence / purity
+### REAL-SAMPLE-V2-MODEL-HANDOFF-001: Export reproducible real-sample v2 model validation
 
 - 状态: ready
-- 类型: 标准 PR / algorithm model diagnostics
-- 前置: `REAL-SAMPLE-V2-SMOKE-001`
-- 目标: 针对 `public/samples/lego_alpha_v1_objects.ply` smoke 暴露的
-  `low_assignment_confidence` / `low_object_purity`，输出可复现诊断表和最小改进计划。
+- 类型: 标准 PR / algorithm model checkpoint handoff
+- 前置: `REAL-SAMPLE-V2-DIAGNOSTICS-001`
+- 目标: 把 diagnostics 选出的 `solver_temperature=0.5` 训练模型变成 Owner 可复跑的
+  checkpoint / summary handoff，证明从 checkpoint restore 后仍能通过 renderer joint /
+  ObjectState validation。
 - 建议范围:
-  - 固定 small public sample sweep：`max_points`、seed、temperature、iterations、
-    object count / slot count 和 image target 尺寸。
-  - 拆分 failure 来源：assignment entropy、slot mass、object_id mapping、颜色 /
-    feature separability、projection purity、renderer image loss。
-  - 给出一个不解冻 geometry 的最小下一步，例如 v2 temperature / confidence sharpening、
-    real-sample hard gate 阈值解释，或 sample-specific evidence normalization。
+  - 新增或复用 CLI / scriptable entrypoint，输入 `public/samples/lego_alpha_v1_objects.ply`
+    后输出 diagnostics summary 和 best v2 checkpoint 到 `/tmp` 或 ignored `outputs/`。
+  - 增加 checkpoint restore validation：从 best checkpoint 恢复 solver state，再跑
+    `evaluate_assignment_v2_renderer_joint`，确认 status 仍 pass。
+  - 输出最小模型验证表：temperature、iterations、loss、ObjectState metrics、
+    checkpoint roundtrip 和 non-goals。
 - 边界:
-  - 不把当前 public sample fail 记为 promotion pass。
-  - 不进入 GPU 长训、diffusion、rollout、replay buffer 或 dynamic-K mutation。
+  - 不提交 checkpoint / summary 到 git。
+  - 不进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry
+    unfreeze。
   - 不改变 public demo / HF release 口径。
 
 ## Suspended
@@ -105,6 +107,55 @@
 当前无进行中 PR。
 
 ## Done
+
+### REAL-SAMPLE-V2-DIAGNOSTICS-001: Diagnose public-sample low confidence / purity
+
+- 状态: done / temperature-sharpening-selected
+- 类型: 标准 PR / algorithm model diagnostics
+- 前置: `REAL-SAMPLE-V2-SMOKE-001`
+- 目标: 针对 `public/samples/lego_alpha_v1_objects.ply` smoke 暴露的
+  `low_assignment_confidence` / `low_object_purity`，输出可复现诊断表和最小改进计划。
+- 已实施:
+  - 新增 `objgauss-real-sample-v2-diagnostics-v1` schema。
+  - 新增 `RealSampleV2DiagnosticsReport`。
+  - 新增 `real_sample_v2_diagnostics_from_cloud(...)` 和
+    `evaluate_real_sample_v2_diagnostics(...)`。
+  - `real_sample_v2_smoke_from_cloud(...)` / `evaluate_real_sample_v2_smoke(...)`
+    新增 `solver_temperature` 参数，默认仍为 `1.0`。
+  - diagnostics report 固定 sample 后扫描 temperature candidates，记录每个候选的
+    training loss、renderer image loss、ObjectState metrics、diagnostics 和 checkpoint
+    roundtrip。
+  - summary 携带 best v2 solver state 小矩阵 checkpoint，便于下一步 handoff / restore
+    验证。
+  - `objgauss.core` 暴露 diagnostics schema、report、builder 和 validator。
+- 真实样例结果:
+  - baseline `solver_temperature=1.0`: renderer joint fail，
+    `mean_normalized_entropy=0.694399`、`assignment_confidence=0.305601`、
+    `object_purity=0.623420`。
+  - `solver_temperature=0.75`: 仍 fail，
+    `mean_normalized_entropy=0.599539`、`assignment_confidence=0.400461`、
+    `object_purity=0.700726`。
+  - `solver_temperature=0.5`: renderer joint pass / ObjectState pass，
+    `mean_normalized_entropy=0.423937`、`assignment_confidence=0.576063`、
+    `object_purity=0.815958`。
+  - recommendation: `temperature_sharpening_sufficient`，选择当前扫描中最高通过温度
+    `0.5`；当前不需要先做 evidence normalization。
+- 边界:
+  - 不启动 GPU 长训。
+  - 不引入 rollout / replay buffer / diffusion world model。
+  - 不自动 mutate dynamic-K。
+  - 不解冻 Gaussian geometry / camera。
+  - 不提交 checkpoint / summary 训练输出。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/real_sample_v2_smoke.py objgauss/core/real_sample_v2_diagnostics.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_real_sample_v2_smoke.py tests/test_real_sample_v2_diagnostics.py tests/test_core_namespace.py`: 15 passed。
+  - `uv run python -c "... real_sample_v2_diagnostics_from_cloud(...)"`:
+    produced `real_sample_v2_diagnostics_pass` and recommended
+    `solver_temperature=0.5`.
+  - `uv run --extra dev pytest`: 244 passed。
+  - `npm run build`: passed；Vite 保留既有 chunk size warning。
+  - `git diff --check`: passed。
+- 完成 commit: `7e92a33`
 
 ### REAL-SAMPLE-V2-SMOKE-001: Run v2 core path on a real/public object sample
 

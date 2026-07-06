@@ -522,6 +522,21 @@ v2 supervised loss `1.588851 -> 0.503807`、renderer image loss `0.038943 -> 0.0
 promote；下一步应先做 real-sample diagnostics / sharpening，而不是解冻 geometry 或进入
 diffusion / replay / rollout。
 
+随后完成 `REAL-SAMPLE-V2-DIAGNOSTICS-001`：新增
+`objgauss-real-sample-v2-diagnostics-v1`，对同一 public sample 固定采样后扫描 solver
+temperature，并把每个候选的 v2 training loss、renderer image loss、ObjectState entropy /
+confidence / purity、diagnostics 和 checkpoint roundtrip 写入同一份报告。结论明确：
+默认 `solver_temperature=1.0` 失败，`0.75` 仍失败，`0.5` 是当前扫描中最高的通过温度。
+`temperature=0.5` 的训练模型验证结果为
+`assignment_v2_renderer_joint_validation_pass`、`objectstate_eval_pass`，
+`mean_normalized_entropy=0.423937`、`assignment_confidence=0.576063`、
+`object_purity=0.815958`，相对 baseline 的 confidence / purity 分别提升
+`+0.270462` / `+0.192537`。diagnostics recommendation 为
+`temperature_sharpening_sufficient`，建议固化 `solver_temperature=0.5`；当前不需要先做
+evidence normalization，也不解冻 geometry / camera / dynamic-K，不进入 diffusion /
+replay / rollout。diagnostics summary 已携带 best v2 solver state 小矩阵 checkpoint，可用于
+下一步 handoff / resume 验证；训练输出仍不进 git。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
