@@ -132,7 +132,7 @@
   - `uv run --extra dev pytest`: 237 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `54f8ac2`
 
 ### ASSIGNMENT-SOLVER-V2-EVAL-001: Validate v2 solver training with stability suite
 
