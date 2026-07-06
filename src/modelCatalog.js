@@ -113,7 +113,9 @@ const OGC_DEBUG_INDEX = {
   ],
 };
 
-export const MODEL_CATALOG = [
+const DEFAULT_DISPLAY_SLOT = "lego-object-segmentation-preview";
+
+const RAW_MODEL_CATALOG = [
   {
     id: "real-sample-v2-sample-aware-lego",
     name: "真实样例 V2 样本自适应 Lego 预览",
@@ -123,6 +125,9 @@ export const MODEL_CATALOG = [
     kind: "object-aware-ply",
     kindLabel: "对象感知 PLY",
     stage: "sample-aware-preview",
+    displaySlot: DEFAULT_DISPLAY_SLOT,
+    displayOrder: 0,
+    updatedAt: "2026-07-06",
     description: "本机生成的样本自适应强化策略预览 PLY，用于查看当前阶段对象分割效果；缺少该文件时自动回退到 Lego alpha。",
     objectCount: 4,
     galleryPosition: [-2.35, 0, -3.58],
@@ -190,6 +195,9 @@ export const MODEL_CATALOG = [
     loadMode: "eager",
     kind: "object-aware-ply",
     stage: "processed",
+    displaySlot: DEFAULT_DISPLAY_SLOT,
+    displayOrder: 0,
+    updatedAt: "2026-06-22",
     objectCount: 5,
     galleryPosition: [0.05, 0, -1.25],
     accent: "#27c2cb",
@@ -341,6 +349,8 @@ export const MODEL_CATALOG = [
   },
 ];
 
+export const MODEL_CATALOG = sortModelCatalog(RAW_MODEL_CATALOG);
+
 export function catalogSummary(models = MODEL_CATALOG) {
   return {
     modelCount: models.length,
@@ -359,14 +369,14 @@ export function modelCatalogFromSearch(search = "") {
   const ogcManifest = ogcManifestArtifactFromParams(params);
   const ogcArtifact = ogcArtifactFromParams(params);
   if (!trainableArtifactPath && !plyPath && !modelArtifactManifest && !ogcManifest && !ogcArtifact) return MODEL_CATALOG;
-  return [
+  return sortModelCatalog([
     ...MODEL_CATALOG,
     ...(trainableArtifactPath ? [trainableUrlArtifactModel(trainableArtifactPath)] : []),
     ...(plyPath ? [plyUrlArtifactModel(plyPath)] : []),
     ...(modelArtifactManifest ? [modelArtifactManifestBundleModel(modelArtifactManifest)] : []),
     ...(ogcManifest ? [ogcManifestUrlArtifactModel(ogcManifest)] : []),
     ...(ogcArtifact ? [ogcUrlArtifactModel(ogcArtifact)] : []),
-  ];
+  ]);
 }
 
 export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
@@ -375,9 +385,38 @@ export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
     ?? models.find((model) => model.id === "model-artifact-manifest")?.id
     ?? models.find((model) => model.id === "ogc-manifest-artifact")?.id
     ?? models.find((model) => model.id === "ogc-url-artifact")?.id
-    ?? models.find((model) => model.id === "real-sample-v2-sample-aware-lego")?.id
+    ?? latestModelForDisplaySlot(models, DEFAULT_DISPLAY_SLOT)?.id
     ?? models[0]?.id
     ?? "";
+}
+
+function sortModelCatalog(models = []) {
+  return models
+    .map((model, index) => ({ index, model }))
+    .sort((left, right) => {
+      const orderDelta = modelDisplayOrder(left.model) - modelDisplayOrder(right.model);
+      if (orderDelta !== 0) return orderDelta;
+      if (left.model.displaySlot && left.model.displaySlot === right.model.displaySlot) {
+        const updatedDelta = modelUpdatedTime(right.model) - modelUpdatedTime(left.model);
+        if (updatedDelta !== 0) return updatedDelta;
+      }
+      return left.index - right.index;
+    })
+    .map(({ model }) => model);
+}
+
+function latestModelForDisplaySlot(models = [], displaySlot = "") {
+  return sortModelCatalog(models.filter((model) => model.displaySlot === displaySlot))[0] ?? null;
+}
+
+function modelDisplayOrder(model) {
+  const value = Number(model?.displayOrder);
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function modelUpdatedTime(model) {
+  const value = Date.parse(model?.updatedAt ?? "");
+  return Number.isFinite(value) ? value : 0;
 }
 
 function trainableArtifactPathFromParams(params) {
