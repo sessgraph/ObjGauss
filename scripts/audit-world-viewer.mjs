@@ -63,6 +63,7 @@ try {
       `objectMove=${summary.objectMoveStatus}`,
       `objectTransform=${summary.objectTransformStatus}`,
       `objectTransformState=${summary.objectTransformStateStatus}`,
+      `objectPick=${summary.objectPickStatus}`,
       `trainingStage=${summary.trainingStageStatus}`,
       `stageModels=${summary.stageVisibleModelCount}/${summary.modelCount}`,
       `stageProcessed=${summary.stageProcessedModelCount}`,
@@ -209,6 +210,9 @@ async function auditWorld(url) {
       if (
         world?.objectTransformContract !== "three-transform-controls-v1" ||
         world?.objectTransformEngine !== "object-transform-state-v1" ||
+        world?.objectPickingContract !== "projected-object-centroid-picker-v1" ||
+        world?.objectPickingDecoupledFromRenderer !== true ||
+        typeof world?.pickObjectForAudit !== "function" ||
         world?.transformGizmoAttached !== true ||
         world?.transformGizmoObject !== selectionId ||
         worldPlane?.getAttribute("data-world-plane-panel") !== "true" ||
@@ -226,6 +230,8 @@ async function auditWorld(url) {
       return {
         contract: world.objectTransformContract,
         engine: world.objectTransformEngine,
+        pickingContract: world.objectPickingContract,
+        pickingDecoupledFromRenderer: world.objectPickingDecoupledFromRenderer,
         gizmoObject: world.transformGizmoObject,
         mode: world.objectTransformMode,
         interactionLayer: interactionLayer.getAttribute("data-object-transform-primary"),
@@ -234,6 +240,27 @@ async function auditWorld(url) {
         topMetricLabels,
       };
     }, objectSelection.selectionId, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    const objectPick = await page.evaluate((selectionId) => {
+      const result = window.__OBJGAUSS_WORLD__?.pickObjectForAudit?.(selectionId) ?? null;
+      const world = window.__OBJGAUSS_WORLD__;
+      return {
+        result,
+        contract: world?.objectPickingContract ?? null,
+        decoupledFromRenderer: world?.objectPickingDecoupledFromRenderer ?? null,
+        last: world?.objectPickingLast ?? null,
+      };
+    }, objectSelection.selectionId);
+    if (
+      objectPick.contract !== "projected-object-centroid-picker-v1" ||
+      objectPick.decoupledFromRenderer !== true ||
+      objectPick.result?.ok !== true ||
+      objectPick.result?.pick?.contract !== "projected-object-centroid-picker-v1" ||
+      objectPick.result?.pick?.decoupledFromRenderer !== true ||
+      objectPick.result?.pick?.selectionId !== objectSelection.selectionId ||
+      !(Number(objectPick.result?.pick?.candidateCount) > 0)
+    ) {
+      throw new Error(`expected decoupled projected object picking to select ObjectState target: ${JSON.stringify(objectPick)}`);
+    }
     const beforeMove = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
       const target = world?.objectSelections?.find((entry) => entry.selectionId === selectionId);
@@ -2047,6 +2074,8 @@ async function auditWorld(url) {
       objectTransformStatus:
         objectTransform.contract === "three-transform-controls-v1" &&
         objectTransform.engine === "object-transform-state-v1" &&
+        objectTransform.pickingContract === "projected-object-centroid-picker-v1" &&
+        objectTransform.pickingDecoupledFromRenderer === true &&
         objectTransform.gizmoObject === objectSelection.selectionId &&
         objectTransform.interactionLayer === "three-transform-controls-v1" &&
         objectTransform.actionButtonCount === 3 &&
@@ -2054,6 +2083,7 @@ async function auditWorld(url) {
           ? "passed"
           : "failed",
       objectTransformStateStatus: objectTransformState.ok ? "passed" : "failed",
+      objectPickStatus: objectPick.result?.ok === true ? "passed" : "failed",
       objectMoveBefore: objectMove.before,
       objectMoveAfter: objectMove.after,
       trainingStageStatus:

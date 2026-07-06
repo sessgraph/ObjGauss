@@ -11,6 +11,13 @@ CLI、资产布局、指标、模型产物和文档都可能在 stable release �
 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
 commercial demo release。
 
+Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
+Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
+ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，
+并新增 `projected-object-centroid-picker-v1` screen-space object picker，使鼠标选择
+对象不再直接依赖 Gaussian renderer raycast hit-test。训练证据、Gaussian probe 和协议
+诊断仍保留在高级系统区，不作为主流程第一入口。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

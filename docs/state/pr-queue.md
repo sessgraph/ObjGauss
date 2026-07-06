@@ -14,7 +14,7 @@
 
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
-3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示和 Three.js-first Object Interaction Layer 已形成可审计默认体验；下一步应把产品主线从“已分割对象级 PLY 预览”推进到“未分割高斯云 -> 选择模型版本处理 -> 已处理跳过 / 加载已有对象层 -> 多版本对比 -> 选中/移动对象”，并继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
+3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer 和 renderer-decoupled object picking 已形成可审计默认体验；下一步应把产品主线从“已分割对象级 PLY 预览”推进到“未分割高斯云 -> 选择模型版本处理 -> 已处理跳过 / 加载已有对象层 -> 多版本对比 -> 选中/移动对象”，并继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
 4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate：Lego 选择 promoted，Polyhaven 自动回落 baseline 并触发 evidence normalization gate；`REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001` 已把 Lego sample-aware promoted PLY 接成本地 viewer 默认预览，并保留缺文件 fallback。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步若继续算法质量，应单独实现 bounded evidence normalization candidate，而不是继续 geometry / camera unfreeze、diffusion、rollout 或 replay。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
@@ -107,6 +107,51 @@
 当前无进行中 PR。
 
 ## Done
+
+### OBJECT-PICKING-LAYER-001: Decouple object picking from Gaussian render hit-test
+
+- 状态: done / validated-local-uncommitted
+- 类型: 微 PR / frontend viewer interaction
+- 前置: `OBJECT-EDIT-UX-PRIMARY-FLOW-001`
+- 目标: 固化 viewer 主流程的第一原则：先由 Three.js 加载并展示高斯云 / 模型，
+  再在展示出的对象层上做选中和移动；对象 picking 不再直接依赖点云 renderer raycast 命中。
+- 已实施:
+  - `ThreeWorld` 新增 `projected-object-centroid-picker-v1`，点击 / hover 先把可见
+    ObjectState group 投影到屏幕空间，再用对象 bbox / centroid 候选选择 object group。
+  - `window.__OBJGAUSS_WORLD__` 暴露 `objectPickingContract`、
+    `objectPickingDecoupledFromRenderer`、`objectPickingLast` 和 `pickObjectForAudit`，
+    用于验证对象选择已经独立于 Gaussian render hit-test。
+  - 对象候选同分时优先选择更靠近相机的 group，符合 3D 场景里前景对象优先的交互预期。
+  - Gaussian probe 保留在诊断 / audit 路径；主鼠标选择只负责选中 ObjectState 对象，
+    不把 per-Gaussian probe 当作对象选择入口。
+  - `scripts/audit-world-viewer.mjs` 将 projected object picking contract 纳入对象交互硬门槛。
+- 验证:
+  - `npm run build`: passed；仍有既有 Vite chunk size warning。
+  - `node --check scripts/audit-world-viewer.mjs`: passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 259 passed。
+  - Playwright + system Chrome targeted check: `http://127.0.0.1:5396/` desktop
+    1440x900 加载真实 Three.js world，选中
+    `real-sample-v2-sample-aware-lego::object-0` 后
+    `objectPickingContract=projected-object-centroid-picker-v1`、
+    `objectPickingDecoupledFromRenderer=true`，`pickObjectForAudit(selectionId)`
+    从对象屏幕中心命中同一个 ObjectState；candidateCount=23，截图：
+    `/tmp/objgauss-object-picking-layer-desktop.png`。
+  - Playwright + system Chrome targeted check: mobile 390x844 同样命中
+    `real-sample-v2-sample-aware-lego::object-0`；candidateCount=35，截图：
+    `/tmp/objgauss-object-picking-layer-mobile.png`。
+  - 截图像素检查: desktop `non_dark=0.2247 / colorful=0.0654`，mobile
+    `non_dark=0.4441 / colorful=0.0767`，确认不是空白 canvas。
+  - `node scripts/audit-world-viewer.mjs --url http://127.0.0.1:5396/`: 仍被既有
+    full audit 旧 UI 假设阻塞：`[data-assignment-heatmap='true']` 位于系统工具高级区内，
+    locator 要求 visible 导致 timeout；本次不把高级诊断重新提升到主 UI。
+- 边界:
+  - 未引入 depth buffer / ID buffer renderer pass；当前是 browser interaction layer 的
+    screen-space projected picker。
+  - 未替换 renderer、Spark bridge、ObjectState contract、manifest contract 或训练流程。
+  - 未实现 `未分割高斯云 -> 生成对象层` 的后端处理入口；该产品流仍登记在
+    `GAUSSIAN-OBJECT-PROCESS-FLOW-001`。
+- 完成 commit: 待提交
 
 ### OBJECT-EDIT-UX-PRIMARY-FLOW-001: Simplify viewer primary flow around object editing
 

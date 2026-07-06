@@ -2756,6 +2756,14 @@ function ThreeWorld({
     let transformMode = transformModeRef.current;
     let transformSnapEnabled = false;
     let lastTransformEvent = null;
+    let lastPickSummary = {
+      contract: "projected-object-centroid-picker-v1",
+      source: "init",
+      candidateCount: 0,
+      hit: false,
+      ambiguous: false,
+      selectionId: null,
+    };
 
     const applyObjectTransformMode = (mode) => {
       transformMode = normalizeObjectTransformMode(mode);
@@ -3041,6 +3049,9 @@ function ThreeWorld({
         draggableCount: draggableObjects.size,
         draggableObjectCount: draggableObjects.size,
         objectMoveContract: "object-group-position-v1",
+        objectPickingContract: "projected-object-centroid-picker-v1",
+        objectPickingDecoupledFromRenderer: true,
+        objectPickingLast: lastPickSummary,
         objectTransformContract: "three-transform-controls-v1",
         objectTransformEngine: "object-transform-state-v1",
         objectTransformMode: transformMode,
@@ -3289,6 +3300,22 @@ function ThreeWorld({
         setTransformModeForAudit(mode = "translate") {
           return api.setTransformMode(mode);
         },
+        pickObjectForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()].find((entry) => entry.visible);
+          if (!object) return { ok: false, reason: "missing-object", pick: lastPickSummary };
+          const screen = objectScreenCenter(object);
+          if (!screen) return { ok: false, reason: "offscreen-object", pick: lastPickSummary };
+          const pick = pickObjectAt(screen.clientX, screen.clientY, { source: "audit" });
+          publishAuditHandle();
+          return {
+            ok: pick.object?.userData?.selectionId === object.userData.selectionId,
+            requested: object.userData.selectionId,
+            picked: pick.object?.userData?.selectionId ?? null,
+            pick: lastPickSummary,
+          };
+        },
       };
     };
 
@@ -3421,25 +3448,119 @@ function ThreeWorld({
       };
     };
 
-    const raycaster = new THREE.Raycaster();
-    raycaster.params.Points.threshold = 0.12;
-    const pointer = new THREE.Vector2();
-    const pointerTarget = (event) => {
+    const pickBox = new THREE.Box3();
+    const pickCenter = new THREE.Vector3();
+    const pickSize = new THREE.Vector3();
+    const pickCorner = new THREE.Vector3();
+    const pickProjected = new THREE.Vector3();
+    const boxCorners = [
+      [0, 0, 0],
+      [0, 0, 1],
+      [0, 1, 0],
+      [0, 1, 1],
+      [1, 0, 0],
+      [1, 0, 1],
+      [1, 1, 0],
+      [1, 1, 1],
+    ];
+    const objectScreenCenter = (object) => {
       const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const intersections = raycaster.intersectObjects([...draggableObjects.values()], true);
-      const hit = intersections[0] ?? null;
+      if (!rect.width || !rect.height || !object) return null;
+      pickBox.setFromObject(object);
+      if (pickBox.isEmpty()) {
+        object.getWorldPosition(pickCenter);
+      } else {
+        pickBox.getCenter(pickCenter);
+      }
+      pickProjected.copy(pickCenter).project(camera);
+      if (pickProjected.z < -1 || pickProjected.z > 1) return null;
       return {
-        hit,
-        object: nearestObjectGroup(hit?.object),
+        clientX: rect.left + ((pickProjected.x + 1) / 2) * rect.width,
+        clientY: rect.top + ((1 - pickProjected.y) / 2) * rect.height,
+        depth: round3(pickProjected.z),
       };
     };
+    const projectedPickCandidate = (object, clientX, clientY) => {
+      const modelRoot = object ? modelRoots.get(object.userData.modelId) : null;
+      if (!object || object.visible === false || modelRoot?.visible === false) return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const center = objectScreenCenter(object);
+      if (!center) return null;
+      pickBox.setFromObject(object);
+      let radius = 22;
+      if (!pickBox.isEmpty()) {
+        pickBox.getSize(pickSize);
+        const maxSpan = Math.max(pickSize.x, pickSize.y, pickSize.z);
+        const worldRadius = Math.max(0.08, maxSpan * 0.5);
+        const maxScreenRadius = boxCorners.reduce((current, corner) => {
+          pickCorner.set(
+            corner[0] ? pickBox.max.x : pickBox.min.x,
+            corner[1] ? pickBox.max.y : pickBox.min.y,
+            corner[2] ? pickBox.max.z : pickBox.min.z,
+          );
+          pickProjected.copy(pickCorner).project(camera);
+          const screenX = rect.left + ((pickProjected.x + 1) / 2) * rect.width;
+          const screenY = rect.top + ((1 - pickProjected.y) / 2) * rect.height;
+          return Math.max(current, Math.hypot(screenX - center.clientX, screenY - center.clientY));
+        }, 0);
+        radius = Math.max(18, Math.min(96, maxScreenRadius || worldRadius * 24));
+      }
+      const distance = Math.hypot(clientX - center.clientX, clientY - center.clientY);
+      return {
+        object,
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        distance: round3(distance),
+        radius: round3(radius),
+        score: round3(distance / Math.max(1, radius)),
+        depth: center.depth,
+        screen: [round3(center.clientX), round3(center.clientY)],
+      };
+    };
+    const pickObjectAt = (clientX, clientY, options = {}) => {
+      const candidates = [...draggableObjects.values()]
+        .map((object) => projectedPickCandidate(object, clientX, clientY))
+        .filter(Boolean)
+        .sort(
+          (left, right) =>
+            left.score - right.score ||
+            left.depth - right.depth ||
+            left.distance - right.distance,
+        );
+      const hit = candidates.find((candidate) => candidate.distance <= Math.max(candidate.radius, 28)) ?? null;
+      const second = candidates.find((candidate) => candidate.selectionId !== hit?.selectionId) ?? null;
+      const ambiguous = Boolean(hit && second && Math.abs(hit.score - second.score) < 0.18);
+      lastPickSummary = {
+        contract: "projected-object-centroid-picker-v1",
+        source: options.source ?? "pointer",
+        decoupledFromRenderer: true,
+        candidateCount: candidates.length,
+        hit: Boolean(hit),
+        ambiguous,
+        selectionId: hit?.selectionId ?? null,
+        modelId: hit?.modelId ?? null,
+        objectId: hit?.objectId ?? null,
+        distance: hit?.distance ?? null,
+        radius: hit?.radius ?? null,
+        score: hit?.score ?? null,
+        nearest: candidates.slice(0, 3).map((candidate) => ({
+          selectionId: candidate.selectionId,
+          distance: candidate.distance,
+          radius: candidate.radius,
+          score: candidate.score,
+        })),
+      };
+      return {
+        object: hit?.object ?? null,
+        hit: null,
+        probe: null,
+      };
+    };
+    const pointerTarget = (event) => pickObjectAt(event.clientX, event.clientY, { source: event.type });
     const onPointerDown = (event) => {
       const target = pointerTarget(event);
-      const probe = gaussianProbeFromIntersection(target.hit);
-      if (target.object) selectObjectGroup(target.object, probe ? { gaussian: probe } : null);
+      if (target.object) selectObjectGroup(target.object);
     };
     const onPointerMove = (event) => {
       const target = pointerTarget(event);
@@ -6060,15 +6181,6 @@ function objectStateWireBox(bounds, accent) {
   return line;
 }
 
-function nearestObjectGroup(object) {
-  let cursor = object;
-  while (cursor) {
-    if (cursor.userData?.selectionId) return cursor;
-    cursor = cursor.parent;
-  }
-  return null;
-}
-
 function firstGaussianCloud(object) {
   let result = null;
   object?.traverse?.((child) => {
@@ -6088,13 +6200,6 @@ function objectChildVisible(object, role) {
     if (child.userData?.role === role && child.visible !== false) visible = true;
   });
   return visible;
-}
-
-function gaussianProbeFromIntersection(intersection) {
-  if (!intersection?.object?.userData || intersection.index === undefined) return null;
-  if (intersection.object.userData.role !== "gaussian-cloud") return null;
-  const probe = intersection.object.userData.gaussianDebug?.[intersection.index];
-  return probe ?? null;
 }
 
 function colorAttributeForDebugLens(cloud, lens, debugEnabled = true) {
