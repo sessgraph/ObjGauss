@@ -19,6 +19,7 @@ from objgauss.core import (
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
     CORE_MODEL_TRAIN_VALIDATE_SCHEMA,
+    REAL_SAMPLE_V2_SMOKE_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentV2RendererJointValidationReport,
     AssignmentSolverV2Config,
@@ -44,6 +45,7 @@ from objgauss.core import (
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
+    RealSampleV2SmokeReport,
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
     SyntheticStabilityDiagnosticsReport,
@@ -96,6 +98,7 @@ from objgauss.core import (
     evaluate_assignment_stability,
     evaluate_assignment_solver_v2_stability,
     evaluate_assignment_v2_renderer_joint,
+    evaluate_real_sample_v2_smoke,
     initialize_assignment_solver_v2,
     expected_slots_for_synthetic_fixture,
     evaluate_solver_decoder_object_states,
@@ -128,6 +131,7 @@ from objgauss.core import (
     project_object_states,
     project_object_states_from_field,
     read_ply,
+    real_sample_v2_smoke_from_cloud,
     renderer_loss_boundary_report,
     solver_decoder_training_scale_plan,
     train_kernel_mvp,
@@ -149,6 +153,7 @@ from objgauss.core import (
     validate_assignment_solver_v2_training_summary,
     validate_assignment_v2_renderer_joint_summary,
     validate_core_model_train_validate_summary,
+    validate_real_sample_v2_smoke_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_identity_oracle,
@@ -585,6 +590,11 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert CoreModelTrainValidateReport is not None
     assert core_model_train_validate_report is not None
     assert validate_core_model_train_validate_summary is not None
+    assert REAL_SAMPLE_V2_SMOKE_SCHEMA == "objgauss-real-sample-v2-smoke-v1"
+    assert RealSampleV2SmokeReport is not None
+    assert real_sample_v2_smoke_from_cloud is not None
+    assert evaluate_real_sample_v2_smoke is not None
+    assert validate_real_sample_v2_smoke_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
