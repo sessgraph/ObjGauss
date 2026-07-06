@@ -115,6 +115,28 @@ const OGC_DEBUG_INDEX = {
 
 export const MODEL_CATALOG = [
   {
+    id: "real-sample-v2-sample-aware-lego",
+    name: "Real Sample V2 sample-aware Lego preview",
+    label: "Real Sample V2",
+    sourcePath: "/samples/objgauss-real-sample-v2-sample-aware-lego.ply",
+    loadMode: "eager",
+    kind: "object-aware-ply",
+    stage: "sample-aware-preview",
+    objectCount: 4,
+    galleryPosition: [-2.35, 0, -3.58],
+    accent: "#35d0c8",
+    displayScale: 2.46,
+    pointSize: 0.036,
+    maxDisplayPoints: 50000,
+    optionalLocalPreview: true,
+    fallbackModelId: "lego-alpha",
+    compression: {
+      layout: "real-sample-v2-sample-aware-preview-ply",
+      status: "local-generated-preview",
+      chunkRoot: "/models/real-sample-v2-sample-aware-lego/objects/",
+    },
+  },
+  {
     id: "plush",
     name: "Plush object scene",
     label: "Plush",
@@ -351,6 +373,7 @@ export function defaultModelIdForCatalog(models = MODEL_CATALOG) {
     ?? models.find((model) => model.id === "model-artifact-manifest")?.id
     ?? models.find((model) => model.id === "ogc-manifest-artifact")?.id
     ?? models.find((model) => model.id === "ogc-url-artifact")?.id
+    ?? models.find((model) => model.id === "real-sample-v2-sample-aware-lego")?.id
     ?? models[0]?.id
     ?? "";
 }

@@ -43,6 +43,7 @@ export default function App() {
     objectId: null,
     selectionId: initialModelId,
   }));
+  const selectionRef = useRef(selection);
   const [models, setModels] = useState(() => initialModelStates(modelCatalog));
   const [debugMode, setDebugMode] = useState(true);
   const [debugLens, setDebugLens] = useState("assignment");
@@ -221,6 +222,10 @@ export default function App() {
     debugEvents,
   });
   const debugSessionDiff = debugSessionSnapshotDiff(selectedDebugSnapshot, debugSessionArchive?.snapshot);
+
+  useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1153,9 +1158,21 @@ export default function App() {
         } catch (error) {
           if (cancelled) return;
           patchModel(model.id, {
-            status: "error",
+            status: model.optionalLocalPreview ? "skipped" : "error",
             message: error?.message ?? "load failed",
           });
+          if (
+            model.optionalLocalPreview &&
+            model.fallbackModelId &&
+            selectionRef.current?.modelId === model.id
+          ) {
+            setSelection({
+              modelId: model.fallbackModelId,
+              objectId: null,
+              selectionId: model.fallbackModelId,
+            });
+            worldApi.current?.focusModel(model.fallbackModelId);
+          }
         }
       }
     }
