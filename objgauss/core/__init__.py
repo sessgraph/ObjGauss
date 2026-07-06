@@ -74,6 +74,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_weak_boundary_opt",
         "RealSampleV2WeakBoundaryOptReport",
     ),
+    "RealSampleV2PromotedWeightsCrossSampleReport": (
+        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "RealSampleV2PromotedWeightsCrossSampleReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -268,6 +272,10 @@ _EXPORTS = {
     "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA": (
         "objgauss.core.real_sample_v2_weak_boundary_opt",
         "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA",
+    ),
+    "REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA": (
+        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -553,6 +561,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_weak_boundary_opt",
         "real_sample_v2_weak_boundary_opt_from_cloud",
     ),
+    "real_sample_v2_promoted_weights_cross_sample_from_cloud": (
+        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "real_sample_v2_promoted_weights_cross_sample_from_cloud",
+    ),
     "render_real_sample_v2_model_handoff_html": (
         "objgauss.core.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
@@ -757,6 +769,10 @@ _EXPORTS = {
     "validate_real_sample_v2_weak_boundary_opt_summary": (
         "objgauss.core.real_sample_v2_weak_boundary_opt",
         "validate_real_sample_v2_weak_boundary_opt_summary",
+    ),
+    "validate_real_sample_v2_promoted_weights_cross_sample_summary": (
+        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "validate_real_sample_v2_promoted_weights_cross_sample_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

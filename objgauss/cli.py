@@ -126,6 +126,9 @@ from objgauss.core.real_sample_v2_segmentation_quality import (
 from objgauss.core.real_sample_v2_weak_boundary_opt import (
     real_sample_v2_weak_boundary_opt_from_cloud,
 )
+from objgauss.core.real_sample_v2_promoted_weights_cross_sample import (
+    real_sample_v2_promoted_weights_cross_sample_from_cloud,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -2007,6 +2010,94 @@ def _training_real_sample_v2_weak_boundary_opt(args: argparse.Namespace) -> None
         print(f"viewer_route={summary['viewer']['debug_route']}")
     if args.require_pass and summary["status"] != "real_sample_v2_weak_boundary_opt_pass":
         raise ValueError("real sample v2 weak-boundary optimization did not pass")
+
+
+def _training_real_sample_v2_promoted_weights_cross_sample(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    report = real_sample_v2_promoted_weights_cross_sample_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        max_points=args.max_points,
+        solver_temperature=args.solver_temperature,
+        baseline_feature_weight=args.baseline_feature_weight,
+        baseline_position_weight=args.baseline_position_weight,
+        promoted_feature_weight=args.promoted_feature_weight,
+        promoted_position_weight=args.promoted_position_weight,
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+        viewer_path=args.viewer_path,
+        reference_sample=args.reference_sample,
+    )
+    summary = report.as_dict()
+    baseline_quality = summary["baseline"]["quality"]
+    baseline_hard = summary["baseline"]["projection"]["hard_segmentation"]
+    promoted_quality = summary["promoted"]["quality"]
+    promoted_hard = summary["promoted"]["projection"]["hard_segmentation"]
+    delta = summary["quality_delta"]
+    changed = summary["changed_gaussians"]
+    recommendation = summary["recommendation"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['source']['source_gaussians']}")
+    print(f"max_points={summary['fixed_target']['max_points']}")
+    print(f"solver_temperature={summary['fixed_target']['solver_temperature']}")
+    print(f"baseline_feature_weight={summary['promotion_policy']['baseline_feature_weight']}")
+    print(f"baseline_position_weight={summary['promotion_policy']['baseline_position_weight']}")
+    print(f"promoted_feature_weight={summary['promotion_policy']['promoted_feature_weight']}")
+    print(f"promoted_position_weight={summary['promotion_policy']['promoted_position_weight']}")
+    print(f"baseline_mixed_gaussians={baseline_hard['mixed_gaussians']}")
+    print(f"promoted_mixed_gaussians={promoted_hard['mixed_gaussians']}")
+    print(f"mixed_gaussians_delta={delta['mixed_gaussians_delta']}")
+    print(f"baseline_direct_slot_match={baseline_quality['direct_slot_match']:.6f}")
+    print(f"promoted_direct_slot_match={promoted_quality['direct_slot_match']:.6f}")
+    print(f"direct_slot_match_delta={delta['direct_slot_match_delta']:.6f}")
+    print(f"baseline_object_purity={_format_optional_float(baseline_quality['object_purity'])}")
+    print(f"promoted_object_purity={_format_optional_float(promoted_quality['object_purity'])}")
+    print(f"object_purity_delta={_format_optional_float(delta['object_purity_delta'])}")
+    print(f"baseline_confidence={baseline_quality['assignment_confidence']:.6f}")
+    print(f"promoted_confidence={promoted_quality['assignment_confidence']:.6f}")
+    print(f"assignment_confidence_delta={delta['assignment_confidence_delta']:.6f}")
+    print(f"baseline_entropy={baseline_quality['mean_normalized_entropy']:.6f}")
+    print(f"promoted_entropy={promoted_quality['mean_normalized_entropy']:.6f}")
+    print(f"mean_normalized_entropy_delta={delta['mean_normalized_entropy_delta']:.6f}")
+    print(f"changed_gaussians={changed['changed_count']}")
+    print(f"hard_fix_count={changed['hard_fix_count']}")
+    print(f"hard_regression_count={changed['hard_regression_count']}")
+    for pair in changed["pairs"]:
+        print(
+            "changed_pair="
+            f"baseline:{pair['baseline_object_id']},"
+            f"promoted:{pair['promoted_object_id']},"
+            f"count:{pair['count']}"
+        )
+    print(f"recommendation_decision={recommendation['decision']}")
+    print(f"recommendation_action={recommendation['action']}")
+    write_ply(args.preview_ply_output, report.promoted_cloud, fmt=_output_format(args))
+    print(f"preview_ply={args.preview_ply_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if summary["viewer"]["debug_route"]:
+        print(f"viewer_route={summary['viewer']['debug_route']}")
+    if (
+        args.require_pass
+        and summary["status"] != "real_sample_v2_promoted_weights_cross_sample_pass"
+    ):
+        raise ValueError("real sample v2 promoted weights cross-sample check did not pass")
 
 
 def _training_eval_assignment(args: argparse.Namespace) -> None:
@@ -3893,6 +3984,90 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_weak_boundary_opt.add_argument("--summary-output", type=Path)
     real_sample_weak_boundary_opt.add_argument("--require-pass", action="store_true")
     real_sample_weak_boundary_opt.set_defaults(handler=_training_real_sample_v2_weak_boundary_opt)
+
+    real_sample_promoted_weights_cross_sample = training_subparsers.add_parser(
+        "real-sample-v2-promoted-weights-cross-sample",
+        help="compare promoted assignment weights against baseline weights on a second real sample",
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("input", type=Path)
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--preview-ply-output",
+        required=True,
+        type=Path,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--viewer-path")
+    real_sample_promoted_weights_cross_sample.add_argument("--slots", type=int)
+    real_sample_promoted_weights_cross_sample.add_argument("--frames", type=int, default=2)
+    real_sample_promoted_weights_cross_sample.add_argument("--max-points", type=int, default=128)
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--solver-temperature",
+        type=float,
+        default=0.35,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--baseline-feature-weight",
+        type=float,
+        default=1.0,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--baseline-position-weight",
+        type=float,
+        default=1.0,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--promoted-feature-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--promoted-position-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--reference-sample",
+        default="public/samples/lego_alpha_v1_objects.ply",
+        help="sample where the promoted weights were first selected",
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--object-id-field", default="object_id")
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--temporal-offset",
+        type=float,
+        default=0.01,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--image-width", type=int, default=12)
+    real_sample_promoted_weights_cross_sample.add_argument("--image-height", type=int, default=12)
+    real_sample_promoted_weights_cross_sample.add_argument("--point-radius", type=int, default=1)
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--iterations", type=int, default=100)
+    real_sample_promoted_weights_cross_sample.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--baseline-temperature",
+        type=float,
+        default=1.0,
+    )
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--image-renderer",
+        choices=("point", "gsplat"),
+        default="point",
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--seed", type=int, default=4)
+    real_sample_promoted_weights_cross_sample.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_promoted_weights_cross_sample.add_argument("--rewrite-sh", action="store_true")
+    real_sample_promoted_weights_cross_sample.add_argument(
+        "--ascii",
+        action="store_true",
+        help="write ASCII PLY",
+    )
+    real_sample_promoted_weights_cross_sample.add_argument("--summary-output", type=Path)
+    real_sample_promoted_weights_cross_sample.add_argument("--require-pass", action="store_true")
+    real_sample_promoted_weights_cross_sample.set_defaults(
+        handler=_training_real_sample_v2_promoted_weights_cross_sample
+    )
 
     eval_assignment = training_subparsers.add_parser(
         "eval-assignment",
