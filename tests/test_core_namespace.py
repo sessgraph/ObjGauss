@@ -17,7 +17,9 @@ from objgauss.core import (
     ASSIGNMENT_SOLVER_V2_STABILITY_EVAL_SCHEMA,
     ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA,
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
+    ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
     AssignmentEvidenceBatch,
+    AssignmentV2RendererJointValidationReport,
     AssignmentSolverV2Config,
     AssignmentSolverV2Prediction,
     AssignmentSolverV2State,
@@ -90,6 +92,7 @@ from objgauss.core import (
     dynamic_k_update_plan,
     evaluate_assignment_stability,
     evaluate_assignment_solver_v2_stability,
+    evaluate_assignment_v2_renderer_joint,
     initialize_assignment_solver_v2,
     expected_slots_for_synthetic_fixture,
     evaluate_solver_decoder_object_states,
@@ -141,6 +144,7 @@ from objgauss.core import (
     validate_assignment_solver_v2_state,
     validate_assignment_solver_v2_stability_eval_summary,
     validate_assignment_solver_v2_training_summary,
+    validate_assignment_v2_renderer_joint_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_identity_oracle,
@@ -567,6 +571,12 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert AssignmentSolverV2StabilityEvalReport is not None
     assert evaluate_assignment_solver_v2_stability is not None
     assert validate_assignment_solver_v2_stability_eval_summary is not None
+    assert ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA == (
+        "objgauss-assignment-v2-render-joint-validation-v1"
+    )
+    assert AssignmentV2RendererJointValidationReport is not None
+    assert evaluate_assignment_v2_renderer_joint is not None
+    assert validate_assignment_v2_renderer_joint_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],

@@ -12,6 +12,9 @@ OBJECT_EMERGENCE_SOLVER_CHECKPOINT_SCHEMA = "objgauss-object-emergence-solver-ch
 OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA = "objgauss-object-state-gaussian-decoder-training-v1"
 SOLVER_DECODER_JOINT_TRAINING_SCHEMA = "objgauss-solver-decoder-joint-training-v1"
 SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA = "objgauss-solver-decoder-joint-checkpoint-v1"
+ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA = (
+    "objgauss-assignment-v2-render-joint-validation-v1"
+)
 FULL_3DGS_RENDERERS = {"gsplat-rasterization-v1"}
 OBJECT_EMERGENCE_SOLVER_EVIDENCE = {
     "object_emergence_solver_training",
@@ -21,6 +24,9 @@ OBJECT_STATE_DECODER_TRAINING_EVIDENCE = {"object_state_gaussian_decoder_trainin
 SOLVER_DECODER_JOINT_EVIDENCE = {
     "solver_decoder_joint_training",
     "solver_decoder_joint_checkpoint",
+}
+ASSIGNMENT_V2_RENDER_JOINT_EVIDENCE = {
+    "assignment_v2_renderer_joint_validation",
 }
 
 
@@ -89,6 +95,12 @@ def renderer_loss_boundary_report(
         and evidence.get("loss_decreased")
         and evidence.get("image_render_loss_decreased")
     )
+    assignment_v2_renderer_ready = bool(
+        kernel_summary is not None
+        and evidence.get("kind") in ASSIGNMENT_V2_RENDER_JOINT_EVIDENCE
+        and evidence.get("loss_decreased")
+        and evidence.get("image_render_loss_decreased")
+    )
     status = "point_render_smoke_ready" if point_ready else "contract_defined"
     if kernel_summary is not None and point_blockers:
         status = "point_render_smoke_blocked"
@@ -98,6 +110,8 @@ def renderer_loss_boundary_report(
         status = "object_state_decoder_training_ready"
     if joint_training_ready:
         status = "solver_decoder_joint_training_ready"
+    if assignment_v2_renderer_ready:
+        status = "assignment_v2_renderer_joint_validation_ready"
     if point_ready and evidence.get("renderer_api_ready"):
         status = "renderer_api_ready"
     full_renderer_ready = (
@@ -110,6 +124,8 @@ def renderer_loss_boundary_report(
         status = "full_3dgs_decoder_training_ready"
     if joint_training_ready and full_renderer_ready:
         status = "full_3dgs_solver_decoder_joint_training_ready"
+    if assignment_v2_renderer_ready and full_renderer_ready:
+        status = "full_3dgs_assignment_v2_renderer_joint_validation_ready"
     upgrade_blockers = []
     if not evidence.get("image_targets_bound"):
         upgrade_blockers.append("image_space_targets_not_bound")
@@ -146,6 +162,13 @@ def renderer_loss_boundary_report(
             "keep geometry/opacity/camera frozen until assignment and color training are stable",
         )
         if evidence.get("kind") == "solver_decoder_joint_checkpoint"
+        else
+        (
+            "promote v2 assignment checkpoint into solver-decoder joint training",
+            "run a controlled gsplat smoke when host GPU is available",
+            "keep identity hard gate as the promotion blocker before renderer loss",
+        )
+        if evidence.get("kind") in ASSIGNMENT_V2_RENDER_JOINT_EVIDENCE
         else
         (
             "select or implement full 3DGS image renderer behind the training renderer API",
@@ -272,6 +295,7 @@ def _kernel_summary_evidence(kernel_summary: dict[str, Any] | None) -> tuple[dic
     if kernel_summary.get("schema") in {
         SOLVER_DECODER_JOINT_TRAINING_SCHEMA,
         SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
+        ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
     }:
         return _solver_decoder_joint_evidence(kernel_summary)
     if kernel_summary.get("schema") != TRAINABLE_KERNEL_SCHEMA:
@@ -338,12 +362,19 @@ def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str)
     joint_training_ready = kind in SOLVER_DECODER_JOINT_EVIDENCE and bool(
         evidence.get("loss_decreased") and evidence.get("image_render_loss_decreased")
     )
+    assignment_v2_renderer_ready = kind in ASSIGNMENT_V2_RENDER_JOINT_EVIDENCE and bool(
+        evidence.get("loss_decreased") and evidence.get("image_render_loss_decreased")
+    )
     renderer_ready = bool(evidence.get("renderer_api_ready"))
     full_renderer_ready = renderer_ready and evidence.get("renderer_name") in FULL_3DGS_RENDERERS
     if full_renderer_ready and joint_training_ready:
         status = "full_renderer_solver_decoder_joint_training_ready"
+    elif full_renderer_ready and assignment_v2_renderer_ready:
+        status = "full_renderer_assignment_v2_renderer_joint_validation_ready"
     elif joint_training_ready:
         status = "solver_decoder_joint_training_ready"
+    elif assignment_v2_renderer_ready:
+        status = "assignment_v2_renderer_joint_validation_ready"
     elif full_renderer_ready and decoder_training_ready:
         status = "full_renderer_decoder_training_ready"
     elif decoder_training_ready:
@@ -396,14 +427,20 @@ def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str)
                 "gradient path from renderer loss back to decoder/solver trainable fields",
             ],
         },
-        "ready_without_gpu": bool(solver_ready or renderer_ready or decoder_training_ready or joint_training_ready),
+        "ready_without_gpu": bool(
+            solver_ready
+            or renderer_ready
+            or decoder_training_ready
+            or joint_training_ready
+            or assignment_v2_renderer_ready
+        ),
         "starts_real_training": bool(decoder_training_ready or joint_training_ready),
         "remaining_before_full_training": [
-            "bind solver checkpoint output to Gaussian decoder parameters",
-            "bind decoded Gaussian artifact to renderer_api loss producer",
-            "pass torch/gsplat/CUDA/NVIDIA driver preflight",
+            "promote v2 assignment checkpoint into solver-decoder joint training",
+            "run controlled gsplat renderer smoke",
+            "keep identity hard gate as promotion blocker before renderer loss",
         ]
-        if not (full_renderer_ready or decoder_training_ready or joint_training_ready)
+        if assignment_v2_renderer_ready and not full_renderer_ready
         else [
             "switch decoder training smoke to full 3DGS renderer",
             "keep geometry/opacity/scale frozen until color-only optimization is stable",
@@ -414,6 +451,17 @@ def _decoder_handoff_contract(evidence: dict[str, Any], *, target_renderer: str)
             "keep dynamic-K and Gaussian geometry updates gated until joint training is stable",
         ]
         if joint_training_ready and not full_renderer_ready
+        else [
+            "bind solver checkpoint output to Gaussian decoder parameters",
+            "bind decoded Gaussian artifact to renderer_api loss producer",
+            "pass torch/gsplat/CUDA/NVIDIA driver preflight",
+        ]
+        if not (
+            full_renderer_ready
+            or decoder_training_ready
+            or joint_training_ready
+            or assignment_v2_renderer_ready
+        )
         else [],
     }
 

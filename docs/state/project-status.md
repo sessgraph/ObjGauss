@@ -480,6 +480,20 @@ roundtrip 通过时才 pass，明确 loss 下降不能替代 identity gate。本
 `ASSIGNMENT-V2-RENDER-JOINT-001`，把 v2 assignment checkpoint 接回
 `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss` 验证。
 
+随后完成 `ASSIGNMENT-V2-RENDER-JOINT-001`：新增
+`objgauss-assignment-v2-render-joint-validation-v1`，把
+`objgauss-assignment-solver-v2-checkpoint` 接回
+`A[N,K] -> ObjectStateProjection -> ObjectStateGaussianDecoderState -> renderer_api image_render_loss`。
+该 validation bridge 使用 uniform assignment 作为 renderer baseline，用 v2 checkpoint final
+state 产生 final assignment；默认 decoder colors 从 `target_assignment / target_rgb` 拟合，
+避免把 decoder 未训练误判为 assignment failure。summary 输出 initial / final renderer loss、
+assignment loss、ObjectState eval、checkpoint roundtrip、identity gate policy 和 frozen fields；
+`renderer-loss-contract` 已能消费该 summary，并输出
+`assignment_v2_renderer_joint_validation_ready`。本切片不启动 optimizer、不接 GPU 长训、
+不解冻 Gaussian geometry / camera / dynamic-K、不把 renderer loss 作为绕过 identity hard gate
+的理由。下一步进入 `CORE-MODEL-TRAIN-VALIDATE-001`，汇总核心模型可训练、可验证、可失败定位的
+milestone 证据。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
@@ -2811,11 +2825,12 @@ npm run acceptance:demo
 
 1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
-3. 算法模型线：`ASSIGNMENT-SOLVER-V2-EVAL-001` 已用 synthetic stability suite 验证
-   v2 assignment solver 的 loss / hard gate / diagnostics / checkpoint roundtrip；下一步做
-   `ASSIGNMENT-V2-RENDER-JOINT-001`，把 v2 checkpoint 接回
-   `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss`。rollout model、replay
-   buffer、diffusion 和更大规模 GPU 训练必须等 core model train / validate milestone 通过后再推进。
+3. 算法模型线：`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回
+   `A[N,K] -> ObjectState -> Gaussian decoder -> renderer loss` validation path，并让
+   `renderer-loss-contract` 消费该 summary；下一步做 `CORE-MODEL-TRAIN-VALIDATE-001`，
+   汇总 loss、hard gate、diagnostics、ObjectState eval、renderer joint smoke 和 checkpoint
+   roundtrip 证据。rollout model、replay buffer、diffusion 和更大规模 GPU 训练必须等 core
+   model train / validate milestone 通过后再推进。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
