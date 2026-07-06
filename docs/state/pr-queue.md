@@ -15,26 +15,29 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选和按需 object-aware PLY 加载已形成可审计默认体验；下一步继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证。近期路线已到真实 public sample 上可训练、可验证、可展示阶段；下一步若继续增强展示，应接入 viewer/debug route，而不是只增加训练日志。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看效果阶段；下一步应诊断 full-cloud `low_object_purity`，避免只看采样 pass。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-### REAL-SAMPLE-V2-VIEWER-PREVIEW-001: Add viewer/debug route for v2 assignment effect
+### REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001: Diagnose full-cloud assignment purity gap
 
 - 状态: ready
-- 类型: 标准 PR / viewer debug preview
-- 前置: `REAL-SAMPLE-V2-MODEL-HANDOFF-001`
-- 目标: 将 handoff 生成的 effect preview 从独立 HTML 推进到 viewer/debug route 或
-  browser-ready debug artifact，使训练模型效果可以在浏览器体验里直接查看。
+- 类型: 标准 PR / algorithm diagnostics + viewer evidence
+- 前置: `REAL-SAMPLE-V2-VIEWER-PREVIEW-001`
+- 目标: 解释为什么采样 handoff 已 pass，但 full-cloud viewer preview 的
+  `object_purity=0.758462` 仍低于 `0.8` gate，并决定下一步是增加 real sample coverage、
+  evidence normalization，还是只调整 preview/export policy。
 - 建议范围:
-  - 读取 handoff summary / checkpoint，展示 baseline vs trained assignment 预览。
-  - 保留 object_id target ring / predicted slot color / confidence opacity 的可解释编码。
-  - 增加 Playwright 审计：页面非空、两个对比面板存在、文本不溢出。
+  - 固定 public `lego_alpha_v1_objects.ply`，比较 `max_points=24/64/128` 或等价覆盖策略
+    对 full-cloud projection purity / confidence / direct slot match 的影响。
+  - 输出同一 schema 的 summary，对比采样 ObjectState gate 与 full-cloud ObjectState gate。
+  - 至少生成一个 `/tmp` viewer preview PLY，复用 `?ply=` debug route 做浏览器审计。
 - 边界:
-  - 不把 debug preview 当公开 production demo。
-  - 不提交 generated checkpoint / summary / preview。
-  - 不进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry unfreeze。
+  - 不把 full-cloud low purity 用 UI 颜色或阈值掩盖。
+  - 不提交 generated checkpoint / summary / preview PLY。
+  - 不进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation、geometry / camera
+    unfreeze。
   - 不改变 public demo / HF release 口径。
 
 ## Suspended
@@ -103,6 +106,52 @@
 当前无进行中 PR。
 
 ## Done
+
+### REAL-SAMPLE-V2-VIEWER-PREVIEW-001: Add viewer/debug route for v2 assignment effect
+
+- 状态: done / full-cloud-viewer-debug-preview
+- 类型: 标准 PR / viewer debug preview
+- 前置: `REAL-SAMPLE-V2-MODEL-HANDOFF-001`
+- 目标: 将 handoff 生成的 effect preview 从独立 HTML 推进到 viewer/debug route 或
+  browser-ready debug artifact，使训练模型效果可以在浏览器体验里直接查看。
+- 已实施:
+  - 新增 `objgauss-real-sample-v2-viewer-preview-v1` schema。
+  - 新增 `RealSampleV2ViewerPreviewReport`、
+    `real_sample_v2_viewer_preview_from_cloud(...)` 和
+    `real_sample_v2_viewer_preview_from_handoff(...)`。
+  - CLI 新增 `objgauss training real-sample-v2-viewer-preview`，输出 full-cloud
+    viewer preview PLY 和 summary。
+  - 派生 PLY 保留 geometry / opacity / scale，新增 `target_object_id`、`target_slot`、
+    `assignment_confidence`、`assignment_entropy`，并把 renderer-facing `object_id` 写为
+    `argmax(A)` predicted slot。
+  - frontend viewer 新增同源 `?ply=/... .ply` debug route，并把 URL PLY 设为默认选中模型。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/real_sample_v2_viewer_preview.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_real_sample_v2_viewer_preview.py tests/test_real_sample_v2_model_handoff.py tests/test_core_namespace.py`: 13 passed。
+  - `node --input-type=module -e "import('./src/modelCatalog.js')..."`: passed，`?ply=` 生成
+    `ply-url-artifact` 并成为默认模型。
+  - `uv run objgauss training real-sample-v2-viewer-preview public/samples/lego_alpha_v1_objects.ply --temperature-candidates 1.0 0.75 0.5 0.35 --preview-ply-output /tmp/objgauss-real-sample-v2-viewer-preview.ply --summary-output /tmp/objgauss-real-sample-v2-viewer-preview-summary.json --viewer-path /samples/objgauss-real-sample-v2-viewer-preview.ply --require-pass`: passed。
+  - `uv run objgauss stats /tmp/objgauss-real-sample-v2-viewer-preview.ply`: passed，`5696`
+    Gaussians，predicted `object_id` counts 为 `692/457/1934/2613`。
+  - `npm run build`: passed；仍有既有 Vite chunk size warning。
+  - Playwright + system Chrome 验证 `/?ply=/samples/objgauss-real-sample-v2-viewer-preview.ply`
+    desktop / mobile：URL PLY route 已被拦截到 `/tmp` PLY，`ply-url-artifact` loaded，
+    `5696` Gaussians，`4` objects，ObjectState debug snapshot source 为
+    `derived_from_object_id`；desktop 截图
+    `/tmp/objgauss-real-sample-v2-viewer-preview-route-debug.png`，mobile 截图
+    `/tmp/objgauss-real-sample-v2-viewer-preview-route-mobile-debug.png`。截图像素检查通过：
+    desktop crop `unique_colors=40171`、`non_dark_pixels=91964`；mobile crop
+    `unique_colors=5654`、`non_dark_pixels=62477`。
+- 结果:
+  - `/tmp` summary 记录 full-cloud viewer preview 为
+    `real_sample_v2_viewer_preview_pass`。
+  - 质量诊断没有被掩盖：full-cloud `mean_normalized_entropy=0.481849`、
+    `assignment_confidence=0.518151`、`direct_slot_match=0.900281`、
+    `object_purity=0.758462`，仍触发 `low_object_purity`。
+- 边界:
+  - 未提交 generated checkpoint / summary / preview PLY。
+  - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
+    camera unfreeze。
 
 ### REAL-SAMPLE-V2-MODEL-HANDOFF-001: Export reproducible real-sample v2 model validation
 

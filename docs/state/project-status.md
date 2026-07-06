@@ -555,6 +555,23 @@ Chrome 截图到 `/tmp/objgauss-real-sample-v2-handoff-preview.png`，确认页�
 2 个 SVG 面板。本切片仍不提交 checkpoint / summary / preview 产物，不解冻 geometry /
 camera / dynamic-K，不进入 GPU 长训、diffusion、replay 或 rollout。
 
+随后完成 `REAL-SAMPLE-V2-VIEWER-PREVIEW-001`：新增
+`objgauss-real-sample-v2-viewer-preview-v1`，把 handoff checkpoint restore 后的
+assignment 投影回全量 real public Gaussian PLY，并导出 viewer 可加载的 object-aware
+debug PLY。CLI 新增 `objgauss training real-sample-v2-viewer-preview`，可从
+`public/samples/lego_alpha_v1_objects.ply` 写出派生 PLY 和 summary 到 `/tmp` 或 ignored
+`outputs/`；派生 PLY 保留原始 Gaussian geometry / opacity / scale，新增
+`target_object_id`、`target_slot`、`assignment_confidence`、`assignment_entropy`，并把
+renderer-facing `object_id` 写成 `argmax(A)` 预测 slot。frontend viewer 新增同源
+`?ply=/... .ply` debug route，`/?ply=/samples/objgauss-real-sample-v2-viewer-preview.ply`
+可直接进入 ObjectState Debug OS 查看派生点云。本轮验证的 `/tmp` 预览 PLY 覆盖
+`5696` 个 Gaussian、`4` 个 predicted objects，`solver_temperature=0.5`、
+`mean_normalized_entropy=0.481849`、`assignment_confidence=0.518151`、
+`direct_slot_match=0.900281`，但 full-cloud `object_purity=0.758462`，仍触发
+`low_object_purity`。结论：训练模型已经能被 3D viewer 看到效果，但全量高斯质量还没有达到
+promotion gate；下一步应诊断 sample-to-full-cloud purity gap，而不是解冻 geometry 或进入
+GPU 长训、diffusion、replay、rollout。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
