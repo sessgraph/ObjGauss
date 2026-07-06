@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Move3D, Redo2, Rotate3D, Scale3D, Undo2, X } from "lucide-react";
 import * as THREE from "three";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
 import { catalogSummary, defaultModelIdForCatalog, modelCatalogFromSearch } from "./modelCatalog.js";
 import { MODEL_ARTIFACT_MANIFEST_SCHEMA, browserReadyArtifact } from "./modelArtifactManifest.js";
@@ -24,6 +26,10 @@ const DEBUG_LENSES = ["assignment", "confidence", "entropy", "opacity"];
 const OBJECT_OVERLAY_MODES = ["full", "bbox", "centroid", "off"];
 const DEBUG_EVENT_LIMIT = 12;
 const HOVER_DIM_OPACITY = 0.18;
+const OBJECT_TRANSFORM_MODES = ["translate", "rotate", "scale"];
+const OBJECT_TRANSFORM_SNAP_STEP = 0.25;
+const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
+const OBJECT_SCALE_SNAP_STEP = 0.1;
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -54,6 +60,7 @@ export default function App() {
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
   const [objectOverlayMode, setObjectOverlayMode] = useState("full");
+  const [objectTransformMode, setObjectTransformMode] = useState("translate");
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
@@ -92,8 +99,12 @@ export default function App() {
     error: "",
   }));
   const [debugSessionArchive, setDebugSessionArchive] = useState(null);
+  const knownStageModelIds = useRef(new Set(modelCatalog.map((model) => model.id)));
+  const [stageModelIds, setStageModelIds] = useState(() => new Set(modelCatalog.map((model) => model.id)));
   const modelList = useMemo(() => Object.values(models), [models]);
   const summary = useMemo(() => catalogSummary(modelList), [modelList]);
+  const stageSummary = useMemo(() => trainingStageSummary(modelList, stageModelIds), [modelList, stageModelIds]);
+  const stageModelIdList = stageSummary.visibleIds;
   const loadedCount = useMemo(
     () => Object.values(models).filter((model) => ["loaded", "compressed"].includes(model.status)).length,
     [models],
@@ -120,6 +131,7 @@ export default function App() {
       ),
     [modelList],
   );
+  const stagedObjectCount = stageSummary.visibleObjectCount;
   const selectedId = selection.modelId;
   const selected = models[selectedId] ?? Object.values(models)[0];
   const selectedObject =
@@ -226,6 +238,20 @@ export default function App() {
   useEffect(() => {
     selectionRef.current = selection;
   }, [selection]);
+
+  useEffect(() => {
+    const known = knownStageModelIds.current;
+    const newModelIds = modelList
+      .map((model) => model.id)
+      .filter((modelId) => modelId && !known.has(modelId));
+    if (!newModelIds.length) return;
+    newModelIds.forEach((modelId) => known.add(modelId));
+    setStageModelIds((current) => {
+      const next = new Set(current);
+      newModelIds.forEach((modelId) => next.add(modelId));
+      return next;
+    });
+  }, [modelList]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -556,6 +582,10 @@ export default function App() {
 
   const selectModel = useCallback(
     (id) => {
+      setStageModelIds((current) => {
+        if (current.has(id)) return current;
+        return new Set([...current, id]);
+      });
       setSelection({ modelId: id, objectId: null, selectionId: id });
       setDebugProbe(null);
       recordDebugEvent("select-model", { modelId: id, selectionId: id, source: "model-dock" });
@@ -577,17 +607,6 @@ export default function App() {
   const handleHoverObject = useCallback((target) => {
     setHoveredTarget(target ?? null);
   }, []);
-
-  const toggleDebugMode = useCallback(() => {
-    const next = !debugMode;
-    setDebugMode(next);
-    recordDebugEvent("debug-toggle", {
-      enabled: next,
-      lens: next ? debugLens : "appearance",
-      source: "top-hud",
-    });
-    worldApi.current?.setDebugMode(next);
-  }, [debugLens, debugMode, recordDebugEvent]);
 
   const selectDebugLens = useCallback((lens) => {
     const next = normalizeDebugLens(lens);
@@ -953,14 +972,15 @@ export default function App() {
   );
 
   const handleObjectMoved = useCallback(
-    (target, position) => {
+    (target, position, options = {}) => {
       if (!target?.modelId) return;
+      const source = options?.source ?? "drag";
       recordDebugEvent("move-object", {
         modelId: target.modelId,
         objectId: target.objectId,
         selectionId: target.selectionId,
         position,
-        source: "drag",
+        source,
       });
       patchModel(target.modelId, (current) => ({
         objects: (current.objects ?? []).map((object) =>
@@ -971,6 +991,120 @@ export default function App() {
       }));
     },
     [patchModel, recordDebugEvent],
+  );
+
+  const moveSelectedObject = useCallback(
+    (delta) => {
+      if (!selection.selectionId || selection.selectionId === selection.modelId) return;
+      worldApi.current?.moveObject(selection.selectionId, delta, { source: "debug-panel" });
+    },
+    [selection.modelId, selection.selectionId],
+  );
+
+  const undoObjectTransform = useCallback(() => {
+    worldApi.current?.undoObjectTransform?.();
+  }, []);
+
+  const redoObjectTransform = useCallback(() => {
+    worldApi.current?.redoObjectTransform?.();
+  }, []);
+
+  const cancelObjectTransform = useCallback(() => {
+    worldApi.current?.cancelObjectTransform?.("panel");
+  }, []);
+
+  const selectObjectTransformMode = useCallback(
+    (mode) => {
+      const next = normalizeObjectTransformMode(mode);
+      setObjectTransformMode(next);
+      worldApi.current?.setTransformMode?.(next);
+      recordDebugEvent("transform-mode", {
+        mode: next,
+        source: "object-interaction-layer",
+      });
+    },
+    [recordDebugEvent],
+  );
+
+  const toggleStageModel = useCallback(
+    (modelId) => {
+      if (!modelId) return;
+      const nextVisible = !stageModelIds.has(modelId);
+      setStageModelIds((current) => {
+        const next = new Set(current);
+        if (nextVisible) {
+          next.add(modelId);
+        } else {
+          next.delete(modelId);
+        }
+        return next;
+      });
+      recordDebugEvent("stage-model-toggle", {
+        modelId,
+        visible: nextVisible,
+        source: "training-stage-panel",
+      });
+    },
+    [recordDebugEvent, stageModelIds],
+  );
+
+  const selectStageModelBatch = useCallback(
+    (mode) => {
+      let ids = [];
+      if (mode === "processed") {
+        ids = modelList
+          .filter((model) => trainingStageModelEntry(model, false).processed)
+          .map((model) => model.id);
+      } else if (mode === "slot") {
+        const slot = selected?.displaySlot;
+        ids = modelList
+          .filter((model) => (slot ? model.displaySlot === slot : model.id === selected?.id))
+          .map((model) => model.id);
+      } else {
+        ids = modelList.map((model) => model.id);
+      }
+      const next = new Set(ids.filter(Boolean));
+      setStageModelIds(next);
+      recordDebugEvent("stage-model-batch", {
+        mode,
+        modelIds: [...next],
+        source: "training-stage-panel",
+      });
+    },
+    [modelList, recordDebugEvent, selected?.displaySlot, selected?.id],
+  );
+
+  const processModelVersion = useCallback(
+    (modelId) => {
+      const model = models[modelId];
+      if (!model) return;
+      const entry = trainingStageModelEntry(model, stageModelIds.has(model.id));
+      setStageModelIds((current) => {
+        if (current.has(model.id)) return current;
+        return new Set([...current, model.id]);
+      });
+      if (entry.processed) {
+        selectModel(model.id);
+        recordDebugEvent("model-process-skip", {
+          modelId: model.id,
+          processStatus: entry.processStatus,
+          source: "training-stage-panel",
+        });
+        return;
+      }
+      patchModel(model.id, {
+        status: "processing",
+        message: "waiting object-layer pipeline",
+      });
+      setSelection({ modelId: model.id, objectId: null, selectionId: model.id });
+      worldApi.current?.focusModel(model.id);
+      recordDebugEvent("model-process-request", {
+        modelId: model.id,
+        processStatus: entry.processStatus,
+        source: "training-stage-panel",
+      });
+    },
+    [models, patchModel, recordDebugEvent, selectModel, stageModelIds],
   );
 
   const handleWorldReady = useCallback((api) => {
@@ -1193,8 +1327,14 @@ export default function App() {
       data-model-count={modelList.length}
       data-catalog-model-count={modelCatalog.length}
       data-loaded-count={loadedCount}
+      data-training-stage="model-version-processing-v1"
+      data-stage-visible-model-count={stageSummary.visibleCount}
+      data-stage-visible-model-ids={stageSummary.visibleIds.join(",")}
+      data-stage-processed-model-count={stageSummary.processedCount}
+      data-stage-pending-model-count={stageSummary.pendingCount}
       data-selected-model={selected?.id ?? ""}
       data-object-count={objectCount}
+      data-stage-object-count={stagedObjectCount}
       data-selected-object={selection.objectId ?? ""}
       data-selected-target={selection.selectionId ?? selected?.id ?? ""}
       data-compression-layout="per-object-corepoint-chunks"
@@ -1304,6 +1444,7 @@ export default function App() {
       data-hover-explainability-reasons={hoveredExplainability.reasonNames}
       data-hidden-objects={hiddenCount}
       data-object-visibility-contract="enabled"
+      data-object-move-contract="object-group-position-v1"
       data-visible-objects={objectVisibility.visibleObjectCount}
       data-visible-gaussians={objectVisibility.visibleGaussianCount}
       data-hidden-gaussians={objectVisibility.hiddenGaussianCount}
@@ -1401,10 +1542,12 @@ export default function App() {
     >
       <ThreeWorld
         models={modelCatalog}
+        stageModelIds={stageModelIdList}
         selectedTargetId={selection.selectionId || selectedId}
         debugMode={debugMode}
         debugLens={debugLens}
         objectOverlayMode={selectedObjectOverlayMode}
+        objectTransformMode={objectTransformMode}
         hiddenSelectionIds={hiddenObjects}
         onReady={handleWorldReady}
         onSelectObject={selectObject}
@@ -1418,13 +1561,13 @@ export default function App() {
           <div className="brandMark">OG</div>
           <div>
             <h1>ObjGauss</h1>
-            <span>VR 3D Gaussian World</span>
+            <span>高斯云训练展示台</span>
           </div>
         </div>
         <div className="metricStrip">
-          <Metric label="模型" value={summary.modelCount} />
-          <Metric label="可交互" value={loadedCount} />
-          <Metric label="对象" value={objectCount} />
+          <Metric label="Three.js" value={worldReady ? "已加载" : "加载中"} />
+          <Metric label="展示版本" value={`${stageSummary.visibleCount}/${modelList.length}`} />
+          <Metric label="对象层" value={stagedObjectCount > 0 ? "已生成" : "未生成"} />
         </div>
         <div className="topActions">
           <input
@@ -1461,53 +1604,6 @@ export default function App() {
             data-debug-session-file-input="true"
             onChange={importDebugSessionFile}
           />
-          <button
-            className={`glassButton ${artifactImport.status === "loaded" ? "active" : ""}`}
-            type="button"
-            data-trainable-artifact-import-button="true"
-            data-import-status={artifactImport.status}
-            onClick={() => artifactInputRef.current?.click()}
-          >
-            {artifactImport.status === "loading"
-              ? "导入中"
-              : artifactImport.status === "error"
-                ? "导入失败"
-              : "导入训练"}
-          </button>
-          <button
-            className={`glassButton ${modelImport.status === "loaded" ? "active" : ""}`}
-            type="button"
-            data-model-artifact-import-button="true"
-            data-import-status={modelImport.status}
-            onClick={() => modelBundleInputRef.current?.click()}
-          >
-            {modelImport.status === "loading"
-              ? "模型中"
-              : modelImport.status === "error"
-                ? "模型失败"
-                : "导入模型"}
-          </button>
-          <button
-            className={`glassButton ${ogcImport.status === "loaded" ? "active" : ""}`}
-            type="button"
-            data-ogc-artifact-import-button="true"
-            data-import-status={ogcImport.status}
-            onClick={() => ogcInputRef.current?.click()}
-          >
-            {ogcImport.status === "loading"
-              ? "OGC中"
-              : ogcImport.status === "error"
-                ? "OGC失败"
-                : "导入OGC"}
-          </button>
-          <button
-            className={`glassButton ${debugMode ? "active" : ""}`}
-            type="button"
-            data-assignment-debug-toggle="true"
-            onClick={toggleDebugMode}
-          >
-            A[N,K]
-          </button>
           <button className="glassButton" type="button" onClick={() => worldApi.current?.resetCamera()}>
             重置视角
           </button>
@@ -1517,16 +1613,17 @@ export default function App() {
       <div className="glassHud objectDock" aria-label="模型入口">
         {modelList.map((model) => (
           <button
-            className={`modelPill ${selectedId === model.id ? "selected" : ""}`}
+            className={`modelPill ${selectedId === model.id ? "selected" : ""} ${stageModelIds.has(model.id) ? "" : "muted"}`}
             type="button"
             key={model.id}
             data-model-row-id={model.id}
             data-model-load-state={model.status}
+            data-stage-visible={stageModelIds.has(model.id) ? "true" : "false"}
             onClick={() => selectModel(model.id)}
           >
             <span className="modelAccent" style={{ background: model.accent }} />
             <span>{model.label}</span>
-            <small>{model.status}</small>
+            <small>{stageModelIds.has(model.id) ? model.status : "隐藏"}</small>
           </button>
         ))}
       </div>
@@ -1558,34 +1655,15 @@ export default function App() {
             </button>
           </div>
           {inspectorCollapsed ? null : (
-            <dl className="metaGrid">
-              <Meta label="加载状态" value={selected.message ?? selected.status} />
-              {selected.description ? <Meta label="模型说明" value={selected.description} /> : null}
+            <dl className="metaGrid primaryMetaGrid">
+              <Meta label="Three.js" value={selected.status === "loaded" || selected.status === "compressed" ? "展示中" : selected.message ?? selected.status} />
+              <Meta label="版本" value={selected.label ?? selected.id} />
               <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
-              <Meta label={selectedObject ? "对象展示点" : "展示点"} value={formatNumber(selectedObject?.displayCount ?? selected.displayCount)} />
-              <Meta label="对象" value={formatNumber(selected.objectCount)} />
-              <Meta label="对象 ID" value={selectedObject ? String(selectedObject.objectId) : "-"} />
-              <Meta label="核心点" value={formatVec(selectedObject?.corePoint ?? selected.corePoint)} />
-              <Meta label="对象位置" value={formatVec(selectedObject?.galleryPosition)} />
-              <Meta label="加载耗时" value={selected.loadMs ? `${selected.loadMs} ms` : "-"} />
-              <Meta label="压缩布局" value={selected.compression?.layout ?? "-"} />
-              <Meta label="分块路径" value={selectedObject?.chunkPath ?? selected.compression?.chunkRoot ?? "-"} />
-              <Meta label="交付源" value={selected.delivery?.source ?? "-"} />
-              <Meta label="artifact" value={selected.delivery?.artifactPath ?? "-"} />
-              <Meta label="frame" value={formatFrame(selected.delivery?.frameIndex, selected.delivery?.frameCount)} />
-              <Meta label="train loss" value={formatLoss(selectedTrainingEvidence?.finalTotalLoss)} />
-              <Meta label="loss delta" value={formatSignedLoss(selectedTrainingEvidence?.totalLossDelta)} />
-              <Meta label="solver loss" value={formatLoss(selectedSolverEvidence?.finalTotalLoss)} />
-              <Meta label="solver delta" value={formatSignedLoss(selectedSolverEvidence?.totalLossDelta)} />
-              <Meta label="OGC chunks" value={selected.delivery?.decodedChunks ?? "-"} />
-              <Meta label="OGC route" value={selected.delivery?.loadRoute ?? "-"} />
-              <Meta label="OGC bytes" value={formatByteWindow(selected.delivery?.fetchedBytes, selected.delivery?.requestedBytes)} />
-              <Meta
-                label="OGC scope"
-                value={selected.delivery?.source === "quantized-ogc" ? formatChunkScope(selected.delivery?.chunkIds) : "-"}
-              />
-              <Meta label="assignment" value={selectedAssignmentSource} />
-              <Meta label="renderer loss" value={formatLoss(selected.delivery?.imageRenderLoss)} />
+              <Meta label="对象层" value={selected.objectCount ? `${formatNumber(selected.objectCount)} 对象` : "未生成"} />
+              <Meta label="选中" value={selectedObject ? `#${selectedObject.objectId}` : "-"} />
+              <Meta label="对象点" value={selectedObject ? formatNumber(selectedObject.displayCount) : "-"} />
+              <Meta label="置信" value={selectedObject ? formatRatio(selectedObject.objectState?.confidence) : "-"} />
+              <Meta label="位置" value={formatVec(selectedObject?.galleryPosition)} />
             </dl>
           )}
         </section>
@@ -1593,6 +1671,7 @@ export default function App() {
 
       <DebugPanel
         selected={selected}
+        models={modelList}
         selectedObject={selectedObject}
         selectedObjectKey={selectedObjectKey}
         hoveredTarget={hoveredTarget}
@@ -1622,6 +1701,11 @@ export default function App() {
         qualityReport={selectedQualityReport}
         objectStateBenchmark={selectedObjectStateBenchmark}
         benchmarkCase={selectedBenchmarkCase}
+        stageSummary={stageSummary}
+        stageModelIds={stageModelIds}
+        onToggleStageModel={toggleStageModel}
+        onSelectStageModelBatch={selectStageModelBatch}
+        onProcessModelVersion={processModelVersion}
         onSelectBenchmarkCase={setBenchmarkCaseName}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
@@ -1629,16 +1713,23 @@ export default function App() {
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
+        onMoveSelectedObject={moveSelectedObject}
+        onUndoObjectTransform={undoObjectTransform}
+        onRedoObjectTransform={redoObjectTransform}
+        onCancelObjectTransform={cancelObjectTransform}
+        objectTransformMode={objectTransformMode}
+        onSelectObjectTransformMode={selectObjectTransformMode}
+        artifactImport={artifactImport}
+        modelImport={modelImport}
+        ogcImport={ogcImport}
+        onImportTrainableArtifact={() => artifactInputRef.current?.click()}
+        onImportModelBundle={() => modelBundleInputRef.current?.click()}
+        onImportOgcArtifact={() => ogcInputRef.current?.click()}
         onExportDebugSnapshot={exportDebugSnapshot}
         onExportDebugSession={exportDebugSession}
         onImportDebugSession={() => debugSessionInputRef.current?.click()}
       />
 
-      <div className="glassHud bottomStatus">
-        <span>Phase 1 Debug OS: A[N,K] / ObjectState / Gaussian probe</span>
-        <span>点击 Gaussian 查看 assignment vector</span>
-        <span>对象开关用于验证 cluster 是否独立</span>
-      </div>
     </main>
   );
 }
@@ -2554,10 +2645,12 @@ function isInlineRoute(path) {
 
 function ThreeWorld({
   models,
+  stageModelIds,
   selectedTargetId,
   debugMode,
   debugLens,
   objectOverlayMode,
+  objectTransformMode,
   hiddenSelectionIds,
   onReady,
   onSelectObject,
@@ -2571,7 +2664,9 @@ function ThreeWorld({
   const debugRef = useRef(debugMode);
   const debugLensRef = useRef(normalizeDebugLens(debugLens));
   const overlayModeRef = useRef(normalizeObjectOverlayMode(objectOverlayMode));
+  const transformModeRef = useRef(normalizeObjectTransformMode(objectTransformMode));
   const hiddenRef = useRef(hiddenSelectionIds);
+  const stageModelIdsRef = useRef(normalizeStageModelIdSet(stageModelIds));
   const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved, onDebugEvent });
 
   useEffect(() => {
@@ -2597,9 +2692,21 @@ function ThreeWorld({
   }, [objectOverlayMode]);
 
   useEffect(() => {
+    const next = normalizeObjectTransformMode(objectTransformMode);
+    transformModeRef.current = next;
+    apiRef.current?.setTransformMode(next);
+  }, [objectTransformMode]);
+
+  useEffect(() => {
     hiddenRef.current = hiddenSelectionIds;
     apiRef.current?.setHiddenObjects(hiddenSelectionIds);
   }, [hiddenSelectionIds]);
+
+  useEffect(() => {
+    const next = normalizeStageModelIdSet(stageModelIds);
+    stageModelIdsRef.current = next;
+    apiRef.current?.setStageModels(next);
+  }, [stageModelIds]);
 
   useEffect(() => {
     callbacksRef.current = { onSelectObject, onHoverObject, onObjectMoved, onDebugEvent };
@@ -2626,6 +2733,14 @@ function ThreeWorld({
     controls.dampingFactor = 0.08;
     controls.target.fromArray(INITIAL_CAMERA.target);
 
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.setMode(transformModeRef.current);
+    transformControls.setSpace("world");
+    transformControls.showY = false;
+    transformControls.size = 0.78;
+    transformControls.detach();
+    scene.add(transformControls.getHelper());
+
     buildWorldShell(scene);
 
     const modelRoots = new Map();
@@ -2635,6 +2750,210 @@ function ThreeWorld({
     let selectedGaussianProbeSelectionId = null;
     let dragControls = null;
     let animationFrame = 0;
+    let transformHistory = [];
+    let transformFuture = [];
+    let activeTransform = null;
+    let transformMode = transformModeRef.current;
+    let transformSnapEnabled = false;
+    let lastTransformEvent = null;
+
+    const applyObjectTransformMode = (mode) => {
+      transformMode = normalizeObjectTransformMode(mode);
+      transformModeRef.current = transformMode;
+      transformControls.setMode(transformMode);
+      transformControls.showX = transformMode !== "rotate";
+      transformControls.showY = transformMode !== "translate";
+      transformControls.showZ = transformMode !== "rotate";
+      return transformMode;
+    };
+
+    applyObjectTransformMode(transformMode);
+
+    const transformSnapshot = (object) => ({
+      position: object.position.toArray().map(round3),
+      rotation: [object.rotation.x, object.rotation.y, object.rotation.z].map(round3),
+      scale: object.scale.toArray().map(round3),
+    });
+
+    const sameTransformSnapshot = (left, right) =>
+      Boolean(left && right) &&
+      ["position", "rotation", "scale"].every((field) =>
+        (left[field] ?? []).every((value, index) => value === right[field]?.[index]),
+      );
+
+    const applyTransformSnapshot = (object, snapshot) => {
+      if (!object || !snapshot) return null;
+      object.position.set(
+        finiteNumber(snapshot.position?.[0]) ?? 0,
+        0,
+        finiteNumber(snapshot.position?.[2]) ?? 0,
+      );
+      object.rotation.set(
+        finiteNumber(snapshot.rotation?.[0]) ?? 0,
+        finiteNumber(snapshot.rotation?.[1]) ?? 0,
+        finiteNumber(snapshot.rotation?.[2]) ?? 0,
+      );
+      object.scale.set(
+        finiteNumber(snapshot.scale?.[0]) ?? 1,
+        finiteNumber(snapshot.scale?.[1]) ?? 1,
+        finiteNumber(snapshot.scale?.[2]) ?? 1,
+      );
+      object.updateMatrixWorld(true);
+      return transformSnapshot(object);
+    };
+
+    const transformPosition = (object) => [
+      round3(object.position.x),
+      round3(object.position.y),
+      round3(object.position.z),
+    ];
+
+    const notifyObjectTransformed = (object, source, details = {}) => {
+      if (!object) return null;
+      const position = transformPosition(object);
+      callbacksRef.current.onObjectMoved?.(objectTarget(object), position, { source });
+      lastTransformEvent = {
+        type: details.type ?? "transform",
+        source,
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        position,
+        historyDepth: transformHistory.length,
+        redoDepth: transformFuture.length,
+      };
+      publishAuditHandle();
+      return position;
+    };
+
+    const commitTransformSnapshot = (object, before, source) => {
+      if (!object || !before) return null;
+      const after = transformSnapshot(object);
+      if (sameTransformSnapshot(before, after)) {
+        publishAuditHandle();
+        return after.position;
+      }
+      transformHistory.push({
+        selectionId: object.userData.selectionId,
+        before,
+        after,
+        source,
+      });
+      if (transformHistory.length > 80) transformHistory = transformHistory.slice(-80);
+      transformFuture = [];
+      return notifyObjectTransformed(object, source, { type: "commit" });
+    };
+
+    const beginObjectTransform = (object, source) => {
+      if (!object?.userData?.selectionId) return null;
+      activeTransform = {
+        selectionId: object.userData.selectionId,
+        before: transformSnapshot(object),
+        source,
+        cancelled: false,
+      };
+      lastTransformEvent = {
+        type: "begin",
+        source,
+        selectionId: object.userData.selectionId,
+        historyDepth: transformHistory.length,
+        redoDepth: transformFuture.length,
+      };
+      publishAuditHandle();
+      return activeTransform;
+    };
+
+    const finishObjectTransform = (object, source) => {
+      if (!object?.userData?.selectionId || !activeTransform) return null;
+      const before = activeTransform.before;
+      const cancelled = activeTransform.cancelled;
+      activeTransform = null;
+      if (cancelled) {
+        publishAuditHandle();
+        return transformSnapshot(object).position;
+      }
+      return commitTransformSnapshot(object, before, source);
+    };
+
+    const applyStoredObjectTransform = (entry, snapshot, source) => {
+      const object = draggableObjects.get(entry?.selectionId);
+      if (!object || !snapshot) return { ok: false, selectionId: entry?.selectionId ?? null, position: null };
+      applyTransformSnapshot(object, snapshot);
+      selectedRef.current = object.userData.selectionId;
+      api.setSelected(object.userData.selectionId);
+      const position = notifyObjectTransformed(object, source, { type: source });
+      return {
+        ok: true,
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        position,
+      };
+    };
+
+    const undoObjectTransform = () => {
+      const entry = transformHistory.pop();
+      if (!entry) {
+        publishAuditHandle();
+        return { ok: false, reason: "empty-history" };
+      }
+      transformFuture.push(entry);
+      return applyStoredObjectTransform(entry, entry.before, "undo");
+    };
+
+    const redoObjectTransform = () => {
+      const entry = transformFuture.pop();
+      if (!entry) {
+        publishAuditHandle();
+        return { ok: false, reason: "empty-redo" };
+      }
+      transformHistory.push(entry);
+      return applyStoredObjectTransform(entry, entry.after, "redo");
+    };
+
+    const cancelActiveObjectTransform = (source = "keyboard") => {
+      if (!activeTransform) {
+        publishAuditHandle();
+        return { ok: false, reason: "no-active-transform" };
+      }
+      const object = draggableObjects.get(activeTransform.selectionId);
+      if (!object) {
+        activeTransform = null;
+        publishAuditHandle();
+        return { ok: false, reason: "missing-object" };
+      }
+      const before = activeTransform.before;
+      activeTransform.cancelled = true;
+      applyTransformSnapshot(object, before);
+      callbacksRef.current.onDebugEvent?.("transform-cancel", {
+        ...objectTarget(object),
+        source,
+      });
+      const position = notifyObjectTransformed(object, "cancel", { type: "cancel" });
+      return {
+        ok: true,
+        selectionId: object.userData.selectionId,
+        position,
+      };
+    };
+
+    const setTransformSnapEnabled = (enabled) => {
+      transformSnapEnabled = Boolean(enabled);
+      transformControls.setTranslationSnap(transformSnapEnabled ? OBJECT_TRANSFORM_SNAP_STEP : null);
+      transformControls.setRotationSnap(transformSnapEnabled ? OBJECT_ROTATION_SNAP_STEP : null);
+      transformControls.setScaleSnap(transformSnapEnabled ? OBJECT_SCALE_SNAP_STEP : null);
+      lastTransformEvent = {
+        type: "snap",
+        enabled: transformSnapEnabled,
+        snapStep: OBJECT_TRANSFORM_SNAP_STEP,
+        rotationSnapStep: round3(OBJECT_ROTATION_SNAP_STEP),
+        scaleSnapStep: OBJECT_SCALE_SNAP_STEP,
+        historyDepth: transformHistory.length,
+        redoDepth: transformFuture.length,
+      };
+      publishAuditHandle();
+      return transformSnapEnabled;
+    };
 
     const publishAuditHandle = () => {
       const selectedObject = draggableObjects.get(selectedRef.current);
@@ -2695,11 +3014,16 @@ function ThreeWorld({
       });
       const highlightedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverHighlighted);
       const dimmedHoverSamples = hoverHighlightSamples.filter((sample) => sample.hoverDimmed);
+      const modelVisibilitySamples = [...modelRoots.values()].map((object) => ({
+        id: object.userData.modelId,
+        visible: object.visible !== false,
+      }));
+      const visibleModelSamples = modelVisibilitySamples.filter((sample) => sample.visible);
       const objectVisibilitySamples = [...draggableObjects.values()].map((object) => ({
         selectionId: object.userData.selectionId,
         modelId: object.userData.modelId,
         objectId: object.userData.objectId,
-        visible: Boolean(object.visible),
+        visible: Boolean(object.visible && modelRoots.get(object.userData.modelId)?.visible !== false),
         gaussianCount: objectGaussianCount(object),
       }));
       const visibleVisibilitySamples = objectVisibilitySamples.filter((sample) => sample.visible);
@@ -2709,9 +3033,30 @@ function ThreeWorld({
         ui: "frosted-glass-in-world",
         sidebars: false,
         modelCount: modelRoots.size,
+        stageModelIds: [...stageModelIdsRef.current],
+        visibleModelCount: visibleModelSamples.length,
+        hiddenModelCount: Math.max(0, modelVisibilitySamples.length - visibleModelSamples.length),
+        modelVisibilitySamples,
         objectCount: draggableObjects.size,
         draggableCount: draggableObjects.size,
         draggableObjectCount: draggableObjects.size,
+        objectMoveContract: "object-group-position-v1",
+        objectTransformContract: "three-transform-controls-v1",
+        objectTransformEngine: "object-transform-state-v1",
+        objectTransformMode: transformMode,
+        objectTransformModes: OBJECT_TRANSFORM_MODES,
+        transformGizmoAttached: Boolean(transformControls.object),
+        transformGizmoObject: transformControls.object?.userData?.selectionId ?? null,
+        transformActive: Boolean(activeTransform),
+        transformSnapEnabled,
+        transformSnapStep: OBJECT_TRANSFORM_SNAP_STEP,
+        transformRotationSnapStep: round3(OBJECT_ROTATION_SNAP_STEP),
+        transformScaleSnapStep: OBJECT_SCALE_SNAP_STEP,
+        transformHistoryDepth: transformHistory.length,
+        transformRedoDepth: transformFuture.length,
+        transformCanUndo: transformHistory.length > 0,
+        transformCanRedo: transformFuture.length > 0,
+        transformLastEvent: lastTransformEvent,
         selectedId: selectedRef.current,
         selectedModelId,
         selectedObjectId: selectedObject?.userData.objectId ?? null,
@@ -2900,6 +3245,50 @@ function ThreeWorld({
           publishAuditHandle();
           return object.visible;
         },
+        moveObjectForAudit(selectionId = null, delta = [0.42, 0, 0]) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()][0];
+          if (!object) return { ok: false, selectionId: null, position: null };
+          return moveObjectGroup(object.userData.selectionId, delta, { source: "audit" });
+        },
+        beginTransformForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()][0];
+          if (!object) return { ok: false, selectionId: null };
+          beginObjectTransform(object, "audit");
+          return { ok: true, selectionId: object.userData.selectionId };
+        },
+        nudgeActiveTransformForAudit(delta = [0.42, 0, 0]) {
+          if (!activeTransform) return { ok: false, reason: "no-active-transform" };
+          const object = draggableObjects.get(activeTransform.selectionId);
+          if (!object) return { ok: false, reason: "missing-object" };
+          object.position.x += finiteNumber(delta?.[0]) ?? 0;
+          object.position.y = 0;
+          object.position.z += finiteNumber(delta?.[2]) ?? 0;
+          publishAuditHandle();
+          return {
+            ok: true,
+            selectionId: object.userData.selectionId,
+            position: transformPosition(object),
+          };
+        },
+        cancelTransformForAudit(source = "audit") {
+          return cancelActiveObjectTransform(source);
+        },
+        undoObjectTransformForAudit() {
+          return undoObjectTransform();
+        },
+        redoObjectTransformForAudit() {
+          return redoObjectTransform();
+        },
+        setTransformSnapForAudit(enabled = true) {
+          return setTransformSnapEnabled(enabled);
+        },
+        setTransformModeForAudit(mode = "translate") {
+          return api.setTransformMode(mode);
+        },
       };
     };
 
@@ -2910,18 +3299,14 @@ function ThreeWorld({
       dragControls.addEventListener("dragstart", (event) => {
         controls.enabled = false;
         selectObjectGroup(event.object);
+        beginObjectTransform(event.object, "drag");
       });
       dragControls.addEventListener("drag", (event) => {
         event.object.position.y = 0;
       });
       dragControls.addEventListener("dragend", (event) => {
         controls.enabled = true;
-        callbacksRef.current.onObjectMoved?.(objectTarget(event.object), [
-          round3(event.object.position.x),
-          round3(event.object.position.y),
-          round3(event.object.position.z),
-        ]);
-        publishAuditHandle();
+        finishObjectTransform(event.object, "drag");
       });
       publishAuditHandle();
     };
@@ -2963,7 +3348,18 @@ function ThreeWorld({
       api.setDebugLens(debugLensRef.current);
       api.setObjectOverlayMode(overlayModeRef.current);
       api.setHiddenObjects(hiddenRef.current);
+      api.setStageModels(stageModelIdsRef.current);
       return result.summary;
+    };
+
+    const attachTransformToSelection = (selectionId) => {
+      const object = draggableObjects.get(selectionId);
+      const modelRoot = object ? modelRoots.get(object.userData.modelId) : null;
+      if (object && object.visible !== false && modelRoot?.visible !== false) {
+        transformControls.attach(object);
+      } else {
+        transformControls.detach();
+      }
     };
 
     const selectObjectGroup = (object, probe = null) => {
@@ -3005,6 +3401,26 @@ function ThreeWorld({
       return target;
     };
 
+    const moveObjectGroup = (selectionId, delta = [0, 0, 0], options = {}) => {
+      const object = draggableObjects.get(selectionId);
+      if (!object) return { ok: false, selectionId: selectionId ?? null, position: null };
+      const before = transformSnapshot(object);
+      const dx = finiteNumber(delta?.[0]) ?? 0;
+      const dz = finiteNumber(delta?.[2]) ?? 0;
+      object.position.x += dx;
+      object.position.y = 0;
+      object.position.z += dz;
+      selectObjectGroup(object);
+      const position = commitTransformSnapshot(object, before, options?.source ?? "api") ?? transformPosition(object);
+      return {
+        ok: true,
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        position,
+      };
+    };
+
     const raycaster = new THREE.Raycaster();
     raycaster.params.Points.threshold = 0.12;
     const pointer = new THREE.Vector2();
@@ -3031,8 +3447,46 @@ function ThreeWorld({
       if (nextHover === hoveredObject) return;
       setHoveredObjectGroup(nextHover);
     };
+    const eventFromEditable = (event) => {
+      const tagName = String(event.target?.tagName ?? "").toLowerCase();
+      return ["input", "select", "textarea"].includes(tagName) || Boolean(event.target?.isContentEditable);
+    };
+    const onKeyDown = (event) => {
+      if (eventFromEditable(event)) return;
+      const key = String(event.key ?? "").toLowerCase();
+      if (key === "shift" && !transformSnapEnabled) {
+        setTransformSnapEnabled(true);
+        return;
+      }
+      const modified = event.ctrlKey || event.metaKey;
+      if (modified && key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redoObjectTransform();
+        } else {
+          undoObjectTransform();
+        }
+        return;
+      }
+      if (modified && key === "y") {
+        event.preventDefault();
+        redoObjectTransform();
+        return;
+      }
+      if (key === "escape") {
+        const result = cancelActiveObjectTransform("keyboard");
+        if (result.ok) event.preventDefault();
+      }
+    };
+    const onKeyUp = (event) => {
+      if (String(event.key ?? "").toLowerCase() === "shift" && transformSnapEnabled) {
+        setTransformSnapEnabled(false);
+      }
+    };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
 
     const api = {
       upsertModel,
@@ -3090,11 +3544,47 @@ function ThreeWorld({
         });
         publishAuditHandle();
       },
+      moveObject(selectionId, delta, options = {}) {
+        return moveObjectGroup(selectionId, delta, options);
+      },
+      undoObjectTransform() {
+        return undoObjectTransform();
+      },
+      redoObjectTransform() {
+        return redoObjectTransform();
+      },
+      cancelObjectTransform(source = "api") {
+        return cancelActiveObjectTransform(source);
+      },
+      setTransformSnap(enabled) {
+        return setTransformSnapEnabled(enabled);
+      },
+      setTransformMode(mode) {
+        const next = applyObjectTransformMode(mode);
+        lastTransformEvent = {
+          type: "mode",
+          mode: next,
+          historyDepth: transformHistory.length,
+          redoDepth: transformFuture.length,
+        };
+        publishAuditHandle();
+        return next;
+      },
+      setStageModels(modelIds) {
+        const staged = normalizeStageModelIdSet(modelIds);
+        stageModelIdsRef.current = staged;
+        for (const object of modelRoots.values()) {
+          object.visible = staged.has(object.userData.modelId);
+        }
+        attachTransformToSelection(selectedRef.current);
+        publishAuditHandle();
+      },
       setHiddenObjects(hiddenIds) {
         const hidden = new Set(hiddenIds ?? []);
         for (const object of draggableObjects.values()) {
           object.visible = !hidden.has(object.userData.selectionId);
         }
+        attachTransformToSelection(selectedRef.current);
         publishAuditHandle();
       },
       setSelected(id) {
@@ -3119,9 +3609,31 @@ function ThreeWorld({
             hoverFocus: Boolean(hoveredObject?.userData?.selectionId),
           });
         }
+        attachTransformToSelection(id);
         publishAuditHandle();
       },
     };
+
+    transformControls.addEventListener("dragging-changed", (event) => {
+      controls.enabled = !event.value;
+      if (dragControls) dragControls.enabled = !event.value;
+      if (event.value && transformControls.object) {
+        beginObjectTransform(transformControls.object, "gizmo");
+      }
+      if (!event.value && transformControls.object) {
+        transformControls.object.position.y = 0;
+        finishObjectTransform(transformControls.object, "gizmo");
+      } else {
+        publishAuditHandle();
+      }
+    });
+
+    transformControls.addEventListener("objectChange", () => {
+      if (transformControls.object) {
+        transformControls.object.position.y = 0;
+      }
+      publishAuditHandle();
+    });
 
     const refreshDebugLens = () => {
       const lens = debugLensRef.current;
@@ -3186,8 +3698,11 @@ function ThreeWorld({
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", resize);
       dragControls?.dispose();
+      transformControls.dispose();
       controls.dispose();
       modelRoots.forEach(disposeObject);
       renderer.dispose();
@@ -3203,6 +3718,7 @@ function ThreeWorld({
 
 function DebugPanel({
   selected,
+  models,
   selectedObject,
   selectedObjectKey,
   hoveredTarget,
@@ -3213,6 +3729,7 @@ function DebugPanel({
   hoverTemporal,
   objectExplainability,
   hoverExplainability,
+  objectTransformMode,
   debugProbe,
   assignmentProbe,
   assignmentTimeline,
@@ -3232,6 +3749,11 @@ function DebugPanel({
   qualityReport,
   objectStateBenchmark,
   benchmarkCase,
+  stageSummary,
+  stageModelIds,
+  onToggleStageModel,
+  onSelectStageModelBatch,
+  onProcessModelVersion,
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectObjectOverlayMode,
@@ -3239,6 +3761,17 @@ function DebugPanel({
   onSelectOgcLod,
   onSelectOgcChunks,
   onSelectBenchmarkCase,
+  onMoveSelectedObject,
+  onUndoObjectTransform,
+  onRedoObjectTransform,
+  onCancelObjectTransform,
+  onSelectObjectTransformMode,
+  artifactImport,
+  modelImport,
+  ogcImport,
+  onImportTrainableArtifact,
+  onImportModelBundle,
+  onImportOgcArtifact,
   onExportDebugSnapshot,
   onExportDebugSession,
   onImportDebugSession,
@@ -3333,6 +3866,8 @@ function DebugPanel({
       data-hover-explainability-score={hoverExplainability?.score ?? ""}
       data-hover-explainability-reasons={hoverExplainability?.reasonNames ?? ""}
       data-object-visibility-contract="enabled"
+      data-object-move-contract="object-group-position-v1"
+      data-object-move-selected={selectedObject?.selectionId ?? ""}
       data-visible-objects={objectVisibility?.visibleObjectCount ?? 0}
       data-visible-gaussians={objectVisibility?.visibleGaussianCount ?? 0}
       data-hidden-objects={objectVisibility?.hiddenObjectCount ?? hiddenObjects.size}
@@ -3343,23 +3878,56 @@ function DebugPanel({
     >
       <div className="debugHeader">
         <div>
-          <h2>ObjectState 调试</h2>
-          <span>{debugMode ? "Assignment 投影" : "外观视图"}</span>
+          <h2>世界操作</h2>
+          <span>对象交互层</span>
         </div>
         <strong>{selectedObject ? `#${selectedObject.objectId}` : selected.label}</strong>
       </div>
 
-      <DebugSection title="概览" status={stability?.status ?? "stable"} defaultOpen>
-        <div className="debugMetrics">
-          <Metric label="置信" value={formatRatio(probeConfidence)} />
-          <Metric label="熵" value={formatRatio(probeEntropy)} />
-          <Metric label="质量" value={formatNumber(activeState?.slotMass)} />
-          <Metric label="渲染损失" value={formatLoss(rendererLoss)} />
+      <DebugSection title="Three.js 世界" status={selected.status ?? "queued"} defaultOpen>
+        <div className="worldPlaneGrid" data-world-plane-panel="true">
+          <Metric label="渲染" value="Three.js" />
+          <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
+          <Metric label="对象层" value={objects.length ? "已生成" : "未生成"} />
+          <Metric label="可见对象" value={formatCount(visibleObjectCount)} />
         </div>
-        <StabilityDashboard stability={stability} />
       </DebugSection>
 
-      <DebugSection title="常用操作" status={debugMode ? "调试中" : "外观"} defaultOpen>
+      <DebugSection title="对象交互" status={selectedObject ? "3D 控制" : "选择对象"} defaultOpen>
+        <ObjectInteractionLayer
+          selected={selected}
+          selectedObject={selectedObject}
+          activeState={activeState}
+          objectContinuity={objectContinuity}
+          assignmentProbe={assignmentProbe}
+          objectTransformMode={objectTransformMode}
+          onMoveSelectedObject={onMoveSelectedObject}
+          onUndoObjectTransform={onUndoObjectTransform}
+          onRedoObjectTransform={onRedoObjectTransform}
+          onCancelObjectTransform={onCancelObjectTransform}
+          onSelectObjectTransformMode={onSelectObjectTransformMode}
+        />
+      </DebugSection>
+
+      <DebugSection title="模型版本" status={`${stageSummary?.processedCount ?? 0}/${models?.length ?? 0}`} defaultOpen>
+        <TrainingStagePanel
+          models={models}
+          selected={selected}
+          summary={stageSummary}
+          stageModelIds={stageModelIds}
+          onToggleStageModel={onToggleStageModel}
+          onSelectStageModelBatch={onSelectStageModelBatch}
+          onProcessModelVersion={onProcessModelVersion}
+        />
+      </DebugSection>
+
+      <details className="debugSection systemDrawer" data-system-drawer="true">
+        <summary>
+          <span>系统工具</span>
+          <strong>高级</strong>
+        </summary>
+        <div className="debugSectionBody">
+      <DebugSection title="显示叠层" status={debugMode ? debugLens : "appearance"}>
         <div
           className="trainableFrameSelector debugLensSelector"
           data-debug-lens-selector="true"
@@ -3479,6 +4047,7 @@ function DebugPanel({
             ))}
           </div>
         ) : null}
+
       </DebugSection>
 
       <DebugSection title="分配 / Gaussian" status={assignmentProbe?.status ?? "none"} defaultOpen>
@@ -3567,6 +4136,14 @@ function DebugPanel({
       </DebugSection>
 
       <DebugSection title="协议与归档" status={sessionImport?.status ?? "idle"}>
+        <AdvancedImportPanel
+          artifactImport={artifactImport}
+          modelImport={modelImport}
+          ogcImport={ogcImport}
+          onImportTrainableArtifact={onImportTrainableArtifact}
+          onImportModelBundle={onImportModelBundle}
+          onImportOgcArtifact={onImportOgcArtifact}
+        />
         <DebugSnapshotPanel
           snapshot={debugSnapshot}
           snapshotExport={snapshotExport}
@@ -3594,7 +4171,166 @@ function DebugPanel({
         <TrainingEvidencePanel artifact={selected.trainableArtifact} />
         <ObjectEmergenceSolverPanel artifact={selected.trainableArtifact} />
       </DebugSection>
+        </div>
+      </details>
     </section>
+  );
+}
+
+function ObjectInteractionLayer({
+  selected,
+  selectedObject,
+  activeState,
+  objectContinuity,
+  assignmentProbe,
+  objectTransformMode,
+  onMoveSelectedObject,
+  onUndoObjectTransform,
+  onRedoObjectTransform,
+  onCancelObjectTransform,
+  onSelectObjectTransformMode,
+}) {
+  const selectedStatus = selectedObject ? "3D 控制器" : "待选择";
+  const transformMode = normalizeObjectTransformMode(objectTransformMode);
+  return (
+    <div
+      className="objectInteractionLayer"
+      data-object-interaction-layer="true"
+      data-object-transform-primary="three-transform-controls-v1"
+      data-object-move-contract="object-group-position-v1"
+      data-object-move-selected={selectedObject?.selectionId ?? ""}
+    >
+      <div className="interactionModeCard">
+        <span>主交互</span>
+        <strong>{selectedStatus}</strong>
+      </div>
+      <div
+        className="interactionModeRow"
+        data-object-transform-mode-selector="true"
+        data-object-transform-mode={transformMode}
+      >
+        <button
+          type="button"
+          className={transformMode === "translate" ? "active" : ""}
+          aria-label="移动对象"
+          title="移动对象"
+          data-object-transform-mode-button="translate"
+          disabled={!selectedObject}
+          onClick={() => onSelectObjectTransformMode?.("translate")}
+        >
+          <Move3D size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={transformMode === "rotate" ? "active" : ""}
+          aria-label="旋转对象"
+          title="旋转对象"
+          data-object-transform-mode-button="rotate"
+          disabled={!selectedObject}
+          onClick={() => onSelectObjectTransformMode?.("rotate")}
+        >
+          <Rotate3D size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={transformMode === "scale" ? "active" : ""}
+          aria-label="缩放对象"
+          title="缩放对象"
+          data-object-transform-mode-button="scale"
+          disabled={!selectedObject}
+          onClick={() => onSelectObjectTransformMode?.("scale")}
+        >
+          <Scale3D size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      </div>
+      <div
+        className="interactionActionRow"
+        data-object-transform-actions="true"
+        data-object-transform-engine="object-transform-state-v1"
+      >
+        <button
+          type="button"
+          aria-label="撤销对象变换"
+          title="撤销对象变换"
+          data-object-transform-button="undo"
+          disabled={!selectedObject}
+          onClick={() => onUndoObjectTransform?.()}
+        >
+          <Undo2 size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="重做对象变换"
+          title="重做对象变换"
+          data-object-transform-button="redo"
+          disabled={!selectedObject}
+          onClick={() => onRedoObjectTransform?.()}
+        >
+          <Redo2 size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="取消当前对象变换"
+          title="取消当前对象变换"
+          data-object-transform-button="cancel"
+          disabled={!selectedObject}
+          onClick={() => onCancelObjectTransform?.()}
+        >
+          <X size={15} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      </div>
+      <dl className="interactionMeta">
+        <Meta label="模型" value={selected?.label ?? "-"} />
+        <Meta label="对象" value={selectedObject ? `#${selectedObject.objectId}` : "-"} />
+        <Meta label="置信" value={selectedObject ? formatRatio(activeState?.confidence) : "-"} />
+        <Meta label="连续性" value={objectContinuity?.status ?? "-"} />
+        <Meta label="分配" value={assignmentProbe?.status ?? "-"} />
+        <Meta label="位置" value={formatVec(selectedObject?.galleryPosition)} />
+      </dl>
+      {selectedObject ? (
+        <div
+          className="trainableFrameSelector objectMoveSelector objectMoveFallback"
+          data-object-move-panel="true"
+          data-object-move-selected={selectedObject.selectionId}
+          data-object-move-contract="object-group-position-v1"
+        >
+          <span>辅助</span>
+          <button
+            type="button"
+            data-object-move-button="-x"
+            onClick={() => onMoveSelectedObject?.([-0.36, 0, 0])}
+          >
+            X-
+          </button>
+          <button
+            type="button"
+            data-object-move-button="+x"
+            onClick={() => onMoveSelectedObject?.([0.36, 0, 0])}
+          >
+            X+
+          </button>
+          <button
+            type="button"
+            data-object-move-button="-z"
+            onClick={() => onMoveSelectedObject?.([0, 0, -0.36])}
+          >
+            Z-
+          </button>
+          <button
+            type="button"
+            data-object-move-button="+z"
+            onClick={() => onMoveSelectedObject?.([0, 0, 0.36])}
+          >
+            Z+
+          </button>
+        </div>
+      ) : (
+        <div className="interactionEmpty" data-object-selection-empty="true">
+          <strong>未选择对象</strong>
+          <span>Three.js 世界</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3607,6 +4343,92 @@ function DebugSection({ title, status = "", defaultOpen = false, children }) {
       </summary>
       <div className="debugSectionBody">{children}</div>
     </details>
+  );
+}
+
+function TrainingStagePanel({
+  models,
+  selected,
+  summary,
+  stageModelIds,
+  onToggleStageModel,
+  onSelectStageModelBatch,
+  onProcessModelVersion,
+}) {
+  const entries = summary?.entries ?? [];
+  return (
+    <div
+      className="stabilityDashboard trainingStagePanel"
+      data-training-stage-panel="true"
+      data-training-stage-schema="model-version-processing-v1"
+      data-stage-visible-models={summary?.visibleCount ?? 0}
+      data-stage-processed-models={summary?.processedCount ?? 0}
+      data-stage-pending-models={summary?.pendingCount ?? 0}
+    >
+      <div className="stabilityHead">
+        <span>世界版本</span>
+        <strong>{formatCount(summary?.visibleCount ?? 0)} / {formatCount(models?.length ?? 0)}</strong>
+      </div>
+      <dl className="stagePipelineSummary">
+        <Meta label="输入" value="高斯云" />
+        <Meta label="输出" value="对象层" />
+        <Meta label="对象层" value={formatCount(summary?.processedCount ?? 0)} />
+        <Meta label="未生成" value={formatCount(summary?.pendingCount ?? 0)} />
+      </dl>
+      <div className="stageBatchActions" data-stage-batch-actions="true">
+        <span>批量</span>
+        <button type="button" data-stage-batch-button="processed" onClick={() => onSelectStageModelBatch?.("processed")}>
+          对象层
+        </button>
+        <button type="button" data-stage-batch-button="slot" onClick={() => onSelectStageModelBatch?.("slot")}>
+          同定位
+        </button>
+        <button type="button" data-stage-batch-button="all" onClick={() => onSelectStageModelBatch?.("all")}>
+          全部
+        </button>
+      </div>
+      <div className="modelVersionRows" data-model-version-list="true">
+        {entries.map((entry) => {
+          const visible = stageModelIds?.has(entry.id) ?? entry.visible;
+          const selectedRow = selected?.id === entry.id;
+          return (
+            <div
+              className={`modelVersionRow ${visible ? "visible" : ""} ${selectedRow ? "selected" : ""}`}
+              key={entry.id}
+              data-model-version-row-id={entry.id}
+              data-model-version-visible={visible ? "true" : "false"}
+              data-model-process-status={entry.processStatus}
+              data-model-processed={entry.processed ? "true" : "false"}
+            >
+              <label className="modelVersionCheck">
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  data-stage-model-toggle={entry.id}
+                  onChange={() => onToggleStageModel?.(entry.id)}
+                />
+                <span className="modelAccent" style={{ background: entry.accent }} />
+                <span className="modelVersionName">
+                  <strong>{entry.label}</strong>
+                  <small>{entry.versionLabel}</small>
+                </span>
+              </label>
+              <span className={`modelProcessBadge ${entry.processStatus}`}>{entry.processLabel}</span>
+              <button
+                type="button"
+                className="modelProcessButton"
+                data-model-process-button={entry.id}
+                data-model-process-action={entry.processAction}
+                disabled={entry.processAction === "processing"}
+                onClick={() => onProcessModelVersion?.(entry.id)}
+              >
+                {entry.processActionLabel}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -3736,6 +4558,68 @@ function DebugEventTracePanel({ events }) {
             <small>{debugEventDetailLabel(event)}</small>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedImportPanel({
+  artifactImport,
+  modelImport,
+  ogcImport,
+  onImportTrainableArtifact,
+  onImportModelBundle,
+  onImportOgcArtifact,
+}) {
+  return (
+    <div
+      className="stabilityDashboard advancedImportPanel"
+      data-advanced-import-panel="true"
+    >
+      <div className="stabilityHead">
+        <span>高级导入</span>
+        <strong>artifact</strong>
+      </div>
+      <div className="advancedImportActions">
+        <button
+          className={artifactImport?.status === "loaded" ? "active" : ""}
+          type="button"
+          data-trainable-artifact-import-button="true"
+          data-import-status={artifactImport?.status ?? "idle"}
+          onClick={() => onImportTrainableArtifact?.()}
+        >
+          {artifactImport?.status === "loading"
+            ? "导入中"
+            : artifactImport?.status === "error"
+              ? "训练失败"
+              : "训练"}
+        </button>
+        <button
+          className={modelImport?.status === "loaded" ? "active" : ""}
+          type="button"
+          data-model-artifact-import-button="true"
+          data-import-status={modelImport?.status ?? "idle"}
+          onClick={() => onImportModelBundle?.()}
+        >
+          {modelImport?.status === "loading"
+            ? "模型中"
+            : modelImport?.status === "error"
+              ? "模型失败"
+              : "模型"}
+        </button>
+        <button
+          className={ogcImport?.status === "loaded" ? "active" : ""}
+          type="button"
+          data-ogc-artifact-import-button="true"
+          data-import-status={ogcImport?.status ?? "idle"}
+          onClick={() => onImportOgcArtifact?.()}
+        >
+          {ogcImport?.status === "loading"
+            ? "OGC中"
+            : ogcImport?.status === "error"
+              ? "OGC失败"
+              : "OGC"}
+        </button>
       </div>
     </div>
   );
@@ -5344,6 +6228,11 @@ function normalizeObjectOverlayMode(mode) {
   return OBJECT_OVERLAY_MODES.includes(value) ? value : "full";
 }
 
+function normalizeObjectTransformMode(mode) {
+  const value = String(mode ?? "translate");
+  return OBJECT_TRANSFORM_MODES.includes(value) ? value : "translate";
+}
+
 function objectOverlayShows(mode, target) {
   const normalized = normalizeObjectOverlayMode(mode);
   if (normalized === "off") return false;
@@ -6216,6 +7105,112 @@ function initialModelStates(models = []) {
       },
     ]),
   );
+}
+
+function normalizeStageModelIdSet(ids) {
+  if (ids instanceof Set) return new Set([...ids].filter(Boolean));
+  if (Array.isArray(ids)) return new Set(ids.filter(Boolean));
+  return new Set();
+}
+
+function trainingStageSummary(models = [], stageModelIds = new Set()) {
+  const visibleSet = normalizeStageModelIdSet(stageModelIds);
+  const entries = models.map((model) => trainingStageModelEntry(model, visibleSet.has(model.id)));
+  const visibleEntries = entries.filter((entry) => entry.visible);
+  const processedEntries = entries.filter((entry) => entry.processed);
+  const pendingEntries = entries.filter((entry) => !entry.processed);
+  return {
+    schema: "objgauss-training-stage-model-version-processing-v1",
+    entries,
+    visibleIds: visibleEntries.map((entry) => entry.id),
+    visibleCount: visibleEntries.length,
+    visibleObjectCount: visibleEntries.reduce(
+      (total, entry) => total + (Number(entry.objectCount) || 0),
+      0,
+    ),
+    processedCount: processedEntries.length,
+    pendingCount: pendingEntries.length,
+  };
+}
+
+function trainingStageModelEntry(model, visible = false) {
+  const status = String(model?.status ?? "queued");
+  const objectCount = model?.objects?.length || Number(model?.objectCount) || 0;
+  const loadedObjectLayer = objectCount > 0 && ["loaded", "compressed"].includes(status);
+  const cacheMissing = model?.optionalLocalPreview && status === "skipped";
+  const declaredObjectLayer = Boolean(
+    model?.kind === "object-aware-ply" ||
+      model?.loadMode === "trainable-artifact" ||
+      model?.loadMode === "ogc-chunked" ||
+      model?.stage === "processed" ||
+      model?.stage === "sample-aware-preview",
+  );
+  const processed = !cacheMissing && (loadedObjectLayer || declaredObjectLayer);
+  const processing = status === "loading" || status === "processing";
+  const processStatus = processing
+    ? "processing"
+    : cacheMissing
+      ? "cache-missing"
+      : loadedObjectLayer
+        ? "object-layer-loaded"
+        : processed
+          ? "processed-cache"
+          : "raw-gaussian";
+  const processAction = processing
+    ? "processing"
+    : processed
+      ? loadedObjectLayer
+        ? "skip"
+        : "load-existing"
+      : "generate-object-layer";
+  return {
+    id: model?.id ?? "",
+    label: model?.label ?? model?.name ?? model?.id ?? "-",
+    accent: model?.accent ?? "#7ff1d6",
+    visible,
+    objectCount,
+    processed,
+    processStatus,
+    processLabel: modelProcessStatusLabel(processStatus),
+    processAction,
+    processActionLabel: modelProcessActionLabel(processAction),
+    versionLabel: modelVersionLabel(model),
+  };
+}
+
+function modelVersionLabel(model) {
+  const updatedAt = String(model?.updatedAt ?? "").trim();
+  if (updatedAt) return updatedAt;
+  if (model?.displaySlot) return "同定位";
+  return model?.stage ?? model?.kindLabel ?? model?.kind ?? "版本";
+}
+
+function modelProcessStatusLabel(status) {
+  switch (status) {
+    case "processing":
+      return "处理中";
+    case "cache-missing":
+      return "缺结果";
+    case "object-layer-loaded":
+      return "已加载";
+    case "processed-cache":
+      return "对象层";
+    default:
+      return "未分割";
+  }
+}
+
+function modelProcessActionLabel(action) {
+  switch (action) {
+    case "processing":
+      return "处理中";
+    case "skip":
+      return "跳过";
+    case "load-existing":
+      return "加载";
+    default:
+      return "生成";
+  }
 }
 
 function objectStateDebugSnapshot({

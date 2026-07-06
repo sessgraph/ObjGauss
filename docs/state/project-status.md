@@ -719,6 +719,40 @@ Playwright + system Chrome 验证 `http://127.0.0.1:5395/` 首屏选中最新模
 为 `真实样例 V2` / `Lego alpha`；截图为 `/tmp/objgauss-latest-model-order.png`。
 代码完成 commit 为 `b7c1d35`。
 
+随后完成本地 `OBJECT-EDIT-UX-PRIMARY-FLOW-001` 切片：viewer 首屏从开发者调试入口收敛为
+训练阶段的高斯云展示台。多个模型被摆在同一 stage 上用于查看训练 / 分割效果，而不是被表述为
+最终生产编辑器；顶栏口径改为 `高斯云训练展示台`，指标收敛为
+`Three.js / 展示版本 / 对象层`，明确所有对象处理都先建立在 Three.js 加载并展示模型之上。
+顶栏不再展示 `导入训练`、`导入模型`、`导入OGC` 和 `A[N,K]`，只保留 `重置视角`；
+artifact / model / OGC 导入下沉到 `协议与归档` 的高级导入区，原有 `data-*` audit hooks
+保持不变。左侧主面板改为 `世界操作`，只默认展开 `Three.js 世界`、`对象交互` 和
+`模型版本`；assignment、Gaussian probe、对象诊断、对象开关、协议归档、训练 / 基准证据统一
+下沉到 `系统工具` 高级抽屉。底部状态条已删除，右侧 inspector 只保留必要的模型 / 对象元数据。
+选中对象后 Three.js `TransformControls` 自动挂载
+`three-transform-controls-v1` 平移 gizmo；方向按钮只作为对象交互面板内的辅助移动控件，
+`object-group-position-v1` audit contract 继续保留。`ThreeWorld` 同时新增
+`object-transform-state-v1` 交互状态栈：按钮移动、直接拖拽和 TransformControls 拖拽都会记录
+object group transform 前后状态；TransformControls 支持移动 / 旋转 / 缩放模式切换，并支持
+undo / redo、active transform cancel 和 Shift 临时 snap。对象交互面板新增移动 / 旋转 / 缩放
+模式图标按钮，以及 undo / redo / cancel 图标按钮，快捷键能力不作为主界面文案展示，但通过 audit
+handle 暴露可验证状态。该切片同时补入训练阶段的
+`模型版本处理` 面板：每个模型版本可用复选框加入 / 移出展示台，批量按钮支持
+`对象层`、`同定位`、`全部`；已加载对象层的版本显示 `跳过`，已有对象层但未加载时显示
+`加载`，未分割输入保留 `生成` 状态入口。`ThreeWorld` 现在支持模型级 stage visibility，
+`window.__OBJGAUSS_WORLD__` 暴露 `stageModelIds`、`visibleModelCount`、
+`modelVisibilitySamples`、`objectTransformContract`、`objectTransformEngine`、
+`transformGizmoObject`、`transformHistoryDepth` 和 `transformRedoDepth` 以审计多版本展示
+和 3D 对象交互状态。UX 审计截图保存在 `/tmp/objgauss-ux-audit/`，训练展示台模型版本验证截图为
+`/tmp/objgauss-training-stage-version-panel.png`；本轮 Three.js-first 对象交互验证截图为
+`/tmp/objgauss-object-interaction-desktop.png`、`/tmp/objgauss-object-interaction-mobile.png`、
+`/tmp/objgauss-object-interaction-canvas-desktop.png` 和
+`/tmp/objgauss-object-interaction-canvas-mobile.png`。验证通过：`npm run build` passed（保留既有
+Vite chunk size warning）、Playwright + system Chrome desktop/mobile targeted check passed，
+并验证 `object-transform-state-v1` 的 move / undo / redo / snap / cancel 合同；PNG 像素统计确认隐藏 HUD 后 canvas 非空；此前同一切片已跑
+`uv run --extra dev pytest` 259 passed 和 `git diff --check` passed。当前切片只做 viewer
+handoff UI，未接真实后端分割任务执行；`未分割高斯云 -> 生成对象层 -> 选中/移动对象` 的完整
+pipeline 主操作仍登记为 `GAUSSIAN-OBJECT-PROCESS-FLOW-001`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

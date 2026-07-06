@@ -60,6 +60,12 @@ try {
       `slotUtil=${summary.slotUtilization}`,
       `mixedSlots=${summary.mixedSlots}`,
       `objectContinuity=${summary.objectContinuityStatus}`,
+      `objectMove=${summary.objectMoveStatus}`,
+      `objectTransform=${summary.objectTransformStatus}`,
+      `objectTransformState=${summary.objectTransformStateStatus}`,
+      `trainingStage=${summary.trainingStageStatus}`,
+      `stageModels=${summary.stageVisibleModelCount}/${summary.modelCount}`,
+      `stageProcessed=${summary.stageProcessedModelCount}`,
       `objectFragmentation=${summary.objectFragmentationStatus}`,
       `objectTemporal=${summary.objectTemporalStatus}`,
       `objectExplainability=${summary.objectExplainabilityStatus}`,
@@ -131,6 +137,20 @@ async function auditWorld(url) {
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
     await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-training-stage-panel='true']").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-training-stage-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const rowCount = panel?.querySelectorAll("[data-model-version-row-id]").length ?? 0;
+      return (
+        shell?.getAttribute("data-training-stage") === "model-version-processing-v1" &&
+        panel?.getAttribute("data-training-stage-schema") === "model-version-processing-v1" &&
+        rowCount >= 7 &&
+        Number(shell?.getAttribute("data-stage-visible-model-count") ?? 0) >= Number(world?.visibleModelCount ?? 0) &&
+        Number(panel?.getAttribute("data-stage-processed-models") ?? 0) > 0
+      );
+    }, undefined, { timeout: 15000 });
     const pills = await page.locator(".modelPill").count();
     if (pills < 7) {
       throw new Error(`expected at least 7 model pills, found ${pills}`);
@@ -176,6 +196,174 @@ async function auditWorld(url) {
         shell?.getAttribute("data-selected-object") !== ""
       );
     }, objectSelection.selectionId, { timeout: 15000 });
+    const objectTransform = await page.waitForFunction((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const worldPlane = document.querySelector("[data-world-plane-panel='true']");
+      const interactionLayer = document.querySelector("[data-object-interaction-layer='true']");
+      const systemDrawer = document.querySelector("[data-system-drawer='true']");
+      const actionButtons = document.querySelectorAll("[data-object-transform-actions='true'] [data-object-transform-button]");
+      const modeButtons = document.querySelectorAll("[data-object-transform-mode-selector='true'] [data-object-transform-mode-button]");
+      const topMetricLabels = [...document.querySelectorAll(".metricStrip .metric span")]
+        .map((node) => node.textContent?.trim())
+        .filter(Boolean);
+      if (
+        world?.objectTransformContract !== "three-transform-controls-v1" ||
+        world?.objectTransformEngine !== "object-transform-state-v1" ||
+        world?.transformGizmoAttached !== true ||
+        world?.transformGizmoObject !== selectionId ||
+        worldPlane?.getAttribute("data-world-plane-panel") !== "true" ||
+        interactionLayer?.getAttribute("data-object-transform-primary") !== "three-transform-controls-v1" ||
+        interactionLayer?.getAttribute("data-object-move-contract") !== "object-group-position-v1" ||
+        interactionLayer?.getAttribute("data-object-move-selected") !== selectionId ||
+        actionButtons.length !== 3 ||
+        modeButtons.length !== 3 ||
+        !systemDrawer ||
+        document.querySelectorAll(".bottomStatus").length !== 0 ||
+        topMetricLabels.join("|") !== "Three.js|展示版本|对象层"
+      ) {
+        return null;
+      }
+      return {
+        contract: world.objectTransformContract,
+        engine: world.objectTransformEngine,
+        gizmoObject: world.transformGizmoObject,
+        mode: world.objectTransformMode,
+        interactionLayer: interactionLayer.getAttribute("data-object-transform-primary"),
+        actionButtonCount: actionButtons.length,
+        modeButtonCount: modeButtons.length,
+        topMetricLabels,
+      };
+    }, objectSelection.selectionId, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    const beforeMove = await page.evaluate((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = world?.objectSelections?.find((entry) => entry.selectionId === selectionId);
+      return {
+        position: target?.position ?? null,
+        contract: world?.objectMoveContract ?? null,
+        hasMoveAudit: typeof world?.moveObjectForAudit === "function",
+      };
+    }, objectSelection.selectionId);
+    if (
+      !Array.isArray(beforeMove.position) ||
+      beforeMove.contract !== "object-group-position-v1" ||
+      !beforeMove.hasMoveAudit
+    ) {
+      throw new Error(`expected movable object audit contract: ${JSON.stringify(beforeMove)}`);
+    }
+    await page.locator("[data-object-move-panel='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-object-move-button='+x']").click();
+    const objectMove = await page.waitForFunction((input) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const movePanel = document.querySelector("[data-object-move-panel='true']");
+      const target = world?.objectSelections?.find((entry) => entry.selectionId === input.selectionId);
+      const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
+      const moveEvent = events.find((event) =>
+        event.type === "move-object" &&
+        event.selectionId === input.selectionId &&
+        event.source === "debug-panel"
+      );
+      if (
+        !target ||
+        !Array.isArray(target.position) ||
+        target.position[0] <= input.before[0] + 0.3 ||
+        target.position[1] !== 0 ||
+        shell?.getAttribute("data-object-move-contract") !== "object-group-position-v1" ||
+        panel?.getAttribute("data-object-move-contract") !== "object-group-position-v1" ||
+        panel?.getAttribute("data-object-move-selected") !== input.selectionId ||
+        movePanel?.getAttribute("data-object-move-selected") !== input.selectionId ||
+        !moveEvent
+      ) {
+        return null;
+      }
+      return {
+        selectionId: input.selectionId,
+        before: input.before,
+        after: target.position,
+        source: moveEvent.source ?? null,
+      };
+    }, {
+      selectionId: objectSelection.selectionId,
+      before: beforeMove.position,
+    }, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    const objectTransformState = await page.evaluate((input) => {
+      const currentWorld = () => window.__OBJGAUSS_WORLD__;
+      const closePosition = (left, right) =>
+        Array.isArray(left) &&
+        Array.isArray(right) &&
+        left.every((value, index) => Math.abs(Number(value) - Number(right[index])) < 0.001);
+      const afterMove = currentWorld()?.objectSelections?.find((entry) => entry.selectionId === input.selectionId)?.position ?? null;
+      const undo = currentWorld()?.undoObjectTransformForAudit?.();
+      const afterUndo = currentWorld()?.objectSelections?.find((entry) => entry.selectionId === input.selectionId)?.position ?? null;
+      const undoWorld = currentWorld();
+      const redo = undoWorld?.redoObjectTransformForAudit?.();
+      const afterRedo = currentWorld()?.objectSelections?.find((entry) => entry.selectionId === input.selectionId)?.position ?? null;
+      const snapOn = currentWorld()?.setTransformSnapForAudit?.(true);
+      const snapEnabled = currentWorld()?.transformSnapEnabled;
+      const snapStep = currentWorld()?.transformSnapStep;
+      const rotateMode = currentWorld()?.setTransformModeForAudit?.("rotate");
+      const scaleMode = currentWorld()?.setTransformModeForAudit?.("scale");
+      const translateMode = currentWorld()?.setTransformModeForAudit?.("translate");
+      const snapOff = currentWorld()?.setTransformSnapForAudit?.(false);
+      const begin = currentWorld()?.beginTransformForAudit?.(input.selectionId);
+      const nudged = currentWorld()?.nudgeActiveTransformForAudit?.([0.51, 0, 0]);
+      const cancel = currentWorld()?.cancelTransformForAudit?.("audit");
+      const afterCancel = currentWorld()?.objectSelections?.find((entry) => entry.selectionId === input.selectionId)?.position ?? null;
+      const finalWorld = currentWorld();
+      const actionButtons = [...document.querySelectorAll("[data-object-transform-actions='true'] [data-object-transform-button]")]
+        .map((node) => node.getAttribute("data-object-transform-button"));
+      return {
+        afterMove,
+        undo,
+        afterUndo,
+        redo,
+        afterRedo,
+        snapOn,
+        snapEnabled,
+        snapStep,
+        rotateMode,
+        scaleMode,
+        translateMode,
+        snapOff,
+        begin,
+        nudged,
+        cancel,
+        afterCancel,
+        historyDepth: finalWorld?.transformHistoryDepth ?? null,
+        redoDepth: finalWorld?.transformRedoDepth ?? null,
+        canUndo: finalWorld?.transformCanUndo ?? null,
+        canRedo: finalWorld?.transformCanRedo ?? null,
+        lastEvent: finalWorld?.transformLastEvent ?? null,
+        actionButtons,
+        ok:
+          currentWorld()?.objectTransformEngine === "object-transform-state-v1" &&
+          closePosition(afterUndo, input.before) &&
+          closePosition(afterRedo, afterMove) &&
+          closePosition(afterCancel, afterRedo) &&
+          undo?.ok === true &&
+          redo?.ok === true &&
+          snapOn === true &&
+          snapEnabled === true &&
+          snapStep === 0.25 &&
+          rotateMode === "rotate" &&
+          scaleMode === "scale" &&
+          translateMode === "translate" &&
+          snapOff === false &&
+          begin?.ok === true &&
+          nudged?.ok === true &&
+          cancel?.ok === true &&
+          finalWorld?.transformHistoryDepth >= 1 &&
+          finalWorld?.transformRedoDepth === 0 &&
+          actionButtons.join("|") === "undo|redo|cancel",
+      };
+    }, {
+      selectionId: objectSelection.selectionId,
+      before: beforeMove.position,
+    });
+    if (!objectTransformState.ok) {
+      throw new Error(`expected object transform state graph to support undo/redo/snap/cancel: ${JSON.stringify(objectTransformState)}`);
+    }
     const gaussianSelection = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
       return {
@@ -1017,9 +1205,40 @@ async function auditWorld(url) {
       const hoverHeatmap = document.querySelector("[data-hover-assignment-heatmap='true']");
       const snapshotPanel = document.querySelector("[data-debug-snapshot-panel='true']");
       const tracePanel = document.querySelector("[data-debug-event-trace='true']");
+      const trainingStagePanel = document.querySelector("[data-training-stage-panel='true']");
+      const worldPlane = document.querySelector("[data-world-plane-panel='true']");
+      const interactionLayer = document.querySelector("[data-object-interaction-layer='true']");
+      const systemDrawer = document.querySelector("[data-system-drawer='true']");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
       return {
         modelCount: handle.modelCount,
+        stageVisibleModelCount: handle.visibleModelCount,
+        stageHiddenModelCount: handle.hiddenModelCount,
+        stageModelIds: handle.stageModelIds,
+        shellTrainingStage: shell?.getAttribute("data-training-stage") ?? null,
+        shellStageVisibleModelCount: Number(shell?.getAttribute("data-stage-visible-model-count") ?? 0),
+        shellStageProcessedModelCount: Number(shell?.getAttribute("data-stage-processed-model-count") ?? 0),
+        shellStagePendingModelCount: Number(shell?.getAttribute("data-stage-pending-model-count") ?? 0),
+        panelTrainingStageSchema: trainingStagePanel?.getAttribute("data-training-stage-schema") ?? null,
+        panelStageVisibleModelCount: Number(trainingStagePanel?.getAttribute("data-stage-visible-models") ?? 0),
+        panelStageProcessedModelCount: Number(trainingStagePanel?.getAttribute("data-stage-processed-models") ?? 0),
+        panelStagePendingModelCount: Number(trainingStagePanel?.getAttribute("data-stage-pending-models") ?? 0),
+        panelModelVersionRows: trainingStagePanel?.querySelectorAll("[data-model-version-row-id]").length ?? 0,
+        worldPlanePresent: Boolean(worldPlane),
+        systemDrawerPresent: Boolean(systemDrawer),
+        objectTransformContract: handle.objectTransformContract ?? null,
+        objectTransformEngine: handle.objectTransformEngine ?? null,
+        transformGizmoAttached: Boolean(handle.transformGizmoAttached),
+        transformGizmoObject: handle.transformGizmoObject ?? null,
+        transformHistoryDepth: handle.transformHistoryDepth ?? null,
+        transformRedoDepth: handle.transformRedoDepth ?? null,
+        transformCanUndo: handle.transformCanUndo ?? null,
+        transformCanRedo: handle.transformCanRedo ?? null,
+        transformSnapStep: handle.transformSnapStep ?? null,
+        objectTransformMode: handle.objectTransformMode ?? null,
+        objectInteractionLayerContract: interactionLayer?.getAttribute("data-object-transform-primary") ?? null,
+        objectInteractionLayerSelected: interactionLayer?.getAttribute("data-object-move-selected") ?? null,
+        bottomStatusCount: document.querySelectorAll(".bottomStatus").length,
         objectCount: handle.objectCount,
         draggableObjectCount: handle.draggableObjectCount,
         selectedId: handle.selectedId,
@@ -1824,6 +2043,27 @@ async function auditWorld(url) {
       slotUtilization: world.slotUtilization,
       mixedSlots: world.mixedSlots,
       objectContinuityStatus: world.objectContinuityStatus,
+      objectMoveStatus: objectMove.source === "debug-panel" ? "passed" : "failed",
+      objectTransformStatus:
+        objectTransform.contract === "three-transform-controls-v1" &&
+        objectTransform.engine === "object-transform-state-v1" &&
+        objectTransform.gizmoObject === objectSelection.selectionId &&
+        objectTransform.interactionLayer === "three-transform-controls-v1" &&
+        objectTransform.actionButtonCount === 3 &&
+        objectTransform.modeButtonCount === 3
+          ? "passed"
+          : "failed",
+      objectTransformStateStatus: objectTransformState.ok ? "passed" : "failed",
+      objectMoveBefore: objectMove.before,
+      objectMoveAfter: objectMove.after,
+      trainingStageStatus:
+        world.shellTrainingStage === "model-version-processing-v1" &&
+        world.panelTrainingStageSchema === "model-version-processing-v1" &&
+        world.panelModelVersionRows >= 7
+          ? "passed"
+          : "failed",
+      stageVisibleModelCount: world.stageVisibleModelCount,
+      stageProcessedModelCount: world.panelStageProcessedModelCount,
       objectFragmentationStatus: world.fragmentPanelStatus,
       objectTemporalStatus: world.objectTemporalStatus,
       objectExplainabilityStatus: world.objectExplainabilityStatus,
