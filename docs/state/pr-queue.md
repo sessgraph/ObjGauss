@@ -151,7 +151,7 @@
   - 未替换 renderer、Spark bridge、ObjectState contract、manifest contract 或训练流程。
   - 未实现 `未分割高斯云 -> 生成对象层` 的后端处理入口；该产品流仍登记在
     `GAUSSIAN-OBJECT-PROCESS-FLOW-001`。
-- 完成 commit: 待提交
+- 完成 commit: `5cc0539`
 
 ### OBJECT-EDIT-UX-PRIMARY-FLOW-001: Simplify viewer primary flow around object editing
 
