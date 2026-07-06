@@ -1,6 +1,6 @@
 # ObjGauss V2 Stability Foundation
 
-状态：`V2-STABILITY-FOUNDATION-002` contract
+状态：`V2-STABILITY-FOUNDATION-002` contract + scenario / diagnostics extension
 
 ## 目标
 
@@ -93,6 +93,42 @@ builder：
 
 这些 fixture 可以作为后续 diagnostics / gate 的输入，但本身不是 final stability gate。
 
+### SyntheticStabilityDiagnosticsReport
+
+`SyntheticStabilityDiagnosticsReport` 是 `V2-STABILITY-DIAGNOSTICS-001` 引入的诊断层。
+它消费 `SyntheticStabilityScenarioFixture` 和与 observation 对齐的 predicted slots 或
+predicted assignments，把 row-level assignment 汇总成 identity-level observations。
+
+当前 schema：
+
+```text
+objgauss-v2-stability-diagnostics-v1
+```
+
+builder：
+
+- `diagnose_synthetic_stability_fixture(...)`
+- `expected_slots_for_synthetic_fixture(...)`
+
+输出包括：
+
+- `slot_transition_matrix`
+- `identity_confusion_graph`
+- `failure_mode_counts`
+- `failure_modes`
+- `identity_observations`
+
+`FailureModeClassifier` 当前区分五类 deterministic failure mode：
+
+- `slot_swap`
+- `identity_fragmentation`
+- `object_merge`
+- `background_absorption`
+- `temporal_drift`
+
+该层只用于失败定位和 gate 前证据检查。它不会训练 solver，不接 renderer loss，也不把
+diagnostics 本身升级成 hard gate。
+
 ## Scenario Kinds
 
 当前 contract 支持四类 scenario kind：
@@ -117,6 +153,7 @@ builder：
 - dynamic-K 自动 birth / merge / split 更新
 - renderer 参数解冻
 - CLI gate
+- diagnostics hard gate
 - TensorBoard / checkpoint 输出
 - SAM2 / CoTracker / DETR 之类外部 perception 模型接入
 
@@ -127,6 +164,6 @@ builder：
 2. `V2-STABILITY-DIAGNOSTICS-001`
    - 增加 `FailureModeClassifier`、slot transition matrix、identity confusion graph。
 3. `V2-STABILITY-GATE-001`
-   - 把 identity invariant 作为 hard gate，assignment / temporal 指标作为 soft gate。
+   - 下一步：把 identity invariant 作为 hard gate，assignment / temporal 指标作为 soft gate。
 4. `V2-STABILITY-CLI-001`
    - 暴露可复现 CPU synthetic benchmark CLI。

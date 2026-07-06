@@ -434,6 +434,17 @@ ASSIGNMENT-V2-RENDER-JOINT-001 -> CORE-MODEL-TRAIN-VALIDATE-001`；
 `MODEL-V2-TRAINING-ROADMAP-001` 后移到 core model validation 完成之后。本步骤不实现训练代码、
 不启动 GPU / renderer training、不引入 diffusion / rollout / replay buffer。
 
+随后完成 `V2-STABILITY-DIAGNOSTICS-001`：新增
+`objgauss-v2-stability-diagnostics-v1`，为 synthetic stability fixture 增加
+deterministic failure diagnostics。`diagnose_synthetic_stability_fixture(...)` 可消费
+`SyntheticStabilityScenarioFixture` 和与 observation 对齐的 predicted slots 或 predicted
+assignments，输出 identity-level observations、slot transition matrix、identity confusion
+graph、failure mode counts 和 failure events。`FailureModeClassifier` 当前能区分
+`slot_swap`、`identity_fragmentation`、`object_merge`、`background_absorption` 和
+`temporal_drift`。该切片只做诊断，不训练 solver、不接 renderer loss、不把 diagnostics
+变成 hard gate、不改变 dynamic-K proposal-only 约束。下一步进入
+`V2-STABILITY-GATE-001`，把 identity invariance 做成 hard gate。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

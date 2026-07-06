@@ -12,6 +12,8 @@ from objgauss.core import (
     ASSIGNMENT_MVP_TRAINING_SCHEMA,
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     AssignmentEvidenceBatch,
+    FailureModeClassifier,
+    FailureModeEvent,
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
     ObjectStateGaussianDecoderState,
@@ -23,11 +25,13 @@ from objgauss.core import (
     ObjectEmergenceSolverState,
     ObjectIdentityOracle,
     ObservationModelConfig,
+    IdentitySlotObservation,
     ObjectStabilityReport,
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
+    SyntheticStabilityDiagnosticsReport,
     SyntheticWorldState,
     TrainableKernelCamera,
     TrainableKernelImageTarget,
@@ -37,6 +41,8 @@ from objgauss.core import (
     TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
     V2_STABILITY_FOUNDATION_SCHEMA,
+    V2_STABILITY_DIAGNOSTICS_SCHEMA,
+    V2_STABILITY_FAILURE_MODES,
     V2_STABILITY_SCENARIO_FIXTURE_SCHEMA,
     V2_STABILITY_SCENARIO_KINDS,
     V2_SYNTHETIC_OBSERVATION_SCHEMA,
@@ -58,9 +64,11 @@ from objgauss.core import (
     build_gsplat_training_input_from_object_state,
     cluster_features,
     decode_gaussian_from_object_state,
+    diagnose_synthetic_stability_fixture,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_assignment_stability,
+    expected_slots_for_synthetic_fixture,
     evaluate_solver_decoder_object_states,
     evaluate_training_renderer_loss,
     evaluate_gsplat_training_renderer_loss,
@@ -112,6 +120,7 @@ from objgauss.core import (
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
     validate_synthetic_observation_frame,
+    validate_synthetic_stability_diagnostics_summary,
     validate_synthetic_stability_scenario_fixture,
     validate_synthetic_world_state,
     validate_renderer_loss_boundary_summary,
@@ -361,6 +370,23 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert fixture.observations[1].expected_slots.tolist() == [0, 1]
     suite = make_synthetic_stability_scenario_suite(object_count=2, seed=7)
     assert tuple(item.scenario_kind for item in suite) == V2_STABILITY_SCENARIO_KINDS
+
+    assert V2_STABILITY_DIAGNOSTICS_SCHEMA == "objgauss-v2-stability-diagnostics-v1"
+    assert "slot_swap" in V2_STABILITY_FAILURE_MODES
+    predicted = expected_slots_for_synthetic_fixture(fixture)
+    diagnostics = diagnose_synthetic_stability_fixture(
+        fixture,
+        predicted_slots=(predicted[0], np.asarray([1, 0], dtype=np.int64)),
+        classifier=FailureModeClassifier(),
+    )
+    assert isinstance(diagnostics, SyntheticStabilityDiagnosticsReport)
+    summary = diagnostics.as_dict()
+    assert validate_synthetic_stability_diagnostics_summary(summary) is summary
+    assert summary["failure_mode_counts"]["slot_swap"] == 1
+    assert summary["diagnostic_role"] == "diagnostic_only_not_gate"
+    first_observation = diagnostics.identity_observations[0]
+    assert isinstance(first_observation, IdentitySlotObservation)
+    assert isinstance(diagnostics.failure_modes[0], FailureModeEvent)
 
 
 def test_core_namespace_exposes_property_append_helper():

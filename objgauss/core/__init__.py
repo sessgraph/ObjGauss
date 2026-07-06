@@ -26,7 +26,19 @@ _EXPORTS = {
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityRecord",
     ),
+    "FailureModeClassifier": (
+        "objgauss.core.v2_stability_diagnostics",
+        "FailureModeClassifier",
+    ),
+    "FailureModeEvent": (
+        "objgauss.core.v2_stability_diagnostics",
+        "FailureModeEvent",
+    ),
     "GaussianCloud": ("objgauss.core.gaussian", "GaussianCloud"),
+    "IdentitySlotObservation": (
+        "objgauss.core.v2_stability_diagnostics",
+        "IdentitySlotObservation",
+    ),
     "ObjectField": ("objgauss.core.object_field", "ObjectField"),
     "ObservationModelConfig": (
         "objgauss.core.v2_stability_foundation",
@@ -63,6 +75,10 @@ _EXPORTS = {
     "SyntheticStabilityScenarioFixture": (
         "objgauss.core.v2_stability_foundation",
         "SyntheticStabilityScenarioFixture",
+    ),
+    "SyntheticStabilityDiagnosticsReport": (
+        "objgauss.core.v2_stability_diagnostics",
+        "SyntheticStabilityDiagnosticsReport",
     ),
     "SyntheticWorldFrame": (
         "objgauss.core.v2_stability_foundation",
@@ -140,6 +156,14 @@ _EXPORTS = {
     "V2_STABILITY_SCENARIO_KINDS": (
         "objgauss.core.v2_stability_foundation",
         "V2_STABILITY_SCENARIO_KINDS",
+    ),
+    "V2_STABILITY_DIAGNOSTICS_SCHEMA": (
+        "objgauss.core.v2_stability_diagnostics",
+        "V2_STABILITY_DIAGNOSTICS_SCHEMA",
+    ),
+    "V2_STABILITY_FAILURE_MODES": (
+        "objgauss.core.v2_stability_diagnostics",
+        "V2_STABILITY_FAILURE_MODES",
     ),
     "assignment_mvp_training_summary": (
         "objgauss.core.object_emergence_solver",
@@ -221,6 +245,10 @@ _EXPORTS = {
         "objgauss.core.gaussian_decoder",
         "decode_gaussian_from_object_state",
     ),
+    "diagnose_synthetic_stability_fixture": (
+        "objgauss.core.v2_stability_diagnostics",
+        "diagnose_synthetic_stability_fixture",
+    ),
     "evidence_from_gaussian_cloud": (
         "objgauss.core.object_emergence_solver",
         "evidence_from_gaussian_cloud",
@@ -284,6 +312,10 @@ _EXPORTS = {
     "evaluate_assignment_stability": (
         "objgauss.core.assignment_stability",
         "evaluate_assignment_stability",
+    ),
+    "expected_slots_for_synthetic_fixture": (
+        "objgauss.core.v2_stability_diagnostics",
+        "expected_slots_for_synthetic_fixture",
     ),
     "object_id_targets_from_cloud": (
         "objgauss.core.object_emergence_solver",
@@ -485,6 +517,10 @@ _EXPORTS = {
     "validate_synthetic_stability_scenario_fixture": (
         "objgauss.core.v2_stability_foundation",
         "validate_synthetic_stability_scenario_fixture",
+    ),
+    "validate_synthetic_stability_diagnostics_summary": (
+        "objgauss.core.v2_stability_diagnostics",
+        "validate_synthetic_stability_diagnostics_summary",
     ),
     "validate_synthetic_world_state": (
         "objgauss.core.v2_stability_foundation",
