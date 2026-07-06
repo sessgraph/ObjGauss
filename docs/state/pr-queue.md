@@ -145,7 +145,7 @@
   - `uv run --extra dev pytest`: 236 passed。
   - `npm run build`: passed；Vite 保留既有 chunk size warning。
   - `git diff --check`: passed。
-- 完成 commit: pending
+- 完成 commit: `c804b2a`
 
 ### ASSIGNMENT-SOLVER-V2-TRAIN-001: Train cost-softmax assignment solver
 
