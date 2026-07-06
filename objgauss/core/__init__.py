@@ -62,6 +62,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_viewer_preview",
         "RealSampleV2ViewerPreviewReport",
     ),
+    "RealSampleV2FullCloudPurityReport": (
+        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "RealSampleV2FullCloudPurityReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -244,6 +248,10 @@ _EXPORTS = {
     "REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA": (
         "objgauss.core.real_sample_v2_model_handoff",
         "REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA",
+    ),
+    "REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA": (
+        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -509,6 +517,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_viewer_preview",
         "real_sample_v2_viewer_preview_from_handoff",
     ),
+    "real_sample_v2_full_cloud_purity_from_cloud": (
+        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "real_sample_v2_full_cloud_purity_from_cloud",
+    ),
     "render_real_sample_v2_model_handoff_html": (
         "objgauss.core.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
@@ -701,6 +713,10 @@ _EXPORTS = {
     "validate_real_sample_v2_viewer_preview_summary": (
         "objgauss.core.real_sample_v2_viewer_preview",
         "validate_real_sample_v2_viewer_preview_summary",
+    ),
+    "validate_real_sample_v2_full_cloud_purity_summary": (
+        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "validate_real_sample_v2_full_cloud_purity_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

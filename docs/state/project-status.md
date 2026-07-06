@@ -572,6 +572,21 @@ renderer-facing `object_id` 写成 `argmax(A)` 预测 slot。frontend viewer 新
 promotion gate；下一步应诊断 sample-to-full-cloud purity gap，而不是解冻 geometry 或进入
 GPU 长训、diffusion、replay、rollout。
 
+随后完成 `REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001`：新增
+`objgauss-real-sample-v2-full-cloud-purity-v1`，把 full-cloud viewer preview 的对象分割
+目标覆盖做成可复跑扫描。CLI 新增
+`objgauss training real-sample-v2-full-cloud-purity`，固定 public
+`lego_alpha_v1_objects.ply` 时默认比较 `max_points=24/64/128`，并把最佳候选导出为
+viewer 可加载 debug PLY。当前结果显示：`max_points=24` 仍为
+`object_purity=0.758462`、`direct_slot_match=0.900281`、`low_object_purity`；
+`max_points=64` 小幅改善到 `object_purity=0.765805`、`direct_slot_match=0.912746`；
+`max_points=128` 通过 full-cloud gate，`solver_temperature=0.35`、
+`mean_normalized_entropy=0.325897`、`assignment_confidence=0.674103`、
+`object_purity=0.853079`、`direct_slot_match=0.989642`。结论：本 public sample 的主要差距
+来自采样覆盖不足，下一步应把阶段分割对象目标临时设为 `max_points=128` 后做视觉质量检查和
+误分割定位；当前不需要 evidence normalization，不解冻 geometry / camera，不进入 GPU 长训、
+diffusion、replay 或 rollout。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

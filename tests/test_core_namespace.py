@@ -21,6 +21,7 @@ from objgauss.core import (
     CORE_MODEL_TRAIN_VALIDATE_SCHEMA,
     REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA,
     REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA,
+    REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA,
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     AssignmentEvidenceBatch,
@@ -49,6 +50,7 @@ from objgauss.core import (
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
     RealSampleV2DiagnosticsReport,
+    RealSampleV2FullCloudPurityReport,
     RealSampleV2ModelHandoffReport,
     RealSampleV2SmokeReport,
     SyntheticObservationFrame,
@@ -139,6 +141,7 @@ from objgauss.core import (
     project_object_states_from_field,
     read_ply,
     real_sample_v2_diagnostics_from_cloud,
+    real_sample_v2_full_cloud_purity_from_cloud,
     real_sample_v2_model_handoff_from_cloud,
     real_sample_v2_smoke_from_cloud,
     render_real_sample_v2_model_handoff_html,
@@ -165,6 +168,7 @@ from objgauss.core import (
     validate_core_model_train_validate_summary,
     validate_real_sample_v2_diagnostics_summary,
     validate_real_sample_v2_effect_preview,
+    validate_real_sample_v2_full_cloud_purity_summary,
     validate_real_sample_v2_model_handoff_summary,
     validate_real_sample_v2_smoke_summary,
     validate_object_emergence_evidence,
@@ -621,6 +625,12 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert render_real_sample_v2_model_handoff_html is not None
     assert validate_real_sample_v2_model_handoff_summary is not None
     assert validate_real_sample_v2_effect_preview is not None
+    assert REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA == (
+        "objgauss-real-sample-v2-full-cloud-purity-v1"
+    )
+    assert RealSampleV2FullCloudPurityReport is not None
+    assert real_sample_v2_full_cloud_purity_from_cloud is not None
+    assert validate_real_sample_v2_full_cloud_purity_summary is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],

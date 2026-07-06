@@ -115,6 +115,9 @@ from objgauss.core.real_sample_v2_model_handoff import (
 from objgauss.core.real_sample_v2_viewer_preview import (
     real_sample_v2_viewer_preview_from_cloud,
 )
+from objgauss.core.real_sample_v2_full_cloud_purity import (
+    real_sample_v2_full_cloud_purity_from_cloud,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1758,6 +1761,81 @@ def _training_real_sample_v2_viewer_preview(args: argparse.Namespace) -> None:
         print(f"viewer_route={summary['viewer']['debug_route']}")
     if args.require_pass and summary["status"] != "real_sample_v2_viewer_preview_pass":
         raise ValueError("real sample v2 viewer preview did not pass")
+
+
+def _training_real_sample_v2_full_cloud_purity(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    temperatures = (
+        tuple(args.temperature_candidates)
+        if args.temperature_candidates is not None
+        else (1.0, 0.75, 0.5, 0.35, 0.25)
+    )
+    report = real_sample_v2_full_cloud_purity_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        max_point_candidates=tuple(args.max_point_candidates),
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        temperature_candidates=temperatures,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+        viewer_path=args.viewer_path,
+    )
+    summary = report.as_dict()
+    best = summary["best_candidate"]
+    quality = best["quality"]
+    delta = summary["quality_delta"]
+    recommendation = summary["recommendation"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['source']['source_gaussians']}")
+    print(f"candidate_count={summary['candidate_count']}")
+    print(f"selected_max_points={summary['segmentation_target']['selected_max_points']}")
+    print(f"selected_solver_temperature={summary['segmentation_target']['selected_solver_temperature']}")
+    print(f"best_quality_status={quality['status']}")
+    print(f"best_full_cloud_entropy={quality['mean_normalized_entropy']:.6f}")
+    print(f"best_full_cloud_confidence={quality['assignment_confidence']:.6f}")
+    print(f"best_full_cloud_purity={_format_optional_float(quality['object_purity'])}")
+    print(f"best_direct_slot_match={quality['direct_slot_match']:.6f}")
+    print(f"purity_delta={_format_optional_float(delta['purity_delta'])}")
+    print(f"direct_slot_match_delta={delta['direct_slot_match_delta']:.6f}")
+    print(f"recommendation_decision={recommendation['decision']}")
+    print(f"recommendation_action={recommendation['action']}")
+    print(f"recommendation_max_points={recommendation['max_points']}")
+    for candidate in summary["coverage_sweep"]:
+        candidate_quality = candidate["quality"]
+        print(
+            "candidate="
+            f"max_points:{candidate['max_points']},"
+            f"temperature:{candidate['solver_temperature']},"
+            f"status:{candidate_quality['status']},"
+            f"entropy:{candidate_quality['mean_normalized_entropy']:.6f},"
+            f"confidence:{candidate_quality['assignment_confidence']:.6f},"
+            f"purity:{_format_optional_float(candidate_quality['object_purity'])},"
+            f"direct_slot_match:{candidate_quality['direct_slot_match']:.6f},"
+            f"diagnostics:{','.join(candidate_quality['diagnostics']) or 'none'}"
+        )
+    write_ply(args.preview_ply_output, report.best_candidate.projected_cloud, fmt=_output_format(args))
+    print(f"preview_ply={args.preview_ply_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if summary["viewer"]["debug_route"]:
+        print(f"viewer_route={summary['viewer']['debug_route']}")
+    if args.require_pass and summary["status"] != "real_sample_v2_full_cloud_purity_pass":
+        raise ValueError("real sample v2 full-cloud purity did not pass")
 
 
 def _training_eval_assignment(args: argparse.Namespace) -> None:
@@ -3515,6 +3593,50 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_viewer_preview.add_argument("--summary-output", type=Path)
     real_sample_viewer_preview.add_argument("--require-pass", action="store_true")
     real_sample_viewer_preview.set_defaults(handler=_training_real_sample_v2_viewer_preview)
+
+    real_sample_full_cloud_purity = training_subparsers.add_parser(
+        "real-sample-v2-full-cloud-purity",
+        help="scan real-sample v2 target coverage and export the best full-cloud viewer PLY",
+    )
+    real_sample_full_cloud_purity.add_argument("input", type=Path)
+    real_sample_full_cloud_purity.add_argument("--preview-ply-output", required=True, type=Path)
+    real_sample_full_cloud_purity.add_argument("--viewer-path")
+    real_sample_full_cloud_purity.add_argument(
+        "--max-point-candidates",
+        type=int,
+        nargs="+",
+        default=[24, 64, 128],
+        help="sample coverage candidates; defaults to 24 64 128",
+    )
+    real_sample_full_cloud_purity.add_argument("--slots", type=int)
+    real_sample_full_cloud_purity.add_argument("--frames", type=int, default=2)
+    real_sample_full_cloud_purity.add_argument("--object-id-field", default="object_id")
+    real_sample_full_cloud_purity.add_argument("--temporal-offset", type=float, default=0.01)
+    real_sample_full_cloud_purity.add_argument("--image-width", type=int, default=12)
+    real_sample_full_cloud_purity.add_argument("--image-height", type=int, default=12)
+    real_sample_full_cloud_purity.add_argument("--point-radius", type=int, default=1)
+    real_sample_full_cloud_purity.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_full_cloud_purity.add_argument("--iterations", type=int, default=100)
+    real_sample_full_cloud_purity.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_full_cloud_purity.add_argument(
+        "--temperature-candidates",
+        type=float,
+        nargs="+",
+        help="temperature sweep candidates; defaults to 1.0 0.75 0.5 0.35 0.25",
+    )
+    real_sample_full_cloud_purity.add_argument("--baseline-temperature", type=float, default=1.0)
+    real_sample_full_cloud_purity.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
+    real_sample_full_cloud_purity.add_argument("--seed", type=int, default=4)
+    real_sample_full_cloud_purity.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_full_cloud_purity.add_argument("--rewrite-sh", action="store_true")
+    real_sample_full_cloud_purity.add_argument("--ascii", action="store_true", help="write ASCII PLY")
+    real_sample_full_cloud_purity.add_argument("--summary-output", type=Path)
+    real_sample_full_cloud_purity.add_argument("--require-pass", action="store_true")
+    real_sample_full_cloud_purity.set_defaults(handler=_training_real_sample_v2_full_cloud_purity)
 
     eval_assignment = training_subparsers.add_parser(
         "eval-assignment",
