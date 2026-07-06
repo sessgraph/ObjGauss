@@ -73,6 +73,26 @@ Object Binding Layer 是否在观测变化下保持同一世界实体？
 `AssignmentEvidenceBatch.target_assignment` 使用 oracle slot 构造，因此它可以作为
 assignment solver / stability gate 的监督或评估输入。
 
+### SyntheticStabilityScenarioFixture
+
+`SyntheticStabilityScenarioFixture` 是 `V2-STABILITY-SCENARIO-002` 引入的 fixture
+层。它把一个 `SyntheticWorldState`、对应的 observation batches、observation config、
+oracle identity labels、expected slots 和 visible / occluded transitions 绑定成同一个
+可复现样例。
+
+当前 schema：
+
+```text
+objgauss-v2-stability-scenario-fixture-v1
+```
+
+builder：
+
+- `make_synthetic_stability_scenario_fixture(...)`
+- `make_synthetic_stability_scenario_suite(...)`
+
+这些 fixture 可以作为后续 diagnostics / gate 的输入，但本身不是 final stability gate。
+
 ## Scenario Kinds
 
 当前 contract 支持四类 scenario kind：
@@ -82,8 +102,11 @@ assignment solver / stability gate 的监督或评估输入。
 - `perturbation`
 - `adversarial_swap`
 
-本阶段只冻结 world/oracle/observation contract，不把这些 scenario 扩成完整
-benchmark suite。
+`adversarial_swap` 会交换 object 0 / 1 的 appearance feature / RGB，但
+`oracle_object_id`、`lineage_id` 和 `expected_slot` 必须保持原身份不变。
+
+本阶段只冻结 world/oracle/observation/fixture contract，不把这些 scenario 升级成
+完整 benchmark gate。
 
 ## Non-goals
 

@@ -60,6 +60,10 @@ _EXPORTS = {
         "objgauss.core.v2_stability_foundation",
         "SyntheticObservationFrame",
     ),
+    "SyntheticStabilityScenarioFixture": (
+        "objgauss.core.v2_stability_foundation",
+        "SyntheticStabilityScenarioFixture",
+    ),
     "SyntheticWorldFrame": (
         "objgauss.core.v2_stability_foundation",
         "SyntheticWorldFrame",
@@ -128,6 +132,14 @@ _EXPORTS = {
     "V2_SYNTHETIC_OBSERVATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
         "V2_SYNTHETIC_OBSERVATION_SCHEMA",
+    ),
+    "V2_STABILITY_SCENARIO_FIXTURE_SCHEMA": (
+        "objgauss.core.v2_stability_foundation",
+        "V2_STABILITY_SCENARIO_FIXTURE_SCHEMA",
+    ),
+    "V2_STABILITY_SCENARIO_KINDS": (
+        "objgauss.core.v2_stability_foundation",
+        "V2_STABILITY_SCENARIO_KINDS",
     ),
     "assignment_mvp_training_summary": (
         "objgauss.core.object_emergence_solver",
@@ -248,6 +260,14 @@ _EXPORTS = {
     "make_synthetic_world_state": (
         "objgauss.core.v2_stability_foundation",
         "make_synthetic_world_state",
+    ),
+    "make_synthetic_stability_scenario_fixture": (
+        "objgauss.core.v2_stability_foundation",
+        "make_synthetic_stability_scenario_fixture",
+    ),
+    "make_synthetic_stability_scenario_suite": (
+        "objgauss.core.v2_stability_foundation",
+        "make_synthetic_stability_scenario_suite",
     ),
     "match_object_states": ("objgauss.core.object_state", "match_object_states"),
     "object_emergence_metrics": ("objgauss.core.evaluation", "object_emergence_metrics"),
@@ -461,6 +481,10 @@ _EXPORTS = {
     "validate_synthetic_observation_frame": (
         "objgauss.core.v2_stability_foundation",
         "validate_synthetic_observation_frame",
+    ),
+    "validate_synthetic_stability_scenario_fixture": (
+        "objgauss.core.v2_stability_foundation",
+        "validate_synthetic_stability_scenario_fixture",
     ),
     "validate_synthetic_world_state": (
         "objgauss.core.v2_stability_foundation",

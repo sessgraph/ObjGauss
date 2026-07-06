@@ -12,11 +12,15 @@ from objgauss.core.assignment_evidence import (
 
 V2_STABILITY_FOUNDATION_SCHEMA = "objgauss-v2-stability-foundation-v1"
 V2_SYNTHETIC_OBSERVATION_SCHEMA = "objgauss-v2-synthetic-observation-v1"
-_VALID_SCENARIO_KINDS = {
+V2_STABILITY_SCENARIO_FIXTURE_SCHEMA = "objgauss-v2-stability-scenario-fixture-v1"
+V2_STABILITY_SCENARIO_KINDS = (
     "cross_view",
     "occlusion_recovery",
     "perturbation",
     "adversarial_swap",
+)
+_VALID_SCENARIO_KINDS = {
+    *V2_STABILITY_SCENARIO_KINDS,
 }
 _EPS = 1e-8
 
@@ -228,6 +232,46 @@ class SyntheticObservationFrame:
         }
 
 
+@dataclass(frozen=True)
+class SyntheticStabilityScenarioFixture:
+    scenario_id: str
+    scenario_kind: str
+    world: SyntheticWorldState
+    observations: tuple[SyntheticObservationFrame, ...]
+    observation_config: ObservationModelConfig
+    world_seed: int
+    schema: str = V2_STABILITY_SCENARIO_FIXTURE_SCHEMA
+
+    @property
+    def frame_count(self) -> int:
+        return self.world.frame_count
+
+    @property
+    def object_count(self) -> int:
+        return self.world.object_count
+
+    def as_dict(self) -> dict[str, Any]:
+        fixture = validate_synthetic_stability_scenario_fixture(self)
+        return {
+            "schema": fixture.schema,
+            "kind": "synthetic_stability_scenario_fixture",
+            "scenario_id": fixture.scenario_id,
+            "scenario_kind": fixture.scenario_kind,
+            "object_count": fixture.object_count,
+            "frame_count": fixture.frame_count,
+            "observation_count": len(fixture.observations),
+            "identity_source": "synthetic_oracle_labels",
+            "expected_slot_source": "canonical_oracle_slot",
+            "scenario_role": "fixture_only_not_final_gate",
+            "world_seed": int(fixture.world_seed),
+            "observation_config": fixture.observation_config.as_dict(),
+            "visibility_transitions": _visibility_transition_records(fixture.world.oracle),
+            "oracle": fixture.world.oracle.as_dict(),
+            "world": fixture.world.as_dict(),
+            "observations": [observation.as_dict() for observation in fixture.observations],
+        }
+
+
 def make_object_identity_oracle(
     *,
     scenario_id: str,
@@ -311,9 +355,15 @@ def make_synthetic_world_state(
         centered_index = frame_index - (frame_count - 1) / 2.0
         objects = []
         for observation in oracle_frame:
+            appearance_object_id = _appearance_object_id_for_scenario(
+                scenario_kind,
+                frame_index=frame_index,
+                object_id=observation.oracle_object_id,
+                object_count=object_count,
+            )
             feature = np.zeros(feature_dim, dtype=np.float32)
-            feature[observation.oracle_object_id] = 1.0
-            rgb = _canonical_rgb(observation.oracle_object_id)
+            feature[appearance_object_id] = 1.0
+            rgb = _canonical_rgb(appearance_object_id)
             trajectory = np.asarray(
                 [
                     0.03 * (observation.oracle_object_id + 1),
@@ -329,6 +379,11 @@ def make_synthetic_world_state(
                 object_id=observation.oracle_object_id,
                 rng=rng,
             )
+            if appearance_object_id != observation.oracle_object_id:
+                perturbation = {
+                    **perturbation,
+                    "appearance_source_object_id": int(appearance_object_id),
+                }
             objects.append(
                 SyntheticWorldObject(
                     oracle_object_id=observation.oracle_object_id,
@@ -357,6 +412,65 @@ def make_synthetic_world_state(
             oracle=oracle,
             frames=tuple(frames),
         )
+    )
+
+
+def make_synthetic_stability_scenario_fixture(
+    *,
+    scenario_kind: str,
+    scenario_id: str | None = None,
+    object_count: int = 3,
+    frame_count: int | None = None,
+    feature_dim: int | None = None,
+    seed: int = 0,
+    observation_config: ObservationModelConfig | None = None,
+) -> SyntheticStabilityScenarioFixture:
+    if scenario_kind not in _VALID_SCENARIO_KINDS:
+        raise ValueError(f"unsupported scenario_kind: {scenario_kind}")
+    if object_count < 1:
+        raise ValueError("object_count must be >= 1")
+    world_seed = int(seed)
+    resolved_frame_count = (
+        _default_scenario_frame_count(scenario_kind)
+        if frame_count is None
+        else int(frame_count)
+    )
+    resolved_feature_dim = max(object_count, 6) if feature_dim is None else int(feature_dim)
+    resolved_scenario_id = scenario_id or f"v2-stability-{scenario_kind}"
+    config = observation_config or _default_observation_config(world_seed)
+    world = make_synthetic_world_state(
+        scenario_id=resolved_scenario_id,
+        scenario_kind=scenario_kind,
+        object_count=object_count,
+        frame_count=resolved_frame_count,
+        feature_dim=resolved_feature_dim,
+        seed=world_seed,
+    )
+    observations = observe_synthetic_world(world, config=config)
+    return validate_synthetic_stability_scenario_fixture(
+        SyntheticStabilityScenarioFixture(
+            scenario_id=resolved_scenario_id,
+            scenario_kind=scenario_kind,
+            world=world,
+            observations=observations,
+            observation_config=config,
+            world_seed=world_seed,
+        )
+    )
+
+
+def make_synthetic_stability_scenario_suite(
+    *,
+    object_count: int = 3,
+    seed: int = 0,
+) -> tuple[SyntheticStabilityScenarioFixture, ...]:
+    return tuple(
+        make_synthetic_stability_scenario_fixture(
+            scenario_kind=scenario_kind,
+            object_count=object_count,
+            seed=int(seed) + index,
+        )
+        for index, scenario_kind in enumerate(V2_STABILITY_SCENARIO_KINDS)
     )
 
 
@@ -426,6 +540,62 @@ def observe_synthetic_world(
             )
         )
     return tuple(observed)
+
+
+def validate_synthetic_stability_scenario_fixture(
+    fixture: SyntheticStabilityScenarioFixture,
+) -> SyntheticStabilityScenarioFixture:
+    if not isinstance(fixture, SyntheticStabilityScenarioFixture):
+        raise TypeError("fixture must be SyntheticStabilityScenarioFixture")
+    if fixture.schema != V2_STABILITY_SCENARIO_FIXTURE_SCHEMA:
+        raise ValueError(f"unsupported stability scenario fixture schema: {fixture.schema}")
+    if fixture.scenario_kind not in _VALID_SCENARIO_KINDS:
+        raise ValueError(f"unsupported scenario_kind: {fixture.scenario_kind}")
+    world = validate_synthetic_world_state(fixture.world)
+    config = validate_observation_model_config(fixture.observation_config)
+    if fixture.scenario_id != world.scenario_id:
+        raise ValueError("fixture scenario_id must match world scenario_id")
+    if fixture.scenario_kind != world.scenario_kind:
+        raise ValueError("fixture scenario_kind must match world scenario_kind")
+    if len(fixture.observations) != world.frame_count:
+        raise ValueError("fixture observations must cover every world frame")
+    validated_observations = tuple(
+        validate_synthetic_observation_frame(observation)
+        for observation in fixture.observations
+    )
+    for frame_index, observation in enumerate(validated_observations):
+        if int(observation.frame_index) != frame_index:
+            raise ValueError("fixture observations must be ordered by frame_index")
+        if observation.view_id != world.frames[frame_index].view_id:
+            raise ValueError("observation view_id must match world frame view_id")
+        oracle_frame = world.oracle.frames[frame_index]
+        visible_ids = {
+            int(oracle_observation.oracle_object_id)
+            for oracle_observation in oracle_frame
+            if oracle_observation.visible
+        }
+        observed_ids = set(observation.oracle_object_ids.astype(int).tolist())
+        if observed_ids != visible_ids:
+            raise ValueError("observation oracle ids must match visible oracle objects")
+        slots_by_id = {
+            int(oracle_observation.oracle_object_id): int(oracle_observation.expected_slot)
+            for oracle_observation in oracle_frame
+        }
+        for object_id, expected_slot in zip(
+            observation.oracle_object_ids.astype(int).tolist(),
+            observation.expected_slots.astype(int).tolist(),
+        ):
+            if int(expected_slot) != slots_by_id[int(object_id)]:
+                raise ValueError("observation expected slots must match oracle slots")
+    return SyntheticStabilityScenarioFixture(
+        scenario_id=fixture.scenario_id,
+        scenario_kind=fixture.scenario_kind,
+        world=world,
+        observations=validated_observations,
+        observation_config=config,
+        world_seed=int(fixture.world_seed),
+        schema=fixture.schema,
+    )
 
 
 def validate_object_identity_oracle(oracle: ObjectIdentityOracle) -> ObjectIdentityOracle:
@@ -593,6 +763,96 @@ def _canonical_rgb(object_id: int) -> np.ndarray:
     return palette[int(object_id) % palette.shape[0]].copy()
 
 
+def _default_scenario_frame_count(scenario_kind: str) -> int:
+    if scenario_kind == "occlusion_recovery":
+        return 4
+    return 3
+
+
+def _default_observation_config(seed: int) -> ObservationModelConfig:
+    return ObservationModelConfig(
+        points_per_object=3,
+        position_jitter=0.02,
+        feature_noise=0.0,
+        include_mask_votes=True,
+        include_track_hints=True,
+        seed=int(seed) + 101,
+    )
+
+
+def _appearance_object_id_for_scenario(
+    scenario_kind: str,
+    *,
+    frame_index: int,
+    object_id: int,
+    object_count: int,
+) -> int:
+    if (
+        scenario_kind == "adversarial_swap"
+        and frame_index > 0
+        and object_count >= 2
+        and object_id in (0, 1)
+    ):
+        return 1 - int(object_id)
+    return int(object_id)
+
+
+def _visibility_transition_records(oracle: ObjectIdentityOracle) -> list[dict[str, Any]]:
+    oracle = validate_object_identity_oracle(oracle)
+    records: list[dict[str, Any]] = []
+    for identity in oracle.identities:
+        statuses = []
+        transitions = []
+        previous_visible: bool | None = None
+        for frame_index, frame in enumerate(oracle.frames):
+            observation = next(
+                item
+                for item in frame
+                if int(item.oracle_object_id) == int(identity.oracle_object_id)
+            )
+            visible = bool(observation.visible)
+            statuses.append(
+                {
+                    "frame_index": int(frame_index),
+                    "visible": visible,
+                    "expected_slot": int(observation.expected_slot),
+                    "expected_slot_relation": observation.expected_slot_relation,
+                }
+            )
+            if previous_visible is not None:
+                transitions.append(
+                    {
+                        "from_frame": int(frame_index - 1),
+                        "to_frame": int(frame_index),
+                        "transition": _visibility_transition_name(
+                            previous_visible,
+                            visible,
+                        ),
+                    }
+                )
+            previous_visible = visible
+        records.append(
+            {
+                "oracle_object_id": int(identity.oracle_object_id),
+                "lineage_id": identity.lineage_id,
+                "expected_slot": int(identity.canonical_slot),
+                "statuses": statuses,
+                "transitions": transitions,
+            }
+        )
+    return records
+
+
+def _visibility_transition_name(previous_visible: bool, visible: bool) -> str:
+    if previous_visible and visible:
+        return "visible_to_visible"
+    if previous_visible and not visible:
+        return "visible_to_occluded"
+    if not previous_visible and visible:
+        return "occluded_to_visible"
+    return "occluded_to_occluded"
+
+
 def _object_perturbation(
     scenario_kind: str,
     *,
@@ -606,10 +866,10 @@ def _object_perturbation(
             "feature_delta": float(0.05 + 0.01 * object_id),
             "brightness": float(1.0 + 0.05 * (object_id + 1)),
         }
-    if scenario_kind == "adversarial_swap" and frame_index > 0:
+    if scenario_kind == "adversarial_swap" and frame_index > 0 and object_id in (0, 1):
         return {
-            "kind": "identity_stress",
-            "appearance_mutation": float(rng.uniform(0.05, 0.1)),
+            "kind": "appearance_swap",
+            "swapped_with": int(1 - object_id),
         }
     return {"kind": "none"}
 

@@ -27,6 +27,7 @@ from objgauss.core import (
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
     SyntheticObservationFrame,
+    SyntheticStabilityScenarioFixture,
     SyntheticWorldState,
     TrainableKernelCamera,
     TrainableKernelImageTarget,
@@ -36,6 +37,8 @@ from objgauss.core import (
     TRAINING_SCALE_PLAN_SCHEMA,
     TrainingRendererLossResult,
     V2_STABILITY_FOUNDATION_SCHEMA,
+    V2_STABILITY_SCENARIO_FIXTURE_SCHEMA,
+    V2_STABILITY_SCENARIO_KINDS,
     V2_SYNTHETIC_OBSERVATION_SCHEMA,
     append_or_replace_property,
     assignment_balance_loss_and_gradient,
@@ -68,6 +71,8 @@ from objgauss.core import (
     initialize_object_state_gaussian_decoder,
     image_target_contract_summary,
     make_object_identity_oracle,
+    make_synthetic_stability_scenario_fixture,
+    make_synthetic_stability_scenario_suite,
     make_synthetic_world_state,
     make_trainable_image_target,
     make_trainable_kernel_mvp_fixture,
@@ -107,6 +112,7 @@ from objgauss.core import (
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
     validate_synthetic_observation_frame,
+    validate_synthetic_stability_scenario_fixture,
     validate_synthetic_world_state,
     validate_renderer_loss_boundary_summary,
     validate_trainable_kernel_model_artifact,
@@ -304,6 +310,13 @@ def test_core_namespace_exposes_object_emergence_solver_abi():
 def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert V2_STABILITY_FOUNDATION_SCHEMA == "objgauss-v2-stability-foundation-v1"
     assert V2_SYNTHETIC_OBSERVATION_SCHEMA == "objgauss-v2-synthetic-observation-v1"
+    assert V2_STABILITY_SCENARIO_FIXTURE_SCHEMA == "objgauss-v2-stability-scenario-fixture-v1"
+    assert V2_STABILITY_SCENARIO_KINDS == (
+        "cross_view",
+        "occlusion_recovery",
+        "perturbation",
+        "adversarial_swap",
+    )
 
     oracle = make_object_identity_oracle(
         scenario_id="namespace-v2-stability",
@@ -331,6 +344,23 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_synthetic_observation_frame(observations[0]) is observations[0]
     assert observations[0].oracle_object_ids.tolist() == [0, 1]
     assert observations[0].expected_slots.tolist() == [0, 1]
+
+    fixture = make_synthetic_stability_scenario_fixture(
+        scenario_kind="adversarial_swap",
+        object_count=2,
+        frame_count=2,
+        feature_dim=3,
+        seed=5,
+        observation_config=ObservationModelConfig(points_per_object=1, position_jitter=0.0, seed=6),
+    )
+    assert isinstance(fixture, SyntheticStabilityScenarioFixture)
+    assert validate_synthetic_stability_scenario_fixture(fixture).schema == (
+        V2_STABILITY_SCENARIO_FIXTURE_SCHEMA
+    )
+    assert fixture.observations[1].oracle_object_ids.tolist() == [0, 1]
+    assert fixture.observations[1].expected_slots.tolist() == [0, 1]
+    suite = make_synthetic_stability_scenario_suite(object_count=2, seed=7)
+    assert tuple(item.scenario_kind for item in suite) == V2_STABILITY_SCENARIO_KINDS
 
 
 def test_core_namespace_exposes_property_append_helper():
