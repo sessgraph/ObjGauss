@@ -9,7 +9,9 @@ from objgauss.core.assignment_evidence import (
     assignment_evidence_sequence_from_trainable_frames,
 )
 from objgauss.core.assignment_solver_v2 import (
+    AssignmentSolverV2Config,
     AssignmentSolverV2Prediction,
+    AssignmentSolverV2State,
     predict_assignment_solver_v2,
 )
 from objgauss.core.assignment_solver_v2_eval import (
@@ -38,6 +40,8 @@ from objgauss.core.trainable_kernel import (
 )
 
 REAL_SAMPLE_V2_VIEWER_PREVIEW_SCHEMA = "objgauss-real-sample-v2-viewer-preview-v1"
+REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT = 2.0
+REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT = 1.0
 _STATUS_PASS = "real_sample_v2_viewer_preview_pass"
 _STATUS_FAIL = "real_sample_v2_viewer_preview_fail"
 _QUALITY_PASS = "full_cloud_objectstate_preview_quality_pass"
@@ -54,6 +58,10 @@ class RealSampleV2ViewerPreviewReport:
     projected_cloud: GaussianCloud
     sample_source: str
     object_id_field: str
+    baseline_feature_weight: float
+    baseline_position_weight: float
+    promoted_feature_weight: float
+    promoted_position_weight: float
     viewer_path: str | None = None
     schema: str = REAL_SAMPLE_V2_VIEWER_PREVIEW_SCHEMA
 
@@ -75,6 +83,10 @@ class RealSampleV2ViewerPreviewReport:
             0.0
             if target_slots.size == 0
             else float(np.mean(self.projection.derived_object_ids == target_slots))
+        )
+        hard_segmentation = _hard_segmentation_summary(
+            target_slots,
+            self.projection.derived_object_ids,
         )
         payload = {
             "schema": self.schema,
@@ -112,6 +124,20 @@ class RealSampleV2ViewerPreviewReport:
                 "feature_dim": int(checkpoint_state.config.feature_dim),
                 "state_schema": checkpoint_state.schema,
             },
+            "assignment_weight_policy": {
+                "family": "assignment_v2_cost_weight_promotion",
+                "promotion_source": "REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001",
+                "baseline_feature_weight": float(self.baseline_feature_weight),
+                "baseline_position_weight": float(self.baseline_position_weight),
+                "promoted_feature_weight": float(self.promoted_feature_weight),
+                "promoted_position_weight": float(self.promoted_position_weight),
+                "applied": (
+                    float(self.baseline_feature_weight) != float(self.promoted_feature_weight)
+                    or float(self.baseline_position_weight) != float(self.promoted_position_weight)
+                ),
+                "uses_target_labels_for_prediction": False,
+                "mutates_checkpoint": False,
+            },
             "projection": {
                 "source": "checkpoint_restored_full_cloud_assignment",
                 "projected_gaussians": int(self.prediction.evidence_count),
@@ -132,6 +158,7 @@ class RealSampleV2ViewerPreviewReport:
                 "slot_mass_fraction": [
                     float(value) for value in self.stability.slot_mass_fraction
                 ],
+                "hard_segmentation": hard_segmentation,
             },
             "quality": {
                 "status": (
@@ -194,6 +221,8 @@ def real_sample_v2_viewer_preview_from_cloud(
     baseline_temperature: float = 1.0,
     image_renderer: str = TRAINING_IMAGE_RENDERER_POINT,
     vram_reserve_gb: int = 1,
+    assignment_feature_weight: float | None = None,
+    assignment_position_weight: float | None = None,
     rewrite_sh: bool = False,
     viewer_path: str | None = None,
 ) -> RealSampleV2ViewerPreviewReport:
@@ -226,6 +255,8 @@ def real_sample_v2_viewer_preview_from_cloud(
         object_id_field=object_id_field,
         slots=slots,
         seed=seed,
+        assignment_feature_weight=assignment_feature_weight,
+        assignment_position_weight=assignment_position_weight,
         rewrite_sh=rewrite_sh,
         viewer_path=viewer_path,
     )
@@ -239,6 +270,8 @@ def real_sample_v2_viewer_preview_from_handoff(
     object_id_field: str = "object_id",
     slots: int | None = None,
     seed: int = 4,
+    assignment_feature_weight: float | None = None,
+    assignment_position_weight: float | None = None,
     rewrite_sh: bool = False,
     viewer_path: str | None = None,
 ) -> RealSampleV2ViewerPreviewReport:
@@ -256,7 +289,12 @@ def real_sample_v2_viewer_preview_from_handoff(
         bind_image_targets=False,
         seed=seed,
     )
-    state = assignment_solver_v2_state_from_checkpoint(handoff.checkpoint)
+    baseline_state = assignment_solver_v2_state_from_checkpoint(handoff.checkpoint)
+    state = _assignment_state_with_weights(
+        baseline_state,
+        feature_weight=assignment_feature_weight,
+        position_weight=assignment_position_weight,
+    )
     evidence = assignment_evidence_sequence_from_trainable_frames(
         sample.frames,
         source="real_sample_v2_viewer_preview",
@@ -289,6 +327,10 @@ def real_sample_v2_viewer_preview_from_handoff(
         projected_cloud=projected_cloud,
         sample_source=str(sample_source),
         object_id_field=str(object_id_field),
+        baseline_feature_weight=float(baseline_state.config.feature_weight),
+        baseline_position_weight=float(baseline_state.config.position_weight),
+        promoted_feature_weight=float(state.config.feature_weight),
+        promoted_position_weight=float(state.config.position_weight),
         viewer_path=viewer_path,
     )
 
@@ -306,6 +348,7 @@ def validate_real_sample_v2_viewer_preview_summary(payload: dict[str, Any]) -> d
         "source",
         "handoff",
         "checkpoint",
+        "assignment_weight_policy",
         "projection",
         "quality",
         "viewer",
@@ -316,6 +359,21 @@ def validate_real_sample_v2_viewer_preview_summary(payload: dict[str, Any]) -> d
             raise ValueError(f"real sample v2 viewer preview summary missing {key}")
     if payload["checkpoint"].get("schema") != ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA:
         raise ValueError("real sample v2 viewer preview must reference assignment v2 checkpoint")
+    weight_policy = payload["assignment_weight_policy"]
+    if weight_policy.get("family") != "assignment_v2_cost_weight_promotion":
+        raise ValueError("viewer preview assignment weight policy is unsupported")
+    for key in (
+        "baseline_feature_weight",
+        "baseline_position_weight",
+        "promoted_feature_weight",
+        "promoted_position_weight",
+    ):
+        if float(weight_policy[key]) < 0.0:
+            raise ValueError(f"viewer preview {key} must be >= 0")
+    if weight_policy.get("uses_target_labels_for_prediction") is not False:
+        raise ValueError("viewer preview promotion must not use target labels for prediction")
+    if weight_policy.get("mutates_checkpoint") is not False:
+        raise ValueError("viewer preview promotion must not mutate checkpoint")
     source_count = int(payload["source"]["source_gaussians"])
     projection = payload["projection"]
     if int(projection["projected_gaussians"]) != source_count:
@@ -324,6 +382,13 @@ def validate_real_sample_v2_viewer_preview_summary(payload: dict[str, Any]) -> d
         raise ValueError("viewer preview export must cover the full source cloud")
     if projection.get("export_object_id") != "argmax_assignment_slot":
         raise ValueError("viewer preview must export object_id from argmax assignment")
+    hard_segmentation = projection.get("hard_segmentation")
+    if not isinstance(hard_segmentation, dict):
+        raise ValueError("viewer preview projection missing hard_segmentation")
+    if int(hard_segmentation["gaussian_count"]) != source_count:
+        raise ValueError("viewer preview hard segmentation must cover the full source cloud")
+    if int(hard_segmentation["mixed_gaussians"]) < 0:
+        raise ValueError("viewer preview mixed_gaussians must be >= 0")
     quality = payload["quality"]
     if quality.get("status") not in {_QUALITY_PASS, _QUALITY_DIAGNOSTIC}:
         raise ValueError("viewer preview quality status is unsupported")
@@ -351,6 +416,53 @@ def validate_real_sample_v2_viewer_preview_summary(payload: dict[str, Any]) -> d
     ):
         raise ValueError("real sample v2 viewer preview summary violates non-goals")
     return payload
+
+
+def _assignment_state_with_weights(
+    state: AssignmentSolverV2State,
+    *,
+    feature_weight: float | None,
+    position_weight: float | None,
+) -> AssignmentSolverV2State:
+    next_feature_weight = (
+        float(state.config.feature_weight)
+        if feature_weight is None
+        else float(feature_weight)
+    )
+    next_position_weight = (
+        float(state.config.position_weight)
+        if position_weight is None
+        else float(position_weight)
+    )
+    if next_feature_weight < 0.0 or next_position_weight < 0.0:
+        raise ValueError("viewer preview assignment weights must be >= 0")
+    if (
+        next_feature_weight == float(state.config.feature_weight)
+        and next_position_weight == float(state.config.position_weight)
+    ):
+        return state
+    config = AssignmentSolverV2Config(
+        slots=state.config.slots,
+        feature_dim=state.config.feature_dim,
+        position_dim=state.config.position_dim,
+        temperature=state.config.temperature,
+        feature_weight=next_feature_weight,
+        position_weight=next_position_weight,
+        solver_family=state.config.solver_family,
+        cost_terms=state.config.cost_terms,
+        balance_policy=state.config.balance_policy,
+        temporal_policy=state.config.temporal_policy,
+        matching_policy=state.config.matching_policy,
+    )
+    return AssignmentSolverV2State(
+        config=config,
+        feature_centers=state.feature_centers,
+        position_centers=state.position_centers,
+        slot_bias=state.slot_bias,
+        step=state.step,
+        source="real_sample_v2_viewer_preview_weighted_promotion",
+        schema=state.schema,
+    )
 
 
 def _projected_viewer_cloud(
@@ -408,6 +520,42 @@ def _projected_viewer_cloud(
         object_id_field="object_id",
         rewrite_sh=rewrite_sh,
     )
+
+
+def _hard_segmentation_summary(
+    target_slots: np.ndarray,
+    predicted_slots: np.ndarray,
+) -> dict[str, Any]:
+    target = np.asarray(target_slots, dtype=np.int32)
+    predicted = np.asarray(predicted_slots, dtype=np.int32)
+    if target.shape[0] != predicted.shape[0]:
+        raise ValueError("target and predicted slots must have the same length")
+    object_counts = _slot_counts(predicted, key="object_id")
+    target_counts = _slot_counts(target, key="target_slot")
+    mixed = 0
+    for object_id in sorted(set(int(value) for value in predicted.tolist())):
+        mask = predicted == object_id
+        if not np.any(mask):
+            continue
+        target_values, counts = np.unique(target[mask], return_counts=True)
+        mixed += int(np.sum(counts) - np.max(counts))
+    return {
+        "gaussian_count": int(predicted.shape[0]),
+        "object_id_counts": object_counts,
+        "target_slot_counts": target_counts,
+        "mixed_gaussians": int(mixed),
+    }
+
+
+def _slot_counts(values: np.ndarray, *, key: str) -> list[dict[str, int]]:
+    slots, counts = np.unique(np.asarray(values, dtype=np.int32), return_counts=True)
+    return [
+        {
+            key: int(slot),
+            "count": int(count),
+        }
+        for slot, count in zip(slots, counts, strict=True)
+    ]
 
 
 def _target_slots(sample: TrainableKernelSample) -> np.ndarray:

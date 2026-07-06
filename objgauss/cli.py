@@ -113,6 +113,8 @@ from objgauss.core.real_sample_v2_model_handoff import (
     render_real_sample_v2_model_handoff_html,
 )
 from objgauss.core.real_sample_v2_viewer_preview import (
+    REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
+    REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
     real_sample_v2_viewer_preview_from_cloud,
 )
 from objgauss.core.real_sample_v2_full_cloud_purity import (
@@ -1737,11 +1739,15 @@ def _training_real_sample_v2_viewer_preview(args: argparse.Namespace) -> None:
         baseline_temperature=args.baseline_temperature,
         image_renderer=args.image_renderer,
         vram_reserve_gb=args.vram_reserve_gb,
+        assignment_feature_weight=args.assignment_feature_weight,
+        assignment_position_weight=args.assignment_position_weight,
         rewrite_sh=args.rewrite_sh,
         viewer_path=args.viewer_path,
     )
     summary = report.as_dict()
     quality = summary["quality"]
+    weight_policy = summary["assignment_weight_policy"]
+    hard_segmentation = summary["projection"]["hard_segmentation"]
     print(f"schema={summary['schema']}")
     print(f"status={summary['status']}")
     print(f"input={args.input}")
@@ -1749,6 +1755,17 @@ def _training_real_sample_v2_viewer_preview(args: argparse.Namespace) -> None:
     print(f"projected_gaussians={summary['projection']['projected_gaussians']}")
     print(f"predicted_object_count={summary['projection']['predicted_object_count']}")
     print(f"recommended_solver_temperature={summary['handoff']['recommended_solver_temperature']}")
+    print(f"assignment_feature_weight={weight_policy['promoted_feature_weight']}")
+    print(f"assignment_position_weight={weight_policy['promoted_position_weight']}")
+    print(f"assignment_weight_promotion_applied={str(weight_policy['applied']).lower()}")
+    print(f"mixed_gaussians={hard_segmentation['mixed_gaussians']}")
+    print(
+        "object_id_counts="
+        + ",".join(
+            f"{item['object_id']}:{item['count']}"
+            for item in hard_segmentation["object_id_counts"]
+        )
+    )
     print(f"quality_status={quality['status']}")
     print(f"full_cloud_entropy={quality['mean_normalized_entropy']:.6f}")
     print(f"full_cloud_confidence={quality['assignment_confidence']:.6f}")
@@ -3719,7 +3736,7 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_viewer_preview.add_argument("--viewer-path")
     real_sample_viewer_preview.add_argument("--slots", type=int)
     real_sample_viewer_preview.add_argument("--frames", type=int, default=2)
-    real_sample_viewer_preview.add_argument("--max-points", type=int, default=24)
+    real_sample_viewer_preview.add_argument("--max-points", type=int, default=128)
     real_sample_viewer_preview.add_argument("--object-id-field", default="object_id")
     real_sample_viewer_preview.add_argument("--temporal-offset", type=float, default=0.01)
     real_sample_viewer_preview.add_argument("--image-width", type=int, default=12)
@@ -3742,6 +3759,18 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_viewer_preview.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
     real_sample_viewer_preview.add_argument("--seed", type=int, default=4)
     real_sample_viewer_preview.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_viewer_preview.add_argument(
+        "--assignment-feature-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
+        help="full-cloud assignment feature cost weight; defaults to promoted weak-boundary value 2.0",
+    )
+    real_sample_viewer_preview.add_argument(
+        "--assignment-position-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
+        help="full-cloud assignment position cost weight; defaults to promoted weak-boundary value 1.0",
+    )
     real_sample_viewer_preview.add_argument("--rewrite-sh", action="store_true")
     real_sample_viewer_preview.add_argument("--ascii", action="store_true", help="write ASCII PLY")
     real_sample_viewer_preview.add_argument("--summary-output", type=Path)

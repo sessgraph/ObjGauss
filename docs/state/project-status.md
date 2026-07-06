@@ -625,6 +625,24 @@ desktop / mobile 可加载 `ply-url-artifact`，ObjectState source 为
 preview / handoff promotion 路径，而不是继续 coverage / sharpening 或进入 geometry /
 camera unfreeze、GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation。
 
+随后完成 `REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001`：`real-sample-v2-viewer-preview`
+现在默认使用 promoted full-cloud assignment weights
+`feature_weight=2.0, position_weight=1.0`，并把 `max_points` 默认提升到 `128`。
+底层 builder 保留受控参数；未显式传入时仍可使用 checkpoint 原权重，避免影响
+`full-cloud-purity` 等历史诊断路径。viewer preview summary 新增
+`assignment_weight_policy` 与 `projection.hard_segmentation`，显式记录 baseline weights、
+promoted weights、`uses_target_labels_for_prediction=false`、`mutates_checkpoint=false`、
+object counts 和 `mixed_gaussians`。真实 public sample CLI 默认输出：
+`recommended_solver_temperature=0.35`、`mixed_gaussians=0`、`object_id_counts=0:736,1:581,2:1787,3:2592`、
+`full_cloud_entropy=0.120526`、`full_cloud_confidence=0.879474`、
+soft `object_purity=0.951687`、hard `direct_slot_match=1.0`，quality diagnostics 为
+`none`。Playwright + system Chrome 已验证
+`/?ply=/samples/objgauss-real-sample-v2-weighted-viewer-preview.ply` desktop / mobile 可加载
+`ply-url-artifact`，4 个对象开关为 `736/581/1787/2592`，object #1 的 `581` 个 Gaussian
+可隐藏并恢复。该步骤不改 handoff checkpoint schema，不提交 generated PLY / summary /
+screenshot，不改变 public demo / HF release 口径，不解冻 geometry / camera，不进入 GPU 长训、
+diffusion、rollout、replay buffer 或 dynamic-K mutation。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
@@ -2960,10 +2978,10 @@ npm run acceptance:demo
    stability hard gate、failure diagnostics、ObjectState eval、renderer joint smoke、
    checkpoint roundtrip 和 renderer-loss-contract evidence。当前 public sample 已跑到
    可训练、可验证、可 3D 查看对象分割效果阶段；`feature_weight=2.0` 的 weak-boundary
-   candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`。
-   下一步应把该 weighted candidate 接入 viewer preview / handoff promotion 路径，并继续
-   小型 real / public sample 重复验证；不要直接跳到 rollout、replay buffer、diffusion 或
-   geometry / camera unfreeze。
+   candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
+   且已接入 viewer preview 默认展示路径。下一步应做小型 real / public sample 重复验证，
+   确认该 promoted weight 不是只修当前样例的局部边界；不要直接跳到 rollout、replay buffer、
+   diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
