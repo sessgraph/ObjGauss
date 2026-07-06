@@ -506,6 +506,22 @@ contract proof，promotion 前必须在小型 real / public sample 上重复；�
 diffusion / rollout / replay buffer、dynamic-K 自动 mutation 和 Gaussian geometry 解冻。至此
 近期路线已推进到“核心模型可训练、可验证、可失败定位”的 development-stage 阶段。
 
+随后完成 `REAL-SAMPLE-V2-SMOKE-001`：新增
+`objgauss-real-sample-v2-smoke-v1`，把小型 real / public `object_id` 样例接入
+`trainable_kernel_sample_from_cloud -> AssignmentSolverV2 training -> checkpoint ->
+AssignmentV2RendererJointValidation -> renderer-loss-contract`。该 smoke 明确把
+`object_id` labels 作为训练 target，不声称语义 ground truth，也不使用 fixture oracle；
+Gaussian geometry、camera、dynamic-K、rollout / replay buffer 和 GPU 长训仍冻结。仓库内
+`public/samples/lego_alpha_v1_objects.ply` 的真实采样 smoke 已暴露核心差距：
+v2 supervised loss `1.588851 -> 0.503807`、renderer image loss `0.038943 -> 0.008694`
+且 checkpoint roundtrip 通过，但 renderer joint summary 仍为
+`assignment_v2_renderer_joint_validation_fail`，失败原因是 ObjectState gate：
+`mean_normalized_entropy=0.694399`、`assignment_confidence=0.305601`、
+`object_purity=0.623420`，diagnostics 为 `low_assignment_confidence` /
+`low_object_purity`。结论：fixture proof 已经推进到真实样例 smoke 入口，但真实样例不能
+promote；下一步应先做 real-sample diagnostics / sharpening，而不是解冻 geometry 或进入
+diffusion / replay / rollout。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
