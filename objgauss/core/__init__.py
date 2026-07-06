@@ -80,6 +80,14 @@ _EXPORTS = {
         "objgauss.core.v2_stability_diagnostics",
         "SyntheticStabilityDiagnosticsReport",
     ),
+    "SyntheticStabilityGateReport": (
+        "objgauss.core.v2_stability_gate",
+        "SyntheticStabilityGateReport",
+    ),
+    "SyntheticStabilitySuiteGateReport": (
+        "objgauss.core.v2_stability_gate",
+        "SyntheticStabilitySuiteGateReport",
+    ),
     "SyntheticWorldFrame": (
         "objgauss.core.v2_stability_foundation",
         "SyntheticWorldFrame",
@@ -164,6 +172,18 @@ _EXPORTS = {
     "V2_STABILITY_FAILURE_MODES": (
         "objgauss.core.v2_stability_diagnostics",
         "V2_STABILITY_FAILURE_MODES",
+    ),
+    "V2_STABILITY_GATE_HARD_CHECKS": (
+        "objgauss.core.v2_stability_gate",
+        "V2_STABILITY_GATE_HARD_CHECKS",
+    ),
+    "V2_STABILITY_GATE_SCHEMA": (
+        "objgauss.core.v2_stability_gate",
+        "V2_STABILITY_GATE_SCHEMA",
+    ),
+    "V2_STABILITY_GATE_SUITE_SCHEMA": (
+        "objgauss.core.v2_stability_gate",
+        "V2_STABILITY_GATE_SUITE_SCHEMA",
     ),
     "assignment_mvp_training_summary": (
         "objgauss.core.object_emergence_solver",
@@ -312,6 +332,14 @@ _EXPORTS = {
     "evaluate_assignment_stability": (
         "objgauss.core.assignment_stability",
         "evaluate_assignment_stability",
+    ),
+    "evaluate_synthetic_stability_gate": (
+        "objgauss.core.v2_stability_gate",
+        "evaluate_synthetic_stability_gate",
+    ),
+    "evaluate_synthetic_stability_suite_gate": (
+        "objgauss.core.v2_stability_gate",
+        "evaluate_synthetic_stability_suite_gate",
     ),
     "expected_slots_for_synthetic_fixture": (
         "objgauss.core.v2_stability_diagnostics",
@@ -521,6 +549,14 @@ _EXPORTS = {
     "validate_synthetic_stability_diagnostics_summary": (
         "objgauss.core.v2_stability_diagnostics",
         "validate_synthetic_stability_diagnostics_summary",
+    ),
+    "validate_synthetic_stability_gate_summary": (
+        "objgauss.core.v2_stability_gate",
+        "validate_synthetic_stability_gate_summary",
+    ),
+    "validate_synthetic_stability_suite_gate_summary": (
+        "objgauss.core.v2_stability_gate",
+        "validate_synthetic_stability_suite_gate_summary",
     ),
     "validate_synthetic_world_state": (
         "objgauss.core.v2_stability_foundation",

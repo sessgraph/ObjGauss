@@ -1,6 +1,6 @@
 # ObjGauss V2 Stability Foundation
 
-状态：`V2-STABILITY-FOUNDATION-002` contract + scenario / diagnostics extension
+状态：`V2-STABILITY-FOUNDATION-002` contract + scenario / diagnostics / gate extension
 
 ## 目标
 
@@ -129,6 +129,49 @@ builder：
 该层只用于失败定位和 gate 前证据检查。它不会训练 solver，不接 renderer loss，也不把
 diagnostics 本身升级成 hard gate。
 
+### SyntheticStabilityGateReport
+
+`SyntheticStabilityGateReport` 是 `V2-STABILITY-GATE-001` 引入的 hard gate 层。它
+消费同一个 `SyntheticStabilityScenarioFixture` 和 predicted slots / assignments，先生成
+diagnostics，再将 identity invariance 作为唯一 hard gate 来源。
+
+当前 schema：
+
+```text
+objgauss-v2-stability-gate-v1
+```
+
+suite schema：
+
+```text
+objgauss-v2-stability-gate-suite-v1
+```
+
+builder：
+
+- `evaluate_synthetic_stability_gate(...)`
+- `evaluate_synthetic_stability_suite_gate(...)`
+
+hard checks：
+
+- `expected_slot_consistency_pass`
+- `no_slot_swap_pass`
+- `identity_no_cross_slot_drift_pass`
+- `adversarial_swap_no_exchange_pass`
+- `occlusion_recovery_return_pass`
+- `no_object_merge_pass`
+- `no_background_absorption_pass`
+- `diagnostics_failure_reporting_pass`
+
+soft diagnostics：
+
+- assignment entropy
+- assignment purity
+- temporal coherence
+
+soft diagnostics 只解释质量和退化风险，不能覆盖 hard gate。`diagnostics` 继续用于失败定位，
+但 diagnostics 本身不是 gate truth source。
+
 ## Scenario Kinds
 
 当前 contract 支持四类 scenario kind：
@@ -153,7 +196,7 @@ diagnostics 本身升级成 hard gate。
 - dynamic-K 自动 birth / merge / split 更新
 - renderer 参数解冻
 - CLI gate
-- diagnostics hard gate
+- diagnostics 替代 identity hard gate
 - TensorBoard / checkpoint 输出
 - SAM2 / CoTracker / DETR 之类外部 perception 模型接入
 
@@ -164,6 +207,6 @@ diagnostics 本身升级成 hard gate。
 2. `V2-STABILITY-DIAGNOSTICS-001`
    - 增加 `FailureModeClassifier`、slot transition matrix、identity confusion graph。
 3. `V2-STABILITY-GATE-001`
-   - 下一步：把 identity invariant 作为 hard gate，assignment / temporal 指标作为 soft gate。
+   - 把 identity invariant 作为 hard gate，assignment / temporal 指标作为 soft diagnostics。
 4. `V2-STABILITY-CLI-001`
    - 暴露可复现 CPU synthetic benchmark CLI。

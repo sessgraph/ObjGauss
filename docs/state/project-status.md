@@ -445,6 +445,17 @@ graph、failure mode counts 和 failure events。`FailureModeClassifier` 当前�
 变成 hard gate、不改变 dynamic-K proposal-only 约束。下一步进入
 `V2-STABILITY-GATE-001`，把 identity invariance 做成 hard gate。
 
+随后完成 `V2-STABILITY-GATE-001`：新增 `objgauss-v2-stability-gate-v1` 和
+`objgauss-v2-stability-gate-suite-v1`，将 synthetic oracle identity invariance 固化为
+hard gate。`evaluate_synthetic_stability_gate(...)` 复用 diagnostics 输出，并把
+expected slot consistency、slot swap、cross-slot drift、adversarial swap exchange、
+occlusion recovery return、object merge、background absorption 和 diagnostics reporting
+作为 hard checks；assignment entropy、assignment purity 和 temporal coherence 只作为
+soft diagnostics，明确不能覆盖 hard gate。该切片不训练 solver、不接 renderer loss、不做
+rollout model、不改变 dynamic-K proposal-only 约束。下一步进入
+`ASSIGNMENT-SOLVER-V2-TRAIN-001`，在 synthetic fixtures 上实现 fixed-K cost-softmax
+assignment solver v2 training。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

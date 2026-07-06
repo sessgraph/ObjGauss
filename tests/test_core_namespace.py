@@ -32,6 +32,8 @@ from objgauss.core import (
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
     SyntheticStabilityDiagnosticsReport,
+    SyntheticStabilityGateReport,
+    SyntheticStabilitySuiteGateReport,
     SyntheticWorldState,
     TrainableKernelCamera,
     TrainableKernelImageTarget,
@@ -43,6 +45,9 @@ from objgauss.core import (
     V2_STABILITY_FOUNDATION_SCHEMA,
     V2_STABILITY_DIAGNOSTICS_SCHEMA,
     V2_STABILITY_FAILURE_MODES,
+    V2_STABILITY_GATE_HARD_CHECKS,
+    V2_STABILITY_GATE_SCHEMA,
+    V2_STABILITY_GATE_SUITE_SCHEMA,
     V2_STABILITY_SCENARIO_FIXTURE_SCHEMA,
     V2_STABILITY_SCENARIO_KINDS,
     V2_SYNTHETIC_OBSERVATION_SCHEMA,
@@ -65,6 +70,8 @@ from objgauss.core import (
     cluster_features,
     decode_gaussian_from_object_state,
     diagnose_synthetic_stability_fixture,
+    evaluate_synthetic_stability_gate,
+    evaluate_synthetic_stability_suite_gate,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_assignment_stability,
@@ -121,6 +128,8 @@ from objgauss.core import (
     validate_solver_decoder_training_scale_plan,
     validate_synthetic_observation_frame,
     validate_synthetic_stability_diagnostics_summary,
+    validate_synthetic_stability_gate_summary,
+    validate_synthetic_stability_suite_gate_summary,
     validate_synthetic_stability_scenario_fixture,
     validate_synthetic_world_state,
     validate_renderer_loss_boundary_summary,
@@ -387,6 +396,20 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     first_observation = diagnostics.identity_observations[0]
     assert isinstance(first_observation, IdentitySlotObservation)
     assert isinstance(diagnostics.failure_modes[0], FailureModeEvent)
+
+    assert V2_STABILITY_GATE_SCHEMA == "objgauss-v2-stability-gate-v1"
+    assert V2_STABILITY_GATE_SUITE_SCHEMA == "objgauss-v2-stability-gate-suite-v1"
+    assert "expected_slot_consistency_pass" in V2_STABILITY_GATE_HARD_CHECKS
+    gate = evaluate_synthetic_stability_gate(fixture)
+    assert isinstance(gate, SyntheticStabilityGateReport)
+    gate_summary = gate.as_dict()
+    assert validate_synthetic_stability_gate_summary(gate_summary) is gate_summary
+    assert gate_summary["status"] == "synthetic_stability_gate_pass"
+    suite_gate = evaluate_synthetic_stability_suite_gate(suite)
+    assert isinstance(suite_gate, SyntheticStabilitySuiteGateReport)
+    suite_summary = suite_gate.as_dict()
+    assert validate_synthetic_stability_suite_gate_summary(suite_summary) is suite_summary
+    assert suite_summary["status"] == "synthetic_stability_suite_gate_pass"
 
 
 def test_core_namespace_exposes_property_append_helper():
