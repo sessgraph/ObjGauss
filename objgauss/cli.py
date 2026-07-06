@@ -108,6 +108,10 @@ from objgauss.core.renderer_loss import renderer_loss_boundary_report
 from objgauss.core.training_scale import solver_decoder_training_scale_plan
 from objgauss.core.training_tensorboard import write_solver_decoder_tensorboard_events
 from objgauss.core.object_state_eval import evaluate_solver_decoder_object_states
+from objgauss.core.real_sample_v2_model_handoff import (
+    real_sample_v2_model_handoff_from_cloud,
+    render_real_sample_v2_model_handoff_html,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -1636,6 +1640,63 @@ def _training_eval_objectstate(args: argparse.Namespace) -> None:
         print(f"summary={args.summary_output}")
     if args.require_pass and summary["status"] != "objectstate_eval_pass":
         raise ValueError("ObjectState checkpoint eval did not pass")
+
+
+def _training_real_sample_v2_handoff(args: argparse.Namespace) -> None:
+    cloud = read_ply(args.input)
+    temperatures = (
+        tuple(args.temperature_candidates)
+        if args.temperature_candidates is not None
+        else (1.0, 0.75, 0.5, 0.35, 0.25)
+    )
+    report = real_sample_v2_model_handoff_from_cloud(
+        cloud,
+        sample_source=str(args.input),
+        object_id_field=args.object_id_field,
+        slots=args.slots,
+        frame_count=args.frames,
+        max_points=args.max_points,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        temperature_candidates=temperatures,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+    )
+    summary = report.as_dict()
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"input={args.input}")
+    print(f"source_gaussians={summary['sample']['source_count']}")
+    print(f"sampled_gaussians={summary['sample']['sampled_count']}")
+    print(f"recommended_solver_temperature={summary['recommended_solver_temperature']}")
+    print(f"restore_renderer_joint_status={summary['restore_validation']['renderer_joint_status']}")
+    print(f"restore_object_state_status={summary['restore_validation']['object_state_status']}")
+    best_metrics = summary["training_effect"]["best_candidate"]["object_state_metrics"]
+    print(f"best_entropy={best_metrics['mean_normalized_entropy']:.6f}")
+    print(f"best_confidence={best_metrics['assignment_confidence']:.6f}")
+    print(f"best_purity={best_metrics['object_purity']:.6f}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.checkpoint_output:
+        write_json(args.checkpoint_output, report.checkpoint)
+        print(f"checkpoint={args.checkpoint_output}")
+    if args.preview_output:
+        args.preview_output.parent.mkdir(parents=True, exist_ok=True)
+        args.preview_output.write_text(
+            render_real_sample_v2_model_handoff_html(summary),
+            encoding="utf-8",
+        )
+        print(f"preview={args.preview_output}")
+    if args.require_pass and summary["status"] != "real_sample_v2_model_handoff_pass":
+        raise ValueError("real sample v2 model handoff did not pass")
 
 
 def _training_eval_assignment(args: argparse.Namespace) -> None:
@@ -3319,6 +3380,42 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_objectstate.add_argument("--summary-output", type=Path)
     eval_objectstate.add_argument("--require-pass", action="store_true")
     eval_objectstate.set_defaults(handler=_training_eval_objectstate)
+
+    real_sample_handoff = training_subparsers.add_parser(
+        "real-sample-v2-handoff",
+        help="export real-sample v2 checkpoint, restore validation, and HTML effect preview",
+    )
+    real_sample_handoff.add_argument("input", type=Path)
+    real_sample_handoff.add_argument("--slots", type=int)
+    real_sample_handoff.add_argument("--frames", type=int, default=2)
+    real_sample_handoff.add_argument("--max-points", type=int, default=24)
+    real_sample_handoff.add_argument("--object-id-field", default="object_id")
+    real_sample_handoff.add_argument("--temporal-offset", type=float, default=0.01)
+    real_sample_handoff.add_argument("--image-width", type=int, default=12)
+    real_sample_handoff.add_argument("--image-height", type=int, default=12)
+    real_sample_handoff.add_argument("--point-radius", type=int, default=1)
+    real_sample_handoff.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    real_sample_handoff.add_argument("--iterations", type=int, default=100)
+    real_sample_handoff.add_argument("--learning-rate", type=float, default=0.4)
+    real_sample_handoff.add_argument(
+        "--temperature-candidates",
+        type=float,
+        nargs="+",
+        help="temperature sweep candidates; defaults to 1.0 0.75 0.5 0.35 0.25",
+    )
+    real_sample_handoff.add_argument("--baseline-temperature", type=float, default=1.0)
+    real_sample_handoff.add_argument("--image-renderer", choices=("point", "gsplat"), default="point")
+    real_sample_handoff.add_argument("--seed", type=int, default=4)
+    real_sample_handoff.add_argument("--vram-reserve-gb", type=int, default=1)
+    real_sample_handoff.add_argument("--summary-output", type=Path)
+    real_sample_handoff.add_argument("--checkpoint-output", type=Path)
+    real_sample_handoff.add_argument("--preview-output", type=Path)
+    real_sample_handoff.add_argument("--require-pass", action="store_true")
+    real_sample_handoff.set_defaults(handler=_training_real_sample_v2_handoff)
 
     eval_assignment = training_subparsers.add_parser(
         "eval-assignment",

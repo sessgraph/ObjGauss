@@ -20,6 +20,8 @@ from objgauss.core import (
     ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
     CORE_MODEL_TRAIN_VALIDATE_SCHEMA,
     REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA,
+    REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA,
+    REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     AssignmentEvidenceBatch,
     AssignmentV2RendererJointValidationReport,
@@ -47,6 +49,7 @@ from objgauss.core import (
     ObjectTemporalMatchReport,
     RendererLossBoundaryReport,
     RealSampleV2DiagnosticsReport,
+    RealSampleV2ModelHandoffReport,
     RealSampleV2SmokeReport,
     SyntheticObservationFrame,
     SyntheticStabilityScenarioFixture,
@@ -101,6 +104,7 @@ from objgauss.core import (
     evaluate_assignment_solver_v2_stability,
     evaluate_assignment_v2_renderer_joint,
     evaluate_real_sample_v2_diagnostics,
+    evaluate_real_sample_v2_model_handoff,
     evaluate_real_sample_v2_smoke,
     initialize_assignment_solver_v2,
     expected_slots_for_synthetic_fixture,
@@ -135,7 +139,9 @@ from objgauss.core import (
     project_object_states_from_field,
     read_ply,
     real_sample_v2_diagnostics_from_cloud,
+    real_sample_v2_model_handoff_from_cloud,
     real_sample_v2_smoke_from_cloud,
+    render_real_sample_v2_model_handoff_html,
     renderer_loss_boundary_report,
     solver_decoder_training_scale_plan,
     train_kernel_mvp,
@@ -158,6 +164,8 @@ from objgauss.core import (
     validate_assignment_v2_renderer_joint_summary,
     validate_core_model_train_validate_summary,
     validate_real_sample_v2_diagnostics_summary,
+    validate_real_sample_v2_effect_preview,
+    validate_real_sample_v2_model_handoff_summary,
     validate_real_sample_v2_smoke_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
@@ -605,6 +613,14 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert real_sample_v2_diagnostics_from_cloud is not None
     assert evaluate_real_sample_v2_diagnostics is not None
     assert validate_real_sample_v2_diagnostics_summary is not None
+    assert REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA == "objgauss-real-sample-v2-model-handoff-v1"
+    assert REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA == "objgauss-real-sample-v2-effect-preview-v1"
+    assert RealSampleV2ModelHandoffReport is not None
+    assert real_sample_v2_model_handoff_from_cloud is not None
+    assert evaluate_real_sample_v2_model_handoff is not None
+    assert render_real_sample_v2_model_handoff_html is not None
+    assert validate_real_sample_v2_model_handoff_summary is not None
+    assert validate_real_sample_v2_effect_preview is not None
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
