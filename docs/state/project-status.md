@@ -707,6 +707,18 @@ PLY 由
 `uv run --extra dev pytest` 259 passed，`npm run build` passed（保留既有 Vite chunk
 size warning），`git diff --check` passed；代码完成 commit 为 `36731a8`。
 
+随后完成 `MODEL-CATALOG-LATEST-SLOT-ORDER-001`：viewer catalog 新增
+`displaySlot`、`displayOrder` 和 `updatedAt` 规则，把同一模型定位下的候选按最新在前
+排序。当前 `real-sample-v2-sample-aware-lego` 与 `lego-alpha` 同属
+`lego-object-segmentation-preview` 定位，dock 顺序固定为最新的 `真实样例 V2` 在前，
+旧的 `Lego alpha` 紧随其后；默认模型也从该定位下按 `updatedAt` 取最新，而不是硬编码
+具体 id。显式 URL 注入的 trainable / PLY / manifest / OGC route 仍保持更高优先级。
+验证通过：Node catalog 断言通过，`uv run --extra dev pytest` 259 passed，
+`npm run build` passed（保留既有 Vite chunk size warning），`git diff --check` passed；
+Playwright + system Chrome 验证 `http://127.0.0.1:5395/` 首屏选中最新模型，dock 前两项
+为 `真实样例 V2` / `Lego alpha`；截图为 `/tmp/objgauss-latest-model-order.png`。
+代码完成 commit 为 `b7c1d35`。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为
