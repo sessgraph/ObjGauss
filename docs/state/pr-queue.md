@@ -146,7 +146,7 @@
   - 不生成新 `.splat`、PLY、OGC、大模型或训练输出。
   - 不把 source `.splat` 与处理后对象层 PLY 合并成同一个渲染 pass；后续 native `.splat`
     object mask route 仍需单独 PR。
-- 完成 commit: 待提交
+- 完成 commit: `66c4b83`
 
 ### OBJECT-PICKING-LAYER-001: Decouple object picking from Gaussian render hit-test
 
