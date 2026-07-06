@@ -14,6 +14,26 @@ _EXPORTS = {
         "objgauss.core.assignment_evidence",
         "AssignmentEvidenceBatch",
     ),
+    "AssignmentSolverV2Config": (
+        "objgauss.core.assignment_solver_v2",
+        "AssignmentSolverV2Config",
+    ),
+    "AssignmentSolverV2LossRecord": (
+        "objgauss.core.assignment_solver_v2",
+        "AssignmentSolverV2LossRecord",
+    ),
+    "AssignmentSolverV2Prediction": (
+        "objgauss.core.assignment_solver_v2",
+        "AssignmentSolverV2Prediction",
+    ),
+    "AssignmentSolverV2State": (
+        "objgauss.core.assignment_solver_v2",
+        "AssignmentSolverV2State",
+    ),
+    "AssignmentSolverV2TrainingResult": (
+        "objgauss.core.assignment_solver_v2",
+        "AssignmentSolverV2TrainingResult",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -148,6 +168,22 @@ _EXPORTS = {
     "ASSIGNMENT_STABILITY_EVAL_SCHEMA": (
         "objgauss.core.assignment_stability",
         "ASSIGNMENT_STABILITY_EVAL_SCHEMA",
+    ),
+    "ASSIGNMENT_SOLVER_V2_COST_TERMS": (
+        "objgauss.core.assignment_solver_v2",
+        "ASSIGNMENT_SOLVER_V2_COST_TERMS",
+    ),
+    "ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA": (
+        "objgauss.core.assignment_solver_v2",
+        "ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA",
+    ),
+    "ASSIGNMENT_SOLVER_V2_STATE_SCHEMA": (
+        "objgauss.core.assignment_solver_v2",
+        "ASSIGNMENT_SOLVER_V2_STATE_SCHEMA",
+    ),
+    "ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA": (
+        "objgauss.core.assignment_solver_v2",
+        "ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -341,6 +377,10 @@ _EXPORTS = {
         "objgauss.core.v2_stability_gate",
         "evaluate_synthetic_stability_suite_gate",
     ),
+    "initialize_assignment_solver_v2": (
+        "objgauss.core.assignment_solver_v2",
+        "initialize_assignment_solver_v2",
+    ),
     "expected_slots_for_synthetic_fixture": (
         "objgauss.core.v2_stability_diagnostics",
         "expected_slots_for_synthetic_fixture",
@@ -352,6 +392,10 @@ _EXPORTS = {
     "predict_object_emergence_assignment": (
         "objgauss.core.object_emergence_solver",
         "predict_object_emergence_assignment",
+    ),
+    "predict_assignment_solver_v2": (
+        "objgauss.core.assignment_solver_v2",
+        "predict_assignment_solver_v2",
     ),
     "project_object_emergence_prediction": (
         "objgauss.core.object_emergence_solver",
@@ -379,6 +423,10 @@ _EXPORTS = {
     "train_object_emergence_solver": (
         "objgauss.core.object_emergence_solver",
         "train_object_emergence_solver",
+    ),
+    "train_assignment_solver_v2": (
+        "objgauss.core.assignment_solver_v2",
+        "train_assignment_solver_v2",
     ),
     "train_kernel_mvp_from_cloud": (
         "objgauss.core.trainable_kernel",
@@ -417,6 +465,10 @@ _EXPORTS = {
     "object_emergence_solver_state_from_dict": (
         "objgauss.core.object_emergence_solver",
         "object_emergence_solver_state_from_dict",
+    ),
+    "assignment_solver_v2_state_from_dict": (
+        "objgauss.core.assignment_solver_v2",
+        "assignment_solver_v2_state_from_dict",
     ),
     "assignment_balance_loss_and_gradient": (
         "objgauss.core.assignment_losses",
@@ -485,6 +537,18 @@ _EXPORTS = {
     "validate_assignment_stability_eval": (
         "objgauss.core.assignment_stability",
         "validate_assignment_stability_eval",
+    ),
+    "validate_assignment_solver_v2_config": (
+        "objgauss.core.assignment_solver_v2",
+        "validate_assignment_solver_v2_config",
+    ),
+    "validate_assignment_solver_v2_state": (
+        "objgauss.core.assignment_solver_v2",
+        "validate_assignment_solver_v2_state",
+    ),
+    "validate_assignment_solver_v2_training_summary": (
+        "objgauss.core.assignment_solver_v2",
+        "validate_assignment_solver_v2_training_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

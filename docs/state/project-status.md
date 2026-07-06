@@ -456,6 +456,18 @@ rollout model、不改变 dynamic-K proposal-only 约束。下一步进入
 `ASSIGNMENT-SOLVER-V2-TRAIN-001`，在 synthetic fixtures 上实现 fixed-K cost-softmax
 assignment solver v2 training。
 
+随后完成 `ASSIGNMENT-SOLVER-V2-TRAIN-001`：新增 dependency-free
+`objgauss-assignment-solver-state-v2` / `objgauss-assignment-prediction-v2` /
+`objgauss-assignment-solver-v2-training-v1`。`AssignmentSolverV2State` 使用
+`feature_centers`、`position_centers` 和 `slot_bias` 计算 cost-softmax assignment
+`A[N,K]`；`train_assignment_solver_v2(...)` 复用现有 v2 loss helper，支持 cluster、
+entropy、balance 和 supervised CE 权重。synthetic fixture smoke 将 swapped 初始化的
+supervised loss 从 `8.569320` 降到 `0.002646`，final assignment 匹配 oracle expected
+slots。该切片只做 fixed-K synthetic / CPU NumPy training，不接 GPU、不接 renderer loss、
+不启用 temporal / matching loss、不引入 Slot Attention / Sinkhorn / OT、不改变 dynamic-K
+proposal-only 约束。下一步进入 `ASSIGNMENT-SOLVER-V2-EVAL-001`，用 stability suite 做训练前后
+hard gate / diagnostics / state roundtrip 验证。
+
 ## 架构重梳理基线
 
 2026-07-02 已按 Owner 新方向建立重构规划基线，事实源为

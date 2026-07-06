@@ -10,8 +10,16 @@ from objgauss.core import (
     GsplatTrainingInput,
     ObjectState,
     ASSIGNMENT_MVP_TRAINING_SCHEMA,
+    ASSIGNMENT_SOLVER_V2_COST_TERMS,
+    ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA,
+    ASSIGNMENT_SOLVER_V2_STATE_SCHEMA,
+    ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA,
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     AssignmentEvidenceBatch,
+    AssignmentSolverV2Config,
+    AssignmentSolverV2Prediction,
+    AssignmentSolverV2State,
+    AssignmentSolverV2TrainingResult,
     FailureModeClassifier,
     FailureModeEvent,
     ObjectStateGaussianDecode,
@@ -59,6 +67,7 @@ from objgauss.core import (
     assignment_entropy_loss_and_gradient,
     assignment_loss_v2_breakdown,
     assignment_mvp_training_summary,
+    assignment_solver_v2_state_from_dict,
     attach_object_aware_lod_metadata,
     attach_quantization_metadata,
     assign_object_ids,
@@ -75,6 +84,7 @@ from objgauss.core import (
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_assignment_stability,
+    initialize_assignment_solver_v2,
     expected_slots_for_synthetic_fixture,
     evaluate_solver_decoder_object_states,
     evaluate_training_renderer_loss,
@@ -101,6 +111,7 @@ from objgauss.core import (
     object_state_gaussian_decoder_state_from_dict,
     observe_synthetic_world,
     predict_object_emergence_assignment,
+    predict_assignment_solver_v2,
     project_object_emergence_prediction,
     project_object_states,
     project_object_states_from_field,
@@ -109,6 +120,7 @@ from objgauss.core import (
     solver_decoder_training_scale_plan,
     train_kernel_mvp,
     train_object_emergence_solver,
+    train_assignment_solver_v2,
     train_object_state_gaussian_decoder,
     train_solver_decoder_joint,
     train_kernel_mvp_from_cloud,
@@ -118,6 +130,9 @@ from objgauss.core import (
     validate_assignment_loss_v2_summary,
     validate_assignment_evidence_summary,
     validate_assignment_stability_eval,
+    validate_assignment_solver_v2_config,
+    validate_assignment_solver_v2_state,
+    validate_assignment_solver_v2_training_summary,
     validate_object_emergence_evidence,
     validate_object_emergence_solver_checkpoint,
     validate_object_identity_oracle,
@@ -497,11 +512,38 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert assignment_entropy_loss_and_gradient is not None
     assert assignment_balance_loss_and_gradient is not None
     assert supervised_assignment_loss_and_gradient is not None
+    assert ASSIGNMENT_SOLVER_V2_STATE_SCHEMA == "objgauss-assignment-solver-state-v2"
+    assert ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA == "objgauss-assignment-prediction-v2"
+    assert ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA == "objgauss-assignment-solver-v2-training-v1"
+    assert ASSIGNMENT_SOLVER_V2_COST_TERMS == ("feature", "position", "slot_bias")
     assignment = np.full((6, 2), 0.5, dtype=np.float32)
     loss_summary = assignment_loss_v2_breakdown([assignment], entropy_weight=0.1).as_dict()
     assert validate_assignment_loss_v2_summary(loss_summary) is True
-    evidence_summary = assignment_evidence_from_trainable_frame(bound_frames[0]).as_dict()
+    evidence_batch = assignment_evidence_from_trainable_frame(bound_frames[0])
+    evidence_summary = evidence_batch.as_dict()
     assert validate_assignment_evidence_summary(evidence_summary) is True
+    solver_v2 = initialize_assignment_solver_v2(slots=2, feature_dim=bound_frames[0].features.shape[1], seed=2)
+    assert isinstance(solver_v2, AssignmentSolverV2State)
+    assert isinstance(solver_v2.config, AssignmentSolverV2Config)
+    assert validate_assignment_solver_v2_config(solver_v2.config) is solver_v2.config
+    solver_v2 = validate_assignment_solver_v2_state(solver_v2)
+    restored_solver_v2 = assignment_solver_v2_state_from_dict(solver_v2.as_dict(include_arrays=True))
+    np.testing.assert_allclose(restored_solver_v2.feature_centers, solver_v2.feature_centers, atol=1e-6)
+    solver_v2_prediction = predict_assignment_solver_v2(evidence_batch, restored_solver_v2)
+    assert isinstance(solver_v2_prediction, AssignmentSolverV2Prediction)
+    solver_v2_training = train_assignment_solver_v2(
+        [evidence_batch],
+        initial_state=restored_solver_v2,
+        iterations=1,
+        learning_rate=0.1,
+        cluster_weight=0.0,
+        entropy_weight=0.1,
+        balance_weight=0.0,
+        supervised_weight=0.0,
+    )
+    assert isinstance(solver_v2_training, AssignmentSolverV2TrainingResult)
+    solver_v2_summary = solver_v2_training.as_dict()
+    assert validate_assignment_solver_v2_training_summary(solver_v2_summary) is solver_v2_summary
     renderer_result = evaluate_training_renderer_loss(
         bound_frames[:1],
         [assignment],
