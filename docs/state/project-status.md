@@ -18,12 +18,12 @@ ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shif
 对象不再直接依赖 Gaussian renderer raycast hit-test。训练证据、Gaussian probe 和协议
 诊断仍保留在高级系统区，不作为主流程第一入口。
 
-Viewer 已新增 `完整高斯 / 点预览 / 对象层` 状态展示：catalog entry 现在显式区分
-`sourceLayer`（例如 `.splat` 原始完整高斯来源）、`renderSurface`
-（当前 Three.js stage 的 `three-world-point-preview-v1` 点预览）和 `objectLayer`
-（处理后的 object-aware PLY / OGC / trainable artifact）。默认真实样例 V2 在 UI 上显示
-`Lego 原始 splat` 可用、当前 stage 为 `点云预览`、处理结果为 `对象层已加载`。这一步只
-澄清和展示现有资产事实，不替换主 stage renderer，也不生成新的训练 / Demo 产物。
+Viewer 已把 `sourceLayer` 的真实 `.splat` 接进主 Three.js world：默认真实样例 V2 使用
+`spark-source-splat-stage-v1` 在同一个 Three.js scene / camera 内加载 `Lego 原始 splat`，
+顶部 HUD 和 `Three.js 世界` 面板显示 `高斯展示=完整 splat`。处理后的 object-aware PLY
+仍作为可交互对象层叠加，用于 ObjectState 选择、bbox / centroid 叠层、TransformControls
+移动和调试证据；它不再作为主视觉的完整高斯替代品。当前实现不生成新的训练 / Demo 产物，
+不引入 native `.splat` object mask，也不改变 ObjectState / manifest / training contract。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

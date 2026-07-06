@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Move3D, Redo2, Rotate3D, Scale3D, Undo2, X } from "lucide-react";
+import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -31,6 +32,7 @@ const OBJECT_TRANSFORM_SNAP_STEP = 0.25;
 const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
 const OBJECT_SCALE_SNAP_STEP = 0.1;
 const THREE_WORLD_POINT_PREVIEW_CONTRACT = "three-world-point-preview-v1";
+const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -135,6 +137,11 @@ export default function App() {
   const stagedObjectCount = stageSummary.visibleObjectCount;
   const selectedId = selection.modelId;
   const selected = models[selectedId] ?? Object.values(models)[0];
+  const selectedLayerState = modelLayerState(
+    selected,
+    selected?.status,
+    selected?.objects?.length ?? 0,
+  );
   const selectedObject =
     selected?.objects?.find((object) => String(object.objectId) === String(selection.objectId)) ?? null;
   const selectedObjectKey = selectedObject?.selectionId ?? "";
@@ -1323,8 +1330,14 @@ export default function App() {
       className="worldShell"
       data-app-mode="vr-three-world"
       data-three-renderer="enabled"
-      data-render-surface-contract={THREE_WORLD_POINT_PREVIEW_CONTRACT}
-      data-gaussian-display-mode={selected?.renderSurface?.label ?? "点云预览"}
+      data-render-surface-contract={selectedLayerState.renderSurfaceContract}
+      data-stage-display-contract={selectedLayerState.stageDisplayContract}
+      data-gaussian-display-mode={selectedLayerState.stageDisplayLabel}
+      data-source-splat-stage-contract={selectedLayerState.sourceSplatStageContract}
+      data-source-splat-status={selectedLayerState.sourceSplatStageStatus}
+      data-source-splat-path={selectedLayerState.sourceLayerPath}
+      data-source-splat-active={selectedLayerState.sourceSplatStageStatus === "available" ? "true" : "false"}
+      data-object-layer-overlay-contract={selectedLayerState.renderSurfaceContract}
       data-full-gaussian-source-count={stageSummary.fullGaussianCount}
       data-object-layer-registered-count={stageSummary.objectLayerRegisteredCount}
       data-object-layer-loaded-count={stageSummary.objectLayerLoadedCount}
@@ -1554,6 +1567,7 @@ export default function App() {
         debugLens={debugLens}
         objectOverlayMode={selectedObjectOverlayMode}
         objectTransformMode={objectTransformMode}
+        sourceSplatOverlay={selectedLayerState.sourceSplatStageStatus === "available"}
         hiddenSelectionIds={hiddenObjects}
         onReady={handleWorldReady}
         onSelectObject={selectObject}
@@ -1572,7 +1586,7 @@ export default function App() {
         </div>
         <div className="metricStrip">
           <Metric label="Three.js" value={worldReady ? "已加载" : "加载中"} />
-          <Metric label="高斯展示" value="点预览" />
+          <Metric label="高斯展示" value={selectedLayerState.stageDisplayLabel} />
           <Metric label="展示版本" value={`${stageSummary.visibleCount}/${modelList.length}`} />
           <Metric label="对象层" value={stagedObjectCount > 0 ? "已生成" : "未生成"} />
         </div>
@@ -2658,6 +2672,7 @@ function ThreeWorld({
   debugLens,
   objectOverlayMode,
   objectTransformMode,
+  sourceSplatOverlay,
   hiddenSelectionIds,
   onReady,
   onSelectObject,
@@ -2724,14 +2739,15 @@ function ThreeWorld({
 
     const mount = mountRef.current;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#070b11");
+    scene.background = null;
     scene.fog = new THREE.Fog("#070b11", 10, 30);
 
     const camera = new THREE.PerspectiveCamera(48, 1, 0.01, 100);
     camera.position.fromArray(INITIAL_CAMERA.position);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
     renderer.domElement.dataset.threeWorldCanvas = "true";
     mount.appendChild(renderer.domElement);
 
@@ -2747,6 +2763,13 @@ function ThreeWorld({
     transformControls.size = 0.78;
     transformControls.detach();
     scene.add(transformControls.getHelper());
+
+    const spark = new SparkRenderer({
+      renderer,
+      sortRadial: false,
+      maxStdDev: Math.sqrt(8),
+    });
+    scene.add(spark);
 
     buildWorldShell(scene);
 
@@ -3034,6 +3057,10 @@ function ThreeWorld({
         visible: object.visible !== false,
       }));
       const visibleModelSamples = modelVisibilitySamples.filter((sample) => sample.visible);
+      const sourceSplatSamples = [...modelRoots.values()]
+        .map(sourceSplatLayerInfo)
+        .filter((sample) => sample.registered);
+      const selectedSourceSplatLayer = selectedModel ? sourceSplatLayerInfo(selectedModel) : null;
       const objectVisibilitySamples = [...draggableObjects.values()].map((object) => ({
         selectionId: object.userData.selectionId,
         modelId: object.userData.modelId,
@@ -3059,6 +3086,13 @@ function ThreeWorld({
         objectPickingContract: "projected-object-centroid-picker-v1",
         objectPickingDecoupledFromRenderer: true,
         objectPickingLast: lastPickSummary,
+        sourceSplatStageContract: SOURCE_SPLAT_STAGE_CONTRACT,
+        sourceSplatActive: sourceSplatSamples.length > 0,
+        sourceSplatReadyCount: sourceSplatSamples.filter((sample) => sample.status === "ready").length,
+        sourceSplatSamples,
+        selectedSourceSplatStatus: selectedSourceSplatLayer?.status ?? "missing",
+        selectedSourceSplatPath: selectedSourceSplatLayer?.path ?? null,
+        selectedSourceSplatModelId: selectedSourceSplatLayer?.modelId ?? null,
         objectTransformContract: "three-transform-controls-v1",
         objectTransformEngine: "object-transform-state-v1",
         objectTransformMode: transformMode,
@@ -3347,6 +3381,10 @@ function ThreeWorld({
 
     const disposeObject = (object) => {
       object.traverse((child) => {
+        if (child.userData?.role === "source-splat-mesh") {
+          disposeSourceSplatMesh(child);
+          return;
+        }
         child.geometry?.dispose?.();
         if (Array.isArray(child.material)) {
           child.material.forEach((material) => material.dispose?.());
@@ -3371,6 +3409,7 @@ function ThreeWorld({
           : points?.length
             ? createPointCloudGroup(model, points)
             : createCompressedModelGroup(model);
+      attachSourceSplatLayer(result.group, model, result.summary?.sourceFrame, publishAuditHandle);
       scene.add(result.group);
       modelRoots.set(model.id, result.group);
       result.objectGroups.forEach((object) => {
@@ -3831,6 +3870,7 @@ function ThreeWorld({
       window.removeEventListener("resize", resize);
       dragControls?.dispose();
       transformControls.dispose();
+      disposeSparkRenderer(spark);
       controls.dispose();
       modelRoots.forEach(disposeObject);
       renderer.dispose();
@@ -3841,7 +3881,13 @@ function ThreeWorld({
     };
   }, [models, onReady]);
 
-  return <div className="threeWorldMount" ref={mountRef} />;
+  return (
+    <div
+      className={`threeWorldMount ${sourceSplatOverlay ? "sourceSplatOverlay" : ""}`}
+      data-source-splat-overlay={sourceSplatOverlay ? "true" : "false"}
+      ref={mountRef}
+    />
+  );
 }
 
 function DebugPanel({
@@ -3999,6 +4045,9 @@ function DebugPanel({
       data-object-move-selected={selectedObject?.selectionId ?? ""}
       data-render-surface-contract={selectedLayerState.renderSurfaceContract}
       data-render-surface-label={selectedLayerState.renderSurfaceLabel}
+      data-stage-display-contract={selectedLayerState.stageDisplayContract}
+      data-stage-display-label={selectedLayerState.stageDisplayLabel}
+      data-source-splat-status={selectedLayerState.sourceSplatStageStatus}
       data-source-layer-status={selectedLayerState.sourceLayerStatus}
       data-source-layer-label={selectedLayerState.sourceLayerLabel}
       data-source-layer-path={selectedLayerState.sourceLayerPath}
@@ -4024,7 +4073,7 @@ function DebugPanel({
       <DebugSection title="Three.js 世界" status={selected.status ?? "queued"} defaultOpen>
         <div className="worldPlaneGrid" data-world-plane-panel="true">
           <Metric label="渲染" value="Three.js" />
-          <Metric label="展示形态" value={selectedLayerState.renderSurfaceLabel} />
+          <Metric label="展示形态" value={selectedLayerState.stageDisplayLabel} />
           <Metric label="完整高斯" value={selectedLayerState.sourceLayerLabel} />
           <Metric label="处理结果" value={selectedLayerState.objectLayerLabel} />
           <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
@@ -4503,6 +4552,8 @@ function TrainingStagePanel({
       data-training-stage-schema="model-version-processing-v1"
       data-stage-visible-models={summary?.visibleCount ?? 0}
       data-stage-render-surface-contract={THREE_WORLD_POINT_PREVIEW_CONTRACT}
+      data-stage-display-contract={summary?.sourceSplatStageCount > 0 ? SOURCE_SPLAT_STAGE_CONTRACT : THREE_WORLD_POINT_PREVIEW_CONTRACT}
+      data-stage-source-splat-models={summary?.sourceSplatStageCount ?? 0}
       data-stage-full-gaussian-sources={summary?.fullGaussianCount ?? 0}
       data-stage-point-preview-models={summary?.pointPreviewCount ?? 0}
       data-stage-object-layer-registered={summary?.objectLayerRegisteredCount ?? 0}
@@ -4516,7 +4567,7 @@ function TrainingStagePanel({
       </div>
       <dl className="stagePipelineSummary">
         <Meta label="完整高斯" value={formatCount(summary?.fullGaussianCount ?? 0)} />
-        <Meta label="展示" value="点预览" />
+        <Meta label="展示" value={summary?.sourceSplatStageCount > 0 ? "完整 splat" : "点预览"} />
         <Meta label="对象登记" value={formatCount(summary?.objectLayerRegisteredCount ?? 0)} />
         <Meta label="已加载" value={formatCount(summary?.objectLayerLoadedCount ?? 0)} />
         <Meta label="对象层" value={formatCount(summary?.processedCount ?? 0)} />
@@ -4547,6 +4598,8 @@ function TrainingStagePanel({
               data-model-process-status={entry.processStatus}
               data-model-processed={entry.processed ? "true" : "false"}
               data-model-render-surface={entry.renderSurfaceLabel}
+              data-model-stage-display={entry.stageDisplayLabel}
+              data-model-source-splat-status={entry.sourceSplatStageStatus}
               data-model-source-layer-status={entry.sourceLayerStatus}
               data-model-object-layer-status={entry.objectLayerStatus}
             >
@@ -4567,7 +4620,7 @@ function TrainingStagePanel({
                 <span className={`modelLayerBadge source ${entry.sourceLayerStatus}`}>
                   {entry.sourceLayerLabel}
                 </span>
-                <span className="modelLayerBadge render">{entry.renderSurfaceLabel}</span>
+                <span className="modelLayerBadge render">{entry.stageDisplayLabel}</span>
                 <span className={`modelProcessBadge ${entry.processStatus}`}>{entry.processLabel}</span>
               </div>
               <button
@@ -5648,6 +5701,7 @@ function buildWorldShell(scene) {
 
 function createPointCloudGroup(model, points) {
   const sampled = samplePoints(points, model.maxDisplayPoints ?? 32000);
+  const sourceOverlay = Boolean(sourceSplatSource(model));
   const bounds = pointBounds(sampled);
   const center = bounds.center;
   const span = Math.max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001);
@@ -5732,12 +5786,13 @@ function createPointCloudGroup(model, points) {
       sizeAttenuation: true,
       vertexColors: true,
       transparent: true,
-      opacity: 0.94,
+      opacity: sourceOverlay ? 0.2 : 0.94,
       depthWrite: false,
     });
 
     const cloud = new THREE.Points(geometry, material);
     cloud.userData.role = "gaussian-cloud";
+    cloud.userData.sourceSplatOverlay = sourceOverlay;
     cloud.userData.originalColor = originalColorAttr;
     cloud.userData.assignmentColor = assignmentColorAttr;
     cloud.userData.confidenceColor = confidenceColorAttr;
@@ -5808,6 +5863,11 @@ function createPointCloudGroup(model, points) {
       displayCount: sampled.length,
       objectCount: objects.length,
       corePoint: [round3(center.x), round3(center.y), round3(center.z)],
+      sourceFrame: {
+        center: center.clone(),
+        scale,
+        minY,
+      },
       objects,
     },
   };
@@ -6131,6 +6191,125 @@ function baseModelGroup(model) {
   return group;
 }
 
+function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange) {
+  const source = sourceSplatSource(model);
+  if (!group || !source || !validSourceFrame(sourceFrame)) return null;
+
+  const layer = new THREE.Group();
+  layer.name = `${model.name} / source splat`;
+  layer.userData = {
+    role: "source-splat-layer",
+    contract: SOURCE_SPLAT_STAGE_CONTRACT,
+    modelId: model.id,
+    path: source.path,
+    label: source.label,
+    renderer: source.renderer,
+    status: "loading",
+    sourceFrame: {
+      scale: round3(sourceFrame.scale),
+      minY: round3(sourceFrame.minY),
+      center: sourceFrame.center.toArray().map(round3),
+    },
+  };
+  layer.scale.setScalar(sourceFrame.scale);
+  layer.position.set(
+    -sourceFrame.center.x * sourceFrame.scale,
+    -sourceFrame.center.y * sourceFrame.scale - sourceFrame.minY,
+    -sourceFrame.center.z * sourceFrame.scale,
+  );
+  layer.renderOrder = -40;
+
+  const splat = new SplatMesh({
+    url: source.path,
+    onProgress: (event) => {
+      if (!event.lengthComputable || event.total === 0) return;
+      layer.userData.status = `${Math.round((event.loaded / event.total) * 100)}%`;
+      onStatusChange?.();
+    },
+    onLoad: () => {
+      layer.userData.status = "ready";
+      onStatusChange?.();
+    },
+  });
+  splat.name = `${model.name} source SplatMesh`;
+  splat.userData.role = "source-splat-mesh";
+  splat.userData.modelId = model.id;
+  splat.userData.path = source.path;
+  splat.frustumCulled = false;
+  layer.add(splat);
+  group.add(layer);
+  group.userData.sourceSplatLayer = layer.userData;
+
+  splat.initialized
+    .then(() => {
+      const sourceCount = splat.splats?.getNumSplats?.();
+      if (Number.isFinite(sourceCount)) layer.userData.sourceSplats = sourceCount;
+      layer.userData.status = "ready";
+      onStatusChange?.();
+    })
+    .catch((error) => {
+      layer.userData.status = "error";
+      layer.userData.error = error?.message ?? "source splat load failed";
+      onStatusChange?.();
+    });
+
+  return layer;
+}
+
+function sourceSplatSource(model = {}) {
+  const layer = model.sourceLayer ?? {};
+  const path = String(layer.path ?? "");
+  if (layer.status !== "available" || !path.toLowerCase().endsWith(".splat")) return null;
+  if (!path.startsWith("/")) return null;
+  return {
+    path,
+    label: layer.label ?? "完整 splat",
+    renderer: layer.renderer ?? "Spark splat",
+  };
+}
+
+function validSourceFrame(frame) {
+  return Boolean(
+    frame?.center?.isVector3 &&
+      Number.isFinite(frame.scale) &&
+      frame.scale > 0 &&
+      Number.isFinite(frame.minY),
+  );
+}
+
+function sourceSplatLayerInfo(modelRoot) {
+  const layer = modelRoot?.userData?.sourceSplatLayer;
+  if (!layer) {
+    return {
+      registered: false,
+      status: "missing",
+      modelId: modelRoot?.userData?.modelId ?? null,
+      path: null,
+    };
+  }
+  return {
+    registered: true,
+    contract: layer.contract ?? SOURCE_SPLAT_STAGE_CONTRACT,
+    status: layer.status ?? "loading",
+    modelId: layer.modelId ?? modelRoot?.userData?.modelId ?? null,
+    path: layer.path ?? null,
+    label: layer.label ?? "完整 splat",
+    renderer: layer.renderer ?? "Spark splat",
+    sourceSplats: layer.sourceSplats ?? null,
+  };
+}
+
+function disposeSourceSplatMesh(splat) {
+  splat.removeFromParent?.();
+  splat.dispose?.();
+  splat.splats?.dispose?.();
+}
+
+function disposeSparkRenderer(spark) {
+  spark.removeFromParent?.();
+  spark.dispose?.();
+}
+
 function baseObjectGroup(model, objectId, position) {
   const group = new THREE.Group();
   group.name = `${model.name} / object ${objectId}`;
@@ -6274,7 +6453,17 @@ function applyObjectVisualState(
       const lensOpacity = opacityForDebugLens(object.userData.objectState, normalizedLens);
       child.userData.activeOpacityLens = debug ? normalizedLens : "appearance";
       const baseOpacity = selected ? 1 : hovered ? Math.max(0.86, lensOpacity) : debug ? lensOpacity : 0.5;
-      child.material.opacity = dimmedByHover ? Math.min(baseOpacity, HOVER_DIM_OPACITY) : baseOpacity;
+      const sourceOverlayOpacity = child.userData.sourceSplatOverlay
+        ? selected
+          ? 0.5
+          : hovered
+            ? 0.42
+            : 0.2
+        : baseOpacity;
+      const opacity = child.userData.sourceSplatOverlay
+        ? Math.min(baseOpacity, sourceOverlayOpacity)
+        : baseOpacity;
+      child.material.opacity = dimmedByHover ? Math.min(opacity, HOVER_DIM_OPACITY) : opacity;
       child.material.size = selected ? baseSize * 1.22 : hovered ? baseSize * 1.2 : dimmedByHover ? baseSize * 0.92 : baseSize;
       child.userData.hoverHighlighted = Boolean(hovered);
       child.userData.hoverDimmed = dimmedByHover;
@@ -7260,6 +7449,7 @@ function trainingStageSummary(models = [], stageModelIds = new Set()) {
   const processedEntries = entries.filter((entry) => entry.processed);
   const pendingEntries = entries.filter((entry) => !entry.processed);
   const fullGaussianEntries = entries.filter((entry) => entry.sourceLayerStatus === "available");
+  const sourceSplatStageEntries = entries.filter((entry) => entry.sourceSplatStageStatus === "available");
   const pointPreviewEntries = entries.filter(
     (entry) => entry.renderSurfaceContract === THREE_WORLD_POINT_PREVIEW_CONTRACT,
   );
@@ -7277,6 +7467,7 @@ function trainingStageSummary(models = [], stageModelIds = new Set()) {
       0,
     ),
     fullGaussianCount: fullGaussianEntries.length,
+    sourceSplatStageCount: sourceSplatStageEntries.length,
     pointPreviewCount: pointPreviewEntries.length,
     objectLayerRegisteredCount: objectLayerRegisteredEntries.length,
     objectLayerLoadedCount: objectLayerLoadedEntries.length,
@@ -7330,6 +7521,9 @@ function trainingStageModelEntry(model, visible = false) {
     processActionLabel: modelProcessActionLabel(processAction),
     renderSurfaceContract: layerState.renderSurfaceContract,
     renderSurfaceLabel: layerState.renderSurfaceLabel,
+    stageDisplayContract: layerState.stageDisplayContract,
+    stageDisplayLabel: layerState.stageDisplayLabel,
+    sourceSplatStageStatus: layerState.sourceSplatStageStatus,
     sourceLayerStatus: layerState.sourceLayerStatus,
     sourceLayerLabel: layerState.sourceLayerLabel,
     sourceLayerPath: layerState.sourceLayerPath,
@@ -7345,12 +7539,19 @@ function modelLayerState(model = {}, status = model?.status, objectCount = model
   const sourceLayer = model?.sourceLayer ?? {};
   const objectLayer = model?.objectLayer ?? {};
   const sourceAvailable = sourceLayer.status === "available" && Boolean(sourceLayer.path);
+  const sourceSplatAvailable = sourceAvailable && String(sourceLayer.path ?? "").toLowerCase().endsWith(".splat");
   const objectRegistered = objectLayer.status === "registered" && Boolean(objectLayer.path);
   const objectLoaded = Number(objectCount) > 0 && ["loaded", "compressed"].includes(String(status ?? ""));
   const objectLayerStatus = objectLoaded ? "loaded" : objectRegistered ? "registered" : "missing";
+  const renderSurfaceContract = renderSurface.contract ?? THREE_WORLD_POINT_PREVIEW_CONTRACT;
+  const renderSurfaceLabel = renderSurface.label ?? modelRenderSurfaceFallbackLabel(model);
   return {
-    renderSurfaceContract: renderSurface.contract ?? THREE_WORLD_POINT_PREVIEW_CONTRACT,
-    renderSurfaceLabel: renderSurface.label ?? modelRenderSurfaceFallbackLabel(model),
+    renderSurfaceContract,
+    renderSurfaceLabel,
+    stageDisplayContract: sourceSplatAvailable ? SOURCE_SPLAT_STAGE_CONTRACT : renderSurfaceContract,
+    stageDisplayLabel: sourceSplatAvailable ? "完整 splat" : renderSurfaceLabel,
+    sourceSplatStageContract: SOURCE_SPLAT_STAGE_CONTRACT,
+    sourceSplatStageStatus: sourceSplatAvailable ? "available" : "missing",
     sourceLayerStatus: sourceAvailable ? "available" : "missing",
     sourceLayerLabel: sourceAvailable ? (sourceLayer.label ?? "完整高斯") : "未登记",
     sourceLayerPath: sourceLayer.path ?? "",

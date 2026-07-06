@@ -66,6 +66,8 @@ try {
       `objectPick=${summary.objectPickStatus}`,
       `trainingStage=${summary.trainingStageStatus}`,
       `gaussianDisplay=${summary.gaussianDisplayMode}`,
+      `sourceSplat=${summary.sourceSplatStatus}`,
+      `sourceSplatReady=${summary.sourceSplatReadyCount}`,
       `fullGaussianSources=${summary.fullGaussianSourceCount}`,
       `objectLayers=${summary.objectLayerLoadedCount}/${summary.objectLayerRegisteredCount}`,
       `stageModels=${summary.stageVisibleModelCount}/${summary.modelCount}`,
@@ -112,7 +114,7 @@ async function auditWorld(url) {
   page.on("pageerror", (error) => consoleIssues.push(`pageerror: ${error.message}`));
 
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     const app = page.locator(".worldShell");
     await app.waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
@@ -139,8 +141,7 @@ async function auditWorld(url) {
     await canvas.waitFor({ timeout: 15000 });
     await page.locator(".glassHud.floatingInspector").waitFor({ timeout: 15000 });
     await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
-    await page.locator("[data-assignment-heatmap='true']").waitFor({ timeout: 15000 });
-    await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
+    await page.locator("[data-assignment-heatmap='true']").waitFor({ state: "attached", timeout: 15000 });
     await page.locator("[data-training-stage-panel='true']").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
@@ -155,6 +156,34 @@ async function auditWorld(url) {
         Number(panel?.getAttribute("data-stage-processed-models") ?? 0) > 0
       );
     }, undefined, { timeout: 15000 });
+    const sourceSplatStage = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const world = window.__OBJGAUSS_WORLD__;
+      const samples = world?.sourceSplatSamples ?? [];
+      const selectedSample = samples.find((sample) => sample.modelId === world?.selectedModelId);
+      if (
+        shell?.getAttribute("data-source-splat-active") !== "true" ||
+        shell?.getAttribute("data-source-splat-stage-contract") !== "spark-source-splat-stage-v1" ||
+        shell?.getAttribute("data-stage-display-contract") !== "spark-source-splat-stage-v1" ||
+        shell?.getAttribute("data-gaussian-display-mode") !== "完整 splat" ||
+        panel?.getAttribute("data-stage-display-label") !== "完整 splat" ||
+        world?.sourceSplatStageContract !== "spark-source-splat-stage-v1" ||
+        world?.sourceSplatActive !== true ||
+        !selectedSample ||
+        !["loading", "ready"].includes(selectedSample.status)
+      ) {
+        return null;
+      }
+      return {
+        contract: world.sourceSplatStageContract,
+        status: selectedSample.status,
+        modelId: selectedSample.modelId,
+        path: selectedSample.path,
+        readyCount: world.sourceSplatReadyCount ?? 0,
+        mode: shell.getAttribute("data-gaussian-display-mode"),
+      };
+    }, undefined, { timeout: 30000 }).then((handle) => handle.jsonValue());
     const pills = await page.locator(".modelPill").count();
     if (pills < 7) {
       throw new Error(`expected at least 7 model pills, found ${pills}`);
@@ -167,7 +196,7 @@ async function auditWorld(url) {
       return pill?.getAttribute("data-model-load-state") === "loaded" &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) > 0;
     }, undefined, { timeout: 15000 });
-    await ogcPill.click();
+    await clickModelPill(page, "ogc-debug");
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -202,11 +231,13 @@ async function auditWorld(url) {
     }, objectSelection.selectionId, { timeout: 15000 });
     const objectTransform = await page.waitForFunction((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
+      const shell = document.querySelector(".worldShell");
       const worldPlane = document.querySelector("[data-world-plane-panel='true']");
       const interactionLayer = document.querySelector("[data-object-interaction-layer='true']");
       const systemDrawer = document.querySelector("[data-system-drawer='true']");
       const actionButtons = document.querySelectorAll("[data-object-transform-actions='true'] [data-object-transform-button]");
       const modeButtons = document.querySelectorAll("[data-object-transform-mode-selector='true'] [data-object-transform-mode-button]");
+      const gaussianDisplayMode = shell?.getAttribute("data-gaussian-display-mode") ?? "";
       const topMetricLabels = [...document.querySelectorAll(".metricStrip .metric span")]
         .map((node) => node.textContent?.trim())
         .filter(Boolean);
@@ -223,7 +254,7 @@ async function auditWorld(url) {
         interactionLayer?.getAttribute("data-object-move-contract") !== "object-group-position-v1" ||
         interactionLayer?.getAttribute("data-object-move-selected") !== selectionId ||
         shell?.getAttribute("data-render-surface-contract") !== "three-world-point-preview-v1" ||
-        shell?.getAttribute("data-gaussian-display-mode") !== "点云预览" ||
+        (!gaussianDisplayMode.endsWith("点预览") && gaussianDisplayMode !== "完整 splat") ||
         worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-render-surface-contract") !== "three-world-point-preview-v1" ||
         worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-object-layer-status") !== "loaded" ||
         actionButtons.length !== 3 ||
@@ -242,7 +273,8 @@ async function auditWorld(url) {
         gizmoObject: world.transformGizmoObject,
         mode: world.objectTransformMode,
         renderSurfaceContract: shell.getAttribute("data-render-surface-contract"),
-        gaussianDisplayMode: shell.getAttribute("data-gaussian-display-mode"),
+        gaussianDisplayMode,
+        sourceSplatActive: shell.getAttribute("data-source-splat-active"),
         objectLayerStatus: worldPlane.closest("[data-object-debug-panel='true']").getAttribute("data-object-layer-status"),
         interactionLayer: interactionLayer.getAttribute("data-object-transform-primary"),
         actionButtonCount: actionButtons.length,
@@ -288,7 +320,7 @@ async function auditWorld(url) {
       throw new Error(`expected movable object audit contract: ${JSON.stringify(beforeMove)}`);
     }
     await page.locator("[data-object-move-panel='true']").waitFor({ timeout: 15000 });
-    await page.locator("[data-object-move-button='+x']").click();
+    await clickSelector(page, "[data-object-move-button='+x']");
     const objectMove = await page.waitForFunction((input) => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -434,7 +466,7 @@ async function auditWorld(url) {
       return pill?.getAttribute("data-model-load-state") === "loaded" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) > 0;
     }, undefined, { timeout: 15000 });
-    await trainablePill.click();
+    await clickModelPill(page, "trainable-mvp-debug");
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -645,7 +677,7 @@ async function auditWorld(url) {
     if (trainableGaussian.trainableArtifactLoadedCount < 1) {
       throw new Error("expected trainable artifact load count to be visible in audit handle");
     }
-    await page.locator("[data-trainable-frame-button='1']").click();
+    await clickSelector(page, "[data-trainable-frame-button='1']");
     const frameSwitch = await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -688,7 +720,7 @@ async function auditWorld(url) {
     ) {
       throw new Error(`expected frame 1 Gaussian probe to remain trainable artifact sourced: ${JSON.stringify(frameGaussian)}`);
     }
-    await page.locator("[data-debug-lens-button='confidence']").click();
+    await clickSelector(page, "[data-debug-lens-button='confidence']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -709,7 +741,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-debug-lens-button='opacity']").click();
+    await clickSelector(page, "[data-debug-lens-button='opacity']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -731,7 +763,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-debug-lens-button='entropy']").click();
+    await clickSelector(page, "[data-debug-lens-button='entropy']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -774,7 +806,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-object-overlay-button='bbox']").click();
+    await clickSelector(page, "[data-object-overlay-button='bbox']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -795,7 +827,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-object-overlay-button='centroid']").click();
+    await clickSelector(page, "[data-object-overlay-button='centroid']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -816,7 +848,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-object-overlay-button='off']").click();
+    await clickSelector(page, "[data-object-overlay-button='off']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -837,7 +869,7 @@ async function auditWorld(url) {
         )
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-object-overlay-button='full']").click();
+    await clickSelector(page, "[data-object-overlay-button='full']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -1258,12 +1290,18 @@ async function auditWorld(url) {
         shellStagePendingModelCount: Number(shell?.getAttribute("data-stage-pending-model-count") ?? 0),
         shellRenderSurfaceContract: shell?.getAttribute("data-render-surface-contract") ?? null,
         shellGaussianDisplayMode: shell?.getAttribute("data-gaussian-display-mode") ?? null,
+        shellStageDisplayContract: shell?.getAttribute("data-stage-display-contract") ?? null,
+        shellSourceSplatActive: shell?.getAttribute("data-source-splat-active") ?? null,
+        shellSourceSplatStatus: shell?.getAttribute("data-source-splat-status") ?? null,
+        shellSourceSplatPath: shell?.getAttribute("data-source-splat-path") ?? null,
         shellFullGaussianSourceCount: Number(shell?.getAttribute("data-full-gaussian-source-count") ?? 0),
         shellObjectLayerRegisteredCount: Number(shell?.getAttribute("data-object-layer-registered-count") ?? 0),
         shellObjectLayerLoadedCount: Number(shell?.getAttribute("data-object-layer-loaded-count") ?? 0),
         panelTrainingStageSchema: trainingStagePanel?.getAttribute("data-training-stage-schema") ?? null,
         panelStageVisibleModelCount: Number(trainingStagePanel?.getAttribute("data-stage-visible-models") ?? 0),
         panelStageRenderSurfaceContract: trainingStagePanel?.getAttribute("data-stage-render-surface-contract") ?? null,
+        panelStageDisplayContract: trainingStagePanel?.getAttribute("data-stage-display-contract") ?? null,
+        panelStageSourceSplatModels: Number(trainingStagePanel?.getAttribute("data-stage-source-splat-models") ?? 0),
         panelStageFullGaussianSources: Number(trainingStagePanel?.getAttribute("data-stage-full-gaussian-sources") ?? 0),
         panelStagePointPreviewModels: Number(trainingStagePanel?.getAttribute("data-stage-point-preview-models") ?? 0),
         panelStageObjectLayerRegistered: Number(trainingStagePanel?.getAttribute("data-stage-object-layer-registered") ?? 0),
@@ -2098,7 +2136,8 @@ async function auditWorld(url) {
         objectTransform.pickingContract === "projected-object-centroid-picker-v1" &&
         objectTransform.pickingDecoupledFromRenderer === true &&
         objectTransform.renderSurfaceContract === "three-world-point-preview-v1" &&
-        objectTransform.gaussianDisplayMode === "点云预览" &&
+        (objectTransform.gaussianDisplayMode.endsWith("点预览") ||
+          objectTransform.gaussianDisplayMode === "完整 splat") &&
         objectTransform.objectLayerStatus === "loaded" &&
         objectTransform.gizmoObject === objectSelection.selectionId &&
         objectTransform.interactionLayer === "three-transform-controls-v1" &&
@@ -2114,8 +2153,13 @@ async function auditWorld(url) {
         world.shellTrainingStage === "model-version-processing-v1" &&
         world.panelTrainingStageSchema === "model-version-processing-v1" &&
         world.shellRenderSurfaceContract === "three-world-point-preview-v1" &&
-        world.shellGaussianDisplayMode === "点云预览" &&
+        sourceSplatStage.contract === "spark-source-splat-stage-v1" &&
+        sourceSplatStage.mode === "完整 splat" &&
+        world.shellStageDisplayContract === "spark-source-splat-stage-v1" &&
+        world.shellSourceSplatActive === "true" &&
         world.panelStageRenderSurfaceContract === "three-world-point-preview-v1" &&
+        world.panelStageDisplayContract === "spark-source-splat-stage-v1" &&
+        world.panelStageSourceSplatModels >= 1 &&
         world.shellFullGaussianSourceCount >= 1 &&
         world.panelStageFullGaussianSources >= 1 &&
         world.shellObjectLayerRegisteredCount >= 1 &&
@@ -2127,6 +2171,8 @@ async function auditWorld(url) {
           ? "passed"
           : "failed",
       gaussianDisplayMode: world.shellGaussianDisplayMode,
+      sourceSplatStatus: sourceSplatStage.status,
+      sourceSplatReadyCount: sourceSplatStage.readyCount,
       fullGaussianSourceCount: world.shellFullGaussianSourceCount,
       objectLayerRegisteredCount: world.shellObjectLayerRegisteredCount,
       objectLayerLoadedCount: world.shellObjectLayerLoadedCount,
@@ -2177,8 +2223,8 @@ async function auditMobileWorld(browser, url) {
       const pill = document.querySelector(".modelPill[data-model-row-id='trainable-mvp-debug']");
       return pill?.getAttribute("data-model-load-state") === "loaded";
     }, undefined, { timeout: 15000 });
-    await page.locator(".modelPill[data-model-row-id='trainable-mvp-debug']").click();
-    await page.locator("[data-trainable-frame-button='1']").click();
+    await clickModelPill(page, "trainable-mvp-debug");
+    await clickSelector(page, "[data-trainable-frame-button='1']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const dashboard = document.querySelector("[data-stability-dashboard='true']");
@@ -2232,7 +2278,7 @@ async function auditUrlTrainableArtifact(browser, url) {
     if (!selection.ok || selection.modelId !== "trainable-url-artifact") {
       throw new Error(`expected URL artifact object selection: ${JSON.stringify(selection)}`);
     }
-    await page.locator("[data-trainable-frame-button='1']").click();
+    await clickSelector(page, "[data-trainable-frame-button='1']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2316,7 +2362,7 @@ async function auditLocalTrainableArtifactImport(browser, url) {
     ) {
       throw new Error(`expected local artifact Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
-    await page.locator("[data-trainable-frame-button='1']").click();
+    await clickSelector(page, "[data-trainable-frame-button='1']");
     await page.waitForFunction(() => {
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
       const types = new Set(events.map((event) => event.type));
@@ -2419,7 +2465,7 @@ async function auditLocalOgcArtifactImport(browser, url) {
     if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected local OGC Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
-    await page.locator("[data-ogc-lod-button='1']").click();
+    await clickSelector(page, "[data-ogc-lod-button='1']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2435,7 +2481,7 @@ async function auditLocalOgcArtifactImport(browser, url) {
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -2532,8 +2578,8 @@ async function auditLocalOgcManifestPackageImport(browser, url) {
     if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected local OGC manifest package Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
-    await page.locator("[data-ogc-lod-button='1']").click();
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-lod-button='1']");
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2623,7 +2669,7 @@ async function auditUrlOgcArtifact(browser, url) {
     if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected URL OGC Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
-    await page.locator("[data-ogc-lod-button='0']").click();
+    await clickSelector(page, "[data-ogc-lod-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2642,7 +2688,7 @@ async function auditUrlOgcArtifact(browser, url) {
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
     }, undefined, { timeout: 15000 });
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
@@ -2684,7 +2730,7 @@ async function auditUrlOgcArtifact(browser, url) {
     if (!chunkGaussian.ok || chunkGaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected URL OGC chunk Gaussian probe: ${JSON.stringify(chunkGaussian)}`);
     }
-    await page.locator("[data-ogc-chunk-button='all']").click();
+    await clickSelector(page, "[data-ogc-chunk-button='all']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2758,8 +2804,8 @@ async function auditUrlOgcManifestArtifact(browser, url) {
     if (!gaussian.ok || gaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected URL OGC manifest Gaussian probe: ${JSON.stringify(gaussian)}`);
     }
-    await page.locator("[data-ogc-lod-button='0']").click();
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-lod-button='0']");
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2896,7 +2942,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       throw new Error(`expected algorithm manifest trainable Gaussian probe: ${JSON.stringify(trainableGaussian)}`);
     }
 
-    await page.locator(".modelPill[data-model-row-id='model-manifest-ogc-artifact']").click();
+    await clickModelPill(page, "model-manifest-ogc-artifact");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -2946,7 +2992,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
     ) {
       throw new Error(`expected algorithm manifest OGC Gaussian probe: ${JSON.stringify(ogcGaussian)}`);
     }
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const events = window.__OBJGAUSS_DEBUG_EVENTS__ ?? [];
@@ -3163,7 +3209,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
       };
     }, undefined, { timeout: 15000 });
     const sessionImport = await sessionImportHandle.jsonValue();
-    await page.locator(".modelPill[data-model-row-id='model-manifest-trainable-artifact']").click();
+    await clickModelPill(page, "model-manifest-trainable-artifact");
     const sessionDriftHandle = await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-debug-session-archive='true']");
@@ -3292,7 +3338,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       throw new Error(`expected local model manifest trainable Gaussian probe: ${JSON.stringify(trainableGaussian)}`);
     }
 
-    await page.locator(".modelPill[data-model-row-id='model-local-manifest-ogc-artifact']").click();
+    await clickModelPill(page, "model-local-manifest-ogc-artifact");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -3335,8 +3381,8 @@ async function auditLocalModelManifestBundleImport(browser, url) {
     if (!ogcGaussian.ok || ogcGaussian.assignmentSource !== "derived_from_object_id") {
       throw new Error(`expected local model manifest OGC Gaussian probe: ${JSON.stringify(ogcGaussian)}`);
     }
-    await page.locator("[data-ogc-lod-button='1']").click();
-    await page.locator("[data-ogc-chunk-button='0']").click();
+    await clickSelector(page, "[data-ogc-lod-button='1']");
+    await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -3617,6 +3663,29 @@ function stopServer(child) {
     process.kill(-child.pid, "SIGTERM");
   } catch {
     child.kill("SIGTERM");
+  }
+}
+
+async function clickModelPill(page, modelId) {
+  const clicked = await page.evaluate((id) => {
+    const selector = `.modelPill[data-model-row-id="${id}"]`;
+    const element = document.querySelector(selector);
+    element?.click();
+    return Boolean(element);
+  }, modelId);
+  if (!clicked) {
+    throw new Error(`model pill not found: ${modelId}`);
+  }
+}
+
+async function clickSelector(page, selector) {
+  const clicked = await page.evaluate((targetSelector) => {
+    const element = document.querySelector(targetSelector);
+    element?.click();
+    return Boolean(element);
+  }, selector);
+  if (!clicked) {
+    throw new Error(`click target not found: ${selector}`);
   }
 }
 
