@@ -162,7 +162,7 @@
   - 未把低质量对象用 UI 颜色或阈值掩盖。
   - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
     camera unfreeze。
-- 完成 commit: pending
+- 完成 commit: `bc47967`
 
 ### REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001: Try minimal slot 1/2 boundary optimization
 
