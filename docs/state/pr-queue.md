@@ -155,6 +155,7 @@
   - 未提交 generated checkpoint / summary / preview PLY / screenshot。
   - 未进入 GPU 长训、diffusion、rollout、replay buffer、dynamic-K mutation 或 geometry /
     camera unfreeze。
+- 完成 commit: `b3aa459`
 
 ### REAL-SAMPLE-V2-VIEWER-PREVIEW-001: Add viewer/debug route for v2 assignment effect
 
