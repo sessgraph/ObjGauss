@@ -39,10 +39,13 @@ summary，predictive gate 已输出 state-vs-history error ratio。`OBJECTSTATE-
 已补 synthetic controlled action smoke，验证 `ObjectState + Action` 不能被 no-action
 tracker 替代。`OBJECTSTATE-REALITY-GATE-001` 已补 controlled real / public row contract
 和 evaluator，强制分离 pass / fail / blocked rows，并要求 identity / prediction /
-intervention 行具备对应 GT 与指标。下一步优先从实际 small real / public artifacts 生成
-第一批 rows 并记录 blocked rows；继续不推进 diffusion、replay buffer 大系统或
-viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛
-full `audit:world-viewer` 的旧等待条件。
+intervention 行具备对应 GT 与指标。`OBJECTSTATE-REALITY-PUBLIC-ROWS-001` 已从现有
+small public / local viewer artifacts 生成第一批 12 条 blocked rows，明确 `object_id`
+不是 physical identity GT，且当前 artifacts 缺 timestamped identity、6DoF pose、
+action events 和 counterfactual outcome。下一步优先导入或采集真正 controlled tabletop
+GT rows，让至少 identity row 从 blocked 进入可评估 pass / fail；继续不推进 diffusion、
+replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY
+LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -110,6 +113,33 @@ full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REALITY-PUBLIC-ROWS-001: Register public artifact reality rows
+
+- 状态: done / current-public-rows-blocked
+- 类型: 标准 PR / research evidence rows + blocked rows
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将当前已存在的 small public / local viewer artifacts 映射为
+  `OBJECTSTATE-REALITY-GATE-001` rows，并把缺少真实 GT 的限制显性化。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_reality_public_rows`。
+  - 新增 `objgauss-objectstate-public-artifact-rows-v1` summary schema。
+  - 默认 artifacts 为 `real-sample-v2-sample-aware-lego`、`polyhaven-chair`、
+    `nike-real-splat-demo` 和 `plush`。
+  - 每个 artifact 生成 `identity` / `prediction` / `intervention` 三条 blocked rows，
+    共 12 rows。
+  - Summary 嵌入 `OBJECTSTATE-REALITY-GATE-001` gate report 和
+    `blocked_rows_markdown`。
+  - 当前 gate 结果为 fail：`real_or_public_rows_present=true`，但三类 pass rows 均缺失。
+- 边界:
+  - `object_id` 明确不是 physical identity GT。
+  - 不写 `public/samples`，不提交 ignored artifact，不训练 Gaussian / dynamics。
+  - 不做 replay buffer / diffusion，不改 viewer/export 默认模型。
+  - 下一步仍是导入或采集 controlled tabletop GT rows。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_reality_public_rows.py tests/test_objectstate_reality_gate.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_reality_public_rows.py`: passed。
+- 完成 commit: `30722bf`。
 
 ### OBJECTSTATE-REALITY-GATE-001: Add controlled real/public row acceptance gate
 

@@ -572,6 +572,42 @@ Implemented v0.1 facts:
   diffusion, touch renderer loss, mutate viewer defaults or submit generated
   outputs.
 
+### OBJECTSTATE-REALITY-PUBLIC-ROWS-001
+
+Register the first public artifact evidence rows against
+`OBJECTSTATE-REALITY-GATE-001`.
+
+Required behavior:
+
+- Use existing small public / local viewer artifacts as row sources.
+- Create rows for identity, prediction and intervention evidence.
+- Mark rows `blocked` when the artifact lacks timestamped identity GT, 6DoF
+  pose tracks or action / intervention outcome GT.
+- State explicitly that `object_id` labels are renderer-facing addresses or
+  candidate object assignments, not physical identity ground truth.
+- Feed the rows into the reality gate so blocked rows are counted separately
+  from pass rows.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_reality_public_rows`.
+- Summary schema: `objgauss-objectstate-public-artifact-rows-v1`.
+- Default public artifacts:
+  - `real-sample-v2-sample-aware-lego`
+  - `polyhaven-chair`
+  - `nike-real-splat-demo`
+  - `plush`
+- Each artifact emits three blocked rows: `identity`, `prediction` and
+  `intervention`.
+- `objectstate_reality_public_rows_summary(...)` returns the artifact list,
+  generated rows, embedded reality gate summary and `blocked_rows_markdown`.
+- The embedded reality gate fails by design today: `real_or_public_rows_present`
+  is true, but identity / prediction / intervention pass rows are absent.
+- Current scope is evidence registration only. It does not write
+  `public/samples`, submit ignored artifacts, train a Gaussian model, collect
+  controlled tabletop data, train dynamics, use replay / diffusion or mutate
+  viewer defaults.
+
 ## 7. Non-Goals
 
 This spec does not authorize:

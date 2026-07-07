@@ -175,6 +175,19 @@ timestamp GT。`open_world_real` 行不能被标记为 `pass`，避免把开放�
 证明真实世界 ObjectState；下一步应把实际 small real / public rows 从 artifact 生成到该
 gate，而不是推进 diffusion、replay buffer 或 viewer/export 默认模型。
 
+随后完成 `OBJECTSTATE-REALITY-PUBLIC-ROWS-001`：新增
+`objgauss.core.objectstate_reality_public_rows`，schema 为
+`objgauss-objectstate-public-artifact-rows-v1`。它把当前已存在的 public / local viewer
+artifacts 登记成第一批 reality gate rows：`real-sample-v2-sample-aware-lego`、
+`polyhaven-chair`、`nike-real-splat-demo` 和 `plush`。每个 artifact 生成
+`identity` / `prediction` / `intervention` 三条 blocked rows，共 12 rows，并嵌入
+`OBJECTSTATE-REALITY-GATE-001` summary。当前 gate 结果按设计为 fail：
+`real_or_public_rows_present=true`，但 identity / prediction / intervention pass rows 均不存在。
+blocked 原因明确写入：现有 `object_id` 只是 renderer-facing address / candidate
+assignment，不是 timestamped physical identity GT；现有 public artifacts 也缺 6DoF pose
+tracks、history-vs-state future targets、action events 和 counterfactual outcomes。因此
+这一步只把真实缺口显性化，不声明 ObjectState 已通过真实世界状态变量验证。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
