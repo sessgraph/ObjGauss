@@ -37,9 +37,11 @@
 candidate prediction 不能 pass，contrastive identity encoder 训练有 loss / retrieval
 summary，predictive gate 已输出 state-vs-history error ratio。`OBJECTSTATE-CAUSAL-GATE-001`
 已补 synthetic controlled action smoke，验证 `ObjectState + Action` 不能被 no-action
-tracker 替代。下一步优先补 controlled real/public identity/action rows；继续不推进
-diffusion、replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量
-4.5M PLY LOD / streaming 或收敛
+tracker 替代。`OBJECTSTATE-REALITY-GATE-001` 已补 controlled real / public row contract
+和 evaluator，强制分离 pass / fail / blocked rows，并要求 identity / prediction /
+intervention 行具备对应 GT 与指标。下一步优先从实际 small real / public artifacts 生成
+第一批 rows 并记录 blocked rows；继续不推进 diffusion、replay buffer 大系统或
+viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛
 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
@@ -108,6 +110,40 @@ full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REALITY-GATE-001: Add controlled real/public row acceptance gate
+
+- 状态: done / row-contract-evaluator-only
+- 类型: 标准 PR / research evaluator + real/public evidence rows
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将 Phase 1 从 synthetic-only smoke 推进到 controlled real / public rows 的可审计
+  gate，验证 row 是否具备 identity / prediction / intervention 所需 GT 和指标，并防止
+  blocked 或 open-world failure 被误报为 pass。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_reality_gate`。
+  - 新增 `objgauss-objectstate-reality-gate-v1` 和
+    `objgauss-objectstate-real-public-row-v1` schema。
+  - Evidence kinds 为 `identity` / `prediction` / `intervention`；source kinds 为
+    `controlled_real` / `public_replay` / `open_world_real`；row statuses 为
+    `pass` / `fail` / `blocked`。
+  - 非 blocked identity 行要求 identity GT、timestamp GT，以及 `idf1`、
+    `fragmentation_rate`、`swap_rate`、`identity_collapse`。
+  - 非 blocked prediction 行要求 pose GT、timestamp GT，以及 `state_ade`、
+    `history_ade`、`prediction_gap_vs_history_model`。
+  - 非 blocked intervention 行要求 pose + action GT、timestamp GT，以及
+    `action_conditioned_ade`、`counterfactual_outcome_accuracy`、`wrong_direction_rate`。
+  - Summary 强制输出 `pass_rows` / `fail_rows` / `blocked_rows`，并报告
+    `controlled_real_identity_collapse`、fragmentation / swap、prediction gap 和
+    intervention accuracy。
+  - `open_world_real` 行不能标记为 `pass`。
+- 边界:
+  - 当前是 row contract / evaluator，不声明已经完成真实 controlled tabletop 采集。
+  - 不训练 dynamics model，不做 replay buffer / diffusion，不接 renderer loss，不改 viewer。
+  - 下一步仍要把实际 small real / public artifacts 生成到该 gate。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_reality_gate.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_reality_gate.py`: passed。
+- 完成 commit: `1a86cbb`。
 
 ### OBJECTSTATE-CAUSAL-GATE-001: Add synthetic action-conditioned causal gate
 

@@ -160,6 +160,21 @@ baseline 比较 `action_conditioned_ade`、`no_action_ade`、`intervention_gain`
 predictor 代替。当前仍是 synthetic controlled action evidence；controlled real action rows、
 relation change、hide / reveal 和 learned dynamics 仍未完成。
 
+随后完成 `OBJECTSTATE-REALITY-GATE-001` 的第一版 controlled real / public row
+acceptance contract：新增 `objgauss.core.objectstate_reality_gate`，schema 为
+`objgauss-objectstate-reality-gate-v1`，row schema 为
+`objgauss-objectstate-real-public-row-v1`。该 gate 把 Phase 1 真实验证拆成
+`identity` / `prediction` / `intervention` 三类 evidence rows，并强制分离
+`pass_rows` / `fail_rows` / `blocked_rows`。非 blocked identity 行必须有 identity GT 和
+`idf1` / `fragmentation_rate` / `swap_rate` / `identity_collapse`；prediction 行必须有
+pose GT 和 `state_ade` / `history_ade` / `prediction_gap_vs_history_model`；intervention
+行必须有 pose + action GT 和 `action_conditioned_ade` /
+`counterfactual_outcome_accuracy` / `wrong_direction_rate`；所有非 blocked 行都要求
+timestamp GT。`open_world_real` 行不能被标记为 `pass`，避免把开放真实失败伪装成通过。
+当前完成的是 row contract / evaluator，不表示已经采集到 controlled real tabletop 数据或
+证明真实世界 ObjectState；下一步应把实际 small real / public rows 从 artifact 生成到该
+gate，而不是推进 diffusion、replay buffer 或 viewer/export 默认模型。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

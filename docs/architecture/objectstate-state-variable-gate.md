@@ -529,6 +529,49 @@ Implemented v0.1 facts:
 - Current scope is synthetic controlled action only. Real action rows, relation
   changes, hide / reveal and learned dynamics remain future gates.
 
+### OBJECTSTATE-REALITY-GATE-001
+
+Add the first controlled real / public row acceptance contract for Phase 1.
+
+Required behavior:
+
+- Treat real / public rows as evidence rows, not as implicit world-model proof.
+- Separate `pass`, `fail` and `blocked` rows in the summary.
+- Require identity, prediction and intervention rows before a candidate can pass.
+- Require ground-truth fields per row type: identity rows need identity GT,
+  prediction rows need pose GT, intervention rows need pose + action GT, and
+  all non-blocked rows need timestamp GT.
+- Report controlled real fragmentation / swap / prediction gap / intervention
+  accuracy when the rows are available.
+- Keep open-world real rows as negative or blocked evidence; do not mark them
+  pass at this gate level.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_reality_gate`.
+- Gate schema: `objgauss-objectstate-reality-gate-v1`.
+- Row schema: `objgauss-objectstate-real-public-row-v1`.
+- Evidence kinds: `identity`, `prediction`, `intervention`.
+- Source kinds: `controlled_real`, `public_replay`, `open_world_real`.
+- Row statuses: `pass`, `fail`, `blocked`.
+- Non-blocked identity rows require `idf1`, `fragmentation_rate`,
+  `swap_rate` and `identity_collapse`.
+- Non-blocked prediction rows require `state_ade`, `history_ade` and
+  `prediction_gap_vs_history_model`.
+- Non-blocked intervention rows require `action_conditioned_ade`,
+  `counterfactual_outcome_accuracy` and `wrong_direction_rate`.
+- Summary reports `controlled_real_identity_collapse`,
+  `controlled_real_fragmentation_rate`, `controlled_real_swap_rate`,
+  `short_horizon_prediction_gap_vs_history_model`,
+  `intervention_counterfactual_outcome_accuracy` and separated
+  `pass_rows` / `fail_rows` / `blocked_rows`.
+- `open_world_real` rows cannot be marked `pass`; this prevents open-world
+  failures from being promoted as candidate evidence.
+- Current scope is the row contract / evaluator. It does not collect a real
+  tabletop dataset, train a dynamics model, implement memory / replay, use
+  diffusion, touch renderer loss, mutate viewer defaults or submit generated
+  outputs.
+
 ## 7. Non-Goals
 
 This spec does not authorize:
