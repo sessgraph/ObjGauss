@@ -741,6 +741,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_eval",
         "read_objectstate_controlled_identity_predictions",
     ),
+    "read_trainable_kernel_identity_source": (
+        "objgauss.core.objectstate_identity_prediction_adapter",
+        "read_trainable_kernel_identity_source",
+    ),
+    "objectstate_identity_predictions_from_trainable_artifact": (
+        "objgauss.core.objectstate_identity_prediction_adapter",
+        "objectstate_identity_predictions_from_trainable_artifact",
+    ),
     "validate_objectstate_controlled_capture_manifest": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_manifest",

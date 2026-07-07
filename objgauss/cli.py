@@ -150,6 +150,10 @@ from objgauss.core.objectstate_controlled_identity_eval import (
     evaluate_objectstate_controlled_identity_predictions,
     read_objectstate_controlled_identity_predictions,
 )
+from objgauss.core.objectstate_identity_prediction_adapter import (
+    objectstate_identity_predictions_from_trainable_artifact,
+    read_trainable_kernel_identity_source,
+)
 from objgauss.core.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
     read_objectstate_controlled_real_manifest,
@@ -3094,6 +3098,32 @@ def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
         raise ValueError("controlled identity eval did not pass")
 
 
+def _object_state_export_identity_predictions(args: argparse.Namespace) -> None:
+    capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
+    artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
+    artifact_refs = (
+        tuple(args.artifact_refs)
+        if args.artifact_refs
+        else (str(args.trainable_artifact),)
+    )
+    predictions = objectstate_identity_predictions_from_trainable_artifact(
+        capture,
+        artifact,
+        candidate_id=args.candidate_id,
+        source=args.source,
+        artifact_refs=artifact_refs,
+        max_centroid_distance=args.max_centroid_distance,
+    )
+    write_json(args.output, predictions)
+    print(f"schema={predictions['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"trainable_artifact={args.trainable_artifact}")
+    print(f"sample_id={predictions['sample_id']}")
+    print(f"candidate_id={predictions['candidate']['candidate_id']}")
+    print(f"prediction_count={len(predictions['predictions'])}")
+    print(f"output={args.output}")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -3285,6 +3315,34 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_controlled_identity.add_argument("--allow-identity-collapse", action="store_true")
     eval_controlled_identity.add_argument("--require-pass", action="store_true")
     eval_controlled_identity.set_defaults(handler=_object_state_eval_controlled_identity)
+    export_identity_predictions = object_state_subparsers.add_parser(
+        "export-identity-predictions",
+        help=(
+            "convert trainable kernel ObjectState frames into controlled identity "
+            "prediction rows"
+        ),
+    )
+    export_identity_predictions.add_argument("capture_manifest", type=Path)
+    export_identity_predictions.add_argument("trainable_artifact", type=Path)
+    export_identity_predictions.add_argument("--output", "-o", required=True, type=Path)
+    export_identity_predictions.add_argument("--candidate-id")
+    export_identity_predictions.add_argument(
+        "--source",
+        default="trainable_kernel_objectstate_nearest_pose_adapter",
+    )
+    export_identity_predictions.add_argument(
+        "--artifact-ref",
+        action="append",
+        dest="artifact_refs",
+        help=(
+            "candidate artifact reference to store in predictions; defaults to the "
+            "trainable artifact path"
+        ),
+    )
+    export_identity_predictions.add_argument("--max-centroid-distance", type=float)
+    export_identity_predictions.set_defaults(
+        handler=_object_state_export_identity_predictions
+    )
 
     object_field = subparsers.add_parser(
         "object-field",

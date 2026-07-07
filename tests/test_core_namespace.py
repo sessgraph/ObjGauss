@@ -190,6 +190,7 @@ from objgauss.core import (
     objectstate_controlled_capture_summary,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
+    objectstate_identity_predictions_from_trainable_artifact,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
     object_state_stability_report,
@@ -206,6 +207,7 @@ from objgauss.core import (
     project_object_states,
     project_object_states_from_field,
     read_ply,
+    read_trainable_kernel_identity_source,
     real_sample_v2_diagnostics_from_cloud,
     real_sample_v2_full_cloud_purity_from_cloud,
     real_sample_v2_model_handoff_from_cloud,
@@ -821,6 +823,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert identity_summary["controlled_real_manifest"]["evidence_rows"][0][
         "status"
     ] == "pass"
+    assert objectstate_identity_predictions_from_trainable_artifact is not None
+    assert read_trainable_kernel_identity_source is not None
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"
