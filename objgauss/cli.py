@@ -3177,6 +3177,11 @@ def _object_state_export_identity_predictions(args: argparse.Namespace) -> None:
 def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
     artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
+    capture_root = (
+        args.capture_root
+        if args.capture_root is not None
+        else args.capture_manifest.parent
+    )
     artifact_refs = (
         tuple(args.artifact_refs)
         if args.artifact_refs
@@ -3197,15 +3202,27 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         ),
         synthetic_smoke_passed=not args.synthetic_smoke_failed,
         min_real_or_public_rows=args.min_real_or_public_rows,
+        capture_root=capture_root,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        hash_files=args.hash_files,
     )
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    capture_file_audit_path = output_dir / "capture-file-audit.json"
+    capture_missing_files_path = output_dir / "capture-missing-files.md"
     predictions_path = output_dir / "identity-predictions.json"
     identity_eval_path = output_dir / "identity-eval-summary.json"
     controlled_real_path = output_dir / "controlled-real.json"
     controlled_real_summary_path = output_dir / "controlled-real-summary.json"
     blocked_rows_path = output_dir / "blocked-rows.md"
     handoff_path = output_dir / "handoff-summary.json"
+    write_json(capture_file_audit_path, summary["capture_file_audit"])
+    capture_missing_files_path.write_text(
+        summary["capture_file_audit"]["missing_files_markdown"],
+        encoding="utf-8",
+    )
     write_json(predictions_path, summary["identity_predictions"])
     write_json(identity_eval_path, summary["identity_eval"])
     write_json(controlled_real_path, summary["controlled_real_manifest"])
@@ -3219,17 +3236,21 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     gate = summary["controlled_real_summary"]["gate"]
     print(f"schema={summary['schema']}")
     print(f"capture={args.capture_manifest}")
+    print(f"capture_root={capture_root}")
     print(f"trainable_artifact={args.trainable_artifact}")
     print(f"output_dir={output_dir}")
     print(f"sample_id={summary['sample']['sample_id']}")
     print(f"candidate_id={summary['candidate']['candidate_id']}")
     print(f"handoff_status={summary['status']}")
+    print(f"capture_file_audit_status={summary['capture_file_audit']['status']}")
     print(f"identity_eval_status={summary['identity_eval']['status']}")
     print(f"identity_gate_status={gate['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
     print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
     print(f"swap_rate={metrics['swap_rate']:.6f}")
     print(f"blocked_rows={summary['controlled_real_summary']['blocked_row_count']}")
+    print(f"capture_file_audit={capture_file_audit_path}")
+    print(f"capture_missing_files={capture_missing_files_path}")
     print(f"predictions={predictions_path}")
     print(f"identity_eval={identity_eval_path}")
     print(f"controlled_real_manifest={controlled_real_path}")
@@ -3512,6 +3533,11 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_handoff.add_argument("capture_manifest", type=Path)
     controlled_identity_handoff.add_argument("trainable_artifact", type=Path)
     controlled_identity_handoff.add_argument("--output-dir", required=True, type=Path)
+    controlled_identity_handoff.add_argument(
+        "--capture-root",
+        type=Path,
+        help="root for relative capture frame refs; defaults to the manifest directory",
+    )
     controlled_identity_handoff.add_argument("--candidate-id")
     controlled_identity_handoff.add_argument(
         "--source",
@@ -3531,6 +3557,28 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_handoff.add_argument("--max-fragmentation-rate", type=float, default=0.05)
     controlled_identity_handoff.add_argument("--max-swap-rate", type=float, default=0.0)
     controlled_identity_handoff.add_argument("--allow-identity-collapse", action="store_true")
+    controlled_identity_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample.artifact_refs paths to exist before handoff pass",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame RGB file",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame Gaussian file",
+    )
+    controlled_identity_handoff.add_argument(
+        "--hash-files",
+        action="store_true",
+        help="include SHA256 hashes for valid frame RGB/Gaussian files",
+    )
     controlled_identity_handoff.add_argument(
         "--synthetic-smoke-failed",
         action="store_true",

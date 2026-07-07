@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from objgauss.core.objectstate_controlled_capture_files import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
+    objectstate_controlled_capture_file_audit,
+    validate_objectstate_controlled_capture_file_audit_summary,
+)
 from objgauss.core.objectstate_controlled_identity_eval import (
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
@@ -38,7 +44,21 @@ def objectstate_controlled_identity_handoff(
     identity_thresholds: ObjectStateControlledIdentityThresholds | None = None,
     synthetic_smoke_passed: bool = True,
     min_real_or_public_rows: int = 1,
+    capture_root: str | Path = ".",
+    check_artifact_refs: bool = False,
+    min_rgb_bytes: int = 1,
+    min_gaussian_bytes: int = 1,
+    hash_files: bool = False,
 ) -> dict[str, Any]:
+    capture_file_audit = objectstate_controlled_capture_file_audit(
+        capture_manifest,
+        root=capture_root,
+        require_gaussian_files=True,
+        check_artifact_refs=check_artifact_refs,
+        min_rgb_bytes=min_rgb_bytes,
+        min_gaussian_bytes=min_gaussian_bytes,
+        hash_files=hash_files,
+    )
     predictions = objectstate_identity_predictions_from_trainable_artifact(
         capture_manifest,
         model_artifact,
@@ -65,7 +85,9 @@ def objectstate_controlled_identity_handoff(
         ),
     )
     passed = (
-        identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
+        capture_file_audit["status"]
+        == "objectstate_controlled_capture_file_audit_pass"
+        and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
     )
     payload = {
@@ -77,11 +99,13 @@ def objectstate_controlled_identity_handoff(
             else "objectstate_controlled_identity_handoff_fail"
         ),
         "prediction_schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
+        "capture_file_audit_schema": OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
         "identity_eval_schema": OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
         "controlled_real_manifest_schema": OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
         "controlled_real_rows_schema": OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
         "sample": dict(identity_eval["sample"]),
         "candidate": dict(identity_eval["candidate"]),
+        "capture_file_audit": capture_file_audit,
         "identity_predictions": predictions,
         "identity_eval": identity_eval,
         "controlled_real_manifest": controlled_real_manifest,
@@ -91,10 +115,12 @@ def objectstate_controlled_identity_handoff(
             "writes_identity_eval": True,
             "writes_controlled_real_manifest": True,
             "writes_identity_only_gate_summary": True,
+            "requires_capture_file_audit_pass": True,
             "prediction_and_intervention_rows_remain_visible": True,
         },
         "claim_policy": {
             "capture_ground_truth_required": True,
+            "capture_bundle_file_audit_required": True,
             "candidate_artifact_required": True,
             "identity_only_stage1_gate": True,
             "does_not_claim_prediction_or_intervention": True,
@@ -133,6 +159,10 @@ def validate_objectstate_controlled_identity_handoff_summary(
         raise ValueError("controlled identity handoff status is unsupported")
     if payload.get("prediction_schema") != OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA:
         raise ValueError("controlled identity handoff has unsupported prediction_schema")
+    if payload.get("capture_file_audit_schema") != OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA:
+        raise ValueError(
+            "controlled identity handoff has unsupported capture_file_audit_schema"
+        )
     if payload.get("identity_eval_schema") != OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA:
         raise ValueError("controlled identity handoff has unsupported identity_eval_schema")
     if payload.get("controlled_real_manifest_schema") != OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA:
@@ -140,6 +170,9 @@ def validate_objectstate_controlled_identity_handoff_summary(
     if payload.get("controlled_real_rows_schema") != OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA:
         raise ValueError("controlled identity handoff has unsupported controlled_real_rows_schema")
 
+    capture_file_audit = validate_objectstate_controlled_capture_file_audit_summary(
+        payload.get("capture_file_audit")
+    )
     predictions = validate_objectstate_controlled_identity_predictions(
         payload.get("identity_predictions")
     )
@@ -152,6 +185,8 @@ def validate_objectstate_controlled_identity_handoff_summary(
     controlled_real_summary = validate_objectstate_controlled_real_rows_summary(
         payload.get("controlled_real_summary")
     )
+    if capture_file_audit["sample"]["sample_id"] != identity_eval["sample"]["sample_id"]:
+        raise ValueError("controlled identity handoff file audit sample mismatch")
     if predictions["sample_id"] != identity_eval["sample"]["sample_id"]:
         raise ValueError("controlled identity handoff sample ids must match")
     if identity_eval["controlled_real_manifest"] != controlled_real_manifest:
@@ -165,7 +200,9 @@ def validate_objectstate_controlled_identity_handoff_summary(
         raise ValueError("controlled identity handoff must not require intervention pass rows")
     expected_status = (
         "objectstate_controlled_identity_handoff_pass"
-        if identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
+        if capture_file_audit["status"]
+        == "objectstate_controlled_capture_file_audit_pass"
+        and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
         else "objectstate_controlled_identity_handoff_fail"
     )
@@ -177,12 +214,14 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or not handoff_contract.get("writes_identity_eval")
         or not handoff_contract.get("writes_controlled_real_manifest")
         or not handoff_contract.get("writes_identity_only_gate_summary")
+        or not handoff_contract.get("requires_capture_file_audit_pass")
         or not handoff_contract.get("prediction_and_intervention_rows_remain_visible")
     ):
         raise ValueError("controlled identity handoff contract is incomplete")
     claim_policy = payload.get("claim_policy", {})
     if (
         not claim_policy.get("capture_ground_truth_required")
+        or not claim_policy.get("capture_bundle_file_audit_required")
         or not claim_policy.get("candidate_artifact_required")
         or not claim_policy.get("identity_only_stage1_gate")
         or not claim_policy.get("does_not_claim_world_model")
