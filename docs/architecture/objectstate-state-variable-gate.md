@@ -788,6 +788,8 @@ Implemented v0.2 facts:
   manifest plus trainable kernel ObjectState artifact and produces:
   - `capture_file_audit` using
     `objgauss-objectstate-controlled-capture-file-audit-v1`;
+  - `candidate_artifact_file_audit` using
+    `objgauss-objectstate-controlled-candidate-artifact-file-audit-v1`;
   - `identity_predictions` using
     `objgauss-objectstate-controlled-identity-predictions-v1`;
   - `identity_eval` using
@@ -800,22 +802,28 @@ Implemented v0.2 facts:
   `require_identity_pass_row=true`,
   `require_prediction_pass_row=false`,
   `require_intervention_pass_row=false`.
-- The handoff pass condition requires the capture file audit to pass before
-  identity metrics and the identity-only reality gate can make the handoff pass.
+- The handoff pass condition requires both the capture file audit and candidate
+  artifact file audit to pass before identity metrics and the identity-only
+  reality gate can make the handoff pass.
 - Frame-level RGB / Gaussian refs are checked as non-empty regular files by
   default, and optional SHA256 hashes can be included for audit evidence.
+- The candidate trainable ObjectState artifact is also checked as a non-empty
+  regular local file, with optional SHA256 hash evidence.
 - Prediction and intervention rows remain visible as blocked rows in the
   controlled-real summary; they are not hidden or promoted.
 - CLI command:
   `objgauss object-state controlled-identity-handoff <capture> <objectstates> --output-dir <dir>`.
 - CLI writes:
   `capture-file-audit.json`, `capture-missing-files.md`,
+  `candidate-artifact-file-audit.json`,
   `identity-predictions.json`, `identity-eval-summary.json`,
   `controlled-real.json`, `controlled-real-summary.json`, `blocked-rows.md`
   and `handoff-summary.json`.
 - CLI defaults `--capture-root` to the manifest directory and supports
   `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files` and
   `--check-artifact-refs`.
+- CLI also supports `--min-candidate-artifact-bytes` and
+  `--hash-candidate-artifact`.
 
 Current scope remains reproducible handoff only. It does not collect capture
 data, create GT, parse image pixels, train Gaussian or dynamics models, compute

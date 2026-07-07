@@ -297,6 +297,14 @@ identity eval 和 identity-only reality gate 三者都通过。CLI 默认用 cap
 获得 identity handoff pass；当前仍没有实际 controlled real capture / true candidate
 artifact 作为通过证据。完成 commit: `2690196`。
 
+随后继续补强 `controlled-identity-handoff` 的 candidate 侧证据：handoff 现在会对本地
+trainable ObjectState artifact 文件执行 `candidate_artifact_file_audit`，要求它是非空
+regular file，且可用 `--hash-candidate-artifact` 写 SHA256。CLI 额外写出
+`candidate-artifact-file-audit.json`，并支持 `--min-candidate-artifact-bytes`。
+handoff pass 现在同时要求 capture file audit、candidate artifact file audit、
+identity eval 和 identity-only reality gate 全部通过；这一步仍不训练新模型、不创建
+GT、不写 `public/samples`。完成 commit: `f8b37e4`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
