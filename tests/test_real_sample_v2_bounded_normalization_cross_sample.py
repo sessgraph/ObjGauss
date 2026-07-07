@@ -28,6 +28,12 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
                 sample_source="public/samples/polyhaven_chair_demo_objects.ply",
                 viewer_path="/samples/objgauss-real-sample-v2-sample-aware-polyhaven.ply",
             ),
+            RealSampleV2BoundedNormalizationCrossSampleInput(
+                sample_id="nike",
+                cloud=read_ply("public/samples/nike_objects.ply"),
+                sample_source="public/samples/nike_objects.ply",
+                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-nike.ply",
+            ),
         ),
         min_samples=2,
         max_points=128,
@@ -44,7 +50,7 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
     assert isinstance(report, RealSampleV2BoundedNormalizationCrossSampleReport)
     assert summary["schema"] == REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA
     assert summary["status"] == "real_sample_v2_bounded_normalization_cross_sample_pass"
-    assert summary["sample_count"] == 2
+    assert summary["sample_count"] == 3
     assert summary["policy"]["uses_target_labels_for_prediction"] is False
     assert summary["policy"]["uses_target_labels_for_gate"] is True
 
@@ -53,17 +59,17 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
     assert aggregate["enough_samples"] is True
     assert aggregate["all_sample_policies_pass"] is True
     assert aggregate["selected_policy_counts"] == {
-        "bounded-normalized": 1,
+        "baseline": 2,
         "promoted": 1,
     }
     assert aggregate["evidence_normalization_status_counts"] == {
         "not_required_for_selected_policy": 1,
-        "satisfied_by_bounded_normalization": 1,
+        "required_before_global_weight_promotion": 2,
     }
     assert aggregate["selected_hard_regression_count"] == 0
     assert aggregate["selected_hard_regression_samples"] == []
-    assert aggregate["blocked_promoted_sample_count"] == 1
-    assert aggregate["blocked_promoted_samples"] == ["polyhaven"]
+    assert aggregate["blocked_promoted_sample_count"] == 2
+    assert aggregate["blocked_promoted_samples"] == ["polyhaven", "nike"]
 
     rows = {row["sample_id"]: row for row in summary["rows"]}
     lego = rows["lego"]
@@ -76,13 +82,31 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
 
     polyhaven = rows["polyhaven"]
     assert polyhaven["source"]["source_gaussians"] == 50000
-    assert polyhaven["selected_policy"]["candidate_name"] == "bounded-normalized"
+    assert polyhaven["selected_policy"]["candidate_name"] == "baseline"
     assert polyhaven["selected_metrics"]["mixed_gaussians"] == 3840
     assert polyhaven["selected_changed_gaussians"]["hard_regression_count"] == 0
     assert polyhaven["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert polyhaven["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
     assert polyhaven["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 1814
-    assert polyhaven["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is True
-    assert polyhaven["evidence_normalization_status"] == "satisfied_by_bounded_normalization"
+    assert polyhaven["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert polyhaven["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
+        "bounded_evidence_normalization_noop_baseline_fallback"
+    )
+    assert polyhaven["evidence_normalization_status"] == "required_before_global_weight_promotion"
+
+    nike = rows["nike"]
+    assert nike["source"]["source_gaussians"] == 270491
+    assert nike["selected_policy"]["candidate_name"] == "baseline"
+    assert nike["selected_metrics"]["mixed_gaussians"] == 16721
+    assert nike["selected_changed_gaussians"]["hard_regression_count"] == 0
+    assert nike["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert nike["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
+    assert nike["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 6671
+    assert nike["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert nike["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
+        "bounded_evidence_normalization_noop_baseline_fallback"
+    )
+    assert nike["evidence_normalization_status"] == "required_before_global_weight_promotion"
 
     assert summary["recommendation"]["decision"] == (
         "sample_aware_bounded_normalization_cross_sample_pass"
@@ -104,10 +128,13 @@ def test_bounded_normalization_cross_sample_cli_writes_summary(tmp_path):
             "real-sample-v2-bounded-normalization-cross-sample",
             "public/samples/lego_alpha_v1_objects.ply",
             "public/samples/polyhaven_chair_demo_objects.ply",
+            "public/samples/nike_objects.ply",
             "--sample-id",
             "lego",
             "--sample-id",
             "polyhaven",
+            "--sample-id",
+            "nike",
             "--summary-output",
             str(summary_path),
             "--require-pass",
@@ -118,9 +145,9 @@ def test_bounded_normalization_cross_sample_cli_writes_summary(tmp_path):
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["status"] == "real_sample_v2_bounded_normalization_cross_sample_pass"
     assert summary["aggregate"]["selected_policy_counts"] == {
-        "bounded-normalized": 1,
+        "baseline": 2,
         "promoted": 1,
     }
     assert summary["aggregate"]["selected_hard_regression_count"] == 0
-    assert summary["aggregate"]["blocked_promoted_samples"] == ["polyhaven"]
-    assert [row["sample_id"] for row in summary["rows"]] == ["lego", "polyhaven"]
+    assert summary["aggregate"]["blocked_promoted_samples"] == ["polyhaven", "nike"]
+    assert [row["sample_id"] for row in summary["rows"]] == ["lego", "polyhaven", "nike"]

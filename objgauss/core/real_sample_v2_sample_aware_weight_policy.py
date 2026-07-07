@@ -454,15 +454,19 @@ def _candidate_records(candidates: tuple[_WeightCandidate, ...]) -> list[dict[st
             changed=changed,
             is_baseline=index == 0,
         )
-        if candidate.normalization and gate["eligible_for_sample"]:
-            gate = {
-                **gate,
-                "decision": (
-                    "bounded_evidence_normalization_safe_fallback"
-                    if float(candidate.normalization["feature_weight_blend"]) == 0.0
-                    else "bounded_evidence_normalization_non_regression"
-                ),
-            }
+        if candidate.normalization:
+            blend = float(candidate.normalization["feature_weight_blend"])
+            if blend == 0.0:
+                gate = {
+                    **gate,
+                    "eligible_for_sample": False,
+                    "decision": "bounded_evidence_normalization_noop_baseline_fallback",
+                }
+            elif gate["eligible_for_sample"]:
+                gate = {
+                    **gate,
+                    "decision": "bounded_evidence_normalization_non_regression",
+                }
         record = {
             "candidate": {
                 "name": candidate.name,
@@ -496,10 +500,12 @@ def _sample_policy_gate(
         eligible = status_pass and quality_pass
         decision = "baseline_safe_fallback" if eligible else "baseline_unavailable"
     else:
+        hard_regression_free = int(changed["hard_regression_count"]) == 0
         eligible = (
             baseline["status"] == "real_sample_v2_viewer_preview_pass"
             and status_pass
             and quality_pass
+            and hard_regression_free
             and int(delta["mixed_gaussians_delta"]) <= 0
             and float(delta["direct_slot_match_delta"]) >= 0.0
             and int(delta["predicted_object_count_delta"]) == 0
@@ -518,6 +524,7 @@ def _sample_policy_gate(
         "decision": decision,
         "hard_mixed_gaussians_non_regression": int(delta["mixed_gaussians_delta"]) <= 0,
         "direct_slot_match_non_regression": float(delta["direct_slot_match_delta"]) >= 0.0,
+        "hard_regression_free": int(changed["hard_regression_count"]) == 0,
         "soft_purity_non_regression": (
             delta["object_purity_delta"] is None
             or float(delta["object_purity_delta"]) >= 0.0
@@ -573,7 +580,7 @@ def _evidence_normalization_gate(records: list[dict[str, Any]]) -> dict[str, Any
         hard_regressed = (
             int(delta["mixed_gaussians_delta"]) > 0
             or float(delta["direct_slot_match_delta"]) < 0.0
-            or int(gate["hard_regression_count"]) > int(gate["hard_fix_count"])
+            or int(gate["hard_regression_count"]) > 0
         )
         if soft_improved and hard_regressed and not gate["eligible_for_sample"]:
             blocked_soft_sharpening.append(record["candidate"]["name"])

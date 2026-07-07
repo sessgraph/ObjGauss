@@ -802,6 +802,25 @@ camera / dynamic-K，不引入 diffusion / rollout / replay buffer，不导出�
 `uv run --extra dev pytest` 261 passed，`npm run build` passed（保留既有 Vite chunk
 size warning），`git diff --check` passed。
 
+随后完成 `REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002`：cross-sample 表从 Lego +
+Polyhaven 扩展到 Lego + Polyhaven + Nike 三行，并收紧 sample-aware candidate gate。非
+baseline 候选现在必须满足 `hard_regression_count == 0` 才能 eligible，candidate gate
+新增 `hard_regression_free`；`feature_weight_blend=0` / `position_weight_blend=0` 的
+`bounded-normalized` 不再 eligible，因为它与 baseline 等价，不能算 evidence
+normalization 已满足；`evidence_normalization_gate` 也把任意 hard regression 视为 soft
+sharpening blocker，不再只在 `hard_regression > hard_fix` 时阻断全局 promotion。
+3-row pass 表通过：Lego selected `promoted`；Polyhaven selected `baseline`；Nike selected
+`baseline`，`source_gaussians=270491`、selected `mixed_gaussians=16721`、selected
+`hard_regression=0`，promoted candidate 被阻断并记录 `hard_regression=6671`。Aggregate 结果为
+`selected_policy_counts={"baseline":2,"promoted":1}`、
+`selected_hard_regression_count=0`、`blocked_promoted_samples=["polyhaven","nike"]`。
+Plush KMeans 作为 blocked negative evidence：旧 gate 会选择 promoted，但其
+`hard_regression=2746`；strict gate 后该样例没有安全 selected policy，CLI 返回
+`no sample-aware candidate passed the gate`，不进入 pass 表。结论仍是继续 sample-aware
+policy + 增加样例行，不把单一 promoted weight 设为全局默认。验证通过：targeted pytest
+15 passed，`uv run --extra dev pytest` 262 passed，`npm run build` passed（保留既有
+Vite chunk size warning），`git diff --check` passed。
+
 随后完成 `MODEL-CATALOG-LATEST-SLOT-ORDER-001`：viewer catalog 新增
 `displaySlot`、`displayOrder` 和 `updatedAt` 规则，把同一模型定位下的候选按最新在前
 排序。当前 `real-sample-v2-sample-aware-lego` 与 `lego-alpha` 同属
@@ -3184,10 +3203,10 @@ npm run acceptance:demo
    checkpoint roundtrip 和 renderer-loss-contract evidence。当前 public sample 已跑到
    可训练、可验证、可 3D 查看对象分割效果阶段；`feature_weight=2.0` 的 weak-boundary
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
-   且 bounded sample-aware gate 已让 Lego 选择 promoted、Polyhaven 选择
-   bounded-normalized 并避免 selected hard regression。下一步若继续算法质量，
-   应扩大更多小型 real / public sample 复验；不要直接跳到 rollout、replay buffer、
-   diffusion 或 geometry / camera unfreeze。
+   最新 strict sample-aware gate 已让 3-row 表中 Lego 选择 promoted、Polyhaven / Nike 回退
+   baseline，并避免 selected hard regression；Plush KMeans 暴露为无安全候选的负证据。
+   下一步若继续算法质量，应扩大更多小型 real / public sample 复验；不要直接跳到 rollout、
+   replay buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

@@ -23,6 +23,17 @@
 
 ## Closed
 
+### ACTION-025: 增加 bounded normalization cross-sample 行并收紧 hard regression gate
+
+- 完成 commit: 本提交
+- 结果: 3-row cross-sample pass 表现在覆盖 Lego、Polyhaven 和 Nike。Nike 回退到
+  `baseline`，selected `hard_regression=0`，promoted candidate 记录
+  `hard_regression=6671` 并被阻断。同步收紧 sample-aware 非 baseline candidate gate：
+  `hard_regression_count` 必须为 `0` 才能 eligible；`feature_weight_blend=0` 的
+  `bounded-normalized` 不再 eligible，因为它与 baseline 等价，不能算 evidence
+  normalization 已满足。Plush KMeans 暴露为 blocked negative evidence：promoted 旧逻辑会带来
+  `hard_regression=2746`，strict gate 后没有安全 selected policy，因此不进入 pass 表。
+
 ### ACTION-024: 扩展 bounded normalization cross-sample 复验
 
 - 完成 commit: 本提交
