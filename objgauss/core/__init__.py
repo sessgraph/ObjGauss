@@ -166,6 +166,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_controlled_identity_handoff",
+        "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA",

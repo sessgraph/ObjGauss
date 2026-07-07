@@ -16,15 +16,19 @@ from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCH
 
 def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
     _write_capture_bundle_files(tmp_path)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
 
     summary = objectstate_controlled_identity_handoff(
         _capture_manifest(),
-        _trainable_artifact(),
+        artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=("outputs/controlled-real/cup-box/objectstates.json",),
         max_centroid_distance=0.05,
         capture_root=tmp_path,
         hash_files=True,
+        candidate_artifact_path=artifact_path,
+        hash_candidate_artifact=True,
     )
 
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA
@@ -33,7 +37,12 @@ def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
         summary["capture_file_audit"]["status"]
         == "objectstate_controlled_capture_file_audit_pass"
     )
+    assert (
+        summary["candidate_artifact_file_audit"]["status"]
+        == "objectstate_controlled_candidate_artifact_file_audit_pass"
+    )
     assert len(summary["capture_file_audit"]["file_records"]["rgb"][0]["sha256"]) == 64
+    assert len(summary["candidate_artifact_file_audit"]["file_record"]["sha256"]) == 64
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["controlled_real_manifest"]["evidence_rows"][0]["status"] == "pass"
     assert summary["controlled_real_manifest"]["evidence_rows"][1]["status"] == "blocked"
@@ -47,18 +56,25 @@ def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
 
 def test_controlled_identity_handoff_surfaces_failed_identity_gate(tmp_path):
     _write_capture_bundle_files(tmp_path)
+    artifact = _trainable_artifact(slot_ids_by_frame=((0, 1), (1, 0), (1, 0)))
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
 
     summary = objectstate_controlled_identity_handoff(
         _capture_manifest(),
-        _trainable_artifact(slot_ids_by_frame=((0, 1), (1, 0), (1, 0))),
+        artifact,
         candidate_id="fragmented-objectstate-slots",
         capture_root=tmp_path,
+        candidate_artifact_path=artifact_path,
     )
 
     assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
     assert (
         summary["capture_file_audit"]["status"]
         == "objectstate_controlled_capture_file_audit_pass"
+    )
+    assert (
+        summary["candidate_artifact_file_audit"]["status"]
+        == "objectstate_controlled_candidate_artifact_file_audit_pass"
     )
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_fail"
     assert summary["controlled_real_manifest"]["evidence_rows"][0]["status"] == "fail"
@@ -67,11 +83,15 @@ def test_controlled_identity_handoff_surfaces_failed_identity_gate(tmp_path):
 
 
 def test_controlled_identity_handoff_requires_capture_file_audit_pass(tmp_path):
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+
     summary = objectstate_controlled_identity_handoff(
         _capture_manifest(),
-        _trainable_artifact(),
+        artifact,
         candidate_id="stable-objectstate-slots",
         capture_root=tmp_path,
+        candidate_artifact_path=artifact_path,
     )
 
     assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
@@ -80,7 +100,40 @@ def test_controlled_identity_handoff_requires_capture_file_audit_pass(tmp_path):
         summary["capture_file_audit"]["status"]
         == "objectstate_controlled_capture_file_audit_fail"
     )
+    assert (
+        summary["candidate_artifact_file_audit"]["status"]
+        == "objectstate_controlled_candidate_artifact_file_audit_pass"
+    )
     assert summary["capture_file_audit"]["missing_files"]
+    assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
+
+
+def test_controlled_identity_handoff_requires_candidate_artifact_file_audit_pass(
+    tmp_path,
+):
+    _write_capture_bundle_files(tmp_path)
+
+    summary = objectstate_controlled_identity_handoff(
+        _capture_manifest(),
+        _trainable_artifact(),
+        candidate_id="stable-objectstate-slots",
+        capture_root=tmp_path,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
+    assert (
+        summary["capture_file_audit"]["status"]
+        == "objectstate_controlled_capture_file_audit_pass"
+    )
+    assert (
+        summary["candidate_artifact_file_audit"]["status"]
+        == "objectstate_controlled_candidate_artifact_file_audit_fail"
+    )
+    assert (
+        summary["candidate_artifact_file_audit"]["file_record"]["missing_reason"]
+        == "candidate artifact path not provided"
+    )
+    assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
 
 
@@ -106,6 +159,7 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
                 "--max-centroid-distance",
                 "0.05",
                 "--hash-files",
+                "--hash-candidate-artifact",
                 "--require-pass",
             ]
         )
@@ -116,6 +170,11 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
     handoff = json.loads((output_dir / "handoff-summary.json").read_text(encoding="utf-8"))
     capture_file_audit = json.loads(
         (output_dir / "capture-file-audit.json").read_text(encoding="utf-8")
+    )
+    candidate_artifact_file_audit = json.loads(
+        (output_dir / "candidate-artifact-file-audit.json").read_text(
+            encoding="utf-8"
+        )
     )
     capture_missing = (output_dir / "capture-missing-files.md").read_text(
         encoding="utf-8"
@@ -132,9 +191,19 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
         "capture_file_audit_status=objectstate_controlled_capture_file_audit_pass"
         in stdout
     )
+    assert (
+        "candidate_artifact_file_audit_status="
+        "objectstate_controlled_candidate_artifact_file_audit_pass"
+        in stdout
+    )
     assert "identity_gate_status=objectstate_reality_gate_pass" in stdout
     assert capture_file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert (
+        candidate_artifact_file_audit["status"]
+        == "objectstate_controlled_candidate_artifact_file_audit_pass"
+    )
     assert len(capture_file_audit["file_records"]["rgb"][0]["sha256"]) == 64
+    assert len(candidate_artifact_file_audit["file_record"]["sha256"]) == 64
     assert "no missing files" in capture_missing
     assert predictions["candidate"]["candidate_id"] == "cli-objectstate-slots"
     assert identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
@@ -143,6 +212,7 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
     assert "prediction" in blocked_rows
     assert handoff["status"] == "objectstate_controlled_identity_handoff_pass"
     assert handoff["capture_file_audit"] == capture_file_audit
+    assert handoff["candidate_artifact_file_audit"] == candidate_artifact_file_audit
 
 
 def _capture_manifest():
@@ -210,6 +280,12 @@ def _write_capture_bundle_files(root) -> None:
             f"ply-{frame_index}",
             encoding="utf-8",
         )
+
+
+def _write_candidate_artifact_file(root, artifact):
+    path = root / "objectstates.json"
+    path.write_text(json.dumps(artifact), encoding="utf-8")
+    return path
 
 
 def _trainable_artifact(
