@@ -134,7 +134,7 @@ full `audit:world-viewer` 的旧等待条件。
   - Controlled real action rows、relation change、hide / reveal 和 learned dynamics 仍是后续工作。
 - 验证:
   - `uv run --extra dev pytest tests/test_objectstate_causal_gate.py tests/test_core_namespace.py -q`: passed。
-- 完成 commit: 本提交。
+- 完成 commit: `3ef591f`。
 
 ### OBJECTSTATE-PREDICTIVE-GATE-001: Add synthetic predictive sufficiency smoke gate
 
