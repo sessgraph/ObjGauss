@@ -80,6 +80,10 @@ def objectstate_controlled_identity_handoff(
         artifact_refs=artifact_refs,
         max_centroid_distance=max_centroid_distance,
     )
+    candidate_artifact_ref_match = _candidate_artifact_ref_match(
+        candidate_artifact_file_audit,
+        predictions,
+    )
     identity_eval = evaluate_objectstate_controlled_identity_predictions(
         capture_manifest,
         predictions,
@@ -102,6 +106,7 @@ def objectstate_controlled_identity_handoff(
         == "objectstate_controlled_capture_file_audit_pass"
         and candidate_artifact_file_audit["status"]
         == "objectstate_controlled_candidate_artifact_file_audit_pass"
+        and candidate_artifact_ref_match["matches"]
         and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
     )
@@ -125,6 +130,7 @@ def objectstate_controlled_identity_handoff(
         "candidate": dict(identity_eval["candidate"]),
         "capture_file_audit": capture_file_audit,
         "candidate_artifact_file_audit": candidate_artifact_file_audit,
+        "candidate_artifact_ref_match": candidate_artifact_ref_match,
         "identity_predictions": predictions,
         "identity_eval": identity_eval,
         "controlled_real_manifest": controlled_real_manifest,
@@ -136,6 +142,7 @@ def objectstate_controlled_identity_handoff(
             "writes_identity_only_gate_summary": True,
             "requires_capture_file_audit_pass": True,
             "requires_candidate_artifact_file_audit_pass": True,
+            "requires_candidate_artifact_ref_match": True,
             "prediction_and_intervention_rows_remain_visible": True,
         },
         "claim_policy": {
@@ -143,6 +150,7 @@ def objectstate_controlled_identity_handoff(
             "capture_bundle_file_audit_required": True,
             "candidate_artifact_required": True,
             "candidate_artifact_file_audit_required": True,
+            "candidate_artifact_ref_must_match_file_audit": True,
             "identity_only_stage1_gate": True,
             "does_not_claim_prediction_or_intervention": True,
             "does_not_claim_world_model": True,
@@ -205,6 +213,9 @@ def validate_objectstate_controlled_identity_handoff_summary(
     candidate_artifact_file_audit = _validate_candidate_artifact_file_audit(
         payload.get("candidate_artifact_file_audit")
     )
+    candidate_artifact_ref_match = _validate_candidate_artifact_ref_match(
+        payload.get("candidate_artifact_ref_match")
+    )
     predictions = validate_objectstate_controlled_identity_predictions(
         payload.get("identity_predictions")
     )
@@ -221,6 +232,14 @@ def validate_objectstate_controlled_identity_handoff_summary(
         raise ValueError("controlled identity handoff file audit sample mismatch")
     if predictions["sample_id"] != identity_eval["sample"]["sample_id"]:
         raise ValueError("controlled identity handoff sample ids must match")
+    expected_artifact_refs = list(predictions["candidate"]["artifact_refs"])
+    if candidate_artifact_ref_match["artifact_refs"] != expected_artifact_refs:
+        raise ValueError("controlled identity handoff candidate artifact refs mismatch")
+    if (
+        candidate_artifact_ref_match["audited_path"]
+        != candidate_artifact_file_audit["file_record"]["path"]
+    ):
+        raise ValueError("controlled identity handoff candidate audited path mismatch")
     if identity_eval["controlled_real_manifest"] != controlled_real_manifest:
         raise ValueError("controlled identity handoff manifest must come from identity eval")
     if controlled_real_summary["sample"]["sample_id"] != identity_eval["sample"]["sample_id"]:
@@ -236,6 +255,7 @@ def validate_objectstate_controlled_identity_handoff_summary(
         == "objectstate_controlled_capture_file_audit_pass"
         and candidate_artifact_file_audit["status"]
         == "objectstate_controlled_candidate_artifact_file_audit_pass"
+        and candidate_artifact_ref_match["matches"]
         and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
         else "objectstate_controlled_identity_handoff_fail"
@@ -250,6 +270,7 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or not handoff_contract.get("writes_identity_only_gate_summary")
         or not handoff_contract.get("requires_capture_file_audit_pass")
         or not handoff_contract.get("requires_candidate_artifact_file_audit_pass")
+        or not handoff_contract.get("requires_candidate_artifact_ref_match")
         or not handoff_contract.get("prediction_and_intervention_rows_remain_visible")
     ):
         raise ValueError("controlled identity handoff contract is incomplete")
@@ -259,6 +280,7 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or not claim_policy.get("capture_bundle_file_audit_required")
         or not claim_policy.get("candidate_artifact_required")
         or not claim_policy.get("candidate_artifact_file_audit_required")
+        or not claim_policy.get("candidate_artifact_ref_must_match_file_audit")
         or not claim_policy.get("identity_only_stage1_gate")
         or not claim_policy.get("does_not_claim_world_model")
     ):
@@ -276,6 +298,45 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or non_goals.get("mutates_viewer_defaults")
     ):
         raise ValueError("controlled identity handoff cannot claim capture, GT, tracking, training, replay, diffusion, or viewer mutation")
+    return payload
+
+
+def _candidate_artifact_ref_match(
+    candidate_artifact_file_audit: Mapping[str, Any],
+    predictions: Mapping[str, Any],
+) -> dict[str, Any]:
+    file_record = candidate_artifact_file_audit["file_record"]
+    audited_path = str(file_record.get("path", ""))
+    candidate = predictions.get("candidate", {})
+    refs = candidate.get("artifact_refs", ()) if isinstance(candidate, Mapping) else ()
+    artifact_refs = [str(ref) for ref in refs]
+    matches = bool(audited_path and audited_path in artifact_refs)
+    payload = {
+        "audited_path": audited_path,
+        "artifact_refs": artifact_refs,
+        "matches": matches,
+    }
+    if not matches:
+        payload["missing_reason"] = "audited candidate artifact path not in artifact_refs"
+    return _validate_candidate_artifact_ref_match(payload)
+
+
+def _validate_candidate_artifact_ref_match(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("candidate artifact ref match must be a dict")
+    if not isinstance(payload.get("audited_path"), str):
+        raise ValueError("candidate artifact ref match requires audited_path")
+    refs = payload.get("artifact_refs")
+    if (
+        isinstance(refs, (str, bytes))
+        or not isinstance(refs, list)
+        or any(not isinstance(ref, str) or not ref for ref in refs)
+    ):
+        raise ValueError("candidate artifact ref match requires artifact_refs")
+    if not isinstance(payload.get("matches"), bool):
+        raise ValueError("candidate artifact ref match requires matches")
+    if not payload["matches"] and not isinstance(payload.get("missing_reason"), str):
+        raise ValueError("candidate artifact ref mismatch requires missing_reason")
     return payload
 
 

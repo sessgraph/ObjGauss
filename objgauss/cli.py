@@ -3255,6 +3255,10 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         "candidate_artifact_file_audit_status="
         f"{summary['candidate_artifact_file_audit']['status']}"
     )
+    print(
+        "candidate_artifact_ref_match="
+        f"{str(summary['candidate_artifact_ref_match']['matches']).lower()}"
+    )
     print(f"identity_eval_status={summary['identity_eval']['status']}")
     print(f"identity_gate_status={gate['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
