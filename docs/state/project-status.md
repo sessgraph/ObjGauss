@@ -241,6 +241,14 @@ Markdown，并支持 `--check-artifact-refs` 与 `--require-pass`。这一步不
 它只防止只有 JSON 而没有真实文件的 capture bundle 进入后续 handoff。完成 commit:
 `d6bd5db`。
 
+随后补强 controlled capture file audit：frame-level RGB / Gaussian refs 现在默认必须是
+非空 regular files，`file_counts` 增加 `valid` 计数，summary 增加完整
+`file_records`，并可用 `--hash-files` 为有效 RGB / Gaussian frame 文件记录 SHA256；
+CLI 同时支持 `--min-rgb-bytes` / `--min-gaussian-bytes` 调整最低字节数。sample-level
+`artifact_refs` 仍只在 `--check-artifact-refs` 时检查存在性，目录可作为 bundle refs。
+这一步只提升本地 bundle 证据完整性，不采集真实数据、不解析图像像素、不训练或发布模型。
+完成 commit: `51fd551`。
+
 随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`：新增
 `objgauss.core.objectstate_controlled_identity_eval`，把 controlled capture GT 和候选
 ObjectState / tracker identity predictions 连接起来，第一次让真实 Stage 1 identity row

@@ -138,7 +138,7 @@ viewer/export 默认模型。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
 
-- 状态: done / file-audit-ready-no-real-capture
+- 状态: done / file-audit-ready-nonempty-hash-no-real-capture
 - 类型: 标准 PR / controlled real capture file audit
 - 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
 - 目标: 在 capture manifest 进入 identity handoff 前，检查其 RGB / Gaussian
@@ -148,26 +148,33 @@ viewer/export 默认模型。
   - 新增 summary schema
     `objgauss-objectstate-controlled-capture-file-audit-v1`。
   - `objectstate_controlled_capture_file_audit(...)` 检查 frame-level RGB /
-    Gaussian refs，并输出 per-kind referenced / existing / missing counts。
+    Gaussian refs，并输出 per-kind referenced / existing / valid / missing
+    counts。
+  - Frame-level RGB / Gaussian refs 默认必须是非空 regular files；存在但为空、
+    指向目录或低于最低字节数都会进入 `missing_files`。
+  - Summary 增加完整 `file_records`，包含 `exists`、`is_file`、`size_bytes`、
+    `valid` 和可选 `sha256`。
   - RGB frame files 始终要求存在。
   - Gaussian frame files 默认要求存在；`require_gaussian_files=false` 支持
     RGB-only local staging，但不声明 real Gaussian readiness。
   - `check_artifact_refs=true` 可额外检查 sample-level `artifact_refs`。
+  - `hash_files=true` / CLI `--hash-files` 只为有效 frame-level RGB / Gaussian
+    文件记录 SHA256，不哈希 sample-level artifact refs。
   - `objectstate_controlled_capture_missing_files_markdown(...)` 输出缺失文件表。
   - CLI 新增 `objgauss object-state audit-controlled-capture-files <capture>`。
   - CLI 默认 `--root` 为 manifest 所在目录，可写 `--summary-output` 和
-    `--missing-files-output`，并支持 `--check-artifact-refs` / `--require-pass`。
+    `--missing-files-output`，并支持 `--check-artifact-refs`、`--min-rgb-bytes`、
+    `--min-gaussian-bytes`、`--hash-files` / `--require-pass`。
 - 边界:
   - 当前没有采集或提交真实 controlled tabletop capture 文件。
-  - File audit 不创建 GT，不读取图像像素，不重建 Gaussian，不训练模型。
+  - File audit 不创建 GT，不解析图像像素，不重建 Gaussian，不训练模型。
   - 不写 `public/samples`，不做 replay buffer / diffusion，不改 viewer/export 默认。
 - 验证:
-  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_files.py tests/test_objectstate_controlled_capture.py tests/test_core_namespace.py -q`: passed。
-  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_files.py objgauss/cli.py objgauss/core/__init__.py`: passed。
-  - `uv run --extra dev pytest`: passed, 324 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_files.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 326 tests。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: `d6bd5db`。
+- 完成 commits: `d6bd5db`, `51fd551`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
 
