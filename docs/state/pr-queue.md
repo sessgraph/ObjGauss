@@ -134,6 +134,7 @@
   - `git diff --check`: passed。
   - Cross-scene aggregate attempt `npm run benchmark:cross-scene -- --run --skip-semantic --skip-scenes --skip-variants`
     未作为验收：当前 `/tmp` 缺少 semantic / variant summary，需要先重跑对应 suites。
+- 完成 commit: `ef661cc`。
 
 ### POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001: Train dense Chair Splatfacto candidate
 
