@@ -57,6 +57,7 @@ from objgauss.core import (
     ObjectStatePredictiveRow,
     ObjectStateRealityGateReport,
     ObjectStateRealityGateThresholds,
+    ObjectStateRealityPublicArtifact,
     ObjectStateRealityRow,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
@@ -72,6 +73,7 @@ from objgauss.core import (
     OBJECTSTATE_REALITY_ROW_SCHEMA,
     OBJECTSTATE_REALITY_ROW_STATUSES,
     OBJECTSTATE_REALITY_SOURCE_KINDS,
+    OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -142,6 +144,7 @@ from objgauss.core import (
     evaluate_objectstate_causal_gate,
     evaluate_objectstate_predictive_gate,
     evaluate_objectstate_reality_gate,
+    evaluate_public_artifact_reality_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
     dynamic_k_proposal_report,
@@ -164,6 +167,7 @@ from objgauss.core import (
     initialize_object_state_gaussian_decoder,
     image_target_contract_summary,
     initialize_objectstate_identity_encoder_state,
+    default_objectstate_reality_public_artifacts,
     make_object_identity_oracle,
     make_synthetic_stability_scenario_fixture,
     make_synthetic_stability_scenario_suite,
@@ -173,6 +177,8 @@ from objgauss.core import (
     match_object_states,
     object_state_delivery_summary,
     objectstate_reality_blocked_rows_markdown,
+    objectstate_reality_public_rows_summary,
+    objectstate_reality_rows_from_public_artifacts,
     object_state_stability_report,
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
@@ -238,6 +244,7 @@ from objgauss.core import (
     validate_objectstate_checkpoint_eval,
     validate_objectstate_causal_gate_summary,
     validate_objectstate_reality_gate_summary,
+    validate_objectstate_reality_public_rows_summary,
     validate_observation_model_config,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
@@ -676,6 +683,22 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_reality_blocked_rows_markdown(reality_report) == (
         "No blocked ObjectState reality rows.\n"
     )
+
+    assert OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA == (
+        "objgauss-objectstate-public-artifact-rows-v1"
+    )
+    public_artifacts = default_objectstate_reality_public_artifacts()
+    assert isinstance(public_artifacts[0], ObjectStateRealityPublicArtifact)
+    public_rows = objectstate_reality_rows_from_public_artifacts(public_artifacts[:1])
+    assert len(public_rows) == 3
+    assert public_rows[0].status == "blocked"
+    public_report = evaluate_public_artifact_reality_gate(public_artifacts[:1])
+    assert isinstance(public_report, ObjectStateRealityGateReport)
+    public_summary = objectstate_reality_public_rows_summary(public_artifacts[:1])
+    assert validate_objectstate_reality_public_rows_summary(public_summary) is public_summary
+    assert public_summary["schema"] == OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA
+    assert public_summary["gate"]["status"] == "objectstate_reality_gate_fail"
+    assert public_summary["claim_policy"]["object_id_is_not_identity_ground_truth"] is True
 
 
 def test_core_namespace_exposes_property_append_helper():

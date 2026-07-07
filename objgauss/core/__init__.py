@@ -142,6 +142,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_gate",
         "ObjectStateRealityRow",
     ),
+    "ObjectStateRealityPublicArtifact": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "ObjectStateRealityPublicArtifact",
+    ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityOracle",
@@ -264,6 +268,10 @@ _EXPORTS = {
     "OBJECTSTATE_REALITY_SOURCE_KINDS": (
         "objgauss.core.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_SOURCE_KINDS",
+    ),
+    "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA",
     ),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -621,6 +629,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_gate",
         "evaluate_objectstate_reality_gate",
     ),
+    "default_objectstate_reality_public_artifacts": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "default_objectstate_reality_public_artifacts",
+    ),
+    "evaluate_public_artifact_reality_gate": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "evaluate_public_artifact_reality_gate",
+    ),
     "initialize_objectstate_identity_encoder_state": (
         "objgauss.core.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
@@ -653,9 +669,21 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_gate",
         "objectstate_reality_blocked_rows_markdown",
     ),
+    "objectstate_reality_public_rows_summary": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "objectstate_reality_public_rows_summary",
+    ),
+    "objectstate_reality_rows_from_public_artifacts": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "objectstate_reality_rows_from_public_artifacts",
+    ),
     "validate_objectstate_reality_gate_summary": (
         "objgauss.core.objectstate_reality_gate",
         "validate_objectstate_reality_gate_summary",
+    ),
+    "validate_objectstate_reality_public_rows_summary": (
+        "objgauss.core.objectstate_reality_public_rows",
+        "validate_objectstate_reality_public_rows_summary",
     ),
     "evaluate_assignment_solver_v2_stability": (
         "objgauss.core.assignment_solver_v2_eval",
