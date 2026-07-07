@@ -779,13 +779,15 @@ defaults.
 
 Bundle the Stage 1 controlled identity chain into a single reproducible handoff.
 
-Implemented v0.1 facts:
+Implemented v0.2 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_identity_handoff`.
 - Summary schema:
   `objgauss-objectstate-controlled-identity-handoff-v1`.
 - `objectstate_controlled_identity_handoff(...)` takes a controlled capture
   manifest plus trainable kernel ObjectState artifact and produces:
+  - `capture_file_audit` using
+    `objgauss-objectstate-controlled-capture-file-audit-v1`;
   - `identity_predictions` using
     `objgauss-objectstate-controlled-identity-predictions-v1`;
   - `identity_eval` using
@@ -798,19 +800,27 @@ Implemented v0.1 facts:
   `require_identity_pass_row=true`,
   `require_prediction_pass_row=false`,
   `require_intervention_pass_row=false`.
+- The handoff pass condition requires the capture file audit to pass before
+  identity metrics and the identity-only reality gate can make the handoff pass.
+- Frame-level RGB / Gaussian refs are checked as non-empty regular files by
+  default, and optional SHA256 hashes can be included for audit evidence.
 - Prediction and intervention rows remain visible as blocked rows in the
   controlled-real summary; they are not hidden or promoted.
 - CLI command:
   `objgauss object-state controlled-identity-handoff <capture> <objectstates> --output-dir <dir>`.
 - CLI writes:
+  `capture-file-audit.json`, `capture-missing-files.md`,
   `identity-predictions.json`, `identity-eval-summary.json`,
   `controlled-real.json`, `controlled-real-summary.json`, `blocked-rows.md`
   and `handoff-summary.json`.
+- CLI defaults `--capture-root` to the manifest directory and supports
+  `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files` and
+  `--check-artifact-refs`.
 
 Current scope remains reproducible handoff only. It does not collect capture
-data, create GT, train Gaussian or dynamics models, compute prediction /
-intervention metrics, use replay / diffusion, write public samples or mutate
-viewer defaults.
+data, create GT, parse image pixels, train Gaussian or dynamics models, compute
+prediction / intervention metrics, use replay / diffusion, write public samples
+or mutate viewer defaults.
 
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 

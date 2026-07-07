@@ -288,6 +288,15 @@ schema `objgauss-objectstate-controlled-identity-handoff-v1` 和 CLI
 不训练 Gaussian / dynamics、不计算 prediction / intervention 指标、不写
 `public/samples`、不改 viewer/export 默认。完成 commit: `47c2754`。
 
+随后补强 `controlled-identity-handoff`：handoff 现在先执行 controlled capture file
+audit，并把 `capture_file_audit` 嵌入 summary；handoff pass 条件要求 file audit、
+identity eval 和 identity-only reality gate 三者都通过。CLI 默认用 capture manifest
+所在目录作为 `--capture-root`，会额外写出 `capture-file-audit.json` 和
+`capture-missing-files.md`，并支持 `--min-rgb-bytes`、`--min-gaussian-bytes`、
+`--hash-files` 与 `--check-artifact-refs`。这一步防止 manifest-only 或空文件 bundle
+获得 identity handoff pass；当前仍没有实际 controlled real capture / true candidate
+artifact 作为通过证据。完成 commit: `2690196`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

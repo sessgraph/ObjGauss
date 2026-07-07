@@ -178,7 +178,7 @@ viewer/export 默认模型。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
 
-- 状态: done / handoff-ready-no-real-capture
+- 状态: done / handoff-requires-file-audit-no-real-capture
 - 类型: 标准 PR / controlled real identity handoff bundle
 - 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
 - 目标: 将 controlled capture manifest + trainable kernel ObjectState artifact
@@ -189,28 +189,33 @@ viewer/export 默认模型。
     `objgauss-objectstate-controlled-identity-handoff-v1`。
   - `objectstate_controlled_identity_handoff(...)` 内部生成 identity predictions、
     identity eval、controlled-real manifest 和 identity-only controlled-real summary。
+  - Handoff 现在先执行 controlled capture file audit，并把 `capture_file_audit`
+    嵌入 `handoff-summary.json`。
+  - Handoff pass 条件要求 capture file audit、identity eval 和 identity-only
+    reality gate 三者都通过；manifest-only 或空文件 bundle 只能得到 fail。
   - Reality gate 使用 Stage 1 identity-only 阈值：要求 identity pass row，不要求
     prediction / intervention pass rows。
   - Prediction / intervention rows 仍保留为 blocked rows，不从 evidence summary 隐藏。
   - CLI 新增 `objgauss object-state controlled-identity-handoff <capture>
     <objectstates> --output-dir <dir>`。
-  - CLI 写出 `identity-predictions.json`、`identity-eval-summary.json`、
+  - CLI 写出 `capture-file-audit.json`、`capture-missing-files.md`、
+    `identity-predictions.json`、`identity-eval-summary.json`、
     `controlled-real.json`、`controlled-real-summary.json`、`blocked-rows.md` 和
     `handoff-summary.json`。
   - CLI 支持 identity 阈值、`--max-centroid-distance`、`--synthetic-smoke-failed`
-    和 `--require-pass`。
+    `--capture-root`、`--min-rgb-bytes`、`--min-gaussian-bytes`、`--hash-files`、
+    `--check-artifact-refs` 和 `--require-pass`。
 - 边界:
   - 当前没有采集或提交真实 controlled tabletop capture / candidate artifact 文件。
   - Handoff 不创建 GT，不运行 tracker / segmentation，不训练 Gaussian / dynamics。
   - 不计算 prediction / intervention metrics，不写 `public/samples`，不做 replay
     buffer / diffusion，不改 viewer/export 默认。
 - 验证:
-  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_identity_prediction_adapter.py tests/test_objectstate_controlled_identity_eval.py tests/test_core_namespace.py -q`: passed。
-  - `uv run python -m py_compile objgauss/core/objectstate_controlled_identity_handoff.py objgauss/core/objectstate_identity_prediction_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
-  - `uv run --extra dev pytest`: passed, 318 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_capture_files.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: `47c2754`。
+- 完成 commits: `47c2754`, `2690196`。
 
 ### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001: Export controlled identity predictions
 
