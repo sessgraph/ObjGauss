@@ -141,6 +141,11 @@ from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_rend
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 from objgauss.core.trainable_quality import write_trainable_quality_report
 from objgauss.core.object_state_benchmark import write_object_state_stability_benchmark
+from objgauss.core.objectstate_controlled_real_rows import (
+    objectstate_controlled_real_rows_summary,
+    read_objectstate_controlled_real_manifest,
+)
+from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
     write_model_artifact_manifest,
@@ -2970,6 +2975,55 @@ def _object_state_stability_benchmark(args: argparse.Namespace) -> None:
     print(f"output={args.output}")
 
 
+def _object_state_controlled_real_gate(args: argparse.Namespace) -> None:
+    manifest = read_objectstate_controlled_real_manifest(args.manifest)
+    summary = objectstate_controlled_real_rows_summary(
+        manifest,
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        thresholds=_controlled_real_gate_thresholds(args),
+    )
+    gate = summary["gate"]
+    sample = summary["sample"]
+    print(f"schema={summary['schema']}")
+    print(f"manifest={args.manifest}")
+    print(f"sample_id={sample['sample_id']}")
+    print(f"object_category={sample['object_category']}")
+    print(f"scenario={sample['scenario']}")
+    print(f"gate_status={gate['status']}")
+    print(f"row_count={summary['row_count']}")
+    print(f"pass_rows={summary['pass_row_count']}")
+    print(f"fail_rows={summary['fail_row_count']}")
+    print(f"blocked_rows={summary['blocked_row_count']}")
+    if gate["hard_blockers"]:
+        print(f"hard_blockers={','.join(gate['hard_blockers'])}")
+    else:
+        print("hard_blockers=none")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows={args.blocked_rows_output}")
+    if args.require_pass and gate["status"] != "objectstate_reality_gate_pass":
+        raise ValueError("controlled real ObjectState reality gate did not pass")
+
+
+def _controlled_real_gate_thresholds(
+    args: argparse.Namespace,
+) -> ObjectStateRealityGateThresholds:
+    return ObjectStateRealityGateThresholds(
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        require_identity_pass_row=True,
+        require_prediction_pass_row=not args.identity_only,
+        require_intervention_pass_row=not args.identity_only,
+        fail_on_failed_rows=True,
+    )
+
+
 def _print_summary(labels: np.ndarray) -> None:
     for label, count in summarize_labels(labels):
         print(f"object_id={label} count={count}")
@@ -3101,6 +3155,29 @@ def _build_parser() -> argparse.ArgumentParser:
         help="fail if the benchmark suite does not satisfy its expected diagnostics",
     )
     state_benchmark.set_defaults(handler=_object_state_stability_benchmark)
+    controlled_real_gate = object_state_subparsers.add_parser(
+        "controlled-real-gate",
+        help="evaluate a controlled real ObjectState evidence manifest",
+    )
+    controlled_real_gate.add_argument("manifest", type=Path)
+    controlled_real_gate.add_argument("--summary-output", type=Path)
+    controlled_real_gate.add_argument("--blocked-rows-output", type=Path)
+    controlled_real_gate.add_argument(
+        "--identity-only",
+        action="store_true",
+        help=(
+            "run the Stage 1 identity-state gate without requiring prediction "
+            "or intervention pass rows"
+        ),
+    )
+    controlled_real_gate.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    controlled_real_gate.add_argument("--min-real-or-public-rows", type=int, default=1)
+    controlled_real_gate.add_argument("--require-pass", action="store_true")
+    controlled_real_gate.set_defaults(handler=_object_state_controlled_real_gate)
 
     object_field = subparsers.add_parser(
         "object-field",
