@@ -28,18 +28,23 @@ Viewer 已把 `sourceLayer` 的真实 `.splat` 接进主 Three.js world：默认
 `gsplat.index -> object_id -> object translate` 接到 source splat 子集。real-sample v2
 targeted browser check 证明移动 `object-0` 后 native source splat motion
 `active=true`、`transformedObjects=1`、`sourceCount=pointCount=5696`。
-当前实现不生成新的训练 / Demo 产物，不改变 ObjectState / manifest / training contract；
-rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在默认能力内。
+随后完成 `NATIVE-SPLAT-MOTION-HARDEN-001`：右侧选中摘要和 `Three.js 世界` 面板现在展示
+`真实绑定` / `绑定点数`，root/debug panel 也暴露 `ready/active/countMatches/sourceCount`
+telemetry；bbox-projected Playwright check 证明移动 selected source splat 子集时，
+desktop / mobile 的 selected screen delta 分别为 `28.708px` / `26.922px`，同模型 peer
+对象 `peerScreenDelta=0`、`peerWorldDelta=0`，UI 会从 `已绑定` 刷新为 `已随动`。当前实现不生成
+新的训练 / Demo 产物，不改变 ObjectState / manifest / training contract；rotate / scale、
+任意第三方 `.splat` object id 和 Gaussian 重优化仍不在默认能力内。
 
 Viewer 对象交互随后补齐 `projected-object-bbox-picker-v2`：主鼠标选择现在只按
 ObjectState bbox 的 screen-space 投影命中，空白区域不会再被中心点半径误选；选中对象会强制
 显示高亮 bbox、centroid / glow / selection ring，并把 object-aware Gaussian overlay 提亮，
 方便确认“选中了哪个对象”和“移动的是对象层”。模型版本列表改为两行布局，避免完整高斯、
 点预览、对象层和处理按钮挤在一行。下一步 viewer TODO 已收敛为
-`NATIVE-SPLAT-MOTION-HARDEN-001`：把 source splat 绑定状态更明显地展示给用户，并补
-pixel-level audit，证明被选 source 子集移动、非选对象保持原位。full
-`audit:world-viewer` 当前仍有旧 trainable stability dashboard 等待过宽问题，source
-splat motion 采用 targeted browser check 作为本切片验收事实源。
+`GAUSSIAN-OBJECT-PROCESS-FLOW-001`：把未分割高斯云到对象层生成的主流程做成产品入口，
+而不是继续只展示已经处理好的样例。full `audit:world-viewer` 当前仍有旧 trainable
+Gaussian probe / stability 等待过宽问题，最新失败点为 `scripts/audit-world-viewer.mjs:595`；
+source splat motion 采用 targeted browser check 作为本切片验收事实源。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

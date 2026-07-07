@@ -213,29 +213,47 @@ async function auditWorld(url) {
         sample,
       };
     }, undefined, { timeout: 30000 }).then((handle) => handle.jsonValue());
-    const sourceSplatMotionMove = await page.evaluate((selectionId) => {
-      return window.__OBJGAUSS_WORLD__?.moveObjectForAudit?.(selectionId, [0.42, 0, 0]) ?? null;
-    }, sourceSplatMotionSelection.selectionId);
-    if (sourceSplatMotionMove?.ok !== true) {
-      throw new Error(`expected source splat object to move: ${JSON.stringify(sourceSplatMotionMove)}`);
-    }
-    const sourceSplatObjectMotion = await page.waitForFunction((selectionId) => {
+    const sourceSplatObjectProjection = await page.evaluate((selectionId) => {
       const world = window.__OBJGAUSS_WORLD__;
-      const motion = world?.sourceSplatObjectMotionForAudit?.(selectionId);
+      return world?.sourceSplatObjectMotionProjectionForAudit?.(selectionId, [0.42, 0, 0]) ?? null;
+    }, sourceSplatMotionSelection.selectionId);
+    if (
+      !sourceSplatObjectProjection ||
+      sourceSplatObjectProjection.ok !== true ||
+      sourceSplatObjectProjection.motion?.contract !== "source-splat-object-translate-v1" ||
+      sourceSplatObjectProjection.motion?.status !== "ready" ||
+      sourceSplatObjectProjection.motion?.active !== true ||
+      sourceSplatObjectProjection.motion?.transformedObjects < 1 ||
+      sourceSplatObjectProjection.motion?.maxTranslate <= 0 ||
+      sourceSplatObjectProjection.motion?.selectedTranslateMagnitude <= 0 ||
+      sourceSplatObjectProjection.motion?.sourceCount !== sourceSplatObjectProjection.motion?.pointCount ||
+      sourceSplatObjectProjection.selectedScreenDelta <= 1 ||
+      sourceSplatObjectProjection.peerScreenDelta > 0.5 ||
+      sourceSplatObjectProjection.peerWorldDelta !== 0
+    ) {
+      throw new Error(`expected source splat projected motion with stable peer: ${JSON.stringify(sourceSplatObjectProjection)}`);
+    }
+    const sourceSplatMotionUi = await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const panel = document.querySelector("[data-object-debug-panel='true']");
+      const metric = document.querySelector("[data-source-splat-motion-metric='true']");
       if (
-        !motion ||
-        motion.contract !== "source-splat-object-translate-v1" ||
-        motion.status !== "ready" ||
-        motion.active !== true ||
-        motion.transformedObjects < 1 ||
-        motion.maxTranslate <= 0 ||
-        motion.selectedTranslateMagnitude <= 0 ||
-        motion.sourceCount !== motion.pointCount
+        shell?.getAttribute("data-source-splat-motion-status") !== "ready" ||
+        shell?.getAttribute("data-source-splat-motion-active") !== "true" ||
+        shell?.getAttribute("data-source-splat-motion-count-matches") !== "true" ||
+        panel?.getAttribute("data-source-splat-motion-status") !== "ready" ||
+        metric?.querySelector("strong")?.textContent?.trim() !== "已随动"
       ) {
         return null;
       }
-      return motion;
-    }, sourceSplatMotionSelection.selectionId, { timeout: 15000 }).then((handle) => handle.jsonValue());
+      return {
+        shellStatus: shell.getAttribute("data-source-splat-motion-status"),
+        panelStatus: panel.getAttribute("data-source-splat-motion-status"),
+        metricLabel: metric.querySelector("strong")?.textContent?.trim() ?? null,
+      };
+    }, undefined, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    Object.assign(sourceSplatObjectProjection, sourceSplatMotionUi);
+    const sourceSplatObjectMotion = sourceSplatObjectProjection.motion;
     const ogcPill = page.locator(".modelPill[data-model-row-id='ogc-debug']");
     await ogcPill.waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
@@ -2201,7 +2219,8 @@ async function auditWorld(url) {
       sourceSplatObjectMotionStatus:
         sourceSplatObjectMotion.status === "ready" &&
         sourceSplatObjectMotion.active === true &&
-        sourceSplatObjectMotion.maxTranslate > 0
+        sourceSplatObjectMotion.maxTranslate > 0 &&
+        sourceSplatObjectProjection.ok === true
           ? "passed"
           : "failed",
       objectTransformStatus:
@@ -2224,6 +2243,7 @@ async function auditWorld(url) {
       objectMoveBefore: objectMove.before,
       objectMoveAfter: objectMove.after,
       sourceSplatObjectMotion,
+      sourceSplatObjectProjection,
       trainingStageStatus:
         world.shellTrainingStage === "model-version-processing-v1" &&
         world.panelTrainingStageSchema === "model-version-processing-v1" &&

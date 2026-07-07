@@ -74,6 +74,7 @@ export default function App() {
   const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
   const [objectOverlayMode, setObjectOverlayMode] = useState("full");
   const [objectTransformMode, setObjectTransformMode] = useState("translate");
+  const [sourceSplatMotionState, setSourceSplatMotionState] = useState(() => emptySourceSplatMotionState());
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
@@ -151,6 +152,10 @@ export default function App() {
     selected,
     selected?.status,
     selected?.objects?.length ?? 0,
+  );
+  const selectedSourceSplatMotion = useMemo(
+    () => sourceSplatMotionForModel(sourceSplatMotionState, selected?.id),
+    [selected?.id, sourceSplatMotionState],
   );
   const selectedObject =
     selected?.objects?.find((object) => String(object.objectId) === String(selection.objectId)) ?? null;
@@ -1011,6 +1016,10 @@ export default function App() {
     [patchModel, recordDebugEvent],
   );
 
+  const handleSourceSplatMotion = useCallback((nextState) => {
+    setSourceSplatMotionState(nextState ?? emptySourceSplatMotionState());
+  }, []);
+
   const moveSelectedObject = useCallback(
     (delta) => {
       if (!selection.selectionId || selection.selectionId === selection.modelId) return;
@@ -1347,6 +1356,12 @@ export default function App() {
       data-source-splat-status={selectedLayerState.sourceSplatStageStatus}
       data-source-splat-path={selectedLayerState.sourceLayerPath}
       data-source-splat-active={selectedLayerState.sourceSplatStageStatus === "available" ? "true" : "false"}
+      data-source-splat-motion-contract={sourceSplatMotionState.contract}
+      data-source-splat-motion-status={selectedSourceSplatMotion?.status ?? "missing"}
+      data-source-splat-motion-active={selectedSourceSplatMotion?.active ? "true" : "false"}
+      data-source-splat-motion-count-matches={selectedSourceSplatMotion?.countMatches ? "true" : "false"}
+      data-source-splat-motion-source-count={selectedSourceSplatMotion?.sourceCount ?? ""}
+      data-source-splat-motion-point-count={selectedSourceSplatMotion?.pointCount ?? ""}
       data-object-layer-overlay-contract={selectedLayerState.renderSurfaceContract}
       data-full-gaussian-source-count={stageSummary.fullGaussianCount}
       data-object-layer-registered-count={stageSummary.objectLayerRegisteredCount}
@@ -1584,6 +1599,7 @@ export default function App() {
         onHoverObject={handleHoverObject}
         onObjectMoved={handleObjectMoved}
         onDebugEvent={recordDebugEvent}
+        onSourceSplatMotion={handleSourceSplatMotion}
       />
 
       <div className="glassHud topHud">
@@ -1691,6 +1707,8 @@ export default function App() {
               <Meta label="版本" value={selected.label ?? selected.id} />
               <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
               <Meta label="对象层" value={selected.objectCount ? `${formatNumber(selected.objectCount)} 对象` : "未生成"} />
+              <Meta label="真实绑定" value={sourceSplatMotionLabel(selectedSourceSplatMotion, selectedLayerState)} />
+              <Meta label="绑定点" value={sourceSplatMotionCountLabel(selectedSourceSplatMotion)} />
               <Meta label="选中" value={selectedObject ? `#${selectedObject.objectId}` : "-"} />
               <Meta label="对象点" value={selectedObject ? formatNumber(selectedObject.displayCount) : "-"} />
               <Meta label="置信" value={selectedObject ? formatRatio(selectedObject.objectState?.confidence) : "-"} />
@@ -1704,6 +1722,7 @@ export default function App() {
         selected={selected}
         models={modelList}
         selectedObject={selectedObject}
+        selectedSourceSplatMotion={selectedSourceSplatMotion}
         selectedObjectKey={selectedObjectKey}
         hoveredTarget={hoveredTarget}
         hoverAssignmentProbe={hoveredAssignmentProbe}
@@ -2689,6 +2708,7 @@ function ThreeWorld({
   onHoverObject,
   onObjectMoved,
   onDebugEvent,
+  onSourceSplatMotion,
 }) {
   const mountRef = useRef(null);
   const apiRef = useRef(null);
@@ -2699,7 +2719,13 @@ function ThreeWorld({
   const transformModeRef = useRef(normalizeObjectTransformMode(objectTransformMode));
   const hiddenRef = useRef(hiddenSelectionIds);
   const stageModelIdsRef = useRef(normalizeStageModelIdSet(stageModelIds));
-  const callbacksRef = useRef({ onSelectObject, onHoverObject, onObjectMoved, onDebugEvent });
+  const callbacksRef = useRef({
+    onSelectObject,
+    onHoverObject,
+    onObjectMoved,
+    onDebugEvent,
+    onSourceSplatMotion,
+  });
 
   useEffect(() => {
     selectedRef.current = selectedTargetId;
@@ -2741,8 +2767,14 @@ function ThreeWorld({
   }, [stageModelIds]);
 
   useEffect(() => {
-    callbacksRef.current = { onSelectObject, onHoverObject, onObjectMoved, onDebugEvent };
-  }, [onDebugEvent, onHoverObject, onObjectMoved, onSelectObject]);
+    callbacksRef.current = {
+      onSelectObject,
+      onHoverObject,
+      onObjectMoved,
+      onDebugEvent,
+      onSourceSplatMotion,
+    };
+  }, [onDebugEvent, onHoverObject, onObjectMoved, onSelectObject, onSourceSplatMotion]);
 
   useEffect(() => {
     if (!mountRef.current) return undefined;
@@ -2776,9 +2808,9 @@ function ThreeWorld({
 
     const spark = new SparkRenderer({
       renderer,
-      sortRadial: false,
       maxStdDev: Math.sqrt(8),
     });
+    guardSparkReadbackSort(spark);
     scene.add(spark);
 
     buildWorldShell(scene);
@@ -2796,6 +2828,7 @@ function ThreeWorld({
     let transformMode = transformModeRef.current;
     let transformSnapEnabled = false;
     let lastTransformEvent = null;
+    let lastSourceSplatMotionDigest = "";
     let lastPickSummary = {
       contract: OBJECT_PICKING_CONTRACT,
       source: "init",
@@ -2855,6 +2888,40 @@ function ThreeWorld({
       round3(object.position.y),
       round3(object.position.z),
     ];
+
+    const sourceSplatObjectMotionAuditResult = (object) => {
+      if (!object) return { ok: false, reason: "missing-object", selectionId: null };
+      syncSourceSplatObjectTransforms(object.userData.modelId);
+      const modelRoot = modelRoots.get(object.userData.modelId);
+      const layerInfo = sourceSplatLayerInfo(modelRoot);
+      const layer = modelRoot?.userData?.sourceSplatLayer;
+      const scale = layer?.sourceFrameScale ?? layer?.sourceFrame?.scale ?? 1;
+      const initial = object.userData.sourceSplatInitialPosition ?? [0, 0, 0];
+      const selectedTranslate = [
+        (Number(object.position.x) - Number(initial[0])) / scale,
+        (Number(object.position.y) - Number(initial[1])) / scale,
+        (Number(object.position.z) - Number(initial[2])) / scale,
+      ].map(round3);
+      return {
+        ok:
+          layerInfo.sourceSplatObjectMotionStatus === "ready" &&
+          layerInfo.sourceSplatObjectMotionCountMatches,
+        selectionId: object.userData.selectionId,
+        modelId: object.userData.modelId,
+        objectId: object.userData.objectId,
+        contract: layerInfo.sourceSplatObjectMotionContract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
+        status: layerInfo.sourceSplatObjectMotionStatus ?? "missing",
+        reason: layerInfo.sourceSplatObjectMotionReason ?? null,
+        active: Boolean(layerInfo.sourceSplatObjectMotionActive),
+        transformedObjects: layerInfo.sourceSplatObjectMotionTransformedObjects ?? 0,
+        maxTranslate: layerInfo.sourceSplatObjectMotionMaxTranslate ?? 0,
+        selectedTranslate,
+        selectedTranslateMagnitude: round3(Math.hypot(...selectedTranslate)),
+        sourceCount: layerInfo.sourceSplatObjectMotionSourceCount ?? null,
+        pointCount: layerInfo.sourceSplatObjectMotionPointCount ?? 0,
+        mappedGaussians: layerInfo.sourceSplatObjectMotionMappedGaussians ?? 0,
+      };
+    };
 
     const syncSourceSplatObjectTransforms = (modelId) => {
       const modelRoot = modelRoots.get(modelId);
@@ -3093,6 +3160,32 @@ function ThreeWorld({
         .map(sourceSplatLayerInfo)
         .filter((sample) => sample.registered);
       const selectedSourceSplatLayer = selectedModel ? sourceSplatLayerInfo(selectedModel) : null;
+      const sourceSplatObjectMotionSamples = sourceSplatSamples.map((sample) => ({
+        modelId: sample.modelId,
+        contract: sample.sourceSplatObjectMotionContract,
+        status: sample.sourceSplatObjectMotionStatus,
+        reason: sample.sourceSplatObjectMotionReason,
+        active: sample.sourceSplatObjectMotionActive,
+        sourceCount: sample.sourceSplatObjectMotionSourceCount,
+        pointCount: sample.sourceSplatObjectMotionPointCount,
+        countMatches: sample.sourceSplatObjectMotionCountMatches,
+        mappedGaussians: sample.sourceSplatObjectMotionMappedGaussians,
+        objectCount: sample.sourceSplatObjectMotionObjectCount,
+        transformedObjects: sample.sourceSplatObjectMotionTransformedObjects,
+        maxTranslate: sample.sourceSplatObjectMotionMaxTranslate,
+        updates: sample.sourceSplatObjectMotionUpdates,
+      }));
+      const sourceSplatMotionState = {
+        contract: SPARK_OBJECT_TRANSFORM_CONTRACT,
+        readyCount: sourceSplatObjectMotionSamples.filter((sample) => sample.status === "ready").length,
+        activeCount: sourceSplatObjectMotionSamples.filter((sample) => sample.active).length,
+        samples: sourceSplatObjectMotionSamples,
+      };
+      const sourceSplatMotionDigest = JSON.stringify(sourceSplatMotionState);
+      if (sourceSplatMotionDigest !== lastSourceSplatMotionDigest) {
+        lastSourceSplatMotionDigest = sourceSplatMotionDigest;
+        callbacksRef.current.onSourceSplatMotion?.(sourceSplatMotionState);
+      }
       const objectVisibilitySamples = [...draggableObjects.values()].map((object) => ({
         selectionId: object.userData.selectionId,
         modelId: object.userData.modelId,
@@ -3129,20 +3222,7 @@ function ThreeWorld({
         sourceSplatObjectMotionActiveCount: sourceSplatSamples.filter(
           (sample) => sample.sourceSplatObjectMotionActive,
         ).length,
-        sourceSplatObjectMotionSamples: sourceSplatSamples.map((sample) => ({
-          modelId: sample.modelId,
-          status: sample.sourceSplatObjectMotionStatus,
-          reason: sample.sourceSplatObjectMotionReason,
-          active: sample.sourceSplatObjectMotionActive,
-          sourceCount: sample.sourceSplatObjectMotionSourceCount,
-          pointCount: sample.sourceSplatObjectMotionPointCount,
-          countMatches: sample.sourceSplatObjectMotionCountMatches,
-          mappedGaussians: sample.sourceSplatObjectMotionMappedGaussians,
-          objectCount: sample.sourceSplatObjectMotionObjectCount,
-          transformedObjects: sample.sourceSplatObjectMotionTransformedObjects,
-          maxTranslate: sample.sourceSplatObjectMotionMaxTranslate,
-          updates: sample.sourceSplatObjectMotionUpdates,
-        })),
+        sourceSplatObjectMotionSamples,
         selectedSourceSplatStatus: selectedSourceSplatLayer?.status ?? "missing",
         selectedSourceSplatPath: selectedSourceSplatLayer?.path ?? null,
         selectedSourceSplatModelId: selectedSourceSplatLayer?.modelId ?? null,
@@ -3369,38 +3449,73 @@ function ThreeWorld({
           const object =
             (selectionId ? draggableObjects.get(selectionId) : null) ??
             [...draggableObjects.values()].find((entry) => entry.visible);
-          if (!object) return { ok: false, reason: "missing-object", selectionId: null };
-          syncSourceSplatObjectTransforms(object.userData.modelId);
-          const modelRoot = modelRoots.get(object.userData.modelId);
-          const layerInfo = sourceSplatLayerInfo(modelRoot);
-          const layer = modelRoot?.userData?.sourceSplatLayer;
-          const scale = layer?.sourceFrameScale ?? layer?.sourceFrame?.scale ?? 1;
-          const initial = object.userData.sourceSplatInitialPosition ?? [0, 0, 0];
-          const selectedTranslate = [
-            (Number(object.position.x) - Number(initial[0])) / scale,
-            (Number(object.position.y) - Number(initial[1])) / scale,
-            (Number(object.position.z) - Number(initial[2])) / scale,
-          ].map(round3);
+          const result = sourceSplatObjectMotionAuditResult(object);
           publishAuditHandle();
-          return {
+          return result;
+        },
+        sourceSplatObjectMotionProjectionForAudit(selectionId = null, delta = [0.42, 0, 0]) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()].find((entry) => entry.visible);
+          if (!object) return { ok: false, reason: "missing-object", selectionId: null };
+          const peer = [...draggableObjects.values()].find(
+            (entry) =>
+              entry.userData.modelId === object.userData.modelId &&
+              entry.userData.selectionId !== object.userData.selectionId &&
+              entry.visible !== false,
+          );
+          if (!peer) {
+            return {
+              ok: false,
+              reason: "missing-peer-object",
+              selectionId: object.userData.selectionId,
+              modelId: object.userData.modelId,
+            };
+          }
+          const beforeSelectedBounds = objectScreenBounds(object);
+          const beforePeerBounds = objectScreenBounds(peer);
+          const beforeSelectedPosition = transformPosition(object);
+          const beforePeerPosition = transformPosition(peer);
+          const move = moveObjectGroup(object.userData.selectionId, delta, {
+            source: "source-motion-projection-audit",
+          });
+          const afterSelectedBounds = objectScreenBounds(object);
+          const afterPeerBounds = objectScreenBounds(peer);
+          const afterSelectedPosition = transformPosition(object);
+          const afterPeerPosition = transformPosition(peer);
+          const motion = sourceSplatObjectMotionAuditResult(object);
+          const selectedScreenDelta = screenCenterDelta(beforeSelectedBounds, afterSelectedBounds);
+          const peerScreenDelta = screenCenterDelta(beforePeerBounds, afterPeerBounds);
+          const peerWorldDelta = vectorDelta(beforePeerPosition, afterPeerPosition);
+          const selectedWorldDelta = vectorDelta(beforeSelectedPosition, afterSelectedPosition);
+          const result = {
             ok:
-              layerInfo.sourceSplatObjectMotionStatus === "ready" &&
-              layerInfo.sourceSplatObjectMotionCountMatches,
+              move?.ok === true &&
+              motion.ok === true &&
+              motion.active === true &&
+              selectedScreenDelta !== null &&
+              selectedScreenDelta > 1 &&
+              peerScreenDelta !== null &&
+              peerScreenDelta <= 0.5 &&
+              peerWorldDelta === 0,
             selectionId: object.userData.selectionId,
             modelId: object.userData.modelId,
             objectId: object.userData.objectId,
-            contract: layerInfo.sourceSplatObjectMotionContract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
-            status: layerInfo.sourceSplatObjectMotionStatus ?? "missing",
-            reason: layerInfo.sourceSplatObjectMotionReason ?? null,
-            active: Boolean(layerInfo.sourceSplatObjectMotionActive),
-            transformedObjects: layerInfo.sourceSplatObjectMotionTransformedObjects ?? 0,
-            maxTranslate: layerInfo.sourceSplatObjectMotionMaxTranslate ?? 0,
-            selectedTranslate,
-            selectedTranslateMagnitude: round3(Math.hypot(...selectedTranslate)),
-            sourceCount: layerInfo.sourceSplatObjectMotionSourceCount ?? null,
-            pointCount: layerInfo.sourceSplatObjectMotionPointCount ?? 0,
-            mappedGaussians: layerInfo.sourceSplatObjectMotionMappedGaussians ?? 0,
+            peerSelectionId: peer.userData.selectionId,
+            peerObjectId: peer.userData.objectId,
+            move,
+            motion,
+            selectedScreenDelta,
+            peerScreenDelta,
+            selectedWorldDelta,
+            peerWorldDelta,
+            beforeSelectedBounds,
+            afterSelectedBounds,
+            beforePeerBounds,
+            afterPeerBounds,
           };
+          publishAuditHandle();
+          return result;
         },
         beginTransformForAudit(selectionId = null) {
           const object =
@@ -4086,6 +4201,7 @@ function DebugPanel({
   selected,
   models,
   selectedObject,
+  selectedSourceSplatMotion,
   selectedObjectKey,
   hoveredTarget,
   hoverAssignmentProbe,
@@ -4164,6 +4280,7 @@ function DebugPanel({
   const visibleObjectCount = objectVisibility?.visibleObjectCount ?? Math.max(0, objects.length - hiddenObjects.size);
   const objectToggleStatus = `${formatCount(visibleObjectCount)} / ${formatCount(objects.length)}`;
   const selectedLayerState = modelLayerState(selected, selected.status, objects.length);
+  const sourceSplatMotionStatus = sourceSplatMotionLabel(selectedSourceSplatMotion, selectedLayerState);
   return (
     <section
       className="glassHud debugPanel"
@@ -4243,6 +4360,12 @@ function DebugPanel({
       data-source-layer-status={selectedLayerState.sourceLayerStatus}
       data-source-layer-label={selectedLayerState.sourceLayerLabel}
       data-source-layer-path={selectedLayerState.sourceLayerPath}
+      data-source-splat-motion-contract={selectedSourceSplatMotion?.contract ?? SPARK_OBJECT_TRANSFORM_CONTRACT}
+      data-source-splat-motion-status={selectedSourceSplatMotion?.status ?? "missing"}
+      data-source-splat-motion-active={selectedSourceSplatMotion?.active ? "true" : "false"}
+      data-source-splat-motion-count-matches={selectedSourceSplatMotion?.countMatches ? "true" : "false"}
+      data-source-splat-motion-source-count={selectedSourceSplatMotion?.sourceCount ?? ""}
+      data-source-splat-motion-point-count={selectedSourceSplatMotion?.pointCount ?? ""}
       data-object-layer-status={selectedLayerState.objectLayerStatus}
       data-object-layer-label={selectedLayerState.objectLayerLabel}
       data-object-layer-path={selectedLayerState.objectLayerPath}
@@ -4268,6 +4391,12 @@ function DebugPanel({
           <Metric label="展示形态" value={selectedLayerState.stageDisplayLabel} />
           <Metric label="完整高斯" value={selectedLayerState.sourceLayerLabel} />
           <Metric label="处理结果" value={selectedLayerState.objectLayerLabel} />
+          <Metric
+            label="真实绑定"
+            value={sourceSplatMotionStatus}
+            data-source-splat-motion-metric="true"
+          />
+          <Metric label="绑定点数" value={sourceSplatMotionCountLabel(selectedSourceSplatMotion)} />
           <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
           <Metric label="对象层" value={objects.length ? "已生成" : "未生成"} />
           <Metric label="可见对象" value={formatCount(visibleObjectCount)} />
@@ -6544,6 +6673,22 @@ function disposeSourceSplatMesh(splat) {
   splat.splats?.dispose?.();
 }
 
+function guardSparkReadbackSort(spark) {
+  if (!spark || typeof spark.driveSort !== "function") return spark;
+  const driveSort = spark.driveSort.bind(spark);
+  spark.driveSort = async (...args) => {
+    try {
+      return await driveSort(...args);
+    } catch (error) {
+      if (error?.message !== "No target") throw error;
+      spark.sorting = false;
+      spark.sortDirty = false;
+      return null;
+    }
+  };
+  return spark;
+}
+
 function disposeSparkRenderer(spark) {
   spark.removeFromParent?.();
   spark.dispose?.();
@@ -7644,9 +7789,9 @@ function syntheticGaussianShell(seedText, count, accent) {
   return { positions, colors, assignmentColors };
 }
 
-function Metric({ label, value }) {
+function Metric({ label, value, ...attrs }) {
   return (
-    <div className="metric">
+    <div className="metric" {...attrs}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -8894,6 +9039,37 @@ function formatNumber(value) {
   return Number.isFinite(number) && number > 0 ? number.toLocaleString() : "-";
 }
 
+function emptySourceSplatMotionState() {
+  return {
+    contract: SPARK_OBJECT_TRANSFORM_CONTRACT,
+    readyCount: 0,
+    activeCount: 0,
+    samples: [],
+  };
+}
+
+function sourceSplatMotionForModel(state, modelId) {
+  if (!modelId) return null;
+  return (state?.samples ?? []).find((sample) => sample.modelId === modelId) ?? null;
+}
+
+function sourceSplatMotionLabel(motion, layerState = {}) {
+  if (layerState.sourceSplatStageStatus !== "available") return "无 source";
+  if (!motion) return "等待绑定";
+  if (motion.active) return "已随动";
+  if (motion.status === "ready" && motion.countMatches) return "已绑定";
+  if (motion.status === "disabled-count-mismatch") return "点数不匹配";
+  if (motion.status === "pending-source-count") return "等待 splat";
+  if (motion.status === "missing-points") return "缺对象点";
+  if (motion.status === "missing") return "未接入";
+  return motion.status ?? "未知";
+}
+
+function sourceSplatMotionCountLabel(motion) {
+  if (!motion) return "-";
+  return `${formatCount(motion.sourceCount)} / ${formatCount(motion.pointCount)}`;
+}
+
 function formatCount(value) {
   if (value === null || value === undefined || value === "") return "-";
   const number = Number(value);
@@ -8902,6 +9078,22 @@ function formatCount(value) {
 
 function formatVec(value) {
   return Array.isArray(value) ? value.map((entry) => Number(entry).toFixed(3)).join(", ") : "-";
+}
+
+function screenCenterDelta(before, after) {
+  if (!before || !after) return null;
+  const dx = Number(after.centerX) - Number(before.centerX);
+  const dy = Number(after.centerY) - Number(before.centerY);
+  return Number.isFinite(dx) && Number.isFinite(dy) ? round3(Math.hypot(dx, dy)) : null;
+}
+
+function vectorDelta(before, after) {
+  if (!Array.isArray(before) || !Array.isArray(after) || before.length !== after.length) return null;
+  const delta = before.reduce((total, value, index) => {
+    const next = Number(after[index]) - Number(value);
+    return Number.isFinite(next) ? total + next ** 2 : Number.NaN;
+  }, 0);
+  return Number.isFinite(delta) ? round3(Math.sqrt(delta)) : null;
 }
 
 function formatBox(value) {
