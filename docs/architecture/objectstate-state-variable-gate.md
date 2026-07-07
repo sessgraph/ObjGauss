@@ -699,6 +699,46 @@ video, create GT, run segmentation / tracking, compute pose prediction,
 compute action-conditioned metrics, train Gaussian or dynamics models, use
 replay / diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001
+
+Bridge candidate ObjectState outputs into the controlled identity evaluator.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_identity_prediction_adapter`.
+- `read_trainable_kernel_identity_source(...)` reads and validates a
+  `objgauss-trainable-kernel-model-artifact-v1` JSON file.
+- `objectstate_identity_predictions_from_trainable_artifact(...)` maps
+  per-frame trainable-kernel `object_states` to
+  `objgauss-objectstate-controlled-identity-predictions-v1`.
+- The adapter requires a controlled capture manifest with per-frame
+  `pose.position`. It uses nearest-centroid association only to decide which
+  candidate ObjectState slot corresponds to each annotated physical object in
+  a frame.
+- The emitted `predicted_identity` is the stable candidate slot address
+  (`slot-<id>`), not physical identity ground truth.
+- Optional `max_centroid_distance` can drop unmatched far associations; an
+  all-dropped output fails validation instead of creating empty evidence.
+- CLI command:
+  `objgauss object-state export-identity-predictions <capture> <objectstates> --output <predictions>`.
+
+Expected handoff chain:
+
+```text
+validate-controlled-capture
+        ->
+export-identity-predictions
+        ->
+eval-controlled-identity
+        ->
+controlled-real-gate --identity-only
+```
+
+Current scope remains adapter / handoff only. It does not create capture data,
+create GT, infer physical identity, train Gaussian or dynamics models, compute
+prediction / intervention metrics, use replay / diffusion, or mutate viewer
+defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

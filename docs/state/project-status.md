@@ -243,6 +243,18 @@ summary JSON、controlled-real manifest 输出、阈值参数和 `--require-pass
 提交真实 capture / candidate prediction 文件；测试使用本地 fixture，只证明 evaluator
 可以拒绝坏 identity tracks 并生成 pass/fail rows。
 
+随后完成 `OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001`：新增
+`objgauss.core.objectstate_identity_prediction_adapter`，把已有
+`objgauss-trainable-kernel-model-artifact-v1` 中的 per-frame `object_states`
+转换为 `objgauss-objectstate-controlled-identity-predictions-v1`。新增 CLI
+`objgauss object-state export-identity-predictions <capture> <objectstates> --output <predictions>`；
+adapter 要求 controlled capture 里有
+per-frame `pose.position`，用 nearest-centroid association 将真实标注物体关联到候选
+ObjectState slot，并把稳定 slot address (`slot-<id>`) 作为
+`predicted_identity`。这一步只打通候选模型输出 -> identity evaluator 的 handoff；
+不采集真实数据、不创建 GT、不训练 Gaussian / dynamics、不计算 prediction /
+intervention 指标、不改 viewer/export 默认。完成 commit: `cc644e8`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

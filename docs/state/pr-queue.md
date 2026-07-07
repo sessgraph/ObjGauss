@@ -53,11 +53,14 @@ annotation manifest validator 和 `validate-controlled-capture` CLI，可把真�
 manifest 转成 blocked controlled-real seed；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
 已新增 candidate identity track evaluator 和 `eval-controlled-identity` CLI，可计算
 `idf1` / fragmentation / swap / collapse 并生成带 identity pass/fail row 的
-controlled-real manifest。下一步仍是实际采集 / 标注 controlled tabletop RGB /
-Gaussian / pose / action 文件，并导出真实 candidate identity predictions 让 identity row
-从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进 diffusion、
-replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY
-LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
+controlled-real manifest；`OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001` 已新增
+`export-identity-predictions` CLI，可把 trainable kernel `object_states` 经
+controlled capture pose association 转成 evaluator 输入。下一步仍是实际采集 /
+标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate
+artifact 导出 identity predictions，让 identity row 从 fixture 进入真实 pass / fail，
+而不是新增大模型。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。
+若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
+`audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -125,6 +128,40 @@ LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001: Export controlled identity predictions
+
+- 状态: done / adapter-ready-no-real-capture
+- 类型: 标准 PR / controlled real candidate prediction handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将已有 trainable kernel model artifact 的 per-frame ObjectState slot
+  输出转换成 `eval-controlled-identity` 可直接消费的
+  `objgauss-objectstate-controlled-identity-predictions-v1`。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_identity_prediction_adapter`。
+  - 新增 `read_trainable_kernel_identity_source(...)`，读取并验证
+    `objgauss-trainable-kernel-model-artifact-v1`。
+  - 新增 `objectstate_identity_predictions_from_trainable_artifact(...)`。
+  - Adapter 要求 capture manifest 中每个 frame object 具备 `pose.position`。
+  - Adapter 使用 nearest-centroid association 将 GT annotated object 关联到候选
+    ObjectState slot，并输出 `predicted_identity=slot-<id>`。
+  - 支持 `max_centroid_distance` 过滤过远匹配；全过滤会 fail-fast，不生成空证据。
+  - CLI 新增 `objgauss object-state export-identity-predictions <capture> <objectstates> --output <predictions>`。
+  - 测试覆盖 stable export + eval pass、fragmentation / swap fail、frame count
+    mismatch、missing pose、distance filtering、JSON read、CLI 输出和 core namespace
+    export。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop capture / candidate artifact 文件。
+  - Adapter 不创建 GT，不运行 tracker / segmentation，不训练 Gaussian / dynamics。
+  - 不计算 prediction / intervention metrics，不做 replay buffer / diffusion，不改
+    viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_identity_prediction_adapter.py tests/test_objectstate_controlled_identity_eval.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_identity_prediction_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed, 315 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `cc644e8`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001: Evaluate controlled identity tracks
 
