@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-06
+> 最近更新: 2026-07-07
 
 ## 队列规则
 
@@ -14,13 +14,35 @@
 
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
-3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；下一步应把产品主线从“已分割对象级 PLY 预览”推进到“未分割高斯云 -> 选择模型版本处理 -> 已处理跳过 / 加载已有对象层 -> 多版本对比 -> 选中/移动对象”，并继续收敛全量 PLY LOD / streaming 和 native `.splat` object mask route。
+3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；当前明确缺口是主展示台 source `.splat` 仍为背景层，TransformControls 只移动 object-aware PLY overlay。下一步先用 UI 明确 `完整高斯=背景层 / 对象层=可移动`，再把已有 native Spark object mask 证据桥接到 `ThreeWorld`，推进真实 `.splat` object_id 子集随对象移动；并继续收敛全量 PLY LOD / streaming。
 4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate：Lego 选择 promoted，Polyhaven 自动回落 baseline 并触发 evidence normalization gate；`REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001` 已把 Lego sample-aware promoted PLY 接成本地 viewer 默认预览，并保留缺文件 fallback。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步若继续算法质量，应单独实现 bounded evidence normalization candidate，而不是继续 geometry / camera unfreeze、diffusion、rollout 或 replay。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-当前无 ready PR。
+### THREEWORLD-SOURCE-LAYER-MOTION-CLARITY-001: Make source splat vs movable object layer explicit
+
+- 状态: ready / todo-reminder / frontend-viewer-ux
+- 类型: 微 PR / frontend viewer UX + audit
+- 目标: 先解决当前用户误解：完整 source `.splat` 是背景层，处理后的 object-aware PLY
+  是当前可移动对象层。选中或拖动对象时，UI 必须明确哪一层会动、哪一层不会动。
+- 建议范围:
+  - `Three.js 世界` 面板和右侧选中摘要增加层语义：`完整高斯=背景层`、
+    `对象层=可移动`、`真实 splat 子集移动=待接入`。
+  - 选中 / transform active 时将 source `.splat` 自动降透明或提供明确的显示切换，
+    让 object-aware overlay 的移动不被静止 source 层盖住。
+  - `window.__OBJGAUSS_WORLD__` 暴露 source layer role、movable layer role、
+    source dim state 和 active transform state，供 browser audit 验证。
+  - 截图验收必须覆盖 desktop / mobile，确认主流程不再让人误以为完整 `.splat` 已随对象移动。
+- 边界:
+  - 不实现 native `.splat` object transform。
+  - 不改变 ObjectState / artifact / manifest contract。
+  - 不引入新 renderer 或重型依赖。
+- 验收:
+  - `npm run build`
+  - targeted Playwright: 选中并移动对象时，object-aware layer 移动、source layer 被标注 /
+    降低干扰；audit 字段证明 source layer 仍为 background，movable layer 为 object-aware。
+  - `git diff --check`
 
 ## Suspended
 
@@ -47,6 +69,47 @@
   - 复用当前对象选择、隐藏、分割视图和移动控件。
 - 边界: 不引入新重型 ML 依赖；不替换 renderer；不把未确认许可的房间样例作为 public demo；
   不改变 artifact / manifest 对外契约，除非另立 ADR 或标准 contract PR。
+
+### NATIVE-SPLAT-OBJECT-TRANSFORM-001: Move source splat object subsets in the main ThreeWorld
+
+- 状态: planned / TODO-can-start-after-clarity
+- 类型: 标准 PR / frontend renderer bridge + audit
+- 提醒: 这是用户明确想要的效果：加载真实高斯云，模型分割后选中对象，并让真实高斯子集随对象拖动。
+- 目标: 把当前主展示台从“source `.splat` 背景 + object-aware PLY 可移动 overlay”推进到
+  “source `.splat` 内对应 `object_id` 的 Gaussian 子集也跟随 ObjectState transform”。
+- 现有事实:
+  - `src/sparkObjectMask.js` 已有 `object-opacity-texture-v1`，可以按 Gaussian index /
+    object id 控制 Spark opacity。
+  - `src/SplatViewport.jsx` 已有 native compact `.splat` mask route，历史 gate 证明
+    index mapping 通过的 no-SH 样例可直接在 Spark source 上使用 object mask。
+  - 当前 `src/App.jsx` 的 `attachSourceSplatLayer(...)` 仍只是 `new SplatMesh({ url })`，
+    没有 object mask，也没有 object transform modifier；`moveObjectGroup(...)` 只移动
+    object-aware `THREE.Group`。
+- 建议分解:
+  - `NATIVE-SPLAT-OBJECT-TRANSFORM-SPEC-001`: 先写最小 contract，定义
+    `sourceSplatObjectMotionContract`、index mapping gate、fallback policy、telemetry 和 audit
+    字段；确认不改 manifest 对外 ABI。
+  - `THREEWORLD-SPLAT-OBJECT-ID-TABLE-001`: 在 `ThreeWorld` 中从 object-aware PLY points
+    构建 `splatIndex -> objectId` 表，并用现有 index mapping audit 证明 source `.splat`
+    count / order 与 object-aware PLY 可对应。
+  - `SPARK-OBJECT-TRANSFORM-MODIFIER-001`: 在 Spark Dyno modifier 中增加
+    `object-transform-texture-v1` 或等价路径，让 `gsplat.index` 查到 object id 后应用该对象的
+    translate / rotate / scale；第一版只要求 translate 与 TransformControls 同步。
+  - `THREEWORLD-SOURCE-SPLAT-MOTION-001`: 将 TransformControls 的 object transform 同步到
+    source splat transform texture；object-aware overlay、bbox 和真实 source 子集必须同向移动。
+  - `NATIVE-SPLAT-MOTION-AUDIT-001`: 浏览器审计覆盖选中对象移动前后 source splat 可见像素变化、
+    非选中对象保持原位、fallback route、index mismatch blocker 和截图证据。
+- 边界:
+  - 第一版只覆盖 ObjGauss 生成 / 登记且 index mapping 已通过的 public sample；不承诺任意第三方
+    `.splat` 自带 object id。
+  - 不做 Gaussian 重新优化、补洞、diffusion、rollout、camera / geometry training 或 renderer 替换。
+  - SH-heavy 样例需要保留 PLY packed SH fallback，除非单独证明 native transform 不丢 SH-rest 外观。
+- 验收:
+  - `npm run build`
+  - `npm run audit:splat-index-mapping`
+  - targeted Playwright: 选中一个对象并拖动，source `.splat` 对应 object_id 子集与 bbox /
+    object-aware overlay 同步位移，其他对象不位移。
+  - 截图和 audit summary 写入 `/tmp/`；不提交生成的大型资产。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 

@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-06
+> 最近更新: 2026-07-07
 
 ## 当前阶段
 
@@ -32,6 +32,14 @@ ObjectState bbox 的 screen-space 投影命中，空白区域不会再被中心�
 点预览、对象层和处理按钮挤在一行。边界不变：完整原始 `.splat` 仍是 source layer 背景，
 不会随单个对象移动；真正让 native splat 子集按对象移动，需要后续 object mask / per-splat
 object id route。
+
+2026-07-07 的下一步规划已把这个缺口登记成显式 TODO：先做
+`THREEWORLD-SOURCE-LAYER-MOTION-CLARITY-001`，在 UI 和 audit 中明确
+`完整高斯=背景层`、`对象层=可移动`，并在选中 / 拖动对象时降低 source layer 干扰；随后推进
+`NATIVE-SPLAT-OBJECT-TRANSFORM-001`，复用既有 `SplatViewport` /
+`sparkObjectMask.js` native mask 证据，把 `source .splat index -> object_id -> object
+transform` 桥接到当前主 `ThreeWorld`。第一版只覆盖 ObjGauss 生成 / 登记且 index mapping
+已通过的样例，不承诺任意第三方 `.splat` 自带 object id，不做重优化补洞或训练解冻。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

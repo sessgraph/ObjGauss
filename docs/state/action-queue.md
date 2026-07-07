@@ -1,8 +1,29 @@
 # ObjGauss 行动队列
 
-> 最近更新: 2026-07-02
+> 最近更新: 2026-07-07
 
 ## Open
+
+### ACTION-021: TODO - 让主展示台真实 `.splat` 对象子集随对象移动
+
+- 原因: 当前 `ThreeWorld` 主展示台已经加载完整 source `.splat`，但该层只是
+  `SplatMesh({ url })` 背景层；TransformControls 移动的是处理后的 object-aware PLY
+  `ObjectState` group。用户会自然期待“选中对象后，真实高斯子集也跟着动”。历史
+  `SplatViewport` / `sparkObjectMask.js` 已证明 no-SH 样例可用 object-aware PLY 的
+  Gaussian index mapping 在 Spark source/original route 上做 object opacity mask，但这条能力尚未
+  接入当前 `ThreeWorld` 展示台，也尚未扩展到 per-object transform。
+- 推荐:
+  - 先做 `THREEWORLD-SOURCE-LAYER-MOTION-CLARITY-001`，在 UI 上明确
+    `完整高斯=背景层`、`对象层=可移动`，并在选中 / 拖动对象时降低或隐藏 source layer，
+    防止继续误读。
+  - 再做 `NATIVE-SPLAT-OBJECT-TRANSFORM-001`：复用 `audit:splat-index-mapping`、
+    `sparkObjectMask.js` 和 `SplatViewport` native mask 经验，在主展示台建立
+    `.splat index -> object_id -> object transform` 的浏览器 contract。
+  - 第一版只覆盖 index mapping 已通过的 ObjGauss 生成 / 登记样例；不承诺任意第三方
+    `.splat` 自带 object id，也不做重优化补洞。
+- 退出条件: 在主 `ThreeWorld` 中选中对象并移动时，真实 source `.splat` 对应 object_id
+  子集与 bbox / object-aware overlay 同步移动；未选中对象仍留在原位；browser audit 同时验证
+  index mapping、transform texture / modifier contract、截图像素变化和 fallback 边界。
 
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
