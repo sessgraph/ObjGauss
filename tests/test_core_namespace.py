@@ -60,6 +60,7 @@ from objgauss.core import (
     ObjectStateRealityPublicArtifact,
     ObjectStateRealityRow,
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA,
@@ -189,6 +190,8 @@ from objgauss.core import (
     objectstate_reality_public_rows_summary,
     objectstate_reality_rows_from_public_artifacts,
     objectstate_controlled_capture_summary,
+    objectstate_controlled_capture_file_audit,
+    objectstate_controlled_capture_missing_files_markdown,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
     objectstate_controlled_identity_handoff,
@@ -263,6 +266,7 @@ from objgauss.core import (
     validate_objectstate_reality_gate_summary,
     validate_objectstate_reality_public_rows_summary,
     validate_objectstate_controlled_capture_manifest,
+    validate_objectstate_controlled_capture_file_audit_summary,
     validate_objectstate_controlled_capture_summary,
     validate_objectstate_controlled_identity_eval_summary,
     validate_objectstate_controlled_identity_handoff_summary,
@@ -773,6 +777,14 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     capture_summary = objectstate_controlled_capture_summary(capture_manifest)
     assert validate_objectstate_controlled_capture_summary(capture_summary) is capture_summary
     assert capture_summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-file-audit-v1"
+    )
+    assert objectstate_controlled_capture_file_audit is not None
+    assert objectstate_controlled_capture_missing_files_markdown([]).endswith(
+        "no missing files |"
+    )
+    assert validate_objectstate_controlled_capture_file_audit_summary is not None
     assert capture_summary["readiness"]["identity_stage_ready"] is True
     capture_seed = objectstate_controlled_real_manifest_from_capture_manifest(
         capture_manifest

@@ -145,6 +145,9 @@ from objgauss.core.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_capture_files import (
+    objectstate_controlled_capture_file_audit,
+)
 from objgauss.core.objectstate_controlled_identity_eval import (
     ObjectStateControlledIdentityThresholds,
     evaluate_objectstate_controlled_identity_predictions,
@@ -3066,6 +3069,47 @@ def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
         raise ValueError("controlled capture manifest is not intervention-stage ready")
 
 
+def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> None:
+    manifest = read_objectstate_controlled_capture_manifest(args.manifest)
+    root = args.root if args.root is not None else args.manifest.parent
+    summary = objectstate_controlled_capture_file_audit(
+        manifest,
+        root=root,
+        require_gaussian_files=not args.no_require_gaussian_files,
+        check_artifact_refs=args.check_artifact_refs,
+    )
+    counts = summary["file_counts"]
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"manifest={args.manifest}")
+    print(f"root={summary['root']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"file_audit_status={summary['status']}")
+    print(f"rgb_existing={counts['rgb']['existing']}/{counts['rgb']['referenced']}")
+    print(
+        "gaussian_existing="
+        f"{counts['gaussian']['existing']}/{counts['gaussian']['referenced']}"
+    )
+    print(
+        "artifact_refs_existing="
+        f"{counts['artifact_refs']['existing']}/{counts['artifact_refs']['referenced']}"
+    )
+    print(f"missing_files={len(summary['missing_files'])}")
+    print(f"capture_bundle_files_ready={str(readiness['capture_bundle_files_ready']).lower()}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.missing_files_output:
+        args.missing_files_output.parent.mkdir(parents=True, exist_ok=True)
+        args.missing_files_output.write_text(
+            summary["missing_files_markdown"],
+            encoding="utf-8",
+        )
+        print(f"missing_files_markdown={args.missing_files_output}")
+    if args.require_pass and summary["status"] != "objectstate_controlled_capture_file_audit_pass":
+        raise ValueError("controlled capture file audit did not pass")
+
+
 def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
     capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
     predictions = read_objectstate_controlled_identity_predictions(args.predictions)
@@ -3370,6 +3414,32 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
     validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
+    audit_controlled_capture_files = object_state_subparsers.add_parser(
+        "audit-controlled-capture-files",
+        help="check local files referenced by a controlled capture manifest",
+    )
+    audit_controlled_capture_files.add_argument("manifest", type=Path)
+    audit_controlled_capture_files.add_argument(
+        "--root",
+        type=Path,
+        help="root for relative frame refs; defaults to the manifest directory",
+    )
+    audit_controlled_capture_files.add_argument("--summary-output", type=Path)
+    audit_controlled_capture_files.add_argument("--missing-files-output", type=Path)
+    audit_controlled_capture_files.add_argument(
+        "--no-require-gaussian-files",
+        action="store_true",
+        help="allow RGB-only capture bundles to pass the file audit",
+    )
+    audit_controlled_capture_files.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample.artifact_refs paths to exist",
+    )
+    audit_controlled_capture_files.add_argument("--require-pass", action="store_true")
+    audit_controlled_capture_files.set_defaults(
+        handler=_object_state_audit_controlled_capture_files
+    )
     eval_controlled_identity = object_state_subparsers.add_parser(
         "eval-controlled-identity",
         help="score candidate identity tracks against a controlled capture manifest",

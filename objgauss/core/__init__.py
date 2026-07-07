@@ -154,6 +154,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_files",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA",
@@ -757,6 +761,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_handoff",
         "objectstate_controlled_identity_handoff",
     ),
+    "objectstate_controlled_capture_file_audit": (
+        "objgauss.core.objectstate_controlled_capture_files",
+        "objectstate_controlled_capture_file_audit",
+    ),
+    "objectstate_controlled_capture_missing_files_markdown": (
+        "objgauss.core.objectstate_controlled_capture_files",
+        "objectstate_controlled_capture_missing_files_markdown",
+    ),
     "validate_objectstate_controlled_capture_manifest": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_manifest",
@@ -764,6 +776,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_summary": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_summary",
+    ),
+    "validate_objectstate_controlled_capture_file_audit_summary": (
+        "objgauss.core.objectstate_controlled_capture_files",
+        "validate_objectstate_controlled_capture_file_audit_summary",
     ),
     "validate_objectstate_controlled_identity_eval_summary": (
         "objgauss.core.objectstate_controlled_identity_eval",
