@@ -26,7 +26,10 @@ def test_diagnostics_clean_fixture_reports_transition_matrix_and_confusion_graph
         seed=10,
         observation_config=ObservationModelConfig(points_per_object=1, position_jitter=0.0, seed=11),
     )
-    report = diagnose_synthetic_stability_fixture(fixture)
+    report = diagnose_synthetic_stability_fixture(
+        fixture,
+        predicted_slots=expected_slots_for_synthetic_fixture(fixture),
+    )
     payload = report.as_dict()
 
     assert isinstance(report, SyntheticStabilityDiagnosticsReport)
@@ -47,6 +50,17 @@ def test_diagnostics_clean_fixture_reports_transition_matrix_and_confusion_graph
         "acts_as_gate": False,
     }
     assert validate_synthetic_stability_diagnostics_summary(payload) is payload
+
+
+def test_diagnostics_requires_explicit_candidate_predictions():
+    fixture = make_synthetic_stability_scenario_fixture(
+        scenario_kind="cross_view",
+        object_count=2,
+        seed=15,
+    )
+
+    with pytest.raises(ValueError, match="require explicit predicted_slots"):
+        diagnose_synthetic_stability_fixture(fixture)
 
 
 def test_slot_swap_is_detected_without_changing_oracle_identity():

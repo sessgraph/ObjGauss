@@ -4,18 +4,6 @@
 
 ## Open
 
-### ACTION-027: 修复 v2 stability gate oracle fallback 和 assignment slot 校验
-
-- 原因: 审查日志验证确认 `evaluate_synthetic_stability_gate(...)` 在未传
-  `predicted_slots` / `predicted_assignments` 时仍会回退到 synthetic oracle expected slots，
-  使未运行 solver 的 gate 也可返回 `synthetic_stability_gate_pass`。当前长度不匹配已有
-  `ValueError`，但 assignment matrix column count 仍未显式校验等于 fixture slot 数。
-- 推荐: gate 层要求显式 prediction 输入，或在无 prediction 时返回 fail / sentinel；
-  `predicted_slots`、`predicted_assignments` 均应校验帧数、行数和 slot 数。补负向测试覆盖
-  no-prediction、slot-count mismatch 和当前已存在的 length mismatch。
-- 退出条件: 无 prediction 的 stability gate 不再 pass；slot-count mismatch fail fast；
-  `tests/test_v2_stability_gate.py` / `tests/test_v2_stability_diagnostics.py` 覆盖上述负路径。
-
 ### ACTION-026: 修复 supervised assignment CE clip 边界梯度
 
 - 原因: 审查日志验证确认 `supervised_assignment_loss_and_gradient(...)` 在
@@ -44,6 +32,17 @@
 - 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
 
 ## Closed
+
+### ACTION-027: 修复 v2 stability gate oracle fallback 和 assignment slot 校验
+
+- 完成 commit: 本提交
+- 结果: `diagnose_synthetic_stability_fixture(...)`、
+  `evaluate_synthetic_stability_gate(...)` 和
+  `evaluate_synthetic_stability_suite_gate(...)` 现在都要求显式 candidate prediction；
+  无 `predicted_slots` / `predicted_assignments` 时 fail-fast，不再回退到 synthetic oracle
+  expected slots。`predicted_assignments` 还新增列数校验，必须等于 fixture oracle slot 数。
+  `tests/test_v2_stability_gate.py`、`tests/test_v2_stability_diagnostics.py` 和
+  `tests/test_objectstate_identity_gate.py` 覆盖 no-prediction 与 slot-count mismatch 负路径。
 
 ### ACTION-025: 增加 bounded normalization cross-sample 行并收紧 hard regression gate
 

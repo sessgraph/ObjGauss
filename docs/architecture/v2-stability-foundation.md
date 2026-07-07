@@ -152,6 +152,13 @@ builder：
 - `evaluate_synthetic_stability_gate(...)`
 - `evaluate_synthetic_stability_suite_gate(...)`
 
+输入 contract：
+
+- Gate 和 diagnostics 都必须消费显式 candidate prediction：`predicted_slots` /
+  `predicted_assignments` 或 suite 级对应输入。
+- 无 prediction 时必须 fail-fast，不允许回退到 oracle `expected_slots` 形成伪绿灯。
+- `predicted_assignments` 的列数必须等于 fixture oracle slot 数，否则 fail-fast。
+
 hard checks：
 
 - `expected_slot_consistency_pass`

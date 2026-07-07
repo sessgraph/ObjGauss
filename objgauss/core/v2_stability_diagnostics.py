@@ -376,9 +376,10 @@ def _prediction_rows(
     if predicted_slots is not None and predicted_assignments is not None:
         raise ValueError("provide predicted_slots or predicted_assignments, not both")
     if predicted_slots is None and predicted_assignments is None:
-        slots = expected_slots_for_synthetic_fixture(fixture)
-        confidences = tuple(np.ones(slots_array.shape[0], dtype=np.float32) for slots_array in slots)
-        return slots, confidences
+        raise ValueError(
+            "synthetic stability diagnostics require explicit predicted_slots "
+            "or predicted_assignments"
+        )
     if predicted_slots is not None:
         if len(predicted_slots) != len(fixture.observations):
             raise ValueError("predicted_slots must cover every observation frame")
@@ -401,6 +402,8 @@ def _prediction_rows(
         assignment_array = _assignment_array(assignment, f"predicted_assignments[{frame_index}]")
         if assignment_array.shape[0] != observation.evidence.evidence_count:
             raise ValueError("predicted assignment rows must match observation evidence rows")
+        if assignment_array.shape[1] != fixture.world.oracle.slots:
+            raise ValueError("predicted assignment columns must match fixture slot count")
         slots_out.append(np.argmax(assignment_array, axis=1).astype(np.int64, copy=False))
         confidences.append(np.max(assignment_array, axis=1).astype(np.float32, copy=False))
     return tuple(slots_out), tuple(confidences)

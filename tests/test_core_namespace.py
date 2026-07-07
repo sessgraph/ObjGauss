@@ -42,7 +42,21 @@ from objgauss.core import (
     ObjectStateGaussianDecode,
     ObjectStateGaussianDecoderTrainingResult,
     ObjectStateGaussianDecoderState,
+    ObjectStateIdentityEncoderConfig,
+    ObjectStateIdentityEncoderState,
+    ObjectStateIdentityEncoderTrainingResult,
+    ObjectStateIdentityGateReport,
+    ObjectStateIdentityGateThresholds,
+    ObjectStateIdentityRow,
+    ObjectStatePredictiveGateReport,
+    ObjectStatePredictiveGateThresholds,
+    ObjectStatePredictiveRow,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
+    OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA,
+    OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA,
+    OBJECTSTATE_IDENTITY_DATASET_SCHEMA,
+    OBJECTSTATE_IDENTITY_GATE_SCHEMA,
+    OBJECTSTATE_PREDICTIVE_GATE_SCHEMA,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -109,6 +123,8 @@ from objgauss.core import (
     core_model_train_validate_report,
     decode_gaussian_from_object_state,
     diagnose_synthetic_stability_fixture,
+    evaluate_objectstate_identity_gate,
+    evaluate_objectstate_predictive_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
     dynamic_k_proposal_report,
@@ -130,6 +146,7 @@ from objgauss.core import (
     initialize_object_emergence_solver,
     initialize_object_state_gaussian_decoder,
     image_target_contract_summary,
+    initialize_objectstate_identity_encoder_state,
     make_object_identity_oracle,
     make_synthetic_stability_scenario_fixture,
     make_synthetic_stability_scenario_suite,
@@ -141,6 +158,7 @@ from objgauss.core import (
     object_state_stability_report,
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
+    objectstate_identity_encoder_features,
     object_emergence_solver_state_from_dict,
     object_scale_multipliers_from_log_offsets,
     object_state_gaussian_decoder_state_from_dict,
@@ -166,6 +184,7 @@ from objgauss.core import (
     renderer_loss_boundary_report,
     solver_decoder_training_scale_plan,
     train_kernel_mvp,
+    train_objectstate_identity_encoder,
     train_object_emergence_solver,
     train_assignment_solver_v2,
     train_object_state_gaussian_decoder,
@@ -203,6 +222,9 @@ from objgauss.core import (
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
     validate_synthetic_observation_frame,
+    validate_objectstate_identity_encoder_training_summary,
+    validate_objectstate_identity_gate_summary,
+    validate_objectstate_predictive_gate_summary,
     validate_synthetic_stability_diagnostics_summary,
     validate_synthetic_stability_gate_summary,
     validate_synthetic_stability_suite_gate_summary,
@@ -476,16 +498,69 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert V2_STABILITY_GATE_SCHEMA == "objgauss-v2-stability-gate-v1"
     assert V2_STABILITY_GATE_SUITE_SCHEMA == "objgauss-v2-stability-gate-suite-v1"
     assert "expected_slot_consistency_pass" in V2_STABILITY_GATE_HARD_CHECKS
-    gate = evaluate_synthetic_stability_gate(fixture)
+    gate = evaluate_synthetic_stability_gate(fixture, predicted_slots=predicted)
     assert isinstance(gate, SyntheticStabilityGateReport)
     gate_summary = gate.as_dict()
     assert validate_synthetic_stability_gate_summary(gate_summary) is gate_summary
     assert gate_summary["status"] == "synthetic_stability_gate_pass"
-    suite_gate = evaluate_synthetic_stability_suite_gate(suite)
+    suite_predictions = tuple(expected_slots_for_synthetic_fixture(item) for item in suite)
+    suite_gate = evaluate_synthetic_stability_suite_gate(
+        suite,
+        predicted_slots_by_fixture=suite_predictions,
+    )
     assert isinstance(suite_gate, SyntheticStabilitySuiteGateReport)
     suite_summary = suite_gate.as_dict()
     assert validate_synthetic_stability_suite_gate_summary(suite_summary) is suite_summary
     assert suite_summary["status"] == "synthetic_stability_suite_gate_pass"
+
+    assert OBJECTSTATE_IDENTITY_GATE_SCHEMA == "objgauss-objectstate-identity-gate-v1"
+    assert OBJECTSTATE_IDENTITY_DATASET_SCHEMA == "objgauss-objectstate-identity-dataset-v1"
+    identity_gate = evaluate_objectstate_identity_gate(
+        suite,
+        predicted_slots_by_fixture=suite_predictions,
+    )
+    assert isinstance(identity_gate, ObjectStateIdentityGateReport)
+    assert isinstance(identity_gate.thresholds, ObjectStateIdentityGateThresholds)
+    assert isinstance(identity_gate.rows[0], ObjectStateIdentityRow)
+    identity_summary = identity_gate.as_dict()
+    assert validate_objectstate_identity_gate_summary(identity_summary) is identity_summary
+    assert identity_summary["status"] == "objectstate_identity_gate_pass"
+    assert identity_summary["metrics"]["idf1"] == 1.0
+
+    assert OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA == (
+        "objgauss-objectstate-identity-encoder-training-v1"
+    )
+    assert OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA == (
+        "objgauss-objectstate-identity-encoder-state-v1"
+    )
+    encoder_features = objectstate_identity_encoder_features(identity_gate.rows)
+    encoder_config = ObjectStateIdentityEncoderConfig(
+        input_dim=encoder_features.shape[1],
+        embedding_dim=2,
+        learning_rate=0.4,
+        weight_decay=0.0,
+        seed=8,
+    )
+    encoder_state = initialize_objectstate_identity_encoder_state(encoder_config)
+    assert isinstance(encoder_state, ObjectStateIdentityEncoderState)
+    encoder_result = train_objectstate_identity_encoder(
+        identity_gate.rows,
+        config=encoder_config,
+        iterations=20,
+    )
+    assert isinstance(encoder_result, ObjectStateIdentityEncoderTrainingResult)
+    encoder_summary = encoder_result.as_dict()
+    assert validate_objectstate_identity_encoder_training_summary(encoder_summary) is encoder_summary
+    assert encoder_summary["schema"] == OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA
+
+    assert OBJECTSTATE_PREDICTIVE_GATE_SCHEMA == "objgauss-objectstate-predictive-gate-v1"
+    predictive_report = evaluate_objectstate_predictive_gate(suite)
+    assert isinstance(predictive_report, ObjectStatePredictiveGateReport)
+    assert isinstance(predictive_report.thresholds, ObjectStatePredictiveGateThresholds)
+    assert isinstance(predictive_report.rows[0], ObjectStatePredictiveRow)
+    predictive_summary = predictive_report.as_dict()
+    assert validate_objectstate_predictive_gate_summary(predictive_summary) is predictive_summary
+    assert predictive_summary["schema"] == OBJECTSTATE_PREDICTIVE_GATE_SCHEMA
 
 
 def test_core_namespace_exposes_property_append_helper():

@@ -32,9 +32,13 @@
 优先继续增加许可 / 来源清晰的小型 real / public sample 行，并把 blocked rows 和 pass rows
 分开记录；若继续 dense Chair，应先试更保守 mask policy，而不是改 viewer/export 默认。
 当前更高优先级算法切片已转为 State Variable Gate 路线：`OBJECTSTATE-STATE-VARIABLE-GATE-001`
-已冻结验收定义，下一步实现 `OBJECTSTATE-IDENTITY-GATE-001`，先证明 `ObjectState` 是
-latent object belief / state variable，而不是继续追 renderer 指标或 Gaussian 分割表格。
-若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
+已冻结验收定义，`OBJECTSTATE-IDENTITY-GATE-001`、`OBJECTSTATE-IDENTITY-MODEL-001` 和
+`OBJECTSTATE-PREDICTIVE-GATE-001` 已补第一版 synthetic smoke evaluator：无显式
+candidate prediction 不能 pass，contrastive identity encoder 训练有 loss / retrieval
+summary，predictive gate 已输出 state-vs-history error ratio。下一步优先补 controlled
+real/public identity rows，或推进 action-conditioned causal gate；继续不推进 diffusion、
+replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛
+full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -42,40 +46,6 @@ latent object belief / state variable，而不是继续追 renderer 指标或 Ga
 需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
-
-### OBJECTSTATE-IDENTITY-GATE-001: Build ObjectState state-variable smoke evaluator
-
-- 状态: planned / next-algorithm-quality-slice
-- 类型: 标准 PR / research evaluator + metrics
-- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
-- 目标: 按 State Variable Gate 的 smoke level，先实现 identity persistence、
-  occlusion recovery 和 view invariance evaluator，证明评估闭环能跑且不会把 observation
-  state 误报为 world state。
-- 背景: 最新评审将 ObjGauss 的核心风险定位为 Gaussian segmentation 工具到
-  object-centric world model 的鸿沟。当前仓库已证明 `PerceptionEvidence -> A[N,K] ->
-  ObjectState -> GaussianToken` 的工程闭环，但还没有证明 `ObjectState` 满足动力系统里的
-  state variable 要求。
-- Smoke gate 覆盖:
-  - **Identity State**: IDF1、fragmentation rate、swap rate、occlusion recovery、
-    cross-view same/different object distance。
-  - synthetic identity oracle 高阈值，例如 identity / occlusion recovery `>= 0.95`。
-  - controlled real / public gate 先要求可复现、可解释、无明显 identity collapse。
-  - open-world real gate 先记录失败，不把失败行混入通过行。
-- 必需输出:
-  - `state_variable_gate.json`。
-  - `failure_table.md`。
-  - `identity_metrics.csv`。
-  - `occlusion_metrics.csv`。
-  - `view_invariance_metrics.csv`。
-- 后续分解:
-  - `OBJECTSTATE-PHYSICAL-STATE-GATE-001`: 加 centroid / pose / velocity / relation prediction checks，并和 history baseline 比较。
-  - `OBJECTSTATE-CAUSAL-STATE-GATE-001`: 加 synthetic / controlled action schema 和 push / move / hide / reveal counterfactual checks。
-- 边界:
-  - 不引入 diffusion world model。
-  - 不实现 replay buffer 大系统。
-  - 不新增重型 tracking / segmentation 依赖。
-  - 不改变 renderer、manifest、public demo 或 HF release 口径。
-  - 不把 PSNR、render occlusion、PLY size 或 viewer 可见模型数量当作 state-variable 证明。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 
@@ -137,6 +107,86 @@ latent object belief / state variable，而不是继续追 renderer 指标或 Ga
 
 ## Done
 
+### OBJECTSTATE-PREDICTIVE-GATE-001: Add synthetic predictive sufficiency smoke gate
+
+- 状态: done / synthetic-state-vs-history-predictive-smoke
+- 类型: 标准 PR / research evaluator + predictive metrics
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 第一次进入 world-model gate：用 `ObjectState(t)` 预测 `ObjectState(t+n)`，
+  并和 history baseline 比较预测误差。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_predictive_gate`。
+  - 新增 `objgauss-objectstate-predictive-gate-v1` schema。
+  - `evaluate_objectstate_predictive_gate(...)` 复用 synthetic stability fixtures，
+    以 synthetic ObjectState pose + `SyntheticWorldObject.trajectory` velocity 预测未来 pose。
+  - History baseline 使用可用短历史估计 velocity；summary 输出 `state_ade`、
+    `state_fde`、`history_ade`、`prediction_error_ratio`、`state_sufficiency_score` 和
+    `identity_consistency_rate`。
+  - `velocity_scale=0` 负路径会 fail，证明 gate 不是无条件绿灯。
+- 边界:
+  - 当前 velocity 来源是 synthetic oracle trajectory，只是 smoke evaluator。
+  - 不训练 dynamics model，不做 replay buffer / diffusion，不接 renderer loss，不改 viewer。
+  - Controlled real rows、learned dynamics 和 action-conditioned counterfactual gate 仍是后续工作。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_predictive_gate.py tests/test_core_namespace.py -q`: passed。
+- 完成 commit: 本提交。
+
+### OBJECTSTATE-IDENTITY-MODEL-001: Train contrastive ObjectState identity encoder
+
+- 状态: done / contrastive-identity-encoder-smoke
+- 类型: 标准 PR / research training evaluator
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在 identity gate rows 上训练一个最小 ObjectState identity encoder，验证 contrastive
+  identity loss 可以作为后续 encoder 训练 gate，而不是直接进入 identity graph。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_identity_encoder`。
+  - 新增 `objgauss-objectstate-identity-encoder-training-v1` 和
+    `objgauss-objectstate-identity-encoder-state-v1` schema。
+  - `train_objectstate_identity_encoder(...)` 使用 NumPy 线性 projection 和 supervised
+    contrastive identity loss；same identity pairs 贡献 positive distance loss，different
+    identity pairs 贡献 margin loss。
+  - Training summary 输出 initial / final total loss、positive / negative loss、
+    active negative pairs、retrieval recall、state shapes 和 non-goals。
+- 边界:
+  - 不引入 identity graph、replay buffer、diffusion、renderer loss 或 viewer 默认策略。
+  - 当前是 synthetic smoke training，不声明真实世界 identity encoder 已充分。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_identity_encoder.py tests/test_objectstate_identity_gate.py tests/test_core_namespace.py -q`: passed。
+- 完成 commit: 本提交。
+
+### OBJECTSTATE-IDENTITY-GATE-001: Build ObjectState state-variable smoke evaluator
+
+- 状态: done / synthetic-identity-smoke-gate-v0.1
+- 类型: 标准 PR / research evaluator + metrics
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 按 State Variable Gate 的 smoke level，先实现 identity persistence、
+  occlusion recovery 和 view invariance evaluator，证明评估闭环能跑且不会把 observation
+  state 或缺失候选预测误报为 world state。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_identity_gate`。
+  - 新增 `objgauss-objectstate-identity-gate-v1` 和
+    `objgauss-objectstate-identity-dataset-v1` schema。
+  - `evaluate_objectstate_identity_gate(...)` 复用 synthetic identity oracle /
+    cross-view / occlusion recovery / perturbation / adversarial swap fixtures，并要求显式
+    `predicted_slots_by_fixture` 或 `predicted_assignments_by_fixture`。
+  - Gate 输出 ObjectInstance / Observation / Transformation / GroundTruthIdentity rows，
+    并记录 candidate ObjectState 的 predicted identity、pose、geometry / appearance /
+    identity embeddings 和 confidence。
+  - Metrics 覆盖 `id_accuracy`、`idf1`、`embedding_retrieval_recall_at_1`、
+    `long_term_drift_rate`、`fragmentation_rate`、`occlusion_recovery_rate` 和
+    `contrastive_margin`。
+  - 同步修复 `v2_stability_diagnostics` / `v2_stability_gate` oracle fallback：无显式
+    prediction 时 fail-fast；`predicted_assignments` 列数必须等于 fixture slot 数。
+- 边界:
+  - 不训练 encoder，不实现 replay buffer / diffusion / dynamics model。
+  - 不改变 viewer/export 默认策略。
+  - 当前只完成 synthetic Identity State smoke gate；Physical State、Causal State 和
+    controlled real/public rows 仍是后续工作。
+- 验证:
+  - `uv run --extra dev pytest tests/test_v2_stability_gate.py tests/test_objectstate_identity_gate.py tests/test_core_namespace.py -q`: passed，20 tests。
+  - `uv run --extra dev pytest tests/test_v2_stability_diagnostics.py tests/test_assignment_solver_v2_eval.py tests/test_core_model_validation.py tests/test_assignment_solver_v2.py -q`: passed，14 tests。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-STATE-VARIABLE-GATE-001: Freeze ObjectState state-variable acceptance gate
 
 - 状态: done / research-architecture-gate-frozen
@@ -157,7 +207,7 @@ latent object belief / state variable，而不是继续追 renderer 指标或 Ga
 - 验收:
   - Architecture spec 存在并引用 v1 kernel、object emergence plan、object emergence
     model v1 和 v2 world-model roadmap。
-  - `OBJECTSTATE-IDENTITY-GATE-001` 已作为后续 smoke evaluator 实现切片进入 Planned。
+  - `OBJECTSTATE-IDENTITY-GATE-001` 后续已完成 synthetic identity smoke gate v0.1。
   - `R-017` 已记录 ObjectState 退化为 observation state 的核心风险。
 - 验证:
   - `git diff --check`: passed。

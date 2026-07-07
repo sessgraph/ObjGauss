@@ -143,6 +143,11 @@ def evaluate_synthetic_stability_gate(
     temporal_coherence_warn_threshold: float = 0.8,
 ) -> SyntheticStabilityGateReport:
     fixture = validate_synthetic_stability_scenario_fixture(fixture)
+    if predicted_slots is None and predicted_assignments is None:
+        raise ValueError(
+            "synthetic stability gate requires explicit predicted_slots "
+            "or predicted_assignments"
+        )
     _validate_gate_thresholds(
         assignment_entropy_warn_threshold=assignment_entropy_warn_threshold,
         object_purity_warn_threshold=object_purity_warn_threshold,
@@ -192,6 +197,11 @@ def evaluate_synthetic_stability_suite_gate(
         raise ValueError("fixtures must contain at least one scenario")
     if predicted_slots_by_fixture is not None and predicted_assignments_by_fixture is not None:
         raise ValueError("provide predicted_slots_by_fixture or predicted_assignments_by_fixture, not both")
+    if predicted_slots_by_fixture is None and predicted_assignments_by_fixture is None:
+        raise ValueError(
+            "synthetic stability suite gate requires explicit predicted_slots_by_fixture "
+            "or predicted_assignments_by_fixture"
+        )
     slot_predictions = _prediction_sequence(predicted_slots_by_fixture, len(resolved_fixtures))
     assignment_predictions = _prediction_sequence(predicted_assignments_by_fixture, len(resolved_fixtures))
     reports = []
@@ -383,6 +393,8 @@ def _assignment_entropy_summary(
             matrix = _normalized_assignment_array(assignment, f"predicted_assignments[{frame_index}]")
             if matrix.shape[0] != observation.evidence.evidence_count:
                 raise ValueError("predicted assignment rows must match observation evidence rows")
+            if matrix.shape[1] != fixture.world.oracle.slots:
+                raise ValueError("predicted assignment columns must match fixture slot count")
             row_count += matrix.shape[0]
             entropies.append(_normalized_entropy(matrix))
         mean_entropy = float(np.mean(np.concatenate(entropies))) if entropies else 0.0
@@ -517,7 +529,7 @@ def _prediction_source(
         return "predicted_assignments"
     if predicted_slots is not None:
         return "predicted_slots"
-    return "oracle_expected_slots"
+    return "missing_predictions"
 
 
 def _prediction_sequence(value: Sequence[Any] | None, expected_length: int) -> tuple[Any, ...]:

@@ -122,6 +122,33 @@ counterfactual / action interface。当前阈值策略是 synthetic oracle 使�
 因此下一阶段算法质量优先级改为实现 state-variable smoke gate，而不是继续追
 renderer 指标、diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
+随后完成 `OBJECTSTATE-IDENTITY-GATE-001` 的第一版可证伪实现：新增
+`objgauss.core.objectstate_identity_gate`，冻结
+`objgauss-objectstate-identity-gate-v1` 和
+`objgauss-objectstate-identity-dataset-v1`。该 smoke evaluator 复用 synthetic identity
+oracle / cross-view / occlusion recovery / perturbation / adversarial swap fixtures，但要求
+显式 candidate prediction 输入；`predicted_slots_by_fixture` 或
+`predicted_assignments_by_fixture` 缺失时 fail-fast，不再允许 oracle expected-slot fallback。
+输出指标包括 `id_accuracy`、`idf1`、`embedding_retrieval_recall_at_1`、
+`long_term_drift_rate`、`fragmentation_rate`、`occlusion_recovery_rate` 和
+`contrastive_margin`。同步收紧旧 `v2_stability_diagnostics` / `v2_stability_gate`：
+无 prediction 不能 pass，assignment matrix 列数必须等于 fixture slot 数。当前结论只表示
+Identity State smoke gate 可运行且可拒绝坏候选；Physical State / Causal State 和真实
+controlled real rows 仍未完成，不能把 ObjGauss 表述为已证明的 object-centric world model。
+
+随后补齐目标文件建议的 `OBJECTSTATE-IDENTITY-MODEL-001` 和
+`OBJECTSTATE-PREDICTIVE-GATE-001` smoke slices：`objgauss.core.objectstate_identity_encoder`
+新增 NumPy 线性 ObjectState identity encoder 训练摘要，schema 为
+`objgauss-objectstate-identity-encoder-training-v1`，使用 supervised contrastive identity
+loss 记录 initial / final loss、positive / negative loss、active negatives 和 retrieval
+recall；它不引入 identity graph、replay buffer、diffusion 或 renderer loss。
+`objgauss.core.objectstate_predictive_gate` 新增
+`objgauss-objectstate-predictive-gate-v1`，用 synthetic ObjectState pose + velocity 预测
+`ObjectState(t+n)`，并和 history baseline 比较 `state_ade`、`history_ade`、
+`prediction_error_ratio`、`state_sufficiency_score` 和 `identity_consistency_rate`。当前
+predictive gate 的 velocity 来源明确是 synthetic world oracle trajectory，属于可失败的
+smoke evaluator；controlled real rows、learned dynamics 和 counterfactual action gate 仍未完成。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

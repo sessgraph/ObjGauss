@@ -24,8 +24,12 @@ from objgauss.core.v2_stability_gate import (
 
 def test_clean_synthetic_stability_suite_passes_identity_hard_gate():
     fixtures = make_synthetic_stability_scenario_suite(object_count=2, seed=100)
+    predicted = tuple(expected_slots_for_synthetic_fixture(fixture) for fixture in fixtures)
 
-    report = evaluate_synthetic_stability_suite_gate(fixtures)
+    report = evaluate_synthetic_stability_suite_gate(
+        fixtures,
+        predicted_slots_by_fixture=predicted,
+    )
     payload = report.as_dict()
 
     assert isinstance(report, SyntheticStabilitySuiteGateReport)
@@ -44,6 +48,40 @@ def test_clean_synthetic_stability_suite_passes_identity_hard_gate():
         assert scenario["status"] == "synthetic_stability_gate_pass"
         assert scenario["hard_blockers"] == []
     assert validate_synthetic_stability_suite_gate_summary(payload) is payload
+
+
+def test_gate_requires_explicit_candidate_predictions():
+    fixture = make_synthetic_stability_scenario_fixture(
+        scenario_kind="cross_view",
+        object_count=2,
+        seed=105,
+    )
+
+    with pytest.raises(ValueError, match="requires explicit predicted_slots"):
+        evaluate_synthetic_stability_gate(fixture)
+
+    with pytest.raises(ValueError, match="requires explicit predicted_slots_by_fixture"):
+        evaluate_synthetic_stability_suite_gate((fixture,))
+
+
+def test_gate_rejects_assignment_slot_count_mismatch():
+    fixture = make_synthetic_stability_scenario_fixture(
+        scenario_kind="cross_view",
+        object_count=2,
+        frame_count=2,
+        seed=106,
+        observation_config=ObservationModelConfig(points_per_object=1, position_jitter=0.0, seed=107),
+    )
+    bad_assignments = tuple(
+        np.full((frame.evidence.evidence_count, 3), 1.0 / 3.0, dtype=np.float32)
+        for frame in fixture.observations
+    )
+
+    with pytest.raises(ValueError, match="columns must match fixture slot count"):
+        evaluate_synthetic_stability_gate(
+            fixture,
+            predicted_assignments=bad_assignments,
+        )
 
 
 def test_adversarial_swap_prediction_fails_identity_hard_gate_with_diagnostics():
@@ -146,6 +184,7 @@ def test_gate_rejects_bad_soft_thresholds():
     with pytest.raises(ValueError, match="assignment_entropy_warn_threshold"):
         evaluate_synthetic_stability_gate(
             fixture,
+            predicted_slots=expected_slots_for_synthetic_fixture(fixture),
             assignment_entropy_warn_threshold=1.5,
         )
 

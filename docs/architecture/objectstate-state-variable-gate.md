@@ -37,6 +37,17 @@ P(S_{t+1} | S_1, ..., S_t, A_t) ~= P(S_{t+1} | S_t, A_t)
 本文件定义 ObjGauss 的 **State Variable Gate**。它不改变 v1 kernel contract，
 也不把 v2 / v3 world-model 假设提前写成已落地能力。
 
+ObjGauss V2 does not assume ObjectState is a valid world state. The purpose of
+V2 is to experimentally determine whether ObjectState satisfies the Markov
+sufficiency property required by a world-state representation.
+
+中文口径：
+
+```text
+ObjGauss V2 不假设 ObjectState 是真实世界状态，而是通过实验验证
+ObjectState 是否满足世界状态表示所需的马尔可夫充分性。
+```
+
 ## 1. Core Claim
 
 ObjGauss 需要验证的科学假设是：
@@ -422,6 +433,63 @@ Required behavior:
 - Fail if no explicit prediction/state sequence is provided.
 - Output pass and fail rows separately.
 - Treat small real/public sample failure as valid negative evidence, not as pass.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_identity_gate`.
+- Gate schema: `objgauss-objectstate-identity-gate-v1`.
+- Dataset schema: `objgauss-objectstate-identity-dataset-v1`.
+- Inputs are explicit candidate predictions: `predicted_slots_by_fixture` or
+  `predicted_assignments_by_fixture`.
+- Candidate identity embeddings are derived from predicted slots / assignments,
+  never from oracle labels by default.
+- Metrics include `id_accuracy`, `idf1`, `embedding_retrieval_recall_at_1`,
+  `long_term_drift_rate`, `fragmentation_rate`, `occlusion_recovery_rate` and
+  `contrastive_margin`.
+- Legacy synthetic stability diagnostics / gate now reject missing predictions;
+  there is no oracle expected-slot fallback in gate paths.
+
+### OBJECTSTATE-IDENTITY-MODEL-001
+
+Train a small ObjectState identity encoder on the identity rows from
+`OBJECTSTATE-IDENTITY-GATE-001`.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_identity_encoder`.
+- Training schema: `objgauss-objectstate-identity-encoder-training-v1`.
+- State schema: `objgauss-objectstate-identity-encoder-state-v1`.
+- Training uses a NumPy linear projection and supervised contrastive identity
+  loss: same identity pairs contribute positive distance loss; different
+  identity pairs contribute margin loss.
+- Summary reports initial / final contrastive loss, positive / negative loss,
+  active negative pairs, retrieval recall and non-goals.
+- This is a smoke training evaluator. It does not add an identity graph,
+  replay buffer, renderer loss, diffusion model or viewer/export default.
+
+### OBJECTSTATE-PREDICTIVE-GATE-001
+
+Build the first synthetic predictive sufficiency smoke gate:
+
+```text
+ObjectState_t(pose, velocity) -> ObjectState_{t+n}(pose)
+```
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_predictive_gate`.
+- Gate schema: `objgauss-objectstate-predictive-gate-v1`.
+- The state predictor uses synthetic ObjectState pose + velocity from
+  `SyntheticWorldObject.trajectory`.
+- The baseline predictor uses short observation history when available.
+- Summary reports `state_ade`, `state_fde`, `history_ade`,
+  `prediction_error_ratio`, `state_sufficiency_score` and
+  `identity_consistency_rate`.
+- A wrong / missing velocity candidate fails the gate, so this is not a
+  rubber-stamp evaluator.
+- Current scope is synthetic smoke only. Controlled real rows, learned
+  dynamics, action-conditioned counterfactuals and paper-level Markov
+  sufficiency remain future gates.
 
 ### OBJECTSTATE-PHYSICAL-STATE-GATE-001
 

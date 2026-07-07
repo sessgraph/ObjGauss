@@ -94,6 +94,42 @@ _EXPORTS = {
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
     ),
+    "ObjectStateIdentityGateReport": (
+        "objgauss.core.objectstate_identity_gate",
+        "ObjectStateIdentityGateReport",
+    ),
+    "ObjectStateIdentityEncoderConfig": (
+        "objgauss.core.objectstate_identity_encoder",
+        "ObjectStateIdentityEncoderConfig",
+    ),
+    "ObjectStateIdentityEncoderState": (
+        "objgauss.core.objectstate_identity_encoder",
+        "ObjectStateIdentityEncoderState",
+    ),
+    "ObjectStateIdentityEncoderTrainingResult": (
+        "objgauss.core.objectstate_identity_encoder",
+        "ObjectStateIdentityEncoderTrainingResult",
+    ),
+    "ObjectStateIdentityGateThresholds": (
+        "objgauss.core.objectstate_identity_gate",
+        "ObjectStateIdentityGateThresholds",
+    ),
+    "ObjectStateIdentityRow": (
+        "objgauss.core.objectstate_identity_gate",
+        "ObjectStateIdentityRow",
+    ),
+    "ObjectStatePredictiveGateReport": (
+        "objgauss.core.objectstate_predictive_gate",
+        "ObjectStatePredictiveGateReport",
+    ),
+    "ObjectStatePredictiveGateThresholds": (
+        "objgauss.core.objectstate_predictive_gate",
+        "ObjectStatePredictiveGateThresholds",
+    ),
+    "ObjectStatePredictiveRow": (
+        "objgauss.core.objectstate_predictive_gate",
+        "ObjectStatePredictiveRow",
+    ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityOracle",
@@ -345,6 +381,26 @@ _EXPORTS = {
         "objgauss.core.object_state_benchmark",
         "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA",
     ),
+    "OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA": (
+        "objgauss.core.objectstate_identity_encoder",
+        "OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA",
+    ),
+    "OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA": (
+        "objgauss.core.objectstate_identity_encoder",
+        "OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA",
+    ),
+    "OBJECTSTATE_IDENTITY_DATASET_SCHEMA": (
+        "objgauss.core.objectstate_identity_gate",
+        "OBJECTSTATE_IDENTITY_DATASET_SCHEMA",
+    ),
+    "OBJECTSTATE_IDENTITY_GATE_SCHEMA": (
+        "objgauss.core.objectstate_identity_gate",
+        "OBJECTSTATE_IDENTITY_GATE_SCHEMA",
+    ),
+    "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA": (
+        "objgauss.core.objectstate_predictive_gate",
+        "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA",
+    ),
     "TrainableKernelCamera": ("objgauss.core.trainable_kernel", "TrainableKernelCamera"),
     "TrainableKernelFrame": ("objgauss.core.trainable_kernel", "TrainableKernelFrame"),
     "TrainableKernelImageTarget": (
@@ -488,6 +544,38 @@ _EXPORTS = {
     "evaluate_synthetic_stability_suite_gate": (
         "objgauss.core.v2_stability_gate",
         "evaluate_synthetic_stability_suite_gate",
+    ),
+    "evaluate_objectstate_identity_gate": (
+        "objgauss.core.objectstate_identity_gate",
+        "evaluate_objectstate_identity_gate",
+    ),
+    "evaluate_objectstate_predictive_gate": (
+        "objgauss.core.objectstate_predictive_gate",
+        "evaluate_objectstate_predictive_gate",
+    ),
+    "initialize_objectstate_identity_encoder_state": (
+        "objgauss.core.objectstate_identity_encoder",
+        "initialize_objectstate_identity_encoder_state",
+    ),
+    "objectstate_identity_encoder_features": (
+        "objgauss.core.objectstate_identity_encoder",
+        "objectstate_identity_encoder_features",
+    ),
+    "train_objectstate_identity_encoder": (
+        "objgauss.core.objectstate_identity_encoder",
+        "train_objectstate_identity_encoder",
+    ),
+    "validate_objectstate_identity_gate_summary": (
+        "objgauss.core.objectstate_identity_gate",
+        "validate_objectstate_identity_gate_summary",
+    ),
+    "validate_objectstate_predictive_gate_summary": (
+        "objgauss.core.objectstate_predictive_gate",
+        "validate_objectstate_predictive_gate_summary",
+    ),
+    "validate_objectstate_identity_encoder_training_summary": (
+        "objgauss.core.objectstate_identity_encoder",
+        "validate_objectstate_identity_encoder_training_summary",
     ),
     "evaluate_assignment_solver_v2_stability": (
         "objgauss.core.assignment_solver_v2_eval",
