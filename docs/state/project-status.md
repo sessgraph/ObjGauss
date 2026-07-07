@@ -228,6 +228,21 @@ intervention readiness、RGB / Gaussian coverage、GT availability 和 issues；
 summary JSON 和 controlled-real seed manifest。当前仍没有提交真实视频、图像、
 Gaussian 或 GT 标注文件；这一步只是让真实采集结果进入 gate 前有可验证数据契约。
 
+随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`：新增
+`objgauss.core.objectstate_controlled_identity_eval`，把 controlled capture GT 和候选
+ObjectState / tracker identity predictions 连接起来，第一次让真实 Stage 1 identity row
+可以从 `blocked` 进入 `pass` / `fail`。新增 prediction schema
+`objgauss-objectstate-controlled-identity-predictions-v1` 和 eval summary schema
+`objgauss-objectstate-controlled-identity-eval-v1`；候选预测按 `(frame_id, object_id)`
+绑定 `predicted_identity`。Evaluator 会拒绝 sample / frame / object 不匹配，计算
+`idf1`、`fragmentation_rate`、`swap_rate`、`identity_collapse`、track coverage 和
+missing prediction count，并生成带 identity pass/fail row 的
+`objgauss-objectstate-controlled-real-manifest-v1`。CLI 新增
+`objgauss object-state eval-controlled-identity <capture.json> <predictions.json>`，支持
+summary JSON、controlled-real manifest 输出、阈值参数和 `--require-pass`。当前仍没有
+提交真实 capture / candidate prediction 文件；测试使用本地 fixture，只证明 evaluator
+可以拒绝坏 identity tracks 并生成 pass/fail rows。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

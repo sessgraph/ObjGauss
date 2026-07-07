@@ -655,6 +655,50 @@ Current scope remains manifest / readiness validation only. It does not capture
 video, create GT, reconstruct Gaussians, compute model metrics, train Gaussian
 or dynamics models, use replay / diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001
+
+Add the first controlled real Stage 1 identity metric evaluator.
+
+Required behavior:
+
+- Input a controlled capture manifest with timestamped physical object GT.
+- Input candidate ObjectState / tracker identity predictions bound to
+  `(frame_id, object_id)`.
+- Reject candidate predictions whose sample id, frame id or object id does not
+  match the capture manifest.
+- Compute identity metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `idf1`, `fragmentation_rate`, `swap_rate` and `identity_collapse`.
+- Emit a controlled-real manifest where the identity row becomes `pass` or
+  `fail`, while prediction / intervention rows remain `blocked` until their
+  metrics exist.
+- Keep this as an evaluator / handoff contract only; do not run a tracking
+  model or infer GT.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_identity_eval`.
+- Prediction schema:
+  `objgauss-objectstate-controlled-identity-predictions-v1`.
+- Eval summary schema:
+  `objgauss-objectstate-controlled-identity-eval-v1`.
+- `read_objectstate_controlled_identity_predictions(...)` reads JSON.
+- `validate_objectstate_controlled_identity_predictions(...)` validates
+  candidate metadata and per-frame predictions.
+- `evaluate_objectstate_controlled_identity_predictions(...)` compares capture
+  GT to candidate identity tracks and outputs pass / fail metrics.
+- Threshold defaults:
+  `min_idf1=0.95`, `max_fragmentation_rate=0.05`, `max_swap_rate=0.0`,
+  `require_no_identity_collapse=true`.
+- CLI command:
+  `objgauss object-state eval-controlled-identity <capture.json> <predictions.json>`.
+- CLI outputs optional `--summary-output` and `--controlled-real-output`, plus
+  threshold args and `--require-pass`.
+
+Current scope remains Stage 1 identity evaluation only. It does not capture
+video, create GT, run segmentation / tracking, compute pose prediction,
+compute action-conditioned metrics, train Gaussian or dynamics models, use
+replay / diffusion, or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.
