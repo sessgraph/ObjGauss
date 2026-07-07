@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 from objgauss.cli import main
@@ -29,11 +30,13 @@ def test_controlled_capture_file_audit_passes_when_frame_files_exist(tmp_path):
     assert summary["file_counts"]["rgb"] == {
         "referenced": 3,
         "existing": 3,
+        "valid": 3,
         "missing": 0,
     }
     assert summary["file_counts"]["gaussian"] == {
         "referenced": 3,
         "existing": 3,
+        "valid": 3,
         "missing": 0,
     }
     assert summary["file_counts"]["artifact_refs"]["missing"] == 0
@@ -59,6 +62,29 @@ def test_controlled_capture_file_audit_fails_missing_gaussian_file(tmp_path):
     assert "gaussians/000001.ply" in summary["missing_files_markdown"]
 
 
+def test_controlled_capture_file_audit_fails_empty_rgb_file(tmp_path):
+    manifest = _capture_manifest()
+    _write_bundle_files(tmp_path, frame_count=3)
+    (tmp_path / "rgb" / "000001.png").write_bytes(b"")
+
+    summary = objectstate_controlled_capture_file_audit(manifest, root=tmp_path)
+
+    assert summary["status"] == "objectstate_controlled_capture_file_audit_fail"
+    assert summary["file_counts"]["rgb"] == {
+        "referenced": 3,
+        "existing": 3,
+        "valid": 2,
+        "missing": 1,
+    }
+    assert summary["readiness"]["rgb_files_present"] is False
+    assert summary["missing_files"][0]["kind"] == "rgb"
+    assert summary["missing_files"][0]["exists"] is True
+    assert summary["missing_files"][0]["valid"] is False
+    assert "file smaller than required minimum bytes" in summary["missing_files"][0][
+        "missing_reason"
+    ]
+
+
 def test_controlled_capture_file_audit_allows_rgb_only_when_gaussian_not_required(tmp_path):
     manifest = _capture_manifest(include_gaussian=False)
     _write_bundle_files(tmp_path, frame_count=3, include_gaussian=False)
@@ -73,6 +99,7 @@ def test_controlled_capture_file_audit_allows_rgb_only_when_gaussian_not_require
     assert summary["file_counts"]["gaussian"] == {
         "referenced": 0,
         "existing": 0,
+        "valid": 0,
         "missing": 0,
     }
     assert summary["readiness"]["gaussian_files_present"] is True
@@ -96,6 +123,26 @@ def test_controlled_capture_file_audit_can_check_artifact_refs(tmp_path):
     assert summary["status"] == "objectstate_controlled_capture_file_audit_fail"
     assert summary["file_counts"]["artifact_refs"]["missing"] == 1
     assert summary["readiness"]["artifact_refs_present"] is False
+
+
+def test_controlled_capture_file_audit_can_hash_frame_files(tmp_path):
+    manifest = _capture_manifest()
+    _write_bundle_files(tmp_path, frame_count=3)
+
+    summary = objectstate_controlled_capture_file_audit(
+        manifest,
+        root=tmp_path,
+        check_artifact_refs=True,
+        hash_files=True,
+    )
+
+    expected_rgb_hash = hashlib.sha256(b"rgb").hexdigest()
+
+    assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert summary["requirements"]["file_hashes_included"] is True
+    assert summary["file_records"]["rgb"][0]["sha256"] == expected_rgb_hash
+    assert len(summary["file_records"]["gaussian"][0]["sha256"]) == 64
+    assert "sha256" not in summary["file_records"]["artifact_refs"][0]
 
 
 def test_controlled_capture_missing_files_markdown_handles_empty_list():
@@ -138,8 +185,8 @@ def test_object_state_audit_controlled_capture_files_cli_writes_summary_and_mark
 
     assert f"schema={OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA}" in stdout
     assert "file_audit_status=objectstate_controlled_capture_file_audit_pass" in stdout
-    assert "rgb_existing=3/3" in stdout
-    assert "gaussian_existing=3/3" in stdout
+    assert "rgb_valid=3/3" in stdout
+    assert "gaussian_valid=3/3" in stdout
     assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
     assert "no missing files" in missing
 

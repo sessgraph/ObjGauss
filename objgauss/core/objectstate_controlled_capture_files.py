@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -20,7 +21,14 @@ def objectstate_controlled_capture_file_audit(
     root: str | Path = ".",
     require_gaussian_files: bool = True,
     check_artifact_refs: bool = False,
+    min_rgb_bytes: int = 1,
+    min_gaussian_bytes: int = 1,
+    hash_files: bool = False,
 ) -> dict[str, Any]:
+    if min_rgb_bytes < 0:
+        raise ValueError("min_rgb_bytes must be non-negative")
+    if min_gaussian_bytes < 0:
+        raise ValueError("min_gaussian_bytes must be non-negative")
     checked_manifest = validate_objectstate_controlled_capture_manifest(manifest)
     root_path = Path(root)
     capture_summary = objectstate_controlled_capture_summary(checked_manifest)
@@ -35,6 +43,9 @@ def objectstate_controlled_capture_file_audit(
                 observation["rgb"],
                 root_path=root_path,
                 frame_id=frame["frame_id"],
+                min_bytes=min_rgb_bytes,
+                require_file=True,
+                hash_file=hash_files,
             )
         )
         if "gaussian" in observation:
@@ -44,6 +55,9 @@ def objectstate_controlled_capture_file_audit(
                     observation["gaussian"],
                     root_path=root_path,
                     frame_id=frame["frame_id"],
+                    min_bytes=min_gaussian_bytes,
+                    require_file=True,
+                    hash_file=hash_files,
                 )
             )
         elif require_gaussian_files:
@@ -54,12 +68,23 @@ def objectstate_controlled_capture_file_audit(
                     "ref": "",
                     "path": "",
                     "exists": False,
+                    "is_file": False,
+                    "size_bytes": None,
+                    "valid": False,
                     "missing_reason": "frame missing gaussian observation reference",
                 }
             )
     if check_artifact_refs:
         artifact_records = [
-            _file_record("artifact_ref", ref, root_path=root_path, frame_id=None)
+            _file_record(
+                "artifact_ref",
+                ref,
+                root_path=root_path,
+                frame_id=None,
+                min_bytes=0,
+                require_file=False,
+                hash_file=False,
+            )
             for ref in checked_manifest["sample"]["artifact_refs"]
         ]
     rgb_counts = _counts(rgb_records)
@@ -68,7 +93,7 @@ def objectstate_controlled_capture_file_audit(
     missing = [
         record
         for record in (*rgb_records, *gaussian_records, *artifact_records)
-        if not record["exists"]
+        if not record["valid"]
     ]
     readiness = {
         "rgb_files_present": rgb_counts["missing"] == 0,
@@ -97,11 +122,20 @@ def objectstate_controlled_capture_file_audit(
             "rgb_files_required": True,
             "gaussian_files_required": bool(require_gaussian_files),
             "artifact_refs_checked": bool(check_artifact_refs),
+            "frame_refs_must_be_files": True,
+            "min_rgb_bytes": int(min_rgb_bytes),
+            "min_gaussian_bytes": int(min_gaussian_bytes),
+            "file_hashes_included": bool(hash_files),
         },
         "file_counts": {
             "rgb": rgb_counts,
             "gaussian": gaussian_counts,
             "artifact_refs": artifact_counts,
+        },
+        "file_records": {
+            "rgb": rgb_records,
+            "gaussian": gaussian_records,
+            "artifact_refs": artifact_records,
         },
         "readiness": readiness,
         "issues": _issues(readiness, rgb_counts, gaussian_counts, artifact_counts),
@@ -113,6 +147,7 @@ def objectstate_controlled_capture_file_audit(
         "claim_policy": {
             "capture_manifest_required": True,
             "file_existence_required_for_ready_bundle": True,
+            "nonempty_frame_files_required_for_ready_bundle": True,
             "file_audit_does_not_create_ground_truth": True,
             "file_audit_does_not_prove_model_quality": True,
         },
@@ -185,6 +220,12 @@ def validate_objectstate_controlled_capture_file_audit_summary(
         _validate_counts(counts.get(key), key)
     if not isinstance(payload.get("missing_files"), list):
         raise ValueError("controlled capture file audit missing_files must be a list")
+    file_records = payload.get("file_records")
+    if not isinstance(file_records, dict):
+        raise ValueError("controlled capture file audit requires file_records")
+    for key in ("rgb", "gaussian", "artifact_refs"):
+        if not isinstance(file_records.get(key), list):
+            raise ValueError(f"controlled capture file audit file_records missing {key}")
     for key in (
         "rgb_files_present",
         "gaussian_files_present",
@@ -206,6 +247,7 @@ def validate_objectstate_controlled_capture_file_audit_summary(
     if (
         not claim_policy.get("capture_manifest_required")
         or not claim_policy.get("file_existence_required_for_ready_bundle")
+        or not claim_policy.get("nonempty_frame_files_required_for_ready_bundle")
         or not claim_policy.get("file_audit_does_not_create_ground_truth")
         or not claim_policy.get("file_audit_does_not_prove_model_quality")
     ):
@@ -233,31 +275,65 @@ def _file_record(
     *,
     root_path: Path,
     frame_id: str | None,
+    min_bytes: int,
+    require_file: bool,
+    hash_file: bool,
 ) -> dict[str, Any]:
     path = Path(ref)
     resolved = path if path.is_absolute() else root_path / path
     exists = resolved.exists()
+    is_file = bool(exists and resolved.is_file())
+    size_bytes = resolved.stat().st_size if is_file else None
+    valid = bool(exists)
+    missing_reason = None
+    if not exists:
+        valid = False
+        missing_reason = "path does not exist"
+    elif require_file and not is_file:
+        valid = False
+        missing_reason = "path is not a file"
+    elif is_file and size_bytes is not None and size_bytes < min_bytes:
+        valid = False
+        missing_reason = (
+            "file smaller than required minimum bytes "
+            f"({size_bytes} < {min_bytes})"
+        )
     result = {
         "kind": kind,
         "frame_id": frame_id,
         "ref": ref,
         "path": str(resolved),
         "exists": bool(exists),
+        "is_file": is_file,
+        "size_bytes": size_bytes,
+        "valid": valid,
     }
-    if not exists:
-        result["missing_reason"] = "path does not exist"
+    if missing_reason is not None:
+        result["missing_reason"] = missing_reason
+    if hash_file and valid and is_file:
+        result["sha256"] = _sha256_file(resolved)
     return result
 
 
 def _counts(records: list[dict[str, Any]]) -> dict[str, int]:
     referenced = len(records)
     existing = sum(1 for record in records if record["exists"])
-    missing = referenced - existing
+    valid = sum(1 for record in records if record["valid"])
+    missing = referenced - valid
     return {
         "referenced": referenced,
         "existing": existing,
+        "valid": valid,
         "missing": missing,
     }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _issues(
@@ -268,19 +344,23 @@ def _issues(
 ) -> list[str]:
     issues = []
     if not readiness["rgb_files_present"]:
-        issues.append(f"missing RGB files: {rgb_counts['missing']}")
+        issues.append(f"invalid or missing RGB files: {rgb_counts['missing']}")
     if not readiness["gaussian_files_present"]:
-        issues.append(f"missing Gaussian files: {gaussian_counts['missing']}")
+        issues.append(f"invalid or missing Gaussian files: {gaussian_counts['missing']}")
     if not readiness["artifact_refs_present"]:
-        issues.append(f"missing sample artifact refs: {artifact_counts['missing']}")
+        issues.append(
+            f"invalid or missing sample artifact refs: {artifact_counts['missing']}"
+        )
     return issues
 
 
 def _validate_counts(value: Any, name: str) -> None:
     if not isinstance(value, dict):
         raise ValueError(f"controlled capture file audit counts missing {name}")
-    for key in ("referenced", "existing", "missing"):
+    for key in ("referenced", "existing", "valid", "missing"):
         if not isinstance(value.get(key), int) or int(value[key]) < 0:
             raise ValueError(f"controlled capture file audit {name} count {key} invalid")
-    if int(value["referenced"]) != int(value["existing"]) + int(value["missing"]):
+    if int(value["referenced"]) != int(value["valid"]) + int(value["missing"]):
         raise ValueError(f"controlled capture file audit {name} counts are inconsistent")
+    if int(value["valid"]) > int(value["existing"]):
+        raise ValueError(f"controlled capture file audit {name} valid exceeds existing")

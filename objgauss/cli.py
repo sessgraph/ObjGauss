@@ -3077,6 +3077,9 @@ def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> No
         root=root,
         require_gaussian_files=not args.no_require_gaussian_files,
         check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        hash_files=args.hash_files,
     )
     counts = summary["file_counts"]
     readiness = summary["readiness"]
@@ -3085,14 +3088,14 @@ def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> No
     print(f"root={summary['root']}")
     print(f"sample_id={summary['sample']['sample_id']}")
     print(f"file_audit_status={summary['status']}")
-    print(f"rgb_existing={counts['rgb']['existing']}/{counts['rgb']['referenced']}")
+    print(f"rgb_valid={counts['rgb']['valid']}/{counts['rgb']['referenced']}")
     print(
-        "gaussian_existing="
-        f"{counts['gaussian']['existing']}/{counts['gaussian']['referenced']}"
+        "gaussian_valid="
+        f"{counts['gaussian']['valid']}/{counts['gaussian']['referenced']}"
     )
     print(
-        "artifact_refs_existing="
-        f"{counts['artifact_refs']['existing']}/{counts['artifact_refs']['referenced']}"
+        "artifact_refs_valid="
+        f"{counts['artifact_refs']['valid']}/{counts['artifact_refs']['referenced']}"
     )
     print(f"missing_files={len(summary['missing_files'])}")
     print(f"capture_bundle_files_ready={str(readiness['capture_bundle_files_ready']).lower()}")
@@ -3435,6 +3438,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "--check-artifact-refs",
         action="store_true",
         help="also require sample.artifact_refs paths to exist",
+    )
+    audit_controlled_capture_files.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame RGB file",
+    )
+    audit_controlled_capture_files.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame Gaussian file",
+    )
+    audit_controlled_capture_files.add_argument(
+        "--hash-files",
+        action="store_true",
+        help="include SHA256 hashes for valid frame RGB/Gaussian files",
     )
     audit_controlled_capture_files.add_argument("--require-pass", action="store_true")
     audit_controlled_capture_files.set_defaults(
