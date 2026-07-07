@@ -82,6 +82,14 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_sample_aware_weight_policy",
         "RealSampleV2SampleAwareWeightPolicyReport",
     ),
+    "RealSampleV2BoundedNormalizationCrossSampleInput": (
+        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "RealSampleV2BoundedNormalizationCrossSampleInput",
+    ),
+    "RealSampleV2BoundedNormalizationCrossSampleReport": (
+        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "RealSampleV2BoundedNormalizationCrossSampleReport",
+    ),
     "ObjectIdentityObservation": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityObservation",
@@ -284,6 +292,10 @@ _EXPORTS = {
     "REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA": (
         "objgauss.core.real_sample_v2_sample_aware_weight_policy",
         "REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA",
+    ),
+    "REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA": (
+        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
         "objgauss.core.v2_stability_foundation",
@@ -577,6 +589,10 @@ _EXPORTS = {
         "objgauss.core.real_sample_v2_sample_aware_weight_policy",
         "real_sample_v2_sample_aware_weight_policy_from_cloud",
     ),
+    "real_sample_v2_bounded_normalization_cross_sample_from_clouds": (
+        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "real_sample_v2_bounded_normalization_cross_sample_from_clouds",
+    ),
     "render_real_sample_v2_model_handoff_html": (
         "objgauss.core.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
@@ -789,6 +805,10 @@ _EXPORTS = {
     "validate_real_sample_v2_sample_aware_weight_policy_summary": (
         "objgauss.core.real_sample_v2_sample_aware_weight_policy",
         "validate_real_sample_v2_sample_aware_weight_policy_summary",
+    ),
+    "validate_real_sample_v2_bounded_normalization_cross_sample_summary": (
+        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "validate_real_sample_v2_bounded_normalization_cross_sample_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
         "objgauss.core.solver_decoder_training",

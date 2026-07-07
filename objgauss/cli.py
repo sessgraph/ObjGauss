@@ -132,6 +132,10 @@ from objgauss.core.real_sample_v2_promoted_weights_cross_sample import (
 from objgauss.core.real_sample_v2_sample_aware_weight_policy import (
     real_sample_v2_sample_aware_weight_policy_from_cloud,
 )
+from objgauss.core.real_sample_v2_bounded_normalization_cross_sample import (
+    RealSampleV2BoundedNormalizationCrossSampleInput,
+    real_sample_v2_bounded_normalization_cross_sample_from_clouds,
+)
 from objgauss.core.training_renderer import evaluate_training_renderer_loss
 from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
@@ -2181,6 +2185,95 @@ def _training_real_sample_v2_sample_aware_weight_policy(args: argparse.Namespace
         raise ValueError("real sample v2 sample-aware weight policy did not pass")
 
 
+def _training_real_sample_v2_bounded_normalization_cross_sample(
+    args: argparse.Namespace,
+) -> None:
+    sample_ids = list(args.sample_ids or [])
+    viewer_paths = list(args.viewer_paths or [])
+    if sample_ids and len(sample_ids) != len(args.inputs):
+        raise ValueError("--sample-id must be provided once per input when used")
+    if viewer_paths and len(viewer_paths) != len(args.inputs):
+        raise ValueError("--viewer-path must be provided once per input when used")
+
+    samples = []
+    for index, input_path in enumerate(args.inputs):
+        sample_id = sample_ids[index] if sample_ids else input_path.stem
+        viewer_path = viewer_paths[index] if viewer_paths else None
+        samples.append(
+            RealSampleV2BoundedNormalizationCrossSampleInput(
+                sample_id=sample_id,
+                cloud=read_ply(input_path),
+                sample_source=str(input_path),
+                object_id_field=args.object_id_field,
+                slots=args.slots,
+                viewer_path=viewer_path,
+            )
+        )
+
+    report = real_sample_v2_bounded_normalization_cross_sample_from_clouds(
+        samples,
+        min_samples=args.min_samples,
+        max_points=args.max_points,
+        solver_temperature=args.solver_temperature,
+        baseline_feature_weight=args.baseline_feature_weight,
+        baseline_position_weight=args.baseline_position_weight,
+        promoted_feature_weight=args.promoted_feature_weight,
+        promoted_position_weight=args.promoted_position_weight,
+        frame_count=args.frames,
+        temporal_offset=args.temporal_offset,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        point_radius=args.point_radius,
+        visibility_policy=args.visibility_policy,
+        seed=args.seed,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        baseline_temperature=args.baseline_temperature,
+        image_renderer=args.image_renderer,
+        vram_reserve_gb=args.vram_reserve_gb,
+        rewrite_sh=args.rewrite_sh,
+    )
+    summary = report.as_dict()
+    aggregate = summary["aggregate"]
+    recommendation = summary["recommendation"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"sample_count={summary['sample_count']}")
+    print(f"min_samples={summary['min_samples']}")
+    print(f"aggregate_result={aggregate['result']}")
+    print(f"selected_policy_counts={aggregate['selected_policy_counts']}")
+    print(f"blocked_promoted_sample_count={aggregate['blocked_promoted_sample_count']}")
+    print(f"selected_hard_regression_count={aggregate['selected_hard_regression_count']}")
+    print(f"recommendation_decision={recommendation['decision']}")
+    print(f"recommendation_action={recommendation['action']}")
+    for row in summary["rows"]:
+        selected = row["selected_policy"]
+        metrics = row["selected_metrics"]
+        changed = row["selected_changed_gaussians"]
+        promoted_gate = row["promoted_candidate"]["sample_policy_gate"]
+        print(
+            "sample="
+            f"id:{row['sample_id']},"
+            f"source_gaussians:{row['source']['source_gaussians']},"
+            f"selected:{selected['candidate_name']},"
+            f"feature_weight:{selected['feature_weight']},"
+            f"position_weight:{selected['position_weight']},"
+            f"mixed:{metrics['mixed_gaussians']},"
+            f"direct:{metrics['direct_slot_match']:.6f},"
+            f"purity:{_format_optional_float(metrics['object_purity'])},"
+            f"hard_fix:{changed['hard_fix_count']},"
+            f"hard_regression:{changed['hard_regression_count']},"
+            f"promoted_eligible:{str(promoted_gate['eligible_for_sample']).lower()},"
+            f"promoted_hard_regression:{promoted_gate['hard_regression_count']},"
+            f"evidence_status:{row['evidence_normalization_status']}"
+        )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_pass and summary["status"] != "real_sample_v2_bounded_normalization_cross_sample_pass":
+        raise ValueError("real sample v2 bounded normalization cross-sample gate did not pass")
+
+
 def _training_eval_assignment(args: argparse.Namespace) -> None:
     checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
     cloud = read_ply(args.input)
@@ -4227,6 +4320,87 @@ def _build_parser() -> argparse.ArgumentParser:
     real_sample_sample_aware_weight_policy.add_argument("--require-pass", action="store_true")
     real_sample_sample_aware_weight_policy.set_defaults(
         handler=_training_real_sample_v2_sample_aware_weight_policy
+    )
+
+    bounded_normalization_cross_sample = training_subparsers.add_parser(
+        "real-sample-v2-bounded-normalization-cross-sample",
+        help="summarize sample-aware bounded normalization policy across real samples",
+    )
+    bounded_normalization_cross_sample.add_argument("inputs", nargs="+", type=Path)
+    bounded_normalization_cross_sample.add_argument(
+        "--sample-id",
+        dest="sample_ids",
+        action="append",
+        help="sample id, repeated once per input when provided",
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--viewer-path",
+        dest="viewer_paths",
+        action="append",
+        help="viewer path, repeated once per input when provided",
+    )
+    bounded_normalization_cross_sample.add_argument("--min-samples", type=int, default=2)
+    bounded_normalization_cross_sample.add_argument("--slots", type=int)
+    bounded_normalization_cross_sample.add_argument("--frames", type=int, default=2)
+    bounded_normalization_cross_sample.add_argument("--max-points", type=int, default=128)
+    bounded_normalization_cross_sample.add_argument(
+        "--solver-temperature",
+        type=float,
+        default=0.35,
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--baseline-feature-weight",
+        type=float,
+        default=1.0,
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--baseline-position-weight",
+        type=float,
+        default=1.0,
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--promoted-feature-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--promoted-position-weight",
+        type=float,
+        default=REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
+    )
+    bounded_normalization_cross_sample.add_argument("--object-id-field", default="object_id")
+    bounded_normalization_cross_sample.add_argument(
+        "--temporal-offset",
+        type=float,
+        default=0.01,
+    )
+    bounded_normalization_cross_sample.add_argument("--image-width", type=int, default=12)
+    bounded_normalization_cross_sample.add_argument("--image-height", type=int, default=12)
+    bounded_normalization_cross_sample.add_argument("--point-radius", type=int, default=1)
+    bounded_normalization_cross_sample.add_argument(
+        "--visibility-policy",
+        choices=("covered_pixels", "all_pixels"),
+        default="covered_pixels",
+    )
+    bounded_normalization_cross_sample.add_argument("--iterations", type=int, default=100)
+    bounded_normalization_cross_sample.add_argument("--learning-rate", type=float, default=0.4)
+    bounded_normalization_cross_sample.add_argument(
+        "--baseline-temperature",
+        type=float,
+        default=1.0,
+    )
+    bounded_normalization_cross_sample.add_argument(
+        "--image-renderer",
+        choices=("point", "gsplat"),
+        default="point",
+    )
+    bounded_normalization_cross_sample.add_argument("--seed", type=int, default=4)
+    bounded_normalization_cross_sample.add_argument("--vram-reserve-gb", type=int, default=1)
+    bounded_normalization_cross_sample.add_argument("--rewrite-sh", action="store_true")
+    bounded_normalization_cross_sample.add_argument("--summary-output", type=Path)
+    bounded_normalization_cross_sample.add_argument("--require-pass", action="store_true")
+    bounded_normalization_cross_sample.set_defaults(
+        handler=_training_real_sample_v2_bounded_normalization_cross_sample
     )
 
     eval_assignment = training_subparsers.add_parser(

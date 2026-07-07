@@ -20,10 +20,11 @@
 
 ## Ready
 
-当前无 ready PR。产品 viewer 主流程入口、demo catalog 清理和
-`BOUNDED-EVIDENCE-NORMALIZATION-001` 已完成；下一步若继续算法质量，优先扩展更多
-小型 real / public sample 复验。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming
-或收敛 full `audit:world-viewer` 的旧等待条件。
+当前无 ready PR。产品 viewer 主流程入口、demo catalog 清理、
+`BOUNDED-EVIDENCE-NORMALIZATION-001` 和
+`REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001` 已完成；下一步若继续算法质量，
+优先继续增加小型 real / public sample 行，而不是改全局权重。若继续 viewer 线，再拆
+全量 4.5M PLY LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -91,6 +92,43 @@
 当前无进行中 PR。
 
 ## Done
+
+### REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001: Cross-sample gate for bounded normalization
+
+- 状态: done / validated-cross-sample
+- 类型: 标准 PR / algorithm validation + CLI summary
+- 目标: 将 sample-aware bounded normalization 从单样例诊断推进到多样例复验表，确认 selected
+  policy 在 Lego + Polyhaven 上均满足 hard regression `0`，同时保留 promoted candidate
+  在 Polyhaven 上被阻断的负证据。
+- 已实施:
+  - 新增 `objgauss.core.real_sample_v2_bounded_normalization_cross_sample`，复用既有
+    `real_sample_v2_sample_aware_weight_policy_from_cloud`，不重写单样例 policy。
+  - 新增 schema
+    `objgauss-real-sample-v2-bounded-normalization-cross-sample-v1`、report/input
+    dataclass、validator 和 lazy core namespace export。
+  - 新增 CLI
+    `objgauss training real-sample-v2-bounded-normalization-cross-sample`，支持多个 PLY
+    输入、可选 `--sample-id` / `--viewer-path`、`--summary-output` 和 `--require-pass`。
+  - Aggregate gate 要求样例数达到 `min_samples`、所有单样例 policy pass，且 selected
+    policy 的 `hard_regression_count` 总和为 `0`。
+- 结果:
+  - Lego row selected `promoted`，`mixed_gaussians=0`、`hard_fix=59`、
+    selected `hard_regression=0`。
+  - Polyhaven row selected `bounded-normalized`，`mixed_gaussians=3840`、
+    selected `hard_regression=0`；promoted candidate 仍被阻断并记录
+    `hard_regression=1814`。
+  - Cross-sample aggregate: `selected_policy_counts={"bounded-normalized":1,"promoted":1}`、
+    `selected_hard_regression_count=0`、`blocked_promoted_samples=["polyhaven"]`，
+    recommendation 为继续保留 sample-aware policy，而不是把单一 promoted weight 设为全局默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_real_sample_v2_bounded_normalization_cross_sample.py tests/test_real_sample_v2_sample_aware_weight_policy.py tests/test_core_namespace.py -q`:
+    passed，14 tests。
+  - `uv run objgauss training real-sample-v2-bounded-normalization-cross-sample public/samples/lego_alpha_v1_objects.ply public/samples/polyhaven_chair_demo_objects.ply --sample-id lego --sample-id polyhaven --summary-output /tmp/objgauss-bounded-normalization-cross-sample-summary.json --require-pass`:
+    passed。
+  - `uv run --extra dev pytest`: passed，261 tests。
+  - `npm run build`: passed（保留既有 Vite chunk size warning）。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
 
 ### BOUNDED-EVIDENCE-NORMALIZATION-001: Add bounded sample-aware normalization candidate
 

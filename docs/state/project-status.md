@@ -783,6 +783,25 @@ PLY 由
 `uv run --extra dev pytest` 259 passed，`npm run build` passed（保留既有 Vite chunk
 size warning），`git diff --check` passed；代码完成 commit 为 `36731a8`。
 
+随后完成 `REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001`：新增
+`objgauss-real-sample-v2-bounded-normalization-cross-sample-v1` 汇总报告和
+`objgauss training real-sample-v2-bounded-normalization-cross-sample` CLI。该报告复用
+单样例 `real_sample_v2_sample_aware_weight_policy_from_cloud`，按多样例 rows 汇总
+selected policy、promoted / bounded-normalized candidate、evidence normalization status
+和 aggregate gate；gate 要求样例数达到 `min_samples`、所有单样例 policy pass，且
+selected policy 的 hard regression 总和为 `0`。Lego + Polyhaven 复验通过：Lego selected
+`promoted`，`mixed_gaussians=0`、`hard_fix=59`、selected `hard_regression=0`；Polyhaven
+selected `bounded-normalized`，`mixed_gaussians=3840`、selected `hard_regression=0`，
+同时保留 promoted blocked evidence `hard_regression=1814`。Aggregate 结果为
+`selected_policy_counts={"bounded-normalized":1,"promoted":1}`、
+`selected_hard_regression_count=0`、`blocked_promoted_samples=["polyhaven"]`；结论是继续使用
+sample-aware policy 并增加小型 real / public sample 行，而不是把单一 promoted weight
+设为全局默认。本步骤不改 ObjectState / manifest / checkpoint ABI，不解冻 geometry /
+camera / dynamic-K，不引入 diffusion / rollout / replay buffer，不导出新的 demo PLY。
+验证通过：targeted pytest 14 passed，CLI cross-sample smoke passed，
+`uv run --extra dev pytest` 261 passed，`npm run build` passed（保留既有 Vite chunk
+size warning），`git diff --check` passed。
+
 随后完成 `MODEL-CATALOG-LATEST-SLOT-ORDER-001`：viewer catalog 新增
 `displaySlot`、`displayOrder` 和 `updatedAt` 规则，把同一模型定位下的候选按最新在前
 排序。当前 `real-sample-v2-sample-aware-lego` 与 `lego-alpha` 同属

@@ -23,6 +23,7 @@ from objgauss.core import (
     REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA,
     REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA,
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
+    REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA,
     REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA,
     REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA,
     REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA,
@@ -56,6 +57,8 @@ from objgauss.core import (
     RealSampleV2DiagnosticsReport,
     RealSampleV2FullCloudPurityReport,
     RealSampleV2ModelHandoffReport,
+    RealSampleV2BoundedNormalizationCrossSampleInput,
+    RealSampleV2BoundedNormalizationCrossSampleReport,
     RealSampleV2PromotedWeightsCrossSampleReport,
     RealSampleV2SampleAwareWeightPolicyReport,
     RealSampleV2SegmentationQualityReport,
@@ -151,6 +154,7 @@ from objgauss.core import (
     real_sample_v2_diagnostics_from_cloud,
     real_sample_v2_full_cloud_purity_from_cloud,
     real_sample_v2_model_handoff_from_cloud,
+    real_sample_v2_bounded_normalization_cross_sample_from_clouds,
     real_sample_v2_promoted_weights_cross_sample_from_cloud,
     real_sample_v2_sample_aware_weight_policy_from_cloud,
     real_sample_v2_segmentation_quality_from_cloud,
@@ -184,6 +188,7 @@ from objgauss.core import (
     validate_real_sample_v2_effect_preview,
     validate_real_sample_v2_full_cloud_purity_summary,
     validate_real_sample_v2_model_handoff_summary,
+    validate_real_sample_v2_bounded_normalization_cross_sample_summary,
     validate_real_sample_v2_promoted_weights_cross_sample_summary,
     validate_real_sample_v2_sample_aware_weight_policy_summary,
     validate_real_sample_v2_segmentation_quality_summary,
@@ -669,6 +674,13 @@ def test_core_namespace_exposes_trainable_kernel_mvp():
     assert RealSampleV2PromotedWeightsCrossSampleReport is not None
     assert real_sample_v2_promoted_weights_cross_sample_from_cloud is not None
     assert validate_real_sample_v2_promoted_weights_cross_sample_summary is not None
+    assert REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA == (
+        "objgauss-real-sample-v2-bounded-normalization-cross-sample-v1"
+    )
+    assert RealSampleV2BoundedNormalizationCrossSampleInput is not None
+    assert RealSampleV2BoundedNormalizationCrossSampleReport is not None
+    assert real_sample_v2_bounded_normalization_cross_sample_from_clouds is not None
+    assert validate_real_sample_v2_bounded_normalization_cross_sample_summary is not None
     assert REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA == (
         "objgauss-real-sample-v2-sample-aware-weight-policy-v1"
     )

@@ -23,6 +23,19 @@
 
 ## Closed
 
+### ACTION-024: 扩展 bounded normalization cross-sample 复验
+
+- 完成 commit: 本提交
+- 结果: 新增
+  `objgauss training real-sample-v2-bounded-normalization-cross-sample` 和
+  `objgauss-real-sample-v2-bounded-normalization-cross-sample-v1` summary。Lego + Polyhaven
+  aggregate 通过：selected policy counts 为 `promoted=1`、`bounded-normalized=1`，
+  selected `hard_regression_count=0`，Polyhaven promoted candidate 仍记录
+  `hard_regression=1814` 并被 sample-aware gate 阻断。结论是继续保留 sample-aware
+  policy 并增加更多小型 real / public sample 行，不把单一 promoted weight 设为全局默认。
+  本项不导出 demo PLY，不解冻 geometry / camera / dynamic-K，不引入 diffusion / rollout /
+  replay buffer。
+
 ### ACTION-023: 实现 bounded evidence normalization candidate
 
 - 完成 commit: 本提交
