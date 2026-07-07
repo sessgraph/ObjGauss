@@ -59,6 +59,8 @@ from objgauss.core import (
     ObjectStateRealityGateThresholds,
     ObjectStateRealityPublicArtifact,
     ObjectStateRealityRow,
+    OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
@@ -182,6 +184,8 @@ from objgauss.core import (
     objectstate_reality_blocked_rows_markdown,
     objectstate_reality_public_rows_summary,
     objectstate_reality_rows_from_public_artifacts,
+    objectstate_controlled_capture_summary,
+    objectstate_controlled_real_manifest_from_capture_manifest,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
     object_state_stability_report,
@@ -250,6 +254,8 @@ from objgauss.core import (
     validate_objectstate_causal_gate_summary,
     validate_objectstate_reality_gate_summary,
     validate_objectstate_reality_public_rows_summary,
+    validate_objectstate_controlled_capture_manifest,
+    validate_objectstate_controlled_capture_summary,
     validate_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
     validate_observation_model_config,
@@ -706,6 +712,61 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert public_summary["schema"] == OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA
     assert public_summary["gate"]["status"] == "objectstate_reality_gate_fail"
     assert public_summary["claim_policy"]["object_id_is_not_identity_ground_truth"] is True
+
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-manifest-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-summary-v1"
+    )
+    capture_manifest = {
+        "schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+        "sample": {
+            "sample_id": "namespace-controlled-capture",
+            "source_kind": "controlled_real",
+            "object_category": "cup",
+            "scenario": "identity_reappearance",
+            "fps": 30.0,
+            "capture_device": "fixture-camera",
+            "observation_modalities": ["rgb", "gaussian"],
+            "artifact_refs": ["outputs/controlled-real/namespace/capture.json"],
+            "license": "local controlled capture",
+        },
+        "objects": [{"object_id": "cup-001", "category": "cup"}],
+        "actions": [],
+        "frames": [
+            {
+                "frame_id": "frame-000000",
+                "timestamp": 0.0,
+                "observation": {
+                    "rgb": "rgb/000000.png",
+                    "gaussian": "gaussians/000000.ply",
+                },
+                "objects": [{"object_id": "cup-001"}],
+            },
+            {
+                "frame_id": "frame-000001",
+                "timestamp": 0.033333,
+                "observation": {
+                    "rgb": "rgb/000001.png",
+                    "gaussian": "gaussians/000001.ply",
+                },
+                "objects": [{"object_id": "cup-001"}],
+            },
+        ],
+    }
+    assert validate_objectstate_controlled_capture_manifest(capture_manifest)[
+        "schema"
+    ] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    capture_summary = objectstate_controlled_capture_summary(capture_manifest)
+    assert validate_objectstate_controlled_capture_summary(capture_summary) is capture_summary
+    assert capture_summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA
+    assert capture_summary["readiness"]["identity_stage_ready"] is True
+    capture_seed = objectstate_controlled_real_manifest_from_capture_manifest(
+        capture_manifest
+    )
+    assert capture_seed["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    assert capture_seed["evidence_rows"][0]["status"] == "blocked"
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"

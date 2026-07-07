@@ -146,6 +146,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_public_rows",
         "ObjectStateRealityPublicArtifact",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA": (
         "objgauss.core.objectstate_controlled_real_rows",
         "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA",
@@ -649,6 +657,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_real_rows",
         "evaluate_controlled_real_manifest_reality_gate",
     ),
+    "objectstate_controlled_capture_summary": (
+        "objgauss.core.objectstate_controlled_capture",
+        "objectstate_controlled_capture_summary",
+    ),
+    "objectstate_controlled_real_manifest_from_capture_manifest": (
+        "objgauss.core.objectstate_controlled_capture",
+        "objectstate_controlled_real_manifest_from_capture_manifest",
+    ),
     "initialize_objectstate_identity_encoder_state": (
         "objgauss.core.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
@@ -700,6 +716,18 @@ _EXPORTS = {
     "read_objectstate_controlled_real_manifest": (
         "objgauss.core.objectstate_controlled_real_rows",
         "read_objectstate_controlled_real_manifest",
+    ),
+    "read_objectstate_controlled_capture_manifest": (
+        "objgauss.core.objectstate_controlled_capture",
+        "read_objectstate_controlled_capture_manifest",
+    ),
+    "validate_objectstate_controlled_capture_manifest": (
+        "objgauss.core.objectstate_controlled_capture",
+        "validate_objectstate_controlled_capture_manifest",
+    ),
+    "validate_objectstate_controlled_capture_summary": (
+        "objgauss.core.objectstate_controlled_capture",
+        "validate_objectstate_controlled_capture_summary",
     ),
     "validate_objectstate_controlled_real_manifest": (
         "objgauss.core.objectstate_controlled_real_rows",

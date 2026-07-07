@@ -141,6 +141,10 @@ from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_rend
 from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
 from objgauss.core.trainable_quality import write_trainable_quality_report
 from objgauss.core.object_state_benchmark import write_object_state_stability_benchmark
+from objgauss.core.objectstate_controlled_capture import (
+    objectstate_controlled_capture_summary,
+    read_objectstate_controlled_capture_manifest,
+)
 from objgauss.core.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
     read_objectstate_controlled_real_manifest,
@@ -3012,6 +3016,44 @@ def _object_state_controlled_real_gate(args: argparse.Namespace) -> None:
         raise ValueError("controlled real ObjectState reality gate did not pass")
 
 
+def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
+    manifest = read_objectstate_controlled_capture_manifest(args.manifest)
+    summary = objectstate_controlled_capture_summary(manifest)
+    sample = summary["sample"]
+    readiness = summary["readiness"]
+    coverage = summary["observation_coverage"]
+    print(f"schema={summary['schema']}")
+    print(f"manifest={args.manifest}")
+    print(f"sample_id={sample['sample_id']}")
+    print(f"object_category={sample['object_category']}")
+    print(f"scenario={sample['scenario']}")
+    print(f"frames={summary['frame_count']}")
+    print(f"objects={summary['object_count']}")
+    print(f"actions={summary['action_count']}")
+    print(f"rgb_frames={coverage['rgb_frames']}")
+    print(f"gaussian_frames={coverage['gaussian_frames']}")
+    print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(f"prediction_stage_ready={str(readiness['prediction_stage_ready']).lower()}")
+    print(f"intervention_stage_ready={str(readiness['intervention_stage_ready']).lower()}")
+    print(
+        "real_gaussian_reconstruction_present="
+        f"{str(readiness['real_gaussian_reconstruction_present']).lower()}"
+    )
+    print(f"issues={len(summary['issues'])}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest_seed"])
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if args.require_identity_ready and not readiness["identity_stage_ready"]:
+        raise ValueError("controlled capture manifest is not identity-stage ready")
+    if args.require_prediction_ready and not readiness["prediction_stage_ready"]:
+        raise ValueError("controlled capture manifest is not prediction-stage ready")
+    if args.require_intervention_ready and not readiness["intervention_stage_ready"]:
+        raise ValueError("controlled capture manifest is not intervention-stage ready")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -3178,6 +3220,17 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_real_gate.add_argument("--min-real-or-public-rows", type=int, default=1)
     controlled_real_gate.add_argument("--require-pass", action="store_true")
     controlled_real_gate.set_defaults(handler=_object_state_controlled_real_gate)
+    validate_controlled_capture = object_state_subparsers.add_parser(
+        "validate-controlled-capture",
+        help="validate a frame-level controlled tabletop capture manifest",
+    )
+    validate_controlled_capture.add_argument("manifest", type=Path)
+    validate_controlled_capture.add_argument("--summary-output", type=Path)
+    validate_controlled_capture.add_argument("--controlled-real-output", type=Path)
+    validate_controlled_capture.add_argument("--require-identity-ready", action="store_true")
+    validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
+    validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
+    validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
 
     object_field = subparsers.add_parser(
         "object-field",
