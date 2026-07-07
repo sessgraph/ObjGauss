@@ -228,6 +228,19 @@ intervention readiness、RGB / Gaussian coverage、GT availability 和 issues；
 summary JSON 和 controlled-real seed manifest。当前仍没有提交真实视频、图像、
 Gaussian 或 GT 标注文件；这一步只是让真实采集结果进入 gate 前有可验证数据契约。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001`：新增
+`objgauss.core.objectstate_controlled_capture_files`，schema 为
+`objgauss-objectstate-controlled-capture-file-audit-v1`。它在 capture manifest
+结构验证之外，检查 frame-level RGB / Gaussian refs 是否真的存在于本地 capture bundle；
+RGB 文件始终要求存在，Gaussian 文件默认要求存在，也可用 `--no-require-gaussian-files`
+只做 RGB-only staging。新增 CLI
+`objgauss object-state audit-controlled-capture-files <capture>`，默认以 manifest
+所在目录作为 `--root`，可写 `--summary-output` JSON 和 `--missing-files-output`
+Markdown，并支持 `--check-artifact-refs` 与 `--require-pass`。这一步不读取图像像素、
+不采集视频、不创建 GT、不重建 Gaussian、不训练模型、不写 `public/samples`；
+它只防止只有 JSON 而没有真实文件的 capture bundle 进入后续 handoff。完成 commit:
+`d6bd5db`。
+
 随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`：新增
 `objgauss.core.objectstate_controlled_identity_eval`，把 controlled capture GT 和候选
 ObjectState / tracker identity predictions 连接起来，第一次让真实 Stage 1 identity row

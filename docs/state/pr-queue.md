@@ -50,7 +50,10 @@ reality gate；`OBJECTSTATE-CONTROLLED-REAL-CLI-001` 已把该 importer 暴露�
 blocked rows Markdown，并支持 `--identity-only` Stage 1 gate；
 `OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001` 已新增 frame-level capture /
 annotation manifest validator 和 `validate-controlled-capture` CLI，可把真实 capture
-manifest 转成 blocked controlled-real seed；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
+manifest 转成 blocked controlled-real seed；
+`OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001` 已新增
+`audit-controlled-capture-files` CLI，可检查 capture manifest 引用的 RGB / Gaussian
+文件是否真的存在于本地 bundle；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
 已新增 candidate identity track evaluator 和 `eval-controlled-identity` CLI，可计算
 `idf1` / fragmentation / swap / collapse 并生成带 identity pass/fail row 的
 controlled-real manifest；`OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001` 已新增
@@ -59,9 +62,10 @@ controlled capture pose association 转成 evaluator 输入；
 `OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001` 已新增
 `controlled-identity-handoff` CLI，可一次性写出 predictions、identity eval、
 controlled-real manifest、identity-only gate summary 和 blocked rows markdown。下一步仍是
-实际采集 / 标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实
-candidate artifact 跑 handoff，让 identity row 从 fixture 进入真实 pass / fail，而不是
-新增大模型。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。
+实际采集 / 标注 controlled tabletop RGB / Gaussian / pose / action 文件，让真实 bundle
+先通过 file audit，再用真实 candidate artifact 跑 handoff，让 identity row 从 fixture
+进入真实 pass / fail，而不是新增大模型。继续不推进 diffusion、replay buffer 大系统或
+viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
 
@@ -131,6 +135,39 @@ candidate artifact 跑 handoff，让 identity row 从 fixture 进入真实 pass 
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
+
+- 状态: done / file-audit-ready-no-real-capture
+- 类型: 标准 PR / controlled real capture file audit
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在 capture manifest 进入 identity handoff 前，检查其 RGB / Gaussian
+  文件引用是否真实存在于本地 bundle。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_files`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-capture-file-audit-v1`。
+  - `objectstate_controlled_capture_file_audit(...)` 检查 frame-level RGB /
+    Gaussian refs，并输出 per-kind referenced / existing / missing counts。
+  - RGB frame files 始终要求存在。
+  - Gaussian frame files 默认要求存在；`require_gaussian_files=false` 支持
+    RGB-only local staging，但不声明 real Gaussian readiness。
+  - `check_artifact_refs=true` 可额外检查 sample-level `artifact_refs`。
+  - `objectstate_controlled_capture_missing_files_markdown(...)` 输出缺失文件表。
+  - CLI 新增 `objgauss object-state audit-controlled-capture-files <capture>`。
+  - CLI 默认 `--root` 为 manifest 所在目录，可写 `--summary-output` 和
+    `--missing-files-output`，并支持 `--check-artifact-refs` / `--require-pass`。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop capture 文件。
+  - File audit 不创建 GT，不读取图像像素，不重建 Gaussian，不训练模型。
+  - 不写 `public/samples`，不做 replay buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_files.py tests/test_objectstate_controlled_capture.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_files.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed, 324 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `d6bd5db`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
 

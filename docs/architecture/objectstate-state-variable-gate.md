@@ -655,6 +655,36 @@ Current scope remains manifest / readiness validation only. It does not capture
 video, create GT, reconstruct Gaussians, compute model metrics, train Gaussian
 or dynamics models, use replay / diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001
+
+Verify that a controlled capture manifest points to an actual local capture
+bundle before identity handoff.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_capture_files`.
+- Summary schema:
+  `objgauss-objectstate-controlled-capture-file-audit-v1`.
+- `objectstate_controlled_capture_file_audit(...)` validates the capture
+  manifest, resolves frame-relative paths against a bundle root and checks
+  file existence.
+- RGB frame files are always required.
+- Gaussian frame files are required by default; `require_gaussian_files=false`
+  allows RGB-only local staging without claiming real Gaussian readiness.
+- `check_artifact_refs=true` also checks sample-level `artifact_refs` paths.
+- The summary reports per-kind `referenced` / `existing` / `missing` counts,
+  readiness booleans and `missing_files`.
+- `objectstate_controlled_capture_missing_files_markdown(...)` renders missing
+  references for handoff reports.
+- CLI command:
+  `objgauss object-state audit-controlled-capture-files <capture>`.
+- CLI defaults `--root` to the manifest directory, and can write
+  `--summary-output` JSON plus `--missing-files-output` Markdown.
+
+Current scope remains local file existence auditing only. It does not capture
+video, create GT, read image pixels, reconstruct Gaussians, train models,
+write public samples, use replay / diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001
 
 Add the first controlled real Stage 1 identity metric evaluator.
