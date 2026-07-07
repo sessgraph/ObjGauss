@@ -59,6 +59,8 @@ from objgauss.core import (
     ObjectStateRealityGateThresholds,
     ObjectStateRealityPublicArtifact,
     ObjectStateRealityRow,
+    OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+    OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
     OBJECTSTATE_CAUSAL_ACTIONS,
@@ -145,6 +147,7 @@ from objgauss.core import (
     evaluate_objectstate_predictive_gate,
     evaluate_objectstate_reality_gate,
     evaluate_public_artifact_reality_gate,
+    evaluate_controlled_real_manifest_reality_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
     dynamic_k_proposal_report,
@@ -179,6 +182,8 @@ from objgauss.core import (
     objectstate_reality_blocked_rows_markdown,
     objectstate_reality_public_rows_summary,
     objectstate_reality_rows_from_public_artifacts,
+    objectstate_controlled_real_rows_summary,
+    objectstate_reality_rows_from_controlled_real_manifest,
     object_state_stability_report,
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
@@ -245,6 +250,8 @@ from objgauss.core import (
     validate_objectstate_causal_gate_summary,
     validate_objectstate_reality_gate_summary,
     validate_objectstate_reality_public_rows_summary,
+    validate_objectstate_controlled_real_manifest,
+    validate_objectstate_controlled_real_rows_summary,
     validate_observation_model_config,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
@@ -699,6 +706,68 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert public_summary["schema"] == OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA
     assert public_summary["gate"]["status"] == "objectstate_reality_gate_fail"
     assert public_summary["claim_policy"]["object_id_is_not_identity_ground_truth"] is True
+
+    assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
+        "objgauss-objectstate-controlled-real-manifest-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA == (
+        "objgauss-objectstate-controlled-real-rows-v1"
+    )
+    controlled_manifest = {
+        "schema": OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+        "sample": {
+            "sample_id": "namespace-controlled-cup",
+            "source_kind": "controlled_real",
+            "object_category": "cup",
+            "scenario": "identity_reappearance",
+            "observation_modalities": ["rgb", "gaussian"],
+            "artifact_refs": ["outputs/controlled-real/namespace/manifest.json"],
+            "license": "local controlled capture",
+        },
+        "ground_truth": {
+            "identity": True,
+            "pose": False,
+            "action": False,
+            "timestamp": True,
+        },
+        "evidence_rows": [
+            {
+                "evidence_kind": "identity",
+                "status": "pass",
+                "metrics": {
+                    "idf1": 1.0,
+                    "fragmentation_rate": 0.0,
+                    "swap_rate": 0.0,
+                    "identity_collapse": False,
+                },
+            },
+            {
+                "evidence_kind": "prediction",
+                "status": "blocked",
+                "metrics": {},
+                "block_reason": "missing pose tracks",
+            },
+        ],
+    }
+    assert validate_objectstate_controlled_real_manifest(controlled_manifest)[
+        "schema"
+    ] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    controlled_rows = objectstate_reality_rows_from_controlled_real_manifest(
+        controlled_manifest
+    )
+    assert controlled_rows[0].status == "pass"
+    controlled_report = evaluate_controlled_real_manifest_reality_gate(
+        controlled_manifest,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_prediction_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+    assert controlled_report.as_dict()["status"] == "objectstate_reality_gate_pass"
+    controlled_summary = objectstate_controlled_real_rows_summary(controlled_manifest)
+    assert validate_objectstate_controlled_real_rows_summary(controlled_summary) is controlled_summary
+    assert controlled_summary["schema"] == OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA
+    assert controlled_summary["pass_row_count"] == 1
 
 
 def test_core_namespace_exposes_property_append_helper():

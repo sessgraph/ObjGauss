@@ -146,6 +146,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_public_rows",
         "ObjectStateRealityPublicArtifact",
     ),
+    "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA",
+    ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityOracle",
@@ -637,6 +645,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_public_rows",
         "evaluate_public_artifact_reality_gate",
     ),
+    "evaluate_controlled_real_manifest_reality_gate": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "evaluate_controlled_real_manifest_reality_gate",
+    ),
     "initialize_objectstate_identity_encoder_state": (
         "objgauss.core.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
@@ -676,6 +688,26 @@ _EXPORTS = {
     "objectstate_reality_rows_from_public_artifacts": (
         "objgauss.core.objectstate_reality_public_rows",
         "objectstate_reality_rows_from_public_artifacts",
+    ),
+    "objectstate_controlled_real_rows_summary": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "objectstate_controlled_real_rows_summary",
+    ),
+    "objectstate_reality_rows_from_controlled_real_manifest": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "objectstate_reality_rows_from_controlled_real_manifest",
+    ),
+    "read_objectstate_controlled_real_manifest": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "read_objectstate_controlled_real_manifest",
+    ),
+    "validate_objectstate_controlled_real_manifest": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "validate_objectstate_controlled_real_manifest",
+    ),
+    "validate_objectstate_controlled_real_rows_summary": (
+        "objgauss.core.objectstate_controlled_real_rows",
+        "validate_objectstate_controlled_real_rows_summary",
     ),
     "validate_objectstate_reality_gate_summary": (
         "objgauss.core.objectstate_reality_gate",
