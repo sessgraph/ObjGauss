@@ -15,14 +15,15 @@
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
 3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补未分割高斯云到对象层生成的主流程入口；`DEMO-CATALOG-REAL-SPLAT-001` 已新增真实 Nike `.splat` 本地 demo 并把首屏 dock / 默认 stage 收敛为 curated demos。剩余 viewer TODO 是继续收敛全量 PLY LOD / streaming；rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在当前默认能力内。
-4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate：Lego 选择 promoted，Polyhaven 自动回落 baseline 并触发 evidence normalization gate；`REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001` 已把 Lego sample-aware promoted PLY 接成本地 viewer 默认预览，并保留缺文件 fallback。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步若继续算法质量，应单独实现 bounded evidence normalization candidate，而不是继续 geometry / camera unfreeze、diffusion、rollout 或 replay。
+4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate；`BOUNDED-EVIDENCE-NORMALIZATION-001` 已新增 bounded-normalized 候选：Lego 仍选 promoted，Polyhaven 选 bounded-normalized 并避免 hard regression；`REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001` 已把 Lego sample-aware promoted PLY 接成本地 viewer 默认预览，并保留缺文件 fallback。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步若继续算法质量，应扩大更多小型 real / public sample 复验，而不是继续 geometry / camera unfreeze、diffusion、rollout 或 replay。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-当前无 ready PR。产品 viewer 主流程入口和 demo catalog 清理已完成；下一步按 Owner 最新方向，
-优先回到 `BOUNDED-EVIDENCE-NORMALIZATION-001`，若继续 viewer 线再拆全量 4.5M PLY
-LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
+当前无 ready PR。产品 viewer 主流程入口、demo catalog 清理和
+`BOUNDED-EVIDENCE-NORMALIZATION-001` 已完成；下一步若继续算法质量，优先扩展更多
+小型 real / public sample 复验。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming
+或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -90,6 +91,59 @@ LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### BOUNDED-EVIDENCE-NORMALIZATION-001: Add bounded sample-aware normalization candidate
+
+- 状态: done / validated-targeted
+- 类型: 标准 PR / algorithm validation + sample-aware policy gate
+- 目标: 把 sample-aware policy 从 “Lego promoted / Polyhaven baseline fallback” 推进到
+  带有显式 bounded evidence normalization 候选的统一 gate。
+- 已实施:
+  - `real_sample_v2_sample_aware_weight_policy_from_cloud` 现在生成第三个
+    `bounded-normalized` 候选。
+  - bounded 候选根据 promoted 相对 baseline 的 hard fix / hard regression 计算
+    `feature_weight_blend` / `position_weight_blend`，并把权重限制在 baseline 和 promoted
+    之间；summary 同时记录 bounded confidence gain、entropy reduction 和 purity gain。
+    它不使用 target labels 做 prediction，只在 gate / summary 中用 target labels
+    验证 hard-boundary 安全。
+  - Summary 新增 `policy.bounded_evidence_normalization`、
+    candidate-level `bounded_evidence_normalization` 和
+    `evidence_normalization_gate.status=satisfied_by_bounded_normalization`。
+  - 候选选择顺序为 hard-boundary promoted > bounded-normalized > baseline；Lego 在
+    promoted 和 bounded 同分时仍选 `promoted`。
+- 结果:
+  - Lego: selected `promoted`，`feature_weight=2.0`、`position_weight=1.0`，
+    `mixed_gaussians=0`、`direct_slot_match=1.000000`、`hard_fix=59`、
+    `hard_regression=0`。
+  - Polyhaven: selected `bounded-normalized`，`feature_weight=1.0`、
+    `position_weight=1.0`，`selection_reason=bounded_evidence_normalization_safe_fallback`，
+    `evidence_normalization_status=satisfied_by_bounded_normalization`，
+    `hard_regression=0`，并记录 promoted soft evidence：
+    `bounded_confidence_gain=0.125433`、`bounded_entropy_reduction=0.125433`。
+    Promoted 仍作为 blocked candidate 记录：
+    `mixed_delta=78`、`direct_delta=-0.001560`、`hard_fix=1736`、
+    `hard_regression=1814`。
+  - Polyhaven 只读扫描显示 `feature_weight=1.05..1.25` 可改善总体 mixed/direct，但仍产生
+    hard regression；按当前验收要求不把这些中间权重选为 viewer export。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/real_sample_v2_sample_aware_weight_policy.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_real_sample_v2_sample_aware_weight_policy.py tests/test_real_sample_v2_promoted_weights_cross_sample.py tests/test_core_namespace.py -q`:
+    `14 passed`。
+  - `uv run objgauss training real-sample-v2-sample-aware-weight-policy public/samples/lego_alpha_v1_objects.ply --preview-ply-output /tmp/objgauss-bounded-normalization-lego.ply --summary-output /tmp/objgauss-bounded-normalization-lego-summary.json --viewer-path /samples/objgauss-bounded-normalization-lego.ply --require-pass`: passed，selected `promoted`。
+  - `uv run objgauss training real-sample-v2-sample-aware-weight-policy public/samples/polyhaven_chair_demo_objects.ply --preview-ply-output /tmp/objgauss-bounded-normalization-polyhaven.ply --summary-output /tmp/objgauss-bounded-normalization-polyhaven-summary.json --viewer-path /samples/objgauss-bounded-normalization-polyhaven.ply --require-pass`: passed，selected `bounded-normalized`。
+  - `uv run objgauss stats /tmp/objgauss-bounded-normalization-lego.ply`: passed；object counts
+    `736/581/1787/2592`。
+  - `uv run objgauss stats /tmp/objgauss-bounded-normalization-polyhaven.ply`: passed；object counts
+    `15214/4383/7359/9152/7812/6080`，fields include `sample_aware_*` audit fields。
+  - `uv run --extra dev pytest`: `259 passed`。
+  - `npm run build`: passed；保留既有 Vite chunk size warning。
+  - `git diff --check`: passed。
+- 边界:
+  - 不改变 ObjectState / manifest / checkpoint ABI。
+  - 不解冻 Gaussian geometry / camera / dynamic-K。
+  - 不引入 diffusion、rollout、replay buffer 或 GPU 长训。
+  - 不提交 `/tmp` summary / preview PLY。
+- 完成 commit: 本提交
 
 ### DEMO-CATALOG-REAL-SPLAT-001: Add real splat demo and curate viewer catalog
 

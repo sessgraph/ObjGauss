@@ -39,16 +39,22 @@ def test_sample_aware_weight_policy_selects_baseline_when_promoted_regresses_pol
     assert summary["status"] == "real_sample_v2_sample_aware_weight_policy_pass"
     assert summary["source"]["source_gaussians"] == 50000
     assert summary["policy"]["selection_rule"] == (
-        "prefer_hard_boundary_non_regression_over_soft_sharpening"
+        "prefer_hard_boundary_non_regression_over_bounded_normalization_over_baseline"
     )
     assert summary["policy"]["uses_target_labels_for_prediction"] is False
     assert summary["policy"]["uses_target_labels_for_gate"] is True
-    assert summary["selected_policy"]["candidate_name"] == "baseline"
+    assert summary["policy"]["bounded_evidence_normalization"]["schema"] == (
+        "objgauss-bounded-evidence-normalization-v1"
+    )
+    assert summary["policy"]["bounded_evidence_normalization"]["feature_weight_blend"] == 0.0
+    assert summary["selected_policy"]["candidate_name"] == "bounded-normalized"
     assert summary["selected_policy"]["feature_weight"] == 1.0
-    assert summary["selected_policy"]["selection_reason"] == "baseline_safe_fallback"
-    assert summary["selected_policy"]["global_default"] == "sample_specific_only"
+    assert summary["selected_policy"]["selection_reason"] == (
+        "bounded_evidence_normalization_safe_fallback"
+    )
+    assert summary["selected_policy"]["global_default"] == "sample_specific_bounded_normalization"
 
-    baseline, promoted = summary["candidates"]
+    baseline, promoted, normalized = summary["candidates"]
     assert baseline["candidate"]["name"] == "baseline"
     assert baseline["sample_policy_gate"]["eligible_for_sample"] is True
     assert baseline["metrics"]["mixed_gaussians"] == 3840
@@ -71,11 +77,26 @@ def test_sample_aware_weight_policy_selects_baseline_when_promoted_regresses_pol
     assert promoted["changed_gaussians"]["changed_count"] == 3670
     assert promoted["changed_gaussians"]["hard_fix_count"] == 1736
     assert promoted["changed_gaussians"]["hard_regression_count"] == 1814
+    assert normalized["candidate"]["name"] == "bounded-normalized"
+    assert normalized["candidate"]["feature_weight"] == 1.0
+    assert normalized["bounded_evidence_normalization"]["reason"] == (
+        "hard_regression_not_bounded_by_hard_fix"
+    )
+    assert normalized["bounded_evidence_normalization"]["hard_safety_blend"] == 0.0
+    assert normalized["bounded_evidence_normalization"]["soft_evidence_blend"] > 0.0
+    assert normalized["bounded_evidence_normalization"]["bounded_confidence_gain"] > 0.12
+    assert normalized["bounded_evidence_normalization"]["bounded_entropy_reduction"] > 0.12
+    assert normalized["sample_policy_gate"]["eligible_for_sample"] is True
+    assert normalized["sample_policy_gate"]["hard_regression_count"] == 0
+    assert normalized["metrics"]["mixed_gaussians"] == baseline["metrics"]["mixed_gaussians"]
+    assert normalized["delta_vs_baseline"]["mixed_gaussians_delta"] == 0
 
     evidence_gate = summary["evidence_normalization_gate"]
-    assert evidence_gate["status"] == "required_before_global_weight_promotion"
-    assert evidence_gate["requires_evidence_normalization"] is True
+    assert evidence_gate["status"] == "satisfied_by_bounded_normalization"
+    assert evidence_gate["requires_evidence_normalization"] is False
     assert evidence_gate["blocked_soft_sharpening_candidates"] == ["promoted"]
+    assert evidence_gate["bounded_normalized_candidate"]["eligible_for_sample"] is True
+    assert evidence_gate["bounded_normalized_candidate"]["feature_weight_blend"] == 0.0
     assert evidence_gate["requires_geometry_unfreeze"] is False
     assert evidence_gate["requires_diffusion_replay_or_rollout"] is False
     assert validate_real_sample_v2_sample_aware_weight_policy_summary(summary) is summary
@@ -91,7 +112,7 @@ def test_sample_aware_weight_policy_selects_baseline_when_promoted_regresses_pol
         "sample_aware_hard_fix",
         "sample_aware_hard_regression",
     }.issubset(set(selected_cloud.fields))
-    assert np.unique(selected_cloud.vertices["sample_aware_selected_index"]).tolist() == [0]
+    assert np.unique(selected_cloud.vertices["sample_aware_selected_index"]).tolist() == [2]
     assert int(np.sum(selected_cloud.vertices["sample_aware_changed"])) == 0
 
 
@@ -123,7 +144,7 @@ def test_sample_aware_weight_policy_selects_promoted_for_lego_local_boundary():
     )
     assert summary["evidence_normalization_gate"]["requires_evidence_normalization"] is False
 
-    baseline, promoted = summary["candidates"]
+    baseline, promoted, normalized = summary["candidates"]
     assert baseline["metrics"]["mixed_gaussians"] == 59
     assert promoted["sample_policy_gate"]["eligible_for_sample"] is True
     assert promoted["metrics"]["mixed_gaussians"] == 0
@@ -132,6 +153,12 @@ def test_sample_aware_weight_policy_selects_promoted_for_lego_local_boundary():
     assert promoted["delta_vs_baseline"]["direct_slot_match_delta"] > 0.0103
     assert promoted["changed_gaussians"]["hard_fix_count"] == 59
     assert promoted["changed_gaussians"]["hard_regression_count"] == 0
+    assert normalized["candidate"]["name"] == "bounded-normalized"
+    assert normalized["bounded_evidence_normalization"]["feature_weight_blend"] == 1.0
+    assert normalized["bounded_evidence_normalization"]["hard_safety_blend"] == 1.0
+    assert normalized["bounded_evidence_normalization"]["bounded_entropy_reduction"] > 0.20
+    assert normalized["metrics"]["mixed_gaussians"] == 0
+    assert normalized["changed_gaussians"]["hard_regression_count"] == 0
 
     selected_cloud = report.selected_cloud
     assert np.unique(selected_cloud.vertices["sample_aware_selected_index"]).tolist() == [1]
@@ -169,13 +196,14 @@ def test_sample_aware_weight_policy_cli_writes_selected_ply_and_summary(tmp_path
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     cloud = read_ply(preview_ply)
     assert summary["status"] == "real_sample_v2_sample_aware_weight_policy_pass"
-    assert summary["selected_policy"]["candidate_name"] == "baseline"
-    assert summary["evidence_normalization_gate"]["requires_evidence_normalization"] is True
+    assert summary["selected_policy"]["candidate_name"] == "bounded-normalized"
+    assert summary["evidence_normalization_gate"]["requires_evidence_normalization"] is False
+    assert summary["evidence_normalization_gate"]["status"] == "satisfied_by_bounded_normalization"
     assert summary["viewer"]["debug_route"] == (
         "/?ply=/samples/objgauss-real-sample-v2-sample-aware-polyhaven.ply"
     )
     assert cloud.count == 50000
     assert "sample_aware_selected_index" in cloud.fields
     assert "sample_aware_hard_regression" in cloud.fields
-    assert np.unique(cloud.vertices["sample_aware_selected_index"]).tolist() == [0]
+    assert np.unique(cloud.vertices["sample_aware_selected_index"]).tolist() == [2]
     assert int(np.sum(cloud.vertices["sample_aware_hard_regression"])) == 0

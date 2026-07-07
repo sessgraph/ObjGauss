@@ -747,6 +747,26 @@ demo / HF release / renderer / manifest / checkpoint schema，也不表示 evide
 数学已实现。验证通过：targeted pytest 14 passed，`uv run --extra dev pytest` 259 passed，
 `npm run build` passed，`git diff --check` passed；代码完成 commit 为 `45afd2d`。
 
+随后完成 `BOUNDED-EVIDENCE-NORMALIZATION-001`：`real-sample-v2-sample-aware-weight-policy`
+在 baseline / promoted 之外新增 `bounded-normalized` 候选。该候选根据 promoted 相对
+baseline 的 hard fix / hard regression 计算 `feature_weight_blend` /
+`position_weight_blend`，把权重限制在 baseline 和 promoted 之间，并在 summary 中记录
+bounded confidence gain、entropy reduction 和 purity gain；prediction 仍不使用 target
+labels，target labels 只用于 gate / summary 的 hard-boundary 验收。Lego 仍选择
+`promoted`：`feature_weight=2.0`、`mixed_gaussians=0`、
+`direct_slot_match=1.000000`、`hard_fix=59`、`hard_regression=0`。Polyhaven 现在选择
+`bounded-normalized`：`feature_weight=1.0`、`position_weight=1.0`、
+`selection_reason=bounded_evidence_normalization_safe_fallback`、
+`evidence_normalization_status=satisfied_by_bounded_normalization`、selected
+`hard_regression=0`，并记录 promoted soft evidence：
+`bounded_confidence_gain=0.125433`、`bounded_entropy_reduction=0.125433`；blocked
+promoted candidate 仍记录 `mixed_delta=78`、`direct_delta=-0.001560`、`hard_fix=1736`、
+`hard_regression=1814`。补充只读扫描显示
+Polyhaven `feature_weight=1.05..1.25` 虽可改善总体 mixed/direct，但仍产生 hard
+regression，因此当前 viewer export 不选择这些中间权重。本步骤不改变 ObjectState /
+manifest / checkpoint ABI，不解冻 geometry / camera / dynamic-K，不引入 diffusion /
+rollout / replay buffer。
+
 随后完成 `REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001`：viewer catalog 新增本机
 `real-sample-v2-sample-aware-lego` 预览模型，默认指向 ignored
 `public/samples/objgauss-real-sample-v2-sample-aware-lego.ply`，让根路径 UI 优先展示
@@ -3145,8 +3165,9 @@ npm run acceptance:demo
    checkpoint roundtrip 和 renderer-loss-contract evidence。当前 public sample 已跑到
    可训练、可验证、可 3D 查看对象分割效果阶段；`feature_weight=2.0` 的 weak-boundary
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
-   且 sample-aware gate 已让 Lego 选择 promoted、Polyhaven 回落 baseline。下一步若继续算法质量，
-   应单独实现 bounded evidence normalization candidate 和更多小型 real / public sample 复验；不要直接跳到 rollout、replay buffer、
+   且 bounded sample-aware gate 已让 Lego 选择 promoted、Polyhaven 选择
+   bounded-normalized 并避免 selected hard regression。下一步若继续算法质量，
+   应扩大更多小型 real / public sample 复验；不要直接跳到 rollout、replay buffer、
    diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

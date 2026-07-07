@@ -33,6 +33,7 @@ class _WeightCandidate:
     feature_weight: float
     position_weight: float
     preview: RealSampleV2ViewerPreviewReport
+    normalization: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -99,12 +100,13 @@ class RealSampleV2SampleAwareWeightPolicyReport:
             },
             "policy": {
                 "family": "sample_aware_assignment_weight_policy_v1",
-                "selection_rule": "prefer_hard_boundary_non_regression_over_soft_sharpening",
+                "selection_rule": "prefer_hard_boundary_non_regression_over_bounded_normalization_over_baseline",
                 "baseline_candidate": self.candidates[0].name,
                 "candidate_count": len(records),
                 "uses_target_labels_for_prediction": False,
                 "uses_target_labels_for_gate": True,
                 "mutates_checkpoint": False,
+                "bounded_evidence_normalization": _bounded_normalization_policy(records),
             },
             "candidates": records,
             "selected_policy": {
@@ -113,11 +115,7 @@ class RealSampleV2SampleAwareWeightPolicyReport:
                 "position_weight": selected_record["candidate"]["position_weight"],
                 "selection_reason": selected_record["sample_policy_gate"]["decision"],
                 "selected_for_viewer_export": True,
-                "global_default": (
-                    "sample_specific_only"
-                    if evidence_gate["requires_evidence_normalization"]
-                    else "eligible_after_more_cross_sample_rows"
-                ),
+                "global_default": _selected_global_default_label(evidence_gate),
             },
             "evidence_normalization_gate": evidence_gate,
             "viewer": {
@@ -233,6 +231,26 @@ def real_sample_v2_sample_aware_weight_policy_from_cloud(
         rewrite_sh=rewrite_sh,
         viewer_path=viewer_path,
     )
+    bounded_feature_weight, bounded_position_weight, normalization = _bounded_normalized_weights(
+        baseline_preview=baseline_preview,
+        promoted_preview=promoted_preview,
+        baseline_feature_weight=float(baseline_feature_weight),
+        baseline_position_weight=float(baseline_position_weight),
+        promoted_feature_weight=float(promoted_feature_weight),
+        promoted_position_weight=float(promoted_position_weight),
+    )
+    bounded_preview = real_sample_v2_viewer_preview_from_handoff(
+        cloud,
+        handoff,
+        sample_source=sample_source,
+        object_id_field=object_id_field,
+        slots=slots,
+        seed=seed,
+        assignment_feature_weight=bounded_feature_weight,
+        assignment_position_weight=bounded_position_weight,
+        rewrite_sh=rewrite_sh,
+        viewer_path=viewer_path,
+    )
     return RealSampleV2SampleAwareWeightPolicyReport(
         candidates=(
             _WeightCandidate(
@@ -246,6 +264,13 @@ def real_sample_v2_sample_aware_weight_policy_from_cloud(
                 feature_weight=float(promoted_feature_weight),
                 position_weight=float(promoted_position_weight),
                 preview=promoted_preview,
+            ),
+            _WeightCandidate(
+                name="bounded-normalized",
+                feature_weight=float(bounded_feature_weight),
+                position_weight=float(bounded_position_weight),
+                preview=bounded_preview,
+                normalization=normalization,
             ),
         ),
         sample_source=str(sample_source),
@@ -307,6 +332,17 @@ def validate_real_sample_v2_sample_aware_weight_policy_summary(
         raise ValueError("sample-aware policy gate must be explicit about target-label evaluation")
     if policy.get("mutates_checkpoint") is not False:
         raise ValueError("sample-aware policy must not mutate checkpoint")
+    normalization_policy = policy.get("bounded_evidence_normalization")
+    if not isinstance(normalization_policy, dict):
+        raise ValueError("sample-aware policy must describe bounded evidence normalization")
+    if normalization_policy.get("schema") != "objgauss-bounded-evidence-normalization-v1":
+        raise ValueError("sample-aware bounded evidence normalization schema is unsupported")
+    if normalization_policy.get("uses_target_labels_for_prediction") is not False:
+        raise ValueError("bounded evidence normalization must not use target labels for prediction")
+    if normalization_policy.get("uses_target_labels_for_gate") is not True:
+        raise ValueError("bounded evidence normalization gate must be explicit about target labels")
+    if not 0.0 <= float(normalization_policy["feature_weight_blend"]) <= 1.0:
+        raise ValueError("bounded evidence normalization blend must be in [0, 1]")
 
     candidates = payload["candidates"]
     if not isinstance(candidates, list) or len(candidates) < 2:
@@ -331,6 +367,7 @@ def validate_real_sample_v2_sample_aware_weight_policy_summary(
     gate = payload["evidence_normalization_gate"]
     if gate.get("status") not in {
         "not_required_for_selected_policy",
+        "satisfied_by_bounded_normalization",
         "required_before_global_weight_promotion",
     }:
         raise ValueError("sample-aware evidence normalization gate status is unsupported")
@@ -389,6 +426,14 @@ def _validate_candidate_record(candidate: dict[str, Any], source_count: int) -> 
         raise ValueError("sample-aware candidate changed_count must be >= 0")
     if int(changed["hard_fix_count"]) < 0 or int(changed["hard_regression_count"]) < 0:
         raise ValueError("sample-aware candidate hard change counts must be >= 0")
+    normalization = candidate.get("bounded_evidence_normalization")
+    if normalization is not None:
+        if normalization.get("schema") != "objgauss-bounded-evidence-normalization-v1":
+            raise ValueError("sample-aware candidate normalization schema is unsupported")
+        if not 0.0 <= float(normalization["feature_weight_blend"]) <= 1.0:
+            raise ValueError("sample-aware candidate normalization blend must be in [0, 1]")
+        if not 0.0 <= float(normalization["soft_evidence_blend"]) <= 1.0:
+            raise ValueError("sample-aware candidate soft evidence blend must be in [0, 1]")
 
 
 def _candidate_records(candidates: tuple[_WeightCandidate, ...]) -> list[dict[str, Any]]:
@@ -409,21 +454,31 @@ def _candidate_records(candidates: tuple[_WeightCandidate, ...]) -> list[dict[st
             changed=changed,
             is_baseline=index == 0,
         )
-        records.append(
-            {
-                "candidate": {
-                    "name": candidate.name,
-                    "role": "baseline" if index == 0 else "candidate",
-                    "feature_weight": float(candidate.feature_weight),
-                    "position_weight": float(candidate.position_weight),
-                },
-                "preview": summary,
-                "metrics": _metrics(summary),
-                "delta_vs_baseline": delta,
-                "changed_gaussians": changed,
-                "sample_policy_gate": gate,
+        if candidate.normalization and gate["eligible_for_sample"]:
+            gate = {
+                **gate,
+                "decision": (
+                    "bounded_evidence_normalization_safe_fallback"
+                    if float(candidate.normalization["feature_weight_blend"]) == 0.0
+                    else "bounded_evidence_normalization_non_regression"
+                ),
             }
-        )
+        record = {
+            "candidate": {
+                "name": candidate.name,
+                "role": "baseline" if index == 0 else "candidate",
+                "feature_weight": float(candidate.feature_weight),
+                "position_weight": float(candidate.position_weight),
+            },
+            "preview": summary,
+            "metrics": _metrics(summary),
+            "delta_vs_baseline": delta,
+            "changed_gaussians": changed,
+            "sample_policy_gate": gate,
+        }
+        if candidate.normalization is not None:
+            record["bounded_evidence_normalization"] = candidate.normalization
+        records.append(record)
     return records
 
 
@@ -480,15 +535,21 @@ def _select_candidate_name(records: list[dict[str, Any]]) -> str:
     if not eligible:
         raise ValueError("no sample-aware candidate passed the gate")
 
-    def score(record: dict[str, Any]) -> tuple[float, int, float, float, float]:
+    def score(record: dict[str, Any]) -> tuple[float, int, float, float, float, int]:
         metrics = record["metrics"]
         purity = -1.0 if metrics["object_purity"] is None else float(metrics["object_purity"])
+        policy_rank = {
+            "promoted": 2,
+            "bounded-normalized": 1,
+            "baseline": 0,
+        }.get(str(record["candidate"]["name"]), 0)
         return (
             float(metrics["direct_slot_match"]),
             -int(metrics["mixed_gaussians"]),
             purity,
             float(metrics["assignment_confidence"]),
             -float(metrics["mean_normalized_entropy"]),
+            policy_rank,
         )
 
     selected = max(eligible, key=score)
@@ -497,7 +558,10 @@ def _select_candidate_name(records: list[dict[str, Any]]) -> str:
 
 def _evidence_normalization_gate(records: list[dict[str, Any]]) -> dict[str, Any]:
     blocked_soft_sharpening = []
+    bounded_normalized = None
     for record in records:
+        if record["candidate"]["name"] == "bounded-normalized":
+            bounded_normalized = record
         if record["candidate"]["role"] == "baseline":
             continue
         delta = record["delta_vs_baseline"]
@@ -513,28 +577,175 @@ def _evidence_normalization_gate(records: list[dict[str, Any]]) -> dict[str, Any
         )
         if soft_improved and hard_regressed and not gate["eligible_for_sample"]:
             blocked_soft_sharpening.append(record["candidate"]["name"])
-    required = bool(blocked_soft_sharpening)
+    bounded_satisfied = (
+        bool(blocked_soft_sharpening)
+        and bounded_normalized is not None
+        and bool(bounded_normalized["sample_policy_gate"]["eligible_for_sample"])
+    )
+    required = bool(blocked_soft_sharpening) and not bounded_satisfied
     return {
         "status": (
             "required_before_global_weight_promotion"
             if required
-            else "not_required_for_selected_policy"
+            else (
+                "satisfied_by_bounded_normalization"
+                if bounded_satisfied
+                else "not_required_for_selected_policy"
+            )
         ),
         "requires_evidence_normalization": required,
         "blocked_soft_sharpening_candidates": blocked_soft_sharpening,
+        "bounded_normalized_candidate": (
+            None
+            if bounded_normalized is None
+            else {
+                "name": bounded_normalized["candidate"]["name"],
+                "eligible_for_sample": bool(bounded_normalized["sample_policy_gate"]["eligible_for_sample"]),
+                "feature_weight": float(bounded_normalized["candidate"]["feature_weight"]),
+                "position_weight": float(bounded_normalized["candidate"]["position_weight"]),
+                "feature_weight_blend": float(
+                    bounded_normalized.get("bounded_evidence_normalization", {}).get(
+                        "feature_weight_blend",
+                        0.0,
+                    )
+                ),
+                "hard_regression_count": int(
+                    bounded_normalized["sample_policy_gate"]["hard_regression_count"]
+                ),
+            }
+        ),
         "decision": (
             "block_soft_sharpening_without_hard_boundary_non_regression"
             if required
-            else "selected_policy_passes_sample_gate"
+            else (
+                "bounded_normalization_satisfies_soft_sharpening_gate"
+                if bounded_satisfied
+                else "selected_policy_passes_sample_gate"
+            )
         ),
         "action": (
             "add_evidence_normalization_or_sample_specific_weight_policy_before_global_default"
             if required
-            else "keep_selected_policy_for_this_sample"
+            else (
+                "use_bounded_normalized_candidate_for_this_sample"
+                if bounded_satisfied
+                else "keep_selected_policy_for_this_sample"
+            )
         ),
         "requires_geometry_unfreeze": False,
         "requires_diffusion_replay_or_rollout": False,
     }
+
+
+def _bounded_normalization_policy(records: list[dict[str, Any]]) -> dict[str, Any]:
+    normalized = next(
+        (record for record in records if record["candidate"]["name"] == "bounded-normalized"),
+        None,
+    )
+    normalization = normalized.get("bounded_evidence_normalization", {}) if normalized else {}
+    return {
+        "schema": "objgauss-bounded-evidence-normalization-v1",
+        "enabled": normalized is not None,
+        "candidate_name": "bounded-normalized",
+        "source_candidate": "promoted",
+        "baseline_candidate": "baseline",
+        "feature_weight_blend": float(normalization.get("feature_weight_blend", 0.0)),
+        "position_weight_blend": float(normalization.get("position_weight_blend", 0.0)),
+        "uses_target_labels_for_prediction": False,
+        "uses_target_labels_for_gate": True,
+        "mutates_checkpoint": False,
+    }
+
+
+def _selected_global_default_label(evidence_gate: dict[str, Any]) -> str:
+    status = evidence_gate.get("status")
+    if status == "required_before_global_weight_promotion":
+        return "sample_specific_only"
+    if status == "satisfied_by_bounded_normalization":
+        return "sample_specific_bounded_normalization"
+    return "eligible_after_more_cross_sample_rows"
+
+
+def _bounded_normalized_weights(
+    *,
+    baseline_preview: RealSampleV2ViewerPreviewReport,
+    promoted_preview: RealSampleV2ViewerPreviewReport,
+    baseline_feature_weight: float,
+    baseline_position_weight: float,
+    promoted_feature_weight: float,
+    promoted_position_weight: float,
+) -> tuple[float, float, dict[str, Any]]:
+    baseline_summary = validate_real_sample_v2_viewer_preview_summary(
+        baseline_preview.as_dict()
+    )
+    promoted_summary = validate_real_sample_v2_viewer_preview_summary(
+        promoted_preview.as_dict()
+    )
+    delta = _quality_delta(baseline_summary, promoted_summary)
+    changed = _changed_gaussians(baseline_preview, promoted_preview)
+    hard_fix = int(changed["hard_fix_count"])
+    hard_regression = int(changed["hard_regression_count"])
+    if hard_regression <= 0:
+        hard_safety_blend = 1.0
+        reason = "promoted_has_no_hard_regression"
+    elif hard_regression >= hard_fix:
+        hard_safety_blend = 0.0
+        reason = "hard_regression_not_bounded_by_hard_fix"
+    else:
+        hard_safety_blend = max(
+            0.0,
+            min(1.0, (hard_fix - hard_regression) / max(hard_fix, 1)),
+        )
+        reason = "partial_soft_sharpening_with_hard_regression_budget"
+    confidence_gain = max(0.0, float(delta["assignment_confidence_delta"]))
+    entropy_reduction = max(0.0, -float(delta["mean_normalized_entropy_delta"]))
+    purity_gain = (
+        0.0
+        if delta["object_purity_delta"] is None
+        else max(0.0, float(delta["object_purity_delta"]))
+    )
+    bounded_confidence_gain = min(1.0, confidence_gain)
+    bounded_entropy_gain = min(1.0, entropy_reduction)
+    bounded_purity_gain = min(1.0, purity_gain)
+    soft_evidence_blend = float(
+        np.mean([bounded_confidence_gain, bounded_entropy_gain, bounded_purity_gain])
+    )
+    blend = hard_safety_blend
+    feature_weight = baseline_feature_weight + blend * (
+        promoted_feature_weight - baseline_feature_weight
+    )
+    position_weight = baseline_position_weight + blend * (
+        promoted_position_weight - baseline_position_weight
+    )
+    normalization = {
+        "schema": "objgauss-bounded-evidence-normalization-v1",
+        "source_candidate": "promoted",
+        "baseline_candidate": "baseline",
+        "reason": reason,
+        "feature_weight_blend": float(blend),
+        "position_weight_blend": float(blend),
+        "hard_safety_blend": float(hard_safety_blend),
+        "soft_evidence_blend": soft_evidence_blend,
+        "baseline_feature_weight": float(baseline_feature_weight),
+        "baseline_position_weight": float(baseline_position_weight),
+        "promoted_feature_weight": float(promoted_feature_weight),
+        "promoted_position_weight": float(promoted_position_weight),
+        "normalized_feature_weight": float(feature_weight),
+        "normalized_position_weight": float(position_weight),
+        "promoted_hard_fix_count": hard_fix,
+        "promoted_hard_regression_count": hard_regression,
+        "promoted_mixed_gaussians_delta": int(delta["mixed_gaussians_delta"]),
+        "promoted_direct_slot_match_delta": float(delta["direct_slot_match_delta"]),
+        "promoted_assignment_confidence_delta": float(delta["assignment_confidence_delta"]),
+        "promoted_entropy_delta": float(delta["mean_normalized_entropy_delta"]),
+        "bounded_confidence_gain": bounded_confidence_gain,
+        "bounded_entropy_reduction": bounded_entropy_gain,
+        "bounded_purity_gain": bounded_purity_gain,
+        "uses_target_labels_for_prediction": False,
+        "uses_target_labels_for_gate": True,
+        "mutates_checkpoint": False,
+    }
+    return float(feature_weight), float(position_weight), normalization
 
 
 def _metrics(summary: dict[str, Any]) -> dict[str, Any]:

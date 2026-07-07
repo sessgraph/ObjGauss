@@ -23,6 +23,17 @@
 
 ## Closed
 
+### ACTION-023: 实现 bounded evidence normalization candidate
+
+- 完成 commit: 本提交
+- 结果: `real-sample-v2-sample-aware-weight-policy` 新增 `bounded-normalized` 候选和
+  `objgauss-bounded-evidence-normalization-v1` summary，记录 feature / position blend、
+  bounded confidence gain 和 entropy reduction。Lego 仍选择 `promoted`，
+  `mixed_gaussians=0`、`hard_regression=0`；Polyhaven 选择 `bounded-normalized`，
+  `evidence_normalization_status=satisfied_by_bounded_normalization`，selected
+  `hard_regression=0`，blocked promoted candidate 仍记录 `hard_regression=1814`。
+  本项不解冻 geometry / camera / dynamic-K，不引入 diffusion / rollout / replay buffer。
+
 ### ACTION-022: 下载真实 Gaussian cloud 并清理 viewer demo 入口
 
 - 完成 commit: 本提交
