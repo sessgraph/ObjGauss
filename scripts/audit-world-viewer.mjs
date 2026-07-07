@@ -61,6 +61,7 @@ try {
       `mixedSlots=${summary.mixedSlots}`,
       `objectContinuity=${summary.objectContinuityStatus}`,
       `objectMove=${summary.objectMoveStatus}`,
+      `sourceSplatMotion=${summary.sourceSplatObjectMotionStatus}`,
       `objectTransform=${summary.objectTransformStatus}`,
       `objectTransformState=${summary.objectTransformStateStatus}`,
       `objectPick=${summary.objectPickStatus}`,
@@ -188,6 +189,53 @@ async function auditWorld(url) {
     if (pills < 7) {
       throw new Error(`expected at least 7 model pills, found ${pills}`);
     }
+    const sourceSplatMotionSelection = await page.waitForFunction(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const sample = (world?.sourceSplatObjectMotionSamples ?? []).find(
+        (entry) =>
+          entry.status === "ready" &&
+          entry.countMatches === true &&
+          Number(entry.mappedGaussians) > 0,
+      );
+      const selection = (world?.objectSelections ?? []).find(
+        (entry) => entry.modelId === sample?.modelId && entry.visible,
+      );
+      if (!sample || !selection || typeof world?.selectObjectForAudit !== "function") {
+        return null;
+      }
+      const selected = world.selectObjectForAudit(selection.selectionId);
+      if (!selected) return null;
+      return {
+        selectionId: selection.selectionId,
+        modelId: selection.modelId,
+        objectId: selection.objectId,
+        before: selection.position,
+        sample,
+      };
+    }, undefined, { timeout: 30000 }).then((handle) => handle.jsonValue());
+    const sourceSplatMotionMove = await page.evaluate((selectionId) => {
+      return window.__OBJGAUSS_WORLD__?.moveObjectForAudit?.(selectionId, [0.42, 0, 0]) ?? null;
+    }, sourceSplatMotionSelection.selectionId);
+    if (sourceSplatMotionMove?.ok !== true) {
+      throw new Error(`expected source splat object to move: ${JSON.stringify(sourceSplatMotionMove)}`);
+    }
+    const sourceSplatObjectMotion = await page.waitForFunction((selectionId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const motion = world?.sourceSplatObjectMotionForAudit?.(selectionId);
+      if (
+        !motion ||
+        motion.contract !== "source-splat-object-translate-v1" ||
+        motion.status !== "ready" ||
+        motion.active !== true ||
+        motion.transformedObjects < 1 ||
+        motion.maxTranslate <= 0 ||
+        motion.selectedTranslateMagnitude <= 0 ||
+        motion.sourceCount !== motion.pointCount
+      ) {
+        return null;
+      }
+      return motion;
+    }, sourceSplatMotionSelection.selectionId, { timeout: 15000 }).then((handle) => handle.jsonValue());
     const ogcPill = page.locator(".modelPill[data-model-row-id='ogc-debug']");
     await ogcPill.waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
@@ -2150,6 +2198,12 @@ async function auditWorld(url) {
       mixedSlots: world.mixedSlots,
       objectContinuityStatus: world.objectContinuityStatus,
       objectMoveStatus: objectMove.source === "debug-panel" ? "passed" : "failed",
+      sourceSplatObjectMotionStatus:
+        sourceSplatObjectMotion.status === "ready" &&
+        sourceSplatObjectMotion.active === true &&
+        sourceSplatObjectMotion.maxTranslate > 0
+          ? "passed"
+          : "failed",
       objectTransformStatus:
         objectTransform.contract === "three-transform-controls-v1" &&
         objectTransform.engine === "object-transform-state-v1" &&
@@ -2169,6 +2223,7 @@ async function auditWorld(url) {
       objectPickStatus: objectPick.result?.ok === true ? "passed" : "failed",
       objectMoveBefore: objectMove.before,
       objectMoveAfter: objectMove.after,
+      sourceSplatObjectMotion,
       trainingStageStatus:
         world.shellTrainingStage === "model-version-processing-v1" &&
         world.panelTrainingStageSchema === "model-version-processing-v1" &&

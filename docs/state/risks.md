@@ -1,6 +1,6 @@
 # ObjGauss 风险登记
 
-> 最近更新: 2026-07-03
+> 最近更新: 2026-07-07
 
 | ID | 风险 | 影响 | 当前缓解 | 关闭条件 | 状态 |
 | --- | --- | --- | --- | --- | --- |
@@ -17,3 +17,4 @@
 | R-011 | Hugging Face 公开仓库处于开发阶段，远端大文件状态可能与本地记录不一致 | 其他人下载时可能缺少 object-aware PLY 或 checkpoint，复现失败 | HF README 已加 development-stage 注释；Dataset object-aware PLY 和 Model checkpoint 已上传并远端核对，大小 / checksum / commit 已写入 `docs/state/huggingface-release.md` | Dataset object-aware PLY 和 Model checkpoint 均远端可见，大小 / checksum / commit 已写入 `docs/state/huggingface-release.md` | closed |
 | R-012 | HF 全量 `4,503,634`-Gaussian object-aware PLY 不能直接达到 production-interactive browser runtime | 其他人下载 HF 全量 PLY 后可能误以为 viewer 可无优化直接流畅交互 | HF / 项目文档明确区分 development-stage full PLY 与 sampled1m terminal proof；默认 viewer 仍优先 `.splat` 快速查看和按需加载 PLY；`audit:large-model-viewer-route` 已证明 near-1M quick view 不请求 object-aware PLY，只有对象编辑 / `加载对象 PLY` 才请求；当前 full PLY runtime min approx FPS=`4.412` 已记录为 negative evidence | LOD、streaming、分块加载或全量性能优化通过 full PLY production SLA | open |
 | R-013 | 训练模型主线受当前 torch / gsplat / CUDA / NVIDIA driver 环境阻塞 | `TRAIN-GSPLAT-MVP-001` 无法在当前 Codex 环境证明 full renderer training MVP；若继续重复尝试会浪费队列并可能把 point renderer / deterministic Debug OS 误记为 gsplat 训练成功 | 已确认此前 `nvidia-smi` 失败来自默认沙箱 `/dev` 视图不暴露 `/dev/nvidia*`，不是 host driver 不可用；host / 提权环境中 RTX 5060 Ti、driver `595.71.05`、CUDA `13.2` 可用。临时 uv 环境已验证 `torch 2.12.1+cu130`、`gsplat 1.5.3`，并复用 `/tmp/objgauss-cuda13` + CUDA 13.0 uv package set 跑通显式 `--image-renderer gsplat` 2-iteration smoke；`renderer-loss-contract` 输出 `status=full_3dgs_renderer_ready`、`upgrade_blockers=[]` | `TRAIN-GSPLAT-MVP-001` 以显式 `--image-renderer gsplat` 完成小规模 smoke 并产出验收 summary | closed |
+| R-014 | `audit:world-viewer` full script 覆盖过宽且部分等待条件已落后于当前精简 UI | 新 viewer 切片可能已通过 targeted browser evidence，但 full audit 仍在旧 trainable stability dashboard 条件超时，导致验收信号混杂 | `NATIVE-SPLAT-OBJECT-TRANSFORM-001` 使用 targeted Playwright + system Chrome 验证 source splat motion；full audit 失败点记录为 `scripts/audit-world-viewer.mjs:577`，不作为本切片完成门槛 | 将 full audit 拆成 source motion、object picking、trainable diagnostics、import routes 等独立脚本，或更新旧 stability dashboard 等待条件与当前 UI 一致 | open |

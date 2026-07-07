@@ -15,6 +15,14 @@ import {
 } from "./ogcDecoder.js";
 import { colorForObject, rgbToCss } from "./palette.js";
 import { parsePly } from "./ply.js";
+import {
+  configureSparkObjectTransform,
+  createSparkObjectTransform,
+  disposeSparkObjectTransform,
+  sparkObjectTransformStats,
+  SPARK_OBJECT_TRANSFORM_CONTRACT,
+  updateSparkObjectTransforms,
+} from "./sparkObjectTransform.js";
 
 const INITIAL_CAMERA = {
   position: [0, 5.4, 10.8],
@@ -2848,8 +2856,27 @@ function ThreeWorld({
       round3(object.position.z),
     ];
 
+    const syncSourceSplatObjectTransforms = (modelId) => {
+      const modelRoot = modelRoots.get(modelId);
+      const layer = modelRoot?.userData?.sourceSplatLayer;
+      const transform = layer?.objectTransformHandle;
+      if (!modelRoot || !transform) return null;
+      const objectGroups = [...draggableObjects.values()].filter(
+        (object) => object.userData.modelId === modelId,
+      );
+      const stats = updateSparkObjectTransforms(transform, {
+        objectGroups,
+        sourceFrameScale: layer.sourceFrameScale ?? layer.sourceFrame?.scale ?? 1,
+      });
+      layer.objectMotion = stats;
+      const splat = sourceSplatMeshForRoot(modelRoot);
+      if (splat) splat.needsUpdate = true;
+      return stats;
+    };
+
     const notifyObjectTransformed = (object, source, details = {}) => {
       if (!object) return null;
+      const sourceSplatObjectMotion = syncSourceSplatObjectTransforms(object.userData.modelId);
       const position = transformPosition(object);
       callbacksRef.current.onObjectMoved?.(objectTarget(object), position, { source });
       lastTransformEvent = {
@@ -2859,6 +2886,9 @@ function ThreeWorld({
         modelId: object.userData.modelId,
         objectId: object.userData.objectId,
         position,
+        sourceSplatObjectMotionStatus: sourceSplatObjectMotion?.status ?? "missing",
+        sourceSplatObjectMotionActive: Boolean(sourceSplatObjectMotion?.active),
+        sourceSplatObjectMotionMaxTranslate: sourceSplatObjectMotion?.maxTranslate ?? 0,
         historyDepth: transformHistory.length,
         redoDepth: transformFuture.length,
       };
@@ -3092,9 +3122,38 @@ function ThreeWorld({
         sourceSplatActive: sourceSplatSamples.length > 0,
         sourceSplatReadyCount: sourceSplatSamples.filter((sample) => sample.status === "ready").length,
         sourceSplatSamples,
+        sourceSplatObjectMotionContract: SPARK_OBJECT_TRANSFORM_CONTRACT,
+        sourceSplatObjectMotionReadyCount: sourceSplatSamples.filter(
+          (sample) => sample.sourceSplatObjectMotionStatus === "ready",
+        ).length,
+        sourceSplatObjectMotionActiveCount: sourceSplatSamples.filter(
+          (sample) => sample.sourceSplatObjectMotionActive,
+        ).length,
+        sourceSplatObjectMotionSamples: sourceSplatSamples.map((sample) => ({
+          modelId: sample.modelId,
+          status: sample.sourceSplatObjectMotionStatus,
+          reason: sample.sourceSplatObjectMotionReason,
+          active: sample.sourceSplatObjectMotionActive,
+          sourceCount: sample.sourceSplatObjectMotionSourceCount,
+          pointCount: sample.sourceSplatObjectMotionPointCount,
+          countMatches: sample.sourceSplatObjectMotionCountMatches,
+          mappedGaussians: sample.sourceSplatObjectMotionMappedGaussians,
+          objectCount: sample.sourceSplatObjectMotionObjectCount,
+          transformedObjects: sample.sourceSplatObjectMotionTransformedObjects,
+          maxTranslate: sample.sourceSplatObjectMotionMaxTranslate,
+          updates: sample.sourceSplatObjectMotionUpdates,
+        })),
         selectedSourceSplatStatus: selectedSourceSplatLayer?.status ?? "missing",
         selectedSourceSplatPath: selectedSourceSplatLayer?.path ?? null,
         selectedSourceSplatModelId: selectedSourceSplatLayer?.modelId ?? null,
+        selectedSourceSplatObjectMotionStatus:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionStatus ?? "missing",
+        selectedSourceSplatObjectMotionReason:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionReason ?? null,
+        selectedSourceSplatObjectMotionActive:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionActive ?? false,
+        selectedSourceSplatObjectMotionMaxTranslate:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionMaxTranslate ?? 0,
         objectTransformContract: "three-transform-controls-v1",
         objectTransformEngine: "object-transform-state-v1",
         objectTransformMode: transformMode,
@@ -3306,6 +3365,43 @@ function ThreeWorld({
           if (!object) return { ok: false, selectionId: null, position: null };
           return moveObjectGroup(object.userData.selectionId, delta, { source: "audit" });
         },
+        sourceSplatObjectMotionForAudit(selectionId = null) {
+          const object =
+            (selectionId ? draggableObjects.get(selectionId) : null) ??
+            [...draggableObjects.values()].find((entry) => entry.visible);
+          if (!object) return { ok: false, reason: "missing-object", selectionId: null };
+          syncSourceSplatObjectTransforms(object.userData.modelId);
+          const modelRoot = modelRoots.get(object.userData.modelId);
+          const layerInfo = sourceSplatLayerInfo(modelRoot);
+          const layer = modelRoot?.userData?.sourceSplatLayer;
+          const scale = layer?.sourceFrameScale ?? layer?.sourceFrame?.scale ?? 1;
+          const initial = object.userData.sourceSplatInitialPosition ?? [0, 0, 0];
+          const selectedTranslate = [
+            (Number(object.position.x) - Number(initial[0])) / scale,
+            (Number(object.position.y) - Number(initial[1])) / scale,
+            (Number(object.position.z) - Number(initial[2])) / scale,
+          ].map(round3);
+          publishAuditHandle();
+          return {
+            ok:
+              layerInfo.sourceSplatObjectMotionStatus === "ready" &&
+              layerInfo.sourceSplatObjectMotionCountMatches,
+            selectionId: object.userData.selectionId,
+            modelId: object.userData.modelId,
+            objectId: object.userData.objectId,
+            contract: layerInfo.sourceSplatObjectMotionContract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
+            status: layerInfo.sourceSplatObjectMotionStatus ?? "missing",
+            reason: layerInfo.sourceSplatObjectMotionReason ?? null,
+            active: Boolean(layerInfo.sourceSplatObjectMotionActive),
+            transformedObjects: layerInfo.sourceSplatObjectMotionTransformedObjects ?? 0,
+            maxTranslate: layerInfo.sourceSplatObjectMotionMaxTranslate ?? 0,
+            selectedTranslate,
+            selectedTranslateMagnitude: round3(Math.hypot(...selectedTranslate)),
+            sourceCount: layerInfo.sourceSplatObjectMotionSourceCount ?? null,
+            pointCount: layerInfo.sourceSplatObjectMotionPointCount ?? 0,
+            mappedGaussians: layerInfo.sourceSplatObjectMotionMappedGaussians ?? 0,
+          };
+        },
         beginTransformForAudit(selectionId = null) {
           const object =
             (selectionId ? draggableObjects.get(selectionId) : null) ??
@@ -3321,6 +3417,7 @@ function ThreeWorld({
           object.position.x += finiteNumber(delta?.[0]) ?? 0;
           object.position.y = 0;
           object.position.z += finiteNumber(delta?.[2]) ?? 0;
+          syncSourceSplatObjectTransforms(object.userData.modelId);
           publishAuditHandle();
           return {
             ok: true,
@@ -3397,6 +3494,8 @@ function ThreeWorld({
       });
       dragControls.addEventListener("drag", (event) => {
         event.object.position.y = 0;
+        syncSourceSplatObjectTransforms(event.object.userData.modelId);
+        publishAuditHandle();
       });
       dragControls.addEventListener("dragend", (event) => {
         controls.enabled = true;
@@ -3435,7 +3534,10 @@ function ThreeWorld({
           : points?.length
             ? createPointCloudGroup(model, points)
             : createCompressedModelGroup(model);
-      attachSourceSplatLayer(result.group, model, result.summary?.sourceFrame, publishAuditHandle);
+      attachSourceSplatLayer(result.group, model, result.summary?.sourceFrame, publishAuditHandle, {
+        points,
+        objectGroups: result.objectGroups,
+      });
       scene.add(result.group);
       modelRoots.set(model.id, result.group);
       result.objectGroups.forEach((object) => {
@@ -3887,6 +3989,7 @@ function ThreeWorld({
     transformControls.addEventListener("objectChange", () => {
       if (transformControls.object) {
         transformControls.object.position.y = 0;
+        syncSourceSplatObjectTransforms(transformControls.object.userData.modelId);
       }
       publishAuditHandle();
     });
@@ -6280,9 +6383,12 @@ function baseModelGroup(model) {
   return group;
 }
 
-function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange) {
+function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange, options = {}) {
   const source = sourceSplatSource(model);
   if (!group || !source || !validSourceFrame(sourceFrame)) return null;
+  const points = Array.isArray(options.points) ? options.points : [];
+  const objectGroups = Array.isArray(options.objectGroups) ? options.objectGroups : [];
+  const objectTransform = points.length > 0 ? createSparkObjectTransform(points) : null;
 
   const layer = new THREE.Group();
   layer.name = `${model.name} / source splat`;
@@ -6299,6 +6405,9 @@ function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange) {
       minY: round3(sourceFrame.minY),
       center: sourceFrame.center.toArray().map(round3),
     },
+    sourceFrameScale: sourceFrame.scale,
+    objectMotion: sparkObjectTransformStats(objectTransform),
+    objectTransformHandle: objectTransform,
   };
   layer.scale.setScalar(sourceFrame.scale);
   layer.position.set(
@@ -6308,7 +6417,7 @@ function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange) {
   );
   layer.renderOrder = -40;
 
-  const splat = new SplatMesh({
+  const splatOptions = {
     url: source.path,
     onProgress: (event) => {
       if (!event.lengthComputable || event.total === 0) return;
@@ -6319,20 +6428,37 @@ function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange) {
       layer.userData.status = "ready";
       onStatusChange?.();
     },
-  });
+  };
+  if (objectTransform) splatOptions.objectModifier = objectTransform.modifier;
+  const splat = new SplatMesh(splatOptions);
   splat.name = `${model.name} source SplatMesh`;
   splat.userData.role = "source-splat-mesh";
   splat.userData.modelId = model.id;
   splat.userData.path = source.path;
+  splat.userData.sourceSplatObjectTransform = objectTransform;
   splat.frustumCulled = false;
   layer.add(splat);
   group.add(layer);
   group.userData.sourceSplatLayer = layer.userData;
+  if (objectTransform) {
+    layer.userData.objectMotion = updateSparkObjectTransforms(objectTransform, {
+      objectGroups,
+      sourceFrameScale: sourceFrame.scale,
+    });
+  }
 
   splat.initialized
     .then(() => {
       const sourceCount = splat.splats?.getNumSplats?.();
       if (Number.isFinite(sourceCount)) layer.userData.sourceSplats = sourceCount;
+      if (objectTransform) {
+        configureSparkObjectTransform(objectTransform, { sourceCount });
+        layer.userData.objectMotion = updateSparkObjectTransforms(objectTransform, {
+          objectGroups,
+          sourceFrameScale: sourceFrame.scale,
+        });
+        splat.needsUpdate = true;
+      }
       layer.userData.status = "ready";
       onStatusChange?.();
     })
@@ -6376,6 +6502,7 @@ function sourceSplatLayerInfo(modelRoot) {
       path: null,
     };
   }
+  const objectMotion = layer.objectMotion ?? sparkObjectTransformStats(layer.objectTransformHandle);
   return {
     registered: true,
     contract: layer.contract ?? SOURCE_SPLAT_STAGE_CONTRACT,
@@ -6385,10 +6512,33 @@ function sourceSplatLayerInfo(modelRoot) {
     label: layer.label ?? "完整 splat",
     renderer: layer.renderer ?? "Spark splat",
     sourceSplats: layer.sourceSplats ?? null,
+    sourceSplatObjectMotionContract: objectMotion.contract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
+    sourceSplatObjectMotionMode: objectMotion.mode ?? "none",
+    sourceSplatObjectMotionStatus: objectMotion.status ?? "missing",
+    sourceSplatObjectMotionReason: objectMotion.reason ?? null,
+    sourceSplatObjectMotionActive: Boolean(objectMotion.active),
+    sourceSplatObjectMotionPointCount: objectMotion.pointCount ?? 0,
+    sourceSplatObjectMotionSourceCount: objectMotion.sourceCount ?? null,
+    sourceSplatObjectMotionCountMatches: Boolean(objectMotion.sourceCountMatches),
+    sourceSplatObjectMotionObjectCount: objectMotion.objectCount ?? 0,
+    sourceSplatObjectMotionMappedGaussians: objectMotion.mappedGaussians ?? 0,
+    sourceSplatObjectMotionUpdates: objectMotion.updates ?? 0,
+    sourceSplatObjectMotionTransformedObjects: objectMotion.transformedObjects ?? 0,
+    sourceSplatObjectMotionMaxTranslate: objectMotion.maxTranslate ?? 0,
   };
 }
 
+function sourceSplatMeshForRoot(modelRoot) {
+  let result = null;
+  modelRoot?.traverse?.((child) => {
+    if (!result && child.userData?.role === "source-splat-mesh") result = child;
+  });
+  return result;
+}
+
 function disposeSourceSplatMesh(splat) {
+  disposeSparkObjectTransform(splat.userData?.sourceSplatObjectTransform);
+  splat.userData.sourceSplatObjectTransform = null;
   splat.removeFromParent?.();
   splat.dispose?.();
   splat.splats?.dispose?.();
@@ -6408,6 +6558,7 @@ function baseObjectGroup(model, objectId, position) {
     objectId,
     selectionId: selectionIdForObject(model.id, objectId),
     draggable: true,
+    sourceSplatInitialPosition: [position.x, position.y ?? 0, position.z],
   };
   return group;
 }

@@ -22,24 +22,24 @@ Viewer 已把 `sourceLayer` 的真实 `.splat` 接进主 Three.js world：默认
 `spark-source-splat-stage-v1` 在同一个 Three.js scene / camera 内加载 `Lego 原始 splat`，
 顶部 HUD 和 `Three.js 世界` 面板显示 `高斯展示=完整 splat`。处理后的 object-aware PLY
 仍作为可交互对象层叠加，用于 ObjectState 选择、bbox / centroid 叠层、TransformControls
-移动和调试证据；它不再作为主视觉的完整高斯替代品。当前实现不生成新的训练 / Demo 产物，
-不引入 native `.splat` object mask，也不改变 ObjectState / manifest / training contract。
+移动和调试证据；它不再作为主视觉的完整高斯替代品。2026-07-07 已新增
+`source-splat-object-translate-v1`：当 source `.splat` 和 object-aware PLY 满足
+`sourceCount == pointCount` 时，主 `ThreeWorld` 会用 Spark Dyno modifier 将
+`gsplat.index -> object_id -> object translate` 接到 source splat 子集。real-sample v2
+targeted browser check 证明移动 `object-0` 后 native source splat motion
+`active=true`、`transformedObjects=1`、`sourceCount=pointCount=5696`。
+当前实现不生成新的训练 / Demo 产物，不改变 ObjectState / manifest / training contract；
+rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在默认能力内。
 
 Viewer 对象交互随后补齐 `projected-object-bbox-picker-v2`：主鼠标选择现在只按
 ObjectState bbox 的 screen-space 投影命中，空白区域不会再被中心点半径误选；选中对象会强制
 显示高亮 bbox、centroid / glow / selection ring，并把 object-aware Gaussian overlay 提亮，
 方便确认“选中了哪个对象”和“移动的是对象层”。模型版本列表改为两行布局，避免完整高斯、
-点预览、对象层和处理按钮挤在一行。边界不变：完整原始 `.splat` 仍是 source layer 背景，
-不会随单个对象移动；真正让 native splat 子集按对象移动，需要后续 object mask / per-splat
-object id route。
-
-2026-07-07 的下一步规划已把这个缺口登记成显式 TODO：先做
-`THREEWORLD-SOURCE-LAYER-MOTION-CLARITY-001`，在 UI 和 audit 中明确
-`完整高斯=背景层`、`对象层=可移动`，并在选中 / 拖动对象时降低 source layer 干扰；随后推进
-`NATIVE-SPLAT-OBJECT-TRANSFORM-001`，复用既有 `SplatViewport` /
-`sparkObjectMask.js` native mask 证据，把 `source .splat index -> object_id -> object
-transform` 桥接到当前主 `ThreeWorld`。第一版只覆盖 ObjGauss 生成 / 登记且 index mapping
-已通过的样例，不承诺任意第三方 `.splat` 自带 object id，不做重优化补洞或训练解冻。
+点预览、对象层和处理按钮挤在一行。下一步 viewer TODO 已收敛为
+`NATIVE-SPLAT-MOTION-HARDEN-001`：把 source splat 绑定状态更明显地展示给用户，并补
+pixel-level audit，证明被选 source 子集移动、非选对象保持原位。full
+`audit:world-viewer` 当前仍有旧 trainable stability dashboard 等待过宽问题，source
+splat motion 采用 targeted browser check 作为本切片验收事实源。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
