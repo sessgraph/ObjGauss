@@ -20,9 +20,8 @@
 
 ## Ready
 
-当前无 ready PR。下一步建议从 Planned 提升
-`GAUSSIAN-OBJECT-PROCESS-FLOW-001`，把 viewer 主流程从“展示已处理样例”推进到
-“未分割高斯云 -> 生成对象层 -> 选中并移动对象”的产品入口。
+当前无 ready PR。产品 viewer 主流程入口已完成；下一步若继续 viewer 线，优先拆全量
+4.5M PLY LOD / streaming 或继续收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -30,25 +29,6 @@
 需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
-
-### GAUSSIAN-OBJECT-PROCESS-FLOW-001: Promote raw Gaussian to object-edit flow
-
-- 状态: planned / product-viewer-primary-flow
-- 类型: 标准 PR / frontend viewer + pipeline handoff
-- 目标: 把 viewer 主流程明确为 `未分割高斯云 -> 生成对象层 -> 选中对象 -> 移动对象`。
-  当前 viewer 已能加载 object-aware PLY 并移动对象，但还没有把未分割 `.splat / .ply / OGC`
-  资产通过模型处理生成 object layer 的产品入口。
-- 建议范围:
-  - 在 model catalog / selected model state 中明确 `raw-gaussian`、`object-aware`、
-    `processing`、`object-layer-ready` 状态。
-  - 保留训练阶段的展示台语义：同一场景或同定位模型可选择多个版本一起展示，
-    已处理版本跳过重新处理并直接加载已有对象层。
-  - 为未分割资产提供 `生成对象` 主操作；第一版可以调用现有 CLI / manifest handoff 输出，
-    不在浏览器里引入重型分割模型。
-  - 处理完成后自动切换到 object-aware artifact，并保留原始高斯云作为 source layer。
-  - 复用当前对象选择、隐藏、分割视图和移动控件。
-- 边界: 不引入新重型 ML 依赖；不替换 renderer；不把未确认许可的房间样例作为 public demo；
-  不改变 artifact / manifest 对外契约，除非另立 ADR 或标准 contract PR。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 
@@ -109,6 +89,51 @@
 当前无进行中 PR。
 
 ## Done
+
+### GAUSSIAN-OBJECT-PROCESS-FLOW-001: Promote raw Gaussian to object-edit flow
+
+- 状态: done / validated-targeted-browser
+- 类型: 标准 PR / frontend viewer + pipeline handoff
+- 目标: 把 viewer 主流程从“展示已处理样例”推进到
+  `未分割高斯云 -> 生成对象层 -> 选中并移动对象`。
+- 已实施:
+  - `src/modelCatalog.js` 新增默认 `lego-alpha-raw-source` raw-gaussian model，只加载
+    `/samples/lego_alpha_proxy.splat` source layer，不注册对象层，不创建 draggable object groups。
+  - `src/App.jsx` 新增 `objgauss-gaussian-object-process-flow-v1` handoff 状态；raw model 点击
+    `生成` 后显示本地 CLI 命令、viewer path、result model id 和安全边界，浏览器本身不运行
+    重型分割 / 训练模型。
+  - `加载结果` 会 fetch 生成的
+    `/samples/objgauss-real-sample-v2-sample-aware-lego.ply`，将结果加载到
+    `real-sample-v2-sample-aware-lego`，自动切换 selection，并把 stage 收敛到生成后的对象层模型。
+  - 结果模型复用已有 source `.splat` + object-aware PLY index mapping；对象选择、bbox highlight、
+    TransformControls、native source splat translate 和 peer-stays-put audit 路径保持一致。
+- 验证:
+  - Catalog Node assertion: default model is `lego-alpha-raw-source`; raw process command points to
+    `real-sample-v2-sample-aware-weight-policy`.
+  - `uv run objgauss training real-sample-v2-sample-aware-weight-policy public/samples/lego_alpha_v1_objects.ply --preview-ply-output /tmp/objgauss-process-flow-smoke.ply --summary-output /tmp/objgauss-process-flow-smoke-summary.json --viewer-path /samples/objgauss-process-flow-smoke.ply --require-pass`: passed；selected `promoted`、`mixed_gaussians=0`、`hard_regression=0`。
+  - `uv run objgauss stats /tmp/objgauss-process-flow-smoke.ply`: passed；`5696` Gaussians、
+    object counts `736/581/1787/2592`。
+  - `npm run build`: passed；保留既有 Vite chunk size warning。
+  - Playwright + system Chrome desktop on `http://127.0.0.1:5395/`: page identity / non-empty
+    shell / no app console errors passed；default selected `lego-alpha-raw-source` with
+    `processStatus=raw-gaussian`、`objectLayerStatus=missing`；click `生成` produced
+    `handoff-ready` and command; click `加载结果` selected
+    `real-sample-v2-sample-aware-lego` with `object-layer-ready` and stage only
+    `real-sample-v2-sample-aware-lego`; source splat motion projection audit moved
+    `object-0` with `active=true`、`transformedObjects=1`、`selectedScreenDelta=28.513px`、
+    peer world delta `0`。
+  - Playwright + system Chrome mobile 390x844: handoff panel visible, `命令就绪` / `加载结果`
+    present, command includes policy, panel width `284px < 390px`, no framework overlay or app
+    console errors.
+  - Screenshots:
+    `/tmp/objgauss-process-flow-desktop.png`、
+    `/tmp/objgauss-process-flow-mobile.png`。
+- 边界:
+  - 不在浏览器里运行 SAM / CLIP / gsplat / solver training。
+  - 不改变 ObjectState / manifest / checkpoint ABI。
+  - 不提交 generated PLY / summary / screenshots；`public/samples/*.ply` 仍由 ignore 规则排除。
+  - 不承诺任意第三方 `.splat` 自带 object id、rotate / scale native motion 或 Gaussian 重优化。
+- 完成 commit: 本提交
 
 ### DEV-SERVER-5395-RESTART-001: Pin development server restart policy to port 5395
 

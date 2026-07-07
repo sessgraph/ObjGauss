@@ -4,27 +4,6 @@
 
 ## Open
 
-### ACTION-021: TODO - 让主展示台真实 `.splat` 对象子集随对象移动
-
-- 原因: 当前 `ThreeWorld` 主展示台已经加载完整 source `.splat`，但该层只是
-  `SplatMesh({ url })` 背景层；TransformControls 移动的是处理后的 object-aware PLY
-  `ObjectState` group。用户会自然期待“选中对象后，真实高斯子集也跟着动”。历史
-  `SplatViewport` / `sparkObjectMask.js` 已证明 no-SH 样例可用 object-aware PLY 的
-  Gaussian index mapping 在 Spark source/original route 上做 object opacity mask，但这条能力尚未
-  接入当前 `ThreeWorld` 展示台，也尚未扩展到 per-object transform。
-- 推荐:
-  - 先做 `THREEWORLD-SOURCE-LAYER-MOTION-CLARITY-001`，在 UI 上明确
-    `完整高斯=背景层`、`对象层=可移动`，并在选中 / 拖动对象时降低或隐藏 source layer，
-    防止继续误读。
-  - 再做 `NATIVE-SPLAT-OBJECT-TRANSFORM-001`：复用 `audit:splat-index-mapping`、
-    `sparkObjectMask.js` 和 `SplatViewport` native mask 经验，在主展示台建立
-    `.splat index -> object_id -> object transform` 的浏览器 contract。
-  - 第一版只覆盖 index mapping 已通过的 ObjGauss 生成 / 登记样例；不承诺任意第三方
-    `.splat` 自带 object id，也不做重优化补洞。
-- 退出条件: 在主 `ThreeWorld` 中选中对象并移动时，真实 source `.splat` 对应 object_id
-  子集与 bbox / object-aware overlay 同步移动；未选中对象仍留在原位；browser audit 同时验证
-  index mapping、transform texture / modifier contract、截图像素变化和 fallback 边界。
-
 ### ACTION-006: 接入 SAM / CLIP mask 生成器
 
 - 原因: `SEG-002` 已完成真实 SAM checkpoint 小场景验收，`SEG-CLIP-001` 已完成 manifest-level 跨视角 slot alignment，`CLIP-SCORE-001` 已完成可选 CLIP score cache contract；`CLIP-RUN-001` 已跑通真实 `transformers` CLIP inference，`CLIP-QUALITY-001`、`CLIP-SLOT-QUALITY-002`、`CLIP-BASELINE-003`、`CLIP-QUALITY-004`、`CLIP-BALANCE-001` 和 `CLIP-COVERAGE-001` 已落地 mask-level / slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy、slot support rebalance policy 与显式 foreground coverage recovery 机制。真实 CLIP 语义路线的 slot balance blocker 已清除，但整体仍保持 `do-not-promote`。
@@ -43,6 +22,16 @@
 - 退出条件: 产出 School Chair `.splat` / ObjGauss PLY，并可前端加载。
 
 ## Closed
+
+### ACTION-021: 让主展示台真实 `.splat` 对象子集随对象移动
+
+- 完成 commit: `1ced889`、`67343a1`；本轮 `GAUSSIAN-OBJECT-PROCESS-FLOW-001` 再次验证。
+- 结果: `NATIVE-SPLAT-OBJECT-TRANSFORM-001` 已在主 `ThreeWorld` 建立
+  `.splat index -> object_id -> object translate` 路径；`NATIVE-SPLAT-MOTION-HARDEN-001`
+  已把真实绑定状态显示到 UI，并证明 selected source splat 子集移动、peer 对象不动。
+  本轮 raw -> handoff -> object layer flow 的 desktop browser check 进一步验证生成结果模型
+  `real-sample-v2-sample-aware-lego::object-0` 移动后 native source splat motion
+  `active=true`、`transformedObjects=1`、`selectedScreenDelta=28.513px`，peer world delta 为 `0`。
 
 ### ACTION-016: 用真实 SAM checkpoint 跑小场景 mask manifest
 

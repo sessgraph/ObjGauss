@@ -42,6 +42,7 @@ const OBJECT_SCALE_SNAP_STEP = 0.1;
 const THREE_WORLD_POINT_PREVIEW_CONTRACT = "three-world-point-preview-v1";
 const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
 const OBJECT_PICKING_CONTRACT = "projected-object-bbox-picker-v2";
+const OBJECT_PROCESS_FLOW_SCHEMA = "objgauss-gaussian-object-process-flow-v1";
 const OBJECT_PICK_BOX_SCREEN_PADDING_PX = 4;
 
 export default function App() {
@@ -75,6 +76,7 @@ export default function App() {
   const [objectOverlayMode, setObjectOverlayMode] = useState("full");
   const [objectTransformMode, setObjectTransformMode] = useState("translate");
   const [sourceSplatMotionState, setSourceSplatMotionState] = useState(() => emptySourceSplatMotionState());
+  const [objectProcessHandoff, setObjectProcessHandoff] = useState(() => emptyObjectProcessHandoff());
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
@@ -1119,19 +1121,118 @@ export default function App() {
         });
         return;
       }
+      const handoff = objectProcessHandoffForModel(model);
       patchModel(model.id, {
         status: "processing",
-        message: "waiting object-layer pipeline",
+        message: handoff.command ? "object process handoff ready" : "missing object process handoff",
+        objectProcessHandoff: handoff,
       });
+      setObjectProcessHandoff(handoff);
+      setStageModelIds(new Set([model.id]));
       setSelection({ modelId: model.id, objectId: null, selectionId: model.id });
       worldApi.current?.focusModel(model.id);
       recordDebugEvent("model-process-request", {
         modelId: model.id,
         processStatus: entry.processStatus,
+        processHandoffStatus: handoff.status,
+        resultModelId: handoff.resultModelId,
+        viewerPath: handoff.viewerPath,
         source: "training-stage-panel",
       });
     },
     [models, patchModel, recordDebugEvent, selectModel, stageModelIds],
+  );
+
+  const loadObjectProcessResult = useCallback(
+    async (handoff = objectProcessHandoff) => {
+      const target = normalizeObjectProcessHandoff(handoff);
+      if (!target.viewerPath || !target.resultModelId) {
+        setObjectProcessHandoff({ ...target, status: "missing-output", error: "missing viewer path" });
+        return;
+      }
+      const resultModel = models[target.resultModelId] ?? modelCatalog.find((model) => model.id === target.resultModelId);
+      if (!resultModel) {
+        setObjectProcessHandoff({ ...target, status: "missing-output", error: "missing result model" });
+        return;
+      }
+      const loadingHandoff = { ...target, status: "loading-result", error: "" };
+      setObjectProcessHandoff(loadingHandoff);
+      patchModel(target.resultModelId, {
+        status: "loading",
+        message: "loading generated object layer",
+      });
+      try {
+        const startedAt = performance.now();
+        const response = await fetch(target.viewerPath);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const cloud = parsePly(await response.arrayBuffer());
+        const nextModel = {
+          ...resultModel,
+          sourcePath: target.viewerPath,
+          objectLayer: {
+            ...(resultModel.objectLayer ?? {}),
+            status: "registered",
+            path: target.viewerPath,
+            format: ".ply",
+            renderer: "Three.js Points",
+            label: "对象层 PLY",
+          },
+        };
+        const rendered = worldApi.current?.upsertModel(nextModel, cloud.points);
+        patchModel(target.resultModelId, {
+          ...nextModel,
+          status: "loaded",
+          message: "object-layer-ready",
+          gaussianCount: cloud.points.length,
+          displayCount: rendered?.displayCount ?? 0,
+          objectCount: rendered?.objectCount ?? nextModel.objectCount,
+          corePoint: rendered?.corePoint ?? null,
+          objects: rendered?.objects ?? [],
+          loadMs: Math.round(performance.now() - startedAt),
+        });
+        setStageModelIds(new Set([target.resultModelId]));
+        setSelection({
+          modelId: target.resultModelId,
+          objectId: null,
+          selectionId: target.resultModelId,
+        });
+        worldApi.current?.focusModel(target.resultModelId);
+        const readyHandoff = {
+          ...target,
+          status: "object-layer-ready",
+          error: "",
+          loadedGaussians: cloud.points.length,
+          loadedObjects: rendered?.objectCount ?? nextModel.objectCount ?? 0,
+        };
+        setObjectProcessHandoff(readyHandoff);
+        recordDebugEvent("model-process-result-loaded", {
+          modelId: target.modelId,
+          resultModelId: target.resultModelId,
+          viewerPath: target.viewerPath,
+          gaussians: cloud.points.length,
+          objects: rendered?.objectCount ?? nextModel.objectCount ?? 0,
+          source: "training-stage-panel",
+        });
+      } catch (error) {
+        patchModel(target.resultModelId, {
+          status: resultModel.optionalLocalPreview ? "skipped" : "error",
+          message: error?.message ?? "generated object layer load failed",
+        });
+        setObjectProcessHandoff({
+          ...target,
+          status: "missing-output",
+          error: error?.message ?? "generated object layer load failed",
+        });
+        recordDebugEvent("model-process-result-missing", {
+          modelId: target.modelId,
+          resultModelId: target.resultModelId,
+          viewerPath: target.viewerPath,
+          error: error?.message ?? "generated object layer load failed",
+          source: "training-stage-panel",
+        });
+      }
+    },
+    [modelCatalog, models, objectProcessHandoff, patchModel, recordDebugEvent],
   );
 
   const handleWorldReady = useCallback((api) => {
@@ -1285,6 +1386,23 @@ export default function App() {
           }
           continue;
         }
+        if (model.loadMode === "raw-gaussian-source") {
+          const startedAt = performance.now();
+          patchModel(model.id, { status: "loading", message: "loading raw source" });
+          const rendered = worldApi.current?.upsertModel(model, null);
+          if (cancelled) return;
+          patchModel(model.id, {
+            status: "raw",
+            message: "raw source ready",
+            gaussianCount: Number(model.gaussianCount) || 0,
+            displayCount: rendered?.displayCount ?? 0,
+            objectCount: 0,
+            corePoint: rendered?.corePoint ?? null,
+            objects: [],
+            loadMs: Math.round(performance.now() - startedAt),
+          });
+          continue;
+        }
         if (model.loadMode !== "eager") {
           const rendered = worldApi.current?.upsertModel(model, null);
           patchModel(model.id, {
@@ -1372,6 +1490,12 @@ export default function App() {
       data-catalog-model-count={modelCatalog.length}
       data-loaded-count={loadedCount}
       data-training-stage="model-version-processing-v1"
+      data-object-process-flow-schema={OBJECT_PROCESS_FLOW_SCHEMA}
+      data-object-process-status={objectProcessHandoff.status}
+      data-object-process-model={objectProcessHandoff.modelId}
+      data-object-process-result-model={objectProcessHandoff.resultModelId}
+      data-object-process-viewer-path={objectProcessHandoff.viewerPath}
+      data-object-process-command={objectProcessHandoff.command}
       data-stage-visible-model-count={stageSummary.visibleCount}
       data-stage-visible-model-ids={stageSummary.visibleIds.join(",")}
       data-stage-processed-model-count={stageSummary.processedCount}
@@ -1756,6 +1880,8 @@ export default function App() {
         onToggleStageModel={toggleStageModel}
         onSelectStageModelBatch={selectStageModelBatch}
         onProcessModelVersion={processModelVersion}
+        onLoadObjectProcessResult={loadObjectProcessResult}
+        objectProcessHandoff={objectProcessHandoff}
         onSelectBenchmarkCase={setBenchmarkCaseName}
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
@@ -3644,7 +3770,9 @@ function ThreeWorld({
         if (object.userData.modelId === model.id) draggableObjects.delete(selectionId);
       }
       const result =
-        model.loadMode === "trainable-artifact"
+        model.loadMode === "raw-gaussian-source"
+          ? createRawGaussianSourceGroup(model)
+          : model.loadMode === "trainable-artifact"
           ? createTrainableArtifactGroup(model)
           : points?.length
             ? createPointCloudGroup(model, points)
@@ -4233,9 +4361,11 @@ function DebugPanel({
   benchmarkCase,
   stageSummary,
   stageModelIds,
+  objectProcessHandoff,
   onToggleStageModel,
   onSelectStageModelBatch,
   onProcessModelVersion,
+  onLoadObjectProcessResult,
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectObjectOverlayMode,
@@ -4425,9 +4555,11 @@ function DebugPanel({
           selected={selected}
           summary={stageSummary}
           stageModelIds={stageModelIds}
+          objectProcessHandoff={objectProcessHandoff}
           onToggleStageModel={onToggleStageModel}
           onSelectStageModelBatch={onSelectStageModelBatch}
           onProcessModelVersion={onProcessModelVersion}
+          onLoadObjectProcessResult={onLoadObjectProcessResult}
         />
       </DebugSection>
 
@@ -4861,16 +4993,25 @@ function TrainingStagePanel({
   selected,
   summary,
   stageModelIds,
+  objectProcessHandoff,
   onToggleStageModel,
   onSelectStageModelBatch,
   onProcessModelVersion,
+  onLoadObjectProcessResult,
 }) {
   const entries = summary?.entries ?? [];
+  const handoff = normalizeObjectProcessHandoff(objectProcessHandoff);
   return (
     <div
       className="stabilityDashboard trainingStagePanel"
       data-training-stage-panel="true"
       data-training-stage-schema="model-version-processing-v1"
+      data-object-process-flow-schema={OBJECT_PROCESS_FLOW_SCHEMA}
+      data-object-process-status={handoff.status}
+      data-object-process-model={handoff.modelId}
+      data-object-process-result-model={handoff.resultModelId}
+      data-object-process-viewer-path={handoff.viewerPath}
+      data-object-process-command={handoff.command}
       data-stage-visible-models={summary?.visibleCount ?? 0}
       data-stage-render-surface-contract={THREE_WORLD_POINT_PREVIEW_CONTRACT}
       data-stage-display-contract={summary?.sourceSplatStageCount > 0 ? SOURCE_SPLAT_STAGE_CONTRACT : THREE_WORLD_POINT_PREVIEW_CONTRACT}
@@ -4958,6 +5099,35 @@ function TrainingStagePanel({
           );
         })}
       </div>
+      {handoff.status !== "idle" ? (
+        <div
+          className={`objectProcessHandoff ${handoff.status}`}
+          data-object-process-handoff="true"
+          data-object-process-handoff-status={handoff.status}
+          data-object-process-handoff-model={handoff.modelId}
+          data-object-process-handoff-result-model={handoff.resultModelId}
+          data-object-process-handoff-viewer-path={handoff.viewerPath}
+          data-object-process-handoff-command={handoff.command}
+        >
+          <div className="objectProcessHandoffHead">
+            <span>{objectProcessStatusLabel(handoff.status)}</span>
+            <strong>{handoff.resultModelId || "-"}</strong>
+          </div>
+          <code>{handoff.command || "no command"}</code>
+          <div className="objectProcessHandoffMeta">
+            <span>{handoff.viewerPath || "-"}</span>
+            {handoff.error ? <b>{handoff.error}</b> : null}
+          </div>
+          <button
+            type="button"
+            data-object-process-load-result="true"
+            disabled={!handoff.viewerPath || handoff.status === "loading-result"}
+            onClick={() => onLoadObjectProcessResult?.(handoff)}
+          >
+            {handoff.status === "loading-result" ? "加载中" : "加载结果"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -6020,6 +6190,22 @@ function buildWorldShell(scene) {
   scene.add(halo);
 }
 
+function createRawGaussianSourceGroup(model) {
+  const group = baseModelGroup(model);
+  const sourceFrame = sourceFrameFromModel(model);
+  return {
+    group,
+    objectGroups: [],
+    summary: {
+      displayCount: 0,
+      objectCount: 0,
+      corePoint: sourceFrame?.center?.toArray?.().map(round3) ?? [0, 0, 0],
+      sourceFrame,
+      objects: [],
+    },
+  };
+}
+
 function createPointCloudGroup(model, points) {
   const sampled = samplePoints(points, model.maxDisplayPoints ?? 32000);
   const sourceOverlay = Boolean(sourceSplatSource(model));
@@ -6598,6 +6784,23 @@ function attachSourceSplatLayer(group, model, sourceFrame, onStatusChange, optio
     });
 
   return layer;
+}
+
+function sourceFrameFromModel(model = {}) {
+  const frame = model.sourceFrame ?? {};
+  const center = Array.isArray(frame.center) ? frame.center : null;
+  const scale = Number(frame.scale);
+  const minY = Number(frame.minY);
+  if (!center || center.length < 3 || !Number.isFinite(scale) || !Number.isFinite(minY)) return null;
+  return {
+    center: new THREE.Vector3(
+      Number(center[0]) || 0,
+      Number(center[1]) || 0,
+      Number(center[2]) || 0,
+    ),
+    scale,
+    minY,
+  };
 }
 
 function sourceSplatSource(model = {}) {
@@ -7824,6 +8027,70 @@ function initialModelStates(models = []) {
       },
     ]),
   );
+}
+
+function emptyObjectProcessHandoff() {
+  return {
+    schema: OBJECT_PROCESS_FLOW_SCHEMA,
+    status: "idle",
+    modelId: "",
+    resultModelId: "",
+    command: "",
+    viewerPath: "",
+    outputPath: "",
+    summaryPath: "",
+    error: "",
+  };
+}
+
+function objectProcessHandoffForModel(model = {}) {
+  const config = model.objectProcess ?? {};
+  return normalizeObjectProcessHandoff({
+    schema: OBJECT_PROCESS_FLOW_SCHEMA,
+    status: config.command ? "handoff-ready" : "command-missing",
+    modelId: model.id ?? "",
+    resultModelId: config.resultModelId ?? "",
+    command: config.command ?? "",
+    viewerPath: config.viewerPath ?? "",
+    outputPath: config.outputPath ?? "",
+    summaryPath: config.summaryPath ?? "",
+    pipeline: config.pipeline ?? "",
+    safety: config.safety ?? {},
+    error: config.command ? "" : "missing object process command",
+  });
+}
+
+function normalizeObjectProcessHandoff(handoff = {}) {
+  return {
+    ...emptyObjectProcessHandoff(),
+    ...handoff,
+    schema: OBJECT_PROCESS_FLOW_SCHEMA,
+    status: String(handoff.status ?? "idle"),
+    modelId: String(handoff.modelId ?? ""),
+    resultModelId: String(handoff.resultModelId ?? ""),
+    command: String(handoff.command ?? ""),
+    viewerPath: String(handoff.viewerPath ?? ""),
+    outputPath: String(handoff.outputPath ?? ""),
+    summaryPath: String(handoff.summaryPath ?? ""),
+    error: String(handoff.error ?? ""),
+  };
+}
+
+function objectProcessStatusLabel(status) {
+  switch (status) {
+    case "handoff-ready":
+      return "命令就绪";
+    case "loading-result":
+      return "加载结果";
+    case "object-layer-ready":
+      return "对象层就绪";
+    case "missing-output":
+      return "缺少输出";
+    case "command-missing":
+      return "缺命令";
+    default:
+      return "未开始";
+  }
 }
 
 function normalizeStageModelIdSet(ids) {

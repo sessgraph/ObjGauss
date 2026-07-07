@@ -40,11 +40,19 @@ Viewer 对象交互随后补齐 `projected-object-bbox-picker-v2`：主鼠标选
 ObjectState bbox 的 screen-space 投影命中，空白区域不会再被中心点半径误选；选中对象会强制
 显示高亮 bbox、centroid / glow / selection ring，并把 object-aware Gaussian overlay 提亮，
 方便确认“选中了哪个对象”和“移动的是对象层”。模型版本列表改为两行布局，避免完整高斯、
-点预览、对象层和处理按钮挤在一行。下一步 viewer TODO 已收敛为
-`GAUSSIAN-OBJECT-PROCESS-FLOW-001`：把未分割高斯云到对象层生成的主流程做成产品入口，
-而不是继续只展示已经处理好的样例。full `audit:world-viewer` 当前仍有旧 trainable
-Gaussian probe / stability 等待过宽问题，最新失败点为 `scripts/audit-world-viewer.mjs:595`；
-source splat motion 采用 targeted browser check 作为本切片验收事实源。
+点预览、对象层和处理按钮挤在一行。随后完成 `GAUSSIAN-OBJECT-PROCESS-FLOW-001`：
+viewer catalog 新增默认 `lego-alpha-raw-source`，只加载未分割 source `.splat`，对象层状态为
+`raw-gaussian / 未生成`；点击 `生成` 会进入 `objgauss-gaussian-object-process-flow-v1`
+handoff，展示可复跑的本地 CLI 命令、viewer path 和目标 object-aware model。浏览器不运行重型
+分割 / 训练模型；本地命令生成 ignored `public/samples/objgauss-real-sample-v2-sample-aware-lego.ply`
+后，`加载结果` 会 fetch 该 PLY、切换到 `real-sample-v2-sample-aware-lego`，并把 stage 收敛为
+生成后的对象层模型。Playwright + system Chrome 验证 desktop raw -> handoff -> load result ->
+source splat object motion：result model `object-layer-ready`，stage 只保留
+`real-sample-v2-sample-aware-lego`，移动 `object-0` 后 native source splat motion
+`active=true`、`transformedObjects=1`、`selectedScreenDelta=28.513px`、peer world delta 为 `0`；
+mobile 验证 handoff panel 宽度 `284px < 390px`、`命令就绪` / `加载结果` 可见且无框架 overlay。
+full `audit:world-viewer` 当前仍有旧 trainable Gaussian probe / stability 等待过宽问题，最新失败点
+为 `scripts/audit-world-viewer.mjs:595`；本流程继续采用 targeted browser check 作为验收事实源。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
@@ -784,9 +792,9 @@ handle 暴露可验证状态。该切片同时补入训练阶段的
 `/tmp/objgauss-object-interaction-canvas-mobile.png`。验证通过：`npm run build` passed（保留既有
 Vite chunk size warning）、Playwright + system Chrome desktop/mobile targeted check passed，
 并验证 `object-transform-state-v1` 的 move / undo / redo / snap / cancel 合同；PNG 像素统计确认隐藏 HUD 后 canvas 非空；此前同一切片已跑
-`uv run --extra dev pytest` 259 passed 和 `git diff --check` passed。当前切片只做 viewer
-handoff UI，未接真实后端分割任务执行；`未分割高斯云 -> 生成对象层 -> 选中/移动对象` 的完整
-pipeline 主操作仍登记为 `GAUSSIAN-OBJECT-PROCESS-FLOW-001`。
+`uv run --extra dev pytest` 259 passed 和 `git diff --check` passed。该切片只做 viewer
+handoff UI，未接真实后端分割任务执行；随后 `GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已把
+`未分割高斯云 -> 生成对象层 -> 选中/移动对象` 收敛为 viewer 内 CLI handoff 主流程入口。
 
 ## 架构重梳理基线
 
@@ -3117,15 +3125,15 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 产品 viewer 线：near-1M / HF 大模型默认 route 已形成；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及 native `.splat` object mask route 的产品化边界。
-2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate 和 slot-level gate 已落地；下一步推进 baseline 对比和默认训练策略 promotion policy。near-1M terminal proof 已关闭，但 object quality 仍不能只靠更多训练步数解释。
+1. 产品 viewer 线：`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补 raw source -> CLI handoff -> object layer ready 主入口；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及任意第三方 `.splat` object id / rotate-scale native motion / Gaussian 重优化等仍未承诺边界。
+2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate、slot-level gate、baseline comparison 和 promotion policy 已落地；真实 CLIP 语义路线仍保持 `do-not-promote`，下一步应扩大 foreground coverage / mask selection 证据，而不是把更多训练步数当作语义质量解释。
 3. 算法模型线：`CORE-MODEL-TRAIN-VALIDATE-001` 已聚合 v2 assignment training、synthetic
    stability hard gate、failure diagnostics、ObjectState eval、renderer joint smoke、
    checkpoint roundtrip 和 renderer-loss-contract evidence。当前 public sample 已跑到
    可训练、可验证、可 3D 查看对象分割效果阶段；`feature_weight=2.0` 的 weak-boundary
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
-   且已接入 viewer preview 默认展示路径。下一步应做小型 real / public sample 重复验证，
-   确认该 promoted weight 不是只修当前样例的局部边界；不要直接跳到 rollout、replay buffer、
+   且 sample-aware gate 已让 Lego 选择 promoted、Polyhaven 回落 baseline。下一步若继续算法质量，
+   应单独实现 bounded evidence normalization candidate 和更多小型 real / public sample 复验；不要直接跳到 rollout、replay buffer、
    diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
