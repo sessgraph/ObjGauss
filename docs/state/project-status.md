@@ -211,6 +211,23 @@ controlled-real-gate <manifest.json>` 已成为 controlled real manifest 的可�
 当前仍没有采集或提交真实 controlled tabletop 数据，也不训练 Gaussian / dynamics、不写
 `outputs/` / `public/samples`、不改 viewer/export 默认。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001`：新增
+`objgauss.core.objectstate_controlled_capture`，冻结 frame-level controlled tabletop
+capture / annotation manifest schema
+`objgauss-objectstate-controlled-capture-manifest-v1` 和 summary schema
+`objgauss-objectstate-controlled-capture-summary-v1`。该 manifest 位于 reality rows
+之前，用来记录真实采集的一手事实源：sample id、对象类别、场景、FPS、artifact refs、
+license、declared physical objects、严格递增 timestamp 的 frames、RGB refs、可选
+per-frame Gaussian refs、per-frame object annotations、6DoF pose 和 action events。
+`objectstate_controlled_capture_summary(...)` 输出 identity / prediction /
+intervention readiness、RGB / Gaussian coverage、GT availability 和 issues；
+`objectstate_controlled_real_manifest_from_capture_manifest(...)` 可生成
+`objgauss-objectstate-controlled-real-manifest-v1` seed，但三类 evidence rows 仍保持
+`blocked`，直到候选模型指标被计算。CLI 新增
+`objgauss object-state validate-controlled-capture <capture-manifest.json>`，支持写
+summary JSON 和 controlled-real seed manifest。当前仍没有提交真实视频、图像、
+Gaussian 或 GT 标注文件；这一步只是让真实采集结果进入 gate 前有可验证数据契约。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

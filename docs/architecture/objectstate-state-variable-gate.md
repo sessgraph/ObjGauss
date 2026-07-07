@@ -608,6 +608,53 @@ Implemented v0.1 facts:
   controlled tabletop data, train dynamics, use replay / diffusion or mutate
   viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
+
+Add the frame-level contract for actual controlled tabletop capture /
+annotation data.
+
+Required behavior:
+
+- Record the raw capture evidence before candidate model metrics exist.
+- Require a controlled real sample id, object category, scenario, FPS,
+  observation modalities, artifact refs and license.
+- Record declared physical objects with stable `object_id`.
+- Record frames with strictly increasing timestamps, RGB evidence, optional
+  per-frame Gaussian reconstruction refs, per-frame object annotations and
+  optional action refs.
+- Record 6DoF pose as `position` plus `rotation_xyzw` when available.
+- Record action events with object id, time interval, type and optional vector.
+- Produce a readiness summary for Stage 1 identity, Stage 2 prediction and
+  Stage 3 intervention evidence.
+- Produce a controlled-real manifest seed whose identity / prediction /
+  intervention rows remain `blocked` until candidate metrics are computed.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_capture`.
+- Manifest schema:
+  `objgauss-objectstate-controlled-capture-manifest-v1`.
+- Summary schema:
+  `objgauss-objectstate-controlled-capture-summary-v1`.
+- `read_objectstate_controlled_capture_manifest(...)` reads JSON.
+- `validate_objectstate_controlled_capture_manifest(...)` validates schema,
+  declared objects, actions, frame references, pose shape and timestamp order.
+- `objectstate_controlled_capture_summary(...)` reports frame / object / action
+  counts, RGB / Gaussian coverage, GT availability and readiness booleans:
+  `identity_stage_ready`, `prediction_stage_ready`,
+  `intervention_stage_ready` and `real_gaussian_reconstruction_present`.
+- `objectstate_controlled_real_manifest_from_capture_manifest(...)` emits a
+  `objgauss-objectstate-controlled-real-manifest-v1` seed with blocked rows.
+- CLI command:
+  `objgauss object-state validate-controlled-capture <capture-manifest.json>`.
+- CLI outputs optional `--summary-output` and `--controlled-real-output`, plus
+  readiness gates `--require-identity-ready`,
+  `--require-prediction-ready` and `--require-intervention-ready`.
+
+Current scope remains manifest / readiness validation only. It does not capture
+video, create GT, reconstruct Gaussians, compute model metrics, train Gaussian
+or dynamics models, use replay / diffusion, or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

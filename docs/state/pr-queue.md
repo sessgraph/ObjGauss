@@ -47,8 +47,12 @@ GT rows，让至少 identity row 从 blocked 进入可评估 pass / fail；`OBJE
 已补 controlled real manifest importer，后续 capture / annotation 可直接进入
 reality gate；`OBJECTSTATE-CONTROLLED-REAL-CLI-001` 已把该 importer 暴露成
 `objgauss object-state controlled-real-gate <manifest.json>`，可生成 summary JSON 和
-blocked rows Markdown，并支持 `--identity-only` Stage 1 gate。下一步仍是实际采集 /
-标注 controlled tabletop capture manifest，而不是新增大模型。继续不推进 diffusion、
+blocked rows Markdown，并支持 `--identity-only` Stage 1 gate；
+`OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001` 已新增 frame-level capture /
+annotation manifest validator 和 `validate-controlled-capture` CLI，可把真实 capture
+manifest 转成 blocked controlled-real seed。下一步仍是实际采集 / 标注 controlled
+tabletop RGB / Gaussian / pose / action 文件，并计算 candidate identity metrics 让
+identity row 从 blocked 进入 pass / fail，而不是新增大模型。继续不推进 diffusion、
 replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY
 LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
@@ -118,6 +122,47 @@ LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001: Add frame-level capture manifest
+
+- 状态: done / manifest-ready-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture data contract + CLI validation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 定义真实 controlled tabletop capture / annotation 的逐帧事实源，让 RGB、
+  Gaussian refs、timestamp、object_id、6DoF pose 和 action events 能在进入 reality
+  gate 前被验证和汇总。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture`。
+  - 新增 `objgauss-objectstate-controlled-capture-manifest-v1` manifest schema。
+  - 新增 `objgauss-objectstate-controlled-capture-summary-v1` summary schema。
+  - `read_objectstate_controlled_capture_manifest(...)` 读取 JSON manifest。
+  - `validate_objectstate_controlled_capture_manifest(...)` 校验 sample、declared
+    objects、actions、frames、strict timestamp、frame object refs、pose shape 和
+    action refs。
+  - `objectstate_controlled_capture_summary(...)` 输出 frame / object / action counts、
+    RGB / Gaussian coverage、GT availability、identity / prediction / intervention
+    readiness 和 issues。
+  - `objectstate_controlled_real_manifest_from_capture_manifest(...)` 生成
+    `objgauss-objectstate-controlled-real-manifest-v1` seed，三类 rows 均保持
+    `blocked`，直到候选模型指标存在。
+  - CLI 新增 `objgauss object-state validate-controlled-capture <manifest.json>`。
+  - CLI 支持 `--summary-output`、`--controlled-real-output`、
+    `--require-identity-ready`、`--require-prediction-ready` 和
+    `--require-intervention-ready`。
+  - 测试覆盖 full readiness、incomplete capture blocked seed、JSON read、
+    非递增 timestamp、重复 object_id、malformed pose 和 CLI 输出。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop 视频 / 图像 / Gaussian / GT 文件。
+  - Validator 不创建 GT，不写 `outputs/` / `public/samples`。
+  - 不计算 candidate metrics，不训练 Gaussian / dynamics，不做 replay buffer /
+    diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture.py tests/test_objectstate_controlled_real_cli.py tests/test_objectstate_controlled_real_rows.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed, 300 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `7ecf823`。
 
 ### OBJECTSTATE-CONTROLLED-REAL-CLI-001: Add controlled real gate CLI handoff
 
