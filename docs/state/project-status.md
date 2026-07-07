@@ -67,6 +67,21 @@ desktop / mobile 验证 `catalogModelCount=10`、`dockModelCount=5`、`stageVisi
 点击 `nike-real-splat-demo` 后 selected / object layer 都进入 loaded 状态，截图在
 `/tmp/objgauss-demo-catalog-desktop.png` 和 `/tmp/objgauss-demo-catalog-mobile.png`。
 
+随后按“找一个更好的、构建训练数据”的方向补齐
+`TRAINING-DATA-POLYHAVEN-DENSE-001`：新增
+`polyhaven-school-chair-nerf-dense`，复用 Poly Haven School Chair CC0 glTF，但把
+训练输入从原来的 16-frame / 256px 提升为 32-frame / 384px NeRF-style RGBA orbit
+dataset。已执行 `uv run objgauss assets pull polyhaven-school-chair-nerf-dense`，本地
+ignored 产物为 `outputs/assets/training/polyhaven-school-chair-nerf-dense/` 和
+`outputs/assets/converted/polyhaven-school-chair-nerf-dense/training-manifest.json`。
+manifest 记录 `frames=32`、`image_size=384`、`triangles=5072`、`files=35`；
+`inspect-nerf` 验证 train / val / test 各 32 frames，总计 `frames=96`、
+`missing_images=0`、`invalid_transforms=0`；PNG 检查为 shape `(384,384,4)`，
+alpha coverage `min=0.182231`、`mean=0.286609`、`max=0.359138`。该步骤只构建
+训练数据，不表示已经训练出新的 Gaussian 模型；下一步若继续模型产出，应在 ignored
+`outputs/` 上跑 Splatfacto candidate / smoke training，再决定是否进入 viewer/export
+默认策略。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

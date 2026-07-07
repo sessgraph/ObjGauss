@@ -92,6 +92,7 @@ def test_asset_registry_has_pullable_sample():
     nike = get_asset("nike-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
     chair_nerf = get_asset("polyhaven-school-chair-nerf")
+    chair_dense = get_asset("polyhaven-school-chair-nerf-dense")
     training = get_asset("nerf-synthetic-lego")
     fern = get_asset("nerf-llff-fern")
 
@@ -112,6 +113,12 @@ def test_asset_registry_has_pullable_sample():
     assert demo.license.startswith("CC0")
     assert chair_nerf.pull_pipeline == "polyhaven-nerf-render"
     assert chair_nerf.polyhaven_id == "SchoolChair_01"
+    assert chair_nerf.render_frames == 16
+    assert chair_nerf.render_image_size == 256
+    assert chair_dense.pull_pipeline == "polyhaven-nerf-render"
+    assert chair_dense.polyhaven_id == "SchoolChair_01"
+    assert chair_dense.render_frames == 32
+    assert chair_dense.render_image_size == 384
     assert training.pull_pipeline == "nerf-example-data"
     assert training.training_subdir == "nerf_synthetic/lego"
     assert fern.pull_pipeline == "nerf-example-data"
@@ -126,6 +133,7 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
     assert "nike-3dgs-local" in output
     assert "polyhaven-school-chair-1k" in output
     assert "polyhaven-school-chair-nerf" in output
+    assert "polyhaven-school-chair-nerf-dense" in output
     assert "nerf-synthetic-lego" in output
     assert "nerf-llff-fern" in output
     assert "Demo 可用" in output
@@ -227,6 +235,55 @@ def test_polyhaven_nerf_pull_renders_training_dataset(tmp_path, monkeypatch):
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["triangles"] == 1
     assert "transforms_train.json" in manifest["files"]
+
+
+def test_polyhaven_dense_nerf_pull_renders_higher_density_training_dataset(tmp_path, monkeypatch):
+    def fake_fetch_json(_url):
+        return {
+            "gltf": {
+                "1k": {
+                    "gltf": {
+                        "url": "https://example.invalid/tiny.gltf",
+                        "include": {
+                            "tiny.bin": {
+                                "url": "https://example.invalid/tiny.bin",
+                            },
+                        },
+                    }
+                }
+            }
+        }
+
+    def fake_download(_url, path, *, force):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and not force:
+            return
+        if path.suffix == ".gltf":
+            path.write_text(json.dumps(_tiny_gltf_manifest()), encoding="utf-8")
+        elif path.suffix == ".bin":
+            path.write_bytes(_tiny_gltf_bin())
+        else:
+            path.write_bytes(b"asset")
+
+    monkeypatch.setattr(asset_module, "_fetch_json", fake_fetch_json)
+    monkeypatch.setattr(asset_module, "_download", fake_download)
+
+    result = asset_module.pull_asset(
+        "polyhaven-school-chair-nerf-dense",
+        raw_dir=tmp_path / "raw",
+        converted_dir=tmp_path / "converted",
+        training_dir=tmp_path / "training",
+    )
+
+    assert result.training_path and result.training_path.name == "polyhaven-school-chair-nerf-dense"
+    transforms = json.loads(result.output_path.read_text(encoding="utf-8"))
+    assert transforms["source_type"] == "gltf-orbit-render"
+    assert len(transforms["frames"]) == 32
+    rgba = read_png_rgba(result.training_path / "train" / "r_0.png")
+    assert rgba.shape == (384, 384, 4)
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["frames"] == 32
+    assert manifest["image_size"] == 384
 
 
 def test_nerf_pull_extracts_training_subset(tmp_path, monkeypatch):

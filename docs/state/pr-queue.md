@@ -23,7 +23,10 @@
 当前无 ready PR。产品 viewer 主流程入口、demo catalog 清理、
 `BOUNDED-EVIDENCE-NORMALIZATION-001`、
 `REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001` 和
-`REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002` 已完成；下一步若继续算法质量，
+`REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002` 已完成；`TRAINING-DATA-POLYHAVEN-DENSE-001`
+已补一个更高密度、许可干净的 Poly Haven Chair 训练输入。下一步若要继续“新模型”，优先在
+ignored `outputs/` 上对 `polyhaven-school-chair-nerf-dense` 跑 Splatfacto candidate /
+smoke training，再决定是否把生成模型推进到 viewer/export 默认策略。若继续算法质量，
 优先继续增加许可 / 来源清晰的小型 real / public sample 行，并把 blocked rows 和 pass rows
 分开记录，而不是改全局权重。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或
 收敛 full `audit:world-viewer` 的旧等待条件。
@@ -94,6 +97,44 @@
 当前无进行中 PR。
 
 ## Done
+
+### TRAINING-DATA-POLYHAVEN-DENSE-001: Build dense Poly Haven chair training dataset
+
+- 状态: done / training-data-built
+- 类型: 标准 PR / asset registry + training data
+- 目标: 找一个比现有 16-frame / 256px chair render set 更适合作为下一轮 Gaussian 训练候选的
+  小型、许可清晰训练输入，并在本地构建可复跑训练数据。
+- 已实施:
+  - `AssetSource` 新增 `render_frames` 和 `render_image_size`，让
+    `polyhaven-nerf-render` 管线可以按 asset 配置渲染密度。
+  - 新增 `polyhaven-school-chair-nerf-dense`：同源 Poly Haven School Chair CC0 glTF，
+    渲染为 32-frame / 384px NeRF-style RGBA orbit dataset。
+  - `src/assetLibrary.js` 和 `docs/asset-library.md` 同步该训练资产；该资产只作为训练输入，
+    不是 viewer public sample，也不表示已经产生新的 Gaussian 模型。
+  - 已执行 `uv run objgauss assets pull polyhaven-school-chair-nerf-dense`，生成 ignored
+    `outputs/assets/training/polyhaven-school-chair-nerf-dense/` 和
+    `outputs/assets/converted/polyhaven-school-chair-nerf-dense/training-manifest.json`。
+- 结果:
+  - training manifest: `asset_id=polyhaven-school-chair-nerf-dense`、`frames=32`、
+    `image_size=384`、`triangles=5072`、`files=35`。
+  - `inspect-nerf` 结果: train / val / test 各 32 frames，总计 `frames=96`、
+    `missing_images=0`、`invalid_transforms=0`。
+  - PNG 检查: `frames=32`、shape `(384, 384, 4)`、
+    `alpha_coverage_min=0.182231`、`alpha_coverage_mean=0.286609`、
+    `alpha_coverage_max=0.359138`。
+- 验证:
+  - `uv run objgauss assets list --pullable`: passed；包含
+    `polyhaven-school-chair-nerf-dense`。
+  - `uv run objgauss assets pull polyhaven-school-chair-nerf-dense`: passed。
+  - `uv run objgauss object-field inspect-nerf outputs/assets/training/polyhaven-school-chair-nerf-dense --output /tmp/objgauss-polyhaven-chair-dense-inspect.json`:
+    passed。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "asset_registry or assets_list or polyhaven_nerf" -q`:
+    passed，3 tests。
+- 边界:
+  - 不启动 GPU / Splatfacto 长训。
+  - 不提交 generated PNG、PLY、checkpoint 或 ignored `outputs/` 产物。
+  - 不改变 ObjectState、manifest、checkpoint ABI 或 viewer/export 默认策略。
+- 完成 commit: 本提交。
 
 ### REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002: Add Nike row and strict hard-regression gate
 

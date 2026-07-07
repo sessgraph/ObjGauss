@@ -23,6 +23,7 @@
 | NeRF Lego Alpha 前景/背景诊断基线 | NeRF Synthetic Lego + 本机外部 3DGS 训练输出 | `public/samples/nerf_lego_alpha_fgbg_bg005.splat` + `public/samples/nerf_lego_alpha_fgbg_bg005_objects.ply` | 页面对比 `background_confidence=0.05` 的 Level 1 foreground/background Object Field 训练结果 | NeRF 官方示例数据，仅训练/研究使用；诊断基线，不是展示默认，也不是 part-level 稳定分离结论 |
 | NeRF LLFF Fern | https://github.com/bmild/nerf | `outputs/assets/training/nerf-llff-fern/` | Lego 之外的第二个真实多视角 Splatfacto/COLMAP benchmark scene | NeRF 官方示例数据，仅训练/研究使用 |
 | Poly Haven School Chair NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf/` | 第三个 Splatfacto-trained benchmark scene，由 CC0 glTF mesh 离线渲染多视角 RGBA | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
+| Poly Haven School Chair dense NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf-dense/` | 更高密度训练输入：32-frame / 384px CC0 glTF orbit render，用于后续生成更好的 Splatfacto candidate | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | Poly Haven Chair 商用展示样例 | https://polyhaven.com/a/SchoolChair_01 | `public/samples/polyhaven_chair_demo.splat` + `public/samples/polyhaven_chair_demo_objects.ply` | 许可干净、viewer 可直接加载和对象编辑的 Gaussian demo sample | CC0 派生训练输出；public sample 文件本地生成，不提交 git |
 
 处理链路：
@@ -295,6 +296,7 @@ Poly Haven School Chair glTF
 
 ```bash
 objgauss assets pull polyhaven-school-chair-nerf
+objgauss assets pull polyhaven-school-chair-nerf-dense
 ```
 
 默认输出：
@@ -303,12 +305,27 @@ objgauss assets pull polyhaven-school-chair-nerf
 outputs/assets/training/polyhaven-school-chair-nerf/train/
 outputs/assets/training/polyhaven-school-chair-nerf/transforms_train.json
 outputs/assets/converted/polyhaven-school-chair-nerf/training-manifest.json
+outputs/assets/training/polyhaven-school-chair-nerf-dense/train/
+outputs/assets/training/polyhaven-school-chair-nerf-dense/transforms_train.json
+outputs/assets/converted/polyhaven-school-chair-nerf-dense/training-manifest.json
 ```
 
 该数据集不是前端 public sample；它用于 `docs/benchmarks/splatfacto-scenes.json`
 里的第三个 Splatfacto-trained scene row。当前 renderer 是确定性 mesh
 rasterizer，用于生成可复现训练图像；它不是现实相机采集数据，也不替代
 真实 3DGS / Spark renderer。
+
+`polyhaven-school-chair-nerf-dense` 使用同一 CC0 glTF 源，但把训练输入从
+16-frame / 256px 提升到 32-frame / 384px。它只准备后续训练数据，不表示已经产生新的
+Gaussian 模型，也不会提交 generated PNG / PLY。
+
+本地构建记录（2026-07-07）：
+
+- `uv run objgauss assets pull polyhaven-school-chair-nerf-dense`: passed。
+- `training-manifest.json`: `frames=32`、`image_size=384`、`triangles=5072`、`files=35`。
+- `inspect-nerf`: train / val / test 各 32 frames，总计 `frames=96`、
+  `missing_images=0`、`invalid_transforms=0`。
+- PNG alpha coverage: `min=0.182231`、`mean=0.286609`、`max=0.359138`。
 
 ### Poly Haven Chair Commercial Demo Sample
 
@@ -377,6 +394,7 @@ closure，然后执行浏览器闭环验收。
 | P0 | NeRF Synthetic Lego | 多视角合成图像 + pose | ObjGauss v1 Object Field 训练烟测 | https://github.com/bmild/nerf |
 | P0 | NeRF LLFF Fern | 真实多视角图像 + COLMAP | 跨 Splatfacto scene benchmark | https://github.com/bmild/nerf |
 | P0 | Poly Haven School Chair NeRF render set | CC0 mesh 派生多视角图像 + pose | 第三个 Splatfacto scene benchmark | https://polyhaven.com/a/SchoolChair_01 |
+| P0 | Poly Haven School Chair dense NeRF render set | CC0 mesh 派生 32-frame / 384px 图像 + pose | 后续更高质量 Splatfacto candidate 训练输入 | https://polyhaven.com/a/SchoolChair_01 |
 | P0 | OmniObject3D | 对象级 scan / mesh / point cloud | 单个真实扫描物体，高质量对象编辑实验 | https://omniobject3d.github.io/ |
 | P0 | Poly Haven | CC0 mesh / texture / HDRI | 展示 demo、开源项目可复现素材 | https://polyhaven.com/models |
 | P1 | ScanNet | 真实室内 scan + 语义/实例标注 | 场景到对象分组验证 | https://www.scan-net.org/ |

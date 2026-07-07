@@ -42,6 +42,8 @@ class AssetSource:
     polyhaven_id: str | None = None
     resolution: str | None = None
     training_subdir: str | None = None
+    render_frames: int = 16
+    render_image_size: int = 256
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,28 @@ ASSETS: tuple[AssetSource, ...] = (
         use_cases=("3DGS训练", "跨场景benchmark"),
         polyhaven_id="SchoolChair_01",
         resolution="1k",
+    ),
+    AssetSource(
+        id="polyhaven-school-chair-nerf-dense",
+        name="Poly Haven School Chair dense NeRF render set",
+        category="3DGS 训练集",
+        source_type="images",
+        status="已接入",
+        priority="P0",
+        source_url="https://polyhaven.com/a/SchoolChair_01",
+        download_url="https://api.polyhaven.com/files/SchoolChair_01",
+        license="CC0；API 仅用于非商用/研究拉取，需带 User-Agent",
+        formats=("images", "transforms_train.json", "CC0"),
+        best_for="许可干净的更高密度 chair 训练数据：32-frame / 384px glTF orbit render，用于后续生成更好的 Splatfacto candidate。",
+        raw_file_name="polyhaven-school-chair-1k",
+        output_file_name="training-manifest.json",
+        pull_pipeline="polyhaven-nerf-render",
+        pipeline_stage="训练源已自动化",
+        use_cases=("3DGS训练", "更高质量候选", "可商用样例"),
+        polyhaven_id="SchoolChair_01",
+        resolution="1k",
+        render_frames=32,
+        render_image_size=384,
     ),
     AssetSource(
         id="polyhaven-chair-commercial-demo-local",
@@ -487,7 +511,12 @@ def _pull_polyhaven_nerf_render(
         force=force,
     )
     output_path = Path(training_dir) / asset.id
-    result = render_gltf_nerf_dataset(entrypoint, output_path, frames=16, image_size=256)
+    result = render_gltf_nerf_dataset(
+        entrypoint,
+        output_path,
+        frames=asset.render_frames,
+        image_size=asset.render_image_size,
+    )
     manifest_path = Path(converted_dir) / asset.id / asset.output_file_name
     files = sorted(
         str(path.relative_to(output_path))
