@@ -111,6 +111,17 @@ assignment stability 更好，但 render 和 held-out render 更弱（旧 Chair 
 `0.248716` / `0.224084`）。结论保持不 publish、不设为 viewer/export 默认；若继续，
 应先尝试更保守的 dense Chair mask policy 或扩更多许可清晰的小型样本行。
 
+随后冻结 `OBJECTSTATE-STATE-VARIABLE-GATE-001` 的研究验收定义：
+`docs/architecture/objectstate-state-variable-gate.md` 明确 ObjGauss v2 的核心 claim
+不是“能分割 Gaussian”，而是证明 `ObjectState_t` 是 `X_t` 的近似充分统计量。该 gate 将
+验收拆成 Identity State、Physical State、Causal State 三层，并要求五类证据：
+identity persistence、occlusion recovery、view invariance、predictive sufficiency 和
+counterfactual / action interface。当前阈值策略是 synthetic oracle 使用高阈值
+（例如 identity / occlusion recovery `>= 0.95`），controlled real / public rows 先要求
+可复现、可解释、无明显 identity collapse，open-world real rows 只记录失败，不伪装成通过。
+因此下一阶段算法质量优先级改为实现 state-variable smoke gate，而不是继续追
+renderer 指标、diffusion、replay buffer 大系统或 viewer/export 默认模型。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
