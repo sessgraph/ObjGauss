@@ -62,6 +62,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
+    OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
@@ -190,6 +191,7 @@ from objgauss.core import (
     objectstate_controlled_capture_summary,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
+    objectstate_controlled_identity_handoff,
     objectstate_identity_predictions_from_trainable_artifact,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
@@ -263,6 +265,7 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_summary,
     validate_objectstate_controlled_identity_eval_summary,
+    validate_objectstate_controlled_identity_handoff_summary,
     validate_objectstate_controlled_identity_predictions,
     validate_objectstate_controlled_identity_thresholds,
     validate_objectstate_controlled_real_manifest,
@@ -782,6 +785,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA == (
         "objgauss-objectstate-controlled-identity-eval-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA == (
+        "objgauss-objectstate-controlled-identity-handoff-v1"
+    )
     identity_predictions = {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
         "sample_id": "namespace-controlled-capture",
@@ -824,6 +830,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
         "status"
     ] == "pass"
     assert objectstate_identity_predictions_from_trainable_artifact is not None
+    assert objectstate_controlled_identity_handoff is not None
+    assert validate_objectstate_controlled_identity_handoff_summary is not None
     assert read_trainable_kernel_identity_source is not None
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (

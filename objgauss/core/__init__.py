@@ -158,6 +158,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_controlled_identity_handoff",
+        "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA",
@@ -749,6 +753,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_identity_prediction_adapter",
         "objectstate_identity_predictions_from_trainable_artifact",
     ),
+    "objectstate_controlled_identity_handoff": (
+        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objectstate_controlled_identity_handoff",
+    ),
     "validate_objectstate_controlled_capture_manifest": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_manifest",
@@ -760,6 +768,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_identity_eval_summary": (
         "objgauss.core.objectstate_controlled_identity_eval",
         "validate_objectstate_controlled_identity_eval_summary",
+    ),
+    "validate_objectstate_controlled_identity_handoff_summary": (
+        "objgauss.core.objectstate_controlled_identity_handoff",
+        "validate_objectstate_controlled_identity_handoff_summary",
     ),
     "validate_objectstate_controlled_identity_predictions": (
         "objgauss.core.objectstate_controlled_identity_eval",

@@ -150,6 +150,9 @@ from objgauss.core.objectstate_controlled_identity_eval import (
     evaluate_objectstate_controlled_identity_predictions,
     read_objectstate_controlled_identity_predictions,
 )
+from objgauss.core.objectstate_controlled_identity_handoff import (
+    objectstate_controlled_identity_handoff,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3124,6 +3127,72 @@ def _object_state_export_identity_predictions(args: argparse.Namespace) -> None:
     print(f"output={args.output}")
 
 
+def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
+    capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
+    artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
+    artifact_refs = (
+        tuple(args.artifact_refs)
+        if args.artifact_refs
+        else (str(args.trainable_artifact),)
+    )
+    summary = objectstate_controlled_identity_handoff(
+        capture,
+        artifact,
+        candidate_id=args.candidate_id,
+        source=args.source,
+        artifact_refs=artifact_refs,
+        max_centroid_distance=args.max_centroid_distance,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_swap_rate=args.max_swap_rate,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+    )
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    predictions_path = output_dir / "identity-predictions.json"
+    identity_eval_path = output_dir / "identity-eval-summary.json"
+    controlled_real_path = output_dir / "controlled-real.json"
+    controlled_real_summary_path = output_dir / "controlled-real-summary.json"
+    blocked_rows_path = output_dir / "blocked-rows.md"
+    handoff_path = output_dir / "handoff-summary.json"
+    write_json(predictions_path, summary["identity_predictions"])
+    write_json(identity_eval_path, summary["identity_eval"])
+    write_json(controlled_real_path, summary["controlled_real_manifest"])
+    write_json(controlled_real_summary_path, summary["controlled_real_summary"])
+    blocked_rows_path.write_text(
+        summary["controlled_real_summary"]["blocked_rows_markdown"],
+        encoding="utf-8",
+    )
+    write_json(handoff_path, summary)
+    metrics = summary["identity_eval"]["metrics"]
+    gate = summary["controlled_real_summary"]["gate"]
+    print(f"schema={summary['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"trainable_artifact={args.trainable_artifact}")
+    print(f"output_dir={output_dir}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"handoff_status={summary['status']}")
+    print(f"identity_eval_status={summary['identity_eval']['status']}")
+    print(f"identity_gate_status={gate['status']}")
+    print(f"idf1={metrics['idf1']:.6f}")
+    print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
+    print(f"swap_rate={metrics['swap_rate']:.6f}")
+    print(f"blocked_rows={summary['controlled_real_summary']['blocked_row_count']}")
+    print(f"predictions={predictions_path}")
+    print(f"identity_eval={identity_eval_path}")
+    print(f"controlled_real_manifest={controlled_real_path}")
+    print(f"controlled_real_summary={controlled_real_summary_path}")
+    print(f"blocked_rows_markdown={blocked_rows_path}")
+    print(f"handoff_summary={handoff_path}")
+    if args.require_pass and summary["status"] != "objectstate_controlled_identity_handoff_pass":
+        raise ValueError("controlled identity handoff did not pass")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -3342,6 +3411,45 @@ def _build_parser() -> argparse.ArgumentParser:
     export_identity_predictions.add_argument("--max-centroid-distance", type=float)
     export_identity_predictions.set_defaults(
         handler=_object_state_export_identity_predictions
+    )
+    controlled_identity_handoff = object_state_subparsers.add_parser(
+        "controlled-identity-handoff",
+        help=(
+            "run capture + trainable ObjectState artifact through the Stage 1 "
+            "controlled identity handoff"
+        ),
+    )
+    controlled_identity_handoff.add_argument("capture_manifest", type=Path)
+    controlled_identity_handoff.add_argument("trainable_artifact", type=Path)
+    controlled_identity_handoff.add_argument("--output-dir", required=True, type=Path)
+    controlled_identity_handoff.add_argument("--candidate-id")
+    controlled_identity_handoff.add_argument(
+        "--source",
+        default="trainable_kernel_objectstate_nearest_pose_adapter",
+    )
+    controlled_identity_handoff.add_argument(
+        "--artifact-ref",
+        action="append",
+        dest="artifact_refs",
+        help=(
+            "candidate artifact reference to store in predictions; defaults to the "
+            "trainable artifact path"
+        ),
+    )
+    controlled_identity_handoff.add_argument("--max-centroid-distance", type=float)
+    controlled_identity_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    controlled_identity_handoff.add_argument("--max-fragmentation-rate", type=float, default=0.05)
+    controlled_identity_handoff.add_argument("--max-swap-rate", type=float, default=0.0)
+    controlled_identity_handoff.add_argument("--allow-identity-collapse", action="store_true")
+    controlled_identity_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    controlled_identity_handoff.add_argument("--min-real-or-public-rows", type=int, default=1)
+    controlled_identity_handoff.add_argument("--require-pass", action="store_true")
+    controlled_identity_handoff.set_defaults(
+        handler=_object_state_controlled_identity_handoff
     )
 
     object_field = subparsers.add_parser(
