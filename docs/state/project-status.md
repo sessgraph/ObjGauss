@@ -149,6 +149,17 @@ recall；它不引入 identity graph、replay buffer、diffusion 或 renderer lo
 predictive gate 的 velocity 来源明确是 synthetic world oracle trajectory，属于可失败的
 smoke evaluator；controlled real rows、learned dynamics 和 counterfactual action gate 仍未完成。
 
+随后按新评审建议完成 `OBJECTSTATE-CAUSAL-GATE-001` synthetic controlled action smoke：
+新增 `objgauss.core.objectstate_causal_gate`，schema 为
+`objgauss-objectstate-causal-gate-v1`，action schema 为 `objgauss-objectstate-action-v1`。
+最小 action set 为 `push_left` / `push_right` / `hold`，gate 用
+`ObjectState(t).pose + velocity + action_delta` 预测 counterfactual target，并和 no-action
+baseline 比较 `action_conditioned_ade`、`no_action_ade`、`intervention_gain`、
+`counterfactual_outcome_accuracy`、`wrong_direction_rate` 和 `identity_consistency_rate`。
+`candidate_action_scale=0` 的负路径会 fail，证明该 gate 不能被纯 tracker / no-action
+predictor 代替。当前仍是 synthetic controlled action evidence；controlled real action rows、
+relation change、hide / reveal 和 learned dynamics 仍未完成。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

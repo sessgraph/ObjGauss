@@ -35,9 +35,11 @@
 已冻结验收定义，`OBJECTSTATE-IDENTITY-GATE-001`、`OBJECTSTATE-IDENTITY-MODEL-001` 和
 `OBJECTSTATE-PREDICTIVE-GATE-001` 已补第一版 synthetic smoke evaluator：无显式
 candidate prediction 不能 pass，contrastive identity encoder 训练有 loss / retrieval
-summary，predictive gate 已输出 state-vs-history error ratio。下一步优先补 controlled
-real/public identity rows，或推进 action-conditioned causal gate；继续不推进 diffusion、
-replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛
+summary，predictive gate 已输出 state-vs-history error ratio。`OBJECTSTATE-CAUSAL-GATE-001`
+已补 synthetic controlled action smoke，验证 `ObjectState + Action` 不能被 no-action
+tracker 替代。下一步优先补 controlled real/public identity/action rows；继续不推进
+diffusion、replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量
+4.5M PLY LOD / streaming 或收敛
 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
@@ -106,6 +108,33 @@ full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CAUSAL-GATE-001: Add synthetic action-conditioned causal gate
+
+- 状态: done / synthetic-controlled-action-causal-smoke
+- 类型: 标准 PR / research evaluator + causal metrics
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 验证 `ObjectState(t) + Action(t)` 能解释动作导致的状态变化，并避免 predictive
+  gate 被纯 tracking / no-action predictor 替代。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_causal_gate`。
+  - 新增 `objgauss-objectstate-causal-gate-v1` 和
+    `objgauss-objectstate-action-v1` schema。
+  - 最小 action set 为 `push_left` / `push_right` / `hold`。
+  - `evaluate_objectstate_causal_gate(...)` 复用 synthetic stability fixtures，用
+    current pose + velocity + action delta 构造 controlled counterfactual target，并和
+    no-action baseline 比较。
+  - Summary 输出 `action_conditioned_ade`、`action_conditioned_fde`、`no_action_ade`、
+    `intervention_gain`、`action_error_ratio`、`counterfactual_outcome_accuracy`、
+    `wrong_direction_rate` 和 `identity_consistency_rate`。
+  - `candidate_action_scale=0` 负路径会 fail，证明 gate 不是无条件绿灯。
+- 边界:
+  - 当前是 synthetic controlled action smoke，不声明真实世界因果性已证明。
+  - 不训练 dynamics model，不做 replay buffer / diffusion，不接 renderer loss，不改 viewer。
+  - Controlled real action rows、relation change、hide / reveal 和 learned dynamics 仍是后续工作。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_causal_gate.py tests/test_core_namespace.py -q`: passed。
+- 完成 commit: 本提交。
 
 ### OBJECTSTATE-PREDICTIVE-GATE-001: Add synthetic predictive sufficiency smoke gate
 

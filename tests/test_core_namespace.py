@@ -9,6 +9,10 @@ from objgauss.core import (
     GsplatRendererAvailability,
     GsplatTrainingInput,
     ObjectState,
+    ObjectStateAction,
+    ObjectStateCausalGateReport,
+    ObjectStateCausalGateThresholds,
+    ObjectStateCausalRow,
     ASSIGNMENT_MVP_TRAINING_SCHEMA,
     ASSIGNMENT_SOLVER_V2_COST_TERMS,
     ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA,
@@ -52,6 +56,9 @@ from objgauss.core import (
     ObjectStatePredictiveGateThresholds,
     ObjectStatePredictiveRow,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
+    OBJECTSTATE_ACTION_SCHEMA,
+    OBJECTSTATE_CAUSAL_ACTIONS,
+    OBJECTSTATE_CAUSAL_GATE_SCHEMA,
     OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA,
     OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA,
     OBJECTSTATE_IDENTITY_DATASET_SCHEMA,
@@ -124,6 +131,7 @@ from objgauss.core import (
     decode_gaussian_from_object_state,
     diagnose_synthetic_stability_fixture,
     evaluate_objectstate_identity_gate,
+    evaluate_objectstate_causal_gate,
     evaluate_objectstate_predictive_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
@@ -218,6 +226,7 @@ from objgauss.core import (
     validate_object_identity_oracle,
     validate_object_state_gaussian_decoder_state,
     validate_objectstate_checkpoint_eval,
+    validate_objectstate_causal_gate_summary,
     validate_observation_model_config,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
@@ -561,6 +570,18 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     predictive_summary = predictive_report.as_dict()
     assert validate_objectstate_predictive_gate_summary(predictive_summary) is predictive_summary
     assert predictive_summary["schema"] == OBJECTSTATE_PREDICTIVE_GATE_SCHEMA
+
+    assert OBJECTSTATE_CAUSAL_GATE_SCHEMA == "objgauss-objectstate-causal-gate-v1"
+    assert OBJECTSTATE_ACTION_SCHEMA == "objgauss-objectstate-action-v1"
+    assert "push_left" in OBJECTSTATE_CAUSAL_ACTIONS
+    causal_report = evaluate_objectstate_causal_gate(suite)
+    assert isinstance(causal_report, ObjectStateCausalGateReport)
+    assert isinstance(causal_report.thresholds, ObjectStateCausalGateThresholds)
+    assert isinstance(causal_report.rows[0], ObjectStateCausalRow)
+    assert isinstance(causal_report.rows[0].action, ObjectStateAction)
+    causal_summary = causal_report.as_dict()
+    assert validate_objectstate_causal_gate_summary(causal_summary) is causal_summary
+    assert causal_summary["schema"] == OBJECTSTATE_CAUSAL_GATE_SCHEMA
 
 
 def test_core_namespace_exposes_property_append_helper():

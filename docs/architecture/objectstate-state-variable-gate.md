@@ -511,6 +511,24 @@ Required behavior:
 - Test push / move / hide / reveal.
 - Report wrong-direction and relation outcome errors.
 
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_causal_gate`.
+- Gate schema: `objgauss-objectstate-causal-gate-v1`.
+- Action schema: `objgauss-objectstate-action-v1`.
+- Minimal action set: `push_left`, `push_right`, `hold`.
+- The synthetic target applies current ObjectState pose + velocity + controlled
+  action delta, then compares action-conditioned prediction against a no-action
+  baseline.
+- Summary reports `action_conditioned_ade`, `action_conditioned_fde`,
+  `no_action_ade`, `intervention_gain`, `action_error_ratio`,
+  `counterfactual_outcome_accuracy`, `wrong_direction_rate` and
+  `identity_consistency_rate`.
+- A candidate that ignores action (`candidate_action_scale=0`) fails the gate,
+  so causal evidence cannot be replaced by a pure tracker.
+- Current scope is synthetic controlled action only. Real action rows, relation
+  changes, hide / reveal and learned dynamics remain future gates.
+
 ## 7. Non-Goals
 
 This spec does not authorize:
