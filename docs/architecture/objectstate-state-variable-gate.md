@@ -739,6 +739,43 @@ create GT, infer physical identity, train Gaussian or dynamics models, compute
 prediction / intervention metrics, use replay / diffusion, or mutate viewer
 defaults.
 
+### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001
+
+Bundle the Stage 1 controlled identity chain into a single reproducible handoff.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_identity_handoff`.
+- Summary schema:
+  `objgauss-objectstate-controlled-identity-handoff-v1`.
+- `objectstate_controlled_identity_handoff(...)` takes a controlled capture
+  manifest plus trainable kernel ObjectState artifact and produces:
+  - `identity_predictions` using
+    `objgauss-objectstate-controlled-identity-predictions-v1`;
+  - `identity_eval` using
+    `objgauss-objectstate-controlled-identity-eval-v1`;
+  - `controlled_real_manifest` using
+    `objgauss-objectstate-controlled-real-manifest-v1`;
+  - `controlled_real_summary` using
+    `objgauss-objectstate-controlled-real-rows-v1`.
+- The embedded reality gate is identity-only Stage 1:
+  `require_identity_pass_row=true`,
+  `require_prediction_pass_row=false`,
+  `require_intervention_pass_row=false`.
+- Prediction and intervention rows remain visible as blocked rows in the
+  controlled-real summary; they are not hidden or promoted.
+- CLI command:
+  `objgauss object-state controlled-identity-handoff <capture> <objectstates> --output-dir <dir>`.
+- CLI writes:
+  `identity-predictions.json`, `identity-eval-summary.json`,
+  `controlled-real.json`, `controlled-real-summary.json`, `blocked-rows.md`
+  and `handoff-summary.json`.
+
+Current scope remains reproducible handoff only. It does not collect capture
+data, create GT, train Gaussian or dynamics models, compute prediction /
+intervention metrics, use replay / diffusion, write public samples or mutate
+viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

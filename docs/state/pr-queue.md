@@ -55,10 +55,13 @@ manifest 转成 blocked controlled-real seed；`OBJECTSTATE-CONTROLLED-IDENTITY-
 `idf1` / fragmentation / swap / collapse 并生成带 identity pass/fail row 的
 controlled-real manifest；`OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001` 已新增
 `export-identity-predictions` CLI，可把 trainable kernel `object_states` 经
-controlled capture pose association 转成 evaluator 输入。下一步仍是实际采集 /
-标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate
-artifact 导出 identity predictions，让 identity row 从 fixture 进入真实 pass / fail，
-而不是新增大模型。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。
+controlled capture pose association 转成 evaluator 输入；
+`OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001` 已新增
+`controlled-identity-handoff` CLI，可一次性写出 predictions、identity eval、
+controlled-real manifest、identity-only gate summary 和 blocked rows markdown。下一步仍是
+实际采集 / 标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实
+candidate artifact 跑 handoff，让 identity row 从 fixture 进入真实 pass / fail，而不是
+新增大模型。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
 
@@ -128,6 +131,42 @@ artifact 导出 identity predictions，让 identity row 从 fixture 进入真实
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
+
+- 状态: done / handoff-ready-no-real-capture
+- 类型: 标准 PR / controlled real identity handoff bundle
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将 controlled capture manifest + trainable kernel ObjectState artifact
+  到 Stage 1 identity-only reality gate 的链路收敛为一个可复跑命令。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_identity_handoff`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-identity-handoff-v1`。
+  - `objectstate_controlled_identity_handoff(...)` 内部生成 identity predictions、
+    identity eval、controlled-real manifest 和 identity-only controlled-real summary。
+  - Reality gate 使用 Stage 1 identity-only 阈值：要求 identity pass row，不要求
+    prediction / intervention pass rows。
+  - Prediction / intervention rows 仍保留为 blocked rows，不从 evidence summary 隐藏。
+  - CLI 新增 `objgauss object-state controlled-identity-handoff <capture>
+    <objectstates> --output-dir <dir>`。
+  - CLI 写出 `identity-predictions.json`、`identity-eval-summary.json`、
+    `controlled-real.json`、`controlled-real-summary.json`、`blocked-rows.md` 和
+    `handoff-summary.json`。
+  - CLI 支持 identity 阈值、`--max-centroid-distance`、`--synthetic-smoke-failed`
+    和 `--require-pass`。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop capture / candidate artifact 文件。
+  - Handoff 不创建 GT，不运行 tracker / segmentation，不训练 Gaussian / dynamics。
+  - 不计算 prediction / intervention metrics，不写 `public/samples`，不做 replay
+    buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_identity_prediction_adapter.py tests/test_objectstate_controlled_identity_eval.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_identity_handoff.py objgauss/core/objectstate_identity_prediction_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed, 318 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `47c2754`。
 
 ### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001: Export controlled identity predictions
 

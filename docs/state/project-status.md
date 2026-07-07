@@ -255,6 +255,18 @@ ObjectState slot，并把稳定 slot address (`slot-<id>`) 作为
 不采集真实数据、不创建 GT、不训练 Gaussian / dynamics、不计算 prediction /
 intervention 指标、不改 viewer/export 默认。完成 commit: `cc644e8`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001`：新增
+`objgauss.core.objectstate_controlled_identity_handoff`，把 controlled capture manifest
++ trainable kernel ObjectState artifact 一次性跑完整 Stage 1 identity handoff。新增
+schema `objgauss-objectstate-controlled-identity-handoff-v1` 和 CLI
+`objgauss object-state controlled-identity-handoff <capture> <objectstates> --output-dir <dir>`。
+该命令会写出 `identity-predictions.json`、`identity-eval-summary.json`、
+`controlled-real.json`、`controlled-real-summary.json`、`blocked-rows.md` 和
+`handoff-summary.json`；内部使用 identity-only reality gate，只要求 identity pass row，
+并保留 prediction / intervention blocked rows。当前仍不采集真实数据、不创建 GT、
+不训练 Gaussian / dynamics、不计算 prediction / intervention 指标、不写
+`public/samples`、不改 viewer/export 默认。完成 commit: `47c2754`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
