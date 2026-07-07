@@ -14,14 +14,15 @@
 
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
-3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；`NATIVE-SPLAT-OBJECT-TRANSFORM-001` 已把 index-matched source `.splat` 子集 translate 接入主 `ThreeWorld`，`NATIVE-SPLAT-MOTION-HARDEN-001` 已把真实绑定状态展示到 UI，并用 bbox-projected audit 证明被选 source splat 子集移动、同模型 peer 对象不动。剩余 viewer TODO 是把未分割高斯云到对象层生成的主流程做成产品入口，并继续收敛全量 PLY LOD / streaming；rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在当前默认能力内。
+3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补未分割高斯云到对象层生成的主流程入口；`DEMO-CATALOG-REAL-SPLAT-001` 已新增真实 Nike `.splat` 本地 demo 并把首屏 dock / 默认 stage 收敛为 curated demos。剩余 viewer TODO 是继续收敛全量 PLY LOD / streaming；rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在当前默认能力内。
 4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate：Lego 选择 promoted，Polyhaven 自动回落 baseline 并触发 evidence normalization gate；`REAL-SAMPLE-V2-AUTO-LOAD-VIEWER-001` 已把 Lego sample-aware promoted PLY 接成本地 viewer 默认预览，并保留缺文件 fallback。近期路线已到真实 public sample 上可训练、可验证、可 3D 查看对象分割效果阶段；下一步若继续算法质量，应单独实现 bounded evidence normalization candidate，而不是继续 geometry / camera unfreeze、diffusion、rollout 或 replay。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
 ## Ready
 
-当前无 ready PR。产品 viewer 主流程入口已完成；下一步若继续 viewer 线，优先拆全量
-4.5M PLY LOD / streaming 或继续收敛 full `audit:world-viewer` 的旧等待条件。
+当前无 ready PR。产品 viewer 主流程入口和 demo catalog 清理已完成；下一步按 Owner 最新方向，
+优先回到 `BOUNDED-EVIDENCE-NORMALIZATION-001`，若继续 viewer 线再拆全量 4.5M PLY
+LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -89,6 +90,53 @@
 当前无进行中 PR。
 
 ## Done
+
+### DEMO-CATALOG-REAL-SPLAT-001: Add real splat demo and curate viewer catalog
+
+- 状态: done / validated-targeted
+- 类型: 标准 PR / asset registry + frontend viewer catalog
+- 目标: 按 Owner 要求下载一个真实 Gaussian cloud，并清理当前 viewer 模型入口的混乱状态，
+  重新给首屏添加少数可解释 demo。
+- 已实施:
+  - `objgauss/assets.py` 新增 `nike-3dgs-local`，走既有
+    `splat-to-objgauss-ply` 管线从 `cakewalk/splat-data` 下载 `nike.splat`。
+  - 已执行 `uv run objgauss assets pull nike-3dgs-local --force`；本地产物为
+    ignored `outputs/assets/raw/nike.splat`、`outputs/assets/converted/nike.ply`、
+    `public/samples/nike.splat` 和 `public/samples/nike_objects.ply`。
+  - `src/modelCatalog.js` 新增 `nike-real-splat-demo`，source layer 指向
+    `/samples/nike.splat`，对象层指向 `/samples/nike_objects.ply`。
+  - viewer catalog 新增 `dockVisible` / `defaultStageVisible` 分层；首屏 dock 和默认 stage
+    收敛为 5 个 curated demos：`lego-alpha-raw-source`、
+    `real-sample-v2-sample-aware-lego`、`polyhaven-chair`、`nike-real-splat-demo`、
+    `plush`。near-1M、OGC、trainable artifact 和旧 closure 仍保留在高级模型版本 / URL
+    调试路径，不再抢首屏。
+  - `src/assetLibrary.js` 和 `docs/asset-library.md` 同步 Nike 来源、用途、许可边界和本地路径。
+- 验证:
+  - `uv run objgauss assets list --pullable`: passed；包含 `nike-3dgs-local`。
+  - `uv run objgauss assets pull nike-3dgs-local --force`: passed；`270491` Gaussians，
+    object counts `84781/69968/74734/41008`。
+  - `uv run objgauss stats public/samples/nike_objects.ply`: passed；字段包含 `object_id`。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "asset_registry or assets_list"`:
+    `2 passed`。
+  - Catalog Node assertion: default model remains `lego-alpha-raw-source`，dock / default stage
+    均为 5 个 curated demos，诊断模型不在 dock。
+  - `npm run build`: passed；保留既有 Vite chunk size warning。
+  - `uv run --extra dev pytest`: `259 passed`。
+  - `git diff --check`: passed。
+  - Playwright + system Chrome desktop / mobile on `http://127.0.0.1:5395/`: page identity
+    passed；`catalogModelCount=10`、`dockModelCount=5`、`stageVisibleCount=5`；dock ids 为
+    `lego-alpha-raw-source,real-sample-v2-sample-aware-lego,polyhaven-chair,nike-real-splat-demo,plush`；
+    `near1m-lego` / `ogc-debug` 不在 dock；点击 `nike-real-splat-demo` 后 selected 更新为
+    `nike-real-splat-demo`，object layer status 为 `loaded`，canvas 非空。截图：
+    `/tmp/objgauss-demo-catalog-desktop.png`、
+    `/tmp/objgauss-demo-catalog-mobile.png`。控制台仅有 WebGL `ReadPixels` performance warning，
+    无 app error / framework overlay。
+- 边界:
+  - `nike.splat` 继承 `cakewalk/splat-data` 来源限制，只作为本地测试素材，不作为公开商用 demo 承诺。
+  - 不提交 `.splat` / `.ply` / `outputs/` 产物。
+  - 不改 ObjectState / manifest / checkpoint ABI，不解冻 geometry / camera / dynamic-K，
+    不引入 diffusion / rollout。
+- 完成 commit: 本提交
 
 ### GAUSSIAN-OBJECT-PROCESS-FLOW-001: Promote raw Gaussian to object-edit flow
 

@@ -89,6 +89,7 @@ def test_read_splat_as_gaussian_cloud(tmp_path):
 
 def test_asset_registry_has_pullable_sample():
     asset = get_asset("plush-3dgs-local")
+    nike = get_asset("nike-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
     chair_nerf = get_asset("polyhaven-school-chair-nerf")
     training = get_asset("nerf-synthetic-lego")
@@ -101,6 +102,11 @@ def test_asset_registry_has_pullable_sample():
     assert asset.pipeline_stage == "Demo 可用"
     assert "Demo预览" in asset.use_cases
     assert asset in list_assets()
+    assert nike.download_url.endswith("/nike.splat")
+    assert nike.local_path == "/samples/nike_objects.ply"
+    assert nike.splat_path == "/samples/nike.splat"
+    assert nike.default_clusters == 4
+    assert nike.pull_pipeline == "splat-to-objgauss-ply"
     assert demo.pull_pipeline == "polyhaven-gltf"
     assert demo.polyhaven_id == "SchoolChair_01"
     assert demo.license.startswith("CC0")
@@ -117,6 +123,7 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
 
     output = capsys.readouterr().out
     assert "plush-3dgs-local" in output
+    assert "nike-3dgs-local" in output
     assert "polyhaven-school-chair-1k" in output
     assert "polyhaven-school-chair-nerf" in output
     assert "nerf-synthetic-lego" in output

@@ -54,6 +54,19 @@ mobile 验证 handoff panel 宽度 `284px < 390px`、`命令就绪` / `加载结
 full `audit:world-viewer` 当前仍有旧 trainable Gaussian probe / stability 等待过宽问题，最新失败点
 为 `scripts/audit-world-viewer.mjs:595`；本流程继续采用 targeted browser check 作为验收事实源。
 
+随后按 Owner 要求完成 `DEMO-CATALOG-REAL-SPLAT-001` 的前置整理：新增
+`nike-3dgs-local` 真实 Gaussian asset，从 `cakewalk/splat-data` 下载 `nike.splat`，
+经既有 `splat-to-objgauss-ply` 管线生成 ignored `public/samples/nike.splat` 和
+`public/samples/nike_objects.ply`。该样例为 `270,491` Gaussians / 4 个 object，counts
+为 `84,781 / 69,968 / 74,734 / 41,008`，仅作为本地测试素材，不作为公开商用 demo 承诺。
+Viewer catalog 同步新增 `nike-real-splat-demo`，并把首屏 dock / 默认 stage 收敛成 5 个
+curated demos：`lego-alpha-raw-source`、`real-sample-v2-sample-aware-lego`、
+`polyhaven-chair`、`nike-real-splat-demo`、`plush`。near-1M、OGC、trainable artifact 和旧
+closure 仍保留在高级模型版本 / URL 调试路径，不再抢首屏。Playwright + system Chrome
+desktop / mobile 验证 `catalogModelCount=10`、`dockModelCount=5`、`stageVisibleCount=5`，
+点击 `nike-real-splat-demo` 后 selected / object layer 都进入 loaded 状态，截图在
+`/tmp/objgauss-demo-catalog-desktop.png` 和 `/tmp/objgauss-demo-catalog-mobile.png`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
@@ -3125,7 +3138,7 @@ npm run acceptance:demo
 
 ## 下一步主线
 
-1. 产品 viewer 线：`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补 raw source -> CLI handoff -> object layer ready 主入口；下一步聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及任意第三方 `.splat` object id / rotate-scale native motion / Gaussian 重优化等仍未承诺边界。
+1. 产品 viewer 线：`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补 raw source -> CLI handoff -> object layer ready 主入口；`DEMO-CATALOG-REAL-SPLAT-001` 已下载 Nike 真实 `.splat` 并把首屏模型入口收敛成 5 个 curated demos；下一步若继续 viewer 聚焦全量 4.5M PLY 的 LOD / streaming / 分块加载，以及任意第三方 `.splat` object id / rotate-scale native motion / Gaussian 重优化等仍未承诺边界。
 2. 语义质量线：depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level gate、slot-level gate、baseline comparison 和 promotion policy 已落地；真实 CLIP 语义路线仍保持 `do-not-promote`，下一步应扩大 foreground coverage / mask selection 证据，而不是把更多训练步数当作语义质量解释。
 3. 算法模型线：`CORE-MODEL-TRAIN-VALIDATE-001` 已聚合 v2 assignment training、synthetic
    stability hard gate、failure diagnostics、ObjectState eval、renderer joint smoke、

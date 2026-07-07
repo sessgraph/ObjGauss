@@ -20,6 +20,24 @@ const RAW_ASSET_LIBRARY = [
     bestFor: "快速验证高斯点云加载、对象聚类色、删除/隔离预览。",
   },
   {
+    id: "nike-3dgs-local",
+    name: "Nike 真实 3DGS 示例",
+    category: "本地样例",
+    sourceType: "gaussian",
+    status: "已接入",
+    priority: "P0",
+    pipelineStage: "Demo 可用",
+    useCases: ["Demo预览", "真实Splat", "对象编辑"],
+    localPath: "/samples/nike_objects.ply",
+    splatPath: "/samples/nike.splat",
+    fileName: "nike_objects.ply",
+    sourceName: "cakewalk/splat-data",
+    sourceUrl: "https://huggingface.co/cakewalk/splat-data/blob/main/nike.splat",
+    license: "来源许可混合，仅用于本地测试",
+    formats: [".splat", ".ply", "object_id"],
+    bestFor: "新下载的小体积真实 Gaussian cloud，用于整理后的 viewer demo 入口和对象编辑 smoke。",
+  },
+  {
     id: "plush-v1-closure-local",
     name: "ObjGauss v1 闭环样例",
     category: "本地验收",
@@ -321,14 +339,15 @@ const RAW_ASSET_LIBRARY = [
 export const ASSET_LIBRARY = RAW_ASSET_LIBRARY.map(withModelArtifactManifest);
 
 export const FEATURED_ASSET_IDS = [
-  "nerf-lego-trained-near1m-random1300k-local",
-  "plush-semantic-closure-local",
-  "polyhaven-chair-commercial-demo-local",
-  "plush-v1-closure-local",
   "nerf-lego-alpha-closure-local",
+  "polyhaven-chair-commercial-demo-local",
+  "nike-3dgs-local",
+  "plush-3dgs-local",
+  "plush-v1-closure-local",
+  "plush-semantic-closure-local",
   "nerf-lego-trained-output-local",
   "nerf-lego-alpha-fgbg-bg005-local",
-  "plush-3dgs-local",
+  "nerf-lego-trained-near1m-random1300k-local",
 ];
 
 export function featuredAssets() {

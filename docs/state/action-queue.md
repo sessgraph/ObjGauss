@@ -23,6 +23,16 @@
 
 ## Closed
 
+### ACTION-022: 下载真实 Gaussian cloud 并清理 viewer demo 入口
+
+- 完成 commit: 本提交
+- 结果: 新增 `nike-3dgs-local` asset registry，已用 `uv run objgauss assets pull
+  nike-3dgs-local --force` 下载 `nike.splat` 并生成 ignored
+  `public/samples/nike.splat` / `public/samples/nike_objects.ply`。该样例为
+  `270,491` Gaussians / 4 个 object，counts `84,781 / 69,968 / 74,734 / 41,008`。
+  Viewer catalog 新增 `nike-real-splat-demo`，首屏 dock / 默认 stage 收敛为 5 个 curated
+  demos；near-1M、OGC、trainable artifact 和旧 closure 保留在高级模型版本 / URL 调试路径。
+
 ### ACTION-021: 让主展示台真实 `.splat` 对象子集随对象移动
 
 - 完成 commit: `1ced889`、`67343a1`；本轮 `GAUSSIAN-OBJECT-PROCESS-FLOW-001` 再次验证。

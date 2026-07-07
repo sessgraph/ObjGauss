@@ -116,8 +116,9 @@ export default function App() {
   }));
   const [debugSessionArchive, setDebugSessionArchive] = useState(null);
   const knownStageModelIds = useRef(new Set(modelCatalog.map((model) => model.id)));
-  const [stageModelIds, setStageModelIds] = useState(() => new Set(modelCatalog.map((model) => model.id)));
+  const [stageModelIds, setStageModelIds] = useState(() => initialStageModelIdSet(modelCatalog));
   const modelList = useMemo(() => Object.values(models), [models]);
+  const dockModelList = useMemo(() => modelList.filter((model) => model.dockVisible !== false), [modelList]);
   const summary = useMemo(() => catalogSummary(modelList), [modelList]);
   const stageSummary = useMemo(() => trainingStageSummary(modelList, stageModelIds), [modelList, stageModelIds]);
   const stageModelIdList = stageSummary.visibleIds;
@@ -1488,6 +1489,7 @@ export default function App() {
       data-frosted-ui="enabled"
       data-model-count={modelList.length}
       data-catalog-model-count={modelCatalog.length}
+      data-dock-model-count={dockModelList.length}
       data-loaded-count={loadedCount}
       data-training-stage="model-version-processing-v1"
       data-object-process-flow-schema={OBJECT_PROCESS_FLOW_SCHEMA}
@@ -1782,12 +1784,13 @@ export default function App() {
       </div>
 
       <div className="glassHud objectDock" aria-label="模型入口">
-        {modelList.map((model) => (
+        {dockModelList.map((model) => (
           <button
             className={`modelPill ${selectedId === model.id ? "selected" : ""} ${stageModelIds.has(model.id) ? "" : "muted"}`}
             type="button"
             key={model.id}
             data-model-row-id={model.id}
+            data-model-demo-group={model.demoGroup ?? model.stage ?? ""}
             data-model-load-state={model.status}
             data-stage-visible={stageModelIds.has(model.id) ? "true" : "false"}
             onClick={() => selectModel(model.id)}
@@ -8097,6 +8100,14 @@ function normalizeStageModelIdSet(ids) {
   if (ids instanceof Set) return new Set([...ids].filter(Boolean));
   if (Array.isArray(ids)) return new Set(ids.filter(Boolean));
   return new Set();
+}
+
+function initialStageModelIdSet(models = []) {
+  const visible = models
+    .filter((model) => model?.defaultStageVisible !== false)
+    .map((model) => model.id)
+    .filter(Boolean);
+  return new Set(visible.length > 0 ? visible : models.map((model) => model.id).filter(Boolean));
 }
 
 function trainingStageSummary(models = [], stageModelIds = new Set()) {
