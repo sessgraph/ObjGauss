@@ -790,6 +790,8 @@ Implemented v0.2 facts:
     `objgauss-objectstate-controlled-capture-file-audit-v1`;
   - `candidate_artifact_file_audit` using
     `objgauss-objectstate-controlled-candidate-artifact-file-audit-v1`;
+  - `candidate_artifact_ref_match`, proving the audited candidate artifact path
+    is present in prediction `candidate.artifact_refs`;
   - `identity_predictions` using
     `objgauss-objectstate-controlled-identity-predictions-v1`;
   - `identity_eval` using
@@ -803,12 +805,15 @@ Implemented v0.2 facts:
   `require_prediction_pass_row=false`,
   `require_intervention_pass_row=false`.
 - The handoff pass condition requires both the capture file audit and candidate
-  artifact file audit to pass before identity metrics and the identity-only
-  reality gate can make the handoff pass.
+  artifact file audit to pass, and requires the audited candidate artifact path
+  to match prediction artifact refs, before identity metrics and the
+  identity-only reality gate can make the handoff pass.
 - Frame-level RGB / Gaussian refs are checked as non-empty regular files by
   default, and optional SHA256 hashes can be included for audit evidence.
 - The candidate trainable ObjectState artifact is also checked as a non-empty
   regular local file, with optional SHA256 hash evidence.
+- The candidate metadata cannot claim a different artifact: the audited file
+  path must appear in `identity_predictions.candidate.artifact_refs`.
 - Prediction and intervention rows remain visible as blocked rows in the
   controlled-real summary; they are not hidden or promoted.
 - CLI command:

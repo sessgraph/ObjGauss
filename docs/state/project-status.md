@@ -305,6 +305,13 @@ handoff pass 现在同时要求 capture file audit、candidate artifact file aud
 identity eval 和 identity-only reality gate 全部通过；这一步仍不训练新模型、不创建
 GT、不写 `public/samples`。完成 commit: `f8b37e4`。
 
+随后进一步把 candidate file audit 和 prediction metadata 绑定：handoff summary 新增
+`candidate_artifact_ref_match`，要求被审计的本地 candidate artifact 路径必须出现在
+`identity_predictions.candidate.artifact_refs` 中。handoff pass 现在会拒绝“审计 A
+文件、metadata 声明 B 文件”的不一致情况。CLI 输出新增
+`candidate_artifact_ref_match=true|false`。当前仍没有实际 controlled real capture /
+true candidate artifact 作为通过证据。完成 commit: `32d4a5d`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
