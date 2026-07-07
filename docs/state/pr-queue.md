@@ -110,6 +110,40 @@
 
 ## Done
 
+### DEV-SERVER-5395-RESTART-001: Pin development server restart policy to port 5395
+
+- 状态: done / validated-local
+- 类型: 微 PR / development tooling
+- 目标: 将本项目开发端口固定为 `127.0.0.1:5395`，并允许 5395 被本项目 Vite/dev server
+  占用时自动重启；非本项目进程占用时阻断，避免误杀外部服务。
+- 已实施:
+  - 新增 `scripts/dev-server.mjs`，作为 `npm run dev` 入口；默认 `DEFAULT_PORT=5395`、
+    `DEFAULT_HOST=127.0.0.1`，启动本地 Vite。
+  - 端口占用检测使用 `lsof` + `/proc/<pid>`，仅当监听进程 cwd/cmdline 能确认为当前仓库的
+    Vite / npm dev / dev-server helper 时才发送 `SIGTERM`，必要时 fallback 到 `SIGKILL`。
+  - 更新 renderer route contract，继续把 local dev / preview / audit / acceptance 默认端口
+    固定在 5395，并明确 dev script 可重启同项目服务。
+  - `docs/development-flow.md` 增加固定本地开发端口规则：默认验收都应指向 5395，临时端口
+    只能作为记录清楚的异常排查手段。
+- 验收:
+  - `node --check scripts/dev-server.mjs`: passed。
+  - `node --check scripts/audit-renderer-route-contract.mjs`: passed。
+  - `npm run build`: passed；仍有既有 Vite chunk size warning。
+  - `uv run --extra dev pytest`: 259 passed。
+  - `git diff --check`: passed。
+  - `node scripts/audit-renderer-route-contract.mjs`: BR04 fixed-port / same-project restart
+    contract passed；整体仍 expected failed 于既有 BR01 / BR03 / BR05，与本切片无关。
+  - `npm run dev` on occupied `127.0.0.1:5395`: passed；第二次启动自动终止同项目旧
+    Vite listener，并重新在 5395 ready。
+  - Playwright + system Chrome on `http://127.0.0.1:5395/`: desktop / mobile page identity、
+    non-empty shell、no framework overlay、no pageerror passed；ready desktop state
+    `selectedSourceSplatStatus=ready`、`selectedSourceSplatObjectMotionStatus=ready`。
+    截图：
+    `/tmp/objgauss-dev-5395-desktop.png`、
+    `/tmp/objgauss-dev-5395-mobile.png`、
+    `/tmp/objgauss-dev-5395-ready-desktop.png`。
+- 完成 commit: 本提交
+
 ### NATIVE-SPLAT-MOTION-HARDEN-001: Harden native source splat object motion evidence
 
 - 状态: done / validated-targeted-browser
