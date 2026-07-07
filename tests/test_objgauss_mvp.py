@@ -1025,11 +1025,16 @@ def test_splatfacto_scene_benchmark_script_dry_run_reports_pipeline():
     assert result.returncode == 0, result.stderr
     assert "mode=dry-run" in result.stdout
     assert "manifest=docs/benchmarks/splatfacto-scenes.json" in result.stdout
-    assert "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke,chair-splatfacto-smoke" in result.stdout
+    assert (
+        "scenes=lego-splatfacto-safe-2000,fern-splatfacto-smoke,chair-splatfacto-smoke,"
+        "chair-dense-splatfacto-smoke"
+    ) in result.stdout
     assert "scripts/benchmark-splatfacto-balanced.mjs" in result.stdout
     assert "nerf-fern-sam-smoke/mask-manifest.json" in result.stdout
     assert "polyhaven-school-chair-nerf" in result.stdout
     assert "polyhaven-chair-sam-smoke/mask-manifest.json" in result.stdout
+    assert "polyhaven-school-chair-nerf-dense" in result.stdout
+    assert "polyhaven-chair-dense-sam-smoke/mask-manifest.json" in result.stdout
     assert "--train-sam-manifest" in result.stdout
     assert "--heldout-manifest" in result.stdout
     assert "--heldout-every 4" in result.stdout

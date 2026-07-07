@@ -97,8 +97,19 @@ Splatfacto train loss 更低 `0.359148 vs 0.389867`、PSNR 略高
 但当前 SAM vote 质量回退：supervised fraction `0.161200 vs 0.242340`，
 vote conflict fraction `0.859677 vs 0.743914`，final vote loss
 `0.999969 vs 0.849624`。结论：dense candidate 已生成且值得保留，但暂不推进为
-viewer/export 默认；下一步应先为 dense Chair 调整 mask policy / benchmark row，再做发布或
-默认策略决定。
+viewer/export 默认；当时的下一步是先为 dense Chair 补 mask policy / benchmark row 复验，
+再做发布或默认策略决定。
+
+随后完成 `POLYHAVEN-DENSE-BENCH-001`：`chair-dense-splatfacto-smoke` 已加入
+`docs/benchmarks/splatfacto-scenes.json` 并通过 4-row scene suite 复验。全量
+`npm run benchmark:splatfacto:scenes -- --run --skip-sam` 通过，`status=ready missing=0`，
+scene suite 扩展为 Lego / Fern / Chair / dense Chair 四行。dense Chair 使用相同
+SAM 8 frames / 6 masks / `max_area_fraction=0.75` policy，train / held-out split 为
+`6 / 2` frames；ARI=`0.786356`、curve OES=`0.759438`、render=`0.185040`、
+held-out loss=`2.002325`、held-out render=`0.178836`。相对旧 Chair，dense 的
+assignment stability 更好，但 render 和 held-out render 更弱（旧 Chair 分别为
+`0.248716` / `0.224084`）。结论保持不 publish、不设为 viewer/export 默认；若继续，
+应先尝试更保守的 dense Chair mask policy 或扩更多许可清晰的小型样本行。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

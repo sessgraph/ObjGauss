@@ -25,12 +25,12 @@
 `REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001` 和
 `REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002` 已完成；`TRAINING-DATA-POLYHAVEN-DENSE-001`
 已补一个更高密度、许可干净的 Poly Haven Chair 训练输入；`POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001`
-已生成 dense Chair 100-step Splatfacto candidate。当前判断是保留 candidate，但不直接推进
-viewer/export 默认策略：dense 的 Splatfacto train loss / PSNR 和 emergence 指标更好，
-但 SAM vote coverage 和 final vote loss 回退。下一步若继续，应先为 dense Chair 补 mask
-policy / benchmark row 复验，再决定是否 publish。若继续算法质量，
+已生成 dense Chair 100-step Splatfacto candidate；`POLYHAVEN-DENSE-BENCH-001`
+已补 dense Chair scene benchmark row 并复验 4-row suite。当前判断是保留 candidate，
+但不 publish、不直接推进 viewer/export 默认策略：dense 的 assignment stability 更好，
+但 render 和 held-out render 弱于旧 Chair。若继续算法质量，
 优先继续增加许可 / 来源清晰的小型 real / public sample 行，并把 blocked rows 和 pass rows
-分开记录，而不是改全局权重。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或
+分开记录；若继续 dense Chair，应先试更保守 mask policy，而不是改 viewer/export 默认。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或
 收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
@@ -99,6 +99,41 @@ policy / benchmark row 复验，再决定是否 publish。若继续算法质量�
 当前无进行中 PR。
 
 ## Done
+
+### POLYHAVEN-DENSE-BENCH-001: Revalidate dense Chair benchmark row
+
+- 状态: done / candidate-kept-do-not-publish
+- 类型: 标准 PR / benchmark row + mask policy复验
+- 目标: 将 dense Chair Splatfacto candidate 纳入 `splatfacto-scenes` cross-sample 表，
+  复验当前 SAM mask policy 后决定是否 publish 或设为 viewer/export 默认。
+- 范围外:
+  - 不提交 `outputs/`、checkpoint、SAM checkpoint 或 benchmark generated outputs。
+  - 不发布 `public/samples/`，不改变 viewer/export 默认策略。
+  - 不改变 manifest / renderer / training contract。
+- 实施:
+  - 新增 `chair-dense-splatfacto-smoke` scene row，指向
+    `outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply`。
+  - 复用 dense SAM manifest，并生成 train / held-out split：
+    `outputs/masks/polyhaven-chair-dense-sam-smoke/train-mask-manifest.json` 和
+    `heldout-mask-manifest.json`。
+  - 记录 dense row 到 `docs/benchmarks/splatfacto-scenes.md` 和 `docs/asset-library.md`。
+- 验收:
+  - Scene suite 扩展为 4 rows：Lego、Fern、旧 Chair、dense Chair。
+  - dense Chair split 为 train `6` frames / held-out `2` frames。
+  - dense Chair: ARI=`0.786356`、curve OES=`0.759438`、render=`0.185040`、
+    held-out loss=`2.002325`、held-out render=`0.178836`。
+  - 对比旧 Chair：dense 的 ARI 更高，但 render `0.185040 < 0.248716`、
+    held-out render `0.178836 < 0.224084`。
+  - 决策：保留为 candidate，不 publish，不设为 viewer/export 默认。
+- 验证:
+  - `npm run benchmark:splatfacto:scenes -- --dry-run --scene chair-dense-splatfacto-smoke --skip-sam`: passed。
+  - `npm run benchmark:splatfacto:scenes -- --run --scene chair-dense-splatfacto-smoke --skip-sam`: passed。
+  - `npm run benchmark:splatfacto:scenes -- --run --skip-sam`: passed，scenes=4。
+  - `npm run benchmark:splatfacto:scenes -- --status --skip-sam`: `status=ready missing=0`，scenes=4。
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -k "splatfacto_scene" -q`: 1 passed。
+  - `git diff --check`: passed。
+  - Cross-scene aggregate attempt `npm run benchmark:cross-scene -- --run --skip-semantic --skip-scenes --skip-variants`
+    未作为验收：当前 `/tmp` 缺少 semantic / variant summary，需要先重跑对应 suites。
 
 ### POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001: Train dense Chair Splatfacto candidate
 

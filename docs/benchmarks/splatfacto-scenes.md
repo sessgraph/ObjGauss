@@ -30,6 +30,7 @@ The manifest is `docs/benchmarks/splatfacto-scenes.json`.
 | `lego-splatfacto-safe-2000` | `outputs/training/nerf-lego-splatfacto-long/export-safe-2000-cpu-cache-v1/splat.ply` | 8 SAM frames, 4 masks per frame, max area 0.3 | Current stronger Lego geometry baseline |
 | `fern-splatfacto-smoke` | `outputs/training/nerf-fern-splatfacto-smoke/export-smoke-cuda/splat.ply` | 4 SAM frames, 6 masks per frame, max area 0.35, max image size 768 | Second Splatfacto-trained scene from LLFF/COLMAP Fern |
 | `chair-splatfacto-smoke` | `outputs/training/polyhaven-chair-splatfacto-smoke/export-smoke-cuda/splat.ply` | 8 SAM frames, 6 masks per frame, max area 0.75 | Third Splatfacto-trained scene from a CC0 Poly Haven mesh-derived NeRF render set |
+| `chair-dense-splatfacto-smoke` | `outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply` | 8 SAM frames, 6 masks per frame, max area 0.75 on 32-frame / 384px dense Chair | Dense Chair candidate row for mask-policy and publish/default gating |
 
 Outputs:
 
@@ -74,6 +75,12 @@ scale-aware probe:
 | `lego-splatfacto-safe-2000` | 6 | 2 | 0.469787 | 0.784051 | 0.229397 | 2.301630 | 0.197505 |
 | `fern-splatfacto-smoke` | 3 | 1 | 0.790636 | 0.780132 | 0.235029 | 0.670722 | 0.233851 |
 | `chair-splatfacto-smoke` | 6 | 2 | 0.614363 | 0.757609 | 0.248716 | 2.284750 | 0.224084 |
+| `chair-dense-splatfacto-smoke` | 6 | 2 | 0.786356 | 0.759438 | 0.185040 | 2.002325 | 0.178836 |
+
+Dense Chair improves assignment stability over the old Chair row, but it does
+not improve the current scale-aware render occlusion metric. The current
+decision is to keep it as a candidate benchmark row and not publish it or make
+it the viewer / export default.
 
 ## Fern Preparation
 
@@ -178,6 +185,58 @@ Then refresh the scene suite:
 
 ```bash
 npm run benchmark:splatfacto:scenes -- --run --skip-sam
+```
+
+### Dense Chair Candidate
+
+The dense Chair candidate uses the same CC0 Poly Haven School Chair source but
+renders a 32-frame / 384px NeRF-style orbit set before the 100-step Splatfacto
+smoke run. The first benchmark pass keeps the same SAM 8-frame / 6-mask /
+`max_area_fraction=0.75` policy as the old Chair row. It remains a benchmark
+candidate because render occlusion and held-out render are weaker than the old
+Chair row.
+
+Generate the dense training input:
+
+```bash
+uv run objgauss assets pull polyhaven-school-chair-nerf-dense
+```
+
+Run the dense Splatfacto smoke:
+
+```bash
+npm run train:splatfacto:smoke -- \
+  --run \
+  --asset-id polyhaven-school-chair-nerf-dense \
+  --dataset outputs/assets/training/polyhaven-school-chair-nerf-dense \
+  --output-root outputs/training/polyhaven-chair-dense-splatfacto-smoke \
+  --experiment chair-dense-splatfacto-smoke \
+  --timestamp smoke-cuda \
+  --export-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda \
+  --object-field-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam \
+  --sam-manifest outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json \
+  --data-parser blender-data \
+  --iterations 100 \
+  --steps-per-save 100 \
+  --vis tensorboard \
+  --cache-images cpu \
+  --camera-res-scale-factor 0.5 \
+  --cuda-home /tmp/objgauss-cuda13 \
+  --max-jobs 2 \
+  --device cuda \
+  --sam-max-frames 8 \
+  --sam-max-masks-per-frame 6 \
+  --sam-min-area 64 \
+  --sam-max-area-fraction 0.75 \
+  --slots 6 \
+  --object-iterations 80 \
+  --skip-benchmark
+```
+
+Then refresh only the dense candidate row:
+
+```bash
+npm run benchmark:splatfacto:scenes -- --run --scene chair-dense-splatfacto-smoke --skip-sam
 ```
 
 ## Interpretation Boundary

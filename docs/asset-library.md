@@ -370,6 +370,17 @@ outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json
 Object emergence 指标更好，但 SAM vote 监督覆盖和 final vote loss 回退。因此 dense
 candidate 先保留为训练候选，不推进为 viewer / export 默认策略。
 
+Dense benchmark row 复验（2026-07-07）：
+
+- `npm run benchmark:splatfacto:scenes -- --run --skip-sam`: passed，scene suite
+  扩展为 4 rows。
+- `chair-dense-splatfacto-smoke`: train / held-out split 为 `6 / 2` frames；
+  ARI=`0.786356`、curve OES=`0.759438`、render=`0.185040`、held-out loss=`2.002325`、
+  held-out render=`0.178836`。
+- 对比旧 `chair-splatfacto-smoke`: dense 的 ARI / single-point OES 更高，但 render
+  `0.185040 < 0.248716`、held-out render `0.178836 < 0.224084`，因此仍不 publish，
+  也不设为 viewer / export 默认。
+
 ### Poly Haven Chair Commercial Demo Sample
 
 处理链路：
