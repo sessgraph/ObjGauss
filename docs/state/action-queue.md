@@ -35,7 +35,7 @@
 
 ### ACTION-027: 修复 v2 stability gate oracle fallback 和 assignment slot 校验
 
-- 完成 commit: 本提交
+- 完成 commit: `667e3a0`
 - 结果: `diagnose_synthetic_stability_fixture(...)`、
   `evaluate_synthetic_stability_gate(...)` 和
   `evaluate_synthetic_stability_suite_gate(...)` 现在都要求显式 candidate prediction；

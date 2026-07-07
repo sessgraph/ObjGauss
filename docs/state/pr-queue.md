@@ -129,7 +129,7 @@ full `audit:world-viewer` 的旧等待条件。
   - Controlled real rows、learned dynamics 和 action-conditioned counterfactual gate 仍是后续工作。
 - 验证:
   - `uv run --extra dev pytest tests/test_objectstate_predictive_gate.py tests/test_core_namespace.py -q`: passed。
-- 完成 commit: 本提交。
+- 完成 commit: `667e3a0`。
 
 ### OBJECTSTATE-IDENTITY-MODEL-001: Train contrastive ObjectState identity encoder
 
@@ -152,7 +152,7 @@ full `audit:world-viewer` 的旧等待条件。
   - 当前是 synthetic smoke training，不声明真实世界 identity encoder 已充分。
 - 验证:
   - `uv run --extra dev pytest tests/test_objectstate_identity_encoder.py tests/test_objectstate_identity_gate.py tests/test_core_namespace.py -q`: passed。
-- 完成 commit: 本提交。
+- 完成 commit: `667e3a0`。
 
 ### OBJECTSTATE-IDENTITY-GATE-001: Build ObjectState state-variable smoke evaluator
 
@@ -185,7 +185,7 @@ full `audit:world-viewer` 的旧等待条件。
 - 验证:
   - `uv run --extra dev pytest tests/test_v2_stability_gate.py tests/test_objectstate_identity_gate.py tests/test_core_namespace.py -q`: passed，20 tests。
   - `uv run --extra dev pytest tests/test_v2_stability_diagnostics.py tests/test_assignment_solver_v2_eval.py tests/test_core_model_validation.py tests/test_assignment_solver_v2.py -q`: passed，14 tests。
-- 完成 commit: 本提交。
+- 完成 commit: `667e3a0`。
 
 ### OBJECTSTATE-STATE-VARIABLE-GATE-001: Freeze ObjectState state-variable acceptance gate
 
