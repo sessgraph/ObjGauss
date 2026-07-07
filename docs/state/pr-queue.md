@@ -161,6 +161,7 @@ latent object belief / state variable，而不是继续追 renderer 指标或 Ga
   - `R-017` 已记录 ObjectState 退化为 observation state 的核心风险。
 - 验证:
   - `git diff --check`: passed。
+- 完成 commit: `7cdfb58`。
 
 ### POLYHAVEN-DENSE-BENCH-001: Revalidate dense Chair benchmark row
 
