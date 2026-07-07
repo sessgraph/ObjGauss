@@ -45,8 +45,12 @@ small public / local viewer artifacts 生成第一批 12 条 blocked rows，明�
 action events 和 counterfactual outcome。下一步优先导入或采集真正 controlled tabletop
 GT rows，让至少 identity row 从 blocked 进入可评估 pass / fail；`OBJECTSTATE-CONTROLLED-REAL-ROWS-001`
 已补 controlled real manifest importer，后续 capture / annotation 可直接进入
-reality gate。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。若继续
-viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
+reality gate；`OBJECTSTATE-CONTROLLED-REAL-CLI-001` 已把该 importer 暴露成
+`objgauss object-state controlled-real-gate <manifest.json>`，可生成 summary JSON 和
+blocked rows Markdown，并支持 `--identity-only` Stage 1 gate。下一步仍是实际采集 /
+标注 controlled tabletop capture manifest，而不是新增大模型。继续不推进 diffusion、
+replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY
+LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -114,6 +118,34 @@ viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full `audit:world-v
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REAL-CLI-001: Add controlled real gate CLI handoff
+
+- 状态: done / cli-ready-no-real-capture
+- 类型: 标准 PR / ObjectState reality gate CLI handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将 controlled real manifest importer 暴露成可复跑 CLI，让真实 controlled
+  tabletop capture / annotation manifest 能直接生成 pass / fail / blocked evidence summary。
+- 已实施:
+  - 新增 `objgauss object-state controlled-real-gate <manifest.json>`。
+  - 默认执行完整 identity / prediction / intervention reality gate。
+  - `--summary-output` 写入 `objgauss-objectstate-controlled-real-rows-v1` summary。
+  - `--blocked-rows-output` 写入 blocked rows Markdown。
+  - `--identity-only` 支持 Stage 1 identity-state gate，不要求 prediction /
+    intervention pass rows，但继续保留 blocked rows。
+  - `--require-pass` 支持 CI / handoff 严格验收。
+  - CLI 测试覆盖默认完整 gate fail summary 和 identity-only require-pass。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop 数据。
+  - CLI 不创建 GT，不写 `outputs/` / `public/samples`。
+  - 不训练 Gaussian / dynamics，不做 replay buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_cli.py tests/test_objectstate_controlled_real_rows.py tests/test_objectstate_reality_gate.py -q`: passed。
+  - `uv run python -m py_compile objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest`: passed, 293 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `98482d7`。
 
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001: Add controlled real manifest importer
 

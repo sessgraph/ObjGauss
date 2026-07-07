@@ -648,6 +648,34 @@ Implemented v0.1 facts:
   Gaussian or dynamics models, add replay / diffusion, or mutate viewer
   defaults.
 
+### OBJECTSTATE-CONTROLLED-REAL-CLI-001
+
+Expose the controlled real manifest importer as a reproducible command-line
+handoff.
+
+Implemented v0.1 facts:
+
+- CLI command:
+  `objgauss object-state controlled-real-gate <manifest.json>`.
+- Inputs: a JSON manifest using
+  `objgauss-objectstate-controlled-real-manifest-v1`.
+- Outputs:
+  - stdout summary with sample id, row counts, gate status and hard blockers.
+  - optional `--summary-output` JSON using
+    `objgauss-objectstate-controlled-real-rows-v1`.
+  - optional `--blocked-rows-output` Markdown table derived from blocked rows.
+- Default mode runs the full reality gate and still requires identity,
+  prediction and intervention pass rows.
+- `--identity-only` runs the Stage 1 identity-state gate by requiring only an
+  identity pass row while leaving prediction / intervention blocked rows
+  visible in the summary.
+- `--require-pass` converts a failed gate into a non-zero CLI error for CI or
+  handoff checks.
+
+Current scope remains handoff / audit only. The command does not capture video,
+create ground truth, write `outputs/` / `public/samples`, train Gaussian or
+dynamics models, add replay / diffusion, or mutate viewer defaults.
+
 ## 7. Non-Goals
 
 This spec does not authorize:

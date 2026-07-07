@@ -201,6 +201,16 @@ GT 与 identity metrics 时，identity row 可以从 blocked 进入可评估 pas
 prediction / intervention 可继续保持 blocked。当前仍没有提交真实采集数据；下一步是用
 实际 controlled tabletop capture / annotation 生成 manifest。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-CLI-001`：`objgauss object-state
+controlled-real-gate <manifest.json>` 已成为 controlled real manifest 的可复跑验收入口。
+命令默认执行完整 reality gate，输出 sample / row count / gate status / hard blockers；
+`--summary-output` 写入 `objgauss-objectstate-controlled-real-rows-v1` JSON，
+`--blocked-rows-output` 写入 blocked rows Markdown。`--identity-only --require-pass`
+支持 Stage 1 identity-state 验收：只要求 timestamped identity GT + identity metrics
+形成 pass row，同时保留 prediction / intervention blocked rows，不把它们伪装成通过。
+当前仍没有采集或提交真实 controlled tabletop 数据，也不训练 Gaussian / dynamics、不写
+`outputs/` / `public/samples`、不改 viewer/export 默认。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
