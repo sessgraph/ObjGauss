@@ -179,6 +179,75 @@ Use `npm run preview -- --port 5395 --strictPort` when `npm run audit:demo`
 cannot start Vite dev server because the system inotify watcher limit is
 exhausted.
 
+## Poly Haven Chair Dense Candidate
+
+On 2026-07-07, `polyhaven-school-chair-nerf-dense` was trained with the same
+100-step Splatfacto smoke wrapper as the earlier chair sample:
+
+```bash
+npm run train:splatfacto:smoke -- --run \
+  --asset-id polyhaven-school-chair-nerf-dense \
+  --dataset outputs/assets/training/polyhaven-school-chair-nerf-dense \
+  --output-root outputs/training/polyhaven-chair-dense-splatfacto-smoke \
+  --experiment chair-dense-splatfacto-smoke \
+  --timestamp smoke-cuda \
+  --export-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda \
+  --object-field-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam \
+  --sam-manifest outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json \
+  --data-parser blender-data \
+  --iterations 100 \
+  --steps-per-save 100 \
+  --vis tensorboard \
+  --cache-images cpu \
+  --camera-res-scale-factor 0.5 \
+  --cuda-home /tmp/objgauss-cuda13 \
+  --max-jobs 2 \
+  --device cuda \
+  --sam-max-frames 8 \
+  --sam-max-masks-per-frame 6 \
+  --sam-min-area 64 \
+  --sam-max-area-fraction 0.75 \
+  --slots 6 \
+  --object-iterations 80 \
+  --skip-benchmark
+```
+
+The first run failed because `/tmp/objgauss-cuda13` had expired and `gsplat`
+reported no CUDA toolkit. Recreating the temporary wrapper symlinks restored
+the CUDA 13 wheel layout and the second run passed. The first iteration spent
+about `7m18s` in JIT compilation; later iterations were about `6-7ms`.
+
+Dense candidate outputs are ignored local artifacts:
+
+```text
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/chair-dense-splatfacto-smoke/splatfacto/smoke-cuda/nerfstudio_models/step-000000099.ckpt
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam/polyhaven-school-chair-nerf-dense_splatfacto_sam_objects.ply
+outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json
+```
+
+Comparison with the earlier 16-frame chair smoke:
+
+```text
+Splatfacto final train loss: dense=0.359148, old=0.389867
+Splatfacto PSNR: dense=11.108979, old=11.075611
+Exported Gaussians: dense=50000, old=50000
+
+SAM supervised fraction: dense=0.161200, old=0.242340
+SAM vote conflict fraction: dense=0.859677, old=0.743914
+Object Field final vote loss: dense=0.999969, old=0.849624
+
+Object emergence score: dense=0.796839, old=0.709509
+Stability ARI: dense=0.763848, old=0.581991
+Matched label agreement: dense=0.867780, old=0.797980
+```
+
+Interpretation: the dense candidate is useful evidence and improves the
+reconstruction / ObjectState shape metrics, but its current SAM vote
+supervision is weaker than the old chair smoke. Do not promote it to the
+viewer/export default until a dense mask-policy benchmark row and browser audit
+pass.
+
 ## TRAIN-003D Near-1M Candidate To Production SLA
 
 TRAIN-003D is the handoff from "resource-safe candidate" to the renderer C-path

@@ -24,9 +24,11 @@
 `BOUNDED-EVIDENCE-NORMALIZATION-001`、
 `REAL-SAMPLE-V2-BOUNDED-NORM-CROSS-SAMPLE-001` 和
 `REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002` 已完成；`TRAINING-DATA-POLYHAVEN-DENSE-001`
-已补一个更高密度、许可干净的 Poly Haven Chair 训练输入。下一步若要继续“新模型”，优先在
-ignored `outputs/` 上对 `polyhaven-school-chair-nerf-dense` 跑 Splatfacto candidate /
-smoke training，再决定是否把生成模型推进到 viewer/export 默认策略。若继续算法质量，
+已补一个更高密度、许可干净的 Poly Haven Chair 训练输入；`POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001`
+已生成 dense Chair 100-step Splatfacto candidate。当前判断是保留 candidate，但不直接推进
+viewer/export 默认策略：dense 的 Splatfacto train loss / PSNR 和 emergence 指标更好，
+但 SAM vote coverage 和 final vote loss 回退。下一步若继续，应先为 dense Chair 补 mask
+policy / benchmark row 复验，再决定是否 publish。若继续算法质量，
 优先继续增加许可 / 来源清晰的小型 real / public sample 行，并把 blocked rows 和 pass rows
 分开记录，而不是改全局权重。若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或
 收敛 full `audit:world-viewer` 的旧等待条件。
@@ -97,6 +99,57 @@ smoke training，再决定是否把生成模型推进到 viewer/export 默认策
 当前无进行中 PR。
 
 ## Done
+
+### POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001: Train dense Chair Splatfacto candidate
+
+- 状态: done / candidate-generated-do-not-promote-yet
+- 类型: 标准 PR / training smoke + quality comparison
+- 目标: 使用 `polyhaven-school-chair-nerf-dense` 跑一次真实 Splatfacto smoke，生成新的
+  Gaussian candidate，并与旧 `polyhaven-school-chair-nerf` chair smoke 对比，决定是否进入
+  viewer/export 默认策略。
+- 已实施:
+  - 重建 `/tmp/objgauss-cuda13` 临时 CUDA wrapper，恢复 uv CUDA 13 wheel 的
+    `libcudart.so` / `nvcc` / include / lib 路径；该 wrapper 只在 `/tmp` 建 symlink，
+    不修改系统 CUDA，也不提交 git。
+  - 执行 dense 100-step Splatfacto smoke，输出 ignored 本地产物：
+    `outputs/training/polyhaven-chair-dense-splatfacto-smoke/`。
+  - 导出新 Gaussian PLY：
+    `outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply`。
+  - 生成 dense SAM mask manifest：
+    `outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json`。
+  - 生成 dense object-aware PLY：
+    `outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam/polyhaven-school-chair-nerf-dense_splatfacto_sam_objects.ply`。
+- 结果:
+  - Dense status: `status=ready missing=0`；checkpoint `step-000000099.ckpt` 约 `44M`，
+    exported `splat.ply` 约 `12M`，object-aware PLY 约 `13M`。
+  - Splatfacto train metrics: dense final train loss `0.359148` vs old chair `0.389867`；
+    dense PSNR `11.108979` vs old chair `11.075611`；both exported `50000` Gaussians。
+  - SAM / Object Field vote quality regressed: dense supervised fraction `0.161200` vs old
+    `0.242340`; dense vote conflict fraction `0.859677` vs old `0.743914`; dense final
+    vote loss `0.999969` vs old `0.849624`。
+  - Object emergence metrics improved: dense `object_emergence_score=0.796839` vs old
+    `0.709509`; dense `stability_ari=0.763848` vs old `0.581991`; dense
+    `matched_label_agreement=0.867780` vs old `0.797980`。
+- 判断:
+  - Dense candidate is promising for reconstruction / ObjectState shape metrics.
+  - It should **not** become the viewer/export default yet because the current SAM vote
+    supervision is weaker than the old chair smoke.
+  - Next step should tune dense mask policy / add a benchmark row, then rerun promotion
+    decision with browser audit if quality holds.
+- 验证:
+  - `npm run train:splatfacto:smoke -- --status --asset-id polyhaven-school-chair-nerf-dense ...`:
+    `status=ready missing=0`。
+  - `uv run objgauss stats outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply`:
+    `gaussians=50000`。
+  - `uv run objgauss stats outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam/polyhaven-school-chair-nerf-dense_splatfacto_sam_objects.ply`:
+    `gaussians=50000`，object counts `14497/2983/8334/7630/8289/8267`。
+  - `uv run objgauss object-field emergence ... --output /tmp/objgauss-polyhaven-chair-dense-emergence.json`:
+    passed，`object_emergence_score=0.796839`。
+- 边界:
+  - 不提交 `outputs/`、checkpoint、SAM manifest、PLY、`.splat` 或 TensorBoard event。
+  - 不改变 viewer/export 默认策略。
+  - 不把 100-step smoke 表述为最终 public/commercial demo。
+- 完成 commit: 本提交。
 
 ### TRAINING-DATA-POLYHAVEN-DENSE-001: Build dense Poly Haven chair training dataset
 

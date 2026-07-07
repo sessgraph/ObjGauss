@@ -327,6 +327,49 @@ Gaussian 模型，也不会提交 generated PNG / PLY。
   `missing_images=0`、`invalid_transforms=0`。
 - PNG alpha coverage: `min=0.182231`、`mean=0.286609`、`max=0.359138`。
 
+Dense Splatfacto smoke（2026-07-07）：
+
+```bash
+npm run train:splatfacto:smoke -- --run \
+  --asset-id polyhaven-school-chair-nerf-dense \
+  --dataset outputs/assets/training/polyhaven-school-chair-nerf-dense \
+  --output-root outputs/training/polyhaven-chair-dense-splatfacto-smoke \
+  --experiment chair-dense-splatfacto-smoke \
+  --timestamp smoke-cuda \
+  --export-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda \
+  --object-field-dir outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam \
+  --sam-manifest outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json \
+  --data-parser blender-data \
+  --iterations 100 \
+  --steps-per-save 100 \
+  --vis tensorboard \
+  --cache-images cpu \
+  --camera-res-scale-factor 0.5 \
+  --cuda-home /tmp/objgauss-cuda13 \
+  --max-jobs 2 \
+  --device cuda \
+  --sam-max-frames 8 \
+  --sam-max-masks-per-frame 6 \
+  --sam-min-area 64 \
+  --sam-max-area-fraction 0.75 \
+  --slots 6 \
+  --object-iterations 80 \
+  --skip-benchmark
+```
+
+输出仍是 ignored local training output，不提交 git：
+
+```text
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/chair-dense-splatfacto-smoke/splatfacto/smoke-cuda/nerfstudio_models/step-000000099.ckpt
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/export-smoke-cuda/splat.ply
+outputs/training/polyhaven-chair-dense-splatfacto-smoke/object-field-sam/polyhaven-school-chair-nerf-dense_splatfacto_sam_objects.ply
+outputs/masks/polyhaven-chair-dense-sam-smoke/mask-manifest.json
+```
+
+对比旧 `polyhaven-chair-splatfacto-smoke`：dense 的 Splatfacto train loss / PSNR 与
+Object emergence 指标更好，但 SAM vote 监督覆盖和 final vote loss 回退。因此 dense
+candidate 先保留为训练候选，不推进为 viewer / export 默认策略。
+
 ### Poly Haven Chair Commercial Demo Sample
 
 处理链路：

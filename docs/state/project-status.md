@@ -82,6 +82,24 @@ alpha coverage `min=0.182231`、`mean=0.286609`、`max=0.359138`。该步骤只�
 `outputs/` 上跑 Splatfacto candidate / smoke training，再决定是否进入 viewer/export
 默认策略。
 
+随后完成 `POLYHAVEN-DENSE-SPLATFACTO-SMOKE-001`：使用
+`polyhaven-school-chair-nerf-dense` 跑通 100-step Nerfstudio Splatfacto smoke，并生成新的
+ignored Gaussian candidate。输出路径为
+`outputs/training/polyhaven-chair-dense-splatfacto-smoke/`，其中 checkpoint
+`step-000000099.ckpt` 约 `44M`，exported Gaussian PLY
+`export-smoke-cuda/splat.ply` 为 `50,000` Gaussians / 约 `12M`，object-aware PLY 为
+`object-field-sam/polyhaven-school-chair-nerf-dense_splatfacto_sam_objects.ply` / 约 `13M`。
+训练前因 `/tmp/objgauss-cuda13` 临时 CUDA wrapper 已消失，首次 run 在 `gsplat: No CUDA
+toolkit found` 处失败；重建 wrapper symlink 后同一命令通过。dense 相比旧 chair smoke 的
+Splatfacto train loss 更低 `0.359148 vs 0.389867`、PSNR 略高
+`11.108979 vs 11.075611`，Object emergence 也更好：
+`object_emergence_score=0.796839 vs 0.709509`、`stability_ari=0.763848 vs 0.581991`。
+但当前 SAM vote 质量回退：supervised fraction `0.161200 vs 0.242340`，
+vote conflict fraction `0.859677 vs 0.743914`，final vote loss
+`0.999969 vs 0.849624`。结论：dense candidate 已生成且值得保留，但暂不推进为
+viewer/export 默认；下一步应先为 dense Chair 调整 mask policy / benchmark row，再做发布或
+默认策略决定。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
