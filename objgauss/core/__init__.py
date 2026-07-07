@@ -130,6 +130,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_predictive_gate",
         "ObjectStatePredictiveRow",
     ),
+    "ObjectStateRealityGateReport": (
+        "objgauss.core.objectstate_reality_gate",
+        "ObjectStateRealityGateReport",
+    ),
+    "ObjectStateRealityGateThresholds": (
+        "objgauss.core.objectstate_reality_gate",
+        "ObjectStateRealityGateThresholds",
+    ),
+    "ObjectStateRealityRow": (
+        "objgauss.core.objectstate_reality_gate",
+        "ObjectStateRealityRow",
+    ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",
         "ObjectIdentityOracle",
@@ -232,6 +244,26 @@ _EXPORTS = {
     "ObjectStateCausalRow": (
         "objgauss.core.objectstate_causal_gate",
         "ObjectStateCausalRow",
+    ),
+    "OBJECTSTATE_REALITY_EVIDENCE_KINDS": (
+        "objgauss.core.objectstate_reality_gate",
+        "OBJECTSTATE_REALITY_EVIDENCE_KINDS",
+    ),
+    "OBJECTSTATE_REALITY_GATE_SCHEMA": (
+        "objgauss.core.objectstate_reality_gate",
+        "OBJECTSTATE_REALITY_GATE_SCHEMA",
+    ),
+    "OBJECTSTATE_REALITY_ROW_SCHEMA": (
+        "objgauss.core.objectstate_reality_gate",
+        "OBJECTSTATE_REALITY_ROW_SCHEMA",
+    ),
+    "OBJECTSTATE_REALITY_ROW_STATUSES": (
+        "objgauss.core.objectstate_reality_gate",
+        "OBJECTSTATE_REALITY_ROW_STATUSES",
+    ),
+    "OBJECTSTATE_REALITY_SOURCE_KINDS": (
+        "objgauss.core.objectstate_reality_gate",
+        "OBJECTSTATE_REALITY_SOURCE_KINDS",
     ),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
@@ -585,6 +617,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_predictive_gate",
         "evaluate_objectstate_predictive_gate",
     ),
+    "evaluate_objectstate_reality_gate": (
+        "objgauss.core.objectstate_reality_gate",
+        "evaluate_objectstate_reality_gate",
+    ),
     "initialize_objectstate_identity_encoder_state": (
         "objgauss.core.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
@@ -612,6 +648,14 @@ _EXPORTS = {
     "validate_objectstate_causal_gate_summary": (
         "objgauss.core.objectstate_causal_gate",
         "validate_objectstate_causal_gate_summary",
+    ),
+    "objectstate_reality_blocked_rows_markdown": (
+        "objgauss.core.objectstate_reality_gate",
+        "objectstate_reality_blocked_rows_markdown",
+    ),
+    "validate_objectstate_reality_gate_summary": (
+        "objgauss.core.objectstate_reality_gate",
+        "validate_objectstate_reality_gate_summary",
     ),
     "evaluate_assignment_solver_v2_stability": (
         "objgauss.core.assignment_solver_v2_eval",

@@ -55,6 +55,9 @@ from objgauss.core import (
     ObjectStatePredictiveGateReport,
     ObjectStatePredictiveGateThresholds,
     ObjectStatePredictiveRow,
+    ObjectStateRealityGateReport,
+    ObjectStateRealityGateThresholds,
+    ObjectStateRealityRow,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
     OBJECTSTATE_CAUSAL_ACTIONS,
@@ -64,6 +67,11 @@ from objgauss.core import (
     OBJECTSTATE_IDENTITY_DATASET_SCHEMA,
     OBJECTSTATE_IDENTITY_GATE_SCHEMA,
     OBJECTSTATE_PREDICTIVE_GATE_SCHEMA,
+    OBJECTSTATE_REALITY_EVIDENCE_KINDS,
+    OBJECTSTATE_REALITY_GATE_SCHEMA,
+    OBJECTSTATE_REALITY_ROW_SCHEMA,
+    OBJECTSTATE_REALITY_ROW_STATUSES,
+    OBJECTSTATE_REALITY_SOURCE_KINDS,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -133,6 +141,7 @@ from objgauss.core import (
     evaluate_objectstate_identity_gate,
     evaluate_objectstate_causal_gate,
     evaluate_objectstate_predictive_gate,
+    evaluate_objectstate_reality_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
     dynamic_k_proposal_report,
@@ -163,6 +172,7 @@ from objgauss.core import (
     make_trainable_kernel_mvp_fixture,
     match_object_states,
     object_state_delivery_summary,
+    objectstate_reality_blocked_rows_markdown,
     object_state_stability_report,
     object_id_targets_from_cloud,
     object_emergence_solver_checkpoint,
@@ -227,6 +237,7 @@ from objgauss.core import (
     validate_object_state_gaussian_decoder_state,
     validate_objectstate_checkpoint_eval,
     validate_objectstate_causal_gate_summary,
+    validate_objectstate_reality_gate_summary,
     validate_observation_model_config,
     validate_solver_decoder_joint_checkpoint,
     validate_solver_decoder_training_scale_plan,
@@ -582,6 +593,89 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     causal_summary = causal_report.as_dict()
     assert validate_objectstate_causal_gate_summary(causal_summary) is causal_summary
     assert causal_summary["schema"] == OBJECTSTATE_CAUSAL_GATE_SCHEMA
+
+    assert OBJECTSTATE_REALITY_GATE_SCHEMA == "objgauss-objectstate-reality-gate-v1"
+    assert OBJECTSTATE_REALITY_ROW_SCHEMA == "objgauss-objectstate-real-public-row-v1"
+    assert "identity" in OBJECTSTATE_REALITY_EVIDENCE_KINDS
+    assert "controlled_real" in OBJECTSTATE_REALITY_SOURCE_KINDS
+    assert "blocked" in OBJECTSTATE_REALITY_ROW_STATUSES
+    reality_rows = (
+        ObjectStateRealityRow(
+            row_id="namespace-identity",
+            sample_id="namespace-controlled-cup",
+            source_kind="controlled_real",
+            evidence_kind="identity",
+            status="pass",
+            object_category="cup",
+            scenario="cross_view_reappearance",
+            observation_modalities=("rgb", "gaussian"),
+            artifact_refs=("datasets/namespace-controlled-cup/identity.json",),
+            metrics={
+                "idf1": 1.0,
+                "fragmentation_rate": 0.0,
+                "swap_rate": 0.0,
+                "identity_collapse": False,
+            },
+            has_identity_gt=True,
+            has_pose_gt=True,
+            has_action_gt=False,
+            has_timestamp=True,
+        ),
+        ObjectStateRealityRow(
+            row_id="namespace-prediction",
+            sample_id="namespace-controlled-cup",
+            source_kind="controlled_real",
+            evidence_kind="prediction",
+            status="pass",
+            object_category="cup",
+            scenario="short_horizon_pose",
+            observation_modalities=("rgb", "gaussian"),
+            artifact_refs=("datasets/namespace-controlled-cup/pose.json",),
+            metrics={
+                "state_ade": 0.04,
+                "history_ade": 0.03,
+                "prediction_gap_vs_history_model": 0.01,
+            },
+            has_identity_gt=True,
+            has_pose_gt=True,
+            has_action_gt=False,
+            has_timestamp=True,
+        ),
+        ObjectStateRealityRow(
+            row_id="namespace-intervention",
+            sample_id="namespace-controlled-cup",
+            source_kind="controlled_real",
+            evidence_kind="intervention",
+            status="pass",
+            object_category="cup",
+            scenario="push_left",
+            observation_modalities=("rgb", "gaussian"),
+            artifact_refs=("datasets/namespace-controlled-cup/action.json",),
+            metrics={
+                "action_conditioned_ade": 0.02,
+                "counterfactual_outcome_accuracy": 1.0,
+                "wrong_direction_rate": 0.0,
+            },
+            has_identity_gt=True,
+            has_pose_gt=True,
+            has_action_gt=True,
+            has_timestamp=True,
+        ),
+    )
+    reality_report = evaluate_objectstate_reality_gate(
+        reality_rows,
+        synthetic_smoke_passed=True,
+    )
+    assert isinstance(reality_report, ObjectStateRealityGateReport)
+    assert isinstance(reality_report.thresholds, ObjectStateRealityGateThresholds)
+    assert isinstance(reality_report.rows[0], ObjectStateRealityRow)
+    reality_summary = reality_report.as_dict()
+    assert validate_objectstate_reality_gate_summary(reality_summary) is reality_summary
+    assert reality_summary["schema"] == OBJECTSTATE_REALITY_GATE_SCHEMA
+    assert reality_summary["status"] == "objectstate_reality_gate_pass"
+    assert objectstate_reality_blocked_rows_markdown(reality_report) == (
+        "No blocked ObjectState reality rows.\n"
+    )
 
 
 def test_core_namespace_exposes_property_append_helper():
