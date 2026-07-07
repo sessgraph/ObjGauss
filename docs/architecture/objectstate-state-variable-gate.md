@@ -608,6 +608,46 @@ Implemented v0.1 facts:
   controlled tabletop data, train dynamics, use replay / diffusion or mutate
   viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
+
+Add the import path for real controlled tabletop manifests.
+
+Required behavior:
+
+- Define a manifest schema for controlled real samples that records sample
+  metadata, artifact refs, GT availability and evidence rows.
+- Import rows into `OBJECTSTATE-REALITY-GATE-001` without creating or inferring
+  ground truth.
+- Allow identity rows with timestamped identity GT to become pass / fail rows.
+- Keep prediction / intervention rows blocked until 6DoF pose tracks, history
+  targets, action events and counterfactual outcomes exist.
+- Reject non-blocked rows when required GT or metrics are missing.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_real_rows`.
+- Manifest schema: `objgauss-objectstate-controlled-real-manifest-v1`.
+- Summary schema: `objgauss-objectstate-controlled-real-rows-v1`.
+- Manifest shape:
+  - `sample`: `sample_id`, `source_kind=controlled_real`,
+    `object_category`, `scenario`, `observation_modalities`, `artifact_refs`
+    and `license`.
+  - `ground_truth`: boolean availability for `identity`, `pose`, `action` and
+    `timestamp`.
+  - `evidence_rows`: `identity` / `prediction` / `intervention` rows with
+    `pass`, `fail` or `blocked` status.
+- `read_objectstate_controlled_real_manifest(...)` reads JSON.
+- `objectstate_reality_rows_from_controlled_real_manifest(...)` converts the
+  manifest to reality gate rows and validates them immediately.
+- `evaluate_controlled_real_manifest_reality_gate(...)` sends imported rows to
+  the existing reality gate.
+- `objectstate_controlled_real_rows_summary(...)` embeds rows, gate summary and
+  blocked rows markdown.
+- Current tests use a tiny local manifest fixture, not a captured dataset. This
+  PR does not collect video, write `outputs/` / `public/samples`, train
+  Gaussian or dynamics models, add replay / diffusion, or mutate viewer
+  defaults.
+
 ## 7. Non-Goals
 
 This spec does not authorize:

@@ -43,9 +43,10 @@ intervention 行具备对应 GT 与指标。`OBJECTSTATE-REALITY-PUBLIC-ROWS-001
 small public / local viewer artifacts 生成第一批 12 条 blocked rows，明确 `object_id`
 不是 physical identity GT，且当前 artifacts 缺 timestamped identity、6DoF pose、
 action events 和 counterfactual outcome。下一步优先导入或采集真正 controlled tabletop
-GT rows，让至少 identity row 从 blocked 进入可评估 pass / fail；继续不推进 diffusion、
-replay buffer 大系统或 viewer/export 默认模型。若继续 viewer 线，再拆全量 4.5M PLY
-LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
+GT rows，让至少 identity row 从 blocked 进入可评估 pass / fail；`OBJECTSTATE-CONTROLLED-REAL-ROWS-001`
+已补 controlled real manifest importer，后续 capture / annotation 可直接进入
+reality gate。继续不推进 diffusion、replay buffer 大系统或 viewer/export 默认模型。若继续
+viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 
 ## Suspended
 
@@ -113,6 +114,35 @@ LOD / streaming 或收敛 full `audit:world-viewer` 的旧等待条件。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REAL-ROWS-001: Add controlled real manifest importer
+
+- 状态: done / importer-ready-no-real-capture
+- 类型: 标准 PR / controlled real data contract + reality rows importer
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 定义真实 controlled tabletop GT 数据进入 `OBJECTSTATE-REALITY-GATE-001` 的
+  manifest 契约，让有 timestamped identity GT 的 identity row 可以从 blocked 进入可评估
+  pass / fail。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_real_rows`。
+  - 新增 `objgauss-objectstate-controlled-real-manifest-v1` manifest schema。
+  - 新增 `objgauss-objectstate-controlled-real-rows-v1` summary schema。
+  - `read_objectstate_controlled_real_manifest(...)` 读取 JSON manifest。
+  - `objectstate_reality_rows_from_controlled_real_manifest(...)` 将 manifest evidence rows
+    转成 `ObjectStateRealityRow` 并立即严格校验。
+  - `evaluate_controlled_real_manifest_reality_gate(...)` 把 rows 送进既有 reality gate。
+  - `objectstate_controlled_real_rows_summary(...)` 输出 rows、gate summary 和
+    `blocked_rows_markdown`。
+  - 测试 fixture 覆盖 identity pass + prediction / intervention blocked、identity fail、
+    缺 GT 拒绝和 JSON file read。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop 数据。
+  - Importer 不创建 GT，不写 `outputs/` / `public/samples`。
+  - 不训练 Gaussian / dynamics，不做 replay buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_rows.py tests/test_objectstate_reality_gate.py tests/test_core_namespace.py -q`: passed。
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_real_rows.py`: passed。
+- 完成 commit: `8225b57`。
 
 ### OBJECTSTATE-REALITY-PUBLIC-ROWS-001: Register public artifact reality rows
 

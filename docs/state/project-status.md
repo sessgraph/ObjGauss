@@ -188,6 +188,19 @@ assignment，不是 timestamped physical identity GT；现有 public artifacts �
 tracks、history-vs-state future targets、action events 和 counterfactual outcomes。因此
 这一步只把真实缺口显性化，不声明 ObjectState 已通过真实世界状态变量验证。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-ROWS-001`：新增
+`objgauss.core.objectstate_controlled_real_rows`，manifest schema 为
+`objgauss-objectstate-controlled-real-manifest-v1`，summary schema 为
+`objgauss-objectstate-controlled-real-rows-v1`。该 importer 定义真实 controlled tabletop
+样本进入 reality gate 的最小 JSON 契约：`sample` 记录 `sample_id`、`source_kind=controlled_real`、
+对象类别、场景、观察模态、artifact refs 和许可；`ground_truth` 记录 identity / pose /
+action / timestamp GT 是否存在；`evidence_rows` 记录 identity / prediction /
+intervention 的 `pass` / `fail` / `blocked` 行和指标。导入时不会创建 GT，非 blocked
+row 会立即走 `ObjectStateRealityRow` 严格校验；测试 fixture 证明有 timestamped identity
+GT 与 identity metrics 时，identity row 可以从 blocked 进入可评估 pass / fail，而
+prediction / intervention 可继续保持 blocked。当前仍没有提交真实采集数据；下一步是用
+实际 controlled tabletop capture / annotation 生成 manifest。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
