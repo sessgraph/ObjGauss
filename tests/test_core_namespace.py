@@ -61,8 +61,11 @@ from objgauss.core import (
     ObjectStateRealityRow,
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
+    OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
+    OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
+    ObjectStateControlledIdentityThresholds,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
     OBJECTSTATE_CAUSAL_ACTIONS,
@@ -186,6 +189,7 @@ from objgauss.core import (
     objectstate_reality_rows_from_public_artifacts,
     objectstate_controlled_capture_summary,
     objectstate_controlled_real_manifest_from_capture_manifest,
+    evaluate_objectstate_controlled_identity_predictions,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
     object_state_stability_report,
@@ -256,6 +260,9 @@ from objgauss.core import (
     validate_objectstate_reality_public_rows_summary,
     validate_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_summary,
+    validate_objectstate_controlled_identity_eval_summary,
+    validate_objectstate_controlled_identity_predictions,
+    validate_objectstate_controlled_identity_thresholds,
     validate_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
     validate_observation_model_config,
@@ -767,6 +774,53 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert capture_seed["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
     assert capture_seed["evidence_rows"][0]["status"] == "blocked"
+    assert OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA == (
+        "objgauss-objectstate-controlled-identity-predictions-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA == (
+        "objgauss-objectstate-controlled-identity-eval-v1"
+    )
+    identity_predictions = {
+        "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
+        "sample_id": "namespace-controlled-capture",
+        "candidate": {
+            "candidate_id": "namespace-identity-candidate",
+            "source": "namespace fixture",
+            "artifact_refs": ["outputs/controlled-real/namespace/objectstates.json"],
+        },
+        "predictions": [
+            {
+                "frame_id": "frame-000000",
+                "object_id": "cup-001",
+                "predicted_identity": "cup-track",
+            },
+            {
+                "frame_id": "frame-000001",
+                "object_id": "cup-001",
+                "predicted_identity": "cup-track",
+            },
+        ],
+    }
+    assert validate_objectstate_controlled_identity_predictions(identity_predictions)[
+        "schema"
+    ] == OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA
+    identity_thresholds = ObjectStateControlledIdentityThresholds()
+    assert validate_objectstate_controlled_identity_thresholds(identity_thresholds)[
+        "min_idf1"
+    ] == 0.95
+    identity_summary = evaluate_objectstate_controlled_identity_predictions(
+        capture_manifest,
+        identity_predictions,
+        thresholds=identity_thresholds,
+    )
+    assert validate_objectstate_controlled_identity_eval_summary(
+        identity_summary
+    ) is identity_summary
+    assert identity_summary["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA
+    assert identity_summary["status"] == "objectstate_controlled_identity_eval_pass"
+    assert identity_summary["controlled_real_manifest"]["evidence_rows"][0][
+        "status"
+    ] == "pass"
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"

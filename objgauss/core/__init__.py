@@ -154,6 +154,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA",
+    ),
+    "ObjectStateControlledIdentityThresholds": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "ObjectStateControlledIdentityThresholds",
+    ),
     "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA": (
         "objgauss.core.objectstate_controlled_real_rows",
         "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA",
@@ -665,6 +677,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture",
         "objectstate_controlled_real_manifest_from_capture_manifest",
     ),
+    "evaluate_objectstate_controlled_identity_predictions": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "evaluate_objectstate_controlled_identity_predictions",
+    ),
     "initialize_objectstate_identity_encoder_state": (
         "objgauss.core.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
@@ -721,6 +737,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture",
         "read_objectstate_controlled_capture_manifest",
     ),
+    "read_objectstate_controlled_identity_predictions": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "read_objectstate_controlled_identity_predictions",
+    ),
     "validate_objectstate_controlled_capture_manifest": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_manifest",
@@ -728,6 +748,18 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_summary": (
         "objgauss.core.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_summary",
+    ),
+    "validate_objectstate_controlled_identity_eval_summary": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "validate_objectstate_controlled_identity_eval_summary",
+    ),
+    "validate_objectstate_controlled_identity_predictions": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "validate_objectstate_controlled_identity_predictions",
+    ),
+    "validate_objectstate_controlled_identity_thresholds": (
+        "objgauss.core.objectstate_controlled_identity_eval",
+        "validate_objectstate_controlled_identity_thresholds",
     ),
     "validate_objectstate_controlled_real_manifest": (
         "objgauss.core.objectstate_controlled_real_rows",

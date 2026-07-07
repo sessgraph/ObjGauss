@@ -145,6 +145,11 @@ from objgauss.core.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_identity_eval import (
+    ObjectStateControlledIdentityThresholds,
+    evaluate_objectstate_controlled_identity_predictions,
+    read_objectstate_controlled_identity_predictions,
+)
 from objgauss.core.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
     read_objectstate_controlled_real_manifest,
@@ -3054,6 +3059,41 @@ def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
         raise ValueError("controlled capture manifest is not intervention-stage ready")
 
 
+def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
+    capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
+    predictions = read_objectstate_controlled_identity_predictions(args.predictions)
+    summary = evaluate_objectstate_controlled_identity_predictions(
+        capture,
+        predictions,
+        thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_swap_rate=args.max_swap_rate,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+    )
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"predictions={args.predictions}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"identity_eval_status={summary['status']}")
+    print(f"idf1={metrics['idf1']:.6f}")
+    print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
+    print(f"swap_rate={metrics['swap_rate']:.6f}")
+    print(f"identity_collapse={str(metrics['identity_collapse']).lower()}")
+    print(f"track_coverage={metrics['track_coverage']:.6f}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest"])
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if args.require_pass and summary["status"] != "objectstate_controlled_identity_eval_pass":
+        raise ValueError("controlled identity eval did not pass")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -3231,6 +3271,20 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
     validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
+    eval_controlled_identity = object_state_subparsers.add_parser(
+        "eval-controlled-identity",
+        help="score candidate identity tracks against a controlled capture manifest",
+    )
+    eval_controlled_identity.add_argument("capture_manifest", type=Path)
+    eval_controlled_identity.add_argument("predictions", type=Path)
+    eval_controlled_identity.add_argument("--summary-output", type=Path)
+    eval_controlled_identity.add_argument("--controlled-real-output", type=Path)
+    eval_controlled_identity.add_argument("--min-idf1", type=float, default=0.95)
+    eval_controlled_identity.add_argument("--max-fragmentation-rate", type=float, default=0.05)
+    eval_controlled_identity.add_argument("--max-swap-rate", type=float, default=0.0)
+    eval_controlled_identity.add_argument("--allow-identity-collapse", action="store_true")
+    eval_controlled_identity.add_argument("--require-pass", action="store_true")
+    eval_controlled_identity.set_defaults(handler=_object_state_eval_controlled_identity)
 
     object_field = subparsers.add_parser(
         "object-field",
