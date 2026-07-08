@@ -849,6 +849,29 @@ reviewability 和 metric pass 继续分离；depth 缺失时只返回 incomplete
 pose GT 生成 RGB-D geometry、不使用 BOP pose GT 或 object ids 放置预测 ObjectState、不运行
 Splatfacto / 3DGS optimization、不训练模型、不声明 metric pass、intervention /
 counterfactual gate 或 world model，也不改 viewer/export 默认策略。
+随后生成第一条真实 public BOP LMO RGB-D baseline evidence row：
+`OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001`。官方来源为 Hugging Face
+`bop-benchmark/lmo`，license 为 `cc-by-sa-4.0`；本地 ignored zip 为
+`outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`，大小 `117550985` bytes，
+SHA256 为
+`42d7a15f317476ca3980ee7ec0344b691cbadc796835f0b14f72c89a1dcec421`。
+抽取 `test/000002` 的 `000003` / `000008` / `000017` 三帧后，运行
+`bop-rgbd-baseline-local-row-handoff` 产出本地 ignored evidence package：
+`outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/`。结果为
+`selected_frames=3`、`exported_frames=3`、`rgbd_total_vertices=30000`、
+`baseline_total_gaussians=30000`、`prediction_candidates=16`。prediction evidence
+package 已达到 `objectstate_controlled_prediction_evidence_package_reviewable`，
+Phase 1 ledger maturity 为 `prediction_reviewable`，但 metric gate 明确 fail：
+`state_ade=0.292669`、`history_ade=0.195073`、gap `0.097596`、
+error ratio `1.500305`。identity eval 也 fail，并暴露
+`identity_collapse=true`、`track_retrieval_recall_at_1=0.125`、缺
+reconstruction-noise evidence；identity package 仍因缺 explicit lighting /
+camera-pose condition metadata 而 incomplete。该行是实际 public data negative
+evidence，不是 pass row，不声明 intervention / world model。
+同时修复 `OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001`：当
+`bop-prediction-baseline-handoff` 使用相对 `output_root` 时，prediction evidence package
+此前会把 `candidate_dir` 拼成双重路径，真实 LMO run 中表现为 package audit 报
+required files missing；现在 handoff 传入相对 `reality-candidates`，并补相对路径回归测试。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

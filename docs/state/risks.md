@@ -94,3 +94,17 @@ package；该缓解减少真实 BOP subset 从 RGB-D 到 reviewable negative evi
 但仍不下载数据、不创建 GT、不使用 pose GT 生成 candidate prediction、不运行 Splatfacto /
 optimized 3DGS reconstruction、不训练模型、不声明 metric pass、intervention gate 或
 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001`
+使用官方 BOP LMO public RGB-D scene 生成第一条真实 public baseline evidence row。本地
+ignored zip 为 `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`，大小 `117550985`
+bytes，SHA256 为
+`42d7a15f317476ca3980ee7ec0344b691cbadc796835f0b14f72c89a1dcec421`；抽取
+`test/000002` 的 `000003` / `000008` / `000017` 三帧后，prediction evidence
+package 已达到 reviewable，Phase 1 ledger maturity 为 `prediction_reviewable`。该 row
+同时给出明确负证据：prediction metric fail，identity eval fail 且
+`identity_collapse=true`，identity package 因缺 explicit lighting / camera-pose
+condition metadata 仍 incomplete。此次还修复相对 `output_root` 下 prediction package
+audit 双重拼接 `candidate_dir` 的问题。该缓解只证明 public RGB-D route 可以生成可复验
+prediction row 和 identity negative result，不训练模型、不提交数据集或 evidence outputs、
+不声明 metric pass、intervention gate 或 world-model evidence。

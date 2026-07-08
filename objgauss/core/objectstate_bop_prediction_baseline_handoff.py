@@ -155,7 +155,7 @@ def objectstate_bop_prediction_baseline_handoff(
 
     evidence_package = objectstate_controlled_prediction_evidence_package(
         out,
-        candidate_dir=candidate_dir,
+        candidate_dir="reality-candidates",
     )
     evidence_package_path = candidate_dir / "prediction-evidence-package-summary.json"
     _write_json(evidence_package_path, evidence_package)

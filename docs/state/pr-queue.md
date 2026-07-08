@@ -200,6 +200,13 @@ seed 接到 baseline local row：`bop-rgbd-baseline-local-row-handoff` 可从本
 `depth/<frame>.png` 先写 per-frame `gaussians/<frame>.ply`，再生成 single-state
 baseline `objectstates.json` 并跑 identity / prediction local-row package；depth 缺失时
 只返回 incomplete，不创建伪 evidence，不训练模型、不声明 pass/intervention/world-model。
+`OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001` 已在官方 BOP LMO public RGB-D scene 上跑出第一条
+真实 public baseline row：prediction package reviewable 但 metric fail，identity eval 暴露
+identity collapse 且 identity package 因缺 lighting/camera pose condition metadata 仍 incomplete。
+该结果是 negative evidence，不是 pass row。
+`OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001` 修复相对 `output_root` 下
+prediction package audit 把 `candidate_dir` 双重拼接的问题；真实 LMO run 已验证该修复让
+prediction evidence package 从 missing-files 进入 reviewable。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -321,6 +328,94 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001: Run first public LMO RGB-D baseline row
+
+- 状态: done / public-negative-evidence-row
+- 类型: 标准 PR / ObjectState public pose dataset evidence row
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 用真实 public BOP RGB-D + 6D pose data 生成第一条可复验 Phase 1
+  baseline evidence row，并明确区分 prediction reviewability、identity blocker 和 metric fail。
+- 数据来源:
+  - Dataset: Hugging Face `bop-benchmark/lmo`
+  - URL: `https://huggingface.co/datasets/bop-benchmark/lmo`
+  - License: `cc-by-sa-4.0`
+  - Downloaded zip:
+    `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`
+  - Size: `117550985` bytes
+  - SHA256:
+    `42d7a15f317476ca3980ee7ec0344b691cbadc796835f0b14f72c89a1dcec421`
+  - Extracted scene:
+    `outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002`
+  - Selected frames: `000003`, `000008`, `000017`
+- Evidence output:
+  - `outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/`
+  - `bop-rgbd-baseline-local-row-summary.json`
+  - `phase1-evidence-ledger.json`
+  - `reality-candidates/prediction-evidence-package-summary.json`
+  - `identity-handoff/identity-evidence-package-summary.json`
+- Command:
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 --output-root outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline --sample-id bop-lmo-test-scene-000002-rgbd-baseline --dataset-id bop-lmo --object-category lmo_objects --max-frames 3 --max-points-per-frame 10000 --overwrite-gaussian-evidence --ply-format binary_little_endian --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --force`
+- 结果:
+  - `selected_frames=3`
+  - `exported_frames=3`
+  - `missing_depth_files=0`
+  - `rgbd_total_vertices=30000`
+  - `baseline_total_gaussians=30000`
+  - `identity_predictions=24`
+  - `prediction_candidates=16`
+  - Prediction evidence package:
+    `objectstate_controlled_prediction_evidence_package_reviewable`
+  - Phase 1 ledger maturity: `prediction_reviewable`
+  - Summary status:
+    `objectstate_bop_rgbd_baseline_local_row_handoff_incomplete`
+- Negative evidence:
+  - Prediction eval status:
+    `objectstate_controlled_prediction_eval_fail`
+  - `state_ade=0.29266938346336563`
+  - `history_ade=0.19507330249123483`
+  - `prediction_gap_vs_history_model=0.0975960809721308`
+  - `error_ratio_vs_history_model=1.500304653305985`
+  - Identity eval status:
+    `objectstate_controlled_identity_eval_fail`
+  - `identity_collapse=true`
+  - `track_retrieval_recall_at_1=0.125`
+  - `reconstruction_noise_evidence_present=false`
+- 边界:
+  - 不提交 public dataset zip、RGB-D frames、PLY evidence seed、candidate artifact
+    或 handoff outputs。
+  - 不创建 GT，不使用 BOP pose GT 或 object ids 放置 predicted ObjectState。
+  - 不训练 Gaussian / tracking / prediction / dynamics model。
+  - 不声明 metric pass、identity pass、intervention gate 或 world-model evidence。
+  - Identity package 仍因缺 explicit lighting / camera-pose condition metadata 而
+    incomplete；不要把该 row 记成 identity-reviewable。
+- 验证:
+  - `wget -O outputs/assets/raw/bop-lmo/lmo_test_bop19.zip https://huggingface.co/datasets/bop-benchmark/lmo/resolve/main/lmo_test_bop19.zip`: passed。
+  - `sha256sum outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`: `42d7a15f317476ca3980ee7ec0344b691cbadc796835f0b14f72c89a1dcec421`。
+  - `7z x ... test/000002/...`: extracted scene metadata and selected RGB-D frames.
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff ...`: passed with incomplete summary and prediction-reviewable ledger.
+  - `git check-ignore -v outputs/assets/raw/bop-lmo/lmo_test_bop19.zip outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json`: passed; outputs ignored.
+- 完成 commit: pending。
+
+### OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001: Fix relative output package audit
+
+- 状态: done / relative-path-audit-fix
+- 类型: 标准 PR / ObjectState public pose dataset evidence package bugfix
+- 目标: 修复 `bop-prediction-baseline-handoff` 在相对 `output_root` 下把
+  `candidate_dir` 双重拼接，导致 prediction evidence package 误报 required files missing。
+- 已实施:
+  - `objectstate_bop_prediction_baseline_handoff(...)` 调用
+    `objectstate_controlled_prediction_evidence_package(...)` 时传入相对
+    `reality-candidates`。
+  - 新增相对路径回归测试，验证 package path 不含
+    `prediction-package/prediction-package`。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_prediction_baseline_handoff.py -q`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_handoff.py tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py -q`: passed，8 tests。
+  - 真实 LMO rerun 证明 prediction evidence package 从 missing-files 进入
+    `objectstate_controlled_prediction_evidence_package_reviewable`。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001: Run BOP RGB-D baseline local rows
 

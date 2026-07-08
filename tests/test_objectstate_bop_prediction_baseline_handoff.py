@@ -117,6 +117,36 @@ def test_bop_prediction_baseline_handoff_blocks_without_gaussian_files(tmp_path)
     )
 
 
+def test_bop_prediction_baseline_handoff_relative_output_root_package_paths(
+    tmp_path,
+    monkeypatch,
+):
+    scene_root = tmp_path / "bop-scene"
+    _write_bop_scene(scene_root)
+    _write_gaussian_frames(scene_root)
+    monkeypatch.chdir(tmp_path)
+
+    summary = objectstate_bop_prediction_baseline_handoff(
+        "bop-scene",
+        output_root="prediction-package",
+        sample_id="bop-ycbv-scene-000001",
+        candidate_id="fixture-bop-baseline",
+        candidate_source="unit-test BOP baseline",
+        artifact_ref="prediction-package/objectstates.json",
+    )
+
+    package = summary["prediction_evidence_package"]
+    assert summary["status"] == "objectstate_bop_prediction_baseline_handoff_reviewable"
+    assert package["status"] == (
+        "objectstate_controlled_prediction_evidence_package_reviewable"
+    )
+    assert package["candidate_dir"] == "prediction-package/reality-candidates"
+    assert all(
+        "prediction-package/prediction-package" not in record["path"]
+        for record in package["files"]
+    )
+
+
 def test_object_state_bop_prediction_baseline_handoff_cli(
     tmp_path,
     capsys,
