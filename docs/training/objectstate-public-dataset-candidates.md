@@ -133,6 +133,22 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 or `.splat` files for every selected frame.
 
 Once the local scene has RGB, pose and per-frame Gaussian evidence, the
+read-only route audit should report `handoff_ready`:
+
+```bash
+uv run objgauss object-state audit-bop-phase1-route \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output-root outputs/captures/bop-ycbv-scene-000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-phase1-route-summary.json
+```
+
+The audit does not write handoff outputs or run prediction eval. It only reports
+whether the scene is blocked, ready for `bop-prediction-baseline-handoff`, or
+already prediction-reviewable from existing evidence files.
+
+Once the local scene has RGB, pose and per-frame Gaussian evidence, the
 prediction-only baseline handoff can run the full reviewable package in one
 command:
 
@@ -214,6 +230,19 @@ uv run objgauss object-state audit-phase1-evidence-ledger \
   --prediction-summary outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-evidence-package-summary.json \
   --summary-output outputs/captures/bop-ycbv-scene-000001/phase1-evidence-ledger.json \
   --require-reviewable
+```
+
+After handoff, rerun the route audit with `--require-prediction-reviewable` to
+confirm the BOP route now exposes reviewable prediction evidence:
+
+```bash
+uv run objgauss object-state audit-bop-phase1-route \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output-root outputs/captures/bop-ycbv-scene-000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-phase1-route-summary.json \
+  --require-prediction-reviewable
 ```
 
 This still does not prove the causal / counterfactual gate. It only moves the

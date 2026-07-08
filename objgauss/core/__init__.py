@@ -278,6 +278,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -374,6 +378,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "objectstate_bop_prediction_baseline_handoff",
     ),
+    "objectstate_bop_phase1_route_audit": (
+        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "objectstate_bop_phase1_route_audit",
+    ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
@@ -433,6 +441,10 @@ _EXPORTS = {
     "validate_objectstate_bop_prediction_baseline_handoff_summary": (
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "validate_objectstate_bop_prediction_baseline_handoff_summary",
+    ),
+    "validate_objectstate_bop_phase1_route_audit_summary": (
+        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "validate_objectstate_bop_phase1_route_audit_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

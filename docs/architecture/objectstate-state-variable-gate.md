@@ -743,6 +743,38 @@ BOP data, create GT, reconstruct Gaussians, train Gaussian / dynamics models,
 claim a learned prediction model, prove intervention / counterfactual evidence,
 use replay / diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
+
+Add a read-only route audit for local BOP Phase 1 prediction evidence.
+
+Required behavior:
+
+- Input a local BOP scene root and output root.
+- Run BOP acceptance in memory with per-frame Gaussian files required.
+- Inspect existing `reality-candidates/prediction-evidence-package-summary.json`.
+- Inspect existing `phase1-evidence-ledger.json`.
+- Report whether the route is blocked, ready to run
+  `bop-prediction-baseline-handoff`, or already prediction-reviewable.
+- Emit next actions without running handoff, prediction eval, training,
+  downloads or Gaussian reconstruction.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_phase1_route_audit`.
+- Summary schema: `objgauss-objectstate-bop-phase1-route-audit-v1`.
+- Core function: `objectstate_bop_phase1_route_audit(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-phase1-route <scene-root> --output-root <dir>`.
+- Status values:
+  - `objectstate_bop_phase1_route_audit_blocked`;
+  - `objectstate_bop_phase1_route_audit_handoff_ready`;
+  - `objectstate_bop_phase1_route_audit_prediction_reviewable`.
+
+Current scope is read-only route accounting. It does not download BOP data,
+create GT, reconstruct Gaussians, run prediction handoff, run prediction eval,
+train models, claim identity / intervention gates, claim world model, use replay
+/ diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /
