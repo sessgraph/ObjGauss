@@ -81,9 +81,12 @@ CSV headers、`rgb/` / `gaussians/` 目录和后续验收命令；
 上输出 layout / metadata / CSV / row / file / scenario / candidate 缺口和
 next actions。`OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001` 已新增正式
 controlled real capture runbook，并让 bundle README 指向 readiness-first
-采集 / 验收命令链。下一步仍是实际采集 / 标注 controlled tabletop RGB / Gaussian /
-pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
-让 identity row 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
+采集 / 验收命令链。`OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001` 已新增
+Real Predictive Gate 的 controlled evaluator，可把真实 pose GT 和 candidate
+future-pose predictions 比成 `state_ade` / `history_ade` / gap，并让 prediction
+row 进入 pass / fail。下一步仍是实际采集 / 标注 controlled tabletop RGB /
+Gaussian / pose / action 文件，并用真实 candidate artifact 跑 identity / prediction
+handoff，让 rows 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
@@ -154,6 +157,52 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001: Evaluate controlled real prediction rows
+
+- 状态: done / evaluator-only-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop predictive sufficiency evaluator
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给 Phase 1 Real Predictive Gate 增加第一条可复跑 evaluator，让带
+  timestamped 6DoF pose GT 的 controlled capture 可以比较
+  `ObjectState(t) -> ObjectState(t+n)` 的 candidate future pose prediction
+  和显式 history baseline，并把 prediction row 写入 reality gate。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_prediction_eval`。
+  - 新增 prediction candidate schema
+    `objgauss-objectstate-controlled-prediction-candidates-v1`。
+  - 新增 eval summary schema
+    `objgauss-objectstate-controlled-prediction-eval-v1`。
+  - Evaluator 要求候选预测显式绑定
+    `(source_frame_id, target_frame_id, object_id)`，并提供
+    `predicted_position` 与 `history_baseline_position`；缺 sample / frame /
+    object / pose GT、重复预测 tuple 或 target 不在 source 之后都会 fail-fast。
+  - 输出 `state_ade`、`history_ade`、
+    `prediction_gap_vs_history_model`、`error_ratio_vs_history_model`、
+    prediction count 和 horizon seconds。
+  - 生成的 controlled-real manifest 会把 prediction row 从 blocked 改成
+    pass / fail；identity 和 intervention rows 继续保持 blocked，除非独立 evaluator
+    已经产生对应指标。
+  - CLI 新增 `objgauss object-state eval-controlled-prediction
+    <capture.json> <predictions.json>`。
+  - CLI 可写 `--summary-output` 和 `--controlled-real-output`，支持
+    `--max-state-ade`、`--max-prediction-gap-vs-history-model`、
+    `--max-error-ratio-vs-history-model`、`--min-prediction-count` 和
+    `--require-pass`。
+  - Core lazy namespace 暴露 prediction schema、thresholds、evaluator 和 validators。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 candidate predictions，不运行 prediction / dynamics model，
+    不训练 Gaussian / dynamics，不计算 identity / intervention metrics。
+  - 不声明 ObjectState 已通过真实世界预测充分性验证，不推进 replay buffer /
+    diffusion，不写 `public/samples`，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_prediction_eval.py -q`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_prediction_eval.py tests/test_objectstate_controlled_identity_eval.py tests/test_objectstate_controlled_real_rows.py tests/test_objectstate_controlled_capture.py tests/test_core_namespace.py -q`: passed, 39 tests。
+  - `uv run --extra dev pytest`: passed, 362 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `354920a`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001: Register controlled real capture runbook
 

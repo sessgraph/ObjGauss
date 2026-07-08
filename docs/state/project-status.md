@@ -437,6 +437,19 @@ candidate artifact `identity_evidence` 要求、readiness / acceptance /
 不改 viewer/export 默认；它只把真实采集执行口径从聊天和模板提示收敛到仓库事实源。
 完成 commit: `ecae41d`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001`：新增
+`objgauss.core.objectstate_controlled_prediction_eval`，schema 为
+`objgauss-objectstate-controlled-prediction-candidates-v1` 和
+`objgauss-objectstate-controlled-prediction-eval-v1`，并新增 CLI
+`objgauss object-state eval-controlled-prediction <capture.json> <predictions.json>`。
+该 evaluator 要求 controlled capture manifest 已具备 timestamped 6DoF pose GT，
+候选预测显式提供 `(source_frame_id, target_frame_id, object_id)`、`predicted_position`
+和 `history_baseline_position`；它计算 `state_ade`、`history_ade`、
+`prediction_gap_vs_history_model`、error ratio 和 horizon 统计，并把 controlled-real
+manifest 的 prediction row 从 blocked 推进为 pass / fail。该切片仍不采集视频、
+不创建 GT、不运行预测 / dynamics 模型、不训练 Gaussian 或 dynamics、不计算 identity /
+intervention 指标、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `354920a`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
