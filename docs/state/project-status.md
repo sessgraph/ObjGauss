@@ -1072,6 +1072,17 @@ metric pass、learned model 或 world model。
 和 action vector，no-action baseline 使用 source pose；测试覆盖修改 target pose 不改变导出预测。
 它不运行 intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
 metric pass、learned model、counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-TRANSITION-REALITY-HANDOFF-001`：新增
+`objgauss.core.objectstate_transition_reality_handoff`，schema 为
+`objgauss-objectstate-transition-reality-handoff-v1`，CLI 为
+`objgauss object-state transition-reality-handoff <capture-manifest.json> <objectstate-transitions.json>`。
+该 handoff 对 Object Transition Dataset 先跑 readiness audit，再导出 action-delta /
+constant-velocity 等 baseline prediction candidates 和 action-delta / hold-action
+intervention candidates，随后复用既有 controlled prediction / intervention evaluator，
+写出 prediction / intervention eval summaries、controlled-real manifest、partial
+controlled-real summary 和 blocked rows。它会把 identity row 保持为 blocked seed，只要求
+prediction / intervention rows 进入 pass / fail accounting；不训练 dynamics、不创建 replay
+buffer、不声明 learned model、identity proof、counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

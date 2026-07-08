@@ -209,6 +209,9 @@ from objgauss.core.objectstate_transition_prediction_candidates import (
 from objgauss.core.objectstate_transition_intervention_candidates import (
     write_objectstate_transition_intervention_candidates,
 )
+from objgauss.core.objectstate_transition_reality_handoff import (
+    write_objectstate_transition_reality_handoff,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -4927,6 +4930,105 @@ def _object_state_export_transition_intervention_candidates(
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
+
+
+def _object_state_transition_reality_handoff(args: argparse.Namespace) -> None:
+    summary = write_objectstate_transition_reality_handoff(
+        args.capture_manifest,
+        args.transition_dataset,
+        args.output_dir,
+        prediction_policy=args.prediction_policy,
+        intervention_policy=args.intervention_policy,
+        prediction_candidate_id=args.prediction_candidate_id,
+        intervention_candidate_id=args.intervention_candidate_id,
+        prediction_candidate_source=args.prediction_candidate_source,
+        intervention_candidate_source=args.intervention_candidate_source,
+        prediction_artifact_ref=args.prediction_artifact_ref,
+        intervention_artifact_ref=args.intervention_artifact_ref,
+        confidence=args.confidence,
+        min_object_episodes=args.min_object_episodes,
+        min_transitions=args.min_transitions,
+        min_action_conditioned_transitions=args.min_action_conditioned_transitions,
+        min_horizon_seconds=args.min_horizon_seconds,
+        require_gaussian_refs=args.require_gaussian_refs,
+        prediction_thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+        intervention_thresholds=ObjectStateControlledInterventionThresholds(
+            max_action_conditioned_ade=args.max_action_conditioned_ade,
+            min_counterfactual_outcome_accuracy=(
+                args.min_counterfactual_outcome_accuracy
+            ),
+            max_wrong_direction_rate=args.max_wrong_direction_rate,
+            min_intervention_gain=args.min_intervention_gain,
+            min_intervention_count=args.min_intervention_count,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        force=args.force,
+    )
+    prediction_metrics = summary["prediction_eval"]["metrics"]
+    intervention_metrics = summary["intervention_eval"]["metrics"]
+    gate = summary["controlled_real_summary"]["gate"]
+    files = summary["files"]
+    print(f"schema={summary['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"transition_dataset={args.transition_dataset}")
+    print(f"output_dir={args.output_dir}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"transition_reality_handoff_status={summary['status']}")
+    print(f"transition_audit_status={summary['transition_audit']['status']}")
+    print(f"prediction_policy={summary['prediction_candidate_summary']['policy']['name']}")
+    print(
+        "intervention_policy="
+        f"{summary['intervention_candidate_summary']['policy']['name']}"
+    )
+    print(f"prediction_eval_status={summary['prediction_eval']['status']}")
+    print(f"intervention_eval_status={summary['intervention_eval']['status']}")
+    print(f"partial_reality_gate_status={gate['status']}")
+    print(f"state_ade={prediction_metrics['state_ade']:.6f}")
+    print(f"history_ade={prediction_metrics['history_ade']:.6f}")
+    print(
+        "prediction_gap_vs_history_model="
+        f"{prediction_metrics['prediction_gap_vs_history_model']:.6f}"
+    )
+    print(
+        "action_conditioned_ade="
+        f"{intervention_metrics['action_conditioned_ade']:.6f}"
+    )
+    print(
+        "counterfactual_outcome_accuracy="
+        f"{intervention_metrics['counterfactual_outcome_accuracy']:.6f}"
+    )
+    print(f"wrong_direction_rate={intervention_metrics['wrong_direction_rate']:.6f}")
+    print(f"pass_rows={summary['controlled_real_summary']['pass_row_count']}")
+    print(f"fail_rows={summary['controlled_real_summary']['fail_row_count']}")
+    print(f"blocked_rows={summary['controlled_real_summary']['blocked_row_count']}")
+    for key in (
+        "transition_audit",
+        "prediction_candidates",
+        "prediction_candidate_summary",
+        "prediction_eval",
+        "prediction_controlled_real",
+        "intervention_candidates",
+        "intervention_candidate_summary",
+        "intervention_eval",
+        "intervention_controlled_real",
+        "controlled_real",
+        "controlled_real_summary",
+        "blocked_rows",
+        "handoff_summary",
+    ):
+        print(f"{key}={files[key]}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_transition_reality_handoff_pass"
+    ):
+        raise ValueError("transition reality handoff did not pass")
 
 
 def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> None:
@@ -10507,6 +10609,135 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     export_transition_intervention_candidates.set_defaults(
         handler=_object_state_export_transition_intervention_candidates
+    )
+    transition_reality_handoff = object_state_subparsers.add_parser(
+        "transition-reality-handoff",
+        help=(
+            "run an ObjectState transition dataset through baseline prediction "
+            "and intervention candidate export plus controlled real eval"
+        ),
+    )
+    transition_reality_handoff.add_argument("capture_manifest", type=Path)
+    transition_reality_handoff.add_argument("transition_dataset", type=Path)
+    transition_reality_handoff.add_argument("--output-dir", required=True, type=Path)
+    transition_reality_handoff.add_argument(
+        "--prediction-policy",
+        choices=("hold", "constant_velocity", "action_delta"),
+        default="action_delta",
+    )
+    transition_reality_handoff.add_argument(
+        "--intervention-policy",
+        choices=("action_delta", "hold_action"),
+        default="action_delta",
+    )
+    transition_reality_handoff.add_argument(
+        "--prediction-candidate-id",
+        default="transition-prediction-baseline-action-delta",
+    )
+    transition_reality_handoff.add_argument(
+        "--intervention-candidate-id",
+        default="transition-intervention-baseline-action-delta",
+    )
+    transition_reality_handoff.add_argument("--prediction-candidate-source")
+    transition_reality_handoff.add_argument("--intervention-candidate-source")
+    transition_reality_handoff.add_argument(
+        "--prediction-artifact-ref",
+        help=(
+            "artifact ref stored in prediction candidates; defaults to the "
+            "generated prediction-candidates.json path"
+        ),
+    )
+    transition_reality_handoff.add_argument(
+        "--intervention-artifact-ref",
+        help=(
+            "artifact ref stored in intervention candidates; defaults to the "
+            "generated intervention-candidates.json path"
+        ),
+    )
+    transition_reality_handoff.add_argument(
+        "--confidence",
+        type=float,
+        default=0.5,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-object-episodes",
+        type=int,
+        default=1,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-transitions",
+        type=int,
+        default=1,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-action-conditioned-transitions",
+        type=int,
+        default=1,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-horizon-seconds",
+        type=float,
+        default=0.0,
+    )
+    transition_reality_handoff.add_argument(
+        "--require-gaussian-refs",
+        action="store_true",
+        help="require real per-frame Gaussian refs declared in the source capture",
+    )
+    transition_reality_handoff.add_argument("--max-state-ade", type=float, default=0.05)
+    transition_reality_handoff.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    transition_reality_handoff.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    transition_reality_handoff.add_argument(
+        "--max-action-conditioned-ade",
+        type=float,
+        default=0.05,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-counterfactual-outcome-accuracy",
+        type=float,
+        default=0.95,
+    )
+    transition_reality_handoff.add_argument(
+        "--max-wrong-direction-rate",
+        type=float,
+        default=0.0,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-intervention-gain",
+        type=float,
+        default=0.0,
+    )
+    transition_reality_handoff.add_argument(
+        "--min-intervention-count",
+        type=int,
+        default=1,
+    )
+    transition_reality_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    transition_reality_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite generated handoff files if they already exist",
+    )
+    transition_reality_handoff.add_argument("--require-pass", action="store_true")
+    transition_reality_handoff.set_defaults(
+        handler=_object_state_transition_reality_handoff
     )
     audit_controlled_capture_files = object_state_subparsers.add_parser(
         "audit-controlled-capture-files",

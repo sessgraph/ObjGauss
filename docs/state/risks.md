@@ -259,3 +259,14 @@ JSON，支持 action-delta / hold-action baseline，并用测试固定“不读�
 dynamics、不创建 replay buffer、不生成 reality rows、不声明 metric pass、learned model、
 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 transition-backed
 intervention rows 进入 pass/fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-REALITY-HANDOFF-001`
+新增 `transition-reality-handoff`，可从同一个 controlled capture manifest 和 Object
+Transition Dataset 生成 baseline prediction / intervention candidates，立即运行既有
+controlled prediction / intervention evaluator，并写出 partial controlled-real manifest、
+controlled-real summary 和 blocked rows。该缓解把 transition-backed prediction /
+intervention rows 接入 pass/fail accounting，并显式保持 identity row 为 blocked seed；
+但它仍只评估 baseline candidates，不训练 dynamics、不创建 replay buffer、不声明 learned
+model、identity proof、counterfactual proof 或 world-model evidence。风险继续 open，直到
+真实 controlled/public capture 产生可审计 identity + prediction + intervention rows，且 full
+Phase 1 gate 不再依赖 fixture evidence。

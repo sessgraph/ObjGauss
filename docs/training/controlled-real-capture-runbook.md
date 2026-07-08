@@ -1,7 +1,7 @@
 # Controlled Real Capture Runbook
 
 > Status: current
-> Last updated: 2026-07-08
+> Last updated: 2026-07-09
 
 This runbook describes the first ObjGauss Phase 1 controlled real capture
 session. It exists to move `ObjectState` validation from synthetic fixtures to
@@ -263,6 +263,47 @@ baseline holds the source pose. The exporter skips action contexts whose action
 interval does not fit within the transition timestamps. It does not read target
 pose values to generate action-conditioned predictions, does not run an eval,
 does not train dynamics, and does not claim intervention pass.
+
+To run the transition-backed prediction and intervention accounting in one
+step, use:
+
+```bash
+uv run objgauss object-state transition-reality-handoff \
+  outputs/captures/controlled-tabletop-cup-box-001/capture-manifest.json \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --output-dir outputs/captures/controlled-tabletop-cup-box-001/transition-reality-handoff \
+  --prediction-policy action_delta \
+  --intervention-policy action_delta \
+  --require-gaussian-refs \
+  --require-pass
+```
+
+This writes:
+
+```text
+transition-reality-handoff/transition-dataset-audit.json
+transition-reality-handoff/prediction-candidates.json
+transition-reality-handoff/transition-prediction-summary.json
+transition-reality-handoff/prediction-eval-summary.json
+transition-reality-handoff/prediction-controlled-real.json
+transition-reality-handoff/intervention-candidates.json
+transition-reality-handoff/transition-intervention-summary.json
+transition-reality-handoff/intervention-eval-summary.json
+transition-reality-handoff/intervention-controlled-real.json
+transition-reality-handoff/controlled-real.json
+transition-reality-handoff/controlled-real-summary.json
+transition-reality-handoff/blocked-rows.md
+transition-reality-handoff/transition-reality-handoff-summary.json
+```
+
+The handoff merges only prediction and intervention rows into a partial
+controlled-real manifest. The identity row intentionally remains a blocked seed
+row because identity persistence is evaluated by `controlled-identity-handoff`
+or `controlled-reality-bundle-handoff`. A passing
+`transition-reality-handoff` means the baseline transition candidates passed
+the prediction and intervention evaluators under the selected thresholds; it is
+not a learned dynamics model, identity proof, counterfactual proof, replay
+buffer, or world-model claim.
 
 ## 7. Candidate Artifact
 

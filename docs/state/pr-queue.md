@@ -347,6 +347,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-REALITY-HANDOFF-001: Run transition-backed reality handoff
+
+- 状态: done / objectstate-transition-reality-handoff
+- 类型: 标准 PR / ObjectState Phase 1 prediction + intervention accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 Object Transition Dataset 接到 baseline candidate export、controlled
+  prediction / intervention eval 和 partial controlled-real accounting，形成
+  `ObjectState_t + Action_t -> ObjectState_t+1` 的可审计 pass / fail handoff。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_transition_reality_handoff`。
+  - 新增 schema `objgauss-objectstate-transition-reality-handoff-v1`。
+  - 新增 CLI `objgauss object-state transition-reality-handoff
+    <capture-manifest.json> <objectstate-transitions.json> --output-dir <dir>`。
+  - Handoff 会写出 transition dataset audit、prediction candidates、intervention
+    candidates、prediction / intervention eval summary、controlled-real manifest、
+    controlled-real summary、blocked rows Markdown 和 handoff summary。
+  - 默认使用 `action_delta` baseline；prediction policy 可切换为 `hold` /
+    `constant_velocity` / `action_delta`，intervention policy 可切换为
+    `action_delta` / `hold_action`。
+  - Validator 显式要求 identity row 仍为 blocked seed，partial reality gate 只要求
+    prediction / intervention pass，不把本命令伪装成 identity 或 full Phase 1 gate。
+  - 测试覆盖 pass handoff、failed intervention candidate accounting、CLI 输出文件和
+    `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集数据、不下载 public dataset、不创建 GT、不推断 physical identity。
+  - 不重建 Gaussian、不运行 tracking model、不训练 dynamics。
+  - 不创建 replay buffer、不声明 learned model、identity proof、counterfactual proof 或
+    world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_reality_handoff.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_transition_reality_handoff.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_dataset.py tests/test_objectstate_transition_prediction_candidates.py tests/test_objectstate_transition_intervention_candidates.py tests/test_objectstate_transition_reality_handoff.py tests/test_core_namespace.py -q`: 25 passed。
+  - `uv run --extra dev pytest`: 543 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-TRANSITION-INTERVENTION-CANDIDATES-001: Export intervention candidates from transition dataset
 
 - 状态: done / objectstate-transition-intervention-candidates
