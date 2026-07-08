@@ -816,6 +816,19 @@ identity route 可审计的 `objgauss-trainable-kernel-model-artifact-v1`
 `objectstates.json`。输出 artifact policy 标记为 candidate packaging / not a training
 run；可选写入真实模型提供的 reconstruction-noise evidence，但不伪造默认值。该步骤不训练
 模型、不运行 identity handoff / eval、不创建 Phase 1 pass row，也不改 viewer/export 默认策略。
+随后完成 `OBJECTSTATE-BOP-IDENTITY-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_identity_handoff`，schema 为
+`objgauss-objectstate-bop-identity-handoff-v1`，CLI 为
+`objgauss object-state bop-identity-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`。
+该命令把 BOP acceptance、finalized trainable ObjectState artifact、controlled identity
+handoff / eval、identity evidence package audit 和 Phase 1 evidence ledger 串成一条本地
+Stage 1 identity evidence 命令。输出中 `reviewability_gates` 与 `pass_gates` 分离：
+证据包完整可审阅不等于 identity metric 通过，identity fail row 也可作为负证据进入
+ledger。命令仍要求 per-frame Gaussian evidence、candidate artifact file audit、artifact ref
+match、occlusion reappearance、view / lighting / camera motion metadata；它不下载 BOP、
+不创建 GT、不重建 Gaussian、不训练模型、不声明 prediction / intervention gate 或 world model。
+为兼容 BOP finalizer 的 candidate artifact，identity prediction adapter 会把 artifact-level
+`identity_evidence` 归一化为 evaluator 需要的带来源 evidence，而不修改 artifact 本身。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

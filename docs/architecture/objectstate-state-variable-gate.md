@@ -799,6 +799,56 @@ create GT, reconstruct Gaussians, run identity handoff, run identity eval, train
 models, claim prediction / intervention gates, claim world model, use replay /
 diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-IDENTITY-HANDOFF-001
+
+Run the local BOP identity handoff as one reviewable Stage 1 evidence package
+command.
+
+Required behavior:
+
+- Input a local BOP scene root, output root and finalized trainable
+  ObjectState candidate artifact.
+- Run BOP acceptance with per-frame Gaussian files required.
+- Run controlled identity handoff against the accepted capture manifest and
+  candidate artifact.
+- Require the existing identity scenario audit: occlusion reappearance,
+  cross-view metadata, lighting metadata and camera motion metadata.
+- Write identity predictions, identity eval summary, identity-only
+  controlled-real manifest, blocked rows Markdown, identity evidence package
+  summary and Phase 1 evidence ledger.
+- Treat reviewability and metric pass as separate gates: an identity fail row
+  can still be reviewable negative evidence.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_identity_handoff`.
+- Summary schema: `objgauss-objectstate-bop-identity-handoff-v1`.
+- Core function: `objectstate_bop_identity_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-identity-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`.
+- The handoff writes BOP acceptance summaries under the output root and writes
+  self-contained identity package files under `identity-handoff/`:
+  `capture-manifest.json`, `capture-file-audit.json`,
+  `candidate-artifact-file-audit.json`, `identity-scenario-audit.json`,
+  `identity-predictions.json`, `identity-eval-summary.json`,
+  `controlled-real.json`, `controlled-real-summary.json`,
+  `blocked-rows.md`, `handoff-summary.json` and
+  `identity-evidence-package-summary.json`.
+- It writes `phase1-evidence-ledger.json` with reviewable identity evidence
+  when the package is complete.
+- `reviewability_gates` and `pass_gates` are separate. The top-level
+  `objectstate_bop_identity_handoff_reviewable` status means the evidence is
+  complete enough to review; it does not by itself claim the identity metric
+  passed or that prediction / intervention gates passed.
+- The trainable-artifact identity adapter now normalizes artifact-level
+  `identity_evidence` by adding a source field when the artifact only supplied
+  reconstruction noise robustness values.
+
+Current scope is deterministic local orchestration only. It does not download
+BOP data, create GT, reconstruct Gaussians, train Gaussian / tracking /
+dynamics models, claim prediction / intervention gates, claim world model, use
+replay / diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.

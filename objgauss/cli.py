@@ -235,6 +235,9 @@ from objgauss.core.objectstate_bop_capture_adapter import (
 from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
     objectstate_bop_prediction_baseline_handoff,
 )
+from objgauss.core.objectstate_bop_identity_handoff import (
+    objectstate_bop_identity_handoff,
+)
 from objgauss.core.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
@@ -5233,6 +5236,100 @@ def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> N
         raise ValueError("BOP prediction baseline handoff is not reviewable")
 
 
+def _object_state_bop_identity_handoff(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_identity_handoff(
+        args.scene_root,
+        output_root=args.output_root,
+        sample_id=args.sample_id,
+        candidate_artifact=args.candidate_artifact,
+        identity_dir=args.identity_dir,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        max_centroid_distance=args.max_centroid_distance,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
+            max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        force=args.force,
+    )
+    gates = summary["reviewability_gates"]
+    pass_gates = summary["pass_gates"]
+    handoff = summary["identity_handoff"]
+    identity_eval = handoff["identity_eval"]
+    metrics = identity_eval["metrics"]
+    evidence = summary["identity_evidence_package"]
+    ledger = summary["phase1_evidence_ledger_summary"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"identity_dir={summary['identity_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"candidate_artifact={summary['candidate']['artifact_ref']}")
+    print(f"bop_identity_handoff_status={summary['status']}")
+    for gate, passed in gates.items():
+        print(f"reviewability.{gate}={str(passed).lower()}")
+    for gate, passed in pass_gates.items():
+        print(f"pass.{gate}={str(passed).lower()}")
+    print(f"identity_handoff_status={handoff['status']}")
+    print(f"identity_eval_status={identity_eval['status']}")
+    print(f"idf1={metrics['idf1']:.6f}")
+    print(
+        "track_retrieval_recall_at_1="
+        f"{metrics['track_retrieval_recall_at_1']:.6f}"
+    )
+    print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
+    print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
+    print(f"swap_rate={metrics['swap_rate']:.6f}")
+    print(f"identity_evidence_package_status={evidence['status']}")
+    print(f"phase1_evidence_ledger_maturity={ledger['maturity']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"] != "objectstate_bop_identity_handoff_reviewable"
+    ):
+        raise ValueError("BOP identity handoff is not reviewable")
+    if args.require_pass and not summary["pass_gates"]["identity_handoff_pass"]:
+        raise ValueError("BOP identity handoff did not pass")
+
+
 def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
     summary = objectstate_bop_phase1_route_audit(
         args.scene_root,
@@ -6508,6 +6605,170 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_prediction_baseline_handoff.set_defaults(
         handler=_object_state_bop_prediction_baseline_handoff
+    )
+    bop_identity_handoff = object_state_subparsers.add_parser(
+        "bop-identity-handoff",
+        help=(
+            "run BOP acceptance, trainable ObjectState identity eval, identity "
+            "evidence package audit, and Phase 1 evidence ledger"
+        ),
+    )
+    bop_identity_handoff.add_argument("scene_root", type=Path)
+    bop_identity_handoff.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+    )
+    bop_identity_handoff.add_argument("--summary-output", type=Path)
+    bop_identity_handoff.add_argument("--sample-id", required=True)
+    bop_identity_handoff.add_argument(
+        "--candidate-artifact",
+        required=True,
+        type=Path,
+        help="finalized trainable ObjectState artifact to evaluate",
+    )
+    bop_identity_handoff.add_argument(
+        "--identity-dir",
+        type=Path,
+        help="identity package directory; defaults to <output-root>/identity-handoff",
+    )
+    bop_identity_handoff.add_argument("--dataset-id", default="bop-ycbv")
+    bop_identity_handoff.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    bop_identity_handoff.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    bop_identity_handoff.add_argument("--fps", type=float, default=30.0)
+    bop_identity_handoff.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    bop_identity_handoff.add_argument("--rgb-dir", default="rgb")
+    bop_identity_handoff.add_argument("--gaussian-dir", default="gaussians")
+    bop_identity_handoff.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
+    bop_identity_handoff.add_argument("--max-frames", type=int)
+    bop_identity_handoff.add_argument("--frame-step", type=int, default=1)
+    bop_identity_handoff.add_argument("--candidate-id")
+    bop_identity_handoff.add_argument(
+        "--candidate-source",
+        default="trainable_kernel_objectstate_nearest_pose_adapter",
+    )
+    bop_identity_handoff.add_argument("--max-centroid-distance", type=float)
+    bop_identity_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    bop_identity_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
+    bop_identity_handoff.add_argument(
+        "--max-fragmentation-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_identity_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_identity_handoff.add_argument("--max-swap-rate", type=float, default=0.0)
+    bop_identity_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    bop_identity_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
+    bop_identity_handoff.add_argument("--allow-identity-collapse", action="store_true")
+    bop_identity_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample artifact refs such as scene_gt.json to exist",
+    )
+    bop_identity_handoff.add_argument("--min-rgb-bytes", type=int, default=1)
+    bop_identity_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    bop_identity_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    bop_identity_handoff.add_argument("--hash-files", action="store_true")
+    bop_identity_handoff.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+    )
+    bop_identity_handoff.add_argument(
+        "--hash-candidate-artifact",
+        action="store_true",
+    )
+    bop_identity_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    bop_identity_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    bop_identity_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    bop_identity_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    bop_identity_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    bop_identity_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    bop_identity_handoff.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=1,
+    )
+    bop_identity_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite handoff output files if they already exist",
+    )
+    bop_identity_handoff.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the generated identity evidence package is reviewable",
+    )
+    bop_identity_handoff.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless the identity handoff metric gate passes",
+    )
+    bop_identity_handoff.set_defaults(
+        handler=_object_state_bop_identity_handoff
     )
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",

@@ -188,6 +188,11 @@ schema 会被 identity route 拒绝，不复制 BOP pose GT、不训练模型、
 `finalize-bop-objectstate-artifact-template`，可把已填写模板包装成 identity route
 当前可审计的 `objectstates.json`，同时拒绝 TODO 和精确 BOP pose GT centroid 泄漏；
 它不训练模型、不运行 identity eval、不创建 pass row。
+`OBJECTSTATE-BOP-IDENTITY-HANDOFF-001` 继续补齐
+`bop-identity-handoff`，可把 BOP acceptance、finalized `objectstates.json`、
+controlled identity handoff / eval、identity evidence package audit 和 Phase 1 ledger
+串成一条 Stage 1 identity evidence 命令；reviewable 与 metric pass 分离，fail row
+也可作为负证据审阅。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -259,6 +264,34 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-IDENTITY-HANDOFF-001: Run BOP identity evidence handoff
+
+- 状态: done / stage1-identity-evidence-handoff
+- 类型: 标准 PR / ObjectState public pose dataset identity evidence
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把本地 BOP scene、per-frame Gaussian evidence、finalized trainable
+  ObjectState artifact 和 controlled identity evaluator 串成一条可复跑 Stage 1
+  identity evidence package 命令。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_identity_handoff`，冻结
+    `objgauss-objectstate-bop-identity-handoff-v1` summary schema。
+  - 新增 CLI `objgauss object-state bop-identity-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`。
+  - 命令写出 BOP acceptance summaries、identity predictions、identity eval、
+    identity-only controlled-real manifest、blocked rows Markdown、identity evidence
+    package summary 和 `phase1-evidence-ledger.json`。
+  - `reviewability_gates` 与 `pass_gates` 分离：证据包可审阅不等于 identity metric
+    pass；identity fail row 仍可作为负证据进入 evidence package。
+  - `objectstate_identity_predictions_from_trainable_artifact(...)` 会给 artifact-level
+    `identity_evidence` 补 evaluator 所需的 `source`，但不改写 artifact 文件。
+- 边界:
+  - 不下载 BOP，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不声明 prediction / intervention gate，不声明 world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_identity_handoff.py`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_controlled_identity_eval.py tests/test_core_namespace.py`: passed，27 tests。
+- 完成 commit: `32b60b7`。
 
 ### OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-FINALIZE-001: Finalize BOP ObjectState artifact templates
 

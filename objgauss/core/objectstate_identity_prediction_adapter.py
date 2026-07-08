@@ -74,7 +74,7 @@ def objectstate_identity_predictions_from_trainable_artifact(
         "source": str(source),
         "artifact_refs": _artifact_refs(artifact_refs, artifact),
     }
-    identity_evidence = artifact.get("identity_evidence")
+    identity_evidence = _identity_evidence(artifact.get("identity_evidence"))
     if identity_evidence is not None:
         candidate["identity_evidence"] = identity_evidence
 
@@ -204,6 +204,16 @@ def _artifact_refs(
     if not refs or any(not item for item in refs):
         raise ValueError("artifact_refs must contain non-empty strings")
     return refs
+
+
+def _identity_evidence(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise TypeError("trainable artifact identity_evidence must be a mapping")
+    result = dict(value)
+    result.setdefault("source", "trainable_kernel_model_artifact.identity_evidence")
+    return result
 
 
 def _vector(value: Any, name: str) -> np.ndarray:
