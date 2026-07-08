@@ -88,10 +88,14 @@ row 进入 pass / fail。`OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001` 已新�
 Real Intervention Gate 的 controlled evaluator，可把真实 pose/action GT、
 action-conditioned prediction 和 no-action baseline 比成
 `action_conditioned_ade` / `counterfactual_outcome_accuracy` /
-`wrong_direction_rate`，并让 intervention row 进入 pass / fail。下一步仍是实际采集 /
-标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate
-artifact 跑 identity / prediction / intervention handoff，让 rows 从 fixture 进入真实
-pass / fail，而不是新增大模型。继续不推进
+`wrong_direction_rate`，并让 intervention row 进入 pass / fail。
+`OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001` 已新增 full Phase 1 handoff，
+可从真实 bundle root、trainable ObjectState artifact、prediction candidates 和
+intervention candidates 一次性跑 identity / prediction / intervention 三类 rows，并生成
+merged controlled-real manifest 与 full reality gate。下一步仍是实际采集 / 标注
+controlled tabletop RGB / Gaussian / pose / action 文件，并准备真实 candidate artifact /
+prediction / intervention JSON，让 rows 从 fixture 进入真实 pass / fail，而不是新增大模型。
+继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
@@ -162,6 +166,52 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001: Hand off full controlled reality bundles
+
+- 状态: done / handoff-only-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop full reality handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把 Phase 1 Real World Validation 的 identity / prediction /
+  intervention 三类 evaluator 串成一个可复跑 bundle-level handoff，让真实
+  controlled tabletop bundle 可以一次性生成 merged controlled-real manifest 和 full
+  reality gate。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_reality_bundle_handoff`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-reality-bundle-handoff-v1`。
+  - Handoff 输入为 bundle root、trainable ObjectState artifact、prediction
+    candidates JSON 和 intervention candidates JSON。
+  - Handoff 复用 `OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001`，
+    保留 bundle import、file audit、candidate artifact audit、identity scenario
+    audit、identity predictions 和 identity eval 的既有 Stage 1 路径。
+  - Handoff 在同一个 imported capture manifest 上运行 controlled prediction eval
+    和 controlled intervention eval。
+  - Handoff 将 identity / prediction / intervention 三个 child manifest 的
+    pass/fail rows 合并为最终 `controlled-real.json`。
+  - Full reality gate 默认 `min_real_or_public_rows=3`，并要求 identity /
+    prediction / intervention pass rows 同时存在。
+  - CLI 新增 `objgauss object-state controlled-reality-bundle-handoff
+    <bundle-root> <objectstates.json> <prediction-candidates.json>
+    <intervention-candidates.json> --output-dir <dir>`。
+  - CLI 写出 bundle import / acceptance / file audit、identity handoff artifacts、
+    `prediction-eval-summary.json`、`intervention-eval-summary.json`、
+    merged `controlled-real.json`、full `controlled-real-summary.json`、
+    `blocked-rows.md` 和 `reality-bundle-handoff-summary.json`。
+  - Core lazy namespace 暴露 full handoff schema、runner 和 validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 prediction / intervention candidates，不运行 prediction /
+    intervention / dynamics model，不训练 Gaussian / dynamics，不写
+    `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_bundle_handoff.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 371 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `6dd84df`。
 
 ### OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001: Evaluate controlled real intervention rows
 

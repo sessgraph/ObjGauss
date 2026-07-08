@@ -466,6 +466,19 @@ row 从 blocked 推进为 pass / fail。该切片仍不采集视频、不创建 
 action-conditioned / dynamics 模型、不训练 Gaussian 或 dynamics、不计算 identity /
 prediction 指标、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `26cf3ec`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001`：新增
+`objgauss.core.objectstate_controlled_reality_bundle_handoff`，schema 为
+`objgauss-objectstate-controlled-reality-bundle-handoff-v1`，并新增 CLI
+`objgauss object-state controlled-reality-bundle-handoff <bundle-root> <objectstates.json> <prediction-candidates.json> <intervention-candidates.json> --output-dir <dir>`。
+该 handoff 复用现有 controlled identity bundle handoff 完成 bundle import、file audit、
+candidate artifact audit、identity scenario audit、identity predictions 和 identity eval；
+随后在同一个 imported capture manifest 上运行 controlled prediction eval 和 controlled
+intervention eval，并把 identity / prediction / intervention 三条 row 合并成最终
+controlled-real manifest。最终 reality gate 默认要求 3 条 controlled real rows 且
+identity、prediction、intervention 都是 pass。该切片仍不采集视频、不创建 GT、
+不创建 prediction / intervention candidates、不运行预测或动作模型、不训练 Gaussian /
+dynamics、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `6dd84df`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
