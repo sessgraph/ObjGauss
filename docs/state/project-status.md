@@ -780,6 +780,15 @@ blocked candidate issues 和后续 `init-bop-condition-sidecar` /
 capture environment preflight 记录 COLMAP / Nerfstudio Gaussian reconstruction tool
 readiness。它只做 read-only preflight，不下载 BOP、不创建 GT、不推断 condition metadata、
 不重建 Gaussian、不运行 handoff、不训练模型，也不声明任何 Phase 1 pass row。
+随后补齐 `OBJECTSTATE-BOP-RGBD-GAUSSIAN-EXPORT-001`：新增
+`objgauss.core.objectstate_bop_rgbd_gaussian_export`，schema 为
+`objgauss-objectstate-bop-rgbd-gaussian-export-v1`，CLI 为
+`objgauss object-state export-bop-rgbd-gaussian-evidence`。该命令在本地 BOP scene 已有
+`depth/<frame>.png` 时，用 `scene_camera.json` 的相机内参和 `depth_scale` 把 depth
+pixels 反投影成 per-frame `gaussians/<frame>.ply` evidence seed，并用 RGB 只做点颜色。
+它会写本地 scene root 下的 ignored evidence 文件，但不下载 BOP、不使用 object pose GT
+放置几何、不训练 Splatfacto、不创建 checkpoint、不运行 identity / prediction handoff，
+也不声明 Phase 1 pass row 或 world-model 证明。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

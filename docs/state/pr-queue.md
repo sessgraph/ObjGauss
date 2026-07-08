@@ -172,6 +172,10 @@ Phase 1 seed 的 scene。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
+`OBJECTSTATE-BOP-RGBD-GAUSSIAN-EXPORT-001` 继续补齐
+`export-bop-rgbd-gaussian-evidence`，可在本地 BOP scene 含 depth PNG 时把 RGB-D
+反投影成 per-frame `gaussians/<frame>.ply` evidence seed，供 Gaussian evidence
+preflight 和后续 BOP route audits 使用。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -243,6 +247,33 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-RGBD-GAUSSIAN-EXPORT-001: Export BOP RGB-D Gaussian evidence seeds
+
+- 状态: done / local-bop-rgbd-depth-backprojection-evidence-export
+- 类型: 标准 PR / ObjectState public pose dataset Gaussian evidence generation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在本地 BOP scene 已有 RGB-D 文件时，把 `depth/<frame>.png` 通过
+  `scene_camera.json` camera intrinsics 反投影成 per-frame `gaussians/<frame>.ply`
+  evidence seed，让 `audit-bop-gaussian-evidence` 能从 missing evidence 进入可复验状态。
+- 已实施:
+  - 新增 schema `objgauss-objectstate-bop-rgbd-gaussian-export-v1`。
+  - 新增 core function `objectstate_bop_rgbd_gaussian_export(...)`。
+  - 新增 CLI `objgauss object-state export-bop-rgbd-gaussian-evidence`。
+  - exporter 复用 BOP adapter 选帧和 manifest policy，读取 BOP `depth_scale`、
+    `cam_K` 和 `depth/<frame>.png`，写出本地 `gaussians/<frame>.ply`。
+  - 内置最小 PNG 解码路径，覆盖 8-bit RGB PNG 和 16-bit depth PNG，不新增 Pillow /
+    OpenCV 依赖。
+- 边界:
+  - 只写本地 scene root 下的 per-frame PLY evidence seed；不写 `public/samples`。
+  - 不下载 BOP、不创建 identity / pose GT、不推断 condition metadata。
+  - 不使用 object pose GT 放置几何，不训练 Splatfacto，不创建 checkpoint。
+  - 不运行 identity / prediction handoff，不声明 pass row / world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_rgbd_gaussian_export.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_core_namespace.py -q`: passed，12 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_phase1_subset_selector.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_core_namespace.py -q`: passed，51 tests。
+- 完成 commit: `fbbc95c`。
 
 ### UI-IA-REGROUP-001: Promote frequently-used object debug sections out of the advanced drawer
 
