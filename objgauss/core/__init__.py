@@ -174,6 +174,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_bundle_readiness",
         "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_environment",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA",
+    ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
@@ -194,6 +198,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_bundle_readiness",
         "objectstate_controlled_capture_bundle_readiness",
     ),
+    "objectstate_controlled_capture_environment": (
+        "objgauss.core.objectstate_controlled_capture_environment",
+        "objectstate_controlled_capture_environment",
+    ),
     "validate_objectstate_controlled_capture_import_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
@@ -209,6 +217,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_bundle_readiness_summary": (
         "objgauss.core.objectstate_controlled_capture_bundle_readiness",
         "validate_objectstate_controlled_capture_bundle_readiness_summary",
+    ),
+    "validate_objectstate_controlled_capture_environment_summary": (
+        "objgauss.core.objectstate_controlled_capture_environment",
+        "validate_objectstate_controlled_capture_environment_summary",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",

@@ -151,6 +151,9 @@ from objgauss.core.objectstate_controlled_capture_template import (
 from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
+from objgauss.core.objectstate_controlled_capture_environment import (
+    objectstate_controlled_capture_environment,
+)
 from objgauss.core.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
@@ -3159,6 +3162,59 @@ def _object_state_audit_controlled_capture_bundle_readiness(
         raise ValueError("controlled capture bundle readiness did not pass")
 
 
+def _object_state_audit_controlled_capture_environment(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_capture_environment(dev_root=args.dev_root)
+    readiness = summary["readiness"]
+    devices = summary["devices"]
+    commands = summary["commands"]
+    print(f"schema={summary['schema']}")
+    print(f"environment_status={summary['status']}")
+    print(f"dev_root={summary['dev_root']}")
+    print(f"video_devices={len(devices['video_devices'])}")
+    for device in devices["video_devices"]:
+        print(f"video_device={device}")
+    print(f"rgb_capture_ready={str(readiness['rgb_capture_ready']).lower()}")
+    print(
+        "gaussian_reconstruction_ready="
+        f"{str(readiness['gaussian_reconstruction_ready']).lower()}"
+    )
+    print(
+        "controlled_capture_environment_ready="
+        f"{str(readiness['controlled_capture_environment_ready']).lower()}"
+    )
+    for key in (
+        "ffmpeg",
+        "v4l2_ctl",
+        "colmap",
+        "ns_process_data",
+        "ns_train",
+        "ns_export",
+    ):
+        record = commands[key]
+        print(f"command.{key}.available={str(record['available']).lower()}")
+        if record["path"]:
+            print(f"command.{key}.path={record['path']}")
+    print(
+        "python.cv2.available="
+        f"{str(summary['python_modules']['cv2']['available']).lower()}"
+    )
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and not readiness["controlled_capture_environment_ready"]
+    ):
+        raise ValueError("controlled capture environment is not ready")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -4480,6 +4536,31 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_controlled_capture.set_defaults(
         handler=_object_state_init_controlled_capture_bundle
+    )
+    audit_controlled_capture_environment = object_state_subparsers.add_parser(
+        "audit-controlled-capture-environment",
+        help=(
+            "audit local camera and reconstruction tool availability before "
+            "controlled real capture"
+        ),
+    )
+    audit_controlled_capture_environment.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_controlled_capture_environment.add_argument(
+        "--dev-root",
+        type=Path,
+        default=Path("/dev"),
+        help="device root to scan for video*/media* devices",
+    )
+    audit_controlled_capture_environment.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless RGB capture and Gaussian reconstruction tools are ready",
+    )
+    audit_controlled_capture_environment.set_defaults(
+        handler=_object_state_audit_controlled_capture_environment
     )
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",

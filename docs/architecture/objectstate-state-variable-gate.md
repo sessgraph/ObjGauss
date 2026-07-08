@@ -660,6 +660,35 @@ Current scope remains manifest / readiness validation only. It does not capture
 video, create GT, reconstruct Gaussians, compute model metrics, train Gaussian
 or dynamics models, use replay / diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001
+
+Add a local environment preflight before real controlled capture.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_capture_environment`.
+- Summary schema:
+  `objgauss-objectstate-controlled-capture-environment-v1`.
+- `objectstate_controlled_capture_environment(...)` checks:
+  - visible `video*` and `media*` devices under `/dev` or a supplied
+    `--dev-root`;
+  - RGB capture tooling: `ffmpeg` or Python `cv2`;
+  - camera inspection tooling: `v4l2-ctl`;
+  - Gaussian reconstruction tooling: `colmap`, `ns-process-data`,
+    `ns-train` and `ns-export`.
+- The summary reports `rgb_capture_ready`,
+  `gaussian_reconstruction_ready` and
+  `controlled_capture_environment_ready` plus hard blockers and next actions.
+- CLI command:
+  `objgauss object-state audit-controlled-capture-environment`.
+- CLI supports `--summary-output`, `--dev-root` and `--require-ready`.
+
+Current scope remains environment preflight only. It may be sandbox-limited and
+does not capture video, create GT, create frame / annotation / action rows,
+reconstruct Gaussians, run handoff or eval, train models, write public samples,
+use replay / diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001
 
 Build a controlled capture manifest from a local tabletop capture bundle.

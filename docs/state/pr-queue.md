@@ -117,6 +117,11 @@ tuple/list 误报。当前已创建 ignored 本地 skeleton
 `annotations.csv` / `actions.csv` 仍无真实行，`rgb/` / `gaussians/` 仍无真实采集 /
 重建文件，也没有 ObjectState candidate artifact。后续仍要让 readiness 从 fixture 进入真实
 ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
+`OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001` 已新增
+`audit-controlled-capture-environment` CLI；当前会话运行结果为 blocked：未看到
+`/dev/video*`，且缺 `ffmpeg` / `cv2` / `colmap` / `ns-process-data` /
+`ns-train` / `ns-export`。下一步应在物理 capture host 上重跑 environment preflight，
+再采集真实 RGB / Gaussian / pose / action。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -188,6 +193,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001: Audit capture host environment
+
+- 状态: done / preflight-only-no-real-capture-output
+- 类型: 标准 PR / controlled tabletop capture environment preflight
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在真实 capture bundle 填写前，提供可复跑的 host 环境检查，明确当前机器是否
+  能看到摄像头、RGB capture 工具和 Gaussian reconstruction 工具。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_environment`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-capture-environment-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-controlled-capture-environment`。
+  - Preflight 检查 `/dev/video*` / `/dev/media*`、`ffmpeg`、`v4l2-ctl`、
+    Python `cv2`、`colmap`、`ns-process-data`、`ns-train` 和 `ns-export`。
+  - CLI 支持 `--summary-output`、`--dev-root` 和 `--require-ready`。
+  - 本地运行输出到 ignored
+    `outputs/captures/controlled-tabletop-cup-box-001/environment-summary.json`，
+    当前结果为 blocked：没有 video device，也缺 RGB capture / Gaussian
+    reconstruction tooling。
+- 边界:
+  - 不采集视频，不创建 GT，不创建 frame / annotation / action rows。
+  - 不重建 Gaussian，不运行 handoff / eval，不训练 Gaussian / dynamics。
+  - 不声明 reality gate pass，不写 `public/samples`，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_environment.py -q`: passed, 3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py -q`: passed, 9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_environment.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 386 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `TBD`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001: Audit full Phase 1 evidence package
 

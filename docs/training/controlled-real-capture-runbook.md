@@ -76,7 +76,25 @@ infer physical truth from pixels, lighting, or camera motion. Bad annotations
 can still produce bad science, so capture notes should be kept next to the
 local bundle but not committed if they contain large files or private data.
 
-## 3. Bundle Layout
+## 3. Environment Preflight
+
+Before a capture session, run the local environment preflight:
+
+```bash
+uv run objgauss object-state audit-controlled-capture-environment \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/environment-summary.json
+```
+
+The preflight checks whether the current host can see camera devices under
+`/dev`, whether RGB capture tooling such as `ffmpeg` or OpenCV `cv2` is
+available, and whether Gaussian reconstruction tooling such as COLMAP /
+Nerfstudio is on PATH. It does not capture video, reconstruct Gaussians, create
+GT, run training, or prove the reality gate.
+
+If the preflight reports no video device, rerun it on the physical capture host
+instead of treating a sandbox result as proof that no camera exists.
+
+## 4. Bundle Layout
 
 Create the local bundle outside committed sample paths:
 
@@ -109,7 +127,7 @@ README.md
 Do not copy large captures, reconstructed Gaussian files, checkpoints, or
 candidate artifacts into git.
 
-## 4. File Naming
+## 5. File Naming
 
 Use stable names that keep RGB and Gaussian refs easy to audit:
 
@@ -126,7 +144,7 @@ RGB files must have recognizable PNG, JPEG, WebP, or PPM signatures. Gaussian
 files must be PLY files with a vertex element, or raw `.splat` files with a
 non-zero size that is a multiple of 32 bytes.
 
-## 5. CSV Rules
+## 6. CSV Rules
 
 `objects.csv` declares physical objects:
 
@@ -162,7 +180,7 @@ action_id,action_type,object_id,start_timestamp,end_timestamp,actor,target_objec
 push-left-001,push_left,cup-001,1.000,1.500,human,, -0.05,0,0
 ```
 
-## 6. Candidate Artifact
+## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible
 with `objgauss-trainable-kernel-model-artifact-v1`. The artifact must include:
@@ -176,7 +194,7 @@ with `objgauss-trainable-kernel-model-artifact-v1`. The artifact must include:
 The evaluator does not synthesize robustness evidence from file existence. A
 stable slot track still fails if `identity_evidence` is missing.
 
-## 7. Prediction And Intervention Candidates
+## 8. Prediction And Intervention Candidates
 
 For full Phase 1 validation, create draft candidate files after the bundle has
 pose tracks and action metadata:
@@ -209,7 +227,7 @@ The finalizer only changes filled draft templates into validated evaluator
 input files. It does not run prediction or intervention models and does not
 claim pass rows.
 
-## 8. Readiness Loop
+## 9. Readiness Loop
 
 Run the tolerant readiness audit while the bundle is being filled:
 
@@ -285,7 +303,7 @@ This audit only checks that the expected local JSON / Markdown artifacts exist,
 validate, use a consistent `sample_id`, and agree with the full handoff summary.
 It does not rerun the handoff or turn a failed metric row into a pass.
 
-## 9. Acceptance Evidence
+## 10. Acceptance Evidence
 
 For the first real identity row, keep these local artifacts together:
 
@@ -332,7 +350,7 @@ blocked rows or pass rows. The evidence package audit is the final local
 pre-review check for that file set; it is not a substitute for real capture,
 pose/action GT, candidate outputs, or metric review.
 
-## 10. Boundaries
+## 11. Boundaries
 
 This runbook does not:
 

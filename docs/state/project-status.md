@@ -562,6 +562,20 @@ intervention stage 均未 ready、capture file audit 不能运行、capture mani
 camera pose / object pose / action rows，并生成真实 ObjectState candidate artifact；该本地
 skeleton 不进入 git，也不构成真实 Phase 1 通过证据。
 
+随后新增 `OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001`：新增
+`objgauss.core.objectstate_controlled_capture_environment`，schema 为
+`objgauss-objectstate-controlled-capture-environment-v1`，并新增 CLI
+`objgauss object-state audit-controlled-capture-environment`。该 preflight 检查当前 host
+是否可见 `/dev/video*` / `/dev/media*`，是否有 RGB capture 工具 `ffmpeg` 或 Python
+`cv2`，以及 Gaussian 重建所需 `colmap`、`ns-process-data`、`ns-train` 和 `ns-export`。
+本地运行
+`uv run objgauss object-state audit-controlled-capture-environment --summary-output outputs/captures/controlled-tabletop-cup-box-001/environment-summary.json`
+结果为 `objectstate_controlled_capture_environment_blocked`：`video_devices=0`，
+`ffmpeg=false`、`cv2=false`、`colmap=false`、`ns-process-data=false`、`ns-train=false`、
+`ns-export=false`。这说明当前会话环境不能直接采集 / 重建真实 controlled tabletop
+数据；需要在物理采集主机上暴露摄像头和采集 / 重建工具后重跑。该 preflight 只记录环境
+blocker，不采集视频、不创建 GT、不重建 Gaussian、不训练模型、不声明 reality gate pass。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
