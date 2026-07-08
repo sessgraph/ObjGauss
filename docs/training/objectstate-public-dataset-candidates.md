@@ -570,6 +570,22 @@ This writes `sample.json`, CSV headers, `rgb/`, `gaussians/`, and
 import / acceptance, candidate template finalization, full handoff, conversion
 to `source_kind=public_replay` rows, and ledger aggregation.
 
+After creating or partially filling the workspace, use the progress audit to
+make the next missing evidence item explicit:
+
+```bash
+uv run objgauss object-state audit-public-interaction-workspace-progress \
+  outputs/captures/hot3d-clip-000001 \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-workspace-progress.json
+```
+
+The progress audit checks source sequence binding, controlled capture import
+readiness, RGB / Gaussian file evidence, intervention-ready pose/action rows,
+ObjectState artifact presence, prediction / intervention candidate validity,
+full handoff summary, `public_replay` rows, and ledger summary. It is read-only
+and reports `evidence_chain_reviewable=true` only after the complete chain is
+present; it does not make the gate pass.
+
 Boundary:
 
 - The local `sample.json` remains `source_kind=controlled_real` only so the
@@ -579,6 +595,8 @@ Boundary:
 - The workspace does not download HOT3D / DexYCB, adapt raw egocentric streams,
   create GT, create frame/action rows, generate Gaussian evidence, create
   candidates, run eval, train a model, or claim counterfactual proof.
+- The progress audit does not fill missing files or run handoff / eval; it only
+  points to the next concrete missing artifact.
 
 ## Public Interaction Route Audit
 

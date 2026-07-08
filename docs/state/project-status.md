@@ -1010,6 +1010,16 @@ candidate templates、full handoff、`public_replay` rows converter 和 ledger �
 不下载或适配 public dataset、不创建 GT / frame / annotation / action rows、不生成 Gaussian
 evidence、不创建 candidate、不运行 handoff/eval、不训练模型、不创建 pass row，也不声明
 counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-PROGRESS-001`：同一模块新增
+`objgauss-objectstate-public-interaction-workspace-progress-v1` 和 CLI
+`objgauss object-state audit-public-interaction-workspace-progress <workspace-root>`。
+该 read-only audit 把 public interaction workspace 从 source sequence binding 到
+controlled capture import/file readiness、intervention-ready pose/action rows、ObjectState
+artifact、prediction / intervention candidates、full handoff summary、`public_replay`
+rows 和 ledger summary 的每一段缺口显性化，输出 `hard_blockers`、`next_actions` 和
+`evidence_chain_reviewable`。该标志只表示 row accounting 文件链可审阅，不是 metric pass；
+本切片仍不下载数据、不创建 GT/rows/candidates、不生成 Gaussian、不运行 handoff/eval、不训练模型，
+也不声明 intervention pass、counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

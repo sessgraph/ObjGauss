@@ -347,6 +347,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-PROGRESS-001: Audit public interaction workspace progress
+
+- 状态: done / public-interaction-authoring-progress-audit
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 在 public interaction workspace skeleton 和 route / handoff / ledger 之间增加
+  read-only progress audit，明确 HOT3D / DexYCB-style action evidence 还缺哪一个
+  artifact 或 gate。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_public_interaction_workspace`。
+  - 新增 schema `objgauss-objectstate-public-interaction-workspace-progress-v1`。
+  - 新增 CLI `objgauss object-state audit-public-interaction-workspace-progress
+    <workspace-root>`。
+  - 复用 controlled capture bundle readiness，检查 source sequence binding、
+    controlled capture import/file readiness、intervention-ready pose/action/timestamp
+    rows、ObjectState artifact、prediction / intervention candidate validity、route
+    audit readiness、full handoff summary、`public_replay` rows 和 ledger summary。
+  - 输出 `hard_blockers`、`next_actions` 和 `evidence_chain_reviewable`，让操作者
+    从 skeleton 逐步推进到可审阅 row accounting。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不适配原始 egocentric streams。
+  - 不创建 GT、frame rows、annotation rows、action rows、Gaussian evidence 或 candidates。
+  - 不运行 route audit 以外的生成动作、不运行 handoff、不运行 eval、不训练模型。
+  - 不创建 pass row，不把 `evidence_chain_reviewable` 当作 metric pass。
+  - 不把 observed interaction 写成 randomized counterfactual proof 或 world-model pass。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_interaction_workspace.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py -q`: 15 passed。
+  - `uv run --extra dev pytest`: 524 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-001: Scaffold public interaction route workspace
 
 - 状态: done / public-interaction-authoring-scaffold

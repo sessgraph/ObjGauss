@@ -8,6 +8,9 @@ import pytest
 from objgauss.cli import main
 from objgauss.core.objectstate_public_interaction_workspace import (
     OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA,
+    OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA,
+    objectstate_public_interaction_workspace_progress,
+    validate_objectstate_public_interaction_workspace_progress_summary,
     validate_objectstate_public_interaction_workspace_summary,
     write_objectstate_public_interaction_workspace,
 )
@@ -92,6 +95,67 @@ def test_public_interaction_workspace_rejects_pose_only_candidate(tmp_path):
         )
 
 
+def test_public_interaction_workspace_progress_reports_authoring_gap(tmp_path):
+    workspace = tmp_path / "hot3d-clip"
+    workspace_summary = workspace / "public-interaction-workspace.json"
+    scaffold = write_objectstate_public_interaction_workspace(
+        workspace,
+        sample_id="hot3d-clip-unit-001",
+        source_sequence_id="hot3d-sequence-unit-001",
+        objects=[{"object_id": "cup-001", "category": "cup"}],
+    )
+    workspace_summary.write_text(
+        json.dumps(scaffold, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    summary = objectstate_public_interaction_workspace_progress(workspace)
+
+    assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA
+    assert summary["status"] == (
+        "objectstate_public_interaction_workspace_progress_blocked"
+    )
+    assert summary["source_sequence_id"] == "hot3d-sequence-unit-001"
+    assert summary["readiness"]["workspace_layout_ready"] is True
+    assert summary["readiness"]["workspace_summary_valid"] is True
+    assert summary["readiness"]["source_sequence_bound"] is True
+    assert summary["readiness"]["controlled_bundle_import_ready"] is False
+    assert summary["readiness"]["route_handoff_ready"] is False
+    assert summary["readiness"]["public_replay_rows_valid"] is False
+    assert summary["readiness"]["evidence_chain_reviewable"] is False
+    assert "controlled capture CSV rows are not import-ready" in (
+        summary["hard_blockers"]
+    )
+    assert summary["next_actions"] == [
+        (
+            "fill objects.csv, frames.csv, annotations.csv and actions.csv with "
+            "timestamped identity, 6DoF pose and action rows"
+        )
+    ]
+    assert (
+        summary["claim_policy"]["final_rows_must_be_public_replay"] is True
+    )
+    assert validate_objectstate_public_interaction_workspace_progress_summary(
+        summary
+    ) == summary
+
+
+def test_public_interaction_workspace_progress_keeps_todo_sequence_blocked(tmp_path):
+    workspace = tmp_path / "hot3d-clip"
+    write_objectstate_public_interaction_workspace(
+        workspace,
+        sample_id="hot3d-clip-unit-001",
+    )
+
+    summary = objectstate_public_interaction_workspace_progress(workspace)
+
+    assert summary["readiness"]["source_sequence_bound"] is False
+    assert "source_sequence_id is missing or still TODO" in summary["hard_blockers"]
+    assert summary["next_actions"] == [
+        "replace TODO source_sequence_id with the real public dataset clip id"
+    ]
+
+
 def test_object_state_init_public_interaction_workspace_cli(tmp_path, capsys):
     workspace = tmp_path / "hot3d-clip"
     summary_path = tmp_path / "workspace-summary.json"
@@ -127,3 +191,43 @@ def test_object_state_init_public_interaction_workspace_cli(tmp_path, capsys):
     assert summary["files"]["public_interaction_readme"].endswith(
         "PUBLIC_INTERACTION_ROUTE.md"
     )
+
+
+def test_object_state_audit_public_interaction_workspace_progress_cli(
+    tmp_path,
+    capsys,
+):
+    workspace = tmp_path / "hot3d-clip"
+    scaffold_summary_path = workspace / "public-interaction-workspace.json"
+    progress_summary_path = tmp_path / "progress-summary.json"
+    scaffold = write_objectstate_public_interaction_workspace(
+        workspace,
+        sample_id="hot3d-clip-unit-001",
+        source_sequence_id="hot3d-sequence-unit-001",
+    )
+    scaffold_summary_path.write_text(
+        json.dumps(scaffold, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-public-interaction-workspace-progress",
+                str(workspace),
+                "--summary-output",
+                str(progress_summary_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(progress_summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA}" in stdout
+    assert "progress_status=objectstate_public_interaction_workspace_progress_blocked" in stdout
+    assert "source_sequence_bound=true" in stdout
+    assert "evidence_chain_reviewable=false" in stdout
+    assert summary["readiness"]["source_sequence_bound"] is True

@@ -200,3 +200,13 @@ egocentric streams、不创建 GT / frame / annotation / action rows、不生成
 不创建 candidates、不运行 handoff / eval、不训练模型、不创建 pass row，也不把 observed
 interaction 解释成 randomized counterfactual proof 或 world-model evidence。风险继续 open，
 直到真实 public interaction bundle 产生 identity / prediction / intervention pass / fail rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-PROGRESS-001`
+新增 `audit-public-interaction-workspace-progress`，可只读审计 public interaction workspace
+从 source sequence binding、controlled capture import/file readiness、intervention-ready
+pose/action rows、ObjectState candidate、prediction / intervention candidates、full handoff、
+`public_replay` rows 到 ledger 的完整链路缺口。该缓解把 HOT3D / DexYCB-style action route
+的下一步从人工猜测变成机器可读 blocker / next action，但仍不填 GT、不生成 Gaussian、不创建
+candidate、不运行 handoff/eval、不创建 rows、不训练模型、不声明 intervention pass、
+counterfactual proof 或 world-model evidence。风险继续 open，直到真实 public interaction rows
+进入 pass / fail accounting。

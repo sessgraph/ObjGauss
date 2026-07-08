@@ -222,6 +222,7 @@ from objgauss.core.objectstate_public_interaction_reality_rows import (
     read_objectstate_public_interaction_handoff_summary,
 )
 from objgauss.core.objectstate_public_interaction_workspace import (
+    objectstate_public_interaction_workspace_progress,
     write_objectstate_public_interaction_workspace,
 )
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
@@ -3235,6 +3236,43 @@ def _object_state_init_public_interaction_route_workspace(
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
+
+
+def _object_state_audit_public_interaction_workspace_progress(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_public_interaction_workspace_progress(
+        args.workspace_root,
+        workspace_summary=args.workspace_summary,
+        candidate_id=args.candidate_id,
+        source_sequence_id=args.source_sequence_id,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"workspace_root={summary['root']}")
+    print(f"progress_status={summary['status']}")
+    print(f"candidate_id={summary['candidate_id']}")
+    print(f"source_sequence_id={summary['source_sequence_id']}")
+    for key in (
+        "source_sequence_bound",
+        "controlled_bundle_intervention_ready",
+        "route_handoff_ready",
+        "handoff_summary_valid",
+        "public_replay_rows_valid",
+        "ledger_valid",
+        "evidence_chain_reviewable",
+    ):
+        print(f"{key}={str(readiness[key]).lower()}")
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_reviewable and not readiness["evidence_chain_reviewable"]:
+        raise ValueError("public interaction workspace evidence chain is not reviewable")
 
 
 def _object_state_audit_controlled_capture_bundle_readiness(
@@ -6969,6 +7007,50 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_public_interaction_workspace.set_defaults(
         handler=_object_state_init_public_interaction_route_workspace
+    )
+    audit_public_interaction_workspace_progress = (
+        object_state_subparsers.add_parser(
+            "audit-public-interaction-workspace-progress",
+            help=(
+                "audit a public interaction route workspace from authoring "
+                "skeleton to public_replay ledger"
+            ),
+        )
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "workspace_root",
+        type=Path,
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "--workspace-summary",
+        type=Path,
+        help=(
+            "optional init-public-interaction-route-workspace summary; defaults "
+            "to <workspace-root>/public-interaction-workspace.json"
+        ),
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "--candidate-id",
+        help="override the public interaction candidate id",
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "--source-sequence-id",
+        help="override or bind the public dataset clip / sequence id",
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_public_interaction_workspace_progress.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help=(
+            "fail unless route audit, handoff summary, public_replay rows and "
+            "ledger are all reviewable"
+        ),
+    )
+    audit_public_interaction_workspace_progress.set_defaults(
+        handler=_object_state_audit_public_interaction_workspace_progress
     )
     audit_controlled_capture_environment = object_state_subparsers.add_parser(
         "audit-controlled-capture-environment",

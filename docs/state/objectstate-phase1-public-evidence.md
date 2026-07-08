@@ -470,6 +470,20 @@ model, or create reality rows. Its purpose is to keep the HOT3D / DexYCB-style
 route aligned with the existing controlled capture validators and to remind
 operators that final rows must be converted to `source_kind=public_replay`.
 
+The matching progress audit is:
+
+```bash
+uv run objgauss object-state audit-public-interaction-workspace-progress \
+  outputs/captures/hot3d-clip-000001 \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-workspace-progress.json
+```
+
+This audit walks the same workspace from source-sequence binding through
+controlled capture import/file readiness, action-ready bundle state, candidate
+JSON files, full handoff summary, `public_replay` rows and ledger output. It is
+read-only and its `evidence_chain_reviewable` flag is not a metric pass; it only
+proves that the files needed for row accounting exist and validate.
+
 2026-07-09 added a read-only action-capable public dataset route audit:
 
 ```bash
