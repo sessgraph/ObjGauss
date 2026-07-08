@@ -73,8 +73,10 @@ pass 现在也要求 retrieval / drift / reconstruction-noise evidence 通过；
 `OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001` 已新增
 `controlled-identity-bundle-handoff` CLI，可从真实 bundle root 直接完成 import、
 bundle acceptance、file audit、candidate artifact audit、identity handoff 和
-identity-only reality gate 输出。下一步仍是实际采集 / 标注 controlled tabletop RGB /
-Gaussian / pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
+identity-only reality gate 输出；`OBJECTSTATE-CONTROLLED-CAPTURE-TEMPLATE-001`
+已新增 `init-controlled-capture-bundle` CLI，可生成 local-only bundle skeleton、
+CSV headers、`rgb/` / `gaussians/` 目录和后续验收命令。下一步仍是实际采集 /
+标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
 让 identity row 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -146,6 +148,47 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-TEMPLATE-001: Initialize controlled capture bundles
+
+- 状态: done / local-template-ready-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture bundle template
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 为实际 controlled tabletop 采集提供一条可复跑的本地 bundle skeleton
+  初始化入口，让下一次真实 RGB / Gaussian / pose / action 文件进入现有 import /
+  acceptance / identity handoff 链路时不再手写文件布局和 CSV header。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_template`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-capture-bundle-template-v1`。
+  - `write_objectstate_controlled_capture_bundle_template(...)` 会写出
+    `sample.json`、`objects.csv`、`frames.csv`、`annotations.csv`、
+    `actions.csv`、`README.md`、`rgb/` 和 `gaussians/`。
+  - 默认只写 CSV headers，不写 frame、annotation 或 action 数据行；空 skeleton
+    仍不能通过 import，避免伪造真实采集 ready 状态。
+  - 可用 object declarations 预填 `objects.csv`，但仍不创建 pose GT 或 frame rows。
+  - 默认拒绝覆盖已有 template 文件；只有显式 `force=True` / `--force` 才会覆盖。
+  - README 记录 Stage 1 identity 场景最低要求：至少三帧、clear-visible /
+    occluded / clear-visible、两个 view condition、两个 lighting condition、camera
+    motion metadata，以及带 reconstruction-noise evidence 的 candidate artifact。
+  - CLI 新增 `objgauss object-state init-controlled-capture-bundle
+    <bundle-root> --sample-id <id>`。
+  - CLI 支持 `--object object_id:category[:label]`、`--summary-output` 和
+    `--force`，并打印 import / acceptance / `controlled-identity-bundle-handoff`
+    下一步命令。
+  - Core lazy namespace 暴露 template schema、writer 和 validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 frame / annotation / action rows，不重建 Gaussian，不运行
+    tracker / segmentation，不训练 Gaussian / dynamics，不写 `public/samples`。
+  - 不计算 identity / prediction / intervention metrics，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 353 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `873aec1`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001: Hand off controlled identity bundles
 

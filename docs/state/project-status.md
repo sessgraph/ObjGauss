@@ -398,6 +398,20 @@ camera-motion metadata、缺 reconstruction-noise evidence 或 identity gate fai
 `public/samples`、不改 viewer/export 默认；它只是把下一次真实采集目录 + candidate
 artifact 的 Stage 1 identity 验收收敛成一条可复跑命令。完成 commit: `67b45e0`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-TEMPLATE-001`：新增
+`objgauss.core.objectstate_controlled_capture_template`，schema 为
+`objgauss-objectstate-controlled-capture-bundle-template-v1`，并新增 CLI
+`objgauss object-state init-controlled-capture-bundle <bundle-root> --sample-id <id>`。
+该命令为真实 controlled tabletop 采集生成本地 skeleton：`sample.json`、
+`objects.csv`、`frames.csv`、`annotations.csv`、`actions.csv`、`README.md`、
+`rgb/` 和 `gaussians/`。默认只写 CSV headers，不写 frame / annotation / action
+数据行；可用 `--object object_id:category[:label]` 预写 physical object declarations。
+模板 README 记录最小 Stage 1 identity 场景要求和后续 import / acceptance /
+`controlled-identity-bundle-handoff` 命令。该切片不采集视频、不创建 GT、不生成伪造
+RGB / Gaussian / pose / action row、不重建 Gaussian、不训练模型、不写 `public/samples`、
+不改 viewer/export 默认；它只把真实采集目录的文件布局和下一步验收命令固定下来。
+完成 commit: `873aec1`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
