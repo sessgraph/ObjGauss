@@ -12,12 +12,14 @@ The goal is narrow:
 
 ```text
 real tabletop capture -> controlled capture bundle -> identity handoff
+real tabletop capture -> controlled reality candidate rows -> full handoff
 ```
 
 The first successful row only needs to prove that a real controlled identity
 sample can enter the `OBJECTSTATE-REALITY-GATE` as pass or fail evidence. It is
 not a public demo, a production dataset, a dynamics model, or a viewer default
-promotion.
+promotion. Prediction and intervention rows should be added only after the same
+capture bundle has pose GT, action GT, and external candidate outputs.
 
 ## 1. Minimum Session
 
@@ -174,7 +176,40 @@ with `objgauss-trainable-kernel-model-artifact-v1`. The artifact must include:
 The evaluator does not synthesize robustness evidence from file existence. A
 stable slot track still fails if `identity_evidence` is missing.
 
-## 7. Readiness Loop
+## 7. Prediction And Intervention Candidates
+
+For full Phase 1 validation, create draft candidate files after the bundle has
+pose tracks and action metadata:
+
+```bash
+uv run objgauss object-state init-controlled-reality-candidates \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-candidates \
+  --candidate-id controlled-tabletop-cup-box-001-candidate-v1 \
+  --candidate-source "external objectstate predictor" \
+  --artifact-ref outputs/captures/controlled-tabletop-cup-box-001/objectstates.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/template-summary.json
+```
+
+Fill the generated `.template.json` files with external model or baseline
+outputs. Do not copy target GT pose values into predictions.
+
+Then finalize the filled templates into evaluator-ready JSON:
+
+```bash
+uv run objgauss object-state finalize-controlled-reality-candidates \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.template.json \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.template.json \
+  --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-candidates \
+  --bundle-root outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/finalize-summary.json
+```
+
+The finalizer only changes filled draft templates into validated evaluator
+input files. It does not run prediction or intervention models and does not
+claim pass rows.
+
+## 8. Readiness Loop
 
 Run the tolerant readiness audit while the bundle is being filled:
 
@@ -206,11 +241,37 @@ uv run objgauss object-state controlled-identity-bundle-handoff \
   --require-pass
 ```
 
+For full Phase 1 readiness, add the finalized prediction and intervention
+candidate JSON files:
+
+```bash
+uv run objgauss object-state audit-controlled-reality-bundle-readiness \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstates.json \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.json \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/full-readiness-summary.json \
+  --require-ready
+```
+
+If the full readiness audit passes, run the full handoff:
+
+```bash
+uv run objgauss object-state controlled-reality-bundle-handoff \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstates.json \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.json \
+  outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.json \
+  --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-handoff \
+  --hash-files \
+  --require-pass
+```
+
 The expected result is not necessarily a pass. A true fail row is useful
 evidence if it preserves the distinction between `pass_rows`, `fail_rows`, and
 `blocked_rows`.
 
-## 8. Acceptance Evidence
+## 9. Acceptance Evidence
 
 For the first real identity row, keep these local artifacts together:
 
@@ -224,6 +285,21 @@ identity-handoff/controlled-real-summary.json
 identity-handoff/blocked-rows.md
 ```
 
+For full Phase 1 rows, also keep:
+
+```text
+reality-candidates/template-summary.json
+reality-candidates/finalize-summary.json
+reality-candidates/full-readiness-summary.json
+reality-candidates/prediction-candidates.json
+reality-candidates/intervention-candidates.json
+reality-handoff/reality-bundle-handoff-summary.json
+reality-handoff/prediction-eval-summary.json
+reality-handoff/intervention-eval-summary.json
+reality-handoff/controlled-real-summary.json
+reality-handoff/blocked-rows.md
+```
+
 A Stage 1 identity claim is only reviewable when:
 
 - capture file audit passed with real RGB and Gaussian files;
@@ -234,7 +310,12 @@ A Stage 1 identity claim is only reviewable when:
 - reality gate kept prediction and intervention rows blocked until their GT
   and metrics exist.
 
-## 9. Boundaries
+A full Phase 1 reality claim is only reviewable when identity, prediction, and
+intervention rows all come from the same controlled capture manifest, and the
+full reality gate preserves any fail rows instead of converting them into
+blocked rows or pass rows.
+
+## 10. Boundaries
 
 This runbook does not:
 
@@ -247,4 +328,4 @@ This runbook does not:
 - start replay buffer, identity graph, diffusion, or long-horizon dynamics work.
 
 It only defines the shortest reliable path from real controlled tabletop
-evidence to a reviewable Phase 1 identity row.
+evidence to reviewable Phase 1 identity, prediction, and intervention rows.

@@ -150,6 +150,13 @@ def write_objectstate_controlled_reality_candidate_templates(
         "readiness": readiness,
         "issues": issues,
         "next_commands": {
+            "finalize_candidates": (
+                "uv run objgauss object-state "
+                "finalize-controlled-reality-candidates "
+                f"{out / _PREDICTION_TEMPLATE_FILE} "
+                f"{out / _INTERVENTION_TEMPLATE_FILE} "
+                f"--output-dir {out} --bundle-root {root}"
+            ),
             "audit_full_readiness": (
                 "uv run objgauss object-state "
                 "audit-controlled-reality-bundle-readiness "
@@ -309,7 +316,7 @@ def validate_objectstate_controlled_reality_candidate_template_summary(
     next_commands = payload.get("next_commands")
     if not isinstance(next_commands, Mapping):
         raise ValueError("controlled reality candidate template requires next_commands")
-    for key in ("audit_full_readiness", "full_handoff"):
+    for key in ("finalize_candidates", "audit_full_readiness", "full_handoff"):
         if not isinstance(next_commands.get(key), str) or not next_commands[key]:
             raise ValueError(f"controlled reality candidate template missing command {key}")
     _validate_claim_policy(payload.get("claim_policy", {}))
@@ -918,16 +925,20 @@ This directory contains draft JSON templates for the controlled real prediction
 and intervention gates. The templates are intentionally not valid evaluator
 inputs. Fill model outputs into separate files named:
 
+- prediction-candidates.template.json
+- intervention-candidates.template.json
+
+Do not rename these `.template.json` files into evaluator inputs. Replace every
+TODO value with external model or baseline outputs, then run the finalizer. It
+will write evaluator-ready files named:
+
 - prediction-candidates.json
 - intervention-candidates.json
-
-Do not rename these `.template.json` files into evaluator inputs without
-replacing every TODO value, changing the schema to the target eval schema, and
-removing authoring-only fields.
 
 Validation commands:
 
 ```bash
+uv run objgauss object-state finalize-controlled-reality-candidates {output_dir / 'prediction-candidates.template.json'} {output_dir / 'intervention-candidates.template.json'} --output-dir {output_dir} --bundle-root {bundle_root}
 uv run objgauss object-state audit-controlled-reality-bundle-readiness {bundle_root} <objectstates.json> {output_dir / 'prediction-candidates.json'} {output_dir / 'intervention-candidates.json'}
 uv run objgauss object-state controlled-reality-bundle-handoff {bundle_root} <objectstates.json> {output_dir / 'prediction-candidates.json'} {output_dir / 'intervention-candidates.json'} --output-dir {output_dir / 'reality-handoff'}
 ```

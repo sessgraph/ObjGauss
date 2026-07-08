@@ -1219,6 +1219,9 @@ Implemented v0.1 facts:
   `objgauss object-state init-controlled-reality-candidates <bundle-root> --output-dir <dir>`.
 - CLI supports capture bundle file names, `--candidate-id`,
   `--candidate-source`, `--artifact-ref`, `--summary-output` and `--force`.
+- Generated README and summary next commands point to
+  `finalize-controlled-reality-candidates` before readiness / handoff, so
+  authors do not need to hand-edit evaluator schemas.
 
 Current scope remains candidate authoring only. It does not collect capture
 data, create GT, run prediction / intervention models, train Gaussian or
@@ -1261,6 +1264,32 @@ Current scope remains candidate JSON finalization only. It does not collect
 capture data, create GT, run prediction / intervention models, train Gaussian
 or dynamics models, evaluate metrics, claim pass rows, use replay / diffusion,
 write public samples or mutate viewer defaults.
+
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001
+
+Document the full candidate authoring path from capture bundle to full Phase 1
+handoff.
+
+Implemented v0.1 facts:
+
+- `docs/training/controlled-real-capture-runbook.md` now covers:
+  - Stage 1 identity handoff as the first real row;
+  - prediction / intervention candidate template generation;
+  - filling external model or baseline outputs into `.template.json` files;
+  - finalizing templates into evaluator-ready candidate JSON;
+  - full controlled reality readiness;
+  - full controlled reality handoff.
+- The runbook records local artifact names for full Phase 1 evidence:
+  `template-summary.json`, `finalize-summary.json`,
+  `full-readiness-summary.json`, `prediction-candidates.json`,
+  `intervention-candidates.json`, `reality-bundle-handoff-summary.json`,
+  prediction / intervention eval summaries, full `controlled-real-summary.json`
+  and `blocked-rows.md`.
+
+Current scope remains workflow documentation and generated command chaining
+only. It does not collect capture data, create GT, run candidate models, train
+Gaussian or dynamics models, evaluate metrics, claim pass rows, use replay /
+diffusion, write public samples or mutate viewer defaults.
 
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 

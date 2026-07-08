@@ -76,7 +76,15 @@ def test_controlled_reality_candidate_templates_are_draft_only(tmp_path):
     ].startswith("TODO")
     assert "target_position" not in json.dumps(prediction_template)
     assert "target_position" not in json.dumps(intervention_template)
+    assert "finalize_candidates" in summary["next_commands"]
+    assert "finalize-controlled-reality-candidates" in summary["next_commands"][
+        "finalize_candidates"
+    ]
+    assert "prediction-candidates.template.json" in summary["next_commands"][
+        "finalize_candidates"
+    ]
     assert "audit-controlled-reality-bundle-readiness" in readme
+    assert "finalize-controlled-reality-candidates" in readme
     assert "controlled-reality-bundle-handoff" in readme
     assert "not valid evaluator" in readme
 
@@ -126,6 +134,7 @@ def test_object_state_init_controlled_reality_candidates_cli(tmp_path, capsys):
     assert "sample_id=controlled-tabletop-cup-001" in stdout
     assert "prediction_drafts=2" in stdout
     assert "intervention_drafts=1" in stdout
+    assert "finalize_candidates_command=" in stdout
     assert "audit_full_readiness_command=" in stdout
     assert "full_handoff_command=" in stdout
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA
