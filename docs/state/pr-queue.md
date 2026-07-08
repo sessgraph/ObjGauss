@@ -193,6 +193,11 @@ schema 会被 identity route 拒绝，不复制 BOP pose GT、不训练模型、
 controlled identity handoff / eval、identity evidence package audit 和 Phase 1 ledger
 串成一条 Stage 1 identity evidence 命令；reviewable 与 metric pass 分离，fail row
 也可作为负证据审阅。
+`OBJECTSTATE-BOP-LOCAL-ROW-HANDOFF-001` 继续补齐
+`bop-local-row-handoff`，可用同一 BOP scene / sample id / Gaussian evidence /
+condition sidecar 同时跑 identity handoff 和 prediction baseline handoff，并写出合并的
+Phase 1 ledger；该 ledger 可达到 identity+prediction reviewable，但 intervention 仍为
+explicitly out of scope。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -264,6 +269,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-LOCAL-ROW-HANDOFF-001: Run BOP identity and prediction evidence together
+
+- 状态: done / identity-prediction-local-row-evidence
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 evidence
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 用同一个本地 BOP scene / sample id / per-frame Gaussian evidence / condition
+  sidecar 同时跑 Stage 1 identity handoff 和 prediction baseline handoff，并生成合并的
+  Phase 1 evidence ledger。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_local_row_handoff`，冻结
+    `objgauss-objectstate-bop-local-row-handoff-v1` summary schema。
+  - 新增 CLI `objgauss object-state bop-local-row-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`。
+  - 命令复用 `bop-identity-handoff` 和 `bop-prediction-baseline-handoff`，分别写
+    `identity-handoff/` 与 `reality-candidates/` package，再重写合并的
+    `phase1-evidence-ledger.json`。
+  - 顶层 summary 分离 `reviewability_gates` 和 `pass_gates`；reviewable 不等于 metric
+    pass，metric fail 仍可作为负证据。
+  - 合并 ledger 可达到 `identity_prediction_reviewable` maturity；BOP route 明确不声明
+    intervention / counterfactual evidence。
+- 边界:
+  - 不下载 BOP，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不声明 intervention gate，不声明 world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_handoff.py`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: passed，9 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_local_row_handoff.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，58 tests。
+  - `uv run --extra dev pytest`: passed，470 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 待提交。
 
 ### OBJECTSTATE-BOP-IDENTITY-HANDOFF-001: Run BOP identity evidence handoff
 

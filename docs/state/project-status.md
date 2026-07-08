@@ -829,6 +829,18 @@ match、occlusion reappearance、view / lighting / camera motion metadata；它�
 不创建 GT、不重建 Gaussian、不训练模型、不声明 prediction / intervention gate 或 world model。
 为兼容 BOP finalizer 的 candidate artifact，identity prediction adapter 会把 artifact-level
 `identity_evidence` 归一化为 evaluator 需要的带来源 evidence，而不修改 artifact 本身。
+随后完成 `OBJECTSTATE-BOP-LOCAL-ROW-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_local_row_handoff`，schema 为
+`objgauss-objectstate-bop-local-row-handoff-v1`，CLI 为
+`objgauss object-state bop-local-row-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`。
+该命令用同一 BOP scene / sample id / selected frames / Gaussian evidence / condition
+sidecar 跑 `bop-identity-handoff` 和 `bop-prediction-baseline-handoff`，然后重写合并的
+`phase1-evidence-ledger.json`。当 identity package 和 prediction package 都完整可审阅时，
+ledger maturity 可达到 `identity_prediction_reviewable`；`intervention_evidence_reviewable`
+仍按设计为 false，因为 BOP pose scene 没有 action outcome / counterfactual evidence。
+顶层继续分离 `reviewability_gates` 与 `pass_gates`，不把可审阅证据等同于 metric pass。
+该步骤仍不下载 BOP、不创建 GT、不重建 Gaussian、不训练模型、不声明 intervention gate 或
+world model，也不改 viewer/export 默认策略。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

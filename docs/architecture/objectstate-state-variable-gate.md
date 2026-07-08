@@ -849,6 +849,46 @@ BOP data, create GT, reconstruct Gaussians, train Gaussian / tracking /
 dynamics models, claim prediction / intervention gates, claim world model, use
 replay / diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-LOCAL-ROW-HANDOFF-001
+
+Run the local BOP identity and prediction handoffs as one combined Phase 1
+local-row evidence command.
+
+Required behavior:
+
+- Input a local BOP scene root, output root and finalized trainable
+  ObjectState candidate artifact.
+- Run the BOP prediction baseline handoff and BOP identity handoff with the
+  same scene, sample id, frame selection, Gaussian evidence and condition
+  sidecar settings.
+- Preserve the stricter identity scenario requirements: occlusion
+  reappearance, view metadata, lighting metadata and camera motion metadata.
+- Write or refresh the normal identity package under `identity-handoff/` and
+  the normal prediction package under `reality-candidates/`.
+- Write a merged `phase1-evidence-ledger.json` that exposes identity and
+  prediction reviewability for the same sample.
+- Keep intervention / counterfactual gates explicitly out of scope because BOP
+  pose scenes do not provide action outcome evidence.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_local_row_handoff`.
+- Summary schema: `objgauss-objectstate-bop-local-row-handoff-v1`.
+- Core function: `objectstate_bop_local_row_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-local-row-handoff <scene-root> --output-root <dir> --candidate-artifact <objectstates.json>`.
+- The summary separates `reviewability_gates` from `pass_gates`; a package can
+  be reviewable even when an identity or prediction row is a metric fail.
+- The merged ledger can reach `identity_prediction_reviewable` maturity when
+  both subpackages are complete for the same sample. `intervention_evidence_reviewable`
+  remains false by design.
+
+Current scope is deterministic local orchestration only. It does not download
+BOP data, create GT, reconstruct Gaussians, train Gaussian / tracking /
+prediction / dynamics models, claim intervention / counterfactual gates, claim
+world model, use replay / diffusion, write public samples or mutate viewer
+defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.
