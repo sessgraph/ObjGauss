@@ -491,6 +491,23 @@ candidates schema / action binding。`full_reality_handoff_ready=true` 只表示
 eval、不训练 Gaussian 或 dynamics、不写 `public/samples`、不改 viewer/export 默认。
 完成 commit: `c3b22ef`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001`：新增
+`objgauss.core.objectstate_controlled_reality_candidate_template`，schema 为
+`objgauss-objectstate-controlled-reality-candidate-template-v1`，并新增 CLI
+`objgauss object-state init-controlled-reality-candidates <bundle-root> --output-dir <dir>`。
+该命令从已填写的 controlled capture bundle 导入 manifest，枚举 pose-backed
+prediction draft rows 和 action-bracketed intervention draft rows，写出
+`prediction-candidates.template.json`、`intervention-candidates.template.json`
+和本地 README。两个模板使用独立 draft schema：
+`objgauss-objectstate-controlled-prediction-candidates-template-v1` 和
+`objgauss-objectstate-controlled-intervention-candidates-template-v1`，并保持
+`template_status=draft_not_valid_for_eval`；正式 evaluator 会拒绝这些模板 schema，防止
+TODO 模板被误当作真实 pass evidence。模板不写 target pose values，不运行预测 /
+动作模型，不训练 Gaussian 或 dynamics，不创建 GT，不写 `public/samples`、不改
+viewer/export 默认。当前仍缺实际 controlled tabletop capture 文件和真实
+objectstates / prediction / intervention candidate JSON 作为通过证据。完成 commit:
+`443344d`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

@@ -97,8 +97,11 @@ merged controlled-real manifest 与 full reality gate。
 可在实际跑 handoff 前检查 bundle、trainable artifact、prediction candidates 和
 intervention candidates 是否结构完整并绑定同一个 capture manifest。下一步仍是实际采集 /
 标注 controlled tabletop RGB / Gaussian / pose / action 文件，并准备真实 candidate
-artifact / prediction / intervention JSON，让 readiness 从 fixture 进入真实 ready，再让 rows
-进入真实 pass / fail，而不是新增大模型。
+artifact / prediction / intervention JSON；`OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001`
+已新增 `init-controlled-reality-candidates` CLI，可从已填写 bundle 生成 draft-only
+prediction / intervention candidate templates，帮助作者填真实模型输出，同时保证
+模板 schema 不能被 evaluator 当作 pass evidence。后续仍要让 readiness 从 fixture
+进入真实 ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -170,6 +173,44 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001: Scaffold controlled reality candidate templates
+
+- 状态: done / authoring-template-only-no-real-candidate-output
+- 类型: 标准 PR / controlled tabletop candidate authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给 Phase 1 full controlled reality handoff 增加 prediction /
+  intervention candidate JSON 的安全作者ing入口，降低真实 bundle 进入 full
+  readiness / handoff 的手工 schema 成本。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_reality_candidate_template`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-reality-candidate-template-v1`。
+  - 新增 draft schema
+    `objgauss-objectstate-controlled-prediction-candidates-template-v1` 和
+    `objgauss-objectstate-controlled-intervention-candidates-template-v1`。
+  - Template writer 从 controlled capture bundle 导入 manifest，枚举
+    pose-backed prediction draft rows 和 action-bracketed intervention draft rows。
+  - 输出 `prediction-candidates.template.json`、
+    `intervention-candidates.template.json` 和本地 README。
+  - 模板 row 保持 TODO candidate position 字段，并不写 target pose values。
+  - 模板 schema 故意不同于正式 evaluator input schema；测试覆盖正式
+    prediction / intervention evaluator 会拒绝这些 template schema。
+  - CLI 新增 `objgauss object-state init-controlled-reality-candidates
+    <bundle-root> --output-dir <dir>`，支持 bundle CSV 文件名、`--candidate-id`、
+    `--candidate-source`、`--artifact-ref`、`--summary-output` 和 `--force`。
+  - Core lazy namespace 暴露 template schema、writer 和 validators。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 eval-ready prediction / intervention candidates，不运行
+    prediction / intervention 模型，不训练 Gaussian / dynamics，不写
+    `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_core_namespace.py -q`: passed, 12 tests。
+  - `git diff --check`: passed。
+- 完成 commit: `443344d`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-READINESS-001: Audit full controlled reality handoff readiness
 
