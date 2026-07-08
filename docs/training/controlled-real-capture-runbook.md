@@ -180,6 +180,27 @@ action_id,action_type,object_id,start_timestamp,end_timestamp,actor,target_objec
 push-left-001,push_left,cup-001,1.000,1.500,human,, -0.05,0,0
 ```
 
+## 6.1 Object Transition Dataset
+
+After `capture-manifest.json` validates and before creating prediction /
+intervention candidate files, compile the frame-level capture into object-level
+transition rows:
+
+```bash
+uv run objgauss object-state compile-objectstate-transitions \
+  outputs/captures/controlled-tabletop-cup-box-001/capture-manifest.json \
+  --output outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions-summary.json \
+  --require-action-transition
+```
+
+This writes `objgauss-objectstate-transition-dataset-v1`: object episodes and
+transition rows shaped as `ObjectState_t + Action_t -> ObjectState_t+1`.
+The compiler only consumes the already validated capture manifest. It does not
+create GT, infer identity, run a prediction / intervention model, train
+dynamics, create replay buffers, emit reality rows, or make a metric-pass
+claim.
+
 ## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible

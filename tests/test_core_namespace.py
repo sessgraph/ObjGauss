@@ -67,6 +67,8 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
+    OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
+    OBJECTSTATE_TRANSITION_ROW_SCHEMA,
     OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA,
@@ -258,6 +260,8 @@ from objgauss.core import (
     objectstate_controlled_capture_import_summary,
     objectstate_controlled_capture_manifest_from_bundle,
     objectstate_controlled_capture_missing_files_markdown,
+    objectstate_transition_dataset_from_capture_manifest,
+    write_objectstate_transition_dataset,
     write_objectstate_controlled_capture_bundle_template,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
@@ -381,6 +385,7 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_file_audit_summary,
     validate_objectstate_controlled_capture_summary,
     validate_objectstate_controlled_capture_import_summary,
+    validate_objectstate_transition_dataset,
     validate_objectstate_controlled_identity_eval_summary,
     validate_objectstate_controlled_identity_handoff_summary,
     validate_objectstate_controlled_identity_predictions,
@@ -979,11 +984,19 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA == (
         "objgauss-objectstate-controlled-capture-environment-v1"
     )
+    assert OBJECTSTATE_TRANSITION_DATASET_SCHEMA == (
+        "objgauss-objectstate-transition-dataset-v1"
+    )
+    assert OBJECTSTATE_TRANSITION_ROW_SCHEMA == (
+        "objgauss-objectstate-transition-row-v1"
+    )
     assert objectstate_controlled_capture_file_audit is not None
     assert objectstate_controlled_capture_environment is not None
     assert objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert objectstate_controlled_capture_import_summary is not None
     assert objectstate_controlled_capture_manifest_from_bundle is not None
+    assert objectstate_transition_dataset_from_capture_manifest is not None
+    assert write_objectstate_transition_dataset is not None
     assert objectstate_controlled_capture_missing_files_markdown([]).endswith(
         "no missing files |"
     )
@@ -991,7 +1004,16 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_controlled_capture_environment_summary is not None
     assert validate_objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert validate_objectstate_controlled_capture_import_summary is not None
+    assert validate_objectstate_transition_dataset is not None
     assert capture_summary["readiness"]["identity_stage_ready"] is True
+    transition_dataset = objectstate_transition_dataset_from_capture_manifest(
+        capture_manifest,
+        require_action_transition=True,
+    )
+    assert transition_dataset["schema"] == OBJECTSTATE_TRANSITION_DATASET_SCHEMA
+    assert validate_objectstate_transition_dataset(transition_dataset) == (
+        transition_dataset
+    )
     capture_seed = objectstate_controlled_real_manifest_from_capture_manifest(
         capture_manifest
     )

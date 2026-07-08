@@ -1032,6 +1032,18 @@ intervention-ready 状态；但它仍只是 GT row authoring adapter，不下载
 不复制媒体、不推断 GT、不重建 Gaussian、不创建 candidates、不运行 handoff/eval、不生成
 `public_replay` rows、不训练模型，也不声明 intervention pass、counterfactual proof 或
 world model。
+随后完成 `OBJECTSTATE-TRANSITION-DATASET-001`：新增
+`objgauss.core.objectstate_transition_dataset`，schema 为
+`objgauss-objectstate-transition-dataset-v1`，row schema 为
+`objgauss-objectstate-transition-row-v1`，CLI 为
+`objgauss object-state compile-objectstate-transitions <capture-manifest.json> --output <objectstate-transitions.json>`。
+该 compiler 从已验证 controlled capture manifest 生成 object-level episodes 和
+`ObjectState_t + action_context -> ObjectState_t+1` transition rows，并统计
+action-conditioned / no-action transitions、pose transition readiness 和 Gaussian ref
+coverage。它是把 frame-level GT 收敛为目标文件所要求 Object Transition Dataset 的数据
+契约；不采集数据、不创建 GT、不推断 identity、不重建 Gaussian、不运行 prediction /
+intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
+metric pass 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

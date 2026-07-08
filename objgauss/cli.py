@@ -199,6 +199,9 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
 from objgauss.core.objectstate_controlled_prediction_baseline import (
     write_objectstate_controlled_prediction_baseline_candidates,
 )
+from objgauss.core.objectstate_transition_dataset import (
+    write_objectstate_transition_dataset,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -4744,6 +4747,42 @@ def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
         raise ValueError("controlled capture manifest is not prediction-stage ready")
     if args.require_intervention_ready and not readiness["intervention_stage_ready"]:
         raise ValueError("controlled capture manifest is not intervention-stage ready")
+
+
+def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
+    summary = write_objectstate_transition_dataset(
+        args.capture_manifest,
+        args.output,
+        require_pose=not args.allow_missing_pose,
+        require_action_transition=args.require_action_transition,
+        force=args.force,
+    )
+    readiness = summary["readiness"]
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"capture_manifest={args.capture_manifest}")
+    print(f"output={summary['output']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"object_episodes={counts['object_episodes']}")
+    print(f"transitions={counts['transitions']}")
+    print(f"action_conditioned_transitions={counts['action_conditioned_transitions']}")
+    print(f"no_action_transitions={counts['no_action_transitions']}")
+    print(f"pose_transition_ready={str(readiness['pose_transition_ready']).lower()}")
+    print(
+        "action_conditioned_transition_ready="
+        f"{str(readiness['action_conditioned_transition_ready']).lower()}"
+    )
+    print(f"real_gaussian_refs_present={str(readiness['real_gaussian_refs_present']).lower()}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_action_transition
+        and not readiness["action_conditioned_transition_ready"]
+    ):
+        raise ValueError(
+            "ObjectState transition dataset has no action-conditioned transitions"
+        )
 
 
 def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> None:
@@ -10148,6 +10187,34 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
     validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
+    compile_objectstate_transitions = object_state_subparsers.add_parser(
+        "compile-objectstate-transitions",
+        help=(
+            "compile a controlled capture manifest into object-level "
+            "ObjectState transition rows"
+        ),
+    )
+    compile_objectstate_transitions.add_argument("capture_manifest", type=Path)
+    compile_objectstate_transitions.add_argument("--output", type=Path, required=True)
+    compile_objectstate_transitions.add_argument("--summary-output", type=Path)
+    compile_objectstate_transitions.add_argument(
+        "--allow-missing-pose",
+        action="store_true",
+        help="allow transition states without pose; default requires pose",
+    )
+    compile_objectstate_transitions.add_argument(
+        "--require-action-transition",
+        action="store_true",
+        help="fail unless at least one transition has action context",
+    )
+    compile_objectstate_transitions.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite the transition dataset output if it already exists",
+    )
+    compile_objectstate_transitions.set_defaults(
+        handler=_object_state_compile_objectstate_transitions
+    )
     audit_controlled_capture_files = object_state_subparsers.add_parser(
         "audit-controlled-capture-files",
         help="check local files referenced by a controlled capture manifest",

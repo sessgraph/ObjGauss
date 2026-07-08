@@ -220,3 +220,13 @@ physical `object_id`、完整 6DoF pose、action metadata 和 per-frame Gaussian
 不运行 handoff/eval、不创建 `public_replay` rows、不训练模型，也不声明 intervention pass、
 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 public interaction
 identity / prediction / intervention rows 进入 pass / fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-DATASET-001`
+新增 `compile-objectstate-transitions`，可把已验证 controlled capture manifest 编译成
+object-level episodes 和 `ObjectState_t + action_context -> ObjectState_t+1` transition
+rows。该缓解让 Phase 1 数据从 frame-level capture 进一步进入目标文件要求的 Object
+Transition Dataset 形态，并显式统计 action-conditioned / no-action transitions；但它仍只
+编译已有 GT，不采集数据、不推断 identity、不重建 Gaussian、不运行 eval、不训练 dynamics、
+不创建 replay buffer、不创建 reality rows、不声明 metric pass 或 world-model evidence。风险继续
+open，直到真实 transition-backed identity / prediction / intervention rows 进入 pass /
+fail accounting。

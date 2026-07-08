@@ -347,6 +347,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-DATASET-001: Compile object-level transition dataset
+
+- 状态: done / objectstate-transition-dataset
+- 类型: 标准 PR / ObjectState Phase 1 data contract
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将已验证 controlled capture manifest 从 frame-level capture 收敛为
+  object-level experience / transition rows，对齐目标文件里的
+  `ObjectState_t + Action_t -> ObjectState_t+1` 数据形态。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_transition_dataset`。
+  - 新增 schema `objgauss-objectstate-transition-dataset-v1` 和 row schema
+    `objgauss-objectstate-transition-row-v1`。
+  - 新增 CLI `objgauss object-state compile-objectstate-transitions
+    <capture-manifest.json> --output <objectstate-transitions.json>`。
+  - 从 validated controlled capture manifest 生成 object episodes、transition rows、
+    action context、pose transition readiness、action-conditioned / no-action counts 和
+    Gaussian ref coverage。
+  - 支持 `--require-action-transition`，确保 action-capable capture 能被明确检查。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集数据、不下载 public dataset、不创建 GT、不推断 physical identity。
+  - 不重建 Gaussian、不运行 prediction / intervention eval、不训练 dynamics。
+  - 不创建 replay buffer、不创建 reality rows、不声明 metric pass 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_dataset.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_transition_dataset.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_dataset.py tests/test_core_namespace.py -q`: 12 passed。
+  - `uv run --extra dev pytest`: 530 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-CLIP-CSV-ADAPTER-001: Import normalized public interaction clip CSV
 
 - 状态: done / public-interaction-clip-csv-adapter
