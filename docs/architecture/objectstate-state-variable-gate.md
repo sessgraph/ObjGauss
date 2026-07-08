@@ -1004,6 +1004,47 @@ run local-row handoff, train models, claim metric pass, claim intervention /
 counterfactual gates, claim world model, use replay / diffusion, write public
 samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-PHASE1-SAMPLE-WORKSPACES-001
+
+Initialize per-sample authoring directories from a BOP Phase 1 batch spec.
+
+Required behavior:
+
+- Input a native BOP local-row batch spec.
+- Resolve each sample's scene root, target candidate artifact and target
+  condition sidecar relative to the batch spec.
+- Create the target artifact parent directory as the sample authoring root.
+- Write a condition CSV template and draft condition sidecar for every sample
+  whose scene root can be read.
+- Write a per-sample README with next commands for condition sidecar
+  authoring, optional RGB-D Gaussian evidence export, candidate artifact
+  template initialization and candidate artifact finalization.
+- Keep target `bop-condition-sidecar.json` and `objectstates.json` missing
+  until the operator fills real metadata and model output.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_phase1_sample_workspace`.
+- Summary schema:
+  `objgauss-objectstate-bop-phase1-sample-workspaces-v1`.
+- Core function:
+  `objectstate_bop_phase1_sample_workspaces(...)`.
+- CLI command:
+  `objgauss object-state init-bop-phase1-sample-workspaces <batch-spec.json>`.
+- The command writes helper files such as
+  `bop-conditions.template.csv`, `bop-condition-sidecar.draft.json` and
+  `README.md` under each sample's authoring root.
+- `--require-ready-to-author` fails if scene roots or helper templates are
+  missing.
+
+Current scope is per-sample authoring only. It does not download BOP data, copy
+datasets, create GT, infer condition metadata, create the target condition
+sidecar, create ObjectState candidate artifacts, reconstruct Gaussians, run
+readiness, run local-row handoff, train models, claim metric pass, claim
+intervention / counterfactual gates, claim world model, use replay /
+diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample

@@ -55,3 +55,11 @@ README / next commands；该缓解只把本地 BOP subset 到 batch readiness �
 路径收敛成可复跑 workspace，不创建 candidate artifact、condition sidecar、Gaussian
 evidence 或 GT，不运行 readiness / handoff、不训练模型、不声明 metric pass、
 intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-PHASE1-SAMPLE-WORKSPACES-001`
+新增 `init-bop-phase1-sample-workspaces`，可从 native BOP local-row batch spec 为每个
+sample 写出 condition CSV 模板、condition sidecar draft 和 README / next commands，
+帮助作者填真实 `bop-condition-sidecar.json`、per-frame Gaussian evidence 和
+`objectstates.json`；该缓解只初始化 per-sample authoring helper，不创建真实 target
+sidecar、candidate artifact、Gaussian evidence 或 GT，不运行 readiness / handoff、不训练
+模型、不声明 metric pass、intervention gate 或 world-model evidence。

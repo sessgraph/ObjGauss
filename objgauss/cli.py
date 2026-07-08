@@ -221,6 +221,9 @@ from objgauss.core.objectstate_bop_phase1_subset_selector import (
 from objgauss.core.objectstate_bop_phase1_batch_workspace import (
     objectstate_bop_phase1_batch_workspace,
 )
+from objgauss.core.objectstate_bop_phase1_sample_workspace import (
+    objectstate_bop_phase1_sample_workspaces,
+)
 from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
     objectstate_bop_gaussian_evidence_preflight,
 )
@@ -3421,6 +3424,43 @@ def _object_state_init_bop_phase1_batch_workspace(args: argparse.Namespace) -> N
         raise ValueError("BOP Phase 1 batch workspace input paths are incomplete")
 
 
+def _object_state_init_bop_phase1_sample_workspaces(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_phase1_sample_workspaces(
+        args.batch_spec,
+        force=args.force,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    print(f"schema={summary['schema']}")
+    print(f"bop_phase1_sample_workspaces_status={summary['status']}")
+    print(f"samples={summary['row_counts']['samples']}")
+    print(
+        "condition_csv_templates_written="
+        f"{summary['row_counts']['condition_csv_templates_written']}"
+    )
+    print(
+        "target_condition_sidecars_present="
+        f"{summary['row_counts']['target_condition_sidecars_present']}"
+    )
+    print(
+        "target_candidate_artifacts_present="
+        f"{summary['row_counts']['target_candidate_artifacts_present']}"
+    )
+    for record in summary["sample_records"]:
+        print(f"sample_workspace={record['sample_id']}:{record['paths']['authoring_root']}")
+        for issue in record["issues"]:
+            print(f"sample_issue={record['sample_id']}:{issue}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.require_ready_to_author and not summary["readiness"][
+        "sample_workspaces_ready_to_author"
+    ]:
+        raise ValueError("BOP Phase 1 sample workspaces are not ready to author")
+
+
 def _write_bop_batch_samples_csv_template(
     output: Path,
     summary: Mapping[str, object],
@@ -6391,6 +6431,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_bop_phase1_batch_workspace.set_defaults(
         handler=_object_state_init_bop_phase1_batch_workspace
+    )
+    init_bop_phase1_sample_workspaces = object_state_subparsers.add_parser(
+        "init-bop-phase1-sample-workspaces",
+        help="initialize per-sample BOP Phase 1 authoring directories from a batch spec",
+    )
+    init_bop_phase1_sample_workspaces.add_argument("batch_spec", type=Path)
+    init_bop_phase1_sample_workspaces.add_argument("--summary-output", type=Path)
+    init_bop_phase1_sample_workspaces.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite helper files such as README and condition CSV templates",
+    )
+    init_bop_phase1_sample_workspaces.add_argument(
+        "--require-ready-to-author",
+        action="store_true",
+        help="fail unless sample authoring helper files were initialized",
+    )
+    init_bop_phase1_sample_workspaces.set_defaults(
+        handler=_object_state_init_bop_phase1_sample_workspaces
     )
     audit_bop_gaussian_evidence = object_state_subparsers.add_parser(
         "audit-bop-gaussian-evidence",
