@@ -145,6 +145,9 @@ from objgauss.core.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_capture_template import (
+    write_objectstate_controlled_capture_bundle_template,
+)
 from objgauss.core.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
@@ -3038,6 +3041,53 @@ def _object_state_controlled_real_gate(args: argparse.Namespace) -> None:
         raise ValueError("controlled real ObjectState reality gate did not pass")
 
 
+def _object_state_init_controlled_capture_bundle(args: argparse.Namespace) -> None:
+    summary = write_objectstate_controlled_capture_bundle_template(
+        args.bundle_root,
+        sample_id=args.sample_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        capture_device=args.capture_device,
+        license_text=args.license_text,
+        objects=_controlled_capture_template_objects(args.objects),
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"object_row_count={summary['object_row_count']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for key, path in summary["directories"].items():
+        print(f"{key}_dir={path}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
+def _controlled_capture_template_objects(
+    object_specs: list[str] | None,
+) -> list[dict[str, str]]:
+    objects = []
+    for spec in object_specs or ():
+        parts = spec.split(":", 2)
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            raise ValueError(
+                "--object must use object_id:category or object_id:category:label"
+            )
+        item = {
+            "object_id": parts[0],
+            "category": parts[1],
+        }
+        if len(parts) == 3 and parts[2]:
+            item["instance_label"] = parts[2]
+        objects.append(item)
+    return objects
+
+
 def _object_state_import_controlled_capture_bundle(args: argparse.Namespace) -> None:
     summary = objectstate_controlled_capture_import_summary(
         args.bundle_root,
@@ -3813,6 +3863,45 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_real_gate.add_argument("--min-real-or-public-rows", type=int, default=1)
     controlled_real_gate.add_argument("--require-pass", action="store_true")
     controlled_real_gate.set_defaults(handler=_object_state_controlled_real_gate)
+    init_controlled_capture = object_state_subparsers.add_parser(
+        "init-controlled-capture-bundle",
+        help="create a local controlled tabletop capture bundle skeleton",
+    )
+    init_controlled_capture.add_argument("bundle_root", type=Path)
+    init_controlled_capture.add_argument("--sample-id", required=True)
+    init_controlled_capture.add_argument(
+        "--object-category",
+        default="controlled_tabletop",
+    )
+    init_controlled_capture.add_argument(
+        "--scenario",
+        default="cross_view_occlusion_reappearance",
+    )
+    init_controlled_capture.add_argument("--fps", type=float, default=30.0)
+    init_controlled_capture.add_argument(
+        "--capture-device",
+        default="controlled-camera",
+    )
+    init_controlled_capture.add_argument(
+        "--license",
+        dest="license_text",
+        default="local controlled capture; not public release",
+    )
+    init_controlled_capture.add_argument(
+        "--object",
+        action="append",
+        dest="objects",
+        help="object_id:category or object_id:category:label; repeat per object",
+    )
+    init_controlled_capture.add_argument("--summary-output", type=Path)
+    init_controlled_capture.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite template files if they already exist",
+    )
+    init_controlled_capture.set_defaults(
+        handler=_object_state_init_controlled_capture_bundle
+    )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",
         help="build a controlled capture manifest from local bundle CSV files",

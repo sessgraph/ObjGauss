@@ -166,6 +166,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_import",
         "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_template",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA",
+    ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
@@ -178,6 +182,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_manifest_from_bundle",
     ),
+    "write_objectstate_controlled_capture_bundle_template": (
+        "objgauss.core.objectstate_controlled_capture_template",
+        "write_objectstate_controlled_capture_bundle_template",
+    ),
     "validate_objectstate_controlled_capture_import_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
@@ -185,6 +193,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_bundle_acceptance_summary",
+    ),
+    "validate_objectstate_controlled_capture_bundle_template_summary": (
+        "objgauss.core.objectstate_controlled_capture_template",
+        "validate_objectstate_controlled_capture_bundle_template_summary",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
