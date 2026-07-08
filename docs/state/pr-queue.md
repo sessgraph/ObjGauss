@@ -354,7 +354,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，501 tests。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: pending。
+- 完成 commit: `6af51ac`。
 
 ### OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001: Audit BOP sample authoring progress
 
