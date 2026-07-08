@@ -228,6 +228,21 @@ intervention readiness、RGB / Gaussian coverage、GT availability 和 issues；
 summary JSON 和 controlled-real seed manifest。当前仍没有提交真实视频、图像、
 Gaussian 或 GT 标注文件；这一步只是让真实采集结果进入 gate 前有可验证数据契约。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001`：新增
+`objgauss.core.objectstate_controlled_capture_import`，schema 为
+`objgauss-objectstate-controlled-capture-import-v1`。新增 CLI
+`objgauss object-state import-controlled-capture-bundle <bundle-root> --output <capture-manifest.json>`，
+可从本地 controlled tabletop bundle 的 `sample.json`、`objects.csv`、`frames.csv`、
+`annotations.csv` 和可选 `actions.csv` 生成
+`objgauss-objectstate-controlled-capture-manifest-v1`，并同步输出 import summary
+和 controlled-real blocked seed。CSV importer 支持 per-frame RGB / Gaussian refs、
+timestamp、view / lighting / camera pose condition、per-object visibility /
+occlusion、6DoF pose 和 action event metadata；partial pose 会 fail-fast，未知 frame
+annotation 也会 fail-fast。该步骤只把已采集 / 已标注事实导入现有 manifest / audit /
+handoff 链路，不采集视频、不创建 GT、不重建 Gaussian、不训练模型、不写
+`public/samples`、不改 viewer/export 默认；当前仍缺实际 controlled tabletop 文件和
+真实 candidate artifact 作为通过证据。完成 commit: `01ed42f`。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001`：新增
 `objgauss.core.objectstate_controlled_capture_files`，schema 为
 `objgauss-objectstate-controlled-capture-file-audit-v1`。它在 capture manifest

@@ -50,7 +50,10 @@ reality gate；`OBJECTSTATE-CONTROLLED-REAL-CLI-001` 已把该 importer 暴露�
 blocked rows Markdown，并支持 `--identity-only` Stage 1 gate；
 `OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001` 已新增 frame-level capture /
 annotation manifest validator 和 `validate-controlled-capture` CLI，可把真实 capture
-manifest 转成 blocked controlled-real seed；
+manifest 转成 blocked controlled-real seed；`OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001`
+已新增 `import-controlled-capture-bundle` CLI，可把本地 `sample.json`、`objects.csv`、
+`frames.csv`、`annotations.csv` 和可选 `actions.csv` 导入 controlled capture
+manifest；
 `OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001` 已新增
 `audit-controlled-capture-files` CLI，可检查 capture manifest 引用的 RGB / Gaussian
 文件是否真的存在于本地 bundle；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
@@ -176,6 +179,47 @@ viewer/export 默认模型。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
 - 完成 commit: `a9b0007`。
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001: Import controlled capture bundles
+
+- 状态: done / csv-importer-ready-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture bundle import
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让实际 controlled tabletop 采集包不用手写 JSON manifest，即可从本地
+  sample / object / frame / annotation / action 文件进入现有 capture manifest、
+  file audit 和 identity handoff 链路。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_import`。
+  - 新增 import summary schema
+    `objgauss-objectstate-controlled-capture-import-v1`。
+  - `objectstate_controlled_capture_manifest_from_bundle(...)` 从 bundle root 读取
+    `sample.json`、`objects.csv`、`frames.csv`、`annotations.csv` 和可选
+    `actions.csv`，生成
+    `objgauss-objectstate-controlled-capture-manifest-v1`。
+  - `objectstate_controlled_capture_import_summary(...)` 嵌入生成的 manifest、
+    controlled capture summary 和 row counts。
+  - CSV contract 支持对象 dimensions、per-frame RGB / Gaussian refs、
+    view / lighting / camera pose condition、per-object visibility /
+    occlusion、6DoF pose 和 action vector。
+  - Partial pose columns、未知 frame annotation、无对象或无标注会 fail-fast。
+  - CLI 新增 `objgauss object-state import-controlled-capture-bundle
+    <bundle-root> --output <capture-manifest.json>`。
+  - CLI 可写 `--summary-output` 和 `--controlled-real-output`，并支持
+    `--require-identity-ready`、`--require-prediction-ready` 和
+    `--require-intervention-ready`。
+  - Core lazy namespace 暴露 importer schema / summary / manifest builder /
+    summary validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - Importer 不创建 GT，不检查文件字节，不重建 Gaussian，不训练模型，不新增
+    `public/samples`。
+  - 不计算 candidate metrics，不推进 replay buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 344 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `01ed42f`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
 
