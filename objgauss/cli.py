@@ -4745,10 +4745,13 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
         identity_summaries=tuple(args.identity_summary),
         prediction_summaries=tuple(args.prediction_summary),
         reality_summaries=tuple(args.reality_summary),
+        discover_roots=tuple(args.discover_root),
+        max_depth=args.max_depth,
     )
     if args.summary_output:
         write_json(args.summary_output, summary)
     stage_summary = summary["stage_summary"]
+    discovery = summary["discovery"]
     phase_gates = summary["phase1_evidence_gates"]
     sample_ids = ",".join(summary["sample_scope"]["sample_ids"])
     print(f"schema={summary['schema']}")
@@ -4759,6 +4762,19 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
         f"{str(summary['status'].endswith('_reviewable')).lower()}"
     )
     print(f"sample_ids={sample_ids}")
+    print(f"discover_roots={len(discovery['roots'])}")
+    print(
+        "discovered_identity_summaries="
+        f"{discovery['identity_summary_count']}"
+    )
+    print(
+        "discovered_prediction_summaries="
+        f"{discovery['prediction_summary_count']}"
+    )
+    print(
+        "discovered_reality_summaries="
+        f"{discovery['reality_summary_count']}"
+    )
     print(f"identity_packages={stage_summary['identity']['package_count']}")
     print(f"identity_reviewable={stage_summary['identity']['reviewable_count']}")
     print(f"identity_pass_rows={stage_summary['identity']['pass_row_count']}")
@@ -4789,6 +4805,8 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
     )
     for gate, passed in phase_gates.items():
         print(f"phase1_gate.{gate}={str(passed).lower()}")
+    for issue in discovery["issues"]:
+        print(f"discovery_issue={issue}")
     print(f"issue_count={len(summary['issues'])}")
     for issue in summary["issues"]:
         print(f"issue={issue}")
@@ -5904,6 +5922,19 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         type=Path,
         help="full reality evidence package summary JSON; may be repeated",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--discover-root",
+        action="append",
+        default=[],
+        type=Path,
+        help="root directory to scan for standard Phase 1 summary filenames",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--max-depth",
+        default=4,
+        type=int,
+        help="maximum subdirectory depth to scan below each discovery root",
     )
     audit_phase1_evidence_ledger.add_argument(
         "--summary-output",

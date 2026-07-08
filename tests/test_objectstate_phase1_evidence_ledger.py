@@ -62,6 +62,47 @@ def test_phase1_evidence_ledger_reports_missing_summary(tmp_path):
     assert any("summary file is missing" in issue for issue in summary["issues"])
 
 
+def test_phase1_evidence_ledger_discovers_summary_files(tmp_path):
+    sample_root = tmp_path / "controlled-tabletop-cup-box-001"
+    identity_path = (
+        sample_root / "identity-handoff" / "identity-evidence-package-summary.json"
+    )
+    prediction_path = (
+        sample_root
+        / "reality-candidates"
+        / "prediction-evidence-package-summary.json"
+    )
+    reality_path = sample_root / "evidence-package-summary.json"
+    _write_json(identity_path, _identity_summary(row_status="pass"))
+    _write_json(prediction_path, _prediction_summary(row_status="fail"))
+    _write_json(reality_path, _reality_summary(pass_rows=3, fail_rows=0, blocked_rows=0))
+
+    summary = objectstate_phase1_evidence_ledger(
+        discover_roots=(tmp_path,),
+        max_depth=3,
+    )
+
+    assert summary["status"] == "objectstate_phase1_evidence_ledger_reviewable"
+    assert summary["maturity"] == "full_reality_reviewable"
+    assert summary["discovery"]["identity_summary_count"] == 1
+    assert summary["discovery"]["prediction_summary_count"] == 1
+    assert summary["discovery"]["reality_summary_count"] == 1
+    assert summary["stage_summary"]["identity"]["package_count"] == 1
+    assert summary["stage_summary"]["prediction"]["package_count"] == 1
+    assert summary["stage_summary"]["full_reality"]["package_count"] == 1
+    assert summary["issues"] == []
+
+
+def test_phase1_evidence_ledger_reports_invalid_discovery_root(tmp_path):
+    missing_root = tmp_path / "missing"
+
+    summary = objectstate_phase1_evidence_ledger(discover_roots=(missing_root,))
+
+    assert summary["status"] == "objectstate_phase1_evidence_ledger_incomplete"
+    assert summary["ledger_gates"]["discovery_roots_valid"] is False
+    assert any("discovery root is missing" in issue for issue in summary["issues"])
+
+
 def test_object_state_audit_phase1_evidence_ledger_cli(tmp_path, capsys):
     identity_path = tmp_path / "identity-summary.json"
     prediction_path = tmp_path / "prediction-summary.json"
@@ -100,6 +141,54 @@ def test_object_state_audit_phase1_evidence_ledger_cli(tmp_path, capsys):
     assert "prediction_reviewable=1" in stdout
     assert "full_reality_reviewable=1" in stdout
     assert "phase1_gate.does_not_claim_world_model=true" in stdout
+    assert "issue_count=0" in stdout
+    assert summary["maturity"] == "full_reality_reviewable"
+
+
+def test_object_state_audit_phase1_evidence_ledger_cli_discovers(
+    tmp_path,
+    capsys,
+):
+    sample_root = tmp_path / "controlled-tabletop-cup-box-001"
+    identity_path = (
+        sample_root / "identity-handoff" / "identity-evidence-package-summary.json"
+    )
+    prediction_path = (
+        sample_root
+        / "reality-candidates"
+        / "prediction-evidence-package-summary.json"
+    )
+    reality_path = sample_root / "evidence-package-summary.json"
+    summary_path = tmp_path / "phase1-ledger-summary.json"
+    _write_json(identity_path, _identity_summary(row_status="pass"))
+    _write_json(prediction_path, _prediction_summary(row_status="pass"))
+    _write_json(reality_path, _reality_summary(pass_rows=3, fail_rows=0, blocked_rows=0))
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-phase1-evidence-ledger",
+                "--discover-root",
+                str(tmp_path),
+                "--max-depth",
+                "3",
+                "--summary-output",
+                str(summary_path),
+                "--require-reviewable",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert "ledger_status=objectstate_phase1_evidence_ledger_reviewable" in stdout
+    assert "discover_roots=1" in stdout
+    assert "discovered_identity_summaries=1" in stdout
+    assert "discovered_prediction_summaries=1" in stdout
+    assert "discovered_reality_summaries=1" in stdout
     assert "issue_count=0" in stdout
     assert summary["maturity"] == "full_reality_reviewable"
 

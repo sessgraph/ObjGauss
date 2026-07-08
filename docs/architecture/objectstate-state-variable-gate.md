@@ -1687,6 +1687,10 @@ Implemented v0.1 facts:
 - Summary schema: `objgauss-objectstate-phase1-evidence-ledger-v1`.
 - `objectstate_phase1_evidence_ledger(...)` accepts existing summary JSON
   paths for identity-only, prediction-only and full reality evidence packages.
+- It can also discover standard summary filenames under explicit roots:
+  `identity-evidence-package-summary.json`,
+  `prediction-evidence-package-summary.json`, `evidence-package-summary.json`
+  and `reality-evidence-package-summary.json`.
 - The ledger validates each summary with its native validator, records
   `sample_id`, reviewability, row status / row accounting and issues, and then
   reports maturity:
@@ -1697,8 +1701,8 @@ Implemented v0.1 facts:
 - CLI command:
   `objgauss object-state audit-phase1-evidence-ledger`.
 - CLI supports repeated `--identity-summary`, `--prediction-summary` and
-  `--reality-summary` inputs, plus `--summary-output` and
-  `--require-reviewable`.
+  `--reality-summary` inputs, `--discover-root` / `--max-depth` discovery,
+  plus `--summary-output` and `--require-reviewable`.
 
 Current scope remains summary-level audit only. It does not collect capture
 data, create GT, reconstruct Gaussians, run identity handoff, rerun identity /

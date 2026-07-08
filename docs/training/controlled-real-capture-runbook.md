@@ -316,8 +316,8 @@ summaries, run:
 
 ```bash
 uv run objgauss object-state audit-phase1-evidence-ledger \
-  --identity-summary outputs/captures/controlled-tabletop-cup-box-001/identity-handoff/identity-evidence-package-summary.json \
-  --reality-summary outputs/captures/controlled-tabletop-cup-box-001/evidence-package-summary.json \
+  --discover-root outputs/captures/controlled-tabletop-cup-box-001 \
+  --max-depth 4 \
   --summary-output outputs/captures/controlled-tabletop-cup-box-001/phase1-evidence-ledger.json \
   --require-reviewable
 ```
