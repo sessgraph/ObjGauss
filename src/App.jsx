@@ -4606,6 +4606,91 @@ function DebugPanel({
         />
       </DebugSection>
 
+      <DebugSection title="对象开关" status={objectToggleStatus} defaultOpen>
+        <div className="objectStateList" data-object-toggle-list="true">
+          {objects.map((object) => {
+            const hidden = hiddenObjects.has(object.selectionId);
+            const selectedRow = object.selectionId === selectedObjectKey;
+            return (
+              <button
+                key={object.selectionId}
+                type="button"
+                className={`objectStateRow ${selectedRow ? "selected" : ""} ${hidden ? "hidden" : ""}`}
+                data-object-toggle={object.selectionId}
+                data-object-visible={hidden ? "false" : "true"}
+                data-object-gaussians={objectGaussianCountForSummary(object)}
+                data-object-hidden-gaussians={hidden ? objectGaussianCountForSummary(object) : 0}
+                onClick={() => onToggleObjectVisibility(object)}
+              >
+                <span className="modelAccent" style={{ background: object.accent }} />
+                <span>#{object.objectId}</span>
+                <small>{formatRatio(object.objectState?.confidence)}</small>
+                <i>{hidden ? "关" : "开"}</i>
+              </button>
+            );
+          })}
+        </div>
+      </DebugSection>
+
+      <DebugSection title="分配 / Gaussian" status={assignmentProbe?.status ?? "none"} defaultOpen>
+        <AssignmentHeatmap
+          assignment={assignment}
+          selectedObject={selectedObject}
+          debugProbe={debugProbe}
+          assignmentProbe={assignmentProbe}
+        />
+        <AssignmentTimelinePanel timeline={assignmentTimeline} />
+        <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
+        <HoverAssignmentHeatmap
+          hoveredTarget={hoveredTarget}
+          hoverAssignmentProbe={hoverAssignmentProbe}
+        />
+      </DebugSection>
+
+      <DebugSection title="对象诊断" status={objectExplainability?.status ?? objectContinuity?.status ?? "-"} defaultOpen>
+        <ObjectFragmentationPanel
+          selectedObject={selectedObject}
+          objectContinuity={objectContinuity}
+          hoveredTarget={hoveredTarget}
+          hoverContinuity={hoverContinuity}
+        />
+        <ObjectStateVerdictPanel
+          objectExplainability={objectExplainability}
+          hoverExplainability={hoverExplainability}
+        />
+        <dl className="debugStateGrid">
+          <Meta label="来源" value={debugProbe?.source ?? activeState?.source} />
+          <Meta label="渲染器" value={selected.delivery?.rendererName} />
+          <Meta label="Gaussian" value={debugProbe?.gaussianIndex ?? "-"} />
+          <Meta label="中心点" value={formatVec(activeState?.centroid)} />
+          <Meta label="包围盒" value={formatBox(activeState?.bbox)} />
+          <Meta label="空间" value={objectContinuity?.status ?? "-"} />
+          <Meta label="对角线" value={formatRatio(objectContinuity?.bboxDiagonal)} />
+          <Meta label="时序" value={objectTemporal?.status ?? "-"} />
+          <Meta label="抖动" value={formatRatio(objectTemporal?.assignmentJitter)} />
+          <Meta label="解释性" value={objectExplainability?.status ?? "-"} />
+          <Meta
+            label="悬停"
+            value={
+              hoveredTarget
+                ? `${hoveredTarget.modelId} #${hoveredTarget.objectId} / ${formatNumber(hoveredTarget.gaussianCount)}G`
+                : "-"
+            }
+          />
+          <Meta label="高亮" value={hoveredTarget?.selectionId ? "启用" : "-"} />
+          <Meta label="悬停 A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
+          <Meta label="悬停熵" value={formatRatio(hoverAssignmentProbe?.entropy)} />
+          <Meta label="悬停空间" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
+          <Meta label="悬停时序" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
+          <Meta
+            label="悬停解释"
+            value={hoverExplainability?.status !== "none" ? hoverExplainability?.status : "-"}
+          />
+          <Meta label="隐藏对象" value={hiddenObjects.size} />
+          <Meta label="隐藏点" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
+        </dl>
+      </DebugSection>
+
       <details className="debugSection systemDrawer" data-system-drawer="true">
         <summary>
           <span>系统工具</span>
@@ -4733,91 +4818,6 @@ function DebugPanel({
           </div>
         ) : null}
 
-      </DebugSection>
-
-      <DebugSection title="分配 / Gaussian" status={assignmentProbe?.status ?? "none"} defaultOpen>
-        <AssignmentHeatmap
-          assignment={assignment}
-          selectedObject={selectedObject}
-          debugProbe={debugProbe}
-          assignmentProbe={assignmentProbe}
-        />
-        <AssignmentTimelinePanel timeline={assignmentTimeline} />
-        <GaussianProbePanel debugProbe={debugProbe} assignmentProbe={assignmentProbe} />
-        <HoverAssignmentHeatmap
-          hoveredTarget={hoveredTarget}
-          hoverAssignmentProbe={hoverAssignmentProbe}
-        />
-      </DebugSection>
-
-      <DebugSection title="对象诊断" status={objectExplainability?.status ?? objectContinuity?.status ?? "-"} defaultOpen>
-        <ObjectFragmentationPanel
-          selectedObject={selectedObject}
-          objectContinuity={objectContinuity}
-          hoveredTarget={hoveredTarget}
-          hoverContinuity={hoverContinuity}
-        />
-        <ObjectStateVerdictPanel
-          objectExplainability={objectExplainability}
-          hoverExplainability={hoverExplainability}
-        />
-        <dl className="debugStateGrid">
-          <Meta label="来源" value={debugProbe?.source ?? activeState?.source} />
-          <Meta label="渲染器" value={selected.delivery?.rendererName} />
-          <Meta label="Gaussian" value={debugProbe?.gaussianIndex ?? "-"} />
-          <Meta label="中心点" value={formatVec(activeState?.centroid)} />
-          <Meta label="包围盒" value={formatBox(activeState?.bbox)} />
-          <Meta label="空间" value={objectContinuity?.status ?? "-"} />
-          <Meta label="对角线" value={formatRatio(objectContinuity?.bboxDiagonal)} />
-          <Meta label="时序" value={objectTemporal?.status ?? "-"} />
-          <Meta label="抖动" value={formatRatio(objectTemporal?.assignmentJitter)} />
-          <Meta label="解释性" value={objectExplainability?.status ?? "-"} />
-          <Meta
-            label="悬停"
-            value={
-              hoveredTarget
-                ? `${hoveredTarget.modelId} #${hoveredTarget.objectId} / ${formatNumber(hoveredTarget.gaussianCount)}G`
-                : "-"
-            }
-          />
-          <Meta label="高亮" value={hoveredTarget?.selectionId ? "启用" : "-"} />
-          <Meta label="悬停 A" value={hoverAssignmentProbe?.status !== "none" ? hoverAssignmentProbe?.status : "-"} />
-          <Meta label="悬停熵" value={formatRatio(hoverAssignmentProbe?.entropy)} />
-          <Meta label="悬停空间" value={hoverContinuity?.status !== "none" ? hoverContinuity?.status : "-"} />
-          <Meta label="悬停时序" value={hoverTemporal?.status !== "none" ? hoverTemporal?.status : "-"} />
-          <Meta
-            label="悬停解释"
-            value={hoverExplainability?.status !== "none" ? hoverExplainability?.status : "-"}
-          />
-          <Meta label="隐藏对象" value={hiddenObjects.size} />
-          <Meta label="隐藏点" value={formatCount(objectVisibility?.hiddenGaussianCount)} />
-        </dl>
-      </DebugSection>
-
-      <DebugSection title="对象开关" status={objectToggleStatus} defaultOpen>
-        <div className="objectStateList" data-object-toggle-list="true">
-          {objects.map((object) => {
-            const hidden = hiddenObjects.has(object.selectionId);
-            const selectedRow = object.selectionId === selectedObjectKey;
-            return (
-              <button
-                key={object.selectionId}
-                type="button"
-                className={`objectStateRow ${selectedRow ? "selected" : ""} ${hidden ? "hidden" : ""}`}
-                data-object-toggle={object.selectionId}
-                data-object-visible={hidden ? "false" : "true"}
-                data-object-gaussians={objectGaussianCountForSummary(object)}
-                data-object-hidden-gaussians={hidden ? objectGaussianCountForSummary(object) : 0}
-                onClick={() => onToggleObjectVisibility(object)}
-              >
-                <span className="modelAccent" style={{ background: object.accent }} />
-                <span>#{object.objectId}</span>
-                <small>{formatRatio(object.objectState?.confidence)}</small>
-                <i>{hidden ? "关" : "开"}</i>
-              </button>
-            );
-          })}
-        </div>
       </DebugSection>
 
       <DebugSection title="协议与归档" status={sessionImport?.status ?? "idle"}>
