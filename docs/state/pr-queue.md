@@ -323,7 +323,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，485 tests。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: pending。
+- 完成 commit: `6948500`。
 
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001: Preflight BOP local row batches
 
