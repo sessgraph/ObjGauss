@@ -231,6 +231,14 @@ pose transition；弱 `actions.csv` 会被 acceptance / readiness / handoff pref
 counterfactual proof 或 world-model evidence；风险继续 open，直到真实 controlled/public
 action rows 进入 pass / fail accounting。
 
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-REALITY-ACTION-GT-001`
+将同一个 `intervention_action_gt_ready` 门禁接入 `transition-reality-handoff`。现在
+transition-backed prediction / intervention accounting 在生成 candidates 或运行 evaluator
+前，也会拒绝零 action vector 或无法覆盖对象连续 pose transition 的 action row。该缓解堵住
+transition route 对弱 `actions.csv` 的绕行风险，但仍不创建 GT、不采集数据、不训练 dynamics、
+不声明 counterfactual proof 或 world-model evidence；风险继续 open，直到真实
+controlled/public action rows 进入 pass / fail accounting。
+
 R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-DATASET-001`
 新增 `compile-objectstate-transitions`，可把已验证 controlled capture manifest 编译成
 object-level episodes 和 `ObjectState_t + action_context -> ObjectState_t+1` transition

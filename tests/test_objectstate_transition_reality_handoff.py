@@ -33,6 +33,7 @@ def test_transition_reality_handoff_runs_prediction_and_intervention_rows():
     assert summary["status"] == "objectstate_transition_reality_handoff_pass"
     assert validate_objectstate_transition_reality_handoff_summary(summary) == summary
     assert summary["handoff_gates"] == {
+        "intervention_action_gt_ready": True,
         "transition_dataset_ready": True,
         "action_transition_ready": True,
         "prediction_eval_pass": True,
@@ -61,8 +62,24 @@ def test_transition_reality_handoff_runs_prediction_and_intervention_rows():
     assert summary["controlled_real_summary"]["pass_row_count"] == 2
     assert summary["controlled_real_summary"]["blocked_row_count"] == 1
     assert summary["claim_policy"]["baseline_candidates_not_learned_model"] is True
+    assert summary["claim_policy"]["intervention_action_gt_preflight_required"] is True
     assert summary["claim_policy"]["does_not_evaluate_identity"] is True
     assert summary["claim_policy"]["does_not_claim_world_model"] is True
+
+
+def test_transition_reality_handoff_blocks_weak_intervention_action_gt():
+    capture = _capture_manifest()
+    capture["actions"][0]["vector"] = [0.0, 0.0, 0.0]
+    dataset = objectstate_transition_dataset_from_capture_manifest(
+        capture,
+        require_action_transition=True,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="requires intervention action GT readiness.*non-zero vector",
+    ):
+        objectstate_transition_reality_handoff(capture, dataset)
 
 
 def test_transition_reality_handoff_records_failed_intervention_candidate():
@@ -162,6 +179,7 @@ def test_transition_reality_handoff_writer_and_cli(tmp_path, capsys):
     assert f"schema={OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA}" in stdout
     assert "sample_id=transition-action-cup-001" in stdout
     assert "transition_reality_handoff_status=objectstate_transition_reality_handoff_pass" in stdout
+    assert "intervention_action_gt_ready=true" in stdout
     assert "prediction_eval_status=objectstate_controlled_prediction_eval_pass" in stdout
     assert "intervention_eval_status=objectstate_controlled_intervention_eval_pass" in stdout
     assert "partial_reality_gate_status=objectstate_reality_gate_pass" in stdout

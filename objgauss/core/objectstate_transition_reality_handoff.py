@@ -10,6 +10,10 @@ from objgauss.core.objectstate_controlled_capture import (
     read_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_capture_intervention_action_gt import (
+    objectstate_controlled_capture_intervention_action_gt_readiness,
+    validate_objectstate_controlled_capture_intervention_action_gt_readiness,
+)
 from objgauss.core.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
     ObjectStateControlledInterventionThresholds,
@@ -80,6 +84,10 @@ def objectstate_transition_reality_handoff(
     dataset = validate_objectstate_transition_dataset(transition_dataset)
     if capture["sample"]["sample_id"] != dataset["sample"]["sample_id"]:
         raise ValueError("transition handoff capture and dataset sample_id mismatch")
+    intervention_action_gt = (
+        objectstate_controlled_capture_intervention_action_gt_readiness(capture)
+    )
+    _require_intervention_action_gt_ready(intervention_action_gt)
     audit = objectstate_transition_dataset_audit(
         dataset,
         min_object_episodes=min_object_episodes,
@@ -135,6 +143,7 @@ def objectstate_transition_reality_handoff(
         ),
     )
     gates = {
+        "intervention_action_gt_ready": bool(intervention_action_gt["ready"]),
         "transition_dataset_ready": bool(audit["readiness"]["transition_dataset_ready"]),
         "action_transition_ready": bool(
             audit["readiness"]["action_transition_count_ready"]
@@ -199,6 +208,7 @@ def objectstate_transition_reality_handoff(
             intervention_eval,
             controlled_real_summary,
         ),
+        "intervention_action_gt": intervention_action_gt,
         "transition_audit": audit,
         "prediction_candidate_summary": prediction_summary,
         "intervention_candidate_summary": intervention_summary,
@@ -209,6 +219,7 @@ def objectstate_transition_reality_handoff(
         "handoff_contract": {
             "uses_existing_controlled_capture_manifest": True,
             "uses_objectstate_transition_dataset": True,
+            "requires_intervention_action_gt_ready": True,
             "audits_transition_dataset_before_eval": True,
             "exports_prediction_candidates": True,
             "exports_intervention_candidates": True,
@@ -220,6 +231,7 @@ def objectstate_transition_reality_handoff(
         },
         "claim_policy": {
             "controlled_capture_ground_truth_required": True,
+            "intervention_action_gt_preflight_required": True,
             "transition_dataset_required": True,
             "baseline_candidates_not_learned_model": True,
             "candidate_future_predictions_required": True,
@@ -412,6 +424,11 @@ def validate_objectstate_transition_reality_handoff_summary(
     transition_audit = validate_objectstate_transition_dataset_audit(
         payload.get("transition_audit")
     )
+    intervention_action_gt = (
+        validate_objectstate_controlled_capture_intervention_action_gt_readiness(
+            payload.get("intervention_action_gt")
+        )
+    )
     prediction_summary = validate_objectstate_transition_prediction_candidates_summary(
         payload.get("prediction_candidate_summary")
     )
@@ -483,6 +500,7 @@ def validate_objectstate_transition_reality_handoff_summary(
     ):
         raise ValueError("transition reality handoff gates must be bools")
     expected_gates = {
+        "intervention_action_gt_ready": bool(intervention_action_gt["ready"]),
         "transition_dataset_ready": bool(
             transition_audit["readiness"]["transition_dataset_ready"]
         ),
@@ -525,6 +543,7 @@ def validate_objectstate_transition_reality_handoff_summary(
     if (
         not handoff_contract.get("uses_existing_controlled_capture_manifest")
         or not handoff_contract.get("uses_objectstate_transition_dataset")
+        or not handoff_contract.get("requires_intervention_action_gt_ready")
         or not handoff_contract.get("audits_transition_dataset_before_eval")
         or not handoff_contract.get("exports_prediction_candidates")
         or not handoff_contract.get("exports_intervention_candidates")
@@ -538,6 +557,7 @@ def validate_objectstate_transition_reality_handoff_summary(
     claim_policy = payload.get("claim_policy", {})
     if (
         not claim_policy.get("controlled_capture_ground_truth_required")
+        or not claim_policy.get("intervention_action_gt_preflight_required")
         or not claim_policy.get("transition_dataset_required")
         or not claim_policy.get("baseline_candidates_not_learned_model")
         or not claim_policy.get("candidate_future_predictions_required")
@@ -683,6 +703,17 @@ def _handoff_issues(
             for key in controlled_real_summary["gate"]["hard_blockers"]
         )
     return issues
+
+
+def _require_intervention_action_gt_ready(intervention_action_gt: Mapping[str, Any]) -> None:
+    if intervention_action_gt.get("ready") is True:
+        return
+    issues = intervention_action_gt.get("issues", ())
+    detail = "; ".join(str(item) for item in issues) if issues else "unknown issue"
+    raise ValueError(
+        "transition reality handoff requires intervention action GT readiness: "
+        f"{detail}"
+    )
 
 
 def _handoff_files(output_dir: Path) -> dict[str, Path]:

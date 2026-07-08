@@ -5217,6 +5217,10 @@ def _object_state_transition_reality_handoff(args: argparse.Namespace) -> None:
     print(f"output_dir={args.output_dir}")
     print(f"sample_id={summary['sample']['sample_id']}")
     print(f"transition_reality_handoff_status={summary['status']}")
+    print(
+        "intervention_action_gt_ready="
+        f"{str(summary['intervention_action_gt']['ready']).lower()}"
+    )
     print(f"transition_audit_status={summary['transition_audit']['status']}")
     print(f"prediction_policy={summary['prediction_candidate_summary']['policy']['name']}")
     print(

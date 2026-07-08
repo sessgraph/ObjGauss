@@ -386,6 +386,11 @@ the prediction and intervention evaluators under the selected thresholds; it is
 not a learned dynamics model, identity proof, counterfactual proof, replay
 buffer, or world-model claim.
 
+`transition-reality-handoff` also requires `intervention_action_gt_ready=true`
+before it runs candidate export or evaluator steps. Weak action rows with zero
+vectors, or action intervals that do not fit the referenced object's pose
+transition, must be fixed in the capture manifest first.
+
 After the handoff, audit the transition evidence package and add it to the
 Phase 1 ledger:
 

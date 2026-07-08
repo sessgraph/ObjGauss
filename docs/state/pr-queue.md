@@ -347,6 +347,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-REALITY-ACTION-GT-001: Require action GT readiness in transition handoff
+
+- 状态: done / objectstate-transition-reality-action-gt
+- 类型: 标准 PR / ObjectState Phase 1 transition evidence gate
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 让 `transition-reality-handoff` 和 full bundle handoff 使用同一套
+  `intervention_action_gt_ready` 前置门禁，避免 transition-backed intervention route
+  通过弱 `actions.csv` 绕过 action GT readiness。
+- 已实施:
+  - `objectstate_transition_reality_handoff(...)` 复用共享
+    `objectstate_controlled_capture_intervention_action_gt_readiness(...)`。
+  - transition handoff summary 新增 `intervention_action_gt` 和
+    `handoff_gates.intervention_action_gt_ready`。
+  - handoff 在生成 transition prediction / intervention candidates 或运行 evaluator 前
+    先要求 action GT readiness；零向量或无法匹配 pose transition 的 action 会在 preflight
+    处报错。
+  - CLI `transition-reality-handoff` 新增
+    `intervention_action_gt_ready=<true|false>` 输出。
+- 边界:
+  - 不修改 controlled capture manifest schema 或 transition dataset schema。
+  - 不采集视频、不创建 GT、不推断动作、不重建 Gaussian。
+  - 不训练 dynamics、不创建 replay buffer、不声明 counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_reality_handoff.py objgauss/cli.py tests/test_objectstate_transition_reality_handoff.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_reality_handoff.py`: 4 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_reality_handoff.py tests/test_objectstate_transition_reality_evidence_package.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py`: 24 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 567 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
 ### OBJECTSTATE-CONTROLLED-INTERVENTION-ACTION-GT-ACCEPTANCE-001: Require action GT readiness in full Phase 1 handoff
 
 - 状态: done / objectstate-controlled-intervention-action-gt-acceptance

@@ -4417,10 +4417,11 @@ npm run acceptance:demo
    是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
    replay buffer、diffusion 或 geometry / camera unfreeze。若继续 action / intervention
    route，`accept-controlled-capture-bundle --require-intervention-ready`、full controlled
-   reality readiness 和 `controlled-reality-bundle-handoff` 现在都会要求
-   `intervention_action_gt_ready=true`：action 必须有非零 vector，并且 action interval
-   必须覆盖被引用对象的连续 pose transition，弱 `actions.csv` 不能进入 full Phase 1
-   intervention evidence。
+   reality readiness、`controlled-reality-bundle-handoff` 和
+   `transition-reality-handoff` 现在都会要求 `intervention_action_gt_ready=true`：
+   action 必须有非零 vector，并且 action interval 必须覆盖被引用对象的连续 pose
+   transition，弱 `actions.csv` 不能进入 full 或 transition-backed Phase 1 intervention
+   evidence。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
