@@ -23,6 +23,7 @@ def objectstate_controlled_capture_file_audit(
     check_artifact_refs: bool = False,
     min_rgb_bytes: int = 1,
     min_gaussian_bytes: int = 1,
+    require_frame_formats: bool = True,
     hash_files: bool = False,
 ) -> dict[str, Any]:
     if min_rgb_bytes < 0:
@@ -45,6 +46,7 @@ def objectstate_controlled_capture_file_audit(
                 frame_id=frame["frame_id"],
                 min_bytes=min_rgb_bytes,
                 require_file=True,
+                require_format=require_frame_formats,
                 hash_file=hash_files,
             )
         )
@@ -57,6 +59,7 @@ def objectstate_controlled_capture_file_audit(
                     frame_id=frame["frame_id"],
                     min_bytes=min_gaussian_bytes,
                     require_file=True,
+                    require_format=require_frame_formats,
                     hash_file=hash_files,
                 )
             )
@@ -83,6 +86,7 @@ def objectstate_controlled_capture_file_audit(
                 frame_id=None,
                 min_bytes=0,
                 require_file=False,
+                require_format=False,
                 hash_file=False,
             )
             for ref in checked_manifest["sample"]["artifact_refs"]
@@ -103,6 +107,19 @@ def objectstate_controlled_capture_file_audit(
         ),
         "artifact_refs_present": (
             not check_artifact_refs or artifact_counts["missing"] == 0
+        ),
+        "frame_formats_valid": (
+            not require_frame_formats
+            or (
+                rgb_counts["missing"] == 0
+                and (
+                    not require_gaussian_files
+                    or (
+                        gaussian_counts["referenced"] > 0
+                        and gaussian_counts["missing"] == 0
+                    )
+                )
+            )
         ),
     }
     readiness["capture_bundle_files_ready"] = all(readiness.values())
@@ -125,6 +142,7 @@ def objectstate_controlled_capture_file_audit(
             "frame_refs_must_be_files": True,
             "min_rgb_bytes": int(min_rgb_bytes),
             "min_gaussian_bytes": int(min_gaussian_bytes),
+            "frame_file_formats_required": bool(require_frame_formats),
             "file_hashes_included": bool(hash_files),
         },
         "file_counts": {
@@ -148,14 +166,20 @@ def objectstate_controlled_capture_file_audit(
             "capture_manifest_required": True,
             "file_existence_required_for_ready_bundle": True,
             "nonempty_frame_files_required_for_ready_bundle": True,
+            "recognized_frame_formats_required_for_ready_bundle": bool(
+                require_frame_formats
+            ),
             "file_audit_does_not_create_ground_truth": True,
             "file_audit_does_not_prove_model_quality": True,
+            "format_audit_does_not_decode_image_pixels": True,
+            "format_audit_does_not_fully_parse_gaussian_payload": True,
         },
         "non_goals": {
             "captures_video": False,
             "creates_ground_truth": False,
             "reconstructs_gaussians": False,
             "reads_image_pixels": False,
+            "fully_parses_gaussian_files": False,
             "trains_gaussian_model": False,
             "trains_dynamics_model": False,
             "writes_public_samples": False,
@@ -230,6 +254,7 @@ def validate_objectstate_controlled_capture_file_audit_summary(
         "rgb_files_present",
         "gaussian_files_present",
         "artifact_refs_present",
+        "frame_formats_valid",
         "capture_bundle_files_ready",
     ):
         if not isinstance(readiness.get(key), bool):
@@ -248,8 +273,14 @@ def validate_objectstate_controlled_capture_file_audit_summary(
         not claim_policy.get("capture_manifest_required")
         or not claim_policy.get("file_existence_required_for_ready_bundle")
         or not claim_policy.get("nonempty_frame_files_required_for_ready_bundle")
+        or not isinstance(
+            claim_policy.get("recognized_frame_formats_required_for_ready_bundle"),
+            bool,
+        )
         or not claim_policy.get("file_audit_does_not_create_ground_truth")
         or not claim_policy.get("file_audit_does_not_prove_model_quality")
+        or not claim_policy.get("format_audit_does_not_decode_image_pixels")
+        or not claim_policy.get("format_audit_does_not_fully_parse_gaussian_payload")
     ):
         raise ValueError("controlled capture file audit must preserve claim policy")
     non_goals = payload.get("non_goals", {})
@@ -258,6 +289,7 @@ def validate_objectstate_controlled_capture_file_audit_summary(
         or non_goals.get("creates_ground_truth")
         or non_goals.get("reconstructs_gaussians")
         or non_goals.get("reads_image_pixels")
+        or non_goals.get("fully_parses_gaussian_files")
         or non_goals.get("trains_gaussian_model")
         or non_goals.get("trains_dynamics_model")
         or non_goals.get("writes_public_samples")
@@ -277,6 +309,7 @@ def _file_record(
     frame_id: str | None,
     min_bytes: int,
     require_file: bool,
+    require_format: bool,
     hash_file: bool,
 ) -> dict[str, Any]:
     path = Path(ref)
@@ -298,6 +331,12 @@ def _file_record(
             "file smaller than required minimum bytes "
             f"({size_bytes} < {min_bytes})"
         )
+    format_record = None
+    if require_format and is_file and kind in {"rgb", "gaussian"}:
+        format_record = _frame_format_record(kind, resolved, size_bytes=size_bytes)
+        if not format_record["valid"] and valid:
+            valid = False
+            missing_reason = format_record["reason"]
     result = {
         "kind": kind,
         "frame_id": frame_id,
@@ -308,11 +347,105 @@ def _file_record(
         "size_bytes": size_bytes,
         "valid": valid,
     }
+    if format_record is not None:
+        result["format"] = format_record
     if missing_reason is not None:
         result["missing_reason"] = missing_reason
     if hash_file and valid and is_file:
         result["sha256"] = _sha256_file(resolved)
     return result
+
+
+def _frame_format_record(
+    kind: str,
+    path: Path,
+    *,
+    size_bytes: int | None,
+) -> dict[str, Any]:
+    prefix = _read_prefix(path)
+    if kind == "rgb":
+        return _rgb_format_record(prefix)
+    if kind == "gaussian":
+        return _gaussian_format_record(path, prefix, size_bytes=size_bytes)
+    return {
+        "valid": False,
+        "format": "unsupported",
+        "reason": f"unsupported frame format audit kind: {kind}",
+    }
+
+
+def _rgb_format_record(prefix: bytes) -> dict[str, Any]:
+    if prefix.startswith(b"\x89PNG\r\n\x1a\n"):
+        return {"valid": True, "format": "png", "reason": "recognized PNG signature"}
+    if prefix.startswith(b"\xff\xd8\xff"):
+        return {"valid": True, "format": "jpeg", "reason": "recognized JPEG signature"}
+    if len(prefix) >= 12 and prefix[:4] == b"RIFF" and prefix[8:12] == b"WEBP":
+        return {"valid": True, "format": "webp", "reason": "recognized WebP signature"}
+    if prefix.startswith((b"P6\n", b"P6\r\n", b"P3\n", b"P3\r\n")):
+        return {"valid": True, "format": "ppm", "reason": "recognized PPM signature"}
+    return {
+        "valid": False,
+        "format": "unknown",
+        "reason": "unrecognized rgb frame format; expected PNG, JPEG, WebP, or PPM",
+    }
+
+
+def _gaussian_format_record(
+    path: Path,
+    prefix: bytes,
+    *,
+    size_bytes: int | None,
+) -> dict[str, Any]:
+    if prefix.startswith((b"ply\n", b"ply\r\n")):
+        return _ply_format_record(prefix)
+    if path.suffix.lower() == ".splat":
+        valid_size = bool(size_bytes is not None and size_bytes >= 32 and size_bytes % 32 == 0)
+        return {
+            "valid": valid_size,
+            "format": "splat" if valid_size else "invalid_splat",
+            "reason": (
+                "recognized raw .splat size multiple"
+                if valid_size
+                else "raw .splat must be non-empty and a multiple of 32 bytes"
+            ),
+        }
+    return {
+        "valid": False,
+        "format": "unknown",
+        "reason": "unrecognized gaussian frame format; expected PLY or raw .splat",
+    }
+
+
+def _ply_format_record(prefix: bytes) -> dict[str, Any]:
+    header_end = prefix.find(b"end_header")
+    if header_end < 0:
+        return {
+            "valid": False,
+            "format": "invalid_ply",
+            "reason": "PLY header missing end_header",
+        }
+    header_text = prefix[:header_end].decode("ascii", errors="ignore")
+    has_format = (
+        "format ascii 1.0" in header_text
+        or "format binary_little_endian 1.0" in header_text
+        or "format binary_big_endian 1.0" in header_text
+    )
+    has_vertex = "element vertex " in header_text
+    valid = has_format and has_vertex
+    return {
+        "valid": valid,
+        "format": "ply" if valid else "invalid_ply",
+        "reason": (
+            "recognized PLY header with vertex element"
+            if valid
+            else "PLY header requires format and element vertex declarations"
+        ),
+    }
+
+
+def _read_prefix(path: Path, *, max_bytes: int = 4096) -> bytes:
+    with path.open("rb") as handle:
+        return handle.read(max_bytes)
 
 
 def _counts(records: list[dict[str, Any]]) -> dict[str, int]:

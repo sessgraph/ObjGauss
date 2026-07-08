@@ -13,6 +13,18 @@ from objgauss.core.objectstate_controlled_identity_handoff import (
 )
 from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
+PNG_BYTES = b"\x89PNG\r\n\x1a\n"
+PLY_BYTES = (
+    b"ply\n"
+    b"format ascii 1.0\n"
+    b"element vertex 1\n"
+    b"property float x\n"
+    b"property float y\n"
+    b"property float z\n"
+    b"end_header\n"
+    b"0 0 0\n"
+)
+
 
 def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
     _write_capture_bundle_files(tmp_path)
@@ -37,6 +49,7 @@ def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
         summary["capture_file_audit"]["status"]
         == "objectstate_controlled_capture_file_audit_pass"
     )
+    assert summary["capture_file_audit"]["readiness"]["frame_formats_valid"] is True
     assert (
         summary["candidate_artifact_file_audit"]["status"]
         == "objectstate_controlled_candidate_artifact_file_audit_pass"
@@ -137,6 +150,30 @@ def test_controlled_identity_handoff_requires_capture_file_audit_pass(tmp_path):
         == "objectstate_controlled_identity_scenario_audit_pass"
     )
     assert summary["capture_file_audit"]["missing_files"]
+    assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
+
+
+def test_controlled_identity_handoff_rejects_text_placeholder_frame_files(tmp_path):
+    _write_capture_bundle_files(tmp_path, valid_formats=False)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+
+    summary = objectstate_controlled_identity_handoff(
+        _capture_manifest(),
+        artifact,
+        candidate_id="stable-objectstate-slots",
+        artifact_refs=(str(artifact_path),),
+        capture_root=tmp_path,
+        candidate_artifact_path=artifact_path,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
+    assert (
+        summary["capture_file_audit"]["status"]
+        == "objectstate_controlled_capture_file_audit_fail"
+    )
+    assert summary["capture_file_audit"]["readiness"]["frame_formats_valid"] is False
+    assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
 
 
@@ -473,18 +510,14 @@ def _capture_manifest(*, include_occlusion: bool = True, include_conditions: boo
     }
 
 
-def _write_capture_bundle_files(root) -> None:
+def _write_capture_bundle_files(root, *, valid_formats: bool = True) -> None:
     (root / "rgb").mkdir(parents=True, exist_ok=True)
     (root / "gaussians").mkdir(parents=True, exist_ok=True)
     for frame_index in range(3):
-        (root / "rgb" / f"{frame_index:06d}.png").write_text(
-            f"rgb-{frame_index}",
-            encoding="utf-8",
-        )
-        (root / "gaussians" / f"{frame_index:06d}.ply").write_text(
-            f"ply-{frame_index}",
-            encoding="utf-8",
-        )
+        rgb_bytes = PNG_BYTES if valid_formats else f"rgb-{frame_index}".encode()
+        ply_bytes = PLY_BYTES if valid_formats else f"ply-{frame_index}".encode()
+        (root / "rgb" / f"{frame_index:06d}.png").write_bytes(rgb_bytes)
+        (root / "gaussians" / f"{frame_index:06d}.ply").write_bytes(ply_bytes)
 
 
 def _write_candidate_artifact_file(root, artifact):

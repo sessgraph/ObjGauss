@@ -3079,6 +3079,7 @@ def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> No
         check_artifact_refs=args.check_artifact_refs,
         min_rgb_bytes=args.min_rgb_bytes,
         min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
         hash_files=args.hash_files,
     )
     counts = summary["file_counts"]
@@ -3097,6 +3098,7 @@ def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> No
         "artifact_refs_valid="
         f"{counts['artifact_refs']['valid']}/{counts['artifact_refs']['referenced']}"
     )
+    print(f"frame_formats_valid={str(readiness['frame_formats_valid']).lower()}")
     print(f"missing_files={len(summary['missing_files'])}")
     print(f"capture_bundle_files_ready={str(readiness['capture_bundle_files_ready']).lower()}")
     if args.summary_output:
@@ -3206,6 +3208,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         check_artifact_refs=args.check_artifact_refs,
         min_rgb_bytes=args.min_rgb_bytes,
         min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
         hash_files=args.hash_files,
         candidate_artifact_path=args.trainable_artifact,
         min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
@@ -3516,6 +3519,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include SHA256 hashes for valid frame RGB/Gaussian files",
     )
+    audit_controlled_capture_files.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
     audit_controlled_capture_files.add_argument("--require-pass", action="store_true")
     audit_controlled_capture_files.set_defaults(
         handler=_object_state_audit_controlled_capture_files
@@ -3617,6 +3625,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--hash-files",
         action="store_true",
         help="include SHA256 hashes for valid frame RGB/Gaussian files",
+    )
+    controlled_identity_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
     )
     controlled_identity_handoff.add_argument(
         "--min-candidate-artifact-bytes",

@@ -14,6 +14,19 @@ from objgauss.core.objectstate_controlled_capture_files import (
     validate_objectstate_controlled_capture_file_audit_summary,
 )
 
+PNG_BYTES = b"\x89PNG\r\n\x1a\n"
+PLY_BYTES = (
+    b"ply\n"
+    b"format ascii 1.0\n"
+    b"element vertex 1\n"
+    b"property float x\n"
+    b"property float y\n"
+    b"property float z\n"
+    b"end_header\n"
+    b"0 0 0\n"
+)
+SPLAT_BYTES = b"\x00" * 32
+
 
 def test_controlled_capture_file_audit_passes_when_frame_files_exist(tmp_path):
     manifest = _capture_manifest()
@@ -41,6 +54,17 @@ def test_controlled_capture_file_audit_passes_when_frame_files_exist(tmp_path):
     }
     assert summary["file_counts"]["artifact_refs"]["missing"] == 0
     assert summary["readiness"]["capture_bundle_files_ready"] is True
+    assert summary["readiness"]["frame_formats_valid"] is True
+    assert summary["file_records"]["rgb"][0]["format"] == {
+        "valid": True,
+        "format": "png",
+        "reason": "recognized PNG signature",
+    }
+    assert summary["file_records"]["gaussian"][0]["format"] == {
+        "valid": True,
+        "format": "ply",
+        "reason": "recognized PLY header with vertex element",
+    }
     assert summary["missing_files"] == []
     assert "no missing files" in summary["missing_files_markdown"]
     assert validate_objectstate_controlled_capture_file_audit_summary(summary) is summary
@@ -83,6 +107,59 @@ def test_controlled_capture_file_audit_fails_empty_rgb_file(tmp_path):
     assert "file smaller than required minimum bytes" in summary["missing_files"][0][
         "missing_reason"
     ]
+
+
+def test_controlled_capture_file_audit_accepts_raw_splat_gaussian_refs(tmp_path):
+    manifest = _capture_manifest()
+    for index, frame in enumerate(manifest["frames"]):
+        frame["observation"]["gaussian"] = f"gaussians/{index:06d}.splat"
+    _write_bundle_files(tmp_path, frame_count=3, include_gaussian=False)
+    (tmp_path / "gaussians").mkdir(parents=True, exist_ok=True)
+    for index in range(3):
+        (tmp_path / "gaussians" / f"{index:06d}.splat").write_bytes(SPLAT_BYTES)
+
+    summary = objectstate_controlled_capture_file_audit(manifest, root=tmp_path)
+
+    assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert summary["file_records"]["gaussian"][0]["format"] == {
+        "valid": True,
+        "format": "splat",
+        "reason": "recognized raw .splat size multiple",
+    }
+
+
+def test_controlled_capture_file_audit_rejects_text_placeholders_by_default(tmp_path):
+    manifest = _capture_manifest()
+    _write_bundle_files(tmp_path, frame_count=3)
+    (tmp_path / "rgb" / "000001.png").write_text("rgb", encoding="utf-8")
+    (tmp_path / "gaussians" / "000001.ply").write_text("ply", encoding="utf-8")
+
+    summary = objectstate_controlled_capture_file_audit(manifest, root=tmp_path)
+
+    assert summary["status"] == "objectstate_controlled_capture_file_audit_fail"
+    assert summary["readiness"]["frame_formats_valid"] is False
+    assert summary["file_counts"]["rgb"]["missing"] == 1
+    assert summary["file_counts"]["gaussian"]["missing"] == 1
+    reasons = [record["missing_reason"] for record in summary["missing_files"]]
+    assert any("unrecognized rgb frame format" in reason for reason in reasons)
+    assert any("unrecognized gaussian frame format" in reason for reason in reasons)
+
+
+def test_controlled_capture_file_audit_can_skip_format_checks_for_staging(tmp_path):
+    manifest = _capture_manifest()
+    _write_bundle_files(tmp_path, frame_count=3)
+    (tmp_path / "rgb" / "000001.png").write_text("rgb", encoding="utf-8")
+    (tmp_path / "gaussians" / "000001.ply").write_text("ply", encoding="utf-8")
+
+    summary = objectstate_controlled_capture_file_audit(
+        manifest,
+        root=tmp_path,
+        require_frame_formats=False,
+    )
+
+    assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert summary["requirements"]["frame_file_formats_required"] is False
+    assert summary["readiness"]["frame_formats_valid"] is True
 
 
 def test_controlled_capture_file_audit_allows_rgb_only_when_gaussian_not_required(tmp_path):
@@ -136,7 +213,7 @@ def test_controlled_capture_file_audit_can_hash_frame_files(tmp_path):
         hash_files=True,
     )
 
-    expected_rgb_hash = hashlib.sha256(b"rgb").hexdigest()
+    expected_rgb_hash = hashlib.sha256(PNG_BYTES).hexdigest()
 
     assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
     assert summary["requirements"]["file_hashes_included"] is True
@@ -187,6 +264,7 @@ def test_object_state_audit_controlled_capture_files_cli_writes_summary_and_mark
     assert "file_audit_status=objectstate_controlled_capture_file_audit_pass" in stdout
     assert "rgb_valid=3/3" in stdout
     assert "gaussian_valid=3/3" in stdout
+    assert "frame_formats_valid=true" in stdout
     assert summary["status"] == "objectstate_controlled_capture_file_audit_pass"
     assert "no missing files" in missing
 
@@ -248,11 +326,8 @@ def _write_bundle_files(
     (root / "capture-manifest.json").write_text("{}", encoding="utf-8")
     (root / "rgb").mkdir(parents=True, exist_ok=True)
     for index in range(frame_count):
-        (root / "rgb" / f"{index:06d}.png").write_text("rgb", encoding="utf-8")
+        (root / "rgb" / f"{index:06d}.png").write_bytes(PNG_BYTES)
     if include_gaussian:
         (root / "gaussians").mkdir(parents=True, exist_ok=True)
         for index in range(frame_count):
-            (root / "gaussians" / f"{index:06d}.ply").write_text(
-                "ply",
-                encoding="utf-8",
-            )
+            (root / "gaussians" / f"{index:06d}.ply").write_bytes(PLY_BYTES)

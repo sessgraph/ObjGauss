@@ -61,6 +61,7 @@ def objectstate_controlled_identity_handoff(
     check_artifact_refs: bool = False,
     min_rgb_bytes: int = 1,
     min_gaussian_bytes: int = 1,
+    require_frame_formats: bool = True,
     hash_files: bool = False,
     candidate_artifact_path: str | Path | None = None,
     min_candidate_artifact_bytes: int = 1,
@@ -78,6 +79,7 @@ def objectstate_controlled_identity_handoff(
         check_artifact_refs=check_artifact_refs,
         min_rgb_bytes=min_rgb_bytes,
         min_gaussian_bytes=min_gaussian_bytes,
+        require_frame_formats=require_frame_formats,
         hash_files=hash_files,
     )
     candidate_artifact_file_audit = _candidate_artifact_file_audit(
