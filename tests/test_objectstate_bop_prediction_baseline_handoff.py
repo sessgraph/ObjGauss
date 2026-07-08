@@ -48,6 +48,7 @@ def test_bop_prediction_baseline_handoff_writes_reviewable_package(tmp_path):
         "baseline_candidates_ready": True,
         "prediction_eval_ready": True,
         "prediction_evidence_package_reviewable": True,
+        "phase1_evidence_ledger_prediction_reviewable": True,
     }
     assert summary["row_counts"]["prediction_drafts"] == 4
     assert summary["row_counts"]["prediction_candidates"] == 4
@@ -72,6 +73,13 @@ def test_bop_prediction_baseline_handoff_writes_reviewable_package(tmp_path):
         / "reality-candidates"
         / "prediction-evidence-package-summary.json"
     ).is_file()
+    phase1_ledger = _read_json(output_root / "phase1-evidence-ledger.json")
+    assert phase1_ledger["maturity"] == "prediction_reviewable"
+    assert (
+        phase1_ledger["phase1_evidence_gates"]["prediction_evidence_reviewable"]
+        is True
+    )
+    assert summary["phase1_evidence_ledger_summary"] == phase1_ledger
 
 
 def test_bop_prediction_baseline_handoff_blocks_without_gaussian_files(tmp_path):
@@ -92,7 +100,15 @@ def test_bop_prediction_baseline_handoff_blocks_without_gaussian_files(tmp_path)
     assert summary["readiness"]["bop_acceptance_pass"] is False
     assert summary["readiness"]["phase1_gaussian_evidence_ready"] is False
     assert summary["readiness"]["prediction_evidence_package_reviewable"] is False
+    assert (
+        summary["readiness"]["phase1_evidence_ledger_prediction_reviewable"]
+        is False
+    )
     assert "phase1 Gaussian evidence is not ready" in summary["issues"]
+    assert (
+        "phase1 evidence ledger does not expose reviewable prediction evidence"
+        in summary["issues"]
+    )
     assert (
         summary["prediction_evidence_package"]["reviewability_gates"][
             "phase1_gaussian_evidence_ready"
@@ -146,8 +162,10 @@ def test_object_state_bop_prediction_baseline_handoff_cli(
     assert "baseline_candidates_ready=true" in stdout
     assert "prediction_eval_status=objectstate_controlled_prediction_eval_pass" in stdout
     assert "prediction_evidence_package_reviewable=true" in stdout
+    assert "phase1_evidence_ledger_prediction_reviewable=true" in stdout
     assert "prediction_candidate_count=4" in stdout
     assert "prediction_evidence_package_summary=" in stdout
+    assert "phase1_evidence_ledger=" in stdout
     assert summary["candidate"]["candidate_id"] == "cli-bop-baseline"
     assert summary["status"] == "objectstate_bop_prediction_baseline_handoff_reviewable"
 

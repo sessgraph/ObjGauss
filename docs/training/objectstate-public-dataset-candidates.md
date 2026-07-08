@@ -153,7 +153,8 @@ uv run objgauss object-state bop-prediction-baseline-handoff \
 
 This command writes the accepted capture manifest, BOP file audit, prediction
 candidate templates, baseline-filled prediction candidates, prediction eval
-summary and prediction evidence package audit under `--output-root`.
+summary, prediction evidence package audit and `phase1-evidence-ledger.json`
+under `--output-root`.
 
 After acceptance passes, initialize candidate authoring directly from the BOP
 controlled capture manifest. The following commands are the expanded manual
@@ -202,6 +203,16 @@ Finally, audit the local prediction evidence package:
 uv run objgauss object-state audit-controlled-prediction-evidence-package \
   outputs/captures/bop-ycbv-scene-000001 \
   --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-evidence-package-summary.json \
+  --require-reviewable
+```
+
+The one-command handoff writes the Phase 1 evidence ledger automatically. For
+manual workflows, run the same ledger explicitly:
+
+```bash
+uv run objgauss object-state audit-phase1-evidence-ledger \
+  --prediction-summary outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-evidence-package-summary.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/phase1-evidence-ledger.json \
   --require-reviewable
 ```
 

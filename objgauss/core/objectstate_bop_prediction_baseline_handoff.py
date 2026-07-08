@@ -30,6 +30,11 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     validate_objectstate_controlled_reality_candidate_template_summary,
 )
+from objgauss.core.objectstate_phase1_evidence_ledger import (
+    OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA,
+    objectstate_phase1_evidence_ledger,
+    validate_objectstate_phase1_evidence_ledger_summary,
+)
 
 OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA = (
     "objgauss-objectstate-bop-prediction-baseline-handoff-v1"
@@ -153,6 +158,12 @@ def objectstate_bop_prediction_baseline_handoff(
     evidence_package_path = candidate_dir / "prediction-evidence-package-summary.json"
     _write_json(evidence_package_path, evidence_package)
 
+    phase1_evidence_ledger = objectstate_phase1_evidence_ledger(
+        prediction_summaries=(evidence_package_path,),
+    )
+    phase1_evidence_ledger_path = out / "phase1-evidence-ledger.json"
+    _write_json(phase1_evidence_ledger_path, phase1_evidence_ledger)
+
     files = {
         "capture_manifest": capture_manifest_path,
         "bop_acceptance_summary": acceptance_path,
@@ -169,6 +180,7 @@ def objectstate_bop_prediction_baseline_handoff(
         "prediction_eval_summary": prediction_eval_path,
         "controlled_real_prediction": controlled_real_prediction_path,
         "prediction_evidence_package_summary": evidence_package_path,
+        "phase1_evidence_ledger": phase1_evidence_ledger_path,
     }
     readiness = {
         "bop_acceptance_pass": (
@@ -190,6 +202,11 @@ def objectstate_bop_prediction_baseline_handoff(
             evidence_package["status"]
             == "objectstate_controlled_prediction_evidence_package_reviewable"
         ),
+        "phase1_evidence_ledger_prediction_reviewable": bool(
+            phase1_evidence_ledger["phase1_evidence_gates"][
+                "prediction_evidence_reviewable"
+            ]
+        ),
     }
     status = (
         "objectstate_bop_prediction_baseline_handoff_reviewable"
@@ -207,6 +224,7 @@ def objectstate_bop_prediction_baseline_handoff(
         "evidence_package_schema": (
             OBJECTSTATE_CONTROLLED_PREDICTION_EVIDENCE_PACKAGE_SCHEMA
         ),
+        "phase1_evidence_ledger_schema": OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA,
         "scene_root": str(scene),
         "output_root": str(out),
         "candidate_dir": str(candidate_dir),
@@ -233,6 +251,7 @@ def objectstate_bop_prediction_baseline_handoff(
         "prediction_baseline_summary": baseline_summary,
         "prediction_eval_summary": prediction_eval,
         "prediction_evidence_package": evidence_package,
+        "phase1_evidence_ledger_summary": phase1_evidence_ledger,
         "issues": _handoff_issues(readiness),
         "claim_policy": {
             "orchestrates_local_bop_prediction_handoff": True,
@@ -240,6 +259,7 @@ def objectstate_bop_prediction_baseline_handoff(
             "generates_baseline_candidates": True,
             "runs_prediction_eval": True,
             "runs_evidence_package_audit": True,
+            "runs_phase1_evidence_ledger": True,
             "uses_target_pose_values_for_eval_only": True,
             "does_not_download_dataset": True,
             "does_not_create_ground_truth": True,
@@ -315,6 +335,7 @@ def validate_objectstate_bop_prediction_baseline_handoff_summary(
         "prediction_eval_summary",
         "controlled_real_prediction",
         "prediction_evidence_package_summary",
+        "phase1_evidence_ledger",
     ):
         if not isinstance(files.get(key), str) or not files[key]:
             raise ValueError(f"BOP prediction baseline handoff missing file {key}")
@@ -345,6 +366,9 @@ def validate_objectstate_bop_prediction_baseline_handoff_summary(
     validate_objectstate_controlled_prediction_evidence_package_summary(
         payload.get("prediction_evidence_package")
     )
+    validate_objectstate_phase1_evidence_ledger_summary(
+        payload.get("phase1_evidence_ledger_summary")
+    )
     claim_policy = payload.get("claim_policy")
     if (
         not isinstance(claim_policy, Mapping)
@@ -353,6 +377,7 @@ def validate_objectstate_bop_prediction_baseline_handoff_summary(
         or not claim_policy.get("generates_baseline_candidates")
         or not claim_policy.get("runs_prediction_eval")
         or not claim_policy.get("runs_evidence_package_audit")
+        or not claim_policy.get("runs_phase1_evidence_ledger")
         or not claim_policy.get("uses_target_pose_values_for_eval_only")
         or not claim_policy.get("does_not_download_dataset")
         or not claim_policy.get("does_not_create_ground_truth")
@@ -386,6 +411,7 @@ def _ensure_output_paths(output_root: Path, candidate_dir: Path, *, force: bool)
         candidate_dir / "prediction-eval-summary.json",
         candidate_dir / "controlled-real-prediction.json",
         candidate_dir / "prediction-evidence-package-summary.json",
+        output_root / "phase1-evidence-ledger.json",
     )
     existing = [path for path in files if path.exists()]
     if existing and not force:
@@ -405,6 +431,9 @@ def _handoff_issues(readiness: Mapping[str, bool]) -> list[str]:
         "prediction_eval_ready": "prediction eval did not produce candidate metrics",
         "prediction_evidence_package_reviewable": (
             "prediction evidence package is not reviewable"
+        ),
+        "phase1_evidence_ledger_prediction_reviewable": (
+            "phase1 evidence ledger does not expose reviewable prediction evidence"
         ),
     }
     return [message for key, message in labels.items() if not readiness.get(key)]

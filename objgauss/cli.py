@@ -4879,6 +4879,10 @@ def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> N
         "prediction_evidence_package_reviewable="
         f"{str(readiness['prediction_evidence_package_reviewable']).lower()}"
     )
+    print(
+        "phase1_evidence_ledger_prediction_reviewable="
+        f"{str(readiness['phase1_evidence_ledger_prediction_reviewable']).lower()}"
+    )
     print(f"prediction_candidate_count={prediction['prediction_candidate_count']}")
     print(f"prediction_row_status={prediction['prediction_row_status']}")
     for key, path in summary["files"].items():

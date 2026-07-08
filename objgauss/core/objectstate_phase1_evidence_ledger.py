@@ -179,6 +179,7 @@ def validate_objectstate_phase1_evidence_ledger_summary(
         "no_evidence_summaries",
         "evidence_summaries_present_not_reviewable",
         "identity_reviewable",
+        "prediction_reviewable",
         "identity_prediction_reviewable",
         "full_reality_reviewable",
     }:
@@ -506,6 +507,8 @@ def _maturity(stage_summary: Mapping[str, Mapping[str, Any]]) -> str:
         and int(stage_summary["prediction"]["reviewable_count"]) > 0
     ):
         return "identity_prediction_reviewable"
+    if int(stage_summary["prediction"]["reviewable_count"]) > 0:
+        return "prediction_reviewable"
     if int(stage_summary["identity"]["reviewable_count"]) > 0:
         return "identity_reviewable"
     return "evidence_summaries_present_not_reviewable"

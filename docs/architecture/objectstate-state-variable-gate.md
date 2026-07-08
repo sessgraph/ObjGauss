@@ -735,7 +735,8 @@ Implemented v0.1 facts:
 - The handoff writes `reality-candidates/prediction-baseline-summary.json`,
   `prediction-candidates.json`, `prediction-eval-summary.json`,
   `controlled-real-prediction.json` and
-  `prediction-evidence-package-summary.json`.
+  `prediction-evidence-package-summary.json`, then writes
+  `phase1-evidence-ledger.json` over that prediction evidence summary.
 
 Current scope is deterministic local orchestration only. It does not download
 BOP data, create GT, reconstruct Gaussians, train Gaussian / dynamics models,
@@ -1695,6 +1696,7 @@ Implemented v0.1 facts:
   `sample_id`, reviewability, row status / row accounting and issues, and then
   reports maturity:
   - `identity_reviewable`;
+  - `prediction_reviewable`;
   - `identity_prediction_reviewable`;
   - `full_reality_reviewable`;
   - or an incomplete / not-reviewable state.
