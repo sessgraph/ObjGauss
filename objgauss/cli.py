@@ -223,6 +223,9 @@ from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
 from objgauss.core.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
+from objgauss.core.objectstate_bop_identity_route_audit import (
+    objectstate_bop_identity_route_audit,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -4953,6 +4956,68 @@ def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
         raise ValueError("BOP Phase 1 route is not prediction-reviewable")
 
 
+def _object_state_audit_bop_identity_route(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_identity_route_audit(
+        args.scene_root,
+        output_root=args.output_root,
+        sample_id=args.sample_id,
+        candidate_artifact=args.candidate_artifact,
+        identity_dir=args.identity_dir,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"identity_dir={summary['identity_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"bop_identity_route_status={summary['status']}")
+    for gate, passed in readiness.items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    scenario = summary["identity_scenario_metadata_audit"]
+    print(f"identity_scenario_metadata_status={scenario['status']}")
+    for gate, passed in scenario["readiness"].items():
+        print(f"identity_scenario.{gate}={str(passed).lower()}")
+    print(f"hard_blocker_count={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    print(f"next_action_count={len(summary['next_actions'])}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    print(f"issue_count={len(summary['issues'])}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_identity_reviewable
+        and summary["status"]
+        != "objectstate_bop_identity_route_audit_identity_reviewable"
+    ):
+        raise ValueError("BOP identity route is not identity-reviewable")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -5340,6 +5405,87 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_phase1_route.set_defaults(
         handler=_object_state_audit_bop_phase1_route
+    )
+    audit_bop_identity_route = object_state_subparsers.add_parser(
+        "audit-bop-identity-route",
+        help=(
+            "read-only audit of a local BOP scene and output root on the path "
+            "to Phase 1 identity evidence"
+        ),
+    )
+    audit_bop_identity_route.add_argument("scene_root", type=Path)
+    audit_bop_identity_route.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+    )
+    audit_bop_identity_route.add_argument("--summary-output", type=Path)
+    audit_bop_identity_route.add_argument("--sample-id", required=True)
+    audit_bop_identity_route.add_argument("--candidate-artifact", type=Path)
+    audit_bop_identity_route.add_argument("--identity-dir", default="identity-handoff")
+    audit_bop_identity_route.add_argument("--dataset-id", default="bop-ycbv")
+    audit_bop_identity_route.add_argument("--object-category", default="bop_objects")
+    audit_bop_identity_route.add_argument("--scenario", default="bop_pose_sequence")
+    audit_bop_identity_route.add_argument("--fps", type=float, default=30.0)
+    audit_bop_identity_route.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    audit_bop_identity_route.add_argument("--rgb-dir", default="rgb")
+    audit_bop_identity_route.add_argument("--gaussian-dir", default="gaussians")
+    audit_bop_identity_route.add_argument("--max-frames", type=int)
+    audit_bop_identity_route.add_argument("--frame-step", type=int, default=1)
+    audit_bop_identity_route.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample artifact refs such as scene_gt.json to exist",
+    )
+    audit_bop_identity_route.add_argument("--min-rgb-bytes", type=int, default=1)
+    audit_bop_identity_route.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    audit_bop_identity_route.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    audit_bop_identity_route.add_argument("--hash-files", action="store_true")
+    audit_bop_identity_route.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    audit_bop_identity_route.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    audit_bop_identity_route.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    audit_bop_identity_route.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    audit_bop_identity_route.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    audit_bop_identity_route.add_argument(
+        "--require-identity-reviewable",
+        action="store_true",
+        help="fail unless existing outputs expose reviewable identity evidence",
+    )
+    audit_bop_identity_route.set_defaults(
+        handler=_object_state_audit_bop_identity_route
     )
     bop_prediction_baseline_handoff = object_state_subparsers.add_parser(
         "bop-prediction-baseline-handoff",

@@ -132,6 +132,29 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 `--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
 or `.splat` files for every selected frame.
 
+For Stage 1 identity-state evidence, run the identity route audit before
+starting a handoff:
+
+```bash
+uv run objgauss object-state audit-bop-identity-route \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output-root outputs/captures/bop-ycbv-scene-000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --candidate-artifact outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-identity-route-summary.json
+```
+
+This audit checks BOP acceptance, per-frame Gaussian files, candidate
+ObjectState artifact validity, `object_states` frame binding, existing
+identity evidence package output and the Phase 1 ledger. It also applies a
+stricter identity scenario metadata gate: enough frames, occlusion
+reappearance, cross-view variation, lighting variation and camera-pose motion.
+The default BOP adapter often has enough pose frames for prediction but still
+lacks lighting / camera motion metadata for identity-state proof. In that case
+the route should stay blocked; do not relax the identity gate just to turn BOP
+pose data into a pass row.
+
 Once the local scene has RGB, pose and per-frame Gaussian evidence, the
 read-only route audit should report `handoff_ready`:
 

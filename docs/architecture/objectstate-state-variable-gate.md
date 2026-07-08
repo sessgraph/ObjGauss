@@ -743,6 +743,53 @@ BOP data, create GT, reconstruct Gaussians, train Gaussian / dynamics models,
 claim a learned prediction model, prove intervention / counterfactual evidence,
 use replay / diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-IDENTITY-ROUTE-AUDIT-001
+
+Add a read-only route audit for local BOP identity evidence.
+
+Required behavior:
+
+- Input a local BOP scene root, output root and ObjectState candidate artifact.
+- Run BOP acceptance in memory with per-frame Gaussian files required.
+- Validate that the candidate artifact is a trainable ObjectState artifact and
+  that its `object_states` frames bind one-to-one with the accepted BOP capture
+  frames.
+- Audit whether the accepted manifest contains identity scenario metadata for
+  Stage 1: enough frames, occlusion reappearance, cross-view variation,
+  lighting variation and camera-pose motion.
+- Inspect existing
+  `identity-handoff/identity-evidence-package-summary.json`.
+- Inspect existing `phase1-evidence-ledger.json`.
+- Report whether the route is blocked, ready to run identity handoff, or
+  already identity-reviewable.
+- Emit next actions without running identity handoff, identity eval, training,
+  downloads or Gaussian reconstruction.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_identity_route_audit`.
+- Summary schema: `objgauss-objectstate-bop-identity-route-audit-v1`.
+- Core function: `objectstate_bop_identity_route_audit(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-identity-route <scene-root> --output-root <dir>`.
+- Status values:
+  - `objectstate_bop_identity_route_audit_blocked`;
+  - `objectstate_bop_identity_route_audit_handoff_ready`;
+  - `objectstate_bop_identity_route_audit_identity_reviewable`.
+
+BOP pose scenes can support identity accounting, but the default adapter only
+provides BOP frame view ids and `bop-default` lighting, with no explicit
+`camera_pose` condition. The identity route audit must therefore remain
+stricter than the prediction route: it may accept RGB / pose / Gaussian files
+and candidate ObjectState frames while still blocking identity handoff until
+the scenario metadata proves occlusion reappearance, cross-view and camera
+motion coverage. Do not relax this gate to make a BOP route pass.
+
+Current scope is read-only route accounting. It does not download BOP data,
+create GT, reconstruct Gaussians, run identity handoff, run identity eval, train
+models, claim prediction / intervention gates, claim world model, use replay /
+diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.
