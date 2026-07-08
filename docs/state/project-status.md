@@ -866,6 +866,18 @@ batch spec 列出多个 BOP sample 的 `scene_root`、`sample_id`、`candidate_a
 达到配置的多 sample / scene / category coverage 阈值；二者都不声明 metric pass、
 intervention gate 或 world model。该步骤仍不下载 BOP、不创建 GT、不重建 Gaussian、
 不训练模型、不写 public samples、不改 viewer/export 默认。
+随后完成 `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001`：新增
+`objgauss.core.objectstate_bop_local_row_batch_readiness`，summary schema 为
+`objgauss-objectstate-bop-local-row-batch-readiness-v1`，CLI 为
+`objgauss object-state audit-bop-local-row-batch-readiness <batch-spec.json>`。该
+read-only preflight 使用同一个 batch spec，逐个复用 single-sample
+`audit-bop-phase1-local-row` readiness，聚合 Gaussian evidence、candidate artifact
+binding、identity scenario metadata、ready / reviewable sample count 和 scene /
+category / scenario coverage。`ready` 只表示该样本可进入 `bop-local-row-handoff` 或已具备
+identity+prediction reviewable evidence，不表示 metric pass；batch readiness 也不运行
+handoff、不创建 GT、不重建 Gaussian、不训练模型、不声明 intervention / world model、不改
+viewer/export 默认。下一步若要扩大 cross-sample 表，应先在实际 ignored BOP subset 上跑
+该 readiness，使缺口显性化，再决定是否运行 batch handoff。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
@@ -4005,8 +4017,10 @@ npm run acceptance:demo
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
    最新 strict sample-aware gate 已让 3-row 表中 Lego 选择 promoted、Polyhaven / Nike 回退
    baseline，并避免 selected hard regression；Plush KMeans 暴露为无安全候选的负证据。
-   下一步若继续算法质量，应扩大更多小型 real / public sample 复验；不要直接跳到 rollout、
-   replay buffer、diffusion 或 geometry / camera unfreeze。
+   下一步若继续算法质量，应先在本地 / ignored BOP subset 上跑
+   `audit-bop-local-row-batch-readiness`，再按 readiness 缺口决定是否运行
+   `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、replay
+   buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

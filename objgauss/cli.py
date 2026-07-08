@@ -247,6 +247,9 @@ from objgauss.core.objectstate_bop_cross_sample_ledger import (
 from objgauss.core.objectstate_bop_local_row_batch_handoff import (
     objectstate_bop_local_row_batch_handoff,
 )
+from objgauss.core.objectstate_bop_local_row_batch_readiness import (
+    objectstate_bop_local_row_batch_readiness,
+)
 from objgauss.core.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
@@ -5581,6 +5584,74 @@ def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
         raise ValueError("BOP local row batch candidate gate is not ready")
 
 
+def _object_state_audit_bop_local_row_batch_readiness(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_bop_local_row_batch_readiness(
+        args.batch_spec,
+        output_root=args.output_root,
+        min_reviewable_samples=args.min_reviewable_samples,
+        min_scene_or_category_coverage=args.min_scene_or_category_coverage,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    if args.table_output:
+        args.table_output.parent.mkdir(parents=True, exist_ok=True)
+        args.table_output.write_text(
+            summary["sample_table_markdown"],
+            encoding="utf-8",
+        )
+    batch = summary["batch"]
+    sample_summary = summary["sample_summary"]
+    coverage = summary["coverage"]
+    print(f"schema={summary['schema']}")
+    print(f"batch_spec={args.batch_spec}")
+    print(f"batch_id={batch['batch_id']}")
+    print(f"output_root={batch['output_root']}")
+    print(f"bop_local_row_batch_readiness_status={summary['status']}")
+    print(f"samples={sample_summary['samples']}")
+    print(
+        "ready_for_local_row_handoff_samples="
+        f"{sample_summary['ready_for_local_row_handoff_samples']}"
+    )
+    print(
+        "identity_prediction_reviewable_samples="
+        f"{sample_summary['identity_prediction_reviewable_samples']}"
+    )
+    print(
+        "ready_or_reviewable_samples="
+        f"{sample_summary['ready_or_reviewable_samples']}"
+    )
+    print(f"object_category_count={coverage['object_category_count']}")
+    print(f"scenario_count={coverage['scenario_count']}")
+    for gate, passed in summary["readiness_gates"].items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    print(f"hard_blocker_count={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    print(f"next_action_count={len(summary['next_actions'])}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    for record in summary["sample_records"]:
+        print(
+            "sample="
+            f"{record['sample_id']} status={record['status']} "
+            f"ready={str(record['ready_for_local_row_handoff']).lower()} "
+            f"reviewable={str(record['identity_prediction_reviewable']).lower()}"
+        )
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if args.table_output:
+        print(f"sample_table={args.table_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_bop_local_row_batch_readiness_ready"
+    ):
+        raise ValueError("BOP local row batch readiness is not ready")
+
+
 def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
     summary = objectstate_bop_phase1_route_audit(
         args.scene_root,
@@ -7217,6 +7288,49 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.set_defaults(
         handler=_object_state_bop_local_row_handoff
+    )
+    audit_bop_local_row_batch_readiness = object_state_subparsers.add_parser(
+        "audit-bop-local-row-batch-readiness",
+        help=(
+            "read-only preflight for a BOP local-row batch spec before running "
+            "batch handoff"
+        ),
+    )
+    audit_bop_local_row_batch_readiness.add_argument(
+        "batch_spec",
+        type=Path,
+        help="JSON batch spec using objgauss-objectstate-bop-local-row-batch-spec-v1",
+    )
+    audit_bop_local_row_batch_readiness.add_argument(
+        "--output-root",
+        type=Path,
+        help="override the batch output root declared in the spec",
+    )
+    audit_bop_local_row_batch_readiness.add_argument("--summary-output", type=Path)
+    audit_bop_local_row_batch_readiness.add_argument(
+        "--table-output",
+        type=Path,
+        help="optional Markdown output for the batch readiness sample table",
+    )
+    audit_bop_local_row_batch_readiness.add_argument(
+        "--min-reviewable-samples",
+        default=3,
+        type=int,
+        help="minimum ready or reviewable samples before batch handoff",
+    )
+    audit_bop_local_row_batch_readiness.add_argument(
+        "--min-scene-or-category-coverage",
+        default=3,
+        type=int,
+        help="minimum sample, scene, category, or scenario coverage for readiness",
+    )
+    audit_bop_local_row_batch_readiness.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless all batch readiness gates pass",
+    )
+    audit_bop_local_row_batch_readiness.set_defaults(
+        handler=_object_state_audit_bop_local_row_batch_readiness
     )
     bop_local_row_batch_handoff = object_state_subparsers.add_parser(
         "bop-local-row-batch-handoff",

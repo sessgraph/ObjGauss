@@ -969,6 +969,46 @@ prediction / dynamics models, claim intervention / counterfactual gates, claim
 metric pass, claim world model, use replay / diffusion, write public samples or
 mutate viewer defaults.
 
+### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001
+
+Add a read-only batch preflight before running BOP local-row batch handoff.
+
+Required behavior:
+
+- Input the same explicit batch spec used by
+  `bop-local-row-batch-handoff`.
+- Resolve paths with the same batch / sample semantics as the handoff command.
+- Run the existing single-sample
+  `audit-bop-phase1-local-row` readiness logic for every sample.
+- Report per-sample blockers for BOP acceptance, Gaussian evidence, candidate
+  artifact binding and identity scenario metadata.
+- Aggregate ready / reviewable sample counts and scene / category / scenario
+  coverage before allowing a batch handoff attempt.
+- Keep readiness separate from metric pass: ready means the local row can be
+  handed off or is already identity+prediction reviewable; it does not mean
+  identity / prediction metrics pass.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_local_row_batch_readiness`.
+- Summary schema:
+  `objgauss-objectstate-bop-local-row-batch-readiness-v1`.
+- Core function: `objectstate_bop_local_row_batch_readiness(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-local-row-batch-readiness <batch-spec.json>`.
+- The CLI supports `--output-root`, `--min-reviewable-samples`,
+  `--min-scene-or-category-coverage`, `--summary-output`, `--table-output`
+  and `--require-ready`.
+- The summary reports `sample_summary`, `coverage`, `readiness_gates`,
+  per-sample records, a Markdown sample table, hard blockers and next actions.
+
+Current scope is read-only preflight only. It does not run local-row handoff,
+download BOP data, create GT, reconstruct Gaussians, train Gaussian / tracking
+/ prediction / dynamics models, claim intervention / counterfactual gates,
+claim metric pass, claim world model, use replay / diffusion, write public
+samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.

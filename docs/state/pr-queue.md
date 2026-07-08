@@ -208,6 +208,12 @@ identity+prediction reviewability 和 candidate gate 缺口；该 audit 不重�
 `bop-local-row-handoff`，为每个 sample 写 summary，并自动产出 cross-sample ledger /
 Markdown table；它仍只编排本地已有 scene / Gaussian evidence / candidate artifact，
 不下载数据、不创建 GT、不训练模型。
+`OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001` 继续补齐
+`audit-bop-local-row-batch-readiness`，可在真正运行 batch handoff 前复用每个 sample
+的 local row readiness，显式报告 Gaussian evidence、candidate artifact binding、
+identity scenario metadata、ready/reviewable sample count 和 scene/category/scenario
+coverage 缺口；它是 read-only preflight，不运行 handoff、不创建 GT、不训练模型、不声明
+metric pass 或 world model。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -279,6 +285,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001: Preflight BOP local row batches
+
+- 状态: done / batch-local-row-readiness-preflight
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 readiness accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在运行 `bop-local-row-batch-handoff` 前，用同一个 batch spec 对每个
+  sample 执行 read-only local row readiness audit，提前暴露 Gaussian evidence、
+  candidate artifact、identity scenario metadata 和 coverage 缺口。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_local_row_batch_readiness`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-local-row-batch-readiness-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-bop-local-row-batch-readiness <batch-spec.json>`。
+  - 每个 sample 复用既有 `audit-bop-phase1-local-row` readiness contract。
+  - 聚合 `sample_summary`、`coverage`、`readiness_gates`、per-sample records、
+    Markdown sample table、hard blockers 和 next actions。
+  - `ready` 与 metric pass 分离：ready 只表示可进入 local-row handoff，或已经
+    identity+prediction reviewable。
+- 边界:
+  - 只读 preflight，不运行 local-row handoff。
+  - 不下载 BOP，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不声明 intervention gate，不声明 metric pass，不声明 world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_local_row_batch_readiness.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_batch_readiness.py`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: passed，9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，69 tests。
+  - `uv run --extra dev pytest`: passed，481 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001: Run BOP local rows from a batch spec
 

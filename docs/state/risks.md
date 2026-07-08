@@ -27,3 +27,10 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001`
 BOP local-row handoff，并自动生成 cross-sample ledger / Markdown table；该缓解
 仍只编排本地已有 scene、Gaussian evidence 和 candidate artifact，不创建 GT、不训练
 模型、不声明 intervention / world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-READINESS-001`
+新增 `audit-bop-local-row-batch-readiness`，可在 batch handoff 前复用每个
+BOP sample 的 local-row readiness，显式报告 Gaussian evidence、candidate artifact
+binding、identity scenario metadata、ready/reviewable sample count 和
+scene/category/scenario coverage 缺口；该缓解仍是 read-only preflight，不运行 handoff、
+不创建 GT、不训练模型、不声明 metric pass、intervention gate 或 world-model evidence。
