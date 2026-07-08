@@ -302,6 +302,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA": (
+        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -418,6 +422,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "objectstate_bop_phase1_subset_selector",
     ),
+    "objectstate_bop_gaussian_evidence_preflight": (
+        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "objectstate_bop_gaussian_evidence_preflight",
+    ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
@@ -501,6 +509,10 @@ _EXPORTS = {
     "validate_objectstate_bop_phase1_subset_selector_summary": (
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "validate_objectstate_bop_phase1_subset_selector_summary",
+    ),
+    "validate_objectstate_bop_gaussian_evidence_preflight_summary": (
+        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "validate_objectstate_bop_gaussian_evidence_preflight_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

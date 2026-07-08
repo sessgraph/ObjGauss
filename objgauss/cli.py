@@ -217,6 +217,9 @@ from objgauss.core.objectstate_public_dataset_candidates import (
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
 )
+from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
+    objectstate_bop_gaussian_evidence_preflight,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3333,6 +3336,62 @@ def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
         raise ValueError("no BOP Phase 1 subset candidate is ready")
 
 
+def _object_state_audit_bop_gaussian_evidence(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_gaussian_evidence_preflight(
+        args.scene_root,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        dev_root=args.dev_root,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_gaussian_evidence_status={summary['status']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"selected_frames={summary['row_counts']['selected_frames']}")
+    print(f"expected_gaussian_files={summary['row_counts']['expected_gaussian_files']}")
+    print(f"missing_gaussian_files={summary['row_counts']['missing_gaussian_files']}")
+    print(
+        "phase1_gaussian_evidence_ready="
+        f"{str(readiness['phase1_gaussian_evidence_ready']).lower()}"
+    )
+    print(
+        "gaussian_reconstruction_tools_ready="
+        f"{str(readiness['gaussian_reconstruction_tools_ready']).lower()}"
+    )
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.missing_gaussians_output:
+        args.missing_gaussians_output.parent.mkdir(parents=True, exist_ok=True)
+        args.missing_gaussians_output.write_text(
+            summary["missing_gaussian_files_markdown"],
+            encoding="utf-8",
+        )
+        print(f"missing_gaussians_markdown={args.missing_gaussians_output}")
+    if args.require_ready and not readiness["phase1_gaussian_evidence_ready"]:
+        raise ValueError("BOP Gaussian evidence is not ready")
+
+
 def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_condition_sidecar_summary(
         args.scene_root,
@@ -5496,6 +5555,64 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     select_bop_phase1_subset.set_defaults(
         handler=_object_state_select_bop_phase1_subset
+    )
+    audit_bop_gaussian_evidence = object_state_subparsers.add_parser(
+        "audit-bop-gaussian-evidence",
+        help=(
+            "audit expected per-frame Gaussian evidence for a local BOP scene "
+            "before Phase 1 handoff"
+        ),
+    )
+    audit_bop_gaussian_evidence.add_argument("scene_root", type=Path)
+    audit_bop_gaussian_evidence.add_argument("--summary-output", type=Path)
+    audit_bop_gaussian_evidence.add_argument(
+        "--missing-gaussians-output",
+        type=Path,
+    )
+    audit_bop_gaussian_evidence.add_argument("--sample-id", required=True)
+    audit_bop_gaussian_evidence.add_argument("--dataset-id", default="bop-ycbv")
+    audit_bop_gaussian_evidence.add_argument("--object-category", default="bop_objects")
+    audit_bop_gaussian_evidence.add_argument("--scenario", default="bop_pose_sequence")
+    audit_bop_gaussian_evidence.add_argument("--fps", type=float, default=30.0)
+    audit_bop_gaussian_evidence.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    audit_bop_gaussian_evidence.add_argument("--rgb-dir", default="rgb")
+    audit_bop_gaussian_evidence.add_argument("--gaussian-dir", default="gaussians")
+    audit_bop_gaussian_evidence.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
+    audit_bop_gaussian_evidence.add_argument("--max-frames", type=int)
+    audit_bop_gaussian_evidence.add_argument("--frame-step", type=int, default=1)
+    audit_bop_gaussian_evidence.add_argument("--min-rgb-bytes", type=int, default=1)
+    audit_bop_gaussian_evidence.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    audit_bop_gaussian_evidence.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+    )
+    audit_bop_gaussian_evidence.add_argument("--hash-files", action="store_true")
+    audit_bop_gaussian_evidence.add_argument(
+        "--dev-root",
+        type=Path,
+        default=Path("/dev"),
+        help="device root passed through to the reconstruction environment preflight",
+    )
+    audit_bop_gaussian_evidence.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless every selected frame has valid Gaussian evidence",
+    )
+    audit_bop_gaussian_evidence.set_defaults(
+        handler=_object_state_audit_bop_gaussian_evidence
     )
     init_bop_condition_sidecar = object_state_subparsers.add_parser(
         "init-bop-condition-sidecar",

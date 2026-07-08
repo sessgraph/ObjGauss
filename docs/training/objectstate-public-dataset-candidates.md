@@ -153,6 +153,25 @@ identities, and prints the next `init-bop-condition-sidecar`,
 recommended scene. It does not download BOP, copy scene files, infer view /
 lighting metadata, generate Gaussian evidence or create a pass row.
 
+After a scene is selected, audit the expected per-frame Gaussian evidence before
+running handoff or candidate eval:
+
+```bash
+uv run objgauss object-state audit-bop-gaussian-evidence \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-gaussian-evidence-summary.json \
+  --missing-gaussians-output outputs/captures/bop-ycbv-scene-000001/bop-missing-gaussians.md
+```
+
+This preflight reuses the BOP acceptance/file-audit path with
+`--require-gaussian-files`, lists the expected `gaussians/<frame>.ply` files,
+reports missing or invalid files, and separately records whether COLMAP /
+Nerfstudio reconstruction tools are visible on the current host. It does not
+reconstruct Gaussians or train a model; it only tells you whether the local
+scene can pass the Gaussian evidence prerequisite for Phase 1.
+
 To get one machine-readable status for the whole local BOP row, run the
 combined Phase 1 local row readiness audit:
 
