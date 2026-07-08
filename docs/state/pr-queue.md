@@ -269,6 +269,32 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-CONDITION-CSV-TEMPLATE-001: Write BOP condition CSV templates
+
+- 状态: done / bop-condition-csv-template-authoring-aid
+- 类型: 标准 PR / ObjectState public pose dataset condition authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 `init-bop-condition-sidecar` 不只读已存在的 condition CSV，也能为选中
+  BOP frames 生成带标准列名和默认 condition 值的可填写 CSV 模板。
+- 已实施:
+  - `objectstate_bop_capture_condition_sidecar_summary(...)` 新增
+    `condition_csv_template` rows，并由 summary validator 检查模板字段完整性。
+  - CLI 新增 `--condition-csv-template-output`，把模板写成 CSV。
+  - 模板包含 `frame_id`、`view_id`、`lighting_id`、`camera_x/y/z` 和
+    `camera_qx/qy/qz/qw`；如果输入 CSV 已提供 camera pose，模板会回显规范化数值。
+- 边界:
+  - 只提供 authoring aid；不下载 BOP 数据，不从 pixels 推断 view / lighting / camera pose。
+  - 不创建 identity GT、不修改 BOP pose GT、不生成 per-frame Gaussian。
+  - 不运行 identity / prediction handoff，不训练模型，不声明 pass row / world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_capture_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，24 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_core_namespace.py -q`: passed，42 tests。
+  - `uv run --extra dev pytest`: passed，445 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `fbb51f1`。
+
 ### UI-METRIC-DEDUP-001: Deduplicate world-panel and floating-inspector object metrics
 
 - 状态: done / metric-display-consolidation-no-state-change

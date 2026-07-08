@@ -753,6 +753,13 @@ lighting condition count、camera pose count、最大 camera translation 和
 `needs_metadata`；带齐 lighting variation 和 camera motion 的 CSV 可让 sidecar authoring
 达到 `identity_ready`。该步骤仍不下载 BOP、不创建 GT、不生成 Gaussian、不训练模型、不运行
 handoff，也不声明 pass row 或 world model。
+随后补齐 `OBJECTSTATE-BOP-CONDITION-CSV-TEMPLATE-001`：同一个 summary 现在会生成
+`condition_csv_template` rows，CLI 新增 `--condition-csv-template-output`，可把选中 BOP
+frame id、默认 view / lighting metadata 和已有 camera pose metadata 写成可填写 CSV。
+推荐流程变为先导出 `bop-conditions.template.csv`，人工填入真实 capture condition，再 rerun
+`init-bop-condition-sidecar --condition-csv ... --require-identity-ready`。这只是 authoring
+aid，不从 pixels 推断条件、不创建 identity / pose GT、不生成 Gaussian、不训练模型，也不把
+BOP row 标记为 reality gate pass。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
