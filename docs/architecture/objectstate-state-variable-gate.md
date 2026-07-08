@@ -1151,6 +1151,41 @@ intervention candidates, run prediction / intervention models, train Gaussian
 or dynamics models, use replay / diffusion, write public samples or mutate
 viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-READINESS-001
+
+Add the preflight audit for the full Phase 1 controlled reality handoff.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_reality_bundle_readiness`.
+- Summary schema:
+  `objgauss-objectstate-controlled-reality-bundle-readiness-v1`.
+- `objectstate_controlled_reality_bundle_readiness(...)` takes a controlled
+  capture bundle root, trainable ObjectState artifact path, prediction
+  candidates path and intervention candidates path.
+- The audit reuses `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001` with
+  prediction / intervention readiness and candidate artifact checks enabled.
+- The audit validates the trainable artifact schema and checks that the
+  trainable artifact can bind to the imported capture manifest through the
+  identity prediction adapter.
+- The audit validates prediction / intervention candidate schemas and checks
+  that their sample id, frame ids, object ids, pose references, action ids,
+  action vectors and action intervals bind to the same imported capture
+  manifest.
+- The audit reports `full_reality_handoff_ready`; this means the inputs are
+  structurally ready to run `controlled-reality-bundle-handoff`, not that the
+  candidate quality metrics will pass.
+- CLI command:
+  `objgauss object-state audit-controlled-reality-bundle-readiness <bundle-root> <objectstates.json> <prediction-candidates.json> <intervention-candidates.json>`.
+- CLI supports `--summary-output`, `--require-ready`, file audit options and
+  identity scenario audit thresholds.
+
+Current scope remains pre-handoff readiness only. It does not collect capture
+data, create GT, create prediction / intervention candidates, run identity
+handoff, run prediction / intervention eval, train Gaussian or dynamics models,
+use replay / diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

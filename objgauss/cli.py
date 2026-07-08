@@ -182,6 +182,9 @@ from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
 from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
     objectstate_controlled_reality_bundle_handoff,
 )
+from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
+    objectstate_controlled_reality_bundle_readiness,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -4074,6 +4077,87 @@ def _object_state_controlled_reality_bundle_handoff(args: argparse.Namespace) ->
         raise ValueError("controlled reality bundle handoff did not pass")
 
 
+def _object_state_audit_controlled_reality_bundle_readiness(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_reality_bundle_readiness(
+        args.bundle_root,
+        args.trainable_artifact,
+        args.prediction_candidates,
+        args.intervention_candidates,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        max_centroid_distance=args.max_centroid_distance,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={args.bundle_root}")
+    print(f"trainable_artifact={args.trainable_artifact}")
+    print(f"prediction_candidates={args.prediction_candidates}")
+    print(f"intervention_candidates={args.intervention_candidates}")
+    print(f"readiness_status={summary['status']}")
+    print(
+        "full_reality_handoff_ready="
+        f"{str(readiness['full_reality_handoff_ready']).lower()}"
+    )
+    print(
+        "capture_bundle_ready="
+        f"{str(readiness['capture_bundle_ready']).lower()}"
+    )
+    print(
+        "identity_bundle_handoff_ready="
+        f"{str(readiness['identity_bundle_handoff_ready']).lower()}"
+    )
+    print(
+        "trainable_artifact_schema_ready="
+        f"{str(readiness['trainable_artifact_schema_ready']).lower()}"
+    )
+    print(
+        "trainable_artifact_binding_ready="
+        f"{str(readiness['trainable_artifact_binding_ready']).lower()}"
+    )
+    print(
+        "prediction_candidates_schema_ready="
+        f"{str(readiness['prediction_candidates_schema_ready']).lower()}"
+    )
+    print(
+        "prediction_candidates_binding_ready="
+        f"{str(readiness['prediction_candidates_binding_ready']).lower()}"
+    )
+    print(
+        "intervention_candidates_schema_ready="
+        f"{str(readiness['intervention_candidates_schema_ready']).lower()}"
+    )
+    print(
+        "intervention_candidates_binding_ready="
+        f"{str(readiness['intervention_candidates_binding_ready']).lower()}"
+    )
+    print(f"hard_blocker_count={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if args.require_ready and not readiness["full_reality_handoff_ready"]:
+        raise ValueError("controlled reality bundle is not full-handoff ready")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -4358,6 +4442,110 @@ def _build_parser() -> argparse.ArgumentParser:
     audit_controlled_capture_bundle_readiness.add_argument("--require-ready", action="store_true")
     audit_controlled_capture_bundle_readiness.set_defaults(
         handler=_object_state_audit_controlled_capture_bundle_readiness
+    )
+    audit_controlled_reality_bundle_readiness = object_state_subparsers.add_parser(
+        "audit-controlled-reality-bundle-readiness",
+        help=(
+            "audit controlled bundle, trainable artifact, prediction candidates "
+            "and intervention candidates before full reality handoff"
+        ),
+    )
+    audit_controlled_reality_bundle_readiness.add_argument("bundle_root", type=Path)
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "trainable_artifact",
+        type=Path,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "prediction_candidates",
+        type=Path,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "intervention_candidates",
+        type=Path,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--sample-json",
+        default="sample.json",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--objects-csv",
+        default="objects.csv",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--frames-csv",
+        default="frames.csv",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--annotations-csv",
+        default="annotations.csv",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--actions-csv",
+        default="actions.csv",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--max-centroid-distance",
+        type=float,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--hash-files",
+        action="store_true",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    audit_controlled_reality_bundle_readiness.add_argument(
+        "--require-ready",
+        action="store_true",
+    )
+    audit_controlled_reality_bundle_readiness.set_defaults(
+        handler=_object_state_audit_controlled_reality_bundle_readiness
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",
