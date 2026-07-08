@@ -795,6 +795,17 @@ pixels 反投影成 per-frame `gaussians/<frame>.ply` evidence seed，并用 RGB
 Gaussian evidence 缺失时，CLI 会打印 `rgbd_export_candidate=true` 和可直接运行的
 `export-bop-rgbd-gaussian-evidence` 命令。该 hint 不自动写 PLY、不重建 / 训练模型、
 不运行 handoff，也不把 local row 或 Phase 1 reality gate 标记为 pass。
+随后补齐 `OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-TEMPLATE-001`：
+新增 `objgauss.core.objectstate_bop_candidate_artifact_template`，schema 为
+`objgauss-objectstate-bop-candidate-artifact-template-v1`，summary schema 为
+`objgauss-objectstate-bop-candidate-artifact-template-summary-v1`，CLI 为
+`objgauss object-state init-bop-objectstate-artifact-template`。该命令从本地 BOP
+acceptance manifest 生成 draft-only `objectstates.template.json`，列出每个 selected
+frame 的 Gaussian ref、object ids 和待填写的 ObjectState centroid / bbox /
+confidence placeholder；模板 schema 与 `objgauss-trainable-kernel-model-artifact-v1`
+刻意不同，因此会被 identity route / trainable artifact validator 拒绝。该步骤只帮助作者
+填写真正的本地模型输出 `objectstates.json`，不复制 BOP pose GT 到 candidate centroid、
+不训练模型、不运行 identity eval、不创建 pass row，也不改 viewer/export 默认策略。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

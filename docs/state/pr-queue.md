@@ -180,6 +180,10 @@ preflight 和后续 BOP route audits 使用。
 `audit-bop-phase1-local-row` 的 read-only 诊断：当 depth 齐全但 Gaussian evidence
 缺失时，local row summary / CLI 会给出 `rgbd_export_candidate=true` 和可运行的
 export 命令。
+`OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-TEMPLATE-001` 继续补齐
+`init-bop-objectstate-artifact-template`，可从 BOP acceptance manifest 写出 draft-only
+`objectstates.template.json`，帮助作者填写真实模型输出 `objectstates.json`；该模板
+schema 会被 identity route 拒绝，不复制 BOP pose GT、不训练模型、不创建 pass row。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -251,6 +255,37 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-TEMPLATE-001: Initialize BOP ObjectState artifact templates
+
+- 状态: done / draft-only-candidate-artifact-authoring
+- 类型: 标准 PR / ObjectState public pose dataset candidate authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在 BOP RGB / pose / per-frame Gaussian evidence 之后，给真实 ObjectState
+  candidate artifact 提供可复跑、可审计的 draft template，避免把 BOP pose GT 误填成
+  candidate centroid。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_candidate_artifact_template`，冻结
+    draft template schema 和 summary schema。
+  - 新增 CLI `objgauss object-state init-bop-objectstate-artifact-template`，可写
+    `objectstates.template.json` 和 summary JSON，并打印 local-row / identity-route
+    后续 audit 命令。
+  - 模板中的 centroid / bbox / confidence 只保留 TODO placeholder；目标 artifact
+    schema 指向 `objgauss-trainable-kernel-model-artifact-v1`，但模板自身 schema 与其不同。
+  - runbook 记录模板只用于填写真实模型输出，不可提交给 identity route 当作有效 artifact。
+- 边界:
+  - 不生成有效 trainable artifact，不运行模型，不训练 Gaussian / dynamics。
+  - 不复制 BOP `cam_t_m2c` / pose GT 到 candidate centroid。
+  - 不运行 identity eval / handoff，不创建 Phase 1 pass row，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_candidate_artifact_template.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py -q`: passed，5 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_core_namespace.py -q`: passed，26 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，54 tests。
+  - `uv run --extra dev pytest`: passed，460 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `7d97ca7`。
 
 ### OBJECTSTATE-BOP-RGBD-READINESS-HINT-001: Hint RGB-D export from BOP local row readiness
 
