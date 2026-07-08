@@ -75,6 +75,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
+    OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
@@ -233,6 +234,7 @@ from objgauss.core import (
     objectstate_controlled_reality_bundle_readiness,
     objectstate_controlled_reality_evidence_package,
     objectstate_controlled_prediction_evidence_package,
+    objectstate_bop_prediction_baseline_handoff,
     write_objectstate_controlled_reality_candidate_templates,
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     objectstate_identity_predictions_from_trainable_artifact,
@@ -321,6 +323,7 @@ from objgauss.core import (
     validate_objectstate_controlled_intervention_candidates_template,
     validate_objectstate_controlled_intervention_eval_summary,
     validate_objectstate_controlled_prediction_candidates,
+    validate_objectstate_bop_prediction_baseline_handoff_summary,
     validate_objectstate_controlled_prediction_baseline_summary,
     validate_objectstate_controlled_prediction_candidate_finalize_summary,
     validate_objectstate_controlled_prediction_candidates_template,
@@ -1067,6 +1070,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA == (
         "objgauss-objectstate-controlled-prediction-baseline-candidates-v1"
     )
+    assert OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA == (
+        "objgauss-objectstate-bop-prediction-baseline-handoff-v1"
+    )
     assert OBJECTSTATE_CONTROLLED_PREDICTION_EVIDENCE_PACKAGE_SCHEMA == (
         "objgauss-objectstate-controlled-prediction-evidence-package-v1"
     )
@@ -1082,12 +1088,14 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert finalize_objectstate_controlled_reality_candidate_templates is not None
     assert finalize_objectstate_controlled_prediction_candidate_template is not None
     assert write_objectstate_controlled_prediction_baseline_candidates is not None
+    assert objectstate_bop_prediction_baseline_handoff is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
     assert validate_objectstate_controlled_reality_candidate_template_summary is not None
     assert validate_objectstate_controlled_reality_candidate_finalize_summary is not None
     assert validate_objectstate_controlled_prediction_candidate_finalize_summary is not None
     assert validate_objectstate_controlled_prediction_baseline_summary is not None
+    assert validate_objectstate_bop_prediction_baseline_handoff_summary is not None
     assert validate_objectstate_controlled_prediction_evidence_package_summary is not None
     assert (
         validate_objectstate_controlled_reality_evidence_package_summary

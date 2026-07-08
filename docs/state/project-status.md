@@ -652,6 +652,17 @@ controlled capture manifest 和 draft `prediction-candidates.template.json`，�
 target timestamp，不读取 target pose values；它不是 learned dynamics model，不运行 eval，
 不创建 GT、不训练 Gaussian / dynamics、不创建 pass row、不改 viewer/export 默认策略。
 
+随后新增 `OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_prediction_baseline_handoff`，schema 为
+`objgauss-objectstate-bop-prediction-baseline-handoff-v1`，并新增 CLI
+`objgauss object-state bop-prediction-baseline-handoff`。该命令对本地 BOP scene 执行
+`--require-gaussian-files` acceptance，写出 `capture-manifest.json`、BOP acceptance /
+file audit / missing files、manifest-first candidate templates、baseline-filled
+prediction candidates、prediction eval summary、`controlled-real-prediction.json`
+和 prediction evidence package audit summary。它把 BOP prediction-only 路线从多条手工
+命令收敛为一个可复验本地 handoff；仍不下载 BOP 数据、不生成 Gaussian evidence、不训练或
+发布新模型、不创建 GT、不声明 intervention / counterfactual gate、不改 viewer/export 默认。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

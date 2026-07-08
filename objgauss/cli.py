@@ -211,6 +211,9 @@ from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
 )
+from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
+    objectstate_bop_prediction_baseline_handoff,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -4633,6 +4636,83 @@ def _object_state_audit_controlled_prediction_evidence_package(
         raise ValueError("controlled prediction evidence package is not reviewable")
 
 
+def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_prediction_baseline_handoff(
+        args.scene_root,
+        output_root=args.output_root,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        policy=args.policy,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        confidence=args.confidence,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        prediction_thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+        force=args.force,
+    )
+    readiness = summary["readiness"]
+    prediction_eval = summary["prediction_eval_summary"]
+    prediction = summary["prediction_evidence_package"]["prediction"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"candidate_dir={summary['candidate_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"bop_prediction_baseline_handoff_status={summary['status']}")
+    print(
+        "bop_acceptance_pass="
+        f"{str(readiness['bop_acceptance_pass']).lower()}"
+    )
+    print(
+        "phase1_gaussian_evidence_ready="
+        f"{str(readiness['phase1_gaussian_evidence_ready']).lower()}"
+    )
+    print(
+        "baseline_candidates_ready="
+        f"{str(readiness['baseline_candidates_ready']).lower()}"
+    )
+    print(f"prediction_eval_status={prediction_eval['status']}")
+    print(
+        "prediction_evidence_package_reviewable="
+        f"{str(readiness['prediction_evidence_package_reviewable']).lower()}"
+    )
+    print(f"prediction_candidate_count={prediction['prediction_candidate_count']}")
+    print(f"prediction_row_status={prediction['prediction_row_status']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_bop_prediction_baseline_handoff_reviewable"
+    ):
+        raise ValueError("BOP prediction baseline handoff is not reviewable")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -4967,6 +5047,110 @@ def _build_parser() -> argparse.ArgumentParser:
     accept_bop_capture_scene.add_argument("--hash-files", action="store_true")
     accept_bop_capture_scene.add_argument("--require-pass", action="store_true")
     accept_bop_capture_scene.set_defaults(handler=_object_state_accept_bop_capture_scene)
+    bop_prediction_baseline_handoff = object_state_subparsers.add_parser(
+        "bop-prediction-baseline-handoff",
+        help=(
+            "run BOP acceptance, baseline prediction candidate generation, "
+            "prediction eval, and prediction evidence package audit"
+        ),
+    )
+    bop_prediction_baseline_handoff.add_argument("scene_root", type=Path)
+    bop_prediction_baseline_handoff.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+    )
+    bop_prediction_baseline_handoff.add_argument("--summary-output", type=Path)
+    bop_prediction_baseline_handoff.add_argument("--sample-id", required=True)
+    bop_prediction_baseline_handoff.add_argument("--dataset-id", default="bop-ycbv")
+    bop_prediction_baseline_handoff.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    bop_prediction_baseline_handoff.add_argument("--fps", type=float, default=30.0)
+    bop_prediction_baseline_handoff.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    bop_prediction_baseline_handoff.add_argument("--rgb-dir", default="rgb")
+    bop_prediction_baseline_handoff.add_argument("--gaussian-dir", default="gaussians")
+    bop_prediction_baseline_handoff.add_argument("--max-frames", type=int)
+    bop_prediction_baseline_handoff.add_argument("--frame-step", type=int, default=1)
+    bop_prediction_baseline_handoff.add_argument(
+        "--policy",
+        choices=("constant_velocity", "hold"),
+        default="constant_velocity",
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--candidate-id",
+        default="bop-constant-velocity-baseline",
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--candidate-source",
+        default="controlled-prediction-baseline",
+    )
+    bop_prediction_baseline_handoff.add_argument("--artifact-ref")
+    bop_prediction_baseline_handoff.add_argument(
+        "--confidence",
+        type=float,
+        default=0.5,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample artifact refs such as scene_gt.json to exist",
+    )
+    bop_prediction_baseline_handoff.add_argument("--min-rgb-bytes", type=int, default=1)
+    bop_prediction_baseline_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    bop_prediction_baseline_handoff.add_argument("--hash-files", action="store_true")
+    bop_prediction_baseline_handoff.add_argument(
+        "--max-state-ade",
+        type=float,
+        default=0.05,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite handoff output files if they already exist",
+    )
+    bop_prediction_baseline_handoff.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the generated evidence package is reviewable",
+    )
+    bop_prediction_baseline_handoff.set_defaults(
+        handler=_object_state_bop_prediction_baseline_handoff
+    )
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",
         help="audit staged controlled capture bundle readiness before import/handoff",

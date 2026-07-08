@@ -153,6 +153,9 @@ controlled-real prediction manifest 串成 reviewable package；reviewable 不�
 已补 hold / constant-velocity baseline candidate generator，用 source pose、prior pose
 history 和 target timestamp 生成 evaluator-ready prediction candidates，不读取 target
 pose values，也不声明 learned model 或 metric pass。
+`OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001` 已把 BOP acceptance、candidate
+template、baseline candidates、prediction eval 和 prediction evidence package audit 串成
+一条本地命令；仍要求本地已有 per-frame Gaussian evidence，不生成或训练新模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -224,6 +227,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001: Run BOP prediction baseline evidence handoff
+
+- 状态: done / local-bop-prediction-package-orchestration
+- 类型: 标准 PR / ObjectState public pose dataset prediction handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把 BOP prediction-only 路线从 acceptance -> template -> baseline candidates ->
+  prediction eval -> evidence audit 的多步手工流程收敛成一条可复验本地命令。
+- 已实施:
+  - 新增 module
+    `objgauss.core.objectstate_bop_prediction_baseline_handoff`。
+  - 新增 schema
+    `objgauss-objectstate-bop-prediction-baseline-handoff-v1`。
+  - 新增 core function
+    `objectstate_bop_prediction_baseline_handoff(...)`。
+  - 新增 CLI
+    `objgauss object-state bop-prediction-baseline-handoff`。
+  - Handoff 默认要求 per-frame Gaussian files，写出 accepted capture manifest、
+    BOP acceptance / file audit、candidate template summary、baseline summary、
+    `prediction-candidates.json`、prediction eval summary、controlled-real prediction
+    manifest 和 prediction evidence package summary。
+- 边界:
+  - 不下载 BOP 数据，不写 `outputs/` 或 `public/samples`。
+  - 不生成 Gaussian evidence，不创建 GT，不训练模型。
+  - 不声明 learned dynamics model、intervention / counterfactual gate、public demo
+    或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_controlled_prediction_baseline.py tests/test_objectstate_controlled_prediction_evidence_package.py tests/test_core_namespace.py -q`: passed，29 tests。
+  - `uv run --extra dev pytest`: passed，415 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
 
 ### OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001: Generate controlled prediction baseline candidates
 

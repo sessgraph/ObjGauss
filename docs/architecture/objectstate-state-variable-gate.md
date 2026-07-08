@@ -703,6 +703,45 @@ Implemented v0.1 facts:
   create pass rows, claim public demo eligibility, use replay / diffusion or
   mutate viewer defaults.
 
+### OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001
+
+Run the local BOP prediction-only baseline handoff as one reviewable evidence
+package command.
+
+Required behavior:
+
+- Input a local BOP scene root and an explicit output root.
+- Run BOP acceptance with per-frame Gaussian files required.
+- Write `capture-manifest.json`, BOP acceptance summary, file audit, missing
+  files Markdown and controlled-real blocked seed under the output root.
+- Generate manifest-first prediction / intervention candidate templates. BOP
+  pose scenes should produce prediction rows and zero intervention rows.
+- Generate hold / constant-velocity baseline prediction candidates without
+  reading target pose values while authoring candidates.
+- Run controlled prediction eval against the capture manifest.
+- Run the prediction evidence package audit and report whether the package is
+  reviewable.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_prediction_baseline_handoff`.
+- Summary schema:
+  `objgauss-objectstate-bop-prediction-baseline-handoff-v1`.
+- Core function:
+  `objectstate_bop_prediction_baseline_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-prediction-baseline-handoff <scene-root> --output-root <dir>`.
+- The handoff writes `reality-candidates/prediction-baseline-summary.json`,
+  `prediction-candidates.json`, `prediction-eval-summary.json`,
+  `controlled-real-prediction.json` and
+  `prediction-evidence-package-summary.json`.
+
+Current scope is deterministic local orchestration only. It does not download
+BOP data, create GT, reconstruct Gaussians, train Gaussian / dynamics models,
+claim a learned prediction model, prove intervention / counterfactual evidence,
+use replay / diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /

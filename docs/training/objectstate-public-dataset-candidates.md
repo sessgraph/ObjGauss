@@ -132,8 +132,32 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 `--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
 or `.splat` files for every selected frame.
 
+Once the local scene has RGB, pose and per-frame Gaussian evidence, the
+prediction-only baseline handoff can run the full reviewable package in one
+command:
+
+```bash
+uv run objgauss object-state bop-prediction-baseline-handoff \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output-root outputs/captures/bop-ycbv-scene-000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --policy constant_velocity \
+  --candidate-id bop-ycbv-constant-velocity-baseline \
+  --candidate-source controlled-prediction-baseline \
+  --artifact-ref outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --hash-files \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-prediction-baseline-handoff-summary.json \
+  --require-reviewable
+```
+
+This command writes the accepted capture manifest, BOP file audit, prediction
+candidate templates, baseline-filled prediction candidates, prediction eval
+summary and prediction evidence package audit under `--output-root`.
+
 After acceptance passes, initialize candidate authoring directly from the BOP
-controlled capture manifest:
+controlled capture manifest. The following commands are the expanded manual
+version of the one-command handoff above:
 
 ```bash
 uv run objgauss object-state init-controlled-reality-candidates-from-manifest \
