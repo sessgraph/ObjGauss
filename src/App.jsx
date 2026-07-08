@@ -47,6 +47,16 @@ const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
 const OBJECT_PICKING_CONTRACT = "projected-object-bbox-picker-v2";
 const OBJECT_PROCESS_FLOW_SCHEMA = "objgauss-gaussian-object-process-flow-v1";
 const OBJECT_PICK_BOX_SCREEN_PADDING_PX = 4;
+// 与 styles.css 里 "@media (min-width: 821px)" 断点一致：<=820px 视为窄屏/移动端,
+// "世界操作" 调试面板默认收起为小按钮，避免挡住 3D 视口；用户仍可手动展开/收起。
+const NARROW_VIEWPORT_MEDIA_QUERY = "(max-width: 820px)";
+
+function isNarrowViewport() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia(NARROW_VIEWPORT_MEDIA_QUERY).matches;
+}
 
 export default function App() {
   const modelCatalog = useMemo(
@@ -81,6 +91,7 @@ export default function App() {
   const [sourceSplatMotionState, setSourceSplatMotionState] = useState(() => emptySourceSplatMotionState());
   const [objectProcessHandoff, setObjectProcessHandoff] = useState(() => emptyObjectProcessHandoff());
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [debugPanelCollapsed, setDebugPanelCollapsed] = useState(() => isNarrowViewport());
   const [artifactImport, setArtifactImport] = useState(() => ({
     status: "idle",
     modelId: "",
@@ -1859,6 +1870,8 @@ export default function App() {
       <DebugPanel
         selected={selected}
         models={modelList}
+        collapsed={debugPanelCollapsed}
+        onToggleCollapsed={() => setDebugPanelCollapsed((value) => !value)}
         selectedObject={selectedObject}
         selectedSourceSplatMotion={selectedSourceSplatMotion}
         selectedObjectKey={selectedObjectKey}
@@ -4342,6 +4355,8 @@ function ThreeWorld({
 function DebugPanel({
   selected,
   models,
+  collapsed,
+  onToggleCollapsed,
   selectedObject,
   selectedSourceSplatMotion,
   selectedObjectKey,
@@ -4427,8 +4442,9 @@ function DebugPanel({
   const sourceSplatMotionStatus = sourceSplatMotionLabel(selectedSourceSplatMotion, selectedLayerState);
   return (
     <section
-      className="glassHud debugPanel"
+      className={`glassHud debugPanel ${collapsed ? "collapsed" : ""}`}
       data-object-debug-panel="true"
+      data-debug-panel-collapsed={collapsed ? "true" : "false"}
       data-debug-mode={debugMode ? "assignment" : "appearance"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
       data-object-overlay-mode={objectOverlayMode}
@@ -4526,9 +4542,22 @@ function DebugPanel({
           <h2>世界操作</h2>
           <span>对象交互层</span>
         </div>
-        <strong>{selectedObject ? `#${selectedObject.objectId}` : selected.label}</strong>
+        <div className="debugHeaderActions">
+          <strong>{selectedObject ? `#${selectedObject.objectId}` : selected.label}</strong>
+          <button
+            className="inspectorToggle"
+            type="button"
+            aria-expanded={!collapsed}
+            data-debug-panel-collapse-button="true"
+            onClick={() => onToggleCollapsed?.()}
+          >
+            {collapsed ? "展开" : "收起"}
+          </button>
+        </div>
       </div>
 
+      {collapsed ? null : (
+        <>
       <DebugSection title="Three.js 世界" status={selected.status ?? "queued"} defaultOpen>
         <div className="worldPlaneGrid" data-world-plane-panel="true">
           <Metric label="渲染" value="Three.js" />
@@ -4829,6 +4858,8 @@ function DebugPanel({
       </DebugSection>
         </div>
       </details>
+        </>
+      )}
     </section>
   );
 }

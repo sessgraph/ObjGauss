@@ -298,12 +298,34 @@ button:focus-visible {
   border-radius: 22px;
 }
 
+.debugPanel.collapsed {
+  width: min(232px, calc(100vw - 52px));
+  max-height: none;
+  overflow: visible;
+  padding: 12px 14px;
+  /* 覆盖窄屏媒体查询给 .debugPanel 设置的 top+bottom 双向定位(会把高度撑满整屏)，
+     收起态只应包住 debugHeader 本身的高度。 */
+  bottom: auto;
+  height: auto;
+}
+
+.debugPanel.collapsed .debugHeader {
+  margin-bottom: 0;
+}
+
 .debugHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 14px;
+}
+
+.debugHeaderActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
 }
 
 .debugHeader h2 {
