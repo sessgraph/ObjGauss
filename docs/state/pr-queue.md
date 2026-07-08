@@ -347,6 +347,48 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-STATE-VARIABLE-MATRIX-001: Map reality rows to five state-variable experiments
+
+- 状态: done / five-experiment-reality-matrix
+- 类型: 标准 PR / ObjectState Phase 1 state-variable evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 把 reality row ledger 从 `identity` / `prediction` / `intervention`
+  三类 row 进一步映射到五个 State Variable Gate 实验，避免把 prediction pass
+  误读成完整状态变量通过。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_reality_row_ledger`。
+  - `objgauss-objectstate-reality-row-ledger-v1` summary 新增
+    `state_variable_evidence_matrix` 和
+    `state_variable_evidence_matrix_markdown`。
+  - 矩阵实验项为 `identity_persistence`、`occlusion_recovery`、
+    `view_invariance`、`predictive_sufficiency` 和
+    `counterfactual_action_interface`。
+  - 每项记录 required / present / missing metrics、source row ids、
+    metric row ids、row status counts 和解释。
+  - CLI `audit-reality-row-ledger` 新增 `--experiment-matrix-output`，并打印
+    `experiment=<name>:<status>`。
+- 真实 public evidence 结果:
+  - 当前 LMO / HOPE ledger 仍为 2 summaries / 6 rows / 1 pass / 3 fail / 2 blocked。
+  - 五实验矩阵:
+    - `identity_persistence=objectstate_state_variable_experiment_fail`
+    - `occlusion_recovery=objectstate_state_variable_experiment_missing_metric`
+    - `view_invariance=objectstate_state_variable_experiment_missing_metric`
+    - `predictive_sufficiency=objectstate_state_variable_experiment_pass`
+    - `counterfactual_action_interface=objectstate_state_variable_experiment_blocked`
+  - 输出:
+    `outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md`。
+- 边界:
+  - 只读已有 summaries，不创建 GT、不采集视频、不新增 reality rows。
+  - 不运行 identity / prediction / intervention eval，不训练模型。
+  - 不把 BOP public replay prediction pass 扩大解释成 identity / occlusion /
+    view / counterfactual pass。
+  - 不声明 ObjectState 已经通过真实世界 state-variable / world-model gate。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_reality_row_ledger.py objgauss/cli.py`: passed。
+  - `uv run objgauss object-state audit-reality-row-ledger outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md --experiment-matrix-output outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md --next-actions-output outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`: passed。
+
 ### OBJECTSTATE-REALITY-ROW-LEDGER-NEXT-ACTIONS-001: Add gap-plan next actions to reality row ledger
 
 - 状态: done / state-variable-gap-plan-ledger

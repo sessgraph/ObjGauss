@@ -154,3 +154,12 @@ boundary 一起记录。该缓解只做 read-only gap planning，不创建 GT、
 eval、不训练模型、不声明 identity / intervention pass 或 world-model evidence；风险继续
 open，直到真实 controlled/public rows 形成 identity、prediction 和 intervention pass/fail
 证据。
+
+R-017 update 2026-07-08: `OBJECTSTATE-STATE-VARIABLE-MATRIX-001`
+扩展 `audit-reality-row-ledger`，把现有 reality rows 映射到五个 State Variable Gate
+实验。当前 LMO + HOPE public replay matrix 为：identity persistence fail、occlusion
+recovery missing_metric、view invariance missing_metric、predictive sufficiency pass、
+counterfactual / action interface blocked。该缓解防止把单个 prediction pass row 误读为
+状态变量通过，也把下一步真实证据缺口从三类 row 拆到五类实验；风险继续 open，因为仍缺
+真实 identity pass、occlusion recovery / view invariance metrics 和 action-conditioned
+counterfactual row。

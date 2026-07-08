@@ -35,6 +35,46 @@ _SUPPORTED_SUMMARY_SCHEMAS = {
     OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA,
     OBJECTSTATE_REALITY_GATE_SCHEMA,
 }
+_STATE_VARIABLE_EXPERIMENTS = (
+    {
+        "experiment": "identity_persistence",
+        "evidence_kind": "identity",
+        "required_metrics": (
+            "idf1",
+            "fragmentation_rate",
+            "swap_rate",
+            "identity_collapse",
+        ),
+    },
+    {
+        "experiment": "occlusion_recovery",
+        "evidence_kind": "identity",
+        "required_metrics": ("occlusion_recovery_rate",),
+    },
+    {
+        "experiment": "view_invariance",
+        "evidence_kind": "identity",
+        "required_metrics": ("contrastive_margin",),
+    },
+    {
+        "experiment": "predictive_sufficiency",
+        "evidence_kind": "prediction",
+        "required_metrics": (
+            "state_ade",
+            "history_ade",
+            "prediction_gap_vs_history_model",
+        ),
+    },
+    {
+        "experiment": "counterfactual_action_interface",
+        "evidence_kind": "intervention",
+        "required_metrics": (
+            "action_conditioned_ade",
+            "counterfactual_outcome_accuracy",
+            "wrong_direction_rate",
+        ),
+    },
+)
 
 
 def read_objectstate_reality_row_summary(path: str | Path) -> dict[str, Any]:
@@ -92,6 +132,7 @@ def objectstate_reality_row_ledger(
         gate_payload = gate.as_dict()
         blocked_rows_markdown = objectstate_reality_blocked_rows_markdown(gate)
     next_actions = _next_actions(gate_payload, rows)
+    experiment_matrix = _state_variable_evidence_matrix(rows)
 
     payload = {
         "schema": OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA,
@@ -118,6 +159,10 @@ def objectstate_reality_row_ledger(
         "rows": [row.as_dict() for row in rows],
         "gate": gate_payload,
         "gap_summary": _gap_summary(gate_payload, rows),
+        "state_variable_evidence_matrix": experiment_matrix,
+        "state_variable_evidence_matrix_markdown": (
+            _state_variable_evidence_matrix_markdown(experiment_matrix)
+        ),
         "next_actions": next_actions,
         "next_actions_markdown": _next_actions_markdown(next_actions),
         "blocked_rows_markdown": blocked_rows_markdown,
@@ -217,6 +262,18 @@ def validate_objectstate_reality_row_ledger_summary(
         raise ValueError("ObjectState reality row ledger requires duplicate_row_ids")
     if not isinstance(payload.get("gap_summary"), Mapping):
         raise ValueError("ObjectState reality row ledger requires gap_summary")
+    experiment_matrix = payload.get("state_variable_evidence_matrix")
+    if not isinstance(experiment_matrix, list):
+        raise ValueError(
+            "ObjectState reality row ledger requires state_variable_evidence_matrix"
+        )
+    for record in experiment_matrix:
+        _validate_experiment_record(record)
+    if not isinstance(payload.get("state_variable_evidence_matrix_markdown"), str):
+        raise ValueError(
+            "ObjectState reality row ledger requires "
+            "state_variable_evidence_matrix_markdown"
+        )
     next_actions = payload.get("next_actions")
     if not isinstance(next_actions, list):
         raise ValueError("ObjectState reality row ledger requires next_actions")
@@ -379,6 +436,177 @@ def _gap_summary(
         "full_gate_status": None if gate is None else gate.get("status"),
         "hard_blockers": [] if gate is None else list(gate.get("hard_blockers", ())),
     }
+
+
+def _state_variable_evidence_matrix(
+    rows: Sequence[ObjectStateRealityRow],
+) -> list[dict[str, Any]]:
+    records = []
+    for spec in _STATE_VARIABLE_EXPERIMENTS:
+        evidence_kind = str(spec["evidence_kind"])
+        required_metrics = tuple(str(metric) for metric in spec["required_metrics"])
+        experiment_rows = [row for row in rows if row.evidence_kind == evidence_kind]
+        metric_rows = [
+            row
+            for row in experiment_rows
+            if all(metric in row.metrics for metric in required_metrics)
+        ]
+        status = _experiment_status(experiment_rows, metric_rows)
+        records.append(
+            {
+                "experiment": str(spec["experiment"]),
+                "evidence_kind": evidence_kind,
+                "status": status,
+                "required_metrics": list(required_metrics),
+                "present_metrics": sorted(
+                    {
+                        str(metric)
+                        for row in experiment_rows
+                        for metric in row.metrics.keys()
+                    }
+                ),
+                "missing_metrics": [
+                    metric
+                    for metric in required_metrics
+                    if not any(metric in row.metrics for row in experiment_rows)
+                ],
+                "source_row_ids": [row.row_id for row in experiment_rows],
+                "metric_row_ids": [row.row_id for row in metric_rows],
+                "row_status_counts": {
+                    "pass": _row_status_count(experiment_rows, "pass"),
+                    "fail": _row_status_count(experiment_rows, "fail"),
+                    "blocked": _row_status_count(experiment_rows, "blocked"),
+                },
+                "interpretation": _experiment_interpretation(
+                    str(spec["experiment"]),
+                    status,
+                    evidence_kind=evidence_kind,
+                    metric_rows=metric_rows,
+                ),
+            }
+        )
+    return records
+
+
+def _experiment_status(
+    experiment_rows: Sequence[ObjectStateRealityRow],
+    metric_rows: Sequence[ObjectStateRealityRow],
+) -> str:
+    if any(row.status == "pass" for row in metric_rows):
+        return "objectstate_state_variable_experiment_pass"
+    if any(row.status == "fail" for row in metric_rows):
+        return "objectstate_state_variable_experiment_fail"
+    if any(row.status == "blocked" for row in experiment_rows):
+        return "objectstate_state_variable_experiment_blocked"
+    if experiment_rows:
+        return "objectstate_state_variable_experiment_missing_metric"
+    return "objectstate_state_variable_experiment_missing_row"
+
+
+def _experiment_interpretation(
+    experiment: str,
+    status: str,
+    *,
+    evidence_kind: str,
+    metric_rows: Sequence[ObjectStateRealityRow],
+) -> str:
+    if status == "objectstate_state_variable_experiment_pass":
+        pass_rows = [row.row_id for row in metric_rows if row.status == "pass"]
+        return f"{experiment} has pass evidence from rows: {', '.join(pass_rows)}"
+    if status == "objectstate_state_variable_experiment_fail":
+        fail_rows = [row.row_id for row in metric_rows if row.status == "fail"]
+        return f"{experiment} has explicit fail evidence from rows: {', '.join(fail_rows)}"
+    if status == "objectstate_state_variable_experiment_blocked":
+        return f"{experiment} is blocked by existing {evidence_kind} rows"
+    if status == "objectstate_state_variable_experiment_missing_metric":
+        return (
+            f"{experiment} has {evidence_kind} rows but lacks the experiment "
+            "metric fields required for this state-variable claim"
+        )
+    return f"{experiment} has no {evidence_kind} rows in this ledger"
+
+
+def _state_variable_evidence_matrix_markdown(
+    matrix: Sequence[Mapping[str, Any]],
+) -> str:
+    lines = [
+        "# ObjectState State-Variable Evidence Matrix",
+        "",
+        "| experiment | evidence_kind | status | missing_metrics | source_rows |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for record in matrix:
+        lines.append(
+            "| "
+            + str(record.get("experiment", ""))
+            + " | "
+            + str(record.get("evidence_kind", ""))
+            + " | "
+            + str(record.get("status", ""))
+            + " | "
+            + ", ".join(str(item) for item in record.get("missing_metrics", ()))
+            + " | "
+            + ", ".join(str(item) for item in record.get("source_row_ids", ()))
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "This matrix is read-only. It maps existing reality rows to the five "
+            "state-variable experiments and does not create ground truth, train "
+            "models, relax gates, or claim a world-model pass.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _validate_experiment_record(value: Any) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("ObjectState reality row ledger experiment must be a mapping")
+    for key in (
+        "experiment",
+        "evidence_kind",
+        "status",
+        "required_metrics",
+        "present_metrics",
+        "missing_metrics",
+        "source_row_ids",
+        "metric_row_ids",
+        "row_status_counts",
+        "interpretation",
+    ):
+        if key not in value:
+            raise ValueError(
+                f"ObjectState reality row ledger experiment requires {key}"
+            )
+    if value["status"] not in {
+        "objectstate_state_variable_experiment_pass",
+        "objectstate_state_variable_experiment_fail",
+        "objectstate_state_variable_experiment_blocked",
+        "objectstate_state_variable_experiment_missing_metric",
+        "objectstate_state_variable_experiment_missing_row",
+    }:
+        raise ValueError("ObjectState reality row ledger experiment status unsupported")
+    for key in (
+        "required_metrics",
+        "present_metrics",
+        "missing_metrics",
+        "source_row_ids",
+        "metric_row_ids",
+    ):
+        if not isinstance(value.get(key), list):
+            raise ValueError(
+                f"ObjectState reality row ledger experiment {key} must be list"
+            )
+    counts = value.get("row_status_counts")
+    if not isinstance(counts, Mapping) or any(
+        not isinstance(counts.get(status), int)
+        for status in ("pass", "fail", "blocked")
+    ):
+        raise ValueError(
+            "ObjectState reality row ledger experiment requires row_status_counts"
+        )
 
 
 def _next_actions(

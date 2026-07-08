@@ -42,6 +42,28 @@ def test_reality_row_ledger_aggregates_existing_row_summaries(tmp_path):
         "identity",
         "intervention",
     ]
+    experiment_status = {
+        row["experiment"]: row["status"]
+        for row in ledger["state_variable_evidence_matrix"]
+    }
+    assert experiment_status == {
+        "identity_persistence": "objectstate_state_variable_experiment_fail",
+        "occlusion_recovery": "objectstate_state_variable_experiment_missing_metric",
+        "view_invariance": "objectstate_state_variable_experiment_missing_metric",
+        "predictive_sufficiency": "objectstate_state_variable_experiment_pass",
+        "counterfactual_action_interface": (
+            "objectstate_state_variable_experiment_blocked"
+        ),
+    }
+    occlusion_row = next(
+        row
+        for row in ledger["state_variable_evidence_matrix"]
+        if row["experiment"] == "occlusion_recovery"
+    )
+    assert occlusion_row["missing_metrics"] == ["occlusion_recovery_rate"]
+    assert ledger["state_variable_evidence_matrix_markdown"].startswith(
+        "# ObjectState State-Variable Evidence Matrix"
+    )
     assert [action["evidence_kind"] for action in ledger["next_actions"]] == [
         "identity",
         "intervention",
@@ -81,6 +103,7 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     path_b = tmp_path / "controlled-b-rows.json"
     summary_path = tmp_path / "reality-row-ledger.json"
     blocked_path = tmp_path / "reality-row-ledger-blocked.md"
+    matrix_path = tmp_path / "reality-row-ledger-experiment-matrix.md"
     actions_path = tmp_path / "reality-row-ledger-next-actions.md"
     _write_json(path_a, summary_a)
     _write_json(path_b, summary_b)
@@ -96,6 +119,8 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
                 str(summary_path),
                 "--blocked-rows-output",
                 str(blocked_path),
+                "--experiment-matrix-output",
+                str(matrix_path),
                 "--next-actions-output",
                 str(actions_path),
             ]
@@ -110,6 +135,14 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     assert "gate_status=objectstate_reality_gate_fail" in stdout
     assert "missing_pass_evidence_kinds=identity,intervention" in stdout
     assert (
+        "experiment=identity_persistence:"
+        "objectstate_state_variable_experiment_fail"
+    ) in stdout
+    assert (
+        "experiment=predictive_sufficiency:"
+        "objectstate_state_variable_experiment_pass"
+    ) in stdout
+    assert (
         "next_action=identity:pass_evidence_missing:"
         "controlled_real_identity_handoff"
     ) in stdout
@@ -121,6 +154,9 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
         written_summary
     )
     assert blocked_path.read_text(encoding="utf-8").startswith("| row_id |")
+    assert matrix_path.read_text(encoding="utf-8").startswith(
+        "# ObjectState State-Variable Evidence Matrix"
+    )
     assert actions_path.read_text(encoding="utf-8").startswith(
         "# ObjectState Reality Row Ledger Next Actions"
     )

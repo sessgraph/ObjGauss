@@ -6144,6 +6144,11 @@ def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
         )
     for blocker in gap["hard_blockers"]:
         print(f"hard_blocker={blocker}")
+    for experiment in summary["state_variable_evidence_matrix"]:
+        print(
+            "experiment="
+            f"{experiment['experiment']}:{experiment['status']}"
+        )
     for action in summary["next_actions"]:
         print(
             "next_action="
@@ -6162,6 +6167,13 @@ def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
             encoding="utf-8",
         )
         print(f"blocked_rows={args.blocked_rows_output}")
+    if args.experiment_matrix_output:
+        args.experiment_matrix_output.parent.mkdir(parents=True, exist_ok=True)
+        args.experiment_matrix_output.write_text(
+            summary["state_variable_evidence_matrix_markdown"],
+            encoding="utf-8",
+        )
+        print(f"experiment_matrix={args.experiment_matrix_output}")
     if args.next_actions_output:
         args.next_actions_output.parent.mkdir(parents=True, exist_ok=True)
         args.next_actions_output.write_text(
@@ -8773,6 +8785,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_reality_row_ledger.add_argument("--summary-output", type=Path)
     audit_reality_row_ledger.add_argument("--blocked-rows-output", type=Path)
+    audit_reality_row_ledger.add_argument("--experiment-matrix-output", type=Path)
     audit_reality_row_ledger.add_argument("--next-actions-output", type=Path)
     audit_reality_row_ledger.add_argument(
         "--synthetic-smoke-failed",

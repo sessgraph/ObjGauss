@@ -378,6 +378,8 @@ It makes the current state-variable gap explicit:
   `outputs/evidence/objectstate-phase1-reality-row-ledger.json`
 - Blocked rows:
   `outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md`
+- State-variable experiment matrix:
+  `outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md`
 - Next actions:
   `outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`
 
@@ -389,6 +391,7 @@ uv run objgauss object-state audit-reality-row-ledger \
   outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json \
   --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json \
   --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md \
+  --experiment-matrix-output outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md \
   --next-actions-output outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md
 ```
 
@@ -410,6 +413,12 @@ Result:
 - Hard blockers:
   `identity_pass_rows_present`, `intervention_pass_rows_present`,
   `controlled_real_identity_collapse_absent`, `failed_rows_absent`
+- State-variable experiment matrix:
+  - `identity_persistence: objectstate_state_variable_experiment_fail`
+  - `occlusion_recovery: objectstate_state_variable_experiment_missing_metric`
+  - `view_invariance: objectstate_state_variable_experiment_missing_metric`
+  - `predictive_sufficiency: objectstate_state_variable_experiment_pass`
+  - `counterfactual_action_interface: objectstate_state_variable_experiment_blocked`
 - Next actions:
   - `identity: pass_evidence_missing -> controlled_real_identity_handoff`
   - `intervention: pass_evidence_missing -> controlled_reality_bundle_handoff`
@@ -421,6 +430,10 @@ gate view. It confirms that existing BOP public rows are useful but not enough:
 only prediction has a pass row, identity remains failed because baseline
 identity collapse is real negative evidence, and intervention remains blocked
 because no action-conditioned / counterfactual public row exists.
+The experiment matrix makes the narrower scientific claim explicit: current
+public replay evidence supports predictive sufficiency only. It does not yet
+provide occlusion recovery metrics, view invariance metrics or counterfactual
+action evidence.
 The next-actions file is an operator handoff for the missing state-variable
 evidence. It does not create GT, run evaluations, train a model, or convert
 these public replay rows into identity / intervention pass evidence.

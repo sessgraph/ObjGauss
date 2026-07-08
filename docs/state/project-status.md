@@ -946,6 +946,18 @@ operator-facing `next_actions_markdown`。当前 LMO / HOPE ledger 仍为
 `outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`。该切片仍是
 read-only handoff planning：不采集数据、不创建 GT、不运行 identity / prediction /
 intervention eval、不训练模型、不声明 ObjectState 已经是 world model。
+随后完成 `OBJECTSTATE-STATE-VARIABLE-MATRIX-001`：同一个
+`audit-reality-row-ledger` summary 新增 `state_variable_evidence_matrix` 和
+`state_variable_evidence_matrix_markdown`，把 reality rows 映射到 State Variable Gate
+五个实验：identity persistence、occlusion recovery、view invariance、predictive
+sufficiency 和 counterfactual / action interface。当前 LMO / HOPE public replay 的矩阵为：
+`identity_persistence=fail`，`occlusion_recovery=missing_metric`，
+`view_invariance=missing_metric`，`predictive_sufficiency=pass`，
+`counterfactual_action_interface=blocked`。CLI 新增
+`--experiment-matrix-output`，本地 ignored 输出为
+`outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md`。该矩阵只做
+read-only evidence accounting，不创建新 row、不放松 gate、不把 prediction pass 解释成
+identity / counterfactual pass，也不声明 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
