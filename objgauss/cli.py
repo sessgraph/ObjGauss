@@ -195,6 +195,10 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
+from objgauss.core.objectstate_public_dataset_candidates import (
+    objectstate_public_dataset_candidates_audit,
+    objectstate_public_dataset_candidates_markdown,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3215,6 +3219,43 @@ def _object_state_audit_controlled_capture_environment(
         raise ValueError("controlled capture environment is not ready")
 
 
+def _object_state_audit_public_dataset_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_public_dataset_candidates_audit()
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"candidate_count={summary['candidate_count']}")
+    print(f"recommended_first={summary['recommended_first']}")
+    print(f"recommended_action_candidate={summary['recommended_action_candidate']}")
+    print(
+        "direct_phase1_ready="
+        f"{str(readiness['has_direct_phase1_ready_dataset']).lower()}"
+    )
+    print(
+        "direct_gaussian_evidence="
+        f"{str(readiness['has_direct_gaussian_evidence']).lower()}"
+    )
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.markdown_output:
+        args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_output.write_text(
+            objectstate_public_dataset_candidates_markdown(summary),
+            encoding="utf-8",
+        )
+        print(f"markdown={args.markdown_output}")
+    if args.require_ready and not readiness["has_direct_phase1_ready_dataset"]:
+        raise ValueError("no public dataset candidate is directly Phase 1 ready")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -4561,6 +4602,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_capture_environment.set_defaults(
         handler=_object_state_audit_controlled_capture_environment
+    )
+    audit_public_dataset_candidates = object_state_subparsers.add_parser(
+        "audit-public-dataset-candidates",
+        help=(
+            "audit public controlled pose/action dataset candidates for the "
+            "ObjectState reality gate"
+        ),
+    )
+    audit_public_dataset_candidates.add_argument("--summary-output", type=Path)
+    audit_public_dataset_candidates.add_argument("--markdown-output", type=Path)
+    audit_public_dataset_candidates.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail because current public candidates still require adapters and local Gaussian evidence",
+    )
+    audit_public_dataset_candidates.set_defaults(
+        handler=_object_state_audit_public_dataset_candidates
     )
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",

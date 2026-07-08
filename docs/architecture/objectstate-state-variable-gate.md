@@ -608,6 +608,40 @@ Implemented v0.1 facts:
   controlled tabletop data, train dynamics, use replay / diffusion or mutate
   viewer defaults.
 
+### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
+
+Audit public pose / interaction dataset candidates for Phase 1 reality rows
+when the local capture host is not ready.
+
+Required behavior:
+
+- Record candidate source URL, license / access constraints and expected size
+  boundary.
+- Map each dataset to the five State Variable Gate experiments.
+- Keep public pose data separate from ObjGauss pass rows until a controlled
+  capture manifest adapter and local Gaussian evidence exist.
+- Prefer the smallest useful subset; do not download or commit full archives.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_public_dataset_candidates`.
+- Summary schema: `objgauss-objectstate-public-dataset-candidates-v1`.
+- CLI:
+  `objgauss object-state audit-public-dataset-candidates`.
+- Candidate ranking:
+  `bop-ycbv-keyframes`, `bop-hopev2`, `bop-tudl`, `hot3d-clips`, `dexycb`.
+- Recommended first slice is one small BOP YCB-V subset because it is the most
+  direct path to RGB / depth / mask / 6DoF pose / camera rows. HOT3D remains
+  the later action-like interaction candidate after the pose adapter works.
+- The audit deliberately reports `has_direct_phase1_ready_dataset=false` and
+  `has_direct_gaussian_evidence=false`. It is a data-selection preflight, not a
+  reality-gate pass.
+- Current scope is candidate audit only. It does not download datasets, create
+  reality rows, reconstruct Gaussians, train models, write `public/samples`,
+  claim a public demo, use replay / diffusion or mutate viewer defaults.
+- Review doc:
+  `docs/training/objectstate-public-dataset-candidates.md`.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /

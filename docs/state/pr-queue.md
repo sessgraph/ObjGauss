@@ -122,6 +122,14 @@ ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
 `/dev/video*`，且缺 `ffmpeg` / `cv2` / `colmap` / `ns-process-data` /
 `ns-train` / `ns-export`。下一步应在物理 capture host 上重跑 environment preflight，
 再采集真实 RGB / Gaussian / pose / action。
+`OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001` 已新增
+`audit-public-dataset-candidates` CLI 和
+`docs/training/objectstate-public-dataset-candidates.md`，在当前 capture host blocked 时
+给出 public pose / interaction dataset 替代路线审计。当前建议第一候选为
+`bop-ycbv-keyframes`，后续做小型 BOP YCB-V subset -> controlled capture manifest
+adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`hot3d-clips`
+只作为后续 action-like interaction candidate。所有候选当前都不是 direct Phase 1 ready
+dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -193,6 +201,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001: Audit public dataset candidates for Phase 1
+
+- 状态: done / candidate-audit-only-no-data-download
+- 类型: 标准 PR / ObjectState controlled reality public dataset selection
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 当当前 capture host 无法直接采集 / 重建 controlled tabletop 数据时，提供
+  public pose / interaction dataset 候选审计，明确哪一个小型公开子集最适合作为
+  Phase 1 identity / prediction rows 的第一步。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_public_dataset_candidates`。
+  - 新增 summary schema
+    `objgauss-objectstate-public-dataset-candidates-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-public-dataset-candidates`。
+  - 新增 review doc
+    `docs/training/objectstate-public-dataset-candidates.md`。
+  - 候选排序为 `bop-ycbv-keyframes`、`bop-hopev2`、`bop-tudl`、
+    `hot3d-clips`、`dexycb`。
+  - 当前推荐第一步为一个小型 BOP YCB-V subset，后续再做 controlled capture
+    manifest adapter 和 ignored per-frame Gaussian evidence。
+- 边界:
+  - 不下载数据，不写 `outputs/` 或 `public/samples`。
+  - 不创建 reality pass / fail rows，不重建 Gaussian，不训练模型。
+  - 不声明 public dataset 直接 ready，不声明 reality gate pass、public demo 或
+    world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py -q`: passed。
+  - `uv run objgauss object-state audit-public-dataset-candidates --summary-output /tmp/objgauss-public-dataset-candidates.json --markdown-output /tmp/objgauss-public-dataset-candidates.md`: passed；`recommended_first=bop-ycbv-keyframes`，`direct_phase1_ready=false`。
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py tests/test_objectstate_reality_public_rows.py tests/test_objectstate_reality_gate.py tests/test_core_namespace.py -q`: passed，23 tests。
+  - `uv run --extra dev pytest`: passed，391 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `e9f4621`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001: Audit capture host environment
 

@@ -576,6 +576,19 @@ skeleton 不进入 git，也不构成真实 Phase 1 通过证据。
 数据；需要在物理采集主机上暴露摄像头和采集 / 重建工具后重跑。该 preflight 只记录环境
 blocker，不采集视频、不创建 GT、不重建 Gaussian、不训练模型、不声明 reality gate pass。
 
+随后新增 `OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001`：在当前 capture host 不可用时，
+新增 public pose / interaction dataset candidate audit 作为 Phase 1 替代数据路线前置
+审计。`objgauss.core.objectstate_public_dataset_candidates` 冻结
+`objgauss-objectstate-public-dataset-candidates-v1` summary schema，CLI
+`objgauss object-state audit-public-dataset-candidates` 可写 JSON / Markdown 审计输出。
+当前排序为 `bop-ycbv-keyframes` -> `bop-hopev2` -> `bop-tudl` -> `hot3d-clips` ->
+`dexycb`；建议第一步用一个小型 BOP YCB-V subset 做 controlled capture manifest
+adapter，再在 ignored `outputs/` 下生成 per-frame Gaussian evidence，之后才生成
+identity / prediction rows。HOT3D 只作为后续 action-like interaction candidate；
+所有 public candidates 当前仍报告 `has_direct_phase1_ready_dataset=false` 和
+`has_direct_gaussian_evidence=false`，因此不能声明 reality gate pass、public demo 或
+world model。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

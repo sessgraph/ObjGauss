@@ -1,0 +1,110 @@
+# ObjectState Public Dataset Candidates
+
+> Status: current candidate audit
+> Last updated: 2026-07-08
+> Scope: Phase 1 controlled real / public data selection only.
+
+This document records public dataset candidates for the ObjectState state
+variable gate. It is a selection audit, not a downloaded dataset, not a
+training run, not a Gaussian reconstruction, and not a reality-gate pass.
+
+The current capture host preflight is blocked because this session cannot see a
+camera device and lacks RGB / Gaussian reconstruction tooling. The practical
+fallback is to choose a small public pose dataset subset, adapt it into the
+controlled capture manifest contract, and then generate local Gaussian
+evidence under ignored `outputs/`.
+
+## Selection Principle
+
+ObjGauss needs evidence for this claim:
+
+```text
+ObjectState_t approximates a state variable:
+P(S_{t+1} | S_1, ..., S_t, A_t) ~= P(S_{t+1} | S_t, A_t)
+```
+
+For Phase 1, the public dataset must support at least:
+
+- physical object identity ground truth;
+- timestamp or frame ordering;
+- 6DoF pose ground truth;
+- camera/view metadata;
+- enough view or occlusion change to test identity stability.
+
+Per-frame Gaussian evidence is still required before the candidate can become
+a real ObjGauss row. Public RGB / pose data alone is not enough.
+
+## Candidate Ranking
+
+| Rank | Candidate | Role | Why |
+| --- | --- | --- | --- |
+| 1 | `bop-ycbv-keyframes` | First public identity / prediction adapter | BOP YCB-V gives household objects, RGB-D evidence, labels, masks, object models, and 6D poses. It is the most direct bridge into current controlled manifest rows. |
+| 2 | `bop-hopev2` | View / lighting / robustness candidate | HOPE/HOPEv2 adds household/office clutter, lighting variation, and moving-camera data. Good second row after the adapter exists. |
+| 3 | `bop-tudl` | Small adapter sanity check | TUD-L is small, with three moving objects and eight lighting conditions. Useful for cheap smoke, but too narrow for the main claim. |
+| 4 | `hot3d-clips` | Action-like interaction candidate | HOT3D-Clips has 150-frame hand-object clips with object/hand/camera 3D poses. It can stress prediction and action-conditioned rows, but it is not randomized counterfactual evidence. |
+| 5 | `dexycb` | Non-commercial hand-occlusion stress candidate | DexYCB has YCB grasp sequences and 6D object pose tasks, but the full dataset is large and CC BY-NC, so it must never be treated as public commercial demo material. |
+
+## Gate Coverage
+
+| Candidate | Identity | Occlusion | View | Prediction | Counterfactual |
+| --- | --- | --- | --- | --- | --- |
+| `bop-ycbv-keyframes` | ready with adapter | partial | partial | partial | blocked |
+| `bop-hopev2` | ready with adapter | partial | ready with adapter | partial | blocked |
+| `bop-tudl` | ready with adapter | blocked | ready with adapter | partial | blocked |
+| `hot3d-clips` | ready with adapter | ready with adapter | ready with adapter | ready with adapter | partial |
+| `dexycb` | ready with adapter | partial | partial | partial | blocked |
+
+Interpretation:
+
+- `ready with adapter` means the source appears to contain the required GT, but
+  ObjGauss still needs a local adapter into `controlled capture manifest` rows.
+- `partial` means the source can support a related measurement, but not the
+  full gate without restrictions or additional candidate outputs.
+- `blocked` means the dataset should not be used to claim that gate.
+
+## Recommended First Slice
+
+Use one small BOP YCB-V subset first:
+
+```text
+BOP YCB-V RGB / depth / mask / pose / camera
+        |
+        v
+controlled capture manifest adapter
+        |
+        v
+local per-frame Gaussian evidence under outputs/
+        |
+        v
+identity row + prediction row
+```
+
+Do not start with HOT3D. It is closer to interaction, but the format, license
+agreement, and egocentric multi-stream setup add avoidable complexity before
+the simpler pose adapter has been proven.
+
+## Hard Blockers
+
+- No public candidate directly supplies ObjGauss per-frame Gaussian evidence.
+- All public candidates require a controlled capture manifest adapter.
+- Counterfactual rows remain blocked until action-conditioned outcomes are
+  evaluated against real outcomes.
+- Dataset license terms must be reviewed before any public demo,
+  redistribution, or commercial claim.
+
+## Source Notes
+
+- BOP dataset page: `https://bop.felk.cvut.cz/datasets/`
+- HOT3D project page: `https://facebookresearch.github.io/hot3d/`
+- DexYCB project page: `https://dex-ycb.github.io/`
+
+The code-backed audit can be reproduced with:
+
+```bash
+uv run objgauss object-state audit-public-dataset-candidates \
+  --summary-output /tmp/objgauss-public-dataset-candidates.json \
+  --markdown-output /tmp/objgauss-public-dataset-candidates.md
+```
+
+This command does not download data or create pass rows. It only records the
+candidate selection state.
