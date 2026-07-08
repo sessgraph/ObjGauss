@@ -146,6 +146,7 @@ from objgauss.core.objectstate_controlled_capture import (
     read_objectstate_controlled_capture_manifest,
 )
 from objgauss.core.objectstate_controlled_capture_import import (
+    objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
 )
 from objgauss.core.objectstate_controlled_capture_files import (
@@ -3080,6 +3081,82 @@ def _object_state_import_controlled_capture_bundle(args: argparse.Namespace) -> 
         raise ValueError("imported controlled capture bundle is not intervention-stage ready")
 
 
+def _object_state_accept_controlled_capture_bundle(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_capture_bundle_acceptance_summary(
+        args.bundle_root,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        require_identity_ready=not args.no_require_identity_ready,
+        require_prediction_ready=args.require_prediction_ready,
+        require_intervention_ready=args.require_intervention_ready,
+        require_gaussian_files=not args.no_require_gaussian_files,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+    )
+    import_summary = summary["import_summary"]
+    file_audit = summary["capture_file_audit"]
+    manifest = import_summary["manifest"]
+    capture_summary = import_summary["capture_summary"]
+    readiness = capture_summary["readiness"]
+    gates = summary["acceptance_gates"]
+    write_json(args.output, manifest)
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={args.bundle_root}")
+    print(f"sample_id={manifest['sample']['sample_id']}")
+    print(f"acceptance_status={summary['status']}")
+    print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(f"prediction_stage_ready={str(readiness['prediction_stage_ready']).lower()}")
+    print(f"intervention_stage_ready={str(readiness['intervention_stage_ready']).lower()}")
+    print(
+        "capture_file_audit_status="
+        f"{file_audit['status']}"
+    )
+    print(
+        "capture_bundle_files_ready="
+        f"{str(file_audit['readiness']['capture_bundle_files_ready']).lower()}"
+    )
+    print(
+        "acceptance_gates="
+        + ",".join(f"{key}:{str(value).lower()}" for key, value in gates.items())
+    )
+    print(f"missing_files={len(file_audit['missing_files'])}")
+    print(f"output={args.output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.import_summary_output:
+        write_json(args.import_summary_output, import_summary)
+        print(f"import_summary={args.import_summary_output}")
+    if args.file_audit_output:
+        write_json(args.file_audit_output, file_audit)
+        print(f"file_audit={args.file_audit_output}")
+    if args.missing_files_output:
+        args.missing_files_output.parent.mkdir(parents=True, exist_ok=True)
+        args.missing_files_output.write_text(
+            file_audit["missing_files_markdown"],
+            encoding="utf-8",
+        )
+        print(f"missing_files_markdown={args.missing_files_output}")
+    if args.controlled_real_output:
+        write_json(
+            args.controlled_real_output,
+            capture_summary["controlled_real_manifest_seed"],
+        )
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if (
+        args.require_pass
+        and summary["status"]
+        != "objectstate_controlled_capture_bundle_acceptance_pass"
+    ):
+        raise ValueError("controlled capture bundle acceptance did not pass")
+
+
 def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
     manifest = read_objectstate_controlled_capture_manifest(args.manifest)
     summary = objectstate_controlled_capture_summary(manifest)
@@ -3566,6 +3643,47 @@ def _build_parser() -> argparse.ArgumentParser:
     import_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     import_controlled_capture.set_defaults(
         handler=_object_state_import_controlled_capture_bundle
+    )
+    accept_controlled_capture = object_state_subparsers.add_parser(
+        "accept-controlled-capture-bundle",
+        help="import and file-audit a controlled capture bundle before identity handoff",
+    )
+    accept_controlled_capture.add_argument("bundle_root", type=Path)
+    accept_controlled_capture.add_argument("--output", "-o", required=True, type=Path)
+    accept_controlled_capture.add_argument("--summary-output", type=Path)
+    accept_controlled_capture.add_argument("--import-summary-output", type=Path)
+    accept_controlled_capture.add_argument("--file-audit-output", type=Path)
+    accept_controlled_capture.add_argument("--missing-files-output", type=Path)
+    accept_controlled_capture.add_argument("--controlled-real-output", type=Path)
+    accept_controlled_capture.add_argument("--sample-json", default="sample.json")
+    accept_controlled_capture.add_argument("--objects-csv", default="objects.csv")
+    accept_controlled_capture.add_argument("--frames-csv", default="frames.csv")
+    accept_controlled_capture.add_argument("--annotations-csv", default="annotations.csv")
+    accept_controlled_capture.add_argument("--actions-csv", default="actions.csv")
+    accept_controlled_capture.add_argument(
+        "--no-require-identity-ready",
+        action="store_true",
+        help="allow staging bundles without identity-stage readiness",
+    )
+    accept_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
+    accept_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
+    accept_controlled_capture.add_argument(
+        "--no-require-gaussian-files",
+        action="store_true",
+        help="allow RGB-only capture bundles to pass the file audit",
+    )
+    accept_controlled_capture.add_argument("--check-artifact-refs", action="store_true")
+    accept_controlled_capture.add_argument("--min-rgb-bytes", type=int, default=1)
+    accept_controlled_capture.add_argument("--min-gaussian-bytes", type=int, default=1)
+    accept_controlled_capture.add_argument("--hash-files", action="store_true")
+    accept_controlled_capture.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    accept_controlled_capture.add_argument("--require-pass", action="store_true")
+    accept_controlled_capture.set_defaults(
+        handler=_object_state_accept_controlled_capture_bundle
     )
     validate_controlled_capture = object_state_subparsers.add_parser(
         "validate-controlled-capture",

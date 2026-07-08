@@ -709,8 +709,53 @@ Implemented v0.1 facts:
 Current scope remains import / validation only. It does not capture video,
 create ground truth, verify file bytes, reconstruct Gaussians, train models,
 write public samples, use replay / diffusion or mutate viewer defaults. Use
-`audit-controlled-capture-files` after import to prove the referenced RGB /
+`audit-controlled-capture-files` after import, or
+`accept-controlled-capture-bundle` directly, to prove the referenced RGB /
 Gaussian files exist and have recognizable formats.
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-BUNDLE-ACCEPTANCE-001
+
+Bundle import and file audit into the pre-identity-handoff acceptance gate.
+
+Required behavior:
+
+- Import a local controlled capture bundle into the controlled capture
+  manifest contract.
+- Run the controlled capture file audit against the same bundle root.
+- Require identity-stage readiness by default, because the accepted bundle is
+  meant to feed Stage 1 identity handoff.
+- Optionally require prediction-stage and intervention-stage readiness for
+  stricter Phase 1 rows.
+- Keep acceptance separate from candidate identity evaluation; a bundle can be
+  accepted and still have no candidate pass row.
+
+Implemented v0.1 facts:
+
+- Summary schema:
+  `objgauss-objectstate-controlled-capture-bundle-acceptance-v1`.
+- Core function:
+  `objectstate_controlled_capture_bundle_acceptance_summary(...)`.
+- Summary embeds both `objgauss-objectstate-controlled-capture-import-v1` and
+  `objgauss-objectstate-controlled-capture-file-audit-v1`.
+- Acceptance gates:
+  `identity_stage_ready`, `prediction_stage_ready`,
+  `intervention_stage_ready` and `capture_file_audit_pass`.
+- Default behavior requires identity readiness and Gaussian frame files.
+- CLI command:
+  `objgauss object-state accept-controlled-capture-bundle <bundle-root> --output <capture-manifest.json>`.
+- CLI can write `--summary-output`, `--import-summary-output`,
+  `--file-audit-output`, `--missing-files-output` and
+  `--controlled-real-output`.
+- CLI supports `--require-prediction-ready`,
+  `--require-intervention-ready`, `--no-require-identity-ready`,
+  `--no-require-gaussian-files`, `--check-artifact-refs`,
+  `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files`,
+  `--no-require-frame-formats` and `--require-pass`.
+
+Current scope remains import + local file audit only. It does not capture
+video, create ground truth, reconstruct Gaussians, run identity handoff,
+score a candidate model, train models, write public samples, use replay /
+diffusion or mutate viewer defaults.
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001
 

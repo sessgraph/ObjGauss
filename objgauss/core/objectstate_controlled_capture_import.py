@@ -12,9 +12,17 @@ from objgauss.core.objectstate_controlled_capture import (
     validate_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_summary,
 )
+from objgauss.core.objectstate_controlled_capture_files import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
+    objectstate_controlled_capture_file_audit,
+    validate_objectstate_controlled_capture_file_audit_summary,
+)
 
 OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA = (
     "objgauss-objectstate-controlled-capture-import-v1"
+)
+OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA = (
+    "objgauss-objectstate-controlled-capture-bundle-acceptance-v1"
 )
 
 
@@ -176,6 +184,206 @@ def validate_objectstate_controlled_capture_import_summary(
         raise ValueError(
             "controlled capture import cannot claim capture, GT creation, "
             "reconstruction, training, replay, diffusion, or viewer mutation"
+        )
+    return dict(payload)
+
+
+def objectstate_controlled_capture_bundle_acceptance_summary(
+    root: str | Path,
+    *,
+    sample_json: str | Path = "sample.json",
+    objects_csv: str | Path = "objects.csv",
+    frames_csv: str | Path = "frames.csv",
+    annotations_csv: str | Path = "annotations.csv",
+    actions_csv: str | Path | None = "actions.csv",
+    require_identity_ready: bool = True,
+    require_prediction_ready: bool = False,
+    require_intervention_ready: bool = False,
+    require_gaussian_files: bool = True,
+    check_artifact_refs: bool = False,
+    min_rgb_bytes: int = 1,
+    min_gaussian_bytes: int = 1,
+    require_frame_formats: bool = True,
+    hash_files: bool = False,
+) -> dict[str, Any]:
+    bundle_root = Path(root)
+    import_summary = objectstate_controlled_capture_import_summary(
+        bundle_root,
+        sample_json=sample_json,
+        objects_csv=objects_csv,
+        frames_csv=frames_csv,
+        annotations_csv=annotations_csv,
+        actions_csv=actions_csv,
+    )
+    file_audit = objectstate_controlled_capture_file_audit(
+        import_summary["manifest"],
+        root=bundle_root,
+        require_gaussian_files=require_gaussian_files,
+        check_artifact_refs=check_artifact_refs,
+        min_rgb_bytes=min_rgb_bytes,
+        min_gaussian_bytes=min_gaussian_bytes,
+        require_frame_formats=require_frame_formats,
+        hash_files=hash_files,
+    )
+    readiness = import_summary["capture_summary"]["readiness"]
+    gates = {
+        "identity_stage_ready": (
+            not require_identity_ready or bool(readiness["identity_stage_ready"])
+        ),
+        "prediction_stage_ready": (
+            not require_prediction_ready or bool(readiness["prediction_stage_ready"])
+        ),
+        "intervention_stage_ready": (
+            not require_intervention_ready
+            or bool(readiness["intervention_stage_ready"])
+        ),
+        "capture_file_audit_pass": (
+            file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+        ),
+    }
+    issues = []
+    if not gates["identity_stage_ready"]:
+        issues.append("imported bundle is not identity-stage ready")
+    if not gates["prediction_stage_ready"]:
+        issues.append("imported bundle is not prediction-stage ready")
+    if not gates["intervention_stage_ready"]:
+        issues.append("imported bundle is not intervention-stage ready")
+    if not gates["capture_file_audit_pass"]:
+        issues.extend(file_audit["issues"])
+    passed = all(gates.values())
+    payload = {
+        "schema": OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA,
+        "kind": "objectstate_controlled_capture_bundle_acceptance",
+        "capture_import_schema": OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
+        "capture_file_audit_schema": OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
+        "status": (
+            "objectstate_controlled_capture_bundle_acceptance_pass"
+            if passed
+            else "objectstate_controlled_capture_bundle_acceptance_fail"
+        ),
+        "root": str(bundle_root),
+        "requirements": {
+            "identity_stage_ready_required": bool(require_identity_ready),
+            "prediction_stage_ready_required": bool(require_prediction_ready),
+            "intervention_stage_ready_required": bool(require_intervention_ready),
+            "gaussian_files_required": bool(require_gaussian_files),
+            "artifact_refs_checked": bool(check_artifact_refs),
+            "frame_file_formats_required": bool(require_frame_formats),
+            "file_hashes_included": bool(hash_files),
+        },
+        "acceptance_gates": gates,
+        "issues": issues,
+        "import_summary": import_summary,
+        "capture_file_audit": file_audit,
+        "claim_policy": {
+            "imports_existing_capture_files": True,
+            "requires_file_audit_for_acceptance": True,
+            "acceptance_is_identity_handoff_prerequisite": True,
+            "does_not_create_ground_truth": True,
+            "does_not_reconstruct_gaussians": True,
+            "does_not_score_candidate_model": True,
+        },
+        "non_goals": {
+            "captures_video": False,
+            "creates_ground_truth": False,
+            "reconstructs_gaussians": False,
+            "trains_gaussian_model": False,
+            "trains_dynamics_model": False,
+            "runs_identity_handoff": False,
+            "uses_replay_buffer": False,
+            "uses_diffusion": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_controlled_capture_bundle_acceptance_summary(payload)
+
+
+def validate_objectstate_controlled_capture_bundle_acceptance_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("controlled capture bundle acceptance summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA:
+        raise ValueError(
+            "unsupported controlled capture bundle acceptance schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_controlled_capture_bundle_acceptance":
+        raise ValueError("controlled capture bundle acceptance kind is unsupported")
+    if payload.get("capture_import_schema") != OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA:
+        raise ValueError("controlled capture bundle acceptance has unsupported import schema")
+    if (
+        payload.get("capture_file_audit_schema")
+        != OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA
+    ):
+        raise ValueError(
+            "controlled capture bundle acceptance has unsupported file audit schema"
+        )
+    if payload.get("status") not in {
+        "objectstate_controlled_capture_bundle_acceptance_pass",
+        "objectstate_controlled_capture_bundle_acceptance_fail",
+    }:
+        raise ValueError("controlled capture bundle acceptance status is unsupported")
+    import_summary = validate_objectstate_controlled_capture_import_summary(
+        payload.get("import_summary")
+    )
+    file_audit = validate_objectstate_controlled_capture_file_audit_summary(
+        payload.get("capture_file_audit")
+    )
+    if file_audit["sample"]["sample_id"] != import_summary["manifest"]["sample"]["sample_id"]:
+        raise ValueError("controlled capture bundle acceptance sample mismatch")
+    if not isinstance(payload.get("requirements"), Mapping):
+        raise ValueError("controlled capture bundle acceptance requires requirements")
+    gates = payload.get("acceptance_gates")
+    if not isinstance(gates, Mapping) or any(
+        not isinstance(value, bool) for value in gates.values()
+    ):
+        raise ValueError("controlled capture bundle acceptance gates must be bools")
+    for key in (
+        "identity_stage_ready",
+        "prediction_stage_ready",
+        "intervention_stage_ready",
+        "capture_file_audit_pass",
+    ):
+        if key not in gates:
+            raise ValueError(f"controlled capture bundle acceptance missing gate {key}")
+    expected_status = (
+        "objectstate_controlled_capture_bundle_acceptance_pass"
+        if all(gates.values())
+        else "objectstate_controlled_capture_bundle_acceptance_fail"
+    )
+    if payload["status"] != expected_status:
+        raise ValueError("controlled capture bundle acceptance status must match gates")
+    if not isinstance(payload.get("issues"), list):
+        raise ValueError("controlled capture bundle acceptance requires issues")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not claim_policy.get("imports_existing_capture_files")
+        or not claim_policy.get("requires_file_audit_for_acceptance")
+        or not claim_policy.get("acceptance_is_identity_handoff_prerequisite")
+        or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_score_candidate_model")
+    ):
+        raise ValueError(
+            "controlled capture bundle acceptance must preserve claim policy"
+        )
+    non_goals = payload.get("non_goals", {})
+    if (
+        non_goals.get("captures_video")
+        or non_goals.get("creates_ground_truth")
+        or non_goals.get("reconstructs_gaussians")
+        or non_goals.get("trains_gaussian_model")
+        or non_goals.get("trains_dynamics_model")
+        or non_goals.get("runs_identity_handoff")
+        or non_goals.get("uses_replay_buffer")
+        or non_goals.get("uses_diffusion")
+        or non_goals.get("mutates_viewer_defaults")
+    ):
+        raise ValueError(
+            "controlled capture bundle acceptance cannot claim capture, GT "
+            "creation, reconstruction, training, handoff, replay, diffusion, "
+            "or viewer mutation"
         )
     return dict(payload)
 

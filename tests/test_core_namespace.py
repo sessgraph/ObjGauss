@@ -59,6 +59,7 @@ from objgauss.core import (
     ObjectStateRealityGateThresholds,
     ObjectStateRealityPublicArtifact,
     ObjectStateRealityRow,
+    OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
@@ -193,6 +194,7 @@ from objgauss.core import (
     objectstate_reality_public_rows_summary,
     objectstate_reality_rows_from_public_artifacts,
     objectstate_controlled_capture_summary,
+    objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_file_audit,
     objectstate_controlled_capture_import_summary,
     objectstate_controlled_capture_manifest_from_bundle,
@@ -271,6 +273,7 @@ from objgauss.core import (
     validate_objectstate_reality_gate_summary,
     validate_objectstate_reality_public_rows_summary,
     validate_objectstate_controlled_capture_manifest,
+    validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_file_audit_summary,
     validate_objectstate_controlled_capture_summary,
     validate_objectstate_controlled_capture_import_summary,
@@ -789,13 +792,18 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA == (
         "objgauss-objectstate-controlled-capture-import-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-bundle-acceptance-v1"
+    )
     assert objectstate_controlled_capture_file_audit is not None
+    assert objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert objectstate_controlled_capture_import_summary is not None
     assert objectstate_controlled_capture_manifest_from_bundle is not None
     assert objectstate_controlled_capture_missing_files_markdown([]).endswith(
         "no missing files |"
     )
     assert validate_objectstate_controlled_capture_file_audit_summary is not None
+    assert validate_objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert validate_objectstate_controlled_capture_import_summary is not None
     assert capture_summary["readiness"]["identity_stage_ready"] is True
     capture_seed = objectstate_controlled_real_manifest_from_capture_manifest(

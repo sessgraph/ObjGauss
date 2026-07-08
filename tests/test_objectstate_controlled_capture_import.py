@@ -11,13 +11,28 @@ from objgauss.core.objectstate_controlled_capture import (
     validate_objectstate_controlled_capture_manifest,
 )
 from objgauss.core.objectstate_controlled_capture_import import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
+    objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
     objectstate_controlled_capture_manifest_from_bundle,
+    validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_import_summary,
 )
 from objgauss.core.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+)
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\n"
+PLY_BYTES = (
+    b"ply\n"
+    b"format ascii 1.0\n"
+    b"element vertex 1\n"
+    b"property float x\n"
+    b"property float y\n"
+    b"property float z\n"
+    b"end_header\n"
+    b"0 0 0\n"
 )
 
 
@@ -102,6 +117,100 @@ def test_controlled_capture_bundle_import_cli_writes_outputs(tmp_path, capsys):
     }
 
 
+def test_controlled_capture_bundle_acceptance_requires_file_audit_pass(tmp_path):
+    _write_bundle(tmp_path, include_frame_files=True)
+
+    summary = objectstate_controlled_capture_bundle_acceptance_summary(
+        tmp_path,
+        hash_files=True,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA
+    assert summary["status"] == (
+        "objectstate_controlled_capture_bundle_acceptance_pass"
+    )
+    assert summary["acceptance_gates"] == {
+        "identity_stage_ready": True,
+        "prediction_stage_ready": True,
+        "intervention_stage_ready": True,
+        "capture_file_audit_pass": True,
+    }
+    assert (
+        summary["capture_file_audit"]["status"]
+        == "objectstate_controlled_capture_file_audit_pass"
+    )
+    assert len(summary["capture_file_audit"]["file_records"]["rgb"][0]["sha256"]) == 64
+    assert validate_objectstate_controlled_capture_bundle_acceptance_summary(summary) == summary
+
+
+def test_controlled_capture_bundle_acceptance_fails_missing_frame_files(tmp_path):
+    _write_bundle(tmp_path, include_frame_files=False)
+
+    summary = objectstate_controlled_capture_bundle_acceptance_summary(tmp_path)
+
+    assert summary["status"] == (
+        "objectstate_controlled_capture_bundle_acceptance_fail"
+    )
+    assert summary["acceptance_gates"]["identity_stage_ready"] is True
+    assert summary["acceptance_gates"]["capture_file_audit_pass"] is False
+    assert summary["capture_file_audit"]["missing_files"]
+
+
+def test_controlled_capture_bundle_acceptance_cli_writes_outputs(tmp_path, capsys):
+    _write_bundle(tmp_path, include_frame_files=True)
+    manifest_path = tmp_path / "accepted-capture.json"
+    summary_path = tmp_path / "acceptance-summary.json"
+    import_path = tmp_path / "import-summary.json"
+    audit_path = tmp_path / "file-audit.json"
+    missing_path = tmp_path / "missing-files.md"
+    controlled_real_path = tmp_path / "controlled-real-seed.json"
+
+    assert (
+        main(
+            [
+                "object-state",
+                "accept-controlled-capture-bundle",
+                str(tmp_path),
+                "--output",
+                str(manifest_path),
+                "--summary-output",
+                str(summary_path),
+                "--import-summary-output",
+                str(import_path),
+                "--file-audit-output",
+                str(audit_path),
+                "--missing-files-output",
+                str(missing_path),
+                "--controlled-real-output",
+                str(controlled_real_path),
+                "--require-prediction-ready",
+                "--require-intervention-ready",
+                "--hash-files",
+                "--require-pass",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    import_summary = json.loads(import_path.read_text(encoding="utf-8"))
+    file_audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    controlled_real = json.loads(controlled_real_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA}" in stdout
+    assert "acceptance_status=objectstate_controlled_capture_bundle_acceptance_pass" in stdout
+    assert "capture_bundle_files_ready=true" in stdout
+    assert "missing_files=0" in stdout
+    assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA
+    assert import_summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA
+    assert file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert controlled_real["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    assert "no missing files" in missing_path.read_text(encoding="utf-8")
+
+
 def test_controlled_capture_bundle_import_rejects_annotation_without_frame(tmp_path):
     _write_bundle(tmp_path)
     with (tmp_path / "annotations.csv").open("a", encoding="utf-8") as handle:
@@ -123,7 +232,7 @@ def test_controlled_capture_bundle_import_rejects_partial_pose(tmp_path):
         objectstate_controlled_capture_manifest_from_bundle(tmp_path)
 
 
-def _write_bundle(root) -> None:
+def _write_bundle(root, *, include_frame_files: bool = False) -> None:
     (root / "sample.json").write_text(
         json.dumps(
             {
@@ -192,3 +301,9 @@ def _write_bundle(root) -> None:
         + "\n",
         encoding="utf-8",
     )
+    if include_frame_files:
+        (root / "rgb").mkdir(parents=True, exist_ok=True)
+        (root / "gaussians").mkdir(parents=True, exist_ok=True)
+        for index in range(3):
+            (root / "rgb" / f"{index:06d}.png").write_bytes(PNG_BYTES)
+            (root / "gaussians" / f"{index:06d}.ply").write_bytes(PLY_BYTES)
