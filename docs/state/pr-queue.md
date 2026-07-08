@@ -249,7 +249,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，406 tests。
   - `npm run build`: passed；仅保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: ccf6022。
+- 完成 commit: 0bdeeb9。
 
 ### OBJECTSTATE-BOP-CAPTURE-ACCEPTANCE-001: Accept local BOP scene files before handoff
 
