@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 
 import pytest
@@ -177,6 +178,44 @@ def test_bop_condition_sidecar_summary_reports_template_blocker(tmp_path):
     assert summary["readiness"]["identity_scenario_metadata_ready"] is False
     assert summary["coverage"]["lighting_ids"] == ["bop-default"]
     assert summary["coverage"]["camera_pose_count"] == 0
+    assert summary["condition_csv_template"] == [
+        {
+            "frame_id": 0,
+            "view_id": "bop-camera-frame-000000",
+            "lighting_id": "bop-default",
+            "camera_x": "",
+            "camera_y": "",
+            "camera_z": "",
+            "camera_qx": "",
+            "camera_qy": "",
+            "camera_qz": "",
+            "camera_qw": "",
+        },
+        {
+            "frame_id": 1,
+            "view_id": "bop-camera-frame-000001",
+            "lighting_id": "bop-default",
+            "camera_x": "",
+            "camera_y": "",
+            "camera_z": "",
+            "camera_qx": "",
+            "camera_qy": "",
+            "camera_qz": "",
+            "camera_qw": "",
+        },
+        {
+            "frame_id": 2,
+            "view_id": "bop-camera-frame-000002",
+            "lighting_id": "bop-default",
+            "camera_x": "",
+            "camera_y": "",
+            "camera_z": "",
+            "camera_qx": "",
+            "camera_qy": "",
+            "camera_qz": "",
+            "camera_qw": "",
+        },
+    ]
     assert "condition CSV was not provided" in " ".join(summary["issues"])
     assert (
         validate_objectstate_bop_capture_condition_sidecar_summary(summary)
@@ -187,6 +226,7 @@ def test_bop_condition_sidecar_summary_reports_template_blocker(tmp_path):
 def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsys):
     _write_bop_scene(tmp_path)
     csv_path = tmp_path / "bop-conditions.csv"
+    template_path = tmp_path / "bop-conditions.template.csv"
     sidecar_path = tmp_path / "bop-condition-sidecar.json"
     summary_path = tmp_path / "bop-condition-sidecar-summary.json"
     _write_condition_csv(csv_path)
@@ -203,6 +243,8 @@ def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsy
                 str(sidecar_path),
                 "--summary-output",
                 str(summary_path),
+                "--condition-csv-template-output",
+                str(template_path),
                 "--require-identity-ready",
             ]
         )
@@ -212,6 +254,8 @@ def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsy
     stdout = capsys.readouterr().out
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    with template_path.open("r", encoding="utf-8", newline="") as handle:
+        template_rows = list(csv.DictReader(handle))
 
     assert f"schema={OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA}" in stdout
     assert (
@@ -219,6 +263,7 @@ def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsy
         "objectstate_bop_capture_condition_sidecar_identity_ready"
     ) in stdout
     assert "readiness.identity_scenario_metadata_ready=true" in stdout
+    assert f"condition_csv_template={template_path}" in stdout
     assert sidecar["schema"] == OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA
     assert sidecar["frames"]["2"]["view_id"] == "right"
     assert sidecar["frames"]["2"]["lighting_id"] == "dim"
@@ -229,6 +274,18 @@ def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsy
     )
     assert summary["coverage"]["lighting_condition_count"] == 2
     assert summary["coverage"]["max_camera_translation_m"] == pytest.approx(0.04)
+    assert template_rows[2] == {
+        "frame_id": "2",
+        "view_id": "right",
+        "lighting_id": "dim",
+        "camera_x": "0.04",
+        "camera_y": "0",
+        "camera_z": "0",
+        "camera_qx": "0",
+        "camera_qy": "0",
+        "camera_qz": "0",
+        "camera_qw": "1",
+    }
 
 
 def test_bop_capture_adapter_cli_accepts_condition_sidecar(tmp_path, capsys):

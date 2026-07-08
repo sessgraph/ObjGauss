@@ -498,6 +498,10 @@ def objectstate_bop_capture_condition_sidecar_summary(
         },
         "sidecar_schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
         "sidecar": sidecar,
+        "condition_csv_template": _condition_csv_template_rows(
+            sidecar,
+            frame_ids,
+        ),
         "coverage": coverage,
         "readiness": readiness,
         "issues": issues,
@@ -603,6 +607,18 @@ def validate_objectstate_bop_capture_condition_sidecar_summary(
         raise ValueError("BOP capture condition sidecar summary requires selected frames")
     if len(sidecar["frames"]) != len(selected):
         raise ValueError("BOP capture condition sidecar frame count mismatch")
+    template = payload.get("condition_csv_template")
+    if not isinstance(template, list) or len(template) != len(selected):
+        raise ValueError("BOP capture condition sidecar summary requires CSV template")
+    for row in template:
+        if not isinstance(row, Mapping):
+            raise ValueError("BOP capture condition sidecar CSV template rows must map")
+        for key in _condition_csv_template_fieldnames():
+            if key not in row:
+                raise ValueError(
+                    "BOP capture condition sidecar CSV template row missing "
+                    f"{key}"
+                )
     readiness = payload.get("readiness")
     if not isinstance(readiness, Mapping) or not readiness:
         raise ValueError("BOP capture condition sidecar summary requires readiness")
@@ -1150,6 +1166,72 @@ def _condition_sidecar_coverage(
         "missing_camera_pose_frame_ids": missing_camera_pose_frame_ids,
         "max_camera_translation_m": _max_translation(camera_positions),
     }
+
+
+def _condition_csv_template_rows(
+    sidecar: Mapping[str, Any],
+    frame_ids: Sequence[int],
+) -> list[dict[str, Any]]:
+    frames = sidecar.get("frames", {})
+    if not isinstance(frames, Mapping):
+        frames = {}
+    rows = []
+    for frame_id in frame_ids:
+        condition = frames.get(str(frame_id), {})
+        if not isinstance(condition, Mapping):
+            condition = {}
+        camera_pose = condition.get("camera_pose")
+        position: Sequence[float] | None = None
+        rotation: Sequence[float] | None = None
+        if isinstance(camera_pose, Mapping):
+            pose_position = camera_pose.get("position")
+            pose_rotation = camera_pose.get("rotation_xyzw")
+            if isinstance(pose_position, Sequence) and not isinstance(
+                pose_position,
+                (str, bytes),
+            ):
+                position = pose_position
+            if isinstance(pose_rotation, Sequence) and not isinstance(
+                pose_rotation,
+                (str, bytes),
+            ):
+                rotation = pose_rotation
+        rows.append(
+            {
+                "frame_id": int(frame_id),
+                "view_id": str(condition.get("view_id", "")),
+                "lighting_id": str(condition.get("lighting_id", "")),
+                "camera_x": _template_float(position, 0),
+                "camera_y": _template_float(position, 1),
+                "camera_z": _template_float(position, 2),
+                "camera_qx": _template_float(rotation, 0),
+                "camera_qy": _template_float(rotation, 1),
+                "camera_qz": _template_float(rotation, 2),
+                "camera_qw": _template_float(rotation, 3),
+            }
+        )
+    return rows
+
+
+def _condition_csv_template_fieldnames() -> list[str]:
+    return [
+        "frame_id",
+        "view_id",
+        "lighting_id",
+        "camera_x",
+        "camera_y",
+        "camera_z",
+        "camera_qx",
+        "camera_qy",
+        "camera_qz",
+        "camera_qw",
+    ]
+
+
+def _template_float(values: Sequence[float] | None, index: int) -> str:
+    if values is None or len(values) <= index:
+        return ""
+    return f"{float(values[index]):.9g}"
 
 
 def _condition_sidecar_issues(

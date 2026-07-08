@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 from pathlib import Path
@@ -3301,10 +3302,17 @@ def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
     readiness = summary["readiness"]
     coverage = summary["coverage"]
     write_json(args.output, summary["sidecar"])
+    if args.condition_csv_template_output:
+        _write_condition_csv_template(
+            args.condition_csv_template_output,
+            summary["condition_csv_template"],
+        )
     print(f"schema={summary['schema']}")
     print(f"bop_condition_sidecar_status={summary['status']}")
     print(f"scene_root={summary['scene_root']}")
     print(f"sidecar={args.output}")
+    if args.condition_csv_template_output:
+        print(f"condition_csv_template={args.condition_csv_template_output}")
     print(f"selected_frames={summary['row_counts']['selected_frames']}")
     print(f"csv_condition_rows={summary['row_counts']['csv_condition_rows']}")
     print(f"view_condition_count={coverage['view_condition_count']}")
@@ -3325,6 +3333,27 @@ def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
         print(f"summary={args.summary_output}")
     if args.require_identity_ready and not readiness["identity_scenario_metadata_ready"]:
         raise ValueError("BOP condition sidecar is not identity-scenario ready")
+
+
+def _write_condition_csv_template(path: Path, rows) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "frame_id",
+        "view_id",
+        "lighting_id",
+        "camera_x",
+        "camera_y",
+        "camera_z",
+        "camera_qx",
+        "camera_qy",
+        "camera_qz",
+        "camera_qw",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
 def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
@@ -5399,6 +5428,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "CSV with frame_id, view_id, lighting_id, camera_x/y/z, "
             "camera_qx/qy/qz/qw columns"
         ),
+    )
+    init_bop_condition_sidecar.add_argument(
+        "--condition-csv-template-output",
+        type=Path,
+        help="write a fillable condition CSV template for the selected BOP frames",
     )
     init_bop_condition_sidecar.add_argument("--max-frames", type=int)
     init_bop_condition_sidecar.add_argument("--frame-step", type=int, default=1)

@@ -183,6 +183,7 @@ turn a filled condition CSV into an identity-ready sidecar:
 ```bash
 uv run objgauss object-state init-bop-condition-sidecar \
   outputs/datasets/bop/ycbv/test/000001 \
+  --condition-csv-template-output outputs/captures/bop-ycbv-scene-000001/bop-conditions.template.csv \
   --condition-csv outputs/captures/bop-ycbv-scene-000001/bop-conditions.csv \
   --output outputs/captures/bop-ycbv-scene-000001/bop-condition-sidecar.json \
   --summary-output outputs/captures/bop-ycbv-scene-000001/bop-condition-sidecar-summary.json \
@@ -194,6 +195,11 @@ The condition CSV columns are:
 ```text
 frame_id,view_id,lighting_id,camera_x,camera_y,camera_z,camera_qx,camera_qy,camera_qz,camera_qw
 ```
+
+To bootstrap a real BOP scene, run the command once without `--condition-csv`
+and with `--condition-csv-template-output`. Fill the generated CSV template
+from the capture setup metadata, save it as `bop-conditions.csv`, then rerun
+with `--condition-csv` and `--require-identity-ready`.
 
 The generated sidecar uses this schema:
 
@@ -235,10 +241,11 @@ The generated sidecar uses this schema:
 }
 ```
 
-If `--condition-csv` is omitted, the command writes a default template that is
-valid JSON but should usually remain `needs_metadata` because it lacks
-lighting variation and camera motion. Pass an identity-ready sidecar to the
-adapter, acceptance and route audits with
+If `--condition-csv` is omitted, the sidecar falls back to default per-frame
+`view_id` and `lighting_id` values and should usually remain `needs_metadata`
+because it lacks lighting variation and camera motion. The optional CSV
+template output is only a fillable authoring aid, not inferred metadata. Pass
+an identity-ready sidecar to the adapter, acceptance and route audits with
 `--condition-sidecar <path>`. The sidecar may override only
 `frame.condition.view_id`, `frame.condition.lighting_id` and
 `frame.condition.camera_pose`; it does not create identity GT, object pose GT,
