@@ -668,6 +668,11 @@ identity / prediction / full reality evidence package summary JSON，复用各�
 输出 maturity（`identity_reviewable`、`identity_prediction_reviewable`、
 `full_reality_reviewable` 等）、sample scope、阶段 row count 和 issues。它不运行 handoff
 或 eval，不创建 GT，不生成 pass rows，也不声明 world model。
+随后补强 ledger 发现能力：CLI 现在支持 `--discover-root` / `--max-depth`，可在
+controlled capture 或 public dataset handoff root 下自动发现标准文件名
+`identity-evidence-package-summary.json`、`prediction-evidence-package-summary.json`、
+`evidence-package-summary.json` 和 `reality-evidence-package-summary.json`，再与显式
+summary 路径合并去重。缺失或非法 root 会记录为 discovery issue 和 ledger gate failure。
 
 随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`：新增
 `objgauss.core.objectstate_controlled_prediction_baseline`，schema 为

@@ -427,6 +427,37 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 0ac29e6。
 
+### OBJECTSTATE-PHASE1-EVIDENCE-LEDGER-DISCOVERY-001: Discover Phase 1 evidence summaries from roots
+
+- 状态: done / read-only-phase1-evidence-ledger-discovery
+- 类型: 标准 PR / ObjectState Phase 1 evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 Phase 1 evidence ledger 可以从 controlled capture 或 public dataset
+  handoff root 自动发现标准 summary 文件，减少手工列路径时的漏项风险。
+- 已实施:
+  - `objectstate_phase1_evidence_ledger(...)` 新增 `discover_roots` 和 `max_depth`。
+  - discovery 只匹配标准文件名：
+    `identity-evidence-package-summary.json`、
+    `prediction-evidence-package-summary.json`、`evidence-package-summary.json` 和
+    `reality-evidence-package-summary.json`。
+  - 显式 summary 路径与 discovery 结果合并去重，仍复用每类 evidence package 的原生
+    validator。
+  - ledger summary 新增 `discovery` 区块和 `discovery_roots_valid` gate；缺失或非法
+    discovery root 会进入 issues。
+  - CLI `audit-phase1-evidence-ledger` 新增 `--discover-root` 和 `--max-depth`。
+- 边界:
+  - 只做只读扫描和 summary-level audit。
+  - 不采集视频，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不运行 identity handoff，不重新运行 identity / prediction / intervention eval。
+  - 不创建 pass rows，不声明 metric pass、counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_phase1_evidence_ledger.py objgauss/cli.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，16 tests。
+  - `uv run --extra dev pytest`: passed，426 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 43edf27。
+
 ### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
 
 - 状态: done / manifest-first-prediction-authoring-only
