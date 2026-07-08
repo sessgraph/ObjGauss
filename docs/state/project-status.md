@@ -380,6 +380,24 @@ metadata 可携带 `identity_evidence`，其中必须显式声明
 viewer/export 默认；当前仍缺实际 controlled tabletop capture 和真实 candidate
 artifact 作为通过证据。完成 commit: `a9b0007`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001`：新增
+`objgauss.core.objectstate_controlled_identity_bundle_handoff`，schema 为
+`objgauss-objectstate-controlled-identity-bundle-handoff-v1`，并新增 CLI
+`objgauss object-state controlled-identity-bundle-handoff <bundle-root> <objectstates> --output-dir <dir>`。
+该入口从真实 controlled tabletop bundle 根目录开始，先导入 `sample.json`、
+`objects.csv`、`frames.csv`、`annotations.csv` 和可选 `actions.csv`，再执行 bundle
+acceptance / file audit，最后复用现有 `controlled-identity-handoff` 生成 predictions、
+identity eval、controlled-real manifest、identity-only gate summary 和 blocked rows。
+顶层 pass 同时要求 bundle acceptance pass 和 identity handoff pass；缺 RGB / Gaussian
+真实文件、缺 candidate artifact、artifact ref mismatch、缺 view / lighting /
+camera-motion metadata、缺 reconstruction-noise evidence 或 identity gate fail 都不会被
+顶层 summary 隐藏。CLI 会写出 `capture-manifest.json`、
+`bundle-acceptance-summary.json`、`bundle-import-summary.json`、`bundle-file-audit.json`、
+`bundle-missing-files.md`、`controlled-real-seed.json` 以及 handoff 的所有 identity
+输出。该切片仍不采集视频、不创建 GT、不重建 Gaussian、不训练新模型、不写
+`public/samples`、不改 viewer/export 默认；它只是把下一次真实采集目录 + candidate
+artifact 的 Stage 1 identity 验收收敛成一条可复跑命令。完成 commit: `67b45e0`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

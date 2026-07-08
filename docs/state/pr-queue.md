@@ -69,11 +69,14 @@ controlled capture pose association 转成 evaluator 输入，并传递 trainabl
 `OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001` 已新增
 `controlled-identity-handoff` CLI，可一次性写出 predictions、identity eval、
 controlled-real manifest、identity-only gate summary 和 blocked rows markdown；handoff
-pass 现在也要求 retrieval / drift / reconstruction-noise evidence 通过。下一步仍是
-实际采集 / 标注 controlled tabletop RGB / Gaussian / pose / action 文件，让真实 bundle
-先通过 file audit，再用真实 candidate artifact 跑 handoff，让 identity row 从 fixture
-进入真实 pass / fail，而不是新增大模型。继续不推进 diffusion、replay buffer 大系统或
-viewer/export 默认模型。
+pass 现在也要求 retrieval / drift / reconstruction-noise evidence 通过；
+`OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001` 已新增
+`controlled-identity-bundle-handoff` CLI，可从真实 bundle root 直接完成 import、
+bundle acceptance、file audit、candidate artifact audit、identity handoff 和
+identity-only reality gate 输出。下一步仍是实际采集 / 标注 controlled tabletop RGB /
+Gaussian / pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
+让 identity row 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
+diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
 
@@ -143,6 +146,55 @@ viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-IDENTITY-BUNDLE-HANDOFF-001: Hand off controlled identity bundles
+
+- 状态: done / bundle-import-to-identity-handoff-ready-no-real-capture-files
+- 类型: 标准 PR / controlled real identity bundle handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将 controlled tabletop bundle root + trainable kernel ObjectState
+  artifact 到 Stage 1 identity-only reality gate 的链路收敛成一条命令，避免真实
+  capture 目录进入验收时还需要人工串联 import、file audit 和 handoff。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_identity_bundle_handoff`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-identity-bundle-handoff-v1`。
+  - `objectstate_controlled_identity_bundle_handoff(...)` 先执行
+    `objectstate_controlled_capture_bundle_acceptance_summary(...)`，再把导入出的
+    capture manifest 传给现有 `objectstate_controlled_identity_handoff(...)`。
+  - 顶层 pass 条件要求 bundle acceptance pass 和 identity handoff pass 同时成立；
+    缺 RGB / Gaussian frame files、candidate artifact 文件、artifact ref match、
+    identity scenario coverage、retrieval / drift / reconstruction-noise evidence 或
+    identity-only reality gate 时都会保持 fail。
+  - Summary 嵌入 `capture_bundle_acceptance`、`identity_handoff`、
+    `identity_predictions`、`identity_eval`、`controlled_real_manifest` 和
+    `controlled_real_summary`，并显式保留 prediction / intervention blocked rows。
+  - CLI 新增 `objgauss object-state controlled-identity-bundle-handoff
+    <bundle-root> <objectstates> --output-dir <dir>`。
+  - CLI 写出 `capture-manifest.json`、`bundle-acceptance-summary.json`、
+    `bundle-import-summary.json`、`bundle-file-audit.json`、
+    `bundle-missing-files.md`、`controlled-real-seed.json`、
+    `capture-file-audit.json`、`capture-missing-files.md`、
+    `candidate-artifact-file-audit.json`、`identity-scenario-audit.json`、
+    `identity-predictions.json`、`identity-eval-summary.json`、
+    `controlled-real.json`、`controlled-real-summary.json`、`blocked-rows.md`、
+    `handoff-summary.json` 和 `bundle-handoff-summary.json`。
+  - CLI 复用 existing handoff 的 identity 阈值、scenario 阈值、file audit、
+    candidate artifact audit、hash 和 `--require-pass` 参数，并新增 bundle CSV
+    文件名和 optional prediction / intervention readiness 参数。
+  - Core lazy namespace 暴露 bundle handoff schema、summary function 和 validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不重建 Gaussian，不运行 tracker / segmentation，不训练 Gaussian /
+    dynamics，不写 `public/samples`。
+  - 不计算 prediction / intervention metrics，不推进 replay buffer / diffusion，
+    不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_capture_import.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 350 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `67b45e0`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-QUALITY-GATE-001: Require controlled identity retrieval, drift and noise evidence
 
