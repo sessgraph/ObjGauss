@@ -105,6 +105,9 @@ def objectstate_controlled_reality_bundle_handoff(
     capture_manifest = identity_bundle_handoff["capture_bundle_acceptance"][
         "import_summary"
     ]["manifest"]
+    _require_intervention_action_gt_ready(
+        identity_bundle_handoff["capture_bundle_acceptance"]
+    )
     prediction_eval = evaluate_objectstate_controlled_prediction_candidates(
         capture_manifest,
         prediction_candidates,
@@ -550,3 +553,18 @@ def _handoff_issues(
             for key in controlled_real_summary["gate"]["hard_blockers"]
         )
     return issues
+
+
+def _require_intervention_action_gt_ready(
+    capture_bundle_acceptance: Mapping[str, Any],
+) -> None:
+    gates = capture_bundle_acceptance.get("acceptance_gates", {})
+    if gates.get("intervention_action_gt_ready") is True:
+        return
+    action_gt = capture_bundle_acceptance.get("intervention_action_gt", {})
+    issues = action_gt.get("issues", ())
+    detail = "; ".join(str(item) for item in issues) if issues else "unknown issue"
+    raise ValueError(
+        "controlled reality bundle handoff requires intervention action GT readiness: "
+        f"{detail}"
+    )

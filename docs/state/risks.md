@@ -221,6 +221,16 @@ physical `object_id`、完整 6DoF pose、action metadata 和 per-frame Gaussian
 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 public interaction
 identity / prediction / intervention rows 进入 pass / fail accounting。
 
+R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-INTERVENTION-ACTION-GT-ACCEPTANCE-001`
+将 `intervention_action_gt_ready` 从 tolerant readiness audit 提升到
+`accept-controlled-capture-bundle`、full controlled reality readiness 和
+`controlled-reality-bundle-handoff` 前置门禁。现在 full Phase 1 handoff 在运行 prediction /
+intervention eval 前要求 action row 有非零 vector，且 action interval 覆盖被引用对象的连续
+pose transition；弱 `actions.csv` 会被 acceptance / readiness / handoff preflight 阻断。
+该缓解只防止 action/intervention 证据伪通过，不创建 GT、不采集数据、不训练模型、不声明
+counterfactual proof 或 world-model evidence；风险继续 open，直到真实 controlled/public
+action rows 进入 pass / fail accounting。
+
 R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-DATASET-001`
 新增 `compile-objectstate-transitions`，可把已验证 controlled capture manifest 编译成
 object-level episodes 和 `ObjectState_t + action_context -> ObjectState_t+1` transition

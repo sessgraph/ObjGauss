@@ -53,6 +53,7 @@ def test_controlled_reality_bundle_readiness_reports_ready_inputs(tmp_path):
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA
     assert summary["status"] == "objectstate_controlled_reality_bundle_readiness_ready"
     assert summary["readiness"]["full_reality_handoff_ready"] is True
+    assert summary["readiness"]["intervention_action_gt_ready"] is True
     assert summary["trainable_artifact"]["identity_prediction_count"] == 6
     assert summary["prediction_candidates"]["record_count"] == 1
     assert summary["intervention_candidates"]["record_count"] == 1
@@ -92,6 +93,40 @@ def test_controlled_reality_bundle_readiness_blocks_sample_mismatch(tmp_path):
         "candidate sample_id does not match" in item
         for item in summary["prediction_candidates"]["binding_issues"]
     )
+
+
+def test_controlled_reality_bundle_readiness_blocks_weak_intervention_action_gt(
+    tmp_path,
+):
+    _write_bundle(tmp_path, include_frame_files=True)
+    rows = (tmp_path / "actions.csv").read_text(encoding="utf-8").splitlines()
+    rows[1] = (
+        "push-right-001,push_right,cup-001,0.033333,0.066667,"
+        "scripted-hand,,0.0,0.0,0.0"
+    )
+    (tmp_path / "actions.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    artifact_path = tmp_path / "objectstates.json"
+    predictions_path = tmp_path / "prediction-candidates.json"
+    interventions_path = tmp_path / "intervention-candidates.json"
+    artifact_path.write_text(json.dumps(_trainable_artifact()), encoding="utf-8")
+    predictions_path.write_text(json.dumps(_prediction_candidates()), encoding="utf-8")
+    interventions_path.write_text(
+        json.dumps(_intervention_candidates()),
+        encoding="utf-8",
+    )
+
+    summary = objectstate_controlled_reality_bundle_readiness(
+        tmp_path,
+        artifact_path,
+        predictions_path,
+        interventions_path,
+        max_centroid_distance=0.05,
+    )
+
+    assert summary["status"] == "objectstate_controlled_reality_bundle_readiness_blocked"
+    assert summary["readiness"]["intervention_action_gt_ready"] is False
+    assert summary["readiness"]["full_reality_handoff_ready"] is False
+    assert any("non-zero vector" in item for item in summary["hard_blockers"])
 
 
 def test_object_state_audit_controlled_reality_bundle_readiness_cli_writes_summary(
@@ -135,6 +170,7 @@ def test_object_state_audit_controlled_reality_bundle_readiness_cli_writes_summa
 
     assert f"schema={OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA}" in stdout
     assert "full_reality_handoff_ready=true" in stdout
+    assert "intervention_action_gt_ready=true" in stdout
     assert "hard_blocker_count=0" in stdout
     assert summary["readiness"]["full_reality_handoff_ready"] is True
 

@@ -17,6 +17,10 @@ from objgauss.core.objectstate_controlled_capture_files import (
     objectstate_controlled_capture_file_audit,
     validate_objectstate_controlled_capture_file_audit_summary,
 )
+from objgauss.core.objectstate_controlled_capture_intervention_action_gt import (
+    objectstate_controlled_capture_intervention_action_gt_readiness,
+    validate_objectstate_controlled_capture_intervention_action_gt_readiness,
+)
 
 OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA = (
     "objgauss-objectstate-controlled-capture-import-v1"
@@ -226,6 +230,11 @@ def objectstate_controlled_capture_bundle_acceptance_summary(
         hash_files=hash_files,
     )
     readiness = import_summary["capture_summary"]["readiness"]
+    intervention_action_gt = (
+        objectstate_controlled_capture_intervention_action_gt_readiness(
+            import_summary["manifest"]
+        )
+    )
     gates = {
         "identity_stage_ready": (
             not require_identity_ready or bool(readiness["identity_stage_ready"])
@@ -236,6 +245,9 @@ def objectstate_controlled_capture_bundle_acceptance_summary(
         "intervention_stage_ready": (
             not require_intervention_ready
             or bool(readiness["intervention_stage_ready"])
+        ),
+        "intervention_action_gt_ready": (
+            not require_intervention_ready or bool(intervention_action_gt["ready"])
         ),
         "capture_file_audit_pass": (
             file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
@@ -248,6 +260,8 @@ def objectstate_controlled_capture_bundle_acceptance_summary(
         issues.append("imported bundle is not prediction-stage ready")
     if not gates["intervention_stage_ready"]:
         issues.append("imported bundle is not intervention-stage ready")
+    if not gates["intervention_action_gt_ready"]:
+        issues.extend(str(item) for item in intervention_action_gt["issues"])
     if not gates["capture_file_audit_pass"]:
         issues.extend(file_audit["issues"])
     passed = all(gates.values())
@@ -266,12 +280,14 @@ def objectstate_controlled_capture_bundle_acceptance_summary(
             "identity_stage_ready_required": bool(require_identity_ready),
             "prediction_stage_ready_required": bool(require_prediction_ready),
             "intervention_stage_ready_required": bool(require_intervention_ready),
+            "intervention_action_gt_required": bool(require_intervention_ready),
             "gaussian_files_required": bool(require_gaussian_files),
             "artifact_refs_checked": bool(check_artifact_refs),
             "frame_file_formats_required": bool(require_frame_formats),
             "file_hashes_included": bool(hash_files),
         },
         "acceptance_gates": gates,
+        "intervention_action_gt": intervention_action_gt,
         "issues": issues,
         "import_summary": import_summary,
         "capture_file_audit": file_audit,
@@ -330,6 +346,11 @@ def validate_objectstate_controlled_capture_bundle_acceptance_summary(
     file_audit = validate_objectstate_controlled_capture_file_audit_summary(
         payload.get("capture_file_audit")
     )
+    intervention_action_gt = (
+        validate_objectstate_controlled_capture_intervention_action_gt_readiness(
+            payload.get("intervention_action_gt")
+        )
+    )
     if file_audit["sample"]["sample_id"] != import_summary["manifest"]["sample"]["sample_id"]:
         raise ValueError("controlled capture bundle acceptance sample mismatch")
     if not isinstance(payload.get("requirements"), Mapping):
@@ -343,10 +364,19 @@ def validate_objectstate_controlled_capture_bundle_acceptance_summary(
         "identity_stage_ready",
         "prediction_stage_ready",
         "intervention_stage_ready",
+        "intervention_action_gt_ready",
         "capture_file_audit_pass",
     ):
         if key not in gates:
             raise ValueError(f"controlled capture bundle acceptance missing gate {key}")
+    expected_intervention_action_gt_gate = (
+        not payload["requirements"].get("intervention_action_gt_required", False)
+        or bool(intervention_action_gt["ready"])
+    )
+    if gates["intervention_action_gt_ready"] != expected_intervention_action_gt_gate:
+        raise ValueError(
+            "controlled capture bundle acceptance intervention action gate mismatch"
+        )
     expected_status = (
         "objectstate_controlled_capture_bundle_acceptance_pass"
         if all(gates.values())

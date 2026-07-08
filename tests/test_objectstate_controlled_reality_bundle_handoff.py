@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from objgauss.cli import main
 from objgauss.core.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
@@ -115,6 +117,34 @@ def test_controlled_reality_bundle_handoff_fails_wrong_direction_intervention(
     )
     assert summary["controlled_real_manifest"]["evidence_rows"][2]["status"] == "fail"
     assert "controlled intervention eval did not pass" in summary["issues"]
+
+
+def test_controlled_reality_bundle_handoff_blocks_weak_intervention_action_gt(
+    tmp_path,
+):
+    _write_bundle(tmp_path, include_frame_files=True)
+    rows = (tmp_path / "actions.csv").read_text(encoding="utf-8").splitlines()
+    rows[1] = (
+        "push-right-001,push_right,cup-001,0.033333,0.066667,"
+        "scripted-hand,,0.0,0.0,0.0"
+    )
+    (tmp_path / "actions.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+
+    with pytest.raises(
+        ValueError,
+        match="requires intervention action GT readiness.*non-zero vector",
+    ):
+        objectstate_controlled_reality_bundle_handoff(
+            tmp_path,
+            artifact,
+            _prediction_candidates(),
+            _intervention_candidates(),
+            candidate_id="stable-objectstate-slots",
+            max_centroid_distance=0.05,
+            candidate_artifact_path=artifact_path,
+        )
 
 
 def test_object_state_controlled_reality_bundle_handoff_cli_writes_artifacts(

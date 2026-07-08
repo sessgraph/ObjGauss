@@ -4910,6 +4910,10 @@ def _object_state_accept_controlled_capture_bundle(args: argparse.Namespace) -> 
     print(f"prediction_stage_ready={str(readiness['prediction_stage_ready']).lower()}")
     print(f"intervention_stage_ready={str(readiness['intervention_stage_ready']).lower()}")
     print(
+        "intervention_action_gt_ready="
+        f"{str(summary['intervention_action_gt']['ready']).lower()}"
+    )
+    print(
         "capture_file_audit_status="
         f"{file_audit['status']}"
     )
@@ -6088,6 +6092,10 @@ def _object_state_audit_controlled_reality_bundle_readiness(
     print(
         "identity_bundle_handoff_ready="
         f"{str(readiness['identity_bundle_handoff_ready']).lower()}"
+    )
+    print(
+        "intervention_action_gt_ready="
+        f"{str(readiness['intervention_action_gt_ready']).lower()}"
     )
     print(
         "trainable_artifact_schema_ready="

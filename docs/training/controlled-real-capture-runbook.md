@@ -255,6 +255,12 @@ object's consecutive pose transition interval. This is still only a preflight
 for action-conditioned transition authoring. It does not run the intervention
 evaluator or create a counterfactual proof.
 
+`accept-controlled-capture-bundle --require-intervention-ready` and the full
+controlled reality readiness / handoff route use the same
+`intervention_action_gt_ready` gate. A bundle with action rows but zero vectors,
+or an action interval that does not fit the referenced object's pose transition,
+must be fixed before it can enter full Phase 1 intervention evidence.
+
 ## 6.1 Object Transition Dataset
 
 After `capture-manifest.json` validates and before creating prediction /
@@ -471,6 +477,11 @@ uv run objgauss object-state accept-controlled-capture-bundle \
   --hash-files \
   --require-pass
 ```
+
+For a full identity + prediction + intervention package, include
+`--require-prediction-ready --require-intervention-ready`. The acceptance CLI
+prints `intervention_action_gt_ready=<true|false>`; it must be `true` before
+running `controlled-reality-bundle-handoff`.
 
 Then run the identity handoff with the candidate artifact:
 

@@ -347,6 +347,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-INTERVENTION-ACTION-GT-ACCEPTANCE-001: Require action GT readiness in full Phase 1 handoff
+
+- 状态: done / objectstate-controlled-intervention-action-gt-acceptance
+- 类型: 标准 PR / ObjectState Phase 1 controlled real evidence gate
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 `intervention_action_gt_ready` 从 tolerant readiness audit 推进到
+  `accept-controlled-capture-bundle`、full controlled reality readiness 和
+  `controlled-reality-bundle-handoff` 前置门禁，避免弱 `actions.csv` 被计入
+  intervention evidence route。
+- 已实施:
+  - 新增共享 helper
+    `objectstate_controlled_capture_intervention_action_gt_readiness(...)`，
+    统一判定 action row 是否存在、vector 是否非零、action interval 是否覆盖被引用对象的
+    连续 pose transition。
+  - `objectstate_controlled_capture_bundle_acceptance_summary(...)` 新增
+    `intervention_action_gt` summary 和
+    `acceptance_gates.intervention_action_gt_ready`；当
+    `require_intervention_ready=True` 时该 gate 必须通过。
+  - `audit-controlled-reality-bundle-readiness` 的顶层 readiness 新增
+    `intervention_action_gt_ready`，CLI 直接打印该字段。
+  - `controlled-reality-bundle-handoff` 在运行 prediction / intervention eval 前
+    明确要求 action GT readiness；弱 action GT 会在 handoff preflight 处报错，
+    不再等到 intervention evaluator 深处失败。
+  - `accept-controlled-capture-bundle` CLI 新增
+    `intervention_action_gt_ready=<true|false>` 输出。
+- 边界:
+  - 不修改 controlled capture manifest schema。
+  - 不采集视频、不创建 GT、不推断动作、不重建 Gaussian。
+  - 不训练 dynamics、不创建 replay buffer、不声明 counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_intervention_action_gt.py objgauss/core/objectstate_controlled_capture_bundle_readiness.py objgauss/core/objectstate_controlled_capture_import.py objgauss/core/objectstate_controlled_reality_bundle_readiness.py objgauss/core/objectstate_controlled_reality_bundle_handoff.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_reality_bundle_readiness.py tests/test_objectstate_controlled_reality_bundle_handoff.py`: 22 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_objectstate_controlled_reality_evidence_package.py tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py`: 24 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 566 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-INTERVENTION-READINESS-001: Harden intervention bundle readiness
 
 - 状态: done / objectstate-controlled-capture-intervention-readiness

@@ -100,6 +100,9 @@ def objectstate_controlled_reality_bundle_readiness(
         "identity_bundle_handoff_ready": bool(
             capture_readiness["readiness"]["identity_bundle_handoff_ready"]
         ),
+        "intervention_action_gt_ready": bool(
+            capture_readiness["readiness"]["intervention_action_gt_ready"]
+        ),
         "trainable_artifact_schema_ready": bool(trainable["schema_ready"]),
         "trainable_artifact_binding_ready": bool(trainable["binding_ready"]),
         "prediction_candidates_schema_ready": bool(prediction["schema_ready"]),
@@ -204,6 +207,7 @@ def validate_objectstate_controlled_reality_bundle_readiness_summary(
     for key in (
         "capture_bundle_ready",
         "identity_bundle_handoff_ready",
+        "intervention_action_gt_ready",
         "trainable_artifact_schema_ready",
         "trainable_artifact_binding_ready",
         "prediction_candidates_schema_ready",

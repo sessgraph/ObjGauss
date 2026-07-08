@@ -133,8 +133,10 @@ def test_controlled_capture_bundle_acceptance_requires_file_audit_pass(tmp_path)
         "identity_stage_ready": True,
         "prediction_stage_ready": True,
         "intervention_stage_ready": True,
+        "intervention_action_gt_ready": True,
         "capture_file_audit_pass": True,
     }
+    assert summary["intervention_action_gt"]["ready"] is True
     assert (
         summary["capture_file_audit"]["status"]
         == "objectstate_controlled_capture_file_audit_pass"
@@ -154,6 +156,35 @@ def test_controlled_capture_bundle_acceptance_fails_missing_frame_files(tmp_path
     assert summary["acceptance_gates"]["identity_stage_ready"] is True
     assert summary["acceptance_gates"]["capture_file_audit_pass"] is False
     assert summary["capture_file_audit"]["missing_files"]
+
+
+def test_controlled_capture_bundle_acceptance_requires_intervention_action_gt_ready(
+    tmp_path,
+):
+    _write_bundle(tmp_path, include_frame_files=True)
+    rows = (tmp_path / "actions.csv").read_text(encoding="utf-8").splitlines()
+    rows[1] = (
+        "push-left-001,push_left,cup-001,0.033333,0.066667,"
+        "scripted-hand,,0.0,0.0,0.0"
+    )
+    (tmp_path / "actions.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    summary = objectstate_controlled_capture_bundle_acceptance_summary(
+        tmp_path,
+        require_intervention_ready=True,
+    )
+
+    assert summary["status"] == (
+        "objectstate_controlled_capture_bundle_acceptance_fail"
+    )
+    assert summary["acceptance_gates"]["intervention_stage_ready"] is True
+    assert summary["acceptance_gates"]["intervention_action_gt_ready"] is False
+    assert summary["intervention_action_gt"]["metrics"] == {
+        "action_count": 1,
+        "nonzero_vector_action_count": 0,
+        "usable_action_transition_count": 0,
+    }
+    assert any("non-zero vector" in item for item in summary["issues"])
 
 
 def test_controlled_capture_bundle_acceptance_cli_writes_outputs(tmp_path, capsys):
@@ -201,6 +232,7 @@ def test_controlled_capture_bundle_acceptance_cli_writes_outputs(tmp_path, capsy
 
     assert f"schema={OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA}" in stdout
     assert "acceptance_status=objectstate_controlled_capture_bundle_acceptance_pass" in stdout
+    assert "intervention_action_gt_ready=true" in stdout
     assert "capture_bundle_files_ready=true" in stdout
     assert "missing_files=0" in stdout
     assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
