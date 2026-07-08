@@ -347,6 +347,46 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-REALITY-EVIDENCE-PACKAGE-001: Audit transition reality evidence package
+
+- 状态: done / objectstate-transition-reality-evidence-package
+- 类型: 标准 PR / ObjectState Phase 1 evidence ledger accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 `transition-reality-handoff/` 产物升级为可复验 evidence
+  package，并接入 Phase 1 evidence ledger 的 reviewability accounting。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_transition_reality_evidence_package`。
+  - 新增 schema
+    `objgauss-objectstate-transition-reality-evidence-package-v1`。
+  - 新增 CLI `objgauss object-state audit-transition-reality-evidence-package
+    <package-root> --handoff-dir transition-reality-handoff`。
+  - Evidence package 只读检查 transition audit、prediction / intervention
+    candidates、eval summaries、controlled-real manifest / summary、blocked rows
+    Markdown 和 handoff summary 的存在性、schema、`sample_id` 一致性和
+    standalone-vs-embedded consistency。
+  - Reviewability gate 要求 identity row 保持 blocked，prediction /
+    intervention rows 进入 pass 或 fail；不会把 partial transition evidence
+    升级为 identity proof、full reality gate 或 world model claim。
+  - Phase 1 ledger 新增 `transition_reality` stage 和
+    `transition_reality_reviewable` maturity；该 stage 可贡献 prediction /
+    intervention evidence reviewability，但不贡献 identity 或 full reality
+    reviewability。
+  - Runbook 已补 transition handoff 后的 evidence package audit 和 ledger 命令链。
+- 边界:
+  - 不采集数据、不下载 public dataset、不创建 GT、不推断 physical identity。
+  - 不重建 Gaussian、不运行 identity handoff、不重新运行 prediction / intervention
+    eval。
+  - 不训练 dynamics、不创建 replay buffer、不声明 learned model、metric pass、
+    counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_reality_evidence_package.py objgauss/core/objectstate_phase1_evidence_ledger.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_transition_reality_evidence_package.py tests/test_core_namespace.py tests/test_objectstate_phase1_evidence_ledger.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_reality_evidence_package.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py tests/test_objectstate_transition_reality_handoff.py -q`: 23 passed。
+  - `uv run --extra dev pytest`: 547 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-TRANSITION-REALITY-HANDOFF-001: Run transition-backed reality handoff
 
 - 状态: done / objectstate-transition-reality-handoff

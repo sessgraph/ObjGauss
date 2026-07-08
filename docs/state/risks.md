@@ -270,3 +270,13 @@ intervention rows 接入 pass/fail accounting，并显式保持 identity row 为
 model、identity proof、counterfactual proof 或 world-model evidence。风险继续 open，直到
 真实 controlled/public capture 产生可审计 identity + prediction + intervention rows，且 full
 Phase 1 gate 不再依赖 fixture evidence。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-REALITY-EVIDENCE-PACKAGE-001`
+新增 `audit-transition-reality-evidence-package`，可只读审计
+`transition-reality-handoff/` 产物，并让 Phase 1 evidence ledger 发现
+`transition-reality-evidence-package-summary.json`。该缓解把 transition-backed
+prediction / intervention pass/fail accounting 从单个 handoff 输出接入全局 ledger，ledger
+maturity 新增 `transition_reality_reviewable`，同时明确 identity row 必须保持 blocked，
+因此不会把 partial transition evidence 升级为 full reality 或 world-model 证明。风险继续
+open，直到真实 controlled/public capture 同时产生可审计 identity、prediction 和
+intervention rows，并通过 full Phase 1 evidence review。

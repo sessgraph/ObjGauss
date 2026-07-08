@@ -16,6 +16,10 @@ from objgauss.core.objectstate_controlled_reality_evidence_package import (
     OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA,
     validate_objectstate_controlled_reality_evidence_package_summary,
 )
+from objgauss.core.objectstate_transition_reality_evidence_package import (
+    OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA,
+    validate_objectstate_transition_reality_evidence_package_summary,
+)
 
 OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA = (
     "objgauss-objectstate-phase1-evidence-ledger-v1"
@@ -30,6 +34,9 @@ REALITY_EVIDENCE_PACKAGE_SUMMARY_FILENAMES = (
     "evidence-package-summary.json",
     "reality-evidence-package-summary.json",
 )
+TRANSITION_REALITY_EVIDENCE_PACKAGE_SUMMARY_FILENAMES = (
+    "transition-reality-evidence-package-summary.json",
+)
 
 Validator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 
@@ -38,6 +45,7 @@ def objectstate_phase1_evidence_ledger(
     *,
     identity_summaries: Sequence[str | Path] = (),
     prediction_summaries: Sequence[str | Path] = (),
+    transition_reality_summaries: Sequence[str | Path] = (),
     reality_summaries: Sequence[str | Path] = (),
     discover_roots: Sequence[str | Path] = (),
     max_depth: int = 4,
@@ -48,6 +56,12 @@ def objectstate_phase1_evidence_ledger(
     )
     prediction_paths = _dedupe_paths(
         (*prediction_summaries, *discovery["paths"]["prediction"])
+    )
+    transition_reality_paths = _dedupe_paths(
+        (
+            *transition_reality_summaries,
+            *discovery["paths"]["transition_reality"],
+        )
     )
     reality_paths = _dedupe_paths(
         (*reality_summaries, *discovery["paths"]["full_reality"])
@@ -80,6 +94,15 @@ def objectstate_phase1_evidence_ledger(
             )
             for path in reality_paths
         ),
+        *(
+            _summary_record(
+                path,
+                stage="transition_reality",
+                expected_schema=OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA,
+                validator=validate_objectstate_transition_reality_evidence_package_summary,
+            )
+            for path in transition_reality_paths
+        ),
     ]
     discovery_summary = _discovery_summary(discovery)
     stage_summary = _stage_summary(records)
@@ -100,12 +123,20 @@ def objectstate_phase1_evidence_ledger(
         ),
         "prediction_evidence_reviewable": bool(
             stage_summary["prediction"]["reviewable_count"] > 0
+            or stage_summary["transition_reality"]["reviewable_count"] > 0
             or stage_summary["full_reality"]["reviewable_count"] > 0
+        ),
+        "transition_reality_evidence_reviewable": bool(
+            stage_summary["transition_reality"]["reviewable_count"] > 0
         ),
         "full_reality_evidence_reviewable": bool(
             stage_summary["full_reality"]["reviewable_count"] > 0
         ),
         "intervention_evidence_reviewable": bool(
+            stage_summary["transition_reality"]["reviewable_count"] > 0
+            or stage_summary["full_reality"]["reviewable_count"] > 0
+        ),
+        "full_intervention_evidence_reviewable": bool(
             stage_summary["full_reality"]["reviewable_count"] > 0
         ),
         "does_not_claim_metric_pass": True,
@@ -181,6 +212,7 @@ def validate_objectstate_phase1_evidence_ledger_summary(
         "identity_reviewable",
         "prediction_reviewable",
         "identity_prediction_reviewable",
+        "transition_reality_reviewable",
         "full_reality_reviewable",
     }:
         raise ValueError("phase1 evidence ledger maturity is unsupported")
@@ -198,7 +230,7 @@ def validate_objectstate_phase1_evidence_ledger_summary(
     stage_summary = payload.get("stage_summary")
     if not isinstance(stage_summary, Mapping):
         raise ValueError("phase1 evidence ledger requires stage_summary")
-    for stage in ("identity", "prediction", "full_reality"):
+    for stage in ("identity", "prediction", "full_reality", "transition_reality"):
         _validate_stage(stage_summary.get(stage), stage)
     ledger_gates = payload.get("ledger_gates")
     if not isinstance(ledger_gates, Mapping) or not ledger_gates:
@@ -253,6 +285,7 @@ def _discover_summary_paths(
         "identity": [],
         "prediction": [],
         "full_reality": [],
+        "transition_reality": [],
     }
     issues: list[str] = []
     root_strings: list[str] = []
@@ -291,6 +324,8 @@ def _summary_stage_for_filename(filename: str) -> str | None:
         return "prediction"
     if filename in REALITY_EVIDENCE_PACKAGE_SUMMARY_FILENAMES:
         return "full_reality"
+    if filename in TRANSITION_REALITY_EVIDENCE_PACKAGE_SUMMARY_FILENAMES:
+        return "transition_reality"
     return None
 
 
@@ -327,6 +362,9 @@ def _discovery_summary(discovery: Mapping[str, Any]) -> dict[str, Any]:
         "identity": [str(path) for path in paths["identity"]],
         "prediction": [str(path) for path in paths["prediction"]],
         "full_reality": [str(path) for path in paths["full_reality"]],
+        "transition_reality": [
+            str(path) for path in paths["transition_reality"]
+        ],
     }
     return {
         "roots": list(discovery["roots"]),
@@ -334,6 +372,9 @@ def _discovery_summary(discovery: Mapping[str, Any]) -> dict[str, Any]:
         "identity_summary_count": len(discovered_paths["identity"]),
         "prediction_summary_count": len(discovered_paths["prediction"]),
         "reality_summary_count": len(discovered_paths["full_reality"]),
+        "transition_reality_summary_count": len(
+            discovered_paths["transition_reality"]
+        ),
         "discovered_paths": discovered_paths,
         "issues": list(discovery["issues"]),
     }
@@ -422,7 +463,7 @@ def _row_status(stage: str, payload: Mapping[str, Any]) -> str | None:
 
 
 def _row_accounting(stage: str, payload: Mapping[str, Any]) -> dict[str, int] | None:
-    if stage != "full_reality":
+    if stage not in {"full_reality", "transition_reality"}:
         return None
     row_accounting = payload.get("row_accounting")
     if not isinstance(row_accounting, Mapping):
@@ -438,7 +479,7 @@ def _row_accounting(stage: str, payload: Mapping[str, Any]) -> dict[str, int] | 
 def _stage_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     return {
         stage: _summarize_stage(stage, records)
-        for stage in ("identity", "prediction", "full_reality")
+        for stage in ("identity", "prediction", "full_reality", "transition_reality")
     }
 
 
@@ -498,10 +539,13 @@ def _maturity(stage_summary: Mapping[str, Mapping[str, Any]]) -> str:
         int(stage_summary["identity"]["package_count"]) == 0
         and int(stage_summary["prediction"]["package_count"]) == 0
         and int(stage_summary["full_reality"]["package_count"]) == 0
+        and int(stage_summary["transition_reality"]["package_count"]) == 0
     ):
         return "no_evidence_summaries"
     if int(stage_summary["full_reality"]["reviewable_count"]) > 0:
         return "full_reality_reviewable"
+    if int(stage_summary["transition_reality"]["reviewable_count"]) > 0:
+        return "transition_reality_reviewable"
     if (
         int(stage_summary["identity"]["reviewable_count"]) > 0
         and int(stage_summary["prediction"]["reviewable_count"]) > 0
@@ -546,7 +590,7 @@ def _validate_discovery(discovery: Any) -> None:
     discovered_paths = discovery.get("discovered_paths")
     if not isinstance(discovered_paths, Mapping):
         raise ValueError("phase1 evidence ledger requires discovered_paths")
-    for stage in ("identity", "prediction", "full_reality"):
+    for stage in ("identity", "prediction", "full_reality", "transition_reality"):
         paths = discovered_paths.get(stage)
         if not isinstance(paths, list) or any(
             not isinstance(path, str) or not path for path in paths
@@ -558,6 +602,7 @@ def _validate_discovery(discovery: Any) -> None:
         "identity_summary_count": "identity",
         "prediction_summary_count": "prediction",
         "reality_summary_count": "full_reality",
+        "transition_reality_summary_count": "transition_reality",
     }
     for count_field, stage in count_fields.items():
         value = discovery.get(count_field)
@@ -582,7 +627,12 @@ def _validate_record(record: Any) -> None:
     for key in ("stage", "path"):
         if not isinstance(record.get(key), str) or not record[key]:
             raise ValueError(f"phase1 evidence ledger record requires {key}")
-    if record["stage"] not in {"identity", "prediction", "full_reality"}:
+    if record["stage"] not in {
+        "identity",
+        "prediction",
+        "full_reality",
+        "transition_reality",
+    }:
         raise ValueError("phase1 evidence ledger record stage is unsupported")
     for key in ("exists", "is_file", "schema_ok", "validator_ok", "reviewable"):
         if not isinstance(record.get(key), bool):

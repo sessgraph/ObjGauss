@@ -74,6 +74,7 @@ from objgauss.core import (
     OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES,
     OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA,
+    OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA,
     OBJECTSTATE_TRANSITION_ROW_SCHEMA,
     OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
@@ -272,6 +273,7 @@ from objgauss.core import (
     objectstate_transition_intervention_candidates_summary,
     objectstate_transition_prediction_candidates_summary,
     objectstate_transition_reality_handoff,
+    objectstate_transition_reality_evidence_package,
     read_objectstate_transition_dataset,
     write_objectstate_transition_dataset,
     write_objectstate_transition_intervention_candidates,
@@ -405,6 +407,7 @@ from objgauss.core import (
     validate_objectstate_transition_intervention_candidates_summary,
     validate_objectstate_transition_prediction_candidates_summary,
     validate_objectstate_transition_reality_handoff_summary,
+    validate_objectstate_transition_reality_evidence_package_summary,
     validate_objectstate_controlled_identity_eval_summary,
     validate_objectstate_controlled_identity_handoff_summary,
     validate_objectstate_controlled_identity_predictions,
@@ -1274,6 +1277,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA == (
         "objgauss-objectstate-controlled-reality-evidence-package-v1"
+    )
+    assert OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA == (
+        "objgauss-objectstate-transition-reality-evidence-package-v1"
     )
     assert OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA == (
         "objgauss-objectstate-phase1-evidence-ledger-v1"

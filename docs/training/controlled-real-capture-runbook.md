@@ -305,6 +305,30 @@ the prediction and intervention evaluators under the selected thresholds; it is
 not a learned dynamics model, identity proof, counterfactual proof, replay
 buffer, or world-model claim.
 
+After the handoff, audit the transition evidence package and add it to the
+Phase 1 ledger:
+
+```bash
+uv run objgauss object-state audit-transition-reality-evidence-package \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --handoff-dir transition-reality-handoff \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/transition-reality-evidence-package-summary.json \
+  --require-reviewable
+
+uv run objgauss object-state audit-phase1-evidence-ledger \
+  --transition-reality-summary outputs/captures/controlled-tabletop-cup-box-001/transition-reality-evidence-package-summary.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/phase1-evidence-ledger.json \
+  --require-reviewable
+```
+
+The transition evidence package is reviewable when all handoff JSON / Markdown
+outputs exist, schemas validate, `sample_id` is consistent, standalone outputs
+match the embedded handoff summary, the identity row remains blocked, and the
+prediction / intervention rows are pass or fail. In the ledger this contributes
+`transition_reality_reviewable`: prediction and intervention evidence are
+reviewable, but identity and full reality remain unproven until the identity
+handoff or full controlled reality bundle handoff also passes reviewability.
+
 ## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible
@@ -478,6 +502,7 @@ reality-handoff/intervention-eval-summary.json
 reality-handoff/controlled-real-summary.json
 reality-handoff/blocked-rows.md
 evidence-package-summary.json
+transition-reality-evidence-package-summary.json
 ```
 
 A Stage 1 identity claim is only reviewable when:

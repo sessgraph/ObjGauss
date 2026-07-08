@@ -212,6 +212,9 @@ from objgauss.core.objectstate_transition_intervention_candidates import (
 from objgauss.core.objectstate_transition_reality_handoff import (
     write_objectstate_transition_reality_handoff,
 )
+from objgauss.core.objectstate_transition_reality_evidence_package import (
+    objectstate_transition_reality_evidence_package,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -5940,6 +5943,59 @@ def _object_state_audit_controlled_reality_evidence_package(
         raise ValueError("controlled reality evidence package is not reviewable")
 
 
+def _object_state_audit_transition_reality_evidence_package(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_transition_reality_evidence_package(
+        args.package_root,
+        handoff_dir=args.handoff_dir,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    row_accounting = summary["row_accounting"]
+    print(f"schema={summary['schema']}")
+    print(f"package_root={args.package_root}")
+    print(f"handoff_dir={summary['handoff_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"transition_evidence_status={summary['status']}")
+    print(
+        "reviewable="
+        f"{str(summary['status'].endswith('_reviewable')).lower()}"
+    )
+    print(
+        "transition_dataset_ready="
+        f"{str(summary['transition']['transition_dataset_ready']).lower()}"
+    )
+    print(f"handoff_status={summary['handoff']['status']}")
+    print(
+        "partial_reality_gate_status="
+        f"{summary['handoff']['partial_reality_gate_status']}"
+    )
+    print(
+        "requires_identity_pass_row="
+        f"{str(summary['handoff']['requires_identity_pass_row']).lower()}"
+    )
+    print(f"identity_row_status={row_accounting['identity_row_status']}")
+    print(f"prediction_row_status={row_accounting['prediction_row_status']}")
+    print(f"intervention_row_status={row_accounting['intervention_row_status']}")
+    print(f"pass_rows={row_accounting['pass_row_count']}")
+    print(f"fail_rows={row_accounting['fail_row_count']}")
+    print(f"blocked_rows={row_accounting['blocked_row_count']}")
+    print(f"issue_count={len(summary['issues'])}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability_gate.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_transition_reality_evidence_package_reviewable"
+    ):
+        raise ValueError("transition reality evidence package is not reviewable")
+
+
 def _object_state_audit_controlled_prediction_evidence_package(
     args: argparse.Namespace,
 ) -> None:
@@ -6053,6 +6109,7 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
     summary = objectstate_phase1_evidence_ledger(
         identity_summaries=tuple(args.identity_summary),
         prediction_summaries=tuple(args.prediction_summary),
+        transition_reality_summaries=tuple(args.transition_reality_summary),
         reality_summaries=tuple(args.reality_summary),
         discover_roots=tuple(args.discover_root),
         max_depth=args.max_depth,
@@ -6084,6 +6141,10 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
         "discovered_reality_summaries="
         f"{discovery['reality_summary_count']}"
     )
+    print(
+        "discovered_transition_reality_summaries="
+        f"{discovery['transition_reality_summary_count']}"
+    )
     print(f"identity_packages={stage_summary['identity']['package_count']}")
     print(f"identity_reviewable={stage_summary['identity']['reviewable_count']}")
     print(f"identity_pass_rows={stage_summary['identity']['pass_row_count']}")
@@ -6111,6 +6172,24 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
     print(
         "full_reality_blocked_rows="
         f"{stage_summary['full_reality']['blocked_row_count']}"
+    )
+    transition_summary = stage_summary["transition_reality"]
+    print(f"transition_reality_packages={transition_summary['package_count']}")
+    print(
+        "transition_reality_reviewable="
+        f"{transition_summary['reviewable_count']}"
+    )
+    print(
+        "transition_reality_pass_rows="
+        f"{transition_summary['pass_row_count']}"
+    )
+    print(
+        "transition_reality_fail_rows="
+        f"{transition_summary['fail_row_count']}"
+    )
+    print(
+        "transition_reality_blocked_rows="
+        f"{transition_summary['blocked_row_count']}"
     )
     for gate, passed in phase_gates.items():
         print(f"phase1_gate.{gate}={str(passed).lower()}")
@@ -10183,6 +10262,34 @@ def _build_parser() -> argparse.ArgumentParser:
     audit_controlled_reality_evidence_package.set_defaults(
         handler=_object_state_audit_controlled_reality_evidence_package
     )
+    audit_transition_reality_evidence_package = object_state_subparsers.add_parser(
+        "audit-transition-reality-evidence-package",
+        help=(
+            "audit a local transition-backed prediction/intervention evidence "
+            "package after transition-reality-handoff"
+        ),
+    )
+    audit_transition_reality_evidence_package.add_argument(
+        "package_root",
+        type=Path,
+    )
+    audit_transition_reality_evidence_package.add_argument(
+        "--handoff-dir",
+        default="transition-reality-handoff",
+        help="transition handoff output directory, relative to package_root unless absolute",
+    )
+    audit_transition_reality_evidence_package.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_transition_reality_evidence_package.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the transition evidence package is complete and reviewable",
+    )
+    audit_transition_reality_evidence_package.set_defaults(
+        handler=_object_state_audit_transition_reality_evidence_package
+    )
     audit_controlled_prediction_evidence_package = object_state_subparsers.add_parser(
         "audit-controlled-prediction-evidence-package",
         help=(
@@ -10336,6 +10443,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         type=Path,
         help="full reality evidence package summary JSON; may be repeated",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--transition-reality-summary",
+        action="append",
+        default=[],
+        type=Path,
+        help="transition reality evidence package summary JSON; may be repeated",
     )
     audit_phase1_evidence_ledger.add_argument(
         "--discover-root",

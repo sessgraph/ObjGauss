@@ -1083,6 +1083,19 @@ intervention candidates，随后复用既有 controlled prediction / interventio
 controlled-real summary 和 blocked rows。它会把 identity row 保持为 blocked seed，只要求
 prediction / intervention rows 进入 pass / fail accounting；不训练 dynamics、不创建 replay
 buffer、不声明 learned model、identity proof、counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-TRANSITION-REALITY-EVIDENCE-PACKAGE-001`：新增
+`objgauss.core.objectstate_transition_reality_evidence_package`，schema 为
+`objgauss-objectstate-transition-reality-evidence-package-v1`，CLI 为
+`objgauss object-state audit-transition-reality-evidence-package <package-root>`。
+该只读 audit 检查 `transition-reality-handoff/` 下的 transition audit、prediction /
+intervention candidates、eval summaries、controlled-real manifest / summary、blocked rows
+和 handoff summary 是否存在、schema valid、sample id 一致、standalone outputs 与 handoff
+嵌入内容一致，并要求 identity row 保持 blocked、prediction / intervention row 为 pass 或
+fail。Phase 1 ledger 新增 `transition_reality` stage 和
+`transition_reality_reviewable` maturity；该 stage 可贡献 prediction / intervention
+reviewability，但不会贡献 identity reviewability 或 full reality reviewability，不训练
+dynamics、不创建 replay buffer、不声明 learned model、identity proof、counterfactual proof 或
+world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

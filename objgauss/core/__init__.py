@@ -210,6 +210,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_reality_handoff",
         "OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA": (
+        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA",
+    ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
@@ -278,6 +282,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_reality_handoff",
         "write_objectstate_transition_reality_handoff",
     ),
+    "objectstate_transition_reality_evidence_package": (
+        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "objectstate_transition_reality_evidence_package",
+    ),
     "validate_objectstate_controlled_capture_import_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
@@ -317,6 +325,10 @@ _EXPORTS = {
     "validate_objectstate_transition_reality_handoff_summary": (
         "objgauss.core.objectstate_transition_reality_handoff",
         "validate_objectstate_transition_reality_handoff_summary",
+    ),
+    "validate_objectstate_transition_reality_evidence_package_summary": (
+        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "validate_objectstate_transition_reality_evidence_package_summary",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
