@@ -380,8 +380,10 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
   - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 --output-root outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --sample-id bop-lmo-test-scene-000002-rgbd-baseline --dataset-id bop-lmo --object-category lmo_objects --scenario bop_pose_sequence --license-text "BOP LMO dataset license: cc-by-sa-4.0; verify source terms before redistribution" --max-frames 3 --max-points-per-frame 10000 --overwrite-gaussian-evidence --ply-format binary_little_endian --force`: passed。
   - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
-  - Full validation pending before commit.
-- 完成 commit: pending.
+  - `uv run --extra dev pytest`: passed，510 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `05fa906`.
 
 ### OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001: Run HOPE multi-instance RGB-D baseline row
 
