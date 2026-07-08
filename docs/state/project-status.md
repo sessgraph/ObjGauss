@@ -426,6 +426,17 @@ metadata，以及可选 candidate artifact。输出区分 `capture_bundle_ready`
 视频、不创建 GT、不生成伪造行、不重建 Gaussian、不训练模型、不运行 handoff、不写
 `public/samples`、不改 viewer/export 默认。完成 commit: `63c384f`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001`：新增
+`docs/training/controlled-real-capture-runbook.md`，把 Phase 1 controlled real
+capture 的最小桌面场景、帧要求、文件命名、CSV 填写、pose / action 记录、
+candidate artifact `identity_evidence` 要求、readiness / acceptance /
+`controlled-identity-bundle-handoff` 命令链和验收证据清单固定成可复跑规程。
+`init-controlled-capture-bundle` 生成的 bundle README 现在会指向该 runbook，并先建议
+运行 `audit-controlled-capture-bundle-readiness`。该切片仍不采集视频、不创建 GT、
+不生成 RGB / Gaussian 文件、不训练 candidate、不运行 handoff、不写 `public/samples`、
+不改 viewer/export 默认；它只把真实采集执行口径从聊天和模板提示收敛到仓库事实源。
+完成 commit: `ecae41d`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

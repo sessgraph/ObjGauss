@@ -79,7 +79,9 @@ CSV headers、`rgb/` / `gaussians/` 目录和后续验收命令；
 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001` 已新增
 `audit-controlled-capture-bundle-readiness` CLI，可在 skeleton 或半填充 bundle
 上输出 layout / metadata / CSV / row / file / scenario / candidate 缺口和
-next actions。下一步仍是实际采集 / 标注 controlled tabletop RGB / Gaussian /
+next actions。`OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001` 已新增正式
+controlled real capture runbook，并让 bundle README 指向 readiness-first
+采集 / 验收命令链。下一步仍是实际采集 / 标注 controlled tabletop RGB / Gaussian /
 pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
 让 identity row 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
@@ -152,6 +154,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001: Register controlled real capture runbook
+
+- 状态: done / runbook-only-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture operations
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把 Phase 1 controlled real identity capture 从零散聊天 / skeleton README
+  提示收敛成仓库内可复跑 runbook，降低下一次真实采集填错 bundle、漏 pose /
+  action / candidate evidence 或误把空目录当 ready 的风险。
+- 已实施:
+  - 新增 `docs/training/controlled-real-capture-runbook.md`。
+  - Runbook 固定最小桌面场景、clear-visible / occluded / clear-visible
+    帧要求、推荐 6-12 帧采集顺序、RGB / Gaussian 文件签名要求、CSV 示例、
+    `view_id` / `lighting_id` / camera pose 要求、action row 进入 intervention
+    evidence 的方式和 candidate artifact `identity_evidence` 要求。
+  - Runbook 记录 readiness -> acceptance -> `controlled-identity-bundle-handoff`
+    命令链，以及首个真实 identity row 需要保留的 local audit artifacts。
+  - `init-controlled-capture-bundle` 生成的 bundle README 现在指向该 runbook，
+    并把 `audit-controlled-capture-bundle-readiness` 放在 import / acceptance /
+    handoff 之前。
+  - Template 测试固定 README 中的 runbook 链接和 readiness audit 命令。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 frame / annotation / action rows，不重建 Gaussian，不训练
+    candidate / dynamics，不运行 identity handoff，不写 `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_template.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 356 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `ecae41d`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001: Audit controlled capture bundle readiness
 
