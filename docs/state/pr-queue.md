@@ -355,7 +355,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，503 tests。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: pending。
+- 完成 commit: `2fd2458`。
 
 ### OBJECTSTATE-BOP-BASELINE-CANDIDATE-001: Generate BOP ObjectState baseline candidates
 
