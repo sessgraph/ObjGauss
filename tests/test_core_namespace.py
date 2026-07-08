@@ -72,11 +72,14 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+    OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA,
+    OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     ObjectStateControlledIdentityThresholds,
@@ -218,6 +221,7 @@ from objgauss.core import (
     objectstate_controlled_identity_handoff,
     objectstate_controlled_reality_bundle_handoff,
     objectstate_controlled_reality_bundle_readiness,
+    write_objectstate_controlled_reality_candidate_templates,
     objectstate_identity_predictions_from_trainable_artifact,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
@@ -300,11 +304,14 @@ from objgauss.core import (
     validate_objectstate_controlled_identity_predictions,
     validate_objectstate_controlled_identity_thresholds,
     validate_objectstate_controlled_intervention_candidates,
+    validate_objectstate_controlled_intervention_candidates_template,
     validate_objectstate_controlled_intervention_eval_summary,
     validate_objectstate_controlled_prediction_candidates,
+    validate_objectstate_controlled_prediction_candidates_template,
     validate_objectstate_controlled_prediction_eval_summary,
     validate_objectstate_controlled_reality_bundle_handoff_summary,
     validate_objectstate_controlled_reality_bundle_readiness_summary,
+    validate_objectstate_controlled_reality_candidate_template_summary,
     validate_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
     validate_observation_model_config,
@@ -926,6 +933,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA == (
         "objgauss-objectstate-controlled-prediction-candidates-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA == (
+        "objgauss-objectstate-controlled-prediction-candidates-template-v1"
+    )
     assert OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA == (
         "objgauss-objectstate-controlled-prediction-eval-v1"
     )
@@ -966,6 +976,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     ] == "pass"
     assert OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA == (
         "objgauss-objectstate-controlled-intervention-candidates-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA == (
+        "objgauss-objectstate-controlled-intervention-candidates-template-v1"
     )
     assert OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA == (
         "objgauss-objectstate-controlled-intervention-eval-v1"
@@ -1018,10 +1031,17 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA == (
         "objgauss-objectstate-controlled-reality-bundle-readiness-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA == (
+        "objgauss-objectstate-controlled-reality-candidate-template-v1"
+    )
     assert objectstate_controlled_reality_bundle_handoff is not None
     assert objectstate_controlled_reality_bundle_readiness is not None
+    assert write_objectstate_controlled_reality_candidate_templates is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
+    assert validate_objectstate_controlled_reality_candidate_template_summary is not None
+    assert validate_objectstate_controlled_prediction_candidates_template is not None
+    assert validate_objectstate_controlled_intervention_candidates_template is not None
     assert objectstate_identity_predictions_from_trainable_artifact is not None
     assert objectstate_controlled_identity_handoff is not None
     assert validate_objectstate_controlled_identity_handoff_summary is not None

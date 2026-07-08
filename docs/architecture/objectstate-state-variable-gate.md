@@ -1186,6 +1186,45 @@ data, create GT, create prediction / intervention candidates, run identity
 handoff, run prediction / intervention eval, train Gaussian or dynamics models,
 use replay / diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001
+
+Add a local authoring helper for Phase 1 prediction / intervention candidate
+JSON files.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_reality_candidate_template`.
+- Summary schema:
+  `objgauss-objectstate-controlled-reality-candidate-template-v1`.
+- Draft template schemas:
+  - `objgauss-objectstate-controlled-prediction-candidates-template-v1`;
+  - `objgauss-objectstate-controlled-intervention-candidates-template-v1`.
+- `write_objectstate_controlled_reality_candidate_templates(...)` imports a
+  controlled capture bundle, enumerates pose-backed future-prediction pairs and
+  action-bracketed intervention pairs, then writes:
+  - `prediction-candidates.template.json`;
+  - `intervention-candidates.template.json`;
+  - a local README with the full readiness / handoff command chain.
+- The template schemas are deliberately different from the evaluator input
+  schemas:
+  - `objgauss-objectstate-controlled-prediction-candidates-v1`;
+  - `objgauss-objectstate-controlled-intervention-candidates-v1`.
+- Template rows keep candidate position fields as TODO strings and omit target
+  pose values to reduce GT leakage during authoring.
+- Validators require `template_status="draft_not_valid_for_eval"` and preserve
+  claim policy that evaluator schemas must only be used after external model /
+  baseline outputs replace all TODO values.
+- CLI command:
+  `objgauss object-state init-controlled-reality-candidates <bundle-root> --output-dir <dir>`.
+- CLI supports capture bundle file names, `--candidate-id`,
+  `--candidate-source`, `--artifact-ref`, `--summary-output` and `--force`.
+
+Current scope remains candidate authoring only. It does not collect capture
+data, create GT, run prediction / intervention models, train Gaussian or
+dynamics models, write eval-ready pass candidates, use replay / diffusion,
+write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

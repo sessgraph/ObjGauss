@@ -230,6 +230,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_bundle_readiness",
         "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA",
@@ -294,6 +306,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_bundle_readiness",
         "objectstate_controlled_reality_bundle_readiness",
     ),
+    "write_objectstate_controlled_reality_candidate_templates": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "write_objectstate_controlled_reality_candidate_templates",
+    ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
         "validate_objectstate_controlled_reality_bundle_handoff_summary",
@@ -301,6 +317,18 @@ _EXPORTS = {
     "validate_objectstate_controlled_reality_bundle_readiness_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_readiness",
         "validate_objectstate_controlled_reality_bundle_readiness_summary",
+    ),
+    "validate_objectstate_controlled_reality_candidate_template_summary": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "validate_objectstate_controlled_reality_candidate_template_summary",
+    ),
+    "validate_objectstate_controlled_prediction_candidates_template": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "validate_objectstate_controlled_prediction_candidates_template",
+    ),
+    "validate_objectstate_controlled_intervention_candidates_template": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "validate_objectstate_controlled_intervention_candidates_template",
     ),
     "validate_objectstate_controlled_prediction_candidates": (
         "objgauss.core.objectstate_controlled_prediction_eval",

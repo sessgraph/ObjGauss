@@ -185,6 +185,9 @@ from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
 from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
     objectstate_controlled_reality_bundle_readiness,
 )
+from objgauss.core.objectstate_controlled_reality_candidate_template import (
+    write_objectstate_controlled_reality_candidate_templates,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3152,6 +3155,39 @@ def _object_state_audit_controlled_capture_bundle_readiness(
         raise ValueError("controlled capture bundle readiness did not pass")
 
 
+def _object_state_init_controlled_reality_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_controlled_reality_candidate_templates(
+        args.bundle_root,
+        output_dir=args.output_dir,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['bundle_root']}")
+    print(f"output_dir={summary['output_dir']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"prediction_drafts={summary['row_counts']['prediction_drafts']}")
+    print(f"intervention_drafts={summary['row_counts']['intervention_drafts']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _controlled_capture_template_objects(
     object_specs: list[str] | None,
 ) -> list[dict[str, str]]:
@@ -4546,6 +4582,60 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_reality_bundle_readiness.set_defaults(
         handler=_object_state_audit_controlled_reality_bundle_readiness
+    )
+    init_controlled_reality_candidates = object_state_subparsers.add_parser(
+        "init-controlled-reality-candidates",
+        help=(
+            "create draft prediction/intervention candidate templates from a "
+            "controlled capture bundle"
+        ),
+    )
+    init_controlled_reality_candidates.add_argument("bundle_root", type=Path)
+    init_controlled_reality_candidates.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--sample-json",
+        default="sample.json",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--objects-csv",
+        default="objects.csv",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--frames-csv",
+        default="frames.csv",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--annotations-csv",
+        default="annotations.csv",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--actions-csv",
+        default="actions.csv",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--candidate-id",
+        default="TODO_CANDIDATE_ID",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--candidate-source",
+        default="TODO_CANDIDATE_SOURCE",
+    )
+    init_controlled_reality_candidates.add_argument(
+        "--artifact-ref",
+        default="TODO_CANDIDATE_ARTIFACT_REF",
+    )
+    init_controlled_reality_candidates.add_argument("--summary-output", type=Path)
+    init_controlled_reality_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite candidate template files if they already exist",
+    )
+    init_controlled_reality_candidates.set_defaults(
+        handler=_object_state_init_controlled_reality_candidates
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",
