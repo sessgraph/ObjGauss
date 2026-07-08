@@ -192,6 +192,29 @@ f001,cup-001,true,0.7,0.11,0.20,0.00,0,0,0,1
 f002,cup-001,true,0.0,0.12,0.21,0.00,0,0,0,1
 ```
 
+For a safer annotation workflow, generate a draft annotation template from the
+current `frames.csv` and `objects.csv`, fill it with measured 6DoF GT, then
+finalize it into importable `annotations.csv`:
+
+```bash
+uv run objgauss object-state init-controlled-capture-annotations \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/annotation-template-summary.json \
+  --require-ready
+
+uv run objgauss object-state finalize-controlled-capture-annotations \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/annotation-finalize-summary.json \
+  --require-ready
+```
+
+`annotations.template.csv` is a draft helper and is not valid evidence. The
+finalizer rejects blank / `TODO` values, unknown `frame_id` / `object_id`
+bindings, missing 6DoF pose columns, invalid occlusion fractions, and missing
+frame/object pairs. It does not infer pose or create GT; it only converts
+human- or externally-measured annotation rows into the controlled capture
+bundle format.
+
 For Stage 1 identity, actions can remain empty. For intervention rows, add
 `actions.csv` and reference `action_id` from the affected frames:
 

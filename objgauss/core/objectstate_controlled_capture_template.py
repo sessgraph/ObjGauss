@@ -119,6 +119,16 @@ def write_objectstate_controlled_capture_bundle_template(
                 f"{bundle_root} --summary-output "
                 f"{bundle_root / 'frames-summary.json'} --require-ready"
             ),
+            "init_annotations": (
+                "uv run objgauss object-state init-controlled-capture-annotations "
+                f"{bundle_root} --summary-output "
+                f"{bundle_root / 'annotation-template-summary.json'} --require-ready"
+            ),
+            "finalize_annotations": (
+                "uv run objgauss object-state finalize-controlled-capture-annotations "
+                f"{bundle_root} --summary-output "
+                f"{bundle_root / 'annotation-finalize-summary.json'} --require-ready"
+            ),
             "import_bundle": (
                 "uv run objgauss object-state import-controlled-capture-bundle "
                 f"{bundle_root} --output {bundle_root / 'capture-manifest.json'}"
@@ -243,6 +253,8 @@ def validate_objectstate_controlled_capture_bundle_template_summary(
             )
     for key in (
         "populate_frames",
+        "init_annotations",
+        "finalize_annotations",
         "import_bundle",
         "accept_bundle",
         "identity_bundle_handoff",
@@ -417,6 +429,12 @@ Required files:
 - rgb/: place captured RGB frames referenced by frames.csv.
 - gaussians/: place reconstructed per-frame Gaussian files referenced by frames.csv.
 
+Annotation authoring:
+
+- `annotations.template.csv` is a draft helper and is not valid import input.
+- Fill measured visibility, occlusion, and 6DoF pose values externally.
+- Run `finalize-controlled-capture-annotations` to write `annotations.csv`.
+
 Minimum Stage 1 identity scenario:
 
 - At least three frames.
@@ -431,6 +449,8 @@ Validation commands:
 
 ```bash
 uv run objgauss object-state populate-controlled-capture-frames . --summary-output frames-summary.json --require-ready
+uv run objgauss object-state init-controlled-capture-annotations . --summary-output annotation-template-summary.json --require-ready
+uv run objgauss object-state finalize-controlled-capture-annotations . --summary-output annotation-finalize-summary.json --require-ready
 uv run objgauss object-state audit-controlled-capture-bundle-readiness . --summary-output readiness-summary.json
 uv run objgauss object-state import-controlled-capture-bundle . --output capture-manifest.json
 uv run objgauss object-state accept-controlled-capture-bundle . --output capture-manifest.json --summary-output acceptance-summary.json

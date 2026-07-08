@@ -425,6 +425,18 @@ authoring blocker，不采集视频、不创建 pose / action GT、不生成 ann
 不重建 Gaussian、不运行 identity / prediction / intervention gate、不声明 metric pass 或
 world model。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-ANNOTATIONS-001`：新增
+`objgauss.core.objectstate_controlled_capture_annotations`，schema 为
+`objgauss-objectstate-controlled-capture-annotation-template-v1` 和
+`objgauss-objectstate-controlled-capture-annotation-finalize-v1`，并新增 CLI
+`objgauss object-state init-controlled-capture-annotations <bundle-root>` /
+`finalize-controlled-capture-annotations <bundle-root>`。第一步从已有 `frames.csv` 和
+`objects.csv` 写出 draft-only `annotations.template.csv`，第二步只在人工或外部填写的
+visible、occlusion 和完整 6DoF pose 没有空值 / TODO、frame/object binding 合法且默认覆盖
+所有 frame/object pairs 时，才写正式 `annotations.csv`。该切片减少 pose GT 标注表进入
+controlled capture bundle 的路径漂移，但不推断 pose、不创建 GT、不写 action rows、不运行
+handoff/eval、不创建 pass row、不声明 ObjectState 已通过真实世界状态变量验证。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001`：新增
 `objgauss.core.objectstate_controlled_capture_bundle_readiness`，schema 为
 `objgauss-objectstate-controlled-capture-bundle-readiness-v1`，并新增 CLI

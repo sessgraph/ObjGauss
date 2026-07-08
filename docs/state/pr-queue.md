@@ -347,6 +347,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-ANNOTATIONS-001: Finalize controlled capture pose annotations
+
+- 状态: done / objectstate-controlled-capture-annotations
+- 类型: 标准 PR / ObjectState Phase 1 controlled real GT authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 controlled capture 的 per-frame / per-object 6DoF pose GT
+  authoring 收敛为 draft template + strict finalizer，减少 `annotations.csv`
+  手工填写错误。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_annotations`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-capture-annotation-template-v1` 和
+    `objgauss-objectstate-controlled-capture-annotation-finalize-v1`。
+  - 新增 CLI `objgauss object-state init-controlled-capture-annotations
+    <bundle-root>`，从已有 `frames.csv` 和 `objects.csv` 写
+    `annotations.template.csv` draft。
+  - 新增 CLI `objgauss object-state finalize-controlled-capture-annotations
+    <bundle-root>`，验证填好的 template 后写正式 `annotations.csv`。
+  - Finalizer 拒绝空值 / `TODO`、未知 `frame_id` / `object_id`、缺失 6DoF
+    pose columns、非数值 pose、越界 `occlusion_fraction`、重复 rows，以及默认缺失的
+    frame/object pair。
+  - `init-controlled-capture-bundle` 的 generated README / next commands 和
+    controlled real capture runbook 已接入 annotation template / finalize 步骤。
+  - 测试覆盖 draft 不影响 readiness、TODO 不写入正式 annotations、填完后 import
+    能读到 pose rows、CLI template/finalize 和 `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集视频、不推断 pose、不创建 GT。
+  - 不写 `actions.csv`，不生成 candidate artifact。
+  - 不重建 Gaussian、不运行 identity / prediction / intervention handoff。
+  - 不创建 pass row、不训练 dynamics、不创建 replay buffer、不声明 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_annotations.py objgauss/core/objectstate_controlled_capture_template.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_controlled_capture_annotations.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_annotations.py tests/test_objectstate_controlled_capture_frames.py tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_import.py tests/test_core_namespace.py -q`: 31 passed。
+  - `uv run --extra dev pytest`: 556 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FRAMES-001: Populate controlled capture frame rows from local files
 
 - 状态: done / objectstate-controlled-capture-frames

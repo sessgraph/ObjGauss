@@ -153,6 +153,10 @@ from objgauss.core.objectstate_controlled_capture_template import (
 from objgauss.core.objectstate_controlled_capture_frames import (
     write_objectstate_controlled_capture_frames,
 )
+from objgauss.core.objectstate_controlled_capture_annotations import (
+    finalize_objectstate_controlled_capture_annotations,
+    write_objectstate_controlled_capture_annotation_template,
+)
 from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
@@ -3264,6 +3268,89 @@ def _object_state_populate_controlled_capture_frames(args: argparse.Namespace) -
         and summary["status"] != "objectstate_controlled_capture_frames_ready"
     ):
         raise ValueError("controlled capture frame population did not pass")
+
+
+def _object_state_init_controlled_capture_annotations(args: argparse.Namespace) -> None:
+    summary = write_objectstate_controlled_capture_annotation_template(
+        args.bundle_root,
+        frames_csv=args.frames_csv,
+        objects_csv=args.objects_csv,
+        output=args.output,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"annotation_template_status={summary['status']}")
+    print(
+        "annotation_template_ready="
+        f"{str(summary['readiness']['annotation_template_ready']).lower()}"
+    )
+    print(f"annotation_template_csv={summary['paths']['annotation_template_csv']}")
+    print(f"frame_count={summary['row_counts']['frame_count']}")
+    print(f"object_count={summary['row_counts']['object_count']}")
+    print(
+        "template_annotation_rows="
+        f"{summary['row_counts']['template_annotation_rows']}"
+    )
+    print(f"wrote_template={str(summary['output']['wrote_template']).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"]
+        != "objectstate_controlled_capture_annotation_template_ready"
+    ):
+        raise ValueError("controlled capture annotation template is not ready")
+
+
+def _object_state_finalize_controlled_capture_annotations(
+    args: argparse.Namespace,
+) -> None:
+    summary = finalize_objectstate_controlled_capture_annotations(
+        args.bundle_root,
+        source=args.source,
+        frames_csv=args.frames_csv,
+        objects_csv=args.objects_csv,
+        output=args.output,
+        require_all_frame_object_pairs=not args.allow_partial_pairs,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"annotation_finalize_status={summary['status']}")
+    print(
+        "annotations_ready="
+        f"{str(summary['readiness']['controlled_capture_annotations_ready']).lower()}"
+    )
+    print(f"source_annotation_csv={summary['paths']['source_annotation_csv']}")
+    print(f"annotations_csv={summary['paths']['annotations_csv']}")
+    print(f"source_annotation_rows={summary['row_counts']['source_annotation_rows']}")
+    print(
+        "finalized_annotation_rows="
+        f"{summary['row_counts']['finalized_annotation_rows']}"
+    )
+    print(
+        "wrote_annotations_csv="
+        f"{str(summary['output']['wrote_annotations_csv']).lower()}"
+    )
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"]
+        != "objectstate_controlled_capture_annotation_finalize_ready"
+    ):
+        raise ValueError("controlled capture annotation finalize is not ready")
 
 
 def _object_state_init_public_interaction_route_workspace(
@@ -7475,6 +7562,83 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     populate_controlled_capture_frames.set_defaults(
         handler=_object_state_populate_controlled_capture_frames
+    )
+    init_controlled_capture_annotations = object_state_subparsers.add_parser(
+        "init-controlled-capture-annotations",
+        help=(
+            "write a draft annotations.template.csv for measured object pose "
+            "labels in a controlled capture bundle"
+        ),
+    )
+    init_controlled_capture_annotations.add_argument("bundle_root", type=Path)
+    init_controlled_capture_annotations.add_argument(
+        "--frames-csv",
+        default="frames.csv",
+    )
+    init_controlled_capture_annotations.add_argument(
+        "--objects-csv",
+        default="objects.csv",
+    )
+    init_controlled_capture_annotations.add_argument(
+        "--output",
+        default="annotations.template.csv",
+    )
+    init_controlled_capture_annotations.add_argument("--summary-output", type=Path)
+    init_controlled_capture_annotations.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty annotation template",
+    )
+    init_controlled_capture_annotations.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the annotation template was written",
+    )
+    init_controlled_capture_annotations.set_defaults(
+        handler=_object_state_init_controlled_capture_annotations
+    )
+    finalize_controlled_capture_annotations = object_state_subparsers.add_parser(
+        "finalize-controlled-capture-annotations",
+        help=(
+            "validate a filled controlled capture annotation template and write "
+            "annotations.csv"
+        ),
+    )
+    finalize_controlled_capture_annotations.add_argument("bundle_root", type=Path)
+    finalize_controlled_capture_annotations.add_argument(
+        "--source",
+        default="annotations.template.csv",
+    )
+    finalize_controlled_capture_annotations.add_argument(
+        "--frames-csv",
+        default="frames.csv",
+    )
+    finalize_controlled_capture_annotations.add_argument(
+        "--objects-csv",
+        default="objects.csv",
+    )
+    finalize_controlled_capture_annotations.add_argument(
+        "--output",
+        default="annotations.csv",
+    )
+    finalize_controlled_capture_annotations.add_argument(
+        "--allow-partial-pairs",
+        action="store_true",
+        help="allow a subset of frame/object pairs instead of requiring full coverage",
+    )
+    finalize_controlled_capture_annotations.add_argument("--summary-output", type=Path)
+    finalize_controlled_capture_annotations.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty annotations.csv",
+    )
+    finalize_controlled_capture_annotations.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless annotations.csv was written",
+    )
+    finalize_controlled_capture_annotations.set_defaults(
+        handler=_object_state_finalize_controlled_capture_annotations
     )
     init_public_interaction_workspace = object_state_subparsers.add_parser(
         "init-public-interaction-route-workspace",

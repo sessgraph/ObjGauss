@@ -182,6 +182,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_frames",
         "OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA",
+    ),
     "OBJECTSTATE_TRANSITION_DATASET_SCHEMA": (
         "objgauss.core.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_DATASET_SCHEMA",
@@ -245,6 +253,14 @@ _EXPORTS = {
     "write_objectstate_controlled_capture_frames": (
         "objgauss.core.objectstate_controlled_capture_frames",
         "write_objectstate_controlled_capture_frames",
+    ),
+    "write_objectstate_controlled_capture_annotation_template": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "write_objectstate_controlled_capture_annotation_template",
+    ),
+    "finalize_objectstate_controlled_capture_annotations": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "finalize_objectstate_controlled_capture_annotations",
     ),
     "objectstate_transition_dataset_from_capture_manifest": (
         "objgauss.core.objectstate_transition_dataset",
@@ -317,6 +333,14 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_frames_summary": (
         "objgauss.core.objectstate_controlled_capture_frames",
         "validate_objectstate_controlled_capture_frames_summary",
+    ),
+    "validate_objectstate_controlled_capture_annotation_template_summary": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "validate_objectstate_controlled_capture_annotation_template_summary",
+    ),
+    "validate_objectstate_controlled_capture_annotation_finalize_summary": (
+        "objgauss.core.objectstate_controlled_capture_annotations",
+        "validate_objectstate_controlled_capture_annotation_finalize_summary",
     ),
     "validate_objectstate_transition_dataset": (
         "objgauss.core.objectstate_transition_dataset",

@@ -289,3 +289,13 @@ bundle README / runbook。该缓解减少真实 RGB / Gaussian 文件进入 mani
 Gaussian、不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不声明
 ObjectState 已证明为真实世界状态变量。风险继续 open，直到真实 controlled/public capture
 同时产生可审计 identity、prediction 和 intervention rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-CAPTURE-ANNOTATIONS-001`
+新增 `init-controlled-capture-annotations` / `finalize-controlled-capture-annotations`，
+把 `frames.csv` + `objects.csv` 到正式 `annotations.csv` 的 pose GT authoring 做成
+draft/finalize 双阶段。finalizer 会拒绝空值 / TODO、未知 frame/object、缺 6DoF pose、
+无效 occlusion fraction 和默认缺失的 frame/object pair。该缓解减少真实 6DoF pose 标注表
+进入 manifest 的手工错误，但仍不采集视频、不推断 pose、不创建 GT、不写 action rows、
+不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不声明 ObjectState 已证明
+为真实世界状态变量。风险继续 open，直到真实 controlled/public capture 同时产生可审计
+identity、prediction 和 intervention rows。
