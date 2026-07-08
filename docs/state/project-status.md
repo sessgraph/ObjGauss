@@ -479,6 +479,18 @@ identity、prediction、intervention 都是 pass。该切片仍不采集视频�
 不创建 prediction / intervention candidates、不运行预测或动作模型、不训练 Gaussian /
 dynamics、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `6dd84df`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-READINESS-001`：新增
+`objgauss.core.objectstate_controlled_reality_bundle_readiness`，schema 为
+`objgauss-objectstate-controlled-reality-bundle-readiness-v1`，并新增 CLI
+`objgauss object-state audit-controlled-reality-bundle-readiness <bundle-root> <objectstates.json> <prediction-candidates.json> <intervention-candidates.json>`。
+该 audit 复用 capture bundle readiness，并额外检查 trainable ObjectState artifact schema /
+identity binding、prediction candidates schema / capture binding 和 intervention
+candidates schema / action binding。`full_reality_handoff_ready=true` 只表示输入结构足够运行
+`controlled-reality-bundle-handoff`，不表示 identity / prediction / intervention 指标会 pass。
+该切片仍不采集视频、不创建 GT、不生成候选 prediction / intervention、不运行 handoff /
+eval、不训练 Gaussian 或 dynamics、不写 `public/samples`、不改 viewer/export 默认。
+完成 commit: `c3b22ef`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

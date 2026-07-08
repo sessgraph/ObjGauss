@@ -92,9 +92,13 @@ action-conditioned prediction 和 no-action baseline 比成
 `OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001` 已新增 full Phase 1 handoff，
 可从真实 bundle root、trainable ObjectState artifact、prediction candidates 和
 intervention candidates 一次性跑 identity / prediction / intervention 三类 rows，并生成
-merged controlled-real manifest 与 full reality gate。下一步仍是实际采集 / 标注
-controlled tabletop RGB / Gaussian / pose / action 文件，并准备真实 candidate artifact /
-prediction / intervention JSON，让 rows 从 fixture 进入真实 pass / fail，而不是新增大模型。
+merged controlled-real manifest 与 full reality gate。
+`OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-READINESS-001` 已新增 full handoff preflight，
+可在实际跑 handoff 前检查 bundle、trainable artifact、prediction candidates 和
+intervention candidates 是否结构完整并绑定同一个 capture manifest。下一步仍是实际采集 /
+标注 controlled tabletop RGB / Gaussian / pose / action 文件，并准备真实 candidate
+artifact / prediction / intervention JSON，让 readiness 从 fixture 进入真实 ready，再让 rows
+进入真实 pass / fail，而不是新增大模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -166,6 +170,48 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-READINESS-001: Audit full controlled reality handoff readiness
+
+- 状态: done / readiness-only-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop full reality preflight
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给 Phase 1 full controlled reality handoff 增加预飞检查，让真实
+  bundle root、trainable ObjectState artifact、prediction candidates 和
+  intervention candidates 可以在运行 handoff / eval 前先暴露结构缺口。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_reality_bundle_readiness`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-reality-bundle-readiness-v1`。
+  - Audit 复用 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001`，默认要求
+    prediction / intervention readiness 和 candidate artifact readiness。
+  - Audit 验证 trainable artifact schema，并检查它能通过 identity prediction
+    adapter 绑定到 imported capture manifest。
+  - Audit 验证 prediction candidates schema，并检查 sample id、frame id、
+    object id、source/target timestamp 和 pose GT 绑定。
+  - Audit 验证 intervention candidates schema，并检查 sample id、frame id、
+    object id、action id、action vector、action interval 和 pose/action GT 绑定。
+  - CLI 新增 `objgauss object-state audit-controlled-reality-bundle-readiness
+    <bundle-root> <objectstates.json> <prediction-candidates.json>
+    <intervention-candidates.json>`。
+  - CLI 可写 `--summary-output`，支持 `--require-ready`、frame file audit 参数和
+    identity scenario audit 阈值。
+  - Core lazy namespace 暴露 readiness schema、runner 和 validator。
+- 边界:
+  - `full_reality_handoff_ready=true` 只表示输入结构足够运行 full handoff，不表示
+    identity / prediction / intervention 指标会 pass。
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 prediction / intervention candidates，不运行 identity handoff
+    或 eval，不训练 Gaussian / dynamics，不写 `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_bundle_readiness.py tests/test_core_namespace.py -q`: passed, 12 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_bundle_readiness.py tests/test_objectstate_controlled_reality_bundle_handoff.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 374 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `c3b22ef`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001: Hand off full controlled reality bundles
 
