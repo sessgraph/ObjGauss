@@ -124,7 +124,9 @@ def test_public_interaction_clip_csv_adapter_writes_controlled_bundle(tmp_path):
     assert summary["readiness"]["identity_stage_ready"] is True
     assert summary["readiness"]["prediction_stage_ready"] is True
     assert summary["readiness"]["intervention_stage_ready"] is True
+    assert summary["readiness"]["intervention_action_gt_ready"] is True
     assert summary["readiness"]["real_gaussian_reconstruction_present"] is True
+    assert summary["intervention_action_gt"]["ready"] is True
     assert summary["claim_policy"]["writes_controlled_capture_bundle_rows"] is True
     assert summary["claim_policy"]["does_not_copy_media_files"] is True
     assert summary["claim_policy"]["does_not_claim_world_model"] is True
@@ -145,7 +147,7 @@ def test_public_interaction_clip_csv_adapter_writes_controlled_bundle(tmp_path):
     assert "000001,0.033333,rgb/000001.png,gaussians/000001.ply,push-left-001" in (
         frames_csv
     )
-    assert "push-left-001,push_left,cup-001,0.0,0.066667" in (
+    assert "push-left-001,push_left,cup-001,0.033333,0.066667" in (
         workspace / "actions.csv"
     ).read_text(encoding="utf-8")
 
@@ -159,6 +161,23 @@ def test_public_interaction_clip_csv_adapter_rejects_missing_action_by_default(
     )
 
     with pytest.raises(ValueError, match="requires at least one action row"):
+        write_objectstate_public_interaction_clip_csv_bundle(
+            source_csv,
+            tmp_path / "hot3d-clip",
+            sample_id="hot3d-clip-unit-001",
+            source_sequence_id="hot3d-sequence-unit-001",
+        )
+
+
+def test_public_interaction_clip_csv_adapter_rejects_weak_action_gt_by_default(
+    tmp_path,
+):
+    source_csv = _write_public_interaction_clip_csv(
+        tmp_path / "clip.csv",
+        action_vector=("0.0", "0.0", "0.0"),
+    )
+
+    with pytest.raises(ValueError, match="required action but action GT is not ready"):
         write_objectstate_public_interaction_clip_csv_bundle(
             source_csv,
             tmp_path / "hot3d-clip",
@@ -240,6 +259,7 @@ def test_object_state_import_public_interaction_clip_csv_cli(tmp_path, capsys):
     assert "candidate=hot3d-clips" in stdout
     assert "source_rows=3" in stdout
     assert "intervention_stage_ready=true" in stdout
+    assert "intervention_action_gt_ready=true" in stdout
     assert "real_gaussian_reconstruction_present=true" in stdout
     assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA
 
@@ -341,6 +361,7 @@ def _write_public_interaction_clip_csv(
     path: Path,
     *,
     include_action: bool = True,
+    action_vector: tuple[str, str, str] = ("-0.1", "0.0", "0.0"),
 ) -> Path:
     fieldnames = [
         "frame_id",
@@ -385,13 +406,13 @@ def _write_public_interaction_clip_csv(
             "action_id": "push-left-001",
             "action_type": "push_left",
             "action_object_id": "cup-001",
-            "action_start_timestamp": "0.0",
+            "action_start_timestamp": "0.033333",
             "action_end_timestamp": "0.066667",
             "actor": "hand-001",
             "target_object_id": "",
-            "action_vector_x": "-0.1",
-            "action_vector_y": "0.0",
-            "action_vector_z": "0.0",
+            "action_vector_x": action_vector[0],
+            "action_vector_y": action_vector[1],
+            "action_vector_z": action_vector[2],
         }
         if not include_action:
             action_fields = {key: "" for key in action_fields}

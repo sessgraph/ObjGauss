@@ -127,6 +127,7 @@ def test_public_interaction_route_audit_reports_handoff_ready(tmp_path):
         == "objectstate_public_interaction_route_handoff_ready"
     )
     assert summary["readiness"]["capture_intervention_ready"] is True
+    assert summary["readiness"]["capture_intervention_action_gt_ready"] is True
     assert summary["readiness"]["gaussian_evidence_declared"] is True
     assert summary["readiness"]["candidate_artifact_present"] is True
     assert summary["readiness"]["prediction_candidates_valid"] is True
@@ -135,7 +136,37 @@ def test_public_interaction_route_audit_reports_handoff_ready(tmp_path):
     assert summary["hard_blockers"] == []
     markdown = objectstate_public_interaction_route_markdown(summary)
     assert "handoff ready: `true`" in markdown
+    assert "| capture_intervention_action_gt_ready | true |" in markdown
     assert "observed interactions are action-like" in markdown
+
+
+def test_public_interaction_route_blocks_weak_action_gt(tmp_path):
+    bundle_root = tmp_path / "hot3d-clip"
+    _write_interaction_route_bundle(bundle_root, action_vector=[0.0, 0.0, 0.0])
+
+    summary = objectstate_public_interaction_route_audit(dataset_root=bundle_root)
+
+    assert (
+        summary["status"]
+        == "objectstate_public_interaction_route_intervention_gt_required"
+    )
+    assert summary["readiness"]["capture_intervention_ready"] is True
+    assert summary["readiness"]["capture_intervention_action_gt_ready"] is False
+    assert summary["readiness"]["controlled_reality_handoff_ready"] is False
+    assert "capture manifest lacks usable intervention action GT" in (
+        summary["hard_blockers"]
+    )
+    assert summary["next_actions"] == [
+        (
+            "fill action rows with non-zero vectors whose intervals cover "
+            "object pose transitions until intervention_action_gt_ready=true"
+        ),
+        "run controlled-reality-bundle-handoff only after this audit reports handoff_ready",
+        (
+            "keep counterfactual proof blocked unless observed actions have an explicit "
+            "counterfactual evaluation design"
+        ),
+    ]
 
 
 def test_public_interaction_route_rejects_pose_only_candidate(tmp_path):
@@ -185,13 +216,15 @@ def test_object_state_audit_public_interaction_route_cli(tmp_path, capsys):
 
     assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA}" in stdout
     assert "handoff_ready=true" in stdout
+    assert "capture_intervention_action_gt_ready=true" in stdout
     assert summary["readiness"]["controlled_reality_handoff_ready"] is True
     assert "ObjectState Public Interaction Route Audit" in markdown
 
 
-def _write_interaction_route_bundle(bundle_root) -> None:
+def _write_interaction_route_bundle(bundle_root, *, action_vector=None) -> None:
     bundle_root.mkdir(parents=True, exist_ok=True)
     sample_id = "hot3d-clip-unit-001"
+    vector = [1.0, 0.0, 0.0] if action_vector is None else action_vector
     (bundle_root / "reality-candidates").mkdir(parents=True, exist_ok=True)
     (bundle_root / "objectstates.json").write_text("{}", encoding="utf-8")
     capture = {
@@ -222,7 +255,7 @@ def _write_interaction_route_bundle(bundle_root) -> None:
                 "start_timestamp": 0.0333333333,
                 "end_timestamp": 0.0666666667,
                 "actor": "hand",
-                "vector": [1.0, 0.0, 0.0],
+                "vector": vector,
             }
         ],
         "frames": [

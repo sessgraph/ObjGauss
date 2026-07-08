@@ -16,6 +16,10 @@ from objgauss.core.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_import_summary,
     validate_objectstate_controlled_capture_import_summary,
 )
+from objgauss.core.objectstate_controlled_capture_intervention_action_gt import (
+    objectstate_controlled_capture_intervention_action_gt_readiness,
+    validate_objectstate_controlled_capture_intervention_action_gt_readiness,
+)
 from objgauss.core.objectstate_controlled_capture_template import (
     ACTIONS_CSV_HEADER,
     ANNOTATIONS_CSV_HEADER,
@@ -251,7 +255,15 @@ def write_objectstate_public_interaction_clip_csv_bundle(
     )
     _write_csv_rows(files["actions_csv"], ACTIONS_CSV_HEADER, bundle_rows["actions"])
     import_summary = objectstate_controlled_capture_import_summary(workspace_root)
-    readiness = import_summary["capture_summary"]["readiness"]
+    intervention_action_gt = (
+        objectstate_controlled_capture_intervention_action_gt_readiness(
+            import_summary["manifest"]
+        )
+    )
+    readiness = dict(import_summary["capture_summary"]["readiness"])
+    readiness["intervention_action_gt_ready"] = bool(
+        intervention_action_gt["ready"]
+    )
     requirements = {
         "pose_required": bool(require_pose),
         "action_required": bool(require_action),
@@ -297,7 +309,8 @@ def write_objectstate_public_interaction_clip_csv_bundle(
             "annotations": len(bundle_rows["annotations"]),
             "actions": len(bundle_rows["actions"]),
         },
-        "readiness": dict(readiness),
+        "readiness": readiness,
+        "intervention_action_gt": intervention_action_gt,
         "import_summary": import_summary,
         "next_commands": next_commands,
         "claim_policy": {
@@ -566,6 +579,7 @@ def validate_objectstate_public_interaction_workspace_progress_summary(
         "controlled_bundle_import_ready",
         "controlled_bundle_files_ready",
         "controlled_bundle_intervention_ready",
+        "controlled_bundle_intervention_action_gt_ready",
         "candidate_artifact_present",
         "prediction_candidates_valid",
         "intervention_candidates_valid",
@@ -719,6 +733,11 @@ def validate_objectstate_public_interaction_clip_csv_adapter_summary(
     import_summary = validate_objectstate_controlled_capture_import_summary(
         payload.get("import_summary")
     )
+    intervention_action_gt = (
+        validate_objectstate_controlled_capture_intervention_action_gt_readiness(
+            payload.get("intervention_action_gt")
+        )
+    )
     row_counts = payload.get("row_counts")
     if not isinstance(row_counts, Mapping):
         raise ValueError("public interaction clip CSV adapter requires row_counts")
@@ -731,8 +750,14 @@ def validate_objectstate_public_interaction_clip_csv_adapter_summary(
             "public interaction clip CSV adapter row_counts must match import summary"
         )
     readiness = payload.get("readiness")
-    if not isinstance(readiness, Mapping) or dict(readiness) != dict(
-        import_summary["capture_summary"]["readiness"]
+    base_readiness = dict(import_summary["capture_summary"]["readiness"])
+    if not isinstance(readiness, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires readiness")
+    for key, value in base_readiness.items():
+        if readiness.get(key) != value:
+            raise ValueError("public interaction clip CSV adapter readiness mismatch")
+    if readiness.get("intervention_action_gt_ready") != bool(
+        intervention_action_gt["ready"]
     ):
         raise ValueError("public interaction clip CSV adapter readiness mismatch")
     if requirements["pose_required"] and not readiness["prediction_stage_ready"]:
@@ -742,6 +767,10 @@ def validate_objectstate_public_interaction_clip_csv_adapter_summary(
     if requirements["action_required"] and not readiness["intervention_stage_ready"]:
         raise ValueError(
             "public interaction clip CSV adapter required action but intervention is not ready"
+        )
+    if requirements["action_required"] and not readiness["intervention_action_gt_ready"]:
+        raise ValueError(
+            "public interaction clip CSV adapter required action but action GT is not ready"
         )
     if requirements["gaussian_required"] and not readiness["real_gaussian_reconstruction_present"]:
         raise ValueError(
@@ -1041,6 +1070,9 @@ def _progress_readiness(
         "controlled_bundle_intervention_ready": bool(
             bundle_gates["intervention_stage_ready"]
         ),
+        "controlled_bundle_intervention_action_gt_ready": bool(
+            bundle_gates["intervention_action_gt_ready"]
+        ),
         "candidate_artifact_present": bool(route_gates["candidate_artifact_present"]),
         "prediction_candidates_valid": bool(route_gates["prediction_candidates_valid"]),
         "intervention_candidates_valid": bool(
@@ -1091,6 +1123,10 @@ def _progress_blockers(readiness: Mapping[str, bool]) -> list[str]:
             "controlled_bundle_intervention_ready",
             "pose/action/timestamp GT is not intervention-ready",
         ),
+        (
+            "controlled_bundle_intervention_action_gt_ready",
+            "action GT lacks non-zero vector or pose-transition coverage",
+        ),
         ("candidate_artifact_present", "ObjectState candidate artifact is missing"),
         ("prediction_candidates_valid", "prediction candidates JSON is missing or invalid"),
         (
@@ -1124,6 +1160,11 @@ def _progress_next_actions(
         return [
             "fill objects.csv, frames.csv, annotations.csv and actions.csv with "
             "timestamped identity, 6DoF pose and action rows"
+        ]
+    if not readiness["controlled_bundle_intervention_action_gt_ready"]:
+        return [
+            "fill actions.csv with non-zero action vectors whose time intervals "
+            "cover object pose transitions, then rerun readiness"
         ]
     if not readiness["controlled_bundle_files_ready"]:
         return [

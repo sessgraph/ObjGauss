@@ -337,3 +337,13 @@ R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-CAPTURE-INTERVENTION-READINESS-
 counterfactual pass row、不训练 dynamics、不创建 replay buffer，也不声明 ObjectState 已证明
 为真实世界状态变量。风险继续 open，直到真实 controlled/public capture 同时产生可审计
 identity、prediction 和 intervention rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001`
+将同一 `intervention_action_gt_ready` gate 接入 public interaction route audit、workspace
+progress 和 public interaction CSV adapter：`hot3d-clips` / DexYCB-style route 只有在 action
+row 具备非零 vector 且 action interval 覆盖 referenced object pose transition 时，才可进入
+handoff-ready；零向量或无法绑定 pose transition 的公开交互 action rows 会停在
+`objectstate_public_interaction_route_intervention_gt_required`。该缓解减少 public interaction
+route 绕过 action GT readiness 的风险，但仍不下载 public dataset、不创建 GT、不运行 eval、
+不创建 pass row，也不声明 counterfactual proof 或 world-model evidence。风险继续 open，
+直到真实 controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。

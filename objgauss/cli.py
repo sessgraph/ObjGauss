@@ -3500,6 +3500,7 @@ def _object_state_import_public_interaction_clip_csv(
         "identity_stage_ready",
         "prediction_stage_ready",
         "intervention_stage_ready",
+        "intervention_action_gt_ready",
         "real_gaussian_reconstruction_present",
     ):
         print(f"{key}={str(readiness[key]).lower()}")
@@ -3530,6 +3531,7 @@ def _object_state_audit_public_interaction_workspace_progress(
     for key in (
         "source_sequence_bound",
         "controlled_bundle_intervention_ready",
+        "controlled_bundle_intervention_action_gt_ready",
         "route_handoff_ready",
         "handoff_summary_valid",
         "public_replay_rows_valid",
@@ -3730,6 +3732,10 @@ def _object_state_audit_public_interaction_route(
     print(
         "capture_intervention_ready="
         f"{str(readiness['capture_intervention_ready']).lower()}"
+    )
+    print(
+        "capture_intervention_action_gt_ready="
+        f"{str(readiness['capture_intervention_action_gt_ready']).lower()}"
     )
     print(
         "gaussian_evidence_declared="

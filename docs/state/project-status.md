@@ -4421,7 +4421,11 @@ npm run acceptance:demo
    `transition-reality-handoff` 现在都会要求 `intervention_action_gt_ready=true`：
    action 必须有非零 vector，并且 action interval 必须覆盖被引用对象的连续 pose
    transition，弱 `actions.csv` 不能进入 full 或 transition-backed Phase 1 intervention
-   evidence。
+   evidence。`audit-public-interaction-route` 和
+   `audit-public-interaction-workspace-progress` 也已同步该 gate：public interaction
+   route 只有在 `capture_intervention_action_gt_ready=true` 时才会进入
+   handoff-ready，零向量或无法覆盖 pose transition 的公开交互 action rows 会停在
+   `objectstate_public_interaction_route_intervention_gt_required`。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

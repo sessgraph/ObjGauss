@@ -130,6 +130,8 @@ ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
 adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`hot3d-clips`
 只作为后续 action-like interaction candidate。所有候选当前都不是 direct Phase 1 ready
 dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
+public interaction route audit 已同步 `intervention_action_gt_ready`：只有非零 action
+vector 且 action interval 覆盖 referenced object pose transition 时才会进入 handoff-ready。
 `OBJECTSTATE-BOP-CAPTURE-ADAPTER-001` 已新增
 `import-bop-capture-scene` CLI，可把本地 BOP scene 的 `scene_camera.json` /
 `scene_gt.json` / optional `scene_gt_info.json` / `rgb/` 转成 controlled capture
@@ -346,6 +348,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
+
+- 状态: done / public-interaction-action-gt-gate
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence gate
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/objectstate-public-dataset-candidates.md`
+- 目标: 让 HOT3D / DexYCB-style public interaction route 和 workspace progress
+  使用与 controlled / transition routes 一致的 `intervention_action_gt_ready`，
+  避免只有 action row 但无可用 action vector / pose transition binding 的公开交互
+  bundle 被误报为 handoff-ready。
+- 已实施:
+  - `objectstate_public_interaction_route_audit(...)` 在读取 controlled capture
+    manifest 后计算共享 `intervention_action_gt` readiness。
+  - route readiness 新增 `capture_intervention_action_gt_ready`，handoff-ready 必须同时
+    满足 `capture_intervention_ready` 和该 action-GT gate。
+  - public interaction workspace progress 新增
+    `controlled_bundle_intervention_action_gt_ready` blocker / next action。
+  - public interaction CSV adapter summary 新增
+    `readiness.intervention_action_gt_ready` 和 `intervention_action_gt`，默认拒绝
+    零向量或无法覆盖 pose transition 的 action rows。
+  - CLI `import-public-interaction-clip-csv`、
+    `audit-public-interaction-workspace-progress` 和 `audit-public-interaction-route`
+    现在都会打印对应 action-GT readiness 字段。
+- 边界:
+  - 不修改 controlled capture manifest schema。
+  - 不下载 HOT3D / DexYCB，不复制媒体文件，不创建 GT。
+  - 不重建 Gaussian、不训练 dynamics、不运行 eval、不创建 pass row。
+  - 不把 observed interaction 写成 randomized counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_dataset_candidates.py objgauss/core/objectstate_public_interaction_workspace.py objgauss/cli.py tests/test_objectstate_public_dataset_candidates.py tests/test_objectstate_public_interaction_workspace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py tests/test_objectstate_public_interaction_workspace.py -q`: 20 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py tests/test_objectstate_public_interaction_workspace.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_reality_bundle_readiness.py tests/test_objectstate_transition_reality_handoff.py tests/test_core_namespace.py -q`: 49 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 569 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
 
 ### OBJECTSTATE-TRANSITION-REALITY-ACTION-GT-001: Require action GT readiness in transition handoff
 

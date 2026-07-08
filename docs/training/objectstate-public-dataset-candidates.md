@@ -644,9 +644,13 @@ By default the command expects:
 It validates the controlled capture manifest, prediction candidates,
 intervention candidates and `sample_id` binding. It reports
 `objectstate_public_interaction_route_handoff_ready` only when the local
-interaction bundle has action GT, pose/timestamp GT, declared per-frame
+interaction bundle has usable action GT, pose/timestamp GT, declared per-frame
 Gaussian evidence, an ObjectState candidate artifact, prediction candidates and
 action-conditioned intervention candidates all bound to the same sample.
+Usable action GT means `intervention_action_gt_ready=true`: action rows must
+contain non-zero action vectors and the action interval must cover a referenced
+object pose transition. A clip with action rows but zero vectors remains
+`objectstate_public_interaction_route_intervention_gt_required`.
 
 Boundary:
 

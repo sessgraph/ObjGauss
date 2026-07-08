@@ -8,6 +8,9 @@ from objgauss.core.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_capture_intervention_action_gt import (
+    objectstate_controlled_capture_intervention_action_gt_readiness,
+)
 from objgauss.core.objectstate_controlled_intervention_eval import (
     read_objectstate_controlled_intervention_candidates,
 )
@@ -532,6 +535,9 @@ def objectstate_public_interaction_route_audit(
         "capture_intervention_ready": bool(
             capture_record["readiness"].get("intervention_stage_ready")
         ),
+        "capture_intervention_action_gt_ready": bool(
+            capture_record["readiness"].get("intervention_action_gt_ready")
+        ),
         "gaussian_evidence_declared": bool(
             capture_record["readiness"].get("real_gaussian_reconstruction_present")
         ),
@@ -545,6 +551,7 @@ def objectstate_public_interaction_route_audit(
         and readiness["candidate_has_action_gt"]
         and readiness["dataset_root_present"]
         and readiness["capture_intervention_ready"]
+        and readiness["capture_intervention_action_gt_ready"]
         and readiness["gaussian_evidence_declared"]
         and readiness["candidate_artifact_present"]
         and readiness["prediction_candidates_valid"]
@@ -614,6 +621,7 @@ def objectstate_public_interaction_route_markdown(summary: Mapping[str, Any]) ->
         "candidate_has_action_gt",
         "dataset_root_present",
         "capture_intervention_ready",
+        "capture_intervention_action_gt_ready",
         "gaussian_evidence_declared",
         "candidate_artifact_present",
         "prediction_candidates_valid",
@@ -779,6 +787,7 @@ def validate_objectstate_public_interaction_route_audit(
         "capture_identity_ready",
         "capture_prediction_ready",
         "capture_intervention_ready",
+        "capture_intervention_action_gt_ready",
         "gaussian_evidence_declared",
         "candidate_artifact_present",
         "prediction_candidates_valid",
@@ -1047,6 +1056,7 @@ def _capture_manifest_record(path: Path | None) -> dict[str, Any]:
             "valid": False,
             "sample_id": None,
             "readiness": {},
+            "intervention_action_gt": None,
             "error": record.get("error"),
         }
     try:
@@ -1058,15 +1068,24 @@ def _capture_manifest_record(path: Path | None) -> dict[str, Any]:
             "valid": False,
             "sample_id": None,
             "readiness": {},
+            "intervention_action_gt": None,
             "error": str(exc),
         }
+    intervention_action_gt = (
+        objectstate_controlled_capture_intervention_action_gt_readiness(manifest)
+    )
+    readiness = dict(summary["readiness"])
+    readiness["intervention_action_gt_ready"] = bool(
+        intervention_action_gt["ready"]
+    )
     return {
         **record,
         "valid": True,
         "sample_id": manifest["sample"]["sample_id"],
         "frame_count": summary["frame_count"],
         "action_count": summary["action_count"],
-        "readiness": dict(summary["readiness"]),
+        "readiness": readiness,
+        "intervention_action_gt": intervention_action_gt,
         "error": None,
     }
 
@@ -1143,6 +1162,8 @@ def _public_interaction_route_status(readiness: Mapping[str, bool]) -> str:
         return "objectstate_public_interaction_route_capture_required"
     if not readiness.get("capture_intervention_ready"):
         return "objectstate_public_interaction_route_intervention_gt_required"
+    if not readiness.get("capture_intervention_action_gt_ready"):
+        return "objectstate_public_interaction_route_intervention_gt_required"
     if not readiness.get("gaussian_evidence_declared"):
         return "objectstate_public_interaction_route_gaussian_evidence_required"
     if (
@@ -1170,6 +1191,10 @@ def _public_interaction_route_blockers(
         blockers.append("controlled capture manifest is missing or invalid")
     elif not readiness["capture_intervention_ready"]:
         blockers.append("capture manifest is not intervention-ready")
+    elif not readiness["capture_intervention_action_gt_ready"]:
+        blockers.append(
+            "capture manifest lacks usable intervention action GT"
+        )
     if not readiness["gaussian_evidence_declared"]:
         blockers.append("capture manifest does not declare per-frame Gaussian evidence")
     if not readiness["candidate_artifact_present"]:
@@ -1204,6 +1229,11 @@ def _public_interaction_route_next_actions(
     elif not readiness["capture_intervention_ready"]:
         actions.append(
             "fill timestamped object pose tracks and action events until intervention_stage_ready=true"
+        )
+    elif not readiness["capture_intervention_action_gt_ready"]:
+        actions.append(
+            "fill action rows with non-zero vectors whose intervals cover "
+            "object pose transitions until intervention_action_gt_ready=true"
         )
     if not readiness["gaussian_evidence_declared"]:
         actions.append(
