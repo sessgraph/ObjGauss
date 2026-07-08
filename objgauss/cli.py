@@ -160,6 +160,9 @@ from objgauss.core.objectstate_controlled_identity_eval import (
 from objgauss.core.objectstate_controlled_identity_handoff import (
     objectstate_controlled_identity_handoff,
 )
+from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
+    objectstate_controlled_identity_bundle_handoff,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3459,6 +3462,191 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         raise ValueError("controlled identity handoff did not pass")
 
 
+def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -> None:
+    artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
+    artifact_refs = (
+        tuple(args.artifact_refs)
+        if args.artifact_refs
+        else (str(args.trainable_artifact),)
+    )
+    summary = objectstate_controlled_identity_bundle_handoff(
+        args.bundle_root,
+        artifact,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        require_prediction_ready=args.require_prediction_ready,
+        require_intervention_ready=args.require_intervention_ready,
+        candidate_id=args.candidate_id,
+        source=args.source,
+        artifact_refs=artifact_refs,
+        max_centroid_distance=args.max_centroid_distance,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
+            max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        candidate_artifact_path=args.trainable_artifact,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    acceptance = summary["capture_bundle_acceptance"]
+    import_summary = acceptance["import_summary"]
+    bundle_file_audit = acceptance["capture_file_audit"]
+    handoff = summary["identity_handoff"]
+
+    capture_manifest_path = output_dir / "capture-manifest.json"
+    bundle_acceptance_path = output_dir / "bundle-acceptance-summary.json"
+    bundle_import_path = output_dir / "bundle-import-summary.json"
+    bundle_file_audit_path = output_dir / "bundle-file-audit.json"
+    bundle_missing_files_path = output_dir / "bundle-missing-files.md"
+    controlled_real_seed_path = output_dir / "controlled-real-seed.json"
+    capture_file_audit_path = output_dir / "capture-file-audit.json"
+    capture_missing_files_path = output_dir / "capture-missing-files.md"
+    candidate_artifact_file_audit_path = output_dir / "candidate-artifact-file-audit.json"
+    identity_scenario_audit_path = output_dir / "identity-scenario-audit.json"
+    predictions_path = output_dir / "identity-predictions.json"
+    identity_eval_path = output_dir / "identity-eval-summary.json"
+    controlled_real_path = output_dir / "controlled-real.json"
+    controlled_real_summary_path = output_dir / "controlled-real-summary.json"
+    blocked_rows_path = output_dir / "blocked-rows.md"
+    handoff_path = output_dir / "handoff-summary.json"
+    bundle_handoff_path = output_dir / "bundle-handoff-summary.json"
+
+    write_json(capture_manifest_path, import_summary["manifest"])
+    write_json(bundle_acceptance_path, acceptance)
+    write_json(bundle_import_path, import_summary)
+    write_json(bundle_file_audit_path, bundle_file_audit)
+    bundle_missing_files_path.write_text(
+        bundle_file_audit["missing_files_markdown"],
+        encoding="utf-8",
+    )
+    write_json(
+        controlled_real_seed_path,
+        import_summary["capture_summary"]["controlled_real_manifest_seed"],
+    )
+    write_json(capture_file_audit_path, handoff["capture_file_audit"])
+    capture_missing_files_path.write_text(
+        handoff["capture_file_audit"]["missing_files_markdown"],
+        encoding="utf-8",
+    )
+    write_json(
+        candidate_artifact_file_audit_path,
+        handoff["candidate_artifact_file_audit"],
+    )
+    write_json(identity_scenario_audit_path, handoff["identity_scenario_audit"])
+    write_json(predictions_path, handoff["identity_predictions"])
+    write_json(identity_eval_path, handoff["identity_eval"])
+    write_json(controlled_real_path, handoff["controlled_real_manifest"])
+    write_json(controlled_real_summary_path, handoff["controlled_real_summary"])
+    blocked_rows_path.write_text(
+        handoff["controlled_real_summary"]["blocked_rows_markdown"],
+        encoding="utf-8",
+    )
+    write_json(handoff_path, handoff)
+    write_json(bundle_handoff_path, summary)
+
+    metrics = handoff["identity_eval"]["metrics"]
+    gate = handoff["controlled_real_summary"]["gate"]
+    scenario_coverage = handoff["identity_scenario_audit"]["scenario_coverage"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={args.bundle_root}")
+    print(f"trainable_artifact={args.trainable_artifact}")
+    print(f"output_dir={output_dir}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"bundle_handoff_status={summary['status']}")
+    print(f"acceptance_status={acceptance['status']}")
+    print(f"handoff_status={handoff['status']}")
+    print(f"bundle_file_audit_status={bundle_file_audit['status']}")
+    print(f"capture_file_audit_status={handoff['capture_file_audit']['status']}")
+    print(
+        "candidate_artifact_file_audit_status="
+        f"{handoff['candidate_artifact_file_audit']['status']}"
+    )
+    print(
+        "candidate_artifact_ref_match="
+        f"{str(handoff['candidate_artifact_ref_match']['matches']).lower()}"
+    )
+    print(
+        "identity_scenario_audit_status="
+        f"{handoff['identity_scenario_audit']['status']}"
+    )
+    print(
+        "identity_scenario_view_conditions="
+        f"{scenario_coverage['view_condition_count']}"
+    )
+    print(
+        "identity_scenario_lighting_conditions="
+        f"{scenario_coverage['lighting_condition_count']}"
+    )
+    print(
+        "identity_scenario_max_camera_translation_m="
+        f"{scenario_coverage['max_camera_translation_m']:.6f}"
+    )
+    print(f"identity_eval_status={handoff['identity_eval']['status']}")
+    print(f"identity_gate_status={gate['status']}")
+    print(f"idf1={metrics['idf1']:.6f}")
+    print(f"track_retrieval_recall_at_1={metrics['track_retrieval_recall_at_1']:.6f}")
+    print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
+    print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
+    print(f"swap_rate={metrics['swap_rate']:.6f}")
+    noise_robustness = metrics["reconstruction_noise_robustness"]
+    noise_text = f"{noise_robustness:.6f}" if noise_robustness is not None else "missing"
+    print(f"reconstruction_noise_robustness={noise_text}")
+    print(
+        "reconstruction_noise_variant_count="
+        f"{metrics['reconstruction_noise_variant_count']}"
+    )
+    print(f"blocked_rows={handoff['controlled_real_summary']['blocked_row_count']}")
+    print(f"capture_manifest={capture_manifest_path}")
+    print(f"bundle_acceptance_summary={bundle_acceptance_path}")
+    print(f"bundle_import_summary={bundle_import_path}")
+    print(f"bundle_file_audit={bundle_file_audit_path}")
+    print(f"bundle_missing_files={bundle_missing_files_path}")
+    print(f"controlled_real_seed={controlled_real_seed_path}")
+    print(f"capture_file_audit={capture_file_audit_path}")
+    print(f"capture_missing_files={capture_missing_files_path}")
+    print(f"candidate_artifact_file_audit={candidate_artifact_file_audit_path}")
+    print(f"identity_scenario_audit={identity_scenario_audit_path}")
+    print(f"predictions={predictions_path}")
+    print(f"identity_eval={identity_eval_path}")
+    print(f"controlled_real_manifest={controlled_real_path}")
+    print(f"controlled_real_summary={controlled_real_summary_path}")
+    print(f"blocked_rows_markdown={blocked_rows_path}")
+    print(f"handoff_summary={handoff_path}")
+    print(f"bundle_handoff_summary={bundle_handoff_path}")
+    if (
+        args.require_pass
+        and summary["status"]
+        != "objectstate_controlled_identity_bundle_handoff_pass"
+    ):
+        raise ValueError("controlled identity bundle handoff did not pass")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -3937,6 +4125,162 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_handoff.add_argument("--require-pass", action="store_true")
     controlled_identity_handoff.set_defaults(
         handler=_object_state_controlled_identity_handoff
+    )
+    controlled_identity_bundle_handoff = object_state_subparsers.add_parser(
+        "controlled-identity-bundle-handoff",
+        help=(
+            "import a controlled capture bundle and run the Stage 1 "
+            "controlled identity handoff"
+        ),
+    )
+    controlled_identity_bundle_handoff.add_argument("bundle_root", type=Path)
+    controlled_identity_bundle_handoff.add_argument("trainable_artifact", type=Path)
+    controlled_identity_bundle_handoff.add_argument("--output-dir", required=True, type=Path)
+    controlled_identity_bundle_handoff.add_argument("--sample-json", default="sample.json")
+    controlled_identity_bundle_handoff.add_argument("--objects-csv", default="objects.csv")
+    controlled_identity_bundle_handoff.add_argument("--frames-csv", default="frames.csv")
+    controlled_identity_bundle_handoff.add_argument(
+        "--annotations-csv",
+        default="annotations.csv",
+    )
+    controlled_identity_bundle_handoff.add_argument("--actions-csv", default="actions.csv")
+    controlled_identity_bundle_handoff.add_argument(
+        "--require-prediction-ready",
+        action="store_true",
+        help="also require the imported bundle to be prediction-stage ready",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--require-intervention-ready",
+        action="store_true",
+        help="also require the imported bundle to be intervention-stage ready",
+    )
+    controlled_identity_bundle_handoff.add_argument("--candidate-id")
+    controlled_identity_bundle_handoff.add_argument(
+        "--source",
+        default="trainable_kernel_objectstate_nearest_pose_adapter",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--artifact-ref",
+        action="append",
+        dest="artifact_refs",
+        help=(
+            "candidate artifact reference to store in predictions; defaults to the "
+            "trainable artifact path"
+        ),
+    )
+    controlled_identity_bundle_handoff.add_argument("--max-centroid-distance", type=float)
+    controlled_identity_bundle_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--max-fragmentation-rate",
+        type=float,
+        default=0.05,
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
+    controlled_identity_bundle_handoff.add_argument("--max-swap-rate", type=float, default=0.0)
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--allow-identity-collapse",
+        action="store_true",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample.artifact_refs paths to exist before handoff pass",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame RGB file",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame Gaussian file",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--hash-files",
+        action="store_true",
+        help="include SHA256 hashes for valid frame RGB/Gaussian files",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for the trainable ObjectState artifact file",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--hash-candidate-artifact",
+        action="store_true",
+        help="include a SHA256 hash for the trainable ObjectState artifact file",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+        help="minimum frame count for identity scenario challenge audit",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+        help="occlusion_fraction threshold for identity scenario challenge audit",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.view_id values for identity handoff",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.lighting_id values for identity handoff",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+        help="minimum camera translation in meters from frame.condition.camera_pose",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    controlled_identity_bundle_handoff.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=1,
+    )
+    controlled_identity_bundle_handoff.add_argument("--require-pass", action="store_true")
+    controlled_identity_bundle_handoff.set_defaults(
+        handler=_object_state_controlled_identity_bundle_handoff
     )
 
     object_field = subparsers.add_parser(

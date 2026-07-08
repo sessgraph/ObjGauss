@@ -194,6 +194,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA",
@@ -797,6 +801,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_handoff",
         "objectstate_controlled_identity_handoff",
     ),
+    "objectstate_controlled_identity_bundle_handoff": (
+        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "objectstate_controlled_identity_bundle_handoff",
+    ),
     "objectstate_controlled_capture_file_audit": (
         "objgauss.core.objectstate_controlled_capture_files",
         "objectstate_controlled_capture_file_audit",
@@ -824,6 +832,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_identity_handoff_summary": (
         "objgauss.core.objectstate_controlled_identity_handoff",
         "validate_objectstate_controlled_identity_handoff_summary",
+    ),
+    "validate_objectstate_controlled_identity_bundle_handoff_summary": (
+        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "validate_objectstate_controlled_identity_bundle_handoff_summary",
     ),
     "validate_objectstate_controlled_identity_predictions": (
         "objgauss.core.objectstate_controlled_identity_eval",
