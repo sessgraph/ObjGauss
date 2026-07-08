@@ -280,3 +280,12 @@ maturity 新增 `transition_reality_reviewable`，同时明确 identity row 必�
 因此不会把 partial transition evidence 升级为 full reality 或 world-model 证明。风险继续
 open，直到真实 controlled/public capture 同时产生可审计 identity、prediction 和
 intervention rows，并通过 full Phase 1 evidence review。
+
+R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-CAPTURE-FRAMES-001`
+新增 `populate-controlled-capture-frames`，可从 controlled capture bundle 中已经存在的
+`rgb/` 和 same-stem `gaussians/` 文件写出 timestamped `frames.csv` rows，并把该步骤接入
+bundle README / runbook。该缓解减少真实 RGB / Gaussian 文件进入 manifest 前的手工填表
+错误，但仍不采集视频、不创建 6DoF pose / action GT、不写 annotations / actions、不重建
+Gaussian、不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不声明
+ObjectState 已证明为真实世界状态变量。风险继续 open，直到真实 controlled/public capture
+同时产生可审计 identity、prediction 和 intervention rows。

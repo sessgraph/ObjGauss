@@ -114,6 +114,11 @@ def write_objectstate_controlled_capture_bundle_template(
             "gaussians": str(bundle_root / "gaussians"),
         },
         "next_commands": {
+            "populate_frames": (
+                "uv run objgauss object-state populate-controlled-capture-frames "
+                f"{bundle_root} --summary-output "
+                f"{bundle_root / 'frames-summary.json'} --require-ready"
+            ),
             "import_bundle": (
                 "uv run objgauss object-state import-controlled-capture-bundle "
                 f"{bundle_root} --output {bundle_root / 'capture-manifest.json'}"
@@ -236,7 +241,12 @@ def validate_objectstate_controlled_capture_bundle_template_summary(
             raise ValueError(
                 f"controlled capture bundle template missing directory {key}"
             )
-    for key in ("import_bundle", "accept_bundle", "identity_bundle_handoff"):
+    for key in (
+        "populate_frames",
+        "import_bundle",
+        "accept_bundle",
+        "identity_bundle_handoff",
+    ):
         if not isinstance(next_commands.get(key), str) or not next_commands[key]:
             raise ValueError(
                 f"controlled capture bundle template missing command {key}"
@@ -420,6 +430,7 @@ Minimum Stage 1 identity scenario:
 Validation commands:
 
 ```bash
+uv run objgauss object-state populate-controlled-capture-frames . --summary-output frames-summary.json --require-ready
 uv run objgauss object-state audit-controlled-capture-bundle-readiness . --summary-output readiness-summary.json
 uv run objgauss object-state import-controlled-capture-bundle . --output capture-manifest.json
 uv run objgauss object-state accept-controlled-capture-bundle . --output capture-manifest.json --summary-output acceptance-summary.json

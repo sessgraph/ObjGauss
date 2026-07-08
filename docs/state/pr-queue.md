@@ -347,6 +347,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-FRAMES-001: Populate controlled capture frame rows from local files
+
+- 状态: done / objectstate-controlled-capture-frames
+- 类型: 标准 PR / ObjectState Phase 1 controlled real data authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将已经落盘的 controlled capture RGB / Gaussian 文件转成 timestamped
+  `frames.csv` rows，减少真实采集进入 manifest 前的手工填表错误。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_frames`。
+  - 新增 schema `objgauss-objectstate-controlled-capture-frames-v1`。
+  - 新增 CLI `objgauss object-state populate-controlled-capture-frames
+    <bundle-root>`。
+  - 默认扫描 `rgb/` 和 `gaussians/`，按 same-stem 文件配对写
+    `frames.csv`，timestamp 由 `--fps` 和 `--start-timestamp` 生成。
+  - 默认要求每个 RGB frame 有同名 `.ply` 或 `.splat` Gaussian evidence；
+    `--allow-missing-gaussians` 只用于明确的 incomplete RGB-only staging。
+  - 默认只覆盖空的 template `frames.csv`；已有非空表需要显式 `--force`。
+  - 支持写入统一 `view_id`、`lighting_id` 和可选 `camera_pose` columns。
+  - `init-controlled-capture-bundle` 的 generated README / next commands 和
+    controlled real capture runbook 已接入该步骤。
+  - 测试覆盖 ready 写入、missing Gaussian blocked、CLI 输出、非空
+    `frames.csv` overwrite guard、readiness 仍因缺 annotations 保持 blocked、
+    以及 `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集视频、不创建 6DoF pose / action GT。
+  - 不写 `annotations.csv` / `actions.csv`，不生成 candidate artifact。
+  - 不重建 Gaussian、不运行 identity / prediction / intervention handoff。
+  - 不创建 pass row、不训练 dynamics、不创建 replay buffer、不声明 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_frames.py objgauss/core/objectstate_controlled_capture_template.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_controlled_capture_frames.py tests/test_objectstate_controlled_capture_template.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_frames.py tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_core_namespace.py -q`: 19 passed。
+  - `uv run --extra dev pytest`: 551 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-TRANSITION-REALITY-EVIDENCE-PACKAGE-001: Audit transition reality evidence package
 
 - 状态: done / objectstate-transition-reality-evidence-package

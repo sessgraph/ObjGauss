@@ -144,6 +144,26 @@ RGB files must have recognizable PNG, JPEG, WebP, or PPM signatures. Gaussian
 files must be PLY files with a vertex element, or raw `.splat` files with a
 non-zero size that is a multiple of 32 bytes.
 
+If the RGB and Gaussian files already exist with matching stems, populate
+`frames.csv` directly from the bundle directory:
+
+```bash
+uv run objgauss object-state populate-controlled-capture-frames \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --fps 30 \
+  --view-id front \
+  --lighting-id lighting-a \
+  --camera-pose 0,0,0,0,0,0,1 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/frames-summary.json \
+  --require-ready
+```
+
+This command only writes timestamped frame rows from existing files. It does
+not create pose annotations, action rows, Gaussian reconstructions, identity
+predictions, or pass evidence. By default every RGB file must have a same-stem
+`.ply` or `.splat` under `gaussians/`; use `--allow-missing-gaussians` only for
+an explicitly incomplete RGB-only staging pass.
+
 ## 6. CSV Rules
 
 `objects.csv` declares physical objects:

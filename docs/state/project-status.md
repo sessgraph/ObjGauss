@@ -412,6 +412,19 @@ RGB / Gaussian / pose / action row、不重建 Gaussian、不训练模型、不�
 不改 viewer/export 默认；它只把真实采集目录的文件布局和下一步验收命令固定下来。
 完成 commit: `873aec1`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-FRAMES-001`：新增
+`objgauss.core.objectstate_controlled_capture_frames`，schema 为
+`objgauss-objectstate-controlled-capture-frames-v1`，并新增 CLI
+`objgauss object-state populate-controlled-capture-frames <bundle-root>`。
+该命令扫描 controlled capture bundle 中已存在的 `rgb/` 和 `gaussians/` 文件，按同名
+stem 配对，写出 timestamped `frames.csv` rows；默认要求每个 RGB frame 都有同名
+`.ply` 或 `.splat` Gaussian evidence，并且只覆盖空的 `frames.csv`，非空表需要显式
+`--force`。`init-controlled-capture-bundle` 生成的 next commands / README 和
+controlled real capture runbook 已补入该步骤。该切片只消除真实文件到 frame rows 的
+authoring blocker，不采集视频、不创建 pose / action GT、不生成 annotation / action rows、
+不重建 Gaussian、不运行 identity / prediction / intervention gate、不声明 metric pass 或
+world model。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001`：新增
 `objgauss.core.objectstate_controlled_capture_bundle_readiness`，schema 为
 `objgauss-objectstate-controlled-capture-bundle-readiness-v1`，并新增 CLI

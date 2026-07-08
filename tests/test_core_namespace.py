@@ -63,6 +63,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
@@ -280,6 +281,7 @@ from objgauss.core import (
     write_objectstate_transition_prediction_candidates,
     write_objectstate_transition_reality_handoff,
     write_objectstate_controlled_capture_bundle_template,
+    write_objectstate_controlled_capture_frames,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
     evaluate_objectstate_controlled_intervention_candidates,
@@ -398,6 +400,7 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_bundle_readiness_summary,
     validate_objectstate_controlled_capture_environment_summary,
+    validate_objectstate_controlled_capture_frames_summary,
     validate_objectstate_controlled_capture_bundle_template_summary,
     validate_objectstate_controlled_capture_file_audit_summary,
     validate_objectstate_controlled_capture_summary,
@@ -1005,6 +1008,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA == (
         "objgauss-objectstate-controlled-capture-environment-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-frames-v1"
     )
     assert OBJECTSTATE_TRANSITION_DATASET_SCHEMA == (
         "objgauss-objectstate-transition-dataset-v1"

@@ -150,6 +150,9 @@ from objgauss.core.objectstate_controlled_capture import (
 from objgauss.core.objectstate_controlled_capture_template import (
     write_objectstate_controlled_capture_bundle_template,
 )
+from objgauss.core.objectstate_controlled_capture_frames import (
+    write_objectstate_controlled_capture_frames,
+)
 from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
@@ -3220,6 +3223,49 @@ def _object_state_init_controlled_capture_bundle(args: argparse.Namespace) -> No
         print(f"summary={args.summary_output}")
 
 
+def _object_state_populate_controlled_capture_frames(args: argparse.Namespace) -> None:
+    summary = write_objectstate_controlled_capture_frames(
+        args.bundle_root,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        output=args.output,
+        fps=args.fps,
+        start_timestamp=args.start_timestamp,
+        frame_id_prefix=args.frame_id_prefix,
+        view_id=args.view_id,
+        lighting_id=args.lighting_id,
+        camera_pose=_parse_camera_pose(args.camera_pose),
+        require_gaussian_pairs=not args.allow_missing_gaussians,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"frames_status={summary['status']}")
+    print(
+        "frame_rows_ready="
+        f"{str(summary['readiness']['controlled_capture_frame_rows_ready']).lower()}"
+    )
+    print(f"frames_csv={summary['paths']['frames_csv']}")
+    print(f"rgb_file_count={summary['scan']['rgb_file_count']}")
+    print(f"gaussian_file_count={summary['scan']['gaussian_file_count']}")
+    print(f"frame_row_count={summary['scan']['frame_row_count']}")
+    print(f"paired_frame_count={summary['scan']['paired_frame_count']}")
+    print(f"missing_gaussian_count={summary['scan']['missing_gaussian_count']}")
+    print(f"wrote_frames_csv={str(summary['output']['wrote_frames_csv']).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_controlled_capture_frames_ready"
+    ):
+        raise ValueError("controlled capture frame population did not pass")
+
+
 def _object_state_init_public_interaction_route_workspace(
     args: argparse.Namespace,
 ) -> None:
@@ -4600,6 +4646,18 @@ def _controlled_capture_template_objects(
             item["instance_label"] = parts[2]
         objects.append(item)
     return objects
+
+
+def _parse_camera_pose(value: str | None) -> list[float] | None:
+    if value is None or not value.strip():
+        return None
+    parts = [part.strip() for part in value.split(",")]
+    if len(parts) != 7:
+        raise ValueError("--camera-pose must be x,y,z,qx,qy,qz,qw")
+    try:
+        return [float(part) for part in parts]
+    except ValueError as exc:
+        raise ValueError("--camera-pose values must be numeric") from exc
 
 
 def _object_state_import_controlled_capture_bundle(args: argparse.Namespace) -> None:
@@ -7368,6 +7426,55 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_controlled_capture.set_defaults(
         handler=_object_state_init_controlled_capture_bundle
+    )
+    populate_controlled_capture_frames = object_state_subparsers.add_parser(
+        "populate-controlled-capture-frames",
+        help=(
+            "write frames.csv rows from existing RGB and same-stem Gaussian files "
+            "in a controlled capture bundle"
+        ),
+    )
+    populate_controlled_capture_frames.add_argument("bundle_root", type=Path)
+    populate_controlled_capture_frames.add_argument("--rgb-dir", default="rgb")
+    populate_controlled_capture_frames.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    populate_controlled_capture_frames.add_argument("--output", default="frames.csv")
+    populate_controlled_capture_frames.add_argument("--fps", type=float, default=30.0)
+    populate_controlled_capture_frames.add_argument(
+        "--start-timestamp",
+        type=float,
+        default=0.0,
+    )
+    populate_controlled_capture_frames.add_argument(
+        "--frame-id-prefix",
+        default="frame-",
+    )
+    populate_controlled_capture_frames.add_argument("--view-id", default="")
+    populate_controlled_capture_frames.add_argument("--lighting-id", default="")
+    populate_controlled_capture_frames.add_argument(
+        "--camera-pose",
+        help="optional x,y,z,qx,qy,qz,qw camera pose applied to every frame row",
+    )
+    populate_controlled_capture_frames.add_argument(
+        "--allow-missing-gaussians",
+        action="store_true",
+        help="write RGB-only frame rows instead of requiring same-stem Gaussian files",
+    )
+    populate_controlled_capture_frames.add_argument("--summary-output", type=Path)
+    populate_controlled_capture_frames.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty frames.csv",
+    )
+    populate_controlled_capture_frames.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless frames.csv rows were written",
+    )
+    populate_controlled_capture_frames.set_defaults(
+        handler=_object_state_populate_controlled_capture_frames
     )
     init_public_interaction_workspace = object_state_subparsers.add_parser(
         "init-public-interaction-route-workspace",

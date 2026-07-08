@@ -43,6 +43,7 @@ def test_controlled_capture_template_writes_headers_without_fake_rows(tmp_path):
     readme = (tmp_path / "README.md").read_text(encoding="utf-8")
     assert "controlled-identity-bundle-handoff" in readme
     assert "docs/training/controlled-real-capture-runbook.md" in readme
+    assert "populate-controlled-capture-frames" in readme
     assert "audit-controlled-capture-bundle-readiness" in readme
     assert "does not contain captured RGB frames" in readme
     assert "Do not copy large captures" in readme
