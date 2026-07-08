@@ -166,6 +166,9 @@ Gaussian、不训练模型、不声明 pass row。
 `OBJECTSTATE-BOP-CONDITION-CSV-TEMPLATE-001` 继续补齐
 `--condition-csv-template-output`，可先导出可填写 CSV 模板，再用真实 capture condition
 rerun sidecar authoring。
+`OBJECTSTATE-BOP-PHASE1-SUBSET-SELECTOR-001` 继续补齐
+`select-bop-phase1-subset`，可从本地 BOP dataset / split root 扫描并推荐第一个可作为
+Phase 1 seed 的 scene。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -286,6 +289,37 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - Playwright 移动(390×844)：新按钮与"重置视角"正常换行展示，无溢出。
   - console 无新增 error/warning；`git diff --check`: passed。
 - 完成 commit: 待提交（改动仅限 `src/App.jsx`）。
+
+### OBJECTSTATE-BOP-PHASE1-SUBSET-SELECTOR-001: Select local BOP Phase 1 scene seeds
+
+- 状态: done / read-only-bop-dataset-scene-selector
+- 类型: 标准 PR / ObjectState public pose dataset local subset selection
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在已有本地 BOP dataset / split root 时，先用只读扫描推荐可进入 Phase 1
+  identity / prediction seed 的 scene，减少手动挑 scene 后才发现 adapter / RGB /
+  repeated identity 不满足要求的往返。
+- 已实施:
+  - 新增 schema `objgauss-objectstate-bop-phase1-subset-selector-v1`。
+  - 新增 core function `objectstate_bop_phase1_subset_selector(...)`。
+  - 新增 CLI `objgauss object-state select-bop-phase1-subset`。
+  - selector 会发现包含 `scene_gt.json` 和 `scene_camera.json` 的 scene roots，复用
+    BOP adapter 校验每个 scene，并要求 selected frames / objects / repeated identities
+    达到最小阈值。
+  - 输出推荐 scene、sample id、blocked candidate issues 和下一步
+    `init-bop-condition-sidecar` / `accept-bop-capture-scene` /
+    `audit-bop-phase1-local-row` 命令。
+- 边界:
+  - 只做本地只读扫描；不下载 BOP、不复制 scene 文件。
+  - 不创建 identity / pose GT、不推断 condition metadata、不生成 per-frame Gaussian。
+  - 不运行 identity / prediction handoff，不训练模型，不声明 pass row / world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_subset_selector.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_subset_selector.py tests/test_core_namespace.py -q`: passed，12 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_subset_selector.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_core_namespace.py -q`: passed，45 tests。
+  - `uv run --extra dev pytest`: passed，448 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `0bfd958`。
 
 ### OBJECTSTATE-BOP-CONDITION-CSV-TEMPLATE-001: Write BOP condition CSV templates
 

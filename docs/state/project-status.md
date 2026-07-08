@@ -760,6 +760,17 @@ frame id、默认 view / lighting metadata 和已有 camera pose metadata 写成
 `init-bop-condition-sidecar --condition-csv ... --require-identity-ready`。这只是 authoring
 aid，不从 pixels 推断条件、不创建 identity / pose GT、不生成 Gaussian、不训练模型，也不把
 BOP row 标记为 reality gate pass。
+随后补齐 `OBJECTSTATE-BOP-PHASE1-SUBSET-SELECTOR-001`：新增
+`objgauss.core.objectstate_bop_phase1_subset_selector`，schema 为
+`objgauss-objectstate-bop-phase1-subset-selector-v1`，CLI 为
+`objgauss object-state select-bop-phase1-subset`。该命令只读扫描本地 BOP dataset /
+split root，发现包含 `scene_gt.json` 和 `scene_camera.json` 的 scene roots，并复用现有
+BOP adapter 验证每个候选；ready 判定要求足够 selected frames、objects、repeated
+identities、identity stage 和 prediction stage seed。输出推荐 scene、sample id、
+blocked candidate issues 和后续 `init-bop-condition-sidecar` /
+`accept-bop-capture-scene` / `audit-bop-phase1-local-row` 命令。它不下载 BOP、不复制数据、
+不创建 GT、不推断 condition metadata、不生成 Gaussian、不运行 handoff、不训练模型，也不把
+任何 row 标记为 reality gate pass。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
