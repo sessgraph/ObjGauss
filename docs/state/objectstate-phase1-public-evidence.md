@@ -414,11 +414,17 @@ Result:
   `identity_pass_rows_present`, `intervention_pass_rows_present`,
   `controlled_real_identity_collapse_absent`, `failed_rows_absent`
 - State-variable experiment matrix:
-  - `identity_persistence: objectstate_state_variable_experiment_fail`
-  - `occlusion_recovery: objectstate_state_variable_experiment_missing_metric`
-  - `view_invariance: objectstate_state_variable_experiment_missing_metric`
-  - `predictive_sufficiency: objectstate_state_variable_experiment_pass`
-  - `counterfactual_action_interface: objectstate_state_variable_experiment_blocked`
+  - `identity_persistence: objectstate_state_variable_experiment_fail /
+    objectstate_state_variable_challenge_not_required`
+  - `occlusion_recovery: objectstate_state_variable_experiment_missing_metric /
+    objectstate_state_variable_challenge_present`
+  - `view_invariance: objectstate_state_variable_experiment_missing_metric /
+    objectstate_state_variable_challenge_present`
+  - `predictive_sufficiency: objectstate_state_variable_experiment_pass /
+    objectstate_state_variable_challenge_not_required`
+  - `counterfactual_action_interface:
+    objectstate_state_variable_experiment_blocked /
+    objectstate_state_variable_challenge_absent`
 - Next actions:
   - `identity: pass_evidence_missing -> controlled_real_identity_handoff`
   - `intervention: pass_evidence_missing -> controlled_reality_bundle_handoff`
@@ -433,7 +439,10 @@ because no action-conditioned / counterfactual public row exists.
 The experiment matrix makes the narrower scientific claim explicit: current
 public replay evidence supports predictive sufficiency only. It does not yet
 provide occlusion recovery metrics, view invariance metrics or counterfactual
-action evidence.
+action evidence. The BOP scenario challenge metrics now show that LMO contributes
+an occlusion reappearance challenge and both LMO / HOPE contribute multi-view
+challenge metadata, but those are not `occlusion_recovery_rate` or
+`contrastive_margin` model metrics. BOP still has no action challenge.
 The next-actions file is an operator handoff for the missing state-variable
 evidence. It does not create GT, run evaluations, train a model, or convert
 these public replay rows into identity / intervention pass evidence.

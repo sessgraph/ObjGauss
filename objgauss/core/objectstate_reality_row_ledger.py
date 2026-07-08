@@ -45,16 +45,19 @@ _STATE_VARIABLE_EXPERIMENTS = (
             "swap_rate",
             "identity_collapse",
         ),
+        "challenge_metrics": (),
     },
     {
         "experiment": "occlusion_recovery",
         "evidence_kind": "identity",
         "required_metrics": ("occlusion_recovery_rate",),
+        "challenge_metrics": ("occlusion_challenge_present",),
     },
     {
         "experiment": "view_invariance",
         "evidence_kind": "identity",
         "required_metrics": ("contrastive_margin",),
+        "challenge_metrics": ("view_challenge_present",),
     },
     {
         "experiment": "predictive_sufficiency",
@@ -64,6 +67,7 @@ _STATE_VARIABLE_EXPERIMENTS = (
             "history_ade",
             "prediction_gap_vs_history_model",
         ),
+        "challenge_metrics": (),
     },
     {
         "experiment": "counterfactual_action_interface",
@@ -73,6 +77,7 @@ _STATE_VARIABLE_EXPERIMENTS = (
             "counterfactual_outcome_accuracy",
             "wrong_direction_rate",
         ),
+        "challenge_metrics": ("action_challenge_present",),
     },
 )
 
@@ -445,19 +450,23 @@ def _state_variable_evidence_matrix(
     for spec in _STATE_VARIABLE_EXPERIMENTS:
         evidence_kind = str(spec["evidence_kind"])
         required_metrics = tuple(str(metric) for metric in spec["required_metrics"])
+        challenge_metrics = tuple(str(metric) for metric in spec["challenge_metrics"])
         experiment_rows = [row for row in rows if row.evidence_kind == evidence_kind]
         metric_rows = [
             row
             for row in experiment_rows
             if all(metric in row.metrics for metric in required_metrics)
         ]
+        challenge_status = _challenge_status(experiment_rows, challenge_metrics)
         status = _experiment_status(experiment_rows, metric_rows)
         records.append(
             {
                 "experiment": str(spec["experiment"]),
                 "evidence_kind": evidence_kind,
                 "status": status,
+                "challenge_status": challenge_status,
                 "required_metrics": list(required_metrics),
+                "challenge_metrics": list(challenge_metrics),
                 "present_metrics": sorted(
                     {
                         str(metric)
@@ -526,13 +535,44 @@ def _experiment_interpretation(
     return f"{experiment} has no {evidence_kind} rows in this ledger"
 
 
+def _challenge_status(
+    rows: Sequence[ObjectStateRealityRow],
+    challenge_metrics: Sequence[str],
+) -> str:
+    if not challenge_metrics:
+        return "objectstate_state_variable_challenge_not_required"
+    if not rows:
+        return "objectstate_state_variable_challenge_missing_row"
+    present_values = []
+    for metric in challenge_metrics:
+        for row in rows:
+            if metric in row.metrics:
+                present_values.append(row.metrics[metric])
+    if not present_values:
+        return "objectstate_state_variable_challenge_unknown"
+    if any(_truthy_metric(value) for value in present_values):
+        return "objectstate_state_variable_challenge_present"
+    return "objectstate_state_variable_challenge_absent"
+
+
+def _truthy_metric(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    try:
+        return float(value) > 0.0
+    except (TypeError, ValueError):
+        return False
+
+
 def _state_variable_evidence_matrix_markdown(
     matrix: Sequence[Mapping[str, Any]],
 ) -> str:
     lines = [
         "# ObjectState State-Variable Evidence Matrix",
         "",
-        "| experiment | evidence_kind | status | missing_metrics | source_rows |",
+        "| experiment | evidence_kind | status / challenge | missing_metrics | source_rows |",
         "| --- | --- | --- | --- | --- |",
     ]
     for record in matrix:
@@ -543,6 +583,8 @@ def _state_variable_evidence_matrix_markdown(
             + str(record.get("evidence_kind", ""))
             + " | "
             + str(record.get("status", ""))
+            + " / "
+            + str(record.get("challenge_status", ""))
             + " | "
             + ", ".join(str(item) for item in record.get("missing_metrics", ()))
             + " | "
@@ -568,7 +610,9 @@ def _validate_experiment_record(value: Any) -> None:
         "experiment",
         "evidence_kind",
         "status",
+        "challenge_status",
         "required_metrics",
+        "challenge_metrics",
         "present_metrics",
         "missing_metrics",
         "source_row_ids",
@@ -588,8 +632,19 @@ def _validate_experiment_record(value: Any) -> None:
         "objectstate_state_variable_experiment_missing_row",
     }:
         raise ValueError("ObjectState reality row ledger experiment status unsupported")
+    if value["challenge_status"] not in {
+        "objectstate_state_variable_challenge_not_required",
+        "objectstate_state_variable_challenge_missing_row",
+        "objectstate_state_variable_challenge_unknown",
+        "objectstate_state_variable_challenge_present",
+        "objectstate_state_variable_challenge_absent",
+    }:
+        raise ValueError(
+            "ObjectState reality row ledger experiment challenge status unsupported"
+        )
     for key in (
         "required_metrics",
+        "challenge_metrics",
         "present_metrics",
         "missing_metrics",
         "source_row_ids",

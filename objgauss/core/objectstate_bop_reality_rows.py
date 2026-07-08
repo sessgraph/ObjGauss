@@ -54,6 +54,7 @@ def objectstate_bop_reality_rows_from_summary(
     local_row = _local_row_from_supported_summary(checked_source)
     identity_manifest = _identity_controlled_real_manifest(local_row)
     prediction_manifest = _prediction_controlled_real_manifest(local_row)
+    identity_scenario_metrics = _identity_scenario_metrics(local_row)
 
     rows: list[ObjectStateRealityRow] = []
     for evidence_kind in _EVIDENCE_KINDS:
@@ -70,6 +71,13 @@ def objectstate_bop_reality_rows_from_summary(
                 source_label=source_label,
                 source_kind=checked_source_kind,
                 source_summary_ref=source_summary_ref,
+                extra_metrics=(
+                    identity_scenario_metrics
+                    if evidence_kind == "identity"
+                    else _action_scenario_metrics(manifest)
+                    if evidence_kind == "intervention"
+                    else {}
+                ),
             )
         )
     return tuple(rows)
@@ -97,6 +105,7 @@ def objectstate_bop_reality_rows_summary(
         thresholds=thresholds,
     )
     issues = _issues_from_source(checked_source, local_row, gate.as_dict())
+    identity_scenario_metrics = _identity_scenario_metrics(local_row)
     payload = {
         "schema": OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA,
         "kind": "objectstate_bop_reality_rows",
@@ -115,6 +124,7 @@ def objectstate_bop_reality_rows_summary(
         "blocked_rows_markdown": objectstate_reality_blocked_rows_markdown(gate),
         "source_reviewability": _source_reviewability(checked_source, local_row),
         "source_pass_gates": _source_pass_gates(checked_source, local_row),
+        "identity_scenario_metrics": identity_scenario_metrics,
         "row_sources": _row_sources(rows),
         "issues": issues,
         "claim_policy": {
@@ -202,6 +212,11 @@ def validate_objectstate_bop_reality_rows_summary(
         raise ValueError("BOP reality rows require source_reviewability")
     if not isinstance(payload.get("source_pass_gates"), Mapping):
         raise ValueError("BOP reality rows require source_pass_gates")
+    if (
+        payload.get("identity_scenario_metrics") is not None
+        and not isinstance(payload.get("identity_scenario_metrics"), Mapping)
+    ):
+        raise ValueError("BOP reality rows identity_scenario_metrics must be a mapping")
     if not isinstance(payload.get("row_sources"), list):
         raise ValueError("BOP reality rows require row_sources")
     if not isinstance(payload.get("issues"), list):
@@ -332,6 +347,7 @@ def _reality_row_from_evidence(
     source_label: str,
     source_kind: str,
     source_summary_ref: str | None,
+    extra_metrics: Mapping[str, Any] | None = None,
 ) -> ObjectStateRealityRow:
     sample = manifest["sample"]
     ground_truth = manifest["ground_truth"]
@@ -345,7 +361,7 @@ def _reality_row_from_evidence(
         scenario=sample["scenario"],
         observation_modalities=tuple(sample["observation_modalities"]),
         artifact_refs=_artifact_refs(evidence, sample, source_summary_ref),
-        metrics=_metrics(evidence.get("metrics", {})),
+        metrics=_merged_metrics(evidence.get("metrics", {}), extra_metrics),
         has_identity_gt=bool(ground_truth["identity"]),
         has_pose_gt=bool(ground_truth["pose"]),
         has_action_gt=bool(ground_truth["action"]),
@@ -355,6 +371,16 @@ def _reality_row_from_evidence(
         failure_reason=evidence.get("failure_reason"),
     )
     return validate_objectstate_reality_row(row)
+
+
+def _merged_metrics(
+    metrics: Mapping[str, Any],
+    extra_metrics: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    merged = _metrics(metrics)
+    if extra_metrics:
+        merged.update(_metrics(extra_metrics))
+    return merged
 
 
 def _artifact_refs(
@@ -377,6 +403,84 @@ def _metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
             continue
         normalized[str(key)] = value
     return normalized
+
+
+def _identity_scenario_metrics(local_row: Mapping[str, Any]) -> dict[str, Any]:
+    scenario = _identity_scenario_audit(local_row)
+    if scenario is None:
+        return {
+            "identity_scenario_audit_present": False,
+            "identity_scenario_metadata_ready": False,
+            "occlusion_challenge_present": False,
+            "view_challenge_present": False,
+            "lighting_challenge_present": False,
+            "camera_motion_challenge_present": False,
+        }
+    readiness = scenario.get("readiness")
+    if not isinstance(readiness, Mapping):
+        readiness = {}
+    coverage = scenario.get("scenario_coverage")
+    if not isinstance(coverage, Mapping):
+        coverage = {}
+    object_tracks = scenario.get("object_tracks")
+    if not isinstance(object_tracks, list):
+        object_tracks = []
+    occlusion_track_count = sum(
+        1
+        for track in object_tracks
+        if isinstance(track, Mapping)
+        and bool(track.get("occlusion_reappearance", False))
+    )
+    return {
+        "identity_scenario_audit_present": True,
+        "identity_scenario_metadata_ready": (
+            scenario.get("status")
+            == "objectstate_controlled_identity_scenario_audit_pass"
+        ),
+        "identity_scenario_min_frame_count_met": bool(
+            readiness.get("min_frame_count_met", False)
+        ),
+        "occlusion_challenge_present": bool(
+            readiness.get("occlusion_reappearance_present", False)
+        ),
+        "occlusion_reappearance_track_count": float(occlusion_track_count),
+        "view_challenge_present": bool(
+            readiness.get("min_view_conditions_met", False)
+        ),
+        "view_condition_count": float(coverage.get("view_condition_count", 0.0)),
+        "lighting_challenge_present": bool(
+            readiness.get("min_lighting_conditions_met", False)
+        ),
+        "lighting_condition_count": float(
+            coverage.get("lighting_condition_count", 0.0)
+        ),
+        "camera_motion_challenge_present": bool(
+            readiness.get("camera_motion_present", False)
+        ),
+        "camera_pose_count": float(coverage.get("camera_pose_count", 0.0)),
+        "max_camera_translation_m": float(
+            coverage.get("max_camera_translation_m", 0.0)
+        ),
+    }
+
+
+def _identity_scenario_audit(local_row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    try:
+        scenario = local_row["identity_handoff"]["identity_handoff"][
+            "identity_scenario_audit"
+        ]
+    except KeyError:
+        return None
+    return scenario if isinstance(scenario, Mapping) else None
+
+
+def _action_scenario_metrics(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    ground_truth = manifest.get("ground_truth")
+    if not isinstance(ground_truth, Mapping):
+        return {"action_challenge_present": False}
+    return {
+        "action_challenge_present": bool(ground_truth.get("action", False)),
+    }
 
 
 def _source_reviewability(

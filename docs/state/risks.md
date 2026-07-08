@@ -163,3 +163,11 @@ counterfactual / action interface blocked。该缓解防止把单个 prediction 
 状态变量通过，也把下一步真实证据缺口从三类 row 拆到五类实验；风险继续 open，因为仍缺
 真实 identity pass、occlusion recovery / view invariance metrics 和 action-conditioned
 counterfactual row。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-SCENARIO-CHALLENGE-METRICS-001`
+扩展 BOP reality rows 和 ledger matrix，把 BOP identity scenario audit 的 challenge
+coverage 与模型指标分开记录。当前 LMO 提供 occlusion reappearance challenge，LMO / HOPE
+提供 multi-view challenge，BOP action challenge 仍 absent；但这些只说明 public replay
+含部分测试场景，不等于 `occlusion_recovery_rate`、`contrastive_margin` 或 counterfactual
+metric pass。风险继续 open：identity collapse 仍是真实 fail evidence，且真实 controlled
+identity pass / view-invariant metric / action-conditioned intervention row 仍缺。

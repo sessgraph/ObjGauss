@@ -61,6 +61,28 @@ def test_reality_row_ledger_aggregates_existing_row_summaries(tmp_path):
         if row["experiment"] == "occlusion_recovery"
     )
     assert occlusion_row["missing_metrics"] == ["occlusion_recovery_rate"]
+    assert (
+        occlusion_row["challenge_status"]
+        == "objectstate_state_variable_challenge_unknown"
+    )
+    view_row = next(
+        row
+        for row in ledger["state_variable_evidence_matrix"]
+        if row["experiment"] == "view_invariance"
+    )
+    assert (
+        view_row["challenge_status"]
+        == "objectstate_state_variable_challenge_unknown"
+    )
+    intervention_row = next(
+        row
+        for row in ledger["state_variable_evidence_matrix"]
+        if row["experiment"] == "counterfactual_action_interface"
+    )
+    assert (
+        intervention_row["challenge_status"]
+        == "objectstate_state_variable_challenge_unknown"
+    )
     assert ledger["state_variable_evidence_matrix_markdown"].startswith(
         "# ObjectState State-Variable Evidence Matrix"
     )
@@ -136,11 +158,13 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     assert "missing_pass_evidence_kinds=identity,intervention" in stdout
     assert (
         "experiment=identity_persistence:"
-        "objectstate_state_variable_experiment_fail"
+        "objectstate_state_variable_experiment_fail:"
+        "objectstate_state_variable_challenge_not_required"
     ) in stdout
     assert (
         "experiment=predictive_sufficiency:"
-        "objectstate_state_variable_experiment_pass"
+        "objectstate_state_variable_experiment_pass:"
+        "objectstate_state_variable_challenge_not_required"
     ) in stdout
     assert (
         "next_action=identity:pass_evidence_missing:"

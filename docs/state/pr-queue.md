@@ -347,6 +347,54 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-SCENARIO-CHALLENGE-METRICS-001: Carry BOP scenario challenge coverage into reality rows
+
+- 状态: done / public-replay-scenario-challenge-metrics
+- 类型: 标准 PR / ObjectState Phase 1 BOP reality evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 把 BOP local-row identity scenario audit 中已有的 occlusion /
+  view / lighting / camera-motion 覆盖写入 BOP reality rows，避免 ledger
+  只能看到缺 metric 而看不到 public replay 是否已经包含对应挑战场景。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_bop_reality_rows`。
+  - Identity row metrics 新增 `identity_scenario_audit_present`、
+    `identity_scenario_metadata_ready`、`occlusion_challenge_present`、
+    `occlusion_reappearance_track_count`、`view_challenge_present`、
+    `view_condition_count`、`lighting_challenge_present`、
+    `lighting_condition_count`、`camera_motion_challenge_present`、
+    `camera_pose_count` 和 `max_camera_translation_m`。
+  - Intervention blocked row metrics 新增 `action_challenge_present=false`，
+    使 counterfactual/action 缺口从 implicit blocked 变成显式 challenge absent。
+  - `objgauss.core.objectstate_reality_row_ledger` 的五实验矩阵新增
+    `challenge_metrics` 和 `challenge_status`，CLI 打印
+    `experiment=<name>:<status>:<challenge_status>`。
+  - 兼容旧 BOP reality summary：`identity_scenario_metrics` 顶层字段可缺省读取，
+    新 summary 会写出该字段。
+- 真实 public evidence 结果:
+  - 重新生成 LMO / HOPE ignored BOP reality rows 后，全局 ledger 仍为
+    `row_count=6`、`pass_row_count=1`、`fail_row_count=3`、
+    `blocked_row_count=2`，full gate 仍 fail。
+  - `occlusion_recovery` 仍是 `missing_metric`，但
+    `challenge_status=objectstate_state_variable_challenge_present`，因为 LMO
+    public replay 有 occlusion reappearance challenge；HOPE 仍缺该 challenge。
+  - `view_invariance` 仍是 `missing_metric`，但
+    `challenge_status=objectstate_state_variable_challenge_present`，因为 LMO / HOPE
+    都有多 view ids。
+  - `counterfactual_action_interface` 仍是 `blocked`，且
+    `challenge_status=objectstate_state_variable_challenge_absent`，因为 BOP pose replay
+    没有 action GT。
+- 边界:
+  - 不把 challenge coverage 当作 `occlusion_recovery_rate` 或 `contrastive_margin`。
+  - 不创建 GT、不采集视频、不新增 pass row、不运行 eval、不训练模型。
+  - 不放松 identity scenario gate，不声明 identity / occlusion / view / counterfactual pass。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_reality_rows.py tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: passed，13 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_reality_rows.py objgauss/core/objectstate_reality_row_ledger.py objgauss/cli.py`: passed。
+  - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
+  - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
+  - `uv run objgauss object-state audit-reality-row-ledger outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md --experiment-matrix-output outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md --next-actions-output outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`: passed。
+
 ### OBJECTSTATE-STATE-VARIABLE-MATRIX-001: Map reality rows to five state-variable experiments
 
 - 状态: done / five-experiment-reality-matrix

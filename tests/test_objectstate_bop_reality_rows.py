@@ -20,6 +20,9 @@ from objgauss.core.objectstate_bop_reality_rows import (
 from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
     objectstate_bop_rgbd_baseline_local_row_handoff,
 )
+from objgauss.core.objectstate_reality_row_ledger import (
+    objectstate_reality_row_ledger,
+)
 
 
 def test_bop_reality_rows_convert_existing_rgbd_local_row_summary(tmp_path):
@@ -53,6 +56,37 @@ def test_bop_reality_rows_convert_existing_rgbd_local_row_summary(tmp_path):
     assert "prediction:pass" in {
         f"{row['evidence_kind']}:{row['status']}" for row in summary["rows"]
     }
+    identity_row = next(row for row in summary["rows"] if row["evidence_kind"] == "identity")
+    assert identity_row["metrics"]["identity_scenario_audit_present"] is True
+    assert identity_row["metrics"]["identity_scenario_metadata_ready"] is True
+    assert identity_row["metrics"]["occlusion_challenge_present"] is True
+    assert identity_row["metrics"]["occlusion_reappearance_track_count"] == 1.0
+    assert identity_row["metrics"]["view_challenge_present"] is True
+    assert identity_row["metrics"]["view_condition_count"] == 2.0
+    assert identity_row["metrics"]["lighting_challenge_present"] is True
+    assert identity_row["metrics"]["camera_motion_challenge_present"] is True
+    intervention_row = next(
+        row for row in summary["rows"] if row["evidence_kind"] == "intervention"
+    )
+    assert intervention_row["metrics"]["action_challenge_present"] is False
+    assert summary["identity_scenario_metrics"]["occlusion_challenge_present"] is True
+    assert summary["identity_scenario_metrics"]["view_challenge_present"] is True
+    summary_path = tmp_path / "bop-reality-rows-summary.json"
+    _write_json(summary_path, summary)
+    ledger = objectstate_reality_row_ledger((summary_path,))
+    experiment_challenges = {
+        row["experiment"]: row["challenge_status"]
+        for row in ledger["state_variable_evidence_matrix"]
+    }
+    assert experiment_challenges["occlusion_recovery"] == (
+        "objectstate_state_variable_challenge_present"
+    )
+    assert experiment_challenges["view_invariance"] == (
+        "objectstate_state_variable_challenge_present"
+    )
+    assert experiment_challenges["counterfactual_action_interface"] == (
+        "objectstate_state_variable_challenge_absent"
+    )
     assert "intervention" in summary["blocked_rows_markdown"]
     assert any("full ObjectState reality gate did not pass" in issue for issue in summary["issues"])
 

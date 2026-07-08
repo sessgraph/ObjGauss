@@ -958,6 +958,19 @@ sufficiency 和 counterfactual / action interface。当前 LMO / HOPE public rep
 `outputs/evidence/objectstate-phase1-state-variable-experiment-matrix.md`。该矩阵只做
 read-only evidence accounting，不创建新 row、不放松 gate、不把 prediction pass 解释成
 identity / counterfactual pass，也不声明 world model。
+随后完成 `OBJECTSTATE-BOP-SCENARIO-CHALLENGE-METRICS-001`：扩展
+`audit-bop-reality-rows`，从已有 BOP local-row identity scenario audit 里把场景挑战覆盖
+写入 identity row metrics，例如 `occlusion_challenge_present`、
+`view_challenge_present`、`lighting_challenge_present`、
+`camera_motion_challenge_present`、condition counts 和
+`identity_scenario_metadata_ready`；intervention blocked row 也显式记录
+`action_challenge_present=false`。重新生成 LMO / HOPE ignored BOP reality rows 后，
+全局 ledger 的五实验矩阵变为：`occlusion_recovery=missing_metric/challenge_present`，
+`view_invariance=missing_metric/challenge_present`，
+`counterfactual_action_interface=blocked/challenge_absent`。这说明 public replay 已含
+部分 occlusion / view 挑战场景，但仍缺真正的 `occlusion_recovery_rate`、
+`contrastive_margin` 和 action/counterfactual evidence；该切片不创建 pass row、不放松
+identity gate、不声明 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

@@ -6147,7 +6147,8 @@ def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
     for experiment in summary["state_variable_evidence_matrix"]:
         print(
             "experiment="
-            f"{experiment['experiment']}:{experiment['status']}"
+            f"{experiment['experiment']}:{experiment['status']}:"
+            f"{experiment['challenge_status']}"
         )
     for action in summary["next_actions"]:
         print(
