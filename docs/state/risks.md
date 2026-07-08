@@ -210,3 +210,13 @@ pose/action rows、ObjectState candidate、prediction / intervention candidates�
 candidate、不运行 handoff/eval、不创建 rows、不训练模型、不声明 intervention pass、
 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 public interaction rows
 进入 pass / fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-CLIP-CSV-ADAPTER-001`
+新增 `import-public-interaction-clip-csv`，可把已经外部规范化的一行一 frame/object
+public interaction 标注表转成 controlled capture bundle rows，并默认要求 timestamp、
+physical `object_id`、完整 6DoF pose、action metadata 和 per-frame Gaussian refs 齐全。
+该缓解减少 HOT3D / DexYCB-style action evidence 从外部标注表进入 Phase 1 bundle 的手工
+错误，但仍不下载或复制媒体、不推断 GT、不重建 Gaussian、不创建 ObjectState candidate、
+不运行 handoff/eval、不创建 `public_replay` rows、不训练模型，也不声明 intervention pass、
+counterfactual proof 或 world-model evidence。风险继续 open，直到真实 public interaction
+identity / prediction / intervention rows 进入 pass / fail accounting。

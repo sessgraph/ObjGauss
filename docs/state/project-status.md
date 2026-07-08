@@ -1020,6 +1020,18 @@ rows 和 ledger summary 的每一段缺口显性化，输出 `hard_blockers`、`
 `evidence_chain_reviewable`。该标志只表示 row accounting 文件链可审阅，不是 metric pass；
 本切片仍不下载数据、不创建 GT/rows/candidates、不生成 Gaussian、不运行 handoff/eval、不训练模型，
 也不声明 intervention pass、counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-CLIP-CSV-ADAPTER-001`：同一模块新增
+`objgauss-objectstate-public-interaction-clip-csv-adapter-v1` 和 CLI
+`objgauss object-state import-public-interaction-clip-csv <source.csv> <workspace-root>`。
+该 adapter 面向已经被外部规范化的一行一 frame/object 标注表，把 timestamp、physical
+`object_id`、6DoF pose、action metadata、RGB ref 和 per-frame Gaussian ref 转写为
+controlled capture bundle 的 `sample.json`、`objects.csv`、`frames.csv`、
+`annotations.csv` 和 `actions.csv`，并立即跑 existing controlled capture import summary。
+默认要求 pose/action/Gaussian refs 齐全，使 bundle 可进入 identity / prediction /
+intervention-ready 状态；但它仍只是 GT row authoring adapter，不下载 HOT3D / DexYCB、
+不复制媒体、不推断 GT、不重建 Gaussian、不创建 candidates、不运行 handoff/eval、不生成
+`public_replay` rows、不训练模型，也不声明 intervention pass、counterfactual proof 或
+world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

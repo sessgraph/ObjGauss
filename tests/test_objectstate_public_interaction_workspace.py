@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -7,11 +8,14 @@ import pytest
 
 from objgauss.cli import main
 from objgauss.core.objectstate_public_interaction_workspace import (
+    OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA,
     objectstate_public_interaction_workspace_progress,
+    validate_objectstate_public_interaction_clip_csv_adapter_summary,
     validate_objectstate_public_interaction_workspace_progress_summary,
     validate_objectstate_public_interaction_workspace_summary,
+    write_objectstate_public_interaction_clip_csv_bundle,
     write_objectstate_public_interaction_workspace,
 )
 
@@ -95,6 +99,74 @@ def test_public_interaction_workspace_rejects_pose_only_candidate(tmp_path):
         )
 
 
+def test_public_interaction_clip_csv_adapter_writes_controlled_bundle(tmp_path):
+    source_csv = _write_public_interaction_clip_csv(tmp_path / "clip.csv")
+    workspace = tmp_path / "hot3d-clip"
+
+    summary = write_objectstate_public_interaction_clip_csv_bundle(
+        source_csv,
+        workspace,
+        sample_id="hot3d-clip-unit-001",
+        source_sequence_id="hot3d-sequence-unit-001",
+    )
+
+    assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA
+    assert summary["status"] == "objectstate_public_interaction_clip_csv_adapter_ready"
+    assert summary["candidate"]["candidate_id"] == "hot3d-clips"
+    assert summary["source_sequence_id"] == "hot3d-sequence-unit-001"
+    assert summary["row_counts"] == {
+        "source_rows": 3,
+        "objects": 1,
+        "frames": 3,
+        "annotations": 3,
+        "actions": 1,
+    }
+    assert summary["readiness"]["identity_stage_ready"] is True
+    assert summary["readiness"]["prediction_stage_ready"] is True
+    assert summary["readiness"]["intervention_stage_ready"] is True
+    assert summary["readiness"]["real_gaussian_reconstruction_present"] is True
+    assert summary["claim_policy"]["writes_controlled_capture_bundle_rows"] is True
+    assert summary["claim_policy"]["does_not_copy_media_files"] is True
+    assert summary["claim_policy"]["does_not_claim_world_model"] is True
+    assert all(value is False for value in summary["non_goals"].values())
+    assert validate_objectstate_public_interaction_clip_csv_adapter_summary(
+        summary
+    ) == summary
+
+    for key in (
+        "sample_json",
+        "objects_csv",
+        "frames_csv",
+        "annotations_csv",
+        "actions_csv",
+    ):
+        assert Path(summary["files"][key]).is_file()
+    frames_csv = (workspace / "frames.csv").read_text(encoding="utf-8")
+    assert "000001,0.033333,rgb/000001.png,gaussians/000001.ply,push-left-001" in (
+        frames_csv
+    )
+    assert "push-left-001,push_left,cup-001,0.0,0.066667" in (
+        workspace / "actions.csv"
+    ).read_text(encoding="utf-8")
+
+
+def test_public_interaction_clip_csv_adapter_rejects_missing_action_by_default(
+    tmp_path,
+):
+    source_csv = _write_public_interaction_clip_csv(
+        tmp_path / "clip.csv",
+        include_action=False,
+    )
+
+    with pytest.raises(ValueError, match="requires at least one action row"):
+        write_objectstate_public_interaction_clip_csv_bundle(
+            source_csv,
+            tmp_path / "hot3d-clip",
+            sample_id="hot3d-clip-unit-001",
+            source_sequence_id="hot3d-sequence-unit-001",
+        )
+
+
 def test_public_interaction_workspace_progress_reports_authoring_gap(tmp_path):
     workspace = tmp_path / "hot3d-clip"
     workspace_summary = workspace / "public-interaction-workspace.json"
@@ -132,12 +204,44 @@ def test_public_interaction_workspace_progress_reports_authoring_gap(tmp_path):
             "timestamped identity, 6DoF pose and action rows"
         )
     ]
-    assert (
-        summary["claim_policy"]["final_rows_must_be_public_replay"] is True
-    )
+    assert summary["claim_policy"]["final_rows_must_be_public_replay"] is True
     assert validate_objectstate_public_interaction_workspace_progress_summary(
         summary
     ) == summary
+
+
+def test_object_state_import_public_interaction_clip_csv_cli(tmp_path, capsys):
+    source_csv = _write_public_interaction_clip_csv(tmp_path / "clip.csv")
+    workspace = tmp_path / "hot3d-clip"
+    summary_path = tmp_path / "clip-import-summary.json"
+
+    assert (
+        main(
+            [
+                "object-state",
+                "import-public-interaction-clip-csv",
+                str(source_csv),
+                str(workspace),
+                "--sample-id",
+                "hot3d-clip-unit-001",
+                "--source-sequence-id",
+                "hot3d-sequence-unit-001",
+                "--summary-output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA}" in stdout
+    assert "candidate=hot3d-clips" in stdout
+    assert "source_rows=3" in stdout
+    assert "intervention_stage_ready=true" in stdout
+    assert "real_gaussian_reconstruction_present=true" in stdout
+    assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA
 
 
 def test_public_interaction_workspace_progress_keeps_todo_sequence_blocked(tmp_path):
@@ -231,3 +335,98 @@ def test_object_state_audit_public_interaction_workspace_progress_cli(
     assert "source_sequence_bound=true" in stdout
     assert "evidence_chain_reviewable=false" in stdout
     assert summary["readiness"]["source_sequence_bound"] is True
+
+
+def _write_public_interaction_clip_csv(
+    path: Path,
+    *,
+    include_action: bool = True,
+) -> Path:
+    fieldnames = [
+        "frame_id",
+        "timestamp",
+        "rgb",
+        "gaussian",
+        "object_id",
+        "category",
+        "instance_label",
+        "visible",
+        "occlusion_fraction",
+        "x",
+        "y",
+        "z",
+        "qx",
+        "qy",
+        "qz",
+        "qw",
+        "action_id",
+        "action_type",
+        "action_object_id",
+        "action_start_timestamp",
+        "action_end_timestamp",
+        "actor",
+        "target_object_id",
+        "action_vector_x",
+        "action_vector_y",
+        "action_vector_z",
+        "view_id",
+        "lighting_id",
+        "camera_x",
+        "camera_y",
+        "camera_z",
+        "camera_qx",
+        "camera_qy",
+        "camera_qz",
+        "camera_qw",
+    ]
+    rows = []
+    for index, timestamp in enumerate(("0.0", "0.033333", "0.066667")):
+        action_fields = {
+            "action_id": "push-left-001",
+            "action_type": "push_left",
+            "action_object_id": "cup-001",
+            "action_start_timestamp": "0.0",
+            "action_end_timestamp": "0.066667",
+            "actor": "hand-001",
+            "target_object_id": "",
+            "action_vector_x": "-0.1",
+            "action_vector_y": "0.0",
+            "action_vector_z": "0.0",
+        }
+        if not include_action:
+            action_fields = {key: "" for key in action_fields}
+        rows.append(
+            {
+                "frame_id": f"{index:06d}",
+                "timestamp": timestamp,
+                "rgb": f"rgb/{index:06d}.png",
+                "gaussian": f"gaussians/{index:06d}.ply",
+                "object_id": "cup-001",
+                "category": "cup",
+                "instance_label": "unit cup",
+                "visible": "true",
+                "occlusion_fraction": "0.0",
+                "x": str(0.01 * index),
+                "y": "0.0",
+                "z": "0.5",
+                "qx": "0.0",
+                "qy": "0.0",
+                "qz": "0.0",
+                "qw": "1.0",
+                "view_id": "front",
+                "lighting_id": "lab",
+                "camera_x": "0.0",
+                "camera_y": "-1.0",
+                "camera_z": "0.8",
+                "camera_qx": "0.0",
+                "camera_qy": "0.0",
+                "camera_qz": "0.0",
+                "camera_qw": "1.0",
+                **action_fields,
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path

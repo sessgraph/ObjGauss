@@ -378,6 +378,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_public_interaction_workspace",
         "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA",
     ),
+    "OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA",
+    ),
     "objectstate_public_dataset_candidates_audit": (
         "objgauss.core.objectstate_public_dataset_candidates",
         "objectstate_public_dataset_candidates_audit",
@@ -397,6 +401,10 @@ _EXPORTS = {
     "write_objectstate_public_interaction_workspace": (
         "objgauss.core.objectstate_public_interaction_workspace",
         "write_objectstate_public_interaction_workspace",
+    ),
+    "write_objectstate_public_interaction_clip_csv_bundle": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "write_objectstate_public_interaction_clip_csv_bundle",
     ),
     "objectstate_public_interaction_workspace_progress": (
         "objgauss.core.objectstate_public_interaction_workspace",
@@ -421,6 +429,10 @@ _EXPORTS = {
     "validate_objectstate_public_interaction_workspace_progress_summary": (
         "objgauss.core.objectstate_public_interaction_workspace",
         "validate_objectstate_public_interaction_workspace_progress_summary",
+    ),
+    "validate_objectstate_public_interaction_clip_csv_adapter_summary": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "validate_objectstate_public_interaction_clip_csv_adapter_summary",
     ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_bop_candidate_artifact_template",

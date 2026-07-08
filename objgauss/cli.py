@@ -223,6 +223,7 @@ from objgauss.core.objectstate_public_interaction_reality_rows import (
 )
 from objgauss.core.objectstate_public_interaction_workspace import (
     objectstate_public_interaction_workspace_progress,
+    write_objectstate_public_interaction_clip_csv_bundle,
     write_objectstate_public_interaction_workspace,
 )
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
@@ -3231,6 +3232,50 @@ def _object_state_init_public_interaction_route_workspace(
         print(f"{key}={path}")
     for key, path in summary["directories"].items():
         print(f"{key}_dir={path}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
+def _object_state_import_public_interaction_clip_csv(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_public_interaction_clip_csv_bundle(
+        args.source_csv,
+        args.workspace_root,
+        sample_id=args.sample_id,
+        source_sequence_id=args.source_sequence_id,
+        candidate_id=args.candidate_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        force=args.force,
+        require_pose=not args.allow_missing_pose,
+        require_action=not args.allow_missing_action,
+        require_gaussian=not args.allow_missing_gaussian,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"source_csv={summary['source_csv']}")
+    print(f"workspace_root={summary['root']}")
+    print(f"candidate={summary['candidate']['candidate_id']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"source_sequence_id={summary['source_sequence_id']}")
+    for key, value in summary["row_counts"].items():
+        label = key if key.endswith("_rows") else f"{key}_rows"
+        print(f"{label}={value}")
+    for key in (
+        "identity_stage_ready",
+        "prediction_stage_ready",
+        "intervention_stage_ready",
+        "real_gaussian_reconstruction_present",
+    ):
+        print(f"{key}={str(readiness[key]).lower()}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
     for key, command in summary["next_commands"].items():
         print(f"{key}_command={command}")
     if args.summary_output:
@@ -7007,6 +7052,67 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_public_interaction_workspace.set_defaults(
         handler=_object_state_init_public_interaction_route_workspace
+    )
+    import_public_interaction_clip_csv = object_state_subparsers.add_parser(
+        "import-public-interaction-clip-csv",
+        help=(
+            "convert a normalized public interaction clip CSV into a controlled "
+            "capture bundle"
+        ),
+    )
+    import_public_interaction_clip_csv.add_argument("source_csv", type=Path)
+    import_public_interaction_clip_csv.add_argument("workspace_root", type=Path)
+    import_public_interaction_clip_csv.add_argument("--sample-id", required=True)
+    import_public_interaction_clip_csv.add_argument(
+        "--source-sequence-id",
+        required=True,
+        help="public dataset clip or sequence id represented by the CSV",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--candidate-id",
+        default="hot3d-clips",
+        help="public interaction dataset candidate id",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--object-category",
+        default="public_interaction_objects",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--scenario",
+        default="public_interaction_action_like_clip",
+    )
+    import_public_interaction_clip_csv.add_argument("--fps", type=float, default=30.0)
+    import_public_interaction_clip_csv.add_argument(
+        "--license",
+        dest="license_text",
+        help="override the public dataset candidate license note",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite bundle files if they already exist",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--allow-missing-pose",
+        action="store_true",
+        help="allow annotation rows without 6DoF pose; default requires pose",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--allow-missing-action",
+        action="store_true",
+        help="allow clips without action rows; default requires action",
+    )
+    import_public_interaction_clip_csv.add_argument(
+        "--allow-missing-gaussian",
+        action="store_true",
+        help="allow frames without Gaussian refs; default requires Gaussian refs",
+    )
+    import_public_interaction_clip_csv.set_defaults(
+        handler=_object_state_import_public_interaction_clip_csv
     )
     audit_public_interaction_workspace_progress = (
         object_state_subparsers.add_parser(

@@ -347,6 +347,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-PUBLIC-INTERACTION-CLIP-CSV-ADAPTER-001: Import normalized public interaction clip CSV
+
+- 状态: done / public-interaction-clip-csv-adapter
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 让已经外部规范化的 HOT3D / DexYCB-style public interaction frame/object
+  标注长表进入既有 controlled capture bundle contract，减少从真实 action clip 到
+  identity / prediction / intervention gate 的手工转写错误。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_public_interaction_workspace`。
+  - 新增 schema `objgauss-objectstate-public-interaction-clip-csv-adapter-v1`。
+  - 新增 CLI `objgauss object-state import-public-interaction-clip-csv
+    <source.csv> <workspace-root>`。
+  - 输入 CSV 采用一行一 frame/object annotation；adapter 合并并一致性检查
+    object / frame / action rows，然后写出 `sample.json`、`objects.csv`、
+    `frames.csv`、`annotations.csv` 和 `actions.csv`。
+  - 默认要求 timestamp、physical `object_id`、完整 6DoF pose、至少一个 action
+    row 和 per-frame Gaussian refs，并立即复用 existing controlled capture import
+    summary 输出 identity / prediction / intervention readiness。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不复制 RGB / Gaussian 媒体文件。
+  - 不推断 GT、不重建 Gaussian、不创建 ObjectState candidate 或 prediction /
+    intervention candidates。
+  - 不运行 route audit、handoff、eval 或训练。
+  - 不创建 `public_replay` rows，不把 bundle readiness 当作 metric pass。
+  - 不把 observed interaction 写成 randomized counterfactual proof 或 world-model pass。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_interaction_workspace.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py -q`: 18 passed。
+  - `uv run --extra dev pytest`: 527 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-PROGRESS-001: Audit public interaction workspace progress
 
 - 状态: done / public-interaction-authoring-progress-audit

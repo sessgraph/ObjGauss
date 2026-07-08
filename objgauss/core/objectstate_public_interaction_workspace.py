@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -11,7 +12,15 @@ from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
 from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
     validate_objectstate_controlled_reality_bundle_handoff_summary,
 )
+from objgauss.core.objectstate_controlled_capture_import import (
+    objectstate_controlled_capture_import_summary,
+    validate_objectstate_controlled_capture_import_summary,
+)
 from objgauss.core.objectstate_controlled_capture_template import (
+    ACTIONS_CSV_HEADER,
+    ANNOTATIONS_CSV_HEADER,
+    FRAMES_CSV_HEADER,
+    OBJECTS_CSV_HEADER,
     write_objectstate_controlled_capture_bundle_template,
     validate_objectstate_controlled_capture_bundle_template_summary,
 )
@@ -33,6 +42,49 @@ OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA = (
 )
 OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA = (
     "objgauss-objectstate-public-interaction-workspace-progress-v1"
+)
+OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA = (
+    "objgauss-objectstate-public-interaction-clip-csv-adapter-v1"
+)
+OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_HEADER = (
+    "frame_id",
+    "timestamp",
+    "rgb",
+    "gaussian",
+    "object_id",
+    "category",
+    "instance_label",
+    "dimension_x_m",
+    "dimension_y_m",
+    "dimension_z_m",
+    "visible",
+    "occlusion_fraction",
+    "x",
+    "y",
+    "z",
+    "qx",
+    "qy",
+    "qz",
+    "qw",
+    "action_id",
+    "action_type",
+    "action_object_id",
+    "action_start_timestamp",
+    "action_end_timestamp",
+    "actor",
+    "target_object_id",
+    "action_vector_x",
+    "action_vector_y",
+    "action_vector_z",
+    "view_id",
+    "lighting_id",
+    "camera_x",
+    "camera_y",
+    "camera_z",
+    "camera_qx",
+    "camera_qy",
+    "camera_qz",
+    "camera_qw",
 )
 _TODO_SEQUENCE_ID = "TODO_PUBLIC_INTERACTION_SEQUENCE_ID"
 
@@ -145,6 +197,145 @@ def write_objectstate_public_interaction_workspace(
         },
     }
     return validate_objectstate_public_interaction_workspace_summary(payload)
+
+
+def write_objectstate_public_interaction_clip_csv_bundle(
+    source_csv: str | Path,
+    root: str | Path,
+    *,
+    sample_id: str,
+    source_sequence_id: str,
+    candidate_id: str = "hot3d-clips",
+    object_category: str = "public_interaction_objects",
+    scenario: str = "public_interaction_action_like_clip",
+    fps: float = 30.0,
+    license_text: str | None = None,
+    force: bool = False,
+    require_pose: bool = True,
+    require_action: bool = True,
+    require_gaussian: bool = True,
+) -> dict[str, Any]:
+    source_path = Path(source_csv)
+    workspace_root = Path(root)
+    candidate = _public_interaction_candidate(candidate_id)
+    if not source_sequence_id or source_sequence_id == _TODO_SEQUENCE_ID:
+        raise ValueError(
+            "public interaction clip CSV adapter requires a real source_sequence_id"
+        )
+    rows = _read_public_interaction_clip_csv(source_path)
+    bundle_rows = _public_interaction_bundle_rows(
+        rows,
+        require_pose=require_pose,
+        require_action=require_action,
+        require_gaussian=require_gaussian,
+    )
+    effective_license = license_text or candidate.source_license
+    controlled_template = write_objectstate_controlled_capture_bundle_template(
+        workspace_root,
+        sample_id=sample_id,
+        object_category=object_category,
+        scenario=scenario,
+        fps=fps,
+        capture_device=f"{candidate.candidate_id}-public-interaction-csv",
+        license_text=effective_license,
+        objects=bundle_rows["object_template_rows"],
+        force=force,
+    )
+    files = _template_bundle_files(workspace_root)
+    _write_csv_rows(files["objects_csv"], OBJECTS_CSV_HEADER, bundle_rows["objects"])
+    _write_csv_rows(files["frames_csv"], FRAMES_CSV_HEADER, bundle_rows["frames"])
+    _write_csv_rows(
+        files["annotations_csv"],
+        ANNOTATIONS_CSV_HEADER,
+        bundle_rows["annotations"],
+    )
+    _write_csv_rows(files["actions_csv"], ACTIONS_CSV_HEADER, bundle_rows["actions"])
+    import_summary = objectstate_controlled_capture_import_summary(workspace_root)
+    readiness = import_summary["capture_summary"]["readiness"]
+    requirements = {
+        "pose_required": bool(require_pose),
+        "action_required": bool(require_action),
+        "gaussian_required": bool(require_gaussian),
+    }
+    next_commands = dict(_next_commands(workspace_root))
+    next_commands["progress_audit"] = (
+        "uv run objgauss object-state audit-public-interaction-workspace-progress "
+        f"{workspace_root} --summary-output "
+        f"{workspace_root / 'public-interaction-workspace-progress.json'}"
+    )
+    payload = {
+        "schema": OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA,
+        "kind": "objectstate_public_interaction_clip_csv_adapter",
+        "status": "objectstate_public_interaction_clip_csv_adapter_ready",
+        "source_csv": str(source_path),
+        "root": str(workspace_root),
+        "candidate": candidate.as_dict(),
+        "source_sequence_id": str(source_sequence_id),
+        "sample": {
+            "sample_id": sample_id,
+            "source_kind": "controlled_real",
+            "object_category": object_category,
+            "scenario": scenario,
+            "fps": float(fps),
+            "license": effective_license,
+        },
+        "requirements": requirements,
+        "csv_header_contract": list(OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_HEADER),
+        "controlled_capture_template": controlled_template,
+        "files": {
+            "source_csv": str(source_path),
+            **{key: str(value) for key, value in files.items()},
+        },
+        "directories": {
+            "rgb": str(workspace_root / "rgb"),
+            "gaussians": str(workspace_root / "gaussians"),
+        },
+        "row_counts": {
+            "source_rows": len(rows),
+            "objects": len(bundle_rows["objects"]),
+            "frames": len(bundle_rows["frames"]),
+            "annotations": len(bundle_rows["annotations"]),
+            "actions": len(bundle_rows["actions"]),
+        },
+        "readiness": dict(readiness),
+        "import_summary": import_summary,
+        "next_commands": next_commands,
+        "claim_policy": {
+            "converts_external_public_annotations": True,
+            "writes_controlled_capture_bundle_rows": True,
+            "source_annotations_required": True,
+            "does_not_download_dataset": True,
+            "does_not_copy_media_files": True,
+            "does_not_infer_ground_truth": True,
+            "does_not_reconstruct_gaussians": True,
+            "does_not_create_candidates": True,
+            "does_not_run_handoff": True,
+            "does_not_run_eval": True,
+            "does_not_create_reality_rows": True,
+            "does_not_claim_intervention_pass": True,
+            "does_not_claim_counterfactual_proof": True,
+            "does_not_claim_world_model": True,
+        },
+        "non_goals": {
+            "downloads_dataset": False,
+            "copies_media_files": False,
+            "infers_pose": False,
+            "infers_actions": False,
+            "reconstructs_gaussians": False,
+            "creates_prediction_candidates": False,
+            "creates_intervention_candidates": False,
+            "runs_handoff": False,
+            "runs_eval": False,
+            "creates_reality_rows": False,
+            "trains_gaussian_model": False,
+            "trains_dynamics_model": False,
+            "writes_public_samples": False,
+            "uses_replay_buffer": False,
+            "uses_diffusion": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_public_interaction_clip_csv_adapter_summary(payload)
 
 
 def objectstate_public_interaction_workspace_progress(
@@ -455,6 +646,148 @@ def validate_objectstate_public_interaction_workspace_progress_summary(
         )
     if readiness["evidence_chain_reviewable"] and payload["hard_blockers"]:
         raise ValueError("reviewable public interaction progress cannot have blockers")
+    return dict(payload)
+
+
+def validate_objectstate_public_interaction_clip_csv_adapter_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("public interaction clip CSV adapter summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA:
+        raise ValueError(
+            "unsupported public interaction clip CSV adapter schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_public_interaction_clip_csv_adapter":
+        raise ValueError("public interaction clip CSV adapter kind is unsupported")
+    if payload.get("status") != "objectstate_public_interaction_clip_csv_adapter_ready":
+        raise ValueError("public interaction clip CSV adapter status is unsupported")
+    if not isinstance(payload.get("source_csv"), str) or not payload["source_csv"]:
+        raise ValueError("public interaction clip CSV adapter requires source_csv")
+    if not isinstance(payload.get("root"), str) or not payload["root"]:
+        raise ValueError("public interaction clip CSV adapter requires root")
+    _validate_candidate_payload(payload.get("candidate"))
+    source_sequence_id = payload.get("source_sequence_id")
+    if (
+        not isinstance(source_sequence_id, str)
+        or not source_sequence_id
+        or source_sequence_id == _TODO_SEQUENCE_ID
+    ):
+        raise ValueError(
+            "public interaction clip CSV adapter requires bound source_sequence_id"
+        )
+    sample = payload.get("sample")
+    if not isinstance(sample, Mapping) or sample.get("source_kind") != "controlled_real":
+        raise ValueError(
+            "public interaction clip CSV adapter must keep controlled_real sample"
+        )
+    requirements = payload.get("requirements")
+    if not isinstance(requirements, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires requirements")
+    for key in ("pose_required", "action_required", "gaussian_required"):
+        if not isinstance(requirements.get(key), bool):
+            raise ValueError(f"public interaction clip CSV adapter missing bool {key}")
+    if payload.get("csv_header_contract") != list(
+        OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_HEADER
+    ):
+        raise ValueError("public interaction clip CSV adapter header contract mismatch")
+    controlled_template = validate_objectstate_controlled_capture_bundle_template_summary(
+        payload.get("controlled_capture_template")
+    )
+    if controlled_template["sample"]["sample_id"] != sample.get("sample_id"):
+        raise ValueError("public interaction clip CSV adapter sample mismatch")
+    files = payload.get("files")
+    if not isinstance(files, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires files")
+    for key in (
+        "source_csv",
+        "sample_json",
+        "objects_csv",
+        "frames_csv",
+        "annotations_csv",
+        "actions_csv",
+    ):
+        if not isinstance(files.get(key), str) or not files[key]:
+            raise ValueError(f"public interaction clip CSV adapter missing file {key}")
+    directories = payload.get("directories")
+    if not isinstance(directories, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires directories")
+    for key in ("rgb", "gaussians"):
+        if not isinstance(directories.get(key), str) or not directories[key]:
+            raise ValueError(f"public interaction clip CSV adapter missing dir {key}")
+    import_summary = validate_objectstate_controlled_capture_import_summary(
+        payload.get("import_summary")
+    )
+    row_counts = payload.get("row_counts")
+    if not isinstance(row_counts, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires row_counts")
+    expected_counts = {
+        "source_rows": int(import_summary["row_counts"]["annotations"]),
+        **dict(import_summary["row_counts"]),
+    }
+    if dict(row_counts) != expected_counts or row_counts["source_rows"] < 1:
+        raise ValueError(
+            "public interaction clip CSV adapter row_counts must match import summary"
+        )
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping) or dict(readiness) != dict(
+        import_summary["capture_summary"]["readiness"]
+    ):
+        raise ValueError("public interaction clip CSV adapter readiness mismatch")
+    if requirements["pose_required"] and not readiness["prediction_stage_ready"]:
+        raise ValueError(
+            "public interaction clip CSV adapter required pose but prediction is not ready"
+        )
+    if requirements["action_required"] and not readiness["intervention_stage_ready"]:
+        raise ValueError(
+            "public interaction clip CSV adapter required action but intervention is not ready"
+        )
+    if requirements["gaussian_required"] and not readiness["real_gaussian_reconstruction_present"]:
+        raise ValueError(
+            "public interaction clip CSV adapter required Gaussian refs but summary is not Gaussian-ready"
+        )
+    next_commands = payload.get("next_commands")
+    if not isinstance(next_commands, Mapping):
+        raise ValueError("public interaction clip CSV adapter requires next_commands")
+    for key in (
+        "import_bundle",
+        "accept_bundle",
+        "full_handoff",
+        "public_replay_rows",
+        "ledger",
+        "progress_audit",
+    ):
+        if not isinstance(next_commands.get(key), str) or not next_commands[key]:
+            raise ValueError(f"public interaction clip CSV adapter missing command {key}")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not isinstance(claim_policy, Mapping)
+        or not claim_policy.get("converts_external_public_annotations")
+        or not claim_policy.get("writes_controlled_capture_bundle_rows")
+        or not claim_policy.get("source_annotations_required")
+        or not claim_policy.get("does_not_download_dataset")
+        or not claim_policy.get("does_not_copy_media_files")
+        or not claim_policy.get("does_not_infer_ground_truth")
+        or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_create_candidates")
+        or not claim_policy.get("does_not_run_handoff")
+        or not claim_policy.get("does_not_run_eval")
+        or not claim_policy.get("does_not_create_reality_rows")
+        or not claim_policy.get("does_not_claim_intervention_pass")
+        or not claim_policy.get("does_not_claim_counterfactual_proof")
+        or not claim_policy.get("does_not_claim_world_model")
+    ):
+        raise ValueError(
+            "public interaction clip CSV adapter must preserve claim policy"
+        )
+    non_goals = payload.get("non_goals", {})
+    if not isinstance(non_goals, Mapping) or any(bool(value) for value in non_goals.values()):
+        raise ValueError(
+            "public interaction clip CSV adapter cannot download/copy media, "
+            "infer GT, reconstruct, create candidates/rows, run handoff/eval, "
+            "train, write public samples, replay, diffuse, or mutate viewer defaults"
+        )
     return dict(payload)
 
 
@@ -843,3 +1176,379 @@ def _validate_candidate_payload(payload: Any) -> None:
     ground_truth = payload.get("ground_truth")
     if not isinstance(ground_truth, Mapping) or not ground_truth.get("action"):
         raise ValueError("candidate payload must advertise action ground truth")
+
+
+def _read_public_interaction_clip_csv(path: Path) -> list[dict[str, str]]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError(f"public interaction clip CSV has no header: {path}")
+        required_columns = {"frame_id", "timestamp", "rgb", "object_id", "category"}
+        missing = sorted(required_columns - set(reader.fieldnames))
+        if missing:
+            raise ValueError(
+                "public interaction clip CSV missing required columns: "
+                + ", ".join(missing)
+            )
+        rows = []
+        for row_number, row in enumerate(reader, start=2):
+            normalized = {
+                key: "" if row.get(key) is None else str(row.get(key)).strip()
+                for key in OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_HEADER
+            }
+            normalized["_row_number"] = str(row_number)
+            rows.append(normalized)
+    if not rows:
+        raise ValueError("public interaction clip CSV requires at least one data row")
+    return rows
+
+
+def _public_interaction_bundle_rows(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    require_pose: bool,
+    require_action: bool,
+    require_gaussian: bool,
+) -> dict[str, list[dict[str, str]]]:
+    objects_by_id: dict[str, dict[str, str]] = {}
+    frames_by_id: dict[str, dict[str, str]] = {}
+    actions_by_id: dict[str, dict[str, str]] = {}
+    annotations: list[dict[str, str]] = []
+    seen_annotations: set[tuple[str, str]] = set()
+
+    for row in rows:
+        frame_id = _required_clip(row, "frame_id")
+        object_id = _required_clip(row, "object_id")
+        objects_by_id[object_id] = _merge_clip_record(
+            objects_by_id.get(object_id),
+            _object_csv_row(row),
+            record_name=f"object_id={object_id}",
+        )
+        frames_by_id[frame_id] = _merge_clip_record(
+            frames_by_id.get(frame_id),
+            _frame_csv_row(row, require_gaussian=require_gaussian),
+            record_name=f"frame_id={frame_id}",
+        )
+        key = (frame_id, object_id)
+        if key in seen_annotations:
+            raise ValueError(
+                "public interaction clip CSV has duplicate frame/object annotation: "
+                f"frame_id={frame_id} object_id={object_id}"
+            )
+        seen_annotations.add(key)
+        annotations.append(
+            _annotation_csv_row(row, require_pose=require_pose)
+        )
+        action_id = _optional_clip(row, "action_id")
+        if action_id is not None:
+            actions_by_id[action_id] = _merge_clip_record(
+                actions_by_id.get(action_id),
+                _action_csv_row(row),
+                record_name=f"action_id={action_id}",
+            )
+
+    if require_action and not actions_by_id:
+        raise ValueError("public interaction clip CSV requires at least one action row")
+    _validate_action_frame_refs(frames_by_id, actions_by_id, require_action=require_action)
+    frame_rows = sorted(
+        frames_by_id.values(),
+        key=lambda item: _float_clip_value(item["timestamp"], "timestamp"),
+    )
+    action_rows = sorted(
+        actions_by_id.values(),
+        key=lambda item: (
+            _float_clip_value(item["start_timestamp"], "action_start_timestamp"),
+            item["action_id"],
+        ),
+    )
+    object_rows = sorted(objects_by_id.values(), key=lambda item: item["object_id"])
+    annotation_rows = sorted(
+        annotations,
+        key=lambda item: (
+            _frame_order_index(frame_rows, item["frame_id"]),
+            item["object_id"],
+        ),
+    )
+    return {
+        "objects": object_rows,
+        "object_template_rows": [
+            _object_template_row(item) for item in object_rows
+        ],
+        "frames": frame_rows,
+        "annotations": annotation_rows,
+        "actions": action_rows,
+    }
+
+
+def _object_csv_row(row: Mapping[str, str]) -> dict[str, str]:
+    dimensions = _optional_clip_vector(
+        row,
+        ("dimension_x_m", "dimension_y_m", "dimension_z_m"),
+        "object dimensions",
+    )
+    return {
+        "object_id": _required_clip(row, "object_id"),
+        "category": _required_clip(row, "category"),
+        "instance_label": _optional_clip(row, "instance_label") or "",
+        "dimension_x_m": dimensions[0] if dimensions is not None else "",
+        "dimension_y_m": dimensions[1] if dimensions is not None else "",
+        "dimension_z_m": dimensions[2] if dimensions is not None else "",
+    }
+
+
+def _object_template_row(row: Mapping[str, str]) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "object_id": row["object_id"],
+        "category": row["category"],
+    }
+    if row.get("instance_label"):
+        result["instance_label"] = row["instance_label"]
+    dimensions = [
+        row.get("dimension_x_m", ""),
+        row.get("dimension_y_m", ""),
+        row.get("dimension_z_m", ""),
+    ]
+    if all(dimensions):
+        result["dimensions_m"] = [float(value) for value in dimensions]
+    return result
+
+
+def _frame_csv_row(
+    row: Mapping[str, str],
+    *,
+    require_gaussian: bool,
+) -> dict[str, str]:
+    gaussian = _optional_clip(row, "gaussian")
+    if require_gaussian and gaussian is None:
+        raise ValueError("public interaction clip CSV requires gaussian for every frame")
+    camera_pose = _optional_clip_vector(
+        row,
+        ("camera_x", "camera_y", "camera_z", "camera_qx", "camera_qy", "camera_qz", "camera_qw"),
+        "camera pose",
+    )
+    result = {
+        "frame_id": _required_clip(row, "frame_id"),
+        "timestamp": _float_clip(row, "timestamp"),
+        "rgb": _required_clip(row, "rgb"),
+        "gaussian": gaussian or "",
+        "action_id": _optional_clip(row, "action_id") or "",
+        "view_id": _optional_clip(row, "view_id") or "",
+        "lighting_id": _optional_clip(row, "lighting_id") or "",
+        "camera_x": "",
+        "camera_y": "",
+        "camera_z": "",
+        "camera_qx": "",
+        "camera_qy": "",
+        "camera_qz": "",
+        "camera_qw": "",
+    }
+    if camera_pose is not None:
+        (
+            result["camera_x"],
+            result["camera_y"],
+            result["camera_z"],
+            result["camera_qx"],
+            result["camera_qy"],
+            result["camera_qz"],
+            result["camera_qw"],
+        ) = camera_pose
+    return result
+
+
+def _annotation_csv_row(
+    row: Mapping[str, str],
+    *,
+    require_pose: bool,
+) -> dict[str, str]:
+    pose = _optional_clip_vector(
+        row,
+        ("x", "y", "z", "qx", "qy", "qz", "qw"),
+        "object pose",
+    )
+    if require_pose and pose is None:
+        raise ValueError("public interaction clip CSV requires 6DoF pose for every object row")
+    result = {
+        "frame_id": _required_clip(row, "frame_id"),
+        "object_id": _required_clip(row, "object_id"),
+        "visible": _optional_clip(row, "visible") or "",
+        "occlusion_fraction": _optional_float_clip(row, "occlusion_fraction") or "",
+        "x": "",
+        "y": "",
+        "z": "",
+        "qx": "",
+        "qy": "",
+        "qz": "",
+        "qw": "",
+    }
+    if pose is not None:
+        (
+            result["x"],
+            result["y"],
+            result["z"],
+            result["qx"],
+            result["qy"],
+            result["qz"],
+            result["qw"],
+        ) = pose
+    return result
+
+
+def _action_csv_row(row: Mapping[str, str]) -> dict[str, str]:
+    action_id = _required_clip(row, "action_id")
+    object_id = _optional_clip(row, "action_object_id") or _required_clip(row, "object_id")
+    vector = _optional_clip_vector(
+        row,
+        ("action_vector_x", "action_vector_y", "action_vector_z"),
+        "action vector",
+    )
+    result = {
+        "action_id": action_id,
+        "action_type": _required_clip(row, "action_type"),
+        "object_id": object_id,
+        "start_timestamp": _float_clip(row, "action_start_timestamp"),
+        "end_timestamp": _float_clip(row, "action_end_timestamp"),
+        "actor": _optional_clip(row, "actor") or "",
+        "target_object_id": _optional_clip(row, "target_object_id") or "",
+        "vector_x": "",
+        "vector_y": "",
+        "vector_z": "",
+    }
+    if vector is not None:
+        result["vector_x"], result["vector_y"], result["vector_z"] = vector
+    return result
+
+
+def _merge_clip_record(
+    previous: Mapping[str, str] | None,
+    current: Mapping[str, str],
+    *,
+    record_name: str,
+) -> dict[str, str]:
+    if previous is None:
+        return dict(current)
+    merged = dict(previous)
+    for key, value in current.items():
+        existing = merged.get(key, "")
+        if not existing and value:
+            merged[key] = value
+            continue
+        if existing and value and existing != value:
+            raise ValueError(
+                "public interaction clip CSV has inconsistent "
+                f"{record_name} field {key}: {existing!r} != {value!r}"
+            )
+    return merged
+
+
+def _validate_action_frame_refs(
+    frames_by_id: Mapping[str, Mapping[str, str]],
+    actions_by_id: Mapping[str, Mapping[str, str]],
+    *,
+    require_action: bool,
+) -> None:
+    frame_action_ids = {
+        frame["action_id"]
+        for frame in frames_by_id.values()
+        if frame.get("action_id")
+    }
+    missing_actions = sorted(frame_action_ids - set(actions_by_id))
+    if missing_actions:
+        raise ValueError(
+            "public interaction clip CSV frames reference missing action rows: "
+            + ", ".join(missing_actions)
+        )
+    if require_action and not frame_action_ids:
+        raise ValueError(
+            "public interaction clip CSV requires at least one frame action_id"
+        )
+
+
+def _frame_order_index(
+    frame_rows: Sequence[Mapping[str, str]],
+    frame_id: str,
+) -> int:
+    for index, frame in enumerate(frame_rows):
+        if frame["frame_id"] == frame_id:
+            return index
+    raise ValueError(f"public interaction clip CSV annotation references unknown frame: {frame_id}")
+
+
+def _template_bundle_files(root: Path) -> dict[str, Path]:
+    return {
+        "sample_json": root / "sample.json",
+        "objects_csv": root / "objects.csv",
+        "frames_csv": root / "frames.csv",
+        "annotations_csv": root / "annotations.csv",
+        "actions_csv": root / "actions.csv",
+        "readme": root / "README.md",
+    }
+
+
+def _write_csv_rows(
+    path: Path,
+    header: Sequence[str],
+    rows: Sequence[Mapping[str, str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(header))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key, "") for key in header})
+
+
+def _required_clip(row: Mapping[str, str], key: str) -> str:
+    value = _optional_clip(row, key)
+    if value is None:
+        row_number = row.get("_row_number", "?")
+        raise ValueError(f"public interaction clip CSV row {row_number} requires {key}")
+    return value
+
+
+def _optional_clip(row: Mapping[str, str], key: str) -> str | None:
+    value = row.get(key)
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped or None
+
+
+def _float_clip(row: Mapping[str, str], key: str) -> str:
+    value = _required_clip(row, key)
+    _float_clip_value(value, key)
+    return value
+
+
+def _optional_float_clip(row: Mapping[str, str], key: str) -> str | None:
+    value = _optional_clip(row, key)
+    if value is None:
+        return None
+    _float_clip_value(value, key)
+    return value
+
+
+def _float_clip_value(value: str, key: str) -> float:
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"public interaction clip CSV {key} must be numeric") from exc
+
+
+def _optional_clip_vector(
+    row: Mapping[str, str],
+    keys: Sequence[str],
+    name: str,
+) -> list[str] | None:
+    values = [_optional_clip(row, key) for key in keys]
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        row_number = row.get("_row_number", "?")
+        raise ValueError(
+            f"public interaction clip CSV row {row_number} {name} "
+            "requires all columns: "
+            + ", ".join(keys)
+        )
+    for key, value in zip(keys, values, strict=True):
+        _float_clip_value(str(value), key)
+    return [str(value) for value in values]

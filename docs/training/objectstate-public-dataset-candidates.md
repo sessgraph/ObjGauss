@@ -570,6 +570,29 @@ This writes `sample.json`, CSV headers, `rgb/`, `gaussians/`, and
 import / acceptance, candidate template finalization, full handoff, conversion
 to `source_kind=public_replay` rows, and ledger aggregation.
 
+If the public clip has already been normalized into one row per
+frame/object annotation with external timestamp, physical `object_id`, 6DoF
+pose, action metadata and RGB / Gaussian refs, import it directly into the same
+controlled capture bundle:
+
+```bash
+uv run objgauss object-state import-public-interaction-clip-csv \
+  outputs/captures/hot3d-clip-000001/normalized-public-interaction.csv \
+  outputs/captures/hot3d-clip-000001 \
+  --sample-id hot3d-clip-000001 \
+  --source-sequence-id <public-dataset-clip-id> \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-clip-import.json \
+  --force
+```
+
+The adapter writes `sample.json`, `objects.csv`, `frames.csv`,
+`annotations.csv` and `actions.csv`, then runs the existing controlled capture
+import summary. By default it requires complete per-object pose, at least one
+action row and per-frame Gaussian refs so the bundle can become identity /
+prediction / intervention ready. It does not copy RGB files, copy Gaussian
+files, infer GT, reconstruct Gaussian evidence, create ObjectState candidates,
+run handoff / eval, create `public_replay` rows or claim counterfactual proof.
+
 After creating or partially filling the workspace, use the progress audit to
 make the next missing evidence item explicit:
 

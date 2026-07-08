@@ -470,6 +470,28 @@ model, or create reality rows. Its purpose is to keep the HOT3D / DexYCB-style
 route aligned with the existing controlled capture validators and to remind
 operators that final rows must be converted to `source_kind=public_replay`.
 
+2026-07-09 added a normalized public interaction clip CSV adapter:
+
+```bash
+uv run objgauss object-state import-public-interaction-clip-csv \
+  outputs/captures/hot3d-clip-000001/normalized-public-interaction.csv \
+  outputs/captures/hot3d-clip-000001 \
+  --sample-id hot3d-clip-000001 \
+  --source-sequence-id <public-dataset-clip-id> \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-clip-import.json \
+  --force
+```
+
+This adapter is for clips that have already been externally normalized to
+timestamped frame/object annotation rows. It writes the controlled capture
+bundle CSVs and immediately checks the existing import summary. The default
+contract requires physical `object_id`, complete 6DoF pose, at least one action
+row and per-frame Gaussian refs; this can make the bundle intervention-ready,
+but it is still not an identity / prediction / intervention pass row. It does
+not download HOT3D / DexYCB, copy media, infer GT, reconstruct Gaussians,
+create candidates, run handoff / eval, emit `public_replay` rows or prove
+counterfactual causality.
+
 The matching progress audit is:
 
 ```bash
