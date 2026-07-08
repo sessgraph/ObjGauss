@@ -742,6 +742,17 @@ artifact 的前提下，能够满足 Stage 1 identity scenario metadata gate，�
 adapter 缺 lighting / camera motion 元数据而永久 blocked。该 sidecar 不创建 identity GT、
 不改 BOP pose GT、不生成 Gaussian、不训练或发布新模型、不声明 prediction /
 intervention / world model，也不改变 viewer/export 默认策略。
+随后补齐 `OBJECTSTATE-BOP-CONDITION-SIDECAR-AUTHORING-001`：新增
+`objgauss object-state init-bop-condition-sidecar` CLI 和
+`objgauss-objectstate-bop-capture-condition-sidecar-summary-v1` summary。该命令读取本地
+BOP scene 的选中 frame，并可选消费 `bop-conditions.csv`（`frame_id`、view /
+lighting、camera pose columns），写出符合
+`objgauss-objectstate-bop-capture-condition-sidecar-v1` 的 sidecar，同时报告 view /
+lighting condition count、camera pose count、最大 camera translation 和
+`identity_scenario_metadata_ready`。无 CSV 时会写出默认模板但通常保持
+`needs_metadata`；带齐 lighting variation 和 camera motion 的 CSV 可让 sidecar authoring
+达到 `identity_ready`。该步骤仍不下载 BOP、不创建 GT、不生成 Gaussian、不训练模型、不运行
+handoff，也不声明 pass row 或 world model。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

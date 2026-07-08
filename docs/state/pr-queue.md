@@ -300,8 +300,11 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 - 验证:
   - `uv run python -m py_compile objgauss/core/objectstate_bop_capture_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
   - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，24 tests。
-  - Full validation pending before final push.
-- 完成 commit: pending.
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_core_namespace.py -q`: passed，42 tests。
+  - `uv run --extra dev pytest`: passed，445 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `7ff0911`。
 
 ### UI-POLISH-CONTRAST-DOCK-001: Fix viewer glassmorphism contrast and truncation polish
 
