@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_acceptance_summary,
@@ -56,6 +58,8 @@ def objectstate_bop_prediction_baseline_handoff(
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     policy: str = "constant_velocity",
     candidate_id: str = "bop-constant-velocity-baseline",
     candidate_source: str = "controlled-prediction-baseline",
@@ -90,6 +94,8 @@ def objectstate_bop_prediction_baseline_handoff(
         gaussian_dir=gaussian_dir,
         condition_sidecar=condition_sidecar,
         require_gaussian_files=True,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         check_artifact_refs=check_artifact_refs,
         min_rgb_bytes=min_rgb_bytes,
         min_gaussian_bytes=min_gaussian_bytes,

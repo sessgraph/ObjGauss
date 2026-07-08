@@ -117,3 +117,15 @@ BOP acceptance、per-frame Gaussian evidence、candidate artifact validity 和 f
 变成可复验 evidence，同时保持风险 open：不能放松 identity scenario gate，不能伪造
 lighting / camera-pose sidecar，也不能把该 public BOP row 记为 identity-reviewable、
 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-MULTI-INSTANCE-IDENTITY-POLICY-001`
+新增显式 `pose_track_per_obj_id` BOP identity import policy，解决 HOPE 这类同一
+`obj_id` 多实例 public scene 无法进入 manifest 的问题；默认
+`single_instance_per_bop_obj_id` 策略仍 fail-fast。`OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001`
+在 BOP HOPE `val/000001` 三帧上生成 RGB-D Gaussian evidence seed 和 baseline local row：
+prediction package reviewable / pass，但 identity handoff 不 reviewable / 不 pass；
+`OBJECTSTATE-BOP-HOPE-CONDITION-GAP-001` 进一步证明阻塞来自缺 lighting、camera pose 和
+clear occlusion-reappearance metadata，而不是 adapter、Gaussian evidence 或 candidate
+binding。该缓解扩大了真实 public multi-instance evidence 覆盖，但风险仍 open：尚无真实
+controlled identity pass row、无真实 intervention row，也不能把 BOP pose import policy
+误称为 ObjectState 已经是 world state。

@@ -587,6 +587,52 @@ def test_bop_capture_adapter_rejects_duplicate_obj_ids(tmp_path):
         )
 
 
+def test_bop_capture_adapter_pose_track_policy_tracks_duplicate_obj_ids(tmp_path):
+    _write_bop_scene_with_duplicate_instances(tmp_path)
+
+    summary = objectstate_bop_capture_adapter_summary(
+        tmp_path,
+        sample_id="bop-hope-scene-000001",
+        dataset_id="bop-hope",
+        identity_policy="pose_track_per_obj_id",
+        max_frames=3,
+    )
+    manifest = summary["manifest"]
+
+    assert summary["adapter_policy"]["identity_policy"] == "pose_track_per_obj_id"
+    assert summary["adapter_policy"]["duplicate_obj_id_policy"] == (
+        "pose_track_per_obj_id"
+    )
+    assert summary["adapter_policy"]["uses_bop_pose_gt_for_identity_import"] is True
+    assert summary["row_counts"] == {
+        "objects": 3,
+        "frames": 3,
+        "annotations": 9,
+        "actions": 0,
+    }
+    assert [obj["object_id"] for obj in manifest["objects"]] == [
+        "bop-hope-obj-000001-inst-000001",
+        "bop-hope-obj-000001-inst-000002",
+        "bop-hope-obj-000002-inst-000001",
+    ]
+    first_frame_ids = [obj["object_id"] for obj in manifest["frames"][0]["objects"]]
+    second_frame_ids = [obj["object_id"] for obj in manifest["frames"][1]["objects"]]
+    third_frame_ids = [obj["object_id"] for obj in manifest["frames"][2]["objects"]]
+
+    assert first_frame_ids == [
+        "bop-hope-obj-000001-inst-000001",
+        "bop-hope-obj-000001-inst-000002",
+        "bop-hope-obj-000002-inst-000001",
+    ]
+    assert second_frame_ids == [
+        "bop-hope-obj-000001-inst-000002",
+        "bop-hope-obj-000001-inst-000001",
+        "bop-hope-obj-000002-inst-000001",
+    ]
+    assert third_frame_ids == first_frame_ids
+    assert validate_objectstate_bop_capture_adapter_summary(summary) == summary
+
+
 def test_bop_capture_adapter_requires_rgb_files(tmp_path):
     _write_bop_scene(tmp_path)
     (tmp_path / "rgb" / "000001.png").unlink()
@@ -649,6 +695,80 @@ def _write_bop_scene(root) -> None:
         json.dumps(scene_gt_info),
         encoding="utf-8",
     )
+
+
+def _write_bop_scene_with_duplicate_instances(root) -> None:
+    (root / "rgb").mkdir()
+    for frame_id in range(3):
+        (root / "rgb" / f"{frame_id:06d}.png").write_bytes(PNG_BYTES)
+    scene_camera = {
+        str(frame_id): {
+            "cam_K": [572.4, 0.0, 325.2, 0.0, 573.5, 242.0, 0.0, 0.0, 1.0],
+            "depth_scale": 1.0,
+        }
+        for frame_id in range(3)
+    }
+    identity_rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    scene_gt = {
+        "0": [
+            _bop_gt(1, identity_rotation, [10.0, 20.0, 30.0]),
+            _bop_gt(1, identity_rotation, [90.0, 20.0, 30.0]),
+            _bop_gt(2, identity_rotation, [40.0, 50.0, 60.0]),
+        ],
+        "1": [
+            _bop_gt(1, identity_rotation, [91.0, 20.0, 30.0]),
+            _bop_gt(1, identity_rotation, [11.0, 20.0, 30.0]),
+            _bop_gt(2, identity_rotation, [41.0, 50.0, 60.0]),
+        ],
+        "2": [
+            _bop_gt(1, identity_rotation, [12.0, 20.0, 30.0]),
+            _bop_gt(1, identity_rotation, [92.0, 20.0, 30.0]),
+            _bop_gt(2, identity_rotation, [42.0, 50.0, 60.0]),
+        ],
+    }
+    scene_gt_info = {
+        str(frame_id): [
+            {
+                "bbox_obj": [10, 20, 30, 40],
+                "bbox_visib": [10, 20, 30, 40],
+                "px_count_all": 1000,
+                "px_count_valid": 1000,
+                "px_count_visib": 1000,
+                "visib_fract": 1.0,
+            },
+            {
+                "bbox_obj": [50, 20, 30, 40],
+                "bbox_visib": [50, 20, 30, 40],
+                "px_count_all": 900,
+                "px_count_valid": 900,
+                "px_count_visib": 810,
+                "visib_fract": 0.9,
+            },
+            {
+                "bbox_obj": [70, 60, 30, 40],
+                "bbox_visib": [70, 60, 30, 40],
+                "px_count_all": 800,
+                "px_count_valid": 800,
+                "px_count_visib": 800,
+                "visib_fract": 1.0,
+            },
+        ]
+        for frame_id in range(3)
+    }
+    (root / "scene_camera.json").write_text(json.dumps(scene_camera), encoding="utf-8")
+    (root / "scene_gt.json").write_text(json.dumps(scene_gt), encoding="utf-8")
+    (root / "scene_gt_info.json").write_text(
+        json.dumps(scene_gt_info),
+        encoding="utf-8",
+    )
+
+
+def _bop_gt(obj_id, rotation, translation):
+    return {
+        "obj_id": obj_id,
+        "cam_R_m2c": rotation,
+        "cam_t_m2c": translation,
+    }
 
 
 def _write_gaussian_frames(root) -> None:

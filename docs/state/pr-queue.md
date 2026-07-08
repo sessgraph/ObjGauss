@@ -208,6 +208,13 @@ identity collapse 且 identity package 因缺 lighting/camera pose condition met
 可复验 gap audit：BOP acceptance、Gaussian evidence 和 candidate binding 均 ready，
 但 lighting condition 只有 `bop-default`，camera pose metadata 为 0，因此 identity route
 仍 blocked；不得放松 gate 或伪造 sidecar 让 public row 变成 identity-reviewable。
+`OBJECTSTATE-BOP-MULTI-INSTANCE-IDENTITY-POLICY-001` 已让 BOP adapter 支持显式
+`pose_track_per_obj_id` identity import policy，默认单实例策略不变；该 policy 只用
+BOP pose GT 导入 stable physical instance ids，不用于 candidate prediction。
+`OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001` 已在官方 BOP HOPE `val_realsense` scene 上跑出
+multi-instance public baseline row：prediction package reviewable / pass，但 identity
+route 因缺 lighting、camera pose 和 occlusion-reappearance metadata 仍 blocked。该结果是
+public multi-instance route evidence，不是 identity pass row。
 `OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001` 修复相对 `output_root` 下
 prediction package audit 把 `candidate_dir` 双重拼接的问题；真实 LMO run 已验证该修复让
 prediction evidence package 从 missing-files 进入 reviewable。
@@ -332,6 +339,142 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001: Run HOPE multi-instance RGB-D baseline row
+
+- 状态: done / public-multi-instance-negative-evidence-row
+- 类型: 标准 PR / ObjectState public pose dataset evidence row
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 用 BOP HOPE public RGB-D + 6D pose data 验证多实例 BOP scene 可以进入
+  ObjectState Phase 1 public route，同时保留 identity blocker，不把它包装成 pass。
+- 数据来源:
+  - Dataset: Hugging Face `bop-benchmark/hope`
+  - URL: `https://huggingface.co/datasets/bop-benchmark/hope`
+  - License: `cc-by-sa-4.0`
+  - Downloaded zip:
+    `outputs/assets/raw/bop-hope/hope_val_realsense.zip`
+  - Size: `153745625` bytes
+  - SHA256:
+    `25c75bb2daad4ad7e143b3f8d5bdff793fadb65463492792e822dbb36245a49f`
+  - Extracted scene:
+    `outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001`
+  - Selected frames: `000000`, `000001`, `000002`
+- Evidence output:
+  - `outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/`
+  - `bop-rgbd-baseline-local-row-summary.json`
+  - `objectstates.json`
+  - `phase1-evidence-ledger.json`
+  - `identity-handoff/identity-evidence-package-summary.json`
+  - `reality-candidates/prediction-evidence-package-summary.json`
+- Command:
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 --output-root outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline --sample-id bop-hope-val-scene-000001-rgbd-baseline --dataset-id bop-hope --object-category hope_objects --license-text "BOP HOPE dataset license: cc-by-sa-4.0; verify source terms before redistribution" --identity-policy pose_track_per_obj_id --max-frames 3 --max-points-per-frame 10000 --overwrite-gaussian-evidence --ply-format binary_little_endian --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --force`
+- Result:
+  - Status:
+    `objectstate_bop_rgbd_baseline_local_row_handoff_incomplete`
+  - Adapter identity policy:
+    `pose_track_per_obj_id`
+  - `selected_frames=3`
+  - `exported_frames=3`
+  - `missing_depth_files=0`
+  - `rgbd_total_vertices=30000`
+  - `baseline_total_gaussians=30000`
+  - `identity_predictions=54`
+  - `prediction_candidates=36`
+  - `local_row_prediction_handoff_reviewable=true`
+  - `local_row_identity_handoff_reviewable=false`
+  - `prediction_eval_pass=true`
+  - `identity_handoff_pass=false`
+- 边界:
+  - 不提交 dataset zip、RGB-D frames、PLY evidence 或 handoff outputs。
+  - `pose_track_per_obj_id` 只用于导入 BOP GT manifest 的 physical instance id；
+    candidate artifact 不用 BOP pose GT / object ids 来放置预测。
+  - 不训练 Gaussian / tracking / prediction / dynamics model。
+  - 不声明 identity pass、intervention gate 或 world-model evidence。
+- 验证:
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff ...`: passed，
+    status 为 `objectstate_bop_rgbd_baseline_local_row_handoff_incomplete`。
+  - `git check-ignore -v outputs/assets/raw/bop-hope/hope_val_realsense.zip outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/scene_gt.json outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json`: passed; outputs ignored.
+- 完成 commit: pending.
+
+### OBJECTSTATE-BOP-MULTI-INSTANCE-IDENTITY-POLICY-001: Import duplicate BOP obj_id scenes
+
+- 状态: done / explicit-policy
+- 类型: 标准 PR / BOP adapter identity policy
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 保持默认 `single_instance_per_bop_obj_id` fail-fast 策略不变，同时为 HOPE
+  这类同一 `obj_id` 多实例 scene 提供显式 `pose_track_per_obj_id` 导入策略。
+- 范围:
+  - `objectstate_bop_capture_adapter_summary`、acceptance、manifest helper 支持
+    `identity_policy` 和 `pose_track_max_distance_m`。
+  - `pose_track_per_obj_id` 按首帧 pose 排序创建 instance ids，后续帧按同 `obj_id`
+    pose continuity 做唯一最近匹配。
+  - 实例数变化、匹配超过阈值或匹配歧义时 fail-fast。
+  - RGB-D export、baseline candidate、candidate template、identity / prediction
+    handoff、local-row handoff、route audit 和 subset selector 透传该 policy。
+- 边界:
+  - 默认行为不变：未显式传 `--identity-policy pose_track_per_obj_id` 时重复
+    `obj_id` 仍报错。
+  - 该策略只导入已有 BOP GT identity manifest，不创建 GT、不训练模型、不声明
+    ObjectState prediction 质量。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py -q`: passed.
+  - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_objectstate_bop_local_row_handoff.py tests/test_objectstate_bop_identity_handoff.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_baseline_candidate.py tests/test_objectstate_bop_rgbd_gaussian_export.py -q`: passed.
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_subset_selector.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_identity_route_audit.py -q`: passed.
+- 完成 commit: pending.
+
+### OBJECTSTATE-BOP-HOPE-CONDITION-GAP-001: Audit HOPE public identity condition gap
+
+- 状态: done / public-condition-metadata-gap
+- 类型: 标准 PR / ObjectState public pose dataset identity route audit
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 对 HOPE public row 的 identity blocker 做可复验审计，明确 multi-instance
+  adapter、RGB-D evidence 和 candidate binding 已通过，阻塞仍是真实 scenario metadata。
+- Evidence output:
+  - `outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/`
+  - `bop-condition-sidecar.default.json`
+  - `bop-condition-sidecar-summary.json`
+  - `bop-conditions.template.csv`
+  - `bop-identity-route-audit-summary.json`
+- Condition sidecar command:
+  - `uv run objgauss object-state init-bop-condition-sidecar outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 --output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar.default.json --summary-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar-summary.json --condition-csv-template-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-conditions.template.csv --max-frames 3`
+- Condition sidecar result:
+  - Status:
+    `objectstate_bop_capture_condition_sidecar_needs_metadata`
+  - `selected_frame_ids=[0,1,2]`
+  - `view_condition_count=3`
+  - `lighting_condition_count=1`
+  - `lighting_ids=["bop-default"]`
+  - `camera_pose_count=0`
+  - `max_camera_translation_m=0.0`
+  - `identity_scenario_metadata_ready=false`
+- Identity route audit command:
+  - `uv run objgauss object-state audit-bop-identity-route outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 --output-root outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline --summary-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-identity-route-audit-summary.json --sample-id bop-hope-val-scene-000001-rgbd-baseline --dataset-id bop-hope --object-category hope_objects --candidate-artifact outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/objectstates.json --condition-sidecar outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar.default.json --identity-policy pose_track_per_obj_id --max-frames 3`
+- Identity route audit result:
+  - Status:
+    `objectstate_bop_identity_route_audit_blocked`
+  - `bop_acceptance_pass=true`
+  - `phase1_gaussian_evidence_ready=true`
+  - `candidate_artifact_present=true`
+  - `candidate_artifact_valid=true`
+  - `candidate_artifact_binding_ready=true`
+  - `identity_scenario_metadata_ready=false`
+  - `identity_evidence_package_reviewable=false`
+  - `phase1_evidence_ledger_identity_reviewable=false`
+  - `route_ready_for_identity_handoff=false`
+  - `route_has_reviewable_identity_evidence=false`
+- 边界:
+  - 不提交 outputs。
+  - 不伪造 lighting / camera-pose / occlusion-reappearance metadata。
+  - 不放松 identity scenario gate，不创建 identity-reviewable row 或 pass row。
+  - 不声明 intervention gate 或 world-model evidence。
+- 验证:
+  - `uv run objgauss object-state init-bop-condition-sidecar ...`: passed，status 为
+    `objectstate_bop_capture_condition_sidecar_needs_metadata`。
+  - `uv run objgauss object-state audit-bop-identity-route ...`: passed，status 为
+    `objectstate_bop_identity_route_audit_blocked`。
+- 完成 commit: pending.
 
 ### OBJECTSTATE-BOP-LMO-CONDITION-GAP-001: Audit LMO public identity condition gap
 

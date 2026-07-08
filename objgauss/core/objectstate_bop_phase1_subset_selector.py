@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
     objectstate_bop_capture_adapter_summary,
     validate_objectstate_bop_capture_adapter_summary,
@@ -26,6 +28,8 @@ def objectstate_bop_phase1_subset_selector(
     rgb_dir: str = "rgb",
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     max_depth: int = 3,
     max_scene_candidates: int = 20,
     min_frames: int = 3,
@@ -68,6 +72,8 @@ def objectstate_bop_phase1_subset_selector(
             rgb_dir=rgb_dir,
             max_frames=max_frames,
             frame_step=frame_step,
+            identity_policy=identity_policy,
+            pose_track_max_distance_m=pose_track_max_distance_m,
             min_frames=min_frames,
             min_objects=min_objects,
             min_persistent_objects=min_persistent_objects,
@@ -280,6 +286,8 @@ def _candidate_summary(
     rgb_dir: str,
     max_frames: int | None,
     frame_step: int,
+    identity_policy: str,
+    pose_track_max_distance_m: float,
     min_frames: int,
     min_objects: int,
     min_persistent_objects: int,
@@ -297,6 +305,8 @@ def _candidate_summary(
             rgb_dir=rgb_dir,
             max_frames=max_frames,
             frame_step=frame_step,
+            identity_policy=identity_policy,
+            pose_track_max_distance_m=pose_track_max_distance_m,
         )
         persistent_objects = _persistent_object_count(adapter["manifest"])
         readiness = {

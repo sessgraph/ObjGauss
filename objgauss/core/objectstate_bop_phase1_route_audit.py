@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_acceptance_summary,
@@ -40,6 +42,8 @@ def objectstate_bop_phase1_route_audit(
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     check_artifact_refs: bool = False,
     min_rgb_bytes: int = 1,
     min_gaussian_bytes: int = 1,
@@ -61,6 +65,8 @@ def objectstate_bop_phase1_route_audit(
         condition_sidecar=condition_sidecar,
         max_frames=max_frames,
         frame_step=frame_step,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         check_artifact_refs=check_artifact_refs,
         min_rgb_bytes=min_rgb_bytes,
         min_gaussian_bytes=min_gaussian_bytes,

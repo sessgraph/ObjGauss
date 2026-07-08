@@ -3,6 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
+from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
+)
 from objgauss.core.objectstate_bop_baseline_local_row_handoff import (
     OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA,
     objectstate_bop_baseline_local_row_handoff,
@@ -42,6 +46,8 @@ def objectstate_bop_rgbd_baseline_local_row_handoff(
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     pixel_stride: int = 1,
     max_points_per_frame: int | None = 50_000,
     min_depth_m: float = 0.0,
@@ -93,6 +99,8 @@ def objectstate_bop_rgbd_baseline_local_row_handoff(
         gaussian_dir=gaussian_dir,
         max_frames=max_frames,
         frame_step=frame_step,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         pixel_stride=pixel_stride,
         max_points_per_frame=max_points_per_frame,
         min_depth_m=min_depth_m,
@@ -117,6 +125,8 @@ def objectstate_bop_rgbd_baseline_local_row_handoff(
             condition_sidecar=condition_sidecar,
             max_frames=max_frames,
             frame_step=frame_step,
+            identity_policy=identity_policy,
+            pose_track_max_distance_m=pose_track_max_distance_m,
             baseline_candidate_id=baseline_candidate_id,
             identity_candidate_source=identity_candidate_source,
             max_centroid_distance=max_centroid_distance,

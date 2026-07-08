@@ -172,3 +172,152 @@ occlusion reappearance signal, but they do not provide explicit lighting
 variation or camera-pose motion metadata. The correct next step is to use a
 controlled capture or an enriched public manifest with measured condition
 metadata; the identity gate must not be relaxed to make this BOP row pass.
+
+## BOP HOPE Public RGB-D Baseline Row
+
+- Evidence id: `OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001`
+- Source dataset: BOP Benchmark `bop-benchmark/hope`
+- Source URL:
+  `https://huggingface.co/datasets/bop-benchmark/hope`
+- License: `cc-by-sa-4.0`
+- Downloaded file:
+  `outputs/assets/raw/bop-hope/hope_val_realsense.zip`
+- Downloaded file size: `153745625` bytes
+- SHA256:
+  `25c75bb2daad4ad7e143b3f8d5bdff793fadb65463492792e822dbb36245a49f`
+- Extracted local scene:
+  `outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001`
+- Selected frames: `000000`, `000001`, `000002`
+- Local evidence output:
+  `outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/`
+
+Command:
+
+```bash
+uv run objgauss object-state bop-rgbd-baseline-local-row-handoff \
+  outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 \
+  --output-root outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline \
+  --sample-id bop-hope-val-scene-000001-rgbd-baseline \
+  --dataset-id bop-hope \
+  --object-category hope_objects \
+  --license-text "BOP HOPE dataset license: cc-by-sa-4.0; verify source terms before redistribution" \
+  --identity-policy pose_track_per_obj_id \
+  --max-frames 3 \
+  --max-points-per-frame 10000 \
+  --overwrite-gaussian-evidence \
+  --ply-format binary_little_endian \
+  --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json \
+  --force
+```
+
+Result:
+
+- Summary status:
+  `objectstate_bop_rgbd_baseline_local_row_handoff_incomplete`
+- Adapter identity policy:
+  `identity_policy=pose_track_per_obj_id`,
+  `duplicate_obj_id_policy=pose_track_per_obj_id`,
+  `pose_track_max_distance_m=0.05`,
+  `uses_bop_pose_gt_for_identity_import=true`
+- RGB-D evidence:
+  `selected_frames=3`, `exported_frames=3`, `missing_depth_files=0`,
+  `rgbd_total_vertices=30000`
+- Baseline ObjectState artifact:
+  `baseline_frames=3`, `baseline_states=3`,
+  `baseline_total_gaussians=30000`
+- Identity predictions: `54`
+- Prediction candidates: `36`
+- Local row reviewability:
+  `local_row_prediction_handoff_reviewable=true`,
+  `local_row_identity_handoff_reviewable=false`
+- Phase 1 ledger maturity: `prediction_reviewable`
+- Pass gates:
+  `prediction_eval_pass=true`, `identity_handoff_pass=false`
+
+Interpretation:
+
+This row proves the BOP adapter can now import a multi-instance public scene
+when the caller explicitly selects `pose_track_per_obj_id`. The policy uses
+existing BOP pose GT only to create stable physical instance ids in the ground
+truth manifest; the generated Gaussian centroid baseline still does not use
+BOP pose GT or object ids for ObjectState prediction.
+
+The row is still not a Phase 1 identity pass. It is prediction-reviewable
+public evidence plus a clear identity blocker, and it must not be used to claim
+ObjectState is a real-world state variable.
+
+## BOP HOPE Condition Metadata Gap Audit
+
+- Evidence id: `OBJECTSTATE-BOP-HOPE-CONDITION-GAP-001`
+- Related row: `OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001`
+- Local evidence output:
+  `outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/`
+- Files:
+  - `bop-condition-sidecar.default.json`
+  - `bop-condition-sidecar-summary.json`
+  - `bop-conditions.template.csv`
+  - `bop-identity-route-audit-summary.json`
+
+Condition sidecar command:
+
+```bash
+uv run objgauss object-state init-bop-condition-sidecar \
+  outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 \
+  --output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar.default.json \
+  --summary-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar-summary.json \
+  --condition-csv-template-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-conditions.template.csv \
+  --max-frames 3
+```
+
+Condition sidecar result:
+
+- Status:
+  `objectstate_bop_capture_condition_sidecar_needs_metadata`
+- Selected frames: `000000`, `000001`, `000002`
+- `view_condition_count=3`
+- `lighting_condition_count=1`
+- `lighting_ids=["bop-default"]`
+- `camera_pose_count=0`
+- `max_camera_translation_m=0.0`
+- `identity_scenario_metadata_ready=false`
+
+Identity route audit command:
+
+```bash
+uv run objgauss object-state audit-bop-identity-route \
+  outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001 \
+  --output-root outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline \
+  --summary-output outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-identity-route-audit-summary.json \
+  --sample-id bop-hope-val-scene-000001-rgbd-baseline \
+  --dataset-id bop-hope \
+  --object-category hope_objects \
+  --candidate-artifact outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/objectstates.json \
+  --condition-sidecar outputs/evidence/objectstate-bop-hope-public-000001-condition-gap/bop-condition-sidecar.default.json \
+  --identity-policy pose_track_per_obj_id \
+  --max-frames 3
+```
+
+Identity route audit result:
+
+- Status:
+  `objectstate_bop_identity_route_audit_blocked`
+- `bop_acceptance_pass=true`
+- `phase1_gaussian_evidence_ready=true`
+- `candidate_artifact_present=true`
+- `candidate_artifact_valid=true`
+- `candidate_artifact_binding_ready=true`
+- `identity_scenario_metadata_ready=false`
+- `identity_evidence_package_reviewable=false`
+- `phase1_evidence_ledger_identity_reviewable=false`
+- `route_ready_for_identity_handoff=false`
+- `route_has_reviewable_identity_evidence=false`
+
+Interpretation:
+
+The HOPE row is blocked by scenario metadata and challenge coverage, not by the
+multi-instance adapter, RGB-D evidence, Gaussian file readiness or candidate
+artifact binding. The selected frames have three view ids but no explicit
+lighting variation, no camera pose motion metadata and no clear
+occlusion-reappearance metadata. The next step is to enrich conditions from a
+source that actually records them or move to controlled tabletop capture; do
+not fabricate metadata to make the identity route pass.

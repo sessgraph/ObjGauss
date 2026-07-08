@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from itertools import permutations
 import json
 import math
 import re
@@ -37,6 +38,13 @@ OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA = (
 OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA = (
     "objgauss-objectstate-bop-capture-condition-sidecar-summary-v1"
 )
+BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID = "single_instance_per_bop_obj_id"
+BOP_IDENTITY_POLICY_POSE_TRACK_PER_OBJ_ID = "pose_track_per_obj_id"
+BOP_IDENTITY_POLICIES = (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    BOP_IDENTITY_POLICY_POSE_TRACK_PER_OBJ_ID,
+)
+DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M = 0.05
 
 
 def objectstate_bop_capture_manifest_from_scene(
@@ -54,6 +62,8 @@ def objectstate_bop_capture_manifest_from_scene(
     include_gaussian_refs: bool = False,
     gaussian_dir: str = "gaussians",
     condition_sidecar: str | Path | None = None,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
 ) -> dict[str, Any]:
     summary = objectstate_bop_capture_adapter_summary(
         scene_root,
@@ -69,6 +79,8 @@ def objectstate_bop_capture_manifest_from_scene(
         include_gaussian_refs=include_gaussian_refs,
         gaussian_dir=gaussian_dir,
         condition_sidecar=condition_sidecar,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
     )
     return summary["manifest"]
 
@@ -88,8 +100,15 @@ def objectstate_bop_capture_adapter_summary(
     include_gaussian_refs: bool = False,
     gaussian_dir: str = "gaussians",
     condition_sidecar: str | Path | None = None,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
 ) -> dict[str, Any]:
     root = Path(scene_root)
+    normalized_identity_policy = _identity_policy(identity_policy)
+    max_track_distance = _positive_float(
+        pose_track_max_distance_m,
+        "pose_track_max_distance_m",
+    )
     if fps <= 0:
         raise ValueError("fps must be positive")
     if frame_step < 1:
@@ -117,13 +136,19 @@ def objectstate_bop_capture_adapter_summary(
         frame_step=frame_step,
     )
     safe_dataset_id = _slug(dataset_id)
-    objects = _objects_from_scene_gt(scene_gt, frame_ids, dataset_id=safe_dataset_id)
+    identity_plan = _identity_plan_from_scene_gt(
+        scene_gt,
+        frame_ids,
+        dataset_id=safe_dataset_id,
+        identity_policy=normalized_identity_policy,
+        pose_track_max_distance_m=max_track_distance,
+    )
     frames = _frames_from_bop_scene(
         root,
         scene_gt,
         scene_gt_info,
         frame_ids,
-        dataset_id=safe_dataset_id,
+        object_id_by_frame_annotation=identity_plan["object_id_by_frame_annotation"],
         fps=float(fps),
         rgb_dir=rgb_dir,
         include_gaussian_refs=include_gaussian_refs,
@@ -151,7 +176,7 @@ def objectstate_bop_capture_adapter_summary(
             ),
             "license": _required_string(license_text, "license_text"),
         },
-        "objects": objects,
+        "objects": identity_plan["objects"],
         "actions": [],
         "frames": frames,
     }
@@ -188,8 +213,14 @@ def objectstate_bop_capture_adapter_summary(
             },
         },
         "adapter_policy": {
-            "identity_policy": "single_instance_per_bop_obj_id",
-            "duplicate_obj_id_policy": "fail_fast",
+            "identity_policy": normalized_identity_policy,
+            "duplicate_obj_id_policy": _duplicate_obj_id_policy(
+                normalized_identity_policy
+            ),
+            "pose_track_max_distance_m": max_track_distance,
+            "uses_bop_pose_gt_for_identity_import": (
+                normalized_identity_policy == BOP_IDENTITY_POLICY_POSE_TRACK_PER_OBJ_ID
+            ),
             "timestamp_policy": "selected_frame_rank_divided_by_fps",
             "condition_sidecar_policy": "explicit_frame_condition_override",
             "does_not_infer_action": True,
@@ -276,6 +307,8 @@ def objectstate_bop_capture_acceptance_summary(
     min_gaussian_bytes: int = 1,
     require_frame_formats: bool = True,
     hash_files: bool = False,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
 ) -> dict[str, Any]:
     root = Path(scene_root)
     effective_include_gaussian_refs = bool(
@@ -295,6 +328,8 @@ def objectstate_bop_capture_acceptance_summary(
         include_gaussian_refs=effective_include_gaussian_refs,
         gaussian_dir=gaussian_dir,
         condition_sidecar=condition_sidecar,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
     )
     file_audit = objectstate_controlled_capture_file_audit(
         adapter["manifest"],
@@ -678,6 +713,26 @@ def validate_objectstate_bop_capture_adapter_summary(
     for key in ("source", "adapter_policy", "row_counts", "selected_frame_ids"):
         if key not in payload:
             raise ValueError(f"BOP capture adapter summary requires {key}")
+    adapter_policy = payload.get("adapter_policy")
+    if not isinstance(adapter_policy, Mapping):
+        raise ValueError("BOP capture adapter summary requires adapter_policy")
+    identity_policy = _identity_policy(str(adapter_policy.get("identity_policy", "")))
+    if adapter_policy.get("duplicate_obj_id_policy") != _duplicate_obj_id_policy(
+        identity_policy
+    ):
+        raise ValueError("BOP capture adapter duplicate_obj_id_policy mismatch")
+    _positive_float(
+        adapter_policy.get("pose_track_max_distance_m"),
+        "adapter_policy.pose_track_max_distance_m",
+    )
+    if not isinstance(
+        adapter_policy.get("uses_bop_pose_gt_for_identity_import"),
+        bool,
+    ):
+        raise ValueError(
+            "BOP capture adapter policy requires "
+            "uses_bop_pose_gt_for_identity_import"
+        )
     manifest = validate_objectstate_controlled_capture_manifest(
         payload.get("manifest")
     )
@@ -871,6 +926,24 @@ def validate_objectstate_bop_capture_acceptance_summary(
     return dict(payload)
 
 
+def _identity_policy(value: str) -> str:
+    policy = _required_string(value, "identity_policy")
+    if policy not in BOP_IDENTITY_POLICIES:
+        raise ValueError(
+            "identity_policy must be one of "
+            f"{', '.join(BOP_IDENTITY_POLICIES)}"
+        )
+    return policy
+
+
+def _duplicate_obj_id_policy(identity_policy: str) -> str:
+    if identity_policy == BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID:
+        return "fail_fast"
+    if identity_policy == BOP_IDENTITY_POLICY_POSE_TRACK_PER_OBJ_ID:
+        return "pose_track_per_obj_id"
+    raise ValueError(f"unsupported identity_policy: {identity_policy}")
+
+
 def _selected_frame_ids(
     scene_gt: Mapping[str, Any],
     scene_camera: Mapping[str, Any],
@@ -897,20 +970,232 @@ def _objects_from_scene_gt(
     *,
     dataset_id: str,
 ) -> list[dict[str, Any]]:
+    return _identity_plan_from_scene_gt(
+        scene_gt,
+        frame_ids,
+        dataset_id=dataset_id,
+        identity_policy=BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+        pose_track_max_distance_m=DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
+    )["objects"]
+
+
+def _identity_plan_from_scene_gt(
+    scene_gt: Mapping[str, Any],
+    frame_ids: Sequence[int],
+    *,
+    dataset_id: str,
+    identity_policy: str,
+    pose_track_max_distance_m: float,
+) -> dict[str, Any]:
+    if identity_policy == BOP_IDENTITY_POLICY_POSE_TRACK_PER_OBJ_ID:
+        return _pose_track_identity_plan_from_scene_gt(
+            scene_gt,
+            frame_ids,
+            dataset_id=dataset_id,
+            pose_track_max_distance_m=pose_track_max_distance_m,
+        )
     obj_ids: set[int] = set()
+    object_id_by_frame_annotation: dict[tuple[int, int], str] = {}
     for frame_id in frame_ids:
         annotations = _annotation_list(scene_gt, frame_id)
         _reject_duplicate_obj_ids(annotations, frame_id=frame_id)
-        for annotation in annotations:
-            obj_ids.add(_obj_id(annotation))
+        for annotation_index, annotation in enumerate(annotations):
+            obj_id = _obj_id(annotation)
+            obj_ids.add(obj_id)
+            object_id_by_frame_annotation[(frame_id, annotation_index)] = (
+                _controlled_object_id(dataset_id, obj_id)
+            )
+    objects = [
+        _bop_object_record(
+            _controlled_object_id(dataset_id, obj_id),
+            obj_id=obj_id,
+            instance_index=None,
+        )
+        for obj_id in sorted(obj_ids)
+    ]
+    return {
+        "objects": objects,
+        "object_id_by_frame_annotation": object_id_by_frame_annotation,
+    }
+
+
+def _pose_track_identity_plan_from_scene_gt(
+    scene_gt: Mapping[str, Any],
+    frame_ids: Sequence[int],
+    *,
+    dataset_id: str,
+    pose_track_max_distance_m: float,
+) -> dict[str, Any]:
+    if not frame_ids:
+        raise ValueError("pose_track_per_obj_id requires selected frames")
+    first_frame_id = int(frame_ids[0])
+    first_groups = _annotations_by_obj_id(
+        _annotation_list(scene_gt, first_frame_id)
+    )
+    tracks_by_obj: dict[int, list[dict[str, Any]]] = {}
+    object_id_by_frame_annotation: dict[tuple[int, int], str] = {}
+    for obj_id in sorted(first_groups):
+        entries = sorted(
+            first_groups[obj_id],
+            key=lambda item: (
+                _translation_m(item[1])[0],
+                _translation_m(item[1])[1],
+                _translation_m(item[1])[2],
+                item[0],
+            ),
+        )
+        tracks: list[dict[str, Any]] = []
+        for instance_index, (annotation_index, annotation) in enumerate(
+            entries,
+            start=1,
+        ):
+            object_id = _controlled_object_instance_id(
+                dataset_id,
+                obj_id,
+                instance_index,
+            )
+            tracks.append(
+                {
+                    "obj_id": obj_id,
+                    "instance_index": instance_index,
+                    "object_id": object_id,
+                    "previous_translation": _translation_m(annotation),
+                }
+            )
+            object_id_by_frame_annotation[(first_frame_id, annotation_index)] = object_id
+        tracks_by_obj[obj_id] = tracks
+
+    expected_obj_ids = set(tracks_by_obj)
+    for frame_id in frame_ids[1:]:
+        groups = _annotations_by_obj_id(_annotation_list(scene_gt, int(frame_id)))
+        current_obj_ids = set(groups)
+        if current_obj_ids != expected_obj_ids:
+            missing = sorted(expected_obj_ids - current_obj_ids)
+            added = sorted(current_obj_ids - expected_obj_ids)
+            raise ValueError(
+                "pose_track_per_obj_id requires stable obj_id sets across selected "
+                f"frames; frame {frame_id} missing={missing} added={added}"
+            )
+        for obj_id in sorted(expected_obj_ids):
+            tracks = tracks_by_obj[obj_id]
+            entries = groups[obj_id]
+            if len(entries) != len(tracks):
+                raise ValueError(
+                    "pose_track_per_obj_id requires stable instance counts for "
+                    f"obj_id={obj_id}; frame {frame_id} has {len(entries)}, "
+                    f"expected {len(tracks)}"
+                )
+            assignment = _unique_pose_track_assignment(
+                tracks,
+                entries,
+                frame_id=int(frame_id),
+                obj_id=obj_id,
+                pose_track_max_distance_m=pose_track_max_distance_m,
+            )
+            for track_index, annotation_index, translation in assignment:
+                track = tracks[track_index]
+                object_id_by_frame_annotation[(int(frame_id), annotation_index)] = str(
+                    track["object_id"]
+                )
+                track["previous_translation"] = translation
+
+    objects = [
+        _bop_object_record(
+            str(track["object_id"]),
+            obj_id=obj_id,
+            instance_index=int(track["instance_index"]),
+        )
+        for obj_id in sorted(tracks_by_obj)
+        for track in sorted(
+            tracks_by_obj[obj_id],
+            key=lambda item: int(item["instance_index"]),
+        )
+    ]
+    return {
+        "objects": objects,
+        "object_id_by_frame_annotation": object_id_by_frame_annotation,
+    }
+
+
+def _annotations_by_obj_id(
+    annotations: Sequence[Mapping[str, Any]],
+) -> dict[int, list[tuple[int, Mapping[str, Any]]]]:
+    groups: dict[int, list[tuple[int, Mapping[str, Any]]]] = {}
+    for annotation_index, annotation in enumerate(annotations):
+        groups.setdefault(_obj_id(annotation), []).append((annotation_index, annotation))
+    return groups
+
+
+def _unique_pose_track_assignment(
+    tracks: Sequence[Mapping[str, Any]],
+    entries: Sequence[tuple[int, Mapping[str, Any]]],
+    *,
+    frame_id: int,
+    obj_id: int,
+    pose_track_max_distance_m: float,
+) -> list[tuple[int, int, list[float]]]:
+    best_cost: float | None = None
+    second_best_cost: float | None = None
+    best_permutation: tuple[int, ...] | None = None
+    for entry_permutation in permutations(range(len(entries))):
+        distances = []
+        for track_index, entry_index in enumerate(entry_permutation):
+            previous = tracks[track_index].get("previous_translation")
+            if (
+                not isinstance(previous, Sequence)
+                or isinstance(previous, (str, bytes))
+                or len(previous) != 3
+            ):
+                raise ValueError("pose track is missing previous_translation")
+            current_translation = _translation_m(entries[entry_index][1])
+            distances.append(math.dist([float(v) for v in previous], current_translation))
+        if any(distance > pose_track_max_distance_m for distance in distances):
+            continue
+        cost = float(sum(distances))
+        if best_cost is None or cost < best_cost - 1e-12:
+            second_best_cost = best_cost
+            best_cost = cost
+            best_permutation = tuple(entry_permutation)
+        elif second_best_cost is None or cost < second_best_cost:
+            second_best_cost = cost
+    if best_permutation is None or best_cost is None:
+        raise ValueError(
+            "pose_track_per_obj_id could not match obj_id="
+            f"{obj_id} instances in frame {frame_id} within "
+            f"{pose_track_max_distance_m:.6f}m"
+        )
+    if second_best_cost is not None and abs(second_best_cost - best_cost) <= 1e-12:
+        raise ValueError(
+            "pose_track_per_obj_id ambiguous pose continuity for "
+            f"obj_id={obj_id} in frame {frame_id}"
+        )
     return [
-        {
-            "object_id": _controlled_object_id(dataset_id, obj_id),
+        (
+            track_index,
+            entries[entry_index][0],
+            _translation_m(entries[entry_index][1]),
+        )
+        for track_index, entry_index in enumerate(best_permutation)
+    ]
+
+
+def _bop_object_record(
+    object_id: str,
+    *,
+    obj_id: int,
+    instance_index: int | None,
+) -> dict[str, Any]:
+    if instance_index is None:
+        return {
+            "object_id": object_id,
             "category": f"bop_obj_{obj_id:06d}",
             "instance_label": f"BOP object {obj_id}",
         }
-        for obj_id in sorted(obj_ids)
-    ]
+    return {
+        "object_id": object_id,
+        "category": f"bop_obj_{obj_id:06d}",
+        "instance_label": f"BOP object {obj_id} instance {instance_index}",
+    }
 
 
 def _frames_from_bop_scene(
@@ -919,7 +1204,7 @@ def _frames_from_bop_scene(
     scene_gt_info: Mapping[str, Any],
     frame_ids: Sequence[int],
     *,
-    dataset_id: str,
+    object_id_by_frame_annotation: Mapping[tuple[int, int], str],
     fps: float,
     rgb_dir: str,
     include_gaussian_refs: bool,
@@ -929,14 +1214,18 @@ def _frames_from_bop_scene(
     frames = []
     for index, frame_id in enumerate(frame_ids):
         annotations = _annotation_list(scene_gt, frame_id)
-        _reject_duplicate_obj_ids(annotations, frame_id=frame_id)
         info_items = _gt_info_list(scene_gt_info, frame_id)
         objects = []
         for annotation_index, annotation in enumerate(annotations):
             info = info_items[annotation_index] if annotation_index < len(info_items) else {}
-            obj_id = _obj_id(annotation)
+            object_id = object_id_by_frame_annotation.get((int(frame_id), annotation_index))
+            if object_id is None:
+                raise ValueError(
+                    "BOP identity policy did not assign object_id for "
+                    f"frame {frame_id} annotation {annotation_index}"
+                )
             frame_object = {
-                "object_id": _controlled_object_id(dataset_id, obj_id),
+                "object_id": object_id,
                 "visible": _visible_from_info(info),
                 "pose": {
                     "position": _translation_m(annotation),
@@ -1490,6 +1779,14 @@ def _controlled_object_id(dataset_id: str, obj_id: int) -> str:
     return f"{dataset_id}-obj-{obj_id:06d}"
 
 
+def _controlled_object_instance_id(
+    dataset_id: str,
+    obj_id: int,
+    instance_index: int,
+) -> str:
+    return f"{dataset_id}-obj-{obj_id:06d}-inst-{instance_index:06d}"
+
+
 def _slug(value: str) -> str:
     result = re.sub(r"[^A-Za-z0-9_.-]+", "-", _required_string(value, "dataset_id"))
     result = result.strip("-_.")
@@ -1526,6 +1823,13 @@ def _number(value: Any, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{name} must be numeric")
     return float(value)
+
+
+def _positive_float(value: Any, name: str) -> float:
+    result = _number(value, name)
+    if result <= 0.0:
+        raise ValueError(f"{name} must be positive")
+    return result
 
 
 def _clamp01(value: float) -> float:

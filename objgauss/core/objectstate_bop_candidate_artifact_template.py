@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_acceptance_summary,
@@ -40,6 +42,8 @@ def write_objectstate_bop_candidate_artifact_template(
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     candidate_id: str = "bop-objectstate-candidate",
     candidate_source: str = "local-objectstate-model-output",
     target_artifact_path: str | Path | None = None,
@@ -62,6 +66,8 @@ def write_objectstate_bop_candidate_artifact_template(
         condition_sidecar=condition_sidecar,
         max_frames=max_frames,
         frame_step=frame_step,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         require_gaussian_files=True,
     )
     target_path = (
@@ -172,6 +178,8 @@ def finalize_objectstate_bop_candidate_artifact_template(
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     gt_leakage_tolerance: float = 1e-9,
     reconstruction_noise_robustness: float | None = None,
     reconstruction_noise_variant_count: int | None = None,
@@ -201,6 +209,8 @@ def finalize_objectstate_bop_candidate_artifact_template(
         condition_sidecar=condition_sidecar,
         max_frames=max_frames,
         frame_step=frame_step,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         require_gaussian_files=True,
     )
     _check_template_acceptance_binding(checked_template, acceptance)

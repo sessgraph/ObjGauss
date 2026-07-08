@@ -11,6 +11,8 @@ import numpy as np
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.io_ply import write_ply
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
     objectstate_bop_capture_adapter_summary,
     validate_objectstate_bop_capture_adapter_summary,
@@ -35,6 +37,8 @@ def objectstate_bop_rgbd_gaussian_export(
     gaussian_dir: str = "gaussians",
     max_frames: int | None = None,
     frame_step: int = 1,
+    identity_policy: str = BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    pose_track_max_distance_m: float = DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     pixel_stride: int = 1,
     max_points_per_frame: int | None = 50_000,
     min_depth_m: float = 0.0,
@@ -65,6 +69,8 @@ def objectstate_bop_rgbd_gaussian_export(
         rgb_dir=rgb_dir,
         max_frames=max_frames,
         frame_step=frame_step,
+        identity_policy=identity_policy,
+        pose_track_max_distance_m=pose_track_max_distance_m,
         include_gaussian_refs=True,
         gaussian_dir=gaussian_dir,
     )
@@ -121,6 +127,8 @@ def objectstate_bop_rgbd_gaussian_export(
             "depth_dir": depth_dir,
             "gaussian_dir": gaussian_dir,
             "pixel_stride": int(pixel_stride),
+            "identity_policy": identity_policy,
+            "pose_track_max_distance_m": float(pose_track_max_distance_m),
             "max_points_per_frame": max_points_per_frame,
             "min_depth_m": float(min_depth_m),
             "max_depth_m": float(max_depth_m) if max_depth_m is not None else None,

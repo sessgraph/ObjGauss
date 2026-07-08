@@ -886,6 +886,31 @@ required files missing；现在 handoff 传入相对 `reality-candidates`，并�
 candidate binding，而是缺真实 lighting / camera-pose condition metadata。该切片不放松
 identity gate、不伪造 condition CSV、不创建 pass row、不训练模型、不声明 intervention /
 world model。
+随后完成 `OBJECTSTATE-BOP-MULTI-INSTANCE-IDENTITY-POLICY-001` 和
+`OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001`：BOP adapter 的默认 identity policy 仍为
+`single_instance_per_bop_obj_id`，重复 `obj_id` 继续 fail-fast；新增显式
+`pose_track_per_obj_id` policy，用 BOP pose GT 的帧间连续性只在 ground-truth manifest
+导入阶段生成稳定 physical instance ids，并在实例数变化、匹配歧义或超过
+`pose_track_max_distance_m=0.05` 时失败。该策略已透传到 RGB-D export、baseline
+candidate、identity / prediction handoff、route audit 和 candidate template CLI。使用
+官方 BOP HOPE `hope_val_realsense.zip`（license `cc-by-sa-4.0`，大小 `153745625`
+bytes，SHA256
+`25c75bb2daad4ad7e143b3f8d5bdff793fadb65463492792e822dbb36245a49f`）抽取
+`val/000001` 的 `000000` / `000001` / `000002` 三帧后，显式运行
+`bop-rgbd-baseline-local-row-handoff --identity-policy pose_track_per_obj_id`。
+结果为 `selected_frames=3`、`exported_frames=3`、`rgbd_total_vertices=30000`、
+`baseline_total_gaussians=30000`、`identity_predictions=54`、
+`prediction_candidates=36`；prediction package 和 Phase 1 ledger prediction 侧
+reviewable，`prediction_eval_pass=true`，但 identity 侧仍不 reviewable / 不 pass。
+随后完成 `OBJECTSTATE-BOP-HOPE-CONDITION-GAP-001`：condition sidecar 和 identity route
+audit 证明 HOPE row 的阻塞已从 adapter multi-instance 限制转移到真实 scenario metadata：
+`bop_acceptance_pass=true`、`phase1_gaussian_evidence_ready=true`、
+`candidate_artifact_binding_ready=true`，但 `lighting_condition_count=1`、
+`camera_pose_count=0`、缺 clear occlusion-reappearance metadata，
+`identity_scenario_metadata_ready=false`。该结果是 public multi-instance route 的
+prediction-reviewable / identity-blocked evidence，不是 Phase 1 identity pass row；
+不使用 pose GT 生成 candidate prediction，不训练模型，不声明 intervention 或 world-model
+证明。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

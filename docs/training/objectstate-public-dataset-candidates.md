@@ -44,6 +44,15 @@ a real ObjGauss row. Public RGB / pose data alone is not enough.
 | 4 | `hot3d-clips` | Action-like interaction candidate | HOT3D-Clips has 150-frame hand-object clips with object/hand/camera 3D poses. It can stress prediction and action-conditioned rows, but it is not randomized counterfactual evidence. |
 | 5 | `dexycb` | Non-commercial hand-occlusion stress candidate | DexYCB has YCB grasp sequences and 6D object pose tasks, but the full dataset is large and CC BY-NC, so it must never be treated as public commercial demo material. |
 
+2026-07-08 update: HOPE `val_realsense` has now been downloaded and tested as
+a small ignored local subset. Scene `val/000001` contains duplicate `obj_id`
+entries in selected frames, so it requires the explicit
+`pose_track_per_obj_id` identity import policy. The route now runs through
+RGB-D Gaussian evidence export and prediction-reviewable baseline handoff, but
+identity remains blocked by missing lighting / camera-pose / occlusion
+scenario metadata. Treat HOPE as a useful multi-instance robustness row, not a
+Phase 1 identity pass row.
+
 ## Gate Coverage
 
 | Candidate | Identity | Occlusion | View | Prediction | Counterfactual |
@@ -104,6 +113,14 @@ files. It converts `cam_R_m2c` / `cam_t_m2c` into ObjGauss 6DoF pose, converts
 `single_instance_per_bop_obj_id` identity policy. If a selected frame contains
 duplicate `obj_id` entries, it fails instead of inventing unstable instance
 tracks.
+
+For cluttered BOP scenes where the same `obj_id` appears multiple times in a
+selected frame, pass `--identity-policy pose_track_per_obj_id`. That policy
+uses existing BOP pose GT only to import stable physical instance ids into the
+ground-truth manifest; it still fails on unstable instance counts, ambiguous
+pose continuity or matches farther than `--pose-track-max-distance-m`. It must
+not be confused with ObjectState prediction quality, and candidate artifacts
+must still avoid using BOP pose GT or object ids to place predicted states.
 
 The adapter does not create Gaussian evidence. After importing the BOP scene,
 run a file audit and reconstruct per-frame Gaussian files under ignored

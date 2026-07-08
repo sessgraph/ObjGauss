@@ -247,6 +247,9 @@ from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
     objectstate_bop_rgbd_baseline_local_row_handoff,
 )
 from objgauss.core.objectstate_bop_capture_adapter import (
+    BOP_IDENTITY_POLICIES,
+    BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+    DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
     objectstate_bop_capture_condition_sidecar_summary,
@@ -3350,6 +3353,8 @@ def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
         rgb_dir=args.rgb_dir,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         max_depth=args.max_depth,
         max_scene_candidates=args.max_scene_candidates,
         min_frames=args.min_frames,
@@ -3616,6 +3621,8 @@ def _object_state_audit_bop_gaussian_evidence(args: argparse.Namespace) -> None:
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         min_rgb_bytes=args.min_rgb_bytes,
         min_gaussian_bytes=args.min_gaussian_bytes,
         require_frame_formats=not args.no_require_frame_formats,
@@ -3674,6 +3681,8 @@ def _object_state_export_bop_rgbd_gaussian_evidence(
         gaussian_dir=args.gaussian_dir,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         pixel_stride=args.pixel_stride,
         max_points_per_frame=args.max_points_per_frame,
         min_depth_m=args.min_depth_m,
@@ -3724,6 +3733,8 @@ def _object_state_bop_rgbd_baseline_local_row_handoff(
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         pixel_stride=args.pixel_stride,
         max_points_per_frame=args.max_points_per_frame,
         min_depth_m=args.min_depth_m,
@@ -3836,6 +3847,8 @@ def _object_state_generate_bop_objectstate_baseline_candidate(
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         candidate_id=args.candidate_id,
         force=args.force,
     )
@@ -3935,6 +3948,24 @@ def _write_condition_csv_template(path: Path, rows) -> None:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
+def _add_bop_identity_policy_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--identity-policy",
+        choices=BOP_IDENTITY_POLICIES,
+        default=BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
+        help=(
+            "BOP object identity import policy; use pose_track_per_obj_id "
+            "only for multi-instance scenes with stable BOP pose GT"
+        ),
+    )
+    parser.add_argument(
+        "--pose-track-max-distance-m",
+        type=float,
+        default=DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
+        help="maximum per-frame pose-track identity match distance in meters",
+    )
+
+
 def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_adapter_summary(
         args.scene_root,
@@ -3950,6 +3981,8 @@ def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
         include_gaussian_refs=args.include_gaussian_refs,
         gaussian_dir=args.gaussian_dir,
         condition_sidecar=args.condition_sidecar,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
     )
     readiness = summary["readiness"]
     print(f"schema={summary['schema']}")
@@ -4007,6 +4040,8 @@ def _object_state_accept_bop_capture_scene(args: argparse.Namespace) -> None:
         min_gaussian_bytes=args.min_gaussian_bytes,
         require_frame_formats=not args.no_require_frame_formats,
         hash_files=args.hash_files,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
     )
     readiness = summary["readiness"]
     file_audit = summary["file_audit"]
@@ -4068,6 +4103,8 @@ def _object_state_init_bop_objectstate_artifact_template(
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         candidate_id=args.candidate_id,
         candidate_source=args.candidate_source,
         target_artifact_path=args.target_artifact_path,
@@ -4114,6 +4151,8 @@ def _object_state_finalize_bop_objectstate_artifact_template(
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         gt_leakage_tolerance=args.gt_leakage_tolerance,
         reconstruction_noise_robustness=args.reconstruction_noise_robustness,
         reconstruction_noise_variant_count=args.reconstruction_noise_variant_count,
@@ -5657,6 +5696,8 @@ def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> N
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         policy=args.policy,
         candidate_id=args.candidate_id,
         candidate_source=args.candidate_source,
@@ -5741,6 +5782,8 @@ def _object_state_bop_identity_handoff(args: argparse.Namespace) -> None:
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         candidate_id=args.candidate_id,
         candidate_source=args.candidate_source,
         max_centroid_distance=args.max_centroid_distance,
@@ -5834,6 +5877,8 @@ def _object_state_bop_local_row_handoff(args: argparse.Namespace) -> None:
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         identity_candidate_id=args.identity_candidate_id,
         identity_candidate_source=args.identity_candidate_source,
         max_centroid_distance=args.max_centroid_distance,
@@ -5931,6 +5976,8 @@ def _object_state_bop_baseline_local_row_handoff(args: argparse.Namespace) -> No
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         baseline_candidate_id=args.baseline_candidate_id,
         identity_candidate_source=args.identity_candidate_source,
         max_centroid_distance=args.max_centroid_distance,
@@ -6217,6 +6264,8 @@ def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         check_artifact_refs=args.check_artifact_refs,
         min_rgb_bytes=args.min_rgb_bytes,
         min_gaussian_bytes=args.min_gaussian_bytes,
@@ -6270,6 +6319,8 @@ def _object_state_audit_bop_identity_route(args: argparse.Namespace) -> None:
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
+        identity_policy=args.identity_policy,
+        pose_track_max_distance_m=args.pose_track_max_distance_m,
         check_artifact_refs=args.check_artifact_refs,
         min_rgb_bytes=args.min_rgb_bytes,
         min_gaussian_bytes=args.min_gaussian_bytes,
@@ -6682,6 +6733,7 @@ def _build_parser() -> argparse.ArgumentParser:
     select_bop_phase1_subset.add_argument("--rgb-dir", default="rgb")
     select_bop_phase1_subset.add_argument("--max-frames", type=int)
     select_bop_phase1_subset.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(select_bop_phase1_subset)
     select_bop_phase1_subset.add_argument("--max-depth", type=int, default=3)
     select_bop_phase1_subset.add_argument("--max-scene-candidates", type=int, default=20)
     select_bop_phase1_subset.add_argument("--min-frames", type=int, default=3)
@@ -6852,6 +6904,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_gaussian_evidence.add_argument("--max-frames", type=int)
     audit_bop_gaussian_evidence.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(audit_bop_gaussian_evidence)
     audit_bop_gaussian_evidence.add_argument("--min-rgb-bytes", type=int, default=1)
     audit_bop_gaussian_evidence.add_argument(
         "--min-gaussian-bytes",
@@ -6915,6 +6968,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
     )
+    _add_bop_identity_policy_args(export_bop_rgbd_gaussian_evidence)
     export_bop_rgbd_gaussian_evidence.add_argument(
         "--pixel-stride",
         type=int,
@@ -7012,6 +7066,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
     )
+    _add_bop_identity_policy_args(bop_rgbd_baseline_local_row_handoff)
     bop_rgbd_baseline_local_row_handoff.add_argument(
         "--pixel-stride",
         type=int,
@@ -7278,6 +7333,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
     )
+    _add_bop_identity_policy_args(generate_bop_objectstate_baseline_candidate)
     generate_bop_objectstate_baseline_candidate.add_argument(
         "--candidate-id",
         default="bop-gaussian-centroid-baseline",
@@ -7378,6 +7434,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     import_bop_capture_scene.add_argument("--max-frames", type=int)
     import_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(import_bop_capture_scene)
     import_bop_capture_scene.add_argument(
         "--include-gaussian-refs",
         action="store_true",
@@ -7419,6 +7476,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     accept_bop_capture_scene.add_argument("--max-frames", type=int)
     accept_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(accept_bop_capture_scene)
     accept_bop_capture_scene.add_argument(
         "--include-gaussian-refs",
         action="store_true",
@@ -7503,6 +7561,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
     )
+    _add_bop_identity_policy_args(init_bop_objectstate_artifact_template)
     init_bop_objectstate_artifact_template.add_argument(
         "--candidate-id",
         default="bop-objectstate-candidate",
@@ -7586,6 +7645,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
     )
+    _add_bop_identity_policy_args(finalize_bop_objectstate_artifact_template)
     finalize_bop_objectstate_artifact_template.add_argument(
         "--gt-leakage-tolerance",
         type=float,
@@ -7644,6 +7704,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_phase1_route.add_argument("--max-frames", type=int)
     audit_bop_phase1_route.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(audit_bop_phase1_route)
     audit_bop_phase1_route.add_argument(
         "--check-artifact-refs",
         action="store_true",
@@ -7705,6 +7766,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_identity_route.add_argument("--max-frames", type=int)
     audit_bop_identity_route.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(audit_bop_identity_route)
     audit_bop_identity_route.add_argument(
         "--check-artifact-refs",
         action="store_true",
@@ -7891,6 +7953,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_prediction_baseline_handoff.add_argument("--max-frames", type=int)
     bop_prediction_baseline_handoff.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(bop_prediction_baseline_handoff)
     bop_prediction_baseline_handoff.add_argument(
         "--policy",
         choices=("constant_velocity", "hold"),
@@ -8011,6 +8074,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_identity_handoff.add_argument("--max-frames", type=int)
     bop_identity_handoff.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(bop_identity_handoff)
     bop_identity_handoff.add_argument("--candidate-id")
     bop_identity_handoff.add_argument(
         "--candidate-source",
@@ -8170,6 +8234,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.add_argument("--max-frames", type=int)
     bop_local_row_handoff.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(bop_local_row_handoff)
     bop_local_row_handoff.add_argument("--identity-candidate-id")
     bop_local_row_handoff.add_argument(
         "--identity-candidate-source",
@@ -8369,6 +8434,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_baseline_local_row_handoff.add_argument("--max-frames", type=int)
     bop_baseline_local_row_handoff.add_argument("--frame-step", type=int, default=1)
+    _add_bop_identity_policy_args(bop_baseline_local_row_handoff)
     bop_baseline_local_row_handoff.add_argument(
         "--baseline-candidate-id",
         default="bop-gaussian-centroid-baseline",
