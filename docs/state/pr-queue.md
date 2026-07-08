@@ -234,7 +234,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，391 tests。
   - `npm run build`: passed；仅保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: `e9f4621`。
+- 完成 commit: `ea849eb`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-ENVIRONMENT-001: Audit capture host environment
 
