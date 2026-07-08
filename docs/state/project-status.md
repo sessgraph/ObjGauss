@@ -243,6 +243,18 @@ handoff 链路，不采集视频、不创建 GT、不重建 Gaussian、不训练
 `public/samples`、不改 viewer/export 默认；当前仍缺实际 controlled tabletop 文件和
 真实 candidate artifact 作为通过证据。完成 commit: `01ed42f`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-BUNDLE-ACCEPTANCE-001`：新增
+`objgauss-objectstate-controlled-capture-bundle-acceptance-v1`，把 controlled capture
+bundle import 和 controlled capture file audit 合成一条 pre-identity-handoff gate。
+新增 CLI `objgauss object-state accept-controlled-capture-bundle <bundle-root> --output <capture-manifest.json>`，
+默认要求 imported manifest 达到 identity-stage ready，且 RGB / Gaussian frame refs
+通过本地文件存在性与格式签名审计；可选再要求 prediction / intervention readiness。
+CLI 可同时写出 acceptance summary、import summary、file audit、missing-files Markdown
+和 controlled-real blocked seed。该步骤只验收本地 bundle 可进入 Stage 1 identity
+handoff 前置流程，不运行 candidate identity handoff、不创建 GT、不重建 Gaussian、
+不训练模型、不写 `public/samples`、不改 viewer/export 默认；当前仍缺实际 controlled
+tabletop bundle 和真实 candidate artifact 作为通过证据。完成 commit: `cd0cf1b`。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001`：新增
 `objgauss.core.objectstate_controlled_capture_files`，schema 为
 `objgauss-objectstate-controlled-capture-file-audit-v1`。它在 capture manifest

@@ -53,7 +53,9 @@ annotation manifest validator 和 `validate-controlled-capture` CLI，可把真�
 manifest 转成 blocked controlled-real seed；`OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001`
 已新增 `import-controlled-capture-bundle` CLI，可把本地 `sample.json`、`objects.csv`、
 `frames.csv`、`annotations.csv` 和可选 `actions.csv` 导入 controlled capture
-manifest；
+manifest；`OBJECTSTATE-CONTROLLED-CAPTURE-BUNDLE-ACCEPTANCE-001` 已新增
+`accept-controlled-capture-bundle` CLI，可一条命令完成 bundle import、file audit
+和 identity-handoff 前置验收；
 `OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001` 已新增
 `audit-controlled-capture-files` CLI，可检查 capture manifest 引用的 RGB / Gaussian
 文件是否真的存在于本地 bundle；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
@@ -220,6 +222,43 @@ viewer/export 默认模型。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
 - 完成 commit: `01ed42f`。
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-BUNDLE-ACCEPTANCE-001: Accept controlled capture bundles
+
+- 状态: done / import-plus-file-audit-ready-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture bundle acceptance
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把 bundle CSV import 和 frame file audit 合成 identity handoff 前置验收，
+  让真实采集包进入 handoff 前先证明 manifest 可生成且 RGB / Gaussian 文件真实存在。
+- 已实施:
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-capture-bundle-acceptance-v1`。
+  - 新增 `objectstate_controlled_capture_bundle_acceptance_summary(...)`。
+  - Acceptance summary 嵌入 controlled capture import summary 和 capture file
+    audit summary。
+  - 默认要求 identity-stage readiness 和 Gaussian frame files；prediction /
+    intervention readiness 可通过参数额外要求。
+  - Acceptance gates 包括 `identity_stage_ready`、
+    `prediction_stage_ready`、`intervention_stage_ready` 和
+    `capture_file_audit_pass`。
+  - CLI 新增 `objgauss object-state accept-controlled-capture-bundle
+    <bundle-root> --output <capture-manifest.json>`。
+  - CLI 可写 `--summary-output`、`--import-summary-output`、
+    `--file-audit-output`、`--missing-files-output` 和
+    `--controlled-real-output`，并支持 file-audit 参数、
+    readiness 参数和 `--require-pass`。
+  - Core lazy namespace 暴露 acceptance schema / summary / validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - Acceptance 不创建 GT，不重建 Gaussian，不训练模型，不运行 identity handoff，
+    不新增 `public/samples`。
+  - 不计算 candidate metrics，不推进 replay buffer / diffusion，不改 viewer/export 默认。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture.py tests/test_objectstate_controlled_capture_files.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 347 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `cd0cf1b`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
 
