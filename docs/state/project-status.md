@@ -771,6 +771,13 @@ blocked candidate issues 和后续 `init-bop-condition-sidecar` /
 `accept-bop-capture-scene` / `audit-bop-phase1-local-row` 命令。它不下载 BOP、不复制数据、
 不创建 GT、不推断 condition metadata、不生成 Gaussian、不运行 handoff、不训练模型，也不把
 任何 row 标记为 reality gate pass。
+随后完成 `OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001`：`select-bop-phase1-subset`
+新增 `--batch-samples-csv-template-output` 和 `--batch-sample-artifact-root`，可把扫描结果中
+ready 的 BOP scene 写成 `init-bop-local-row-batch-spec` 可消费的 CSV。CSV 包含
+`sample_id`、`scene_root`、默认 `candidate_artifact` / `condition_sidecar` 路径、
+`output_root`、`dataset_id`、`object_category`、`scenario`、`max_frames` 和
+`frame_step`；它只写 authoring 模板，不创建 candidate artifact 或 sidecar，不运行
+readiness / handoff，不生成 Gaussian、不训练模型、不声明 pass row 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
@@ -4029,8 +4036,9 @@ npm run acceptance:demo
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
    最新 strict sample-aware gate 已让 3-row 表中 Lego 选择 promoted、Polyhaven / Nike 回退
    baseline，并避免 selected hard regression；Plush KMeans 暴露为无安全候选的负证据。
-   下一步若继续算法质量，应先用本地 / ignored BOP subset 的 CSV 运行
-   `init-bop-local-row-batch-spec` 生成 batch spec，再跑
+   下一步若继续算法质量，应先用 `select-bop-phase1-subset --batch-samples-csv-template-output`
+   从本地 / ignored BOP subset 生成 CSV 模板，填齐每个 sample 的 candidate artifact /
+   sidecar 后运行 `init-bop-local-row-batch-spec` 生成 batch spec，再跑
    `audit-bop-local-row-batch-readiness`，并按 readiness 缺口决定是否运行
    `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、replay
    buffer、diffusion 或 geometry / camera unfreeze。

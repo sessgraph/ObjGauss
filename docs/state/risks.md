@@ -40,3 +40,10 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001`
 并检查 scene root、candidate artifact 和 declared condition sidecar 路径缺口；该缓解
 只减少手写 batch spec 和路径漂移风险，不运行 readiness / handoff、不创建 GT、不重建
 Gaussian、不训练模型、不声明 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001`
+扩展 `select-bop-phase1-subset`，可把 ready BOP scene 写成
+`init-bop-local-row-batch-spec` 可消费的 CSV 模板，并指向 expected candidate artifact /
+condition sidecar 本地路径；该缓解只减少从 selector 到 batch authoring 的人工错漏，不创建
+candidate artifact 或 sidecar，不运行 readiness / handoff、不创建 GT、不训练模型、不声明
+metric pass、intervention gate 或 world-model evidence。

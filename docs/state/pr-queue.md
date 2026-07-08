@@ -169,6 +169,10 @@ rerun sidecar authoring。
 `OBJECTSTATE-BOP-PHASE1-SUBSET-SELECTOR-001` 继续补齐
 `select-bop-phase1-subset`，可从本地 BOP dataset / split root 扫描并推荐第一个可作为
 Phase 1 seed 的 scene。
+`OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001` 继续把 selector 结果接到 batch authoring：
+`select-bop-phase1-subset --batch-samples-csv-template-output` 可把 ready scene 写成
+`init-bop-local-row-batch-spec` 可消费的 CSV；它只写模板，不创建 candidate artifact /
+condition sidecar，不运行 readiness / handoff。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -290,6 +294,36 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001: Write BOP batch sample CSV templates
+
+- 状态: done / selector-to-batch-authoring-bridge
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 batch input preparation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 `select-bop-phase1-subset` 的 ready scene 输出可直接进入
+  `init-bop-local-row-batch-spec`，减少人工手写 batch samples CSV 的路径错误。
+- 已实施:
+  - `select-bop-phase1-subset` 新增 `--batch-samples-csv-template-output`。
+  - 新增 `--batch-sample-artifact-root`，默认 `outputs/captures`。
+  - CSV 只包含 selector-ready scene，并写出 `sample_id`、`scene_root`、
+    `candidate_artifact`、`condition_sidecar`、`output_root`、`dataset_id`、
+    `object_category`、`scenario`、`max_frames` 和 `frame_step`。
+  - CSV 里的 candidate artifact / condition sidecar 是 expected local paths；
+    后续 `init-bop-local-row-batch-spec --require-inputs` 会继续检查是否存在。
+- 边界:
+  - 只写 CSV 模板，不创建 candidate artifact 或 condition sidecar。
+  - 不下载 BOP，不复制 dataset，不创建 GT，不重建 Gaussian。
+  - 不运行 readiness / handoff，不训练模型，不声明 metric pass / intervention gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_subset_selector.py`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_batch_spec.py`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，74 tests。
+  - `uv run --extra dev pytest`: passed，486 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001: Write BOP batch specs from CSV
 

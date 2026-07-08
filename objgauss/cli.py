@@ -5,6 +5,7 @@ import csv
 import json
 import os
 from pathlib import Path
+from typing import Mapping
 
 import numpy as np
 
@@ -3357,8 +3358,84 @@ def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
+    if args.batch_samples_csv_template_output:
+        ready_count = _write_bop_batch_samples_csv_template(
+            args.batch_samples_csv_template_output,
+            summary,
+            dataset_id=args.dataset_id,
+            object_category=args.object_category,
+            scenario=args.scenario,
+            artifact_root=args.batch_sample_artifact_root,
+            max_frames=args.max_frames,
+            frame_step=args.frame_step,
+        )
+        print(f"batch_samples_csv_template={args.batch_samples_csv_template_output}")
+        print(f"batch_samples_csv_template_rows={ready_count}")
     if args.require_ready and summary["recommended"] is None:
         raise ValueError("no BOP Phase 1 subset candidate is ready")
+
+
+def _write_bop_batch_samples_csv_template(
+    output: Path,
+    summary: Mapping[str, object],
+    *,
+    dataset_id: str,
+    object_category: str,
+    scenario: str,
+    artifact_root: Path,
+    max_frames: int | None,
+    frame_step: int,
+) -> int:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for candidate in summary["candidates"]:  # type: ignore[index]
+        if not candidate["readiness"]["phase1_seed_ready"]:
+            continue
+        sample_id = candidate["sample_id"]
+        sample_root = artifact_root / sample_id
+        rows.append(
+            {
+                "sample_id": sample_id,
+                "scene_root": _path_for_csv(candidate["scene_root"], output.parent),
+                "candidate_artifact": _path_for_csv(
+                    sample_root / "objectstates.json",
+                    output.parent,
+                ),
+                "condition_sidecar": _path_for_csv(
+                    sample_root / "bop-condition-sidecar.json",
+                    output.parent,
+                ),
+                "output_root": f"samples/{sample_id}",
+                "dataset_id": dataset_id,
+                "object_category": object_category,
+                "scenario": scenario,
+                "max_frames": "" if max_frames is None else str(max_frames),
+                "frame_step": str(frame_step),
+            }
+        )
+    fieldnames = [
+        "sample_id",
+        "scene_root",
+        "candidate_artifact",
+        "condition_sidecar",
+        "output_root",
+        "dataset_id",
+        "object_category",
+        "scenario",
+        "max_frames",
+        "frame_step",
+    ]
+    with output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return len(rows)
+
+
+def _path_for_csv(value: str | Path, csv_root: Path) -> str:
+    path = Path(value)
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    return os.path.relpath(absolute, csv_root)
 
 
 def _object_state_audit_bop_gaussian_evidence(args: argparse.Namespace) -> None:
@@ -6150,6 +6227,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     select_bop_phase1_subset.add_argument("dataset_root", type=Path)
     select_bop_phase1_subset.add_argument("--summary-output", type=Path)
+    select_bop_phase1_subset.add_argument(
+        "--batch-samples-csv-template-output",
+        type=Path,
+        help=(
+            "optional CSV template for init-bop-local-row-batch-spec; "
+            "includes ready scanned scenes only"
+        ),
+    )
+    select_bop_phase1_subset.add_argument(
+        "--batch-sample-artifact-root",
+        type=Path,
+        default=Path("outputs/captures"),
+        help=(
+            "root used in the CSV template for per-sample objectstates.json "
+            "and bop-condition-sidecar.json placeholders"
+        ),
+    )
     select_bop_phase1_subset.add_argument("--dataset-id", default="bop-ycbv")
     select_bop_phase1_subset.add_argument("--output-root", type=Path)
     select_bop_phase1_subset.add_argument("--object-category", default="bop_objects")

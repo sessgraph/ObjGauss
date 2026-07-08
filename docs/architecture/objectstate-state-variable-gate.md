@@ -930,6 +930,41 @@ Gaussian / tracking / prediction / dynamics models, claim intervention /
 counterfactual gates, claim world model, use replay / diffusion, write public
 samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001
+
+Bridge local BOP subset selection into batch spec authoring.
+
+Required behavior:
+
+- Extend the local BOP subset selector with an optional CSV template output.
+- Include only selector-ready scenes in the CSV template.
+- Emit the columns consumed by `init-bop-local-row-batch-spec`:
+  `sample_id`, `scene_root`, `candidate_artifact`, `condition_sidecar`,
+  `output_root`, `dataset_id`, `object_category`, `scenario`, `max_frames`
+  and `frame_step`.
+- Use a declared sample artifact root for per-sample
+  `objectstates.json` and `bop-condition-sidecar.json` placeholders.
+- Keep the template as authoring aid only; missing candidate artifacts and
+  sidecars remain visible in the later batch spec authoring / readiness steps.
+
+Implemented v0.1 facts:
+
+- CLI extension:
+  `objgauss object-state select-bop-phase1-subset --batch-samples-csv-template-output <samples.csv>`.
+- Additional CLI option:
+  `--batch-sample-artifact-root <dir>`, defaulting to `outputs/captures`.
+- The output CSV can be consumed directly by
+  `objgauss object-state init-bop-local-row-batch-spec --samples-csv <samples.csv>`.
+- The template writer does not create candidate artifacts or condition
+  sidecars; it only points to the expected local paths.
+
+Current scope is CSV authoring only. It does not download BOP data, copy
+datasets, create GT, infer condition metadata, create ObjectState candidate
+artifacts, reconstruct Gaussians, run readiness, run local-row handoff, train
+models, claim metric pass, claim intervention / counterfactual gates, claim
+world model, use replay / diffusion, write public samples or mutate viewer
+defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample

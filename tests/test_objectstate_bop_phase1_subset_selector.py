@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 
 from objgauss.cli import main
@@ -106,6 +107,81 @@ def test_bop_phase1_subset_selector_cli_writes_summary(tmp_path, capsys):
     assert summary["recommended"]["sample_id"] == "bop-ycbv-test-000001"
 
 
+def test_bop_phase1_subset_selector_cli_writes_batch_samples_csv(tmp_path, capsys):
+    dataset_root = tmp_path / "bop" / "ycbv"
+    ready_scene = dataset_root / "test" / "000001"
+    blocked_scene = dataset_root / "test" / "000002"
+    template_csv = tmp_path / "batch" / "samples.csv"
+    artifact_root = tmp_path / "captures"
+    batch_spec = tmp_path / "batch" / "batch.json"
+    _write_bop_scene(ready_scene, frame_count=3, write_rgb=True)
+    _write_bop_scene(blocked_scene, frame_count=1, write_rgb=True)
+    _write_json(
+        artifact_root / "bop-ycbv-test-000001" / "objectstates.json",
+        {"schema": "unit-test-candidate"},
+    )
+    _write_json(
+        artifact_root / "bop-ycbv-test-000001" / "bop-condition-sidecar.json",
+        {"schema": "unit-test-sidecar"},
+    )
+
+    assert (
+        main(
+            [
+                "object-state",
+                "select-bop-phase1-subset",
+                str(dataset_root),
+                "--dataset-id",
+                "bop-ycbv",
+                "--batch-samples-csv-template-output",
+                str(template_csv),
+                "--batch-sample-artifact-root",
+                str(artifact_root),
+                "--max-frames",
+                "3",
+                "--require-ready",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    rows = _read_csv(template_csv)
+
+    assert f"batch_samples_csv_template={template_csv}" in stdout
+    assert "batch_samples_csv_template_rows=1" in stdout
+    assert rows == [
+        {
+            "sample_id": "bop-ycbv-test-000001",
+            "scene_root": "../bop/ycbv/test/000001",
+            "candidate_artifact": "../captures/bop-ycbv-test-000001/objectstates.json",
+            "condition_sidecar": "../captures/bop-ycbv-test-000001/bop-condition-sidecar.json",
+            "output_root": "samples/bop-ycbv-test-000001",
+            "dataset_id": "bop-ycbv",
+            "object_category": "bop_objects",
+            "scenario": "bop_pose_sequence",
+            "max_frames": "3",
+            "frame_step": "1",
+        }
+    ]
+    assert (
+        main(
+            [
+                "object-state",
+                "init-bop-local-row-batch-spec",
+                "--samples-csv",
+                str(template_csv),
+                "--output",
+                str(batch_spec),
+                "--require-inputs",
+            ]
+        )
+        == 0
+    )
+    spec = json.loads(batch_spec.read_text(encoding="utf-8"))
+    assert spec["samples"][0]["sample_id"] == "bop-ycbv-test-000001"
+
+
 def _write_bop_scene(root, *, frame_count: int, write_rgb: bool) -> None:
     if write_rgb:
         (root / "rgb").mkdir(parents=True)
@@ -147,3 +223,8 @@ def _write_bop_scene(root, *, frame_count: int, write_rgb: bool) -> None:
 def _write_json(path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _read_csv(path):
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
