@@ -391,6 +391,12 @@ This directory is a local-only skeleton for controlled real ObjectState
 validation. It does not contain captured RGB frames, Gaussian reconstructions,
 ground truth poses, actions, or candidate model outputs yet.
 
+Follow the repository runbook before filling the CSV rows:
+
+```text
+docs/training/controlled-real-capture-runbook.md
+```
+
 Required files:
 
 - sample.json: sample metadata and local-only license.
@@ -414,6 +420,7 @@ Minimum Stage 1 identity scenario:
 Validation commands:
 
 ```bash
+uv run objgauss object-state audit-controlled-capture-bundle-readiness . --summary-output readiness-summary.json
 uv run objgauss object-state import-controlled-capture-bundle . --output capture-manifest.json
 uv run objgauss object-state accept-controlled-capture-bundle . --output capture-manifest.json --summary-output acceptance-summary.json
 uv run objgauss object-state controlled-identity-bundle-handoff . <objectstates.json> --output-dir identity-handoff

@@ -42,6 +42,8 @@ def test_controlled_capture_template_writes_headers_without_fake_rows(tmp_path):
     assert _csv_rows(tmp_path / "actions.csv") == []
     readme = (tmp_path / "README.md").read_text(encoding="utf-8")
     assert "controlled-identity-bundle-handoff" in readme
+    assert "docs/training/controlled-real-capture-runbook.md" in readme
+    assert "audit-controlled-capture-bundle-readiness" in readme
     assert "does not contain captured RGB frames" in readme
     assert "Do not copy large captures" in readme
     assert validate_objectstate_controlled_capture_bundle_template_summary(summary) == summary
