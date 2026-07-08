@@ -626,6 +626,20 @@ prediction template 转成 evaluator-ready `prediction-candidates.json`，再交
 prediction model、不重建 Gaussian、不训练模型、不创建 pass row、不声明 intervention /
 counterfactual gate 或 world model。
 
+随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001`：新增
+`objgauss.core.objectstate_controlled_prediction_evidence_package`，schema 为
+`objgauss-objectstate-controlled-prediction-evidence-package-v1`，并新增 CLI
+`objgauss object-state audit-controlled-prediction-evidence-package`。该 audit 面向
+BOP / manifest-first prediction-only 证据包，默认检查 `capture-manifest.json`、
+`bop-acceptance-summary.json`、`bop-file-audit.json`、`bop-missing-files.md`、
+`reality-candidates/template-summary.json`、`prediction-finalize-summary.json`、
+`prediction-candidates.json`、`prediction-eval-summary.json` 和
+`controlled-real-prediction.json`。reviewable 要求 BOP acceptance 已有
+`phase1_gaussian_evidence_ready=true`、所有 JSON schema 有效、`sample_id` 一致、
+prediction row 为 pass 或 fail，且 controlled-real prediction manifest 与 prediction eval
+内嵌 manifest 一致；reviewable 不要求 prediction 指标 pass，也不声明 intervention /
+counterfactual gate。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

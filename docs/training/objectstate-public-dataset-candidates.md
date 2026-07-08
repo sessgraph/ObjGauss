@@ -168,10 +168,21 @@ uv run objgauss object-state eval-controlled-prediction \
   --controlled-real-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/controlled-real-prediction.json
 ```
 
+Finally, audit the local prediction evidence package:
+
+```bash
+uv run objgauss object-state audit-controlled-prediction-evidence-package \
+  outputs/captures/bop-ycbv-scene-000001 \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-evidence-package-summary.json \
+  --require-reviewable
+```
+
 This still does not prove the causal / counterfactual gate. It only moves the
 BOP route from blocked rows toward a real prediction pass / fail row once
 Gaussian evidence, ObjectState candidate output and future-pose predictions are
-available.
+available. The prediction evidence package is reviewable when file acceptance,
+candidate finalization and prediction eval outputs are internally consistent;
+reviewable does not mean the prediction metric passed.
 
 ## Hard Blockers
 

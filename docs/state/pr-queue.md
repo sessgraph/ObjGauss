@@ -146,6 +146,10 @@ identity / prediction handoff。`OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-00
 已补 manifest-first candidate authoring 和 prediction-only finalizer：BOP acceptance
 输出的 `capture-manifest.json` 可直接生成 prediction template；无 action 的 BOP scene
 不会伪造 intervention rows，只能继续到 `eval-controlled-prediction` 的 pass / fail row。
+`OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001` 已补 prediction-only
+evidence package audit，可把 BOP acceptance、candidate finalize、prediction eval 和
+controlled-real prediction manifest 串成 reviewable package；reviewable 不等于 metric pass，
+也不声明 intervention / counterfactual gate。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -217,6 +221,42 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001: Audit BOP prediction-only evidence packages
+
+- 状态: done / read-only-prediction-evidence-audit
+- 类型: 标准 PR / ObjectState public pose dataset prediction evidence package
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 BOP / manifest-first prediction-only 路线在跑完 acceptance、candidate
+  finalize 和 `eval-controlled-prediction` 后，有一个可复核的本地 evidence package
+  audit，不被 full intervention handoff 的要求挡住。
+- 已实施:
+  - 新增 module
+    `objgauss.core.objectstate_controlled_prediction_evidence_package`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-prediction-evidence-package-v1`。
+  - 新增 core function
+    `objectstate_controlled_prediction_evidence_package(...)`。
+  - 新增 CLI
+    `objgauss object-state audit-controlled-prediction-evidence-package`。
+  - Audit 默认检查 `capture-manifest.json`、`bop-acceptance-summary.json`、
+    `bop-file-audit.json`、`bop-missing-files.md` 和
+    `reality-candidates/` 下的 template / finalize / candidates / eval /
+    controlled-real prediction outputs。
+  - Reviewability 要求 `phase1_gaussian_evidence_ready=true`、schema 有效、
+    `sample_id` 一致、prediction row 为 pass 或 fail，且 standalone
+    `controlled-real-prediction.json` 与 prediction eval 内嵌 manifest 一致。
+- 边界:
+  - 不下载 BOP 数据，不写 `outputs/` 或 `public/samples`。
+  - 不重建 Gaussian，不训练模型，不运行 prediction model，不创建 GT。
+  - 不要求 prediction metric pass；fail row 也是 reviewable evidence。
+  - 不声明 intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_prediction_evidence_package.py tests/test_objectstate_controlled_reality_candidate_template.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，33 tests。
+  - `uv run --extra dev pytest`: passed，409 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
 
 ### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
 

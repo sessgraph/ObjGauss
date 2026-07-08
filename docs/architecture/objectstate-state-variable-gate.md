@@ -1395,6 +1395,46 @@ claim prediction pass, create intervention rows, use replay / diffusion, write
 public samples or mutate viewer defaults. For a full causal / intervention gate,
 use a dataset with action events and the full reality candidate finalizer.
 
+### OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001
+
+Add a read-only audit for prediction-only Phase 1 evidence packages, primarily
+for BOP pose scenes where action / intervention rows are unavailable.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_prediction_evidence_package`.
+- Summary schema:
+  `objgauss-objectstate-controlled-prediction-evidence-package-v1`.
+- `objectstate_controlled_prediction_evidence_package(...)` reads a local
+  package root with default BOP-style files:
+  - `capture-manifest.json`;
+  - `bop-acceptance-summary.json`;
+  - `bop-file-audit.json`;
+  - `bop-missing-files.md`;
+  - `reality-candidates/template-summary.json`;
+  - `reality-candidates/prediction-finalize-summary.json`;
+  - `reality-candidates/prediction-candidates.json`;
+  - `reality-candidates/prediction-eval-summary.json`;
+  - `reality-candidates/controlled-real-prediction.json`.
+- The audit validates every JSON schema, checks `sample_id` consistency,
+  requires BOP acceptance to have `phase1_gaussian_evidence_ready=true`,
+  requires a prediction pass / fail row in the controlled-real manifest, and
+  verifies that `controlled-real-prediction.json` matches the manifest embedded
+  in the prediction eval summary.
+- Reviewability does not require the prediction metric to pass. A real fail row
+  remains reviewable evidence.
+- CLI command:
+  `objgauss object-state audit-controlled-prediction-evidence-package <package-root>`.
+- CLI supports `--candidate-dir`, source file overrides, `--summary-output`
+  and `--require-reviewable`.
+
+Current scope remains local prediction evidence package audit only. It does not
+collect capture data, create GT, reconstruct Gaussians, create prediction
+candidates, rerun prediction eval, claim metric pass, claim intervention /
+counterfactual evidence, use replay / diffusion, write public samples or mutate
+viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001
 
 Add a checked transition from filled draft templates to evaluator-ready

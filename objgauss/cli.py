@@ -197,6 +197,9 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
+from objgauss.core.objectstate_controlled_prediction_evidence_package import (
+    objectstate_controlled_prediction_evidence_package,
+)
 from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
@@ -4545,6 +4548,52 @@ def _object_state_audit_controlled_reality_evidence_package(
         raise ValueError("controlled reality evidence package is not reviewable")
 
 
+def _object_state_audit_controlled_prediction_evidence_package(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_prediction_evidence_package(
+        args.package_root,
+        candidate_dir=args.candidate_dir,
+        capture_manifest=args.capture_manifest,
+        acceptance_summary=args.acceptance_summary,
+        file_audit=args.file_audit,
+        missing_files_markdown=args.missing_files_markdown,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    prediction = summary["prediction"]
+    print(f"schema={summary['schema']}")
+    print(f"package_root={args.package_root}")
+    print(f"candidate_dir={summary['candidate_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"prediction_evidence_status={summary['status']}")
+    print(
+        "reviewable="
+        f"{str(summary['status'].endswith('_reviewable')).lower()}"
+    )
+    print(f"bop_acceptance_status={summary['acceptance']['status']}")
+    print(
+        "phase1_gaussian_evidence_ready="
+        f"{str(summary['acceptance']['phase1_gaussian_evidence_ready']).lower()}"
+    )
+    print(f"prediction_eval_status={prediction['prediction_eval_status']}")
+    print(f"prediction_candidate_count={prediction['prediction_candidate_count']}")
+    print(f"prediction_row_status={prediction['prediction_row_status']}")
+    print(f"issue_count={len(summary['issues'])}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability_gate.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_controlled_prediction_evidence_package_reviewable"
+    ):
+        raise ValueError("controlled prediction evidence package is not reviewable")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -5258,6 +5307,54 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_reality_evidence_package.set_defaults(
         handler=_object_state_audit_controlled_reality_evidence_package
+    )
+    audit_controlled_prediction_evidence_package = object_state_subparsers.add_parser(
+        "audit-controlled-prediction-evidence-package",
+        help=(
+            "audit a local prediction-only Phase 1 evidence package after BOP "
+            "acceptance, candidate finalization, and prediction eval"
+        ),
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "package_root",
+        type=Path,
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--candidate-dir",
+        default="reality-candidates",
+        help="candidate output directory, relative to package_root unless absolute",
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--capture-manifest",
+        default="capture-manifest.json",
+        help="capture manifest path, relative to package_root unless absolute",
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--acceptance-summary",
+        default="bop-acceptance-summary.json",
+        help="BOP acceptance summary path, relative to package_root unless absolute",
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--file-audit",
+        default="bop-file-audit.json",
+        help="capture file audit path, relative to package_root unless absolute",
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--missing-files-markdown",
+        default="bop-missing-files.md",
+        help="missing-files markdown path, relative to package_root unless absolute",
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_controlled_prediction_evidence_package.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the prediction evidence package is complete and reviewable",
+    )
+    audit_controlled_prediction_evidence_package.set_defaults(
+        handler=_object_state_audit_controlled_prediction_evidence_package
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",
