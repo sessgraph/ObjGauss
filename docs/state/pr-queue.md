@@ -84,9 +84,14 @@ controlled real capture runbook，并让 bundle README 指向 readiness-first
 采集 / 验收命令链。`OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001` 已新增
 Real Predictive Gate 的 controlled evaluator，可把真实 pose GT 和 candidate
 future-pose predictions 比成 `state_ade` / `history_ade` / gap，并让 prediction
-row 进入 pass / fail。下一步仍是实际采集 / 标注 controlled tabletop RGB /
-Gaussian / pose / action 文件，并用真实 candidate artifact 跑 identity / prediction
-handoff，让 rows 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
+row 进入 pass / fail。`OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001` 已新增
+Real Intervention Gate 的 controlled evaluator，可把真实 pose/action GT、
+action-conditioned prediction 和 no-action baseline 比成
+`action_conditioned_ade` / `counterfactual_outcome_accuracy` /
+`wrong_direction_rate`，并让 intervention row 进入 pass / fail。下一步仍是实际采集 /
+标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate
+artifact 跑 identity / prediction / intervention handoff，让 rows 从 fixture 进入真实
+pass / fail，而不是新增大模型。继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
 `audit:world-viewer` 的旧等待条件。
@@ -157,6 +162,56 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001: Evaluate controlled real intervention rows
+
+- 状态: done / evaluator-only-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop counterfactual intervention evaluator
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给 Phase 1 Real Intervention Gate 增加第一条可复跑 evaluator，让带
+  timestamped 6DoF pose GT 和 action GT 的 controlled capture 可以比较
+  `ObjectState(t) + action -> ObjectState(t+n)` 的 candidate action-conditioned
+  future pose prediction 和显式 no-action baseline，并把 intervention row 写入
+  reality gate。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_intervention_eval`。
+  - 新增 intervention candidate schema
+    `objgauss-objectstate-controlled-intervention-candidates-v1`。
+  - 新增 eval summary schema
+    `objgauss-objectstate-controlled-intervention-eval-v1`。
+  - Evaluator 要求候选 intervention 显式绑定
+    `(source_frame_id, target_frame_id, object_id, action_id)`，并提供
+    `action_conditioned_position` 与 `no_action_baseline_position`；缺 sample /
+    frame / object / action / pose GT、重复 tuple、action interval 不在
+    source/target timestamp 内或 action vector 缺失都会 fail-fast。
+  - 输出 `action_conditioned_ade`、`no_action_ade`、
+    `intervention_gain`、`action_error_ratio`、
+    `counterfactual_outcome_accuracy`、`wrong_direction_rate`、
+    intervention count 和 horizon seconds。
+  - 生成的 controlled-real manifest 会把 intervention row 从 blocked 改成
+    pass / fail；identity 和 prediction rows 继续保持 blocked，除非独立 evaluator
+    已经产生对应指标。
+  - CLI 新增 `objgauss object-state eval-controlled-intervention
+    <capture.json> <interventions.json>`。
+  - CLI 可写 `--summary-output` 和 `--controlled-real-output`，支持
+    `--max-action-conditioned-ade`、`--min-counterfactual-outcome-accuracy`、
+    `--max-wrong-direction-rate`、`--min-intervention-gain`、
+    `--min-intervention-count` 和 `--require-pass`。
+  - Core lazy namespace 暴露 intervention schema、thresholds、evaluator 和
+    validators。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 candidate interventions，不运行 action-conditioned /
+    dynamics model，不训练 Gaussian / dynamics，不计算 identity / prediction
+    metrics。
+  - 不声明 ObjectState 已通过真实世界因果 / 反事实验证，不推进 replay buffer /
+    diffusion，不写 `public/samples`，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_intervention_eval.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 368 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `26cf3ec`。
 
 ### OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001: Evaluate controlled real prediction rows
 

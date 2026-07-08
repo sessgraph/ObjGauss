@@ -450,6 +450,22 @@ manifest 的 prediction row 从 blocked 推进为 pass / fail。该切片仍不�
 不创建 GT、不运行预测 / dynamics 模型、不训练 Gaussian 或 dynamics、不计算 identity /
 intervention 指标、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `354920a`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001`：新增
+`objgauss.core.objectstate_controlled_intervention_eval`，schema 为
+`objgauss-objectstate-controlled-intervention-candidates-v1` 和
+`objgauss-objectstate-controlled-intervention-eval-v1`，并新增 CLI
+`objgauss object-state eval-controlled-intervention <capture.json> <interventions.json>`。
+该 evaluator 要求 controlled capture manifest 已具备 timestamped 6DoF pose GT 和
+action GT，候选 intervention 显式提供
+`(source_frame_id, target_frame_id, object_id, action_id)`、
+`action_conditioned_position` 和 `no_action_baseline_position`；action 必须提供非零
+vector，才能计算 `wrong_direction_rate`。它计算 `action_conditioned_ade`、
+`no_action_ade`、`intervention_gain`、`counterfactual_outcome_accuracy`、
+`wrong_direction_rate` 和 horizon 统计，并把 controlled-real manifest 的 intervention
+row 从 blocked 推进为 pass / fail。该切片仍不采集视频、不创建 GT、不运行
+action-conditioned / dynamics 模型、不训练 Gaussian 或 dynamics、不计算 identity /
+prediction 指标、不写 `public/samples`、不改 viewer/export 默认。完成 commit: `26cf3ec`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
