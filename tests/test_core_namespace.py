@@ -79,6 +79,7 @@ from objgauss.core import (
     OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA,
     OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA,
+    OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
@@ -243,6 +244,7 @@ from objgauss.core import (
     objectstate_bop_prediction_baseline_handoff,
     objectstate_bop_phase1_route_audit,
     objectstate_bop_identity_route_audit,
+    objectstate_bop_phase1_local_row_readiness,
     write_objectstate_controlled_reality_candidate_templates,
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     objectstate_identity_predictions_from_trainable_artifact,
@@ -334,6 +336,7 @@ from objgauss.core import (
     validate_objectstate_bop_prediction_baseline_handoff_summary,
     validate_objectstate_bop_phase1_route_audit_summary,
     validate_objectstate_bop_identity_route_audit_summary,
+    validate_objectstate_bop_phase1_local_row_readiness_summary,
     validate_objectstate_controlled_identity_evidence_package_summary,
     validate_objectstate_phase1_evidence_ledger_summary,
     validate_objectstate_controlled_prediction_baseline_summary,
@@ -1103,6 +1106,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA == (
         "objgauss-objectstate-bop-identity-route-audit-v1"
     )
+    assert OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA == (
+        "objgauss-objectstate-bop-phase1-local-row-readiness-v1"
+    )
     assert objectstate_controlled_reality_bundle_handoff is not None
     assert objectstate_controlled_reality_bundle_readiness is not None
     assert objectstate_controlled_reality_evidence_package is not None
@@ -1117,6 +1123,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_bop_prediction_baseline_handoff is not None
     assert objectstate_bop_phase1_route_audit is not None
     assert objectstate_bop_identity_route_audit is not None
+    assert objectstate_bop_phase1_local_row_readiness is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
     assert validate_objectstate_controlled_reality_candidate_template_summary is not None
@@ -1126,6 +1133,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_bop_prediction_baseline_handoff_summary is not None
     assert validate_objectstate_bop_phase1_route_audit_summary is not None
     assert validate_objectstate_bop_identity_route_audit_summary is not None
+    assert validate_objectstate_bop_phase1_local_row_readiness_summary is not None
     assert validate_objectstate_controlled_identity_evidence_package_summary is not None
     assert validate_objectstate_phase1_evidence_ledger_summary is not None
     assert validate_objectstate_controlled_prediction_evidence_package_summary is not None

@@ -132,6 +132,26 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 `--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
 or `.splat` files for every selected frame.
 
+To get one machine-readable status for the whole local BOP row, run the
+combined Phase 1 local row readiness audit:
+
+```bash
+uv run objgauss object-state audit-bop-phase1-local-row \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output-root outputs/captures/bop-ycbv-scene-000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --candidate-artifact outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-phase1-local-row-summary.json
+```
+
+This command wraps the identity route and prediction route audits without
+running either handoff. Use it as the first local row status check after placing
+the BOP subset and any generated Gaussian / candidate artifacts. It reports a
+single `blocking_stage`, such as `local_bop_scene`,
+`phase1_gaussian_evidence`, `candidate_artifact`,
+`identity_scenario_metadata`, `handoff_ready`, or reviewable evidence status.
+
 For Stage 1 identity-state evidence, run the identity route audit before
 starting a handoff:
 

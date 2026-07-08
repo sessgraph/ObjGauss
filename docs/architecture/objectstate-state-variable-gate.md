@@ -822,6 +822,44 @@ create GT, reconstruct Gaussians, run prediction handoff, run prediction eval,
 train models, claim identity / intervention gates, claim world model, use replay
 / diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-PHASE1-LOCAL-ROW-READINESS-001
+
+Add a read-only combined local row readiness audit for BOP Phase 1 identity and
+prediction evidence.
+
+Required behavior:
+
+- Input a local BOP scene root, output root and optional ObjectState candidate
+  artifact.
+- Run the BOP identity route audit and BOP prediction route audit with matching
+  scene / sample / file-audit parameters.
+- Report one local row status that explains whether the next blocker is local
+  scene availability, per-frame Gaussian evidence, candidate ObjectState
+  artifact binding, identity scenario metadata, handoff readiness, or existing
+  reviewable evidence.
+- Preserve route-level evidence details under nested `routes.identity` and
+  `routes.prediction`.
+- Emit next actions without downloading data, reconstructing Gaussians, running
+  identity / prediction handoff, running eval, or training a model.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_phase1_local_row_readiness`.
+- Summary schema: `objgauss-objectstate-bop-phase1-local-row-readiness-v1`.
+- Core function: `objectstate_bop_phase1_local_row_readiness(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-phase1-local-row <scene-root> --output-root <dir>`.
+- The combined audit uses conservative status ordering:
+  - scene / acceptance / Gaussian blockers first;
+  - candidate artifact blocker before identity scenario blocker;
+  - reviewable identity / prediction evidence before handoff-ready states;
+  - intervention / counterfactual evidence always remains outside this route.
+
+Current scope is read-only local row accounting. It does not download BOP data,
+create GT, reconstruct Gaussians, run identity / prediction handoff, run eval,
+train models, claim intervention / counterfactual gates, claim world model, use
+replay / diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /

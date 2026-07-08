@@ -6,6 +6,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 playwright-report/
+.playwright-mcp/
 test-results/
 dist/
 build/
