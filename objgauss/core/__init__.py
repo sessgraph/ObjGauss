@@ -158,6 +158,22 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_files",
         "OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_import",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA",
+    ),
+    "objectstate_controlled_capture_import_summary": (
+        "objgauss.core.objectstate_controlled_capture_import",
+        "objectstate_controlled_capture_import_summary",
+    ),
+    "objectstate_controlled_capture_manifest_from_bundle": (
+        "objgauss.core.objectstate_controlled_capture_import",
+        "objectstate_controlled_capture_manifest_from_bundle",
+    ),
+    "validate_objectstate_controlled_capture_import_summary": (
+        "objgauss.core.objectstate_controlled_capture_import",
+        "validate_objectstate_controlled_capture_import_summary",
+    ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA",

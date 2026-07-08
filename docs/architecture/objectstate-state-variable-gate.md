@@ -1,7 +1,7 @@
 # ObjectState State Variable Gate
 
 > 状态: research architecture spec / v2 gate baseline
-> 最近更新: 2026-07-07
+> 最近更新: 2026-07-08
 > 依赖:
 > - `docs/architecture/objgauss-v1-kernel-contract.md`
 > - `docs/architecture/objgauss-v1-object-emergence-plan.md`
@@ -659,6 +659,58 @@ Implemented v0.2 facts:
 Current scope remains manifest / readiness validation only. It does not capture
 video, create GT, reconstruct Gaussians, compute model metrics, train Gaussian
 or dynamics models, use replay / diffusion, or mutate viewer defaults.
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-IMPORT-001
+
+Build a controlled capture manifest from a local tabletop capture bundle.
+
+Required behavior:
+
+- Treat `sample.json`, `objects.csv`, `frames.csv`, `annotations.csv` and
+  optional `actions.csv` as operator-provided capture / annotation facts.
+- Convert those files into
+  `objgauss-objectstate-controlled-capture-manifest-v1`.
+- Validate the resulting manifest with the existing controlled capture
+  contract.
+- Emit the normal controlled capture summary and controlled-real blocked seed.
+- Do not create GT, infer missing poses, reconstruct Gaussians or score a
+  candidate model.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_capture_import`.
+- Import summary schema:
+  `objgauss-objectstate-controlled-capture-import-v1`.
+- Bundle files:
+  - `sample.json`: controlled sample metadata compatible with
+    capture manifest `sample`.
+  - `objects.csv`: `object_id`, `category`, optional `instance_label`, optional
+    `dimension_x_m`, `dimension_y_m`, `dimension_z_m`.
+  - `frames.csv`: `frame_id`, `timestamp`, `rgb`, optional `gaussian`,
+    optional `action_id`, optional `view_id`, `lighting_id` and camera pose
+    columns `camera_x`, `camera_y`, `camera_z`, `camera_qx`, `camera_qy`,
+    `camera_qz`, `camera_qw`.
+  - `annotations.csv`: `frame_id`, `object_id`, optional `visible`,
+    optional `occlusion_fraction`, optional object pose columns `x`, `y`, `z`,
+    `qx`, `qy`, `qz`, `qw`.
+  - `actions.csv`: optional action facts with `action_id`, `action_type`,
+    `object_id`, `start_timestamp`, `end_timestamp`, optional `actor`,
+    optional `target_object_id` and optional vector columns.
+- Partial pose vectors fail-fast; if any pose component is present, all
+  required pose columns must be present.
+- Annotation rows must reference a known frame, and every imported frame must
+  have at least one annotation row.
+- CLI command:
+  `objgauss object-state import-controlled-capture-bundle <bundle-root> --output <capture-manifest.json>`.
+- CLI can also write `--summary-output` and `--controlled-real-output`, and
+  supports readiness gates `--require-identity-ready`,
+  `--require-prediction-ready` and `--require-intervention-ready`.
+
+Current scope remains import / validation only. It does not capture video,
+create ground truth, verify file bytes, reconstruct Gaussians, train models,
+write public samples, use replay / diffusion or mutate viewer defaults. Use
+`audit-controlled-capture-files` after import to prove the referenced RGB /
+Gaussian files exist and have recognizable formats.
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001
 

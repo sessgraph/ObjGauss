@@ -145,6 +145,9 @@ from objgauss.core.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
+from objgauss.core.objectstate_controlled_capture_import import (
+    objectstate_controlled_capture_import_summary,
+)
 from objgauss.core.objectstate_controlled_capture_files import (
     objectstate_controlled_capture_file_audit,
 )
@@ -3031,6 +3034,52 @@ def _object_state_controlled_real_gate(args: argparse.Namespace) -> None:
         raise ValueError("controlled real ObjectState reality gate did not pass")
 
 
+def _object_state_import_controlled_capture_bundle(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_capture_import_summary(
+        args.bundle_root,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+    )
+    manifest = summary["manifest"]
+    capture_summary = summary["capture_summary"]
+    sample = manifest["sample"]
+    readiness = capture_summary["readiness"]
+    write_json(args.output, manifest)
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={args.bundle_root}")
+    print(f"sample_id={sample['sample_id']}")
+    print(f"frames={summary['row_counts']['frames']}")
+    print(f"objects={summary['row_counts']['objects']}")
+    print(f"annotations={summary['row_counts']['annotations']}")
+    print(f"actions={summary['row_counts']['actions']}")
+    print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(f"prediction_stage_ready={str(readiness['prediction_stage_ready']).lower()}")
+    print(f"intervention_stage_ready={str(readiness['intervention_stage_ready']).lower()}")
+    print(
+        "real_gaussian_reconstruction_present="
+        f"{str(readiness['real_gaussian_reconstruction_present']).lower()}"
+    )
+    print(f"output={args.output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(
+            args.controlled_real_output,
+            capture_summary["controlled_real_manifest_seed"],
+        )
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if args.require_identity_ready and not readiness["identity_stage_ready"]:
+        raise ValueError("imported controlled capture bundle is not identity-stage ready")
+    if args.require_prediction_ready and not readiness["prediction_stage_ready"]:
+        raise ValueError("imported controlled capture bundle is not prediction-stage ready")
+    if args.require_intervention_ready and not readiness["intervention_stage_ready"]:
+        raise ValueError("imported controlled capture bundle is not intervention-stage ready")
+
+
 def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
     manifest = read_objectstate_controlled_capture_manifest(args.manifest)
     summary = objectstate_controlled_capture_summary(manifest)
@@ -3499,6 +3548,25 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_real_gate.add_argument("--min-real-or-public-rows", type=int, default=1)
     controlled_real_gate.add_argument("--require-pass", action="store_true")
     controlled_real_gate.set_defaults(handler=_object_state_controlled_real_gate)
+    import_controlled_capture = object_state_subparsers.add_parser(
+        "import-controlled-capture-bundle",
+        help="build a controlled capture manifest from local bundle CSV files",
+    )
+    import_controlled_capture.add_argument("bundle_root", type=Path)
+    import_controlled_capture.add_argument("--output", "-o", required=True, type=Path)
+    import_controlled_capture.add_argument("--summary-output", type=Path)
+    import_controlled_capture.add_argument("--controlled-real-output", type=Path)
+    import_controlled_capture.add_argument("--sample-json", default="sample.json")
+    import_controlled_capture.add_argument("--objects-csv", default="objects.csv")
+    import_controlled_capture.add_argument("--frames-csv", default="frames.csv")
+    import_controlled_capture.add_argument("--annotations-csv", default="annotations.csv")
+    import_controlled_capture.add_argument("--actions-csv", default="actions.csv")
+    import_controlled_capture.add_argument("--require-identity-ready", action="store_true")
+    import_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
+    import_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
+    import_controlled_capture.set_defaults(
+        handler=_object_state_import_controlled_capture_bundle
+    )
     validate_controlled_capture = object_state_subparsers.add_parser(
         "validate-controlled-capture",
         help="validate a frame-level controlled tabletop capture manifest",
