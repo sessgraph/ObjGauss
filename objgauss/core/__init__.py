@@ -330,6 +330,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_PHASE1_BATCH_WORKSPACE_SCHEMA": (
+        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "OBJECTSTATE_BOP_PHASE1_BATCH_WORKSPACE_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
         "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA",
@@ -494,6 +498,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "objectstate_bop_phase1_subset_selector",
     ),
+    "objectstate_bop_phase1_batch_workspace": (
+        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "objectstate_bop_phase1_batch_workspace",
+    ),
     "objectstate_bop_gaussian_evidence_preflight": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
         "objectstate_bop_gaussian_evidence_preflight",
@@ -621,6 +629,10 @@ _EXPORTS = {
     "validate_objectstate_bop_phase1_subset_selector_summary": (
         "objgauss.core.objectstate_bop_phase1_subset_selector",
         "validate_objectstate_bop_phase1_subset_selector_summary",
+    ),
+    "validate_objectstate_bop_phase1_batch_workspace_summary": (
+        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "validate_objectstate_bop_phase1_batch_workspace_summary",
     ),
     "validate_objectstate_bop_gaussian_evidence_preflight_summary": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",

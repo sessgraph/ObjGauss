@@ -173,6 +173,10 @@ Phase 1 seed 的 scene。
 `select-bop-phase1-subset --batch-samples-csv-template-output` 可把 ready scene 写成
 `init-bop-local-row-batch-spec` 可消费的 CSV；它只写模板，不创建 candidate artifact /
 condition sidecar，不运行 readiness / handoff。
+`OBJECTSTATE-BOP-PHASE1-BATCH-WORKSPACE-001` 继续把 selector / samples CSV /
+batch spec authoring 收敛成 `init-bop-phase1-batch-workspace`，可在本地 BOP subset
+上初始化 reviewable authoring workspace；它仍不创建 candidate artifact / condition
+sidecar，不生成 Gaussian evidence，不运行 readiness / handoff。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -294,6 +298,41 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-PHASE1-BATCH-WORKSPACE-001: Initialize BOP Phase 1 batch workspaces
+
+- 状态: done / batch-workspace-authoring
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 batch input preparation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把本地 BOP subset selector、samples CSV authoring 和 native batch spec
+  authoring 合成一个可复跑 workspace 初始化入口，减少从 dataset root 到 batch
+  readiness 的手工路径错误。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_phase1_batch_workspace`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-phase1-batch-workspace-v1`。
+  - 新增 CLI
+    `objgauss object-state init-bop-phase1-batch-workspace <dataset-root> --workspace-root <dir>`。
+  - workspace 写出 `selector-summary.json`、`samples.csv`、
+    `bop-local-row-batch.json`、`batch-spec-authoring-summary.json` 和 `README.md`。
+  - `--require-authored` 可要求至少有 selector-ready sample rows 和 batch spec；
+    `--require-input-paths` 可要求 expected candidate artifact / condition sidecar
+    本地路径已经存在。
+- 边界:
+  - 只初始化 authoring workspace，不下载 BOP、不复制 dataset。
+  - 不创建 GT，不推断 condition metadata，不创建 candidate artifact 或 sidecar。
+  - 不生成 Gaussian evidence，不运行 readiness / handoff，不训练模型。
+  - 不声明 metric pass / intervention gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_batch_workspace.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_batch_workspace.py -q`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_batch_workspace.py tests/test_objectstate_bop_phase1_subset_selector.py tests/test_objectstate_bop_local_row_batch_spec.py tests/test_core_namespace.py -q`: passed，21 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，78 tests。
+  - `uv run --extra dev pytest`: passed，490 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001: Write BOP batch sample CSV templates
 

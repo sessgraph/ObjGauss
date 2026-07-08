@@ -965,6 +965,45 @@ models, claim metric pass, claim intervention / counterfactual gates, claim
 world model, use replay / diffusion, write public samples or mutate viewer
 defaults.
 
+### OBJECTSTATE-BOP-PHASE1-BATCH-WORKSPACE-001
+
+Initialize a local BOP Phase 1 batch workspace from a dataset / split root.
+
+Required behavior:
+
+- Input a local BOP dataset or split root and a local workspace directory.
+- Run the Phase 1 subset selector and persist its summary.
+- Write `samples.csv` with selector-ready scenes only.
+- Write a native `objgauss-objectstate-bop-local-row-batch-spec-v1` batch spec
+  when sample rows exist.
+- Write a README / next-command handoff for batch readiness and batch handoff.
+- Keep missing candidate artifacts and condition sidecars visible as issues;
+  the workspace must not create those files.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_phase1_batch_workspace`.
+- Summary schema:
+  `objgauss-objectstate-bop-phase1-batch-workspace-v1`.
+- Core function:
+  `objectstate_bop_phase1_batch_workspace(...)`.
+- CLI command:
+  `objgauss object-state init-bop-phase1-batch-workspace <dataset-root> --workspace-root <dir>`.
+- Workspace files:
+  `selector-summary.json`, `samples.csv`, `bop-local-row-batch.json`,
+  `batch-spec-authoring-summary.json` and `README.md`.
+- `--require-authored` fails when no selector-ready sample rows were written.
+- `--require-input-paths` fails until expected `objectstates.json` and
+  `bop-condition-sidecar.json` files exist.
+
+Current scope is workspace authoring only. It does not download BOP data, copy
+datasets, create GT, infer condition metadata, create ObjectState candidate
+artifacts, create condition sidecars, reconstruct Gaussians, run readiness,
+run local-row handoff, train models, claim metric pass, claim intervention /
+counterfactual gates, claim world model, use replay / diffusion, write public
+samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample

@@ -218,6 +218,9 @@ from objgauss.core.objectstate_public_dataset_candidates import (
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
 )
+from objgauss.core.objectstate_bop_phase1_batch_workspace import (
+    objectstate_bop_phase1_batch_workspace,
+)
 from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
     objectstate_bop_gaussian_evidence_preflight,
 )
@@ -3375,6 +3378,49 @@ def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
         raise ValueError("no BOP Phase 1 subset candidate is ready")
 
 
+def _object_state_init_bop_phase1_batch_workspace(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_phase1_batch_workspace(
+        args.dataset_root,
+        workspace_root=args.workspace_root,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        depth_dir=args.depth_dir,
+        gaussian_dir=args.gaussian_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        max_depth=args.max_depth,
+        max_scene_candidates=args.max_scene_candidates,
+        min_frames=args.min_frames,
+        min_objects=args.min_objects,
+        min_persistent_objects=args.min_persistent_objects,
+        batch_id=args.batch_id,
+        batch_output_root=args.batch_output_root,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    print(f"schema={summary['schema']}")
+    print(f"bop_phase1_batch_workspace_status={summary['status']}")
+    print(f"workspace_root={summary['workspace_root']}")
+    print(f"samples_csv={summary['files']['samples_csv']}")
+    print(f"batch_spec={summary['files']['batch_spec']}")
+    print(f"samples_csv_rows={summary['row_counts']['samples_csv_rows']}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.require_authored and not summary["readiness"]["workspace_reviewable"]:
+        raise ValueError("BOP Phase 1 batch workspace was not authored")
+    if args.require_input_paths and not summary["readiness"]["batch_spec_inputs_ready"]:
+        raise ValueError("BOP Phase 1 batch workspace input paths are incomplete")
+
+
 def _write_bop_batch_samples_csv_template(
     output: Path,
     summary: Mapping[str, object],
@@ -6275,6 +6321,76 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     select_bop_phase1_subset.set_defaults(
         handler=_object_state_select_bop_phase1_subset
+    )
+    init_bop_phase1_batch_workspace = object_state_subparsers.add_parser(
+        "init-bop-phase1-batch-workspace",
+        help="initialize a local BOP Phase 1 batch authoring workspace",
+    )
+    init_bop_phase1_batch_workspace.add_argument("dataset_root", type=Path)
+    init_bop_phase1_batch_workspace.add_argument(
+        "--workspace-root",
+        type=Path,
+        required=True,
+    )
+    init_bop_phase1_batch_workspace.add_argument("--summary-output", type=Path)
+    init_bop_phase1_batch_workspace.add_argument("--dataset-id", default="bop-ycbv")
+    init_bop_phase1_batch_workspace.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    init_bop_phase1_batch_workspace.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    init_bop_phase1_batch_workspace.add_argument("--fps", type=float, default=30.0)
+    init_bop_phase1_batch_workspace.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    init_bop_phase1_batch_workspace.add_argument("--rgb-dir", default="rgb")
+    init_bop_phase1_batch_workspace.add_argument("--depth-dir", default="depth")
+    init_bop_phase1_batch_workspace.add_argument("--gaussian-dir", default="gaussians")
+    init_bop_phase1_batch_workspace.add_argument("--max-frames", type=int)
+    init_bop_phase1_batch_workspace.add_argument("--frame-step", type=int, default=1)
+    init_bop_phase1_batch_workspace.add_argument("--max-depth", type=int, default=3)
+    init_bop_phase1_batch_workspace.add_argument(
+        "--max-scene-candidates",
+        type=int,
+        default=20,
+    )
+    init_bop_phase1_batch_workspace.add_argument("--min-frames", type=int, default=3)
+    init_bop_phase1_batch_workspace.add_argument("--min-objects", type=int, default=1)
+    init_bop_phase1_batch_workspace.add_argument(
+        "--min-persistent-objects",
+        type=int,
+        default=1,
+    )
+    init_bop_phase1_batch_workspace.add_argument(
+        "--batch-id",
+        default="bop-phase1-local-row-batch",
+    )
+    init_bop_phase1_batch_workspace.add_argument(
+        "--batch-output-root",
+        type=Path,
+        default=Path("handoff"),
+    )
+    init_bop_phase1_batch_workspace.add_argument(
+        "--require-authored",
+        action="store_true",
+        help="fail unless at least one sample row and batch spec are authored",
+    )
+    init_bop_phase1_batch_workspace.add_argument(
+        "--require-input-paths",
+        action="store_true",
+        help=(
+            "fail unless expected candidate artifact and condition sidecar "
+            "paths already exist"
+        ),
+    )
+    init_bop_phase1_batch_workspace.set_defaults(
+        handler=_object_state_init_bop_phase1_batch_workspace
     )
     audit_bop_gaussian_evidence = object_state_subparsers.add_parser(
         "audit-bop-gaussian-evidence",

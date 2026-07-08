@@ -47,3 +47,11 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-BATCH-CSV-TEMPLATE-001`
 condition sidecar 本地路径；该缓解只减少从 selector 到 batch authoring 的人工错漏，不创建
 candidate artifact 或 sidecar，不运行 readiness / handoff、不创建 GT、不训练模型、不声明
 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-PHASE1-BATCH-WORKSPACE-001`
+新增 `init-bop-phase1-batch-workspace`，可从本地 BOP dataset / split root 初始化
+selector summary、samples CSV、native batch spec、batch spec authoring summary 和
+README / next commands；该缓解只把本地 BOP subset 到 batch readiness 的 authoring
+路径收敛成可复跑 workspace，不创建 candidate artifact、condition sidecar、Gaussian
+evidence 或 GT，不运行 readiness / handoff、不训练模型、不声明 metric pass、
+intervention gate 或 world-model evidence。
