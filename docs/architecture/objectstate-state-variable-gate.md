@@ -1282,12 +1282,15 @@ Implemented v0.4 facts:
 - CLI command:
   `objgauss object-state controlled-identity-handoff <capture> <objectstates> --output-dir <dir>`.
 - CLI writes:
-  `capture-file-audit.json`, `capture-missing-files.md`,
+  `capture-manifest.json`, `capture-file-audit.json`, `capture-missing-files.md`,
   `candidate-artifact-file-audit.json`,
   `identity-scenario-audit.json`,
   `identity-predictions.json`, `identity-eval-summary.json`,
   `controlled-real.json`, `controlled-real-summary.json`, `blocked-rows.md`
-  and `handoff-summary.json`.
+  `handoff-summary.json` and `identity-evidence-package-summary.json`.
+- The CLI output directory is self-contained for identity evidence package
+  review: after writing the handoff files, it runs the read-only identity
+  evidence package audit and saves the summary.
 - CLI defaults `--capture-root` to the manifest directory and supports
   `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files` and
   `--check-artifact-refs`.
@@ -1348,6 +1351,10 @@ Implemented v0.1 facts:
   `objgauss object-state audit-controlled-identity-evidence-package <package-root>`.
 - CLI supports source file overrides, `--summary-output` and
   `--require-reviewable`.
+- `controlled-identity-handoff` and `controlled-identity-bundle-handoff`
+  automatically write `identity-evidence-package-summary.json` into their
+  output directory so Stage 1 identity handoff outputs are immediately
+  reviewable without a second manual command.
 
 Current scope remains local identity evidence package audit only. It does not
 collect capture data, create GT, reconstruct Gaussians, generate predictions,

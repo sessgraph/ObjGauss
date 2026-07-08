@@ -8,6 +8,9 @@ from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
     objectstate_controlled_identity_bundle_handoff,
     validate_objectstate_controlled_identity_bundle_handoff_summary,
 )
+from objgauss.core.objectstate_controlled_identity_evidence_package import (
+    OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA,
+)
 from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
@@ -162,6 +165,11 @@ def test_object_state_controlled_identity_bundle_handoff_cli_writes_artifacts(
     controlled_real_summary = json.loads(
         (output_dir / "controlled-real-summary.json").read_text(encoding="utf-8")
     )
+    identity_evidence_package = json.loads(
+        (output_dir / "identity-evidence-package-summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
     assert f"schema={OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA}" in stdout
     assert (
@@ -184,6 +192,12 @@ def test_object_state_controlled_identity_bundle_handoff_cli_writes_artifacts(
     assert "track_retrieval_recall_at_1=1.000000" in stdout
     assert "long_term_drift_rate=0.000000" in stdout
     assert "reconstruction_noise_robustness=1.000000" in stdout
+    assert (
+        "identity_evidence_package_status="
+        "objectstate_controlled_identity_evidence_package_reviewable"
+        in stdout
+    )
+    assert "identity_evidence_package_reviewable=true" in stdout
 
     assert bundle_handoff["status"] == "objectstate_controlled_identity_bundle_handoff_pass"
     assert handoff["status"] == "objectstate_controlled_identity_handoff_pass"
@@ -200,6 +214,15 @@ def test_object_state_controlled_identity_bundle_handoff_cli_writes_artifacts(
         "timestamp": True,
     }
     assert controlled_real_summary["blocked_row_count"] == 2
+    assert (
+        identity_evidence_package["schema"]
+        == OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA
+    )
+    assert identity_evidence_package["status"] == (
+        "objectstate_controlled_identity_evidence_package_reviewable"
+    )
+    assert identity_evidence_package["identity"]["identity_row_status"] == "pass"
+    assert identity_evidence_package["issues"] == []
     assert "no missing files" in (output_dir / "bundle-missing-files.md").read_text(
         encoding="utf-8"
     )

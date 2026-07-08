@@ -214,8 +214,9 @@ package is reviewable when file acceptance, baseline candidate generation,
 candidate finalization and prediction eval outputs are internally consistent;
 reviewable does not mean the prediction metric passed.
 
-For a controlled identity-only handoff, audit the local evidence package after
-`controlled-identity-handoff`:
+For a controlled identity-only handoff, the handoff CLIs write
+`identity-evidence-package-summary.json` into the output directory. To rerun or
+override the read-only local package audit:
 
 ```bash
 uv run objgauss object-state audit-controlled-identity-evidence-package \

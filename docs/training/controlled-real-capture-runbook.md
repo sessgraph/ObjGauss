@@ -259,6 +259,14 @@ uv run objgauss object-state controlled-identity-bundle-handoff \
   --require-pass
 ```
 
+This handoff writes `identity-handoff/identity-evidence-package-summary.json`
+after the handoff artifacts. Treat that file as the Stage 1 identity review
+entry point: reviewable means the local capture / candidate artifact audits,
+scenario challenge audit, identity pass / fail row, and handoff summary are
+internally consistent. It does not mean the identity metric passed unless the
+identity row itself is `pass`, and it does not claim prediction or intervention
+evidence.
+
 For full Phase 1 readiness, add the finalized prediction and intervention
 candidate JSON files:
 

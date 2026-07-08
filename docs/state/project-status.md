@@ -653,6 +653,12 @@ reviewable 要求 capture / candidate artifact file audit 通过、candidate art
 match、identity scenario audit 通过、identity row 为 pass 或 fail，且 standalone outputs
 与 handoff summary 内嵌结果一致；reviewable 不要求 identity 指标 pass，也不声明
 prediction、intervention、counterfactual gate 或 world model。
+随后补强 handoff 集成：`controlled-identity-handoff` 现在会把输入
+`capture-manifest.json` 复制到 output dir，并在写完 handoff artifacts 后自动写出
+`identity-evidence-package-summary.json`；`controlled-identity-bundle-handoff` 也会在
+同一 output dir 自动写出该 summary。该 summary 只是 read-only evidence package audit
+结果，不重新运行 identity eval，不改变 handoff pass / fail 判定，也不声明 prediction /
+intervention 或 world model。
 
 随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`：新增
 `objgauss.core.objectstate_controlled_prediction_baseline`，schema 为

@@ -3984,6 +3984,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     )
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    capture_manifest_path = output_dir / "capture-manifest.json"
     capture_file_audit_path = output_dir / "capture-file-audit.json"
     capture_missing_files_path = output_dir / "capture-missing-files.md"
     candidate_artifact_file_audit_path = output_dir / "candidate-artifact-file-audit.json"
@@ -3994,6 +3995,10 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     controlled_real_summary_path = output_dir / "controlled-real-summary.json"
     blocked_rows_path = output_dir / "blocked-rows.md"
     handoff_path = output_dir / "handoff-summary.json"
+    identity_evidence_package_path = (
+        output_dir / "identity-evidence-package-summary.json"
+    )
+    write_json(capture_manifest_path, capture)
     write_json(capture_file_audit_path, summary["capture_file_audit"])
     capture_missing_files_path.write_text(
         summary["capture_file_audit"]["missing_files_markdown"],
@@ -4013,6 +4018,10 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         encoding="utf-8",
     )
     write_json(handoff_path, summary)
+    identity_evidence_package = objectstate_controlled_identity_evidence_package(
+        output_dir
+    )
+    write_json(identity_evidence_package_path, identity_evidence_package)
     metrics = summary["identity_eval"]["metrics"]
     gate = summary["controlled_real_summary"]["gate"]
     scenario_coverage = summary["identity_scenario_audit"]["scenario_coverage"]
@@ -4053,6 +4062,14 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
     print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
     print(f"swap_rate={metrics['swap_rate']:.6f}")
+    print(
+        "identity_evidence_package_status="
+        f"{identity_evidence_package['status']}"
+    )
+    print(
+        "identity_evidence_package_reviewable="
+        f"{str(identity_evidence_package['status'].endswith('_reviewable')).lower()}"
+    )
     noise_robustness = metrics["reconstruction_noise_robustness"]
     noise_text = f"{noise_robustness:.6f}" if noise_robustness is not None else "missing"
     print(f"reconstruction_noise_robustness={noise_text}")
@@ -4061,6 +4078,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         f"{metrics['reconstruction_noise_variant_count']}"
     )
     print(f"blocked_rows={summary['controlled_real_summary']['blocked_row_count']}")
+    print(f"capture_manifest={capture_manifest_path}")
     print(f"capture_file_audit={capture_file_audit_path}")
     print(f"capture_missing_files={capture_missing_files_path}")
     print(f"candidate_artifact_file_audit={candidate_artifact_file_audit_path}")
@@ -4071,6 +4089,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     print(f"controlled_real_summary={controlled_real_summary_path}")
     print(f"blocked_rows_markdown={blocked_rows_path}")
     print(f"handoff_summary={handoff_path}")
+    print(f"identity_evidence_package_summary={identity_evidence_package_path}")
     if args.require_pass and summary["status"] != "objectstate_controlled_identity_handoff_pass":
         raise ValueError("controlled identity handoff did not pass")
 
@@ -4148,6 +4167,9 @@ def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -
     blocked_rows_path = output_dir / "blocked-rows.md"
     handoff_path = output_dir / "handoff-summary.json"
     bundle_handoff_path = output_dir / "bundle-handoff-summary.json"
+    identity_evidence_package_path = (
+        output_dir / "identity-evidence-package-summary.json"
+    )
 
     write_json(capture_manifest_path, import_summary["manifest"])
     write_json(bundle_acceptance_path, acceptance)
@@ -4181,6 +4203,10 @@ def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -
     )
     write_json(handoff_path, handoff)
     write_json(bundle_handoff_path, summary)
+    identity_evidence_package = objectstate_controlled_identity_evidence_package(
+        output_dir
+    )
+    write_json(identity_evidence_package_path, identity_evidence_package)
 
     metrics = handoff["identity_eval"]["metrics"]
     gate = handoff["controlled_real_summary"]["gate"]
@@ -4227,6 +4253,14 @@ def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -
     print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
     print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
     print(f"swap_rate={metrics['swap_rate']:.6f}")
+    print(
+        "identity_evidence_package_status="
+        f"{identity_evidence_package['status']}"
+    )
+    print(
+        "identity_evidence_package_reviewable="
+        f"{str(identity_evidence_package['status'].endswith('_reviewable')).lower()}"
+    )
     noise_robustness = metrics["reconstruction_noise_robustness"]
     noise_text = f"{noise_robustness:.6f}" if noise_robustness is not None else "missing"
     print(f"reconstruction_noise_robustness={noise_text}")
@@ -4252,6 +4286,7 @@ def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -
     print(f"blocked_rows_markdown={blocked_rows_path}")
     print(f"handoff_summary={handoff_path}")
     print(f"bundle_handoff_summary={bundle_handoff_path}")
+    print(f"identity_evidence_package_summary={identity_evidence_package_path}")
     if (
         args.require_pass
         and summary["status"]

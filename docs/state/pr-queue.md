@@ -368,6 +368,36 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 8e6fdf0。
 
+### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-EVIDENCE-SUMMARY-001: Write identity package summary during handoff
+
+- 状态: done / identity-handoff-package-summary-output
+- 类型: 微改动 / ObjectState controlled identity Stage 1 handoff integration
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 `controlled-identity-handoff` 和
+  `controlled-identity-bundle-handoff` 输出目录自动包含
+  `identity-evidence-package-summary.json`，减少真实 Stage 1 样本 handoff 后漏跑
+  evidence package audit 的风险。
+- 已实施:
+  - `controlled-identity-handoff` 现在会把输入 capture manifest 写成 output dir 内的
+    `capture-manifest.json`。
+  - 两个 identity handoff CLI 都会在写完 handoff artifacts 后运行 read-only
+    `objectstate_controlled_identity_evidence_package(...)`，并写出
+    `identity-evidence-package-summary.json`。
+  - CLI stdout 打印 `identity_evidence_package_status`、
+    `identity_evidence_package_reviewable` 和 summary 路径。
+- 边界:
+  - 不采集视频，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不重新运行 identity eval，不改变 handoff pass / fail 判定。
+  - 不要求 identity metric pass；fail row 仍可成为 reviewable Stage 1 evidence。
+  - 不声明 prediction / intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/cli.py tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_identity_bundle_handoff.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_objectstate_controlled_identity_evidence_package.py -q`: passed，18 tests。
+  - `uv run --extra dev pytest`: passed，419 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
+
 ### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
 
 - 状态: done / manifest-first-prediction-authoring-only
