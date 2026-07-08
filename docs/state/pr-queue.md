@@ -347,6 +347,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-INTERVENTION-CANDIDATES-001: Export intervention candidates from transition dataset
+
+- 状态: done / objectstate-transition-intervention-candidates
+- 类型: 标准 PR / ObjectState Phase 1 intervention candidate handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 action-conditioned Object Transition Dataset 接到现有
+  `objgauss-objectstate-controlled-intervention-candidates-v1` evaluator 输入，
+  形成 `ObjectState_t + Action_t -> ObjectState_t+1` intervention candidate authoring 路径。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_transition_intervention_candidates`。
+  - 新增 schema `objgauss-objectstate-transition-intervention-candidates-v1`。
+  - 新增 CLI `objgauss object-state export-transition-intervention-candidates
+    <objectstate-transitions.json> --output <intervention-candidates.json>`。
+  - 支持 `action_delta` 和 `hold_action` baseline policies。
+  - 导出目标复用现有 controlled intervention candidates schema，可直接进入
+    `eval-controlled-intervention`。
+  - 测试覆盖 target pose mutation 不改变导出 action-conditioned prediction，确保
+    生成路径只使用 source pose、action vector 和 target timestamp。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集数据、不下载 public dataset、不创建 GT、不推断 physical identity。
+  - 不重建 Gaussian、不运行 prediction / intervention eval、不训练 dynamics。
+  - 不创建 replay buffer、不创建 reality rows、不声明 metric pass、learned model、
+    counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_intervention_candidates.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_transition_intervention_candidates.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_intervention_candidates.py tests/test_core_namespace.py -q`: 13 passed。
+  - `uv run --extra dev pytest`: 540 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-TRANSITION-PREDICTION-CANDIDATES-001: Export prediction candidates from transition dataset
 
 - 状态: done / objectstate-transition-prediction-candidates

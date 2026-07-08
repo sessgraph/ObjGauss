@@ -249,3 +249,13 @@ constant-velocity / action-delta baseline。该缓解把 transition-backed `Obje
 但它仍不运行 prediction eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows、
 不声明 metric pass、learned model 或 world-model evidence。风险继续 open，直到真实
 transition-backed prediction / intervention rows 进入 pass/fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-INTERVENTION-CANDIDATES-001`
+新增 `export-transition-intervention-candidates`，可从 action-conditioned Object Transition
+Dataset 导出现有 `objgauss-objectstate-controlled-intervention-candidates-v1` evaluator
+JSON，支持 action-delta / hold-action baseline，并用测试固定“不读取 target pose values
+生成 action-conditioned prediction”。该缓解把 `ObjectState_t + Action_t` transition evidence
+接到 Real Intervention Gate candidate 输入；但它仍不运行 intervention eval、不训练
+dynamics、不创建 replay buffer、不生成 reality rows、不声明 metric pass、learned model、
+counterfactual proof 或 world-model evidence。风险继续 open，直到真实 transition-backed
+intervention rows 进入 pass/fail accounting。

@@ -198,6 +198,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_prediction_candidates",
         "OBJECTSTATE_TRANSITION_PREDICTION_POLICIES",
     ),
+    "OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA": (
+        "objgauss.core.objectstate_transition_intervention_candidates",
+        "OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA",
+    ),
+    "OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES": (
+        "objgauss.core.objectstate_transition_intervention_candidates",
+        "OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES",
+    ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
@@ -250,6 +258,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_prediction_candidates",
         "write_objectstate_transition_prediction_candidates",
     ),
+    "objectstate_transition_intervention_candidates_summary": (
+        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objectstate_transition_intervention_candidates_summary",
+    ),
+    "write_objectstate_transition_intervention_candidates": (
+        "objgauss.core.objectstate_transition_intervention_candidates",
+        "write_objectstate_transition_intervention_candidates",
+    ),
     "validate_objectstate_controlled_capture_import_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
@@ -281,6 +297,10 @@ _EXPORTS = {
     "validate_objectstate_transition_prediction_candidates_summary": (
         "objgauss.core.objectstate_transition_prediction_candidates",
         "validate_objectstate_transition_prediction_candidates_summary",
+    ),
+    "validate_objectstate_transition_intervention_candidates_summary": (
+        "objgauss.core.objectstate_transition_intervention_candidates",
+        "validate_objectstate_transition_intervention_candidates_summary",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",

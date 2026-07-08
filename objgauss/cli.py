@@ -206,6 +206,9 @@ from objgauss.core.objectstate_transition_dataset import (
 from objgauss.core.objectstate_transition_prediction_candidates import (
     write_objectstate_transition_prediction_candidates,
 )
+from objgauss.core.objectstate_transition_intervention_candidates import (
+    write_objectstate_transition_intervention_candidates,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -4884,6 +4887,43 @@ def _object_state_export_transition_prediction_candidates(
         f"{str(summary['claim_policy']['does_not_read_target_pose_values_for_prediction']).lower()}"
     )
     print(f"eval_prediction_command={summary['next_commands']['eval_prediction']}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
+def _object_state_export_transition_intervention_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_transition_intervention_candidates(
+        args.transition_dataset,
+        args.output,
+        policy=args.policy,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        confidence=args.confidence,
+        require_intervention=not args.allow_no_intervention,
+        force=args.force,
+    )
+    counts = summary["row_counts"]
+    policy = summary["policy"]
+    print(f"schema={summary['schema']}")
+    print(f"transition_dataset={args.transition_dataset}")
+    print(f"output={summary['output']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"policy={policy['name']}")
+    print(f"intervention_candidate_count={counts['intervention_candidates']}")
+    print(f"action_delta_rows={counts['action_delta_rows']}")
+    print(f"hold_action_rows={counts['hold_action_rows']}")
+    print(f"skipped_action_contexts={counts['skipped_action_contexts']}")
+    print(f"uses_target_pose_values={str(policy['uses_target_pose_values']).lower()}")
+    print(
+        "does_not_read_target_pose_values_for_prediction="
+        f"{str(summary['claim_policy']['does_not_read_target_pose_values_for_prediction']).lower()}"
+    )
+    print(f"eval_intervention_command={summary['next_commands']['eval_intervention']}")
     if args.summary_output:
         write_json(args.summary_output, summary)
         print(f"summary={args.summary_output}")
@@ -10418,6 +10458,55 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     export_transition_prediction_candidates.set_defaults(
         handler=_object_state_export_transition_prediction_candidates
+    )
+    export_transition_intervention_candidates = object_state_subparsers.add_parser(
+        "export-transition-intervention-candidates",
+        help=(
+            "export evaluator-ready controlled intervention candidates from "
+            "action-conditioned ObjectState transition rows"
+        ),
+    )
+    export_transition_intervention_candidates.add_argument(
+        "transition_dataset",
+        type=Path,
+    )
+    export_transition_intervention_candidates.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+    )
+    export_transition_intervention_candidates.add_argument("--summary-output", type=Path)
+    export_transition_intervention_candidates.add_argument(
+        "--policy",
+        choices=("action_delta", "hold_action"),
+        default="action_delta",
+    )
+    export_transition_intervention_candidates.add_argument(
+        "--candidate-id",
+        default="transition-intervention-baseline-action-delta",
+    )
+    export_transition_intervention_candidates.add_argument("--candidate-source")
+    export_transition_intervention_candidates.add_argument(
+        "--artifact-ref",
+        default="generated-transition-intervention-candidates",
+    )
+    export_transition_intervention_candidates.add_argument(
+        "--confidence",
+        type=float,
+        default=0.5,
+    )
+    export_transition_intervention_candidates.add_argument(
+        "--allow-no-intervention",
+        action="store_true",
+        help="allow datasets with no exportable action-conditioned rows",
+    )
+    export_transition_intervention_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite the intervention candidates output if it already exists",
+    )
+    export_transition_intervention_candidates.set_defaults(
+        handler=_object_state_export_transition_intervention_candidates
     )
     audit_controlled_capture_files = object_state_subparsers.add_parser(
         "audit-controlled-capture-files",

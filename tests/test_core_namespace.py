@@ -71,6 +71,8 @@ from objgauss.core import (
     OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
     OBJECTSTATE_TRANSITION_PREDICTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_TRANSITION_PREDICTION_POLICIES,
+    OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA,
+    OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES,
     OBJECTSTATE_TRANSITION_ROW_SCHEMA,
     OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
@@ -266,9 +268,11 @@ from objgauss.core import (
     objectstate_transition_dataset_audit,
     objectstate_transition_dataset_audit_from_path,
     objectstate_transition_dataset_from_capture_manifest,
+    objectstate_transition_intervention_candidates_summary,
     objectstate_transition_prediction_candidates_summary,
     read_objectstate_transition_dataset,
     write_objectstate_transition_dataset,
+    write_objectstate_transition_intervention_candidates,
     write_objectstate_transition_prediction_candidates,
     write_objectstate_controlled_capture_bundle_template,
     objectstate_controlled_real_manifest_from_capture_manifest,
@@ -395,6 +399,7 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_import_summary,
     validate_objectstate_transition_dataset,
     validate_objectstate_transition_dataset_audit,
+    validate_objectstate_transition_intervention_candidates_summary,
     validate_objectstate_transition_prediction_candidates_summary,
     validate_objectstate_controlled_identity_eval_summary,
     validate_objectstate_controlled_identity_handoff_summary,
@@ -1004,6 +1009,10 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
         "objgauss-objectstate-transition-prediction-candidates-v1"
     )
     assert "constant_velocity" in OBJECTSTATE_TRANSITION_PREDICTION_POLICIES
+    assert OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA == (
+        "objgauss-objectstate-transition-intervention-candidates-v1"
+    )
+    assert "action_delta" in OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES
     assert OBJECTSTATE_TRANSITION_ROW_SCHEMA == (
         "objgauss-objectstate-transition-row-v1"
     )
@@ -1015,9 +1024,11 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_transition_dataset_from_capture_manifest is not None
     assert objectstate_transition_dataset_audit is not None
     assert objectstate_transition_dataset_audit_from_path is not None
+    assert objectstate_transition_intervention_candidates_summary is not None
     assert objectstate_transition_prediction_candidates_summary is not None
     assert read_objectstate_transition_dataset is not None
     assert write_objectstate_transition_dataset is not None
+    assert write_objectstate_transition_intervention_candidates is not None
     assert write_objectstate_transition_prediction_candidates is not None
     assert objectstate_controlled_capture_missing_files_markdown([]).endswith(
         "no missing files |"
@@ -1028,6 +1039,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_controlled_capture_import_summary is not None
     assert validate_objectstate_transition_dataset is not None
     assert validate_objectstate_transition_dataset_audit is not None
+    assert validate_objectstate_transition_intervention_candidates_summary is not None
     assert validate_objectstate_transition_prediction_candidates_summary is not None
     assert capture_summary["readiness"]["identity_stage_ready"] is True
     transition_dataset = objectstate_transition_dataset_from_capture_manifest(
@@ -1056,6 +1068,15 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_transition_prediction_candidates_summary(
         transition_predictions
     ) == transition_predictions
+    transition_interventions = objectstate_transition_intervention_candidates_summary(
+        transition_dataset,
+    )
+    assert transition_interventions["schema"] == (
+        OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA
+    )
+    assert validate_objectstate_transition_intervention_candidates_summary(
+        transition_interventions
+    ) == transition_interventions
     capture_seed = objectstate_controlled_real_manifest_from_capture_manifest(
         capture_manifest
     )

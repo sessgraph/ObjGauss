@@ -243,6 +243,27 @@ source pose, prior pose, target timestamp, and optional action vector. It does
 not read target pose values to generate predicted positions, does not run an
 eval, does not train dynamics, and does not claim a metric pass.
 
+For a first Real Intervention Gate handoff on an action-ready transition
+dataset, export evaluator-ready intervention candidates:
+
+```bash
+uv run objgauss object-state export-transition-intervention-candidates \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.json \
+  --policy action_delta \
+  --candidate-id controlled-tabletop-cup-box-001-transition-action-delta \
+  --artifact-ref outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/transition-intervention-summary.json
+```
+
+This writes the existing
+`objgauss-objectstate-controlled-intervention-candidates-v1` schema. The
+`action_delta` policy predicts `source_pose + action.vector`; the no-action
+baseline holds the source pose. The exporter skips action contexts whose action
+interval does not fit within the transition timestamps. It does not read target
+pose values to generate action-conditioned predictions, does not run an eval,
+does not train dynamics, and does not claim intervention pass.
+
 ## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible

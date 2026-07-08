@@ -1062,6 +1062,16 @@ next actions。它只说明 transition dataset 是否具备进入候选训练或
 prior pose、target timestamp 和可选 action vector；测试覆盖修改 target pose 不改变导出预测。
 它不运行 prediction eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
 metric pass、learned model 或 world model。
+随后完成 `OBJECTSTATE-TRANSITION-INTERVENTION-CANDIDATES-001`：新增
+`objgauss.core.objectstate_transition_intervention_candidates`，schema 为
+`objgauss-objectstate-transition-intervention-candidates-v1`，CLI 为
+`objgauss object-state export-transition-intervention-candidates <objectstate-transitions.json>`。
+该 exporter 从 action-conditioned transition rows 写出现有
+`objgauss-objectstate-controlled-intervention-candidates-v1` evaluator JSON，支持
+`action_delta` 和 `hold_action` baseline policy。action-conditioned 预测只使用 source pose
+和 action vector，no-action baseline 使用 source pose；测试覆盖修改 target pose 不改变导出预测。
+它不运行 intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
+metric pass、learned model、counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
