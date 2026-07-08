@@ -771,6 +771,15 @@ blocked candidate issues 和后续 `init-bop-condition-sidecar` /
 `accept-bop-capture-scene` / `audit-bop-phase1-local-row` 命令。它不下载 BOP、不复制数据、
 不创建 GT、不推断 condition metadata、不生成 Gaussian、不运行 handoff、不训练模型，也不把
 任何 row 标记为 reality gate pass。
+随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
+`objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
+`objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
+`objgauss object-state audit-bop-gaussian-evidence`。该命令对已选 BOP scene 复用
+`accept-bop-capture-scene` 的 adapter / file audit 路径并强制 `require_gaussian_files`，
+列出 expected / missing per-frame `gaussians/<frame>.ply` evidence，同时复用 controlled
+capture environment preflight 记录 COLMAP / Nerfstudio Gaussian reconstruction tool
+readiness。它只做 read-only preflight，不下载 BOP、不创建 GT、不推断 condition metadata、
+不重建 Gaussian、不运行 handoff、不训练模型，也不声明任何 Phase 1 pass row。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
