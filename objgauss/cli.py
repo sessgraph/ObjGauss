@@ -148,6 +148,9 @@ from objgauss.core.objectstate_controlled_capture import (
 from objgauss.core.objectstate_controlled_capture_template import (
     write_objectstate_controlled_capture_bundle_template,
 )
+from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
+    objectstate_controlled_capture_bundle_readiness,
+)
 from objgauss.core.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
@@ -3068,6 +3071,71 @@ def _object_state_init_controlled_capture_bundle(args: argparse.Namespace) -> No
         print(f"summary={args.summary_output}")
 
 
+def _object_state_audit_controlled_capture_bundle_readiness(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_capture_bundle_readiness(
+        args.bundle_root,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        require_prediction_ready=args.require_prediction_ready,
+        require_intervention_ready=args.require_intervention_ready,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        candidate_artifact=args.candidate_artifact,
+        require_candidate_artifact=args.require_candidate_artifact,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"readiness_status={summary['status']}")
+    print(f"capture_bundle_ready={str(readiness['capture_bundle_ready']).lower()}")
+    print(
+        "identity_bundle_handoff_ready="
+        f"{str(readiness['identity_bundle_handoff_ready']).lower()}"
+    )
+    print(f"layout_ready={str(readiness['layout_ready']).lower()}")
+    print(f"sample_metadata_ready={str(readiness['sample_metadata_ready']).lower()}")
+    print(f"csv_headers_ready={str(readiness['csv_headers_ready']).lower()}")
+    print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(f"capture_files_ready={str(readiness['capture_files_ready']).lower()}")
+    print(
+        "identity_scenario_ready="
+        f"{str(readiness['identity_scenario_ready']).lower()}"
+    )
+    print(
+        "candidate_artifact_ready="
+        f"{str(readiness['candidate_artifact_ready']).lower()}"
+    )
+    for key, value in summary["row_counts"].items():
+        print(f"{key}_rows={value}")
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"]
+        != "objectstate_controlled_capture_bundle_readiness_ready"
+    ):
+        raise ValueError("controlled capture bundle readiness did not pass")
+
+
 def _controlled_capture_template_objects(
     object_specs: list[str] | None,
 ) -> list[dict[str, str]]:
@@ -3901,6 +3969,86 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_controlled_capture.set_defaults(
         handler=_object_state_init_controlled_capture_bundle
+    )
+    audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
+        "audit-controlled-capture-bundle-readiness",
+        help="audit staged controlled capture bundle readiness before import/handoff",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument("bundle_root", type=Path)
+    audit_controlled_capture_bundle_readiness.add_argument("--summary-output", type=Path)
+    audit_controlled_capture_bundle_readiness.add_argument("--sample-json", default="sample.json")
+    audit_controlled_capture_bundle_readiness.add_argument("--objects-csv", default="objects.csv")
+    audit_controlled_capture_bundle_readiness.add_argument("--frames-csv", default="frames.csv")
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--annotations-csv",
+        default="annotations.csv",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument("--actions-csv", default="actions.csv")
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--require-prediction-ready",
+        action="store_true",
+        help="also require prediction-stage capture readiness",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--require-intervention-ready",
+        action="store_true",
+        help="also require intervention-stage action readiness",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument("--min-rgb-bytes", type=int, default=1)
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument("--hash-files", action="store_true")
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--candidate-artifact",
+        type=Path,
+        help="optional candidate ObjectState artifact to include in handoff readiness",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--require-candidate-artifact",
+        action="store_true",
+        help="require candidate artifact readiness for overall status",
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    audit_controlled_capture_bundle_readiness.add_argument("--require-ready", action="store_true")
+    audit_controlled_capture_bundle_readiness.set_defaults(
+        handler=_object_state_audit_controlled_capture_bundle_readiness
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",
