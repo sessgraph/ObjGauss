@@ -14,8 +14,10 @@ from objgauss.core.objectstate_controlled_prediction_evidence_package import (
     objectstate_controlled_prediction_evidence_package,
     validate_objectstate_controlled_prediction_evidence_package_summary,
 )
+from objgauss.core.objectstate_controlled_prediction_baseline import (
+    write_objectstate_controlled_prediction_baseline_candidates,
+)
 from objgauss.core.objectstate_controlled_reality_candidate_template import (
-    finalize_objectstate_controlled_prediction_candidate_template,
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
 )
 
@@ -135,13 +137,18 @@ def _write_reviewable_prediction_package(root):
     )
     _write_json(candidate_dir / "template-summary.json", template_summary)
     prediction_template_path = candidate_dir / "prediction-candidates.template.json"
-    _fill_bop_prediction_template(prediction_template_path)
-
-    finalize_summary = finalize_objectstate_controlled_prediction_candidate_template(
+    baseline_summary = write_objectstate_controlled_prediction_baseline_candidates(
+        capture_manifest_path,
         prediction_template_path,
         output_dir=candidate_dir,
-        capture_manifest=capture_manifest_path,
+        policy="constant_velocity",
+        candidate_id="bop-ycbv-predictor-v0",
+        candidate_source="unit-test BOP constant-velocity baseline",
+        artifact_ref="outputs/captures/bop-ycbv-scene-000001/objectstates.json",
+        confidence=0.95,
     )
+    _write_json(candidate_dir / "prediction-baseline-summary.json", baseline_summary)
+    finalize_summary = baseline_summary["prediction_finalize_summary"]
     _write_json(candidate_dir / "prediction-finalize-summary.json", finalize_summary)
     prediction_candidates = _read_json(candidate_dir / "prediction-candidates.json")
     prediction_eval = evaluate_objectstate_controlled_prediction_candidates(
@@ -154,32 +161,6 @@ def _write_reviewable_prediction_package(root):
         prediction_eval["controlled_real_manifest"],
     )
     return {"candidate_dir": candidate_dir}
-
-
-def _fill_bop_prediction_template(path):
-    payload = _read_json(path)
-    target_positions = {
-        ("bop-frame-000001", "bop-ycbv-obj-000001"): [0.011, 0.02, 0.03],
-        ("bop-frame-000002", "bop-ycbv-obj-000001"): [0.012, 0.02, 0.03],
-        ("bop-frame-000001", "bop-ycbv-obj-000002"): [0.041, 0.05, 0.06],
-        ("bop-frame-000002", "bop-ycbv-obj-000002"): [0.042, 0.05, 0.06],
-    }
-    source_positions = {
-        ("bop-frame-000000", "bop-ycbv-obj-000001"): [0.01, 0.02, 0.03],
-        ("bop-frame-000001", "bop-ycbv-obj-000001"): [0.011, 0.02, 0.03],
-        ("bop-frame-000000", "bop-ycbv-obj-000002"): [0.04, 0.05, 0.06],
-        ("bop-frame-000001", "bop-ycbv-obj-000002"): [0.041, 0.05, 0.06],
-    }
-    for row in payload["predictions"]:
-        object_id = row["object_id"]
-        row["predicted_position"] = target_positions[
-            (row["target_frame_id"], object_id)
-        ]
-        row["history_baseline_position"] = source_positions[
-            (row["source_frame_id"], object_id)
-        ]
-        row["confidence"] = 0.95
-    _write_json(path, payload)
 
 
 def _write_bop_scene(root) -> None:

@@ -149,7 +149,10 @@ identity / prediction handoff。`OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-00
 `OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001` 已补 prediction-only
 evidence package audit，可把 BOP acceptance、candidate finalize、prediction eval 和
 controlled-real prediction manifest 串成 reviewable package；reviewable 不等于 metric pass，
-也不声明 intervention / counterfactual gate。
+也不声明 intervention / counterfactual gate。`OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`
+已补 hold / constant-velocity baseline candidate generator，用 source pose、prior pose
+history 和 target timestamp 生成 evaluator-ready prediction candidates，不读取 target
+pose values，也不声明 learned model 或 metric pass。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -221,6 +224,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001: Generate controlled prediction baseline candidates
+
+- 状态: done / deterministic-baseline-candidate-generator
+- 类型: 标准 PR / ObjectState public pose dataset prediction candidate generation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给 BOP / manifest-first prediction-only 路线补一个可复验的 hold /
+  constant-velocity candidate generator，避免手工把 target pose GT 抄入
+  `prediction-candidates.template.json`。
+- 已实施:
+  - 新增 module
+    `objgauss.core.objectstate_controlled_prediction_baseline`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-prediction-baseline-candidates-v1`。
+  - 新增 core function
+    `write_objectstate_controlled_prediction_baseline_candidates(...)`。
+  - 新增 CLI
+    `objgauss object-state generate-controlled-prediction-baseline-candidates`。
+  - 支持 `constant_velocity` 和 `hold` policies，输出
+    `prediction-candidates.baseline-filled.template.json`、
+    `prediction-candidates.json` 和 `prediction-finalize-summary.json`。
+  - BOP prediction evidence package 测试 fixture 已改为调用该 generator，而不是手工填写
+    target positions。
+- 边界:
+  - 不下载 BOP 数据，不写 `outputs/` 或 `public/samples`。
+  - 不读取 target pose values，不创建 GT，不运行 eval，不训练模型。
+  - 不声明 learned dynamics model、prediction metric pass、intervention /
+    counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_prediction_baseline.py tests/test_objectstate_controlled_prediction_evidence_package.py tests/test_objectstate_controlled_reality_candidate_template.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，36 tests。
+  - `uv run --extra dev pytest`: passed，412 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
 
 ### OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001: Audit BOP prediction-only evidence packages
 

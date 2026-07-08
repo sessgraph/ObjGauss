@@ -640,6 +640,18 @@ prediction row 为 pass 或 fail，且 controlled-real prediction manifest 与 p
 内嵌 manifest 一致；reviewable 不要求 prediction 指标 pass，也不声明 intervention /
 counterfactual gate。
 
+随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`：新增
+`objgauss.core.objectstate_controlled_prediction_baseline`，schema 为
+`objgauss-objectstate-controlled-prediction-baseline-candidates-v1`，并新增 CLI
+`objgauss object-state generate-controlled-prediction-baseline-candidates`。该命令读取
+controlled capture manifest 和 draft `prediction-candidates.template.json`，用
+`hold` 或 `constant_velocity` policy 生成
+`prediction-candidates.baseline-filled.template.json`，再复用现有 prediction finalizer
+写出 evaluator-ready `prediction-candidates.json` 和
+`prediction-finalize-summary.json`。baseline 只使用 source pose、prior pose history 和
+target timestamp，不读取 target pose values；它不是 learned dynamics model，不运行 eval，
+不创建 GT、不训练 Gaussian / dynamics、不创建 pass row、不改 viewer/export 默认策略。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

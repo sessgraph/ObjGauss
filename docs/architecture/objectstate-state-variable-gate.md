@@ -1040,6 +1040,43 @@ video, create GT, run a prediction / dynamics model, compute identity or
 action-conditioned metrics, train Gaussian or dynamics models, use replay /
 diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001
+
+Add a reviewable controlled prediction candidate generator for manifest-first
+public / real pose routes.
+
+Required behavior:
+
+- Input a controlled capture manifest and a draft
+  `prediction-candidates.template.json`.
+- Validate that the template `sample_id` matches the capture manifest.
+- Fill each prediction row with an explicit baseline policy:
+  `hold_source_pose` or `source_pose_plus_previous_velocity`.
+- Use the source object pose, prior object pose history and target timestamp
+  only. Do not read target pose values when writing `predicted_position`.
+- Write `prediction-candidates.baseline-filled.template.json`, then reuse
+  `finalize_objectstate_controlled_prediction_candidate_template(...)` to
+  produce evaluator-ready `prediction-candidates.json`.
+- Write `prediction-finalize-summary.json` and a baseline summary with row
+  counts, files, next eval/audit commands and claim policy.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_prediction_baseline`.
+- Summary schema:
+  `objgauss-objectstate-controlled-prediction-baseline-candidates-v1`.
+- Public function:
+  `write_objectstate_controlled_prediction_baseline_candidates(...)`.
+- Supported policies: `constant_velocity` and `hold`.
+- CLI command:
+  `objgauss object-state generate-controlled-prediction-baseline-candidates <capture.json> <prediction-template.json>`.
+
+Current scope remains a deterministic baseline candidate generator. It does
+not create GT, run a learned dynamics model, run eval by itself, claim metric
+pass, train Gaussian / dynamics models, use replay / diffusion, or mutate
+viewer/export defaults.
+
 ### OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001
 
 Add the first controlled real Stage 3 intervention metric evaluator.

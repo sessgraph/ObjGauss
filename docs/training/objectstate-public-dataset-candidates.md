@@ -146,16 +146,20 @@ uv run objgauss object-state init-controlled-reality-candidates-from-manifest \
 ```
 
 BOP pose scenes do not contain action events, so this path should create
-prediction draft rows and keep intervention draft rows at zero. After filling
-`prediction-candidates.template.json` with external model and history-baseline
-outputs, finalize only the prediction candidates:
+prediction draft rows and keep intervention draft rows at zero. To create a
+reviewable first prediction candidate without copying target pose GT into the
+template, generate a deterministic constant-velocity baseline:
 
 ```bash
-uv run objgauss object-state finalize-controlled-prediction-candidates \
+uv run objgauss object-state generate-controlled-prediction-baseline-candidates \
+  outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
   outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-candidates.template.json \
   --output-dir outputs/captures/bop-ycbv-scene-000001/reality-candidates \
-  --capture-manifest outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
-  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-finalize-summary.json
+  --policy constant_velocity \
+  --candidate-id bop-ycbv-constant-velocity-baseline \
+  --candidate-source controlled-prediction-baseline \
+  --artifact-ref outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-baseline-summary.json
 ```
 
 Then run the Real Predictive Gate:
@@ -180,7 +184,9 @@ uv run objgauss object-state audit-controlled-prediction-evidence-package \
 This still does not prove the causal / counterfactual gate. It only moves the
 BOP route from blocked rows toward a real prediction pass / fail row once
 Gaussian evidence, ObjectState candidate output and future-pose predictions are
-available. The prediction evidence package is reviewable when file acceptance,
+available. The baseline generator uses source pose, prior pose history and
+target timestamp only; it is not a learned model. The prediction evidence
+package is reviewable when file acceptance, baseline candidate generation,
 candidate finalization and prediction eval outputs are internally consistent;
 reviewable does not mean the prediction metric passed.
 

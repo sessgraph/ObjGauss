@@ -194,6 +194,9 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     write_objectstate_controlled_reality_candidate_templates,
 )
+from objgauss.core.objectstate_controlled_prediction_baseline import (
+    write_objectstate_controlled_prediction_baseline_candidates,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -3494,6 +3497,42 @@ def _object_state_finalize_controlled_prediction_candidates(
         print(f"summary={args.summary_output}")
 
 
+def _object_state_generate_controlled_prediction_baseline_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_controlled_prediction_baseline_candidates(
+        args.capture_manifest,
+        args.prediction_template,
+        output_dir=args.output_dir,
+        policy=args.policy,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        confidence=args.confidence,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"output_dir={summary['output_dir']}")
+    print(f"policy={summary['policy']['name']}")
+    print(
+        "prediction_candidate_count="
+        f"{summary['row_counts']['prediction_candidates']}"
+    )
+    print(
+        "constant_velocity_rows="
+        f"{summary['row_counts']['constant_velocity_rows']}"
+    )
+    print(f"hold_rows={summary['row_counts']['hold_rows']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _controlled_capture_template_objects(
     object_specs: list[str] | None,
 ) -> list[dict[str, str]]:
@@ -5274,6 +5313,61 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     finalize_controlled_prediction_candidates.set_defaults(
         handler=_object_state_finalize_controlled_prediction_candidates
+    )
+    generate_controlled_prediction_baseline_candidates = (
+        object_state_subparsers.add_parser(
+            "generate-controlled-prediction-baseline-candidates",
+            help=(
+                "fill a prediction candidate template with a hold or "
+                "constant-velocity baseline and finalize it for eval"
+            ),
+        )
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "capture_manifest",
+        type=Path,
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "prediction_template",
+        type=Path,
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--policy",
+        choices=("constant_velocity", "hold"),
+        default="constant_velocity",
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--candidate-id",
+        default="controlled-prediction-baseline-constant-velocity",
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--candidate-source",
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--artifact-ref",
+        default="generated-controlled-prediction-baseline",
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--confidence",
+        type=float,
+        default=0.5,
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    generate_controlled_prediction_baseline_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite generated baseline candidate files if they already exist",
+    )
+    generate_controlled_prediction_baseline_candidates.set_defaults(
+        handler=_object_state_generate_controlled_prediction_baseline_candidates
     )
     audit_controlled_reality_evidence_package = object_state_subparsers.add_parser(
         "audit-controlled-reality-evidence-package",
