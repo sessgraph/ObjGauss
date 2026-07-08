@@ -699,6 +699,14 @@ prediction candidates、prediction eval summary、`controlled-real-prediction.js
 `prediction_reviewable` maturity。它把 BOP prediction-only 路线从多条手工命令收敛为一个
 可复验本地 handoff；仍不下载 BOP 数据、不生成 Gaussian evidence、不训练或发布新模型、
 不创建 GT、不声明 intervention / counterfactual gate、不改 viewer/export 默认。
+随后新增 BOP route 只读审计：`objgauss.core.objectstate_bop_phase1_route_audit`，
+schema 为 `objgauss-objectstate-bop-phase1-route-audit-v1`，CLI 为
+`objgauss object-state audit-bop-phase1-route`。该命令对本地 BOP scene 运行内存态
+acceptance（要求 per-frame Gaussian files），并检查 output root 下已有
+`prediction-evidence-package-summary.json` 和 `phase1-evidence-ledger.json`，输出 route
+状态：blocked、handoff-ready 或 prediction-reviewable。它不运行 handoff / eval，不下载
+数据，不生成 Gaussian，不创建 GT，不训练模型，也不声明 identity、intervention 或 world
+model。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

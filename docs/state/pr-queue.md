@@ -228,6 +228,36 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001: Audit BOP route readiness for Phase 1 evidence
+
+- 状态: done / read-only-bop-phase1-route-audit
+- 类型: 标准 PR / ObjectState public pose dataset route readiness
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给本地 BOP scene + handoff output root 增加一个只读 route audit，明确当前卡在
+  scene 缺失、Gaussian evidence 缺失、handoff-ready，还是 prediction evidence
+  已 reviewable。
+- 已实施:
+  - 新增 module `objgauss.core.objectstate_bop_phase1_route_audit`。
+  - 新增 schema `objgauss-objectstate-bop-phase1-route-audit-v1`。
+  - 新增 core function `objectstate_bop_phase1_route_audit(...)`。
+  - 新增 CLI `objgauss object-state audit-bop-phase1-route`。
+  - Route audit 在内存中运行 BOP acceptance，要求 per-frame Gaussian files，并只读检查
+    output root 下已有 prediction evidence package summary 和 Phase 1 ledger。
+  - 输出 status：`blocked`、`handoff_ready` 或 `prediction_reviewable`，并给出
+    hard blockers / next actions。
+- 边界:
+  - 只做只读 route accounting。
+  - 不下载 BOP 数据，不生成 Gaussian evidence，不创建 GT。
+  - 不运行 prediction handoff，不重新运行 prediction eval，不训练模型。
+  - 不声明 identity / intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_route_audit.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，34 tests。
+  - `uv run --extra dev pytest`: passed，430 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 98682af。
+
 ### OBJECTSTATE-BOP-PHASE1-LEDGER-HANDOFF-001: Write Phase 1 ledger from BOP prediction handoff
 
 - 状态: done / local-bop-prediction-ledger-accounting
