@@ -79,6 +79,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA,
+    OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
@@ -174,6 +175,7 @@ from objgauss.core import (
     evaluate_controlled_real_manifest_reality_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
+    finalize_objectstate_controlled_reality_candidate_templates,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
     evaluate_assignment_stability,
@@ -311,6 +313,7 @@ from objgauss.core import (
     validate_objectstate_controlled_prediction_eval_summary,
     validate_objectstate_controlled_reality_bundle_handoff_summary,
     validate_objectstate_controlled_reality_bundle_readiness_summary,
+    validate_objectstate_controlled_reality_candidate_finalize_summary,
     validate_objectstate_controlled_reality_candidate_template_summary,
     validate_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
@@ -1034,12 +1037,17 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA == (
         "objgauss-objectstate-controlled-reality-candidate-template-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA == (
+        "objgauss-objectstate-controlled-reality-candidate-finalize-v1"
+    )
     assert objectstate_controlled_reality_bundle_handoff is not None
     assert objectstate_controlled_reality_bundle_readiness is not None
     assert write_objectstate_controlled_reality_candidate_templates is not None
+    assert finalize_objectstate_controlled_reality_candidate_templates is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
     assert validate_objectstate_controlled_reality_candidate_template_summary is not None
+    assert validate_objectstate_controlled_reality_candidate_finalize_summary is not None
     assert validate_objectstate_controlled_prediction_candidates_template is not None
     assert validate_objectstate_controlled_intervention_candidates_template is not None
     assert objectstate_identity_predictions_from_trainable_artifact is not None

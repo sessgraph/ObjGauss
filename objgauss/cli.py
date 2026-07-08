@@ -186,6 +186,7 @@ from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
     objectstate_controlled_reality_bundle_readiness,
 )
 from objgauss.core.objectstate_controlled_reality_candidate_template import (
+    finalize_objectstate_controlled_reality_candidate_templates,
     write_objectstate_controlled_reality_candidate_templates,
 )
 from objgauss.core.objectstate_identity_prediction_adapter import (
@@ -3188,6 +3189,36 @@ def _object_state_init_controlled_reality_candidates(
         print(f"summary={args.summary_output}")
 
 
+def _object_state_finalize_controlled_reality_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = finalize_objectstate_controlled_reality_candidate_templates(
+        args.prediction_template,
+        args.intervention_template,
+        output_dir=args.output_dir,
+        bundle_root=args.bundle_root,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"output_dir={args.output_dir}")
+    print(f"prediction_candidates={summary['files']['prediction_candidates']}")
+    print(f"intervention_candidates={summary['files']['intervention_candidates']}")
+    print(
+        "prediction_candidate_count="
+        f"{summary['row_counts']['prediction_candidates']}"
+    )
+    print(
+        "intervention_candidate_count="
+        f"{summary['row_counts']['intervention_candidates']}"
+    )
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _controlled_capture_template_objects(
     object_specs: list[str] | None,
 ) -> list[dict[str, str]]:
@@ -4636,6 +4667,40 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_controlled_reality_candidates.set_defaults(
         handler=_object_state_init_controlled_reality_candidates
+    )
+    finalize_controlled_reality_candidates = object_state_subparsers.add_parser(
+        "finalize-controlled-reality-candidates",
+        help=(
+            "convert filled prediction/intervention candidate templates into "
+            "evaluator-ready JSON"
+        ),
+    )
+    finalize_controlled_reality_candidates.add_argument(
+        "prediction_template",
+        type=Path,
+    )
+    finalize_controlled_reality_candidates.add_argument(
+        "intervention_template",
+        type=Path,
+    )
+    finalize_controlled_reality_candidates.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    finalize_controlled_reality_candidates.add_argument(
+        "--bundle-root",
+        type=Path,
+        help="optional bundle path used only when printing next commands",
+    )
+    finalize_controlled_reality_candidates.add_argument("--summary-output", type=Path)
+    finalize_controlled_reality_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite evaluator-ready candidate files if they already exist",
+    )
+    finalize_controlled_reality_candidates.set_defaults(
+        handler=_object_state_finalize_controlled_reality_candidates
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",

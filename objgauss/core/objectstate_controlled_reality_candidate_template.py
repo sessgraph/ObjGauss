@@ -13,13 +13,18 @@ from objgauss.core.objectstate_controlled_capture_import import (
 )
 from objgauss.core.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+    validate_objectstate_controlled_intervention_candidates,
 )
 from objgauss.core.objectstate_controlled_prediction_eval import (
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+    validate_objectstate_controlled_prediction_candidates,
 )
 
 OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA = (
     "objgauss-objectstate-controlled-reality-candidate-template-v1"
+)
+OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA = (
+    "objgauss-objectstate-controlled-reality-candidate-finalize-v1"
 )
 OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA = (
     "objgauss-objectstate-controlled-prediction-candidates-template-v1"
@@ -30,9 +35,20 @@ OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA = (
 
 _PREDICTION_TEMPLATE_FILE = "prediction-candidates.template.json"
 _INTERVENTION_TEMPLATE_FILE = "intervention-candidates.template.json"
+_PREDICTION_CANDIDATES_FILE = "prediction-candidates.json"
+_INTERVENTION_CANDIDATES_FILE = "intervention-candidates.json"
 _README_FILE = "README.md"
 _TODO_POSITION = "TODO_FILL_WITH_CANDIDATE_POSITION_XYZ"
 _TODO_BASELINE = "TODO_FILL_WITH_BASELINE_POSITION_XYZ"
+_TODO_PREFIX = "TODO"
+_FORBIDDEN_ROW_FIELDS = {
+    "target_position",
+    "target_pose",
+    "target_rotation",
+    "target_rotation_xyzw",
+    "ground_truth_position",
+    "ground_truth_pose",
+}
 
 
 def write_objectstate_controlled_reality_candidate_templates(
@@ -155,6 +171,81 @@ def write_objectstate_controlled_reality_candidate_templates(
     return validate_objectstate_controlled_reality_candidate_template_summary(payload)
 
 
+def finalize_objectstate_controlled_reality_candidate_templates(
+    prediction_template: str | Path,
+    intervention_template: str | Path,
+    *,
+    output_dir: str | Path,
+    bundle_root: str | Path | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    prediction_template_path = Path(prediction_template)
+    intervention_template_path = Path(intervention_template)
+    out = Path(output_dir)
+    prediction_payload = _read_json(prediction_template_path)
+    intervention_payload = _read_json(intervention_template_path)
+    prediction_candidates = _prediction_candidates_from_filled_template(
+        prediction_payload
+    )
+    intervention_candidates = _intervention_candidates_from_filled_template(
+        intervention_payload
+    )
+    if prediction_candidates["sample_id"] != intervention_candidates["sample_id"]:
+        raise ValueError("prediction and intervention templates must use same sample_id")
+    files = {
+        "prediction_candidates": out / _PREDICTION_CANDIDATES_FILE,
+        "intervention_candidates": out / _INTERVENTION_CANDIDATES_FILE,
+    }
+    _ensure_can_write(files.values(), force=force)
+    _write_json(files["prediction_candidates"], prediction_candidates)
+    _write_json(files["intervention_candidates"], intervention_candidates)
+    bundle_ref = str(bundle_root) if bundle_root is not None else "<bundle-root>"
+    payload = {
+        "schema": OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA,
+        "kind": "objectstate_controlled_reality_candidate_finalize",
+        "status": "objectstate_controlled_reality_candidate_finalize_ready",
+        "sample_id": prediction_candidates["sample_id"],
+        "source_templates": {
+            "prediction_template": str(prediction_template_path),
+            "intervention_template": str(intervention_template_path),
+        },
+        "files": {key: str(value) for key, value in files.items()},
+        "target_eval_schemas": {
+            "prediction": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+            "intervention": OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+        },
+        "row_counts": {
+            "prediction_candidates": len(prediction_candidates["predictions"]),
+            "intervention_candidates": len(
+                intervention_candidates["interventions"]
+            ),
+        },
+        "candidate_ids": {
+            "prediction": prediction_candidates["candidate"]["candidate_id"],
+            "intervention": intervention_candidates["candidate"]["candidate_id"],
+        },
+        "next_commands": {
+            "audit_full_readiness": (
+                "uv run objgauss object-state "
+                "audit-controlled-reality-bundle-readiness "
+                f"{bundle_ref} <objectstates.json> "
+                f"{files['prediction_candidates']} "
+                f"{files['intervention_candidates']}"
+            ),
+            "full_handoff": (
+                "uv run objgauss object-state controlled-reality-bundle-handoff "
+                f"{bundle_ref} <objectstates.json> "
+                f"{files['prediction_candidates']} "
+                f"{files['intervention_candidates']} "
+                f"--output-dir {out / 'reality-handoff'}"
+            ),
+        },
+        "claim_policy": _finalize_claim_policy(),
+        "non_goals": _non_goals(),
+    }
+    return validate_objectstate_controlled_reality_candidate_finalize_summary(payload)
+
+
 def validate_objectstate_controlled_reality_candidate_template_summary(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -222,6 +313,49 @@ def validate_objectstate_controlled_reality_candidate_template_summary(
         if not isinstance(next_commands.get(key), str) or not next_commands[key]:
             raise ValueError(f"controlled reality candidate template missing command {key}")
     _validate_claim_policy(payload.get("claim_policy", {}))
+    _validate_non_goals(payload.get("non_goals", {}))
+    return dict(payload)
+
+
+def validate_objectstate_controlled_reality_candidate_finalize_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("controlled reality candidate finalize summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA:
+        raise ValueError(
+            "unsupported controlled reality candidate finalize schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_controlled_reality_candidate_finalize":
+        raise ValueError("controlled reality candidate finalize kind is unsupported")
+    if payload.get("status") != "objectstate_controlled_reality_candidate_finalize_ready":
+        raise ValueError("controlled reality candidate finalize status is unsupported")
+    if not isinstance(payload.get("sample_id"), str) or not payload["sample_id"]:
+        raise ValueError("controlled reality candidate finalize requires sample_id")
+    for key in ("source_templates", "files", "target_eval_schemas", "row_counts"):
+        if not isinstance(payload.get(key), Mapping):
+            raise ValueError(f"controlled reality candidate finalize requires {key}")
+    files = payload["files"]
+    for key in ("prediction_candidates", "intervention_candidates"):
+        if not isinstance(files.get(key), str) or not files[key]:
+            raise ValueError(f"controlled reality candidate finalize missing {key}")
+    target_schemas = payload["target_eval_schemas"]
+    if target_schemas.get("prediction") != OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA:
+        raise ValueError("controlled reality candidate finalize prediction schema mismatch")
+    if target_schemas.get("intervention") != OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA:
+        raise ValueError("controlled reality candidate finalize intervention schema mismatch")
+    for key in ("prediction_candidates", "intervention_candidates"):
+        value = payload["row_counts"].get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"controlled reality candidate finalize row count invalid: {key}")
+    next_commands = payload.get("next_commands")
+    if not isinstance(next_commands, Mapping):
+        raise ValueError("controlled reality candidate finalize requires next_commands")
+    for key in ("audit_full_readiness", "full_handoff"):
+        if not isinstance(next_commands.get(key), str) or not next_commands[key]:
+            raise ValueError(f"controlled reality candidate finalize missing command {key}")
+    _validate_finalize_claim_policy(payload.get("claim_policy", {}))
     _validate_non_goals(payload.get("non_goals", {}))
     return dict(payload)
 
@@ -398,6 +532,87 @@ def _intervention_template(
     return validate_objectstate_controlled_intervention_candidates_template(payload)
 
 
+def _prediction_candidates_from_filled_template(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    _validate_filled_template_common(
+        payload,
+        expected_schema=OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA,
+        expected_kind="prediction",
+        target_schema=OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+    )
+    rows = []
+    for item in _sequence(payload.get("predictions"), "predictions"):
+        if not isinstance(item, Mapping):
+            raise TypeError("controlled prediction candidate rows must be mappings")
+        _reject_forbidden_row_fields(item, "prediction")
+        row: dict[str, Any] = {
+            "source_frame_id": _required_string(item, "source_frame_id"),
+            "target_frame_id": _required_string(item, "target_frame_id"),
+            "object_id": _required_string(item, "object_id"),
+            "predicted_position": _filled_vector(
+                item.get("predicted_position"),
+                "predicted_position",
+            ),
+            "history_baseline_position": _filled_vector(
+                item.get("history_baseline_position"),
+                "history_baseline_position",
+            ),
+        }
+        confidence = _optional_confidence(item)
+        if confidence is not None:
+            row["confidence"] = confidence
+        rows.append(row)
+    result = {
+        "schema": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+        "sample_id": _required_string(payload, "sample_id"),
+        "candidate": _filled_candidate(payload.get("candidate")),
+        "predictions": rows,
+    }
+    return validate_objectstate_controlled_prediction_candidates(result)
+
+
+def _intervention_candidates_from_filled_template(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    _validate_filled_template_common(
+        payload,
+        expected_schema=OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
+        expected_kind="intervention",
+        target_schema=OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+    )
+    rows = []
+    for item in _sequence(payload.get("interventions"), "interventions"):
+        if not isinstance(item, Mapping):
+            raise TypeError("controlled intervention candidate rows must be mappings")
+        _reject_forbidden_row_fields(item, "intervention")
+        row = {
+            "source_frame_id": _required_string(item, "source_frame_id"),
+            "target_frame_id": _required_string(item, "target_frame_id"),
+            "object_id": _required_string(item, "object_id"),
+            "action_id": _required_string(item, "action_id"),
+            "action_conditioned_position": _filled_vector(
+                item.get("action_conditioned_position"),
+                "action_conditioned_position",
+            ),
+            "no_action_baseline_position": _filled_vector(
+                item.get("no_action_baseline_position"),
+                "no_action_baseline_position",
+            ),
+        }
+        confidence = _optional_confidence(item)
+        if confidence is not None:
+            row["confidence"] = confidence
+        rows.append(row)
+    result = {
+        "schema": OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+        "sample_id": _required_string(payload, "sample_id"),
+        "candidate": _filled_candidate(payload.get("candidate")),
+        "interventions": rows,
+    }
+    return validate_objectstate_controlled_intervention_candidates(result)
+
+
 def _pose_frames_by_object(
     manifest: Mapping[str, Any],
 ) -> dict[str, tuple[dict[str, Any], ...]]:
@@ -498,6 +713,22 @@ def _claim_policy() -> dict[str, bool]:
     }
 
 
+def _finalize_claim_policy() -> dict[str, bool]:
+    return {
+        "filled_templates_required": True,
+        "todo_values_rejected": True,
+        "eval_schema_outputs_validated": True,
+        "obvious_target_gt_leakage_rejected": True,
+        "requires_external_candidate_outputs": True,
+        "does_not_create_ground_truth": True,
+        "does_not_run_prediction_model": True,
+        "does_not_run_intervention_model": True,
+        "does_not_claim_prediction_pass": True,
+        "does_not_claim_intervention_pass": True,
+        "does_not_claim_world_model": True,
+    }
+
+
 def _non_goals() -> dict[str, bool]:
     return {
         "captures_video": False,
@@ -521,6 +752,14 @@ def _validate_claim_policy(value: Mapping[str, Any]) -> None:
         raise ValueError("controlled candidate template must preserve claim policy")
 
 
+def _validate_finalize_claim_policy(value: Mapping[str, Any]) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("controlled candidate finalize requires claim_policy")
+    expected = _finalize_claim_policy()
+    if any(value.get(key) is not expected_value for key, expected_value in expected.items()):
+        raise ValueError("controlled candidate finalize must preserve claim policy")
+
+
 def _validate_non_goals(value: Mapping[str, Any]) -> None:
     if not isinstance(value, Mapping):
         raise ValueError("controlled candidate template requires non_goals")
@@ -541,10 +780,116 @@ def _required_string(value: Mapping[str, Any], key: str) -> str:
     return result
 
 
+def _validate_filled_template_common(
+    payload: Mapping[str, Any],
+    *,
+    expected_schema: str,
+    expected_kind: str,
+    target_schema: str,
+) -> None:
+    if not isinstance(payload, Mapping):
+        raise TypeError("filled controlled candidate template must be a mapping")
+    if payload.get("schema") != expected_schema:
+        raise ValueError(
+            "filled controlled candidate template has unsupported schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != expected_kind:
+        raise ValueError("filled controlled candidate template kind is unsupported")
+    if payload.get("template_status") != "draft_not_valid_for_eval":
+        raise ValueError("filled controlled candidate template must originate from draft template")
+    if payload.get("target_eval_schema") != target_schema:
+        raise ValueError("filled controlled candidate template target eval schema mismatch")
+    contract = payload.get("authoring_contract")
+    if not isinstance(contract, Mapping) or not contract.get(
+        "write_eval_schema_only_after_todos_are_replaced"
+    ):
+        raise ValueError("filled controlled candidate template must preserve authoring contract")
+    _validate_claim_policy(payload.get("claim_policy", {}))
+    _validate_non_goals(payload.get("non_goals", {}))
+
+
+def _filled_candidate(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError("filled controlled candidate metadata must be a mapping")
+    candidate_id = _non_todo_string(value, "candidate_id")
+    source = _non_todo_string(value, "source")
+    refs = value.get("artifact_refs")
+    if isinstance(refs, (str, bytes)) or not isinstance(refs, Sequence) or not refs:
+        raise ValueError("filled controlled candidate artifact_refs must be non-empty")
+    artifact_refs = []
+    for item in refs:
+        if not isinstance(item, str) or not item or _is_todo_string(item):
+            raise ValueError("filled controlled candidate artifact_refs cannot contain TODO")
+        artifact_refs.append(item)
+    return {
+        "candidate_id": candidate_id,
+        "source": source,
+        "artifact_refs": artifact_refs,
+    }
+
+
+def _non_todo_string(value: Mapping[str, Any], key: str) -> str:
+    result = _required_string(value, key)
+    if _is_todo_string(result):
+        raise ValueError(f"{key} must be replaced before finalizing candidates")
+    return result
+
+
+def _filled_vector(value: Any, name: str) -> list[float]:
+    if _is_todo_string(value):
+        raise ValueError(f"{name} must be replaced before finalizing candidates")
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise TypeError(f"{name} must be a numeric length-3 sequence")
+    if len(value) != 3:
+        raise ValueError(f"{name} must have length 3")
+    result = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            raise TypeError(f"{name} must contain numeric values")
+        result.append(float(item))
+    return result
+
+
+def _optional_confidence(value: Mapping[str, Any]) -> float | None:
+    if "confidence" not in value:
+        return None
+    confidence = value["confidence"]
+    if _is_todo_string(confidence):
+        return None
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise TypeError("confidence must be numeric")
+    result = float(confidence)
+    if result < 0.0 or result > 1.0:
+        raise ValueError("confidence must be in [0, 1]")
+    return result
+
+
+def _reject_forbidden_row_fields(value: Mapping[str, Any], kind: str) -> None:
+    forbidden = sorted(_FORBIDDEN_ROW_FIELDS.intersection(value))
+    if forbidden:
+        raise ValueError(
+            f"controlled {kind} candidate row contains forbidden GT leakage fields: "
+            + ", ".join(forbidden)
+        )
+
+
+def _is_todo_string(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().upper().startswith(_TODO_PREFIX)
+
+
 def _sequence(value: Any, name: str) -> Sequence[Any]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise TypeError(f"{name} must be a sequence")
     return value
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return payload
 
 
 def _ensure_can_write(paths: Sequence[Path], *, force: bool) -> None:

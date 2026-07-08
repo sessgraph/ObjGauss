@@ -1225,6 +1225,43 @@ data, create GT, run prediction / intervention models, train Gaussian or
 dynamics models, write eval-ready pass candidates, use replay / diffusion,
 write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001
+
+Add a checked transition from filled draft templates to evaluator-ready
+candidate JSON.
+
+Implemented v0.1 facts:
+
+- Core function:
+  `finalize_objectstate_controlled_reality_candidate_templates(...)`.
+- Summary schema:
+  `objgauss-objectstate-controlled-reality-candidate-finalize-v1`.
+- Inputs are the draft template files from
+  `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001`.
+- Finalize requires:
+  - candidate metadata to have non-TODO `candidate_id`, `source` and
+    `artifact_refs`;
+  - all required candidate positions to be numeric length-3 vectors;
+  - TODO values to be absent from required fields;
+  - obvious top-level GT leakage fields such as `target_position` or
+    `target_pose` to be absent.
+- Finalize writes:
+  - `prediction-candidates.json` using
+    `objgauss-objectstate-controlled-prediction-candidates-v1`;
+  - `intervention-candidates.json` using
+    `objgauss-objectstate-controlled-intervention-candidates-v1`.
+- The outputs are immediately validated by the existing prediction /
+  intervention candidate validators.
+- CLI command:
+  `objgauss object-state finalize-controlled-reality-candidates <prediction-template.json> <intervention-template.json> --output-dir <dir>`.
+- CLI supports optional `--bundle-root` for next-command output,
+  `--summary-output` and `--force`.
+
+Current scope remains candidate JSON finalization only. It does not collect
+capture data, create GT, run prediction / intervention models, train Gaussian
+or dynamics models, evaluate metrics, claim pass rows, use replay / diffusion,
+write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.
