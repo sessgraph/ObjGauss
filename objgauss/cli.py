@@ -224,6 +224,7 @@ from objgauss.core.objectstate_bop_rgbd_gaussian_export import (
     objectstate_bop_rgbd_gaussian_export,
 )
 from objgauss.core.objectstate_bop_candidate_artifact_template import (
+    finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
 from objgauss.core.objectstate_bop_capture_adapter import (
@@ -3675,6 +3676,53 @@ def _object_state_init_bop_objectstate_artifact_template(
         print(f"summary={args.summary_output}")
 
 
+def _object_state_finalize_bop_objectstate_artifact_template(
+    args: argparse.Namespace,
+) -> None:
+    summary = finalize_objectstate_bop_candidate_artifact_template(
+        args.template,
+        output=args.output,
+        scene_root=args.scene_root,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        gt_leakage_tolerance=args.gt_leakage_tolerance,
+        reconstruction_noise_robustness=args.reconstruction_noise_robustness,
+        reconstruction_noise_variant_count=args.reconstruction_noise_variant_count,
+        force=args.force,
+    )
+    readiness = summary["readiness"]
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"template={summary['template']}")
+    print(f"output={summary['output']}")
+    print(f"bop_objectstate_artifact_finalize_status={summary['status']}")
+    print(f"frames={counts['frames']}")
+    print(f"states={counts['states']}")
+    for gate, passed in readiness.items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    leakage = summary["pose_gt_leakage_guard"]
+    print(
+        "pose_gt_min_distance="
+        f"{float(leakage['min_distance_to_pose_gt']):.9f}"
+    )
+    print(f"bop_acceptance_status={summary['acceptance']['status']}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -6024,6 +6072,92 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_bop_objectstate_artifact_template.set_defaults(
         handler=_object_state_init_bop_objectstate_artifact_template
+    )
+    finalize_bop_objectstate_artifact_template = object_state_subparsers.add_parser(
+        "finalize-bop-objectstate-artifact-template",
+        help=(
+            "finalize a filled BOP ObjectState candidate template into the "
+            "trainable artifact schema accepted by identity route audits"
+        ),
+    )
+    finalize_bop_objectstate_artifact_template.add_argument("template", type=Path)
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        help="target objectstates.json path; defaults to template target_artifact",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--scene-root",
+        type=Path,
+        help="override scene_root stored in the template",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--dataset-id",
+        default="bop-ycbv",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--fps",
+        type=float,
+        default=30.0,
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    finalize_bop_objectstate_artifact_template.add_argument("--rgb-dir", default="rgb")
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument("--max-frames", type=int)
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--gt-leakage-tolerance",
+        type=float,
+        default=1e-9,
+        help="reject candidate centroids within this distance of BOP pose GT",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--reconstruction-noise-robustness",
+        type=float,
+        help="optional real model robustness evidence to store in identity_evidence",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--reconstruction-noise-variant-count",
+        type=int,
+        help="optional robustness variant count paired with --reconstruction-noise-robustness",
+    )
+    finalize_bop_objectstate_artifact_template.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite the finalized artifact if it already exists",
+    )
+    finalize_bop_objectstate_artifact_template.set_defaults(
+        handler=_object_state_finalize_bop_objectstate_artifact_template
     )
     audit_bop_phase1_route = object_state_subparsers.add_parser(
         "audit-bop-phase1-route",

@@ -240,6 +240,27 @@ centroid / bbox / confidence field is a TODO placeholder. Fill the intended
 authoring aid only. It does not train a model, does not run identity eval and
 does not create a Phase 1 pass row.
 
+After filling the template with real model output, finalize it into the schema
+that the current identity route can audit:
+
+```bash
+uv run objgauss object-state finalize-bop-objectstate-artifact-template \
+  outputs/captures/bop-ycbv-scene-000001/objectstates.template.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/objectstates-finalize-summary.json
+```
+
+The finalizer writes the target `objectstates.json` declared by the template
+unless `--output` is provided. It rejects remaining TODO values, checks that
+the template frames still bind to the accepted BOP capture manifest, requires
+per-frame Gaussian evidence, and rejects exact centroid matches to BOP pose GT
+as obvious leakage. Optional real-model robustness evidence may be supplied
+with `--reconstruction-noise-robustness` and
+`--reconstruction-noise-variant-count`; do not invent these values. A
+finalized artifact can satisfy the candidate-artifact file and binding checks
+in `audit-bop-identity-route`, but it still does not run the identity handoff,
+does not score IDF1 / drift / reconstruction-noise robustness, and does not
+create a pass row.
+
 For Stage 1 identity-state evidence, run the identity route audit before
 starting a handoff:
 
