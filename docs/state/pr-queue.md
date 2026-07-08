@@ -347,6 +347,36 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TRANSITION-DATASET-AUDIT-001: Audit ObjectState transition dataset readiness
+
+- 状态: done / objectstate-transition-dataset-audit
+- 类型: 标准 PR / ObjectState Phase 1 data readiness gate
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 在 `compile-objectstate-transitions` 之后增加只读 readiness gate，
+  判断 object-level transition rows 是否具备进入候选训练或 evaluator authoring
+  的最低数据条件。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_transition_dataset`。
+  - 新增 schema `objgauss-objectstate-transition-dataset-audit-v1`。
+  - 新增 CLI `objgauss object-state audit-objectstate-transition-dataset
+    <objectstate-transitions.json>`。
+  - Audit 检查 object episodes、transition rows、action-conditioned transitions、
+    object horizon、pose readiness 和 real Gaussian ref readiness。
+  - 输出 `hard_blockers` 和 `next_actions`，并支持 `--require-ready` 作为本地门禁。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不采集数据、不下载 public dataset、不创建 GT、不推断 physical identity。
+  - 不重建 Gaussian、不运行 prediction / intervention eval、不训练 dynamics。
+  - 不创建 replay buffer、不创建 reality rows、不声明 metric pass 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_transition_dataset.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_transition_dataset.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_transition_dataset.py tests/test_core_namespace.py -q`: 14 passed。
+  - `uv run --extra dev pytest`: 532 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-TRANSITION-DATASET-001: Compile object-level transition dataset
 
 - 状态: done / objectstate-transition-dataset

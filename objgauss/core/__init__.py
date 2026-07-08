@@ -186,6 +186,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_ROW_SCHEMA",
     ),
+    "OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_transition_dataset",
+        "OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA",
+    ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
@@ -218,6 +222,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_transition_dataset",
         "write_objectstate_transition_dataset",
     ),
+    "read_objectstate_transition_dataset": (
+        "objgauss.core.objectstate_transition_dataset",
+        "read_objectstate_transition_dataset",
+    ),
+    "objectstate_transition_dataset_audit": (
+        "objgauss.core.objectstate_transition_dataset",
+        "objectstate_transition_dataset_audit",
+    ),
+    "objectstate_transition_dataset_audit_from_path": (
+        "objgauss.core.objectstate_transition_dataset",
+        "objectstate_transition_dataset_audit_from_path",
+    ),
     "validate_objectstate_controlled_capture_import_summary": (
         "objgauss.core.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
@@ -241,6 +257,10 @@ _EXPORTS = {
     "validate_objectstate_transition_dataset": (
         "objgauss.core.objectstate_transition_dataset",
         "validate_objectstate_transition_dataset",
+    ),
+    "validate_objectstate_transition_dataset_audit": (
+        "objgauss.core.objectstate_transition_dataset",
+        "validate_objectstate_transition_dataset_audit",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_eval",

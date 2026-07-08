@@ -230,3 +230,13 @@ Transition Dataset 形态，并显式统计 action-conditioned / no-action trans
 不创建 replay buffer、不创建 reality rows、不声明 metric pass 或 world-model evidence。风险继续
 open，直到真实 transition-backed identity / prediction / intervention rows 进入 pass /
 fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-DATASET-AUDIT-001`
+新增 `audit-objectstate-transition-dataset`，可对已生成 Object Transition Dataset 做只读
+readiness gate：检查 object episodes、transition rows、action-conditioned transitions、
+object horizon、pose readiness 和 real Gaussian refs，并输出 hard blockers / next actions。
+该缓解把“数据是否足够进入候选训练或 evaluator authoring”从人工判断变成可复验 schema；
+但它仍不采集数据、不创建 GT、不推断 identity、不重建 Gaussian、不运行 prediction /
+intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows、不声明
+metric pass 或 world-model evidence。风险继续 open，直到真实 transition-backed rows
+进入 identity / prediction / intervention pass/fail accounting。

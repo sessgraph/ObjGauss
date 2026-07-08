@@ -200,6 +200,7 @@ from objgauss.core.objectstate_controlled_prediction_baseline import (
     write_objectstate_controlled_prediction_baseline_candidates,
 )
 from objgauss.core.objectstate_transition_dataset import (
+    objectstate_transition_dataset_audit_from_path,
     write_objectstate_transition_dataset,
 )
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
@@ -4783,6 +4784,68 @@ def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> N
         raise ValueError(
             "ObjectState transition dataset has no action-conditioned transitions"
         )
+
+
+def _object_state_audit_objectstate_transition_dataset(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_transition_dataset_audit_from_path(
+        args.transition_dataset,
+        min_object_episodes=args.min_object_episodes,
+        min_transitions=args.min_transitions,
+        min_action_conditioned_transitions=args.min_action_conditioned_transitions,
+        min_horizon_seconds=args.min_horizon_seconds,
+        require_pose=not args.allow_missing_pose,
+        require_action_transition=args.require_action_transition,
+        require_gaussian_refs=args.require_gaussian_refs,
+    )
+    metrics = summary["metrics"]
+    horizons = metrics["object_horizon_seconds"]
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"transition_dataset={args.transition_dataset}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"status={summary['status']}")
+    print(f"object_episode_count={metrics['object_episode_count']}")
+    print(f"transition_count={metrics['transition_count']}")
+    print(
+        "action_conditioned_transition_count="
+        f"{metrics['action_conditioned_transition_count']}"
+    )
+    print(
+        "no_action_transition_count="
+        f"{metrics['no_action_transition_count']}"
+    )
+    print(
+        "action_transition_fraction="
+        f"{metrics['action_transition_fraction']:.6f}"
+    )
+    print(f"min_horizon_seconds={horizons['min_seconds']:.6f}")
+    print(f"max_horizon_seconds={horizons['max_seconds']:.6f}")
+    print(f"mean_horizon_seconds={horizons['mean_seconds']:.6f}")
+    for key in (
+        "object_episode_count_ready",
+        "transition_count_ready",
+        "action_transition_count_ready",
+        "horizon_ready",
+        "pose_transition_ready",
+        "gaussian_refs_ready",
+        "transition_dataset_ready",
+    ):
+        print(f"{key}={str(readiness[key]).lower()}")
+    if summary["hard_blockers"]:
+        print("hard_blockers:")
+        for blocker in summary["hard_blockers"]:
+            print(f"- {blocker}")
+    if summary["next_actions"]:
+        print("next_actions:")
+        for action in summary["next_actions"]:
+            print(f"- {action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_ready and not readiness["transition_dataset_ready"]:
+        raise ValueError("ObjectState transition dataset audit is not ready")
 
 
 def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> None:
@@ -10214,6 +10277,61 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     compile_objectstate_transitions.set_defaults(
         handler=_object_state_compile_objectstate_transitions
+    )
+    audit_objectstate_transition_dataset = object_state_subparsers.add_parser(
+        "audit-objectstate-transition-dataset",
+        help=(
+            "audit whether object-level ObjectState transition rows are ready "
+            "for the next candidate training or evaluator authoring step"
+        ),
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "transition_dataset",
+        type=Path,
+    )
+    audit_objectstate_transition_dataset.add_argument("--summary-output", type=Path)
+    audit_objectstate_transition_dataset.add_argument(
+        "--min-object-episodes",
+        type=int,
+        default=1,
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--min-transitions",
+        type=int,
+        default=1,
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--min-action-conditioned-transitions",
+        type=int,
+        default=0,
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--min-horizon-seconds",
+        type=float,
+        default=0.0,
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--allow-missing-pose",
+        action="store_true",
+        help="allow transition states without pose; default requires pose",
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--require-action-transition",
+        action="store_true",
+        help="require at least one action-conditioned transition",
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--require-gaussian-refs",
+        action="store_true",
+        help="require real per-frame Gaussian refs declared in the source capture",
+    )
+    audit_objectstate_transition_dataset.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless all requested transition dataset audit gates are ready",
+    )
+    audit_objectstate_transition_dataset.set_defaults(
+        handler=_object_state_audit_objectstate_transition_dataset
     )
     audit_controlled_capture_files = object_state_subparsers.add_parser(
         "audit-controlled-capture-files",

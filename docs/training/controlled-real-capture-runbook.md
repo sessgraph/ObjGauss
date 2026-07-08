@@ -201,6 +201,27 @@ create GT, infer identity, run a prediction / intervention model, train
 dynamics, create replay buffers, emit reality rows, or make a metric-pass
 claim.
 
+Then run the read-only transition dataset audit before using the rows for
+candidate training or evaluator authoring:
+
+```bash
+uv run objgauss object-state audit-objectstate-transition-dataset \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --min-object-episodes 1 \
+  --min-transitions 2 \
+  --require-action-transition \
+  --require-gaussian-refs \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions-audit.json \
+  --require-ready
+```
+
+This writes `objgauss-objectstate-transition-dataset-audit-v1`, checking object
+episode count, transition count, action-conditioned transition count, capture
+horizon, pose readiness, and Gaussian ref readiness. Passing this audit only
+means the transition dataset is ready for the next candidate/evaluator step.
+It is not a dynamics model result, prediction metric pass, intervention metric
+pass, replay buffer, or world-model claim.
+
 ## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible

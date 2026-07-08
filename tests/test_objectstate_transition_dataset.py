@@ -9,10 +9,14 @@ from objgauss.core.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
 from objgauss.core.objectstate_transition_dataset import (
+    OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
     OBJECTSTATE_TRANSITION_ROW_SCHEMA,
+    objectstate_transition_dataset_audit,
+    objectstate_transition_dataset_audit_from_path,
     objectstate_transition_dataset_from_capture_manifest,
     validate_objectstate_transition_dataset,
+    validate_objectstate_transition_dataset_audit,
     write_objectstate_transition_dataset,
 )
 
@@ -59,6 +63,57 @@ def test_transition_dataset_compiles_object_experience_rows():
     box_no_action = rows[("box-001", "frame-000001", "frame-000002")]
     assert box_no_action["has_action"] is False
     assert box_no_action["action_context"] == []
+
+
+def test_transition_dataset_audit_reports_ready_dataset():
+    dataset = objectstate_transition_dataset_from_capture_manifest(
+        _capture_manifest(include_action=True),
+        require_action_transition=True,
+    )
+
+    audit = objectstate_transition_dataset_audit(
+        dataset,
+        min_object_episodes=2,
+        min_transitions=4,
+        min_action_conditioned_transitions=2,
+        min_horizon_seconds=1.0,
+        require_action_transition=True,
+        require_gaussian_refs=True,
+    )
+
+    assert audit["schema"] == OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA
+    assert audit["status"] == "objectstate_transition_dataset_audit_ready"
+    assert audit["sample"]["sample_id"] == "transition-cup-box-001"
+    assert audit["metrics"]["object_episode_count"] == 2
+    assert audit["metrics"]["transition_count"] == 4
+    assert audit["metrics"]["action_conditioned_transition_count"] == 2
+    assert audit["metrics"]["action_transition_fraction"] == pytest.approx(0.5)
+    assert audit["metrics"]["object_horizon_seconds"]["min_seconds"] == pytest.approx(1.0)
+    assert audit["readiness"]["transition_dataset_ready"] is True
+    assert audit["hard_blockers"] == []
+    assert audit["claim_policy"]["does_not_create_replay_buffer"] is True
+    assert audit["claim_policy"]["does_not_claim_metric_pass"] is True
+    assert all(value is False for value in audit["non_goals"].values())
+    assert validate_objectstate_transition_dataset_audit(audit) == audit
+
+
+def test_transition_dataset_audit_blocks_missing_action_transitions():
+    dataset = objectstate_transition_dataset_from_capture_manifest(
+        _capture_manifest(include_action=False),
+    )
+
+    audit = objectstate_transition_dataset_audit(
+        dataset,
+        require_action_transition=True,
+    )
+
+    assert audit["status"] == "objectstate_transition_dataset_audit_blocked"
+    assert audit["readiness"]["action_transition_count_ready"] is False
+    assert audit["readiness"]["transition_dataset_ready"] is False
+    assert any(
+        "action_conditioned_transition_count 0 < required 1" in blocker
+        for blocker in audit["hard_blockers"]
+    )
 
 
 def test_transition_dataset_requires_action_transition_when_requested():
@@ -113,6 +168,48 @@ def test_transition_dataset_writer_and_cli(tmp_path, capsys):
     assert "action_conditioned_transition_ready=true" in stdout
     assert summary["schema"] == OBJECTSTATE_TRANSITION_DATASET_SCHEMA
     assert cli_output.is_file()
+
+    audit_output = tmp_path / "objectstate-transitions-audit.json"
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-objectstate-transition-dataset",
+                str(cli_output),
+                "--min-object-episodes",
+                "2",
+                "--min-transitions",
+                "4",
+                "--min-action-conditioned-transitions",
+                "2",
+                "--min-horizon-seconds",
+                "1.0",
+                "--require-action-transition",
+                "--require-gaussian-refs",
+                "--summary-output",
+                str(audit_output),
+                "--require-ready",
+            ]
+        )
+        == 0
+    )
+
+    audit_summary = json.loads(audit_output.read_text(encoding="utf-8"))
+    audit_stdout = capsys.readouterr().out
+    direct_audit = objectstate_transition_dataset_audit_from_path(
+        cli_output,
+        min_object_episodes=2,
+        min_transitions=4,
+        min_action_conditioned_transitions=2,
+        min_horizon_seconds=1.0,
+        require_action_transition=True,
+        require_gaussian_refs=True,
+    )
+    assert f"schema={OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA}" in audit_stdout
+    assert "status=objectstate_transition_dataset_audit_ready" in audit_stdout
+    assert "transition_dataset_ready=true" in audit_stdout
+    assert validate_objectstate_transition_dataset_audit(audit_summary) == audit_summary
+    assert direct_audit["schema"] == OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA
 
 
 def _capture_manifest(*, include_action: bool) -> dict:

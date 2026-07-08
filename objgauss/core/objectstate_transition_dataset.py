@@ -15,6 +15,9 @@ OBJECTSTATE_TRANSITION_DATASET_SCHEMA = (
     "objgauss-objectstate-transition-dataset-v1"
 )
 OBJECTSTATE_TRANSITION_ROW_SCHEMA = "objgauss-objectstate-transition-row-v1"
+OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA = (
+    "objgauss-objectstate-transition-dataset-audit-v1"
+)
 
 
 def objectstate_transition_dataset_from_capture_manifest(
@@ -172,6 +175,181 @@ def write_objectstate_transition_dataset(
     return checked
 
 
+def read_objectstate_transition_dataset(path: str | Path) -> dict[str, Any]:
+    transition_path = Path(path)
+    payload = json.loads(transition_path.read_text(encoding="utf-8"))
+    return validate_objectstate_transition_dataset(payload)
+
+
+def objectstate_transition_dataset_audit_from_path(
+    path: str | Path,
+    *,
+    min_object_episodes: int = 1,
+    min_transitions: int = 1,
+    min_action_conditioned_transitions: int = 0,
+    min_horizon_seconds: float = 0.0,
+    require_pose: bool = True,
+    require_action_transition: bool = False,
+    require_gaussian_refs: bool = False,
+) -> dict[str, Any]:
+    transition_path = Path(path)
+    dataset = read_objectstate_transition_dataset(transition_path)
+    audit = objectstate_transition_dataset_audit(
+        dataset,
+        min_object_episodes=min_object_episodes,
+        min_transitions=min_transitions,
+        min_action_conditioned_transitions=min_action_conditioned_transitions,
+        min_horizon_seconds=min_horizon_seconds,
+        require_pose=require_pose,
+        require_action_transition=require_action_transition,
+        require_gaussian_refs=require_gaussian_refs,
+    )
+    return validate_objectstate_transition_dataset_audit(
+        {
+            **audit,
+            "source_transition_dataset": str(transition_path),
+        }
+    )
+
+
+def objectstate_transition_dataset_audit(
+    dataset: Mapping[str, Any],
+    *,
+    min_object_episodes: int = 1,
+    min_transitions: int = 1,
+    min_action_conditioned_transitions: int = 0,
+    min_horizon_seconds: float = 0.0,
+    require_pose: bool = True,
+    require_action_transition: bool = False,
+    require_gaussian_refs: bool = False,
+) -> dict[str, Any]:
+    checked_dataset = validate_objectstate_transition_dataset(dataset)
+    if min_object_episodes < 0:
+        raise ValueError("min_object_episodes must be non-negative")
+    if min_transitions < 0:
+        raise ValueError("min_transitions must be non-negative")
+    if min_action_conditioned_transitions < 0:
+        raise ValueError("min_action_conditioned_transitions must be non-negative")
+    if min_horizon_seconds < 0.0:
+        raise ValueError("min_horizon_seconds must be non-negative")
+    row_counts = checked_dataset["row_counts"]
+    transitions = _sequence(checked_dataset["transitions"], "transitions")
+    horizon_summary = _object_horizon_summary(transitions)
+    effective_min_action_transitions = max(
+        int(min_action_conditioned_transitions),
+        1 if require_action_transition else 0,
+    )
+    action_count = int(row_counts["action_conditioned_transitions"])
+    transition_count = int(row_counts["transitions"])
+    object_episode_count = int(row_counts["object_episodes"])
+    min_horizon = float(horizon_summary["min_seconds"])
+    readiness = {
+        "dataset_valid": True,
+        "object_episode_count_ready": (
+            object_episode_count >= int(min_object_episodes)
+        ),
+        "transition_count_ready": transition_count >= int(min_transitions),
+        "action_transition_count_ready": (
+            action_count >= effective_min_action_transitions
+        ),
+        "horizon_ready": bool(horizon_summary["objects"])
+        and min_horizon >= float(min_horizon_seconds),
+        "pose_transition_ready": (
+            True
+            if not require_pose
+            else bool(checked_dataset["readiness"]["pose_transition_ready"])
+        ),
+        "gaussian_refs_ready": (
+            True
+            if not require_gaussian_refs
+            else bool(checked_dataset["readiness"]["real_gaussian_refs_present"])
+        ),
+    }
+    readiness["transition_dataset_ready"] = all(readiness.values())
+    hard_blockers = _transition_dataset_audit_blockers(
+        readiness=readiness,
+        object_episode_count=object_episode_count,
+        min_object_episodes=int(min_object_episodes),
+        transition_count=transition_count,
+        min_transitions=int(min_transitions),
+        action_count=action_count,
+        effective_min_action_transitions=effective_min_action_transitions,
+        min_horizon=min_horizon,
+        min_horizon_seconds=float(min_horizon_seconds),
+        require_pose=require_pose,
+        require_gaussian_refs=require_gaussian_refs,
+    )
+    payload = {
+        "schema": OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
+        "kind": "objectstate_transition_dataset_audit",
+        "status": (
+            "objectstate_transition_dataset_audit_ready"
+            if readiness["transition_dataset_ready"]
+            else "objectstate_transition_dataset_audit_blocked"
+        ),
+        "transition_dataset_schema": OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
+        "sample": dict(checked_dataset["sample"]),
+        "requirements": {
+            "min_object_episodes": int(min_object_episodes),
+            "min_transitions": int(min_transitions),
+            "min_action_conditioned_transitions": int(
+                min_action_conditioned_transitions
+            ),
+            "effective_min_action_conditioned_transitions": (
+                effective_min_action_transitions
+            ),
+            "min_horizon_seconds": float(min_horizon_seconds),
+            "pose_required": bool(require_pose),
+            "action_transition_required": bool(require_action_transition),
+            "gaussian_refs_required": bool(require_gaussian_refs),
+        },
+        "metrics": {
+            "object_episode_count": object_episode_count,
+            "transition_count": transition_count,
+            "action_conditioned_transition_count": action_count,
+            "no_action_transition_count": int(row_counts["no_action_transitions"]),
+            "action_transition_fraction": (
+                action_count / transition_count if transition_count else 0.0
+            ),
+            "object_horizon_seconds": horizon_summary,
+        },
+        "readiness": readiness,
+        "hard_blockers": hard_blockers,
+        "next_actions": _transition_dataset_audit_next_actions(hard_blockers),
+        "claim_policy": {
+            "audits_existing_transition_dataset": True,
+            "validates_object_level_transition_dataset": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_identity": True,
+            "does_not_reconstruct_gaussians": True,
+            "does_not_train_dynamics_model": True,
+            "does_not_create_replay_buffer": True,
+            "does_not_run_prediction_eval": True,
+            "does_not_run_intervention_eval": True,
+            "does_not_create_reality_rows": True,
+            "does_not_claim_metric_pass": True,
+            "does_not_claim_world_model": True,
+        },
+        "non_goals": {
+            "captures_video": False,
+            "downloads_dataset": False,
+            "creates_ground_truth": False,
+            "infers_identity": False,
+            "reconstructs_gaussians": False,
+            "runs_tracking_model": False,
+            "runs_prediction_model": False,
+            "runs_intervention_model": False,
+            "trains_gaussian_model": False,
+            "trains_dynamics_model": False,
+            "creates_replay_buffer": False,
+            "uses_diffusion": False,
+            "creates_reality_rows": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_transition_dataset_audit(payload)
+
+
 def validate_objectstate_transition_dataset(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -265,6 +443,169 @@ def validate_objectstate_transition_dataset(
             "ObjectState transition dataset cannot claim capture, download, GT "
             "creation, inference, reconstruction, model runs, training, replay, "
             "diffusion, reality rows, or viewer mutation"
+        )
+    return dict(payload)
+
+
+def validate_objectstate_transition_dataset_audit(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("ObjectState transition dataset audit must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA:
+        raise ValueError(
+            "unsupported ObjectState transition dataset audit schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_transition_dataset_audit":
+        raise ValueError("ObjectState transition dataset audit kind is unsupported")
+    if payload.get("status") not in {
+        "objectstate_transition_dataset_audit_ready",
+        "objectstate_transition_dataset_audit_blocked",
+    }:
+        raise ValueError("ObjectState transition dataset audit status is unsupported")
+    if payload.get("transition_dataset_schema") != OBJECTSTATE_TRANSITION_DATASET_SCHEMA:
+        raise ValueError("ObjectState transition dataset audit schema mismatch")
+    sample = payload.get("sample")
+    if not isinstance(sample, Mapping) or not sample.get("sample_id"):
+        raise ValueError("ObjectState transition dataset audit requires sample")
+    requirements = payload.get("requirements")
+    if not isinstance(requirements, Mapping):
+        raise ValueError("ObjectState transition dataset audit requires requirements")
+    for key in (
+        "min_object_episodes",
+        "min_transitions",
+        "min_action_conditioned_transitions",
+        "effective_min_action_conditioned_transitions",
+    ):
+        value = requirements.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"ObjectState transition dataset audit invalid requirement {key}"
+            )
+    min_horizon = requirements.get("min_horizon_seconds")
+    if (
+        isinstance(min_horizon, bool)
+        or not isinstance(min_horizon, (int, float))
+        or float(min_horizon) < 0.0
+    ):
+        raise ValueError(
+            "ObjectState transition dataset audit invalid min_horizon_seconds"
+        )
+    for key in (
+        "pose_required",
+        "action_transition_required",
+        "gaussian_refs_required",
+    ):
+        if not isinstance(requirements.get(key), bool):
+            raise ValueError(
+                f"ObjectState transition dataset audit missing bool {key}"
+            )
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, Mapping):
+        raise ValueError("ObjectState transition dataset audit requires metrics")
+    for key in (
+        "object_episode_count",
+        "transition_count",
+        "action_conditioned_transition_count",
+        "no_action_transition_count",
+    ):
+        value = metrics.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"ObjectState transition dataset audit invalid metric {key}"
+            )
+    fraction = metrics.get("action_transition_fraction")
+    if (
+        isinstance(fraction, bool)
+        or not isinstance(fraction, (int, float))
+        or not 0.0 <= float(fraction) <= 1.0
+    ):
+        raise ValueError(
+            "ObjectState transition dataset audit invalid action fraction"
+        )
+    horizons = metrics.get("object_horizon_seconds")
+    if not isinstance(horizons, Mapping):
+        raise ValueError("ObjectState transition dataset audit requires horizons")
+    for key in ("min_seconds", "max_seconds", "mean_seconds"):
+        value = horizons.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(
+                f"ObjectState transition dataset audit invalid horizon {key}"
+            )
+    if not isinstance(horizons.get("objects"), list):
+        raise ValueError("ObjectState transition dataset audit requires horizon objects")
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping):
+        raise ValueError("ObjectState transition dataset audit requires readiness")
+    readiness_keys = (
+        "dataset_valid",
+        "object_episode_count_ready",
+        "transition_count_ready",
+        "action_transition_count_ready",
+        "horizon_ready",
+        "pose_transition_ready",
+        "gaussian_refs_ready",
+        "transition_dataset_ready",
+    )
+    for key in readiness_keys:
+        if not isinstance(readiness.get(key), bool):
+            raise ValueError(
+                f"ObjectState transition dataset audit missing readiness {key}"
+            )
+    if readiness["transition_dataset_ready"] != all(
+        readiness[key] for key in readiness_keys if key != "transition_dataset_ready"
+    ):
+        raise ValueError("ObjectState transition dataset audit readiness mismatch")
+    hard_blockers = payload.get("hard_blockers")
+    next_actions = payload.get("next_actions")
+    if (
+        not isinstance(hard_blockers, list)
+        or any(not isinstance(item, str) for item in hard_blockers)
+    ):
+        raise ValueError("ObjectState transition dataset audit invalid blockers")
+    if (
+        not isinstance(next_actions, list)
+        or any(not isinstance(item, str) for item in next_actions)
+    ):
+        raise ValueError("ObjectState transition dataset audit invalid next actions")
+    if readiness["transition_dataset_ready"] and hard_blockers:
+        raise ValueError("ready ObjectState transition dataset audit has blockers")
+    if (
+        readiness["transition_dataset_ready"]
+        and payload["status"] != "objectstate_transition_dataset_audit_ready"
+    ):
+        raise ValueError("ready ObjectState transition dataset audit status mismatch")
+    if (
+        not readiness["transition_dataset_ready"]
+        and payload["status"] != "objectstate_transition_dataset_audit_blocked"
+    ):
+        raise ValueError("blocked ObjectState transition dataset audit status mismatch")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not isinstance(claim_policy, Mapping)
+        or not claim_policy.get("audits_existing_transition_dataset")
+        or not claim_policy.get("validates_object_level_transition_dataset")
+        or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("does_not_infer_identity")
+        or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_train_dynamics_model")
+        or not claim_policy.get("does_not_create_replay_buffer")
+        or not claim_policy.get("does_not_run_prediction_eval")
+        or not claim_policy.get("does_not_run_intervention_eval")
+        or not claim_policy.get("does_not_create_reality_rows")
+        or not claim_policy.get("does_not_claim_metric_pass")
+        or not claim_policy.get("does_not_claim_world_model")
+    ):
+        raise ValueError(
+            "ObjectState transition dataset audit must preserve claim policy"
+        )
+    non_goals = payload.get("non_goals", {})
+    if not isinstance(non_goals, Mapping) or any(bool(value) for value in non_goals.values()):
+        raise ValueError(
+            "ObjectState transition dataset audit cannot claim capture, download, "
+            "GT creation, inference, reconstruction, model runs, training, "
+            "replay, diffusion, reality rows, or viewer mutation"
         )
     return dict(payload)
 
@@ -427,6 +768,146 @@ def _validate_episode(episode: Any) -> None:
     ids = episode.get("transition_ids")
     if not isinstance(ids, list) or len(ids) != episode["transition_count"]:
         raise ValueError("ObjectState transition episode transition_ids mismatch")
+
+
+def _object_horizon_summary(
+    transitions: Sequence[Any],
+) -> dict[str, Any]:
+    by_object: dict[str, dict[str, float | int]] = {}
+    for item in transitions:
+        if not isinstance(item, Mapping):
+            continue
+        object_id = str(item["object_id"])
+        record = by_object.setdefault(
+            object_id,
+            {
+                "min_source_timestamp": float(item["source_timestamp"]),
+                "max_target_timestamp": float(item["target_timestamp"]),
+                "transition_count": 0,
+            },
+        )
+        record["min_source_timestamp"] = min(
+            float(record["min_source_timestamp"]),
+            float(item["source_timestamp"]),
+        )
+        record["max_target_timestamp"] = max(
+            float(record["max_target_timestamp"]),
+            float(item["target_timestamp"]),
+        )
+        record["transition_count"] = int(record["transition_count"]) + 1
+    object_rows = []
+    for object_id, record in sorted(by_object.items()):
+        horizon = float(record["max_target_timestamp"]) - float(
+            record["min_source_timestamp"]
+        )
+        object_rows.append(
+            {
+                "object_id": object_id,
+                "horizon_seconds": horizon,
+                "transition_count": int(record["transition_count"]),
+            }
+        )
+    horizons = [float(item["horizon_seconds"]) for item in object_rows]
+    if not horizons:
+        return {
+            "min_seconds": 0.0,
+            "max_seconds": 0.0,
+            "mean_seconds": 0.0,
+            "objects": [],
+        }
+    return {
+        "min_seconds": min(horizons),
+        "max_seconds": max(horizons),
+        "mean_seconds": sum(horizons) / len(horizons),
+        "objects": object_rows,
+    }
+
+
+def _transition_dataset_audit_blockers(
+    *,
+    readiness: Mapping[str, bool],
+    object_episode_count: int,
+    min_object_episodes: int,
+    transition_count: int,
+    min_transitions: int,
+    action_count: int,
+    effective_min_action_transitions: int,
+    min_horizon: float,
+    min_horizon_seconds: float,
+    require_pose: bool,
+    require_gaussian_refs: bool,
+) -> list[str]:
+    blockers: list[str] = []
+    if not readiness["object_episode_count_ready"]:
+        blockers.append(
+            "object_episode_count "
+            f"{object_episode_count} < required {min_object_episodes}"
+        )
+    if not readiness["transition_count_ready"]:
+        blockers.append(
+            f"transition_count {transition_count} < required {min_transitions}"
+        )
+    if not readiness["action_transition_count_ready"]:
+        blockers.append(
+            "action_conditioned_transition_count "
+            f"{action_count} < required {effective_min_action_transitions}"
+        )
+    if not readiness["horizon_ready"]:
+        blockers.append(
+            "object_horizon_seconds.min "
+            f"{min_horizon:.6f} < required {min_horizon_seconds:.6f}"
+        )
+    if require_pose and not readiness["pose_transition_ready"]:
+        blockers.append("pose_transition_ready=false")
+    if require_gaussian_refs and not readiness["gaussian_refs_ready"]:
+        blockers.append("real_gaussian_refs_present=false")
+    return blockers
+
+
+def _transition_dataset_audit_next_actions(
+    hard_blockers: Sequence[str],
+) -> list[str]:
+    if not hard_blockers:
+        return [
+            "Use this transition dataset as input for the next candidate "
+            "training or evaluator authoring step, while keeping metric-pass "
+            "claims in the downstream gates."
+        ]
+    actions = []
+    for blocker in hard_blockers:
+        if blocker.startswith("object_episode_count"):
+            actions.append(
+                "Add more physical objects with at least two timestamped "
+                "annotations each, then recompile the transition dataset."
+            )
+        elif blocker.startswith("transition_count"):
+            actions.append(
+                "Add additional timestamped frame annotations so each object "
+                "track contributes enough transitions."
+            )
+        elif blocker.startswith("action_conditioned_transition_count"):
+            actions.append(
+                "Add action metadata that overlaps object transitions, or run "
+                "the audit without action readiness when only identity data is "
+                "being checked."
+            )
+        elif blocker.startswith("object_horizon_seconds"):
+            actions.append(
+                "Extend the capture horizon with later target frames before "
+                "using this dataset for prediction or dynamics candidates."
+            )
+        elif blocker == "pose_transition_ready=false":
+            actions.append(
+                "Fill 6DoF pose annotations for source and target ObjectState "
+                "rows, or run with missing pose allowed only for non-pose checks."
+            )
+        elif blocker == "real_gaussian_refs_present=false":
+            actions.append(
+                "Attach per-frame Gaussian reconstruction refs and pass the "
+                "controlled capture file audit before treating this as real "
+                "Gaussian transition evidence."
+            )
+    return sorted(set(actions))
 
 
 def _sequence(value: Any, name: str) -> Sequence[Any]:

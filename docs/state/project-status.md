@@ -1044,6 +1044,14 @@ coverage。它是把 frame-level GT 收敛为目标文件所要求 Object Transi
 契约；不采集数据、不创建 GT、不推断 identity、不重建 Gaussian、不运行 prediction /
 intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
 metric pass 或 world model。
+随后完成 `OBJECTSTATE-TRANSITION-DATASET-AUDIT-001`：同一模块新增
+`objgauss-objectstate-transition-dataset-audit-v1` 和 CLI
+`objgauss object-state audit-objectstate-transition-dataset <objectstate-transitions.json>`。
+该只读 audit 检查 object episode 数、transition 数、action-conditioned transition 数、
+object horizon、pose readiness 和 real Gaussian ref readiness，并输出 hard blockers /
+next actions。它只说明 transition dataset 是否具备进入候选训练或 evaluator authoring 的
+最低数据条件；不训练 dynamics、不创建 replay buffer、不运行 prediction / intervention eval、
+不生成 reality rows、不声明 metric pass 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
