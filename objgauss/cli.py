@@ -206,6 +206,9 @@ from objgauss.core.objectstate_controlled_prediction_evidence_package import (
 from objgauss.core.objectstate_controlled_identity_evidence_package import (
     objectstate_controlled_identity_evidence_package,
 )
+from objgauss.core.objectstate_phase1_evidence_ledger import (
+    objectstate_phase1_evidence_ledger,
+)
 from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
@@ -4737,6 +4740,67 @@ def _object_state_audit_controlled_identity_evidence_package(
         raise ValueError("controlled identity evidence package is not reviewable")
 
 
+def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None:
+    summary = objectstate_phase1_evidence_ledger(
+        identity_summaries=tuple(args.identity_summary),
+        prediction_summaries=tuple(args.prediction_summary),
+        reality_summaries=tuple(args.reality_summary),
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    stage_summary = summary["stage_summary"]
+    phase_gates = summary["phase1_evidence_gates"]
+    sample_ids = ",".join(summary["sample_scope"]["sample_ids"])
+    print(f"schema={summary['schema']}")
+    print(f"ledger_status={summary['status']}")
+    print(f"maturity={summary['maturity']}")
+    print(
+        "reviewable="
+        f"{str(summary['status'].endswith('_reviewable')).lower()}"
+    )
+    print(f"sample_ids={sample_ids}")
+    print(f"identity_packages={stage_summary['identity']['package_count']}")
+    print(f"identity_reviewable={stage_summary['identity']['reviewable_count']}")
+    print(f"identity_pass_rows={stage_summary['identity']['pass_row_count']}")
+    print(f"identity_fail_rows={stage_summary['identity']['fail_row_count']}")
+    print(f"prediction_packages={stage_summary['prediction']['package_count']}")
+    print(
+        "prediction_reviewable="
+        f"{stage_summary['prediction']['reviewable_count']}"
+    )
+    print(f"prediction_pass_rows={stage_summary['prediction']['pass_row_count']}")
+    print(f"prediction_fail_rows={stage_summary['prediction']['fail_row_count']}")
+    print(f"full_reality_packages={stage_summary['full_reality']['package_count']}")
+    print(
+        "full_reality_reviewable="
+        f"{stage_summary['full_reality']['reviewable_count']}"
+    )
+    print(
+        "full_reality_pass_rows="
+        f"{stage_summary['full_reality']['pass_row_count']}"
+    )
+    print(
+        "full_reality_fail_rows="
+        f"{stage_summary['full_reality']['fail_row_count']}"
+    )
+    print(
+        "full_reality_blocked_rows="
+        f"{stage_summary['full_reality']['blocked_row_count']}"
+    )
+    for gate, passed in phase_gates.items():
+        print(f"phase1_gate.{gate}={str(passed).lower()}")
+    print(f"issue_count={len(summary['issues'])}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"] != "objectstate_phase1_evidence_ledger_reviewable"
+    ):
+        raise ValueError("phase1 evidence ledger is not reviewable")
+
+
 def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_prediction_baseline_handoff(
         args.scene_root,
@@ -5812,6 +5876,46 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_identity_evidence_package.set_defaults(
         handler=_object_state_audit_controlled_identity_evidence_package
+    )
+    audit_phase1_evidence_ledger = object_state_subparsers.add_parser(
+        "audit-phase1-evidence-ledger",
+        help=(
+            "summarize existing identity, prediction, and full reality "
+            "evidence package summaries without running evaluators"
+        ),
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--identity-summary",
+        action="append",
+        default=[],
+        type=Path,
+        help="identity evidence package summary JSON; may be repeated",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--prediction-summary",
+        action="append",
+        default=[],
+        type=Path,
+        help="prediction evidence package summary JSON; may be repeated",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--reality-summary",
+        action="append",
+        default=[],
+        type=Path,
+        help="full reality evidence package summary JSON; may be repeated",
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_phase1_evidence_ledger.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the ledger inputs are present and schema-valid",
+    )
+    audit_phase1_evidence_ledger.set_defaults(
+        handler=_object_state_audit_phase1_evidence_ledger
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",

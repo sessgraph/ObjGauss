@@ -266,6 +266,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_evidence_package",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA",
     ),
+    "OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA": (
+        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA": (
         "objgauss.core.objectstate_controlled_prediction_baseline",
         "OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA",
@@ -382,6 +386,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_evidence_package",
         "objectstate_controlled_identity_evidence_package",
     ),
+    "objectstate_phase1_evidence_ledger": (
+        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "objectstate_phase1_evidence_ledger",
+    ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
         "validate_objectstate_controlled_reality_bundle_handoff_summary",
@@ -413,6 +421,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_identity_evidence_package_summary": (
         "objgauss.core.objectstate_controlled_identity_evidence_package",
         "validate_objectstate_controlled_identity_evidence_package_summary",
+    ),
+    "validate_objectstate_phase1_evidence_ledger_summary": (
+        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "validate_objectstate_phase1_evidence_ledger_summary",
     ),
     "validate_objectstate_controlled_prediction_baseline_summary": (
         "objgauss.core.objectstate_controlled_prediction_baseline",

@@ -311,6 +311,20 @@ This audit only checks that the expected local JSON / Markdown artifacts exist,
 validate, use a consistent `sample_id`, and agree with the full handoff summary.
 It does not rerun the handoff or turn a failed metric row into a pass.
 
+To summarize the current Phase 1 evidence level from existing package
+summaries, run:
+
+```bash
+uv run objgauss object-state audit-phase1-evidence-ledger \
+  --identity-summary outputs/captures/controlled-tabletop-cup-box-001/identity-handoff/identity-evidence-package-summary.json \
+  --reality-summary outputs/captures/controlled-tabletop-cup-box-001/evidence-package-summary.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/phase1-evidence-ledger.json \
+  --require-reviewable
+```
+
+The ledger is a read-only index over existing summaries. It does not generate
+rows, rerun metrics, or prove the world-model claim.
+
 ## 10. Acceptance Evidence
 
 For the first real identity row, keep these local artifacts together:

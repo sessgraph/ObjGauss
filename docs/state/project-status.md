@@ -660,6 +660,15 @@ prediction、intervention、counterfactual gate 或 world model。
 结果，不重新运行 identity eval，不改变 handoff pass / fail 判定，也不声明 prediction /
 intervention 或 world model。
 
+随后新增 `OBJECTSTATE-PHASE1-EVIDENCE-LEDGER-001`：新增
+`objgauss.core.objectstate_phase1_evidence_ledger`，schema 为
+`objgauss-objectstate-phase1-evidence-ledger-v1`，并新增 CLI
+`objgauss object-state audit-phase1-evidence-ledger`。该 ledger 只读取已有
+identity / prediction / full reality evidence package summary JSON，复用各自 validator，
+输出 maturity（`identity_reviewable`、`identity_prediction_reviewable`、
+`full_reality_reviewable` 等）、sample scope、阶段 row count 和 issues。它不运行 handoff
+或 eval，不创建 GT，不生成 pass rows，也不声明 world model。
+
 随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`：新增
 `objgauss.core.objectstate_controlled_prediction_baseline`，schema 为
 `objgauss-objectstate-controlled-prediction-baseline-candidates-v1`，并新增 CLI

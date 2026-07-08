@@ -398,6 +398,35 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 2a3eaf2。
 
+### OBJECTSTATE-PHASE1-EVIDENCE-LEDGER-001: Summarize Phase 1 evidence package summaries
+
+- 状态: done / read-only-phase1-evidence-ledger
+- 类型: 标准 PR / ObjectState Phase 1 evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 对已有 identity-only、prediction-only 和 full reality evidence package
+  summaries 做统一只读索引，明确当前证据成熟度是 identity、identity+prediction，还是
+  full reality reviewable。
+- 已实施:
+  - 新增 module `objgauss.core.objectstate_phase1_evidence_ledger`。
+  - 新增 schema `objgauss-objectstate-phase1-evidence-ledger-v1`。
+  - 新增 core function `objectstate_phase1_evidence_ledger(...)`。
+  - 新增 CLI `objgauss object-state audit-phase1-evidence-ledger`。
+  - CLI 支持重复 `--identity-summary`、`--prediction-summary`、
+    `--reality-summary`，并输出 maturity、sample scope、阶段 package / row counts
+    和 phase1 evidence gates。
+- 边界:
+  - 只读取已有 evidence package summary JSON。
+  - 不采集视频，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不运行 identity handoff，不重新运行 identity / prediction / intervention eval。
+  - 不创建 pass rows，不声明 metric pass、counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_phase1_evidence_ledger.py objgauss/cli.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，13 tests。
+  - `uv run --extra dev pytest`: passed，423 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
+
 ### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
 
 - 状态: done / manifest-first-prediction-authoring-only

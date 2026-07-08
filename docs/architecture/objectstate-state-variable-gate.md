@@ -1677,6 +1677,35 @@ intervention eval, train Gaussian or dynamics models, claim metric pass, claim
 ObjectState is a world state, use replay / diffusion, write public samples or
 mutate viewer defaults.
 
+### OBJECTSTATE-PHASE1-EVIDENCE-LEDGER-001
+
+Add a read-only ledger over existing Phase 1 evidence package summaries.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_phase1_evidence_ledger`.
+- Summary schema: `objgauss-objectstate-phase1-evidence-ledger-v1`.
+- `objectstate_phase1_evidence_ledger(...)` accepts existing summary JSON
+  paths for identity-only, prediction-only and full reality evidence packages.
+- The ledger validates each summary with its native validator, records
+  `sample_id`, reviewability, row status / row accounting and issues, and then
+  reports maturity:
+  - `identity_reviewable`;
+  - `identity_prediction_reviewable`;
+  - `full_reality_reviewable`;
+  - or an incomplete / not-reviewable state.
+- CLI command:
+  `objgauss object-state audit-phase1-evidence-ledger`.
+- CLI supports repeated `--identity-summary`, `--prediction-summary` and
+  `--reality-summary` inputs, plus `--summary-output` and
+  `--require-reviewable`.
+
+Current scope remains summary-level audit only. It does not collect capture
+data, create GT, reconstruct Gaussians, run identity handoff, rerun identity /
+prediction / intervention eval, train models, claim metric pass, claim
+ObjectState is a world state, use replay / diffusion, write public samples or
+mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.
