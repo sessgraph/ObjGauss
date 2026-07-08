@@ -181,3 +181,12 @@ ObjectState candidate artifact、prediction candidates、intervention candidates
 不运行 eval、不训练模型、不创建 intervention pass row，也不把 observed interaction 误写成
 randomized counterfactual proof；风险继续 open，直到真实 controlled/public action rows
 进入 pass / fail evidence。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-REALITY-ROWS-001`
+新增 `audit-public-interaction-reality-rows`，可把已完成的 public interaction full handoff
+summary 转成 `source_kind=public_replay` 的 identity / prediction / intervention reality
+rows，并让全局 ledger 读取该 schema。该缓解防止 HOT3D 等 public action evidence 被计入
+`controlled_real`，并把 `action_challenge_present=true` 带入 state-variable matrix；但它只
+读取现有 handoff/eval 结果，不下载或适配数据、不创建 GT、不运行 eval、不改变 metric pass/fail，
+也不证明 randomized counterfactual causality。风险继续 open，直到真实 public interaction
+bundle 产生可审计 pass / fail rows。

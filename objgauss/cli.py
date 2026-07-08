@@ -217,6 +217,10 @@ from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_interaction_route_audit,
     objectstate_public_interaction_route_markdown,
 )
+from objgauss.core.objectstate_public_interaction_reality_rows import (
+    objectstate_public_interaction_reality_rows_summary,
+    read_objectstate_public_interaction_handoff_summary,
+)
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
 )
@@ -3398,6 +3402,54 @@ def _object_state_audit_public_interaction_route(
         print(f"markdown={args.markdown_output}")
     if args.require_ready and not readiness["controlled_reality_handoff_ready"]:
         raise ValueError("public interaction route is not handoff-ready")
+
+
+def _object_state_audit_public_interaction_reality_rows(
+    args: argparse.Namespace,
+) -> None:
+    handoff = read_objectstate_public_interaction_handoff_summary(
+        args.handoff_summary
+    )
+    summary = objectstate_public_interaction_reality_rows_summary(
+        handoff,
+        candidate_id=args.candidate_id,
+        source_summary_ref=str(args.handoff_summary),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        thresholds=ObjectStateRealityGateThresholds(
+            min_real_or_public_rows=args.min_real_or_public_rows,
+            require_identity_pass_row=True,
+            require_prediction_pass_row=True,
+            require_intervention_pass_row=True,
+            fail_on_failed_rows=True,
+        ),
+    )
+    gate = summary["gate"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"candidate={summary['candidate']['candidate_id']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"source_kind={summary['source_kind']}")
+    print(f"gate_status={gate['status']}")
+    print(f"pass_rows={summary['pass_row_count']}")
+    print(f"fail_rows={summary['fail_row_count']}")
+    print(f"blocked_rows={summary['blocked_row_count']}")
+    for row in summary["rows"]:
+        print(
+            "row="
+            f"{row['evidence_kind']}:{row['status']}:{row['source_kind']}"
+        )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows={args.blocked_rows_output}")
+    if args.require_pass and gate["status"] != "objectstate_reality_gate_pass":
+        raise ValueError("public interaction reality rows gate did not pass")
 
 
 def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
@@ -6908,6 +6960,39 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_public_interaction_route.set_defaults(
         handler=_object_state_audit_public_interaction_route
+    )
+    audit_public_interaction_rows = object_state_subparsers.add_parser(
+        "audit-public-interaction-reality-rows",
+        help=(
+            "convert an existing public interaction controlled handoff summary "
+            "into public_replay ObjectState reality rows"
+        ),
+    )
+    audit_public_interaction_rows.add_argument("handoff_summary", type=Path)
+    audit_public_interaction_rows.add_argument(
+        "--candidate-id",
+        default="hot3d-clips",
+        help="public interaction dataset candidate id",
+    )
+    audit_public_interaction_rows.add_argument("--summary-output", type=Path)
+    audit_public_interaction_rows.add_argument("--blocked-rows-output", type=Path)
+    audit_public_interaction_rows.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    audit_public_interaction_rows.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=3,
+    )
+    audit_public_interaction_rows.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless the converted public interaction reality gate passes",
+    )
+    audit_public_interaction_rows.set_defaults(
+        handler=_object_state_audit_public_interaction_reality_rows
     )
     select_bop_phase1_subset = object_state_subparsers.add_parser(
         "select-bop-phase1-subset",

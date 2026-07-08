@@ -14,6 +14,14 @@ from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
     objectstate_controlled_reality_bundle_handoff,
     validate_objectstate_controlled_reality_bundle_handoff_summary,
 )
+from objgauss.core.objectstate_public_interaction_reality_rows import (
+    OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA,
+    objectstate_public_interaction_reality_rows_summary,
+    validate_objectstate_public_interaction_reality_rows_summary,
+)
+from objgauss.core.objectstate_reality_row_ledger import (
+    objectstate_reality_row_ledger,
+)
 from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
@@ -198,6 +206,103 @@ def test_object_state_controlled_reality_bundle_handoff_cli_writes_artifacts(
     assert "No blocked ObjectState reality rows." in (
         output_dir / "blocked-rows.md"
     ).read_text(encoding="utf-8")
+
+
+def test_public_interaction_reality_rows_convert_handoff_to_public_replay(tmp_path):
+    _write_bundle(tmp_path, include_frame_files=True)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+    handoff = objectstate_controlled_reality_bundle_handoff(
+        tmp_path,
+        artifact,
+        _prediction_candidates(),
+        _intervention_candidates(),
+        candidate_id="stable-public-interaction-slots",
+        max_centroid_distance=0.05,
+        candidate_artifact_path=artifact_path,
+    )
+
+    summary = objectstate_public_interaction_reality_rows_summary(
+        handoff,
+        source_summary_ref="outputs/captures/hot3d-clip/reality-bundle-handoff-summary.json",
+    )
+
+    assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA
+    assert summary["source_kind"] == "public_replay"
+    assert summary["gate"]["status"] == "objectstate_reality_gate_pass"
+    assert summary["pass_row_count"] == 3
+    assert {row["source_kind"] for row in summary["rows"]} == {"public_replay"}
+    intervention = next(
+        row for row in summary["rows"] if row["evidence_kind"] == "intervention"
+    )
+    assert intervention["metrics"]["action_challenge_present"] is True
+    assert (
+        summary["claim_policy"]["converts_public_interaction_rows_to_public_replay"]
+        is True
+    )
+    assert validate_objectstate_public_interaction_reality_rows_summary(
+        summary
+    ) == summary
+
+    summary_path = tmp_path / "public-interaction-reality-rows.json"
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+    ledger = objectstate_reality_row_ledger((summary_path,))
+    assert ledger["schema"] == "objgauss-objectstate-reality-row-ledger-v1"
+    assert ledger["row_count"] == 3
+    assert ledger["gate"]["status"] == "objectstate_reality_gate_pass"
+    assert ledger["state_variable_evidence_matrix"][-1]["challenge_status"] == (
+        "objectstate_state_variable_challenge_present"
+    )
+
+
+def test_object_state_audit_public_interaction_reality_rows_cli(
+    tmp_path,
+    capsys,
+):
+    _write_bundle(tmp_path, include_frame_files=True)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+    handoff = objectstate_controlled_reality_bundle_handoff(
+        tmp_path,
+        artifact,
+        _prediction_candidates(),
+        _intervention_candidates(),
+        candidate_id="stable-public-interaction-slots",
+        max_centroid_distance=0.05,
+        candidate_artifact_path=artifact_path,
+    )
+    handoff_path = tmp_path / "reality-bundle-handoff-summary.json"
+    summary_path = tmp_path / "public-interaction-reality-rows.json"
+    blocked_path = tmp_path / "public-interaction-blocked-rows.md"
+    handoff_path.write_text(json.dumps(handoff), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-public-interaction-reality-rows",
+                str(handoff_path),
+                "--summary-output",
+                str(summary_path),
+                "--blocked-rows-output",
+                str(blocked_path),
+                "--require-pass",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA}" in stdout
+    assert "source_kind=public_replay" in stdout
+    assert "gate_status=objectstate_reality_gate_pass" in stdout
+    assert "row=intervention:pass:public_replay" in stdout
+    assert summary["pass_row_count"] == 3
+    assert "No blocked ObjectState reality rows." in blocked_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def _prediction_candidates():

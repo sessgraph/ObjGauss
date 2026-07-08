@@ -986,6 +986,18 @@ candidate JSON valid 且 `sample_id` 绑定一致时，才报告
 action / counterfactual 路线变成机器可审计 preflight；不下载 HOT3D、不适配原始
 egocentric streams、不创建 GT、不运行 eval、不训练模型、不新增 pass row，也不声明
 counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-REALITY-ROWS-001`：新增
+`objgauss.core.objectstate_public_interaction_reality_rows`，schema 为
+`objgauss-objectstate-public-interaction-reality-rows-v1`，CLI 为
+`objgauss object-state audit-public-interaction-reality-rows <reality-bundle-handoff-summary.json>`。
+该命令读取已经完成的 full controlled reality handoff summary，重新登记 identity /
+prediction / intervention 三条 row 为 `source_kind=public_replay`，并重新运行
+`OBJECTSTATE-REALITY-GATE-001` accounting，使 HOT3D 这类 public interaction evidence
+可以进入 `audit-reality-row-ledger`，而不是被计入 `controlled_real`。intervention row
+会显式保留 `action_challenge_present=true`，用于 state-variable matrix 的
+counterfactual/action challenge accounting。该切片不运行 handoff、不运行 eval、不下载或适配
+HOT3D、不创建 GT、不训练模型、不改变 metric 结果，也不把 observed action 解释成 randomized
+counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

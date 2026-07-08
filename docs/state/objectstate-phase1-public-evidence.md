@@ -474,3 +474,21 @@ capture manifest is intervention-ready, per-frame Gaussian evidence is
 declared, prediction / intervention candidate JSON files validate and all
 sample ids match. It does not download HOT3D, create GT, run eval, train a
 model, create a pass row or prove counterfactual causality.
+
+2026-07-09 also added a read-only converter for completed public interaction
+handoffs:
+
+```bash
+uv run objgauss object-state audit-public-interaction-reality-rows \
+  outputs/captures/hot3d-clip-000001/reality-handoff/reality-bundle-handoff-summary.json \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-reality-rows.json \
+  --blocked-rows-output outputs/captures/hot3d-clip-000001/public-interaction-blocked-rows.md \
+  --require-pass
+```
+
+That converter takes an existing full handoff summary and emits
+`objgauss-objectstate-public-interaction-reality-rows-v1` rows with
+`source_kind=public_replay`, so the rows can be merged by
+`audit-reality-row-ledger`. It does not run handoff or evaluators again; it
+only prevents action-capable public data from being accounted as
+`controlled_real`.

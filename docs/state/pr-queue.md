@@ -347,6 +347,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-PUBLIC-INTERACTION-REALITY-ROWS-001: Convert public interaction handoffs into public replay rows
+
+- 状态: done / public-interaction-row-accounting
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 让 HOT3D 这类 public interaction handoff 完成后能输出 `source_kind=public_replay`
+  的 reality rows，避免 public action evidence 被计入 `controlled_real`。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_public_interaction_reality_rows`。
+  - 新增 schema `objgauss-objectstate-public-interaction-reality-rows-v1`。
+  - 新增 CLI `objgauss object-state audit-public-interaction-reality-rows
+    <reality-bundle-handoff-summary.json>`。
+  - Converter 读取现有 full controlled reality handoff summary，复用其已完成的 identity /
+    prediction / intervention eval 结果，不重新运行 evaluator。
+  - 输出三条 `public_replay` rows，并重新运行 `OBJECTSTATE-REALITY-GATE-001` accounting。
+  - Intervention row metrics 显式保留 `action_challenge_present=true`，供
+    State Variable Gate matrix 判断 counterfactual/action challenge coverage。
+  - `audit-reality-row-ledger` 已支持读取该 summary schema。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不适配原始 public egocentric streams。
+  - 不创建 GT、不运行 handoff、不运行 identity / prediction / intervention eval。
+  - 不训练 Gaussian / dynamics、不创建 public samples、不改 viewer/export 默认。
+  - 不改变 metric pass/fail 结果，不把 observed action 写成 randomized counterfactual proof。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_interaction_reality_rows.py objgauss/core/objectstate_reality_row_ledger.py objgauss/core/__init__.py objgauss/cli.py tests/test_objectstate_controlled_reality_bundle_handoff.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_bundle_handoff.py tests/test_core_namespace.py tests/test_objectstate_reality_row_ledger.py -q`: 16 passed。
+  - `uv run --extra dev pytest`: 518 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-AUDIT-001: Audit action-capable public interaction route readiness
 
 - 状态: done / public-interaction-route-preflight

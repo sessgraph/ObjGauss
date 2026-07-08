@@ -584,3 +584,21 @@ Boundary:
 - It does not create a reality row or pass evidence.
 - HOT3D-style observed interactions are action-like evidence candidates, not
   randomized counterfactual trials.
+
+After a local public interaction clip has passed route audit and has produced a
+full `controlled-reality-bundle-handoff` summary, convert that handoff into
+`public_replay` reality rows before adding it to the global ledger:
+
+```bash
+uv run objgauss object-state audit-public-interaction-reality-rows \
+  outputs/captures/hot3d-clip-000001/reality-handoff/reality-bundle-handoff-summary.json \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-reality-rows.json \
+  --blocked-rows-output outputs/captures/hot3d-clip-000001/public-interaction-blocked-rows.md \
+  --require-pass
+```
+
+This converter reads the existing handoff summary and re-registers the three
+identity / prediction / intervention rows as `source_kind=public_replay`. It
+then reruns the normal `OBJECTSTATE-REALITY-GATE-001` accounting so the result
+can be passed to `audit-reality-row-ledger` alongside BOP rows. It does not run
+handoff again, does not run eval, and does not change metric outcomes.

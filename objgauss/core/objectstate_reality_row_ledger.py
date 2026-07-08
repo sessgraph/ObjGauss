@@ -12,6 +12,10 @@ from objgauss.core.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     validate_objectstate_controlled_real_rows_summary,
 )
+from objgauss.core.objectstate_public_interaction_reality_rows import (
+    OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA,
+    validate_objectstate_public_interaction_reality_rows_summary,
+)
 from objgauss.core.objectstate_reality_gate import (
     OBJECTSTATE_REALITY_GATE_SCHEMA,
     ObjectStateRealityGateThresholds,
@@ -32,6 +36,7 @@ OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA = (
 _SUPPORTED_SUMMARY_SCHEMAS = {
     OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
+    OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA,
     OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA,
     OBJECTSTATE_REALITY_GATE_SCHEMA,
 }
@@ -383,6 +388,8 @@ def _validate_supported_summary(summary: Mapping[str, Any]) -> dict[str, Any]:
         return validate_objectstate_bop_reality_rows_summary(summary)
     if schema == OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA:
         return validate_objectstate_controlled_real_rows_summary(dict(summary))
+    if schema == OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA:
+        return validate_objectstate_public_interaction_reality_rows_summary(summary)
     if schema == OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA:
         return validate_objectstate_reality_public_rows_summary(dict(summary))
     if schema == OBJECTSTATE_REALITY_GATE_SCHEMA:
