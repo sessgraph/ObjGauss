@@ -97,3 +97,78 @@ baseline:
 The row must not be used to claim ObjectState is a real-world state variable.
 It only proves that the BOP public RGB-D route can produce a reviewable
 prediction row and a clear identity negative result from actual public data.
+
+## BOP LMO Condition Metadata Gap Audit
+
+- Evidence id: `OBJECTSTATE-BOP-LMO-CONDITION-GAP-001`
+- Related row: `OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001`
+- Local evidence output:
+  `outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/`
+- Files:
+  - `bop-condition-sidecar.default.json`
+  - `bop-condition-sidecar-summary.json`
+  - `bop-conditions.template.csv`
+  - `bop-identity-route-audit-summary.json`
+
+Condition sidecar command:
+
+```bash
+uv run objgauss object-state init-bop-condition-sidecar \
+  outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 \
+  --output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar.default.json \
+  --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar-summary.json \
+  --condition-csv-template-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-conditions.template.csv \
+  --max-frames 3
+```
+
+Condition sidecar result:
+
+- Status:
+  `objectstate_bop_capture_condition_sidecar_needs_metadata`
+- Selected frames: `000003`, `000008`, `000017`
+- `view_condition_count=3`
+- `lighting_condition_count=1`
+- `lighting_ids=["bop-default"]`
+- `camera_pose_count=0`
+- `max_camera_translation_m=0.0`
+- `identity_scenario_metadata_ready=false`
+
+Identity route audit command:
+
+```bash
+uv run objgauss object-state audit-bop-identity-route \
+  outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 \
+  --output-root outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline \
+  --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-identity-route-audit-summary.json \
+  --sample-id bop-lmo-test-scene-000002-rgbd-baseline \
+  --dataset-id bop-lmo \
+  --object-category lmo_objects \
+  --candidate-artifact outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/objectstates.json \
+  --condition-sidecar outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar.default.json \
+  --max-frames 3
+```
+
+Identity route audit result:
+
+- Status:
+  `objectstate_bop_identity_route_audit_blocked`
+- `bop_acceptance_pass=true`
+- `phase1_gaussian_evidence_ready=true`
+- `candidate_artifact_present=true`
+- `candidate_artifact_valid=true`
+- `candidate_artifact_binding_ready=true`
+- `identity_scenario_metadata_ready=false`
+- `identity_evidence_package_reviewable=false`
+- `phase1_evidence_ledger_identity_reviewable=false`
+- `route_ready_for_identity_handoff=false`
+- `route_has_reviewable_identity_evidence=false`
+
+Interpretation:
+
+This audit proves that the current LMO public row is blocked by real scenario
+metadata, not by missing RGB-D files, Gaussian evidence or candidate artifact
+binding. The selected BOP frames provide enough frame/view variation and an
+occlusion reappearance signal, but they do not provide explicit lighting
+variation or camera-pose motion metadata. The correct next step is to use a
+controlled capture or an enriched public manifest with measured condition
+metadata; the identity gate must not be relaxed to make this BOP row pass.

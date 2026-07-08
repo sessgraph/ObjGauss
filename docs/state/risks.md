@@ -108,3 +108,12 @@ condition metadata 仍 incomplete。此次还修复相对 `output_root` 下 pred
 audit 双重拼接 `candidate_dir` 的问题。该缓解只证明 public RGB-D route 可以生成可复验
 prediction row 和 identity negative result，不训练模型、不提交数据集或 evidence outputs、
 不声明 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-LMO-CONDITION-GAP-001`
+对同一 LMO public row 运行 condition sidecar authoring 和 identity route audit，确认
+BOP acceptance、per-frame Gaussian evidence、candidate artifact validity 和 frame binding
+均 ready，但 identity route 仍因 `lighting_condition_count=1`、`camera_pose_count=0`、
+`identity_scenario_metadata_ready=false` 而 blocked。该缓解把 identity blocker 从口头判断
+变成可复验 evidence，同时保持风险 open：不能放松 identity scenario gate，不能伪造
+lighting / camera-pose sidecar，也不能把该 public BOP row 记为 identity-reviewable、
+metric pass、intervention gate 或 world-model evidence。

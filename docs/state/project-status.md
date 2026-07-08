@@ -872,6 +872,20 @@ evidence，不是 pass row，不声明 intervention / world model。
 `bop-prediction-baseline-handoff` 使用相对 `output_root` 时，prediction evidence package
 此前会把 `candidate_dir` 拼成双重路径，真实 LMO run 中表现为 package audit 报
 required files missing；现在 handoff 传入相对 `reality-candidates`，并补相对路径回归测试。
+随后完成 `OBJECTSTATE-BOP-LMO-CONDITION-GAP-001`：对同一 LMO row 运行
+`init-bop-condition-sidecar` 和 `audit-bop-identity-route`，把 identity blocker 收敛为
+可复验 condition metadata gap，而不是继续停留在口头判断。ignored 输出为
+`outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/`。sidecar summary 为
+`objectstate_bop_capture_condition_sidecar_needs_metadata`，选中帧仍为 `000003` /
+`000008` / `000017`，`view_condition_count=3`，但 `lighting_condition_count=1`、
+`camera_pose_count=0`、`max_camera_translation_m=0.0`，
+`identity_scenario_metadata_ready=false`。route audit 为
+`objectstate_bop_identity_route_audit_blocked`，同时证明 `bop_acceptance_pass=true`、
+`phase1_gaussian_evidence_ready=true`、`candidate_artifact_valid=true` 且
+`candidate_artifact_binding_ready=true`；因此当前阻塞不是文件、Gaussian evidence 或
+candidate binding，而是缺真实 lighting / camera-pose condition metadata。该切片不放松
+identity gate、不伪造 condition CSV、不创建 pass row、不训练模型、不声明 intervention /
+world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

@@ -204,6 +204,10 @@ baseline `objectstates.json` 并跑 identity / prediction local-row package；de
 真实 public baseline row：prediction package reviewable 但 metric fail，identity eval 暴露
 identity collapse 且 identity package 因缺 lighting/camera pose condition metadata 仍 incomplete。
 该结果是 negative evidence，不是 pass row。
+`OBJECTSTATE-BOP-LMO-CONDITION-GAP-001` 已把该 LMO row 的 condition blocker 跑成
+可复验 gap audit：BOP acceptance、Gaussian evidence 和 candidate binding 均 ready，
+但 lighting condition 只有 `bop-default`，camera pose metadata 为 0，因此 identity route
+仍 blocked；不得放松 gate 或伪造 sidecar 让 public row 变成 identity-reviewable。
 `OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001` 修复相对 `output_root` 下
 prediction package audit 把 `candidate_dir` 双重拼接的问题；真实 LMO run 已验证该修复让
 prediction evidence package 从 missing-files 进入 reviewable。
@@ -328,6 +332,70 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-LMO-CONDITION-GAP-001: Audit LMO public identity condition gap
+
+- 状态: done / public-condition-metadata-gap
+- 类型: 标准 PR / ObjectState public pose dataset identity route audit
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 对 `OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001` 的 identity blocker 做可复验审计，
+  明确它不是 RGB-D 文件、Gaussian evidence 或 candidate binding 缺失，而是缺真实
+  lighting / camera-pose condition metadata。
+- 输入:
+  - Scene:
+    `outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002`
+  - Baseline evidence root:
+    `outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/`
+  - Candidate artifact:
+    `outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/objectstates.json`
+- Evidence output:
+  - `outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/`
+  - `bop-condition-sidecar.default.json`
+  - `bop-condition-sidecar-summary.json`
+  - `bop-conditions.template.csv`
+  - `bop-identity-route-audit-summary.json`
+- Condition sidecar command:
+  - `uv run objgauss object-state init-bop-condition-sidecar outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 --output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar.default.json --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar-summary.json --condition-csv-template-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-conditions.template.csv --max-frames 3`
+- Condition sidecar result:
+  - Status:
+    `objectstate_bop_capture_condition_sidecar_needs_metadata`
+  - `selected_frame_ids=[3,8,17]`
+  - `view_condition_count=3`
+  - `lighting_condition_count=1`
+  - `lighting_ids=["bop-default"]`
+  - `camera_pose_count=0`
+  - `max_camera_translation_m=0.0`
+  - `identity_scenario_metadata_ready=false`
+- Identity route audit command:
+  - `uv run objgauss object-state audit-bop-identity-route outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 --output-root outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-identity-route-audit-summary.json --sample-id bop-lmo-test-scene-000002-rgbd-baseline --dataset-id bop-lmo --object-category lmo_objects --candidate-artifact outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/objectstates.json --condition-sidecar outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar.default.json --max-frames 3`
+- Identity route audit result:
+  - Status:
+    `objectstate_bop_identity_route_audit_blocked`
+  - `bop_acceptance_pass=true`
+  - `phase1_gaussian_evidence_ready=true`
+  - `candidate_artifact_present=true`
+  - `candidate_artifact_valid=true`
+  - `candidate_artifact_binding_ready=true`
+  - `identity_scenario_metadata_ready=false`
+  - `identity_evidence_package_reviewable=false`
+  - `phase1_evidence_ledger_identity_reviewable=false`
+  - `route_ready_for_identity_handoff=false`
+  - `route_has_reviewable_identity_evidence=false`
+- 边界:
+  - 不提交 dataset zip、RGB-D frames、PLY evidence、condition sidecar outputs
+    或 route audit outputs。
+  - 不伪造 lighting / camera-pose condition metadata。
+  - 不放松 identity scenario gate，不创建 identity-reviewable row 或 pass row。
+  - 不训练 Gaussian / tracking / prediction / dynamics model。
+  - 不声明 intervention gate 或 world-model evidence。
+- 验证:
+  - `uv run objgauss object-state init-bop-condition-sidecar ...`: passed，status 为
+    `objectstate_bop_capture_condition_sidecar_needs_metadata`。
+  - `uv run objgauss object-state audit-bop-identity-route ...`: passed，status 为
+    `objectstate_bop_identity_route_audit_blocked`。
+  - `git check-ignore -v outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-identity-route-audit-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-conditions.template.csv`: passed; outputs ignored.
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001: Run first public LMO RGB-D baseline row
 
