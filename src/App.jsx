@@ -1780,6 +1780,16 @@ export default function App() {
             data-debug-session-file-input="true"
             onChange={importDebugSessionFile}
           />
+          <button
+            className={`glassButton ${artifactImport?.status === "loaded" ? "active" : ""}`}
+            type="button"
+            title="导入 trainable ObjectState artifact JSON；OGC / 模型包 / 调试会话导入见左侧“系统工具 > 高级”面板"
+            data-import-trainable-shortcut="true"
+            data-import-status={artifactImport?.status ?? "idle"}
+            onClick={() => artifactInputRef.current?.click()}
+          >
+            {artifactImport?.status === "loading" ? "导入中" : "导入 Artifact"}
+          </button>
           <button className="glassButton" type="button" onClick={() => worldApi.current?.resetCamera()}>
             重置视角
           </button>
