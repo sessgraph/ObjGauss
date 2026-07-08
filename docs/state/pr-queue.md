@@ -242,6 +242,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，400 tests。
   - `npm run build`: passed；仅保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
+- 完成 commit: `f72c4b9`。
 
 ### OBJECTSTATE-BOP-CAPTURE-ADAPTER-001: Import local BOP scene into controlled capture manifest
 
