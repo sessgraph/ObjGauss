@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
+from objgauss.core.objectstate_bop_capture_adapter import (
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+)
 from objgauss.core.objectstate_bop_phase1_local_row_readiness import (
     OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA,
     objectstate_bop_phase1_local_row_readiness,
@@ -93,6 +96,44 @@ def test_bop_phase1_local_row_readiness_reports_identity_scenario_blocker(tmp_pa
     assert summary["readiness"]["identity_scenario_metadata_ready"] is False
     assert summary["readiness"]["prediction_route_ready_for_handoff"] is True
     assert any("do not relax the identity scenario gate" in item for item in summary["next_actions"])
+
+
+def test_bop_phase1_local_row_readiness_accepts_condition_sidecar(tmp_path):
+    scene_root = tmp_path / "bop-scene"
+    output_root = tmp_path / "phase1-row"
+    artifact_path = output_root / "objectstates.json"
+    sidecar_path = scene_root / "bop-condition-sidecar.json"
+    _write_bop_scene(scene_root)
+    _write_gaussian_frames(scene_root)
+    _write_json(artifact_path, _trainable_artifact(frame_count=3))
+    _write_json(sidecar_path, _condition_sidecar_payload())
+
+    summary = objectstate_bop_phase1_local_row_readiness(
+        scene_root,
+        output_root=output_root,
+        sample_id="bop-ycbv-scene-000001",
+        candidate_artifact=artifact_path,
+        condition_sidecar=sidecar_path,
+    )
+
+    assert (
+        summary["status"]
+        == "objectstate_bop_phase1_local_row_readiness_identity_prediction_handoff_ready"
+    )
+    assert summary["blocking_stage"] == "handoff_ready"
+    assert summary["readiness"]["identity_route_ready_for_handoff"] is True
+    assert summary["readiness"]["prediction_route_ready_for_handoff"] is True
+    assert summary["readiness"]["identity_scenario_metadata_ready"] is True
+    assert (
+        summary["routes"]["identity"]["identity_scenario_metadata_audit"]["status"]
+        == "objectstate_bop_identity_route_scenario_metadata_ready"
+    )
+    assert (
+        summary["routes"]["identity"]["acceptance"]["manifest"]["frames"][2][
+            "condition"
+        ]["view_id"]
+        == "right"
+    )
 
 
 def test_bop_phase1_local_row_readiness_reports_prediction_reviewable(tmp_path):
@@ -269,6 +310,44 @@ def _state(state_id: int, centroid: list[float]):
         "feature": [centroid[0], centroid[1], centroid[2]],
         "status": "active",
         "diagnostics": [],
+    }
+
+
+def _condition_sidecar_payload():
+    return {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar",
+        "frames": {
+            "0": {
+                "view_id": "front",
+                "lighting_id": "bright",
+                "camera_pose": {
+                    "position": [0.0, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "1": {
+                "view_id": "front",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.02, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "000002": {
+                "view_id": "right",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.04, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+        },
+        "condition_policy": {
+            "sidecar_only": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+        },
     }
 
 

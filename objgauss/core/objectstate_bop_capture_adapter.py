@@ -30,6 +30,9 @@ OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA = (
 OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA = (
     "objgauss-objectstate-bop-capture-acceptance-v1"
 )
+OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA = (
+    "objgauss-objectstate-bop-capture-condition-sidecar-v1"
+)
 
 
 def objectstate_bop_capture_manifest_from_scene(
@@ -46,6 +49,7 @@ def objectstate_bop_capture_manifest_from_scene(
     frame_step: int = 1,
     include_gaussian_refs: bool = False,
     gaussian_dir: str = "gaussians",
+    condition_sidecar: str | Path | None = None,
 ) -> dict[str, Any]:
     summary = objectstate_bop_capture_adapter_summary(
         scene_root,
@@ -60,6 +64,7 @@ def objectstate_bop_capture_manifest_from_scene(
         frame_step=frame_step,
         include_gaussian_refs=include_gaussian_refs,
         gaussian_dir=gaussian_dir,
+        condition_sidecar=condition_sidecar,
     )
     return summary["manifest"]
 
@@ -78,6 +83,7 @@ def objectstate_bop_capture_adapter_summary(
     frame_step: int = 1,
     include_gaussian_refs: bool = False,
     gaussian_dir: str = "gaussians",
+    condition_sidecar: str | Path | None = None,
 ) -> dict[str, Any]:
     root = Path(scene_root)
     if fps <= 0:
@@ -97,6 +103,8 @@ def objectstate_bop_capture_adapter_summary(
         if scene_gt_info_path.exists()
         else {}
     )
+    condition_sidecar_path = Path(condition_sidecar) if condition_sidecar else None
+    condition_sidecar_payload = _read_condition_sidecar(condition_sidecar_path)
 
     frame_ids = _selected_frame_ids(
         scene_gt,
@@ -116,6 +124,7 @@ def objectstate_bop_capture_adapter_summary(
         rgb_dir=rgb_dir,
         include_gaussian_refs=include_gaussian_refs,
         gaussian_dir=gaussian_dir,
+        condition_sidecar=condition_sidecar_payload,
     )
     modalities = ["rgb", "bop_6d_pose", "bop_visibility", "bop_camera"]
     if include_gaussian_refs:
@@ -164,6 +173,9 @@ def objectstate_bop_capture_adapter_summary(
                 "gaussian_dir": str(root / gaussian_dir)
                 if include_gaussian_refs
                 else None,
+                "condition_sidecar": str(condition_sidecar_path)
+                if condition_sidecar_path
+                else None,
             },
             "bop_format_notes": {
                 "pose_rotation": "cam_R_m2c row-major rotation matrix",
@@ -175,7 +187,9 @@ def objectstate_bop_capture_adapter_summary(
             "identity_policy": "single_instance_per_bop_obj_id",
             "duplicate_obj_id_policy": "fail_fast",
             "timestamp_policy": "selected_frame_rank_divided_by_fps",
+            "condition_sidecar_policy": "explicit_frame_condition_override",
             "does_not_infer_action": True,
+            "does_not_infer_condition_metadata": True,
             "does_not_reconstruct_gaussians": True,
         },
         "row_counts": {
@@ -188,6 +202,8 @@ def objectstate_bop_capture_adapter_summary(
         "manifest_schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
         "capture_summary_schema": OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
         "controlled_real_manifest_schema": OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+        "condition_sidecar_schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "condition_sidecar": condition_sidecar_payload,
         "manifest": checked_manifest,
         "capture_summary": capture_summary,
         "controlled_real_manifest_seed": controlled_real_seed,
@@ -213,6 +229,8 @@ def objectstate_bop_capture_adapter_summary(
             "imports_existing_bop_scene": True,
             "does_not_download_dataset": True,
             "does_not_create_ground_truth": True,
+            "condition_sidecar_only_controls_frame_conditions": True,
+            "does_not_infer_condition_metadata": True,
             "does_not_reconstruct_gaussians": True,
             "does_not_score_candidate_model": True,
             "does_not_claim_reality_gate_pass": True,
@@ -247,6 +265,7 @@ def objectstate_bop_capture_acceptance_summary(
     frame_step: int = 1,
     include_gaussian_refs: bool = False,
     gaussian_dir: str = "gaussians",
+    condition_sidecar: str | Path | None = None,
     require_gaussian_files: bool = False,
     check_artifact_refs: bool = False,
     min_rgb_bytes: int = 1,
@@ -271,6 +290,7 @@ def objectstate_bop_capture_acceptance_summary(
         frame_step=frame_step,
         include_gaussian_refs=effective_include_gaussian_refs,
         gaussian_dir=gaussian_dir,
+        condition_sidecar=condition_sidecar,
     )
     file_audit = objectstate_controlled_capture_file_audit(
         adapter["manifest"],
@@ -326,6 +346,7 @@ def objectstate_bop_capture_acceptance_summary(
             "artifact_refs_checked": bool(check_artifact_refs),
             "frame_file_formats_required": bool(require_frame_formats),
             "file_hashes_included": bool(hash_files),
+            "condition_sidecar_loaded": bool(condition_sidecar),
         },
         "readiness": readiness,
         "hard_blockers": hard_blockers,
@@ -343,6 +364,8 @@ def objectstate_bop_capture_acceptance_summary(
             "runs_file_audit": True,
             "does_not_download_dataset": True,
             "does_not_create_ground_truth": True,
+            "condition_sidecar_only_controls_frame_conditions": True,
+            "does_not_infer_condition_metadata": True,
             "does_not_reconstruct_gaussians": True,
             "does_not_score_candidate_model": True,
             "does_not_claim_reality_gate_pass": True,
@@ -361,6 +384,55 @@ def objectstate_bop_capture_acceptance_summary(
         },
     }
     return validate_objectstate_bop_capture_acceptance_summary(payload)
+
+
+def validate_objectstate_bop_capture_condition_sidecar(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("BOP capture condition sidecar must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA:
+        raise ValueError(
+            "unsupported BOP capture condition sidecar schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_bop_capture_condition_sidecar":
+        raise ValueError("BOP capture condition sidecar kind is unsupported")
+    frames = payload.get("frames")
+    if not isinstance(frames, Mapping) or not frames:
+        raise ValueError("BOP capture condition sidecar requires frames")
+    checked_frames: dict[str, Any] = {}
+    for key, value in frames.items():
+        frame_id = _int_key(key, "condition sidecar frame id")
+        normalized_key = str(frame_id)
+        if normalized_key in checked_frames:
+            raise ValueError(
+                "BOP capture condition sidecar has duplicate frame id after "
+                f"normalization: {key}"
+            )
+        checked_frames[normalized_key] = _validate_sidecar_condition(
+            value,
+            frame_id=frame_id,
+        )
+    policy = payload.get("condition_policy")
+    if not isinstance(policy, Mapping):
+        raise ValueError("BOP capture condition sidecar requires condition_policy")
+    if (
+        not policy.get("sidecar_only")
+        or not policy.get("does_not_create_ground_truth")
+        or not policy.get("does_not_infer_from_pixels")
+    ):
+        raise ValueError("BOP capture condition sidecar must preserve condition policy")
+    return {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar",
+        "frames": checked_frames,
+        "condition_policy": {
+            "sidecar_only": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+        },
+    }
 
 
 def validate_objectstate_bop_capture_adapter_summary(
@@ -386,6 +458,14 @@ def validate_objectstate_bop_capture_adapter_summary(
     validate_objectstate_controlled_real_manifest(
         payload.get("controlled_real_manifest_seed")
     )
+    if (
+        payload.get("condition_sidecar_schema")
+        != OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA
+    ):
+        raise ValueError("BOP capture adapter condition_sidecar_schema mismatch")
+    condition_sidecar = payload.get("condition_sidecar")
+    if condition_sidecar is not None:
+        validate_objectstate_bop_capture_condition_sidecar(condition_sidecar)
     row_counts = payload.get("row_counts")
     if not isinstance(row_counts, Mapping):
         raise ValueError("BOP capture adapter row_counts must be a mapping")
@@ -424,6 +504,8 @@ def validate_objectstate_bop_capture_adapter_summary(
         or not claim_policy.get("imports_existing_bop_scene")
         or not claim_policy.get("does_not_download_dataset")
         or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("condition_sidecar_only_controls_frame_conditions")
+        or not claim_policy.get("does_not_infer_condition_metadata")
         or not claim_policy.get("does_not_reconstruct_gaussians")
         or not claim_policy.get("does_not_score_candidate_model")
         or not claim_policy.get("does_not_claim_reality_gate_pass")
@@ -518,6 +600,7 @@ def validate_objectstate_bop_capture_acceptance_summary(
         "artifact_refs_checked",
         "frame_file_formats_required",
         "file_hashes_included",
+        "condition_sidecar_loaded",
     ):
         if not isinstance(requirements.get(key), bool):
             raise ValueError(f"BOP capture acceptance requirements requires bool {key}")
@@ -532,6 +615,8 @@ def validate_objectstate_bop_capture_acceptance_summary(
         or not claim_policy.get("runs_file_audit")
         or not claim_policy.get("does_not_download_dataset")
         or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("condition_sidecar_only_controls_frame_conditions")
+        or not claim_policy.get("does_not_infer_condition_metadata")
         or not claim_policy.get("does_not_reconstruct_gaussians")
         or not claim_policy.get("does_not_score_candidate_model")
         or not claim_policy.get("does_not_claim_reality_gate_pass")
@@ -610,6 +695,7 @@ def _frames_from_bop_scene(
     rgb_dir: str,
     include_gaussian_refs: bool,
     gaussian_dir: str,
+    condition_sidecar: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
     frames = []
     for index, frame_id in enumerate(frame_ids):
@@ -641,10 +727,10 @@ def _frames_from_bop_scene(
                 "frame_id": f"bop-frame-{frame_id:06d}",
                 "timestamp": index / fps,
                 "observation": observation,
-                "condition": {
-                    "view_id": f"bop-camera-frame-{frame_id:06d}",
-                    "lighting_id": "bop-default",
-                },
+                "condition": _condition_for_frame(
+                    frame_id,
+                    condition_sidecar=condition_sidecar,
+                ),
                 "objects": objects,
             }
         )
@@ -738,6 +824,90 @@ def _next_actions(capture_summary: Mapping[str, Any]) -> list[str]:
     if not capture_summary["readiness"]["identity_stage_ready"]:
         actions.insert(0, "choose a BOP subset where each selected object appears across at least two frames")
     return actions
+
+
+def _read_condition_sidecar(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    return validate_objectstate_bop_capture_condition_sidecar(
+        _read_json_mapping(path, "condition_sidecar")
+    )
+
+
+def _condition_for_frame(
+    frame_id: int,
+    *,
+    condition_sidecar: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    condition: dict[str, Any] = {
+        "view_id": f"bop-camera-frame-{frame_id:06d}",
+        "lighting_id": "bop-default",
+    }
+    if condition_sidecar is None:
+        return condition
+    frames = condition_sidecar.get("frames")
+    if not isinstance(frames, Mapping):
+        return condition
+    override = frames.get(str(frame_id))
+    if override is None:
+        return condition
+    if not isinstance(override, Mapping):
+        raise ValueError(f"condition sidecar frame {frame_id} must be a mapping")
+    condition.update(dict(override))
+    return condition
+
+
+def _validate_sidecar_condition(
+    value: Any,
+    *,
+    frame_id: int,
+) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError(
+            f"BOP capture condition sidecar frame {frame_id} must be a mapping"
+        )
+    result: dict[str, Any] = {}
+    if "view_id" in value:
+        result["view_id"] = _required_string(value["view_id"], "view_id")
+    if "lighting_id" in value:
+        result["lighting_id"] = _required_string(value["lighting_id"], "lighting_id")
+    if "camera_pose" in value:
+        result["camera_pose"] = _validate_sidecar_camera_pose(
+            value["camera_pose"],
+            frame_id=frame_id,
+        )
+    if not result:
+        raise ValueError(
+            f"BOP capture condition sidecar frame {frame_id} must include "
+            "view_id, lighting_id, or camera_pose"
+        )
+    return result
+
+
+def _validate_sidecar_camera_pose(
+    value: Any,
+    *,
+    frame_id: int,
+) -> dict[str, list[float]]:
+    if not isinstance(value, Mapping):
+        raise TypeError(
+            f"BOP capture condition sidecar camera_pose frame {frame_id} must be a mapping"
+        )
+    rotation = _numeric_vector(
+        value.get("rotation_xyzw"),
+        "camera_pose.rotation_xyzw",
+        length=4,
+    )
+    if sum(component * component for component in rotation) <= 0.0:
+        raise ValueError("camera_pose.rotation_xyzw must be non-zero")
+    return {
+        "position": _numeric_vector(
+            value.get("position"),
+            "camera_pose.position",
+            length=3,
+        ),
+        "rotation_xyzw": rotation,
+    }
 
 
 def _read_json_mapping(path: Path, label: str) -> dict[str, Any]:

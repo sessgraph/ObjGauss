@@ -175,6 +175,55 @@ lacks lighting / camera motion metadata for identity-state proof. In that case
 the route should stay blocked; do not relax the identity gate just to turn BOP
 pose data into a pass row.
 
+When the local BOP subset has explicit scenario condition metadata from the
+capture setup, keep it in a sidecar rather than weakening the gate:
+
+```json
+{
+  "schema": "objgauss-objectstate-bop-capture-condition-sidecar-v1",
+  "kind": "objectstate_bop_capture_condition_sidecar",
+  "frames": {
+    "0": {
+      "view_id": "front",
+      "lighting_id": "bright",
+      "camera_pose": {
+        "position": [0.0, 0.0, 0.0],
+        "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]
+      }
+    },
+    "1": {
+      "view_id": "front",
+      "lighting_id": "dim",
+      "camera_pose": {
+        "position": [0.02, 0.0, 0.0],
+        "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]
+      }
+    },
+    "000002": {
+      "view_id": "right",
+      "lighting_id": "dim",
+      "camera_pose": {
+        "position": [0.04, 0.0, 0.0],
+        "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]
+      }
+    }
+  },
+  "condition_policy": {
+    "sidecar_only": true,
+    "does_not_create_ground_truth": true,
+    "does_not_infer_from_pixels": true
+  }
+}
+```
+
+Pass it to the adapter, acceptance and route audits with
+`--condition-sidecar <path>`. The sidecar may override only
+`frame.condition.view_id`, `frame.condition.lighting_id` and
+`frame.condition.camera_pose`; it does not create identity GT, object pose GT,
+Gaussian evidence or a pass row. With RGB / pose / Gaussian files and a bound
+candidate artifact already present, a valid sidecar can move the BOP identity
+route from `identity_scenario_metadata` blocked to handoff-ready.
+
 Once the local scene has RGB, pose and per-frame Gaussian evidence, the
 read-only route audit should report `handoff_ready`:
 

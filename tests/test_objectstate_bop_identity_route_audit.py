@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
+from objgauss.core.objectstate_bop_capture_adapter import (
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+)
 from objgauss.core.objectstate_bop_identity_route_audit import (
     OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA,
     objectstate_bop_identity_route_audit,
@@ -82,6 +85,49 @@ def test_bop_identity_route_audit_blocks_without_identity_scenario_metadata(tmp_
         is False
     )
     assert any("do not relax the identity scenario gate" in item for item in summary["next_actions"])
+
+
+def test_bop_identity_route_audit_accepts_condition_sidecar_for_handoff(tmp_path):
+    scene_root = tmp_path / "bop-scene"
+    output_root = tmp_path / "identity-package"
+    artifact_path = output_root / "objectstates.json"
+    sidecar_path = scene_root / "bop-condition-sidecar.json"
+    _write_bop_scene(scene_root)
+    _write_gaussian_frames(scene_root)
+    _write_json(artifact_path, _trainable_artifact(frame_count=3))
+    _write_json(sidecar_path, _condition_sidecar_payload())
+
+    summary = objectstate_bop_identity_route_audit(
+        scene_root,
+        output_root=output_root,
+        sample_id="bop-ycbv-scene-000001",
+        candidate_artifact=artifact_path,
+        condition_sidecar=sidecar_path,
+    )
+
+    assert (
+        summary["status"]
+        == "objectstate_bop_identity_route_audit_handoff_ready"
+    )
+    assert summary["readiness"]["identity_scenario_metadata_ready"] is True
+    assert summary["readiness"]["route_ready_for_identity_handoff"] is True
+    assert summary["identity_scenario_metadata_audit"]["readiness"] == {
+        "min_frame_count_met": True,
+        "occlusion_reappearance_present": True,
+        "min_view_conditions_met": True,
+        "min_lighting_conditions_met": True,
+        "camera_motion_present": True,
+    }
+    assert (
+        summary["identity_scenario_metadata_audit"]["scenario_coverage"][
+            "max_camera_translation_m"
+        ]
+        >= 0.04
+    )
+    assert (
+        summary["acceptance"]["manifest"]["frames"][2]["condition"]["view_id"]
+        == "right"
+    )
 
 
 def test_bop_identity_route_audit_reports_existing_identity_evidence(tmp_path):
@@ -317,6 +363,44 @@ def _identity_summary(*, row_status: str):
         "issues": [],
         "claim_policy": _identity_claim_policy(),
         "non_goals": _non_goals(),
+    }
+
+
+def _condition_sidecar_payload():
+    return {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar",
+        "frames": {
+            "0": {
+                "view_id": "front",
+                "lighting_id": "bright",
+                "camera_pose": {
+                    "position": [0.0, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "1": {
+                "view_id": "front",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.02, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "000002": {
+                "view_id": "right",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.04, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+        },
+        "condition_policy": {
+            "sidecar_only": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+        },
     }
 
 

@@ -8,11 +8,13 @@ from objgauss.cli import main
 from objgauss.core.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
     objectstate_bop_capture_manifest_from_scene,
     validate_objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_adapter_summary,
+    validate_objectstate_bop_capture_condition_sidecar,
 )
 from objgauss.core.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
@@ -113,6 +115,75 @@ def test_bop_capture_adapter_manifest_helper_returns_manifest(tmp_path):
 
     assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
     assert len(manifest["frames"]) == 3
+
+
+def test_bop_capture_adapter_merges_condition_sidecar(tmp_path):
+    _write_bop_scene(tmp_path)
+    sidecar_path = tmp_path / "bop-condition-sidecar.json"
+    sidecar_payload = _condition_sidecar_payload()
+    _write_json(sidecar_path, sidecar_payload)
+
+    summary = objectstate_bop_capture_adapter_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        condition_sidecar=sidecar_path,
+    )
+    manifest = summary["manifest"]
+
+    assert summary["condition_sidecar_schema"] == (
+        OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA
+    )
+    assert summary["condition_sidecar"] == (
+        validate_objectstate_bop_capture_condition_sidecar(sidecar_payload)
+    )
+    assert summary["source"]["source_files"]["condition_sidecar"] == str(sidecar_path)
+    assert manifest["frames"][0]["condition"] == {
+        "view_id": "front",
+        "lighting_id": "bright",
+        "camera_pose": {
+            "position": [0.0, 0.0, 0.0],
+            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+    }
+    assert manifest["frames"][1]["condition"]["view_id"] == "front"
+    assert manifest["frames"][1]["condition"]["lighting_id"] == "dim"
+    assert manifest["frames"][2]["condition"]["view_id"] == "right"
+
+
+def test_bop_capture_adapter_cli_accepts_condition_sidecar(tmp_path, capsys):
+    _write_bop_scene(tmp_path)
+    sidecar_path = tmp_path / "bop-condition-sidecar.json"
+    _write_json(sidecar_path, _condition_sidecar_payload())
+    manifest_path = tmp_path / "capture-manifest.json"
+
+    assert (
+        main(
+            [
+                "object-state",
+                "import-bop-capture-scene",
+                str(tmp_path),
+                "--sample-id",
+                "bop-ycbv-scene-000001",
+                "--condition-sidecar",
+                str(sidecar_path),
+                "--output",
+                str(manifest_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert "bop_adapter_status=objectstate_bop_capture_adapter_ready" in stdout
+    assert manifest["frames"][0]["condition"]["view_id"] == "front"
+    assert manifest["frames"][1]["condition"]["lighting_id"] == "dim"
+    assert manifest["frames"][2]["condition"]["camera_pose"]["position"] == [
+        0.04,
+        0.0,
+        0.0,
+    ]
 
 
 def test_bop_capture_adapter_cli_writes_outputs(tmp_path, capsys):
@@ -446,6 +517,44 @@ def _write_gaussian_frames(root) -> None:
     (root / "gaussians").mkdir()
     for frame_id in range(3):
         (root / "gaussians" / f"{frame_id:06d}.ply").write_bytes(PLY_BYTES)
+
+
+def _condition_sidecar_payload():
+    return {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar",
+        "frames": {
+            "0": {
+                "view_id": "front",
+                "lighting_id": "bright",
+                "camera_pose": {
+                    "position": [0.0, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "1": {
+                "view_id": "front",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.02, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "000002": {
+                "view_id": "right",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.04, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+        },
+        "condition_policy": {
+            "sidecar_only": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+        },
+    }
 
 
 def _read_json(path):

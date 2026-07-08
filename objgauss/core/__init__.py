@@ -278,6 +278,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA": (
+        "objgauss.core.objectstate_bop_capture_adapter",
+        "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA": (
         "objgauss.core.objectstate_bop_phase1_route_audit",
         "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA",
@@ -457,6 +461,10 @@ _EXPORTS = {
     "validate_objectstate_bop_prediction_baseline_handoff_summary": (
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "validate_objectstate_bop_prediction_baseline_handoff_summary",
+    ),
+    "validate_objectstate_bop_capture_condition_sidecar": (
+        "objgauss.core.objectstate_bop_capture_adapter",
+        "validate_objectstate_bop_capture_condition_sidecar",
     ),
     "validate_objectstate_bop_phase1_route_audit_summary": (
         "objgauss.core.objectstate_bop_phase1_route_audit",

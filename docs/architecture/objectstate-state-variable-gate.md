@@ -210,6 +210,15 @@ front view / side view / back view / multi-camera view
 验收必须同时记录正负样本。只报告 same-object close 不够；需要证明 different-object
 far enough。
 
+Public pose-dataset adapters may provide the observation evidence before a
+full controlled capture exists. For BOP-style routes, explicit
+`frame.condition.view_id`、`frame.condition.lighting_id` 和
+`frame.condition.camera_pose` can be supplied through
+`objgauss-objectstate-bop-capture-condition-sidecar-v1`. This sidecar is only
+scenario condition metadata for Stage 1 identity-state auditing. It must not
+be treated as identity GT, object pose GT, Gaussian reconstruction evidence or
+proof that ObjectState is already a world-state variable.
+
 ### 3.4 Predictive Sufficiency
 
 问题：

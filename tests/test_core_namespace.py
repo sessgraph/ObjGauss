@@ -76,6 +76,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
     OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA,
     OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA,
@@ -333,6 +334,7 @@ from objgauss.core import (
     validate_objectstate_controlled_intervention_candidates_template,
     validate_objectstate_controlled_intervention_eval_summary,
     validate_objectstate_controlled_prediction_candidates,
+    validate_objectstate_bop_capture_condition_sidecar,
     validate_objectstate_bop_prediction_baseline_handoff_summary,
     validate_objectstate_bop_phase1_route_audit_summary,
     validate_objectstate_bop_identity_route_audit_summary,
@@ -1109,6 +1111,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA == (
         "objgauss-objectstate-bop-phase1-local-row-readiness-v1"
     )
+    assert OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA == (
+        "objgauss-objectstate-bop-capture-condition-sidecar-v1"
+    )
     assert objectstate_controlled_reality_bundle_handoff is not None
     assert objectstate_controlled_reality_bundle_readiness is not None
     assert objectstate_controlled_reality_evidence_package is not None
@@ -1124,6 +1129,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_bop_phase1_route_audit is not None
     assert objectstate_bop_identity_route_audit is not None
     assert objectstate_bop_phase1_local_row_readiness is not None
+    assert validate_objectstate_bop_capture_condition_sidecar is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
     assert validate_objectstate_controlled_reality_candidate_template_summary is not None

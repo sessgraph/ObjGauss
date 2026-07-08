@@ -3300,6 +3300,7 @@ def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
         frame_step=args.frame_step,
         include_gaussian_refs=args.include_gaussian_refs,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
     )
     readiness = summary["readiness"]
     print(f"schema={summary['schema']}")
@@ -3350,6 +3351,7 @@ def _object_state_accept_bop_capture_scene(args: argparse.Namespace) -> None:
         frame_step=args.frame_step,
         include_gaussian_refs=args.include_gaussian_refs,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
         require_gaussian_files=args.require_gaussian_files,
         check_artifact_refs=args.check_artifact_refs,
         min_rgb_bytes=args.min_rgb_bytes,
@@ -4840,6 +4842,7 @@ def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> N
         license_text=args.license,
         rgb_dir=args.rgb_dir,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
         policy=args.policy,
@@ -4921,6 +4924,7 @@ def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
         license_text=args.license,
         rgb_dir=args.rgb_dir,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
         check_artifact_refs=args.check_artifact_refs,
@@ -4973,6 +4977,7 @@ def _object_state_audit_bop_identity_route(args: argparse.Namespace) -> None:
         license_text=args.license,
         rgb_dir=args.rgb_dir,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
         check_artifact_refs=args.check_artifact_refs,
@@ -5035,6 +5040,7 @@ def _object_state_audit_bop_phase1_local_row(args: argparse.Namespace) -> None:
         license_text=args.license,
         rgb_dir=args.rgb_dir,
         gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
         frame_step=args.frame_step,
         check_artifact_refs=args.check_artifact_refs,
@@ -5358,6 +5364,11 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     import_bop_capture_scene.add_argument("--rgb-dir", default="rgb")
+    import_bop_capture_scene.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     import_bop_capture_scene.add_argument("--max-frames", type=int)
     import_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
     import_bop_capture_scene.add_argument(
@@ -5394,6 +5405,11 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     accept_bop_capture_scene.add_argument("--rgb-dir", default="rgb")
+    accept_bop_capture_scene.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     accept_bop_capture_scene.add_argument("--max-frames", type=int)
     accept_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
     accept_bop_capture_scene.add_argument(
@@ -5449,6 +5465,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_phase1_route.add_argument("--rgb-dir", default="rgb")
     audit_bop_phase1_route.add_argument("--gaussian-dir", default="gaussians")
+    audit_bop_phase1_route.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     audit_bop_phase1_route.add_argument("--max-frames", type=int)
     audit_bop_phase1_route.add_argument("--frame-step", type=int, default=1)
     audit_bop_phase1_route.add_argument(
@@ -5505,6 +5526,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_identity_route.add_argument("--rgb-dir", default="rgb")
     audit_bop_identity_route.add_argument("--gaussian-dir", default="gaussians")
+    audit_bop_identity_route.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     audit_bop_identity_route.add_argument("--max-frames", type=int)
     audit_bop_identity_route.add_argument("--frame-step", type=int, default=1)
     audit_bop_identity_route.add_argument(
@@ -5586,6 +5612,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_phase1_local_row.add_argument("--rgb-dir", default="rgb")
     audit_bop_phase1_local_row.add_argument("--gaussian-dir", default="gaussians")
+    audit_bop_phase1_local_row.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     audit_bop_phase1_local_row.add_argument("--max-frames", type=int)
     audit_bop_phase1_local_row.add_argument("--frame-step", type=int, default=1)
     audit_bop_phase1_local_row.add_argument(
@@ -5676,6 +5707,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_prediction_baseline_handoff.add_argument("--rgb-dir", default="rgb")
     bop_prediction_baseline_handoff.add_argument("--gaussian-dir", default="gaussians")
+    bop_prediction_baseline_handoff.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
     bop_prediction_baseline_handoff.add_argument("--max-frames", type=int)
     bop_prediction_baseline_handoff.add_argument("--frame-step", type=int, default=1)
     bop_prediction_baseline_handoff.add_argument(
