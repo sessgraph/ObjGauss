@@ -396,7 +396,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `7z x ... test/000002/...`: extracted scene metadata and selected RGB-D frames.
   - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff ...`: passed with incomplete summary and prediction-reviewable ledger.
   - `git check-ignore -v outputs/assets/raw/bop-lmo/lmo_test_bop19.zip outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json`: passed; outputs ignored.
-- 完成 commit: pending。
+- 完成 commit: `8e56b24`。
 
 ### OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001: Fix relative output package audit
 
@@ -415,7 +415,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_handoff.py tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py -q`: passed，8 tests。
   - 真实 LMO rerun 证明 prediction evidence package 从 missing-files 进入
     `objectstate_controlled_prediction_evidence_package_reviewable`。
-- 完成 commit: pending。
+- 完成 commit: `8e56b24`。
 
 ### OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001: Run BOP RGB-D baseline local rows
 
