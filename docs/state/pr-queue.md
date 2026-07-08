@@ -258,7 +258,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，415 tests。
   - `npm run build`: passed；仅保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: pending-local-commit。
+- 完成 commit: `67dde56`。
 
 ### OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001: Generate controlled prediction baseline candidates
 
