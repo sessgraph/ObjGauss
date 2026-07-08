@@ -930,6 +930,47 @@ Gaussian / tracking / prediction / dynamics models, claim intervention /
 counterfactual gates, claim world model, use replay / diffusion, write public
 samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
+
+Generate a native BOP local-row batch spec from a small CSV of local sample
+paths.
+
+Required behavior:
+
+- Input a CSV with `sample_id`, `scene_root` and `candidate_artifact`.
+- Preserve optional per-sample fields such as `condition_sidecar`,
+  `output_root`, `object_category`, `scenario` and handoff thresholds.
+- Resolve CSV-relative input paths and write paths relative to the batch spec
+  by default, so the same spec can be consumed by readiness and handoff.
+- Validate the generated JSON with
+  `validate_objectstate_bop_local_row_batch_spec`.
+- Report local path readiness for scene roots, candidate artifacts and
+  declared condition sidecars without validating model metrics.
+- Emit the next commands for
+  `audit-bop-local-row-batch-readiness` and
+  `bop-local-row-batch-handoff`.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_local_row_batch_spec`.
+- Summary schema:
+  `objgauss-objectstate-bop-local-row-batch-spec-authoring-v1`.
+- Core function:
+  `objectstate_bop_local_row_batch_spec_authoring(...)`.
+- CLI command:
+  `objgauss object-state init-bop-local-row-batch-spec --samples-csv <samples.csv> --output <batch-spec.json>`.
+- The generated file uses the existing native batch spec schema:
+  `objgauss-objectstate-bop-local-row-batch-spec-v1`.
+- `--require-inputs` fails unless scene roots, candidate artifacts and declared
+  condition sidecars exist locally.
+
+Current scope is spec authoring only. It does not download BOP data, copy the
+dataset, create GT, infer condition metadata, reconstruct Gaussians, run
+readiness, run local-row handoff, train models, claim metric pass, claim
+intervention / counterfactual gates, claim world model, use replay / diffusion,
+write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001
 
 Run multiple BOP local-row handoffs from one explicit batch spec, then write a

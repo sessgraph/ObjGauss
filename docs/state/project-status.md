@@ -853,6 +853,18 @@ cross-sample reviewable coverage；它不要求 metric pass，不声明 interven
 counterfactual evidence，也不声明 ObjectState 已证明为 world state。该步骤不运行
 handoff、不下载 BOP、不创建 GT、不重建 Gaussian、不训练模型、不写 public samples、不改
 viewer/export 默认。
+随后完成 `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001`：新增
+`objgauss.core.objectstate_bop_local_row_batch_spec`，summary schema 为
+`objgauss-objectstate-bop-local-row-batch-spec-authoring-v1`，CLI 为
+`objgauss object-state init-bop-local-row-batch-spec --samples-csv <samples.csv> --output <batch-spec.json>`。
+该命令把含 `sample_id`、`scene_root`、`candidate_artifact` 和可选
+`condition_sidecar` / sample options 的 CSV 写成原生
+`objgauss-objectstate-bop-local-row-batch-spec-v1`，并用现有 validator 复验；
+默认把 CSV 相对输入路径改写成相对 batch spec 的路径，方便后续
+`audit-bop-local-row-batch-readiness` 和 `bop-local-row-batch-handoff` 复用同一 spec。
+authoring summary 会检查本地 scene root、candidate artifact 和 sidecar 是否存在，
+但不验证 metric pass，不运行 readiness / handoff，不下载数据、不创建 GT、不重建 Gaussian、
+不训练模型、不声明 intervention / world model。
 随后完成 `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001`：新增
 `objgauss.core.objectstate_bop_local_row_batch_handoff`，batch spec schema 为
 `objgauss-objectstate-bop-local-row-batch-spec-v1`，summary schema 为
@@ -4017,8 +4029,9 @@ npm run acceptance:demo
    candidate 已把 `max_points=128` full-cloud hard segmentation 修到 `mixed_gaussians=0`，
    最新 strict sample-aware gate 已让 3-row 表中 Lego 选择 promoted、Polyhaven / Nike 回退
    baseline，并避免 selected hard regression；Plush KMeans 暴露为无安全候选的负证据。
-   下一步若继续算法质量，应先在本地 / ignored BOP subset 上跑
-   `audit-bop-local-row-batch-readiness`，再按 readiness 缺口决定是否运行
+   下一步若继续算法质量，应先用本地 / ignored BOP subset 的 CSV 运行
+   `init-bop-local-row-batch-spec` 生成 batch spec，再跑
+   `audit-bop-local-row-batch-readiness`，并按 readiness 缺口决定是否运行
    `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、replay
    buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。

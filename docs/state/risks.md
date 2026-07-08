@@ -34,3 +34,9 @@ BOP sample 的 local-row readiness，显式报告 Gaussian evidence、candidate 
 binding、identity scenario metadata、ready/reviewable sample count 和
 scene/category/scenario coverage 缺口；该缓解仍是 read-only preflight，不运行 handoff、
 不创建 GT、不训练模型、不声明 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001`
+新增 `init-bop-local-row-batch-spec`，可从本地 BOP sample CSV 写出原生 batch spec，
+并检查 scene root、candidate artifact 和 declared condition sidecar 路径缺口；该缓解
+只减少手写 batch spec 和路径漂移风险，不运行 readiness / handoff、不创建 GT、不重建
+Gaussian、不训练模型、不声明 metric pass、intervention gate 或 world-model evidence。

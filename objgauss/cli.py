@@ -247,6 +247,9 @@ from objgauss.core.objectstate_bop_cross_sample_ledger import (
 from objgauss.core.objectstate_bop_local_row_batch_handoff import (
     objectstate_bop_local_row_batch_handoff,
 )
+from objgauss.core.objectstate_bop_local_row_batch_spec import (
+    objectstate_bop_local_row_batch_spec_authoring,
+)
 from objgauss.core.objectstate_bop_local_row_batch_readiness import (
     objectstate_bop_local_row_batch_readiness,
 )
@@ -5584,6 +5587,52 @@ def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
         raise ValueError("BOP local row batch candidate gate is not ready")
 
 
+def _object_state_init_bop_local_row_batch_spec(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_local_row_batch_spec_authoring(
+        args.samples_csv,
+        output=args.output,
+        batch_id=args.batch_id,
+        batch_output_root=args.batch_output_root,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        depth_dir=args.depth_dir,
+        gaussian_dir=args.gaussian_dir,
+        relative_paths=not args.absolute_paths,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    row_counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_local_row_batch_spec_authoring_status={summary['status']}")
+    print(f"samples_csv={summary['samples_csv']}")
+    print(f"output={summary['output']}")
+    print(f"samples={row_counts['samples']}")
+    print(f"scene_roots_present={row_counts['scene_roots_present']}")
+    print(f"candidate_artifacts_present={row_counts['candidate_artifacts_present']}")
+    print(f"condition_sidecars_declared={row_counts['condition_sidecars_declared']}")
+    print(f"condition_sidecars_present={row_counts['condition_sidecars_present']}")
+    for gate, passed in summary["readiness"].items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_inputs
+        and summary["status"]
+        != "objectstate_bop_local_row_batch_spec_authoring_ready"
+    ):
+        raise ValueError("BOP local row batch spec inputs are not ready")
+
+
 def _object_state_audit_bop_local_row_batch_readiness(
     args: argparse.Namespace,
 ) -> None:
@@ -7288,6 +7337,68 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.set_defaults(
         handler=_object_state_bop_local_row_handoff
+    )
+    init_bop_local_row_batch_spec = object_state_subparsers.add_parser(
+        "init-bop-local-row-batch-spec",
+        help=(
+            "write a BOP local-row batch spec from a CSV of scene roots and "
+            "candidate artifacts"
+        ),
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--samples-csv",
+        required=True,
+        type=Path,
+        help=(
+            "CSV with sample_id, scene_root, candidate_artifact and optional "
+            "condition_sidecar/output_root/options columns"
+        ),
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="batch spec JSON to write",
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--summary-output",
+        type=Path,
+        help="optional authoring summary JSON",
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--batch-id",
+        default="bop-local-row-batch",
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--batch-output-root",
+        default="bop-local-row-batch",
+        help="output_root value written under the batch spec's batch object",
+    )
+    init_bop_local_row_batch_spec.add_argument("--dataset-id", default="bop-ycbv")
+    init_bop_local_row_batch_spec.add_argument("--object-category", default="bop_objects")
+    init_bop_local_row_batch_spec.add_argument("--scenario", default="bop_pose_sequence")
+    init_bop_local_row_batch_spec.add_argument("--fps", type=float, default=30.0)
+    init_bop_local_row_batch_spec.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    init_bop_local_row_batch_spec.add_argument("--rgb-dir", default="rgb")
+    init_bop_local_row_batch_spec.add_argument("--depth-dir", default="depth")
+    init_bop_local_row_batch_spec.add_argument("--gaussian-dir", default="gaussians")
+    init_bop_local_row_batch_spec.add_argument(
+        "--absolute-paths",
+        action="store_true",
+        help="write absolute/input paths instead of paths relative to the batch spec",
+    )
+    init_bop_local_row_batch_spec.add_argument(
+        "--require-inputs",
+        action="store_true",
+        help="fail unless scene roots, candidate artifacts, and declared sidecars exist",
+    )
+    init_bop_local_row_batch_spec.set_defaults(
+        handler=_object_state_init_bop_local_row_batch_spec
     )
     audit_bop_local_row_batch_readiness = object_state_subparsers.add_parser(
         "audit-bop-local-row-batch-readiness",

@@ -298,6 +298,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_local_row_batch_handoff",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_AUTHORING_SCHEMA": (
+        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_AUTHORING_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_READINESS_SCHEMA": (
         "objgauss.core.objectstate_bop_local_row_batch_readiness",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_READINESS_SCHEMA",
@@ -458,6 +462,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_local_row_batch_handoff",
         "objectstate_bop_local_row_batch_handoff",
     ),
+    "objectstate_bop_local_row_batch_spec_authoring": (
+        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "objectstate_bop_local_row_batch_spec_authoring",
+    ),
     "objectstate_bop_local_row_batch_readiness": (
         "objgauss.core.objectstate_bop_local_row_batch_readiness",
         "objectstate_bop_local_row_batch_readiness",
@@ -581,6 +589,10 @@ _EXPORTS = {
     "validate_objectstate_bop_local_row_batch_handoff_summary": (
         "objgauss.core.objectstate_bop_local_row_batch_handoff",
         "validate_objectstate_bop_local_row_batch_handoff_summary",
+    ),
+    "validate_objectstate_bop_local_row_batch_spec_authoring_summary": (
+        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "validate_objectstate_bop_local_row_batch_spec_authoring_summary",
     ),
     "validate_objectstate_bop_local_row_batch_readiness_summary": (
         "objgauss.core.objectstate_bop_local_row_batch_readiness",
