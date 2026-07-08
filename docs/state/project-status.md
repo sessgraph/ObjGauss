@@ -602,6 +602,15 @@ instance tracking 当作 physical identity GT。该 adapter 只推进 BOP YCB-V 
 manifest 的第一步；仍不下载数据、不重建 Gaussian、不训练模型、不创建 pass rows、不声明
 reality gate pass 或 public demo。
 
+随后新增 `OBJECTSTATE-BOP-CAPTURE-ACCEPTANCE-001`：在 BOP adapter 后接入既有
+controlled capture file audit，新增 CLI
+`objgauss object-state accept-bop-capture-scene`。该命令可一次性输出 capture
+manifest、acceptance summary、file audit、missing-files Markdown 和 controlled-real
+blocked seed。默认可验证 RGB / pose BOP scene 文件；使用 `--require-gaussian-files`
+时会把 expected `gaussians/<frame>.ply` refs 变成硬要求，只有真实 per-frame Gaussian
+文件存在且格式通过时 `phase1_gaussian_evidence_ready=true`。当前仍不下载 BOP 数据、不生成
+Gaussian、不训练模型、不评分 ObjectState candidates、不创建 pass rows。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

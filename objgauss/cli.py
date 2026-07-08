@@ -200,6 +200,7 @@ from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_markdown,
 )
 from objgauss.core.objectstate_bop_capture_adapter import (
+    objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
 )
 from objgauss.core.objectstate_identity_prediction_adapter import (
@@ -3309,6 +3310,70 @@ def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
         raise ValueError("BOP capture adapter output is not prediction-stage ready")
 
 
+def _object_state_accept_bop_capture_scene(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_capture_acceptance_summary(
+        args.scene_root,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        include_gaussian_refs=args.include_gaussian_refs,
+        gaussian_dir=args.gaussian_dir,
+        require_gaussian_files=args.require_gaussian_files,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+    )
+    readiness = summary["readiness"]
+    file_audit = summary["file_audit"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_acceptance_status={summary['status']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"frames={summary['adapter']['row_counts']['frames']}")
+    print(f"objects={summary['adapter']['row_counts']['objects']}")
+    print(f"capture_file_audit_pass={str(readiness['capture_file_audit_pass']).lower()}")
+    print(f"rgb_files_present={str(readiness['rgb_files_present']).lower()}")
+    print(f"gaussian_files_present={str(readiness['gaussian_files_present']).lower()}")
+    print(
+        "phase1_gaussian_evidence_ready="
+        f"{str(readiness['phase1_gaussian_evidence_ready']).lower()}"
+    )
+    print(f"missing_files={len(file_audit['missing_files'])}")
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    write_json(args.output, summary["manifest"])
+    print(f"manifest={args.output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.file_audit_output:
+        write_json(args.file_audit_output, file_audit)
+        print(f"file_audit={args.file_audit_output}")
+    if args.missing_files_output:
+        args.missing_files_output.parent.mkdir(parents=True, exist_ok=True)
+        args.missing_files_output.write_text(
+            file_audit["missing_files_markdown"],
+            encoding="utf-8",
+        )
+        print(f"missing_files_markdown={args.missing_files_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest_seed"])
+        print(f"controlled_real={args.controlled_real_output}")
+    if args.require_pass and summary["status"] != "objectstate_bop_capture_acceptance_pass":
+        raise ValueError("BOP capture scene acceptance did not pass")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -4707,6 +4772,59 @@ def _build_parser() -> argparse.ArgumentParser:
     import_bop_capture_scene.add_argument("--require-identity-ready", action="store_true")
     import_bop_capture_scene.add_argument("--require-prediction-ready", action="store_true")
     import_bop_capture_scene.set_defaults(handler=_object_state_import_bop_capture_scene)
+    accept_bop_capture_scene = object_state_subparsers.add_parser(
+        "accept-bop-capture-scene",
+        help=(
+            "convert a local BOP scene and run controlled capture file audit "
+            "before handoff"
+        ),
+    )
+    accept_bop_capture_scene.add_argument("scene_root", type=Path)
+    accept_bop_capture_scene.add_argument("--output", "-o", required=True, type=Path)
+    accept_bop_capture_scene.add_argument("--summary-output", type=Path)
+    accept_bop_capture_scene.add_argument("--file-audit-output", type=Path)
+    accept_bop_capture_scene.add_argument("--missing-files-output", type=Path)
+    accept_bop_capture_scene.add_argument("--controlled-real-output", type=Path)
+    accept_bop_capture_scene.add_argument("--sample-id", required=True)
+    accept_bop_capture_scene.add_argument("--dataset-id", default="bop-ycbv")
+    accept_bop_capture_scene.add_argument("--object-category", default="bop_objects")
+    accept_bop_capture_scene.add_argument("--scenario", default="bop_pose_sequence")
+    accept_bop_capture_scene.add_argument("--fps", type=float, default=30.0)
+    accept_bop_capture_scene.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    accept_bop_capture_scene.add_argument("--rgb-dir", default="rgb")
+    accept_bop_capture_scene.add_argument("--max-frames", type=int)
+    accept_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
+    accept_bop_capture_scene.add_argument(
+        "--include-gaussian-refs",
+        action="store_true",
+        help="include expected per-frame gaussians/<frame>.ply refs in the manifest",
+    )
+    accept_bop_capture_scene.add_argument("--gaussian-dir", default="gaussians")
+    accept_bop_capture_scene.add_argument(
+        "--require-gaussian-files",
+        action="store_true",
+        help="require Gaussian files for each selected BOP frame",
+    )
+    accept_bop_capture_scene.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample artifact refs such as scene_gt.json to exist",
+    )
+    accept_bop_capture_scene.add_argument("--min-rgb-bytes", type=int, default=1)
+    accept_bop_capture_scene.add_argument("--min-gaussian-bytes", type=int, default=1)
+    accept_bop_capture_scene.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    accept_bop_capture_scene.add_argument("--hash-files", action="store_true")
+    accept_bop_capture_scene.add_argument("--require-pass", action="store_true")
+    accept_bop_capture_scene.set_defaults(handler=_object_state_accept_bop_capture_scene)
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",
         help="audit staged controlled capture bundle readiness before import/handoff",

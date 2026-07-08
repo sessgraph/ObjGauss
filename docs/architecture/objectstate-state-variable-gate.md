@@ -674,6 +674,35 @@ Implemented v0.1 facts:
   reconstruct Gaussians, train a model, create pass rows, claim public demo
   eligibility, use replay / diffusion or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-CAPTURE-ACCEPTANCE-001
+
+Run BOP adapter and controlled capture file audit as one pre-handoff gate.
+
+Required behavior:
+
+- Convert a local BOP scene into controlled capture manifest form.
+- Check referenced RGB files through the existing controlled capture file
+  audit.
+- Optionally require per-frame Gaussian refs and files before allowing a
+  Phase 1 handoff attempt.
+- Emit missing-files Markdown and controlled-real blocked seed output.
+- Preserve the distinction between file acceptance and reality-gate pass.
+
+Implemented v0.1 facts:
+
+- Core function:
+  `objgauss.core.objectstate_bop_capture_adapter.objectstate_bop_capture_acceptance_summary`.
+- Summary schema: `objgauss-objectstate-bop-capture-acceptance-v1`.
+- CLI:
+  `objgauss object-state accept-bop-capture-scene`.
+- `--require-gaussian-files` turns expected `gaussians/<frame>.ply` refs into
+  hard file-audit requirements. Without it, RGB / pose acceptance can pass, but
+  `phase1_gaussian_evidence_ready=false`.
+- Current scope is pre-handoff file acceptance only. It does not download BOP
+  data, reconstruct Gaussians, train a model, score ObjectState candidates,
+  create pass rows, claim public demo eligibility, use replay / diffusion or
+  mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /

@@ -14,6 +14,11 @@ from objgauss.core.objectstate_controlled_capture import (
     validate_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_summary,
 )
+from objgauss.core.objectstate_controlled_capture_files import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
+    objectstate_controlled_capture_file_audit,
+    validate_objectstate_controlled_capture_file_audit_summary,
+)
 from objgauss.core.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     validate_objectstate_controlled_real_manifest,
@@ -21,6 +26,9 @@ from objgauss.core.objectstate_controlled_real_rows import (
 
 OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA = (
     "objgauss-objectstate-bop-capture-adapter-v1"
+)
+OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA = (
+    "objgauss-objectstate-bop-capture-acceptance-v1"
 )
 
 
@@ -225,6 +233,136 @@ def objectstate_bop_capture_adapter_summary(
     return validate_objectstate_bop_capture_adapter_summary(payload)
 
 
+def objectstate_bop_capture_acceptance_summary(
+    scene_root: str | Path,
+    *,
+    sample_id: str,
+    dataset_id: str = "bop-ycbv",
+    object_category: str = "bop_objects",
+    scenario: str = "bop_pose_sequence",
+    fps: float = 30.0,
+    license_text: str = "BOP dataset terms; verify source dataset license before redistribution",
+    rgb_dir: str = "rgb",
+    max_frames: int | None = None,
+    frame_step: int = 1,
+    include_gaussian_refs: bool = False,
+    gaussian_dir: str = "gaussians",
+    require_gaussian_files: bool = False,
+    check_artifact_refs: bool = False,
+    min_rgb_bytes: int = 1,
+    min_gaussian_bytes: int = 1,
+    require_frame_formats: bool = True,
+    hash_files: bool = False,
+) -> dict[str, Any]:
+    root = Path(scene_root)
+    effective_include_gaussian_refs = bool(
+        include_gaussian_refs or require_gaussian_files
+    )
+    adapter = objectstate_bop_capture_adapter_summary(
+        root,
+        sample_id=sample_id,
+        dataset_id=dataset_id,
+        object_category=object_category,
+        scenario=scenario,
+        fps=fps,
+        license_text=license_text,
+        rgb_dir=rgb_dir,
+        max_frames=max_frames,
+        frame_step=frame_step,
+        include_gaussian_refs=effective_include_gaussian_refs,
+        gaussian_dir=gaussian_dir,
+    )
+    file_audit = objectstate_controlled_capture_file_audit(
+        adapter["manifest"],
+        root=root,
+        require_gaussian_files=require_gaussian_files,
+        check_artifact_refs=check_artifact_refs,
+        min_rgb_bytes=min_rgb_bytes,
+        min_gaussian_bytes=min_gaussian_bytes,
+        require_frame_formats=require_frame_formats,
+        hash_files=hash_files,
+    )
+    adapter_readiness = adapter["readiness"]
+    file_readiness = file_audit["readiness"]
+    readiness = {
+        "bop_scene_adapter_ready": bool(adapter_readiness["bop_scene_adapter_ready"]),
+        "capture_file_audit_pass": (
+            file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+        ),
+        "rgb_files_present": bool(file_readiness["rgb_files_present"]),
+        "gaussian_files_present": bool(file_readiness["gaussian_files_present"]),
+        "identity_stage_ready": bool(adapter_readiness["identity_stage_ready"]),
+        "prediction_stage_ready": bool(adapter_readiness["prediction_stage_ready"]),
+        "intervention_stage_ready": bool(adapter_readiness["intervention_stage_ready"]),
+        "phase1_gaussian_evidence_required": bool(require_gaussian_files),
+        "phase1_gaussian_evidence_ready": bool(
+            require_gaussian_files and file_readiness["gaussian_files_present"]
+        ),
+    }
+    readiness["bop_capture_acceptance_ready"] = bool(
+        readiness["bop_scene_adapter_ready"]
+        and readiness["capture_file_audit_pass"]
+    )
+    hard_blockers = _acceptance_hard_blockers(
+        adapter,
+        file_audit,
+        require_gaussian_files=require_gaussian_files,
+    )
+    payload = {
+        "schema": OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
+        "kind": "objectstate_bop_capture_acceptance",
+        "status": (
+            "objectstate_bop_capture_acceptance_pass"
+            if readiness["bop_capture_acceptance_ready"]
+            else "objectstate_bop_capture_acceptance_fail"
+        ),
+        "adapter_schema": OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
+        "file_audit_schema": OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
+        "scene_root": str(root),
+        "sample_id": adapter["manifest"]["sample"]["sample_id"],
+        "requirements": {
+            "gaussian_files_required": bool(require_gaussian_files),
+            "gaussian_refs_included": bool(effective_include_gaussian_refs),
+            "artifact_refs_checked": bool(check_artifact_refs),
+            "frame_file_formats_required": bool(require_frame_formats),
+            "file_hashes_included": bool(hash_files),
+        },
+        "readiness": readiness,
+        "hard_blockers": hard_blockers,
+        "next_actions": _acceptance_next_actions(
+            readiness,
+            require_gaussian_files=require_gaussian_files,
+        ),
+        "adapter": adapter,
+        "file_audit": file_audit,
+        "manifest": adapter["manifest"],
+        "controlled_real_manifest_seed": adapter["controlled_real_manifest_seed"],
+        "claim_policy": {
+            "acceptance_only": True,
+            "imports_existing_bop_scene": True,
+            "runs_file_audit": True,
+            "does_not_download_dataset": True,
+            "does_not_create_ground_truth": True,
+            "does_not_reconstruct_gaussians": True,
+            "does_not_score_candidate_model": True,
+            "does_not_claim_reality_gate_pass": True,
+            "does_not_claim_world_model": True,
+        },
+        "non_goals": {
+            "downloads_dataset": False,
+            "writes_public_samples": False,
+            "reconstructs_gaussians": False,
+            "trains_gaussian_model": False,
+            "trains_dynamics_model": False,
+            "creates_reality_pass_rows": False,
+            "uses_replay_buffer": False,
+            "uses_diffusion": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_bop_capture_acceptance_summary(payload)
+
+
 def validate_objectstate_bop_capture_adapter_summary(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -306,6 +444,114 @@ def validate_objectstate_bop_capture_adapter_summary(
     ):
         raise ValueError(
             "BOP capture adapter cannot claim downloads, public samples, "
+            "reconstruction, training, pass rows, replay, diffusion, or viewer mutation"
+        )
+    return dict(payload)
+
+
+def validate_objectstate_bop_capture_acceptance_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("BOP capture acceptance summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA:
+        raise ValueError(
+            f"unsupported BOP capture acceptance schema: {payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_bop_capture_acceptance":
+        raise ValueError("BOP capture acceptance kind is unsupported")
+    if payload.get("status") not in {
+        "objectstate_bop_capture_acceptance_pass",
+        "objectstate_bop_capture_acceptance_fail",
+    }:
+        raise ValueError("BOP capture acceptance status is unsupported")
+    adapter = validate_objectstate_bop_capture_adapter_summary(
+        payload.get("adapter")
+    )
+    file_audit = validate_objectstate_controlled_capture_file_audit_summary(
+        payload.get("file_audit")
+    )
+    validate_objectstate_controlled_capture_manifest(payload.get("manifest"))
+    validate_objectstate_controlled_real_manifest(
+        payload.get("controlled_real_manifest_seed")
+    )
+    if payload.get("adapter_schema") != OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA:
+        raise ValueError("BOP capture acceptance adapter_schema mismatch")
+    if payload.get("file_audit_schema") != OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA:
+        raise ValueError("BOP capture acceptance file_audit_schema mismatch")
+    if payload.get("sample_id") != adapter["manifest"]["sample"]["sample_id"]:
+        raise ValueError("BOP capture acceptance sample_id mismatch")
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping):
+        raise ValueError("BOP capture acceptance requires readiness")
+    for key in (
+        "bop_scene_adapter_ready",
+        "capture_file_audit_pass",
+        "rgb_files_present",
+        "gaussian_files_present",
+        "identity_stage_ready",
+        "prediction_stage_ready",
+        "intervention_stage_ready",
+        "phase1_gaussian_evidence_required",
+        "phase1_gaussian_evidence_ready",
+        "bop_capture_acceptance_ready",
+    ):
+        if not isinstance(readiness.get(key), bool):
+            raise ValueError(f"BOP capture acceptance readiness requires bool {key}")
+    if readiness["capture_file_audit_pass"] != (
+        file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+    ):
+        raise ValueError("BOP capture acceptance file audit readiness mismatch")
+    expected_status = (
+        "objectstate_bop_capture_acceptance_pass"
+        if readiness["bop_capture_acceptance_ready"]
+        else "objectstate_bop_capture_acceptance_fail"
+    )
+    if payload["status"] != expected_status:
+        raise ValueError("BOP capture acceptance status must match readiness")
+    requirements = payload.get("requirements")
+    if not isinstance(requirements, Mapping):
+        raise ValueError("BOP capture acceptance requires requirements")
+    for key in (
+        "gaussian_files_required",
+        "gaussian_refs_included",
+        "artifact_refs_checked",
+        "frame_file_formats_required",
+        "file_hashes_included",
+    ):
+        if not isinstance(requirements.get(key), bool):
+            raise ValueError(f"BOP capture acceptance requirements requires bool {key}")
+    if not isinstance(payload.get("hard_blockers"), list):
+        raise ValueError("BOP capture acceptance hard_blockers must be a list")
+    if not isinstance(payload.get("next_actions"), list):
+        raise ValueError("BOP capture acceptance next_actions must be a list")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not claim_policy.get("acceptance_only")
+        or not claim_policy.get("imports_existing_bop_scene")
+        or not claim_policy.get("runs_file_audit")
+        or not claim_policy.get("does_not_download_dataset")
+        or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_score_candidate_model")
+        or not claim_policy.get("does_not_claim_reality_gate_pass")
+        or not claim_policy.get("does_not_claim_world_model")
+    ):
+        raise ValueError("BOP capture acceptance must preserve claim policy")
+    non_goals = payload.get("non_goals", {})
+    if (
+        non_goals.get("downloads_dataset")
+        or non_goals.get("writes_public_samples")
+        or non_goals.get("reconstructs_gaussians")
+        or non_goals.get("trains_gaussian_model")
+        or non_goals.get("trains_dynamics_model")
+        or non_goals.get("creates_reality_pass_rows")
+        or non_goals.get("uses_replay_buffer")
+        or non_goals.get("uses_diffusion")
+        or non_goals.get("mutates_viewer_defaults")
+    ):
+        raise ValueError(
+            "BOP capture acceptance cannot claim downloads, public samples, "
             "reconstruction, training, pass rows, replay, diffusion, or viewer mutation"
         )
     return dict(payload)
@@ -431,6 +677,55 @@ def _hard_blockers(capture_summary: Mapping[str, Any]) -> list[str]:
     if not capture_summary["readiness"]["prediction_stage_ready"]:
         blockers.append("selected BOP scene is not prediction-stage ready")
     return blockers
+
+
+def _acceptance_hard_blockers(
+    adapter: Mapping[str, Any],
+    file_audit: Mapping[str, Any],
+    *,
+    require_gaussian_files: bool,
+) -> list[str]:
+    gaussian_ready = bool(file_audit["readiness"]["gaussian_files_present"])
+    blockers = [
+        blocker
+        for blocker in adapter["hard_blockers"]
+        if not (
+            require_gaussian_files
+            and gaussian_ready
+            and str(blocker).startswith("BOP adapter output still needs")
+        )
+    ]
+    if file_audit["status"] != "objectstate_controlled_capture_file_audit_pass":
+        blockers.extend(file_audit["issues"])
+    if not require_gaussian_files:
+        blockers.append(
+            "per-frame Gaussian files were not required in this acceptance; "
+            "rerun with require_gaussian_files before Phase 1 identity rows"
+        )
+    return blockers
+
+
+def _acceptance_next_actions(
+    readiness: Mapping[str, bool],
+    *,
+    require_gaussian_files: bool,
+) -> list[str]:
+    actions = []
+    if not readiness["capture_file_audit_pass"]:
+        actions.append("fix missing or invalid BOP RGB / Gaussian frame files")
+    if not require_gaussian_files:
+        actions.append(
+            "reconstruct per-frame Gaussian evidence and rerun with --require-gaussian-files"
+        )
+    if require_gaussian_files and not readiness["phase1_gaussian_evidence_ready"]:
+        actions.append("create valid gaussians/<frame>.ply or .splat files for each selected BOP frame")
+    actions.extend(
+        [
+            "create ObjectState candidate artifact for the accepted BOP frames",
+            "run controlled identity and prediction handoff on the accepted manifest",
+        ]
+    )
+    return actions
 
 
 def _next_actions(capture_summary: Mapping[str, Any]) -> list[str]:

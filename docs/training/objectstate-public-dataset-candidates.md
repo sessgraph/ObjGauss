@@ -109,6 +109,29 @@ The adapter does not create Gaussian evidence. After importing the BOP scene,
 run a file audit and reconstruct per-frame Gaussian files under ignored
 `outputs/` before attempting identity / prediction handoff.
 
+The combined adapter + file audit gate is:
+
+```bash
+uv run objgauss object-state accept-bop-capture-scene \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --output outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-acceptance-summary.json \
+  --file-audit-output outputs/captures/bop-ycbv-scene-000001/bop-file-audit.json \
+  --missing-files-output outputs/captures/bop-ycbv-scene-000001/bop-missing-files.md \
+  --controlled-real-output outputs/captures/bop-ycbv-scene-000001/controlled-real-seed.json \
+  --require-gaussian-files \
+  --hash-files \
+  --require-pass
+```
+
+Without `--require-gaussian-files`, this command can verify the RGB / pose BOP
+scene files, but it still cannot support Phase 1 identity rows because
+ObjGauss has not produced per-frame Gaussian evidence. With
+`--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
+or `.splat` files for every selected frame.
+
 ## Hard Blockers
 
 - No public candidate directly supplies ObjGauss per-frame Gaussian evidence.

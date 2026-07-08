@@ -6,9 +6,12 @@ import pytest
 
 from objgauss.cli import main
 from objgauss.core.objectstate_bop_capture_adapter import (
+    OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
+    objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
     objectstate_bop_capture_manifest_from_scene,
+    validate_objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_adapter_summary,
 )
 from objgauss.core.objectstate_controlled_capture import (
@@ -19,6 +22,16 @@ from objgauss.core.objectstate_controlled_real_rows import (
 )
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
+PLY_BYTES = (
+    b"ply\n"
+    b"format ascii 1.0\n"
+    b"element vertex 1\n"
+    b"property float x\n"
+    b"property float y\n"
+    b"property float z\n"
+    b"end_header\n"
+    b"0 0 0\n"
+)
 
 
 def test_bop_capture_adapter_builds_identity_prediction_ready_manifest(tmp_path):
@@ -141,6 +154,126 @@ def test_bop_capture_adapter_cli_writes_outputs(tmp_path, capsys):
     }
 
 
+def test_bop_capture_acceptance_passes_rgb_only_file_audit(tmp_path):
+    _write_bop_scene(tmp_path)
+
+    summary = objectstate_bop_capture_acceptance_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        dataset_id="bop-ycbv",
+        hash_files=True,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA
+    assert summary["status"] == "objectstate_bop_capture_acceptance_pass"
+    assert summary["readiness"]["capture_file_audit_pass"] is True
+    assert summary["readiness"]["rgb_files_present"] is True
+    assert summary["readiness"]["gaussian_files_present"] is True
+    assert summary["readiness"]["phase1_gaussian_evidence_required"] is False
+    assert summary["readiness"]["phase1_gaussian_evidence_ready"] is False
+    assert summary["requirements"]["gaussian_refs_included"] is False
+    assert summary["file_audit"]["file_counts"]["rgb"]["valid"] == 3
+    assert summary["file_audit"]["file_counts"]["gaussian"] == {
+        "referenced": 0,
+        "existing": 0,
+        "valid": 0,
+        "missing": 0,
+    }
+    assert "rerun with require_gaussian_files" in " ".join(summary["hard_blockers"])
+    assert validate_objectstate_bop_capture_acceptance_summary(summary) == summary
+
+
+def test_bop_capture_acceptance_requires_gaussian_files_when_requested(tmp_path):
+    _write_bop_scene(tmp_path)
+
+    summary = objectstate_bop_capture_acceptance_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        require_gaussian_files=True,
+    )
+
+    assert summary["status"] == "objectstate_bop_capture_acceptance_fail"
+    assert summary["requirements"]["gaussian_refs_included"] is True
+    assert summary["readiness"]["capture_file_audit_pass"] is False
+    assert summary["readiness"]["gaussian_files_present"] is False
+    assert summary["readiness"]["phase1_gaussian_evidence_ready"] is False
+    assert len(summary["file_audit"]["missing_files"]) == 3
+    assert "invalid or missing Gaussian files" in " ".join(summary["hard_blockers"])
+
+
+def test_bop_capture_acceptance_passes_with_gaussian_files(tmp_path):
+    _write_bop_scene(tmp_path)
+    _write_gaussian_frames(tmp_path)
+
+    summary = objectstate_bop_capture_acceptance_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        require_gaussian_files=True,
+    )
+
+    assert summary["status"] == "objectstate_bop_capture_acceptance_pass"
+    assert summary["readiness"]["gaussian_files_present"] is True
+    assert summary["readiness"]["phase1_gaussian_evidence_ready"] is True
+    assert summary["file_audit"]["file_counts"]["gaussian"]["valid"] == 3
+    assert "gaussian" in summary["manifest"]["sample"]["observation_modalities"]
+    assert "local per-frame Gaussian reconstruction" not in " ".join(
+        summary["hard_blockers"]
+    )
+
+
+def test_bop_capture_acceptance_cli_writes_file_audit_outputs(tmp_path, capsys):
+    _write_bop_scene(tmp_path)
+    _write_gaussian_frames(tmp_path)
+    manifest_path = tmp_path / "accepted-capture-manifest.json"
+    summary_path = tmp_path / "bop-acceptance-summary.json"
+    file_audit_path = tmp_path / "bop-file-audit.json"
+    missing_files_path = tmp_path / "bop-missing-files.md"
+    controlled_real_path = tmp_path / "controlled-real-seed.json"
+
+    assert (
+        main(
+            [
+                "object-state",
+                "accept-bop-capture-scene",
+                str(tmp_path),
+                "--sample-id",
+                "bop-ycbv-scene-000001",
+                "--output",
+                str(manifest_path),
+                "--summary-output",
+                str(summary_path),
+                "--file-audit-output",
+                str(file_audit_path),
+                "--missing-files-output",
+                str(missing_files_path),
+                "--controlled-real-output",
+                str(controlled_real_path),
+                "--require-gaussian-files",
+                "--hash-files",
+                "--require-pass",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    file_audit = json.loads(file_audit_path.read_text(encoding="utf-8"))
+    controlled_real = json.loads(controlled_real_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA}" in stdout
+    assert "bop_acceptance_status=objectstate_bop_capture_acceptance_pass" in stdout
+    assert "capture_file_audit_pass=true" in stdout
+    assert "phase1_gaussian_evidence_ready=true" in stdout
+    assert "missing_files=0" in stdout
+    assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    assert summary["schema"] == OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA
+    assert file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
+    assert controlled_real["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    assert "no missing files" in missing_files_path.read_text(encoding="utf-8")
+
+
 def test_bop_capture_adapter_rejects_duplicate_obj_ids(tmp_path):
     _write_bop_scene(tmp_path)
     scene_gt = json.loads((tmp_path / "scene_gt.json").read_text(encoding="utf-8"))
@@ -219,3 +352,9 @@ def _write_bop_scene(root) -> None:
         json.dumps(scene_gt_info),
         encoding="utf-8",
     )
+
+
+def _write_gaussian_frames(root) -> None:
+    (root / "gaussians").mkdir()
+    for frame_id in range(3):
+        (root / "gaussians" / f"{frame_id:06d}.ply").write_bytes(PLY_BYTES)
