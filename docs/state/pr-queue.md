@@ -184,6 +184,10 @@ export 命令。
 `init-bop-objectstate-artifact-template`，可从 BOP acceptance manifest 写出 draft-only
 `objectstates.template.json`，帮助作者填写真实模型输出 `objectstates.json`；该模板
 schema 会被 identity route 拒绝，不复制 BOP pose GT、不训练模型、不创建 pass row。
+`OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-FINALIZE-001` 继续补齐
+`finalize-bop-objectstate-artifact-template`，可把已填写模板包装成 identity route
+当前可审计的 `objectstates.json`，同时拒绝 TODO 和精确 BOP pose GT centroid 泄漏；
+它不训练模型、不运行 identity eval、不创建 pass row。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -255,6 +259,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-FINALIZE-001: Finalize BOP ObjectState artifact templates
+
+- 状态: done / filled-template-to-candidate-artifact
+- 类型: 标准 PR / ObjectState public pose dataset candidate packaging
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把已填写的 BOP ObjectState candidate template 转成当前 identity route 可审计的
+  `objectstates.json`，同时降低 TODO 模板和 BOP pose GT 泄漏误用风险。
+- 已实施:
+  - `objgauss.core.objectstate_bop_candidate_artifact_template` 新增
+    `objgauss-objectstate-bop-candidate-artifact-finalize-v1` summary 和 finalizer。
+  - 新增 CLI `objgauss object-state finalize-bop-objectstate-artifact-template`，默认写
+    template 声明的 target artifact，也支持 `--output` / `--summary-output`。
+  - finalizer 要求 BOP acceptance pass、per-frame Gaussian evidence ready、template
+    frame / Gaussian ref / object id 与 accepted manifest 绑定一致。
+  - finalizer 拒绝残留 TODO、每帧重复 state id、无效 centroid / bbox / confidence，以及
+    与 BOP pose GT 精确匹配的 candidate centroid。
+  - 输出 artifact 使用当前下游接受的
+    `objgauss-trainable-kernel-model-artifact-v1`，但 artifact policy 标记为
+    candidate packaging / not a training run；可选记录真实模型提供的 reconstruction-noise
+    evidence。
+- 边界:
+  - 不根据 BOP pose GT 生成 candidate centroid，不训练模型，不创建 checkpoint。
+  - 不运行 identity handoff / eval，不生成 Phase 1 pass row。
+  - 不下载 BOP、不写 public samples、不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_candidate_artifact_template.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py -q`: passed，9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_core_namespace.py -q`: passed，30 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，58 tests。
+  - `uv run --extra dev pytest`: passed，464 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `3a1e805`。
 
 ### OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-TEMPLATE-001: Initialize BOP ObjectState artifact templates
 

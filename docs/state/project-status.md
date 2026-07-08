@@ -806,6 +806,16 @@ confidence placeholder；模板 schema 与 `objgauss-trainable-kernel-model-arti
 刻意不同，因此会被 identity route / trainable artifact validator 拒绝。该步骤只帮助作者
 填写真正的本地模型输出 `objectstates.json`，不复制 BOP pose GT 到 candidate centroid、
 不训练模型、不运行 identity eval、不创建 pass row，也不改 viewer/export 默认策略。
+随后补齐 `OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-FINALIZE-001`：
+同一模块新增 `objgauss-objectstate-bop-candidate-artifact-finalize-v1` summary，
+CLI 为 `objgauss object-state finalize-bop-objectstate-artifact-template`。该命令读取
+已填写的 `objectstates.template.json`，要求 BOP acceptance / per-frame Gaussian
+evidence 通过，检查 frame / Gaussian ref / object id 与 accepted manifest 绑定一致，
+拒绝残留 TODO，拒绝 candidate centroid 与 BOP pose GT 精确匹配的明显泄漏，然后写出当前
+identity route 可审计的 `objgauss-trainable-kernel-model-artifact-v1`
+`objectstates.json`。输出 artifact policy 标记为 candidate packaging / not a training
+run；可选写入真实模型提供的 reconstruction-noise evidence，但不伪造默认值。该步骤不训练
+模型、不运行 identity handoff / eval、不创建 Phase 1 pass row，也不改 viewer/export 默认策略。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
