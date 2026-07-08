@@ -298,6 +298,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_local_row_readiness",
         "OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA": (
+        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -410,6 +414,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_local_row_readiness",
         "objectstate_bop_phase1_local_row_readiness",
     ),
+    "objectstate_bop_phase1_subset_selector": (
+        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "objectstate_bop_phase1_subset_selector",
+    ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
@@ -489,6 +497,10 @@ _EXPORTS = {
     "validate_objectstate_bop_phase1_local_row_readiness_summary": (
         "objgauss.core.objectstate_bop_phase1_local_row_readiness",
         "validate_objectstate_bop_phase1_local_row_readiness_summary",
+    ),
+    "validate_objectstate_bop_phase1_subset_selector_summary": (
+        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "validate_objectstate_bop_phase1_subset_selector_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

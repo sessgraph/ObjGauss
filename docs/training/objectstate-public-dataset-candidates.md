@@ -132,6 +132,27 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 `--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
 or `.splat` files for every selected frame.
 
+Before choosing a concrete scene manually, scan the local BOP dataset or split
+root and let the selector recommend the first scene that can seed Phase 1
+identity / prediction rows:
+
+```bash
+uv run objgauss object-state select-bop-phase1-subset \
+  outputs/datasets/bop/ycbv \
+  --dataset-id bop-ycbv \
+  --output-root outputs/captures/bop-ycbv-test-000001 \
+  --summary-output outputs/captures/bop-ycbv-phase1-subset-selector-summary.json \
+  --require-ready
+```
+
+The selector is read-only. It scans for BOP scene roots containing
+`scene_gt.json` and `scene_camera.json`, validates each candidate through the
+existing BOP adapter, checks minimum selected frames / objects / repeated
+identities, and prints the next `init-bop-condition-sidecar`,
+`accept-bop-capture-scene` and `audit-bop-phase1-local-row` commands for the
+recommended scene. It does not download BOP, copy scene files, infer view /
+lighting metadata, generate Gaussian evidence or create a pass row.
+
 To get one machine-readable status for the whole local BOP row, run the
 combined Phase 1 local row readiness audit:
 

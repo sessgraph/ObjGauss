@@ -214,6 +214,9 @@ from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
 )
+from objgauss.core.objectstate_bop_phase1_subset_selector import (
+    objectstate_bop_phase1_subset_selector,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3288,6 +3291,48 @@ def _object_state_audit_public_dataset_candidates(
         raise ValueError("no public dataset candidate is directly Phase 1 ready")
 
 
+def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_phase1_subset_selector(
+        args.dataset_root,
+        dataset_id=args.dataset_id,
+        output_root=args.output_root,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        max_depth=args.max_depth,
+        max_scene_candidates=args.max_scene_candidates,
+        min_frames=args.min_frames,
+        min_objects=args.min_objects,
+        min_persistent_objects=args.min_persistent_objects,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bop_phase1_subset_selector_status={summary['status']}")
+    print(f"dataset_root={summary['dataset_root']}")
+    print(f"scene_candidates={summary['row_counts']['scene_candidates']}")
+    print(f"ready_candidates={summary['row_counts']['ready_candidates']}")
+    recommended = summary["recommended"]
+    if recommended:
+        print(f"recommended_scene_root={recommended['scene_root']}")
+        print(f"recommended_sample_id={recommended['sample_id']}")
+    for gate, passed in summary["readiness"].items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_ready and summary["recommended"] is None:
+        raise ValueError("no BOP Phase 1 subset candidate is ready")
+
+
 def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_condition_sidecar_summary(
         args.scene_root,
@@ -5410,6 +5455,47 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_public_dataset_candidates.set_defaults(
         handler=_object_state_audit_public_dataset_candidates
+    )
+    select_bop_phase1_subset = object_state_subparsers.add_parser(
+        "select-bop-phase1-subset",
+        help=(
+            "scan a local BOP dataset or split root and recommend a Phase 1 "
+            "scene seed"
+        ),
+    )
+    select_bop_phase1_subset.add_argument("dataset_root", type=Path)
+    select_bop_phase1_subset.add_argument("--summary-output", type=Path)
+    select_bop_phase1_subset.add_argument("--dataset-id", default="bop-ycbv")
+    select_bop_phase1_subset.add_argument("--output-root", type=Path)
+    select_bop_phase1_subset.add_argument("--object-category", default="bop_objects")
+    select_bop_phase1_subset.add_argument("--scenario", default="bop_pose_sequence")
+    select_bop_phase1_subset.add_argument("--fps", type=float, default=30.0)
+    select_bop_phase1_subset.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    select_bop_phase1_subset.add_argument("--rgb-dir", default="rgb")
+    select_bop_phase1_subset.add_argument("--max-frames", type=int)
+    select_bop_phase1_subset.add_argument("--frame-step", type=int, default=1)
+    select_bop_phase1_subset.add_argument("--max-depth", type=int, default=3)
+    select_bop_phase1_subset.add_argument("--max-scene-candidates", type=int, default=20)
+    select_bop_phase1_subset.add_argument("--min-frames", type=int, default=3)
+    select_bop_phase1_subset.add_argument("--min-objects", type=int, default=1)
+    select_bop_phase1_subset.add_argument(
+        "--min-persistent-objects",
+        type=int,
+        default=1,
+        help="minimum objects that must appear in at least two selected frames",
+    )
+    select_bop_phase1_subset.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless at least one BOP scene is ready as a Phase 1 seed",
+    )
+    select_bop_phase1_subset.set_defaults(
+        handler=_object_state_select_bop_phase1_subset
     )
     init_bop_condition_sidecar = object_state_subparsers.add_parser(
         "init-bop-condition-sidecar",
