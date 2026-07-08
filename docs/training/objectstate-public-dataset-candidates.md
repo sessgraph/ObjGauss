@@ -176,7 +176,26 @@ the route should stay blocked; do not relax the identity gate just to turn BOP
 pose data into a pass row.
 
 When the local BOP subset has explicit scenario condition metadata from the
-capture setup, keep it in a sidecar rather than weakening the gate:
+capture setup, keep it in a sidecar rather than weakening the gate. The helper
+command can generate a default sidecar template from selected BOP frames, or
+turn a filled condition CSV into an identity-ready sidecar:
+
+```bash
+uv run objgauss object-state init-bop-condition-sidecar \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --condition-csv outputs/captures/bop-ycbv-scene-000001/bop-conditions.csv \
+  --output outputs/captures/bop-ycbv-scene-000001/bop-condition-sidecar.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-condition-sidecar-summary.json \
+  --require-identity-ready
+```
+
+The condition CSV columns are:
+
+```text
+frame_id,view_id,lighting_id,camera_x,camera_y,camera_z,camera_qx,camera_qy,camera_qz,camera_qw
+```
+
+The generated sidecar uses this schema:
 
 ```json
 {
@@ -216,7 +235,10 @@ capture setup, keep it in a sidecar rather than weakening the gate:
 }
 ```
 
-Pass it to the adapter, acceptance and route audits with
+If `--condition-csv` is omitted, the command writes a default template that is
+valid JSON but should usually remain `needs_metadata` because it lacks
+lighting variation and camera motion. Pass an identity-ready sidecar to the
+adapter, acceptance and route audits with
 `--condition-sidecar <path>`. The sidecar may override only
 `frame.condition.view_id`, `frame.condition.lighting_id` and
 `frame.condition.camera_pose`; it does not create identity GT, object pose GT,

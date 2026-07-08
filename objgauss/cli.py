@@ -216,6 +216,7 @@ from objgauss.core.objectstate_public_dataset_candidates import (
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
+    objectstate_bop_capture_condition_sidecar_summary,
 )
 from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
     objectstate_bop_prediction_baseline_handoff,
@@ -3286,6 +3287,46 @@ def _object_state_audit_public_dataset_candidates(
         raise ValueError("no public dataset candidate is directly Phase 1 ready")
 
 
+def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_capture_condition_sidecar_summary(
+        args.scene_root,
+        condition_csv=args.condition_csv,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        default_lighting_id=args.default_lighting_id,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    readiness = summary["readiness"]
+    coverage = summary["coverage"]
+    write_json(args.output, summary["sidecar"])
+    print(f"schema={summary['schema']}")
+    print(f"bop_condition_sidecar_status={summary['status']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sidecar={args.output}")
+    print(f"selected_frames={summary['row_counts']['selected_frames']}")
+    print(f"csv_condition_rows={summary['row_counts']['csv_condition_rows']}")
+    print(f"view_condition_count={coverage['view_condition_count']}")
+    print(f"lighting_condition_count={coverage['lighting_condition_count']}")
+    print(f"camera_pose_count={coverage['camera_pose_count']}")
+    print(
+        "max_camera_translation_m="
+        f"{coverage['max_camera_translation_m']:.6f}"
+    )
+    for gate, passed in readiness.items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_identity_ready and not readiness["identity_scenario_metadata_ready"]:
+        raise ValueError("BOP condition sidecar is not identity-scenario ready")
+
+
 def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_adapter_summary(
         args.scene_root,
@@ -5340,6 +5381,54 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_public_dataset_candidates.set_defaults(
         handler=_object_state_audit_public_dataset_candidates
+    )
+    init_bop_condition_sidecar = object_state_subparsers.add_parser(
+        "init-bop-condition-sidecar",
+        help=(
+            "write a BOP condition sidecar from selected scene frames and an "
+            "optional condition CSV"
+        ),
+    )
+    init_bop_condition_sidecar.add_argument("scene_root", type=Path)
+    init_bop_condition_sidecar.add_argument("--output", "-o", required=True, type=Path)
+    init_bop_condition_sidecar.add_argument("--summary-output", type=Path)
+    init_bop_condition_sidecar.add_argument(
+        "--condition-csv",
+        type=Path,
+        help=(
+            "CSV with frame_id, view_id, lighting_id, camera_x/y/z, "
+            "camera_qx/qy/qz/qw columns"
+        ),
+    )
+    init_bop_condition_sidecar.add_argument("--max-frames", type=int)
+    init_bop_condition_sidecar.add_argument("--frame-step", type=int, default=1)
+    init_bop_condition_sidecar.add_argument(
+        "--default-lighting-id",
+        default="bop-default",
+        help="lighting id used for frames not overridden by --condition-csv",
+    )
+    init_bop_condition_sidecar.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    init_bop_condition_sidecar.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    init_bop_condition_sidecar.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    init_bop_condition_sidecar.add_argument(
+        "--require-identity-ready",
+        action="store_true",
+        help="fail unless the generated sidecar satisfies identity metadata coverage",
+    )
+    init_bop_condition_sidecar.set_defaults(
+        handler=_object_state_init_bop_condition_sidecar
     )
     import_bop_capture_scene = object_state_subparsers.add_parser(
         "import-bop-capture-scene",

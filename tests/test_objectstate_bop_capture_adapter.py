@@ -9,12 +9,15 @@ from objgauss.core.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA,
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
+    objectstate_bop_capture_condition_sidecar_summary,
     objectstate_bop_capture_manifest_from_scene,
     validate_objectstate_bop_capture_acceptance_summary,
     validate_objectstate_bop_capture_adapter_summary,
     validate_objectstate_bop_capture_condition_sidecar,
+    validate_objectstate_bop_capture_condition_sidecar_summary,
 )
 from objgauss.core.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
@@ -148,6 +151,84 @@ def test_bop_capture_adapter_merges_condition_sidecar(tmp_path):
     assert manifest["frames"][1]["condition"]["view_id"] == "front"
     assert manifest["frames"][1]["condition"]["lighting_id"] == "dim"
     assert manifest["frames"][2]["condition"]["view_id"] == "right"
+
+
+def test_bop_condition_sidecar_summary_reports_template_blocker(tmp_path):
+    _write_bop_scene(tmp_path)
+
+    summary = objectstate_bop_capture_condition_sidecar_summary(tmp_path)
+
+    assert summary["schema"] == OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA
+    assert (
+        summary["status"]
+        == "objectstate_bop_capture_condition_sidecar_needs_metadata"
+    )
+    assert summary["selected_frame_ids"] == [0, 1, 2]
+    assert summary["row_counts"] == {
+        "selected_frames": 3,
+        "csv_condition_rows": 0,
+        "sidecar_frames": 3,
+    }
+    assert summary["readiness"]["selected_frames_covered"] is True
+    assert summary["readiness"]["condition_csv_loaded"] is False
+    assert summary["readiness"]["min_view_conditions_met"] is True
+    assert summary["readiness"]["min_lighting_conditions_met"] is False
+    assert summary["readiness"]["camera_motion_present"] is False
+    assert summary["readiness"]["identity_scenario_metadata_ready"] is False
+    assert summary["coverage"]["lighting_ids"] == ["bop-default"]
+    assert summary["coverage"]["camera_pose_count"] == 0
+    assert "condition CSV was not provided" in " ".join(summary["issues"])
+    assert (
+        validate_objectstate_bop_capture_condition_sidecar_summary(summary)
+        == summary
+    )
+
+
+def test_bop_condition_sidecar_cli_writes_identity_ready_sidecar(tmp_path, capsys):
+    _write_bop_scene(tmp_path)
+    csv_path = tmp_path / "bop-conditions.csv"
+    sidecar_path = tmp_path / "bop-condition-sidecar.json"
+    summary_path = tmp_path / "bop-condition-sidecar-summary.json"
+    _write_condition_csv(csv_path)
+
+    assert (
+        main(
+            [
+                "object-state",
+                "init-bop-condition-sidecar",
+                str(tmp_path),
+                "--condition-csv",
+                str(csv_path),
+                "--output",
+                str(sidecar_path),
+                "--summary-output",
+                str(summary_path),
+                "--require-identity-ready",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA}" in stdout
+    assert (
+        "bop_condition_sidecar_status="
+        "objectstate_bop_capture_condition_sidecar_identity_ready"
+    ) in stdout
+    assert "readiness.identity_scenario_metadata_ready=true" in stdout
+    assert sidecar["schema"] == OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA
+    assert sidecar["frames"]["2"]["view_id"] == "right"
+    assert sidecar["frames"]["2"]["lighting_id"] == "dim"
+    assert sidecar["frames"]["2"]["camera_pose"]["position"] == [0.04, 0.0, 0.0]
+    assert (
+        summary["status"]
+        == "objectstate_bop_capture_condition_sidecar_identity_ready"
+    )
+    assert summary["coverage"]["lighting_condition_count"] == 2
+    assert summary["coverage"]["max_camera_translation_m"] == pytest.approx(0.04)
 
 
 def test_bop_capture_adapter_cli_accepts_condition_sidecar(tmp_path, capsys):
@@ -555,6 +636,21 @@ def _condition_sidecar_payload():
             "does_not_infer_from_pixels": True,
         },
     }
+
+
+def _write_condition_csv(path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "frame_id,view_id,lighting_id,camera_x,camera_y,camera_z,camera_qx,camera_qy,camera_qz,camera_qw",
+                "0,front,bright,0.0,0.0,0.0,0.0,0.0,0.0,1.0",
+                "1,front,dim,0.02,0.0,0.0,0.0,0.0,0.0,1.0",
+                "2,right,dim,0.04,0.0,0.0,0.0,0.0,0.0,1.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _read_json(path):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import math
 import re
@@ -32,6 +33,9 @@ OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA = (
 )
 OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA = (
     "objgauss-objectstate-bop-capture-condition-sidecar-v1"
+)
+OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA = (
+    "objgauss-objectstate-bop-capture-condition-sidecar-summary-v1"
 )
 
 
@@ -386,6 +390,145 @@ def objectstate_bop_capture_acceptance_summary(
     return validate_objectstate_bop_capture_acceptance_summary(payload)
 
 
+def objectstate_bop_capture_condition_sidecar_summary(
+    scene_root: str | Path,
+    *,
+    condition_csv: str | Path | None = None,
+    max_frames: int | None = None,
+    frame_step: int = 1,
+    default_lighting_id: str = "bop-default",
+    min_view_conditions: int = 2,
+    min_lighting_conditions: int = 2,
+    min_camera_motion_m: float = 0.01,
+) -> dict[str, Any]:
+    root = Path(scene_root)
+    if frame_step < 1:
+        raise ValueError("frame_step must be >= 1")
+    if max_frames is not None and max_frames < 1:
+        raise ValueError("max_frames must be >= 1")
+    if min_view_conditions < 1:
+        raise ValueError("min_view_conditions must be >= 1")
+    if min_lighting_conditions < 1:
+        raise ValueError("min_lighting_conditions must be >= 1")
+    if min_camera_motion_m < 0:
+        raise ValueError("min_camera_motion_m must be >= 0")
+
+    scene_camera = _read_json_mapping(root / "scene_camera.json", "scene_camera.json")
+    scene_gt = _read_json_mapping(root / "scene_gt.json", "scene_gt.json")
+    frame_ids = _selected_frame_ids(
+        scene_gt,
+        scene_camera,
+        max_frames=max_frames,
+        frame_step=frame_step,
+    )
+    condition_csv_path = Path(condition_csv) if condition_csv else None
+    csv_conditions = _read_condition_csv(condition_csv_path)
+    default_lighting = _required_string(default_lighting_id, "default_lighting_id")
+    frames: dict[str, Any] = {}
+    for frame_id in frame_ids:
+        condition = {
+            "view_id": f"bop-camera-frame-{frame_id:06d}",
+            "lighting_id": default_lighting,
+        }
+        if frame_id in csv_conditions:
+            condition.update(csv_conditions[frame_id])
+        frames[str(frame_id)] = condition
+    sidecar = validate_objectstate_bop_capture_condition_sidecar(
+        {
+            "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+            "kind": "objectstate_bop_capture_condition_sidecar",
+            "frames": frames,
+            "condition_policy": {
+                "sidecar_only": True,
+                "does_not_create_ground_truth": True,
+                "does_not_infer_from_pixels": True,
+            },
+        }
+    )
+    coverage = _condition_sidecar_coverage(sidecar, frame_ids)
+    readiness = {
+        "selected_frames_covered": coverage["selected_frame_count"]
+        == coverage["sidecar_frame_count"],
+        "condition_csv_loaded": condition_csv_path is not None,
+        "min_view_conditions_met": coverage["view_condition_count"]
+        >= min_view_conditions,
+        "min_lighting_conditions_met": coverage["lighting_condition_count"]
+        >= min_lighting_conditions,
+        "camera_motion_present": (
+            coverage["camera_pose_count"] >= 2
+            and coverage["max_camera_translation_m"] >= min_camera_motion_m
+        ),
+    }
+    readiness["identity_scenario_metadata_ready"] = bool(
+        readiness["selected_frames_covered"]
+        and readiness["min_view_conditions_met"]
+        and readiness["min_lighting_conditions_met"]
+        and readiness["camera_motion_present"]
+    )
+    issues = _condition_sidecar_issues(
+        readiness,
+        condition_csv_loaded=condition_csv_path is not None,
+        min_lighting_conditions=min_lighting_conditions,
+        min_camera_motion_m=min_camera_motion_m,
+    )
+    payload = {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar_summary",
+        "status": (
+            "objectstate_bop_capture_condition_sidecar_identity_ready"
+            if readiness["identity_scenario_metadata_ready"]
+            else "objectstate_bop_capture_condition_sidecar_needs_metadata"
+        ),
+        "scene_root": str(root),
+        "source": {
+            "scene_camera": str(root / "scene_camera.json"),
+            "scene_gt": str(root / "scene_gt.json"),
+            "condition_csv": str(condition_csv_path) if condition_csv_path else None,
+        },
+        "selected_frame_ids": frame_ids,
+        "requirements": {
+            "min_view_conditions": int(min_view_conditions),
+            "min_lighting_conditions": int(min_lighting_conditions),
+            "min_camera_motion_m": float(min_camera_motion_m),
+        },
+        "row_counts": {
+            "selected_frames": len(frame_ids),
+            "csv_condition_rows": len(csv_conditions),
+            "sidecar_frames": len(sidecar["frames"]),
+        },
+        "sidecar_schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "sidecar": sidecar,
+        "coverage": coverage,
+        "readiness": readiness,
+        "issues": issues,
+        "next_actions": _condition_sidecar_next_actions(readiness),
+        "claim_policy": {
+            "sidecar_authoring_only": True,
+            "imports_existing_bop_scene": True,
+            "does_not_download_dataset": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+            "does_not_reconstruct_gaussians": True,
+            "does_not_train_model": True,
+            "does_not_run_handoff": True,
+            "does_not_claim_reality_gate_pass": True,
+            "does_not_claim_world_model": True,
+        },
+        "non_goals": {
+            "downloads_dataset": False,
+            "creates_ground_truth": False,
+            "infers_conditions_from_pixels": False,
+            "reconstructs_gaussians": False,
+            "runs_identity_handoff": False,
+            "runs_prediction_handoff": False,
+            "trains_model": False,
+            "writes_public_samples": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_bop_capture_condition_sidecar_summary(payload)
+
+
 def validate_objectstate_bop_capture_condition_sidecar(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -433,6 +576,76 @@ def validate_objectstate_bop_capture_condition_sidecar(
             "does_not_infer_from_pixels": True,
         },
     }
+
+
+def validate_objectstate_bop_capture_condition_sidecar_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("BOP capture condition sidecar summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA:
+        raise ValueError(
+            "unsupported BOP capture condition sidecar summary schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_bop_capture_condition_sidecar_summary":
+        raise ValueError("BOP capture condition sidecar summary kind is unsupported")
+    if payload.get("status") not in {
+        "objectstate_bop_capture_condition_sidecar_identity_ready",
+        "objectstate_bop_capture_condition_sidecar_needs_metadata",
+    }:
+        raise ValueError("BOP capture condition sidecar summary status is unsupported")
+    sidecar = validate_objectstate_bop_capture_condition_sidecar(payload.get("sidecar"))
+    if payload.get("sidecar_schema") != OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA:
+        raise ValueError("BOP capture condition sidecar summary sidecar_schema mismatch")
+    selected = payload.get("selected_frame_ids")
+    if not isinstance(selected, list) or not selected:
+        raise ValueError("BOP capture condition sidecar summary requires selected frames")
+    if len(sidecar["frames"]) != len(selected):
+        raise ValueError("BOP capture condition sidecar frame count mismatch")
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping) or not readiness:
+        raise ValueError("BOP capture condition sidecar summary requires readiness")
+    if any(not isinstance(value, bool) for value in readiness.values()):
+        raise ValueError("BOP capture condition sidecar readiness values must be bool")
+    expected_status = (
+        "objectstate_bop_capture_condition_sidecar_identity_ready"
+        if readiness["identity_scenario_metadata_ready"]
+        else "objectstate_bop_capture_condition_sidecar_needs_metadata"
+    )
+    if payload["status"] != expected_status:
+        raise ValueError("BOP capture condition sidecar status must match readiness")
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, Mapping):
+        raise ValueError("BOP capture condition sidecar summary requires coverage")
+    if int(coverage.get("selected_frame_count", 0)) != len(selected):
+        raise ValueError("BOP capture condition sidecar coverage frame count mismatch")
+    if not isinstance(payload.get("issues"), list):
+        raise ValueError("BOP capture condition sidecar issues must be a list")
+    if not isinstance(payload.get("next_actions"), list):
+        raise ValueError("BOP capture condition sidecar next_actions must be a list")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not claim_policy.get("sidecar_authoring_only")
+        or not claim_policy.get("imports_existing_bop_scene")
+        or not claim_policy.get("does_not_download_dataset")
+        or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("does_not_infer_from_pixels")
+        or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_train_model")
+        or not claim_policy.get("does_not_run_handoff")
+        or not claim_policy.get("does_not_claim_reality_gate_pass")
+        or not claim_policy.get("does_not_claim_world_model")
+    ):
+        raise ValueError("BOP capture condition sidecar summary must preserve claim policy")
+    non_goals = payload.get("non_goals", {})
+    if not isinstance(non_goals, Mapping) or any(bool(value) for value in non_goals.values()):
+        raise ValueError(
+            "BOP capture condition sidecar summary cannot claim downloads, GT, "
+            "condition inference, reconstruction, handoff, training, public samples, "
+            "or viewer defaults"
+        )
+    return dict(payload)
 
 
 def validate_objectstate_bop_capture_adapter_summary(
@@ -834,6 +1047,154 @@ def _read_condition_sidecar(path: Path | None) -> dict[str, Any] | None:
     )
 
 
+def _read_condition_csv(path: Path | None) -> dict[int, dict[str, Any]]:
+    if path is None:
+        return {}
+    if not path.exists():
+        raise FileNotFoundError(f"BOP condition CSV does not exist: {path}")
+    rows: dict[int, dict[str, Any]] = {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames or "frame_id" not in reader.fieldnames:
+            raise ValueError("BOP condition CSV requires a frame_id column")
+        for index, row in enumerate(reader, start=2):
+            frame_id = _int_key(row.get("frame_id"), f"condition CSV row {index} frame_id")
+            if frame_id in rows:
+                raise ValueError(f"duplicate frame_id in BOP condition CSV: {frame_id}")
+            condition: dict[str, Any] = {}
+            view_id = _optional_csv_string(row.get("view_id"))
+            lighting_id = _optional_csv_string(row.get("lighting_id"))
+            if view_id is not None:
+                condition["view_id"] = view_id
+            if lighting_id is not None:
+                condition["lighting_id"] = lighting_id
+            pose_values = [
+                row.get("camera_x"),
+                row.get("camera_y"),
+                row.get("camera_z"),
+                row.get("camera_qx"),
+                row.get("camera_qy"),
+                row.get("camera_qz"),
+                row.get("camera_qw"),
+            ]
+            if any(_csv_cell_present(value) for value in pose_values):
+                if not all(_csv_cell_present(value) for value in pose_values):
+                    raise ValueError(
+                        "BOP condition CSV camera pose columns must be complete "
+                        f"for frame {frame_id}"
+                    )
+                condition["camera_pose"] = {
+                    "position": [
+                        _csv_float(row.get("camera_x"), "camera_x"),
+                        _csv_float(row.get("camera_y"), "camera_y"),
+                        _csv_float(row.get("camera_z"), "camera_z"),
+                    ],
+                    "rotation_xyzw": [
+                        _csv_float(row.get("camera_qx"), "camera_qx"),
+                        _csv_float(row.get("camera_qy"), "camera_qy"),
+                        _csv_float(row.get("camera_qz"), "camera_qz"),
+                        _csv_float(row.get("camera_qw"), "camera_qw"),
+                    ],
+                }
+            if not condition:
+                raise ValueError(
+                    "BOP condition CSV rows must include view_id, lighting_id, "
+                    f"or complete camera pose columns; empty row for frame {frame_id}"
+                )
+            rows[frame_id] = condition
+    return rows
+
+
+def _condition_sidecar_coverage(
+    sidecar: Mapping[str, Any],
+    frame_ids: Sequence[int],
+) -> dict[str, Any]:
+    frames = sidecar.get("frames", {})
+    if not isinstance(frames, Mapping):
+        frames = {}
+    view_ids: set[str] = set()
+    lighting_ids: set[str] = set()
+    camera_positions: list[list[float]] = []
+    missing_camera_pose_frame_ids: list[int] = []
+    for frame_id in frame_ids:
+        condition = frames.get(str(frame_id), {})
+        if not isinstance(condition, Mapping):
+            continue
+        view_id = condition.get("view_id")
+        lighting_id = condition.get("lighting_id")
+        if isinstance(view_id, str) and view_id:
+            view_ids.add(view_id)
+        if isinstance(lighting_id, str) and lighting_id:
+            lighting_ids.add(lighting_id)
+        camera_pose = condition.get("camera_pose")
+        if isinstance(camera_pose, Mapping):
+            position = camera_pose.get("position")
+            if (
+                isinstance(position, Sequence)
+                and not isinstance(position, (str, bytes))
+                and len(position) == 3
+            ):
+                camera_positions.append([float(component) for component in position])
+            else:
+                missing_camera_pose_frame_ids.append(frame_id)
+        else:
+            missing_camera_pose_frame_ids.append(frame_id)
+    return {
+        "selected_frame_count": len(frame_ids),
+        "sidecar_frame_count": len(frames),
+        "view_ids": sorted(view_ids),
+        "view_condition_count": len(view_ids),
+        "lighting_ids": sorted(lighting_ids),
+        "lighting_condition_count": len(lighting_ids),
+        "camera_pose_count": len(camera_positions),
+        "missing_camera_pose_frame_ids": missing_camera_pose_frame_ids,
+        "max_camera_translation_m": _max_translation(camera_positions),
+    }
+
+
+def _condition_sidecar_issues(
+    readiness: Mapping[str, bool],
+    *,
+    condition_csv_loaded: bool,
+    min_lighting_conditions: int,
+    min_camera_motion_m: float,
+) -> list[str]:
+    issues = []
+    if not condition_csv_loaded:
+        issues.append(
+            "condition CSV was not provided; generated a default sidecar template "
+            "that still needs explicit lighting and camera_pose metadata"
+        )
+    if not readiness["min_lighting_conditions_met"]:
+        issues.append(
+            f"identity route requires at least {min_lighting_conditions} lighting conditions"
+        )
+    if not readiness["camera_motion_present"]:
+        issues.append(
+            "identity route requires camera_pose metadata with max translation "
+            f">= {min_camera_motion_m:.6f}m"
+        )
+    return issues
+
+
+def _condition_sidecar_next_actions(readiness: Mapping[str, bool]) -> list[str]:
+    if readiness["identity_scenario_metadata_ready"]:
+        return [
+            "pass the sidecar with --condition-sidecar to BOP acceptance and route audits",
+            "continue preparing per-frame Gaussian evidence and a bound ObjectState candidate artifact",
+        ]
+    actions = [
+        "fill a condition CSV with frame_id, view_id, lighting_id, and camera pose columns",
+        "regenerate the sidecar and rerun audit-bop-phase1-local-row with --condition-sidecar",
+    ]
+    if not readiness["camera_motion_present"]:
+        actions.insert(
+            0,
+            "record explicit camera_pose positions for at least two selected BOP frames",
+        )
+    return actions
+
+
 def _condition_for_frame(
     frame_id: int,
     *,
@@ -908,6 +1269,25 @@ def _validate_sidecar_camera_pose(
         ),
         "rotation_xyzw": rotation,
     }
+
+
+def _optional_csv_string(value: Any) -> str | None:
+    if not _csv_cell_present(value):
+        return None
+    return _required_string(str(value), "condition CSV cell")
+
+
+def _csv_cell_present(value: Any) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
+def _csv_float(value: Any, name: str) -> float:
+    if not _csv_cell_present(value):
+        raise ValueError(f"{name} must be present")
+    try:
+        return float(str(value).strip())
+    except ValueError as exc:
+        raise ValueError(f"{name} must be numeric") from exc
 
 
 def _read_json_mapping(path: Path, label: str) -> dict[str, Any]:
@@ -1068,3 +1448,13 @@ def _number(value: Any, name: str) -> float:
 
 def _clamp01(value: float) -> float:
     return min(1.0, max(0.0, float(value)))
+
+
+def _max_translation(positions: Sequence[Sequence[float]]) -> float:
+    max_distance = 0.0
+    for index, first in enumerate(positions):
+        for second in positions[index + 1 :]:
+            distance = math.dist(first, second)
+            if distance > max_distance:
+                max_distance = distance
+    return max_distance

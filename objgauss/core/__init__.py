@@ -282,6 +282,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_capture_adapter",
         "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_bop_capture_adapter",
+        "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA": (
         "objgauss.core.objectstate_bop_phase1_route_audit",
         "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA",
@@ -390,6 +394,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_prediction_baseline_handoff",
         "objectstate_bop_prediction_baseline_handoff",
     ),
+    "objectstate_bop_capture_condition_sidecar_summary": (
+        "objgauss.core.objectstate_bop_capture_adapter",
+        "objectstate_bop_capture_condition_sidecar_summary",
+    ),
     "objectstate_bop_phase1_route_audit": (
         "objgauss.core.objectstate_bop_phase1_route_audit",
         "objectstate_bop_phase1_route_audit",
@@ -465,6 +473,10 @@ _EXPORTS = {
     "validate_objectstate_bop_capture_condition_sidecar": (
         "objgauss.core.objectstate_bop_capture_adapter",
         "validate_objectstate_bop_capture_condition_sidecar",
+    ),
+    "validate_objectstate_bop_capture_condition_sidecar_summary": (
+        "objgauss.core.objectstate_bop_capture_adapter",
+        "validate_objectstate_bop_capture_condition_sidecar_summary",
     ),
     "validate_objectstate_bop_phase1_route_audit_summary": (
         "objgauss.core.objectstate_bop_phase1_route_audit",
