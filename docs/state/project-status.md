@@ -789,6 +789,12 @@ pixels 反投影成 per-frame `gaussians/<frame>.ply` evidence seed，并用 RGB
 它会写本地 scene root 下的 ignored evidence 文件，但不下载 BOP、不使用 object pose GT
 放置几何、不训练 Splatfacto、不创建 checkpoint、不运行 identity / prediction handoff，
 也不声明 Phase 1 pass row 或 world-model 证明。
+随后补齐 `OBJECTSTATE-BOP-RGBD-READINESS-HINT-001`：`audit-bop-phase1-local-row`
+新增 `rgbd_gaussian_export_hint`，在 read-only local row audit 中统计 selected BOP frames
+的 `depth/<frame>.png` 覆盖和 missing `gaussians/<frame>.ply` 数量；当 depth 齐全但
+Gaussian evidence 缺失时，CLI 会打印 `rgbd_export_candidate=true` 和可直接运行的
+`export-bop-rgbd-gaussian-evidence` 命令。该 hint 不自动写 PLY、不重建 / 训练模型、
+不运行 handoff，也不把 local row 或 Phase 1 reality gate 标记为 pass。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

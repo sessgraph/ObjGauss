@@ -176,6 +176,10 @@ Gaussian evidence，并记录重建工具 readiness。
 `export-bop-rgbd-gaussian-evidence`，可在本地 BOP scene 含 depth PNG 时把 RGB-D
 反投影成 per-frame `gaussians/<frame>.ply` evidence seed，供 Gaussian evidence
 preflight 和后续 BOP route audits 使用。
+`OBJECTSTATE-BOP-RGBD-READINESS-HINT-001` 继续把该 exporter 接进
+`audit-bop-phase1-local-row` 的 read-only 诊断：当 depth 齐全但 Gaussian evidence
+缺失时，local row summary / CLI 会给出 `rgbd_export_candidate=true` 和可运行的
+export 命令。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -247,6 +251,34 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-RGBD-READINESS-HINT-001: Hint RGB-D export from BOP local row readiness
+
+- 状态: done / read-only-rgbd-export-hint
+- 类型: 标准 PR / ObjectState public pose dataset local row readiness
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 当 BOP local row 缺 per-frame Gaussian evidence 但已有 `depth/<frame>.png`
+  时，让 `audit-bop-phase1-local-row` 明确提示可以先运行
+  `export-bop-rgbd-gaussian-evidence`，减少人工在 preflight / export / local-row audit
+  之间来回判断。
+- 已实施:
+  - `objectstate_bop_phase1_local_row_readiness(...)` 新增 `depth_dir` 参数，默认
+    `depth`。
+  - local row summary 新增 `rgbd_gaussian_export_hint`，统计 selected frame ids、
+    depth 覆盖、missing Gaussian evidence 和 recommended export command。
+  - CLI `audit-bop-phase1-local-row` 新增 `--depth-dir`，并打印
+    `rgbd_export_candidate`、depth / Gaussian 缺口和 recommended command。
+  - runbook 记录 local-row readiness 会在 depth 齐全但 Gaussian evidence 缺失时给出
+    RGB-D exporter 下一步。
+- 边界:
+  - 只做 read-only hint；不自动写 `gaussians/<frame>.ply`。
+  - 不下载 BOP、不创建 identity / pose GT、不推断 condition metadata。
+  - 不训练 Gaussian，不运行 identity / prediction handoff，不声明 pass row / world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_local_row_readiness.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_local_row_readiness.py -q`: passed，7 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，49 tests。
+- 完成 commit: `bccc4bc`。
 
 ### OBJECTSTATE-BOP-RGBD-GAUSSIAN-EXPORT-001: Export BOP RGB-D Gaussian evidence seeds
 
