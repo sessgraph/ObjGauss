@@ -129,3 +129,11 @@ clear occlusion-reappearance metadata，而不是 adapter、Gaussian evidence �
 binding。该缓解扩大了真实 public multi-instance evidence 覆盖，但风险仍 open：尚无真实
 controlled identity pass row、无真实 intervention row，也不能把 BOP pose import policy
 误称为 ObjectState 已经是 world state。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-REALITY-ROWS-001`
+新增 `audit-bop-reality-rows`，可把现有 BOP local-row summary 转成
+`OBJECTSTATE-REALITY-GATE-001` 的 `public_replay` rows，并保留 pass / fail / blocked
+状态。当前 HOPE rows 为 identity fail / prediction pass / intervention blocked，LMO rows
+为 identity fail / prediction fail / intervention blocked；两个 full gate 都保持 fail。
+该缓解把 public evidence 纳入 state-variable gate accounting，但不创建 GT、不训练模型、
+不声明 identity pass、intervention gate 或 world-model evidence。

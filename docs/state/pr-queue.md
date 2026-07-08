@@ -215,6 +215,10 @@ BOP pose GT 导入 stable physical instance ids，不用于 candidate prediction
 multi-instance public baseline row：prediction package reviewable / pass，但 identity
 route 因缺 lighting、camera pose 和 occlusion-reappearance metadata 仍 blocked。该结果是
 public multi-instance route evidence，不是 identity pass row。
+`OBJECTSTATE-BOP-REALITY-ROWS-001` 已把现有 LMO / HOPE BOP local-row summaries 转成
+`OBJECTSTATE-REALITY-GATE-001` 的一等 `public_replay` rows：LMO 为 identity fail /
+prediction fail / intervention blocked，HOPE 为 identity fail / prediction pass /
+intervention blocked；两个 full gate 都保持 fail，不声明 intervention 或 world-model evidence。
 `OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001` 修复相对 `output_root` 下
 prediction package audit 把 `candidate_dir` 双重拼接的问题；真实 LMO run 已验证该修复让
 prediction evidence package 从 missing-files 进入 reviewable。
@@ -339,6 +343,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-REALITY-ROWS-001: Convert BOP local rows into reality gate rows
+
+- 状态: done / public-replay-reality-rows
+- 类型: 标准 PR / ObjectState public pose dataset reality gate accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 把现有 BOP local-row handoff summary 中的 identity / prediction /
+  intervention evidence rows 转成 `OBJECTSTATE-REALITY-GATE-001` 的一等
+  `public_replay` rows，让 public evidence 不再只停在 handoff summary。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_reality_rows`。
+  - 冻结 summary schema `objgauss-objectstate-bop-reality-rows-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-bop-reality-rows <local-row-summary.json>`。
+  - 支持读取 BOP local-row、baseline local-row 和 RGB-D baseline local-row summary。
+  - 转换时保留已有 controlled-real manifest evidence status：fail 仍是 fail，
+    blocked 仍是 blocked，不把 BOP public rows 伪装成 pass。
+  - 输出 summary JSON、嵌入 full `OBJECTSTATE-REALITY-GATE-001` report，并可写
+    blocked rows Markdown。
+- 真实 public evidence 结果:
+  - HOPE:
+    `identity=fail`、`prediction=pass`、`intervention=blocked`，
+    full gate=`objectstate_reality_gate_fail`。
+  - LMO:
+    `identity=fail`、`prediction=fail`、`intervention=blocked`，
+    full gate=`objectstate_reality_gate_fail`。
+- 边界:
+  - 只转换已有 local-row summary，不下载 BOP、不创建 GT、不重跑 handoff。
+  - 不重建 Gaussian、不训练模型、不写 `public/samples`。
+  - 不声明 identity pass、intervention pass、counterfactual gate 或 world-model evidence。
+  - 不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_reality_rows.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002 --output-root outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --sample-id bop-lmo-test-scene-000002-rgbd-baseline --dataset-id bop-lmo --object-category lmo_objects --scenario bop_pose_sequence --license-text "BOP LMO dataset license: cc-by-sa-4.0; verify source terms before redistribution" --max-frames 3 --max-points-per-frame 10000 --overwrite-gaussian-evidence --ply-format binary_little_endian --force`: passed。
+  - `uv run objgauss object-state audit-bop-reality-rows outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --blocked-rows-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-blocked-rows.md`: passed。
+  - Full validation pending before commit.
+- 完成 commit: pending.
 
 ### OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001: Run HOPE multi-instance RGB-D baseline row
 

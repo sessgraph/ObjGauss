@@ -39,6 +39,7 @@ uv run objgauss object-state bop-rgbd-baseline-local-row-handoff \
   --overwrite-gaussian-evidence \
   --ply-format binary_little_endian \
   --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json \
+  --license-text "BOP LMO dataset license: cc-by-sa-4.0; verify source terms before redistribution" \
   --force
 ```
 
@@ -321,3 +322,48 @@ lighting variation, no camera pose motion metadata and no clear
 occlusion-reappearance metadata. The next step is to enrich conditions from a
 source that actually records them or move to controlled tabletop capture; do
 not fabricate metadata to make the identity route pass.
+
+## BOP Reality Rows Gate Audit
+
+- Evidence id: `OBJECTSTATE-BOP-REALITY-ROWS-001`
+- Source rows:
+  `OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001`,
+  `OBJECTSTATE-BOP-HOPE-PUBLIC-ROW-001`
+- Output schema: `objgauss-objectstate-bop-reality-rows-v1`
+- Reality row schema: `objgauss-objectstate-real-public-row-v1`
+
+Commands:
+
+```bash
+uv run objgauss object-state audit-bop-reality-rows \
+  outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json \
+  --summary-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json \
+  --blocked-rows-output outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-blocked-rows.md
+
+uv run objgauss object-state audit-bop-reality-rows \
+  outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json \
+  --summary-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json \
+  --blocked-rows-output outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-blocked-rows.md
+```
+
+Results:
+
+| sample | source_kind | identity row | prediction row | intervention row | full gate |
+| --- | --- | --- | --- | --- | --- |
+| `bop-lmo-test-scene-000002-rgbd-baseline` | `public_replay` | `fail` | `fail` | `blocked` | `objectstate_reality_gate_fail` |
+| `bop-hope-val-scene-000001-rgbd-baseline` | `public_replay` | `fail` | `pass` | `blocked` | `objectstate_reality_gate_fail` |
+
+Interpretation:
+
+This audit converts the existing BOP local-row handoff summaries into first-class
+`OBJECTSTATE-REALITY-GATE-001` rows. It does not create new ground truth, rerun
+training, create public samples, or claim intervention / world-model evidence.
+It makes the current state-variable gap explicit:
+
+- HOPE contributes one public replay prediction pass row, but identity remains a
+  fail row because the baseline collapses physical identities and the scenario
+  metadata route is not reviewable.
+- LMO contributes public replay negative evidence: identity fail, prediction
+  fail, intervention blocked.
+- Both rows keep intervention blocked because BOP pose replay has no action /
+  counterfactual outcome evidence.

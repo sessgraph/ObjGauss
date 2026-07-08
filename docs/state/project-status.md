@@ -911,6 +911,19 @@ audit 证明 HOPE row 的阻塞已从 adapter multi-instance 限制转移到真�
 prediction-reviewable / identity-blocked evidence，不是 Phase 1 identity pass row；
 不使用 pose GT 生成 candidate prediction，不训练模型，不声明 intervention 或 world-model
 证明。
+随后完成 `OBJECTSTATE-BOP-REALITY-ROWS-001`：新增
+`objgauss.core.objectstate_bop_reality_rows`，schema 为
+`objgauss-objectstate-bop-reality-rows-v1`，CLI 为
+`objgauss object-state audit-bop-reality-rows <local-row-summary.json>`。该命令把现有
+BOP local-row / baseline local-row / RGB-D baseline local-row summary 中已经生成的
+controlled-real manifest evidence rows 转成 `source_kind=public_replay` 的
+`OBJECTSTATE-REALITY-GATE-001` rows，并写出 summary JSON 和 blocked rows Markdown；
+它不重跑 handoff、不创建 GT、不重建 Gaussian、不训练模型、不写 public samples、不改
+viewer/export 默认，也不声明 intervention 或 world model。当前已对 ignored LMO / HOPE
+public evidence 执行：LMO 输出 `identity=fail`、`prediction=fail`、
+`intervention=blocked`，HOPE 输出 `identity=fail`、`prediction=pass`、
+`intervention=blocked`；两者 full gate 都是 `objectstate_reality_gate_fail`，因为缺
+identity pass、intervention pass，且 baseline identity collapse 被保留为 fail evidence。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

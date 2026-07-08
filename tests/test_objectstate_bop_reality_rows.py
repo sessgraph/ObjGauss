@@ -1,0 +1,259 @@
+from __future__ import annotations
+
+import binascii
+import json
+import struct
+import zlib
+
+import numpy as np
+
+from objgauss.cli import main
+from objgauss.core.objectstate_bop_capture_adapter import (
+    OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+)
+from objgauss.core.objectstate_bop_reality_rows import (
+    OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA,
+    objectstate_bop_reality_rows_from_summary,
+    objectstate_bop_reality_rows_summary,
+    validate_objectstate_bop_reality_rows_summary,
+)
+from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
+    objectstate_bop_rgbd_baseline_local_row_handoff,
+)
+
+
+def test_bop_reality_rows_convert_existing_rgbd_local_row_summary(tmp_path):
+    source_summary = _rgbd_local_row_summary(tmp_path)
+
+    rows = objectstate_bop_reality_rows_from_summary(
+        source_summary,
+        source_summary_ref="bop-rgbd-baseline-local-row-summary.json",
+    )
+    summary = objectstate_bop_reality_rows_summary(
+        source_summary,
+        source_summary_ref="bop-rgbd-baseline-local-row-summary.json",
+    )
+
+    assert summary["schema"] == OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA
+    assert validate_objectstate_bop_reality_rows_summary(summary) == summary
+    assert [(row.evidence_kind, row.status) for row in rows] == [
+        ("identity", "fail"),
+        ("prediction", "pass"),
+        ("intervention", "blocked"),
+    ]
+    assert {row.source_kind for row in rows} == {"public_replay"}
+    assert summary["row_count"] == 3
+    assert summary["pass_row_count"] == 1
+    assert summary["fail_row_count"] == 1
+    assert summary["blocked_row_count"] == 1
+    assert summary["gate"]["status"] == "objectstate_reality_gate_fail"
+    assert summary["gate"]["metrics"]["controlled_real_identity_collapse"] is True
+    assert summary["claim_policy"]["does_not_claim_world_model"] is True
+    assert summary["claim_policy"]["does_not_claim_intervention_gate"] is True
+    assert "prediction:pass" in {
+        f"{row['evidence_kind']}:{row['status']}" for row in summary["rows"]
+    }
+    assert "intervention" in summary["blocked_rows_markdown"]
+    assert any("full ObjectState reality gate did not pass" in issue for issue in summary["issues"])
+
+
+def test_bop_reality_rows_cli_writes_summary_and_blocked_rows(tmp_path, capsys):
+    source_summary = _rgbd_local_row_summary(tmp_path)
+    source_path = tmp_path / "bop-rgbd-baseline-local-row-summary.json"
+    summary_path = tmp_path / "bop-reality-rows-summary.json"
+    blocked_path = tmp_path / "bop-reality-blocked-rows.md"
+    _write_json(source_path, source_summary)
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-bop-reality-rows",
+                str(source_path),
+                "--summary-output",
+                str(summary_path),
+                "--blocked-rows-output",
+                str(blocked_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    written_summary = _read_json(summary_path)
+
+    assert f"schema={OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA}" in stdout
+    assert "gate_status=objectstate_reality_gate_fail" in stdout
+    assert "row=identity:fail:" in stdout
+    assert "row=prediction:pass:" in stdout
+    assert "row=intervention:blocked:" in stdout
+    assert validate_objectstate_bop_reality_rows_summary(written_summary) == written_summary
+    assert blocked_path.read_text(encoding="utf-8").startswith("| row_id |")
+
+
+def _rgbd_local_row_summary(tmp_path):
+    scene_root = tmp_path / "bop-rgbd-scene"
+    output_root = tmp_path / "rgbd-baseline-local-row"
+    sidecar_path = scene_root / "bop-condition-sidecar.json"
+    _write_bop_rgbd_scene(scene_root)
+    _write_json(sidecar_path, _condition_sidecar_payload())
+    return objectstate_bop_rgbd_baseline_local_row_handoff(
+        scene_root,
+        output_root=output_root,
+        sample_id="bop-ycbv-rgbd-scene-000001",
+        condition_sidecar=sidecar_path,
+        ply_format="ascii",
+        max_points_per_frame=None,
+    )
+
+
+def _write_bop_rgbd_scene(root) -> None:
+    (root / "rgb").mkdir(parents=True)
+    (root / "depth").mkdir(parents=True)
+    rgb = np.array(
+        [
+            [[255, 0, 0], [0, 255, 0]],
+            [[0, 0, 255], [255, 255, 255]],
+        ],
+        dtype=np.uint8,
+    )
+    depth = np.array([[1000, 2000], [0, 3000]], dtype=np.uint16)
+    for frame_id in range(3):
+        (root / "rgb" / f"{frame_id:06d}.png").write_bytes(_png_bytes(rgb))
+        (root / "depth" / f"{frame_id:06d}.png").write_bytes(_png_bytes(depth))
+    scene_camera = {
+        str(frame_id): {
+            "cam_K": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            "depth_scale": 1.0,
+        }
+        for frame_id in range(3)
+    }
+    identity_rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    scene_gt = {}
+    scene_gt_info = {}
+    visibility_by_frame = (1.0, 0.2, 1.0)
+    for frame_id in range(3):
+        scene_gt[str(frame_id)] = [
+            {
+                "obj_id": 1,
+                "cam_R_m2c": identity_rotation,
+                "cam_t_m2c": [10.0 + frame_id, 20.0, 30.0],
+            },
+            {
+                "obj_id": 2,
+                "cam_R_m2c": identity_rotation,
+                "cam_t_m2c": [40.0 + frame_id, 50.0, 60.0],
+            },
+        ]
+        scene_gt_info[str(frame_id)] = [
+            {
+                "bbox_obj": [10, 20, 30, 40],
+                "bbox_visib": [10, 20, 30, 40],
+                "px_count_all": 1000,
+                "px_count_valid": 1000,
+                "px_count_visib": int(1000 * visibility_by_frame[frame_id]),
+                "visib_fract": visibility_by_frame[frame_id],
+            },
+            {
+                "bbox_obj": [50, 60, 30, 40],
+                "bbox_visib": [50, 60, 30, 40],
+                "px_count_all": 900,
+                "px_count_valid": 900,
+                "px_count_visib": 900,
+                "visib_fract": 1.0,
+            },
+        ]
+    _write_json(root / "scene_camera.json", scene_camera)
+    _write_json(root / "scene_gt.json", scene_gt)
+    _write_json(root / "scene_gt_info.json", scene_gt_info)
+
+
+def _condition_sidecar_payload():
+    return {
+        "schema": OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
+        "kind": "objectstate_bop_capture_condition_sidecar",
+        "frames": {
+            "0": {
+                "view_id": "front",
+                "lighting_id": "bright",
+                "camera_pose": {
+                    "position": [0.0, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "1": {
+                "view_id": "front",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.02, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+            "000002": {
+                "view_id": "right",
+                "lighting_id": "dim",
+                "camera_pose": {
+                    "position": [0.04, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            },
+        },
+        "condition_policy": {
+            "sidecar_only": True,
+            "does_not_create_ground_truth": True,
+            "does_not_infer_from_pixels": True,
+        },
+    }
+
+
+def _read_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_json(path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _png_bytes(array: np.ndarray) -> bytes:
+    if array.dtype == np.uint8:
+        bit_depth = 8
+        row_bytes = array
+    elif array.dtype == np.uint16:
+        bit_depth = 16
+        row_bytes = array.astype(">u2", copy=False)
+    else:
+        raise TypeError("test PNG helper supports uint8 and uint16 only")
+    if array.ndim == 2:
+        height, width = array.shape
+        color_type = 0
+    elif array.ndim == 3 and array.shape[2] == 3:
+        height, width, _channels = array.shape
+        color_type = 2
+    else:
+        raise ValueError("test PNG helper supports grayscale or RGB arrays")
+    raw = b"".join(
+        b"\x00" + row_bytes[row_index].tobytes()
+        for row_index in range(height)
+    )
+    ihdr = struct.pack(
+        ">IIBBBBB",
+        width,
+        height,
+        bit_depth,
+        color_type,
+        0,
+        0,
+        0,
+    )
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(raw))
+        + _chunk(b"IEND", b"")
+    )
+
+
+def _chunk(kind: bytes, data: bytes) -> bytes:
+    crc = binascii.crc32(kind + data) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)

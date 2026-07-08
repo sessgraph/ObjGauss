@@ -292,6 +292,10 @@ from objgauss.core.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
     read_objectstate_controlled_real_manifest,
 )
+from objgauss.core.objectstate_bop_reality_rows import (
+    objectstate_bop_reality_rows_summary,
+    read_objectstate_bop_local_row_summary,
+)
 from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
@@ -6060,6 +6064,55 @@ def _object_state_bop_baseline_local_row_handoff(args: argparse.Namespace) -> No
         raise ValueError("BOP baseline local row handoff did not pass")
 
 
+def _object_state_audit_bop_reality_rows(args: argparse.Namespace) -> None:
+    source_summary = read_objectstate_bop_local_row_summary(args.local_row_summary)
+    summary = objectstate_bop_reality_rows_summary(
+        source_summary,
+        source_kind=args.source_kind,
+        source_summary_ref=(
+            args.source_summary_ref
+            if args.source_summary_ref is not None
+            else str(args.local_row_summary)
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+    )
+    gate = summary["gate"]
+    print(f"schema={summary['schema']}")
+    print(f"source_schema={summary['source_schema']}")
+    print(f"source_kind={summary['source_kind']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"bop_reality_rows_status={summary['status']}")
+    print(f"row_count={summary['row_count']}")
+    print(f"pass_row_count={summary['pass_row_count']}")
+    print(f"fail_row_count={summary['fail_row_count']}")
+    print(f"blocked_row_count={summary['blocked_row_count']}")
+    print(f"gate_status={gate['status']}")
+    for row in summary["rows"]:
+        print(
+            "row="
+            f"{row['evidence_kind']}:{row['status']}:{row['row_id']}"
+        )
+    for blocker in gate["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows={args.blocked_rows_output}")
+    if (
+        args.require_gate_pass
+        and gate["status"] != "objectstate_reality_gate_pass"
+    ):
+        raise ValueError("BOP reality rows ObjectState reality gate did not pass")
+
+
 def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_local_row_batch_handoff(
         args.batch_spec,
@@ -8595,6 +8648,49 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_baseline_local_row_handoff.set_defaults(
         handler=_object_state_bop_baseline_local_row_handoff
+    )
+    audit_bop_reality_rows = object_state_subparsers.add_parser(
+        "audit-bop-reality-rows",
+        help=(
+            "convert an existing BOP local-row handoff summary into "
+            "ObjectState reality gate rows"
+        ),
+    )
+    audit_bop_reality_rows.add_argument(
+        "local_row_summary",
+        type=Path,
+        help=(
+            "BOP local-row, baseline local-row, or RGB-D baseline local-row "
+            "handoff summary JSON"
+        ),
+    )
+    audit_bop_reality_rows.add_argument("--summary-output", type=Path)
+    audit_bop_reality_rows.add_argument("--blocked-rows-output", type=Path)
+    audit_bop_reality_rows.add_argument(
+        "--source-kind",
+        choices=("public_replay", "controlled_real"),
+        default="public_replay",
+        help="source_kind to stamp on converted reality rows",
+    )
+    audit_bop_reality_rows.add_argument(
+        "--source-summary-ref",
+        help=(
+            "artifact ref to append to converted rows; defaults to the input "
+            "summary path"
+        ),
+    )
+    audit_bop_reality_rows.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    audit_bop_reality_rows.add_argument(
+        "--require-gate-pass",
+        action="store_true",
+        help="fail unless the full ObjectState reality gate passes",
+    )
+    audit_bop_reality_rows.set_defaults(
+        handler=_object_state_audit_bop_reality_rows
     )
     init_bop_local_row_batch_spec = object_state_subparsers.add_parser(
         "init-bop-local-row-batch-spec",

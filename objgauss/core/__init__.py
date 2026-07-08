@@ -486,6 +486,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
         "objectstate_bop_rgbd_baseline_local_row_handoff",
     ),
+    "objectstate_bop_reality_rows_summary": (
+        "objgauss.core.objectstate_bop_reality_rows",
+        "objectstate_bop_reality_rows_summary",
+    ),
+    "objectstate_bop_reality_rows_from_summary": (
+        "objgauss.core.objectstate_bop_reality_rows",
+        "objectstate_bop_reality_rows_from_summary",
+    ),
+    "read_objectstate_bop_local_row_summary": (
+        "objgauss.core.objectstate_bop_reality_rows",
+        "read_objectstate_bop_local_row_summary",
+    ),
     "objectstate_bop_cross_sample_ledger": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "objectstate_bop_cross_sample_ledger",
@@ -633,6 +645,10 @@ _EXPORTS = {
     "validate_objectstate_bop_rgbd_baseline_local_row_handoff_summary": (
         "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
         "validate_objectstate_bop_rgbd_baseline_local_row_handoff_summary",
+    ),
+    "validate_objectstate_bop_reality_rows_summary": (
+        "objgauss.core.objectstate_bop_reality_rows",
+        "validate_objectstate_bop_reality_rows_summary",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
@@ -864,6 +880,10 @@ _EXPORTS = {
     "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA": (
         "objgauss.core.objectstate_reality_public_rows",
         "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA",
+    ),
+    "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA": (
+        "objgauss.core.objectstate_bop_reality_rows",
+        "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA",
     ),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
