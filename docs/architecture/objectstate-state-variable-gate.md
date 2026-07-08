@@ -660,7 +660,7 @@ or dynamics models, use replay / diffusion, or mutate viewer defaults.
 Verify that a controlled capture manifest points to an actual local capture
 bundle before identity handoff.
 
-Implemented v0.2 facts:
+Implemented v0.3 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_capture_files`.
 - Summary schema:
@@ -779,7 +779,7 @@ defaults.
 
 Bundle the Stage 1 controlled identity chain into a single reproducible handoff.
 
-Implemented v0.2 facts:
+Implemented v0.3 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_identity_handoff`.
 - Summary schema:
@@ -792,6 +792,8 @@ Implemented v0.2 facts:
     `objgauss-objectstate-controlled-candidate-artifact-file-audit-v1`;
   - `candidate_artifact_ref_match`, proving the audited candidate artifact path
     is present in prediction `candidate.artifact_refs`;
+  - `identity_scenario_audit` using
+    `objgauss-objectstate-controlled-identity-scenario-audit-v1`;
   - `identity_predictions` using
     `objgauss-objectstate-controlled-identity-predictions-v1`;
   - `identity_eval` using
@@ -806,14 +808,20 @@ Implemented v0.2 facts:
   `require_intervention_pass_row=false`.
 - The handoff pass condition requires both the capture file audit and candidate
   artifact file audit to pass, and requires the audited candidate artifact path
-  to match prediction artifact refs, before identity metrics and the
-  identity-only reality gate can make the handoff pass.
+  to match prediction artifact refs. It also requires the controlled capture
+  manifest to contain an identity scenario challenge before identity metrics and
+  the identity-only reality gate can make the handoff pass.
 - Frame-level RGB / Gaussian refs are checked as non-empty regular files by
   default, and optional SHA256 hashes can be included for audit evidence.
 - The candidate trainable ObjectState artifact is also checked as a non-empty
   regular local file, with optional SHA256 hash evidence.
 - The candidate metadata cannot claim a different artifact: the audited file
   path must appear in `identity_predictions.candidate.artifact_refs`.
+- The identity scenario audit requires at least one object with clear-visible
+  before, occluded, and clear-visible after observations. `clear-visible`
+  means `visible=true` and `occlusion_fraction` below the configured
+  threshold. The audit uses manifest fields `visible` and
+  `occlusion_fraction`; it does not verify lighting change or camera motion.
 - Prediction and intervention rows remain visible as blocked rows in the
   controlled-real summary; they are not hidden or promoted.
 - CLI command:
@@ -821,6 +829,7 @@ Implemented v0.2 facts:
 - CLI writes:
   `capture-file-audit.json`, `capture-missing-files.md`,
   `candidate-artifact-file-audit.json`,
+  `identity-scenario-audit.json`,
   `identity-predictions.json`, `identity-eval-summary.json`,
   `controlled-real.json`, `controlled-real-summary.json`, `blocked-rows.md`
   and `handoff-summary.json`.
@@ -829,6 +838,8 @@ Implemented v0.2 facts:
   `--check-artifact-refs`.
 - CLI also supports `--min-candidate-artifact-bytes` and
   `--hash-candidate-artifact`.
+- CLI also supports `--min-identity-scenario-frames` and
+  `--min-occlusion-fraction`.
 
 Current scope remains reproducible handoff only. It does not collect capture
 data, create GT, parse image pixels, train Gaussian or dynamics models, compute

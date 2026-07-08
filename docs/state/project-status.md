@@ -312,6 +312,16 @@ GT、不写 `public/samples`。完成 commit: `f8b37e4`。
 `candidate_artifact_ref_match=true|false`。当前仍没有实际 controlled real capture /
 true candidate artifact 作为通过证据。完成 commit: `32d4a5d`。
 
+随后补强 identity scenario challenge：`controlled-identity-handoff` 新增
+`identity_scenario_audit`，要求 controlled capture manifest 至少包含一个对象的
+clear-visible / occluded / clear-visible 轨迹；clear-visible 表示 `visible=true`
+且 `occlusion_fraction` 低于阈值，避免全程可见、无遮挡挑战或全程高遮挡的 trivial
+sequence 拿到 Stage 1 handoff pass。该 audit 只读取 manifest 的 `visible` 与
+`occlusion_fraction`，不解析图像像素，也不声称验证光照变化或相机运动。CLI 会写出
+`identity-scenario-audit.json`，并支持 `--min-identity-scenario-frames` 与
+`--min-occlusion-fraction`。当前仍没有实际 controlled real capture / true candidate
+artifact 作为通过证据。完成 commit: `c810b75`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

@@ -178,7 +178,7 @@ viewer/export 默认模型。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
 
-- 状态: done / handoff-requires-input-file-audits-and-ref-match-no-real-capture
+- 状态: done / handoff-requires-input-audits-ref-match-and-identity-scenario-no-real-capture
 - 类型: 标准 PR / controlled real identity handoff bundle
 - 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
 - 目标: 将 controlled capture manifest + trainable kernel ObjectState artifact
@@ -195,10 +195,13 @@ viewer/export 默认模型。
     `candidate_artifact_file_audit` 嵌入 `handoff-summary.json`。
   - Handoff summary 新增 `candidate_artifact_ref_match`，要求被审计的 candidate
     artifact 文件路径出现在 `identity_predictions.candidate.artifact_refs` 中。
+  - Handoff summary 新增 `identity_scenario_audit`，要求 controlled capture manifest
+    至少包含一个对象的 clear-visible / occluded / clear-visible identity 场景；
+    clear-visible 表示 `visible=true` 且 `occlusion_fraction` 低于阈值。
   - Handoff pass 条件要求 capture file audit、candidate artifact file audit、
-    candidate artifact ref match、identity eval 和 identity-only reality gate 全部
-    通过；manifest-only、空 bundle、缺失 candidate artifact 或 artifact ref mismatch
-    只能得到 fail。
+    candidate artifact ref match、identity scenario audit、identity eval 和
+    identity-only reality gate 全部通过；manifest-only、空 bundle、缺失 candidate
+    artifact、artifact ref mismatch 或全程可见 trivial sequence 只能得到 fail。
   - Reality gate 使用 Stage 1 identity-only 阈值：要求 identity pass row，不要求
     prediction / intervention pass rows。
   - Prediction / intervention rows 仍保留为 blocked rows，不从 evidence summary 隐藏。
@@ -206,6 +209,7 @@ viewer/export 默认模型。
     <objectstates> --output-dir <dir>`。
   - CLI 写出 `capture-file-audit.json`、`capture-missing-files.md`、
     `candidate-artifact-file-audit.json`、
+    `identity-scenario-audit.json`、
     `identity-predictions.json`、`identity-eval-summary.json`、
     `controlled-real.json`、`controlled-real-summary.json`、`blocked-rows.md` 和
     `handoff-summary.json`。
@@ -214,6 +218,8 @@ viewer/export 默认模型。
     `--check-artifact-refs`、`--min-candidate-artifact-bytes`、
     `--hash-candidate-artifact` 和 `--require-pass`，并打印
     `candidate_artifact_ref_match=true|false`。
+  - CLI 支持 `--min-identity-scenario-frames` 和 `--min-occlusion-fraction`，并打印
+    `identity_scenario_audit_status=...`。
 - 边界:
   - 当前没有采集或提交真实 controlled tabletop capture / candidate artifact 文件。
   - Handoff 不创建 GT，不运行 tracker / segmentation，不训练 Gaussian / dynamics。
@@ -224,7 +230,7 @@ viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commits: `47c2754`, `2690196`, `f8b37e4`, `32d4a5d`。
+- 完成 commits: `47c2754`, `2690196`, `f8b37e4`, `32d4a5d`, `c810b75`。
 
 ### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001: Export controlled identity predictions
 
