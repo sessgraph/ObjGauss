@@ -34,13 +34,21 @@ def test_controlled_identity_eval_outputs_pass_row_for_stable_tracks():
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA
     assert summary["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["metrics"]["idf1"] == 1.0
+    assert summary["metrics"]["track_retrieval_recall_at_1"] == 1.0
+    assert summary["metrics"]["long_term_drift_rate"] == 0.0
     assert summary["metrics"]["fragmentation_rate"] == 0.0
     assert summary["metrics"]["swap_rate"] == 0.0
     assert summary["metrics"]["identity_collapse"] is False
+    assert summary["metrics"]["reconstruction_noise_robustness"] == 1.0
+    assert summary["metrics"]["reconstruction_noise_variant_count"] == 2
     assert manifest["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
     assert manifest["evidence_rows"][0]["evidence_kind"] == "identity"
     assert manifest["evidence_rows"][0]["status"] == "pass"
     assert manifest["evidence_rows"][0]["metrics"]["idf1"] == 1.0
+    assert (
+        manifest["evidence_rows"][0]["metrics"]["track_retrieval_recall_at_1"]
+        == 1.0
+    )
     gate = evaluate_controlled_real_manifest_reality_gate(
         manifest,
         thresholds=ObjectStateRealityGateThresholds(
@@ -62,7 +70,9 @@ def test_controlled_identity_eval_fails_fragmented_identity():
     assert summary["status"] == "objectstate_controlled_identity_eval_fail"
     assert summary["metrics"]["idf1"] < 0.95
     assert summary["metrics"]["fragmentation_rate"] > 0.0
+    assert summary["metrics"]["long_term_drift_rate"] > 0.0
     assert summary["pass_gates"]["fragmentation_at_or_below_threshold"] is False
+    assert summary["pass_gates"]["long_term_drift_at_or_below_threshold"] is False
     assert identity_row["status"] == "fail"
     assert "fragmentation_at_or_below_threshold" in identity_row["failure_reason"]
 
@@ -92,6 +102,27 @@ def test_controlled_identity_eval_detects_identity_collapse():
     assert summary["status"] == "objectstate_controlled_identity_eval_fail"
     assert summary["metrics"]["identity_collapse"] is True
     assert summary["pass_gates"]["identity_collapse_absent"] is False
+
+
+def test_controlled_identity_eval_requires_reconstruction_noise_evidence():
+    predictions = _predictions()
+    predictions["candidate"].pop("identity_evidence")
+
+    summary = evaluate_objectstate_controlled_identity_predictions(
+        _capture_manifest(),
+        predictions,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_eval_fail"
+    assert summary["metrics"]["reconstruction_noise_robustness"] is None
+    assert summary["metrics"]["reconstruction_noise_variant_count"] == 0
+    assert summary["pass_gates"]["reconstruction_noise_evidence_present"] is False
+    assert (
+        summary["pass_gates"][
+            "reconstruction_noise_robustness_at_or_above_threshold"
+        ]
+        is False
+    )
 
 
 def test_controlled_identity_eval_rejects_unknown_prediction_pair():
@@ -156,6 +187,9 @@ def test_object_state_eval_controlled_identity_cli_writes_summary_and_manifest(
     assert f"schema={OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA}" in stdout
     assert "identity_eval_status=objectstate_controlled_identity_eval_pass" in stdout
     assert "idf1=1.000000" in stdout
+    assert "track_retrieval_recall_at_1=1.000000" in stdout
+    assert "long_term_drift_rate=0.000000" in stdout
+    assert "reconstruction_noise_robustness=1.000000" in stdout
     assert summary["status"] == "objectstate_controlled_identity_eval_pass"
     assert controlled_real["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
     assert controlled_real["evidence_rows"][0]["status"] == "pass"
@@ -187,6 +221,11 @@ def _predictions(
             "artifact_refs": [
                 "outputs/controlled-real/cup-box-identity-001/objectstates.json"
             ],
+            "identity_evidence": {
+                "reconstruction_noise_robustness": 1.0,
+                "reconstruction_noise_variant_count": 2,
+                "source": "fixture repeated Gaussian reconstruction noise variants",
+            },
         },
         "predictions": rows,
     }

@@ -3123,8 +3123,14 @@ def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
         predictions,
         thresholds=ObjectStateControlledIdentityThresholds(
             min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
             max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
             max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
             require_no_identity_collapse=not args.allow_identity_collapse,
         ),
     )
@@ -3136,9 +3142,18 @@ def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
     print(f"candidate_id={summary['candidate']['candidate_id']}")
     print(f"identity_eval_status={summary['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
+    print(f"track_retrieval_recall_at_1={metrics['track_retrieval_recall_at_1']:.6f}")
+    print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
     print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
     print(f"swap_rate={metrics['swap_rate']:.6f}")
     print(f"identity_collapse={str(metrics['identity_collapse']).lower()}")
+    noise_robustness = metrics["reconstruction_noise_robustness"]
+    noise_text = f"{noise_robustness:.6f}" if noise_robustness is not None else "missing"
+    print(f"reconstruction_noise_robustness={noise_text}")
+    print(
+        "reconstruction_noise_variant_count="
+        f"{metrics['reconstruction_noise_variant_count']}"
+    )
     print(f"track_coverage={metrics['track_coverage']:.6f}")
     if args.summary_output:
         write_json(args.summary_output, summary)
@@ -3198,8 +3213,14 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         max_centroid_distance=args.max_centroid_distance,
         identity_thresholds=ObjectStateControlledIdentityThresholds(
             min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
             max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
             max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
             require_no_identity_collapse=not args.allow_identity_collapse,
         ),
         synthetic_smoke_passed=not args.synthetic_smoke_failed,
@@ -3286,8 +3307,17 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     print(f"identity_eval_status={summary['identity_eval']['status']}")
     print(f"identity_gate_status={gate['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
+    print(f"track_retrieval_recall_at_1={metrics['track_retrieval_recall_at_1']:.6f}")
+    print(f"long_term_drift_rate={metrics['long_term_drift_rate']:.6f}")
     print(f"fragmentation_rate={metrics['fragmentation_rate']:.6f}")
     print(f"swap_rate={metrics['swap_rate']:.6f}")
+    noise_robustness = metrics["reconstruction_noise_robustness"]
+    noise_text = f"{noise_robustness:.6f}" if noise_robustness is not None else "missing"
+    print(f"reconstruction_noise_robustness={noise_text}")
+    print(
+        "reconstruction_noise_variant_count="
+        f"{metrics['reconstruction_noise_variant_count']}"
+    )
     print(f"blocked_rows={summary['controlled_real_summary']['blocked_row_count']}")
     print(f"capture_file_audit={capture_file_audit_path}")
     print(f"capture_missing_files={capture_missing_files_path}")
@@ -3537,8 +3567,28 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_controlled_identity.add_argument("--summary-output", type=Path)
     eval_controlled_identity.add_argument("--controlled-real-output", type=Path)
     eval_controlled_identity.add_argument("--min-idf1", type=float, default=0.95)
+    eval_controlled_identity.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
     eval_controlled_identity.add_argument("--max-fragmentation-rate", type=float, default=0.05)
+    eval_controlled_identity.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
     eval_controlled_identity.add_argument("--max-swap-rate", type=float, default=0.0)
+    eval_controlled_identity.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    eval_controlled_identity.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
     eval_controlled_identity.add_argument("--allow-identity-collapse", action="store_true")
     eval_controlled_identity.add_argument("--require-pass", action="store_true")
     eval_controlled_identity.set_defaults(handler=_object_state_eval_controlled_identity)
@@ -3601,8 +3651,28 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     controlled_identity_handoff.add_argument("--max-centroid-distance", type=float)
     controlled_identity_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    controlled_identity_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
     controlled_identity_handoff.add_argument("--max-fragmentation-rate", type=float, default=0.05)
+    controlled_identity_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
     controlled_identity_handoff.add_argument("--max-swap-rate", type=float, default=0.0)
+    controlled_identity_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
     controlled_identity_handoff.add_argument("--allow-identity-collapse", action="store_true")
     controlled_identity_handoff.add_argument(
         "--check-artifact-refs",

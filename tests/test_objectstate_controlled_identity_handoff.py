@@ -77,6 +77,9 @@ def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
         "max_camera_translation_m": 0.04,
     }
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
+    assert summary["identity_eval"]["metrics"]["track_retrieval_recall_at_1"] == 1.0
+    assert summary["identity_eval"]["metrics"]["long_term_drift_rate"] == 0.0
+    assert summary["identity_eval"]["metrics"]["reconstruction_noise_robustness"] == 1.0
     assert summary["controlled_real_manifest"]["evidence_rows"][0]["status"] == "pass"
     assert summary["controlled_real_manifest"]["evidence_rows"][1]["status"] == "blocked"
     assert summary["controlled_real_manifest"]["evidence_rows"][2]["status"] == "blocked"
@@ -151,6 +154,36 @@ def test_controlled_identity_handoff_requires_capture_file_audit_pass(tmp_path):
     )
     assert summary["capture_file_audit"]["missing_files"]
     assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
+
+
+def test_controlled_identity_handoff_requires_reconstruction_noise_evidence(
+    tmp_path,
+):
+    _write_capture_bundle_files(tmp_path)
+    artifact = _trainable_artifact(include_identity_evidence=False)
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+
+    summary = objectstate_controlled_identity_handoff(
+        _capture_manifest(),
+        artifact,
+        candidate_id="missing-noise-robustness",
+        artifact_refs=(str(artifact_path),),
+        capture_root=tmp_path,
+        candidate_artifact_path=artifact_path,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
+    assert (
+        summary["identity_eval"]["status"]
+        == "objectstate_controlled_identity_eval_fail"
+    )
+    assert (
+        summary["identity_eval"]["pass_gates"][
+            "reconstruction_noise_evidence_present"
+        ]
+        is False
+    )
+    assert summary["controlled_real_manifest"]["evidence_rows"][0]["status"] == "fail"
 
 
 def test_controlled_identity_handoff_rejects_text_placeholder_frame_files(tmp_path):
@@ -421,6 +454,9 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
     assert "identity_scenario_lighting_conditions=2" in stdout
     assert "identity_scenario_max_camera_translation_m=0.040000" in stdout
     assert "identity_gate_status=objectstate_reality_gate_pass" in stdout
+    assert "track_retrieval_recall_at_1=1.000000" in stdout
+    assert "long_term_drift_rate=0.000000" in stdout
+    assert "reconstruction_noise_robustness=1.000000" in stdout
     assert capture_file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
     assert (
         candidate_artifact_file_audit["status"]
@@ -529,6 +565,7 @@ def _write_candidate_artifact_file(root, artifact):
 def _trainable_artifact(
     *,
     slot_ids_by_frame: tuple[tuple[int, int], ...] = ((0, 1), (0, 1), (0, 1)),
+    include_identity_evidence: bool = True,
 ):
     object_states = []
     assignments = []
@@ -553,7 +590,7 @@ def _trainable_artifact(
                 "matrix": [[1.0, 0.0], [0.0, 1.0]],
             }
         )
-    return {
+    artifact = {
         "schema": TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
         "kind": "trainable_kernel_mvp_model",
         "label": "fixture-trainable-objectstates",
@@ -573,6 +610,13 @@ def _trainable_artifact(
             "git_policy": "do_not_commit_training_outputs_by_default",
         },
     }
+    if include_identity_evidence:
+        artifact["identity_evidence"] = {
+            "reconstruction_noise_robustness": 1.0,
+            "reconstruction_noise_variant_count": 2,
+            "source": "fixture repeated Gaussian reconstruction noise variants",
+        }
+    return artifact
 
 
 def _state(state_id: int, centroid: list[float]):

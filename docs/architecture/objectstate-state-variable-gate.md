@@ -434,7 +434,7 @@ Required behavior:
 - Output pass and fail rows separately.
 - Treat small real/public sample failure as valid negative evidence, not as pass.
 
-Implemented v0.1 facts:
+Implemented v0.2 facts:
 
 - Core module: `objgauss.core.objectstate_identity_gate`.
 - Gate schema: `objgauss-objectstate-identity-gate-v1`.
@@ -733,11 +733,28 @@ Implemented v0.1 facts:
   `objgauss-objectstate-controlled-identity-eval-v1`.
 - `read_objectstate_controlled_identity_predictions(...)` reads JSON.
 - `validate_objectstate_controlled_identity_predictions(...)` validates
-  candidate metadata and per-frame predictions.
+  candidate metadata and per-frame predictions. Candidate metadata may include
+  explicit `identity_evidence` for reconstruction noise robustness.
 - `evaluate_objectstate_controlled_identity_predictions(...)` compares capture
   GT to candidate identity tracks and outputs pass / fail metrics.
+- Metrics now include `idf1`, `track_retrieval_recall_at_1`,
+  `long_term_drift_rate`, `fragmentation_rate`, `swap_rate`,
+  `identity_collapse`, `track_coverage` and
+  `reconstruction_noise_robustness`.
+- `track_retrieval_recall_at_1` is a controlled-track retrieval proxy: each
+  predicted candidate identity retrieves its majority physical-object owner
+  across the capture sequence.
+- `long_term_drift_rate` counts same-physical-object transitions where the
+  candidate predicted identity changes.
+- `reconstruction_noise_robustness` must come from explicit candidate
+  `identity_evidence` with a score, variant count and source. Missing evidence
+  fails the controlled identity eval; the evaluator does not infer robustness
+  from file existence, image pixels or Gaussian headers.
 - Threshold defaults:
-  `min_idf1=0.95`, `max_fragmentation_rate=0.05`, `max_swap_rate=0.0`,
+  `min_idf1=0.95`, `min_track_retrieval_recall_at_1=0.95`,
+  `max_fragmentation_rate=0.05`, `max_long_term_drift_rate=0.05`,
+  `max_swap_rate=0.0`, `min_reconstruction_noise_robustness=0.95`,
+  `min_reconstruction_noise_variants=2`,
   `require_no_identity_collapse=true`.
 - CLI command:
   `objgauss object-state eval-controlled-identity <capture.json> <predictions.json>`.
@@ -767,6 +784,9 @@ Implemented v0.1 facts:
   a frame.
 - The emitted `predicted_identity` is the stable candidate slot address
   (`slot-<id>`), not physical identity ground truth.
+- If the trainable artifact contains `identity_evidence`, the adapter carries
+  it into prediction `candidate.identity_evidence` for the controlled identity
+  evaluator.
 - Optional `max_centroid_distance` can drop unmatched far associations; an
   all-dropped output fails validation instead of creating empty evidence.
 - CLI command:
@@ -793,7 +813,7 @@ defaults.
 
 Bundle the Stage 1 controlled identity chain into a single reproducible handoff.
 
-Implemented v0.3 facts:
+Implemented v0.4 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_identity_handoff`.
 - Summary schema:
@@ -832,6 +852,10 @@ Implemented v0.3 facts:
   regular local file, with optional SHA256 hash evidence.
 - The candidate metadata cannot claim a different artifact: the audited file
   path must appear in `identity_predictions.candidate.artifact_refs`.
+- The handoff pass condition also inherits controlled identity quality gates:
+  track retrieval, long-term drift and explicit reconstruction-noise
+  robustness evidence. A stable identity track without candidate
+  `identity_evidence` still fails the Stage 1 handoff.
 - The identity scenario audit requires at least one object with clear-visible
   before, occluded, and clear-visible after observations. `clear-visible`
   means `visible=true` and `occlusion_fraction` below the configured
@@ -866,6 +890,9 @@ Implemented v0.3 facts:
   `--min-occlusion-fraction`.
 - CLI also supports `--min-view-conditions`, `--min-lighting-conditions` and
   `--min-camera-motion-m`.
+- CLI also supports `--min-track-retrieval-recall-at-1`,
+  `--max-long-term-drift-rate`, `--min-reconstruction-noise-robustness` and
+  `--min-reconstruction-noise-variants`.
 
 Current scope remains reproducible handoff only. It does not collect capture
 data, create GT, parse image pixels, train Gaussian or dynamics models, compute

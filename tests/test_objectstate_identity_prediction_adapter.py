@@ -32,6 +32,11 @@ def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
     assert predictions["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA
     assert predictions["sample_id"] == "controlled-tabletop-cup-box-identity-001"
     assert predictions["candidate"]["candidate_id"] == "stable-objectstate-slots"
+    assert predictions["candidate"]["identity_evidence"] == {
+        "reconstruction_noise_robustness": 1.0,
+        "reconstruction_noise_variant_count": 2,
+        "source": "fixture repeated Gaussian reconstruction noise variants",
+    }
     assert len(predictions["predictions"]) == 6
     assert predictions["predictions"][0]["predicted_identity"] == "slot-0"
     assert predictions["predictions"][1]["predicted_identity"] == "slot-1"
@@ -44,8 +49,11 @@ def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
 
     assert summary["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["metrics"]["idf1"] == 1.0
+    assert summary["metrics"]["track_retrieval_recall_at_1"] == 1.0
+    assert summary["metrics"]["long_term_drift_rate"] == 0.0
     assert summary["metrics"]["fragmentation_rate"] == 0.0
     assert summary["metrics"]["swap_rate"] == 0.0
+    assert summary["metrics"]["reconstruction_noise_robustness"] == 1.0
 
 
 def test_trainable_artifact_adapter_surfaces_fragmented_slots():
@@ -208,6 +216,7 @@ def _trainable_artifact(
     *,
     slot_ids_by_frame: tuple[tuple[int, int], ...] = ((0, 1), (0, 1), (0, 1)),
     x_offset: float = 0.0,
+    include_identity_evidence: bool = True,
 ):
     object_states = []
     assignments = []
@@ -232,7 +241,7 @@ def _trainable_artifact(
                 "matrix": [[1.0, 0.0], [0.0, 1.0]],
             }
         )
-    return {
+    artifact = {
         "schema": TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
         "kind": "trainable_kernel_mvp_model",
         "label": "fixture-trainable-objectstates",
@@ -252,6 +261,13 @@ def _trainable_artifact(
             "git_policy": "do_not_commit_training_outputs_by_default",
         },
     }
+    if include_identity_evidence:
+        artifact["identity_evidence"] = {
+            "reconstruction_noise_robustness": 1.0,
+            "reconstruction_noise_variant_count": 2,
+            "source": "fixture repeated Gaussian reconstruction noise variants",
+        }
+    return artifact
 
 
 def _state(state_id: int, centroid: list[float]):

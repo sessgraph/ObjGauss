@@ -69,14 +69,19 @@ def objectstate_identity_predictions_from_trainable_artifact(
                 }
             )
 
+    candidate = {
+        "candidate_id": _candidate_id(candidate_id, artifact),
+        "source": str(source),
+        "artifact_refs": _artifact_refs(artifact_refs, artifact),
+    }
+    identity_evidence = artifact.get("identity_evidence")
+    if identity_evidence is not None:
+        candidate["identity_evidence"] = identity_evidence
+
     payload = {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
         "sample_id": capture["sample"]["sample_id"],
-        "candidate": {
-            "candidate_id": _candidate_id(candidate_id, artifact),
-            "source": str(source),
-            "artifact_refs": _artifact_refs(artifact_refs, artifact),
-        },
+        "candidate": candidate,
         "predictions": predictions,
     }
     return validate_objectstate_controlled_identity_predictions(payload)
