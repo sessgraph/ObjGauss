@@ -930,6 +930,45 @@ Gaussian / tracking / prediction / dynamics models, claim intervention /
 counterfactual gates, claim world model, use replay / diffusion, write public
 samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001
+
+Run multiple BOP local-row handoffs from one explicit batch spec, then write a
+cross-sample Phase 1 ledger.
+
+Required behavior:
+
+- Input a JSON batch spec that lists sample id, scene root and finalized
+  ObjectState candidate artifact for each BOP local row.
+- Resolve input paths relative to the spec file and per-sample output roots
+  relative to the batch output root unless absolute paths are supplied.
+- Run `bop-local-row-handoff` for each sample, preserving all local-row
+  reviewability and pass gates.
+- Write each sample's `bop-local-row-handoff-summary.json`.
+- Write batch-level `bop-cross-sample-ledger.json` and
+  `bop-cross-sample-table.md`.
+- Separate batch reviewability from cross-sample candidate readiness and metric
+  pass. A batch can be reviewable while cross-sample thresholds are not met.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_local_row_batch_handoff`.
+- Batch spec schema:
+  `objgauss-objectstate-bop-local-row-batch-spec-v1`.
+- Summary schema:
+  `objgauss-objectstate-bop-local-row-batch-handoff-v1`.
+- Core function: `objectstate_bop_local_row_batch_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-local-row-batch-handoff <batch-spec.json>`.
+- The CLI supports `--output-root`, `--min-reviewable-samples`,
+  `--min-scene-or-category-coverage`, `--summary-output`, `--table-output`,
+  `--force`, `--require-reviewable` and `--require-candidate-ready`.
+
+Current scope is deterministic local orchestration only. It does not download
+BOP data, create GT, reconstruct Gaussians, train Gaussian / tracking /
+prediction / dynamics models, claim intervention / counterfactual gates, claim
+metric pass, claim world model, use replay / diffusion, write public samples or
+mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.

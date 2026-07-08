@@ -853,6 +853,19 @@ cross-sample reviewable coverage；它不要求 metric pass，不声明 interven
 counterfactual evidence，也不声明 ObjectState 已证明为 world state。该步骤不运行
 handoff、不下载 BOP、不创建 GT、不重建 Gaussian、不训练模型、不写 public samples、不改
 viewer/export 默认。
+随后完成 `OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_local_row_batch_handoff`，batch spec schema 为
+`objgauss-objectstate-bop-local-row-batch-spec-v1`，summary schema 为
+`objgauss-objectstate-bop-local-row-batch-handoff-v1`，CLI 为
+`objgauss object-state bop-local-row-batch-handoff <batch-spec.json>`。该命令用显式
+batch spec 列出多个 BOP sample 的 `scene_root`、`sample_id`、`candidate_artifact`
+和可选 `condition_sidecar`，逐个运行既有 `bop-local-row-handoff`，写出每个 sample 的
+`bop-local-row-handoff-summary.json`，再自动生成 `bop-cross-sample-ledger.json`
+和 `bop-cross-sample-table.md`。batch reviewable 与
+`candidate_cross_sample_ready` 分离：前者表示所有 local rows 和 ledger 可审阅，后者才表示
+达到配置的多 sample / scene / category coverage 阈值；二者都不声明 metric pass、
+intervention gate 或 world model。该步骤仍不下载 BOP、不创建 GT、不重建 Gaussian、
+不训练模型、不写 public samples、不改 viewer/export 默认。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

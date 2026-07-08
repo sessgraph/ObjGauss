@@ -81,6 +81,8 @@ from objgauss.core import (
     OBJECTSTATE_BOP_IDENTITY_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_LOCAL_ROW_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA,
+    OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
+    OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA,
     OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA,
     OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA,
@@ -256,6 +258,8 @@ from objgauss.core import (
     objectstate_bop_identity_handoff,
     objectstate_bop_local_row_handoff,
     objectstate_bop_cross_sample_ledger,
+    objectstate_bop_local_row_batch_handoff,
+    read_objectstate_bop_local_row_batch_spec,
     objectstate_bop_capture_condition_sidecar_summary,
     objectstate_bop_phase1_route_audit,
     objectstate_bop_identity_route_audit,
@@ -359,6 +363,8 @@ from objgauss.core import (
     validate_objectstate_bop_identity_handoff_summary,
     validate_objectstate_bop_local_row_handoff_summary,
     validate_objectstate_bop_cross_sample_ledger_summary,
+    validate_objectstate_bop_local_row_batch_spec,
+    validate_objectstate_bop_local_row_batch_handoff_summary,
     validate_objectstate_bop_phase1_route_audit_summary,
     validate_objectstate_bop_identity_route_audit_summary,
     validate_objectstate_bop_phase1_local_row_readiness_summary,
@@ -1155,6 +1161,12 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA == (
         "objgauss-objectstate-bop-cross-sample-ledger-v1"
     )
+    assert OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA == (
+        "objgauss-objectstate-bop-local-row-batch-spec-v1"
+    )
+    assert OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA == (
+        "objgauss-objectstate-bop-local-row-batch-handoff-v1"
+    )
     assert objectstate_controlled_reality_bundle_handoff is not None
     assert objectstate_controlled_reality_bundle_readiness is not None
     assert objectstate_controlled_reality_evidence_package is not None
@@ -1170,6 +1182,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_bop_identity_handoff is not None
     assert objectstate_bop_local_row_handoff is not None
     assert objectstate_bop_cross_sample_ledger is not None
+    assert objectstate_bop_local_row_batch_handoff is not None
+    assert read_objectstate_bop_local_row_batch_spec is not None
     assert objectstate_bop_capture_condition_sidecar_summary is not None
     assert objectstate_bop_phase1_route_audit is not None
     assert objectstate_bop_identity_route_audit is not None
@@ -1186,6 +1200,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_bop_identity_handoff_summary is not None
     assert validate_objectstate_bop_local_row_handoff_summary is not None
     assert validate_objectstate_bop_cross_sample_ledger_summary is not None
+    assert validate_objectstate_bop_local_row_batch_spec is not None
+    assert validate_objectstate_bop_local_row_batch_handoff_summary is not None
     assert validate_objectstate_bop_phase1_route_audit_summary is not None
     assert validate_objectstate_bop_identity_route_audit_summary is not None
     assert validate_objectstate_bop_phase1_local_row_readiness_summary is not None

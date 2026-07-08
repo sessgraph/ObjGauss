@@ -203,6 +203,11 @@ explicitly out of scope。
 汇总成 cross-sample Phase 1 表，显式报告 sample / scene / category / scenario 覆盖、
 identity+prediction reviewability 和 candidate gate 缺口；该 audit 不重新运行 handoff，
 不把 metric pass 或 BOP pose route 误写成 intervention/world-model evidence。
+`OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001` 继续补齐
+`bop-local-row-batch-handoff`，可从一个显式 batch spec 连续运行多个
+`bop-local-row-handoff`，为每个 sample 写 summary，并自动产出 cross-sample ledger /
+Markdown table；它仍只编排本地已有 scene / Gaussian evidence / candidate artifact，
+不下载数据、不创建 GT、不训练模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -274,6 +279,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-HANDOFF-001: Run BOP local rows from a batch spec
+
+- 状态: done / batch-local-row-evidence-orchestration
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 evidence orchestration
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让多个 BOP scene / candidate artifact 可以用一个显式 batch spec 连续跑
+  `bop-local-row-handoff`，并自动生成 cross-sample ledger / Markdown table。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_local_row_batch_handoff`。
+  - 冻结 batch spec schema
+    `objgauss-objectstate-bop-local-row-batch-spec-v1` 和 summary schema
+    `objgauss-objectstate-bop-local-row-batch-handoff-v1`。
+  - 新增 CLI
+    `objgauss object-state bop-local-row-batch-handoff <batch-spec.json>`。
+  - 每个 sample 复用既有 `bop-local-row-handoff`，写
+    `<sample-output>/bop-local-row-handoff-summary.json`。
+  - batch 输出 `bop-cross-sample-ledger.json` 和 `bop-cross-sample-table.md`。
+  - batch reviewability、identity/prediction metric pass 和
+    `candidate_cross_sample_ready` 分开记录。
+- 边界:
+  - 只编排本地已有 BOP scene、per-frame Gaussian evidence 和 candidate artifact。
+  - 不下载 BOP，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不声明 intervention gate，不声明 metric pass，不声明 world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_local_row_batch_handoff.py`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: passed，9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，66 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_local_row_batch_handoff.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed，478 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 待提交。
 
 ### OBJECTSTATE-BOP-CROSS-SAMPLE-LEDGER-001: Audit BOP local rows across samples
 

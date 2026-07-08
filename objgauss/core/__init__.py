@@ -290,6 +290,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA",
+    ),
+    "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA": (
         "objgauss.core.objectstate_bop_capture_adapter",
         "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA",
@@ -442,6 +450,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "objectstate_bop_cross_sample_ledger",
     ),
+    "objectstate_bop_local_row_batch_handoff": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objectstate_bop_local_row_batch_handoff",
+    ),
+    "read_objectstate_bop_local_row_batch_spec": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "read_objectstate_bop_local_row_batch_spec",
+    ),
     "objectstate_bop_capture_condition_sidecar_summary": (
         "objgauss.core.objectstate_bop_capture_adapter",
         "objectstate_bop_capture_condition_sidecar_summary",
@@ -549,6 +565,14 @@ _EXPORTS = {
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "validate_objectstate_bop_cross_sample_ledger_summary",
+    ),
+    "validate_objectstate_bop_local_row_batch_spec": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "validate_objectstate_bop_local_row_batch_spec",
+    ),
+    "validate_objectstate_bop_local_row_batch_handoff_summary": (
+        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "validate_objectstate_bop_local_row_batch_handoff_summary",
     ),
     "validate_objectstate_bop_capture_condition_sidecar": (
         "objgauss.core.objectstate_bop_capture_adapter",

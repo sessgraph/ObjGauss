@@ -244,6 +244,9 @@ from objgauss.core.objectstate_bop_local_row_handoff import (
 from objgauss.core.objectstate_bop_cross_sample_ledger import (
     objectstate_bop_cross_sample_ledger,
 )
+from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+    objectstate_bop_local_row_batch_handoff,
+)
 from objgauss.core.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
@@ -5503,6 +5506,81 @@ def _object_state_bop_local_row_handoff(args: argparse.Namespace) -> None:
         raise ValueError("BOP local row handoff did not pass")
 
 
+def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_local_row_batch_handoff(
+        args.batch_spec,
+        output_root=args.output_root,
+        min_reviewable_samples=args.min_reviewable_samples,
+        min_scene_or_category_coverage=args.min_scene_or_category_coverage,
+        force=args.force,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    if args.table_output:
+        args.table_output.parent.mkdir(parents=True, exist_ok=True)
+        args.table_output.write_text(
+            summary["cross_sample_ledger"]["sample_table_markdown"],
+            encoding="utf-8",
+        )
+    batch = summary["batch"]
+    row_counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"batch_spec={args.batch_spec}")
+    print(f"batch_id={batch['batch_id']}")
+    print(f"output_root={batch['output_root']}")
+    print(f"bop_local_row_batch_handoff_status={summary['status']}")
+    print(f"samples={row_counts['samples']}")
+    print(f"reviewable_samples={row_counts['reviewable_samples']}")
+    print(
+        "identity_prediction_reviewable_samples="
+        f"{row_counts['identity_prediction_reviewable_samples']}"
+    )
+    print(f"identity_pass_samples={row_counts['identity_pass_samples']}")
+    print(f"prediction_pass_samples={row_counts['prediction_pass_samples']}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability.{gate}={str(passed).lower()}")
+    for gate, passed in summary["pass_gates"].items():
+        print(f"pass.{gate}={str(passed).lower()}")
+    print(
+        "cross_sample_ledger_status="
+        f"{summary['cross_sample_ledger']['status']}"
+    )
+    print(
+        "cross_sample_ledger_maturity="
+        f"{summary['cross_sample_ledger']['maturity']}"
+    )
+    print(
+        "candidate_cross_sample_ready="
+        f"{str(summary['pass_gates']['candidate_cross_sample_ready']).lower()}"
+    )
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for record in summary["sample_records"]:
+        print(
+            "sample="
+            f"{record['sample_id']} status={record['status']} "
+            f"identity_pass={str(record['pass_gates']['identity_handoff_pass']).lower()} "
+            f"prediction_pass={str(record['pass_gates']['prediction_eval_pass']).lower()}"
+        )
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if args.table_output:
+        print(f"sample_table={args.table_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_bop_local_row_batch_handoff_reviewable"
+    ):
+        raise ValueError("BOP local row batch handoff is not reviewable")
+    if (
+        args.require_candidate_ready
+        and not summary["pass_gates"]["candidate_cross_sample_ready"]
+    ):
+        raise ValueError("BOP local row batch candidate gate is not ready")
+
+
 def _object_state_audit_bop_phase1_route(args: argparse.Namespace) -> None:
     summary = objectstate_bop_phase1_route_audit(
         args.scene_root,
@@ -7139,6 +7217,59 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.set_defaults(
         handler=_object_state_bop_local_row_handoff
+    )
+    bop_local_row_batch_handoff = object_state_subparsers.add_parser(
+        "bop-local-row-batch-handoff",
+        help=(
+            "run multiple BOP local-row handoffs from a batch spec, then write "
+            "a cross-sample Phase 1 ledger"
+        ),
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "batch_spec",
+        type=Path,
+        help="JSON batch spec using objgauss-objectstate-bop-local-row-batch-spec-v1",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--output-root",
+        type=Path,
+        help="override the batch output root declared in the spec",
+    )
+    bop_local_row_batch_handoff.add_argument("--summary-output", type=Path)
+    bop_local_row_batch_handoff.add_argument(
+        "--table-output",
+        type=Path,
+        help="optional Markdown output for the generated cross-sample sample table",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--min-reviewable-samples",
+        default=3,
+        type=int,
+        help="minimum reviewable samples for candidate cross-sample readiness",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--min-scene-or-category-coverage",
+        default=3,
+        type=int,
+        help="minimum sample, scene, category, or scenario coverage for readiness",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite batch and per-sample handoff outputs if they already exist",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless all batch local-row outputs are reviewable",
+    )
+    bop_local_row_batch_handoff.add_argument(
+        "--require-candidate-ready",
+        action="store_true",
+        help="fail unless cross-sample candidate coverage thresholds are met",
+    )
+    bop_local_row_batch_handoff.set_defaults(
+        handler=_object_state_bop_local_row_batch_handoff
     )
     audit_bop_cross_sample_ledger = object_state_subparsers.add_parser(
         "audit-bop-cross-sample-ledger",
