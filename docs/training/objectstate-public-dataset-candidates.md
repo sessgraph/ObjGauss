@@ -172,6 +172,27 @@ Nerfstudio reconstruction tools are visible on the current host. It does not
 reconstruct Gaussians or train a model; it only tells you whether the local
 scene can pass the Gaussian evidence prerequisite for Phase 1.
 
+If the selected BOP scene includes local `depth/<frame>.png` files, bootstrap
+the first local per-frame evidence from RGB-D backprojection before rerunning
+the preflight:
+
+```bash
+uv run objgauss object-state export-bop-rgbd-gaussian-evidence \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-rgbd-gaussian-export-summary.json \
+  --require-ready
+```
+
+This writes `gaussians/<frame>.ply` under the local BOP scene root by
+back-projecting depth pixels through BOP `scene_camera.json` intrinsics and
+using RGB only for point color. It does not use object pose GT to place the
+geometry, does not run Splatfacto, does not create a checkpoint, and does not
+score identity / prediction candidates. Treat this as RGB-D Gaussian evidence
+seed for Phase 1 file readiness; model quality and ObjectState rows still need
+the route audits and handoff below.
+
 To get one machine-readable status for the whole local BOP row, run the
 combined Phase 1 local row readiness audit:
 

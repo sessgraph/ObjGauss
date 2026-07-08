@@ -220,6 +220,9 @@ from objgauss.core.objectstate_bop_phase1_subset_selector import (
 from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
     objectstate_bop_gaussian_evidence_preflight,
 )
+from objgauss.core.objectstate_bop_rgbd_gaussian_export import (
+    objectstate_bop_rgbd_gaussian_export,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3392,6 +3395,53 @@ def _object_state_audit_bop_gaussian_evidence(args: argparse.Namespace) -> None:
         raise ValueError("BOP Gaussian evidence is not ready")
 
 
+def _object_state_export_bop_rgbd_gaussian_evidence(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_bop_rgbd_gaussian_export(
+        args.scene_root,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        depth_dir=args.depth_dir,
+        gaussian_dir=args.gaussian_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        pixel_stride=args.pixel_stride,
+        max_points_per_frame=args.max_points_per_frame,
+        min_depth_m=args.min_depth_m,
+        max_depth_m=args.max_depth_m,
+        overwrite=args.overwrite,
+        ply_format=args.ply_format,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_rgbd_gaussian_export_status={summary['status']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"selected_frames={summary['row_counts']['selected_frames']}")
+    print(f"exported_frames={summary['row_counts']['exported_frames']}")
+    print(f"missing_depth_files={summary['row_counts']['missing_depth_files']}")
+    print(f"total_vertices={summary['row_counts']['total_vertices']}")
+    print(
+        "phase1_gaussian_evidence_written="
+        f"{str(readiness['phase1_gaussian_evidence_written']).lower()}"
+    )
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_ready and not readiness["phase1_gaussian_evidence_written"]:
+        raise ValueError("BOP RGB-D Gaussian evidence export is not ready")
+
+
 def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_condition_sidecar_summary(
         args.scene_root,
@@ -5613,6 +5663,78 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_gaussian_evidence.set_defaults(
         handler=_object_state_audit_bop_gaussian_evidence
+    )
+    export_bop_rgbd_gaussian_evidence = object_state_subparsers.add_parser(
+        "export-bop-rgbd-gaussian-evidence",
+        help=(
+            "export local BOP RGB-D depth backprojection PLY files as "
+            "per-frame Gaussian evidence seeds"
+        ),
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument("scene_root", type=Path)
+    export_bop_rgbd_gaussian_evidence.add_argument("--summary-output", type=Path)
+    export_bop_rgbd_gaussian_evidence.add_argument("--sample-id", required=True)
+    export_bop_rgbd_gaussian_evidence.add_argument("--dataset-id", default="bop-ycbv")
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument("--fps", type=float, default=30.0)
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument("--rgb-dir", default="rgb")
+    export_bop_rgbd_gaussian_evidence.add_argument("--depth-dir", default="depth")
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument("--max-frames", type=int)
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--pixel-stride",
+        type=int,
+        default=1,
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--max-points-per-frame",
+        type=int,
+        default=50_000,
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--min-depth-m",
+        type=float,
+        default=0.0,
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument("--max-depth-m", type=float)
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="overwrite existing gaussians/<frame>.ply outputs",
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--ply-format",
+        choices=("ascii", "binary_little_endian", "binary_big_endian"),
+        default="binary_little_endian",
+    )
+    export_bop_rgbd_gaussian_evidence.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless all selected RGB-D frames produced Gaussian evidence PLY files",
+    )
+    export_bop_rgbd_gaussian_evidence.set_defaults(
+        handler=_object_state_export_bop_rgbd_gaussian_evidence
     )
     init_bop_condition_sidecar = object_state_subparsers.add_parser(
         "init-bop-condition-sidecar",
