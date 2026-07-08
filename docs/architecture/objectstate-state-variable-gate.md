@@ -889,6 +889,47 @@ prediction / dynamics models, claim intervention / counterfactual gates, claim
 world model, use replay / diffusion, write public samples or mutate viewer
 defaults.
 
+### OBJECTSTATE-BOP-CROSS-SAMPLE-LEDGER-001
+
+Add a read-only cross-sample ledger for BOP local-row Phase 1 evidence.
+
+Required behavior:
+
+- Input one or more `bop-local-row-handoff-summary.json` files, or discover
+  those files under explicit roots.
+- Validate each local-row summary with its native validator before counting it
+  as evidence.
+- Produce a per-sample table with identity reviewability, prediction
+  reviewability, identity row status, prediction row status and metric pass
+  booleans.
+- Report candidate-gate coverage separately from summary reviewability:
+  minimum reviewable samples and minimum sample / scene / category / scenario
+  coverage must be visible and configurable.
+- Keep metric pass, intervention evidence and world-model claims out of the
+  ledger. Reviewable fail rows remain valid evidence.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_cross_sample_ledger`.
+- Summary schema: `objgauss-objectstate-bop-cross-sample-ledger-v1`.
+- Core function: `objectstate_bop_cross_sample_ledger(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-cross-sample-ledger`.
+- The CLI accepts repeated `--local-row-summary`, `--discover-root`,
+  `--min-reviewable-samples`, `--min-scene-or-category-coverage`,
+  `--summary-output`, `--table-output`, `--require-reviewable` and
+  `--require-candidate-ready`.
+- `candidate_cross_sample_ready` can only become true when enough unique
+  local-row summaries are reviewable for identity + prediction and coverage
+  thresholds are met. It does not require or imply identity / prediction metric
+  pass.
+
+Current scope is read-only cross-sample accounting only. It does not download
+BOP data, create GT, reconstruct Gaussians, run local-row handoff, train
+Gaussian / tracking / prediction / dynamics models, claim intervention /
+counterfactual gates, claim world model, use replay / diffusion, write public
+samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001
 
 Add a read-only route audit for local BOP Phase 1 prediction evidence.

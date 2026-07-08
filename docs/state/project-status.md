@@ -841,6 +841,18 @@ ledger maturity 可达到 `identity_prediction_reviewable`；`intervention_evide
 顶层继续分离 `reviewability_gates` 与 `pass_gates`，不把可审阅证据等同于 metric pass。
 该步骤仍不下载 BOP、不创建 GT、不重建 Gaussian、不训练模型、不声明 intervention gate 或
 world model，也不改 viewer/export 默认策略。
+随后完成 `OBJECTSTATE-BOP-CROSS-SAMPLE-LEDGER-001`：新增
+`objgauss.core.objectstate_bop_cross_sample_ledger`，schema 为
+`objgauss-objectstate-bop-cross-sample-ledger-v1`，CLI 为
+`objgauss object-state audit-bop-cross-sample-ledger`。该 read-only audit 读取一个或多个
+`bop-local-row-handoff-summary.json`，或从显式 root 发现这些 summary，先用 local-row
+validator 复验，再输出 per-sample identity / prediction reviewability、row status、
+metric pass booleans、sample / scene / category / scenario 覆盖和 Markdown 表。
+`candidate_cross_sample_ready` 只表示 BOP identity+prediction 本地行在配置阈值下达到
+cross-sample reviewable coverage；它不要求 metric pass，不声明 intervention /
+counterfactual evidence，也不声明 ObjectState 已证明为 world state。该步骤不运行
+handoff、不下载 BOP、不创建 GT、不重建 Gaussian、不训练模型、不写 public samples、不改
+viewer/export 默认。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

@@ -241,6 +241,9 @@ from objgauss.core.objectstate_bop_identity_handoff import (
 from objgauss.core.objectstate_bop_local_row_handoff import (
     objectstate_bop_local_row_handoff,
 )
+from objgauss.core.objectstate_bop_cross_sample_ledger import (
+    objectstate_bop_cross_sample_ledger,
+)
 from objgauss.core.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
@@ -5157,6 +5160,76 @@ def _object_state_audit_phase1_evidence_ledger(args: argparse.Namespace) -> None
         raise ValueError("phase1 evidence ledger is not reviewable")
 
 
+def _object_state_audit_bop_cross_sample_ledger(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_cross_sample_ledger(
+        local_row_summaries=tuple(args.local_row_summary),
+        discover_roots=tuple(args.discover_root),
+        max_depth=args.max_depth,
+        min_reviewable_samples=args.min_reviewable_samples,
+        min_scene_or_category_coverage=args.min_scene_or_category_coverage,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    if args.table_output:
+        args.table_output.parent.mkdir(parents=True, exist_ok=True)
+        args.table_output.write_text(
+            summary["sample_table_markdown"],
+            encoding="utf-8",
+        )
+    sample_summary = summary["sample_summary"]
+    candidate_gate = summary["candidate_gate"]
+    discovery = summary["discovery"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_cross_sample_ledger_status={summary['status']}")
+    print(f"maturity={summary['maturity']}")
+    print(
+        "candidate_cross_sample_ready="
+        f"{str(candidate_gate['candidate_cross_sample_ready']).lower()}"
+    )
+    print(f"summary_count={sample_summary['summary_count']}")
+    print(f"valid_summary_count={sample_summary['valid_summary_count']}")
+    print(f"sample_count={sample_summary['sample_count']}")
+    print(f"reviewable_samples={sample_summary['reviewable_sample_count']}")
+    print(
+        "identity_prediction_reviewable_samples="
+        f"{sample_summary['identity_prediction_reviewable_sample_count']}"
+    )
+    print(
+        "identity_pass_samples="
+        f"{sample_summary['identity_pass_sample_count']}"
+    )
+    print(
+        "prediction_pass_samples="
+        f"{sample_summary['prediction_pass_sample_count']}"
+    )
+    print(f"scene_root_count={sample_summary['scene_root_count']}")
+    print(f"object_category_count={sample_summary['object_category_count']}")
+    print(f"scenario_count={sample_summary['scenario_count']}")
+    print(f"discover_roots={len(discovery['roots'])}")
+    print(f"discovered_local_row_summaries={discovery['local_row_summary_count']}")
+    for gate, passed in summary["audit_gates"].items():
+        print(f"audit_gate.{gate}={str(passed).lower()}")
+    for gate, passed in candidate_gate["gates"].items():
+        print(f"candidate_gate.{gate}={str(passed).lower()}")
+    print(f"issue_count={len(summary['issues'])}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if args.table_output:
+        print(f"sample_table={args.table_output}")
+    if (
+        args.require_reviewable
+        and summary["status"] != "objectstate_bop_cross_sample_ledger_reviewable"
+    ):
+        raise ValueError("BOP cross-sample ledger is not reviewable")
+    if (
+        args.require_candidate_ready
+        and not candidate_gate["candidate_cross_sample_ready"]
+    ):
+        raise ValueError("BOP cross-sample candidate gate is not ready")
+
+
 def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_prediction_baseline_handoff(
         args.scene_root,
@@ -7066,6 +7139,64 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.set_defaults(
         handler=_object_state_bop_local_row_handoff
+    )
+    audit_bop_cross_sample_ledger = object_state_subparsers.add_parser(
+        "audit-bop-cross-sample-ledger",
+        help=(
+            "summarize existing BOP local-row handoff summaries as a "
+            "cross-sample Phase 1 identity/prediction evidence table"
+        ),
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--local-row-summary",
+        action="append",
+        default=[],
+        type=Path,
+        help="BOP local-row handoff summary JSON; may be repeated",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--discover-root",
+        action="append",
+        default=[],
+        type=Path,
+        help="root directory to scan for bop-local-row-handoff-summary.json files",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--max-depth",
+        default=4,
+        type=int,
+        help="maximum subdirectory depth to scan below each discovery root",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--min-reviewable-samples",
+        default=3,
+        type=int,
+        help="minimum unique reviewable samples for candidate cross-sample readiness",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--min-scene-or-category-coverage",
+        default=3,
+        type=int,
+        help="minimum sample, scene, category, or scenario coverage for candidate readiness",
+    )
+    audit_bop_cross_sample_ledger.add_argument("--summary-output", type=Path)
+    audit_bop_cross_sample_ledger.add_argument(
+        "--table-output",
+        type=Path,
+        help="optional Markdown output for the cross-sample evidence table",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless all supplied/discovered summaries are present and valid",
+    )
+    audit_bop_cross_sample_ledger.add_argument(
+        "--require-candidate-ready",
+        action="store_true",
+        help="fail unless cross-sample candidate coverage thresholds are met",
+    )
+    audit_bop_cross_sample_ledger.set_defaults(
+        handler=_object_state_audit_bop_cross_sample_ledger
     )
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",

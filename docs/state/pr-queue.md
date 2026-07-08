@@ -198,6 +198,11 @@ controlled identity handoff / eval、identity evidence package audit 和 Phase 1
 condition sidecar 同时跑 identity handoff 和 prediction baseline handoff，并写出合并的
 Phase 1 ledger；该 ledger 可达到 identity+prediction reviewable，但 intervention 仍为
 explicitly out of scope。
+`OBJECTSTATE-BOP-CROSS-SAMPLE-LEDGER-001` 继续补齐
+`audit-bop-cross-sample-ledger`，可把多个 `bop-local-row-handoff-summary.json`
+汇总成 cross-sample Phase 1 表，显式报告 sample / scene / category / scenario 覆盖、
+identity+prediction reviewability 和 candidate gate 缺口；该 audit 不重新运行 handoff，
+不把 metric pass 或 BOP pose route 误写成 intervention/world-model evidence。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -269,6 +274,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CROSS-SAMPLE-LEDGER-001: Audit BOP local rows across samples
+
+- 状态: done / cross-sample-phase1-evidence-accounting
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把多个 BOP local-row handoff summary 汇总成 cross-sample Phase 1 表，
+  让 sample / scene / category / scenario 覆盖、identity+prediction reviewability、
+  metric pass/fail 和 candidate gate 缺口可以被一次审查。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_cross_sample_ledger`，冻结
+    `objgauss-objectstate-bop-cross-sample-ledger-v1` summary schema。
+  - 新增 CLI `objgauss object-state audit-bop-cross-sample-ledger`。
+  - 输入支持重复 `--local-row-summary`，也支持 `--discover-root` 发现
+    `bop-local-row-handoff-summary.json`。
+  - 每条 local row 先走
+    `validate_objectstate_bop_local_row_handoff_summary`，通过后才计入 sample 表。
+  - 顶层输出 `candidate_cross_sample_ready`，但只表示达到配置的 reviewable sample /
+    scene-or-category coverage；不等价于 metric pass，也不包含 intervention evidence。
+- 边界:
+  - 只读 summary，不重新运行 BOP local-row handoff。
+  - 不下载 BOP，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不声明 intervention gate，不声明 world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_cross_sample_ledger.py`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py`: passed，9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py`: passed，62 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_cross_sample_ledger.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest`: passed，474 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 待提交。
 
 ### OBJECTSTATE-BOP-LOCAL-ROW-HANDOFF-001: Run BOP identity and prediction evidence together
 
