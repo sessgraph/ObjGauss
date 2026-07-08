@@ -732,6 +732,16 @@ per-frame Gaussian evidence 缺失、candidate ObjectState artifact 缺失 / 未
 identity scenario metadata 不足、handoff-ready 或已有 reviewable identity /
 prediction evidence。它只做 route accounting，不运行 handoff / eval、不下载数据、
 不重建 Gaussian、不训练模型，也不声明 intervention / counterfactual / world model。
+随后新增 `OBJECTSTATE-BOP-CONDITION-SIDECAR-001`：BOP adapter / acceptance /
+identity route / prediction route / combined local-row readiness 和 prediction baseline
+handoff 现在都支持 `--condition-sidecar`。sidecar schema 为
+`objgauss-objectstate-bop-capture-condition-sidecar-v1`，只允许为选中 frame 显式覆盖
+`condition.view_id`、`condition.lighting_id` 和 `condition.camera_pose`。这让本地 BOP /
+public pose subset 在已有 RGB / pose / per-frame Gaussian / ObjectState candidate
+artifact 的前提下，能够满足 Stage 1 identity scenario metadata gate，而不是因为默认
+adapter 缺 lighting / camera motion 元数据而永久 blocked。该 sidecar 不创建 identity GT、
+不改 BOP pose GT、不生成 Gaussian、不训练或发布新模型、不声明 prediction /
+intervention / world model，也不改变 viewer/export 默认策略。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

@@ -156,6 +156,10 @@ pose values，也不声明 learned model 或 metric pass。
 `OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001` 已把 BOP acceptance、candidate
 template、baseline candidates、prediction eval 和 prediction evidence package audit 串成
 一条本地命令；仍要求本地已有 per-frame Gaussian evidence，不生成或训练新模型。
+`OBJECTSTATE-BOP-CONDITION-SIDECAR-001` 已让 BOP adapter / route audits /
+local-row readiness 支持 explicit per-frame condition sidecar，可把 view / lighting /
+camera_pose metadata 接入 Stage 1 identity scenario gate，但仍不创建 GT、不生成
+Gaussian、不训练模型、不声明 pass row。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -227,6 +231,36 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CONDITION-SIDECAR-001: Add explicit BOP condition sidecars
+
+- 状态: done / bop-identity-scenario-metadata-sidecar
+- 类型: 标准 PR / ObjectState public pose dataset condition contract
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让本地 BOP scene 可通过显式 sidecar 提供 Stage 1 identity route 所需的
+  view / lighting / camera_pose metadata，避免为了通过 identity gate 而放松
+  scenario metadata 要求。
+- 已实施:
+  - 新增 schema `objgauss-objectstate-bop-capture-condition-sidecar-v1`。
+  - 新增 validator `validate_objectstate_bop_capture_condition_sidecar(...)`。
+  - BOP adapter / acceptance 支持 `condition_sidecar` 参数，并把 sidecar 只合并到
+    `frame.condition`。
+  - `audit-bop-identity-route`、`audit-bop-phase1-route`、
+    `audit-bop-phase1-local-row` 和 `bop-prediction-baseline-handoff` 支持
+    `--condition-sidecar`。
+  - identity route 测试覆盖 RGB / pose / Gaussian / candidate artifact 都存在时，
+    sidecar 可让 scenario metadata gate 达到 handoff-ready。
+- 边界:
+  - sidecar 只记录显式观测条件，不创建 identity GT、不修改 BOP pose GT。
+  - 不下载数据，不生成 per-frame Gaussian，不运行 handoff / eval，不训练模型。
+  - 不声明 prediction / intervention / counterfactual gate，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_capture_adapter.py objgauss/core/objectstate_bop_identity_route_audit.py objgauss/core/objectstate_bop_phase1_route_audit.py objgauss/core/objectstate_bop_phase1_local_row_readiness.py objgauss/core/objectstate_bop_prediction_baseline_handoff.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_core_namespace.py -q`: passed，40 tests。
+  - `uv run --extra dev pytest`: passed，443 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `3f94337`。
 
 ### OBJECTSTATE-BOP-PHASE1-LOCAL-ROW-READINESS-001: Combine BOP identity and prediction route readiness
 
