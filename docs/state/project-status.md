@@ -707,6 +707,21 @@ acceptance（要求 per-frame Gaussian files），并检查 output root 下已�
 状态：blocked、handoff-ready 或 prediction-reviewable。它不运行 handoff / eval，不下载
 数据，不生成 Gaussian，不创建 GT，不训练模型，也不声明 identity、intervention 或 world
 model。
+随后新增 BOP identity route 只读审计：
+`objgauss.core.objectstate_bop_identity_route_audit`，schema 为
+`objgauss-objectstate-bop-identity-route-audit-v1`，CLI 为
+`objgauss object-state audit-bop-identity-route`。该命令对本地 BOP scene 运行内存态
+acceptance（要求 per-frame Gaussian files），并检查 trainable ObjectState candidate
+artifact 是否存在、schema 是否有效、`object_states` frame index 是否与 accepted BOP
+frames 一一绑定；同时检查已有 `identity-evidence-package-summary.json` 和
+`phase1-evidence-ledger.json` 是否已经提供 reviewable identity evidence。额外的
+identity scenario metadata audit 要求 frame count、occlusion reappearance、cross-view、
+lighting variation 和 camera-pose motion。默认 BOP adapter 往往有 pose / visibility
+序列但缺 lighting / camera_pose 条件，因此 route 可以在 RGB / pose / Gaussian /
+candidate artifact 都就绪时仍 blocked；这是 Stage 1 identity-state 门禁的预期行为，
+不应通过放松 identity gate 来声明真实 ObjectState 状态变量证据。该命令不运行 identity
+handoff / eval，不下载数据，不生成 Gaussian，不创建 GT，不训练模型，也不声明
+prediction、intervention 或 world model。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

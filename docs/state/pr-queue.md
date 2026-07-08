@@ -228,6 +228,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-IDENTITY-ROUTE-AUDIT-001: Audit BOP route readiness for identity evidence
+
+- 状态: done / read-only-bop-identity-route-audit
+- 类型: 标准 PR / ObjectState public pose dataset identity route readiness
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给本地 BOP scene + handoff output root 增加 Stage 1 identity route audit，
+  明确当前卡在 scene / Gaussian evidence / candidate artifact / identity scenario
+  metadata，还是已有 identity evidence package 和 Phase 1 ledger 可复验。
+- 已实施:
+  - 新增 module `objgauss.core.objectstate_bop_identity_route_audit`。
+  - 新增 schema `objgauss-objectstate-bop-identity-route-audit-v1`。
+  - 新增 core function `objectstate_bop_identity_route_audit(...)`。
+  - 新增 CLI `objgauss object-state audit-bop-identity-route`。
+  - Route audit 在内存中运行 BOP acceptance，要求 per-frame Gaussian files，并只读检查
+    trainable ObjectState candidate artifact、`object_states` frame binding、
+    identity scenario metadata、已有 identity evidence package summary 和 Phase 1
+    ledger。
+  - 输出 status：`blocked`、`handoff_ready` 或 `identity_reviewable`，并给出
+    hard blockers / next actions。
+  - 默认 BOP adapter 可因缺 lighting / camera_pose metadata 而保持 blocked；这是
+    identity-state 门禁，不应为 BOP route pass 放松。
+- 边界:
+  - 只做只读 route accounting。
+  - 不下载 BOP 数据，不生成 Gaussian evidence，不创建 GT。
+  - 不运行 identity handoff，不重新运行 identity eval，不训练模型。
+  - 不声明 prediction / intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_identity_route_audit.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_bop_identity_route_audit.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_controlled_identity_evidence_package.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，39 tests。
+  - `uv run --extra dev pytest`: passed，434 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: e24b7a0。
+
 ### OBJECTSTATE-BOP-PHASE1-ROUTE-AUDIT-001: Audit BOP route readiness for Phase 1 evidence
 
 - 状态: done / read-only-bop-phase1-route-audit
