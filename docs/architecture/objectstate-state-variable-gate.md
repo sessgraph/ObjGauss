@@ -1291,6 +1291,55 @@ only. It does not collect capture data, create GT, run candidate models, train
 Gaussian or dynamics models, evaluate metrics, claim pass rows, use replay /
 diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001
+
+Add a read-only audit for the full Phase 1 controlled reality evidence package.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_reality_evidence_package`.
+- Summary schema:
+  `objgauss-objectstate-controlled-reality-evidence-package-v1`.
+- `objectstate_controlled_reality_evidence_package(...)` reads a local package
+  root with the default directories:
+  - `reality-candidates/`;
+  - `reality-handoff/`.
+- Required candidate-side files:
+  - `template-summary.json`;
+  - `finalize-summary.json`;
+  - `full-readiness-summary.json`;
+  - `prediction-candidates.json`;
+  - `intervention-candidates.json`.
+- Required handoff-side files:
+  - `reality-bundle-handoff-summary.json`;
+  - `prediction-eval-summary.json`;
+  - `intervention-eval-summary.json`;
+  - `controlled-real-summary.json`;
+  - `blocked-rows.md`.
+- Optional handoff-side file:
+  `controlled-real.json`.
+- The audit calls existing validators for all JSON artifacts, checks
+  `sample_id` consistency, verifies that standalone eval / controlled-real
+  summaries match the embedded full handoff summary, and reports reviewability
+  gates.
+- Reviewability requires identity, prediction and intervention rows to be
+  present as rows, but does not require them to pass. A real fail row remains
+  reviewable evidence.
+- CLI command:
+  `objgauss object-state audit-controlled-reality-evidence-package <package-root>`.
+- CLI supports `--candidate-dir`, `--handoff-dir`, `--summary-output` and
+  `--require-reviewable`.
+- The related handoff validators now compare nested artifacts by JSON
+  equivalence, so CLI-written JSON files can be read back and validated without
+  tuple/list false mismatches.
+
+Current scope remains local evidence package audit only. It does not collect
+capture data, create GT, create candidates, rerun identity / prediction /
+intervention eval, train Gaussian or dynamics models, claim metric pass, claim
+ObjectState is a world state, use replay / diffusion, write public samples or
+mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

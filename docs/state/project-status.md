@@ -533,6 +533,22 @@ reality handoff。该切片仍不采集视频、不创建 GT、不运行预测 /
 Gaussian 或 dynamics、不评估指标、不声明 pass rows、不写 `public/samples`、不改
 viewer/export 默认。完成 commit: `f064801`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001`：新增
+`objgauss.core.objectstate_controlled_reality_evidence_package`，schema 为
+`objgauss-objectstate-controlled-reality-evidence-package-v1`，并新增 CLI
+`objgauss object-state audit-controlled-reality-evidence-package <package-root>`。
+该 read-only audit 检查 full Phase 1 本地证据包：candidate template summary、
+finalize summary、full readiness summary、prediction / intervention candidates、
+reality handoff summary、prediction / intervention eval summary、controlled-real
+summary 和 blocked rows Markdown 是否存在、schema 可验证、`sample_id` 一致，且
+standalone eval / controlled-real outputs 与 handoff summary 嵌入内容一致。
+reviewable 只表示文件包可审查，不表示 metric pass；fail rows 仍应作为真实负证据保留。
+本切片同时修正 controlled identity / reality handoff validators 的 JSON roundtrip 比较，
+避免 CLI 写盘后 tuple/list 差异导致误报 mismatch。当前仍没有采集或提交真实 controlled
+tabletop RGB / Gaussian / pose / action 文件，也没有真实 candidate artifact /
+prediction / intervention 输出；不训练 Gaussian 或 dynamics，不声明 ObjectState 已通过真实
+世界状态变量验证，不写 `public/samples`、不改 viewer/export 默认。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

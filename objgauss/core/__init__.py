@@ -238,6 +238,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -318,6 +322,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "finalize_objectstate_controlled_reality_candidate_templates",
     ),
+    "objectstate_controlled_reality_evidence_package": (
+        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "objectstate_controlled_reality_evidence_package",
+    ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
         "validate_objectstate_controlled_reality_bundle_handoff_summary",
@@ -333,6 +341,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_reality_candidate_finalize_summary": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_reality_candidate_finalize_summary",
+    ),
+    "validate_objectstate_controlled_reality_evidence_package_summary": (
+        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "validate_objectstate_controlled_reality_evidence_package_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

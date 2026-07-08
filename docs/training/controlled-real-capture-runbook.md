@@ -271,6 +271,20 @@ The expected result is not necessarily a pass. A true fail row is useful
 evidence if it preserves the distinction between `pass_rows`, `fail_rows`, and
 `blocked_rows`.
 
+After the full handoff, audit the local evidence package before making a
+review claim:
+
+```bash
+uv run objgauss object-state audit-controlled-reality-evidence-package \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/evidence-package-summary.json \
+  --require-reviewable
+```
+
+This audit only checks that the expected local JSON / Markdown artifacts exist,
+validate, use a consistent `sample_id`, and agree with the full handoff summary.
+It does not rerun the handoff or turn a failed metric row into a pass.
+
 ## 9. Acceptance Evidence
 
 For the first real identity row, keep these local artifacts together:
@@ -298,6 +312,7 @@ reality-handoff/prediction-eval-summary.json
 reality-handoff/intervention-eval-summary.json
 reality-handoff/controlled-real-summary.json
 reality-handoff/blocked-rows.md
+evidence-package-summary.json
 ```
 
 A Stage 1 identity claim is only reviewable when:
@@ -313,7 +328,9 @@ A Stage 1 identity claim is only reviewable when:
 A full Phase 1 reality claim is only reviewable when identity, prediction, and
 intervention rows all come from the same controlled capture manifest, and the
 full reality gate preserves any fail rows instead of converting them into
-blocked rows or pass rows.
+blocked rows or pass rows. The evidence package audit is the final local
+pre-review check for that file set; it is not a substitute for real capture,
+pose/action GT, candidate outputs, or metric review.
 
 ## 10. Boundaries
 

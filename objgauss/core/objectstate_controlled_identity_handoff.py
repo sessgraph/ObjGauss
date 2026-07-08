@@ -283,7 +283,10 @@ def validate_objectstate_controlled_identity_handoff_summary(
         != candidate_artifact_file_audit["file_record"]["path"]
     ):
         raise ValueError("controlled identity handoff candidate audited path mismatch")
-    if identity_eval["controlled_real_manifest"] != controlled_real_manifest:
+    if not _json_equivalent(
+        identity_eval["controlled_real_manifest"],
+        controlled_real_manifest,
+    ):
         raise ValueError("controlled identity handoff manifest must come from identity eval")
     if controlled_real_summary["sample"]["sample_id"] != identity_eval["sample"]["sample_id"]:
         raise ValueError("controlled identity handoff controlled-real summary sample mismatch")
@@ -346,6 +349,18 @@ def validate_objectstate_controlled_identity_handoff_summary(
     ):
         raise ValueError("controlled identity handoff cannot claim capture, GT, tracking, training, replay, diffusion, or viewer mutation")
     return payload
+
+
+def _json_equivalent(left: Any, right: Any) -> bool:
+    return _json_normalize(left) == _json_normalize(right)
+
+
+def _json_normalize(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_normalize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_normalize(item) for item in value]
+    return value
 
 
 def _identity_scenario_audit(

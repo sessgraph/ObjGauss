@@ -318,20 +318,29 @@ def validate_objectstate_controlled_reality_bundle_handoff_summary(
         raise ValueError("controlled reality bundle handoff requires sample")
     if payload["sample"].get("sample_id") != sample_id:
         raise ValueError("controlled reality bundle handoff sample field mismatch")
-    if payload.get("identity_handoff") != identity_bundle_handoff["identity_handoff"]:
+    if not _json_equivalent(
+        payload.get("identity_handoff"),
+        identity_bundle_handoff["identity_handoff"],
+    ):
         raise ValueError("controlled reality bundle handoff identity handoff mismatch")
-    if payload.get("identity_predictions") != identity_bundle_handoff["identity_predictions"]:
+    if not _json_equivalent(
+        payload.get("identity_predictions"),
+        identity_bundle_handoff["identity_predictions"],
+    ):
         raise ValueError(
             "controlled reality bundle handoff identity predictions mismatch"
         )
-    if payload.get("identity_eval") != identity_bundle_handoff["identity_eval"]:
+    if not _json_equivalent(
+        payload.get("identity_eval"),
+        identity_bundle_handoff["identity_eval"],
+    ):
         raise ValueError("controlled reality bundle handoff identity eval mismatch")
     expected_manifest = _merged_controlled_real_manifest(
         identity_bundle_handoff["controlled_real_manifest"],
         prediction_eval["controlled_real_manifest"],
         intervention_eval["controlled_real_manifest"],
     )
-    if controlled_real_manifest != expected_manifest:
+    if not _json_equivalent(controlled_real_manifest, expected_manifest):
         raise ValueError(
             "controlled reality bundle handoff manifest must merge child rows"
         )
@@ -431,6 +440,18 @@ def validate_objectstate_controlled_reality_bundle_handoff_summary(
             "or viewer mutation"
         )
     return dict(payload)
+
+
+def _json_equivalent(left: Any, right: Any) -> bool:
+    return _json_normalize(left) == _json_normalize(right)
+
+
+def _json_normalize(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_normalize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_normalize(item) for item in value]
+    return value
 
 
 def _merged_controlled_real_manifest(

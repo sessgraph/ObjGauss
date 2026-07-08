@@ -189,6 +189,9 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
     finalize_objectstate_controlled_reality_candidate_templates,
     write_objectstate_controlled_reality_candidate_templates,
 )
+from objgauss.core.objectstate_controlled_reality_evidence_package import (
+    objectstate_controlled_reality_evidence_package,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -4225,6 +4228,54 @@ def _object_state_audit_controlled_reality_bundle_readiness(
         raise ValueError("controlled reality bundle is not full-handoff ready")
 
 
+def _object_state_audit_controlled_reality_evidence_package(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_reality_evidence_package(
+        args.package_root,
+        candidate_dir=args.candidate_dir,
+        handoff_dir=args.handoff_dir,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    row_accounting = summary["row_accounting"]
+    print(f"schema={summary['schema']}")
+    print(f"package_root={args.package_root}")
+    print(f"candidate_dir={summary['candidate_dir']}")
+    print(f"handoff_dir={summary['handoff_dir']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"evidence_package_status={summary['status']}")
+    print(
+        "reviewable="
+        f"{str(summary['status'].endswith('_reviewable')).lower()}"
+    )
+    print(
+        "full_reality_handoff_ready="
+        f"{str(summary['readiness']['full_reality_handoff_ready']).lower()}"
+    )
+    print(f"handoff_status={summary['handoff']['status']}")
+    print(
+        "full_reality_gate_status="
+        f"{summary['handoff']['full_reality_gate_status']}"
+    )
+    print(f"pass_rows={row_accounting['pass_row_count']}")
+    print(f"fail_rows={row_accounting['fail_row_count']}")
+    print(f"blocked_rows={row_accounting['blocked_row_count']}")
+    print(f"issue_count={len(summary['issues'])}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability_gate.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_controlled_reality_evidence_package_reviewable"
+    ):
+        raise ValueError("controlled reality evidence package is not reviewable")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -4701,6 +4752,39 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     finalize_controlled_reality_candidates.set_defaults(
         handler=_object_state_finalize_controlled_reality_candidates
+    )
+    audit_controlled_reality_evidence_package = object_state_subparsers.add_parser(
+        "audit-controlled-reality-evidence-package",
+        help=(
+            "audit the local full Phase 1 controlled reality evidence package "
+            "after candidate finalization and full handoff"
+        ),
+    )
+    audit_controlled_reality_evidence_package.add_argument(
+        "package_root",
+        type=Path,
+    )
+    audit_controlled_reality_evidence_package.add_argument(
+        "--candidate-dir",
+        default="reality-candidates",
+        help="candidate output directory, relative to package_root unless absolute",
+    )
+    audit_controlled_reality_evidence_package.add_argument(
+        "--handoff-dir",
+        default="reality-handoff",
+        help="handoff output directory, relative to package_root unless absolute",
+    )
+    audit_controlled_reality_evidence_package.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_controlled_reality_evidence_package.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the evidence package is complete and reviewable",
+    )
+    audit_controlled_reality_evidence_package.set_defaults(
+        handler=_object_state_audit_controlled_reality_evidence_package
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",

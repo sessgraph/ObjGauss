@@ -106,8 +106,13 @@ prediction / intervention candidate templates，帮助作者填真实模型输�
 evaluator JSON，并拒绝 TODO / obvious target-GT leakage；
 `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001` 已把 generated README /
 next commands 和 runbook 串成 init -> fill -> finalize -> full readiness -> full
-handoff。后续仍要让 readiness 从 fixture 进入真实 ready，再让 rows 进入真实 pass /
-fail，而不是新增大模型。
+handoff。`OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001` 已新增
+`audit-controlled-reality-evidence-package` CLI，可对 full Phase 1 本地证据包做
+read-only reviewability audit：检查 template / finalize / readiness / candidates /
+handoff / eval / controlled-real summary / blocked rows 文件存在、schema、`sample_id`
+一致性和 handoff 嵌入输出一致性，并修正 handoff validators 的 JSON roundtrip
+tuple/list 误报。后续仍要让 readiness 从 fixture 进入真实 ready，再让 rows 进入真实
+pass / fail，而不是新增大模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -179,6 +184,46 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001: Audit full Phase 1 evidence package
+
+- 状态: done / read-only-audit-no-real-capture-output
+- 类型: 标准 PR / controlled tabletop evidence package audit
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在 candidate finalization 和 full handoff 之后，提供一个可复跑的本地
+  evidence package reviewability audit，避免真实 Phase 1 输出散落、schema 不一致或
+  standalone summary 与 handoff summary 不一致。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_reality_evidence_package`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-reality-evidence-package-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-controlled-reality-evidence-package <package-root>`。
+  - 默认检查 `reality-candidates/` 下的 template summary、finalize summary、
+    full-readiness summary、prediction candidates 和 intervention candidates。
+  - 默认检查 `reality-handoff/` 下的 full handoff summary、prediction eval
+    summary、intervention eval summary、controlled-real summary 和
+    `blocked-rows.md`。
+  - Audit 调用现有 JSON validators，检查 `sample_id` 一致性、row accounting、
+    identity / prediction / intervention rows 是否都存在，以及 standalone eval /
+    controlled-real outputs 是否与 full handoff summary 嵌入内容一致。
+  - 修正 controlled identity / reality handoff validators 的 JSON roundtrip
+    tuple/list 等价比较，保证 CLI 写盘后的 JSON artifact 可被重新验证。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不创建 candidate outputs，不运行 handoff / eval，不训练
+    Gaussian / dynamics，不声明 metric pass，不写 `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_evidence_package.py -q`: passed, 3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py -q`: passed, 9 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_objectstate_controlled_reality_bundle_handoff.py tests/test_objectstate_controlled_reality_bundle_readiness.py -q`: passed, 20 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_objectstate_controlled_prediction_eval.py tests/test_objectstate_controlled_intervention_eval.py -q`: passed, 18 tests。
+  - `uv run --extra dev pytest`: passed, 383 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `TBD`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001: Wire controlled reality candidate workflow
 

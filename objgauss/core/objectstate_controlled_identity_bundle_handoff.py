@@ -261,20 +261,23 @@ def validate_objectstate_controlled_identity_bundle_handoff_summary(
         raise ValueError("controlled identity bundle handoff status must match gates")
     if not isinstance(payload.get("issues"), list):
         raise ValueError("controlled identity bundle handoff requires issues")
-    if payload.get("identity_predictions") != identity_handoff["identity_predictions"]:
+    if not _json_equivalent(
+        payload.get("identity_predictions"),
+        identity_handoff["identity_predictions"],
+    ):
         raise ValueError("controlled identity bundle handoff predictions mismatch")
-    if payload.get("identity_eval") != identity_handoff["identity_eval"]:
+    if not _json_equivalent(payload.get("identity_eval"), identity_handoff["identity_eval"]):
         raise ValueError("controlled identity bundle handoff identity eval mismatch")
-    if (
-        payload.get("controlled_real_manifest")
-        != identity_handoff["controlled_real_manifest"]
+    if not _json_equivalent(
+        payload.get("controlled_real_manifest"),
+        identity_handoff["controlled_real_manifest"],
     ):
         raise ValueError(
             "controlled identity bundle handoff controlled-real manifest mismatch"
         )
-    if (
-        payload.get("controlled_real_summary")
-        != identity_handoff["controlled_real_summary"]
+    if not _json_equivalent(
+        payload.get("controlled_real_summary"),
+        identity_handoff["controlled_real_summary"],
     ):
         raise ValueError(
             "controlled identity bundle handoff controlled-real summary mismatch"
@@ -327,6 +330,18 @@ def validate_objectstate_controlled_identity_bundle_handoff_summary(
             "or viewer mutation"
         )
     return dict(payload)
+
+
+def _json_equivalent(left: Any, right: Any) -> bool:
+    return _json_normalize(left) == _json_normalize(right)
+
+
+def _json_normalize(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_normalize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_normalize(item) for item in value]
+    return value
 
 
 def _identity_handoff_artifact_refs(
