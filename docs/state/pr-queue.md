@@ -225,7 +225,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed, 386 tests。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: `TBD`。
+- 完成 commit: `be27063`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-EVIDENCE-PACKAGE-001: Audit full Phase 1 evidence package
 
