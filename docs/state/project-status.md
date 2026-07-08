@@ -640,6 +640,20 @@ prediction row 为 pass 或 fail，且 controlled-real prediction manifest 与 p
 内嵌 manifest 一致；reviewable 不要求 prediction 指标 pass，也不声明 intervention /
 counterfactual gate。
 
+随后新增 `OBJECTSTATE-CONTROLLED-IDENTITY-EVIDENCE-PACKAGE-001`：新增
+`objgauss.core.objectstate_controlled_identity_evidence_package`，schema 为
+`objgauss-objectstate-controlled-identity-evidence-package-v1`，并新增 CLI
+`objgauss object-state audit-controlled-identity-evidence-package`。该 audit 面向
+`controlled-identity-handoff` 之后的 identity-only Stage 1 本地证据包，默认检查
+`capture-manifest.json`、`capture-file-audit.json`、`capture-missing-files.md`、
+`candidate-artifact-file-audit.json`、`identity-scenario-audit.json`、
+`identity-predictions.json`、`identity-eval-summary.json`、`controlled-real.json`、
+`controlled-real-summary.json`、`blocked-rows.md` 和 `handoff-summary.json`。
+reviewable 要求 capture / candidate artifact file audit 通过、candidate artifact ref
+match、identity scenario audit 通过、identity row 为 pass 或 fail，且 standalone outputs
+与 handoff summary 内嵌结果一致；reviewable 不要求 identity 指标 pass，也不声明
+prediction、intervention、counterfactual gate 或 world model。
+
 随后新增 `OBJECTSTATE-CONTROLLED-PREDICTION-BASELINE-CANDIDATES-001`：新增
 `objgauss.core.objectstate_controlled_prediction_baseline`，schema 为
 `objgauss-objectstate-controlled-prediction-baseline-candidates-v1`，并新增 CLI

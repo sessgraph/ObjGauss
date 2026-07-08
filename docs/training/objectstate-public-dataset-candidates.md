@@ -214,6 +214,23 @@ package is reviewable when file acceptance, baseline candidate generation,
 candidate finalization and prediction eval outputs are internally consistent;
 reviewable does not mean the prediction metric passed.
 
+For a controlled identity-only handoff, audit the local evidence package after
+`controlled-identity-handoff`:
+
+```bash
+uv run objgauss object-state audit-controlled-identity-evidence-package \
+  outputs/captures/controlled-tabletop-cup-box-identity-001/identity-handoff \
+  --capture-manifest outputs/captures/controlled-tabletop-cup-box-identity-001/capture-manifest.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-identity-001/identity-handoff/identity-evidence-package-summary.json \
+  --require-reviewable
+```
+
+This checks the existing handoff outputs and preserves the Stage 1 boundary:
+reviewable means the identity pass / fail row, capture file audit, candidate
+artifact audit, scenario challenge audit and handoff summary are internally
+consistent. It does not rerun identity eval, require the identity metric to pass,
+or claim predictive / intervention / world-model evidence.
+
 ## Hard Blockers
 
 - No public candidate directly supplies ObjGauss per-frame Gaussian evidence.

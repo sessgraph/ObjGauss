@@ -1308,6 +1308,53 @@ data, create GT, parse image pixels, train Gaussian or dynamics models, compute
 prediction / intervention metrics, use replay / diffusion, write public samples
 or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-IDENTITY-EVIDENCE-PACKAGE-001
+
+Add a read-only audit for identity-only Phase 1 evidence packages after
+`controlled-identity-handoff`.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_identity_evidence_package`.
+- Summary schema:
+  `objgauss-objectstate-controlled-identity-evidence-package-v1`.
+- `objectstate_controlled_identity_evidence_package(...)` reads a local package
+  root with default controlled identity handoff files:
+  - `capture-manifest.json`;
+  - `capture-file-audit.json`;
+  - `capture-missing-files.md`;
+  - `candidate-artifact-file-audit.json`;
+  - `identity-scenario-audit.json`;
+  - `identity-predictions.json`;
+  - `identity-eval-summary.json`;
+  - `controlled-real.json`;
+  - `controlled-real-summary.json`;
+  - `blocked-rows.md`;
+  - `handoff-summary.json`.
+- The audit validates every JSON schema, checks `sample_id` consistency,
+  requires capture and candidate artifact file audits to pass, requires the
+  audited candidate artifact ref to match the identity prediction candidate
+  refs, requires the identity scenario audit to pass, and verifies that
+  standalone outputs match the embedded handoff summary.
+- Reviewability does not require the identity metric to pass. A real identity
+  fail row remains reviewable Stage 1 evidence because it still proves the
+  controlled identity gate was run on a real package and produced a pass / fail
+  result.
+- The gate is identity-only: prediction and intervention rows may remain
+  blocked, and the audit explicitly does not require prediction or
+  counterfactual evidence.
+- CLI command:
+  `objgauss object-state audit-controlled-identity-evidence-package <package-root>`.
+- CLI supports source file overrides, `--summary-output` and
+  `--require-reviewable`.
+
+Current scope remains local identity evidence package audit only. It does not
+collect capture data, create GT, reconstruct Gaussians, generate predictions,
+rerun identity eval, claim metric pass, compute prediction / intervention
+metrics, use replay / diffusion, write public samples or mutate viewer
+defaults.
+
 ### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001
 
 Bundle the full Phase 1 controlled reality chain into a single reproducible

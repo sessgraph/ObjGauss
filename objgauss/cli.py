@@ -203,6 +203,9 @@ from objgauss.core.objectstate_controlled_reality_evidence_package import (
 from objgauss.core.objectstate_controlled_prediction_evidence_package import (
     objectstate_controlled_prediction_evidence_package,
 )
+from objgauss.core.objectstate_controlled_identity_evidence_package import (
+    objectstate_controlled_identity_evidence_package,
+)
 from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
@@ -4636,6 +4639,69 @@ def _object_state_audit_controlled_prediction_evidence_package(
         raise ValueError("controlled prediction evidence package is not reviewable")
 
 
+def _object_state_audit_controlled_identity_evidence_package(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_controlled_identity_evidence_package(
+        args.package_root,
+        capture_manifest=args.capture_manifest,
+        capture_file_audit=args.capture_file_audit,
+        capture_missing_files_markdown=args.capture_missing_files_markdown,
+        candidate_artifact_file_audit=args.candidate_artifact_file_audit,
+        identity_scenario_audit=args.identity_scenario_audit,
+        identity_predictions=args.identity_predictions,
+        identity_eval=args.identity_eval,
+        controlled_real=args.controlled_real,
+        controlled_real_summary=args.controlled_real_summary,
+        blocked_rows_markdown=args.blocked_rows_markdown,
+        handoff_summary=args.handoff_summary,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+    identity = summary["identity"]
+    evidence = summary["evidence"]
+    print(f"schema={summary['schema']}")
+    print(f"package_root={summary['package_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"identity_evidence_status={summary['status']}")
+    print(
+        "reviewable="
+        f"{str(summary['status'].endswith('_reviewable')).lower()}"
+    )
+    print(
+        "capture_file_audit_pass="
+        f"{str(evidence['capture_file_audit_pass']).lower()}"
+    )
+    print(
+        "candidate_artifact_file_audit_pass="
+        f"{str(evidence['candidate_artifact_file_audit_pass']).lower()}"
+    )
+    print(
+        "candidate_artifact_ref_match="
+        f"{str(evidence['candidate_artifact_ref_match']).lower()}"
+    )
+    print(
+        "identity_scenario_audit_pass="
+        f"{str(evidence['identity_scenario_audit_pass']).lower()}"
+    )
+    print(f"identity_eval_status={identity['identity_eval_status']}")
+    print(f"identity_prediction_count={identity['identity_prediction_count']}")
+    print(f"identity_row_status={identity['identity_row_status']}")
+    print(f"issue_count={len(summary['issues'])}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability_gate.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_controlled_identity_evidence_package_reviewable"
+    ):
+        raise ValueError("controlled identity evidence package is not reviewable")
+
+
 def _object_state_bop_prediction_baseline_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_prediction_baseline_handoff(
         args.scene_root,
@@ -5633,6 +5699,84 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_prediction_evidence_package.set_defaults(
         handler=_object_state_audit_controlled_prediction_evidence_package
+    )
+    audit_controlled_identity_evidence_package = object_state_subparsers.add_parser(
+        "audit-controlled-identity-evidence-package",
+        help=(
+            "audit a local identity-only Phase 1 evidence package after "
+            "controlled identity handoff"
+        ),
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "package_root",
+        type=Path,
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--capture-manifest",
+        default="capture-manifest.json",
+        help="capture manifest path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--capture-file-audit",
+        default="capture-file-audit.json",
+        help="capture file audit path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--capture-missing-files-markdown",
+        default="capture-missing-files.md",
+        help="capture missing-files markdown path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--candidate-artifact-file-audit",
+        default="candidate-artifact-file-audit.json",
+        help="candidate artifact audit path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--identity-scenario-audit",
+        default="identity-scenario-audit.json",
+        help="identity scenario audit path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--identity-predictions",
+        default="identity-predictions.json",
+        help="identity predictions path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--identity-eval",
+        default="identity-eval-summary.json",
+        help="identity eval path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--controlled-real",
+        default="controlled-real.json",
+        help="controlled-real manifest path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--controlled-real-summary",
+        default="controlled-real-summary.json",
+        help="controlled-real summary path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--blocked-rows-markdown",
+        default="blocked-rows.md",
+        help="blocked rows markdown path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--handoff-summary",
+        default="handoff-summary.json",
+        help="handoff summary path, relative to package_root unless absolute",
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    audit_controlled_identity_evidence_package.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless the identity evidence package is complete and reviewable",
+    )
+    audit_controlled_identity_evidence_package.set_defaults(
+        handler=_object_state_audit_controlled_identity_evidence_package
     )
     import_controlled_capture = object_state_subparsers.add_parser(
         "import-controlled-capture-bundle",

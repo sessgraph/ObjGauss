@@ -330,6 +330,44 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: e079b82。
 
+### OBJECTSTATE-CONTROLLED-IDENTITY-EVIDENCE-PACKAGE-001: Audit identity-only evidence packages
+
+- 状态: done / read-only-identity-evidence-audit
+- 类型: 标准 PR / ObjectState controlled identity Stage 1 evidence package
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 `controlled-identity-handoff` 输出的本地 identity-only evidence package
+  可复核，先验证 ObjectState 作为 Identity State 的证据链，而不提前声明 prediction、
+  intervention 或 world-model gate。
+- 已实施:
+  - 新增 module
+    `objgauss.core.objectstate_controlled_identity_evidence_package`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-identity-evidence-package-v1`。
+  - 新增 core function
+    `objectstate_controlled_identity_evidence_package(...)`。
+  - 新增 CLI
+    `objgauss object-state audit-controlled-identity-evidence-package`。
+  - Audit 默认检查 `capture-manifest.json`、`capture-file-audit.json`、
+    `capture-missing-files.md`、`candidate-artifact-file-audit.json`、
+    `identity-scenario-audit.json`、`identity-predictions.json`、
+    `identity-eval-summary.json`、`controlled-real.json`、
+    `controlled-real-summary.json`、`blocked-rows.md` 和 `handoff-summary.json`。
+  - Reviewability 要求 capture / candidate artifact file audit pass、candidate
+    artifact ref match、identity scenario audit pass、identity row 为 pass 或 fail，
+    且 standalone outputs 与 handoff summary 内嵌结果一致。
+- 边界:
+  - 不采集视频，不创建 GT，不重建 Gaussian，不训练模型。
+  - 不运行 tracking / identity / prediction model，不重新运行 identity eval。
+  - 不要求 identity metric pass；fail row 也是 reviewable Stage 1 evidence。
+  - 不声明 prediction / intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_identity_evidence_package.py objgauss/cli.py tests/test_objectstate_controlled_identity_evidence_package.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_evidence_package.py tests/test_objectstate_controlled_identity_handoff.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_core_namespace.py -q`: passed，27 tests。
+  - `uv run --extra dev pytest`: passed，419 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending-local-commit。
+
 ### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
 
 - 状态: done / manifest-first-prediction-authoring-only
