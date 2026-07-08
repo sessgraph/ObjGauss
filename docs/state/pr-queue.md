@@ -100,8 +100,11 @@ intervention candidates 是否结构完整并绑定同一个 capture manifest。
 artifact / prediction / intervention JSON；`OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001`
 已新增 `init-controlled-reality-candidates` CLI，可从已填写 bundle 生成 draft-only
 prediction / intervention candidate templates，帮助作者填真实模型输出，同时保证
-模板 schema 不能被 evaluator 当作 pass evidence。后续仍要让 readiness 从 fixture
-进入真实 ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
+模板 schema 不能被 evaluator 当作 pass evidence；
+`OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001` 已新增
+`finalize-controlled-reality-candidates` CLI，可把已填完的 draft templates 转成正式
+evaluator JSON，并拒绝 TODO / obvious target-GT leakage。后续仍要让 readiness 从
+fixture 进入真实 ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -173,6 +176,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001: Finalize controlled reality candidate JSON
+
+- 状态: done / finalizer-only-no-real-candidate-output
+- 类型: 标准 PR / controlled tabletop candidate authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把已填完的 prediction / intervention draft templates 安全转换成
+  `controlled-reality-bundle-readiness` 和 full handoff 可消费的正式 evaluator
+  JSON。
+- 已实施:
+  - `objgauss.core.objectstate_controlled_reality_candidate_template` 新增
+    `finalize_objectstate_controlled_reality_candidate_templates(...)`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-reality-candidate-finalize-v1`。
+  - Finalizer 要求 candidate metadata 中 `candidate_id`、`source` 和
+    `artifact_refs` 不能仍为 TODO。
+  - Finalizer 要求所有必需 position 字段为 numeric length-3 vectors。
+  - Finalizer 拒绝 row 顶层的明显 GT 泄漏字段，例如 `target_position` /
+    `target_pose`。
+  - 输出正式 `prediction-candidates.json` 和 `intervention-candidates.json`。
+  - 输出会立即通过现有
+    `objgauss-objectstate-controlled-prediction-candidates-v1` /
+    `objgauss-objectstate-controlled-intervention-candidates-v1` validators。
+  - CLI 新增 `objgauss object-state finalize-controlled-reality-candidates
+    <prediction-template.json> <intervention-template.json> --output-dir <dir>`，
+    支持 `--bundle-root`、`--summary-output` 和 `--force`。
+  - Core lazy namespace 暴露 finalize schema、runner 和 validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不运行 prediction / intervention 模型，不训练 Gaussian /
+    dynamics，不运行 eval，不声明 pass rows，不写 `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 380 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `5a10915`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-TEMPLATE-001: Scaffold controlled reality candidate templates
 

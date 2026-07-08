@@ -508,6 +508,20 @@ viewer/export 默认。当前仍缺实际 controlled tabletop capture 文件和�
 objectstates / prediction / intervention candidate JSON 作为通过证据。完成 commit:
 `443344d`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001`：同一模块新增
+schema `objgauss-objectstate-controlled-reality-candidate-finalize-v1` 和 CLI
+`objgauss object-state finalize-controlled-reality-candidates <prediction-template.json> <intervention-template.json> --output-dir <dir>`。
+该命令只接受已填完的 draft templates：candidate metadata 不能还是 TODO，所有必需
+position 字段必须是 numeric length-3 vectors，且 row 顶层不能出现
+`target_position` / `target_pose` 等明显 GT 泄漏字段。通过后写出正式 evaluator
+输入 `prediction-candidates.json` 和 `intervention-candidates.json`，并立即用现有
+prediction / intervention candidate validators 校验。该切片仍不运行预测 / 动作模型，
+不创建 GT、不训练 Gaussian 或 dynamics、不评估指标、不声明 pass rows、不写
+`public/samples`、不改 viewer/export 默认；它只把外部真实 candidate 输出从模板转成
+full readiness / handoff 可消费的 JSON。当前仍缺实际 controlled tabletop capture 文件和
+真实 objectstates / prediction / intervention candidate 内容作为通过证据。完成 commit:
+`5a10915`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
