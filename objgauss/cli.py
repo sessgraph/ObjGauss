@@ -3210,12 +3210,15 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         candidate_artifact_path=args.trainable_artifact,
         min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
         hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
     )
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     capture_file_audit_path = output_dir / "capture-file-audit.json"
     capture_missing_files_path = output_dir / "capture-missing-files.md"
     candidate_artifact_file_audit_path = output_dir / "candidate-artifact-file-audit.json"
+    identity_scenario_audit_path = output_dir / "identity-scenario-audit.json"
     predictions_path = output_dir / "identity-predictions.json"
     identity_eval_path = output_dir / "identity-eval-summary.json"
     controlled_real_path = output_dir / "controlled-real.json"
@@ -3231,6 +3234,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         candidate_artifact_file_audit_path,
         summary["candidate_artifact_file_audit"],
     )
+    write_json(identity_scenario_audit_path, summary["identity_scenario_audit"])
     write_json(predictions_path, summary["identity_predictions"])
     write_json(identity_eval_path, summary["identity_eval"])
     write_json(controlled_real_path, summary["controlled_real_manifest"])
@@ -3259,6 +3263,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         "candidate_artifact_ref_match="
         f"{str(summary['candidate_artifact_ref_match']['matches']).lower()}"
     )
+    print(f"identity_scenario_audit_status={summary['identity_scenario_audit']['status']}")
     print(f"identity_eval_status={summary['identity_eval']['status']}")
     print(f"identity_gate_status={gate['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
@@ -3268,6 +3273,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     print(f"capture_file_audit={capture_file_audit_path}")
     print(f"capture_missing_files={capture_missing_files_path}")
     print(f"candidate_artifact_file_audit={candidate_artifact_file_audit_path}")
+    print(f"identity_scenario_audit={identity_scenario_audit_path}")
     print(f"predictions={predictions_path}")
     print(f"identity_eval={identity_eval_path}")
     print(f"controlled_real_manifest={controlled_real_path}")
@@ -3606,6 +3612,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--hash-candidate-artifact",
         action="store_true",
         help="include a SHA256 hash for the trainable ObjectState artifact file",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+        help="minimum frame count for identity scenario challenge audit",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+        help="occlusion_fraction threshold for identity scenario challenge audit",
     )
     controlled_identity_handoff.add_argument(
         "--synthetic-smoke-failed",

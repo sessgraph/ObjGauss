@@ -9,6 +9,10 @@ from objgauss.core.objectstate_controlled_capture_files import (
     objectstate_controlled_capture_file_audit,
     validate_objectstate_controlled_capture_file_audit_summary,
 )
+from objgauss.core.objectstate_controlled_capture import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+    validate_objectstate_controlled_capture_manifest,
+)
 from objgauss.core.objectstate_controlled_identity_eval import (
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
@@ -37,6 +41,10 @@ OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA = (
     "objgauss-objectstate-controlled-candidate-artifact-file-audit-v1"
 )
 
+OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA = (
+    "objgauss-objectstate-controlled-identity-scenario-audit-v1"
+)
+
 
 def objectstate_controlled_identity_handoff(
     capture_manifest: Mapping[str, Any],
@@ -57,6 +65,8 @@ def objectstate_controlled_identity_handoff(
     candidate_artifact_path: str | Path | None = None,
     min_candidate_artifact_bytes: int = 1,
     hash_candidate_artifact: bool = False,
+    min_identity_scenario_frames: int = 3,
+    min_occlusion_fraction: float = 0.5,
 ) -> dict[str, Any]:
     capture_file_audit = objectstate_controlled_capture_file_audit(
         capture_manifest,
@@ -71,6 +81,11 @@ def objectstate_controlled_identity_handoff(
         candidate_artifact_path,
         min_bytes=min_candidate_artifact_bytes,
         hash_file=hash_candidate_artifact,
+    )
+    identity_scenario_audit = _identity_scenario_audit(
+        capture_manifest,
+        min_frames=min_identity_scenario_frames,
+        min_occlusion_fraction=min_occlusion_fraction,
     )
     predictions = objectstate_identity_predictions_from_trainable_artifact(
         capture_manifest,
@@ -107,6 +122,8 @@ def objectstate_controlled_identity_handoff(
         and candidate_artifact_file_audit["status"]
         == "objectstate_controlled_candidate_artifact_file_audit_pass"
         and candidate_artifact_ref_match["matches"]
+        and identity_scenario_audit["status"]
+        == "objectstate_controlled_identity_scenario_audit_pass"
         and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
     )
@@ -123,6 +140,9 @@ def objectstate_controlled_identity_handoff(
         "candidate_artifact_file_audit_schema": (
             OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA
         ),
+        "identity_scenario_audit_schema": (
+            OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA
+        ),
         "identity_eval_schema": OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
         "controlled_real_manifest_schema": OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
         "controlled_real_rows_schema": OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
@@ -131,6 +151,7 @@ def objectstate_controlled_identity_handoff(
         "capture_file_audit": capture_file_audit,
         "candidate_artifact_file_audit": candidate_artifact_file_audit,
         "candidate_artifact_ref_match": candidate_artifact_ref_match,
+        "identity_scenario_audit": identity_scenario_audit,
         "identity_predictions": predictions,
         "identity_eval": identity_eval,
         "controlled_real_manifest": controlled_real_manifest,
@@ -143,6 +164,7 @@ def objectstate_controlled_identity_handoff(
             "requires_capture_file_audit_pass": True,
             "requires_candidate_artifact_file_audit_pass": True,
             "requires_candidate_artifact_ref_match": True,
+            "requires_identity_scenario_audit_pass": True,
             "prediction_and_intervention_rows_remain_visible": True,
         },
         "claim_policy": {
@@ -151,6 +173,7 @@ def objectstate_controlled_identity_handoff(
             "candidate_artifact_required": True,
             "candidate_artifact_file_audit_required": True,
             "candidate_artifact_ref_must_match_file_audit": True,
+            "identity_scenario_challenge_required": True,
             "identity_only_stage1_gate": True,
             "does_not_claim_prediction_or_intervention": True,
             "does_not_claim_world_model": True,
@@ -200,6 +223,13 @@ def validate_objectstate_controlled_identity_handoff_summary(
             "controlled identity handoff has unsupported "
             "candidate_artifact_file_audit_schema"
         )
+    if (
+        payload.get("identity_scenario_audit_schema")
+        != OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA
+    ):
+        raise ValueError(
+            "controlled identity handoff has unsupported identity_scenario_audit_schema"
+        )
     if payload.get("identity_eval_schema") != OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA:
         raise ValueError("controlled identity handoff has unsupported identity_eval_schema")
     if payload.get("controlled_real_manifest_schema") != OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA:
@@ -216,6 +246,9 @@ def validate_objectstate_controlled_identity_handoff_summary(
     candidate_artifact_ref_match = _validate_candidate_artifact_ref_match(
         payload.get("candidate_artifact_ref_match")
     )
+    identity_scenario_audit = _validate_identity_scenario_audit(
+        payload.get("identity_scenario_audit")
+    )
     predictions = validate_objectstate_controlled_identity_predictions(
         payload.get("identity_predictions")
     )
@@ -230,6 +263,8 @@ def validate_objectstate_controlled_identity_handoff_summary(
     )
     if capture_file_audit["sample"]["sample_id"] != identity_eval["sample"]["sample_id"]:
         raise ValueError("controlled identity handoff file audit sample mismatch")
+    if identity_scenario_audit["sample"]["sample_id"] != identity_eval["sample"]["sample_id"]:
+        raise ValueError("controlled identity handoff scenario audit sample mismatch")
     if predictions["sample_id"] != identity_eval["sample"]["sample_id"]:
         raise ValueError("controlled identity handoff sample ids must match")
     expected_artifact_refs = list(predictions["candidate"]["artifact_refs"])
@@ -256,6 +291,8 @@ def validate_objectstate_controlled_identity_handoff_summary(
         and candidate_artifact_file_audit["status"]
         == "objectstate_controlled_candidate_artifact_file_audit_pass"
         and candidate_artifact_ref_match["matches"]
+        and identity_scenario_audit["status"]
+        == "objectstate_controlled_identity_scenario_audit_pass"
         and identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
         and controlled_real_summary["gate"]["status"] == "objectstate_reality_gate_pass"
         else "objectstate_controlled_identity_handoff_fail"
@@ -271,6 +308,7 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or not handoff_contract.get("requires_capture_file_audit_pass")
         or not handoff_contract.get("requires_candidate_artifact_file_audit_pass")
         or not handoff_contract.get("requires_candidate_artifact_ref_match")
+        or not handoff_contract.get("requires_identity_scenario_audit_pass")
         or not handoff_contract.get("prediction_and_intervention_rows_remain_visible")
     ):
         raise ValueError("controlled identity handoff contract is incomplete")
@@ -281,6 +319,7 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or not claim_policy.get("candidate_artifact_required")
         or not claim_policy.get("candidate_artifact_file_audit_required")
         or not claim_policy.get("candidate_artifact_ref_must_match_file_audit")
+        or not claim_policy.get("identity_scenario_challenge_required")
         or not claim_policy.get("identity_only_stage1_gate")
         or not claim_policy.get("does_not_claim_world_model")
     ):
@@ -298,6 +337,163 @@ def validate_objectstate_controlled_identity_handoff_summary(
         or non_goals.get("mutates_viewer_defaults")
     ):
         raise ValueError("controlled identity handoff cannot claim capture, GT, tracking, training, replay, diffusion, or viewer mutation")
+    return payload
+
+
+def _identity_scenario_audit(
+    capture_manifest: Mapping[str, Any],
+    *,
+    min_frames: int,
+    min_occlusion_fraction: float,
+) -> dict[str, Any]:
+    if min_frames < 3:
+        raise ValueError("min_identity_scenario_frames must be at least 3")
+    if min_occlusion_fraction < 0.0 or min_occlusion_fraction > 1.0:
+        raise ValueError("min_occlusion_fraction must be in [0, 1]")
+    checked_manifest = validate_objectstate_controlled_capture_manifest(capture_manifest)
+    frames = checked_manifest["frames"]
+    tracks: dict[str, list[dict[str, Any]]] = {
+        item["object_id"]: [] for item in checked_manifest["objects"]
+    }
+    for index, frame in enumerate(frames):
+        for item in frame["objects"]:
+            occlusion_fraction = float(item.get("occlusion_fraction", 0.0))
+            visible = bool(item.get("visible", True))
+            occluded = (not visible) or occlusion_fraction >= min_occlusion_fraction
+            tracks[str(item["object_id"])].append(
+                {
+                    "frame_index": index,
+                    "frame_id": frame["frame_id"],
+                    "timestamp": frame["timestamp"],
+                    "visible": visible,
+                    "occlusion_fraction": occlusion_fraction,
+                    "occluded": occluded,
+                }
+            )
+    object_tracks = []
+    occlusion_reappearance_present = False
+    for object_id, observations in tracks.items():
+        occluded_indices = [
+            item["frame_index"] for item in observations if item["occluded"]
+        ]
+        clear_visible_indices = [
+            item["frame_index"]
+            for item in observations
+            if item["visible"] and not item["occluded"]
+        ]
+        reappears = any(
+            any(index < occluded for index in clear_visible_indices)
+            and any(index > occluded for index in clear_visible_indices)
+            for occluded in occluded_indices
+        )
+        occlusion_reappearance_present = occlusion_reappearance_present or reappears
+        object_tracks.append(
+            {
+                "object_id": object_id,
+                "observation_count": len(observations),
+                "clear_visible_count": len(clear_visible_indices),
+                "occluded_count": len(occluded_indices),
+                "occlusion_reappearance": reappears,
+            }
+        )
+    readiness = {
+        "min_frame_count_met": len(frames) >= min_frames,
+        "occlusion_reappearance_present": occlusion_reappearance_present,
+    }
+    issues = []
+    if not readiness["min_frame_count_met"]:
+        issues.append(f"identity scenario requires at least {min_frames} frames")
+    if not readiness["occlusion_reappearance_present"]:
+        issues.append(
+            "identity scenario requires clear-visible-before, occluded, "
+            "clear-visible-after observations for at least one object"
+        )
+    payload = {
+        "schema": OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
+        "kind": "objectstate_controlled_identity_scenario_audit",
+        "capture_schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+        "status": (
+            "objectstate_controlled_identity_scenario_audit_pass"
+            if all(readiness.values())
+            else "objectstate_controlled_identity_scenario_audit_fail"
+        ),
+        "sample": dict(checked_manifest["sample"]),
+        "frame_count": len(frames),
+        "requirements": {
+            "min_frames": int(min_frames),
+            "min_occlusion_fraction": float(min_occlusion_fraction),
+            "requires_occlusion_reappearance": True,
+        },
+        "readiness": readiness,
+        "object_tracks": object_tracks,
+        "issues": issues,
+        "claim_policy": {
+            "identity_scenario_required_for_handoff_pass": True,
+            "scenario_audit_does_not_read_image_pixels": True,
+            "scenario_audit_does_not_prove_model_quality": True,
+            "scenario_audit_does_not_verify_lighting_or_camera_motion": True,
+        },
+    }
+    return _validate_identity_scenario_audit(payload)
+
+
+def _validate_identity_scenario_audit(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("identity scenario audit must be a dict")
+    if payload.get("schema") != OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA:
+        raise ValueError(
+            f"unsupported identity scenario audit schema: {payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_controlled_identity_scenario_audit":
+        raise ValueError("identity scenario audit kind is unsupported")
+    if payload.get("capture_schema") != OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA:
+        raise ValueError("identity scenario audit has unsupported capture_schema")
+    if payload.get("status") not in {
+        "objectstate_controlled_identity_scenario_audit_pass",
+        "objectstate_controlled_identity_scenario_audit_fail",
+    }:
+        raise ValueError("identity scenario audit status is unsupported")
+    if not isinstance(payload.get("sample"), dict):
+        raise ValueError("identity scenario audit requires sample")
+    if not isinstance(payload.get("frame_count"), int) or payload["frame_count"] < 1:
+        raise ValueError("identity scenario audit requires positive frame_count")
+    requirements = payload.get("requirements")
+    readiness = payload.get("readiness")
+    if not isinstance(requirements, dict):
+        raise ValueError("identity scenario audit requires requirements")
+    if (
+        not isinstance(requirements.get("min_frames"), int)
+        or int(requirements["min_frames"]) < 3
+        or not isinstance(requirements.get("min_occlusion_fraction"), float)
+        or requirements["min_occlusion_fraction"] < 0.0
+        or requirements["min_occlusion_fraction"] > 1.0
+        or not requirements.get("requires_occlusion_reappearance")
+    ):
+        raise ValueError("identity scenario audit requirements are invalid")
+    if not isinstance(readiness, dict):
+        raise ValueError("identity scenario audit requires readiness")
+    for key in ("min_frame_count_met", "occlusion_reappearance_present"):
+        if not isinstance(readiness.get(key), bool):
+            raise ValueError(f"identity scenario audit readiness missing bool {key}")
+    expected_status = (
+        "objectstate_controlled_identity_scenario_audit_pass"
+        if all(readiness.values())
+        else "objectstate_controlled_identity_scenario_audit_fail"
+    )
+    if payload["status"] != expected_status:
+        raise ValueError("identity scenario audit status must match readiness")
+    if not isinstance(payload.get("object_tracks"), list):
+        raise ValueError("identity scenario audit requires object_tracks")
+    if not isinstance(payload.get("issues"), list):
+        raise ValueError("identity scenario audit requires issues")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not claim_policy.get("identity_scenario_required_for_handoff_pass")
+        or not claim_policy.get("scenario_audit_does_not_read_image_pixels")
+        or not claim_policy.get("scenario_audit_does_not_prove_model_quality")
+        or not claim_policy.get("scenario_audit_does_not_verify_lighting_or_camera_motion")
+    ):
+        raise ValueError("identity scenario audit must preserve claim policy")
     return payload
 
 

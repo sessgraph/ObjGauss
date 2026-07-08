@@ -65,6 +65,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA,
+    OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
@@ -803,6 +804,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA == (
         "objgauss-objectstate-controlled-candidate-artifact-file-audit-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA == (
+        "objgauss-objectstate-controlled-identity-scenario-audit-v1"
     )
     identity_predictions = {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
