@@ -537,6 +537,10 @@ def _batch_next_commands(spec_path: Path | None) -> list[str]:
         return []
     return [
         (
+            "uv run objgauss object-state audit-bop-phase1-authoring-progress "
+            f"{spec_path} --summary-output {spec_path.parent / 'bop-phase1-authoring-progress.json'}"
+        ),
+        (
             "uv run objgauss object-state audit-bop-local-row-batch-readiness "
             f"{spec_path} --summary-output {spec_path.parent / 'bop-local-row-batch-readiness.json'}"
         )

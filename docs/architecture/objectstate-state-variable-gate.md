@@ -1045,6 +1045,49 @@ readiness, run local-row handoff, train models, claim metric pass, claim
 intervention / counterfactual gates, claim world model, use replay /
 diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001
+
+Audit BOP Phase 1 sample authoring progress before the heavier batch readiness
+gate.
+
+Required behavior:
+
+- Input a native BOP local-row batch spec.
+- Resolve each sample's scene root, authoring helper files, target condition
+  sidecar, per-frame Gaussian evidence and target ObjectState candidate
+  artifact.
+- Check whether `init-bop-phase1-sample-workspaces` helper files are present.
+- Check whether the target `bop-condition-sidecar.json` exists and validates
+  against the BOP condition sidecar schema.
+- Check whether selected BOP frames have local `gaussians/<frame>.ply` files.
+- Check whether the target `objectstates.json` exists and validates against
+  the trainable kernel artifact schema accepted by the identity route.
+- Produce per-sample issues, next commands and a Markdown table without running
+  readiness, handoff, identity eval, prediction eval or training.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_phase1_authoring_progress`.
+- Summary schema:
+  `objgauss-objectstate-bop-phase1-authoring-progress-v1`.
+- Core function:
+  `objectstate_bop_phase1_authoring_progress(...)`.
+- CLI command:
+  `objgauss object-state audit-bop-phase1-authoring-progress <batch-spec.json>`.
+- `--require-ready-for-batch-readiness` fails unless every sample has a valid
+  target condition sidecar, per-frame Gaussian evidence and valid target
+  candidate artifact.
+- `init-bop-phase1-sample-workspaces` now points to this audit before the
+  heavier `audit-bop-local-row-batch-readiness` gate.
+
+Current scope is read-only authoring progress accounting. It does not download
+BOP data, copy datasets, create GT, infer condition metadata, create condition
+sidecars, create ObjectState candidate artifacts, reconstruct Gaussians, run
+readiness, run local-row handoff, train models, claim metric pass, claim
+intervention / counterfactual gates, claim world model, use replay /
+diffusion, write public samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample

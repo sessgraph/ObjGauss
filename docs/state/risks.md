@@ -63,3 +63,11 @@ sample 写出 condition CSV 模板、condition sidecar draft 和 README / next c
 `objectstates.json`；该缓解只初始化 per-sample authoring helper，不创建真实 target
 sidecar、candidate artifact、Gaussian evidence 或 GT，不运行 readiness / handoff、不训练
 模型、不声明 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001`
+新增 `audit-bop-phase1-authoring-progress`，可从 native BOP local-row batch spec 只读检查
+每个 sample 的 helper files、target `bop-condition-sidecar.json`、per-frame
+`gaussians/<frame>.ply` 和 target `objectstates.json` 是否已经填到可进入 batch readiness
+input；该缓解只减少 sample authoring 到 batch readiness 之间的漏填 / 路径漂移风险，不创建
+target files、不生成 Gaussian、不运行 readiness / handoff、不训练模型、不声明 metric pass、
+intervention gate 或 world-model evidence。

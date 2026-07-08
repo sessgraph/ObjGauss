@@ -181,6 +181,10 @@ sidecar，不生成 Gaussian evidence，不运行 readiness / handoff。
 的 authoring 目录初始化出来，写 condition CSV 模板、sidecar draft 和 README / next
 commands；它仍不创建真实 target sidecar / candidate artifact，不生成 Gaussian evidence，
 不运行 readiness / handoff。
+`OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001` 继续把 sample workspace 到 batch
+readiness 之间的人工填充状态做成只读审计：检查 helper files、target condition sidecar、
+per-frame Gaussian evidence 和 target candidate artifact 是否已经可进入 batch readiness
+input；它仍不创建 target files、不运行 readiness / handoff、不训练模型。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -302,6 +306,44 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001: Audit BOP sample authoring progress
+
+- 状态: done / authoring-progress-preflight
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 sample input preparation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在 `init-bop-phase1-sample-workspaces` 和
+  `audit-bop-local-row-batch-readiness` 之间增加一个轻量 read-only audit，显式报告
+  每个 sample 的 target sidecar、Gaussian evidence 和 candidate artifact 是否已经填好。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_phase1_authoring_progress`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-phase1-authoring-progress-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-bop-phase1-authoring-progress <batch-spec.json>`。
+  - audit 会检查 per-sample helper files、target `bop-condition-sidecar.json`、
+    selected-frame `gaussians/<frame>.ply` 和 target `objectstates.json`。
+  - `--sample-table-output` 可写 Markdown progress table。
+  - `--require-ready-for-batch-readiness` 可要求所有 sample 已具备 target sidecar、
+    Gaussian evidence 和正式 trainable artifact schema。
+  - `init-bop-phase1-sample-workspaces` 的 batch next commands 已先指向该 audit，再进入
+    `audit-bop-local-row-batch-readiness`。
+- 边界:
+  - 只做 read-only authoring progress audit，不下载 BOP、不复制 dataset。
+  - 不创建 GT，不推断真实 condition metadata。
+  - 不创建 target `bop-condition-sidecar.json` 或 `objectstates.json`。
+  - 不生成 Gaussian evidence，不运行 readiness / handoff，不训练模型。
+  - 不声明 metric pass / intervention gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_authoring_progress.py objgauss/core/objectstate_bop_phase1_sample_workspace.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_authoring_progress.py -q`: passed，4 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_authoring_progress.py tests/test_objectstate_bop_phase1_sample_workspace.py tests/test_objectstate_bop_phase1_batch_workspace.py tests/test_objectstate_bop_local_row_batch_readiness.py tests/test_core_namespace.py -q`: passed，24 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py -q`: passed，86 tests。
+  - `uv run --extra dev pytest`: passed，498 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-PHASE1-SAMPLE-WORKSPACES-001: Initialize BOP sample authoring workspaces
 

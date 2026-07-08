@@ -338,6 +338,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_sample_workspace",
         "OBJECTSTATE_BOP_PHASE1_SAMPLE_WORKSPACES_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_PHASE1_AUTHORING_PROGRESS_SCHEMA": (
+        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "OBJECTSTATE_BOP_PHASE1_AUTHORING_PROGRESS_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
         "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA",
@@ -510,6 +514,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_phase1_sample_workspace",
         "objectstate_bop_phase1_sample_workspaces",
     ),
+    "objectstate_bop_phase1_authoring_progress": (
+        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "objectstate_bop_phase1_authoring_progress",
+    ),
     "objectstate_bop_gaussian_evidence_preflight": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
         "objectstate_bop_gaussian_evidence_preflight",
@@ -645,6 +653,10 @@ _EXPORTS = {
     "validate_objectstate_bop_phase1_sample_workspaces_summary": (
         "objgauss.core.objectstate_bop_phase1_sample_workspace",
         "validate_objectstate_bop_phase1_sample_workspaces_summary",
+    ),
+    "validate_objectstate_bop_phase1_authoring_progress_summary": (
+        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "validate_objectstate_bop_phase1_authoring_progress_summary",
     ),
     "validate_objectstate_bop_gaussian_evidence_preflight_summary": (
         "objgauss.core.objectstate_bop_gaussian_evidence_preflight",

@@ -224,6 +224,9 @@ from objgauss.core.objectstate_bop_phase1_batch_workspace import (
 from objgauss.core.objectstate_bop_phase1_sample_workspace import (
     objectstate_bop_phase1_sample_workspaces,
 )
+from objgauss.core.objectstate_bop_phase1_authoring_progress import (
+    objectstate_bop_phase1_authoring_progress,
+)
 from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
     objectstate_bop_gaussian_evidence_preflight,
 )
@@ -3461,6 +3464,72 @@ def _object_state_init_bop_phase1_sample_workspaces(args: argparse.Namespace) ->
         raise ValueError("BOP Phase 1 sample workspaces are not ready to author")
 
 
+def _object_state_audit_bop_phase1_authoring_progress(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_bop_phase1_authoring_progress(
+        args.batch_spec,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+    )
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.sample_table_output:
+        args.sample_table_output.parent.mkdir(parents=True, exist_ok=True)
+        args.sample_table_output.write_text(
+            summary["sample_table_markdown"],
+            encoding="utf-8",
+        )
+        print(f"sample_table={args.sample_table_output}")
+    print(f"schema={summary['schema']}")
+    print(f"bop_phase1_authoring_progress_status={summary['status']}")
+    print(f"samples={summary['row_counts']['samples']}")
+    print(
+        "sample_workspace_helpers_present="
+        f"{summary['row_counts']['sample_workspace_helpers_present']}"
+    )
+    print(
+        "target_condition_sidecars_valid="
+        f"{summary['row_counts']['target_condition_sidecars_valid']}"
+    )
+    print(
+        "present_gaussian_files="
+        f"{summary['row_counts']['present_gaussian_files']}"
+    )
+    print(
+        "missing_gaussian_files="
+        f"{summary['row_counts']['missing_gaussian_files']}"
+    )
+    print(
+        "target_candidate_artifacts_valid="
+        f"{summary['row_counts']['target_candidate_artifacts_valid']}"
+    )
+    print(
+        "samples_ready_for_batch_readiness_input="
+        f"{summary['row_counts']['samples_ready_for_batch_readiness_input']}"
+    )
+    for record in summary["sample_records"]:
+        ready = record["readiness"]["ready_for_batch_readiness_input"]
+        print(
+            f"sample_authoring={record['sample_id']}:"
+            f"ready_for_batch_readiness_input={str(ready).lower()}"
+        )
+        for issue in record["issues"]:
+            print(f"sample_issue={record['sample_id']}:{issue}")
+    for blocker in summary["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.require_ready_for_batch_readiness and not summary["readiness"][
+        "all_samples_ready_for_batch_readiness_input"
+    ]:
+        raise ValueError(
+            "BOP Phase 1 authoring progress is not ready for batch readiness"
+        )
+
+
 def _write_bop_batch_samples_csv_template(
     output: Path,
     summary: Mapping[str, object],
@@ -6450,6 +6519,36 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_bop_phase1_sample_workspaces.set_defaults(
         handler=_object_state_init_bop_phase1_sample_workspaces
+    )
+    audit_bop_phase1_authoring_progress = object_state_subparsers.add_parser(
+        "audit-bop-phase1-authoring-progress",
+        help=(
+            "read-only audit of BOP Phase 1 sample authoring progress before "
+            "batch readiness"
+        ),
+    )
+    audit_bop_phase1_authoring_progress.add_argument("batch_spec", type=Path)
+    audit_bop_phase1_authoring_progress.add_argument("--summary-output", type=Path)
+    audit_bop_phase1_authoring_progress.add_argument(
+        "--sample-table-output",
+        type=Path,
+        help="write a Markdown table summarizing per-sample authoring progress",
+    )
+    audit_bop_phase1_authoring_progress.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    audit_bop_phase1_authoring_progress.add_argument(
+        "--require-ready-for-batch-readiness",
+        action="store_true",
+        help=(
+            "fail unless target sidecars, Gaussian evidence and candidate "
+            "artifacts are present for every sample"
+        ),
+    )
+    audit_bop_phase1_authoring_progress.set_defaults(
+        handler=_object_state_audit_bop_phase1_authoring_progress
     )
     audit_bop_gaussian_evidence = object_state_subparsers.add_parser(
         "audit-bop-gaussian-evidence",

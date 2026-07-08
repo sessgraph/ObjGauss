@@ -799,6 +799,16 @@ intervention gate / world model。
 `README.md` / next commands。它不创建真实 target sidecar 或 candidate artifact，不生成
 Gaussian evidence，不运行 readiness / handoff，不训练模型，也不声明 metric pass /
 intervention gate / world model。
+随后完成 `OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001`：
+新增 `objgauss.core.objectstate_bop_phase1_authoring_progress`，schema 为
+`objgauss-objectstate-bop-phase1-authoring-progress-v1`，CLI 为
+`objgauss object-state audit-bop-phase1-authoring-progress <batch-spec.json>`。
+该命令只读检查每个 sample 的 helper files、target `bop-condition-sidecar.json`、
+per-frame `gaussians/<frame>.ply` evidence 和 target `objectstates.json`，并输出
+per-sample issues、next commands 和 Markdown table。只有 target sidecar schema 有效、
+Gaussian evidence 齐全且 candidate artifact 至少是正式 trainable artifact schema 时，
+才标记 ready for batch readiness input；它不运行 batch readiness / handoff，不生成或训练
+模型，也不声明 metric pass / intervention gate / world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
@@ -4061,9 +4071,10 @@ npm run acceptance:demo
    `init-bop-phase1-batch-workspace <dataset-root> --workspace-root <dir>`，再运行
    `init-bop-phase1-sample-workspaces <batch-spec.json>` 生成每个 sample 的 condition CSV
    模板和 README；随后填齐真实 `bop-condition-sidecar.json`、per-frame Gaussian evidence
-   和 `objectstates.json`，再跑 `audit-bop-local-row-batch-readiness`，并按 readiness 缺口
-   决定是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
-   replay buffer、diffusion 或 geometry / camera unfreeze。
+   和 `objectstates.json`，先跑 `audit-bop-phase1-authoring-progress` 确认 target files
+   已经可进入 batch readiness input，再跑 `audit-bop-local-row-batch-readiness`，并按
+   readiness 缺口决定是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要
+   直接跳到 rollout、replay buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
