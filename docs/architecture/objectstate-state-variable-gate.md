@@ -1330,6 +1330,10 @@ Implemented v0.1 facts:
   - `prediction-candidates.template.json`;
   - `intervention-candidates.template.json`;
   - a local README with the full readiness / handoff command chain.
+- `write_objectstate_controlled_reality_candidate_templates_from_manifest(...)`
+  reads an already accepted controlled capture manifest, including BOP adapter
+  output, and writes the same draft templates without requiring bundle CSV
+  files.
 - The template schemas are deliberately different from the evaluator input
   schemas:
   - `objgauss-objectstate-controlled-prediction-candidates-v1`;
@@ -1341,16 +1345,55 @@ Implemented v0.1 facts:
   baseline outputs replace all TODO values.
 - CLI command:
   `objgauss object-state init-controlled-reality-candidates <bundle-root> --output-dir <dir>`.
+- Manifest-first CLI command:
+  `objgauss object-state init-controlled-reality-candidates-from-manifest <capture-manifest.json> --output-dir <dir>`.
 - CLI supports capture bundle file names, `--candidate-id`,
   `--candidate-source`, `--artifact-ref`, `--summary-output` and `--force`.
-- Generated README and summary next commands point to
-  `finalize-controlled-reality-candidates` before readiness / handoff, so
-  authors do not need to hand-edit evaluator schemas.
+- Generated README and summary next commands point to either
+  `finalize-controlled-reality-candidates` for full prediction + intervention
+  bundles, or `finalize-controlled-prediction-candidates` for manifest-first
+  pose datasets where intervention rows are absent. Authors do not need to
+  hand-edit evaluator schemas.
 
 Current scope remains candidate authoring only. It does not collect capture
 data, create GT, run prediction / intervention models, train Gaussian or
 dynamics models, write eval-ready pass candidates, use replay / diffusion,
 write public samples or mutate viewer defaults.
+
+### OBJECTSTATE-CONTROLLED-PREDICTION-CANDIDATE-FINALIZE-001
+
+Add a checked prediction-only transition for accepted capture manifests that
+have pose tracks but no action events.
+
+Implemented v0.1 facts:
+
+- Core function:
+  `finalize_objectstate_controlled_prediction_candidate_template(...)`.
+- Summary schema:
+  `objgauss-objectstate-controlled-prediction-candidate-finalize-v1`.
+- Input is one filled
+  `objgauss-objectstate-controlled-prediction-candidates-template-v1` file.
+- Finalize requires:
+  - candidate metadata to have non-TODO `candidate_id`, `source` and
+    `artifact_refs`;
+  - every `predicted_position` and `history_baseline_position` to be numeric
+    length-3 vectors;
+  - TODO values to be absent from required fields;
+  - obvious GT leakage fields such as `target_position` or `target_pose` to be
+    absent.
+- Finalize writes `prediction-candidates.json` using
+  `objgauss-objectstate-controlled-prediction-candidates-v1` and validates it
+  immediately with the existing prediction candidate validator.
+- CLI command:
+  `objgauss object-state finalize-controlled-prediction-candidates <prediction-template.json> --output-dir <dir>`.
+- CLI supports optional `--capture-manifest` for the printed
+  `eval-controlled-prediction` command, `--summary-output` and `--force`.
+
+Current scope remains prediction candidate JSON finalization only. It does not
+collect capture data, create GT, run a prediction model, evaluate metrics,
+claim prediction pass, create intervention rows, use replay / diffusion, write
+public samples or mutate viewer defaults. For a full causal / intervention gate,
+use a dataset with action events and the full reality candidate finalizer.
 
 ### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001
 

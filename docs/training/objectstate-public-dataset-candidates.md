@@ -132,11 +132,55 @@ ObjGauss has not produced per-frame Gaussian evidence. With
 `--require-gaussian-files`, the command expects valid `gaussians/<frame>.ply`
 or `.splat` files for every selected frame.
 
+After acceptance passes, initialize candidate authoring directly from the BOP
+controlled capture manifest:
+
+```bash
+uv run objgauss object-state init-controlled-reality-candidates-from-manifest \
+  outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
+  --output-dir outputs/captures/bop-ycbv-scene-000001/reality-candidates \
+  --candidate-id bop-ycbv-objectstate-candidate \
+  --candidate-source local-objectstate-candidate \
+  --artifact-ref outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/template-summary.json
+```
+
+BOP pose scenes do not contain action events, so this path should create
+prediction draft rows and keep intervention draft rows at zero. After filling
+`prediction-candidates.template.json` with external model and history-baseline
+outputs, finalize only the prediction candidates:
+
+```bash
+uv run objgauss object-state finalize-controlled-prediction-candidates \
+  outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-candidates.template.json \
+  --output-dir outputs/captures/bop-ycbv-scene-000001/reality-candidates \
+  --capture-manifest outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-finalize-summary.json
+```
+
+Then run the Real Predictive Gate:
+
+```bash
+uv run objgauss object-state eval-controlled-prediction \
+  outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
+  outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-candidates.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/prediction-eval-summary.json \
+  --controlled-real-output outputs/captures/bop-ycbv-scene-000001/reality-candidates/controlled-real-prediction.json
+```
+
+This still does not prove the causal / counterfactual gate. It only moves the
+BOP route from blocked rows toward a real prediction pass / fail row once
+Gaussian evidence, ObjectState candidate output and future-pose predictions are
+available.
+
 ## Hard Blockers
 
 - No public candidate directly supplies ObjGauss per-frame Gaussian evidence.
 - Public candidates still require a local adapter run and file audit before
   they become controlled capture manifests.
+- BOP can support identity and future-pose prediction rows, but its pose scene
+  route has no action events and therefore cannot claim the intervention /
+  counterfactual gate.
 - Counterfactual rows remain blocked until action-conditioned outcomes are
   evaluated against real outcomes.
 - Dataset license terms must be reviewed before any public demo,

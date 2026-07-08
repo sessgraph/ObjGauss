@@ -14,15 +14,22 @@ from objgauss.core.objectstate_controlled_prediction_eval import (
 )
 from objgauss.core.objectstate_controlled_reality_candidate_template import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
+    finalize_objectstate_controlled_prediction_candidate_template,
     finalize_objectstate_controlled_reality_candidate_templates,
+    validate_objectstate_controlled_prediction_candidate_finalize_summary,
     validate_objectstate_controlled_intervention_candidates_template,
     validate_objectstate_controlled_prediction_candidates_template,
     validate_objectstate_controlled_reality_candidate_finalize_summary,
     validate_objectstate_controlled_reality_candidate_template_summary,
+    write_objectstate_controlled_reality_candidate_templates_from_manifest,
     write_objectstate_controlled_reality_candidate_templates,
+)
+from objgauss.core.objectstate_controlled_capture_import import (
+    objectstate_controlled_capture_manifest_from_bundle,
 )
 
 
@@ -142,6 +149,79 @@ def test_object_state_init_controlled_reality_candidates_cli(tmp_path, capsys):
     assert (output_dir / "intervention-candidates.template.json").is_file()
 
 
+def test_controlled_reality_candidate_templates_from_manifest(tmp_path):
+    bundle_root = tmp_path / "bundle"
+    manifest_path = tmp_path / "capture-manifest.json"
+    output_dir = tmp_path / "candidate-templates"
+    _write_capture_bundle(bundle_root)
+    manifest = objectstate_controlled_capture_manifest_from_bundle(bundle_root)
+    _write_json(manifest_path, manifest)
+
+    summary = write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        manifest_path,
+        output_dir=output_dir,
+        candidate_id="manifest-draft",
+        candidate_source="manifest fixture",
+        artifact_ref="outputs/controlled-real/test/objectstates.json",
+    )
+
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA
+    assert summary["source"]["kind"] == "capture_manifest"
+    assert summary["capture_manifest"] == str(manifest_path)
+    assert summary["bundle_root"] == ""
+    assert summary["row_counts"]["prediction_drafts"] == 2
+    assert summary["row_counts"]["intervention_drafts"] == 1
+    assert "finalize_prediction_candidates" in summary["next_commands"]
+    assert "eval_prediction" in summary["next_commands"]
+    assert "audit_full_readiness" not in summary["next_commands"]
+    assert validate_objectstate_controlled_reality_candidate_template_summary(summary) == summary
+
+
+def test_object_state_init_controlled_reality_candidates_from_manifest_cli(
+    tmp_path,
+    capsys,
+):
+    bundle_root = tmp_path / "bundle"
+    manifest_path = tmp_path / "capture-manifest.json"
+    output_dir = tmp_path / "candidate-templates"
+    summary_path = tmp_path / "candidate-template-summary.json"
+    _write_capture_bundle(bundle_root)
+    manifest = objectstate_controlled_capture_manifest_from_bundle(bundle_root)
+    _write_json(manifest_path, manifest)
+
+    assert (
+        main(
+            [
+                "object-state",
+                "init-controlled-reality-candidates-from-manifest",
+                str(manifest_path),
+                "--output-dir",
+                str(output_dir),
+                "--candidate-id",
+                "manifest-cli",
+                "--candidate-source",
+                "cli manifest fixture",
+                "--artifact-ref",
+                "outputs/controlled-real/test/objectstates.json",
+                "--summary-output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA}" in stdout
+    assert f"capture_manifest={manifest_path}" in stdout
+    assert "prediction_drafts=2" in stdout
+    assert "finalize_prediction_candidates_command=" in stdout
+    assert "eval_prediction_command=" in stdout
+    assert summary["source"]["kind"] == "capture_manifest"
+    assert (output_dir / "prediction-candidates.template.json").is_file()
+
+
 def test_finalize_controlled_reality_candidate_templates_outputs_eval_json(tmp_path):
     bundle_root = tmp_path / "bundle"
     template_dir = tmp_path / "candidate-templates"
@@ -194,6 +274,91 @@ def test_finalize_controlled_reality_candidate_templates_outputs_eval_json(tmp_p
         "action_conditioned_position"
     ] == [0.2, 0.0, 0.2]
     assert str(bundle_root) in summary["next_commands"]["audit_full_readiness"]
+
+
+def test_finalize_controlled_prediction_candidate_template_outputs_eval_json(tmp_path):
+    bundle_root = tmp_path / "bundle"
+    manifest_path = tmp_path / "capture-manifest.json"
+    template_dir = tmp_path / "candidate-templates"
+    output_dir = tmp_path / "prediction-candidates"
+    _write_capture_bundle(bundle_root)
+    manifest = objectstate_controlled_capture_manifest_from_bundle(bundle_root)
+    _write_json(manifest_path, manifest)
+    write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        manifest_path,
+        output_dir=template_dir,
+        candidate_id="prediction-filled",
+        candidate_source="unit-test predictor",
+        artifact_ref="outputs/controlled-real/test/objectstates.json",
+    )
+    prediction_template_path = template_dir / "prediction-candidates.template.json"
+    _fill_prediction_template(prediction_template_path)
+
+    summary = finalize_objectstate_controlled_prediction_candidate_template(
+        prediction_template_path,
+        output_dir=output_dir,
+        capture_manifest=manifest_path,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA
+    assert summary["sample_id"] == "controlled-tabletop-cup-001"
+    assert summary["row_counts"]["prediction_candidates"] == 2
+    assert validate_objectstate_controlled_prediction_candidate_finalize_summary(
+        summary
+    ) == summary
+    prediction_candidates = json.loads(
+        (output_dir / "prediction-candidates.json").read_text(encoding="utf-8")
+    )
+    assert validate_objectstate_controlled_prediction_candidates(
+        prediction_candidates
+    )["schema"] == "objgauss-objectstate-controlled-prediction-candidates-v1"
+    assert str(manifest_path) in summary["next_commands"]["eval_prediction"]
+
+
+def test_object_state_finalize_controlled_prediction_candidates_cli(tmp_path, capsys):
+    bundle_root = tmp_path / "bundle"
+    manifest_path = tmp_path / "capture-manifest.json"
+    template_dir = tmp_path / "candidate-templates"
+    output_dir = tmp_path / "prediction-candidates"
+    summary_path = tmp_path / "prediction-finalize-summary.json"
+    _write_capture_bundle(bundle_root)
+    manifest = objectstate_controlled_capture_manifest_from_bundle(bundle_root)
+    _write_json(manifest_path, manifest)
+    write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        manifest_path,
+        output_dir=template_dir,
+        candidate_id="prediction-cli-filled",
+        candidate_source="cli prediction fixture",
+        artifact_ref="outputs/controlled-real/test/objectstates.json",
+    )
+    prediction_template_path = template_dir / "prediction-candidates.template.json"
+    _fill_prediction_template(prediction_template_path)
+
+    assert (
+        main(
+            [
+                "object-state",
+                "finalize-controlled-prediction-candidates",
+                str(prediction_template_path),
+                "--output-dir",
+                str(output_dir),
+                "--capture-manifest",
+                str(manifest_path),
+                "--summary-output",
+                str(summary_path),
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA}" in stdout
+    assert "prediction_candidate_count=2" in stdout
+    assert "eval_prediction_command=" in stdout
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA
+    assert (output_dir / "prediction-candidates.json").is_file()
 
 
 def test_finalize_controlled_reality_candidates_rejects_todo_and_gt_leakage(tmp_path):

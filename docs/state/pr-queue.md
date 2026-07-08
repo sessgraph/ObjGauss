@@ -142,7 +142,10 @@ ignored 小型 BOP YCB-V subset，运行 adapter + file audit，再生成本地 
 pre-handoff gate；`--require-gaussian-files` 会要求 expected `gaussians/<frame>.ply`
 真实存在并通过 PLY / `.splat` 格式检查。下一步应在 ignored BOP YCB-V 子集上运行该命令，
 并让 `phase1_gaussian_evidence_ready=true` 后再做 candidate ObjectState artifact 和
-identity / prediction handoff。
+identity / prediction handoff。`OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001`
+已补 manifest-first candidate authoring 和 prediction-only finalizer：BOP acceptance
+输出的 `capture-manifest.json` 可直接生成 prediction template；无 action 的 BOP scene
+不会伪造 intervention rows，只能继续到 `eval-controlled-prediction` 的 pass / fail row。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -214,6 +217,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001: Start BOP prediction candidate authoring from accepted manifests
+
+- 状态: done / manifest-first-prediction-authoring-only
+- 类型: 标准 PR / ObjectState public pose dataset candidate handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 BOP acceptance 输出的 controlled capture manifest 能直接进入 prediction
+  candidate authoring，不再要求先还原成 controlled bundle CSV。
+- 已实施:
+  - 新增 core function
+    `write_objectstate_controlled_reality_candidate_templates_from_manifest(...)`。
+  - 新增 CLI
+    `objgauss object-state init-controlled-reality-candidates-from-manifest`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-prediction-candidate-finalize-v1`。
+  - 新增 core function
+    `finalize_objectstate_controlled_prediction_candidate_template(...)`。
+  - 新增 CLI
+    `objgauss object-state finalize-controlled-prediction-candidates`。
+  - BOP no-action scenes 会生成 prediction draft rows，intervention draft rows 保持
+    0 并记录 issue，避免把缺失 action 数据伪装成 causal gate evidence。
+- 边界:
+  - 不下载 BOP 数据，不写 `outputs/` 或 `public/samples`。
+  - 不重建 Gaussian，不训练模型，不运行 prediction model。
+  - 不创建 reality pass / fail rows；只输出可由外部 candidate 填写和再评估的 JSON。
+  - 不声明 intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_objectstate_bop_capture_adapter.py -q`: passed，21 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，30 tests。
+  - `uv run --extra dev pytest`: passed，406 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: ccf6022。
 
 ### OBJECTSTATE-BOP-CAPTURE-ACCEPTANCE-001: Accept local BOP scene files before handoff
 

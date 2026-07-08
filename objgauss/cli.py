@@ -189,7 +189,9 @@ from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
     objectstate_controlled_reality_bundle_readiness,
 )
 from objgauss.core.objectstate_controlled_reality_candidate_template import (
+    finalize_objectstate_controlled_prediction_candidate_template,
     finalize_objectstate_controlled_reality_candidate_templates,
+    write_objectstate_controlled_reality_candidate_templates_from_manifest,
     write_objectstate_controlled_reality_candidate_templates,
 )
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
@@ -3407,6 +3409,34 @@ def _object_state_init_controlled_reality_candidates(
         print(f"summary={args.summary_output}")
 
 
+def _object_state_init_controlled_reality_candidates_from_manifest(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        args.capture_manifest,
+        output_dir=args.output_dir,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"capture_manifest={summary['capture_manifest']}")
+    print(f"output_dir={summary['output_dir']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"prediction_drafts={summary['row_counts']['prediction_drafts']}")
+    print(f"intervention_drafts={summary['row_counts']['intervention_drafts']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _object_state_finalize_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -3429,6 +3459,30 @@ def _object_state_finalize_controlled_reality_candidates(
     print(
         "intervention_candidate_count="
         f"{summary['row_counts']['intervention_candidates']}"
+    )
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
+def _object_state_finalize_controlled_prediction_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = finalize_objectstate_controlled_prediction_candidate_template(
+        args.prediction_template,
+        output_dir=args.output_dir,
+        capture_manifest=args.capture_manifest,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"output_dir={args.output_dir}")
+    print(f"prediction_candidates={summary['files']['prediction_candidates']}")
+    print(
+        "prediction_candidate_count="
+        f"{summary['row_counts']['prediction_candidates']}"
     )
     for key, command in summary["next_commands"].items():
         print(f"{key}_command={command}")
@@ -5063,6 +5117,48 @@ def _build_parser() -> argparse.ArgumentParser:
     init_controlled_reality_candidates.set_defaults(
         handler=_object_state_init_controlled_reality_candidates
     )
+    init_controlled_reality_candidates_from_manifest = (
+        object_state_subparsers.add_parser(
+            "init-controlled-reality-candidates-from-manifest",
+            help=(
+                "create draft prediction/intervention candidate templates from a "
+                "controlled capture manifest"
+            ),
+        )
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "capture_manifest",
+        type=Path,
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--candidate-id",
+        default="TODO_CANDIDATE_ID",
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--candidate-source",
+        default="TODO_CANDIDATE_SOURCE",
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--artifact-ref",
+        default="TODO_CANDIDATE_ARTIFACT_REF",
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    init_controlled_reality_candidates_from_manifest.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite candidate template files if they already exist",
+    )
+    init_controlled_reality_candidates_from_manifest.set_defaults(
+        handler=_object_state_init_controlled_reality_candidates_from_manifest
+    )
     finalize_controlled_reality_candidates = object_state_subparsers.add_parser(
         "finalize-controlled-reality-candidates",
         help=(
@@ -5096,6 +5192,39 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     finalize_controlled_reality_candidates.set_defaults(
         handler=_object_state_finalize_controlled_reality_candidates
+    )
+    finalize_controlled_prediction_candidates = object_state_subparsers.add_parser(
+        "finalize-controlled-prediction-candidates",
+        help=(
+            "convert a filled prediction candidate template into "
+            "evaluator-ready JSON"
+        ),
+    )
+    finalize_controlled_prediction_candidates.add_argument(
+        "prediction_template",
+        type=Path,
+    )
+    finalize_controlled_prediction_candidates.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    finalize_controlled_prediction_candidates.add_argument(
+        "--capture-manifest",
+        type=Path,
+        help="optional capture manifest path used when printing the eval command",
+    )
+    finalize_controlled_prediction_candidates.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    finalize_controlled_prediction_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite evaluator-ready prediction candidates if they already exist",
+    )
+    finalize_controlled_prediction_candidates.set_defaults(
+        handler=_object_state_finalize_controlled_prediction_candidates
     )
     audit_controlled_reality_evidence_package = object_state_subparsers.add_parser(
         "audit-controlled-reality-evidence-package",

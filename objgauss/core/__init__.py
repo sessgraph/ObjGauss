@@ -250,6 +250,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA",
@@ -330,9 +334,17 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "write_objectstate_controlled_reality_candidate_templates",
     ),
+    "write_objectstate_controlled_reality_candidate_templates_from_manifest": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "write_objectstate_controlled_reality_candidate_templates_from_manifest",
+    ),
     "finalize_objectstate_controlled_reality_candidate_templates": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "finalize_objectstate_controlled_reality_candidate_templates",
+    ),
+    "finalize_objectstate_controlled_prediction_candidate_template": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "finalize_objectstate_controlled_prediction_candidate_template",
     ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
@@ -353,6 +365,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_reality_candidate_finalize_summary": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_reality_candidate_finalize_summary",
+    ),
+    "validate_objectstate_controlled_prediction_candidate_finalize_summary": (
+        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "validate_objectstate_controlled_prediction_candidate_finalize_summary",
     ),
     "validate_objectstate_controlled_reality_evidence_package_summary": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",

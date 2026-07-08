@@ -20,6 +20,17 @@ from objgauss.core.objectstate_controlled_capture import (
 from objgauss.core.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
 )
+from objgauss.core.objectstate_controlled_reality_candidate_template import (
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
+    OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
+    finalize_objectstate_controlled_prediction_candidate_template,
+    validate_objectstate_controlled_prediction_candidate_finalize_summary,
+    validate_objectstate_controlled_reality_candidate_template_summary,
+    write_objectstate_controlled_reality_candidate_templates_from_manifest,
+)
+from objgauss.core.objectstate_controlled_prediction_eval import (
+    validate_objectstate_controlled_prediction_candidates,
+)
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (
@@ -274,6 +285,83 @@ def test_bop_capture_acceptance_cli_writes_file_audit_outputs(tmp_path, capsys):
     assert "no missing files" in missing_files_path.read_text(encoding="utf-8")
 
 
+def test_bop_acceptance_manifest_initializes_prediction_candidates(tmp_path):
+    _write_bop_scene(tmp_path)
+    _write_gaussian_frames(tmp_path)
+    capture_manifest_path = tmp_path / "capture-manifest.json"
+    template_dir = tmp_path / "reality-candidates"
+
+    acceptance = objectstate_bop_capture_acceptance_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        require_gaussian_files=True,
+    )
+    _write_json(capture_manifest_path, acceptance["manifest"])
+
+    summary = write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        capture_manifest_path,
+        output_dir=template_dir,
+        candidate_id="bop-ycbv-candidate",
+        candidate_source="bop candidate fixture",
+        artifact_ref="outputs/captures/bop-ycbv-scene-000001/objectstates.json",
+    )
+
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA
+    assert summary["source"]["kind"] == "capture_manifest"
+    assert summary["sample"]["sample_id"] == "bop-ycbv-scene-000001"
+    assert summary["readiness"]["capture_prediction_stage_ready"] is True
+    assert summary["readiness"]["capture_intervention_stage_ready"] is False
+    assert summary["row_counts"]["prediction_drafts"] == 4
+    assert summary["row_counts"]["intervention_drafts"] == 0
+    assert "no intervention draft rows were generated" in summary["issues"]
+    assert "finalize_prediction_candidates" in summary["next_commands"]
+    assert "finalize_candidates" not in summary["next_commands"]
+    assert validate_objectstate_controlled_reality_candidate_template_summary(summary) == summary
+
+
+def test_bop_prediction_template_can_finalize_without_intervention_rows(tmp_path):
+    _write_bop_scene(tmp_path)
+    _write_gaussian_frames(tmp_path)
+    capture_manifest_path = tmp_path / "capture-manifest.json"
+    template_dir = tmp_path / "reality-candidates"
+    output_dir = tmp_path / "prediction-candidates"
+
+    acceptance = objectstate_bop_capture_acceptance_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        require_gaussian_files=True,
+    )
+    _write_json(capture_manifest_path, acceptance["manifest"])
+    write_objectstate_controlled_reality_candidate_templates_from_manifest(
+        capture_manifest_path,
+        output_dir=template_dir,
+        candidate_id="bop-ycbv-candidate",
+        candidate_source="bop candidate fixture",
+        artifact_ref="outputs/captures/bop-ycbv-scene-000001/objectstates.json",
+    )
+    prediction_template_path = template_dir / "prediction-candidates.template.json"
+    prediction_template = _read_json(prediction_template_path)
+    for index, row in enumerate(prediction_template["predictions"]):
+        value = float(index) * 0.01
+        row["predicted_position"] = [value, 0.0, 0.03]
+        row["history_baseline_position"] = [value + 0.01, 0.0, 0.03]
+    _write_json(prediction_template_path, prediction_template)
+
+    summary = finalize_objectstate_controlled_prediction_candidate_template(
+        prediction_template_path,
+        output_dir=output_dir,
+        capture_manifest=capture_manifest_path,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA
+    assert summary["row_counts"]["prediction_candidates"] == 4
+    assert validate_objectstate_controlled_prediction_candidate_finalize_summary(summary) == summary
+    prediction_candidates = _read_json(output_dir / "prediction-candidates.json")
+    assert validate_objectstate_controlled_prediction_candidates(
+        prediction_candidates
+    )["sample_id"] == "bop-ycbv-scene-000001"
+
+
 def test_bop_capture_adapter_rejects_duplicate_obj_ids(tmp_path):
     _write_bop_scene(tmp_path)
     scene_gt = json.loads((tmp_path / "scene_gt.json").read_text(encoding="utf-8"))
@@ -358,3 +446,11 @@ def _write_gaussian_frames(root) -> None:
     (root / "gaussians").mkdir()
     for frame_id in range(3):
         (root / "gaussians" / f"{frame_id:06d}.ply").write_bytes(PLY_BYTES)
+
+
+def _read_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_json(path, payload) -> None:
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

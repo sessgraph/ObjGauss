@@ -75,6 +75,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
@@ -177,6 +178,7 @@ from objgauss.core import (
     evaluate_controlled_real_manifest_reality_gate,
     evaluate_synthetic_stability_gate,
     evaluate_synthetic_stability_suite_gate,
+    finalize_objectstate_controlled_prediction_candidate_template,
     finalize_objectstate_controlled_reality_candidate_templates,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
@@ -228,6 +230,7 @@ from objgauss.core import (
     objectstate_controlled_reality_bundle_readiness,
     objectstate_controlled_reality_evidence_package,
     write_objectstate_controlled_reality_candidate_templates,
+    write_objectstate_controlled_reality_candidate_templates_from_manifest,
     objectstate_identity_predictions_from_trainable_artifact,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
@@ -314,6 +317,7 @@ from objgauss.core import (
     validate_objectstate_controlled_intervention_candidates_template,
     validate_objectstate_controlled_intervention_eval_summary,
     validate_objectstate_controlled_prediction_candidates,
+    validate_objectstate_controlled_prediction_candidate_finalize_summary,
     validate_objectstate_controlled_prediction_candidates_template,
     validate_objectstate_controlled_prediction_eval_summary,
     validate_objectstate_controlled_reality_bundle_handoff_summary,
@@ -1051,6 +1055,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA == (
         "objgauss-objectstate-controlled-reality-candidate-finalize-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA == (
+        "objgauss-objectstate-controlled-prediction-candidate-finalize-v1"
+    )
     assert OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA == (
         "objgauss-objectstate-controlled-reality-evidence-package-v1"
     )
@@ -1058,11 +1065,14 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_controlled_reality_bundle_readiness is not None
     assert objectstate_controlled_reality_evidence_package is not None
     assert write_objectstate_controlled_reality_candidate_templates is not None
+    assert write_objectstate_controlled_reality_candidate_templates_from_manifest is not None
     assert finalize_objectstate_controlled_reality_candidate_templates is not None
+    assert finalize_objectstate_controlled_prediction_candidate_template is not None
     assert validate_objectstate_controlled_reality_bundle_handoff_summary is not None
     assert validate_objectstate_controlled_reality_bundle_readiness_summary is not None
     assert validate_objectstate_controlled_reality_candidate_template_summary is not None
     assert validate_objectstate_controlled_reality_candidate_finalize_summary is not None
+    assert validate_objectstate_controlled_prediction_candidate_finalize_summary is not None
     assert (
         validate_objectstate_controlled_reality_evidence_package_summary
         is not None

@@ -611,6 +611,21 @@ blocked seed。默认可验证 RGB / pose BOP scene 文件；使用 `--require-g
 文件存在且格式通过时 `phase1_gaussian_evidence_ready=true`。当前仍不下载 BOP 数据、不生成
 Gaussian、不训练模型、不评分 ObjectState candidates、不创建 pass rows。
 
+随后新增 `OBJECTSTATE-BOP-PREDICTION-CANDIDATE-HANDOFF-001`：`objgauss.core.objectstate_controlled_reality_candidate_template`
+现在支持 manifest-first candidate authoring。新增
+`write_objectstate_controlled_reality_candidate_templates_from_manifest(...)` 和 CLI
+`objgauss object-state init-controlled-reality-candidates-from-manifest <capture-manifest.json>`，
+可从 BOP acceptance 输出的 controlled capture manifest 直接生成
+`prediction-candidates.template.json` / `intervention-candidates.template.json` 和 README。
+对于无 action 的 BOP pose scene，prediction draft rows 会生成，intervention draft rows
+保持 0 并记录 issue。新增
+`finalize_objectstate_controlled_prediction_candidate_template(...)` 和 CLI
+`objgauss object-state finalize-controlled-prediction-candidates`，可把已填写的
+prediction template 转成 evaluator-ready `prediction-candidates.json`，再交给
+`eval-controlled-prediction` 形成真实 prediction pass / fail row。该切片不创建 GT、不运行
+prediction model、不重建 Gaussian、不训练模型、不创建 pass row、不声明 intervention /
+counterfactual gate 或 world model。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

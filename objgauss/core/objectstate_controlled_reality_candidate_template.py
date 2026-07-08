@@ -7,6 +7,8 @@ from typing import Any, Mapping, Sequence
 from objgauss.core.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     objectstate_controlled_capture_summary,
+    read_objectstate_controlled_capture_manifest,
+    validate_objectstate_controlled_capture_manifest,
 )
 from objgauss.core.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_manifest_from_bundle,
@@ -25,6 +27,9 @@ OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA = (
 )
 OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA = (
     "objgauss-objectstate-controlled-reality-candidate-finalize-v1"
+)
+OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA = (
+    "objgauss-objectstate-controlled-prediction-candidate-finalize-v1"
 )
 OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA = (
     "objgauss-objectstate-controlled-prediction-candidates-template-v1"
@@ -66,7 +71,6 @@ def write_objectstate_controlled_reality_candidate_templates(
     force: bool = False,
 ) -> dict[str, Any]:
     root = Path(bundle_root)
-    out = Path(output_dir)
     manifest = objectstate_controlled_capture_manifest_from_bundle(
         root,
         sample_json=sample_json,
@@ -75,19 +79,68 @@ def write_objectstate_controlled_reality_candidate_templates(
         annotations_csv=annotations_csv,
         actions_csv=actions_csv,
     )
-    capture_summary = objectstate_controlled_capture_summary(manifest)
-    sample = manifest["sample"]
+    return _write_candidate_templates_for_manifest(
+        manifest,
+        output_dir=output_dir,
+        source={"kind": "bundle", "bundle_root": str(root)},
+        candidate_id=candidate_id,
+        candidate_source=candidate_source,
+        artifact_ref=artifact_ref,
+        force=force,
+    )
+
+
+def write_objectstate_controlled_reality_candidate_templates_from_manifest(
+    capture_manifest: str | Path,
+    *,
+    output_dir: str | Path,
+    candidate_id: str = "TODO_CANDIDATE_ID",
+    candidate_source: str = "TODO_CANDIDATE_SOURCE",
+    artifact_ref: str = "TODO_CANDIDATE_ARTIFACT_REF",
+    force: bool = False,
+) -> dict[str, Any]:
+    manifest_path = Path(capture_manifest)
+    manifest = read_objectstate_controlled_capture_manifest(manifest_path)
+    return _write_candidate_templates_for_manifest(
+        manifest,
+        output_dir=output_dir,
+        source={
+            "kind": "capture_manifest",
+            "capture_manifest": str(manifest_path),
+            "source_root": str(manifest_path.parent),
+        },
+        candidate_id=candidate_id,
+        candidate_source=candidate_source,
+        artifact_ref=artifact_ref,
+        force=force,
+    )
+
+
+def _write_candidate_templates_for_manifest(
+    manifest: Mapping[str, Any],
+    *,
+    output_dir: str | Path,
+    source: Mapping[str, str],
+    candidate_id: str,
+    candidate_source: str,
+    artifact_ref: str,
+    force: bool,
+) -> dict[str, Any]:
+    checked_manifest = validate_objectstate_controlled_capture_manifest(manifest)
+    capture_summary = objectstate_controlled_capture_summary(checked_manifest)
+    sample = checked_manifest["sample"]
+    out = Path(output_dir)
     candidate = {
         "candidate_id": str(candidate_id),
         "source": str(candidate_source),
         "artifact_refs": [str(artifact_ref)],
     }
     prediction_template = _prediction_template(
-        manifest,
+        checked_manifest,
         candidate=candidate,
     )
     intervention_template = _intervention_template(
-        manifest,
+        checked_manifest,
         candidate=candidate,
     )
     files = {
@@ -98,10 +151,6 @@ def write_objectstate_controlled_reality_candidate_templates(
     _ensure_can_write(files.values(), force=force)
     _write_json(files["prediction_template"], prediction_template)
     _write_json(files["intervention_template"], intervention_template)
-    files["readme"].write_text(
-        _readme_text(bundle_root=root, output_dir=out),
-        encoding="utf-8",
-    )
     prediction_count = len(prediction_template["predictions"])
     intervention_count = len(intervention_template["interventions"])
     readiness = {
@@ -119,12 +168,28 @@ def write_objectstate_controlled_reality_candidate_templates(
         prediction_count=prediction_count,
         intervention_count=intervention_count,
     )
+    next_commands = _template_next_commands(
+        source=source,
+        output_dir=out,
+        prediction_count=prediction_count,
+        intervention_count=intervention_count,
+    )
+    files["readme"].write_text(
+        _readme_text(
+            source=source,
+            output_dir=out,
+            next_commands=next_commands,
+        ),
+        encoding="utf-8",
+    )
     payload = {
         "schema": OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
         "kind": "objectstate_controlled_reality_candidate_template",
         "status": "objectstate_controlled_reality_candidate_template_ready",
         "capture_schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
-        "bundle_root": str(root),
+        "source": dict(source),
+        "bundle_root": str(source.get("bundle_root", "")),
+        "capture_manifest": source.get("capture_manifest"),
         "output_dir": str(out),
         "sample": {
             "sample_id": sample["sample_id"],
@@ -149,29 +214,7 @@ def write_objectstate_controlled_reality_candidate_templates(
         },
         "readiness": readiness,
         "issues": issues,
-        "next_commands": {
-            "finalize_candidates": (
-                "uv run objgauss object-state "
-                "finalize-controlled-reality-candidates "
-                f"{out / _PREDICTION_TEMPLATE_FILE} "
-                f"{out / _INTERVENTION_TEMPLATE_FILE} "
-                f"--output-dir {out} --bundle-root {root}"
-            ),
-            "audit_full_readiness": (
-                "uv run objgauss object-state "
-                "audit-controlled-reality-bundle-readiness "
-                f"{root} <objectstates.json> "
-                f"{out / 'prediction-candidates.json'} "
-                f"{out / 'intervention-candidates.json'}"
-            ),
-            "full_handoff": (
-                "uv run objgauss object-state controlled-reality-bundle-handoff "
-                f"{root} <objectstates.json> "
-                f"{out / 'prediction-candidates.json'} "
-                f"{out / 'intervention-candidates.json'} "
-                f"--output-dir {out / 'reality-handoff'}"
-            ),
-        },
+        "next_commands": next_commands,
         "claim_policy": _claim_policy(),
         "non_goals": _non_goals(),
     }
@@ -253,6 +296,53 @@ def finalize_objectstate_controlled_reality_candidate_templates(
     return validate_objectstate_controlled_reality_candidate_finalize_summary(payload)
 
 
+def finalize_objectstate_controlled_prediction_candidate_template(
+    prediction_template: str | Path,
+    *,
+    output_dir: str | Path,
+    capture_manifest: str | Path | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    prediction_template_path = Path(prediction_template)
+    out = Path(output_dir)
+    prediction_payload = _read_json(prediction_template_path)
+    prediction_candidates = _prediction_candidates_from_filled_template(
+        prediction_payload
+    )
+    files = {
+        "prediction_candidates": out / _PREDICTION_CANDIDATES_FILE,
+    }
+    _ensure_can_write(files.values(), force=force)
+    _write_json(files["prediction_candidates"], prediction_candidates)
+    capture_ref = str(capture_manifest) if capture_manifest is not None else "<capture-manifest>"
+    payload = {
+        "schema": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
+        "kind": "objectstate_controlled_prediction_candidate_finalize",
+        "status": "objectstate_controlled_prediction_candidate_finalize_ready",
+        "sample_id": prediction_candidates["sample_id"],
+        "source_template": str(prediction_template_path),
+        "files": {key: str(value) for key, value in files.items()},
+        "target_eval_schema": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+        "row_counts": {
+            "prediction_candidates": len(prediction_candidates["predictions"]),
+        },
+        "candidate_id": prediction_candidates["candidate"]["candidate_id"],
+        "next_commands": {
+            "eval_prediction": (
+                "uv run objgauss object-state eval-controlled-prediction "
+                f"{capture_ref} {files['prediction_candidates']} "
+                f"--summary-output {out / 'prediction-eval-summary.json'} "
+                f"--controlled-real-output {out / 'controlled-real-prediction.json'}"
+            ),
+        },
+        "claim_policy": _prediction_finalize_claim_policy(),
+        "non_goals": _non_goals(),
+    }
+    return validate_objectstate_controlled_prediction_candidate_finalize_summary(
+        payload
+    )
+
+
 def validate_objectstate_controlled_reality_candidate_template_summary(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -269,9 +359,9 @@ def validate_objectstate_controlled_reality_candidate_template_summary(
         raise ValueError("controlled reality candidate template status is unsupported")
     if payload.get("capture_schema") != OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA:
         raise ValueError("controlled reality candidate template capture_schema is unsupported")
-    for key in ("bundle_root", "output_dir"):
-        if not isinstance(payload.get(key), str) or not payload[key]:
-            raise ValueError(f"controlled reality candidate template requires {key}")
+    source = _validate_template_source(payload)
+    if not isinstance(payload.get("output_dir"), str) or not payload["output_dir"]:
+        raise ValueError("controlled reality candidate template requires output_dir")
     sample = payload.get("sample")
     if not isinstance(sample, Mapping) or not sample.get("sample_id"):
         raise ValueError("controlled reality candidate template requires sample")
@@ -316,9 +406,7 @@ def validate_objectstate_controlled_reality_candidate_template_summary(
     next_commands = payload.get("next_commands")
     if not isinstance(next_commands, Mapping):
         raise ValueError("controlled reality candidate template requires next_commands")
-    for key in ("finalize_candidates", "audit_full_readiness", "full_handoff"):
-        if not isinstance(next_commands.get(key), str) or not next_commands[key]:
-            raise ValueError(f"controlled reality candidate template missing command {key}")
+    _validate_template_next_commands(next_commands, source=source, row_counts=row_counts)
     _validate_claim_policy(payload.get("claim_policy", {}))
     _validate_non_goals(payload.get("non_goals", {}))
     return dict(payload)
@@ -363,6 +451,53 @@ def validate_objectstate_controlled_reality_candidate_finalize_summary(
         if not isinstance(next_commands.get(key), str) or not next_commands[key]:
             raise ValueError(f"controlled reality candidate finalize missing command {key}")
     _validate_finalize_claim_policy(payload.get("claim_policy", {}))
+    _validate_non_goals(payload.get("non_goals", {}))
+    return dict(payload)
+
+
+def validate_objectstate_controlled_prediction_candidate_finalize_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("controlled prediction candidate finalize summary must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA:
+        raise ValueError(
+            "unsupported controlled prediction candidate finalize schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_controlled_prediction_candidate_finalize":
+        raise ValueError("controlled prediction candidate finalize kind is unsupported")
+    if payload.get("status") != "objectstate_controlled_prediction_candidate_finalize_ready":
+        raise ValueError("controlled prediction candidate finalize status is unsupported")
+    if not isinstance(payload.get("sample_id"), str) or not payload["sample_id"]:
+        raise ValueError("controlled prediction candidate finalize requires sample_id")
+    if not isinstance(payload.get("source_template"), str) or not payload["source_template"]:
+        raise ValueError("controlled prediction candidate finalize requires source_template")
+    files = payload.get("files")
+    if not isinstance(files, Mapping):
+        raise ValueError("controlled prediction candidate finalize requires files")
+    if not isinstance(files.get("prediction_candidates"), str) or not files[
+        "prediction_candidates"
+    ]:
+        raise ValueError("controlled prediction candidate finalize missing prediction_candidates")
+    if payload.get("target_eval_schema") != OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA:
+        raise ValueError("controlled prediction candidate finalize schema mismatch")
+    row_counts = payload.get("row_counts")
+    if not isinstance(row_counts, Mapping):
+        raise ValueError("controlled prediction candidate finalize requires row_counts")
+    value = row_counts.get("prediction_candidates")
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("controlled prediction candidate finalize row count invalid")
+    if not isinstance(payload.get("candidate_id"), str) or not payload["candidate_id"]:
+        raise ValueError("controlled prediction candidate finalize requires candidate_id")
+    next_commands = payload.get("next_commands")
+    if (
+        not isinstance(next_commands, Mapping)
+        or not isinstance(next_commands.get("eval_prediction"), str)
+        or not next_commands["eval_prediction"]
+    ):
+        raise ValueError("controlled prediction candidate finalize missing eval command")
+    _validate_prediction_finalize_claim_policy(payload.get("claim_policy", {}))
     _validate_non_goals(payload.get("non_goals", {}))
     return dict(payload)
 
@@ -678,6 +813,120 @@ def _template_issues(
     return issues
 
 
+def _template_next_commands(
+    *,
+    source: Mapping[str, str],
+    output_dir: Path,
+    prediction_count: int,
+    intervention_count: int,
+) -> dict[str, str]:
+    prediction_template = output_dir / _PREDICTION_TEMPLATE_FILE
+    intervention_template = output_dir / _INTERVENTION_TEMPLATE_FILE
+    prediction_candidates = output_dir / _PREDICTION_CANDIDATES_FILE
+    intervention_candidates = output_dir / _INTERVENTION_CANDIDATES_FILE
+    commands: dict[str, str] = {}
+    if (
+        prediction_count > 0
+        and (source.get("kind") == "capture_manifest" or intervention_count == 0)
+    ):
+        capture_ref = source.get("capture_manifest", "<capture-manifest>")
+        commands["finalize_prediction_candidates"] = (
+            "uv run objgauss object-state "
+            f"finalize-controlled-prediction-candidates {prediction_template} "
+            f"--output-dir {output_dir} --capture-manifest {capture_ref}"
+        )
+        commands["eval_prediction"] = (
+            "uv run objgauss object-state eval-controlled-prediction "
+            f"{capture_ref} {prediction_candidates} "
+            f"--summary-output {output_dir / 'prediction-eval-summary.json'} "
+            f"--controlled-real-output {output_dir / 'controlled-real-prediction.json'}"
+        )
+    if intervention_count > 0:
+        commands["finalize_candidates"] = (
+            "uv run objgauss object-state "
+            "finalize-controlled-reality-candidates "
+            f"{prediction_template} {intervention_template} "
+            f"--output-dir {output_dir}"
+        )
+        if source.get("kind") == "bundle":
+            bundle_root = source["bundle_root"]
+            commands["finalize_candidates"] += f" --bundle-root {bundle_root}"
+            commands["audit_full_readiness"] = (
+                "uv run objgauss object-state "
+                "audit-controlled-reality-bundle-readiness "
+                f"{bundle_root} <objectstates.json> "
+                f"{prediction_candidates} {intervention_candidates}"
+            )
+            commands["full_handoff"] = (
+                "uv run objgauss object-state controlled-reality-bundle-handoff "
+                f"{bundle_root} <objectstates.json> "
+                f"{prediction_candidates} {intervention_candidates} "
+                f"--output-dir {output_dir / 'reality-handoff'}"
+            )
+        elif "capture_manifest" in source:
+            capture_ref = source["capture_manifest"]
+            commands["eval_intervention"] = (
+                "uv run objgauss object-state eval-controlled-intervention "
+                f"{capture_ref} {intervention_candidates} "
+                f"--summary-output {output_dir / 'intervention-eval-summary.json'} "
+                "--controlled-real-output "
+                f"{output_dir / 'controlled-real-intervention.json'}"
+            )
+    return commands
+
+
+def _validate_template_source(payload: Mapping[str, Any]) -> dict[str, str]:
+    source = payload.get("source")
+    if source is None and isinstance(payload.get("bundle_root"), str):
+        source = {"kind": "bundle", "bundle_root": payload["bundle_root"]}
+    if not isinstance(source, Mapping):
+        raise ValueError("controlled reality candidate template requires source")
+    kind = source.get("kind")
+    if kind == "bundle":
+        bundle_root = source.get("bundle_root")
+        if not isinstance(bundle_root, str) or not bundle_root:
+            raise ValueError("controlled reality candidate bundle source requires bundle_root")
+        return {"kind": "bundle", "bundle_root": bundle_root}
+    if kind == "capture_manifest":
+        capture_manifest = source.get("capture_manifest")
+        if not isinstance(capture_manifest, str) or not capture_manifest:
+            raise ValueError(
+                "controlled reality candidate manifest source requires capture_manifest"
+            )
+        result = {"kind": "capture_manifest", "capture_manifest": capture_manifest}
+        source_root = source.get("source_root")
+        if isinstance(source_root, str) and source_root:
+            result["source_root"] = source_root
+        return result
+    raise ValueError("controlled reality candidate template source kind is unsupported")
+
+
+def _validate_template_next_commands(
+    commands: Mapping[str, Any],
+    *,
+    source: Mapping[str, str],
+    row_counts: Mapping[str, Any],
+) -> None:
+    prediction_count = row_counts.get("prediction_drafts")
+    intervention_count = row_counts.get("intervention_drafts")
+    if prediction_count == 0 and intervention_count == 0:
+        return
+    if source["kind"] == "bundle":
+        if intervention_count and intervention_count > 0:
+            required = (
+                "finalize_candidates",
+                "audit_full_readiness",
+                "full_handoff",
+            )
+        else:
+            required = ("finalize_prediction_candidates", "eval_prediction")
+    else:
+        required = ("finalize_prediction_candidates", "eval_prediction")
+    for key in required:
+        if not isinstance(commands.get(key), str) or not commands[key]:
+            raise ValueError(f"controlled reality candidate template missing command {key}")
+
+
 def _validate_common_template(
     payload: Mapping[str, Any],
     *,
@@ -736,6 +985,20 @@ def _finalize_claim_policy() -> dict[str, bool]:
     }
 
 
+def _prediction_finalize_claim_policy() -> dict[str, bool]:
+    return {
+        "filled_prediction_template_required": True,
+        "todo_values_rejected": True,
+        "eval_schema_output_validated": True,
+        "obvious_target_gt_leakage_rejected": True,
+        "requires_external_candidate_outputs": True,
+        "does_not_create_ground_truth": True,
+        "does_not_run_prediction_model": True,
+        "does_not_claim_prediction_pass": True,
+        "does_not_claim_world_model": True,
+    }
+
+
 def _non_goals() -> dict[str, bool]:
     return {
         "captures_video": False,
@@ -765,6 +1028,16 @@ def _validate_finalize_claim_policy(value: Mapping[str, Any]) -> None:
     expected = _finalize_claim_policy()
     if any(value.get(key) is not expected_value for key, expected_value in expected.items()):
         raise ValueError("controlled candidate finalize must preserve claim policy")
+
+
+def _validate_prediction_finalize_claim_policy(value: Mapping[str, Any]) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("controlled prediction candidate finalize requires claim_policy")
+    expected = _prediction_finalize_claim_policy()
+    if any(value.get(key) is not expected_value for key, expected_value in expected.items()):
+        raise ValueError(
+            "controlled prediction candidate finalize must preserve claim policy"
+        )
 
 
 def _validate_non_goals(value: Mapping[str, Any]) -> None:
@@ -918,12 +1191,25 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     )
 
 
-def _readme_text(*, bundle_root: Path, output_dir: Path) -> str:
+def _readme_text(
+    *,
+    source: Mapping[str, str],
+    output_dir: Path,
+    next_commands: Mapping[str, str],
+) -> str:
+    source_text = (
+        f"capture bundle `{source['bundle_root']}`"
+        if source.get("kind") == "bundle"
+        else f"capture manifest `{source.get('capture_manifest', '<capture-manifest>')}`"
+    )
+    commands = "\n".join(next_commands.values())
+    if not commands:
+        commands = "# no candidate rows were generated"
     return f"""# ObjGauss Controlled Reality Candidate Templates
 
 This directory contains draft JSON templates for the controlled real prediction
-and intervention gates. The templates are intentionally not valid evaluator
-inputs. Fill model outputs into separate files named:
+and intervention gates from {source_text}. These are not valid evaluator inputs.
+Fill model outputs into separate files named:
 
 - prediction-candidates.template.json
 - intervention-candidates.template.json
@@ -938,9 +1224,7 @@ will write evaluator-ready files named:
 Validation commands:
 
 ```bash
-uv run objgauss object-state finalize-controlled-reality-candidates {output_dir / 'prediction-candidates.template.json'} {output_dir / 'intervention-candidates.template.json'} --output-dir {output_dir} --bundle-root {bundle_root}
-uv run objgauss object-state audit-controlled-reality-bundle-readiness {bundle_root} <objectstates.json> {output_dir / 'prediction-candidates.json'} {output_dir / 'intervention-candidates.json'}
-uv run objgauss object-state controlled-reality-bundle-handoff {bundle_root} <objectstates.json> {output_dir / 'prediction-candidates.json'} {output_dir / 'intervention-candidates.json'} --output-dir {output_dir / 'reality-handoff'}
+{commands}
 ```
 
 These templates do not create ground truth, run prediction or intervention
