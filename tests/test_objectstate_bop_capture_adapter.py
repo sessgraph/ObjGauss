@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from objgauss.cli import main
+from objgauss.core.objectstate_bop_capture_adapter import (
+    OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
+    objectstate_bop_capture_adapter_summary,
+    objectstate_bop_capture_manifest_from_scene,
+    validate_objectstate_bop_capture_adapter_summary,
+)
+from objgauss.core.objectstate_controlled_capture import (
+    OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+)
+from objgauss.core.objectstate_controlled_real_rows import (
+    OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+)
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\n"
+
+
+def test_bop_capture_adapter_builds_identity_prediction_ready_manifest(tmp_path):
+    _write_bop_scene(tmp_path)
+
+    summary = objectstate_bop_capture_adapter_summary(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+        dataset_id="bop-ycbv",
+        max_frames=3,
+    )
+    manifest = summary["manifest"]
+    capture_summary = summary["capture_summary"]
+
+    assert summary["schema"] == OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA
+    assert summary["row_counts"] == {
+        "objects": 2,
+        "frames": 3,
+        "annotations": 6,
+        "actions": 0,
+    }
+    assert summary["selected_frame_ids"] == [0, 1, 2]
+    assert summary["readiness"]["identity_stage_ready"] is True
+    assert summary["readiness"]["prediction_stage_ready"] is True
+    assert summary["readiness"]["intervention_stage_ready"] is False
+    assert summary["readiness"]["real_gaussian_reconstruction_present"] is False
+    assert "local per-frame Gaussian reconstruction" in " ".join(
+        summary["hard_blockers"]
+    )
+    assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    assert manifest["sample"]["sample_id"] == "bop-ycbv-scene-000001"
+    assert manifest["objects"][0]["object_id"] == "bop-ycbv-obj-000001"
+    assert manifest["frames"][0]["observation"]["rgb"] == "rgb/000000.png"
+    assert manifest["frames"][0]["objects"][0]["pose"]["position"] == [
+        0.01,
+        0.02,
+        0.03,
+    ]
+    assert manifest["frames"][1]["objects"][0]["occlusion_fraction"] == pytest.approx(
+        0.2
+    )
+    assert manifest["frames"][0]["objects"][0]["pose"]["rotation_xyzw"] == [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    ]
+    assert capture_summary["ground_truth"] == {
+        "identity": True,
+        "pose": True,
+        "action": False,
+        "timestamp": True,
+    }
+    assert (
+        summary["controlled_real_manifest_seed"]["schema"]
+        == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    )
+    assert validate_objectstate_bop_capture_adapter_summary(summary) == summary
+
+
+def test_bop_capture_adapter_manifest_helper_returns_manifest(tmp_path):
+    _write_bop_scene(tmp_path)
+
+    manifest = objectstate_bop_capture_manifest_from_scene(
+        tmp_path,
+        sample_id="bop-ycbv-scene-000001",
+    )
+
+    assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    assert len(manifest["frames"]) == 3
+
+
+def test_bop_capture_adapter_cli_writes_outputs(tmp_path, capsys):
+    _write_bop_scene(tmp_path)
+    manifest_path = tmp_path / "capture-manifest.json"
+    summary_path = tmp_path / "bop-adapter-summary.json"
+    controlled_real_path = tmp_path / "controlled-real-seed.json"
+
+    assert (
+        main(
+            [
+                "object-state",
+                "import-bop-capture-scene",
+                str(tmp_path),
+                "--sample-id",
+                "bop-ycbv-scene-000001",
+                "--dataset-id",
+                "bop-ycbv",
+                "--output",
+                str(manifest_path),
+                "--summary-output",
+                str(summary_path),
+                "--controlled-real-output",
+                str(controlled_real_path),
+                "--require-identity-ready",
+                "--require-prediction-ready",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    controlled_real = json.loads(controlled_real_path.read_text(encoding="utf-8"))
+
+    assert f"schema={OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA}" in stdout
+    assert "bop_adapter_status=objectstate_bop_capture_adapter_ready" in stdout
+    assert "identity_stage_ready=true" in stdout
+    assert "prediction_stage_ready=true" in stdout
+    assert "real_gaussian_reconstruction_present=false" in stdout
+    assert manifest["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA
+    assert summary["schema"] == OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA
+    assert controlled_real["schema"] == OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA
+    assert controlled_real["ground_truth"] == {
+        "identity": True,
+        "pose": True,
+        "action": False,
+        "timestamp": True,
+    }
+
+
+def test_bop_capture_adapter_rejects_duplicate_obj_ids(tmp_path):
+    _write_bop_scene(tmp_path)
+    scene_gt = json.loads((tmp_path / "scene_gt.json").read_text(encoding="utf-8"))
+    scene_gt["0"].append(scene_gt["0"][0])
+    (tmp_path / "scene_gt.json").write_text(
+        json.dumps(scene_gt),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate obj_id=1"):
+        objectstate_bop_capture_adapter_summary(
+            tmp_path,
+            sample_id="bop-ycbv-scene-000001",
+        )
+
+
+def test_bop_capture_adapter_requires_rgb_files(tmp_path):
+    _write_bop_scene(tmp_path)
+    (tmp_path / "rgb" / "000001.png").unlink()
+
+    with pytest.raises(FileNotFoundError, match="could not find RGB file"):
+        objectstate_bop_capture_adapter_summary(
+            tmp_path,
+            sample_id="bop-ycbv-scene-000001",
+        )
+
+
+def _write_bop_scene(root) -> None:
+    (root / "rgb").mkdir()
+    for frame_id in range(3):
+        (root / "rgb" / f"{frame_id:06d}.png").write_bytes(PNG_BYTES)
+    scene_camera = {
+        str(frame_id): {
+            "cam_K": [572.4, 0.0, 325.2, 0.0, 573.5, 242.0, 0.0, 0.0, 1.0],
+            "depth_scale": 1.0,
+        }
+        for frame_id in range(3)
+    }
+    identity_rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    scene_gt = {}
+    scene_gt_info = {}
+    for frame_id in range(3):
+        scene_gt[str(frame_id)] = [
+            {
+                "obj_id": 1,
+                "cam_R_m2c": identity_rotation,
+                "cam_t_m2c": [10.0 + frame_id, 20.0, 30.0],
+            },
+            {
+                "obj_id": 2,
+                "cam_R_m2c": identity_rotation,
+                "cam_t_m2c": [40.0 + frame_id, 50.0, 60.0],
+            },
+        ]
+        scene_gt_info[str(frame_id)] = [
+            {
+                "bbox_obj": [10, 20, 30, 40],
+                "bbox_visib": [10, 20, 30, 40],
+                "px_count_all": 1000,
+                "px_count_valid": 1000,
+                "px_count_visib": 1000 - frame_id * 200,
+                "visib_fract": 1.0 - frame_id * 0.2,
+            },
+            {
+                "bbox_obj": [50, 60, 30, 40],
+                "bbox_visib": [50, 60, 30, 40],
+                "px_count_all": 900,
+                "px_count_valid": 900,
+                "px_count_visib": 900,
+                "visib_fract": 1.0,
+            },
+        ]
+    (root / "scene_camera.json").write_text(json.dumps(scene_camera), encoding="utf-8")
+    (root / "scene_gt.json").write_text(json.dumps(scene_gt), encoding="utf-8")
+    (root / "scene_gt_info.json").write_text(
+        json.dumps(scene_gt_info),
+        encoding="utf-8",
+    )

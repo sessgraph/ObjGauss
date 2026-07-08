@@ -70,7 +70,7 @@ Use one small BOP YCB-V subset first:
 BOP YCB-V RGB / depth / mask / pose / camera
         |
         v
-controlled capture manifest adapter
+import-bop-capture-scene adapter
         |
         v
 local per-frame Gaussian evidence under outputs/
@@ -83,10 +83,37 @@ Do not start with HOT3D. It is closer to interaction, but the format, license
 agreement, and egocentric multi-stream setup add avoidable complexity before
 the simpler pose adapter has been proven.
 
+The adapter entry point is:
+
+```bash
+uv run objgauss object-state import-bop-capture-scene \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --output outputs/captures/bop-ycbv-scene-000001/capture-manifest.json \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/bop-adapter-summary.json \
+  --controlled-real-output outputs/captures/bop-ycbv-scene-000001/controlled-real-seed.json \
+  --require-identity-ready \
+  --require-prediction-ready
+```
+
+This adapter expects a local BOP scene folder with `scene_camera.json`,
+`scene_gt.json`, optional `scene_gt_info.json`, and `rgb/<frame>.png` or JPEG
+files. It converts `cam_R_m2c` / `cam_t_m2c` into ObjGauss 6DoF pose, converts
+`visib_fract` into `occlusion_fraction`, and uses a conservative
+`single_instance_per_bop_obj_id` identity policy. If a selected frame contains
+duplicate `obj_id` entries, it fails instead of inventing unstable instance
+tracks.
+
+The adapter does not create Gaussian evidence. After importing the BOP scene,
+run a file audit and reconstruct per-frame Gaussian files under ignored
+`outputs/` before attempting identity / prediction handoff.
+
 ## Hard Blockers
 
 - No public candidate directly supplies ObjGauss per-frame Gaussian evidence.
-- All public candidates require a controlled capture manifest adapter.
+- Public candidates still require a local adapter run and file audit before
+  they become controlled capture manifests.
 - Counterfactual rows remain blocked until action-conditioned outcomes are
   evaluated against real outcomes.
 - Dataset license terms must be reviewed before any public demo,

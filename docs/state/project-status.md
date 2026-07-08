@@ -589,6 +589,19 @@ identity / prediction rows。HOT3D 只作为后续 action-like interaction candi
 `has_direct_gaussian_evidence=false`，因此不能声明 reality gate pass、public demo 或
 world model。
 
+随后新增 `OBJECTSTATE-BOP-CAPTURE-ADAPTER-001`：新增
+`objgauss.core.objectstate_bop_capture_adapter`，schema 为
+`objgauss-objectstate-bop-capture-adapter-v1`，并新增 CLI
+`objgauss object-state import-bop-capture-scene`。该 adapter 读取本地 BOP scene 的
+`scene_camera.json`、`scene_gt.json`、可选 `scene_gt_info.json` 和 `rgb/` 帧文件，
+将 `cam_R_m2c` / `cam_t_m2c` 转成 ObjGauss controlled capture 6DoF pose，将
+`visib_fract` 转成 `occlusion_fraction`，并输出 capture manifest、adapter summary 和
+controlled-real blocked seed。当前 identity policy 为
+`single_instance_per_bop_obj_id`，若同一选中帧内出现重复 `obj_id` 会 fail-fast，避免把不稳定
+instance tracking 当作 physical identity GT。该 adapter 只推进 BOP YCB-V 小子集进入
+manifest 的第一步；仍不下载数据、不重建 Gaussian、不训练模型、不创建 pass rows、不声明
+reality gate pass 或 public demo。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

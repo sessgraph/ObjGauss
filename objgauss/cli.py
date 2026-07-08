@@ -199,6 +199,9 @@ from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
 )
+from objgauss.core.objectstate_bop_capture_adapter import (
+    objectstate_bop_capture_adapter_summary,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3256,6 +3259,56 @@ def _object_state_audit_public_dataset_candidates(
         raise ValueError("no public dataset candidate is directly Phase 1 ready")
 
 
+def _object_state_import_bop_capture_scene(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_capture_adapter_summary(
+        args.scene_root,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        include_gaussian_refs=args.include_gaussian_refs,
+        gaussian_dir=args.gaussian_dir,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"bop_adapter_status={summary['status']}")
+    print(f"scene_root={summary['source']['scene_root']}")
+    print(f"sample_id={summary['manifest']['sample']['sample_id']}")
+    print(f"dataset_id={summary['source']['dataset_id']}")
+    print(f"frames={summary['row_counts']['frames']}")
+    print(f"objects={summary['row_counts']['objects']}")
+    print(f"annotations={summary['row_counts']['annotations']}")
+    print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(f"prediction_stage_ready={str(readiness['prediction_stage_ready']).lower()}")
+    print(f"intervention_stage_ready={str(readiness['intervention_stage_ready']).lower()}")
+    print(
+        "real_gaussian_reconstruction_present="
+        f"{str(readiness['real_gaussian_reconstruction_present']).lower()}"
+    )
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    write_json(args.output, summary["manifest"])
+    print(f"manifest={args.output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest_seed"])
+        print(f"controlled_real={args.controlled_real_output}")
+    if args.require_identity_ready and not readiness["identity_stage_ready"]:
+        raise ValueError("BOP capture adapter output is not identity-stage ready")
+    if args.require_prediction_ready and not readiness["prediction_stage_ready"]:
+        raise ValueError("BOP capture adapter output is not prediction-stage ready")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -4620,6 +4673,40 @@ def _build_parser() -> argparse.ArgumentParser:
     audit_public_dataset_candidates.set_defaults(
         handler=_object_state_audit_public_dataset_candidates
     )
+    import_bop_capture_scene = object_state_subparsers.add_parser(
+        "import-bop-capture-scene",
+        help=(
+            "convert a local BOP scene folder into an ObjGauss controlled "
+            "capture manifest seed"
+        ),
+    )
+    import_bop_capture_scene.add_argument("scene_root", type=Path)
+    import_bop_capture_scene.add_argument("--output", "-o", required=True, type=Path)
+    import_bop_capture_scene.add_argument("--summary-output", type=Path)
+    import_bop_capture_scene.add_argument("--controlled-real-output", type=Path)
+    import_bop_capture_scene.add_argument("--sample-id", required=True)
+    import_bop_capture_scene.add_argument("--dataset-id", default="bop-ycbv")
+    import_bop_capture_scene.add_argument("--object-category", default="bop_objects")
+    import_bop_capture_scene.add_argument("--scenario", default="bop_pose_sequence")
+    import_bop_capture_scene.add_argument("--fps", type=float, default=30.0)
+    import_bop_capture_scene.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    import_bop_capture_scene.add_argument("--rgb-dir", default="rgb")
+    import_bop_capture_scene.add_argument("--max-frames", type=int)
+    import_bop_capture_scene.add_argument("--frame-step", type=int, default=1)
+    import_bop_capture_scene.add_argument(
+        "--include-gaussian-refs",
+        action="store_true",
+        help="include expected per-frame gaussians/<frame>.ply refs in the manifest",
+    )
+    import_bop_capture_scene.add_argument("--gaussian-dir", default="gaussians")
+    import_bop_capture_scene.add_argument("--require-identity-ready", action="store_true")
+    import_bop_capture_scene.add_argument("--require-prediction-ready", action="store_true")
+    import_bop_capture_scene.set_defaults(handler=_object_state_import_bop_capture_scene)
     audit_controlled_capture_bundle_readiness = object_state_subparsers.add_parser(
         "audit-controlled-capture-bundle-readiness",
         help="audit staged controlled capture bundle readiness before import/handoff",

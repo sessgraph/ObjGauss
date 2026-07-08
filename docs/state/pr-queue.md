@@ -130,6 +130,13 @@ ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
 adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`hot3d-clips`
 只作为后续 action-like interaction candidate。所有候选当前都不是 direct Phase 1 ready
 dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
+`OBJECTSTATE-BOP-CAPTURE-ADAPTER-001` 已新增
+`import-bop-capture-scene` CLI，可把本地 BOP scene 的 `scene_camera.json` /
+`scene_gt.json` / optional `scene_gt_info.json` / `rgb/` 转成 controlled capture
+manifest seed。当前 adapter 使用 `single_instance_per_bop_obj_id` identity policy，重复
+`obj_id` 会 fail-fast；输出可达到 identity / prediction ready，但仍缺 per-frame
+Gaussian evidence 和 action rows，不能直接成为 Phase 1 pass evidence。下一步是准备一个
+ignored 小型 BOP YCB-V subset，运行 adapter + file audit，再生成本地 Gaussian evidence。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -201,6 +208,37 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CAPTURE-ADAPTER-001: Import local BOP scene into controlled capture manifest
+
+- 状态: done / local-adapter-only-no-data-download
+- 类型: 标准 PR / ObjectState public pose dataset adapter
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将已选定的 BOP YCB-V 小子集路线从“候选审计”推进到“本地 BOP scene 可进入
+  ObjGauss controlled capture manifest seed”，为后续 file audit、per-frame Gaussian
+  reconstruction、identity / prediction rows 做准备。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_capture_adapter`。
+  - 新增 summary schema `objgauss-objectstate-bop-capture-adapter-v1`。
+  - 新增 CLI `objgauss object-state import-bop-capture-scene`。
+  - Adapter 读取 `scene_camera.json`、`scene_gt.json`、可选 `scene_gt_info.json` 和
+    `rgb/` 帧文件。
+  - Adapter 将 BOP `cam_R_m2c` / `cam_t_m2c` 转为 ObjGauss pose，translation 从 mm
+    转为 m，并将 `visib_fract` 转为 `occlusion_fraction`。
+  - Identity policy 固定为 `single_instance_per_bop_obj_id`；同一选中帧内重复
+    `obj_id` 会 fail-fast，不伪造 instance tracking。
+- 边界:
+  - 不下载 BOP 数据，不写 `outputs/` 或 `public/samples`。
+  - 不重建 Gaussian，不训练模型，不创建 reality pass / fail rows。
+  - 不声明 BOP scene 直接 Phase 1 ready，不声明 reality gate pass、public demo 或
+    world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py -q`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture.py -q`: passed，21 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_public_dataset_candidates.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture_files.py tests/test_core_namespace.py -q`: passed，37 tests。
+  - `uv run --extra dev pytest`: passed，396 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
 
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001: Audit public dataset candidates for Phase 1
 

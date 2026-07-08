@@ -642,6 +642,38 @@ Implemented v0.1 facts:
 - Review doc:
   `docs/training/objectstate-public-dataset-candidates.md`.
 
+### OBJECTSTATE-BOP-CAPTURE-ADAPTER-001
+
+Convert a local BOP scene subset into the ObjGauss controlled capture manifest
+contract.
+
+Required behavior:
+
+- Read local BOP `scene_camera.json`, `scene_gt.json`, optional
+  `scene_gt_info.json` and RGB frame files.
+- Convert BOP `cam_R_m2c` / `cam_t_m2c` into ObjGauss 6DoF pose, with
+  translation in meters.
+- Convert `visib_fract` into `occlusion_fraction`.
+- Preserve frame order as timestamped observations.
+- Fail instead of inventing physical instance identity when a selected frame
+  contains duplicate BOP `obj_id` entries.
+- Emit a controlled-real blocked seed manifest, not pass rows.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_bop_capture_adapter`.
+- Summary schema: `objgauss-objectstate-bop-capture-adapter-v1`.
+- CLI:
+  `objgauss object-state import-bop-capture-scene`.
+- The adapter uses `single_instance_per_bop_obj_id` as the default identity
+  policy and rejects duplicate `obj_id` within selected frames.
+- The output can be identity / prediction ready when the BOP scene has
+  timestamped pose tracks, but it still reports missing per-frame Gaussian
+  evidence and missing action rows as blockers.
+- Current scope is local adapter only. It does not download BOP data,
+  reconstruct Gaussians, train a model, create pass rows, claim public demo
+  eligibility, use replay / diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-MANIFEST-001
 
 Add the frame-level contract for actual controlled tabletop capture /
