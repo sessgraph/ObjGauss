@@ -809,6 +809,21 @@ per-sample issues、next commands 和 Markdown table。只有 target sidecar sch
 Gaussian evidence 齐全且 candidate artifact 至少是正式 trainable artifact schema 时，
 才标记 ready for batch readiness input；它不运行 batch readiness / handoff，不生成或训练
 模型，也不声明 metric pass / intervention gate / world model。
+随后完成 `OBJECTSTATE-BOP-BASELINE-CANDIDATE-001`：新增
+`objgauss.core.objectstate_bop_baseline_candidate`，schema 为
+`objgauss-objectstate-bop-baseline-candidate-v1`，CLI 为
+`objgauss object-state generate-bop-objectstate-baseline-candidate <scene-root> --output <objectstates.json>`。
+该命令在本地 BOP scene 和 per-frame `gaussians/<frame>.ply` evidence 已存在时运行
+BOP acceptance，然后对每个 selected frame 的 Gaussian `xyz` 计算一个全局 centroid
+和 bbox，写出当前 identity route 可审计的
+`objgauss-trainable-kernel-model-artifact-v1` candidate artifact。该 artifact 明确标记
+为 `gaussian_centroid_single_state` baseline candidate，预期在多对象 identity 场景中
+形成可审阅负证据；它不读取 BOP pose GT 或 object ids 来放置预测 ObjectState，不训练
+Gaussian / tracking / dynamics 模型，不运行 identity handoff / eval，不创建 pass row，
+也不改 viewer/export 默认策略。`init-bop-phase1-sample-workspaces` 已把该 baseline
+命令插到 RGB-D Gaussian evidence export 之后、手工 template authoring 之前；
+`audit-bop-phase1-authoring-progress` 在 Gaussian evidence 存在但 target candidate
+artifact 缺失时也会优先提示这条命令。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
@@ -4070,11 +4085,14 @@ npm run acceptance:demo
    下一步若继续算法质量，应先在有本地 / ignored BOP subset 的环境运行
    `init-bop-phase1-batch-workspace <dataset-root> --workspace-root <dir>`，再运行
    `init-bop-phase1-sample-workspaces <batch-spec.json>` 生成每个 sample 的 condition CSV
-   模板和 README；随后填齐真实 `bop-condition-sidecar.json`、per-frame Gaussian evidence
-   和 `objectstates.json`，先跑 `audit-bop-phase1-authoring-progress` 确认 target files
-   已经可进入 batch readiness input，再跑 `audit-bop-local-row-batch-readiness`，并按
-   readiness 缺口决定是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要
-   直接跳到 rollout、replay buffer、diffusion 或 geometry / camera unfreeze。
+   模板和 README；随后填齐真实 `bop-condition-sidecar.json` 和 per-frame Gaussian
+   evidence。若还没有真正模型输出，可先运行
+   `generate-bop-objectstate-baseline-candidate` 写出 single-state baseline `objectstates.json`
+   作为可审阅负证据；若已有模型输出，则继续使用 template / finalize 路径。之后先跑
+   `audit-bop-phase1-authoring-progress` 确认 target files 已经可进入 batch readiness
+   input，再跑 `audit-bop-local-row-batch-readiness`，并按 readiness 缺口决定是否运行
+   `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
+   replay buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。

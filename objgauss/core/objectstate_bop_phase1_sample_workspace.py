@@ -480,6 +480,11 @@ def _sample_next_commands(
             f"{scene_root} {common_opts} {frame_opts} --require-ready"
         ).strip(),
         (
+            "uv run objgauss object-state generate-bop-objectstate-baseline-candidate "
+            f"{scene_root} --output {candidate_artifact} {common_opts} "
+            f"--condition-sidecar {condition_sidecar} {frame_opts} --require-ready"
+        ).strip(),
+        (
             "uv run objgauss object-state init-bop-objectstate-artifact-template "
             f"{scene_root} --output {objectstate_template} {common_opts} "
             f"--condition-sidecar {condition_sidecar} --target-artifact-path {candidate_artifact} "

@@ -185,6 +185,11 @@ commands；它仍不创建真实 target sidecar / candidate artifact，不生成
 readiness 之间的人工填充状态做成只读审计：检查 helper files、target condition sidecar、
 per-frame Gaussian evidence 和 target candidate artifact 是否已经可进入 batch readiness
 input；它仍不创建 target files、不运行 readiness / handoff、不训练模型。
+`OBJECTSTATE-BOP-BASELINE-CANDIDATE-001` 继续补齐
+`generate-bop-objectstate-baseline-candidate`，可在 per-frame Gaussian evidence 已存在时
+写出单个全局 Gaussian centroid / bbox 的 trainable ObjectState baseline artifact，
+作为 identity handoff 可审阅的负证据候选；它不读取 BOP pose GT / object ids 来放置预测，
+不训练模型、不运行 handoff、不创建 pass row。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -306,6 +311,50 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-BASELINE-CANDIDATE-001: Generate BOP ObjectState baseline candidates
+
+- 状态: done / gaussian-centroid-baseline-candidate
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 sample input preparation
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 在真实模型输出尚未准备好时，从已有 BOP per-frame Gaussian evidence 生成一个
+  明确标记为 baseline 的 `objectstates.json`，让 sample authoring 可以进入
+  identity handoff / batch readiness 的可审阅负证据路径。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_baseline_candidate`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-baseline-candidate-v1`。
+  - 新增 CLI
+    `objgauss object-state generate-bop-objectstate-baseline-candidate <scene-root> --output <objectstates.json>`。
+  - 命令会先运行 BOP acceptance 且要求 per-frame Gaussian evidence ready。
+  - 对每个 selected frame 的 `gaussians/<frame>.ply` 读取 `x/y/z`，计算单个
+    global Gaussian centroid 和 bbox，并写出
+    `objgauss-trainable-kernel-model-artifact-v1` artifact。
+  - artifact policy 和 summary policy 都标记为
+    `gaussian_centroid_single_state` / baseline candidate / not a training run。
+  - `init-bop-phase1-sample-workspaces` 的 next commands 已把该 baseline 路径放到
+    RGB-D Gaussian evidence export 之后、手工 ObjectState template authoring 之前。
+  - `audit-bop-phase1-authoring-progress` 在 Gaussian evidence 存在但 target candidate
+    artifact 缺失时会提示该 baseline 命令。
+- 边界:
+  - 只从已有 BOP scene 和已有 per-frame Gaussian evidence 写 baseline candidate。
+  - 不下载 BOP、不复制 dataset、不创建 GT。
+  - 不读取 BOP pose GT 或 object ids 来放置预测 ObjectStates。
+  - 不推断 condition metadata，不重建 Gaussian，不训练 Gaussian / tracking / dynamics 模型。
+  - 不运行 identity handoff / eval，不创建 metric pass row。
+  - 不声明 intervention gate / counterfactual gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_baseline_candidate.py objgauss/cli.py objgauss/core/__init__.py objgauss/core/objectstate_bop_phase1_authoring_progress.py objgauss/core/objectstate_bop_phase1_sample_workspace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_baseline_candidate.py -q`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py -q`: passed，9 tests。
+  - `uv run objgauss object-state --help`: passed，命令列表包含 `generate-bop-objectstate-baseline-candidate`。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_baseline_candidate.py tests/test_objectstate_bop_phase1_authoring_progress.py tests/test_objectstate_bop_phase1_sample_workspace.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_core_namespace.py -q`: passed，26 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py -q`: passed，89 tests。
+  - `uv run --extra dev pytest`: passed，501 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001: Audit BOP sample authoring progress
 

@@ -362,6 +362,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_candidate_artifact_template",
         "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_FINALIZE_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA": (
+        "objgauss.core.objectstate_bop_baseline_candidate",
+        "OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -534,6 +538,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_candidate_artifact_template",
         "finalize_objectstate_bop_candidate_artifact_template",
     ),
+    "write_objectstate_bop_gaussian_centroid_baseline_candidate": (
+        "objgauss.core.objectstate_bop_baseline_candidate",
+        "write_objectstate_bop_gaussian_centroid_baseline_candidate",
+    ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
@@ -677,6 +685,10 @@ _EXPORTS = {
     "validate_objectstate_bop_candidate_artifact_finalize_summary": (
         "objgauss.core.objectstate_bop_candidate_artifact_template",
         "validate_objectstate_bop_candidate_artifact_finalize_summary",
+    ),
+    "validate_objectstate_bop_baseline_candidate_summary": (
+        "objgauss.core.objectstate_bop_baseline_candidate",
+        "validate_objectstate_bop_baseline_candidate_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

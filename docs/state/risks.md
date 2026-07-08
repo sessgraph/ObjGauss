@@ -71,3 +71,10 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-PHASE1-AUTHORING-PROGRESS-001`
 input；该缓解只减少 sample authoring 到 batch readiness 之间的漏填 / 路径漂移风险，不创建
 target files、不生成 Gaussian、不运行 readiness / handoff、不训练模型、不声明 metric pass、
 intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-BASELINE-CANDIDATE-001`
+新增 `generate-bop-objectstate-baseline-candidate`，可在本地 BOP scene 已有 per-frame
+Gaussian evidence 时写出单个全局 Gaussian centroid / bbox 的 trainable ObjectState
+baseline artifact，减少 sample authoring 卡在缺 `objectstates.json` 的风险；该 artifact
+预期作为可审阅负证据候选，不读取 BOP pose GT / object ids 来放置预测，不训练模型、不运行
+handoff、不创建 pass row，也不声明 intervention gate 或 world-model evidence。

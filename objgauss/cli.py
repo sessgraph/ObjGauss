@@ -237,6 +237,9 @@ from objgauss.core.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
+from objgauss.core.objectstate_bop_baseline_candidate import (
+    write_objectstate_bop_gaussian_centroid_baseline_candidate,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3696,6 +3699,54 @@ def _object_state_export_bop_rgbd_gaussian_evidence(
         raise ValueError("BOP RGB-D Gaussian evidence export is not ready")
 
 
+def _object_state_generate_bop_objectstate_baseline_candidate(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_bop_gaussian_centroid_baseline_candidate(
+        args.scene_root,
+        output=args.output,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        candidate_id=args.candidate_id,
+        force=args.force,
+    )
+    counts = summary["row_counts"]
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"output={summary['output']}")
+    print(f"bop_baseline_candidate_status={summary['status']}")
+    print(f"frames={counts['frames']}")
+    print(f"states={counts['states']}")
+    print(f"total_gaussians={counts['total_gaussians']}")
+    print(
+        "phase1_gaussian_evidence_ready="
+        f"{str(readiness['phase1_gaussian_evidence_ready']).lower()}"
+    )
+    print(
+        "target_artifact_valid="
+        f"{str(readiness['target_artifact_valid']).lower()}"
+    )
+    print(f"baseline_policy={summary['baseline_policy']['baseline_id']}")
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.require_ready and not readiness["ready_for_identity_handoff"]:
+        raise ValueError("BOP baseline candidate is not ready for identity handoff")
+
+
 def _object_state_init_bop_condition_sidecar(args: argparse.Namespace) -> None:
     summary = objectstate_bop_capture_condition_sidecar_summary(
         args.scene_root,
@@ -6679,6 +6730,93 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     export_bop_rgbd_gaussian_evidence.set_defaults(
         handler=_object_state_export_bop_rgbd_gaussian_evidence
+    )
+    generate_bop_objectstate_baseline_candidate = object_state_subparsers.add_parser(
+        "generate-bop-objectstate-baseline-candidate",
+        help=(
+            "write a deterministic single-state ObjectState baseline from "
+            "existing BOP per-frame Gaussian evidence"
+        ),
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "scene_root",
+        type=Path,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        type=Path,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--sample-id",
+        required=True,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--dataset-id",
+        default="bop-ycbv",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--fps",
+        type=float,
+        default=30.0,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--rgb-dir",
+        default="rgb",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame condition metadata",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--max-frames",
+        type=int,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--candidate-id",
+        default="bop-gaussian-centroid-baseline",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing baseline candidate artifact",
+    )
+    generate_bop_objectstate_baseline_candidate.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the baseline candidate artifact was written and validated",
+    )
+    generate_bop_objectstate_baseline_candidate.set_defaults(
+        handler=_object_state_generate_bop_objectstate_baseline_candidate
     )
     init_bop_condition_sidecar = object_state_subparsers.add_parser(
         "init-bop-condition-sidecar",

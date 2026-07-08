@@ -715,6 +715,15 @@ def _sample_next_commands(
                 ).strip()
             )
     if not readiness["target_candidate_artifact_valid"]:
+        if readiness["gaussian_evidence_present"]:
+            commands.append(
+                (
+                    "uv run objgauss object-state generate-bop-objectstate-baseline-candidate "
+                    f"{paths['scene_root']} --output {paths['target_candidate_artifact']} "
+                    f"{common_opts} --condition-sidecar {paths['target_condition_sidecar']} "
+                    f"{frame_opts} --require-ready"
+                ).strip()
+            )
         if not readiness["objectstate_template_valid"]:
             commands.append(
                 (

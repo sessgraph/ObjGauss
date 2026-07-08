@@ -1088,6 +1088,48 @@ readiness, run local-row handoff, train models, claim metric pass, claim
 intervention / counterfactual gates, claim world model, use replay /
 diffusion, write public samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-BASELINE-CANDIDATE-001
+
+Generate a deterministic baseline ObjectState candidate from existing BOP
+per-frame Gaussian evidence.
+
+Required behavior:
+
+- Input a local BOP scene root and target `objectstates.json` output path.
+- Run BOP acceptance with per-frame Gaussian evidence required.
+- Read each selected `gaussians/<frame>.ply` file and compute one global
+  Gaussian `xyz` centroid and bbox per frame.
+- Write a trainable-kernel-compatible candidate artifact with a single
+  `ObjectState` per frame.
+- Record that the artifact is a baseline candidate only and is expected to be
+  negative evidence for multi-object identity scenes.
+- Do not read BOP pose GT or BOP object ids to place predicted ObjectStates.
+- Emit next commands for local-row audit and identity handoff.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_baseline_candidate`.
+- Summary schema:
+  `objgauss-objectstate-bop-baseline-candidate-v1`.
+- Core function:
+  `write_objectstate_bop_gaussian_centroid_baseline_candidate(...)`.
+- CLI command:
+  `objgauss object-state generate-bop-objectstate-baseline-candidate <scene-root> --output <objectstates.json>`.
+- `init-bop-phase1-sample-workspaces` now lists this baseline route after
+  RGB-D Gaussian evidence export and before manual candidate template
+  authoring.
+- `audit-bop-phase1-authoring-progress` now suggests this command when
+  Gaussian evidence exists but the target candidate artifact is missing.
+
+Current scope is baseline candidate generation only. It requires existing BOP
+scene files and existing Gaussian evidence. It does not download BOP data,
+copy datasets, create GT, infer condition metadata, reconstruct Gaussians,
+train Gaussian / tracking / dynamics models, run identity handoff, run identity
+eval, claim metric pass, claim intervention / counterfactual gates, claim
+world model, use replay / diffusion, write public samples or mutate viewer
+defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample
