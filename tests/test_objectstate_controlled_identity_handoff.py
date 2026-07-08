@@ -51,6 +51,17 @@ def test_controlled_identity_handoff_runs_identity_only_reality_gate(tmp_path):
     assert summary["identity_scenario_audit"]["readiness"] == {
         "min_frame_count_met": True,
         "occlusion_reappearance_present": True,
+        "min_view_conditions_met": True,
+        "min_lighting_conditions_met": True,
+        "camera_motion_present": True,
+    }
+    assert summary["identity_scenario_audit"]["scenario_coverage"] == {
+        "view_ids": ["front", "right"],
+        "view_condition_count": 2,
+        "lighting_ids": ["bright", "dim"],
+        "lighting_condition_count": 2,
+        "camera_pose_count": 3,
+        "max_camera_translation_m": 0.04,
     }
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["controlled_real_manifest"]["evidence_rows"][0]["status"] == "pass"
@@ -212,6 +223,9 @@ def test_controlled_identity_handoff_requires_identity_scenario_challenge(
     assert summary["identity_scenario_audit"]["readiness"] == {
         "min_frame_count_met": True,
         "occlusion_reappearance_present": False,
+        "min_view_conditions_met": True,
+        "min_lighting_conditions_met": True,
+        "camera_motion_present": True,
     }
     assert "clear-visible-before" in summary["identity_scenario_audit"]["issues"][0]
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
@@ -247,7 +261,53 @@ def test_controlled_identity_handoff_requires_clear_visible_reappearance(
     assert summary["identity_scenario_audit"]["readiness"] == {
         "min_frame_count_met": True,
         "occlusion_reappearance_present": False,
+        "min_view_conditions_met": True,
+        "min_lighting_conditions_met": True,
+        "camera_motion_present": True,
     }
+    assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
+    assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
+
+
+def test_controlled_identity_handoff_requires_real_identity_condition_coverage(
+    tmp_path,
+):
+    _write_capture_bundle_files(tmp_path)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+
+    summary = objectstate_controlled_identity_handoff(
+        _capture_manifest(include_conditions=False),
+        artifact,
+        candidate_id="stable-objectstate-slots",
+        artifact_refs=(str(artifact_path),),
+        capture_root=tmp_path,
+        candidate_artifact_path=artifact_path,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_handoff_fail"
+    assert (
+        summary["identity_scenario_audit"]["status"]
+        == "objectstate_controlled_identity_scenario_audit_fail"
+    )
+    assert summary["identity_scenario_audit"]["readiness"] == {
+        "min_frame_count_met": True,
+        "occlusion_reappearance_present": True,
+        "min_view_conditions_met": False,
+        "min_lighting_conditions_met": False,
+        "camera_motion_present": False,
+    }
+    assert summary["identity_scenario_audit"]["scenario_coverage"] == {
+        "view_ids": [],
+        "view_condition_count": 0,
+        "lighting_ids": [],
+        "lighting_condition_count": 0,
+        "camera_pose_count": 0,
+        "max_camera_translation_m": 0.0,
+    }
+    assert "frame.condition.view_id" in summary["identity_scenario_audit"]["issues"][0]
+    assert "frame.condition.lighting_id" in summary["identity_scenario_audit"]["issues"][1]
+    assert "frame.condition.camera_pose" in summary["identity_scenario_audit"]["issues"][2]
     assert summary["identity_eval"]["status"] == "objectstate_controlled_identity_eval_pass"
     assert summary["controlled_real_summary"]["gate"]["status"] == "objectstate_reality_gate_pass"
 
@@ -320,6 +380,9 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
         "objectstate_controlled_identity_scenario_audit_pass"
         in stdout
     )
+    assert "identity_scenario_view_conditions=2" in stdout
+    assert "identity_scenario_lighting_conditions=2" in stdout
+    assert "identity_scenario_max_camera_translation_m=0.040000" in stdout
     assert "identity_gate_status=objectstate_reality_gate_pass" in stdout
     assert capture_file_audit["status"] == "objectstate_controlled_capture_file_audit_pass"
     assert (
@@ -332,6 +395,9 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
     assert identity_scenario_audit["status"] == (
         "objectstate_controlled_identity_scenario_audit_pass"
     )
+    assert identity_scenario_audit["scenario_coverage"]["view_condition_count"] == 2
+    assert identity_scenario_audit["scenario_coverage"]["lighting_condition_count"] == 2
+    assert identity_scenario_audit["scenario_coverage"]["camera_pose_count"] == 3
     assert "no missing files" in capture_missing
     assert predictions["candidate"]["candidate_id"] == "cli-objectstate-slots"
     assert identity_eval["status"] == "objectstate_controlled_identity_eval_pass"
@@ -344,7 +410,7 @@ def test_object_state_controlled_identity_handoff_cli_writes_artifacts(tmp_path,
     assert handoff["identity_scenario_audit"] == identity_scenario_audit
 
 
-def _capture_manifest(*, include_occlusion: bool = True):
+def _capture_manifest(*, include_occlusion: bool = True, include_conditions: bool = True):
     frames = []
     for frame_index, timestamp in enumerate((0.0, 0.033333, 0.066667)):
         frame_objects = []
@@ -362,17 +428,25 @@ def _capture_manifest(*, include_occlusion: bool = True):
                     },
                 }
             )
-        frames.append(
-            {
-                "frame_id": f"frame-{frame_index:06d}",
-                "timestamp": timestamp,
-                "observation": {
-                    "rgb": f"rgb/{frame_index:06d}.png",
-                    "gaussian": f"gaussians/{frame_index:06d}.ply",
+        frame = {
+            "frame_id": f"frame-{frame_index:06d}",
+            "timestamp": timestamp,
+            "observation": {
+                "rgb": f"rgb/{frame_index:06d}.png",
+                "gaussian": f"gaussians/{frame_index:06d}.ply",
+            },
+            "objects": frame_objects,
+        }
+        if include_conditions:
+            frame["condition"] = {
+                "view_id": "front" if frame_index < 2 else "right",
+                "lighting_id": "bright" if frame_index == 0 else "dim",
+                "camera_pose": {
+                    "position": [0.02 * frame_index, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
                 },
-                "objects": frame_objects,
             }
-        )
+        frames.append(frame)
     return {
         "schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
         "sample": {

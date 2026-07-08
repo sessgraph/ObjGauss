@@ -3212,6 +3212,9 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         hash_candidate_artifact=args.hash_candidate_artifact,
         min_identity_scenario_frames=args.min_identity_scenario_frames,
         min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
     )
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -3246,6 +3249,7 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
     write_json(handoff_path, summary)
     metrics = summary["identity_eval"]["metrics"]
     gate = summary["controlled_real_summary"]["gate"]
+    scenario_coverage = summary["identity_scenario_audit"]["scenario_coverage"]
     print(f"schema={summary['schema']}")
     print(f"capture={args.capture_manifest}")
     print(f"capture_root={capture_root}")
@@ -3264,6 +3268,18 @@ def _object_state_controlled_identity_handoff(args: argparse.Namespace) -> None:
         f"{str(summary['candidate_artifact_ref_match']['matches']).lower()}"
     )
     print(f"identity_scenario_audit_status={summary['identity_scenario_audit']['status']}")
+    print(
+        "identity_scenario_view_conditions="
+        f"{scenario_coverage['view_condition_count']}"
+    )
+    print(
+        "identity_scenario_lighting_conditions="
+        f"{scenario_coverage['lighting_condition_count']}"
+    )
+    print(
+        "identity_scenario_max_camera_translation_m="
+        f"{scenario_coverage['max_camera_translation_m']:.6f}"
+    )
     print(f"identity_eval_status={summary['identity_eval']['status']}")
     print(f"identity_gate_status={gate['status']}")
     print(f"idf1={metrics['idf1']:.6f}")
@@ -3624,6 +3640,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.5,
         help="occlusion_fraction threshold for identity scenario challenge audit",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.view_id values for identity handoff",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.lighting_id values for identity handoff",
+    )
+    controlled_identity_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+        help="minimum camera translation in meters from frame.condition.camera_pose",
     )
     controlled_identity_handoff.add_argument(
         "--synthetic-smoke-failed",

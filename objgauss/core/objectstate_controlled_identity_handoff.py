@@ -67,6 +67,9 @@ def objectstate_controlled_identity_handoff(
     hash_candidate_artifact: bool = False,
     min_identity_scenario_frames: int = 3,
     min_occlusion_fraction: float = 0.5,
+    min_view_conditions: int = 2,
+    min_lighting_conditions: int = 2,
+    min_camera_motion_m: float = 0.01,
 ) -> dict[str, Any]:
     capture_file_audit = objectstate_controlled_capture_file_audit(
         capture_manifest,
@@ -86,6 +89,9 @@ def objectstate_controlled_identity_handoff(
         capture_manifest,
         min_frames=min_identity_scenario_frames,
         min_occlusion_fraction=min_occlusion_fraction,
+        min_view_conditions=min_view_conditions,
+        min_lighting_conditions=min_lighting_conditions,
+        min_camera_motion_m=min_camera_motion_m,
     )
     predictions = objectstate_identity_predictions_from_trainable_artifact(
         capture_manifest,
@@ -345,13 +351,23 @@ def _identity_scenario_audit(
     *,
     min_frames: int,
     min_occlusion_fraction: float,
+    min_view_conditions: int,
+    min_lighting_conditions: int,
+    min_camera_motion_m: float,
 ) -> dict[str, Any]:
     if min_frames < 3:
         raise ValueError("min_identity_scenario_frames must be at least 3")
     if min_occlusion_fraction < 0.0 or min_occlusion_fraction > 1.0:
         raise ValueError("min_occlusion_fraction must be in [0, 1]")
+    if min_view_conditions < 1:
+        raise ValueError("min_view_conditions must be at least 1")
+    if min_lighting_conditions < 1:
+        raise ValueError("min_lighting_conditions must be at least 1")
+    if min_camera_motion_m < 0.0:
+        raise ValueError("min_camera_motion_m must be non-negative")
     checked_manifest = validate_objectstate_controlled_capture_manifest(capture_manifest)
     frames = checked_manifest["frames"]
+    scenario_coverage = _identity_scenario_condition_coverage(frames)
     tracks: dict[str, list[dict[str, Any]]] = {
         item["object_id"]: [] for item in checked_manifest["objects"]
     }
@@ -399,6 +415,16 @@ def _identity_scenario_audit(
     readiness = {
         "min_frame_count_met": len(frames) >= min_frames,
         "occlusion_reappearance_present": occlusion_reappearance_present,
+        "min_view_conditions_met": (
+            scenario_coverage["view_condition_count"] >= min_view_conditions
+        ),
+        "min_lighting_conditions_met": (
+            scenario_coverage["lighting_condition_count"] >= min_lighting_conditions
+        ),
+        "camera_motion_present": (
+            scenario_coverage["camera_pose_count"] >= 2
+            and scenario_coverage["max_camera_translation_m"] >= min_camera_motion_m
+        ),
     }
     issues = []
     if not readiness["min_frame_count_met"]:
@@ -407,6 +433,22 @@ def _identity_scenario_audit(
         issues.append(
             "identity scenario requires clear-visible-before, occluded, "
             "clear-visible-after observations for at least one object"
+        )
+    if not readiness["min_view_conditions_met"]:
+        issues.append(
+            "identity scenario requires at least "
+            f"{min_view_conditions} distinct frame.condition.view_id values"
+        )
+    if not readiness["min_lighting_conditions_met"]:
+        issues.append(
+            "identity scenario requires at least "
+            f"{min_lighting_conditions} distinct frame.condition.lighting_id values"
+        )
+    if not readiness["camera_motion_present"]:
+        issues.append(
+            "identity scenario requires at least two frame.condition.camera_pose "
+            "values with max translation >= "
+            f"{min_camera_motion_m:.6f}m"
         )
     payload = {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
@@ -422,9 +464,16 @@ def _identity_scenario_audit(
         "requirements": {
             "min_frames": int(min_frames),
             "min_occlusion_fraction": float(min_occlusion_fraction),
+            "min_view_conditions": int(min_view_conditions),
+            "min_lighting_conditions": int(min_lighting_conditions),
+            "min_camera_motion_m": float(min_camera_motion_m),
             "requires_occlusion_reappearance": True,
+            "requires_view_change": True,
+            "requires_lighting_change": True,
+            "requires_camera_motion": True,
         },
         "readiness": readiness,
+        "scenario_coverage": scenario_coverage,
         "object_tracks": object_tracks,
         "issues": issues,
         "claim_policy": {
@@ -432,6 +481,7 @@ def _identity_scenario_audit(
             "scenario_audit_does_not_read_image_pixels": True,
             "scenario_audit_does_not_prove_model_quality": True,
             "scenario_audit_does_not_verify_lighting_or_camera_motion": True,
+            "scenario_audit_uses_manifest_condition_metadata": True,
         },
     }
     return _validate_identity_scenario_audit(payload)
@@ -467,12 +517,27 @@ def _validate_identity_scenario_audit(payload: Any) -> dict[str, Any]:
         or not isinstance(requirements.get("min_occlusion_fraction"), float)
         or requirements["min_occlusion_fraction"] < 0.0
         or requirements["min_occlusion_fraction"] > 1.0
+        or not isinstance(requirements.get("min_view_conditions"), int)
+        or int(requirements["min_view_conditions"]) < 1
+        or not isinstance(requirements.get("min_lighting_conditions"), int)
+        or int(requirements["min_lighting_conditions"]) < 1
+        or not isinstance(requirements.get("min_camera_motion_m"), float)
+        or requirements["min_camera_motion_m"] < 0.0
         or not requirements.get("requires_occlusion_reappearance")
+        or not requirements.get("requires_view_change")
+        or not requirements.get("requires_lighting_change")
+        or not requirements.get("requires_camera_motion")
     ):
         raise ValueError("identity scenario audit requirements are invalid")
     if not isinstance(readiness, dict):
         raise ValueError("identity scenario audit requires readiness")
-    for key in ("min_frame_count_met", "occlusion_reappearance_present"):
+    for key in (
+        "min_frame_count_met",
+        "occlusion_reappearance_present",
+        "min_view_conditions_met",
+        "min_lighting_conditions_met",
+        "camera_motion_present",
+    ):
         if not isinstance(readiness.get(key), bool):
             raise ValueError(f"identity scenario audit readiness missing bool {key}")
     expected_status = (
@@ -482,6 +547,22 @@ def _validate_identity_scenario_audit(payload: Any) -> dict[str, Any]:
     )
     if payload["status"] != expected_status:
         raise ValueError("identity scenario audit status must match readiness")
+    scenario_coverage = payload.get("scenario_coverage")
+    if not isinstance(scenario_coverage, dict):
+        raise ValueError("identity scenario audit requires scenario_coverage")
+    if (
+        not isinstance(scenario_coverage.get("view_condition_count"), int)
+        or scenario_coverage["view_condition_count"] < 0
+        or not isinstance(scenario_coverage.get("lighting_condition_count"), int)
+        or scenario_coverage["lighting_condition_count"] < 0
+        or not isinstance(scenario_coverage.get("camera_pose_count"), int)
+        or scenario_coverage["camera_pose_count"] < 0
+        or not isinstance(scenario_coverage.get("max_camera_translation_m"), float)
+        or scenario_coverage["max_camera_translation_m"] < 0.0
+        or not isinstance(scenario_coverage.get("view_ids"), list)
+        or not isinstance(scenario_coverage.get("lighting_ids"), list)
+    ):
+        raise ValueError("identity scenario audit scenario_coverage is invalid")
     if not isinstance(payload.get("object_tracks"), list):
         raise ValueError("identity scenario audit requires object_tracks")
     if not isinstance(payload.get("issues"), list):
@@ -492,9 +573,57 @@ def _validate_identity_scenario_audit(payload: Any) -> dict[str, Any]:
         or not claim_policy.get("scenario_audit_does_not_read_image_pixels")
         or not claim_policy.get("scenario_audit_does_not_prove_model_quality")
         or not claim_policy.get("scenario_audit_does_not_verify_lighting_or_camera_motion")
+        or not claim_policy.get("scenario_audit_uses_manifest_condition_metadata")
     ):
         raise ValueError("identity scenario audit must preserve claim policy")
     return payload
+
+
+def _identity_scenario_condition_coverage(
+    frames: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    view_ids: set[str] = set()
+    lighting_ids: set[str] = set()
+    camera_positions: list[Sequence[float]] = []
+    for frame in frames:
+        condition = frame.get("condition", {})
+        if not isinstance(condition, Mapping):
+            continue
+        view_id = condition.get("view_id")
+        lighting_id = condition.get("lighting_id")
+        if isinstance(view_id, str) and view_id:
+            view_ids.add(view_id)
+        if isinstance(lighting_id, str) and lighting_id:
+            lighting_ids.add(lighting_id)
+        camera_pose = condition.get("camera_pose")
+        if isinstance(camera_pose, Mapping):
+            position = camera_pose.get("position")
+            if (
+                isinstance(position, Sequence)
+                and not isinstance(position, (str, bytes))
+                and len(position) == 3
+            ):
+                camera_positions.append([float(component) for component in position])
+    max_camera_translation_m = _max_camera_translation(camera_positions)
+    return {
+        "view_ids": sorted(view_ids),
+        "view_condition_count": len(view_ids),
+        "lighting_ids": sorted(lighting_ids),
+        "lighting_condition_count": len(lighting_ids),
+        "camera_pose_count": len(camera_positions),
+        "max_camera_translation_m": float(max_camera_translation_m),
+    }
+
+
+def _max_camera_translation(camera_positions: Sequence[Sequence[float]]) -> float:
+    max_distance = 0.0
+    for left_index, left in enumerate(camera_positions):
+        for right in camera_positions[left_index + 1 :]:
+            squared = sum(
+                (float(left[axis]) - float(right[axis])) ** 2 for axis in range(3)
+            )
+            max_distance = max(max_distance, squared**0.5)
+    return max_distance
 
 
 def _candidate_artifact_ref_match(

@@ -343,6 +343,8 @@ def _validate_frame(value: Any, *, object_ids: set[str]) -> dict[str, Any]:
     }
     if "action_id" in value:
         result["action_id"] = _required_string(value, "action_id")
+    if "condition" in value:
+        result["condition"] = _validate_frame_condition(value["condition"])
     return result
 
 
@@ -373,6 +375,24 @@ def _validate_frame_object(value: Any, *, object_ids: set[str]) -> dict[str, Any
         result["occlusion_fraction"] = occlusion
     if "pose" in value:
         result["pose"] = _validate_pose(value["pose"])
+    return result
+
+
+def _validate_frame_condition(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError("controlled capture frame.condition must be a mapping")
+    result: dict[str, Any] = {}
+    if "view_id" in value:
+        result["view_id"] = _required_string(value, "view_id")
+    if "lighting_id" in value:
+        result["lighting_id"] = _required_string(value, "lighting_id")
+    if "camera_pose" in value:
+        result["camera_pose"] = _validate_pose(value["camera_pose"])
+    if not result:
+        raise ValueError(
+            "controlled capture frame.condition must include view_id, "
+            "lighting_id, or camera_pose"
+        )
     return result
 
 

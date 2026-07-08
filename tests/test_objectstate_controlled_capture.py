@@ -84,6 +84,23 @@ def test_controlled_capture_manifest_reads_json_file(tmp_path):
     assert manifest["sample"]["sample_id"] == "controlled-tabletop-cup-capture-001"
 
 
+def test_controlled_capture_manifest_preserves_frame_conditions():
+    manifest = _capture_manifest(include_conditions=True)
+
+    checked = validate_objectstate_controlled_capture_manifest(manifest)
+
+    assert checked["frames"][0]["condition"] == {
+        "view_id": "front",
+        "lighting_id": "bright",
+        "camera_pose": {
+            "position": [0.0, 0.0, 0.0],
+            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+    }
+    assert checked["frames"][2]["condition"]["view_id"] == "right"
+    assert checked["frames"][2]["condition"]["lighting_id"] == "dim"
+
+
 def test_controlled_capture_manifest_rejects_non_monotonic_timestamps():
     manifest = _capture_manifest()
     manifest["frames"][1]["timestamp"] = manifest["frames"][0]["timestamp"]
@@ -105,6 +122,14 @@ def test_controlled_capture_manifest_rejects_malformed_pose():
     manifest["frames"][0]["objects"][0]["pose"]["rotation_xyzw"] = [0.0, 0.0, 0.0]
 
     with pytest.raises(ValueError, match="pose.rotation_xyzw must have length 4"):
+        validate_objectstate_controlled_capture_manifest(manifest)
+
+
+def test_controlled_capture_manifest_rejects_empty_frame_condition():
+    manifest = _capture_manifest()
+    manifest["frames"][0]["condition"] = {}
+
+    with pytest.raises(ValueError, match="frame.condition must include"):
         validate_objectstate_controlled_capture_manifest(manifest)
 
 
@@ -161,6 +186,7 @@ def _capture_manifest(
     include_gaussian: bool = True,
     include_pose: bool = True,
     include_action: bool = False,
+    include_conditions: bool = False,
 ):
     frames = []
     for index, timestamp in enumerate((0.0, 0.033333, 0.066667)):
@@ -183,6 +209,15 @@ def _capture_manifest(
             "observation": observation,
             "objects": [frame_object],
         }
+        if include_conditions:
+            frame["condition"] = {
+                "view_id": "front" if index < 2 else "right",
+                "lighting_id": "bright" if index == 0 else "dim",
+                "camera_pose": {
+                    "position": [0.02 * index, 0.0, 0.0],
+                    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+            }
         if include_action and index == 1:
             frame["action_id"] = "push-left-001"
         frames.append(frame)
