@@ -291,7 +291,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 - 验证:
   - `uv run --extra dev pytest tests/test_objectstate_bop_identity_handoff.py`: passed，3 tests。
   - `uv run --extra dev pytest tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_controlled_identity_eval.py tests/test_core_namespace.py`: passed，27 tests。
-- 完成 commit: `32b60b7`。
+- 完成 commit: `ea71370`。
 
 ### OBJECTSTATE-BOP-CANDIDATE-ARTIFACT-FINALIZE-001: Finalize BOP ObjectState artifact templates
 
