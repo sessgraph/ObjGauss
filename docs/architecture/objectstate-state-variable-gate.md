@@ -916,6 +916,65 @@ video, create GT, run a prediction / dynamics model, compute identity or
 action-conditioned metrics, train Gaussian or dynamics models, use replay /
 diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001
+
+Add the first controlled real Stage 3 intervention metric evaluator.
+
+Required behavior:
+
+- Input a controlled capture manifest with timestamped 6DoF pose GT and
+  timestamped action GT.
+- Input candidate action-conditioned future-pose predictions bound to
+  `(source_frame_id, target_frame_id, object_id, action_id)`.
+- Require each intervention prediction to include both
+  `action_conditioned_position` from the ObjectState + Action candidate and
+  `no_action_baseline_position` from an explicit no-action baseline.
+- Require the referenced action to provide a non-zero action vector so
+  `wrong_direction_rate` is measurable instead of inferred.
+- Reject candidate predictions whose sample id, frame id, object id, action id,
+  action interval or pose GT does not match the capture manifest.
+- Compute intervention metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `action_conditioned_ade`, `counterfactual_outcome_accuracy` and
+  `wrong_direction_rate`.
+- Emit a controlled-real manifest where the intervention row becomes `pass` or
+  `fail`, while identity / prediction rows remain blocked unless their metrics
+  already exist.
+- Keep this as an evaluator / handoff contract only; do not run a dynamics
+  model, infer pose/action GT or create no-action baselines.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_intervention_eval`.
+- Intervention schema:
+  `objgauss-objectstate-controlled-intervention-candidates-v1`.
+- Eval summary schema:
+  `objgauss-objectstate-controlled-intervention-eval-v1`.
+- `read_objectstate_controlled_intervention_candidates(...)` reads JSON.
+- `validate_objectstate_controlled_intervention_candidates(...)` validates
+  candidate metadata and per-object action-conditioned predictions.
+- `evaluate_objectstate_controlled_intervention_candidates(...)` compares
+  action-conditioned predictions against capture pose/action GT and outputs
+  pass / fail metrics.
+- Metrics include `action_conditioned_ade`, `no_action_ade`,
+  `intervention_gain`, `action_error_ratio`,
+  `counterfactual_outcome_accuracy`, `wrong_direction_rate`, intervention
+  count and horizon seconds.
+- Threshold defaults:
+  `max_action_conditioned_ade=0.05m`,
+  `min_counterfactual_outcome_accuracy=0.95`,
+  `max_wrong_direction_rate=0.0`,
+  `min_intervention_gain=0.0` and
+  `min_intervention_count=1`.
+- CLI command:
+  `objgauss object-state eval-controlled-intervention <capture.json> <interventions.json>`.
+- CLI outputs optional `--summary-output` and `--controlled-real-output`, plus
+  threshold args and `--require-pass`.
+
+Current scope remains Stage 3 intervention evaluation only. It does not capture
+video, create GT, run an action-conditioned model, compute identity or
+prediction metrics, train Gaussian or dynamics models, use replay / diffusion,
+or mutate viewer defaults.
+
 ### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001
 
 Bridge candidate ObjectState outputs into the controlled identity evaluator.

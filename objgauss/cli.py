@@ -168,6 +168,11 @@ from objgauss.core.objectstate_controlled_prediction_eval import (
     evaluate_objectstate_controlled_prediction_candidates,
     read_objectstate_controlled_prediction_candidates,
 )
+from objgauss.core.objectstate_controlled_intervention_eval import (
+    ObjectStateControlledInterventionThresholds,
+    evaluate_objectstate_controlled_intervention_candidates,
+    read_objectstate_controlled_intervention_candidates,
+)
 from objgauss.core.objectstate_controlled_identity_handoff import (
     objectstate_controlled_identity_handoff,
 )
@@ -3462,6 +3467,53 @@ def _object_state_eval_controlled_prediction(args: argparse.Namespace) -> None:
         raise ValueError("controlled prediction eval did not pass")
 
 
+def _object_state_eval_controlled_intervention(args: argparse.Namespace) -> None:
+    capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
+    candidates = read_objectstate_controlled_intervention_candidates(args.interventions)
+    summary = evaluate_objectstate_controlled_intervention_candidates(
+        capture,
+        candidates,
+        thresholds=ObjectStateControlledInterventionThresholds(
+            max_action_conditioned_ade=args.max_action_conditioned_ade,
+            min_counterfactual_outcome_accuracy=(
+                args.min_counterfactual_outcome_accuracy
+            ),
+            max_wrong_direction_rate=args.max_wrong_direction_rate,
+            min_intervention_gain=args.min_intervention_gain,
+            min_intervention_count=args.min_intervention_count,
+        ),
+    )
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"interventions={args.interventions}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"intervention_eval_status={summary['status']}")
+    print(f"action_conditioned_ade={metrics['action_conditioned_ade']:.6f}")
+    print(f"no_action_ade={metrics['no_action_ade']:.6f}")
+    print(f"intervention_gain={metrics['intervention_gain']:.6f}")
+    print(
+        "counterfactual_outcome_accuracy="
+        f"{metrics['counterfactual_outcome_accuracy']:.6f}"
+    )
+    print(f"wrong_direction_rate={metrics['wrong_direction_rate']:.6f}")
+    print(f"intervention_count={metrics['intervention_count']}")
+    print(f"mean_horizon_seconds={metrics['mean_horizon_seconds']:.6f}")
+    print(f"max_horizon_seconds={metrics['max_horizon_seconds']:.6f}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest"])
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_controlled_intervention_eval_pass"
+    ):
+        raise ValueError("controlled intervention eval did not pass")
+
+
 def _object_state_export_identity_predictions(args: argparse.Namespace) -> None:
     capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
     artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
@@ -4283,6 +4335,46 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_controlled_prediction.add_argument("--require-pass", action="store_true")
     eval_controlled_prediction.set_defaults(
         handler=_object_state_eval_controlled_prediction
+    )
+    eval_controlled_intervention = object_state_subparsers.add_parser(
+        "eval-controlled-intervention",
+        help=(
+            "score action-conditioned intervention predictions against a "
+            "controlled capture manifest"
+        ),
+    )
+    eval_controlled_intervention.add_argument("capture_manifest", type=Path)
+    eval_controlled_intervention.add_argument("interventions", type=Path)
+    eval_controlled_intervention.add_argument("--summary-output", type=Path)
+    eval_controlled_intervention.add_argument("--controlled-real-output", type=Path)
+    eval_controlled_intervention.add_argument(
+        "--max-action-conditioned-ade",
+        type=float,
+        default=0.05,
+    )
+    eval_controlled_intervention.add_argument(
+        "--min-counterfactual-outcome-accuracy",
+        type=float,
+        default=0.95,
+    )
+    eval_controlled_intervention.add_argument(
+        "--max-wrong-direction-rate",
+        type=float,
+        default=0.0,
+    )
+    eval_controlled_intervention.add_argument(
+        "--min-intervention-gain",
+        type=float,
+        default=0.0,
+    )
+    eval_controlled_intervention.add_argument(
+        "--min-intervention-count",
+        type=int,
+        default=1,
+    )
+    eval_controlled_intervention.add_argument("--require-pass", action="store_true")
+    eval_controlled_intervention.set_defaults(
+        handler=_object_state_eval_controlled_intervention
     )
     export_identity_predictions = object_state_subparsers.add_parser(
         "export-identity-predictions",

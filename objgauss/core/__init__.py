@@ -250,6 +250,30 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_prediction_eval",
         "ObjectStateControlledPredictionThresholds",
     ),
+    "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA",
+    ),
+    "ObjectStateControlledInterventionThresholds": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "ObjectStateControlledInterventionThresholds",
+    ),
+    "evaluate_objectstate_controlled_intervention_candidates": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "evaluate_objectstate_controlled_intervention_candidates",
+    ),
+    "validate_objectstate_controlled_intervention_candidates": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "validate_objectstate_controlled_intervention_candidates",
+    ),
+    "validate_objectstate_controlled_intervention_eval_summary": (
+        "objgauss.core.objectstate_controlled_intervention_eval",
+        "validate_objectstate_controlled_intervention_eval_summary",
+    ),
     "evaluate_objectstate_controlled_prediction_candidates": (
         "objgauss.core.objectstate_controlled_prediction_eval",
         "evaluate_objectstate_controlled_prediction_candidates",

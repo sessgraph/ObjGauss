@@ -71,11 +71,14 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
+    OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+    OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     ObjectStateControlledIdentityThresholds,
+    ObjectStateControlledInterventionThresholds,
     ObjectStateControlledPredictionThresholds,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
@@ -208,6 +211,7 @@ from objgauss.core import (
     write_objectstate_controlled_capture_bundle_template,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
+    evaluate_objectstate_controlled_intervention_candidates,
     evaluate_objectstate_controlled_prediction_candidates,
     objectstate_controlled_identity_handoff,
     objectstate_identity_predictions_from_trainable_artifact,
@@ -291,6 +295,8 @@ from objgauss.core import (
     validate_objectstate_controlled_identity_handoff_summary,
     validate_objectstate_controlled_identity_predictions,
     validate_objectstate_controlled_identity_thresholds,
+    validate_objectstate_controlled_intervention_candidates,
+    validate_objectstate_controlled_intervention_eval_summary,
     validate_objectstate_controlled_prediction_candidates,
     validate_objectstate_controlled_prediction_eval_summary,
     validate_objectstate_controlled_real_manifest,
@@ -770,7 +776,17 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
             "license": "local controlled capture",
         },
         "objects": [{"object_id": "cup-001", "category": "cup"}],
-        "actions": [],
+        "actions": [
+            {
+                "action_id": "push-right-001",
+                "action_type": "push_right",
+                "object_id": "cup-001",
+                "start_timestamp": 0.0,
+                "end_timestamp": 0.033333,
+                "actor": "namespace-fixture",
+                "vector": [0.01, 0.0, 0.0],
+            }
+        ],
         "frames": [
             {
                 "frame_id": "frame-000000",
@@ -779,6 +795,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
                     "rgb": "rgb/000000.png",
                     "gaussian": "gaussians/000000.ply",
                 },
+                "action_id": "push-right-001",
                 "objects": [
                     {
                         "object_id": "cup-001",
@@ -939,6 +956,54 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert prediction_summary["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA
     assert prediction_summary["status"] == "objectstate_controlled_prediction_eval_pass"
     assert prediction_summary["controlled_real_manifest"]["evidence_rows"][1][
+        "status"
+    ] == "pass"
+    assert OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA == (
+        "objgauss-objectstate-controlled-intervention-candidates-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA == (
+        "objgauss-objectstate-controlled-intervention-eval-v1"
+    )
+    intervention_candidates = {
+        "schema": OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+        "sample_id": "namespace-controlled-capture",
+        "candidate": {
+            "candidate_id": "namespace-intervention-candidate",
+            "source": "namespace fixture",
+            "artifact_refs": ["outputs/controlled-real/namespace/interventions.json"],
+        },
+        "interventions": [
+            {
+                "source_frame_id": "frame-000000",
+                "target_frame_id": "frame-000001",
+                "object_id": "cup-001",
+                "action_id": "push-right-001",
+                "action_conditioned_position": [0.11, 0.2, 0.3],
+                "no_action_baseline_position": [0.1, 0.2, 0.3],
+            }
+        ],
+    }
+    assert validate_objectstate_controlled_intervention_candidates(
+        intervention_candidates
+    )["schema"] == OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA
+    intervention_thresholds = ObjectStateControlledInterventionThresholds()
+    intervention_summary = evaluate_objectstate_controlled_intervention_candidates(
+        capture_manifest,
+        intervention_candidates,
+        thresholds=intervention_thresholds,
+    )
+    assert validate_objectstate_controlled_intervention_eval_summary(
+        intervention_summary
+    ) is intervention_summary
+    assert (
+        intervention_summary["schema"]
+        == OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA
+    )
+    assert (
+        intervention_summary["status"]
+        == "objectstate_controlled_intervention_eval_pass"
+    )
+    assert intervention_summary["controlled_real_manifest"]["evidence_rows"][2][
         "status"
     ] == "pass"
     assert objectstate_identity_predictions_from_trainable_artifact is not None
