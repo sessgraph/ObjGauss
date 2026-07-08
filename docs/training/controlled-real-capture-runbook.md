@@ -222,6 +222,27 @@ means the transition dataset is ready for the next candidate/evaluator step.
 It is not a dynamics model result, prediction metric pass, intervention metric
 pass, replay buffer, or world-model claim.
 
+For a first Real Predictive Gate handoff, export evaluator-ready prediction
+candidates from the transition dataset:
+
+```bash
+uv run objgauss object-state export-transition-prediction-candidates \
+  outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.json \
+  --policy constant_velocity \
+  --candidate-id controlled-tabletop-cup-box-001-transition-cv \
+  --artifact-ref outputs/captures/controlled-tabletop-cup-box-001/objectstate-transitions.json \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/transition-prediction-summary.json
+```
+
+For an action-vector baseline on an interaction-capable capture, use
+`--policy action_delta --require-action-transition`. The exporter writes the
+existing `objgauss-objectstate-controlled-prediction-candidates-v1` schema, so
+the result can go directly to `eval-controlled-prediction`. The exporter uses
+source pose, prior pose, target timestamp, and optional action vector. It does
+not read target pose values to generate predicted positions, does not run an
+eval, does not train dynamics, and does not claim a metric pass.
+
 ## 7. Candidate Artifact
 
 The identity handoff expects a trainable ObjectState artifact JSON compatible

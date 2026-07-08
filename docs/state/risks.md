@@ -240,3 +240,12 @@ object horizon、pose readiness 和 real Gaussian refs，并输出 hard blockers
 intervention eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows、不声明
 metric pass 或 world-model evidence。风险继续 open，直到真实 transition-backed rows
 进入 identity / prediction / intervention pass/fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-TRANSITION-PREDICTION-CANDIDATES-001`
+新增 `export-transition-prediction-candidates`，可从 Object Transition Dataset 导出现有
+`objgauss-objectstate-controlled-prediction-candidates-v1` evaluator JSON，支持 hold /
+constant-velocity / action-delta baseline。该缓解把 transition-backed `ObjectState_t`
+证据接到 Real Predictive Gate candidate 输入，并用测试固定“不读取 target pose values 生成预测”；
+但它仍不运行 prediction eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows、
+不声明 metric pass、learned model 或 world-model evidence。风险继续 open，直到真实
+transition-backed prediction / intervention rows 进入 pass/fail accounting。

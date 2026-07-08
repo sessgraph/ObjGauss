@@ -203,6 +203,9 @@ from objgauss.core.objectstate_transition_dataset import (
     objectstate_transition_dataset_audit_from_path,
     write_objectstate_transition_dataset,
 )
+from objgauss.core.objectstate_transition_prediction_candidates import (
+    write_objectstate_transition_prediction_candidates,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -4846,6 +4849,44 @@ def _object_state_audit_objectstate_transition_dataset(
         print(f"summary={args.summary_output}")
     if args.require_ready and not readiness["transition_dataset_ready"]:
         raise ValueError("ObjectState transition dataset audit is not ready")
+
+
+def _object_state_export_transition_prediction_candidates(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_transition_prediction_candidates(
+        args.transition_dataset,
+        args.output,
+        policy=args.policy,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        artifact_ref=args.artifact_ref,
+        confidence=args.confidence,
+        require_action_transition=args.require_action_transition,
+        force=args.force,
+    )
+    counts = summary["row_counts"]
+    policy = summary["policy"]
+    print(f"schema={summary['schema']}")
+    print(f"transition_dataset={args.transition_dataset}")
+    print(f"output={summary['output']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"policy={policy['name']}")
+    print(f"prediction_candidate_count={counts['prediction_candidates']}")
+    print(f"constant_velocity_rows={counts['constant_velocity_rows']}")
+    print(f"action_delta_rows={counts['action_delta_rows']}")
+    print(f"hold_rows={counts['hold_rows']}")
+    print(f"action_conditioned_rows={counts['action_conditioned_rows']}")
+    print(f"uses_target_pose_values={str(policy['uses_target_pose_values']).lower()}")
+    print(
+        "does_not_read_target_pose_values_for_prediction="
+        f"{str(summary['claim_policy']['does_not_read_target_pose_values_for_prediction']).lower()}"
+    )
+    print(f"eval_prediction_command={summary['next_commands']['eval_prediction']}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
 
 
 def _object_state_audit_controlled_capture_files(args: argparse.Namespace) -> None:
@@ -10332,6 +10373,51 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_objectstate_transition_dataset.set_defaults(
         handler=_object_state_audit_objectstate_transition_dataset
+    )
+    export_transition_prediction_candidates = object_state_subparsers.add_parser(
+        "export-transition-prediction-candidates",
+        help=(
+            "export evaluator-ready controlled prediction candidates from an "
+            "ObjectState transition dataset"
+        ),
+    )
+    export_transition_prediction_candidates.add_argument(
+        "transition_dataset",
+        type=Path,
+    )
+    export_transition_prediction_candidates.add_argument("--output", type=Path, required=True)
+    export_transition_prediction_candidates.add_argument("--summary-output", type=Path)
+    export_transition_prediction_candidates.add_argument(
+        "--policy",
+        choices=("hold", "constant_velocity", "action_delta"),
+        default="constant_velocity",
+    )
+    export_transition_prediction_candidates.add_argument(
+        "--candidate-id",
+        default="transition-prediction-baseline-constant-velocity",
+    )
+    export_transition_prediction_candidates.add_argument("--candidate-source")
+    export_transition_prediction_candidates.add_argument(
+        "--artifact-ref",
+        default="generated-transition-prediction-candidates",
+    )
+    export_transition_prediction_candidates.add_argument(
+        "--confidence",
+        type=float,
+        default=0.5,
+    )
+    export_transition_prediction_candidates.add_argument(
+        "--require-action-transition",
+        action="store_true",
+        help="fail unless exported rows include at least one action-conditioned transition",
+    )
+    export_transition_prediction_candidates.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite the prediction candidates output if it already exists",
+    )
+    export_transition_prediction_candidates.set_defaults(
+        handler=_object_state_export_transition_prediction_candidates
     )
     audit_controlled_capture_files = object_state_subparsers.add_parser(
         "audit-controlled-capture-files",

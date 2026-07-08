@@ -1052,6 +1052,16 @@ object horizon、pose readiness 和 real Gaussian ref readiness，并输出 hard
 next actions。它只说明 transition dataset 是否具备进入候选训练或 evaluator authoring 的
 最低数据条件；不训练 dynamics、不创建 replay buffer、不运行 prediction / intervention eval、
 不生成 reality rows、不声明 metric pass 或 world model。
+随后完成 `OBJECTSTATE-TRANSITION-PREDICTION-CANDIDATES-001`：新增
+`objgauss.core.objectstate_transition_prediction_candidates`，schema 为
+`objgauss-objectstate-transition-prediction-candidates-v1`，CLI 为
+`objgauss object-state export-transition-prediction-candidates <objectstate-transitions.json>`。
+该 exporter 从 object-level transition rows 写出现有
+`objgauss-objectstate-controlled-prediction-candidates-v1` evaluator JSON，支持 `hold`、
+`constant_velocity` 和 `action_delta` baseline policy。预测生成只使用 source pose、
+prior pose、target timestamp 和可选 action vector；测试覆盖修改 target pose 不改变导出预测。
+它不运行 prediction eval、不训练 dynamics、不创建 replay buffer、不生成 reality rows，也不声明
+metric pass、learned model 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
