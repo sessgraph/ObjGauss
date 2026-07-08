@@ -132,6 +132,11 @@ adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`
 dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
 public interaction route audit 已同步 `intervention_action_gt_ready`：只有非零 action
 vector 且 action interval 覆盖 referenced object pose transition 时才会进入 handoff-ready。
+`GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
+Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
+`truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
+cross-sample / viewer / segmentation 扩展；由于缺 timestamped physical identity /
+6DoF pose / action GT，不能替代 Phase 1 controlled/public reality rows。
 `OBJECTSTATE-BOP-CAPTURE-ADAPTER-001` 已新增
 `import-bop-capture-scene` CLI，可把本地 BOP scene 的 `scene_camera.json` /
 `scene_gt.json` / optional `scene_gt_info.json` / `rgb/` 转成 controlled capture
@@ -348,6 +353,29 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001: Register ready-made Gaussian scene candidates
+
+- 状态: done / gaussian-scene-candidate-triage
+- 类型: docs-only / asset research
+- 状态记录: `docs/asset-library.md`
+- 目标: 回应“找一些现成的高斯场景”，把可优先本地审计的 `.splat` / official results
+  来源写入素材事实源，避免只停留在聊天建议。
+- 已实施:
+  - 新增 `现成 Gaussian 场景候选` 小节。
+  - 登记 cakewalk/splat-data 的 `room.splat`、`train.splat`、`truck.splat`、
+    `garden.splat`、`stump.splat`、`treehill.splat` 和 `bicycle.splat`。
+  - 登记 GraphDECO 官方 `Results - 7GB` 和 `Scenes - 650MB` 作为较大官方来源。
+  - 标注推荐顺序：先 `room` / `train` 小型静态场景，再大场景或官方 results。
+  - 明确这些现成静态 Gaussian 不能替代带 timestamped identity / 6DoF pose /
+    action GT 的 Phase 1 rows。
+- 边界:
+  - 不下载素材、不新增 pullable asset、不写 `public/samples/`。
+  - 不修改 viewer / export 默认。
+  - 不声明 public demo、commercial demo、reality gate pass 或 world-model evidence。
+- 验证:
+  - docs-only，未运行 pytest / build。
+  - `git diff --check`: passed。
 
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
 

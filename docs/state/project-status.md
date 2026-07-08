@@ -4426,6 +4426,10 @@ npm run acceptance:demo
    route 只有在 `capture_intervention_action_gt_ready=true` 时才会进入
    handoff-ready，零向量或无法覆盖 pose transition 的公开交互 action rows 会停在
    `objectstate_public_interaction_route_intervention_gt_required`。
+   若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
+   优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
+   official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，
+   不能替代带 timestamped identity / 6DoF pose / action GT 的 Phase 1 rows。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
