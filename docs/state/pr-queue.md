@@ -395,7 +395,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff ...`: passed，
     status 为 `objectstate_bop_rgbd_baseline_local_row_handoff_incomplete`。
   - `git check-ignore -v outputs/assets/raw/bop-hope/hope_val_realsense.zip outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/scene_gt.json outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json`: passed; outputs ignored.
-- 完成 commit: pending.
+- 完成 commit: `47c54c5`.
 
 ### OBJECTSTATE-BOP-MULTI-INSTANCE-IDENTITY-POLICY-001: Import duplicate BOP obj_id scenes
 
@@ -421,7 +421,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py -q`: passed.
   - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_objectstate_bop_local_row_handoff.py tests/test_objectstate_bop_identity_handoff.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_bop_baseline_candidate.py tests/test_objectstate_bop_rgbd_gaussian_export.py -q`: passed.
   - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_subset_selector.py tests/test_objectstate_bop_gaussian_evidence_preflight.py tests/test_objectstate_bop_candidate_artifact_template.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_identity_route_audit.py -q`: passed.
-- 完成 commit: pending.
+- 完成 commit: `47c54c5`.
 
 ### OBJECTSTATE-BOP-HOPE-CONDITION-GAP-001: Audit HOPE public identity condition gap
 
@@ -474,7 +474,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
     `objectstate_bop_capture_condition_sidecar_needs_metadata`。
   - `uv run objgauss object-state audit-bop-identity-route ...`: passed，status 为
     `objectstate_bop_identity_route_audit_blocked`。
-- 完成 commit: pending.
+- 完成 commit: `47c54c5`.
 
 ### OBJECTSTATE-BOP-LMO-CONDITION-GAP-001: Audit LMO public identity condition gap
 
