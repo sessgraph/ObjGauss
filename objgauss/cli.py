@@ -5263,6 +5263,7 @@ def _object_state_audit_bop_phase1_local_row(args: argparse.Namespace) -> None:
         fps=args.fps,
         license_text=args.license,
         rgb_dir=args.rgb_dir,
+        depth_dir=args.depth_dir,
         gaussian_dir=args.gaussian_dir,
         condition_sidecar=args.condition_sidecar,
         max_frames=args.max_frames,
@@ -5290,6 +5291,16 @@ def _object_state_audit_bop_phase1_local_row(args: argparse.Namespace) -> None:
     print(f"prediction_route_status={routes['prediction']['status']}")
     for gate, passed in readiness.items():
         print(f"readiness.{gate}={str(passed).lower()}")
+    rgbd_hint = summary["rgbd_gaussian_export_hint"]
+    print(
+        "rgbd_export_candidate="
+        f"{str(rgbd_hint['rgbd_export_candidate']).lower()}"
+    )
+    print(f"rgbd_depth_files_present={rgbd_hint['depth_files_present']}")
+    print(f"rgbd_missing_depth_files={rgbd_hint['missing_depth_files']}")
+    print(f"rgbd_missing_gaussian_files={rgbd_hint['missing_gaussian_files']}")
+    if rgbd_hint["recommended_command"]:
+        print(f"rgbd_export_command={rgbd_hint['recommended_command']}")
     print(f"hard_blocker_count={len(summary['hard_blockers'])}")
     for blocker in summary["hard_blockers"]:
         print(f"hard_blocker={blocker}")
@@ -6059,6 +6070,11 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     audit_bop_phase1_local_row.add_argument("--rgb-dir", default="rgb")
+    audit_bop_phase1_local_row.add_argument(
+        "--depth-dir",
+        default="depth",
+        help="depth directory used only for read-only RGB-D export hints",
+    )
     audit_bop_phase1_local_row.add_argument("--gaussian-dir", default="gaussians")
     audit_bop_phase1_local_row.add_argument(
         "--condition-sidecar",

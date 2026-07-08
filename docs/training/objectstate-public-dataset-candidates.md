@@ -212,6 +212,11 @@ the BOP subset and any generated Gaussian / candidate artifacts. It reports a
 single `blocking_stage`, such as `local_bop_scene`,
 `phase1_gaussian_evidence`, `candidate_artifact`,
 `identity_scenario_metadata`, `handoff_ready`, or reviewable evidence status.
+When the scene has BOP `depth/<frame>.png` files but is still missing
+`gaussians/<frame>.ply`, the summary also reports
+`rgbd_gaussian_export_hint.rgbd_export_candidate=true` and prints the exact
+`export-bop-rgbd-gaussian-evidence` command to run before rerunning this
+readiness audit.
 
 For Stage 1 identity-state evidence, run the identity route audit before
 starting a handoff:

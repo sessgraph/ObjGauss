@@ -72,6 +72,32 @@ def test_bop_phase1_local_row_readiness_requires_candidate_after_gaussians(tmp_p
     assert any("create or export a trainable ObjectState artifact" in item for item in summary["next_actions"])
 
 
+def test_bop_phase1_local_row_readiness_hints_rgbd_export_when_depth_exists(tmp_path):
+    scene_root = tmp_path / "bop-scene"
+    output_root = tmp_path / "phase1-row"
+    _write_bop_scene(scene_root)
+    _write_depth_frames(scene_root)
+
+    summary = objectstate_bop_phase1_local_row_readiness(
+        scene_root,
+        output_root=output_root,
+        sample_id="bop-ycbv-scene-000001",
+    )
+
+    hint = summary["rgbd_gaussian_export_hint"]
+    assert summary["status"] == "objectstate_bop_phase1_local_row_readiness_blocked"
+    assert summary["blocking_stage"] == "bop_acceptance"
+    assert summary["readiness"]["phase1_gaussian_evidence_ready"] is False
+    assert hint["selected_frames"] == 3
+    assert hint["depth_files_present"] == 3
+    assert hint["missing_depth_files"] == 0
+    assert hint["missing_gaussian_files"] == 3
+    assert hint["rgbd_export_candidate"] is True
+    assert "export-bop-rgbd-gaussian-evidence" in hint["recommended_command"]
+    assert any("RGB-D Gaussian evidence export" in item for item in summary["next_actions"])
+    assert any("rgbd_export_hint" in item for item in summary["issues"])
+
+
 def test_bop_phase1_local_row_readiness_reports_identity_scenario_blocker(tmp_path):
     scene_root = tmp_path / "bop-scene"
     output_root = tmp_path / "phase1-row"
@@ -205,6 +231,7 @@ def test_object_state_audit_bop_phase1_local_row_cli(tmp_path, capsys):
     assert "prediction_route_status=objectstate_bop_phase1_route_audit_handoff_ready" in stdout
     assert "readiness.candidate_artifact_binding_ready=true" in stdout
     assert "readiness.identity_scenario_metadata_ready=false" in stdout
+    assert "rgbd_export_candidate=false" in stdout
     assert summary["blocking_stage"] == "identity_scenario_metadata"
 
 
@@ -249,6 +276,12 @@ def _write_gaussian_frames(root) -> None:
     (root / "gaussians").mkdir()
     for frame_id in range(3):
         (root / "gaussians" / f"{frame_id:06d}.ply").write_bytes(PLY_BYTES)
+
+
+def _write_depth_frames(root) -> None:
+    (root / "depth").mkdir()
+    for frame_id in range(3):
+        (root / "depth" / f"{frame_id:06d}.png").write_bytes(PNG_BYTES)
 
 
 def _trainable_artifact(*, frame_count: int):

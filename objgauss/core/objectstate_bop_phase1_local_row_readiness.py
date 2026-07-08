@@ -32,6 +32,7 @@ def objectstate_bop_phase1_local_row_readiness(
     fps: float = 30.0,
     license_text: str = "BOP dataset terms; verify source dataset license before redistribution",
     rgb_dir: str = "rgb",
+    depth_dir: str = "depth",
     gaussian_dir: str = "gaussians",
     condition_sidecar: str | Path | None = None,
     max_frames: int | None = None,
@@ -97,6 +98,14 @@ def objectstate_bop_phase1_local_row_readiness(
         hash_files=hash_files,
     )
     readiness = _readiness(identity, prediction)
+    rgbd_hint = _rgbd_gaussian_export_hint(
+        scene,
+        identity,
+        depth_dir=depth_dir,
+        gaussian_dir=gaussian_dir,
+        sample_id=sample_id,
+        dataset_id=dataset_id,
+    )
     status = _status(readiness)
     payload = {
         "schema": OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA,
@@ -113,14 +122,16 @@ def objectstate_bop_phase1_local_row_readiness(
             "prediction": prediction,
         },
         "readiness": readiness,
+        "rgbd_gaussian_export_hint": rgbd_hint,
         "files": _files(identity, prediction),
         "hard_blockers": _hard_blockers(identity, prediction, readiness),
-        "next_actions": _next_actions(identity, prediction, readiness),
-        "issues": _issues(identity, prediction, readiness),
+        "next_actions": _next_actions(identity, prediction, readiness, rgbd_hint),
+        "issues": _issues(identity, prediction, readiness, rgbd_hint),
         "claim_policy": {
             "read_only_local_row_audit": True,
             "runs_identity_route_audit": True,
             "runs_prediction_route_audit": True,
+            "checks_rgbd_export_hint": True,
             "requires_bop_acceptance": True,
             "requires_phase1_gaussian_evidence": True,
             "checks_candidate_artifact_route": True,
@@ -128,6 +139,7 @@ def objectstate_bop_phase1_local_row_readiness(
             "does_not_download_dataset": True,
             "does_not_create_ground_truth": True,
             "does_not_reconstruct_gaussians": True,
+            "does_not_write_rgbd_gaussian_export": True,
             "does_not_run_identity_handoff": True,
             "does_not_run_prediction_handoff": True,
             "does_not_run_identity_eval": True,
@@ -188,6 +200,10 @@ def validate_objectstate_bop_phase1_local_row_readiness_summary(
         raise ValueError("BOP Phase 1 local row readiness status mismatch")
     if payload.get("blocking_stage") != _blocking_stage(readiness):
         raise ValueError("BOP Phase 1 local row readiness blocking_stage mismatch")
+    hint = payload.get("rgbd_gaussian_export_hint")
+    if not isinstance(hint, Mapping):
+        raise ValueError("BOP Phase 1 local row readiness requires RGB-D export hint")
+    _validate_rgbd_hint(hint)
     for key in ("scene_root", "output_root", "sample_id"):
         if not isinstance(payload.get(key), str) or not payload[key]:
             raise ValueError(f"BOP Phase 1 local row readiness requires {key}")
@@ -218,6 +234,7 @@ def validate_objectstate_bop_phase1_local_row_readiness_summary(
         or not claim_policy.get("read_only_local_row_audit")
         or not claim_policy.get("runs_identity_route_audit")
         or not claim_policy.get("runs_prediction_route_audit")
+        or not claim_policy.get("checks_rgbd_export_hint")
         or not claim_policy.get("requires_bop_acceptance")
         or not claim_policy.get("requires_phase1_gaussian_evidence")
         or not claim_policy.get("checks_candidate_artifact_route")
@@ -225,6 +242,7 @@ def validate_objectstate_bop_phase1_local_row_readiness_summary(
         or not claim_policy.get("does_not_download_dataset")
         or not claim_policy.get("does_not_create_ground_truth")
         or not claim_policy.get("does_not_reconstruct_gaussians")
+        or not claim_policy.get("does_not_write_rgbd_gaussian_export")
         or not claim_policy.get("does_not_run_identity_handoff")
         or not claim_policy.get("does_not_run_prediction_handoff")
         or not claim_policy.get("does_not_run_identity_eval")
@@ -365,6 +383,139 @@ def _files(
     }
 
 
+def _rgbd_gaussian_export_hint(
+    scene: Path,
+    identity: Mapping[str, Any],
+    *,
+    depth_dir: str,
+    gaussian_dir: str,
+    sample_id: str,
+    dataset_id: str,
+) -> dict[str, Any]:
+    acceptance = identity.get("acceptance")
+    frame_ids = _selected_bop_frame_ids(acceptance)
+    depth_records = []
+    gaussian_records = []
+    for frame_id in frame_ids:
+        depth_ref = f"{depth_dir}/{frame_id:06d}.png"
+        gaussian_ref = f"{gaussian_dir}/{frame_id:06d}.ply"
+        depth_path = scene / depth_ref
+        gaussian_path = scene / gaussian_ref
+        depth_records.append(
+            {
+                "frame_id": f"{frame_id:06d}",
+                "ref": depth_ref,
+                "path": str(depth_path),
+                "exists": depth_path.is_file(),
+                "size_bytes": int(depth_path.stat().st_size)
+                if depth_path.is_file()
+                else 0,
+            }
+        )
+        gaussian_records.append(
+            {
+                "frame_id": f"{frame_id:06d}",
+                "ref": gaussian_ref,
+                "path": str(gaussian_path),
+                "exists": gaussian_path.is_file(),
+                "size_bytes": int(gaussian_path.stat().st_size)
+                if gaussian_path.is_file()
+                else 0,
+            }
+        )
+    selected_count = len(frame_ids)
+    depth_present = sum(1 for record in depth_records if record["exists"])
+    gaussian_present = sum(1 for record in gaussian_records if record["exists"])
+    missing_depth = selected_count - depth_present
+    missing_gaussian = selected_count - gaussian_present
+    can_export = bool(selected_count and missing_gaussian > 0 and missing_depth == 0)
+    command = (
+        "uv run objgauss object-state export-bop-rgbd-gaussian-evidence "
+        f"{scene} --sample-id {sample_id} --dataset-id {dataset_id} "
+        "--require-ready"
+    )
+    return {
+        "selected_frame_ids": [f"{frame_id:06d}" for frame_id in frame_ids],
+        "depth_dir": depth_dir,
+        "gaussian_dir": gaussian_dir,
+        "selected_frames": selected_count,
+        "depth_files_present": depth_present,
+        "missing_depth_files": missing_depth,
+        "gaussian_files_present": gaussian_present,
+        "missing_gaussian_files": missing_gaussian,
+        "rgbd_export_candidate": can_export,
+        "recommended_command": command if can_export else None,
+        "depth_records": depth_records,
+        "gaussian_records": gaussian_records,
+    }
+
+
+def _selected_bop_frame_ids(acceptance: Any) -> list[int]:
+    if not isinstance(acceptance, Mapping):
+        return []
+    adapter = acceptance.get("adapter")
+    if not isinstance(adapter, Mapping):
+        return []
+    frame_ids = adapter.get("selected_frame_ids")
+    if not isinstance(frame_ids, Sequence) or isinstance(frame_ids, (str, bytes)):
+        return []
+    result = []
+    for value in frame_ids:
+        try:
+            result.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _validate_rgbd_hint(hint: Mapping[str, Any]) -> None:
+    for key in (
+        "selected_frame_ids",
+        "depth_records",
+        "gaussian_records",
+    ):
+        if not isinstance(hint.get(key), list):
+            raise ValueError(f"BOP Phase 1 RGB-D hint requires list {key}")
+    for key in (
+        "depth_dir",
+        "gaussian_dir",
+    ):
+        if not isinstance(hint.get(key), str) or not hint[key]:
+            raise ValueError(f"BOP Phase 1 RGB-D hint requires {key}")
+    for key in (
+        "selected_frames",
+        "depth_files_present",
+        "missing_depth_files",
+        "gaussian_files_present",
+        "missing_gaussian_files",
+    ):
+        if not isinstance(hint.get(key), int) or hint[key] < 0:
+            raise ValueError(f"BOP Phase 1 RGB-D hint count {key} invalid")
+    if not isinstance(hint.get("rgbd_export_candidate"), bool):
+        raise ValueError("BOP Phase 1 RGB-D hint candidate flag invalid")
+    command = hint.get("recommended_command")
+    if command is not None and (not isinstance(command, str) or not command):
+        raise ValueError("BOP Phase 1 RGB-D hint recommended command invalid")
+    if hint["rgbd_export_candidate"] and command is None:
+        raise ValueError("BOP Phase 1 RGB-D hint candidate requires command")
+    if hint["selected_frames"] != len(hint["selected_frame_ids"]):
+        raise ValueError("BOP Phase 1 RGB-D hint selected frame count mismatch")
+    if hint["selected_frames"] != len(hint["depth_records"]):
+        raise ValueError("BOP Phase 1 RGB-D hint depth record count mismatch")
+    if hint["selected_frames"] != len(hint["gaussian_records"]):
+        raise ValueError("BOP Phase 1 RGB-D hint gaussian record count mismatch")
+    for record in (*hint["depth_records"], *hint["gaussian_records"]):
+        if not isinstance(record, Mapping):
+            raise ValueError("BOP Phase 1 RGB-D hint file record must be mapping")
+        for key in ("frame_id", "ref", "path"):
+            if not isinstance(record.get(key), str) or not record[key]:
+                raise ValueError(f"BOP Phase 1 RGB-D hint file record requires {key}")
+        if not isinstance(record.get("exists"), bool):
+            raise ValueError("BOP Phase 1 RGB-D hint file record exists invalid")
+        if not isinstance(record.get("size_bytes"), int) or record["size_bytes"] < 0:
+            raise ValueError("BOP Phase 1 RGB-D hint file record size invalid")
+
+
 def _hard_blockers(
     identity: Mapping[str, Any],
     prediction: Mapping[str, Any],
@@ -393,6 +544,7 @@ def _next_actions(
     identity: Mapping[str, Any],
     prediction: Mapping[str, Any],
     readiness: Mapping[str, bool],
+    rgbd_hint: Mapping[str, Any],
 ) -> list[str]:
     if readiness["phase1_identity_prediction_reviewable"]:
         return [
@@ -410,7 +562,21 @@ def _next_actions(
             *_as_strings(prediction["next_actions"]),
         ]
     if not readiness["bop_acceptance_pass"] or not readiness["phase1_gaussian_evidence_ready"]:
-        return _dedupe(prediction["next_actions"])
+        actions = []
+        if rgbd_hint.get("rgbd_export_candidate"):
+            actions.append(
+                "BOP depth files are present; run RGB-D Gaussian evidence export before rerunning local row readiness"
+            )
+            actions.append(str(rgbd_hint["recommended_command"]))
+        elif rgbd_hint.get("missing_depth_files", 0) > 0 and rgbd_hint.get(
+            "missing_gaussian_files",
+            0,
+        ) > 0:
+            actions.append(
+                "place BOP depth/<frame>.png files or generate per-frame Gaussian evidence before rerunning local row readiness"
+            )
+        actions.extend(_as_strings(prediction["next_actions"]))
+        return _dedupe(actions)
     if not readiness["candidate_artifact_binding_ready"]:
         return _dedupe(identity["next_actions"])
     if not readiness["identity_scenario_metadata_ready"]:
@@ -427,10 +593,18 @@ def _issues(
     identity: Mapping[str, Any],
     prediction: Mapping[str, Any],
     readiness: Mapping[str, bool],
+    rgbd_hint: Mapping[str, Any],
 ) -> list[str]:
     issues = []
     issues.extend(f"identity:{item}" for item in identity["issues"])
     issues.extend(f"prediction:{item}" for item in prediction["issues"])
+    if rgbd_hint.get("rgbd_export_candidate"):
+        issues.append("rgbd_export_hint:depth files can seed missing Gaussian evidence")
+    elif rgbd_hint.get("missing_depth_files", 0) > 0 and rgbd_hint.get(
+        "missing_gaussian_files",
+        0,
+    ) > 0:
+        issues.append("rgbd_export_hint:depth files are missing for RGB-D export")
     for gate, passed in readiness.items():
         if not passed:
             issues.append(f"readiness gate failed: {gate}")
