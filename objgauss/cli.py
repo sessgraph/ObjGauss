@@ -179,6 +179,9 @@ from objgauss.core.objectstate_controlled_identity_handoff import (
 from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
     objectstate_controlled_identity_bundle_handoff,
 )
+from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
+    objectstate_controlled_reality_bundle_handoff,
+)
 from objgauss.core.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
@@ -3867,6 +3870,210 @@ def _object_state_controlled_identity_bundle_handoff(args: argparse.Namespace) -
         raise ValueError("controlled identity bundle handoff did not pass")
 
 
+def _object_state_controlled_reality_bundle_handoff(args: argparse.Namespace) -> None:
+    artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
+    predictions = read_objectstate_controlled_prediction_candidates(
+        args.prediction_candidates
+    )
+    interventions = read_objectstate_controlled_intervention_candidates(
+        args.intervention_candidates
+    )
+    artifact_refs = (
+        tuple(args.artifact_refs)
+        if args.artifact_refs
+        else (str(args.trainable_artifact),)
+    )
+    summary = objectstate_controlled_reality_bundle_handoff(
+        args.bundle_root,
+        artifact,
+        predictions,
+        interventions,
+        sample_json=args.sample_json,
+        objects_csv=args.objects_csv,
+        frames_csv=args.frames_csv,
+        annotations_csv=args.annotations_csv,
+        actions_csv=args.actions_csv,
+        candidate_id=args.candidate_id,
+        source=args.source,
+        artifact_refs=artifact_refs,
+        max_centroid_distance=args.max_centroid_distance,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
+            max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        prediction_thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+        intervention_thresholds=ObjectStateControlledInterventionThresholds(
+            max_action_conditioned_ade=args.max_action_conditioned_ade,
+            min_counterfactual_outcome_accuracy=(
+                args.min_counterfactual_outcome_accuracy
+            ),
+            max_wrong_direction_rate=args.max_wrong_direction_rate,
+            min_intervention_gain=args.min_intervention_gain,
+            min_intervention_count=args.min_intervention_count,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        candidate_artifact_path=args.trainable_artifact,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+    )
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    identity_bundle = summary["identity_bundle_handoff"]
+    acceptance = identity_bundle["capture_bundle_acceptance"]
+    import_summary = acceptance["import_summary"]
+    bundle_file_audit = acceptance["capture_file_audit"]
+    identity_handoff = summary["identity_handoff"]
+    prediction_eval = summary["prediction_eval"]
+    intervention_eval = summary["intervention_eval"]
+    controlled_real_summary = summary["controlled_real_summary"]
+
+    capture_manifest_path = output_dir / "capture-manifest.json"
+    bundle_acceptance_path = output_dir / "bundle-acceptance-summary.json"
+    bundle_import_path = output_dir / "bundle-import-summary.json"
+    bundle_file_audit_path = output_dir / "bundle-file-audit.json"
+    bundle_missing_files_path = output_dir / "bundle-missing-files.md"
+    controlled_real_seed_path = output_dir / "controlled-real-seed.json"
+    capture_file_audit_path = output_dir / "capture-file-audit.json"
+    capture_missing_files_path = output_dir / "capture-missing-files.md"
+    candidate_artifact_file_audit_path = (
+        output_dir / "candidate-artifact-file-audit.json"
+    )
+    identity_scenario_audit_path = output_dir / "identity-scenario-audit.json"
+    identity_predictions_path = output_dir / "identity-predictions.json"
+    identity_eval_path = output_dir / "identity-eval-summary.json"
+    identity_handoff_path = output_dir / "identity-handoff-summary.json"
+    prediction_eval_path = output_dir / "prediction-eval-summary.json"
+    intervention_eval_path = output_dir / "intervention-eval-summary.json"
+    controlled_real_path = output_dir / "controlled-real.json"
+    controlled_real_summary_path = output_dir / "controlled-real-summary.json"
+    blocked_rows_path = output_dir / "blocked-rows.md"
+    reality_handoff_path = output_dir / "reality-bundle-handoff-summary.json"
+
+    write_json(capture_manifest_path, import_summary["manifest"])
+    write_json(bundle_acceptance_path, acceptance)
+    write_json(bundle_import_path, import_summary)
+    write_json(bundle_file_audit_path, bundle_file_audit)
+    bundle_missing_files_path.write_text(
+        bundle_file_audit["missing_files_markdown"],
+        encoding="utf-8",
+    )
+    write_json(
+        controlled_real_seed_path,
+        import_summary["capture_summary"]["controlled_real_manifest_seed"],
+    )
+    write_json(capture_file_audit_path, identity_handoff["capture_file_audit"])
+    capture_missing_files_path.write_text(
+        identity_handoff["capture_file_audit"]["missing_files_markdown"],
+        encoding="utf-8",
+    )
+    write_json(
+        candidate_artifact_file_audit_path,
+        identity_handoff["candidate_artifact_file_audit"],
+    )
+    write_json(identity_scenario_audit_path, identity_handoff["identity_scenario_audit"])
+    write_json(identity_predictions_path, summary["identity_predictions"])
+    write_json(identity_eval_path, summary["identity_eval"])
+    write_json(identity_handoff_path, identity_handoff)
+    write_json(prediction_eval_path, prediction_eval)
+    write_json(intervention_eval_path, intervention_eval)
+    write_json(controlled_real_path, summary["controlled_real_manifest"])
+    write_json(controlled_real_summary_path, controlled_real_summary)
+    blocked_rows_path.write_text(
+        controlled_real_summary["blocked_rows_markdown"],
+        encoding="utf-8",
+    )
+    write_json(reality_handoff_path, summary)
+
+    identity_metrics = summary["identity_eval"]["metrics"]
+    prediction_metrics = prediction_eval["metrics"]
+    intervention_metrics = intervention_eval["metrics"]
+    full_gate = controlled_real_summary["gate"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={args.bundle_root}")
+    print(f"trainable_artifact={args.trainable_artifact}")
+    print(f"prediction_candidates={args.prediction_candidates}")
+    print(f"intervention_candidates={args.intervention_candidates}")
+    print(f"output_dir={output_dir}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"reality_bundle_handoff_status={summary['status']}")
+    print(f"acceptance_status={acceptance['status']}")
+    print(f"identity_handoff_status={identity_handoff['status']}")
+    print(f"identity_eval_status={summary['identity_eval']['status']}")
+    print(f"prediction_eval_status={prediction_eval['status']}")
+    print(f"intervention_eval_status={intervention_eval['status']}")
+    print(f"full_reality_gate_status={full_gate['status']}")
+    print(f"idf1={identity_metrics['idf1']:.6f}")
+    print(f"state_ade={prediction_metrics['state_ade']:.6f}")
+    print(f"history_ade={prediction_metrics['history_ade']:.6f}")
+    print(
+        "prediction_gap_vs_history_model="
+        f"{prediction_metrics['prediction_gap_vs_history_model']:.6f}"
+    )
+    print(
+        "action_conditioned_ade="
+        f"{intervention_metrics['action_conditioned_ade']:.6f}"
+    )
+    print(
+        "counterfactual_outcome_accuracy="
+        f"{intervention_metrics['counterfactual_outcome_accuracy']:.6f}"
+    )
+    print(f"wrong_direction_rate={intervention_metrics['wrong_direction_rate']:.6f}")
+    print(f"pass_rows={controlled_real_summary['pass_row_count']}")
+    print(f"fail_rows={controlled_real_summary['fail_row_count']}")
+    print(f"blocked_rows={controlled_real_summary['blocked_row_count']}")
+    print(f"capture_manifest={capture_manifest_path}")
+    print(f"bundle_acceptance_summary={bundle_acceptance_path}")
+    print(f"bundle_import_summary={bundle_import_path}")
+    print(f"bundle_file_audit={bundle_file_audit_path}")
+    print(f"bundle_missing_files={bundle_missing_files_path}")
+    print(f"controlled_real_seed={controlled_real_seed_path}")
+    print(f"capture_file_audit={capture_file_audit_path}")
+    print(f"capture_missing_files={capture_missing_files_path}")
+    print(f"candidate_artifact_file_audit={candidate_artifact_file_audit_path}")
+    print(f"identity_scenario_audit={identity_scenario_audit_path}")
+    print(f"identity_predictions={identity_predictions_path}")
+    print(f"identity_eval={identity_eval_path}")
+    print(f"identity_handoff_summary={identity_handoff_path}")
+    print(f"prediction_eval={prediction_eval_path}")
+    print(f"intervention_eval={intervention_eval_path}")
+    print(f"controlled_real_manifest={controlled_real_path}")
+    print(f"controlled_real_summary={controlled_real_summary_path}")
+    print(f"blocked_rows_markdown={blocked_rows_path}")
+    print(f"reality_bundle_handoff_summary={reality_handoff_path}")
+    if (
+        args.require_pass
+        and summary["status"]
+        != "objectstate_controlled_reality_bundle_handoff_pass"
+    ):
+        raise ValueError("controlled reality bundle handoff did not pass")
+
+
 def _controlled_real_gate_thresholds(
     args: argparse.Namespace,
 ) -> ObjectStateRealityGateThresholds:
@@ -4691,6 +4898,215 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_bundle_handoff.add_argument("--require-pass", action="store_true")
     controlled_identity_bundle_handoff.set_defaults(
         handler=_object_state_controlled_identity_bundle_handoff
+    )
+    controlled_reality_bundle_handoff = object_state_subparsers.add_parser(
+        "controlled-reality-bundle-handoff",
+        help=(
+            "import a controlled capture bundle and run identity, prediction, "
+            "and intervention reality gates"
+        ),
+    )
+    controlled_reality_bundle_handoff.add_argument("bundle_root", type=Path)
+    controlled_reality_bundle_handoff.add_argument("trainable_artifact", type=Path)
+    controlled_reality_bundle_handoff.add_argument("prediction_candidates", type=Path)
+    controlled_reality_bundle_handoff.add_argument("intervention_candidates", type=Path)
+    controlled_reality_bundle_handoff.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--sample-json",
+        default="sample.json",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--objects-csv",
+        default="objects.csv",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--frames-csv",
+        default="frames.csv",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--annotations-csv",
+        default="annotations.csv",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--actions-csv",
+        default="actions.csv",
+    )
+    controlled_reality_bundle_handoff.add_argument("--candidate-id")
+    controlled_reality_bundle_handoff.add_argument(
+        "--source",
+        default="trainable_kernel_objectstate_nearest_pose_adapter",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--artifact-ref",
+        action="append",
+        dest="artifact_refs",
+        help=(
+            "candidate artifact reference to store in identity predictions; "
+            "defaults to the trainable artifact path"
+        ),
+    )
+    controlled_reality_bundle_handoff.add_argument("--max-centroid-distance", type=float)
+    controlled_reality_bundle_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-fragmentation-rate",
+        type=float,
+        default=0.05,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-swap-rate",
+        type=float,
+        default=0.0,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--allow-identity-collapse",
+        action="store_true",
+    )
+    controlled_reality_bundle_handoff.add_argument("--max-state-ade", type=float, default=0.05)
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-action-conditioned-ade",
+        type=float,
+        default=0.05,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-counterfactual-outcome-accuracy",
+        type=float,
+        default=0.95,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--max-wrong-direction-rate",
+        type=float,
+        default=0.0,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-intervention-gain",
+        type=float,
+        default=0.0,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-intervention-count",
+        type=int,
+        default=1,
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample.artifact_refs paths to exist before handoff pass",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame RGB file",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for each frame Gaussian file",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--hash-files",
+        action="store_true",
+        help="include SHA256 hashes for valid frame RGB/Gaussian files",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+        help="minimum byte size for the trainable ObjectState artifact file",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--hash-candidate-artifact",
+        action="store_true",
+        help="include a SHA256 hash for the trainable ObjectState artifact file",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+        help="minimum frame count for identity scenario challenge audit",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+        help="occlusion_fraction threshold for identity scenario challenge audit",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.view_id values for identity handoff",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+        help="minimum distinct frame.condition.lighting_id values for identity handoff",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+        help="minimum camera translation in meters from frame.condition.camera_pose",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    controlled_reality_bundle_handoff.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=3,
+    )
+    controlled_reality_bundle_handoff.add_argument("--require-pass", action="store_true")
+    controlled_reality_bundle_handoff.set_defaults(
+        handler=_object_state_controlled_reality_bundle_handoff
     )
 
     object_field = subparsers.add_parser(

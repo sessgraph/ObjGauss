@@ -1108,6 +1108,49 @@ data, create GT, parse image pixels, train Gaussian or dynamics models, compute
 prediction / intervention metrics, use replay / diffusion, write public samples
 or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-REALITY-BUNDLE-HANDOFF-001
+
+Bundle the full Phase 1 controlled reality chain into a single reproducible
+handoff.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_controlled_reality_bundle_handoff`.
+- Summary schema:
+  `objgauss-objectstate-controlled-reality-bundle-handoff-v1`.
+- `objectstate_controlled_reality_bundle_handoff(...)` takes a controlled
+  capture bundle root, a trainable ObjectState artifact, explicit prediction
+  candidate JSON and explicit intervention candidate JSON.
+- The handoff first reuses `controlled-identity-bundle-handoff`, so bundle CSV
+  import, file audit, candidate artifact audit, identity scenario audit,
+  identity predictions and identity eval stay on the established Stage 1 path.
+- The handoff then runs `OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001` and
+  `OBJECTSTATE-CONTROLLED-INTERVENTION-EVAL-001` against the same imported
+  capture manifest.
+- The final controlled-real manifest merges:
+  - identity row from the identity evaluator;
+  - prediction row from the prediction evaluator;
+  - intervention row from the intervention evaluator.
+- The final reality gate requires identity, prediction and intervention pass
+  rows, with `min_real_or_public_rows=3` by default.
+- CLI command:
+  `objgauss object-state controlled-reality-bundle-handoff <bundle-root> <objectstates.json> <prediction-candidates.json> <intervention-candidates.json> --output-dir <dir>`.
+- CLI writes:
+  `capture-manifest.json`, bundle acceptance/import/file-audit artifacts,
+  identity handoff artifacts, `prediction-eval-summary.json`,
+  `intervention-eval-summary.json`, the merged `controlled-real.json`,
+  full `controlled-real-summary.json`, `blocked-rows.md` and
+  `reality-bundle-handoff-summary.json`.
+- CLI supports the existing identity thresholds, prediction thresholds,
+  intervention thresholds, file audit options and `--require-pass`.
+
+Current scope remains full Phase 1 handoff orchestration only. It does not
+collect capture data, create GT, create prediction candidates, create
+intervention candidates, run prediction / intervention models, train Gaussian
+or dynamics models, use replay / diffusion, write public samples or mutate
+viewer defaults.
+
 ### OBJECTSTATE-CONTROLLED-REAL-ROWS-001
 
 Add the import path for real controlled tabletop manifests.

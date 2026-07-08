@@ -222,6 +222,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_bundle_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA": (
         "objgauss.core.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA",
@@ -277,6 +281,14 @@ _EXPORTS = {
     "evaluate_objectstate_controlled_prediction_candidates": (
         "objgauss.core.objectstate_controlled_prediction_eval",
         "evaluate_objectstate_controlled_prediction_candidates",
+    ),
+    "objectstate_controlled_reality_bundle_handoff": (
+        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "objectstate_controlled_reality_bundle_handoff",
+    ),
+    "validate_objectstate_controlled_reality_bundle_handoff_summary": (
+        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "validate_objectstate_controlled_reality_bundle_handoff_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates": (
         "objgauss.core.objectstate_controlled_prediction_eval",
