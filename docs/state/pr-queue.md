@@ -257,7 +257,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，412 tests。
   - `npm run build`: passed；仅保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: pending-local-commit。
+- 完成 commit: `0ff402a`。
 
 ### OBJECTSTATE-CONTROLLED-PREDICTION-EVIDENCE-PACKAGE-001: Audit BOP prediction-only evidence packages
 
