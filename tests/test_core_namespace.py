@@ -95,6 +95,8 @@ from objgauss.core import (
     OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA,
     OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA,
     OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA,
+    OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA,
+    OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA,
     OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA,
@@ -284,6 +286,8 @@ from objgauss.core import (
     objectstate_bop_phase1_subset_selector,
     objectstate_bop_gaussian_evidence_preflight,
     objectstate_bop_rgbd_gaussian_export,
+    objectstate_public_dataset_candidates_audit,
+    objectstate_public_interaction_route_audit,
     write_objectstate_bop_gaussian_centroid_baseline_candidate,
     write_objectstate_bop_candidate_artifact_template,
     finalize_objectstate_bop_candidate_artifact_template,
@@ -394,6 +398,8 @@ from objgauss.core import (
     validate_objectstate_bop_gaussian_evidence_preflight_summary,
     validate_objectstate_bop_rgbd_gaussian_export_summary,
     validate_objectstate_bop_baseline_candidate_summary,
+    validate_objectstate_public_dataset_candidates_audit,
+    validate_objectstate_public_interaction_route_audit,
     validate_objectstate_bop_candidate_artifact_template,
     validate_objectstate_bop_candidate_artifact_template_summary,
     validate_objectstate_bop_candidate_artifact_finalize_summary,
@@ -1257,6 +1263,10 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_bop_identity_route_audit_summary is not None
     assert validate_objectstate_bop_phase1_local_row_readiness_summary is not None
     assert validate_objectstate_bop_baseline_candidate_summary is not None
+    assert validate_objectstate_public_dataset_candidates_audit is not None
+    assert validate_objectstate_public_interaction_route_audit is not None
+    assert objectstate_public_dataset_candidates_audit is not None
+    assert objectstate_public_interaction_route_audit is not None
     assert validate_objectstate_controlled_identity_evidence_package_summary is not None
     assert validate_objectstate_phase1_evidence_ledger_summary is not None
     assert validate_objectstate_controlled_prediction_evidence_package_summary is not None
@@ -1273,6 +1283,12 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"
+    )
+    assert OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA == (
+        "objgauss-objectstate-public-dataset-candidates-v1"
+    )
+    assert OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA == (
+        "objgauss-objectstate-public-interaction-route-audit-v1"
     )
     assert OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA == (
         "objgauss-objectstate-controlled-real-rows-v1"

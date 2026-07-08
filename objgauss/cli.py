@@ -214,6 +214,8 @@ from objgauss.core.objectstate_phase1_evidence_ledger import (
 from objgauss.core.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
+    objectstate_public_interaction_route_audit,
+    objectstate_public_interaction_route_markdown,
 )
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
@@ -3346,6 +3348,56 @@ def _object_state_audit_public_dataset_candidates(
         print(f"markdown={args.markdown_output}")
     if args.require_ready and not readiness["has_direct_phase1_ready_dataset"]:
         raise ValueError("no public dataset candidate is directly Phase 1 ready")
+
+
+def _object_state_audit_public_interaction_route(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_public_interaction_route_audit(
+        candidate_id=args.candidate_id,
+        dataset_root=args.dataset_root,
+        capture_manifest=args.capture_manifest,
+        candidate_artifact=args.candidate_artifact,
+        prediction_candidates=args.prediction_candidates,
+        intervention_candidates=args.intervention_candidates,
+    )
+    readiness = summary["readiness"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"candidate={summary['candidate']['candidate_id']}")
+    print(
+        "handoff_ready="
+        f"{str(readiness['controlled_reality_handoff_ready']).lower()}"
+    )
+    print(
+        "capture_intervention_ready="
+        f"{str(readiness['capture_intervention_ready']).lower()}"
+    )
+    print(
+        "gaussian_evidence_declared="
+        f"{str(readiness['gaussian_evidence_declared']).lower()}"
+    )
+    print(
+        "sample_ids_match="
+        f"{str(readiness['sample_ids_match']).lower()}"
+    )
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.markdown_output:
+        args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_output.write_text(
+            objectstate_public_interaction_route_markdown(summary),
+            encoding="utf-8",
+        )
+        print(f"markdown={args.markdown_output}")
+    if args.require_ready and not readiness["controlled_reality_handoff_ready"]:
+        raise ValueError("public interaction route is not handoff-ready")
 
 
 def _object_state_select_bop_phase1_subset(args: argparse.Namespace) -> None:
@@ -6821,6 +6873,41 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_public_dataset_candidates.set_defaults(
         handler=_object_state_audit_public_dataset_candidates
+    )
+    audit_public_interaction_route = object_state_subparsers.add_parser(
+        "audit-public-interaction-route",
+        help=(
+            "audit a local public interaction dataset route before ObjectState "
+            "intervention handoff"
+        ),
+    )
+    audit_public_interaction_route.add_argument(
+        "dataset_root",
+        nargs="?",
+        type=Path,
+        help=(
+            "local public interaction clip/bundle root outside git; defaults to "
+            "a metadata-only blocked audit when omitted"
+        ),
+    )
+    audit_public_interaction_route.add_argument(
+        "--candidate-id",
+        default="hot3d-clips",
+        help="public dataset candidate id from audit-public-dataset-candidates",
+    )
+    audit_public_interaction_route.add_argument("--capture-manifest", type=Path)
+    audit_public_interaction_route.add_argument("--candidate-artifact", type=Path)
+    audit_public_interaction_route.add_argument("--prediction-candidates", type=Path)
+    audit_public_interaction_route.add_argument("--intervention-candidates", type=Path)
+    audit_public_interaction_route.add_argument("--summary-output", type=Path)
+    audit_public_interaction_route.add_argument("--markdown-output", type=Path)
+    audit_public_interaction_route.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the local interaction route is ready for full handoff",
+    )
+    audit_public_interaction_route.set_defaults(
+        handler=_object_state_audit_public_interaction_route
     )
     select_bop_phase1_subset = object_state_subparsers.add_parser(
         "select-bop-phase1-subset",

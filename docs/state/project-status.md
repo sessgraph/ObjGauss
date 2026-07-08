@@ -971,6 +971,21 @@ identity / counterfactual pass，也不声明 world model。
 部分 occlusion / view 挑战场景，但仍缺真正的 `occlusion_recovery_rate`、
 `contrastive_margin` 和 action/counterfactual evidence；该切片不创建 pass row、不放松
 identity gate、不声明 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-AUDIT-001`：扩展
+`audit-public-dataset-candidates` 所在模块，新增
+`objgauss.core.objectstate_public_interaction_route_audit`，schema 为
+`objgauss-objectstate-public-interaction-route-audit-v1`，CLI 为
+`objgauss object-state audit-public-interaction-route`。该命令默认审计 `hot3d-clips`
+这类 action-capable public interaction candidate，并检查本地 bundle root 是否具备
+`capture-manifest.json`、`objectstates.json`、
+`reality-candidates/prediction-candidates.json` 和
+`reality-candidates/intervention-candidates.json`。只有 controlled capture manifest
+intervention-ready、声明 per-frame Gaussian evidence、prediction / intervention
+candidate JSON valid 且 `sample_id` 绑定一致时，才报告
+`objectstate_public_interaction_route_handoff_ready`。该切片只是把 BOP 缺失的
+action / counterfactual 路线变成机器可审计 preflight；不下载 HOT3D、不适配原始
+egocentric streams、不创建 GT、不运行 eval、不训练模型、不新增 pass row，也不声明
+counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

@@ -347,6 +347,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-AUDIT-001: Audit action-capable public interaction route readiness
+
+- 状态: done / public-interaction-route-preflight
+- 类型: 标准 PR / ObjectState Phase 1 intervention evidence route
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 给 `hot3d-clips` 这类 action-capable public interaction candidate 增加机器可审计 route preflight，避免 BOP pose rows 缺 action 后只能停留在手工说明。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_public_dataset_candidates`，新增
+    `objgauss-objectstate-public-interaction-route-audit-v1`。
+  - 新增 `objectstate_public_interaction_route_audit` 和 Markdown 输出。
+  - 新增 CLI `objgauss object-state audit-public-interaction-route`。
+  - 默认检查 local dataset root 下的 `capture-manifest.json`、
+    `objectstates.json`、`reality-candidates/prediction-candidates.json` 和
+    `reality-candidates/intervention-candidates.json`。
+  - 复用 controlled capture、prediction candidate 和 intervention candidate validators；
+    只有 capture intervention-ready、per-frame Gaussian evidence declared、candidate
+    artifact present、prediction / intervention candidates valid 且 `sample_id` 绑定一致时，
+    才报告 `objectstate_public_interaction_route_handoff_ready`。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不适配原始 egocentric streams。
+  - 不创建 GT、不运行 identity / prediction / intervention eval、不训练模型。
+  - 不创建 reality row 或 pass evidence。
+  - 不把 observed interaction 误写成 randomized counterfactual proof 或 world-model pass。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_dataset_candidates.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_public_dataset_candidates.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py tests/test_core_namespace.py -q`: 18 passed。
+  - `uv run objgauss object-state audit-public-interaction-route --summary-output /tmp/objgauss-public-interaction-route.json --markdown-output /tmp/objgauss-public-interaction-route.md`: passed，status=`objectstate_public_interaction_route_blocked_no_local_dataset`。
+  - `uv run --extra dev pytest`: 516 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+
 ### OBJECTSTATE-BOP-SCENARIO-CHALLENGE-METRICS-001: Carry BOP scenario challenge coverage into reality rows
 
 - 状态: done / public-replay-scenario-challenge-metrics

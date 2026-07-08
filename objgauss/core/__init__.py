@@ -358,6 +358,30 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_rgbd_gaussian_export",
         "OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA",
     ),
+    "OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA",
+    ),
+    "OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA",
+    ),
+    "objectstate_public_dataset_candidates_audit": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "objectstate_public_dataset_candidates_audit",
+    ),
+    "objectstate_public_interaction_route_audit": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "objectstate_public_interaction_route_audit",
+    ),
+    "validate_objectstate_public_dataset_candidates_audit": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "validate_objectstate_public_dataset_candidates_audit",
+    ),
+    "validate_objectstate_public_interaction_route_audit": (
+        "objgauss.core.objectstate_public_dataset_candidates",
+        "validate_objectstate_public_interaction_route_audit",
+    ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_bop_candidate_artifact_template",
         "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA",

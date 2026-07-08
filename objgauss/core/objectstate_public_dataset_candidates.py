@@ -1,13 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+from objgauss.core.objectstate_controlled_capture import (
+    objectstate_controlled_capture_summary,
+    read_objectstate_controlled_capture_manifest,
+)
+from objgauss.core.objectstate_controlled_intervention_eval import (
+    read_objectstate_controlled_intervention_candidates,
+)
+from objgauss.core.objectstate_controlled_prediction_eval import (
+    read_objectstate_controlled_prediction_candidates,
+)
 
 OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA = (
     "objgauss-objectstate-public-dataset-candidates-v1"
 )
 OBJECTSTATE_PUBLIC_DATASET_CANDIDATE_SCHEMA = (
     "objgauss-objectstate-public-dataset-candidate-v1"
+)
+OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA = (
+    "objgauss-objectstate-public-interaction-route-audit-v1"
 )
 
 OBJECTSTATE_PUBLIC_DATASET_GATE_KINDS = (
@@ -459,6 +474,165 @@ def objectstate_public_dataset_candidates_markdown(summary: Mapping[str, Any]) -
     return "\n".join(lines) + "\n"
 
 
+def objectstate_public_interaction_route_audit(
+    *,
+    candidate_id: str = "hot3d-clips",
+    dataset_root: str | Path | None = None,
+    capture_manifest: str | Path | None = None,
+    candidate_artifact: str | Path | None = None,
+    prediction_candidates: str | Path | None = None,
+    intervention_candidates: str | Path | None = None,
+    candidates: Sequence[ObjectStatePublicDatasetCandidate] | None = None,
+) -> dict[str, Any]:
+    resolved_candidates = tuple(
+        default_objectstate_public_dataset_candidates()
+        if candidates is None
+        else candidates
+    )
+    checked_candidates = tuple(
+        validate_objectstate_public_dataset_candidate(candidate)
+        for candidate in resolved_candidates
+    )
+    candidate = _candidate_by_id(candidate_id, checked_candidates)
+    root_path = Path(dataset_root) if dataset_root is not None else None
+    resolved_paths = _public_interaction_route_paths(
+        root_path,
+        capture_manifest=capture_manifest,
+        candidate_artifact=candidate_artifact,
+        prediction_candidates=prediction_candidates,
+        intervention_candidates=intervention_candidates,
+    )
+    capture_record = _capture_manifest_record(resolved_paths["capture_manifest"])
+    prediction_record = _candidate_json_record(
+        resolved_paths["prediction_candidates"],
+        reader=read_objectstate_controlled_prediction_candidates,
+    )
+    intervention_record = _candidate_json_record(
+        resolved_paths["intervention_candidates"],
+        reader=read_objectstate_controlled_intervention_candidates,
+    )
+    artifact_record = _plain_file_record(resolved_paths["candidate_artifact"])
+    sample_ids = _sample_id_binding(
+        capture_record=capture_record,
+        prediction_record=prediction_record,
+        intervention_record=intervention_record,
+    )
+    readiness = {
+        "candidate_is_public_interaction_dataset": (
+            candidate.source_kind == "public_interaction_dataset"
+        ),
+        "candidate_has_action_gt": bool(candidate.has_action_gt),
+        "dataset_root_present": bool(root_path is not None and root_path.exists()),
+        "capture_manifest_present": bool(capture_record["present"]),
+        "capture_manifest_valid": bool(capture_record["valid"]),
+        "capture_identity_ready": bool(capture_record["readiness"].get("identity_stage_ready")),
+        "capture_prediction_ready": bool(
+            capture_record["readiness"].get("prediction_stage_ready")
+        ),
+        "capture_intervention_ready": bool(
+            capture_record["readiness"].get("intervention_stage_ready")
+        ),
+        "gaussian_evidence_declared": bool(
+            capture_record["readiness"].get("real_gaussian_reconstruction_present")
+        ),
+        "candidate_artifact_present": bool(artifact_record["present"]),
+        "prediction_candidates_valid": bool(prediction_record["valid"]),
+        "intervention_candidates_valid": bool(intervention_record["valid"]),
+        "sample_ids_match": bool(sample_ids["match"]),
+    }
+    readiness["controlled_reality_handoff_ready"] = bool(
+        readiness["candidate_is_public_interaction_dataset"]
+        and readiness["candidate_has_action_gt"]
+        and readiness["dataset_root_present"]
+        and readiness["capture_intervention_ready"]
+        and readiness["gaussian_evidence_declared"]
+        and readiness["candidate_artifact_present"]
+        and readiness["prediction_candidates_valid"]
+        and readiness["intervention_candidates_valid"]
+        and readiness["sample_ids_match"]
+    )
+    status = _public_interaction_route_status(readiness)
+    payload = {
+        "schema": OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA,
+        "kind": "objectstate_public_interaction_route_audit",
+        "status": status,
+        "candidate": candidate.as_dict(),
+        "dataset_root": _path_string(root_path),
+        "paths": {
+            key: _path_string(path)
+            for key, path in resolved_paths.items()
+        },
+        "file_records": {
+            "capture_manifest": capture_record,
+            "candidate_artifact": artifact_record,
+            "prediction_candidates": prediction_record,
+            "intervention_candidates": intervention_record,
+        },
+        "sample_id_binding": sample_ids,
+        "readiness": readiness,
+        "hard_blockers": _public_interaction_route_blockers(readiness),
+        "next_actions": _public_interaction_route_next_actions(readiness, resolved_paths),
+        "claim_policy": {
+            "route_audit_only": True,
+            "does_not_download_datasets": True,
+            "does_not_create_ground_truth": True,
+            "does_not_create_reality_rows": True,
+            "does_not_claim_intervention_pass": True,
+            "does_not_claim_counterfactual_proof": True,
+            "does_not_claim_world_model": True,
+        },
+        "non_goals": {
+            "downloads_datasets": False,
+            "writes_outputs": False,
+            "writes_public_samples": False,
+            "trains_gaussian_model": False,
+            "trains_dynamics_model": False,
+            "runs_intervention_model": False,
+            "uses_replay_buffer": False,
+            "uses_diffusion": False,
+            "mutates_viewer_defaults": False,
+        },
+    }
+    return validate_objectstate_public_interaction_route_audit(payload)
+
+
+def objectstate_public_interaction_route_markdown(summary: Mapping[str, Any]) -> str:
+    payload = validate_objectstate_public_interaction_route_audit(summary)
+    readiness = payload["readiness"]
+    lines = [
+        "# ObjectState Public Interaction Route Audit",
+        "",
+        f"- schema: `{payload['schema']}`",
+        f"- status: `{payload['status']}`",
+        f"- candidate: `{payload['candidate']['candidate_id']}`",
+        f"- handoff ready: `{str(readiness['controlled_reality_handoff_ready']).lower()}`",
+        "",
+        "| prerequisite | ready |",
+        "| --- | --- |",
+    ]
+    for key in (
+        "candidate_has_action_gt",
+        "dataset_root_present",
+        "capture_intervention_ready",
+        "gaussian_evidence_declared",
+        "candidate_artifact_present",
+        "prediction_candidates_valid",
+        "intervention_candidates_valid",
+        "sample_ids_match",
+    ):
+        lines.append(f"| {key} | {str(readiness[key]).lower()} |")
+    lines.extend(("", "## Hard Blockers", ""))
+    for blocker in payload["hard_blockers"]:
+        lines.append(f"- {blocker}")
+    lines.extend(("", "## Next Actions", ""))
+    for action in payload["next_actions"]:
+        lines.append(f"- {action}")
+    lines.extend(("", "## Claim Boundary", ""))
+    lines.append("- This audit does not create a reality row or pass evidence.")
+    lines.append("- HOT3D-style observed interactions are action-like, not randomized counterfactual trials.")
+    return "\n".join(lines) + "\n"
+
+
 def validate_objectstate_public_dataset_candidates_audit(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -548,6 +722,109 @@ def validate_objectstate_public_dataset_candidates_audit(
             "public dataset candidate audit cannot download, write outputs, "
             "train, replay, diffuse, or mutate viewer defaults"
         )
+    return dict(payload)
+
+
+def validate_objectstate_public_interaction_route_audit(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise TypeError("public interaction route audit must be a mapping")
+    if payload.get("schema") != OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA:
+        raise ValueError(
+            "unsupported public interaction route audit schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "objectstate_public_interaction_route_audit":
+        raise ValueError("public interaction route audit kind is unsupported")
+    if payload.get("status") not in {
+        "objectstate_public_interaction_route_unsupported_candidate",
+        "objectstate_public_interaction_route_blocked_no_local_dataset",
+        "objectstate_public_interaction_route_capture_required",
+        "objectstate_public_interaction_route_intervention_gt_required",
+        "objectstate_public_interaction_route_gaussian_evidence_required",
+        "objectstate_public_interaction_route_candidate_artifacts_required",
+        "objectstate_public_interaction_route_sample_binding_blocked",
+        "objectstate_public_interaction_route_handoff_ready",
+    }:
+        raise ValueError("public interaction route audit status is unsupported")
+    _validate_candidate_payload(payload.get("candidate"))
+    paths = payload.get("paths")
+    if not isinstance(paths, Mapping):
+        raise ValueError("public interaction route audit requires paths")
+    records = payload.get("file_records")
+    if not isinstance(records, Mapping):
+        raise ValueError("public interaction route audit requires file_records")
+    for key in (
+        "capture_manifest",
+        "candidate_artifact",
+        "prediction_candidates",
+        "intervention_candidates",
+    ):
+        _validate_file_record(records.get(key), key)
+    sample_id_binding = payload.get("sample_id_binding")
+    if not isinstance(sample_id_binding, Mapping):
+        raise ValueError("public interaction route audit requires sample_id_binding")
+    if not isinstance(sample_id_binding.get("match"), bool):
+        raise ValueError("sample_id_binding.match must be bool")
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping):
+        raise ValueError("public interaction route audit requires readiness")
+    for key in (
+        "candidate_is_public_interaction_dataset",
+        "candidate_has_action_gt",
+        "dataset_root_present",
+        "capture_manifest_present",
+        "capture_manifest_valid",
+        "capture_identity_ready",
+        "capture_prediction_ready",
+        "capture_intervention_ready",
+        "gaussian_evidence_declared",
+        "candidate_artifact_present",
+        "prediction_candidates_valid",
+        "intervention_candidates_valid",
+        "sample_ids_match",
+        "controlled_reality_handoff_ready",
+    ):
+        if not isinstance(readiness.get(key), bool):
+            raise ValueError(f"public interaction readiness requires bool {key}")
+    expected_status = _public_interaction_route_status(readiness)
+    if payload["status"] != expected_status:
+        raise ValueError("public interaction route status must match readiness")
+    if not isinstance(payload.get("hard_blockers"), list):
+        raise ValueError("public interaction route audit hard_blockers must be a list")
+    next_actions = payload.get("next_actions")
+    if not isinstance(next_actions, (list, tuple)) or not next_actions:
+        raise ValueError("public interaction route audit requires next_actions")
+    claim_policy = payload.get("claim_policy", {})
+    if (
+        not claim_policy.get("route_audit_only")
+        or not claim_policy.get("does_not_download_datasets")
+        or not claim_policy.get("does_not_create_ground_truth")
+        or not claim_policy.get("does_not_create_reality_rows")
+        or not claim_policy.get("does_not_claim_intervention_pass")
+        or not claim_policy.get("does_not_claim_counterfactual_proof")
+        or not claim_policy.get("does_not_claim_world_model")
+    ):
+        raise ValueError("public interaction route audit must preserve claim policy")
+    non_goals = payload.get("non_goals", {})
+    if (
+        non_goals.get("downloads_datasets")
+        or non_goals.get("writes_outputs")
+        or non_goals.get("writes_public_samples")
+        or non_goals.get("trains_gaussian_model")
+        or non_goals.get("trains_dynamics_model")
+        or non_goals.get("runs_intervention_model")
+        or non_goals.get("uses_replay_buffer")
+        or non_goals.get("uses_diffusion")
+        or non_goals.get("mutates_viewer_defaults")
+    ):
+        raise ValueError(
+            "public interaction route audit cannot download, write outputs, "
+            "train, run intervention models, replay, diffuse, or mutate viewer defaults"
+        )
+    if readiness["controlled_reality_handoff_ready"] and payload["hard_blockers"]:
+        raise ValueError("handoff-ready interaction route cannot have hard blockers")
     return dict(payload)
 
 
@@ -705,6 +982,277 @@ def _hard_blockers(
     if not any(candidate.has_action_gt for candidate in candidates):
         blockers.append("no action-like public candidate was found")
     return tuple(blockers)
+
+
+def _candidate_by_id(
+    candidate_id: str,
+    candidates: Sequence[ObjectStatePublicDatasetCandidate],
+) -> ObjectStatePublicDatasetCandidate:
+    normalized = str(candidate_id).strip()
+    for candidate in candidates:
+        if candidate.candidate_id == normalized:
+            return candidate
+    raise ValueError(f"unknown public dataset candidate id: {candidate_id}")
+
+
+def _public_interaction_route_paths(
+    dataset_root: Path | None,
+    *,
+    capture_manifest: str | Path | None,
+    candidate_artifact: str | Path | None,
+    prediction_candidates: str | Path | None,
+    intervention_candidates: str | Path | None,
+) -> dict[str, Path | None]:
+    return {
+        "capture_manifest": _resolve_route_path(
+            dataset_root,
+            capture_manifest,
+            "capture-manifest.json",
+        ),
+        "candidate_artifact": _resolve_route_path(
+            dataset_root,
+            candidate_artifact,
+            "objectstates.json",
+        ),
+        "prediction_candidates": _resolve_route_path(
+            dataset_root,
+            prediction_candidates,
+            "reality-candidates/prediction-candidates.json",
+        ),
+        "intervention_candidates": _resolve_route_path(
+            dataset_root,
+            intervention_candidates,
+            "reality-candidates/intervention-candidates.json",
+        ),
+    }
+
+
+def _resolve_route_path(
+    dataset_root: Path | None,
+    explicit_path: str | Path | None,
+    default_relative: str,
+) -> Path | None:
+    if explicit_path is not None:
+        return Path(explicit_path)
+    if dataset_root is None:
+        return None
+    return dataset_root / default_relative
+
+
+def _capture_manifest_record(path: Path | None) -> dict[str, Any]:
+    record = _plain_file_record(path)
+    if not record["present"]:
+        return {
+            **record,
+            "valid": False,
+            "sample_id": None,
+            "readiness": {},
+            "error": record.get("error"),
+        }
+    try:
+        manifest = read_objectstate_controlled_capture_manifest(path)  # type: ignore[arg-type]
+        summary = objectstate_controlled_capture_summary(manifest)
+    except Exception as exc:  # pragma: no cover - exact parser messages vary.
+        return {
+            **record,
+            "valid": False,
+            "sample_id": None,
+            "readiness": {},
+            "error": str(exc),
+        }
+    return {
+        **record,
+        "valid": True,
+        "sample_id": manifest["sample"]["sample_id"],
+        "frame_count": summary["frame_count"],
+        "action_count": summary["action_count"],
+        "readiness": dict(summary["readiness"]),
+        "error": None,
+    }
+
+
+def _candidate_json_record(path: Path | None, *, reader: Any) -> dict[str, Any]:
+    record = _plain_file_record(path)
+    if not record["present"]:
+        return {**record, "valid": False, "sample_id": None, "error": record.get("error")}
+    try:
+        payload = reader(path)
+    except Exception as exc:  # pragma: no cover - exact parser messages vary.
+        return {**record, "valid": False, "sample_id": None, "error": str(exc)}
+    return {
+        **record,
+        "valid": True,
+        "sample_id": payload["sample_id"],
+        "error": None,
+    }
+
+
+def _plain_file_record(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {
+            "path": None,
+            "present": False,
+            "is_file": False,
+            "size_bytes": 0,
+            "error": "path not provided",
+        }
+    exists = path.exists()
+    is_file = path.is_file()
+    size = path.stat().st_size if is_file else 0
+    error = None
+    if not exists:
+        error = "path does not exist"
+    elif not is_file:
+        error = "path is not a file"
+    return {
+        "path": str(path),
+        "present": bool(is_file),
+        "is_file": bool(is_file),
+        "size_bytes": int(size),
+        "error": error,
+    }
+
+
+def _sample_id_binding(
+    *,
+    capture_record: Mapping[str, Any],
+    prediction_record: Mapping[str, Any],
+    intervention_record: Mapping[str, Any],
+) -> dict[str, Any]:
+    sample_ids = {
+        "capture_manifest": capture_record.get("sample_id"),
+        "prediction_candidates": prediction_record.get("sample_id"),
+        "intervention_candidates": intervention_record.get("sample_id"),
+    }
+    present_ids = [value for value in sample_ids.values() if value]
+    return {
+        "sample_ids": sample_ids,
+        "match": bool(present_ids) and len(set(present_ids)) == 1 and len(present_ids) == 3,
+    }
+
+
+def _public_interaction_route_status(readiness: Mapping[str, bool]) -> str:
+    if (
+        not readiness.get("candidate_is_public_interaction_dataset")
+        or not readiness.get("candidate_has_action_gt")
+    ):
+        return "objectstate_public_interaction_route_unsupported_candidate"
+    if not readiness.get("dataset_root_present"):
+        return "objectstate_public_interaction_route_blocked_no_local_dataset"
+    if not readiness.get("capture_manifest_valid"):
+        return "objectstate_public_interaction_route_capture_required"
+    if not readiness.get("capture_intervention_ready"):
+        return "objectstate_public_interaction_route_intervention_gt_required"
+    if not readiness.get("gaussian_evidence_declared"):
+        return "objectstate_public_interaction_route_gaussian_evidence_required"
+    if (
+        not readiness.get("candidate_artifact_present")
+        or not readiness.get("prediction_candidates_valid")
+        or not readiness.get("intervention_candidates_valid")
+    ):
+        return "objectstate_public_interaction_route_candidate_artifacts_required"
+    if not readiness.get("sample_ids_match"):
+        return "objectstate_public_interaction_route_sample_binding_blocked"
+    return "objectstate_public_interaction_route_handoff_ready"
+
+
+def _public_interaction_route_blockers(
+    readiness: Mapping[str, bool],
+) -> list[str]:
+    blockers: list[str] = []
+    if not readiness["candidate_is_public_interaction_dataset"]:
+        blockers.append("selected candidate is not a public interaction dataset")
+    if not readiness["candidate_has_action_gt"]:
+        blockers.append("selected candidate does not advertise action ground truth")
+    if not readiness["dataset_root_present"]:
+        blockers.append("local public interaction dataset root is missing")
+    if not readiness["capture_manifest_valid"]:
+        blockers.append("controlled capture manifest is missing or invalid")
+    elif not readiness["capture_intervention_ready"]:
+        blockers.append("capture manifest is not intervention-ready")
+    if not readiness["gaussian_evidence_declared"]:
+        blockers.append("capture manifest does not declare per-frame Gaussian evidence")
+    if not readiness["candidate_artifact_present"]:
+        blockers.append("ObjectState candidate artifact is missing")
+    if not readiness["prediction_candidates_valid"]:
+        blockers.append("prediction candidates JSON is missing or invalid")
+    if not readiness["intervention_candidates_valid"]:
+        blockers.append("intervention candidates JSON is missing or invalid")
+    if (
+        readiness["prediction_candidates_valid"]
+        and readiness["intervention_candidates_valid"]
+        and not readiness["sample_ids_match"]
+    ):
+        blockers.append("capture/prediction/intervention sample_id values do not match")
+    return blockers
+
+
+def _public_interaction_route_next_actions(
+    readiness: Mapping[str, bool],
+    paths: Mapping[str, Path | None],
+) -> list[str]:
+    actions: list[str] = []
+    if not readiness["dataset_root_present"]:
+        actions.append(
+            "place one license-reviewed public interaction clip outside git and rerun this route audit"
+        )
+    if not readiness["capture_manifest_valid"]:
+        actions.append(
+            "adapt the clip into the controlled capture manifest contract at "
+            f"{_route_target(paths['capture_manifest'], 'capture-manifest.json')}"
+        )
+    elif not readiness["capture_intervention_ready"]:
+        actions.append(
+            "fill timestamped object pose tracks and action events until intervention_stage_ready=true"
+        )
+    if not readiness["gaussian_evidence_declared"]:
+        actions.append(
+            "write per-frame Gaussian evidence refs into the capture manifest before handoff"
+        )
+    if not readiness["candidate_artifact_present"]:
+        actions.append(
+            "write the ObjectState candidate artifact at "
+            f"{_route_target(paths['candidate_artifact'], 'objectstates.json')}"
+        )
+    if not readiness["prediction_candidates_valid"]:
+        actions.append(
+            "write evaluator-ready prediction candidates at "
+            f"{_route_target(paths['prediction_candidates'], 'reality-candidates/prediction-candidates.json')}"
+        )
+    if not readiness["intervention_candidates_valid"]:
+        actions.append(
+            "write evaluator-ready action-conditioned candidates at "
+            f"{_route_target(paths['intervention_candidates'], 'reality-candidates/intervention-candidates.json')}"
+        )
+    if not readiness["sample_ids_match"]:
+        actions.append("bind capture, prediction and intervention files to the same sample_id")
+    actions.append(
+        "run controlled-reality-bundle-handoff only after this audit reports handoff_ready"
+    )
+    actions.append(
+        "keep counterfactual proof blocked unless observed actions have an explicit counterfactual evaluation design"
+    )
+    return actions
+
+
+def _validate_file_record(value: Any, name: str) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} file record must be a mapping")
+    for key in ("present", "is_file"):
+        if not isinstance(value.get(key), bool):
+            raise ValueError(f"{name}.{key} must be bool")
+    if not isinstance(value.get("size_bytes"), int):
+        raise ValueError(f"{name}.size_bytes must be int")
+
+
+def _path_string(path: Path | None) -> str | None:
+    return None if path is None else str(path)
+
+
+def _route_target(path: Path | None, default_relative: str) -> str:
+    if path is not None:
+        return str(path)
+    return f"<dataset_root>/{default_relative}"
 
 
 def _non_empty_string_tuple(values: Sequence[str], name: str) -> tuple[str, ...]:

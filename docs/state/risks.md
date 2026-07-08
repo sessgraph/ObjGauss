@@ -171,3 +171,13 @@ coverage 与模型指标分开记录。当前 LMO 提供 occlusion reappearance 
 含部分测试场景，不等于 `occlusion_recovery_rate`、`contrastive_margin` 或 counterfactual
 metric pass。风险继续 open：identity collapse 仍是真实 fail evidence，且真实 controlled
 identity pass / view-invariant metric / action-conditioned intervention row 仍缺。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-AUDIT-001`
+新增 `audit-public-interaction-route`，把 `hot3d-clips` 这类 action-capable public
+interaction candidate 到 controlled reality handoff 的 prerequisite 变成机器可审计：
+local dataset root、controlled capture manifest、per-frame Gaussian evidence declaration、
+ObjectState candidate artifact、prediction candidates、intervention candidates 和
+`sample_id` binding。该缓解只提供 action route preflight，不下载数据、不创建 GT、
+不运行 eval、不训练模型、不创建 intervention pass row，也不把 observed interaction 误写成
+randomized counterfactual proof；风险继续 open，直到真实 controlled/public action rows
+进入 pass / fail evidence。

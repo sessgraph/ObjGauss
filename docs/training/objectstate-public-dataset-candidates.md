@@ -548,3 +548,39 @@ uv run objgauss object-state audit-public-dataset-candidates \
 
 This command does not download data or create pass rows. It only records the
 candidate selection state.
+
+## Public Interaction Route Audit
+
+2026-07-09 update: `hot3d-clips` is now backed by a machine-checkable route
+audit, but still not by a submitted ObjGauss evidence row. The audit is:
+
+```bash
+uv run objgauss object-state audit-public-interaction-route \
+  outputs/captures/hot3d-clip-000001 \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-route-summary.json \
+  --markdown-output outputs/captures/hot3d-clip-000001/public-interaction-route.md \
+  --require-ready
+```
+
+By default the command expects:
+
+- `capture-manifest.json`
+- `objectstates.json`
+- `reality-candidates/prediction-candidates.json`
+- `reality-candidates/intervention-candidates.json`
+
+It validates the controlled capture manifest, prediction candidates,
+intervention candidates and `sample_id` binding. It reports
+`objectstate_public_interaction_route_handoff_ready` only when the local
+interaction bundle has action GT, pose/timestamp GT, declared per-frame
+Gaussian evidence, an ObjectState candidate artifact, prediction candidates and
+action-conditioned intervention candidates all bound to the same sample.
+
+Boundary:
+
+- This audit does not download HOT3D or DexYCB.
+- It does not adapt raw egocentric streams into ObjGauss manifests.
+- It does not evaluate identity, prediction or intervention metrics.
+- It does not create a reality row or pass evidence.
+- HOT3D-style observed interactions are action-like evidence candidates, not
+  randomized counterfactual trials.

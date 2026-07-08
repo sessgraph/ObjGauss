@@ -446,3 +446,31 @@ challenge metadata, but those are not `occlusion_recovery_rate` or
 The next-actions file is an operator handoff for the missing state-variable
 evidence. It does not create GT, run evaluations, train a model, or convert
 these public replay rows into identity / intervention pass evidence.
+
+## Public Interaction Route Preflight
+
+2026-07-09 added a read-only action-capable public dataset route audit:
+
+```bash
+uv run objgauss object-state audit-public-interaction-route \
+  outputs/captures/hot3d-clip-000001 \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-route-summary.json \
+  --markdown-output outputs/captures/hot3d-clip-000001/public-interaction-route.md \
+  --require-ready
+```
+
+The audit defaults to `hot3d-clips` and checks whether a local public
+interaction clip has been adapted into the existing controlled capture and
+controlled reality handoff contracts:
+
+- `capture-manifest.json`
+- `objectstates.json`
+- `reality-candidates/prediction-candidates.json`
+- `reality-candidates/intervention-candidates.json`
+
+This is a route readiness check for the missing intervention evidence, not a
+new row in the LMO / HOPE ledger above. It reports handoff-ready only when the
+capture manifest is intervention-ready, per-frame Gaussian evidence is
+declared, prediction / intervention candidate JSON files validate and all
+sample ids match. It does not download HOT3D, create GT, run eval, train a
+model, create a pass row or prove counterfactual causality.
