@@ -286,6 +286,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_local_row_handoff",
         "OBJECTSTATE_BOP_LOCAL_ROW_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",
@@ -470,6 +474,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_local_row_handoff",
         "objectstate_bop_local_row_handoff",
     ),
+    "objectstate_bop_baseline_local_row_handoff": (
+        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "objectstate_bop_baseline_local_row_handoff",
+    ),
     "objectstate_bop_cross_sample_ledger": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "objectstate_bop_cross_sample_ledger",
@@ -609,6 +617,10 @@ _EXPORTS = {
     "validate_objectstate_bop_local_row_handoff_summary": (
         "objgauss.core.objectstate_bop_local_row_handoff",
         "validate_objectstate_bop_local_row_handoff_summary",
+    ),
+    "validate_objectstate_bop_baseline_local_row_handoff_summary": (
+        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "validate_objectstate_bop_baseline_local_row_handoff_summary",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",

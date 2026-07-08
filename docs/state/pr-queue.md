@@ -190,6 +190,11 @@ input；它仍不创建 target files、不运行 readiness / handoff、不训练
 写出单个全局 Gaussian centroid / bbox 的 trainable ObjectState baseline artifact，
 作为 identity handoff 可审阅的负证据候选；它不读取 BOP pose GT / object ids 来放置预测，
 不训练模型、不运行 handoff、不创建 pass row。
+`OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001` 继续补齐
+`bop-baseline-local-row-handoff`，可在已有 BOP scene + Gaussian evidence 时一键生成
+single-state baseline `objectstates.json`，再跑 identity handoff、prediction baseline
+handoff 和 Phase 1 ledger；它把 reviewable negative evidence 和 metric pass 分开，不训练
+模型、不声明 intervention/world-model evidence。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -311,6 +316,46 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001: Run BOP local rows from a baseline candidate
+
+- 状态: done / baseline-local-row-handoff
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 evidence handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 当真实 BOP scene 和 per-frame Gaussian evidence 已经存在、但尚未准备真实模型
+  `objectstates.json` 时，用 single-state Gaussian centroid baseline 直接生成
+  identity+prediction local-row package，让 cross-sample 表可以先获得可审阅负证据。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_baseline_local_row_handoff`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-baseline-local-row-handoff-v1`。
+  - 新增 CLI
+    `objgauss object-state bop-baseline-local-row-handoff <scene-root> --output-root <dir>`。
+  - 命令默认写 `<output-root>/objectstates.json` baseline candidate。
+  - baseline candidate 复用 `gaussians/<frame>.ply` 的 global `xyz` centroid / bbox，
+    不读取 BOP pose GT / object ids 来放置预测 ObjectState。
+  - 随后复用既有 `bop-local-row-handoff`，生成 identity handoff、prediction baseline
+    handoff 和 `phase1-evidence-ledger.json`。
+  - 输出 summary 分离 `reviewability_gates` 与 `pass_gates`；baseline identity fail
+    仍可作为 reviewable negative evidence。
+- 边界:
+  - 只编排已有 BOP scene 和已有 per-frame Gaussian evidence。
+  - 不下载 BOP、不复制 dataset、不创建 GT。
+  - 不推断 condition metadata，不重建 Gaussian，不训练 Gaussian / tracking / dynamics 模型。
+  - 不运行 learned identity / prediction / intervention model。
+  - 不声明 metric pass，不声明 intervention / counterfactual gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_baseline_local_row_handoff.py objgauss/core/objectstate_bop_baseline_candidate.py objgauss/core/objectstate_bop_local_row_handoff.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_baseline_local_row_handoff.py -q`: passed，2 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py -q`: passed，9 tests。
+  - `uv run objgauss object-state bop-baseline-local-row-handoff --help`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_objectstate_bop_baseline_candidate.py tests/test_objectstate_bop_local_row_handoff.py tests/test_core_namespace.py -q`: passed，17 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py -q`: passed，91 tests。
+  - `uv run --extra dev pytest`: passed，503 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-BASELINE-CANDIDATE-001: Generate BOP ObjectState baseline candidates
 

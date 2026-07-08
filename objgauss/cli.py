@@ -240,6 +240,9 @@ from objgauss.core.objectstate_bop_candidate_artifact_template import (
 from objgauss.core.objectstate_bop_baseline_candidate import (
     write_objectstate_bop_gaussian_centroid_baseline_candidate,
 )
+from objgauss.core.objectstate_bop_baseline_local_row_handoff import (
+    objectstate_bop_baseline_local_row_handoff,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -5795,6 +5798,104 @@ def _object_state_bop_local_row_handoff(args: argparse.Namespace) -> None:
         raise ValueError("BOP local row handoff did not pass")
 
 
+def _object_state_bop_baseline_local_row_handoff(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_baseline_local_row_handoff(
+        args.scene_root,
+        output_root=args.output_root,
+        sample_id=args.sample_id,
+        candidate_artifact=args.candidate_artifact,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        baseline_candidate_id=args.baseline_candidate_id,
+        identity_candidate_source=args.identity_candidate_source,
+        max_centroid_distance=args.max_centroid_distance,
+        prediction_policy=args.prediction_policy,
+        prediction_candidate_id=args.prediction_candidate_id,
+        prediction_candidate_source=args.prediction_candidate_source,
+        prediction_confidence=args.prediction_confidence,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
+            max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        prediction_thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        force=args.force,
+    )
+    reviewability = summary["reviewability_gates"]
+    pass_gates = summary["pass_gates"]
+    ledger = summary["phase1_evidence_ledger_summary"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"candidate_artifact={summary['candidate_artifact']}")
+    print(f"bop_baseline_local_row_handoff_status={summary['status']}")
+    print(
+        "baseline_total_gaussians="
+        f"{summary['row_counts']['baseline_total_gaussians']}"
+    )
+    for gate, passed in reviewability.items():
+        print(f"reviewability.{gate}={str(passed).lower()}")
+    for gate, passed in pass_gates.items():
+        print(f"pass.{gate}={str(passed).lower()}")
+    print(f"phase1_evidence_ledger_maturity={ledger['maturity']}")
+    print(
+        "local_row_handoff_status="
+        f"{summary['local_row_handoff']['status']}"
+    )
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_bop_baseline_local_row_handoff_reviewable"
+    ):
+        raise ValueError("BOP baseline local row handoff is not reviewable")
+    if args.require_pass and not all(summary["pass_gates"].values()):
+        raise ValueError("BOP baseline local row handoff did not pass")
+
+
 def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_local_row_batch_handoff(
         args.batch_spec,
@@ -7843,6 +7944,215 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bop_local_row_handoff.set_defaults(
         handler=_object_state_bop_local_row_handoff
+    )
+    bop_baseline_local_row_handoff = object_state_subparsers.add_parser(
+        "bop-baseline-local-row-handoff",
+        help=(
+            "generate a single-state BOP ObjectState baseline candidate, run "
+            "identity and prediction handoff, then write a Phase 1 ledger"
+        ),
+    )
+    bop_baseline_local_row_handoff.add_argument("scene_root", type=Path)
+    bop_baseline_local_row_handoff.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+    )
+    bop_baseline_local_row_handoff.add_argument("--summary-output", type=Path)
+    bop_baseline_local_row_handoff.add_argument("--sample-id", required=True)
+    bop_baseline_local_row_handoff.add_argument(
+        "--candidate-artifact",
+        type=Path,
+        help=(
+            "path for the generated baseline ObjectState artifact; defaults "
+            "to <output-root>/objectstates.json"
+        ),
+    )
+    bop_baseline_local_row_handoff.add_argument("--dataset-id", default="bop-ycbv")
+    bop_baseline_local_row_handoff.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    bop_baseline_local_row_handoff.add_argument("--fps", type=float, default=30.0)
+    bop_baseline_local_row_handoff.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    bop_baseline_local_row_handoff.add_argument("--rgb-dir", default="rgb")
+    bop_baseline_local_row_handoff.add_argument("--gaussian-dir", default="gaussians")
+    bop_baseline_local_row_handoff.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
+    bop_baseline_local_row_handoff.add_argument("--max-frames", type=int)
+    bop_baseline_local_row_handoff.add_argument("--frame-step", type=int, default=1)
+    bop_baseline_local_row_handoff.add_argument(
+        "--baseline-candidate-id",
+        default="bop-gaussian-centroid-baseline",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--identity-candidate-source",
+        default="bop_gaussian_centroid_single_state_baseline",
+    )
+    bop_baseline_local_row_handoff.add_argument("--max-centroid-distance", type=float)
+    bop_baseline_local_row_handoff.add_argument(
+        "--prediction-policy",
+        choices=("constant_velocity", "hold"),
+        default="constant_velocity",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--prediction-candidate-id",
+        default="bop-constant-velocity-baseline",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--prediction-candidate-source",
+        default="controlled-prediction-baseline",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--prediction-confidence",
+        type=float,
+        default=0.5,
+    )
+    bop_baseline_local_row_handoff.add_argument("--min-idf1", type=float, default=0.95)
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-fragmentation-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-swap-rate",
+        type=float,
+        default=0.0,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--allow-identity-collapse",
+        action="store_true",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-state-ade",
+        type=float,
+        default=0.05,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+        help="also require sample artifact refs such as scene_gt.json to exist",
+    )
+    bop_baseline_local_row_handoff.add_argument("--min-rgb-bytes", type=int, default=1)
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+        help="skip RGB/Gaussian frame file format signature checks",
+    )
+    bop_baseline_local_row_handoff.add_argument("--hash-files", action="store_true")
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--hash-candidate-artifact",
+        action="store_true",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=1,
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite generated baseline and handoff output files",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless identity and prediction evidence are reviewable",
+    )
+    bop_baseline_local_row_handoff.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless both identity and prediction metric gates pass",
+    )
+    bop_baseline_local_row_handoff.set_defaults(
+        handler=_object_state_bop_baseline_local_row_handoff
     )
     init_bop_local_row_batch_spec = object_state_subparsers.add_parser(
         "init-bop-local-row-batch-spec",

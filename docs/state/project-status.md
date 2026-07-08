@@ -824,6 +824,18 @@ Gaussian / tracking / dynamics 模型，不运行 identity handoff / eval，不�
 命令插到 RGB-D Gaussian evidence export 之后、手工 template authoring 之前；
 `audit-bop-phase1-authoring-progress` 在 Gaussian evidence 存在但 target candidate
 artifact 缺失时也会优先提示这条命令。
+随后完成 `OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_baseline_local_row_handoff`，schema 为
+`objgauss-objectstate-bop-baseline-local-row-handoff-v1`，CLI 为
+`objgauss object-state bop-baseline-local-row-handoff <scene-root> --output-root <dir>`。
+该命令在本地 BOP scene 和 per-frame Gaussian evidence 已存在时，默认写
+`<output-root>/objectstates.json` baseline candidate，再复用
+`bop-local-row-handoff` 串起 identity handoff、prediction baseline handoff 和
+Phase 1 evidence ledger。reviewable 与 metric pass 继续分离：single-state baseline
+预期可形成 identity fail / negative evidence，而不是被包装成通过。该步骤不下载 BOP、
+不创建 GT、不使用 BOP pose GT 或 object ids 来放置预测 ObjectState、不重建 Gaussian、
+不训练模型、不声明 intervention / counterfactual gate 或 world model，也不改 viewer/export
+默认策略。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
@@ -4087,11 +4099,12 @@ npm run acceptance:demo
    `init-bop-phase1-sample-workspaces <batch-spec.json>` 生成每个 sample 的 condition CSV
    模板和 README；随后填齐真实 `bop-condition-sidecar.json` 和 per-frame Gaussian
    evidence。若还没有真正模型输出，可先运行
-   `generate-bop-objectstate-baseline-candidate` 写出 single-state baseline `objectstates.json`
-   作为可审阅负证据；若已有模型输出，则继续使用 template / finalize 路径。之后先跑
-   `audit-bop-phase1-authoring-progress` 确认 target files 已经可进入 batch readiness
-   input，再跑 `audit-bop-local-row-batch-readiness`，并按 readiness 缺口决定是否运行
-   `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
+   `bop-baseline-local-row-handoff` 直接写 single-state baseline `objectstates.json`
+   并生成 identity+prediction local-row package；若已有模型输出，则继续使用 template /
+   finalize 路径，再跑 `bop-local-row-handoff`。之后先跑
+   `audit-bop-phase1-authoring-progress` 或 `audit-bop-local-row-batch-readiness` 确认
+   target files 与 package 已经可进入 batch / cross-sample 表，再按 readiness 缺口决定
+   是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
    replay buffer、diffusion 或 geometry / camera unfreeze。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。

@@ -78,3 +78,10 @@ Gaussian evidence 时写出单个全局 Gaussian centroid / bbox 的 trainable O
 baseline artifact，减少 sample authoring 卡在缺 `objectstates.json` 的风险；该 artifact
 预期作为可审阅负证据候选，不读取 BOP pose GT / object ids 来放置预测，不训练模型、不运行
 handoff、不创建 pass row，也不声明 intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001`
+新增 `bop-baseline-local-row-handoff`，可在本地 BOP scene 和 per-frame Gaussian evidence
+已存在时，一次生成 single-state baseline `objectstates.json`，再运行 identity handoff、
+prediction baseline handoff 和 Phase 1 ledger；该缓解让真实 BOP subset 可先产出
+reviewable negative evidence，但仍不下载数据、不创建 GT、不重建 Gaussian、不训练模型、
+不声明 metric pass、intervention gate 或 world-model evidence。

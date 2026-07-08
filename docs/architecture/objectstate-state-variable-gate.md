@@ -1130,6 +1130,43 @@ eval, claim metric pass, claim intervention / counterfactual gates, claim
 world model, use replay / diffusion, write public samples or mutate viewer
 defaults.
 
+### OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001
+
+Run a local BOP Phase 1 row from a deterministic baseline ObjectState
+candidate.
+
+Required behavior:
+
+- Input a local BOP scene root and output root.
+- Require existing per-frame Gaussian evidence.
+- Generate the single-state Gaussian centroid baseline `objectstates.json`.
+- Reuse the existing `bop-local-row-handoff` path to run identity handoff,
+  prediction baseline handoff and Phase 1 evidence ledger generation.
+- Keep reviewability separate from metric pass, because the baseline is
+  expected to fail multi-object identity scenes.
+- Do not use BOP pose GT or BOP object ids to place predicted ObjectStates.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_baseline_local_row_handoff`.
+- Summary schema:
+  `objgauss-objectstate-bop-baseline-local-row-handoff-v1`.
+- Core function:
+  `objectstate_bop_baseline_local_row_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-baseline-local-row-handoff <scene-root> --output-root <dir>`.
+- Default candidate artifact path:
+  `<output-root>/objectstates.json`.
+
+Current scope is baseline local-row handoff only. It requires existing BOP
+scene files and existing Gaussian evidence. It does not download BOP data,
+copy datasets, create GT, infer condition metadata, reconstruct Gaussians,
+train Gaussian / tracking / dynamics models, run a learned identity model,
+run a learned prediction model, claim metric pass, claim intervention /
+counterfactual gates, claim world model, use replay / diffusion, write public
+samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample
