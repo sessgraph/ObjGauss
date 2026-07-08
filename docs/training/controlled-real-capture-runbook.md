@@ -248,6 +248,13 @@ be referenced by `frames.csv`. The finalizer does not create GT or infer action
 vectors; it only converts human- or externally-measured action rows into the
 controlled capture bundle format.
 
+When `audit-controlled-capture-bundle-readiness` is run with
+`--require-intervention-ready`, it also checks `intervention_action_gt_ready`:
+at least one action must have a non-zero vector and fit within a referenced
+object's consecutive pose transition interval. This is still only a preflight
+for action-conditioned transition authoring. It does not run the intervention
+evaluator or create a counterfactual proof.
+
 ## 6.1 Object Transition Dataset
 
 After `capture-manifest.json` validates and before creating prediction /

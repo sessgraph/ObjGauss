@@ -130,6 +130,9 @@ def objectstate_controlled_capture_bundle_readiness(
         min_lighting_conditions=min_lighting_conditions,
         min_camera_motion_m=min_camera_motion_m,
     )
+    intervention_action_gt = _intervention_action_gt_readiness(
+        import_summary["manifest"] if import_summary is not None else None
+    )
     candidate = _candidate_artifact_readiness(
         candidate_artifact,
         min_bytes=min_candidate_artifact_bytes,
@@ -155,6 +158,7 @@ def objectstate_controlled_capture_bundle_readiness(
         "intervention_stage_ready": bool(
             capture_readiness.get("intervention_stage_ready", False)
         ),
+        "intervention_action_gt_ready": bool(intervention_action_gt["ready"]),
         "capture_import_ready": import_summary is not None,
         "capture_files_ready": (
             file_audit is not None
@@ -175,6 +179,10 @@ def objectstate_controlled_capture_bundle_readiness(
             readiness["identity_stage_ready"],
             (not require_prediction_ready or readiness["prediction_stage_ready"]),
             (not require_intervention_ready or readiness["intervention_stage_ready"]),
+            (
+                not require_intervention_ready
+                or readiness["intervention_action_gt_ready"]
+            ),
             readiness["capture_import_ready"],
             readiness["capture_files_ready"],
             readiness["identity_scenario_ready"],
@@ -193,6 +201,7 @@ def objectstate_controlled_capture_bundle_readiness(
         import_error=import_error,
         file_audit=file_audit,
         scenario=scenario,
+        intervention_action_gt=intervention_action_gt,
         candidate=candidate,
         require_prediction_ready=require_prediction_ready,
         require_intervention_ready=require_intervention_ready,
@@ -214,6 +223,7 @@ def objectstate_controlled_capture_bundle_readiness(
             "identity_stage_required": True,
             "prediction_stage_required": bool(require_prediction_ready),
             "intervention_stage_required": bool(require_intervention_ready),
+            "intervention_action_gt_required": bool(require_intervention_ready),
             "rgb_files_required": True,
             "gaussian_files_required": True,
             "frame_file_formats_required": bool(require_frame_formats),
@@ -232,6 +242,7 @@ def objectstate_controlled_capture_bundle_readiness(
         "row_integrity": integrity,
         "candidate_artifact": candidate,
         "identity_scenario": scenario,
+        "intervention_action_gt": intervention_action_gt,
         "import_schema": OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
         "file_audit_schema": OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
         "import_summary": import_summary,
@@ -296,6 +307,7 @@ def validate_objectstate_controlled_capture_bundle_readiness_summary(
         "row_integrity",
         "candidate_artifact",
         "identity_scenario",
+        "intervention_action_gt",
         "readiness",
         "hard_blockers",
         "next_actions",
@@ -316,6 +328,7 @@ def validate_objectstate_controlled_capture_bundle_readiness_summary(
         "identity_stage_ready",
         "prediction_stage_ready",
         "intervention_stage_ready",
+        "intervention_action_gt_ready",
         "capture_import_ready",
         "capture_files_ready",
         "identity_scenario_ready",
@@ -340,6 +353,7 @@ def validate_objectstate_controlled_capture_bundle_readiness_summary(
         validate_objectstate_controlled_capture_file_audit_summary(
             payload["capture_file_audit"]
         )
+    _validate_intervention_action_gt(payload["intervention_action_gt"])
     if not isinstance(payload.get("hard_blockers"), list):
         raise ValueError("controlled capture bundle readiness hard_blockers must be list")
     if not isinstance(payload.get("next_actions"), list):
@@ -406,6 +420,43 @@ def _layout_readiness(
             if not record["valid"]
         ],
     }
+
+
+def _validate_intervention_action_gt(payload: Any) -> None:
+    if not isinstance(payload, Mapping):
+        raise ValueError("controlled capture bundle readiness requires intervention_action_gt")
+    if not isinstance(payload.get("ready"), bool):
+        raise ValueError("intervention_action_gt requires ready bool")
+    readiness = payload.get("readiness")
+    if not isinstance(readiness, Mapping):
+        raise ValueError("intervention_action_gt requires readiness")
+    for key in (
+        "actions_present",
+        "nonzero_action_vectors_present",
+        "usable_action_transition_present",
+    ):
+        if not isinstance(readiness.get(key), bool):
+            raise ValueError(f"intervention_action_gt readiness requires bool {key}")
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, Mapping):
+        raise ValueError("intervention_action_gt requires metrics")
+    for key in (
+        "action_count",
+        "nonzero_vector_action_count",
+        "usable_action_transition_count",
+    ):
+        value = metrics.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"intervention_action_gt metrics requires int {key}")
+    usable = payload.get("usable_action_ids")
+    if not isinstance(usable, list) or any(not isinstance(item, str) for item in usable):
+        raise ValueError("intervention_action_gt requires usable_action_ids list")
+    issues = payload.get("issues")
+    if not isinstance(issues, list) or any(not isinstance(item, str) for item in issues):
+        raise ValueError("intervention_action_gt requires issues list")
+    expected_ready = all(bool(readiness[key]) for key in readiness)
+    if bool(payload["ready"]) != expected_ready:
+        raise ValueError("intervention_action_gt ready must match readiness gates")
 
 
 def _path_record(kind: str, path: Path | None, *, expect_file: bool) -> dict[str, Any]:
@@ -738,6 +789,125 @@ def _max_camera_translation(positions: Sequence[Sequence[float]]) -> float:
     return float(max_distance)
 
 
+def _intervention_action_gt_readiness(
+    manifest: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if manifest is None:
+        return {
+            "ready": False,
+            "readiness": {
+                "actions_present": False,
+                "nonzero_action_vectors_present": False,
+                "usable_action_transition_present": False,
+            },
+            "metrics": {
+                "action_count": 0,
+                "nonzero_vector_action_count": 0,
+                "usable_action_transition_count": 0,
+            },
+            "usable_action_ids": [],
+            "issues": ["capture manifest is not import-ready"],
+        }
+    actions = list(manifest.get("actions", ()))
+    frames = list(manifest.get("frames", ()))
+    issues: list[str] = []
+    nonzero_action_ids: set[str] = set()
+    usable_action_ids: set[str] = set()
+    if not actions:
+        issues.append("intervention action GT requires at least one action row")
+    object_tracks = _object_pose_tracks(frames)
+    for action in actions:
+        action_id = str(action.get("action_id", ""))
+        vector = action.get("vector")
+        if not _is_nonzero_vector(vector):
+            issues.append(f"action {action_id or '-'} requires a non-zero vector")
+            continue
+        nonzero_action_ids.add(action_id)
+        refs = [str(action.get("object_id", ""))]
+        target = action.get("target_object_id")
+        if isinstance(target, str) and target:
+            refs.append(target)
+        if any(
+            _action_fits_object_transition(action, object_tracks.get(object_id, ()))
+            for object_id in refs
+            if object_id
+        ):
+            usable_action_ids.add(action_id)
+        else:
+            issues.append(
+                f"action {action_id or '-'} does not fit any referenced object transition"
+            )
+    readiness = {
+        "actions_present": bool(actions),
+        "nonzero_action_vectors_present": bool(actions)
+        and len(nonzero_action_ids) == len(actions),
+        "usable_action_transition_present": bool(actions)
+        and len(usable_action_ids) == len(actions),
+    }
+    if actions and not usable_action_ids:
+        issues.append("intervention action GT requires at least one usable action transition")
+    return {
+        "ready": all(readiness.values()),
+        "readiness": readiness,
+        "metrics": {
+            "action_count": len(actions),
+            "nonzero_vector_action_count": len(nonzero_action_ids),
+            "usable_action_transition_count": len(usable_action_ids),
+        },
+        "usable_action_ids": sorted(usable_action_ids),
+        "issues": _dedupe(issues),
+    }
+
+
+def _object_pose_tracks(
+    frames: Sequence[Mapping[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    tracks: dict[str, list[dict[str, Any]]] = {}
+    for frame in frames:
+        timestamp = float(frame["timestamp"])
+        for item in frame.get("objects", ()):
+            object_id = str(item.get("object_id", ""))
+            if not object_id or "pose" not in item:
+                continue
+            tracks.setdefault(object_id, []).append(
+                {
+                    "frame_id": str(frame.get("frame_id", "")),
+                    "timestamp": timestamp,
+                }
+            )
+    for observations in tracks.values():
+        observations.sort(key=lambda item: item["timestamp"])
+    return tracks
+
+
+def _action_fits_object_transition(
+    action: Mapping[str, Any],
+    observations: Sequence[Mapping[str, Any]],
+) -> bool:
+    if len(observations) < 2:
+        return False
+    start = float(action["start_timestamp"])
+    end = float(action["end_timestamp"])
+    for source, target in zip(observations[:-1], observations[1:], strict=False):
+        if start >= float(source["timestamp"]) and end <= float(target["timestamp"]):
+            return True
+    return False
+
+
+def _is_nonzero_vector(value: Any) -> bool:
+    if (
+        isinstance(value, (str, bytes))
+        or not isinstance(value, Sequence)
+        or len(value) != 3
+    ):
+        return False
+    try:
+        vector = [float(component) for component in value]
+    except (TypeError, ValueError):
+        return False
+    return sum(component * component for component in vector) > 0.0
+
+
 def _candidate_artifact_readiness(
     candidate_artifact: str | Path | None,
     *,
@@ -787,6 +957,7 @@ def _hard_blockers(
     import_error: str | None,
     file_audit: Mapping[str, Any] | None,
     scenario: Mapping[str, Any],
+    intervention_action_gt: Mapping[str, Any],
     candidate: Mapping[str, Any],
     require_prediction_ready: bool,
     require_intervention_ready: bool,
@@ -816,6 +987,8 @@ def _hard_blockers(
         blockers.append("capture summary is not prediction-stage ready")
     if require_intervention_ready and not readiness["intervention_stage_ready"]:
         blockers.append("capture summary is not intervention-stage ready")
+    if require_intervention_ready and not readiness["intervention_action_gt_ready"]:
+        blockers.extend(str(issue) for issue in intervention_action_gt["issues"])
     if file_audit is None:
         blockers.append("capture file audit cannot run until capture import is ready")
     elif file_audit["status"] != "objectstate_controlled_capture_file_audit_pass":
@@ -850,6 +1023,8 @@ def _next_actions(
         actions.append("place real RGB and Gaussian files referenced by frames.csv")
     if not readiness["identity_scenario_ready"]:
         actions.append("capture visible-occluded-visible frames with view, lighting, and camera motion metadata")
+    if not readiness.get("intervention_action_gt_ready", False):
+        actions.append("finalize actions.csv with non-zero vectors that fit object pose transitions")
     if not readiness["candidate_artifact_ready"]:
         actions.append("provide a non-empty candidate ObjectState artifact for handoff")
     if not hard_blockers:

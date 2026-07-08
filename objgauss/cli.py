@@ -3587,6 +3587,10 @@ def _object_state_audit_controlled_capture_bundle_readiness(
     print(f"sample_metadata_ready={str(readiness['sample_metadata_ready']).lower()}")
     print(f"csv_headers_ready={str(readiness['csv_headers_ready']).lower()}")
     print(f"identity_stage_ready={str(readiness['identity_stage_ready']).lower()}")
+    print(
+        "intervention_action_gt_ready="
+        f"{str(readiness['intervention_action_gt_ready']).lower()}"
+    )
     print(f"capture_files_ready={str(readiness['capture_files_ready']).lower()}")
     print(
         "identity_scenario_ready="

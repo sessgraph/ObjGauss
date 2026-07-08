@@ -310,3 +310,12 @@ vector；`--require-frame-action-refs` 可进一步要求 `frames.csv` 显式引
 动作、不创建 GT、不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不
 声明 counterfactual proof 或 ObjectState 已证明为真实世界状态变量。风险继续 open，直到
 真实 controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-CAPTURE-INTERVENTION-READINESS-001`
+扩展 `audit-controlled-capture-bundle-readiness --require-intervention-ready`，新增
+`intervention_action_gt_ready` gate：action GT 不仅要存在，还要有非零 action vector，
+并且 action interval 能完整落在被引用对象的连续 pose transition 区间内。该缓解减少弱
+`actions.csv` 行被误读为 intervention-ready 的风险，但仍不运行 intervention eval、不创建
+counterfactual pass row、不训练 dynamics、不创建 replay buffer，也不声明 ObjectState 已证明
+为真实世界状态变量。风险继续 open，直到真实 controlled/public capture 同时产生可审计
+identity、prediction 和 intervention rows。

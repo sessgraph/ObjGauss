@@ -76,6 +76,13 @@ def test_controlled_capture_bundle_readiness_passes_ready_capture_with_candidate
     assert summary["readiness"]["identity_bundle_handoff_ready"] is True
     assert summary["readiness"]["candidate_artifact_ready"] is True
     assert summary["readiness"]["intervention_stage_ready"] is True
+    assert summary["readiness"]["intervention_action_gt_ready"] is True
+    assert summary["intervention_action_gt"]["metrics"] == {
+        "action_count": 1,
+        "nonzero_vector_action_count": 1,
+        "usable_action_transition_count": 1,
+    }
+    assert summary["intervention_action_gt"]["usable_action_ids"] == ["push-left-001"]
     assert summary["identity_scenario"]["ready"] is True
     assert (
         summary["capture_file_audit"]["status"]
@@ -126,9 +133,45 @@ def test_object_state_audit_controlled_capture_bundle_readiness_cli(
     assert "readiness_status=objectstate_controlled_capture_bundle_readiness_ready" in stdout
     assert "capture_bundle_ready=true" in stdout
     assert "identity_bundle_handoff_ready=true" in stdout
+    assert "intervention_action_gt_ready=true" in stdout
     assert "candidate_artifact_ready=true" in stdout
     assert "hard_blockers=0" in stdout
     assert summary["status"] == "objectstate_controlled_capture_bundle_readiness_ready"
+
+
+def test_controlled_capture_bundle_readiness_blocks_weak_action_gt(tmp_path):
+    _write_ready_bundle(tmp_path)
+    (tmp_path / "actions.csv").write_text(
+        "\n".join(
+            (
+                "action_id,action_type,object_id,start_timestamp,end_timestamp,actor,target_object_id,vector_x,vector_y,vector_z",
+                "push-left-001,push_left,cup-001,0.033333,0.066667,scripted-hand,,,,",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    candidate_path = tmp_path / "objectstates.json"
+    candidate_path.write_text('{"schema":"fixture"}\n', encoding="utf-8")
+
+    summary = objectstate_controlled_capture_bundle_readiness(
+        tmp_path,
+        candidate_artifact=candidate_path,
+        require_candidate_artifact=True,
+        require_intervention_ready=True,
+    )
+
+    assert summary["status"] == "objectstate_controlled_capture_bundle_readiness_blocked"
+    assert summary["readiness"]["intervention_stage_ready"] is True
+    assert summary["readiness"]["intervention_action_gt_ready"] is False
+    assert summary["readiness"]["capture_bundle_ready"] is False
+    assert summary["intervention_action_gt"]["metrics"] == {
+        "action_count": 1,
+        "nonzero_vector_action_count": 0,
+        "usable_action_transition_count": 0,
+    }
+    assert any("requires a non-zero vector" in item for item in summary["hard_blockers"])
+    assert any("non-zero vectors" in item for item in summary["next_actions"])
 
 
 def _write_ready_bundle(root) -> None:

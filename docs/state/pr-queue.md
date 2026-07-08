@@ -347,6 +347,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-INTERVENTION-READINESS-001: Harden intervention bundle readiness
+
+- 状态: done / objectstate-controlled-capture-intervention-readiness
+- 类型: 标准 PR / ObjectState Phase 1 controlled real preflight
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 收紧 `audit-controlled-capture-bundle-readiness --require-intervention-ready`，
+  避免只有 `actions.csv` 行数但缺可用 action vector / transition binding 的 bundle
+  被误读为 intervention-ready。
+- 已实施:
+  - `objectstate_controlled_capture_bundle_readiness` 新增
+    `intervention_action_gt` summary 和 `readiness.intervention_action_gt_ready`。
+  - `--require-intervention-ready` 现在除了 capture summary intervention ready，还要求
+    至少一个 action 具备非零 vector，并且 action interval 完整落在被引用对象的连续
+    pose transition 区间内。
+  - CLI `audit-controlled-capture-bundle-readiness` 新增
+    `intervention_action_gt_ready=<true|false>` 输出。
+  - hard blockers 会报告缺失 / 零 action vector，或 action 无法匹配对象 pose
+    transition。
+  - runbook 已记录 `intervention_action_gt_ready` 的含义和边界。
+- 边界:
+  - 不修改 controlled capture manifest schema。
+  - 不采集视频、不创建 GT、不推断动作。
+  - 不运行 prediction / intervention eval，不创建 pass row。
+  - 不训练 dynamics、不创建 replay buffer、不声明 counterfactual proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_bundle_readiness.py objgauss/cli.py tests/test_objectstate_controlled_capture_bundle_readiness.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_actions.py tests/test_objectstate_transition_dataset.py tests/test_objectstate_transition_intervention_candidates.py`: 19 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_capture_actions.py tests/test_objectstate_controlled_capture_annotations.py tests/test_objectstate_controlled_capture_frames.py tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_transition_dataset.py tests/test_objectstate_transition_intervention_candidates.py tests/test_core_namespace.py`: 47 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 563 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-ACTIONS-001: Finalize controlled capture action rows
 
 - 状态: done / objectstate-controlled-capture-actions

@@ -465,6 +465,16 @@ metadata，以及可选 candidate artifact。输出区分 `capture_bundle_ready`
 视频、不创建 GT、不生成伪造行、不重建 Gaussian、不训练模型、不运行 handoff、不写
 `public/samples`、不改 viewer/export 默认。完成 commit: `63c384f`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-INTERVENTION-READINESS-001`：
+扩展 `audit-controlled-capture-bundle-readiness` 的 intervention preflight。此前
+`--require-intervention-ready` 主要依赖 capture summary 的 `action_count > 0`；现在新增
+`intervention_action_gt_ready` 和 `intervention_action_gt` summary，要求至少一个 action
+具备非零 vector，并且 action interval 能完整落在被引用对象的连续 pose transition 区间内。
+CLI 会打印 `intervention_action_gt_ready`，hard blockers 会暴露缺失 / 零向量或无可用
+action transition 的具体原因。该切片只收紧 bundle readiness，不改 capture manifest
+schema、不运行 intervention eval、不创建 GT、不训练 dynamics、不生成 pass row，也不声明
+counterfactual proof 或 world model。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-RUNBOOK-001`：新增
 `docs/training/controlled-real-capture-runbook.md`，把 Phase 1 controlled real
 capture 的最小桌面场景、帧要求、文件命名、CSV 填写、pose / action 记录、
