@@ -395,7 +395,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run objgauss object-state audit-bop-identity-route ...`: passed，status 为
     `objectstate_bop_identity_route_audit_blocked`。
   - `git check-ignore -v outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-condition-sidecar-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-identity-route-audit-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-condition-gap/bop-conditions.template.csv`: passed; outputs ignored.
-- 完成 commit: pending。
+- 完成 commit: `f78f19c`。
 
 ### OBJECTSTATE-BOP-LMO-PUBLIC-ROW-001: Run first public LMO RGB-D baseline row
 
