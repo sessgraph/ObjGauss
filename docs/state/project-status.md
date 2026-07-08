@@ -412,6 +412,20 @@ RGB / Gaussian / pose / action row、不重建 Gaussian、不训练模型、不�
 不改 viewer/export 默认；它只把真实采集目录的文件布局和下一步验收命令固定下来。
 完成 commit: `873aec1`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001`：新增
+`objgauss.core.objectstate_controlled_capture_bundle_readiness`，schema 为
+`objgauss-objectstate-controlled-capture-bundle-readiness-v1`，并新增 CLI
+`objgauss object-state audit-controlled-capture-bundle-readiness <bundle-root>`。
+该 audit 可在 skeleton 或半填充 bundle 上运行，不再要求先通过 import；它会检查
+layout、`sample.json` metadata、CSV headers、object / frame / annotation rows、
+frame-action-object 引用、pose columns、真实 RGB / Gaussian 文件、identity scenario
+metadata，以及可选 candidate artifact。输出区分 `capture_bundle_ready` 和
+`identity_bundle_handoff_ready`：前者只代表真实采集 bundle 足够进入 Stage 1 identity
+验收，后者在 `--require-candidate-artifact` 时还要求 candidate artifact 文件存在。
+空 skeleton 会返回 hard blockers 和 next actions，不会被误报为 ready。该切片仍不采集
+视频、不创建 GT、不生成伪造行、不重建 Gaussian、不训练模型、不运行 handoff、不写
+`public/samples`、不改 viewer/export 默认。完成 commit: `63c384f`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

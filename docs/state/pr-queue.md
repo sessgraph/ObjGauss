@@ -75,8 +75,12 @@ pass 现在也要求 retrieval / drift / reconstruction-noise evidence 通过；
 bundle acceptance、file audit、candidate artifact audit、identity handoff 和
 identity-only reality gate 输出；`OBJECTSTATE-CONTROLLED-CAPTURE-TEMPLATE-001`
 已新增 `init-controlled-capture-bundle` CLI，可生成 local-only bundle skeleton、
-CSV headers、`rgb/` / `gaussians/` 目录和后续验收命令。下一步仍是实际采集 /
-标注 controlled tabletop RGB / Gaussian / pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
+CSV headers、`rgb/` / `gaussians/` 目录和后续验收命令；
+`OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001` 已新增
+`audit-controlled-capture-bundle-readiness` CLI，可在 skeleton 或半填充 bundle
+上输出 layout / metadata / CSV / row / file / scenario / candidate 缺口和
+next actions。下一步仍是实际采集 / 标注 controlled tabletop RGB / Gaussian /
+pose / action 文件，并用真实 candidate artifact 跑该 bundle handoff，
 让 identity row 从 fixture 进入真实 pass / fail，而不是新增大模型。继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -148,6 +152,49 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001: Audit controlled capture bundle readiness
+
+- 状态: done / tolerant-pre-handoff-readiness-audit-no-real-capture-files
+- 类型: 标准 PR / controlled tabletop capture readiness audit
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让真实 controlled tabletop bundle 在 skeleton 或半填充状态下也能得到
+  结构化缺口报告，而不是必须等到 import / acceptance / handoff 失败后才知道缺什么。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_bundle_readiness`。
+  - 新增 summary schema
+    `objgauss-objectstate-controlled-capture-bundle-readiness-v1`。
+  - `objectstate_controlled_capture_bundle_readiness(...)` 宽容审计 bundle layout、
+    `sample.json` metadata、CSV headers、object / frame / annotation / action row
+    counts、frame/action/object 引用、pose columns、strict timestamp、RGB /
+    Gaussian refs 和 identity scenario metadata。
+  - 当 bundle 已可 import 时，audit 会嵌入现有 import summary 和 controlled
+    capture file audit；当 bundle 仍是 skeleton 或半填充时，返回 hard blockers
+    和 next actions，而不是伪造 manifest 或 pass row。
+  - Readiness 区分 `capture_bundle_ready` 和 `identity_bundle_handoff_ready`：
+    前者表示真实 capture bundle 本身足够进入 Stage 1 identity 验收，后者在
+    `require_candidate_artifact` 时还要求 candidate artifact 文件 ready。
+  - 支持可选 `candidate_artifact`、prediction / intervention readiness 要求、
+    frame format audit、hash audit 和 identity scenario 阈值。
+  - CLI 新增 `objgauss object-state audit-controlled-capture-bundle-readiness
+    <bundle-root>`。
+  - CLI 可写 `--summary-output`，支持 `--require-ready`、`--candidate-artifact`、
+    `--require-candidate-artifact`、`--require-prediction-ready`、
+    `--require-intervention-ready`、`--hash-files`、`--min-rgb-bytes`、
+    `--min-gaussian-bytes` 和 scenario 阈值参数。
+  - Core lazy namespace 暴露 readiness schema、summary function 和 validator。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不生成 frame / annotation / action rows，不重建 Gaussian，不运行
+    tracker / segmentation，不训练 Gaussian / dynamics，不运行 identity handoff。
+  - 不计算 identity / prediction / intervention metrics，不推进 replay buffer /
+    diffusion，不写 `public/samples`，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_controlled_identity_bundle_handoff.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 356 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `63c384f`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-TEMPLATE-001: Initialize controlled capture bundles
 
