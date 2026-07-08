@@ -522,6 +522,17 @@ full readiness / handoff 可消费的 JSON。当前仍缺实际 controlled table
 真实 objectstates / prediction / intervention candidate 内容作为通过证据。完成 commit:
 `5a10915`。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001`：candidate template
+生成的 README 和 summary `next_commands` 现在会先指向
+`finalize-controlled-reality-candidates`，再进入
+`audit-controlled-reality-bundle-readiness` 和 `controlled-reality-bundle-handoff`，
+避免作者手工 rename / 改 schema。`docs/training/controlled-real-capture-runbook.md`
+也从 identity-only handoff 扩展为完整 Phase 1 链路：初始化 candidate templates、填入外部
+model / baseline 输出、finalize 成正式 evaluator JSON、跑 full readiness、再跑 full
+reality handoff。该切片仍不采集视频、不创建 GT、不运行预测 / 动作模型、不训练
+Gaussian 或 dynamics、不评估指标、不声明 pass rows、不写 `public/samples`、不改
+viewer/export 默认。完成 commit: `f064801`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、

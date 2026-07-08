@@ -103,8 +103,11 @@ prediction / intervention candidate templates，帮助作者填真实模型输�
 模板 schema 不能被 evaluator 当作 pass evidence；
 `OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001` 已新增
 `finalize-controlled-reality-candidates` CLI，可把已填完的 draft templates 转成正式
-evaluator JSON，并拒绝 TODO / obvious target-GT leakage。后续仍要让 readiness 从
-fixture 进入真实 ready，再让 rows 进入真实 pass / fail，而不是新增大模型。
+evaluator JSON，并拒绝 TODO / obvious target-GT leakage；
+`OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001` 已把 generated README /
+next commands 和 runbook 串成 init -> fill -> finalize -> full readiness -> full
+handoff。后续仍要让 readiness 从 fixture 进入真实 ready，再让 rows 进入真实 pass /
+fail，而不是新增大模型。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -176,6 +179,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-WORKFLOW-001: Wire controlled reality candidate workflow
+
+- 状态: done / workflow-only-no-real-candidate-output
+- 类型: 标准 PR / controlled tabletop candidate handoff workflow
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 把真实 candidate 文件的作者ing链路从“手工 rename / 改 schema”收敛成
+  init -> fill -> finalize -> full readiness -> full handoff，减少模板误用和
+  handoff 操作错误。
+- 已实施:
+  - `init-controlled-reality-candidates` 生成的 summary `next_commands` 新增
+    `finalize_candidates`。
+  - Generated candidate README 现在先指向
+    `finalize-controlled-reality-candidates`，再指向 full readiness 和 full
+    handoff。
+  - `docs/training/controlled-real-capture-runbook.md` 从 Stage 1
+    identity-only handoff 扩展为完整 Phase 1 candidate workflow。
+  - Runbook 新增 full Phase 1 本地证据清单，包括 template summary、
+    finalize summary、full readiness summary、prediction / intervention
+    candidates、handoff summary、prediction / intervention eval summary、
+    full controlled-real summary 和 blocked rows。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop RGB / Gaussian / GT 文件。
+  - 不创建 GT，不运行 prediction / intervention 模型，不训练 Gaussian /
+    dynamics，不运行 eval，不声明 pass rows，不写 `public/samples`。
+  - 不声明 ObjectState 已通过真实世界状态变量验证，不推进 replay buffer /
+    diffusion，不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py -q`: passed, 6 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_reality_candidate_template.py tests/test_core_namespace.py -q`: passed, 15 tests。
+  - `uv run --extra dev pytest`: passed, 380 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `f064801`。
 
 ### OBJECTSTATE-CONTROLLED-REALITY-CANDIDATE-FINALIZE-001: Finalize controlled reality candidate JSON
 
