@@ -249,6 +249,14 @@ CLI 同时支持 `--min-rgb-bytes` / `--min-gaussian-bytes` 调整最低字节�
 这一步只提升本地 bundle 证据完整性，不采集真实数据、不解析图像像素、不训练或发布模型。
 完成 commit: `51fd551`。
 
+随后继续补强 controlled capture file audit：frame-level RGB / Gaussian refs 默认还必须
+通过文件签名审计。RGB 支持 PNG / JPEG / WebP / PPM；Gaussian 支持带 vertex element
+的 PLY header 或 raw `.splat` 非零 32-byte 倍数文件。非空文本占位文件现在会导致
+file audit fail，从而让 `controlled-identity-handoff` fail；`--no-require-frame-formats`
+只作为显式 staging 降级。该检查只读取文件 header / signature，不解析图像像素，
+不完整解析 Gaussian payload，也不证明真实采集或重建质量。当前仍没有实际 controlled
+real capture 文件作为通过证据。完成 commit: `7b6e761`。
+
 随后完成 `OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`：新增
 `objgauss.core.objectstate_controlled_identity_eval`，把 controlled capture GT 和候选
 ObjectState / tracker identity predictions 连接起来，第一次让真实 Stage 1 identity row

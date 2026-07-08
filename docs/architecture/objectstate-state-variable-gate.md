@@ -665,7 +665,7 @@ or dynamics models, use replay / diffusion, or mutate viewer defaults.
 Verify that a controlled capture manifest points to an actual local capture
 bundle before identity handoff.
 
-Implemented v0.4 facts:
+Implemented v0.5 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_capture_files`.
 - Summary schema:
@@ -674,6 +674,10 @@ Implemented v0.4 facts:
   manifest, resolves frame-relative paths against a bundle root, checks file
   existence, and requires frame-level RGB / Gaussian refs to be regular files
   meeting configurable minimum byte sizes.
+- Frame-level RGB / Gaussian refs also require recognizable file signatures by
+  default. RGB accepts PNG, JPEG, WebP and PPM signatures. Gaussian evidence
+  accepts PLY headers with a vertex element, or raw `.splat` files whose size
+  is a non-zero multiple of 32 bytes.
 - RGB frame files are always required.
 - Gaussian frame files are required by default; `require_gaussian_files=false`
   allows RGB-only local staging without claiming real Gaussian readiness.
@@ -683,17 +687,22 @@ Implemented v0.4 facts:
   `missing_files`.
 - `hash_files=true` records SHA256 hashes for valid frame RGB / Gaussian files;
   sample-level artifact refs are not hashed and may remain directories.
+- `require_frame_formats=false` / CLI `--no-require-frame-formats` is an
+  explicit staging downgrade; default controlled identity handoff keeps the
+  format audit enabled.
 - `objectstate_controlled_capture_missing_files_markdown(...)` renders missing
   references for handoff reports.
 - CLI command:
   `objgauss object-state audit-controlled-capture-files <capture>`.
 - CLI defaults `--root` to the manifest directory, and can write
   `--summary-output` JSON plus `--missing-files-output` Markdown.
-- CLI supports `--min-rgb-bytes`, `--min-gaussian-bytes` and `--hash-files`.
+- CLI supports `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files` and
+  `--no-require-frame-formats`.
 
 Current scope remains local file integrity auditing only. It may hash file
-bytes when requested, but it does not capture video, create GT, parse image
-pixels, reconstruct Gaussians, train models, write public samples, use replay /
+bytes and inspect file signatures when requested, but it does not capture
+video, create GT, parse image pixels, fully parse Gaussian payloads,
+reconstruct Gaussians, train models, write public samples, use replay /
 diffusion or mutate viewer defaults.
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001
@@ -817,7 +826,8 @@ Implemented v0.3 facts:
   manifest to contain an identity scenario challenge before identity metrics and
   the identity-only reality gate can make the handoff pass.
 - Frame-level RGB / Gaussian refs are checked as non-empty regular files by
-  default, and optional SHA256 hashes can be included for audit evidence.
+  default, must pass the frame format signature audit by default, and optional
+  SHA256 hashes can be included for audit evidence.
 - The candidate trainable ObjectState artifact is also checked as a non-empty
   regular local file, with optional SHA256 hash evidence.
 - The candidate metadata cannot claim a different artifact: the audited file
@@ -848,6 +858,8 @@ Implemented v0.3 facts:
 - CLI defaults `--capture-root` to the manifest directory and supports
   `--min-rgb-bytes`, `--min-gaussian-bytes`, `--hash-files` and
   `--check-artifact-refs`.
+- CLI also supports `--no-require-frame-formats` as an explicit staging
+  downgrade.
 - CLI also supports `--min-candidate-artifact-bytes` and
   `--hash-candidate-artifact`.
 - CLI also supports `--min-identity-scenario-frames` and

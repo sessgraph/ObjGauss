@@ -138,7 +138,7 @@ viewer/export 默认模型。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
 
-- 状态: done / file-audit-ready-nonempty-hash-no-real-capture
+- 状态: done / file-audit-ready-nonempty-format-hash-no-real-capture
 - 类型: 标准 PR / controlled real capture file audit
 - 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
 - 目标: 在 capture manifest 进入 identity handoff 前，检查其 RGB / Gaussian
@@ -152,29 +152,36 @@ viewer/export 默认模型。
     counts。
   - Frame-level RGB / Gaussian refs 默认必须是非空 regular files；存在但为空、
     指向目录或低于最低字节数都会进入 `missing_files`。
+  - Frame-level RGB / Gaussian refs 默认还必须有可识别格式签名：RGB 支持
+    PNG / JPEG / WebP / PPM，Gaussian 支持带 vertex element 的 PLY header 或
+    raw `.splat` 非零 32-byte 倍数文件；非空文本占位文件不能通过默认 audit。
   - Summary 增加完整 `file_records`，包含 `exists`、`is_file`、`size_bytes`、
-    `valid` 和可选 `sha256`。
+    `valid`、可选 `format` 和可选 `sha256`。
   - RGB frame files 始终要求存在。
   - Gaussian frame files 默认要求存在；`require_gaussian_files=false` 支持
     RGB-only local staging，但不声明 real Gaussian readiness。
   - `check_artifact_refs=true` 可额外检查 sample-level `artifact_refs`。
   - `hash_files=true` / CLI `--hash-files` 只为有效 frame-level RGB / Gaussian
     文件记录 SHA256，不哈希 sample-level artifact refs。
+  - `--no-require-frame-formats` 可显式跳过格式签名检查，仅用于 staging 降级；
+    默认 handoff 继续要求格式审计。
   - `objectstate_controlled_capture_missing_files_markdown(...)` 输出缺失文件表。
   - CLI 新增 `objgauss object-state audit-controlled-capture-files <capture>`。
   - CLI 默认 `--root` 为 manifest 所在目录，可写 `--summary-output` 和
     `--missing-files-output`，并支持 `--check-artifact-refs`、`--min-rgb-bytes`、
-    `--min-gaussian-bytes`、`--hash-files` / `--require-pass`。
+    `--min-gaussian-bytes`、`--hash-files`、`--no-require-frame-formats` /
+    `--require-pass`。
 - 边界:
   - 当前没有采集或提交真实 controlled tabletop capture 文件。
-  - File audit 不创建 GT，不解析图像像素，不重建 Gaussian，不训练模型。
+  - File audit 不创建 GT，不解析图像像素，不完整解析 Gaussian payload，
+    不重建 Gaussian，不训练模型。
   - 不写 `public/samples`，不做 replay buffer / diffusion，不改 viewer/export 默认。
 - 验证:
   - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_files.py tests/test_core_namespace.py -q`: passed。
   - `uv run --extra dev pytest`: passed, 326 tests。
   - `npm run build`: passed；保留既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commits: `d6bd5db`, `51fd551`。
+- 完成 commits: `d6bd5db`, `51fd551`, `7b6e761`。
 
 ### OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001: Bundle controlled identity handoff
 
@@ -221,8 +228,9 @@ viewer/export 默认模型。
     `handoff-summary.json`。
   - CLI 支持 identity 阈值、`--max-centroid-distance`、`--synthetic-smoke-failed`
     `--capture-root`、`--min-rgb-bytes`、`--min-gaussian-bytes`、`--hash-files`、
-    `--check-artifact-refs`、`--min-candidate-artifact-bytes`、
-    `--hash-candidate-artifact` 和 `--require-pass`，并打印
+    `--no-require-frame-formats`、`--check-artifact-refs`、
+    `--min-candidate-artifact-bytes`、`--hash-candidate-artifact` 和
+    `--require-pass`，并打印
     `candidate_artifact_ref_match=true|false`。
   - CLI 支持 `--min-identity-scenario-frames`、`--min-occlusion-fraction`、
     `--min-view-conditions`、`--min-lighting-conditions` 和
