@@ -1837,8 +1837,6 @@ export default function App() {
               <Meta label="版本" value={selected.label ?? selected.id} />
               <Meta label="点数" value={formatNumber(selected.gaussianCount)} />
               <Meta label="对象层" value={selected.objectCount ? `${formatNumber(selected.objectCount)} 对象` : "未生成"} />
-              <Meta label="真实绑定" value={sourceSplatMotionLabel(selectedSourceSplatMotion, selectedLayerState)} />
-              <Meta label="绑定点" value={sourceSplatMotionCountLabel(selectedSourceSplatMotion)} />
               <Meta label="选中" value={selectedObject ? `#${selectedObject.objectId}` : "-"} />
               <Meta label="对象点" value={selectedObject ? formatNumber(selectedObject.displayCount) : "-"} />
               <Meta label="置信" value={selectedObject ? formatRatio(selectedObject.objectState?.confidence) : "-"} />
@@ -4534,7 +4532,7 @@ function DebugPanel({
           />
           <Metric label="绑定点数" value={sourceSplatMotionCountLabel(selectedSourceSplatMotion)} />
           <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
-          <Metric label="对象层" value={objects.length ? "已生成" : "未生成"} />
+          <Metric label="对象层" value={objects.length ? `${formatNumber(objects.length)} 对象` : "未生成"} />
           <Metric label="可见对象" value={formatCount(visibleObjectCount)} />
         </div>
       </DebugSection>
