@@ -301,7 +301,7 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run --extra dev pytest`: passed，470 tests。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
-- 完成 commit: 待提交。
+- 完成 commit: `6158515`。
 
 ### OBJECTSTATE-BOP-IDENTITY-HANDOFF-001: Run BOP identity evidence handoff
 
