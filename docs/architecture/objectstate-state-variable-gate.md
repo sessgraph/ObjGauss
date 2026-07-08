@@ -622,6 +622,8 @@ Required behavior:
 - Record frames with strictly increasing timestamps, RGB evidence, optional
   per-frame Gaussian reconstruction refs, per-frame object annotations and
   optional action refs.
+- Record optional per-frame capture condition metadata:
+  `condition.view_id`, `condition.lighting_id` and `condition.camera_pose`.
 - Record 6DoF pose as `position` plus `rotation_xyzw` when available.
 - Record action events with object id, time interval, type and optional vector.
 - Produce a readiness summary for Stage 1 identity, Stage 2 prediction and
@@ -629,7 +631,7 @@ Required behavior:
 - Produce a controlled-real manifest seed whose identity / prediction /
   intervention rows remain `blocked` until candidate metrics are computed.
 
-Implemented v0.1 facts:
+Implemented v0.2 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_capture`.
 - Manifest schema:
@@ -639,6 +641,9 @@ Implemented v0.1 facts:
 - `read_objectstate_controlled_capture_manifest(...)` reads JSON.
 - `validate_objectstate_controlled_capture_manifest(...)` validates schema,
   declared objects, actions, frame references, pose shape and timestamp order.
+- Frame `condition` is optional and, when present, validates non-empty
+  `view_id`, non-empty `lighting_id` and / or `camera_pose` with
+  `position` plus `rotation_xyzw`.
 - `objectstate_controlled_capture_summary(...)` reports frame / object / action
   counts, RGB / Gaussian coverage, GT availability and readiness booleans:
   `identity_stage_ready`, `prediction_stage_ready`,
@@ -660,7 +665,7 @@ or dynamics models, use replay / diffusion, or mutate viewer defaults.
 Verify that a controlled capture manifest points to an actual local capture
 bundle before identity handoff.
 
-Implemented v0.3 facts:
+Implemented v0.4 facts:
 
 - Core module: `objgauss.core.objectstate_controlled_capture_files`.
 - Summary schema:
@@ -820,8 +825,15 @@ Implemented v0.3 facts:
 - The identity scenario audit requires at least one object with clear-visible
   before, occluded, and clear-visible after observations. `clear-visible`
   means `visible=true` and `occlusion_fraction` below the configured
-  threshold. The audit uses manifest fields `visible` and
-  `occlusion_fraction`; it does not verify lighting change or camera motion.
+  threshold.
+- The identity scenario audit also requires declared real-identity coverage by
+  default: at least two distinct `frame.condition.view_id` values, at least
+  two distinct `frame.condition.lighting_id` values, and at least two
+  `frame.condition.camera_pose` values whose max translation is at least
+  `0.01m`.
+- The audit uses manifest fields `visible`, `occlusion_fraction` and
+  `condition`; it does not read image pixels or verify actual lighting /
+  physical camera motion beyond the declared metadata.
 - Prediction and intervention rows remain visible as blocked rows in the
   controlled-real summary; they are not hidden or promoted.
 - CLI command:
@@ -840,6 +852,8 @@ Implemented v0.3 facts:
   `--hash-candidate-artifact`.
 - CLI also supports `--min-identity-scenario-frames` and
   `--min-occlusion-fraction`.
+- CLI also supports `--min-view-conditions`, `--min-lighting-conditions` and
+  `--min-camera-motion-m`.
 
 Current scope remains reproducible handoff only. It does not collect capture
 data, create GT, parse image pixels, train Gaussian or dynamics models, compute

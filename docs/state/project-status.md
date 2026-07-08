@@ -322,6 +322,17 @@ sequence 拿到 Stage 1 handoff pass。该 audit 只读取 manifest 的 `visible
 `--min-occlusion-fraction`。当前仍没有实际 controlled real capture / true candidate
 artifact 作为通过证据。完成 commit: `c810b75`。
 
+随后把 Real Identity Gate 的 view / lighting / camera motion 要求落到 handoff
+可审计 metadata：controlled capture frame 现在可选记录 `condition.view_id`、
+`condition.lighting_id` 和 `condition.camera_pose`；`controlled-identity-handoff`
+默认要求至少 2 个 view condition、2 个 lighting condition，以及
+`frame.condition.camera_pose` 最大平移至少 `0.01m`。缺少这些 declared condition
+coverage 时，即使 file audit、candidate artifact、identity eval 和 identity-only
+reality gate 都通过，Stage 1 handoff 也只能 fail。该 audit 仍只读取 manifest
+metadata，不读取图像像素，也不证明实际光照变化或真实相机运动；当前仍没有实际
+controlled real capture / true candidate artifact 作为通过证据。完成 commit:
+`0368b0e`。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
