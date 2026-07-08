@@ -190,3 +190,13 @@ rows，并让全局 ledger 读取该 schema。该缓解防止 HOT3D 等 public a
 读取现有 handoff/eval 结果，不下载或适配数据、不创建 GT、不运行 eval、不改变 metric pass/fail，
 也不证明 randomized counterfactual causality。风险继续 open，直到真实 public interaction
 bundle 产生可审计 pass / fail rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-001`
+新增 `init-public-interaction-route-workspace`，可为 HOT3D / DexYCB-style public
+interaction clip 初始化 local-only controlled capture authoring skeleton、CSV headers、
+`rgb/` / `gaussians/` 目录、`PUBLIC_INTERACTION_ROUTE.md` 和完整命令链。该缓解降低
+public action row 从手工说明到可审计 handoff 的路径漂移风险，但仍不下载数据、不适配原始
+egocentric streams、不创建 GT / frame / annotation / action rows、不生成 Gaussian evidence、
+不创建 candidates、不运行 handoff / eval、不训练模型、不创建 pass row，也不把 observed
+interaction 解释成 randomized counterfactual proof 或 world-model evidence。风险继续 open，
+直到真实 public interaction bundle 产生 identity / prediction / intervention pass / fail rows。

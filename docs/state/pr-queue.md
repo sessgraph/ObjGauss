@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-08
+> 最近更新: 2026-07-09
 
 ## 队列规则
 
@@ -346,6 +346,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-001: Scaffold public interaction route workspace
+
+- 状态: done / public-interaction-authoring-scaffold
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 给 HOT3D / DexYCB-style action-capable public interaction clip 提供
+  local-only authoring workspace，让 public action evidence 进入既有 controlled capture
+  validators、route audit、full handoff、`public_replay` rows 和 ledger 路线。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_public_interaction_workspace`。
+  - 新增 schema `objgauss-objectstate-public-interaction-workspace-v1`。
+  - 新增 CLI `objgauss object-state init-public-interaction-route-workspace
+    <workspace-root>`。
+  - 复用 `init-controlled-capture-bundle` 的 `sample.json` / CSV / `rgb/` /
+    `gaussians/` skeleton；本地 authoring sample 保持 `source_kind=controlled_real`
+    以兼容 controlled capture importer。
+  - 新增 `PUBLIC_INTERACTION_ROUTE.md`，串联 route audit、bundle import /
+    acceptance、candidate template init / finalize、full handoff、
+    `audit-public-interaction-reality-rows` 和 `audit-reality-row-ledger`。
+  - Summary 明确 `final_rows_must_be_converted_to_public_replay=true`，并记录
+    workspace-only claim policy。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不适配原始 egocentric streams。
+  - 不创建 GT、frame rows、annotation rows、action rows 或 per-frame Gaussian evidence。
+  - 不创建 ObjectState candidate、prediction candidates 或 intervention candidates。
+  - 不运行 route audit、handoff、eval 或训练。
+  - 不创建 pass row，不把 observed interaction 写成 randomized counterfactual proof，
+    不声明 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_interaction_workspace.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_interaction_workspace.py tests/test_core_namespace.py -q`: 12 passed。
+  - `uv run --extra dev pytest`: 521 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
 
 ### OBJECTSTATE-PUBLIC-INTERACTION-REALITY-ROWS-001: Convert public interaction handoffs into public replay rows
 

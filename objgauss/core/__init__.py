@@ -370,6 +370,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_public_interaction_reality_rows",
         "OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA",
     ),
+    "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA",
+    ),
     "objectstate_public_dataset_candidates_audit": (
         "objgauss.core.objectstate_public_dataset_candidates",
         "objectstate_public_dataset_candidates_audit",
@@ -386,6 +390,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_public_interaction_reality_rows",
         "objectstate_public_interaction_reality_rows_from_handoff",
     ),
+    "write_objectstate_public_interaction_workspace": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "write_objectstate_public_interaction_workspace",
+    ),
     "validate_objectstate_public_dataset_candidates_audit": (
         "objgauss.core.objectstate_public_dataset_candidates",
         "validate_objectstate_public_dataset_candidates_audit",
@@ -397,6 +405,10 @@ _EXPORTS = {
     "validate_objectstate_public_interaction_reality_rows_summary": (
         "objgauss.core.objectstate_public_interaction_reality_rows",
         "validate_objectstate_public_interaction_reality_rows_summary",
+    ),
+    "validate_objectstate_public_interaction_workspace_summary": (
+        "objgauss.core.objectstate_public_interaction_workspace",
+        "validate_objectstate_public_interaction_workspace_summary",
     ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_bop_candidate_artifact_template",

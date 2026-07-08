@@ -98,6 +98,7 @@ from objgauss.core import (
     OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA,
+    OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA,
     OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA,
@@ -291,6 +292,7 @@ from objgauss.core import (
     objectstate_public_interaction_route_audit,
     objectstate_public_interaction_reality_rows_summary,
     objectstate_public_interaction_reality_rows_from_handoff,
+    write_objectstate_public_interaction_workspace,
     write_objectstate_bop_gaussian_centroid_baseline_candidate,
     write_objectstate_bop_candidate_artifact_template,
     finalize_objectstate_bop_candidate_artifact_template,
@@ -404,6 +406,7 @@ from objgauss.core import (
     validate_objectstate_public_dataset_candidates_audit,
     validate_objectstate_public_interaction_route_audit,
     validate_objectstate_public_interaction_reality_rows_summary,
+    validate_objectstate_public_interaction_workspace_summary,
     validate_objectstate_bop_candidate_artifact_template,
     validate_objectstate_bop_candidate_artifact_template_summary,
     validate_objectstate_bop_candidate_artifact_finalize_summary,
@@ -1270,10 +1273,12 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_public_dataset_candidates_audit is not None
     assert validate_objectstate_public_interaction_route_audit is not None
     assert validate_objectstate_public_interaction_reality_rows_summary is not None
+    assert validate_objectstate_public_interaction_workspace_summary is not None
     assert objectstate_public_dataset_candidates_audit is not None
     assert objectstate_public_interaction_route_audit is not None
     assert objectstate_public_interaction_reality_rows_summary is not None
     assert objectstate_public_interaction_reality_rows_from_handoff is not None
+    assert write_objectstate_public_interaction_workspace is not None
     assert validate_objectstate_controlled_identity_evidence_package_summary is not None
     assert validate_objectstate_phase1_evidence_ledger_summary is not None
     assert validate_objectstate_controlled_prediction_evidence_package_summary is not None
@@ -1299,6 +1304,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA == (
         "objgauss-objectstate-public-interaction-reality-rows-v1"
+    )
+    assert OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA == (
+        "objgauss-objectstate-public-interaction-workspace-v1"
     )
     assert OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA == (
         "objgauss-objectstate-controlled-real-rows-v1"

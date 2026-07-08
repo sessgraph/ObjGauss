@@ -549,6 +549,37 @@ uv run objgauss object-state audit-public-dataset-candidates \
 This command does not download data or create pass rows. It only records the
 candidate selection state.
 
+## Public Interaction Route Workspace
+
+2026-07-09 update: before a HOT3D-style clip can pass route audit, create a
+local-only authoring workspace with the same controlled capture bundle contract
+used by controlled real rows:
+
+```bash
+uv run objgauss object-state init-public-interaction-route-workspace \
+  outputs/captures/hot3d-clip-000001 \
+  --sample-id hot3d-clip-000001 \
+  --candidate-id hot3d-clips \
+  --source-sequence-id <public-dataset-clip-id> \
+  --object <object_id:category:label> \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-workspace.json
+```
+
+This writes `sample.json`, CSV headers, `rgb/`, `gaussians/`, and
+`PUBLIC_INTERACTION_ROUTE.md` with the command chain for route audit, bundle
+import / acceptance, candidate template finalization, full handoff, conversion
+to `source_kind=public_replay` rows, and ledger aggregation.
+
+Boundary:
+
+- The local `sample.json` remains `source_kind=controlled_real` only so the
+  existing controlled capture importer can validate the rows.
+- The final evidence rows must be converted with
+  `audit-public-interaction-reality-rows` before ledger accounting.
+- The workspace does not download HOT3D / DexYCB, adapt raw egocentric streams,
+  create GT, create frame/action rows, generate Gaussian evidence, create
+  candidates, run eval, train a model, or claim counterfactual proof.
+
 ## Public Interaction Route Audit
 
 2026-07-09 update: `hot3d-clips` is now backed by a machine-checkable route

@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-08
+> 最近更新: 2026-07-09
 
 ## 当前阶段
 
@@ -997,6 +997,18 @@ prediction / intervention 三条 row 为 `source_kind=public_replay`，并重新
 会显式保留 `action_challenge_present=true`，用于 state-variable matrix 的
 counterfactual/action challenge accounting。该切片不运行 handoff、不运行 eval、不下载或适配
 HOT3D、不创建 GT、不训练模型、不改变 metric 结果，也不把 observed action 解释成 randomized
+counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-WORKSPACE-001`：新增
+`objgauss.core.objectstate_public_interaction_workspace`，schema 为
+`objgauss-objectstate-public-interaction-workspace-v1`，CLI 为
+`objgauss object-state init-public-interaction-route-workspace <workspace-root>`。
+该命令为 HOT3D / DexYCB-style public interaction clip 初始化 local-only controlled
+capture authoring workspace：`sample.json`、CSV headers、`rgb/`、`gaussians/` 和
+`PUBLIC_INTERACTION_ROUTE.md`，并把 route audit、bundle import / acceptance、
+candidate templates、full handoff、`public_replay` rows converter 和 ledger 命令串成
+同一条 operator handoff。该切片只降低 public action evidence authoring 漏填和路径漂移风险；
+不下载或适配 public dataset、不创建 GT / frame / annotation / action rows、不生成 Gaussian
+evidence、不创建 candidate、不运行 handoff/eval、不训练模型、不创建 pass row，也不声明
 counterfactual proof 或 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为

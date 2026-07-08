@@ -221,6 +221,9 @@ from objgauss.core.objectstate_public_interaction_reality_rows import (
     objectstate_public_interaction_reality_rows_summary,
     read_objectstate_public_interaction_handoff_summary,
 )
+from objgauss.core.objectstate_public_interaction_workspace import (
+    write_objectstate_public_interaction_workspace,
+)
 from objgauss.core.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
 )
@@ -3188,6 +3191,41 @@ def _object_state_init_controlled_capture_bundle(args: argparse.Namespace) -> No
     print(f"bundle_root={summary['root']}")
     print(f"sample_id={summary['sample']['sample_id']}")
     print(f"object_row_count={summary['object_row_count']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for key, path in summary["directories"].items():
+        print(f"{key}_dir={path}")
+    for key, command in summary["next_commands"].items():
+        print(f"{key}_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
+def _object_state_init_public_interaction_route_workspace(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_public_interaction_workspace(
+        args.workspace_root,
+        sample_id=args.sample_id,
+        candidate_id=args.candidate_id,
+        source_sequence_id=args.source_sequence_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        objects=_controlled_capture_template_objects(args.objects),
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"workspace_root={summary['root']}")
+    print(f"candidate={summary['candidate']['candidate_id']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"source_sequence_id={summary['source_sequence_id']}")
+    print(
+        "object_row_count="
+        f"{summary['controlled_capture_template']['object_row_count']}"
+    )
     for key, path in summary["files"].items():
         print(f"{key}={path}")
     for key, path in summary["directories"].items():
@@ -6883,6 +6921,54 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_controlled_capture.set_defaults(
         handler=_object_state_init_controlled_capture_bundle
+    )
+    init_public_interaction_workspace = object_state_subparsers.add_parser(
+        "init-public-interaction-route-workspace",
+        help=(
+            "create a local public interaction route workspace skeleton for "
+            "HOT3D-style ObjectState evidence authoring"
+        ),
+    )
+    init_public_interaction_workspace.add_argument("workspace_root", type=Path)
+    init_public_interaction_workspace.add_argument("--sample-id", required=True)
+    init_public_interaction_workspace.add_argument(
+        "--candidate-id",
+        default="hot3d-clips",
+        help="public interaction dataset candidate id",
+    )
+    init_public_interaction_workspace.add_argument(
+        "--source-sequence-id",
+        default="TODO_PUBLIC_INTERACTION_SEQUENCE_ID",
+        help="dataset clip or sequence id to bind before review",
+    )
+    init_public_interaction_workspace.add_argument(
+        "--object-category",
+        default="public_interaction_objects",
+    )
+    init_public_interaction_workspace.add_argument(
+        "--scenario",
+        default="public_interaction_action_like_clip",
+    )
+    init_public_interaction_workspace.add_argument("--fps", type=float, default=30.0)
+    init_public_interaction_workspace.add_argument(
+        "--license",
+        dest="license_text",
+        help="override the public dataset candidate license note",
+    )
+    init_public_interaction_workspace.add_argument(
+        "--object",
+        action="append",
+        dest="objects",
+        help="object_id:category or object_id:category:label; repeat per object",
+    )
+    init_public_interaction_workspace.add_argument("--summary-output", type=Path)
+    init_public_interaction_workspace.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite workspace template files if they already exist",
+    )
+    init_public_interaction_workspace.set_defaults(
+        handler=_object_state_init_public_interaction_route_workspace
     )
     audit_controlled_capture_environment = object_state_subparsers.add_parser(
         "audit-controlled-capture-environment",

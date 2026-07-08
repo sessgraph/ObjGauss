@@ -449,6 +449,27 @@ these public replay rows into identity / intervention pass evidence.
 
 ## Public Interaction Route Preflight
 
+2026-07-09 added a local-only authoring scaffold for action-capable public
+interaction evidence:
+
+```bash
+uv run objgauss object-state init-public-interaction-route-workspace \
+  outputs/captures/hot3d-clip-000001 \
+  --sample-id hot3d-clip-000001 \
+  --candidate-id hot3d-clips \
+  --source-sequence-id <public-dataset-clip-id> \
+  --object <object_id:category:label> \
+  --summary-output outputs/captures/hot3d-clip-000001/public-interaction-workspace.json
+```
+
+The command writes a controlled capture bundle skeleton plus
+`PUBLIC_INTERACTION_ROUTE.md`. It is intentionally workspace-only: it does not
+download a public dataset, create GT, write frame / annotation / action rows,
+generate Gaussian evidence, create candidates, run handoff, run eval, train a
+model, or create reality rows. Its purpose is to keep the HOT3D / DexYCB-style
+route aligned with the existing controlled capture validators and to remind
+operators that final rows must be converted to `source_kind=public_replay`.
+
 2026-07-09 added a read-only action-capable public dataset route audit:
 
 ```bash
