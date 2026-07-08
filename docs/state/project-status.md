@@ -722,6 +722,16 @@ candidate artifact 都就绪时仍 blocked；这是 Stage 1 identity-state 门�
 不应通过放松 identity gate 来声明真实 ObjectState 状态变量证据。该命令不运行 identity
 handoff / eval，不下载数据，不生成 Gaussian，不创建 GT，不训练模型，也不声明
 prediction、intervention 或 world model。
+随后新增 BOP Phase 1 local row 组合只读审计：
+`objgauss.core.objectstate_bop_phase1_local_row_readiness`，schema 为
+`objgauss-objectstate-bop-phase1-local-row-readiness-v1`，CLI 为
+`objgauss object-state audit-bop-phase1-local-row`。该命令在同一 scene / output root /
+sample id 上同时运行 identity route audit 和 prediction route audit，并输出一个
+`blocking_stage`：可区分 local BOP scene 缺失、BOP acceptance 失败、
+per-frame Gaussian evidence 缺失、candidate ObjectState artifact 缺失 / 未绑定、
+identity scenario metadata 不足、handoff-ready 或已有 reviewable identity /
+prediction evidence。它只做 route accounting，不运行 handoff / eval、不下载数据、
+不重建 Gaussian、不训练模型，也不声明 intervention / counterfactual / world model。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

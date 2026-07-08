@@ -228,6 +228,35 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-PHASE1-LOCAL-ROW-READINESS-001: Combine BOP identity and prediction route readiness
+
+- 状态: done / read-only-bop-phase1-local-row-readiness
+- 类型: 标准 PR / ObjectState public pose dataset local row readiness
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给本地 BOP scene + output root 增加一个组合只读 audit，把 identity route 和
+  prediction route 的状态合成单条 Phase 1 local row readiness，明确下一步卡在 scene、
+  Gaussian evidence、candidate artifact、identity scenario metadata、handoff-ready，
+  还是已有 reviewable evidence。
+- 已实施:
+  - 新增 module `objgauss.core.objectstate_bop_phase1_local_row_readiness`。
+  - 新增 schema `objgauss-objectstate-bop-phase1-local-row-readiness-v1`。
+  - 新增 core function `objectstate_bop_phase1_local_row_readiness(...)`。
+  - 新增 CLI `objgauss object-state audit-bop-phase1-local-row`。
+  - 组合 audit 嵌入 `routes.identity` 和 `routes.prediction`，并输出统一
+    `blocking_stage`、readiness gates、hard blockers 和 next actions。
+- 边界:
+  - 只做只读 local row accounting。
+  - 不下载 BOP 数据，不生成 Gaussian evidence，不创建 GT。
+  - 不运行 identity / prediction handoff，不重新运行 eval，不训练模型。
+  - 不声明 intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_phase1_local_row_readiness.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_phase1_local_row_readiness.py tests/test_objectstate_bop_identity_route_audit.py tests/test_objectstate_bop_phase1_route_audit.py tests/test_objectstate_bop_capture_adapter.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，43 tests。
+  - `uv run --extra dev pytest`: passed，439 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: d7d79d8。
+
 ### OBJECTSTATE-BOP-IDENTITY-ROUTE-AUDIT-001: Audit BOP route readiness for identity evidence
 
 - 状态: done / read-only-bop-identity-route-audit
