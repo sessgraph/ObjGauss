@@ -549,6 +549,19 @@ tabletop RGB / Gaussian / pose / action 文件，也没有真实 candidate artif
 prediction / intervention 输出；不训练 Gaussian 或 dynamics，不声明 ObjectState 已通过真实
 世界状态变量验证，不写 `public/samples`、不改 viewer/export 默认。
 
+随后创建本地 ignored capture skeleton
+`outputs/captures/controlled-tabletop-cup-box-001/`，用于下一次真实桌面采集。命令为
+`uv run objgauss object-state init-controlled-capture-bundle ... --sample-id controlled-tabletop-cup-box-001`
+并输出 `template-summary.json`、`sample.json`、`objects.csv`、空的 `frames.csv` /
+`annotations.csv` / `actions.csv`、`rgb/` 和 `gaussians/`。随后运行
+`uv run objgauss object-state audit-controlled-capture-bundle-readiness outputs/captures/controlled-tabletop-cup-box-001 --summary-output outputs/captures/controlled-tabletop-cup-box-001/readiness-summary.json --require-prediction-ready --require-intervention-ready`，
+结果为 `objectstate_controlled_capture_bundle_readiness_blocked`。当前硬 blocker 为：
+缺 timestamped frame rows、缺 frame/object pose rows、identity / prediction /
+intervention stage 均未 ready、capture file audit 不能运行、capture manifest 还不能导入。
+下一步仍必须放入真实 RGB / Gaussian 文件、填写真实 timestamp / view / lighting /
+camera pose / object pose / action rows，并生成真实 ObjectState candidate artifact；该本地
+skeleton 不进入 git，也不构成真实 Phase 1 通过证据。
+
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
 真实 host 环境具备 RTX 5060 Ti、NVIDIA driver `595.71.05`、CUDA `13.2`、
