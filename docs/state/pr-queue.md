@@ -219,6 +219,9 @@ public multi-instance route evidence，不是 identity pass row。
 `OBJECTSTATE-REALITY-GATE-001` 的一等 `public_replay` rows：LMO 为 identity fail /
 prediction fail / intervention blocked，HOPE 为 identity fail / prediction pass /
 intervention blocked；两个 full gate 都保持 fail，不声明 intervention 或 world-model evidence。
+`OBJECTSTATE-REALITY-ROW-LEDGER-001` 已把多个 reality row summaries 聚合成全局
+reality gate ledger：当前 LMO + HOPE 为 2 summaries / 6 rows / 1 pass / 3 fail /
+2 blocked，missing pass evidence kinds 为 identity 和 intervention，full gate 仍 fail。
 `OBJECTSTATE-BOP-PREDICTION-PACKAGE-RELATIVE-PATH-001` 修复相对 `output_root` 下
 prediction package audit 把 `candidate_dir` 双重拼接的问题；真实 LMO run 已验证该修复让
 prediction evidence package 从 missing-files 进入 reviewable。
@@ -343,6 +346,50 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REALITY-ROW-LEDGER-001: Aggregate reality rows across summaries
+
+- 状态: done / cross-summary-reality-gate-ledger
+- 类型: 标准 PR / ObjectState Phase 1 reality gate accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 把多个已标准化的 reality row summaries 合并成一个全局
+  `OBJECTSTATE-REALITY-GATE-001` report，让 LMO / HOPE public rows 和后续 controlled
+  real rows 可以在同一张 pass / fail / blocked 表里验收。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_reality_row_ledger`。
+  - 冻结 summary schema `objgauss-objectstate-reality-row-ledger-v1`。
+  - 新增 CLI
+    `objgauss object-state audit-reality-row-ledger <summary...>`。
+  - 支持输入 BOP reality rows、controlled real rows、public artifact rows 和 raw
+    reality gate summary。
+  - 每条输入 row 都重新构造成 `ObjectStateRealityRow` 并走严格 validator，再合并跑
+    full reality gate。
+  - Summary 输出 sample scope、source / evidence / status counts、duplicate row id
+    检查、gap summary、blocked rows Markdown 和 full gate hard blockers。
+- 真实 public evidence 结果:
+  - 输入:
+    `outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json`
+    和
+    `outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json`。
+  - 输出:
+    `outputs/evidence/objectstate-phase1-reality-row-ledger.json`。
+  - `summary_count=2`、`row_count=6`、`pass_row_count=1`、
+    `fail_row_count=3`、`blocked_row_count=2`、`sample_count=2`。
+  - Full gate=`objectstate_reality_gate_fail`。
+  - Missing pass evidence kinds=`identity,intervention`。
+- 边界:
+  - 只读已有 summaries，不下载 BOP、不创建 GT、不重跑 handoff。
+  - 不重建 Gaussian、不训练模型、不写 `public/samples`。
+  - 不声明 identity pass、intervention pass、counterfactual gate 或 world-model evidence。
+  - 不改变 viewer/export 默认策略。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run objgauss object-state audit-reality-row-ledger outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md`: passed。
+  - `uv run --extra dev pytest`: passed，512 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending.
 
 ### OBJECTSTATE-BOP-REALITY-ROWS-001: Convert BOP local rows into reality gate rows
 

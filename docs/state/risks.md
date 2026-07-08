@@ -137,3 +137,10 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-REALITY-ROWS-001`
 为 identity fail / prediction fail / intervention blocked；两个 full gate 都保持 fail。
 该缓解把 public evidence 纳入 state-variable gate accounting，但不创建 GT、不训练模型、
 不声明 identity pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-REALITY-ROW-LEDGER-001`
+新增 `audit-reality-row-ledger`，可把多个 reality row summaries 聚合成一个全局
+`OBJECTSTATE-REALITY-GATE-001` report。当前 LMO + HOPE 总表为 2 summaries / 6 rows /
+1 pass / 3 fail / 2 blocked，missing pass evidence kinds 为 identity 和 intervention；
+full gate 仍 fail。该缓解让 Phase 1 缺口可跨样本审计，但风险继续 open：还需要真实
+controlled identity pass row 和 action-conditioned intervention pass row。

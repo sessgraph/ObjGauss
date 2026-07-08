@@ -131,6 +131,7 @@ from objgauss.core import (
     OBJECTSTATE_REALITY_ROW_STATUSES,
     OBJECTSTATE_REALITY_SOURCE_KINDS,
     OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA,
+    OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA,
     SolverDecoderJointTrainingResult,
     ObjectEmergenceAssignmentPrediction,
     ObjectEmergenceEvidence,
@@ -240,6 +241,9 @@ from objgauss.core import (
     objectstate_reality_blocked_rows_markdown,
     objectstate_reality_public_rows_summary,
     objectstate_reality_rows_from_public_artifacts,
+    objectstate_reality_row_ledger,
+    objectstate_reality_rows_from_summary,
+    read_objectstate_reality_row_summary,
     objectstate_controlled_capture_summary,
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_bundle_readiness,
@@ -355,6 +359,7 @@ from objgauss.core import (
     validate_objectstate_causal_gate_summary,
     validate_objectstate_reality_gate_summary,
     validate_objectstate_reality_public_rows_summary,
+    validate_objectstate_reality_row_ledger_summary,
     validate_objectstate_controlled_capture_manifest,
     validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_bundle_readiness_summary,
@@ -848,6 +853,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA == (
         "objgauss-objectstate-public-artifact-rows-v1"
     )
+    assert OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA == (
+        "objgauss-objectstate-reality-row-ledger-v1"
+    )
     public_artifacts = default_objectstate_reality_public_artifacts()
     assert isinstance(public_artifacts[0], ObjectStateRealityPublicArtifact)
     public_rows = objectstate_reality_rows_from_public_artifacts(public_artifacts[:1])
@@ -860,6 +868,10 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert public_summary["schema"] == OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA
     assert public_summary["gate"]["status"] == "objectstate_reality_gate_fail"
     assert public_summary["claim_policy"]["object_id_is_not_identity_ground_truth"] is True
+    assert objectstate_reality_row_ledger is not None
+    assert objectstate_reality_rows_from_summary is not None
+    assert read_objectstate_reality_row_summary is not None
+    assert validate_objectstate_reality_row_ledger_summary is not None
 
     assert OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-capture-manifest-v1"

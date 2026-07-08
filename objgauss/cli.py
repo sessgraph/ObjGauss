@@ -296,6 +296,9 @@ from objgauss.core.objectstate_bop_reality_rows import (
     objectstate_bop_reality_rows_summary,
     read_objectstate_bop_local_row_summary,
 )
+from objgauss.core.objectstate_reality_row_ledger import (
+    objectstate_reality_row_ledger,
+)
 from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
@@ -6113,6 +6116,53 @@ def _object_state_audit_bop_reality_rows(args: argparse.Namespace) -> None:
         raise ValueError("BOP reality rows ObjectState reality gate did not pass")
 
 
+def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
+    summary = objectstate_reality_row_ledger(
+        args.reality_row_summary,
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+    )
+    gate = summary["gate"]
+    gap = summary["gap_summary"]
+    print(f"schema={summary['schema']}")
+    print(f"ledger_status={summary['status']}")
+    print(f"summary_count={summary['summary_count']}")
+    print(f"row_count={summary['row_count']}")
+    print(f"pass_row_count={summary['pass_row_count']}")
+    print(f"fail_row_count={summary['fail_row_count']}")
+    print(f"blocked_row_count={summary['blocked_row_count']}")
+    print(f"sample_count={summary['sample_scope']['sample_count']}")
+    print(f"gate_status={None if gate is None else gate['status']}")
+    print(
+        "missing_pass_evidence_kinds="
+        + ",".join(gap["missing_pass_evidence_kinds"])
+    )
+    for record in summary["records"]:
+        print(
+            "record="
+            f"{record['path']}:{record['schema']}:{record['row_count']}:"
+            f"{str(record['validator_ok']).lower()}"
+        )
+    for blocker in gap["hard_blockers"]:
+        print(f"hard_blocker={blocker}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows={args.blocked_rows_output}")
+    if (
+        args.require_gate_pass
+        and (gate is None or gate["status"] != "objectstate_reality_gate_pass")
+    ):
+        raise ValueError("ObjectState reality row ledger gate did not pass")
+
+
 def _object_state_bop_local_row_batch_handoff(args: argparse.Namespace) -> None:
     summary = objectstate_bop_local_row_batch_handoff(
         args.batch_spec,
@@ -8691,6 +8741,37 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_reality_rows.set_defaults(
         handler=_object_state_audit_bop_reality_rows
+    )
+    audit_reality_row_ledger = object_state_subparsers.add_parser(
+        "audit-reality-row-ledger",
+        help=(
+            "aggregate existing ObjectState reality row summaries into one "
+            "full reality gate ledger"
+        ),
+    )
+    audit_reality_row_ledger.add_argument(
+        "reality_row_summary",
+        nargs="+",
+        type=Path,
+        help=(
+            "reality row summary JSON; supports BOP reality rows, controlled "
+            "real rows, public artifact rows, or raw reality gate summaries"
+        ),
+    )
+    audit_reality_row_ledger.add_argument("--summary-output", type=Path)
+    audit_reality_row_ledger.add_argument("--blocked-rows-output", type=Path)
+    audit_reality_row_ledger.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    audit_reality_row_ledger.add_argument(
+        "--require-gate-pass",
+        action="store_true",
+        help="fail unless the aggregated ObjectState reality gate passes",
+    )
+    audit_reality_row_ledger.set_defaults(
+        handler=_object_state_audit_reality_row_ledger
     )
     init_bop_local_row_batch_spec = object_state_subparsers.add_parser(
         "init-bop-local-row-batch-spec",

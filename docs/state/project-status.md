@@ -924,6 +924,17 @@ public evidence 执行：LMO 输出 `identity=fail`、`prediction=fail`、
 `intervention=blocked`，HOPE 输出 `identity=fail`、`prediction=pass`、
 `intervention=blocked`；两者 full gate 都是 `objectstate_reality_gate_fail`，因为缺
 identity pass、intervention pass，且 baseline identity collapse 被保留为 fail evidence。
+随后完成 `OBJECTSTATE-REALITY-ROW-LEDGER-001`：新增
+`objgauss.core.objectstate_reality_row_ledger`，schema 为
+`objgauss-objectstate-reality-row-ledger-v1`，CLI 为
+`objgauss object-state audit-reality-row-ledger <summary...>`。该 ledger 读取已存在的
+BOP reality rows、controlled real rows、public artifact rows 或 raw reality gate summary，
+重新校验每条 `objgauss-objectstate-real-public-row-v1` row，并合并运行一个全局
+`OBJECTSTATE-REALITY-GATE-001` report。当前对 ignored LMO / HOPE public summaries 运行
+后得到 `summary_count=2`、`row_count=6`、`pass_row_count=1`、`fail_row_count=3`、
+`blocked_row_count=2`、`sample_count=2`，全局 gate 仍为
+`objectstate_reality_gate_fail`；缺失 pass evidence kinds 为 `identity` 和
+`intervention`。该步骤是 read-only accounting，不创建 GT、不训练模型、不声明 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

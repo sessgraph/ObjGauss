@@ -498,6 +498,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_reality_rows",
         "read_objectstate_bop_local_row_summary",
     ),
+    "objectstate_reality_row_ledger": (
+        "objgauss.core.objectstate_reality_row_ledger",
+        "objectstate_reality_row_ledger",
+    ),
+    "objectstate_reality_rows_from_summary": (
+        "objgauss.core.objectstate_reality_row_ledger",
+        "objectstate_reality_rows_from_summary",
+    ),
+    "read_objectstate_reality_row_summary": (
+        "objgauss.core.objectstate_reality_row_ledger",
+        "read_objectstate_reality_row_summary",
+    ),
     "objectstate_bop_cross_sample_ledger": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "objectstate_bop_cross_sample_ledger",
@@ -649,6 +661,10 @@ _EXPORTS = {
     "validate_objectstate_bop_reality_rows_summary": (
         "objgauss.core.objectstate_bop_reality_rows",
         "validate_objectstate_bop_reality_rows_summary",
+    ),
+    "validate_objectstate_reality_row_ledger_summary": (
+        "objgauss.core.objectstate_reality_row_ledger",
+        "validate_objectstate_reality_row_ledger_summary",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
@@ -884,6 +900,10 @@ _EXPORTS = {
     "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA": (
         "objgauss.core.objectstate_bop_reality_rows",
         "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA",
+    ),
+    "OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA": (
+        "objgauss.core.objectstate_reality_row_ledger",
+        "OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA",
     ),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),

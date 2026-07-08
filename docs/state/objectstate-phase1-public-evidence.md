@@ -367,3 +367,51 @@ It makes the current state-variable gap explicit:
   fail, intervention blocked.
 - Both rows keep intervention blocked because BOP pose replay has no action /
   counterfactual outcome evidence.
+
+## Phase 1 Reality Row Ledger
+
+- Evidence id: `OBJECTSTATE-REALITY-ROW-LEDGER-001`
+- Input summaries:
+  - `outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json`
+  - `outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json`
+- Output:
+  `outputs/evidence/objectstate-phase1-reality-row-ledger.json`
+- Blocked rows:
+  `outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md`
+
+Command:
+
+```bash
+uv run objgauss object-state audit-reality-row-ledger \
+  outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json \
+  outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json \
+  --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json \
+  --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md
+```
+
+Result:
+
+- Summary schema:
+  `objgauss-objectstate-reality-row-ledger-v1`
+- `ledger_status=objectstate_reality_row_ledger_reviewable`
+- `summary_count=2`
+- `row_count=6`
+- `pass_row_count=1`
+- `fail_row_count=3`
+- `blocked_row_count=2`
+- `sample_count=2`
+- Full gate:
+  `objectstate_reality_gate_fail`
+- Missing pass evidence kinds:
+  `identity`, `intervention`
+- Hard blockers:
+  `identity_pass_rows_present`, `intervention_pass_rows_present`,
+  `controlled_real_identity_collapse_absent`, `failed_rows_absent`
+
+Interpretation:
+
+The ledger gives the current Phase 1 public evidence table one authoritative
+gate view. It confirms that existing BOP public rows are useful but not enough:
+only prediction has a pass row, identity remains failed because baseline
+identity collapse is real negative evidence, and intervention remains blocked
+because no action-conditioned / counterfactual public row exists.
