@@ -223,6 +223,9 @@ from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
 from objgauss.core.objectstate_bop_rgbd_gaussian_export import (
     objectstate_bop_rgbd_gaussian_export,
 )
+from objgauss.core.objectstate_bop_candidate_artifact_template import (
+    write_objectstate_bop_candidate_artifact_template,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3626,6 +3629,52 @@ def _object_state_accept_bop_capture_scene(args: argparse.Namespace) -> None:
         raise ValueError("BOP capture scene acceptance did not pass")
 
 
+def _object_state_init_bop_objectstate_artifact_template(
+    args: argparse.Namespace,
+) -> None:
+    summary = write_objectstate_bop_candidate_artifact_template(
+        args.scene_root,
+        output=args.output,
+        sample_id=args.sample_id,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license,
+        rgb_dir=args.rgb_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        candidate_id=args.candidate_id,
+        candidate_source=args.candidate_source,
+        target_artifact_path=args.target_artifact_path,
+        force=args.force,
+    )
+    readiness = summary["readiness"]
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"output={summary['output']}")
+    print(f"target_artifact={summary['target_artifact']}")
+    print(f"bop_objectstate_artifact_template_status={summary['status']}")
+    print(f"frames={counts['frames']}")
+    print(f"state_placeholders={counts['state_placeholders']}")
+    for gate, passed in readiness.items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    print(f"bop_acceptance_status={summary['acceptance']['status']}")
+    print(
+        "template_not_valid_for_identity_route="
+        f"{str(readiness['draft_not_valid_for_identity_route']).lower()}"
+    )
+    for command in summary["next_commands"]:
+        print(f"next_command={command}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+
+
 def _object_state_init_controlled_reality_candidates(
     args: argparse.Namespace,
 ) -> None:
@@ -5897,6 +5946,85 @@ def _build_parser() -> argparse.ArgumentParser:
     accept_bop_capture_scene.add_argument("--hash-files", action="store_true")
     accept_bop_capture_scene.add_argument("--require-pass", action="store_true")
     accept_bop_capture_scene.set_defaults(handler=_object_state_accept_bop_capture_scene)
+    init_bop_objectstate_artifact_template = object_state_subparsers.add_parser(
+        "init-bop-objectstate-artifact-template",
+        help=(
+            "write a draft-only BOP ObjectState candidate artifact template "
+            "after RGB/Gaussian evidence is staged"
+        ),
+    )
+    init_bop_objectstate_artifact_template.add_argument("scene_root", type=Path)
+    init_bop_objectstate_artifact_template.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        type=Path,
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--summary-output",
+        type=Path,
+    )
+    init_bop_objectstate_artifact_template.add_argument("--sample-id", required=True)
+    init_bop_objectstate_artifact_template.add_argument(
+        "--dataset-id",
+        default="bop-ycbv",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--fps",
+        type=float,
+        default=30.0,
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--license",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    init_bop_objectstate_artifact_template.add_argument("--rgb-dir", default="rgb")
+    init_bop_objectstate_artifact_template.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame view, lighting, and camera_pose metadata",
+    )
+    init_bop_objectstate_artifact_template.add_argument("--max-frames", type=int)
+    init_bop_objectstate_artifact_template.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--candidate-id",
+        default="bop-objectstate-candidate",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--candidate-source",
+        default="local-objectstate-model-output",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--target-artifact-path",
+        type=Path,
+        help="intended final trainable ObjectState artifact path; defaults next to --output",
+    )
+    init_bop_objectstate_artifact_template.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite the draft template if it already exists",
+    )
+    init_bop_objectstate_artifact_template.set_defaults(
+        handler=_object_state_init_bop_objectstate_artifact_template
+    )
     audit_bop_phase1_route = object_state_subparsers.add_parser(
         "audit-bop-phase1-route",
         help=(

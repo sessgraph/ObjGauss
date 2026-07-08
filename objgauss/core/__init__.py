@@ -310,6 +310,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_rgbd_gaussian_export",
         "OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA",
+    ),
+    "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
@@ -434,6 +442,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_rgbd_gaussian_export",
         "objectstate_bop_rgbd_gaussian_export",
     ),
+    "write_objectstate_bop_candidate_artifact_template": (
+        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "write_objectstate_bop_candidate_artifact_template",
+    ),
     "objectstate_controlled_reality_evidence_package": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
@@ -525,6 +537,14 @@ _EXPORTS = {
     "validate_objectstate_bop_rgbd_gaussian_export_summary": (
         "objgauss.core.objectstate_bop_rgbd_gaussian_export",
         "validate_objectstate_bop_rgbd_gaussian_export_summary",
+    ),
+    "validate_objectstate_bop_candidate_artifact_template": (
+        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "validate_objectstate_bop_candidate_artifact_template",
+    ),
+    "validate_objectstate_bop_candidate_artifact_template_summary": (
+        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "validate_objectstate_bop_candidate_artifact_template_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
         "objgauss.core.objectstate_controlled_reality_candidate_template",

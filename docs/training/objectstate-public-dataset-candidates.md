@@ -218,6 +218,28 @@ When the scene has BOP `depth/<frame>.png` files but is still missing
 `export-bop-rgbd-gaussian-evidence` command to run before rerunning this
 readiness audit.
 
+After the local BOP scene has RGB / pose and at least planned per-frame
+Gaussian refs, create a draft ObjectState candidate artifact template for the
+actual model output:
+
+```bash
+uv run objgauss object-state init-bop-objectstate-artifact-template \
+  outputs/datasets/bop/ycbv/test/000001 \
+  --output outputs/captures/bop-ycbv-scene-000001/objectstates.template.json \
+  --target-artifact-path outputs/captures/bop-ycbv-scene-000001/objectstates.json \
+  --sample-id bop-ycbv-scene-000001 \
+  --dataset-id bop-ycbv \
+  --summary-output outputs/captures/bop-ycbv-scene-000001/objectstates-template-summary.json
+```
+
+This file is intentionally `draft_not_valid_for_identity_route`: its schema is
+different from `objgauss-trainable-kernel-model-artifact-v1`, and each
+centroid / bbox / confidence field is a TODO placeholder. Fill the intended
+`objectstates.json` from real ObjectState model output; do not copy BOP
+`cam_t_m2c` / pose GT values into candidate centroids. The template is an
+authoring aid only. It does not train a model, does not run identity eval and
+does not create a Phase 1 pass row.
+
 For Stage 1 identity-state evidence, run the identity route audit before
 starting a handoff:
 
