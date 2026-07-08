@@ -64,6 +64,8 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
@@ -227,6 +229,7 @@ from objgauss.core import (
     finalize_objectstate_controlled_prediction_candidate_template,
     finalize_objectstate_controlled_reality_candidate_templates,
     finalize_objectstate_controlled_capture_annotations,
+    finalize_objectstate_controlled_capture_actions,
     write_objectstate_controlled_prediction_baseline_candidates,
     dynamic_k_proposal_report,
     dynamic_k_update_plan,
@@ -286,6 +289,7 @@ from objgauss.core import (
     write_objectstate_controlled_capture_bundle_template,
     write_objectstate_controlled_capture_frames,
     write_objectstate_controlled_capture_annotation_template,
+    write_objectstate_controlled_capture_action_template,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
     evaluate_objectstate_controlled_intervention_candidates,
@@ -407,6 +411,8 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_frames_summary,
     validate_objectstate_controlled_capture_annotation_finalize_summary,
     validate_objectstate_controlled_capture_annotation_template_summary,
+    validate_objectstate_controlled_capture_action_finalize_summary,
+    validate_objectstate_controlled_capture_action_template_summary,
     validate_objectstate_controlled_capture_bundle_template_summary,
     validate_objectstate_controlled_capture_file_audit_summary,
     validate_objectstate_controlled_capture_summary,
@@ -1023,6 +1029,12 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA == (
         "objgauss-objectstate-controlled-capture-annotation-finalize-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-action-template-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-action-finalize-v1"
     )
     assert OBJECTSTATE_TRANSITION_DATASET_SCHEMA == (
         "objgauss-objectstate-transition-dataset-v1"

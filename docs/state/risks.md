@@ -299,3 +299,14 @@ draft/finalize 双阶段。finalizer 会拒绝空值 / TODO、未知 frame/objec
 不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不声明 ObjectState 已证明
 为真实世界状态变量。风险继续 open，直到真实 controlled/public capture 同时产生可审计
 identity、prediction 和 intervention rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-CONTROLLED-CAPTURE-ACTIONS-001`
+新增 `init-controlled-capture-actions` / `finalize-controlled-capture-actions`，
+把 `frames.csv` + `objects.csv` 到正式 `actions.csv` 的 action GT authoring 做成
+draft/finalize 双阶段。finalizer 会拒绝空值 / TODO、重复 action id、未知 object /
+target refs、无效或反向时间区间、无 frame timestamp 覆盖的 action，以及默认零 action
+vector；`--require-frame-action-refs` 可进一步要求 `frames.csv` 显式引用 action id。该
+缓解减少真实 intervention action 表进入 manifest 的手工错误，但仍不采集视频、不推断
+动作、不创建 GT、不创建 candidate artifact、不运行 handoff/eval、不创建 pass row，也不
+声明 counterfactual proof 或 ObjectState 已证明为真实世界状态变量。风险继续 open，直到
+真实 controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。

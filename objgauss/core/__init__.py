@@ -190,6 +190,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_annotations",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA",
+    ),
     "OBJECTSTATE_TRANSITION_DATASET_SCHEMA": (
         "objgauss.core.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_DATASET_SCHEMA",
@@ -261,6 +269,14 @@ _EXPORTS = {
     "finalize_objectstate_controlled_capture_annotations": (
         "objgauss.core.objectstate_controlled_capture_annotations",
         "finalize_objectstate_controlled_capture_annotations",
+    ),
+    "write_objectstate_controlled_capture_action_template": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "write_objectstate_controlled_capture_action_template",
+    ),
+    "finalize_objectstate_controlled_capture_actions": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "finalize_objectstate_controlled_capture_actions",
     ),
     "objectstate_transition_dataset_from_capture_manifest": (
         "objgauss.core.objectstate_transition_dataset",
@@ -341,6 +357,14 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_annotation_finalize_summary": (
         "objgauss.core.objectstate_controlled_capture_annotations",
         "validate_objectstate_controlled_capture_annotation_finalize_summary",
+    ),
+    "validate_objectstate_controlled_capture_action_template_summary": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "validate_objectstate_controlled_capture_action_template_summary",
+    ),
+    "validate_objectstate_controlled_capture_action_finalize_summary": (
+        "objgauss.core.objectstate_controlled_capture_actions",
+        "validate_objectstate_controlled_capture_action_finalize_summary",
     ),
     "validate_objectstate_transition_dataset": (
         "objgauss.core.objectstate_transition_dataset",

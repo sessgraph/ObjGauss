@@ -157,6 +157,10 @@ from objgauss.core.objectstate_controlled_capture_annotations import (
     finalize_objectstate_controlled_capture_annotations,
     write_objectstate_controlled_capture_annotation_template,
 )
+from objgauss.core.objectstate_controlled_capture_actions import (
+    finalize_objectstate_controlled_capture_actions,
+    write_objectstate_controlled_capture_action_template,
+)
 from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
@@ -3351,6 +3355,82 @@ def _object_state_finalize_controlled_capture_annotations(
         != "objectstate_controlled_capture_annotation_finalize_ready"
     ):
         raise ValueError("controlled capture annotation finalize is not ready")
+
+
+def _object_state_init_controlled_capture_actions(args: argparse.Namespace) -> None:
+    summary = write_objectstate_controlled_capture_action_template(
+        args.bundle_root,
+        frames_csv=args.frames_csv,
+        objects_csv=args.objects_csv,
+        output=args.output,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"action_template_status={summary['status']}")
+    print(
+        "action_template_ready="
+        f"{str(summary['readiness']['action_template_ready']).lower()}"
+    )
+    print(f"action_template_csv={summary['paths']['action_template_csv']}")
+    print(f"frame_count={summary['row_counts']['frame_count']}")
+    print(f"object_count={summary['row_counts']['object_count']}")
+    print(f"template_action_rows={summary['row_counts']['template_action_rows']}")
+    print(f"wrote_template={str(summary['output']['wrote_template']).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_controlled_capture_action_template_ready"
+    ):
+        raise ValueError("controlled capture action template is not ready")
+
+
+def _object_state_finalize_controlled_capture_actions(
+    args: argparse.Namespace,
+) -> None:
+    summary = finalize_objectstate_controlled_capture_actions(
+        args.bundle_root,
+        source=args.source,
+        frames_csv=args.frames_csv,
+        objects_csv=args.objects_csv,
+        output=args.output,
+        require_nonzero_vector=not args.allow_zero_vector,
+        require_frame_interval=not args.allow_no_frame_interval,
+        require_frame_action_refs=args.require_frame_action_refs,
+        force=args.force,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"bundle_root={summary['root']}")
+    print(f"action_finalize_status={summary['status']}")
+    print(
+        "actions_ready="
+        f"{str(summary['readiness']['controlled_capture_actions_ready']).lower()}"
+    )
+    print(f"source_action_csv={summary['paths']['source_action_csv']}")
+    print(f"actions_csv={summary['paths']['actions_csv']}")
+    print(f"source_action_rows={summary['row_counts']['source_action_rows']}")
+    print(f"finalized_action_rows={summary['row_counts']['finalized_action_rows']}")
+    print(f"covered_frame_count={summary['row_counts']['covered_frame_count']}")
+    print(f"frame_action_ref_count={summary['row_counts']['frame_action_ref_count']}")
+    print(f"wrote_actions_csv={str(summary['output']['wrote_actions_csv']).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    for action in summary["next_actions"]:
+        print(f"next_action={action}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_controlled_capture_action_finalize_ready"
+    ):
+        raise ValueError("controlled capture action finalize is not ready")
 
 
 def _object_state_init_public_interaction_route_workspace(
@@ -7639,6 +7719,81 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     finalize_controlled_capture_annotations.set_defaults(
         handler=_object_state_finalize_controlled_capture_annotations
+    )
+    init_controlled_capture_actions = object_state_subparsers.add_parser(
+        "init-controlled-capture-actions",
+        help=(
+            "write a draft actions.template.csv for measured action event labels "
+            "in a controlled capture bundle"
+        ),
+    )
+    init_controlled_capture_actions.add_argument("bundle_root", type=Path)
+    init_controlled_capture_actions.add_argument("--frames-csv", default="frames.csv")
+    init_controlled_capture_actions.add_argument("--objects-csv", default="objects.csv")
+    init_controlled_capture_actions.add_argument(
+        "--output",
+        default="actions.template.csv",
+    )
+    init_controlled_capture_actions.add_argument("--summary-output", type=Path)
+    init_controlled_capture_actions.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty action template",
+    )
+    init_controlled_capture_actions.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the action template was written",
+    )
+    init_controlled_capture_actions.set_defaults(
+        handler=_object_state_init_controlled_capture_actions
+    )
+    finalize_controlled_capture_actions = object_state_subparsers.add_parser(
+        "finalize-controlled-capture-actions",
+        help=(
+            "validate a filled controlled capture action template and write "
+            "actions.csv"
+        ),
+    )
+    finalize_controlled_capture_actions.add_argument("bundle_root", type=Path)
+    finalize_controlled_capture_actions.add_argument(
+        "--source",
+        default="actions.template.csv",
+    )
+    finalize_controlled_capture_actions.add_argument("--frames-csv", default="frames.csv")
+    finalize_controlled_capture_actions.add_argument("--objects-csv", default="objects.csv")
+    finalize_controlled_capture_actions.add_argument(
+        "--output",
+        default="actions.csv",
+    )
+    finalize_controlled_capture_actions.add_argument(
+        "--allow-zero-vector",
+        action="store_true",
+        help="allow zero action vectors; default requires a non-zero vector",
+    )
+    finalize_controlled_capture_actions.add_argument(
+        "--allow-no-frame-interval",
+        action="store_true",
+        help="allow action intervals that do not cover any frame timestamp",
+    )
+    finalize_controlled_capture_actions.add_argument(
+        "--require-frame-action-refs",
+        action="store_true",
+        help="require every action_id to be referenced by frames.csv",
+    )
+    finalize_controlled_capture_actions.add_argument("--summary-output", type=Path)
+    finalize_controlled_capture_actions.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty actions.csv",
+    )
+    finalize_controlled_capture_actions.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless actions.csv was written",
+    )
+    finalize_controlled_capture_actions.set_defaults(
+        handler=_object_state_finalize_controlled_capture_actions
     )
     init_public_interaction_workspace = object_state_subparsers.add_parser(
         "init-public-interaction-route-workspace",

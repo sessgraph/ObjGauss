@@ -347,6 +347,49 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-ACTIONS-001: Finalize controlled capture action rows
+
+- 状态: done / objectstate-controlled-capture-actions
+- 类型: 标准 PR / ObjectState Phase 1 controlled real GT authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/controlled-real-capture-runbook.md`
+- 目标: 将 controlled capture 的 intervention action GT authoring 收敛为 draft
+  template + strict finalizer，减少 `actions.csv` 手工填写错误。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_capture_actions`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-capture-action-template-v1` 和
+    `objgauss-objectstate-controlled-capture-action-finalize-v1`。
+  - 新增 CLI `objgauss object-state init-controlled-capture-actions
+    <bundle-root>`，从已有 `frames.csv` 和 `objects.csv` 写
+    `actions.template.csv` draft。
+  - 新增 CLI `objgauss object-state finalize-controlled-capture-actions
+    <bundle-root>`，验证填好的 template 后写正式 `actions.csv`。
+  - Finalizer 拒绝空值 / `TODO`、重复 `action_id`、未知 `object_id` /
+    `target_object_id`、非数值或反向时间区间、超出 frame 时间范围、无 frame
+    timestamp 覆盖的 action、以及默认零 action vector。
+  - `--require-frame-action-refs` 可额外要求每个 `action_id` 已被 `frames.csv`
+    引用，便于后续 transition source-frame binding。
+  - `init-controlled-capture-bundle` 的 generated README / next commands 和
+    controlled real capture runbook 已接入 action template / finalize 步骤。
+  - 测试覆盖 draft 不写正式 actions、TODO 不写入正式 actions、填完后 import
+    能读到 action vector、零向量负路径、strict frame action refs 和 `objgauss.core`
+    lazy namespace。
+- 边界:
+  - 不采集视频、不推断动作、不创建 GT。
+  - 不写 annotation rows，不生成 candidate artifact。
+  - 不重建 Gaussian、不运行 identity / prediction / intervention handoff。
+  - 不创建 pass row、不训练 dynamics、不创建 replay buffer、不声明 counterfactual
+    proof 或 world model。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_capture_actions.py objgauss/core/objectstate_controlled_capture_template.py objgauss/core/__init__.py objgauss/cli.py tests/test_objectstate_controlled_capture_actions.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_actions.py tests/test_objectstate_controlled_capture_annotations.py tests/test_objectstate_transition_dataset.py tests/test_core_namespace.py`: 25 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_actions.py tests/test_objectstate_controlled_capture_annotations.py tests/test_objectstate_controlled_capture_frames.py tests/test_objectstate_controlled_capture_template.py tests/test_objectstate_controlled_capture_bundle_readiness.py tests/test_objectstate_controlled_capture_import.py tests/test_objectstate_transition_dataset.py tests/test_objectstate_transition_intervention_candidates.py tests/test_core_namespace.py`: 46 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 562 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
 ### OBJECTSTATE-CONTROLLED-CAPTURE-ANNOTATIONS-001: Finalize controlled capture pose annotations
 
 - 状态: done / objectstate-controlled-capture-annotations

@@ -437,6 +437,20 @@ visible、occlusion 和完整 6DoF pose 没有空值 / TODO、frame/object bindi
 controlled capture bundle 的路径漂移，但不推断 pose、不创建 GT、不写 action rows、不运行
 handoff/eval、不创建 pass row、不声明 ObjectState 已通过真实世界状态变量验证。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-ACTIONS-001`：新增
+`objgauss.core.objectstate_controlled_capture_actions`，schema 为
+`objgauss-objectstate-controlled-capture-action-template-v1` 和
+`objgauss-objectstate-controlled-capture-action-finalize-v1`，并新增 CLI
+`objgauss object-state init-controlled-capture-actions <bundle-root>` /
+`finalize-controlled-capture-actions <bundle-root>`。第一步从已有 `frames.csv` 和
+`objects.csv` 写出 draft-only `actions.template.csv`，第二步只在人工或外部填写的
+action id / type / object binding / time interval / vector 没有空值或 TODO、object /
+target refs 合法、动作区间覆盖至少一个 frame timestamp，且默认 action vector 非零时，
+才写正式 `actions.csv`。可用 `--require-frame-action-refs` 要求每个 `action_id` 已被
+`frames.csv` 引用。该切片减少 intervention GT action 表进入 controlled capture bundle
+的路径漂移，但不推断动作、不创建 GT、不写 annotation rows、不运行 handoff/eval、不创建
+pass row、不声明 counterfactual proof 或 ObjectState 已通过真实世界状态变量验证。
+
 随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-READINESS-001`：新增
 `objgauss.core.objectstate_controlled_capture_bundle_readiness`，schema 为
 `objgauss-objectstate-controlled-capture-bundle-readiness-v1`，并新增 CLI

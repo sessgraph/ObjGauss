@@ -223,6 +223,31 @@ action_id,action_type,object_id,start_timestamp,end_timestamp,actor,target_objec
 push-left-001,push_left,cup-001,1.000,1.500,human,, -0.05,0,0
 ```
 
+For a safer action workflow, generate a draft action template from the current
+`frames.csv` and `objects.csv`, fill it with externally measured action GT,
+then finalize it into importable `actions.csv`:
+
+```bash
+uv run objgauss object-state init-controlled-capture-actions \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/action-template-summary.json \
+  --require-ready
+
+uv run objgauss object-state finalize-controlled-capture-actions \
+  outputs/captures/controlled-tabletop-cup-box-001 \
+  --summary-output outputs/captures/controlled-tabletop-cup-box-001/action-finalize-summary.json \
+  --require-ready
+```
+
+`actions.template.csv` is a draft helper and is not valid evidence. The
+finalizer rejects blank / `TODO` values, unknown `object_id` /
+`target_object_id` references, invalid or reversed time intervals, action
+intervals that cover no frame timestamp, and zero action vectors by default.
+Use `--require-frame-action-refs` when every finalized `action_id` must already
+be referenced by `frames.csv`. The finalizer does not create GT or infer action
+vectors; it only converts human- or externally-measured action rows into the
+controlled capture bundle format.
+
 ## 6.1 Object Transition Dataset
 
 After `capture-manifest.json` validates and before creating prediction /
