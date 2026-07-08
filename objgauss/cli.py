@@ -243,6 +243,9 @@ from objgauss.core.objectstate_bop_baseline_candidate import (
 from objgauss.core.objectstate_bop_baseline_local_row_handoff import (
     objectstate_bop_baseline_local_row_handoff,
 )
+from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
+    objectstate_bop_rgbd_baseline_local_row_handoff,
+)
 from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
     objectstate_bop_capture_adapter_summary,
@@ -3702,6 +3705,120 @@ def _object_state_export_bop_rgbd_gaussian_evidence(
         raise ValueError("BOP RGB-D Gaussian evidence export is not ready")
 
 
+def _object_state_bop_rgbd_baseline_local_row_handoff(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_bop_rgbd_baseline_local_row_handoff(
+        args.scene_root,
+        output_root=args.output_root,
+        sample_id=args.sample_id,
+        candidate_artifact=args.candidate_artifact,
+        dataset_id=args.dataset_id,
+        object_category=args.object_category,
+        scenario=args.scenario,
+        fps=args.fps,
+        license_text=args.license_text,
+        rgb_dir=args.rgb_dir,
+        depth_dir=args.depth_dir,
+        gaussian_dir=args.gaussian_dir,
+        condition_sidecar=args.condition_sidecar,
+        max_frames=args.max_frames,
+        frame_step=args.frame_step,
+        pixel_stride=args.pixel_stride,
+        max_points_per_frame=args.max_points_per_frame,
+        min_depth_m=args.min_depth_m,
+        max_depth_m=args.max_depth_m,
+        overwrite_gaussian_evidence=args.overwrite_gaussian_evidence,
+        ply_format=args.ply_format,
+        baseline_candidate_id=args.baseline_candidate_id,
+        identity_candidate_source=args.identity_candidate_source,
+        max_centroid_distance=args.max_centroid_distance,
+        prediction_policy=args.prediction_policy,
+        prediction_candidate_id=args.prediction_candidate_id,
+        prediction_candidate_source=args.prediction_candidate_source,
+        prediction_confidence=args.prediction_confidence,
+        check_artifact_refs=args.check_artifact_refs,
+        min_rgb_bytes=args.min_rgb_bytes,
+        min_gaussian_bytes=args.min_gaussian_bytes,
+        require_frame_formats=not args.no_require_frame_formats,
+        hash_files=args.hash_files,
+        min_candidate_artifact_bytes=args.min_candidate_artifact_bytes,
+        hash_candidate_artifact=args.hash_candidate_artifact,
+        min_identity_scenario_frames=args.min_identity_scenario_frames,
+        min_occlusion_fraction=args.min_occlusion_fraction,
+        min_view_conditions=args.min_view_conditions,
+        min_lighting_conditions=args.min_lighting_conditions,
+        min_camera_motion_m=args.min_camera_motion_m,
+        identity_thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=args.min_idf1,
+            min_track_retrieval_recall_at_1=args.min_track_retrieval_recall_at_1,
+            max_fragmentation_rate=args.max_fragmentation_rate,
+            max_long_term_drift_rate=args.max_long_term_drift_rate,
+            max_swap_rate=args.max_swap_rate,
+            min_reconstruction_noise_robustness=(
+                args.min_reconstruction_noise_robustness
+            ),
+            min_reconstruction_noise_variants=args.min_reconstruction_noise_variants,
+            require_no_identity_collapse=not args.allow_identity_collapse,
+        ),
+        prediction_thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+        force=args.force,
+    )
+    reviewability = summary["reviewability_gates"]
+    pass_gates = summary["pass_gates"]
+    row_counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"scene_root={summary['scene_root']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"candidate_artifact={summary['candidate_artifact']}")
+    print(f"gaussian_dir={summary['files']['gaussian_dir']}")
+    print(
+        "bop_rgbd_baseline_local_row_handoff_status="
+        f"{summary['status']}"
+    )
+    print(f"selected_frames={row_counts['selected_frames']}")
+    print(f"exported_frames={row_counts['exported_frames']}")
+    print(f"missing_depth_files={row_counts['missing_depth_files']}")
+    print(f"rgbd_total_vertices={row_counts['rgbd_total_vertices']}")
+    print(f"baseline_total_gaussians={row_counts['baseline_total_gaussians']}")
+    for gate, passed in reviewability.items():
+        print(f"reviewability.{gate}={str(passed).lower()}")
+    for gate, passed in pass_gates.items():
+        print(f"pass.{gate}={str(passed).lower()}")
+    handoff = summary["baseline_local_row_handoff"]
+    if handoff is not None:
+        print(
+            "phase1_evidence_ledger_maturity="
+            f"{handoff['phase1_evidence_ledger_summary']['maturity']}"
+        )
+        print(f"local_row_handoff_status={handoff['status']}")
+    for key, path in summary["files"].items():
+        print(f"{key}={path}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_bop_rgbd_baseline_local_row_handoff_reviewable"
+    ):
+        raise ValueError("BOP RGB-D baseline local row handoff is not reviewable")
+    if args.require_pass and not all(summary["pass_gates"].values()):
+        raise ValueError("BOP RGB-D baseline local row handoff did not pass")
+
+
 def _object_state_generate_bop_objectstate_baseline_candidate(
     args: argparse.Namespace,
 ) -> None:
@@ -6831,6 +6948,265 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     export_bop_rgbd_gaussian_evidence.set_defaults(
         handler=_object_state_export_bop_rgbd_gaussian_evidence
+    )
+    bop_rgbd_baseline_local_row_handoff = object_state_subparsers.add_parser(
+        "bop-rgbd-baseline-local-row-handoff",
+        help=(
+            "export BOP RGB-D Gaussian evidence seeds, generate a baseline "
+            "ObjectState artifact, then run identity and prediction handoff"
+        ),
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("scene_root", type=Path)
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("--summary-output", type=Path)
+    bop_rgbd_baseline_local_row_handoff.add_argument("--sample-id", required=True)
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--candidate-artifact",
+        type=Path,
+        help=(
+            "path for the generated baseline ObjectState artifact; defaults "
+            "to <output-root>/objectstates.json"
+        ),
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--dataset-id",
+        default="bop-ycbv",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--object-category",
+        default="bop_objects",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--scenario",
+        default="bop_pose_sequence",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--fps",
+        type=float,
+        default=30.0,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--license-text",
+        default=(
+            "BOP dataset terms; verify source dataset license before redistribution"
+        ),
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("--rgb-dir", default="rgb")
+    bop_rgbd_baseline_local_row_handoff.add_argument("--depth-dir", default="depth")
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--gaussian-dir",
+        default="gaussians",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--condition-sidecar",
+        type=Path,
+        help="optional JSON sidecar with explicit per-frame condition metadata",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("--max-frames", type=int)
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--pixel-stride",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-points-per-frame",
+        type=int,
+        default=50_000,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-depth-m",
+        type=float,
+        default=0.0,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("--max-depth-m", type=float)
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--overwrite-gaussian-evidence",
+        action="store_true",
+        help="overwrite existing gaussians/<frame>.ply outputs from RGB-D export",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--ply-format",
+        choices=("ascii", "binary_little_endian", "binary_big_endian"),
+        default="binary_little_endian",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--baseline-candidate-id",
+        default="bop-gaussian-centroid-baseline",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--identity-candidate-source",
+        default="bop_gaussian_centroid_single_state_baseline",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-centroid-distance",
+        type=float,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--prediction-policy",
+        choices=("constant_velocity", "hold"),
+        default="constant_velocity",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--prediction-candidate-id",
+        default="bop-constant-velocity-baseline",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--prediction-candidate-source",
+        default="controlled-prediction-baseline",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--prediction-confidence",
+        type=float,
+        default=0.5,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-idf1",
+        type=float,
+        default=0.95,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-track-retrieval-recall-at-1",
+        type=float,
+        default=0.95,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-fragmentation-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-long-term-drift-rate",
+        type=float,
+        default=0.05,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-swap-rate",
+        type=float,
+        default=0.0,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-reconstruction-noise-robustness",
+        type=float,
+        default=0.95,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-reconstruction-noise-variants",
+        type=int,
+        default=2,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--allow-identity-collapse",
+        action="store_true",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-state-ade",
+        type=float,
+        default=0.05,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--check-artifact-refs",
+        action="store_true",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-rgb-bytes",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-gaussian-bytes",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--no-require-frame-formats",
+        action="store_true",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument("--hash-files", action="store_true")
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-candidate-artifact-bytes",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--hash-candidate-artifact",
+        action="store_true",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-identity-scenario-frames",
+        type=int,
+        default=3,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-occlusion-fraction",
+        type=float,
+        default=0.5,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-view-conditions",
+        type=int,
+        default=2,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-lighting-conditions",
+        type=int,
+        default=2,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-camera-motion-m",
+        type=float,
+        default=0.01,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark the synthetic prerequisite smoke gate as failed",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--min-real-or-public-rows",
+        type=int,
+        default=1,
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite generated baseline and handoff output files",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless RGB-D export and local-row evidence are reviewable",
+    )
+    bop_rgbd_baseline_local_row_handoff.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless both identity and prediction metric gates pass",
+    )
+    bop_rgbd_baseline_local_row_handoff.set_defaults(
+        handler=_object_state_bop_rgbd_baseline_local_row_handoff
     )
     generate_bop_objectstate_baseline_candidate = object_state_subparsers.add_parser(
         "generate-bop-objectstate-baseline-candidate",

@@ -1167,6 +1167,47 @@ run a learned prediction model, claim metric pass, claim intervention /
 counterfactual gates, claim world model, use replay / diffusion, write public
 samples or mutate viewer defaults.
 
+### OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001
+
+Run a local BOP Phase 1 row directly from RGB-D depth evidence and a
+deterministic baseline ObjectState candidate.
+
+Required behavior:
+
+- Input a local BOP scene root and output root.
+- Require existing BOP RGB, depth, camera and pose annotation files.
+- Use RGB-D depth backprojection to write per-frame `gaussians/<frame>.ply`
+  evidence seed files.
+- Generate the single-state Gaussian centroid baseline `objectstates.json`.
+- Reuse the existing baseline local-row handoff path to run identity handoff,
+  prediction baseline handoff and Phase 1 evidence ledger generation.
+- Return an incomplete / blocked summary when depth evidence is missing instead
+  of fabricating Gaussian evidence or local rows.
+- Keep RGB-D evidence generation, baseline reviewability and metric pass as
+  separate gates.
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff`.
+- Summary schema:
+  `objgauss-objectstate-bop-rgbd-baseline-local-row-handoff-v1`.
+- Core function:
+  `objectstate_bop_rgbd_baseline_local_row_handoff(...)`.
+- CLI command:
+  `objgauss object-state bop-rgbd-baseline-local-row-handoff <scene-root> --output-root <dir>`.
+- The command embeds the existing RGB-D export summary and baseline local-row
+  handoff summary, then exposes combined reviewability / pass gates.
+
+Current scope is local RGB-D evidence seed plus baseline local-row handoff only.
+It requires a local BOP scene with depth frames. It does not download BOP data,
+copy datasets, create GT, use object pose GT for RGB-D geometry, use BOP pose GT
+or object ids to place predicted ObjectStates, run Splatfacto / optimized 3DGS
+reconstruction, train Gaussian / tracking / dynamics models, run learned
+identity or prediction models, claim metric pass, claim intervention /
+counterfactual gates, claim world model, use replay / diffusion, write public
+samples or mutate viewer defaults.
+
 ### OBJECTSTATE-BOP-LOCAL-ROW-BATCH-SPEC-AUTHORING-001
 
 Generate a native BOP local-row batch spec from a small CSV of local sample

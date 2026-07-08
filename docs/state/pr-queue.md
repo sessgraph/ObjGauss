@@ -195,6 +195,11 @@ input；它仍不创建 target files、不运行 readiness / handoff、不训练
 single-state baseline `objectstates.json`，再跑 identity handoff、prediction baseline
 handoff 和 Phase 1 ledger；它把 reviewable negative evidence 和 metric pass 分开，不训练
 模型、不声明 intervention/world-model evidence。
+`OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001` 继续把 RGB-D depth evidence
+seed 接到 baseline local row：`bop-rgbd-baseline-local-row-handoff` 可从本地 BOP
+`depth/<frame>.png` 先写 per-frame `gaussians/<frame>.ply`，再生成 single-state
+baseline `objectstates.json` 并跑 identity / prediction local-row package；depth 缺失时
+只返回 incomplete，不创建伪 evidence，不训练模型、不声明 pass/intervention/world-model。
 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001` 继续补齐
 `audit-bop-gaussian-evidence`，可在 scene 选定后列出 expected / missing per-frame
 Gaussian evidence，并记录重建工具 readiness。
@@ -316,6 +321,52 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001: Run BOP RGB-D baseline local rows
+
+- 状态: done / rgbd-baseline-local-row-handoff
+- 类型: 标准 PR / ObjectState public pose dataset Phase 1 evidence handoff
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 当本地 BOP scene 已有 RGB / depth / camera / GT files，但还没有
+  `gaussians/<frame>.ply` 和真实模型 `objectstates.json` 时，一条命令先从 RGB-D
+  backprojection 生成 Gaussian evidence seed，再生成 baseline ObjectState artifact 并跑
+  identity+prediction local-row package，让真实 BOP subset 更快进入可审阅负证据路径。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff`。
+  - 冻结 summary schema
+    `objgauss-objectstate-bop-rgbd-baseline-local-row-handoff-v1`。
+  - 新增 CLI
+    `objgauss object-state bop-rgbd-baseline-local-row-handoff <scene-root> --output-root <dir>`。
+  - 命令先复用 `export-bop-rgbd-gaussian-evidence`，把 selected depth frames 写成
+    local `gaussians/<frame>.ply` evidence seed。
+  - RGB-D export ready 后复用 `bop-baseline-local-row-handoff`，默认写
+    `<output-root>/objectstates.json`，并产出 identity handoff、prediction baseline
+    handoff 和 `phase1-evidence-ledger.json`。
+  - 输出 summary 嵌入 `rgbd_export` 和 `baseline_local_row_handoff`，并分离
+    `reviewability_gates` 与 `pass_gates`。
+  - depth 缺失时返回 incomplete / blocked summary，`baseline_local_row_handoff=null`，
+    不创建伪 Gaussian evidence 或伪 local rows。
+- 边界:
+  - 只编排已有本地 BOP RGB-D scene。
+  - 不下载 BOP、不复制 dataset、不创建 GT。
+  - 不使用 object pose GT 生成 RGB-D geometry。
+  - 不使用 BOP pose GT 或 object ids 来放置预测 ObjectState。
+  - 不运行 Splatfacto / optimized 3DGS reconstruction，不训练 Gaussian / tracking /
+    dynamics 模型。
+  - 不运行 learned identity / prediction / intervention model。
+  - 不声明 metric pass，不声明 intervention / counterfactual gate / world model。
+  - 不写 `public/samples`，不改 viewer/export 默认策略。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_rgbd_baseline_local_row_handoff.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py -q`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_core_namespace.py -q`: passed，9 tests。
+  - `uv run objgauss object-state bop-rgbd-baseline-local-row-handoff --help`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_rgbd_baseline_local_row_handoff.py tests/test_objectstate_bop_rgbd_gaussian_export.py tests/test_objectstate_bop_baseline_local_row_handoff.py tests/test_core_namespace.py -q`: passed，17 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_*.py -q`: passed，94 tests。
+  - `uv run --extra dev pytest`: passed，506 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: pending。
 
 ### OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001: Run BOP local rows from a baseline candidate
 

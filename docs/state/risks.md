@@ -85,3 +85,12 @@ R-017 update 2026-07-08: `OBJECTSTATE-BOP-BASELINE-LOCAL-ROW-HANDOFF-001`
 prediction baseline handoff 和 Phase 1 ledger；该缓解让真实 BOP subset 可先产出
 reviewable negative evidence，但仍不下载数据、不创建 GT、不重建 Gaussian、不训练模型、
 不声明 metric pass、intervention gate 或 world-model evidence。
+
+R-017 update 2026-07-08: `OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001`
+新增 `bop-rgbd-baseline-local-row-handoff`，可在本地 BOP RGB-D scene 已存在时，
+先从 `depth/<frame>.png` 反投影写 per-frame `gaussians/<frame>.ply` evidence seed，
+再生成 single-state baseline `objectstates.json` 并运行 identity / prediction local-row
+package；该缓解减少真实 BOP subset 从 RGB-D 到 reviewable negative evidence 的手工链路，
+但仍不下载数据、不创建 GT、不使用 pose GT 生成 candidate prediction、不运行 Splatfacto /
+optimized 3DGS reconstruction、不训练模型、不声明 metric pass、intervention gate 或
+world-model evidence。

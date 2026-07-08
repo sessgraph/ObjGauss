@@ -836,6 +836,19 @@ Phase 1 evidence ledger。reviewable 与 metric pass 继续分离：single-state
 不创建 GT、不使用 BOP pose GT 或 object ids 来放置预测 ObjectState、不重建 Gaussian、
 不训练模型、不声明 intervention / counterfactual gate 或 world model，也不改 viewer/export
 默认策略。
+随后完成 `OBJECTSTATE-BOP-RGBD-BASELINE-LOCAL-ROW-HANDOFF-001`：新增
+`objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff`，schema 为
+`objgauss-objectstate-bop-rgbd-baseline-local-row-handoff-v1`，CLI 为
+`objgauss object-state bop-rgbd-baseline-local-row-handoff <scene-root> --output-root <dir>`。
+该命令把本地 BOP RGB-D route 串成一条：先用 `depth/<frame>.png` 和
+`scene_camera.json` 写 per-frame `gaussians/<frame>.ply` evidence seed，再生成
+single-state baseline `objectstates.json`，最后复用 baseline local-row handoff 生成
+identity / prediction packages 和 Phase 1 evidence ledger。RGB-D export、baseline
+reviewability 和 metric pass 继续分离；depth 缺失时只返回 incomplete / blocked summary，
+不会创建伪 Gaussian evidence 或伪 local rows。该步骤不下载 BOP、不创建 GT、不使用 object
+pose GT 生成 RGB-D geometry、不使用 BOP pose GT 或 object ids 放置预测 ObjectState、不运行
+Splatfacto / 3DGS optimization、不训练模型、不声明 metric pass、intervention /
+counterfactual gate 或 world model，也不改 viewer/export 默认策略。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为
@@ -4099,9 +4112,10 @@ npm run acceptance:demo
    `init-bop-phase1-sample-workspaces <batch-spec.json>` 生成每个 sample 的 condition CSV
    模板和 README；随后填齐真实 `bop-condition-sidecar.json` 和 per-frame Gaussian
    evidence。若还没有真正模型输出，可先运行
-   `bop-baseline-local-row-handoff` 直接写 single-state baseline `objectstates.json`
-   并生成 identity+prediction local-row package；若已有模型输出，则继续使用 template /
-   finalize 路径，再跑 `bop-local-row-handoff`。之后先跑
+   `bop-rgbd-baseline-local-row-handoff` 从 depth 生成 Gaussian evidence seed、
+   single-state baseline `objectstates.json` 和 identity+prediction local-row package；
+   若 Gaussian evidence 已经存在，也可直接跑 `bop-baseline-local-row-handoff`；若已有
+   真实模型输出，则继续使用 template / finalize 路径，再跑 `bop-local-row-handoff`。之后先跑
    `audit-bop-phase1-authoring-progress` 或 `audit-bop-local-row-batch-readiness` 确认
    target files 与 package 已经可进入 batch / cross-sample 表，再按 readiness 缺口决定
    是否运行 `bop-local-row-batch-handoff` 扩大 cross-sample 表；不要直接跳到 rollout、
