@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-07
+> 最近更新: 2026-07-08
 
 ## 当前阶段
 
@@ -340,6 +340,18 @@ reality gate 都通过，Stage 1 handoff 也只能 fail。该 audit 仍只读取
 metadata，不读取图像像素，也不证明实际光照变化或真实相机运动；当前仍没有实际
 controlled real capture / true candidate artifact 作为通过证据。完成 commit:
 `0368b0e`。
+
+随后补强 controlled real identity quality gate：`eval-controlled-identity` /
+`controlled-identity-handoff` 现在除 `idf1`、fragmentation、swap 和 collapse 外，
+还输出并门禁 `track_retrieval_recall_at_1` 与 `long_term_drift_rate`。candidate
+metadata 可携带 `identity_evidence`，其中必须显式声明
+`reconstruction_noise_robustness`、`reconstruction_noise_variant_count` 和 source；
+缺少该证据时，即使 identity track 稳定，Stage 1 identity eval / handoff 也会 fail。
+`objectstate_identity_prediction_adapter` 会把 trainable artifact 里的
+`identity_evidence` 传入 predictions。该切片只强化真实 identity gate 的证据契约，
+不采集真实数据、不训练新 Gaussian / dynamics 模型、不写 `public/samples`、不改
+viewer/export 默认；当前仍缺实际 controlled tabletop capture 和真实 candidate
+artifact 作为通过证据。完成 commit: `a9b0007`。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。

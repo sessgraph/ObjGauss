@@ -1,6 +1,6 @@
 # ObjGauss PR 队列
 
-> 最近更新: 2026-07-07
+> 最近更新: 2026-07-08
 
 ## 队列规则
 
@@ -55,13 +55,16 @@ manifest 转成 blocked controlled-real seed；
 `audit-controlled-capture-files` CLI，可检查 capture manifest 引用的 RGB / Gaussian
 文件是否真的存在于本地 bundle；`OBJECTSTATE-CONTROLLED-IDENTITY-EVAL-001`
 已新增 candidate identity track evaluator 和 `eval-controlled-identity` CLI，可计算
-`idf1` / fragmentation / swap / collapse 并生成带 identity pass/fail row 的
+`idf1`、track retrieval、long-term drift、fragmentation、swap、collapse 和显式
+reconstruction-noise robustness evidence，并生成带 identity pass/fail row 的
 controlled-real manifest；`OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001` 已新增
 `export-identity-predictions` CLI，可把 trainable kernel `object_states` 经
-controlled capture pose association 转成 evaluator 输入；
+controlled capture pose association 转成 evaluator 输入，并传递 trainable artifact
+里的 `identity_evidence`；
 `OBJECTSTATE-CONTROLLED-IDENTITY-HANDOFF-001` 已新增
 `controlled-identity-handoff` CLI，可一次性写出 predictions、identity eval、
-controlled-real manifest、identity-only gate summary 和 blocked rows markdown。下一步仍是
+controlled-real manifest、identity-only gate summary 和 blocked rows markdown；handoff
+pass 现在也要求 retrieval / drift / reconstruction-noise evidence 通过。下一步仍是
 实际采集 / 标注 controlled tabletop RGB / Gaussian / pose / action 文件，让真实 bundle
 先通过 file audit，再用真实 candidate artifact 跑 handoff，让 identity row 从 fixture
 进入真实 pass / fail，而不是新增大模型。继续不推进 diffusion、replay buffer 大系统或
@@ -135,6 +138,44 @@ viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-CONTROLLED-IDENTITY-QUALITY-GATE-001: Require controlled identity retrieval, drift and noise evidence
+
+- 状态: done / evaluator-requires-retrieval-drift-noise-evidence-no-real-capture
+- 类型: 标准 PR / controlled real identity quality gate
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 将 Real Identity Gate 的 retrieval、drift 和
+  reconstruction-noise robustness 要求落实到 controlled identity evaluator /
+  handoff，而不是只看 IDF1、fragmentation、swap 和 collapse。
+- 已实施:
+  - `ObjectStateControlledIdentityThresholds` 新增
+    `min_track_retrieval_recall_at_1`、`max_long_term_drift_rate`、
+    `min_reconstruction_noise_robustness` 和
+    `min_reconstruction_noise_variants`。
+  - `eval-controlled-identity` 输出并门禁
+    `track_retrieval_recall_at_1`、`long_term_drift_rate`、
+    `reconstruction_noise_robustness`、
+    `reconstruction_noise_variant_count` 和
+    `reconstruction_noise_evidence_present`。
+  - Prediction `candidate.identity_evidence` 可显式携带 reconstruction-noise
+    robustness score、variant count 和 source；缺失该证据时 identity eval /
+    handoff fail，不从文件存在性、图像像素或 Gaussian header 推断鲁棒性。
+  - `objectstate_identity_prediction_adapter` 会把 trainable artifact 的
+    `identity_evidence` 传入 controlled identity predictions。
+  - CLI 新增对应阈值参数，并打印 retrieval、drift 和 noise robustness 指标。
+  - Controlled-real identity pass/fail row 携带新增指标；prediction /
+    intervention rows 仍保持 blocked。
+- 边界:
+  - 当前没有采集或提交真实 controlled tabletop capture / candidate artifact 文件。
+  - 不运行 tracker / segmentation，不训练 Gaussian / dynamics，不新增模型或
+    `public/samples`。
+  - 不改变 viewer/export 默认策略，不推进 replay buffer / diffusion。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_identity_eval.py tests/test_objectstate_identity_prediction_adapter.py tests/test_objectstate_controlled_identity_handoff.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed, 340 tests。
+  - `npm run build`: passed；保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: `a9b0007`。
 
 ### OBJECTSTATE-CONTROLLED-CAPTURE-FILE-AUDIT-001: Audit controlled capture files
 
