@@ -347,6 +347,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-REALITY-ROW-LEDGER-NEXT-ACTIONS-001: Add gap-plan next actions to reality row ledger
+
+- 状态: done / state-variable-gap-plan-ledger
+- 类型: 标准 PR / ObjectState Phase 1 reality gate handoff planning
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/objectstate-phase1-public-evidence.md`
+- 目标: 把全局 reality row ledger 的 `identity` / `prediction` /
+  `intervention` 缺口转成可审计的 next actions，让 “ObjectState 能否成为状态变量”
+  的下一步证据链不再只停留在文字判断。
+- 已实施:
+  - 扩展 `objgauss.core.objectstate_reality_row_ledger`。
+  - `objgauss-objectstate-reality-row-ledger-v1` summary 新增
+    `next_actions` 和 `next_actions_markdown`。
+  - `next_actions` 只为缺失 pass evidence kind 输出行动项；已有 prediction pass row
+    时不会重复要求 prediction。
+  - 每个 action 记录 `required_evidence`、`minimum_metrics`、
+    `recommended_route`、可复跑 CLI commands 和 claim boundary。
+  - CLI `objgauss object-state audit-reality-row-ledger` 新增
+    `--next-actions-output`，并打印 `next_action=<kind>:<status>:<route>`。
+- 真实 public evidence 结果:
+  - 当前 LMO / HOPE ledger 仍为 `summary_count=2`、`row_count=6`、
+    `pass_row_count=1`、`fail_row_count=3`、`blocked_row_count=2`。
+  - Full gate 仍为 `objectstate_reality_gate_fail`。
+  - Missing pass evidence kinds 仍为 `identity,intervention`。
+  - 新增 next actions:
+    `identity: controlled_real_identity_handoff` 和
+    `intervention: controlled_reality_bundle_handoff`，二者均为 P0。
+  - 输出:
+    `outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`。
+- 边界:
+  - 只读已有 summaries，不下载 BOP、不创建 GT、不采集视频。
+  - 不重跑 identity / prediction / intervention eval，不训练 Gaussian 或 dynamics。
+  - 不把 public replay 的 prediction pass 推广成 identity / intervention pass。
+  - 不声明 ObjectState 已经通过真实世界 state-variable / world-model gate。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run python -m py_compile objgauss/core/objectstate_reality_row_ledger.py objgauss/cli.py`: passed。
+  - `uv run objgauss object-state audit-reality-row-ledger outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md --next-actions-output outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`: passed。
+
 ### OBJECTSTATE-REALITY-ROW-LEDGER-001: Aggregate reality rows across summaries
 
 - 状态: done / cross-summary-reality-gate-ledger

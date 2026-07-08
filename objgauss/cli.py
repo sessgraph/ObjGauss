@@ -6144,6 +6144,12 @@ def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
         )
     for blocker in gap["hard_blockers"]:
         print(f"hard_blocker={blocker}")
+    for action in summary["next_actions"]:
+        print(
+            "next_action="
+            f"{action['evidence_kind']}:{action['status']}:"
+            f"{action['recommended_route']}"
+        )
     for issue in summary["issues"]:
         print(f"issue={issue}")
     if args.summary_output:
@@ -6156,6 +6162,13 @@ def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
             encoding="utf-8",
         )
         print(f"blocked_rows={args.blocked_rows_output}")
+    if args.next_actions_output:
+        args.next_actions_output.parent.mkdir(parents=True, exist_ok=True)
+        args.next_actions_output.write_text(
+            summary["next_actions_markdown"],
+            encoding="utf-8",
+        )
+        print(f"next_actions={args.next_actions_output}")
     if (
         args.require_gate_pass
         and (gate is None or gate["status"] != "objectstate_reality_gate_pass")
@@ -8760,6 +8773,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_reality_row_ledger.add_argument("--summary-output", type=Path)
     audit_reality_row_ledger.add_argument("--blocked-rows-output", type=Path)
+    audit_reality_row_ledger.add_argument("--next-actions-output", type=Path)
     audit_reality_row_ledger.add_argument(
         "--synthetic-smoke-failed",
         action="store_true",

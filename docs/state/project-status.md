@@ -935,6 +935,17 @@ BOP reality rows、controlled real rows、public artifact rows 或 raw reality g
 `blocked_row_count=2`、`sample_count=2`，全局 gate 仍为
 `objectstate_reality_gate_fail`；缺失 pass evidence kinds 为 `identity` 和
 `intervention`。该步骤是 read-only accounting，不创建 GT、不训练模型、不声明 world model。
+随后完成 `OBJECTSTATE-REALITY-ROW-LEDGER-NEXT-ACTIONS-001`：扩展同一个
+`audit-reality-row-ledger` summary，新增机器可读 `next_actions` 和
+operator-facing `next_actions_markdown`。当前 LMO / HOPE ledger 仍为
+`summary_count=2`、`row_count=6`、`pass_row_count=1`、`fail_row_count=3`、
+`blocked_row_count=2`、full gate=`objectstate_reality_gate_fail`；新增 next actions
+只列出两个 P0 缺口：`identity -> controlled_real_identity_handoff` 和
+`intervention -> controlled_reality_bundle_handoff`。CLI 新增
+`--next-actions-output`，本地 ignored 输出为
+`outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`。该切片仍是
+read-only handoff planning：不采集数据、不创建 GT、不运行 identity / prediction /
+intervention eval、不训练模型、不声明 ObjectState 已经是 world model。
 随后补齐 `OBJECTSTATE-BOP-GAUSSIAN-EVIDENCE-PREFLIGHT-001`：新增
 `objgauss.core.objectstate_bop_gaussian_evidence_preflight`，schema 为
 `objgauss-objectstate-bop-gaussian-evidence-preflight-v1`，CLI 为

@@ -144,3 +144,13 @@ R-017 update 2026-07-08: `OBJECTSTATE-REALITY-ROW-LEDGER-001`
 1 pass / 3 fail / 2 blocked，missing pass evidence kinds 为 identity 和 intervention；
 full gate 仍 fail。该缓解让 Phase 1 缺口可跨样本审计，但风险继续 open：还需要真实
 controlled identity pass row 和 action-conditioned intervention pass row。
+
+R-017 update 2026-07-08: `OBJECTSTATE-REALITY-ROW-LEDGER-NEXT-ACTIONS-001`
+扩展 `audit-reality-row-ledger`，在 summary 中新增机器可读 `next_actions` 和
+operator-facing `next_actions_markdown`。当前 LMO + HOPE ledger 仍 fail，但 CLI 会明确输出
+两个 P0 缺口：`identity -> controlled_real_identity_handoff` 和
+`intervention -> controlled_reality_bundle_handoff`，并把所需 GT、指标、命令链和 claim
+boundary 一起记录。该缓解只做 read-only gap planning，不创建 GT、不采集数据、不运行
+eval、不训练模型、不声明 identity / intervention pass 或 world-model evidence；风险继续
+open，直到真实 controlled/public rows 形成 identity、prediction 和 intervention pass/fail
+证据。

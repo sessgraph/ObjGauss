@@ -378,6 +378,8 @@ It makes the current state-variable gap explicit:
   `outputs/evidence/objectstate-phase1-reality-row-ledger.json`
 - Blocked rows:
   `outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md`
+- Next actions:
+  `outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md`
 
 Command:
 
@@ -386,7 +388,8 @@ uv run objgauss object-state audit-reality-row-ledger \
   outputs/evidence/objectstate-bop-hope-public-000001-rgbd-baseline/bop-reality-rows-summary.json \
   outputs/evidence/objectstate-bop-lmo-public-000002-rgbd-baseline/bop-reality-rows-summary.json \
   --summary-output outputs/evidence/objectstate-phase1-reality-row-ledger.json \
-  --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md
+  --blocked-rows-output outputs/evidence/objectstate-phase1-reality-row-ledger-blocked.md \
+  --next-actions-output outputs/evidence/objectstate-phase1-reality-row-ledger-next-actions.md
 ```
 
 Result:
@@ -407,6 +410,9 @@ Result:
 - Hard blockers:
   `identity_pass_rows_present`, `intervention_pass_rows_present`,
   `controlled_real_identity_collapse_absent`, `failed_rows_absent`
+- Next actions:
+  - `identity: pass_evidence_missing -> controlled_real_identity_handoff`
+  - `intervention: pass_evidence_missing -> controlled_reality_bundle_handoff`
 
 Interpretation:
 
@@ -415,3 +421,6 @@ gate view. It confirms that existing BOP public rows are useful but not enough:
 only prediction has a pass row, identity remains failed because baseline
 identity collapse is real negative evidence, and intervention remains blocked
 because no action-conditioned / counterfactual public row exists.
+The next-actions file is an operator handoff for the missing state-variable
+evidence. It does not create GT, run evaluations, train a model, or convert
+these public replay rows into identity / intervention pass evidence.

@@ -91,6 +91,7 @@ def objectstate_reality_row_ledger(
         )
         gate_payload = gate.as_dict()
         blocked_rows_markdown = objectstate_reality_blocked_rows_markdown(gate)
+    next_actions = _next_actions(gate_payload, rows)
 
     payload = {
         "schema": OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA,
@@ -117,6 +118,8 @@ def objectstate_reality_row_ledger(
         "rows": [row.as_dict() for row in rows],
         "gate": gate_payload,
         "gap_summary": _gap_summary(gate_payload, rows),
+        "next_actions": next_actions,
+        "next_actions_markdown": _next_actions_markdown(next_actions),
         "blocked_rows_markdown": blocked_rows_markdown,
         "ledger_gates": ledger_gates,
         "issues": _issues(records, ledger_gates, gate_payload, duplicate_row_ids),
@@ -214,6 +217,30 @@ def validate_objectstate_reality_row_ledger_summary(
         raise ValueError("ObjectState reality row ledger requires duplicate_row_ids")
     if not isinstance(payload.get("gap_summary"), Mapping):
         raise ValueError("ObjectState reality row ledger requires gap_summary")
+    next_actions = payload.get("next_actions")
+    if not isinstance(next_actions, list):
+        raise ValueError("ObjectState reality row ledger requires next_actions")
+    for action in next_actions:
+        if not isinstance(action, Mapping):
+            raise ValueError("ObjectState reality row ledger action must be a mapping")
+        for key in (
+            "evidence_kind",
+            "status",
+            "priority",
+            "required_evidence",
+            "minimum_metrics",
+            "recommended_route",
+            "commands",
+            "claim_boundary",
+        ):
+            if key not in action:
+                raise ValueError(
+                    f"ObjectState reality row ledger action requires {key}"
+                )
+    if not isinstance(payload.get("next_actions_markdown"), str):
+        raise ValueError(
+            "ObjectState reality row ledger requires next_actions_markdown"
+        )
     if not isinstance(payload.get("blocked_rows_markdown"), str):
         raise ValueError("ObjectState reality row ledger requires blocked_rows_markdown")
     if not isinstance(payload.get("issues"), list):
@@ -352,6 +379,202 @@ def _gap_summary(
         "full_gate_status": None if gate is None else gate.get("status"),
         "hard_blockers": [] if gate is None else list(gate.get("hard_blockers", ())),
     }
+
+
+def _next_actions(
+    gate: Mapping[str, Any] | None,
+    rows: Sequence[ObjectStateRealityRow],
+) -> list[dict[str, Any]]:
+    pass_kinds = {row.evidence_kind for row in rows if row.status == "pass"}
+    status_counts = {
+        kind: {
+            "pass": _row_status_count(
+                [row for row in rows if row.evidence_kind == kind],
+                "pass",
+            ),
+            "fail": _row_status_count(
+                [row for row in rows if row.evidence_kind == kind],
+                "fail",
+            ),
+            "blocked": _row_status_count(
+                [row for row in rows if row.evidence_kind == kind],
+                "blocked",
+            ),
+        }
+        for kind in ("identity", "prediction", "intervention")
+    }
+    actions: list[dict[str, Any]] = []
+    for kind in ("identity", "prediction", "intervention"):
+        if kind in pass_kinds:
+            continue
+        actions.append(
+            _next_action_for_kind(
+                kind,
+                gate_status=None if gate is None else str(gate.get("status")),
+                counts=status_counts[kind],
+            )
+        )
+    return actions
+
+
+def _next_action_for_kind(
+    kind: str,
+    *,
+    gate_status: str | None,
+    counts: Mapping[str, int],
+) -> dict[str, Any]:
+    common_boundary = [
+        "Do not mark blocked rows as pass rows.",
+        "Do not claim ObjectState is a world model from this ledger.",
+        "Do not use renderer-facing object_id as physical identity ground truth.",
+    ]
+    if kind == "identity":
+        return {
+            "evidence_kind": "identity",
+            "status": "pass_evidence_missing",
+            "priority": "p0",
+            "reason": (
+                "The ledger has no identity pass row. Existing identity rows "
+                f"include fail={counts['fail']} and blocked={counts['blocked']}."
+            ),
+            "required_evidence": [
+                "timestamped physical object identity ground truth",
+                "clear-visible / occluded / reappeared frames",
+                "view, lighting and camera-pose condition metadata",
+                "RGB and per-frame Gaussian evidence files",
+                "candidate ObjectState artifact bound to the capture manifest",
+                "reconstruction-noise robustness evidence",
+            ],
+            "minimum_metrics": [
+                "idf1",
+                "fragmentation_rate",
+                "swap_rate",
+                "identity_collapse=false",
+                "retrieval_recall_at_1",
+                "long_term_drift_rate",
+                "reconstruction_noise_robustness",
+            ],
+            "recommended_route": "controlled_real_identity_handoff",
+            "commands": [
+                "uv run objgauss object-state audit-controlled-capture-environment --summary-output outputs/captures/controlled-capture-environment.json",
+                "uv run objgauss object-state init-controlled-capture-bundle outputs/captures/controlled-tabletop-cup-box-001 --sample-id controlled-tabletop-cup-box-001 --object-category cup_box --capture-device local-camera --object cup-001:cup:\"blue cup\" --object box-001:box:\"red box\"",
+                "uv run objgauss object-state audit-controlled-capture-bundle-readiness outputs/captures/controlled-tabletop-cup-box-001 --summary-output outputs/captures/controlled-tabletop-cup-box-001/readiness-summary.json",
+                "uv run objgauss object-state controlled-identity-bundle-handoff outputs/captures/controlled-tabletop-cup-box-001 outputs/captures/controlled-tabletop-cup-box-001/objectstates.json --output-dir outputs/captures/controlled-tabletop-cup-box-001/identity-handoff --hash-files --require-pass",
+            ],
+            "claim_boundary": common_boundary
+            + [
+                "A reviewable identity package is not a pass unless its identity row status is pass.",
+            ],
+            "gate_status": gate_status,
+        }
+    if kind == "prediction":
+        return {
+            "evidence_kind": "prediction",
+            "status": "pass_evidence_missing",
+            "priority": "p1",
+            "reason": (
+                "The ledger has no prediction pass row. Existing prediction rows "
+                f"include fail={counts['fail']} and blocked={counts['blocked']}."
+            ),
+            "required_evidence": [
+                "timestamped pose ground truth",
+                "ObjectState future-pose candidate predictions",
+                "history or no-state baseline predictions",
+                "shared capture manifest binding for GT and candidates",
+            ],
+            "minimum_metrics": [
+                "state_ade",
+                "history_ade",
+                "prediction_gap_vs_history_model",
+            ],
+            "recommended_route": "controlled_or_public_prediction_eval",
+            "commands": [
+                "uv run objgauss object-state init-controlled-reality-candidates outputs/captures/controlled-tabletop-cup-box-001 --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-candidates --candidate-id controlled-tabletop-cup-box-001-candidate-v1 --candidate-source \"external objectstate predictor\" --artifact-ref outputs/captures/controlled-tabletop-cup-box-001/objectstates.json --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/template-summary.json",
+                "uv run objgauss object-state finalize-controlled-reality-candidates outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.template.json outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.template.json --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-candidates --bundle-root outputs/captures/controlled-tabletop-cup-box-001 --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/finalize-summary.json",
+            ],
+            "claim_boundary": common_boundary
+            + [
+                "Prediction sufficiency is only comparative: ObjectState must be measured against the declared history baseline.",
+            ],
+            "gate_status": gate_status,
+        }
+    if kind == "intervention":
+        return {
+            "evidence_kind": "intervention",
+            "status": "pass_evidence_missing",
+            "priority": "p0",
+            "reason": (
+                "The ledger has no intervention pass row. Existing intervention "
+                f"rows include fail={counts['fail']} and blocked={counts['blocked']}."
+            ),
+            "required_evidence": [
+                "timestamped pose ground truth",
+                "timestamped action ground truth",
+                "action-conditioned candidate predictions",
+                "no-action baseline predictions",
+                "counterfactual outcome labels or measurable outcome rule",
+            ],
+            "minimum_metrics": [
+                "action_conditioned_ade",
+                "counterfactual_outcome_accuracy",
+                "wrong_direction_rate",
+            ],
+            "recommended_route": "controlled_reality_bundle_handoff",
+            "commands": [
+                "uv run objgauss object-state audit-controlled-reality-bundle-readiness outputs/captures/controlled-tabletop-cup-box-001 outputs/captures/controlled-tabletop-cup-box-001/objectstates.json outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.json outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.json --summary-output outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/full-readiness-summary.json --require-ready",
+                "uv run objgauss object-state controlled-reality-bundle-handoff outputs/captures/controlled-tabletop-cup-box-001 outputs/captures/controlled-tabletop-cup-box-001/objectstates.json outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/prediction-candidates.json outputs/captures/controlled-tabletop-cup-box-001/reality-candidates/intervention-candidates.json --output-dir outputs/captures/controlled-tabletop-cup-box-001/reality-handoff --hash-files --require-pass",
+            ],
+            "claim_boundary": common_boundary
+            + [
+                "BOP pose replay cannot satisfy intervention evidence without action GT and counterfactual outcome evidence.",
+            ],
+            "gate_status": gate_status,
+        }
+    raise ValueError(f"unsupported ObjectState reality evidence kind: {kind}")
+
+
+def _next_actions_markdown(actions: Sequence[Mapping[str, Any]]) -> str:
+    if not actions:
+        return "# ObjectState Reality Row Ledger Next Actions\n\nNo missing pass evidence kinds.\n"
+    lines = [
+        "# ObjectState Reality Row Ledger Next Actions",
+        "",
+        "| evidence_kind | priority | recommended_route | reason |",
+        "| --- | --- | --- | --- |",
+    ]
+    for action in actions:
+        reason = str(action.get("reason", "")).replace("|", "\\|")
+        lines.append(
+            "| "
+            + str(action.get("evidence_kind", ""))
+            + " | "
+            + str(action.get("priority", ""))
+            + " | "
+            + str(action.get("recommended_route", ""))
+            + " | "
+            + reason
+            + " |"
+        )
+    lines.extend(["", "## Commands", ""])
+    for action in actions:
+        lines.append(f"### {action['evidence_kind']}")
+        lines.append("")
+        for command in action.get("commands", ()):
+            lines.append("```bash")
+            lines.append(str(command))
+            lines.append("```")
+            lines.append("")
+    lines.extend(
+        [
+            "## Claim Boundary",
+            "",
+            "- This ledger is read-only.",
+            "- Missing pass evidence must be filled by real controlled/public rows.",
+            "- It must not be used to claim a world-model pass.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _sample_scope(rows: Sequence[ObjectStateRealityRow]) -> dict[str, Any]:

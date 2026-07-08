@@ -42,6 +42,30 @@ def test_reality_row_ledger_aggregates_existing_row_summaries(tmp_path):
         "identity",
         "intervention",
     ]
+    assert [action["evidence_kind"] for action in ledger["next_actions"]] == [
+        "identity",
+        "intervention",
+    ]
+    assert [action["priority"] for action in ledger["next_actions"]] == ["p0", "p0"]
+    assert (
+        ledger["next_actions"][0]["recommended_route"]
+        == "controlled_real_identity_handoff"
+    )
+    assert (
+        "controlled-identity-bundle-handoff"
+        in ledger["next_actions"][0]["commands"][-1]
+    )
+    assert (
+        ledger["next_actions"][1]["recommended_route"]
+        == "controlled_reality_bundle_handoff"
+    )
+    assert (
+        "controlled-reality-bundle-handoff"
+        in ledger["next_actions"][1]["commands"][-1]
+    )
+    assert ledger["next_actions_markdown"].startswith(
+        "# ObjectState Reality Row Ledger Next Actions"
+    )
     assert ledger["claim_policy"]["does_not_claim_world_model"] is True
     assert "full ObjectState reality gate did not pass" in ledger["issues"][-1]
 
@@ -57,6 +81,7 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     path_b = tmp_path / "controlled-b-rows.json"
     summary_path = tmp_path / "reality-row-ledger.json"
     blocked_path = tmp_path / "reality-row-ledger-blocked.md"
+    actions_path = tmp_path / "reality-row-ledger-next-actions.md"
     _write_json(path_a, summary_a)
     _write_json(path_b, summary_b)
 
@@ -71,6 +96,8 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
                 str(summary_path),
                 "--blocked-rows-output",
                 str(blocked_path),
+                "--next-actions-output",
+                str(actions_path),
             ]
         )
         == 0
@@ -82,10 +109,21 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     assert f"schema={OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA}" in stdout
     assert "gate_status=objectstate_reality_gate_fail" in stdout
     assert "missing_pass_evidence_kinds=identity,intervention" in stdout
+    assert (
+        "next_action=identity:pass_evidence_missing:"
+        "controlled_real_identity_handoff"
+    ) in stdout
+    assert (
+        "next_action=intervention:pass_evidence_missing:"
+        "controlled_reality_bundle_handoff"
+    ) in stdout
     assert validate_objectstate_reality_row_ledger_summary(written_summary) == (
         written_summary
     )
     assert blocked_path.read_text(encoding="utf-8").startswith("| row_id |")
+    assert actions_path.read_text(encoding="utf-8").startswith(
+        "# ObjectState Reality Row Ledger Next Actions"
+    )
 
 
 def _controlled_manifest(sample_id: str, *, prediction_status: str):
