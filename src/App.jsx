@@ -39,6 +39,9 @@ const OBJECT_TRANSFORM_MODES = ["translate", "rotate", "scale"];
 const OBJECT_TRANSFORM_SNAP_STEP = 0.25;
 const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
 const OBJECT_SCALE_SNAP_STEP = 0.1;
+// 辅助移动按钮(X-/X+/Z-/Z+)每次点击的位移量。刻意大于
+// OBJECT_TRANSFORM_SNAP_STEP,用于粗调定位;精确对齐仍应使用 Gizmo 拖拽 + snap。
+const OBJECT_NUDGE_STEP = 0.36;
 const THREE_WORLD_POINT_PREVIEW_CONTRACT = "three-world-point-preview-v1";
 const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
 const OBJECT_PICKING_CONTRACT = "projected-object-bbox-picker-v2";
@@ -4943,28 +4946,28 @@ function ObjectInteractionLayer({
           <button
             type="button"
             data-object-move-button="-x"
-            onClick={() => onMoveSelectedObject?.([-0.36, 0, 0])}
+            onClick={() => onMoveSelectedObject?.([-OBJECT_NUDGE_STEP, 0, 0])}
           >
             X-
           </button>
           <button
             type="button"
             data-object-move-button="+x"
-            onClick={() => onMoveSelectedObject?.([0.36, 0, 0])}
+            onClick={() => onMoveSelectedObject?.([OBJECT_NUDGE_STEP, 0, 0])}
           >
             X+
           </button>
           <button
             type="button"
             data-object-move-button="-z"
-            onClick={() => onMoveSelectedObject?.([0, 0, -0.36])}
+            onClick={() => onMoveSelectedObject?.([0, 0, -OBJECT_NUDGE_STEP])}
           >
             Z-
           </button>
           <button
             type="button"
             data-object-move-button="+z"
-            onClick={() => onMoveSelectedObject?.([0, 0, 0.36])}
+            onClick={() => onMoveSelectedObject?.([0, 0, OBJECT_NUDGE_STEP])}
           >
             Z+
           </button>

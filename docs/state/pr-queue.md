@@ -14,7 +14,7 @@
 
 1. **终局证据线**: HF 大文件已核对并补齐；sampled1m near-1M WebGPU C-path production SLA 已通过，后续只保留全量 4.5M PLY LOD / streaming 风险。
 2. **发布 handoff 线**: 保持 HF Dataset / Model 为 development-stage release，所有大训练产物留在 HF / ignored `outputs/`，不进 git。
-3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补未分割高斯云到对象层生成的主流程入口；`DEMO-CATALOG-REAL-SPLAT-001` 已新增真实 Nike `.splat` 本地 demo 并把首屏 dock / 默认 stage 收敛为 curated demos。剩余 viewer TODO 是继续收敛全量 PLY LOD / streaming；rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在当前默认能力内。
+3. **产品 viewer 线**: near-1M 大模型快速查看、训练模型筛选、按需 object-aware PLY 加载、real-sample v2 sample-aware 本地预览自动加载、同定位模型最新优先排序、训练展示台 UI 精简、模型版本展示、多版本批量展示、Three.js-first Object Interaction Layer、renderer-decoupled object picking、ObjectState bbox picking / selection highlight、`完整高斯 / 点预览 / 对象层` 状态展示和同场景 `spark-source-splat-stage-v1` source `.splat` 主视觉已形成可审计默认体验；`GAUSSIAN-OBJECT-PROCESS-FLOW-001` 已补未分割高斯云到对象层生成的主流程入口；`DEMO-CATALOG-REAL-SPLAT-001` 已新增真实 Nike `.splat` 本地 demo 并把首屏 dock / 默认 stage 收敛为 curated demos。在保持"研究者/工程师自用调试"定位的前提下启动一轮体验打磨路线：`UI-POLISH-CONTRAST-DOCK-001` 已修复毛玻璃对比度色斑、标题截断、底部dock裁切和辅助移动步长命名；`UI-METRIC-DEDUP-001`、`UI-IMPORT-ENTRY-001`、`UI-MOBILE-DEFAULT-COLLAPSE-001`、`UI-IA-REGROUP-001` 已排入 Planned。剩余 viewer TODO 是继续收敛全量 PLY LOD / streaming；rotate / scale、任意第三方 `.splat` object id 和 Gaussian 重优化仍不在当前默认能力内；`App.jsx` 单文件 9442 行的结构性拆分暂不在本轮体验打磨范围内，需要单独立项评估。
 4. **算法模型线**: `TRAIN-GSPLAT-MVP-001` 已在 host GPU / CUDA 13 / torch / gsplat 环境跑通最小 full renderer smoke；`OBJECTSTATE-GAUSSIAN-DECODER-001` 将 `ObjectStateProjection -> Gaussian decode -> gsplat/image loss` 变成可测代码路径；`SOLVER-DECODER-TRAIN-001` 已让 decoder `object_colors` 在 point / gsplat image loss 下可训练；`SOLVER-DECODER-JOINT-001` 已让 solver assignment 参数和 decoder colors 进入同一个最小 joint loop；`SOLVER-DECODER-EXPORT-001` 已完成 joint checkpoint/export 与 resume/load 闭环；`TRAIN-SCALE-001` 已完成分段 checkpoint、loss log 和 run output plan；`TRAIN-RUN-TB-001` 已补 TensorBoard scalar event 输出；`EVAL-OBJECTSTATE-001` 已补 checkpoint eval gate；`SOLVER-TEMP-001` 已补 assignment sharpening 控制；`TRAIN-RUN-004` 已把 `solver_temperature=0.5` 固化进 GPU checkpoint 并通过 ObjectState eval；`RENDER-LOSS-RUN-GATE-001` 已修正 segmented run boundary gate；`RENDER-FIELD-UNFREEZE-PLAN-001` 已把第一批 renderer 参数解冻限定为 object-level opacity multiplier；`DECODER-OPACITY-CONTRACT-001` 已把 `decoder.object_opacity_logits` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-OPACITY-001` 已接入 renderer opacity gradient 和显式训练 gate；`TRAIN-RUN-005-OPACITY-SMOKE` 已验证 opacity GPU path / checkpoint / TensorBoard / eval gate 可用，但收益很弱；`RENDER-FIELD-SCALE-PLAN-001` 已把第二批 renderer 参数限定为 object-level scale multiplier；`DECODER-SCALE-CONTRACT-001` 已把 `decoder.object_scale_log_offsets` 做进 decoder state / checkpoint ABI；`TRAIN-DECODER-SCALE-001` 已接入 renderer scale gradient 和显式 training gate；`FIELD-FREEZE-CONTROLS-001` 已补 solver / colors / opacity / scale 的独立 freeze 控制；`TRAIN-RUN-006-SCALE-SMOKE` 已验证 scale-only GPU path / checkpoint / TensorBoard / eval gate 可用，但收益仍很弱；`ASSIGNMENT-SOLVER-V2-CONTRACT-001` 已冻结下一代 assignment solver 的 evidence / state / prediction / loss / metrics / checkpoint contract；`OBJECT-LOSS-V2-001` 已把 assignment loss 拆成可独立测试的 cluster / entropy / balance / supervised CE helper；`ASSIGNMENT-FRAMES-EVIDENCE-001` 已补 `AssignmentEvidenceBatch` adapter；`TRAIN-ASSIGNMENT-MVP-001` 已补 fixed-K assignment MVP summary；`EVAL-ASSIGNMENT-STABILITY-001` 已补 assignment 专用稳定性 eval；`ASSIGNMENT-RENDER-JOINT-001` 已把 assignment stability before / after gate 接入 joint renderer training summary；`DYNAMIC-K-PROPOSAL-001` 已把 proposal-only dynamic-K 候选接入 assignment eval；`V2-STABILITY-FOUNDATION-002` 已补 `ObjectIdentityOracle + SyntheticWorldState + ObservationModel`，冻结 synthetic identity ground truth；`V2-STABILITY-SCENARIO-002` 已补 cross-view / occlusion recovery / perturbation / adversarial swap fixture suite 和 reproducible observation batches；`CORE-MODEL-TRAIN-VALIDATE-PLAN-001` 已将近期路线收敛为 diagnostics -> hard gate -> v2 assignment training -> eval -> renderer joint -> core validation；`V2-STABILITY-DIAGNOSTICS-001` 已补 deterministic failure diagnostics；`V2-STABILITY-GATE-001` 已补 identity-invariant hard gate；`ASSIGNMENT-SOLVER-V2-TRAIN-001` 已补 fixed-K cost-softmax assignment solver v2 training；`ASSIGNMENT-SOLVER-V2-EVAL-001` 已补 training before / after stability eval、diagnostics delta 和 checkpoint roundtrip；`ASSIGNMENT-V2-RENDER-JOINT-001` 已把 v2 checkpoint 接回 ObjectState / renderer validation path；`CORE-MODEL-TRAIN-VALIDATE-001` 已补核心模型 milestone summary；`REAL-SAMPLE-V2-SMOKE-001` 已把 v2 core path 接到 public `object_id` 样例 smoke，并暴露真实样例当前卡在 low confidence / low purity；`REAL-SAMPLE-V2-DIAGNOSTICS-001` 已证明 `solver_temperature=0.5` 是当前 public sample 最高通过温度，temperature sharpening 足够让真实样例训练模型通过 ObjectState / renderer joint validation；`REAL-SAMPLE-V2-MODEL-HANDOFF-001` 已输出可复跑 checkpoint / summary / HTML effect preview，并从 JSON checkpoint restore 后再次通过验证；`REAL-SAMPLE-V2-VIEWER-PREVIEW-001` 已把训练模型投影回全量 real Gaussian PLY 并接入 `?ply=` viewer/debug route；`REAL-SAMPLE-V2-FULL-CLOUD-PURITY-001` 已证明 public sample 的 full-cloud purity gap 主要来自 segmentation target 覆盖不足，`max_points=128` 可通过 full-cloud gate；`REAL-SAMPLE-V2-SEGMENTATION-QUALITY-001` 已把 128 分割结果定位到 slot 1/2 弱边界；`REAL-SAMPLE-V2-WEAK-BOUNDARY-OPT-001` 已证明 `feature_weight=2.0, position_weight=1.0` 可把该 weak boundary 修到 `mixed_gaussians=0`；`REAL-SAMPLE-V2-WEIGHTED-VIEWER-PREVIEW-001` 已把该 promoted weights 接入 viewer preview 默认展示路径；`REAL-SAMPLE-V2-PROMOTED-WEIGHTS-CROSS-SAMPLE-001` 已证明 promoted weights 在 Polyhaven / Plush 第二样例上提升 soft purity / confidence 但 hard boundary 回退，不能直接作为跨样例全局默认；`REAL-SAMPLE-V2-SAMPLE-AWARE-WEIGHT-POLICY-001` 已补 sample-aware gate；`BOUNDED-EVIDENCE-NORMALIZATION-001` / `REAL-SAMPLE-V2-CROSS-SAMPLE-EXPANSION-002` 已把 bounded/no-op 情况收紧：Lego 仍选 promoted，Polyhaven / Nike 回退 baseline，selected hard regression 为 `0`，Plush KMeans 暴露为无安全候选。当前下一阶段已从“继续追 renderer / Gaussian 质量”收敛为 `ObjectState` 状态变量证明：`docs/architecture/objectstate-state-variable-gate.md` 冻结 smoke / candidate / paper gates，要求 identity persistence、occlusion recovery、view invariance、predictive sufficiency 和 counterfactual evidence；近期不推进 diffusion、replay buffer 大系统或默认 viewer/export promotion。
 5. **语义质量线**: depth-aware mask voting、manifest-level 跨视角 slot alignment、CLIP score cache contract、真实 `transformers` CLIP run、mask-level naming quality gate、slot-level naming quality gate、baseline comparison、promotion policy、slot naming diversity policy 和 slot support rebalance policy 已落地；当前真实 CLIP 语义路线仍保持 `do-not-promote`。
 
@@ -160,6 +160,9 @@ template、baseline candidates、prediction eval 和 prediction evidence package
 local-row readiness 支持 explicit per-frame condition sidecar，可把 view / lighting /
 camera_pose metadata 接入 Stage 1 identity scenario gate，但仍不创建 GT、不生成
 Gaussian、不训练模型、不声明 pass row。
+`OBJECTSTATE-BOP-CONDITION-SIDECAR-AUTHORING-001` 已新增
+`init-bop-condition-sidecar` CLI，可从本地 BOP selected frames 和可选 condition CSV
+写出 sidecar，并报告是否满足 identity scenario metadata coverage。
 继续不推进
 diffusion、replay buffer 大系统或 viewer/export 默认模型。
 若继续 viewer 线，再拆全量 4.5M PLY LOD / streaming 或收敛 full
@@ -171,6 +174,47 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 需要在 host shell 或提权命令中执行，否则会误报 `nvidia-smi` / CUDA 不可用。
 
 ## Planned
+
+### UI-METRIC-DEDUP-001: Deduplicate world-panel and floating-inspector object metrics
+
+- 状态: planned
+- 类型: 标准 PR / product viewer UI polish
+- 目标: 左侧"世界操作"面板与右侧浮动摘要面板当前重复展示"对象层""真实绑定""绑定点数/
+  绑定点"等字段，数值相同但标签不统一（`绑定点数` vs `绑定点`）。收敛成单一权威展示位置
+  或统一命名，减少用户误判为两个不同指标。
+- 前置: `UI-POLISH-CONTRAST-DOCK-001` 已完成。
+- 边界: 不改变底层状态字段本身，只调整展示层布局与命名。
+
+### UI-IMPORT-ENTRY-001: Align import trigger buttons with their file inputs
+
+- 状态: planned
+- 类型: 标准 PR / product viewer UI polish
+- 目标: 顶部 `topActions` 里的 4 个隐藏 `<input type=file>`（trainable artifact / OGC /
+  model bundle / debug session）目前只能通过深藏在"系统工具 > 高级"折叠面板里的按钮触发，
+  DOM 位置和可见入口不一致，降低可发现性。让触发按钮和 input 出现在同一 UI 区域，或在顶部
+  栏加一个可见的统一"导入"入口。
+- 前置: `UI-POLISH-CONTRAST-DOCK-001` 已完成。
+- 边界: 不改变导入解析逻辑，只调整入口位置。
+
+### UI-MOBILE-DEFAULT-COLLAPSE-001: Collapse debug panel by default on narrow viewports
+
+- 状态: planned
+- 类型: 标准 PR / product viewer UI polish
+- 目标: 390px 移动端视口下，左侧"世界操作"调试面板默认展开且几乎占满全屏宽高，3D canvas
+  和右侧摘要面板被完全挤出可视区域，首屏看不到核心的高斯场景。移动端应默认收起调试面板，
+  只保留一个可展开 toggle。
+- 边界: 桌面/平板宽度默认行为不变；需要过既有 `audit:world-viewer` 的 mobile 相关断言，
+  必要时同步更新该脚本的期望状态。
+
+### UI-IA-REGROUP-001: Regroup collapsible panels by usage frequency
+
+- 状态: planned
+- 类型: 标准 PR / product viewer UI polish
+- 目标: 当前折叠面板默认展开状态不一致（Three.js 世界/对象交互默认展开，模型版本/系统工具
+  默认收起），嵌套层级较深，关键操作（生成对象层、导入素材）需要多次点击才能找到。按
+  "常用/进阶"重新分组，减少嵌套深度。
+- 前置: `UI-METRIC-DEDUP-001`、`UI-IMPORT-ENTRY-001` 完成后再做，避免信息架构调整和字段
+  去重互相打架。
 
 ### MODEL-V2-TRAINING-ROADMAP-001: Register late-stage world-model training roadmap
 
@@ -231,6 +275,66 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-BOP-CONDITION-SIDECAR-AUTHORING-001: Author and audit BOP condition sidecars
+
+- 状态: done / bop-condition-sidecar-authoring
+- 类型: 标准 PR / ObjectState public pose dataset condition authoring
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 给实际本地 BOP subset 增加 sidecar authoring 入口，避免手写 JSON，并在写出
+  sidecar 时同步判断是否满足 identity route 的 view / lighting / camera motion metadata。
+- 已实施:
+  - 新增 summary schema
+    `objgauss-objectstate-bop-capture-condition-sidecar-summary-v1`。
+  - 新增 core function
+    `objectstate_bop_capture_condition_sidecar_summary(...)`。
+  - 新增 CLI `objgauss object-state init-bop-condition-sidecar`。
+  - CLI 支持 `--condition-csv`，CSV columns 为 `frame_id`、`view_id`、
+    `lighting_id`、`camera_x/y/z`、`camera_qx/qy/qz/qw`。
+  - 无 CSV 时写出默认 sidecar template，并明确报告 `needs_metadata`；CSV 带齐
+    lighting variation 和 camera motion 时可达到 `identity_ready`。
+- 边界:
+  - 只做 sidecar authoring / readiness，不下载 BOP 数据。
+  - 不创建 identity GT、不修改 BOP pose GT、不生成 per-frame Gaussian。
+  - 不运行 identity / prediction handoff，不训练模型，不声明 pass row / world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_capture_adapter.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_capture_adapter.py tests/test_core_namespace.py -q`: passed，24 tests。
+  - Full validation pending before final push.
+- 完成 commit: pending.
+
+### UI-POLISH-CONTRAST-DOCK-001: Fix viewer glassmorphism contrast and truncation polish
+
+- 状态: done / css-and-constant-only-no-logic-change
+- 类型: 标准 PR / product viewer UI polish
+- 目标: 修复 UI 审查中发现的四个具体视觉/交互缺陷，作为"重新设计体验流程"路线的第一个
+  最小可验收切片；不改变任何状态机、picking 或数据流逻辑。
+- 已实施:
+  - `src/styles.css`: 给 `.interactionModeRow` / `.interactionActionRow`（对象交互层的
+    移动/旋转/缩放和撤销/重做/取消图标行）加不透明衬底（`rgba(7, 12, 17, 0.86)`）并
+    `justify-self: start` 收紧到内容宽度，消除 `.glassHud` 的 `backdrop-filter: blur(22px)`
+    把身后 3D 场景实时糊成不可控灰色色斑、影响图标可读性的问题。
+  - `src/styles.css`: `.floatingInspector h2` 从强制单行 `ellipsis` 改为 `-webkit-line-clamp: 2`
+    两行显示，修复类似 `"Lego raw Gaussian sou..."` 的词中截断。
+  - `src/styles.css`: `.objectDock`（底部模型入口横向列表）加 `mask-image` 两侧渐隐、
+    `scrollbar-width: thin` + `scrollbar-color`，卡片被视口边缘硬裁切时不再像"到底了"。
+  - `src/App.jsx`: 新增命名常量 `OBJECT_NUDGE_STEP = 0.36`，替换 `ObjectInteractionLayer`
+    辅助移动按钮（X-/X+/Z-/Z+）里 4 处硬编码 `0.36`，并注释说明与
+    `OBJECT_TRANSFORM_SNAP_STEP` 的关系；数值本身不变，不改变交互行为。
+- 边界:
+  - 只做 CSS 和常量命名改动，不改状态机、picking、gizmo 或模型加载逻辑。
+  - 不动移动端默认面板收起行为（见 Planned `UI-MOBILE-DEFAULT-COLLAPSE-001`）。
+  - 不合并左右面板重复字段（见 Planned `UI-METRIC-DEDUP-001`）。
+  - 不重构 `App.jsx` 结构或拆分组件。
+- 验证:
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `uv run --extra dev pytest`: passed，443 tests（本次改动为纯前端，回归确认用）。
+  - Playwright 桌面(1440×900)与移动(390×844)截图对比：图标行灰色模糊色斑消失、
+    标题完整两行展示、dock 边缘渐隐生效（`scrollWidth=762 > clientWidth=538`）、
+    console 无新增 error/warning。
+  - `git diff --check`: passed。
+- 完成 commit: 待提交（本次会话未执行 `git commit`，改动仅限
+  `src/App.jsx` 和 `src/styles.css`）。
 
 ### OBJECTSTATE-BOP-CONDITION-SIDECAR-001: Add explicit BOP condition sidecars
 

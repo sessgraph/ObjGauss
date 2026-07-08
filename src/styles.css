@@ -204,6 +204,23 @@ button:focus-visible {
   border-radius: 22px;
   transform: translateX(-50%);
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(93, 238, 249, 0.38) rgba(255, 255, 255, 0.05);
+  /* 卡片被视口边缘硬裁切时容易被误认为"到底了",两侧加渐隐提示可横向滚动。 */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 22px,
+    #000 calc(100% - 22px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 22px,
+    #000 calc(100% - 22px),
+    transparent
+  );
 }
 
 @media (min-width: 1181px) {
@@ -690,6 +707,14 @@ button:focus-visible {
   display: grid;
   grid-template-columns: repeat(3, 34px);
   gap: 8px;
+  justify-self: start;
+  padding: 6px;
+  /* 不透明衬底: .glassHud 的 backdrop-filter 会把身后的 3D 场景实时模糊透进面板,
+     颜色/亮度随相机角度和模型变化,足够透明的按钮行会被糊出不可控的色斑,
+     影响图标可读性。这里用接近不透明的深色背景挡住该背景渗透。 */
+  background: rgba(7, 12, 17, 0.86);
+  border: 1px solid rgba(153, 214, 222, 0.14);
+  border-radius: 10px;
 }
 
 .interactionModeRow button,
@@ -1467,7 +1492,16 @@ button:focus-visible {
   flex: 1 1 auto;
 }
 
-.floatingInspector h2,
+.floatingInspector h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.28;
+}
+
 .inspectorHead span {
   overflow: hidden;
   text-overflow: ellipsis;
