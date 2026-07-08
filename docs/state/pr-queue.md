@@ -228,6 +228,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-PHASE1-LEDGER-HANDOFF-001: Write Phase 1 ledger from BOP prediction handoff
+
+- 状态: done / local-bop-prediction-ledger-accounting
+- 类型: 标准 PR / ObjectState public pose dataset evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 目标: 让 BOP prediction-only handoff 在写出 prediction evidence package 后同步写出
+  Phase 1 evidence ledger，减少真实 BOP subset handoff 后的手工审计断点。
+- 已实施:
+  - `objectstate_bop_prediction_baseline_handoff(...)` 在
+    `prediction-evidence-package-summary.json` 之后写出
+    `phase1-evidence-ledger.json`。
+  - BOP handoff summary 新增 `phase1_evidence_ledger_summary` 和
+    `phase1_evidence_ledger_schema`。
+  - Handoff readiness 新增
+    `phase1_evidence_ledger_prediction_reviewable`，要求 Phase 1 ledger 暴露
+    reviewable prediction evidence。
+  - CLI 输出新增 `phase1_evidence_ledger_prediction_reviewable` 和
+    `phase1_evidence_ledger` file path。
+  - Phase 1 ledger maturity 新增 `prediction_reviewable`，用于 prediction-only
+    public / BOP evidence。
+- 边界:
+  - 只串联已有 prediction evidence package 和 Phase 1 ledger。
+  - 不下载 BOP 数据，不生成 Gaussian evidence，不创建 GT，不训练模型。
+  - 不声明 identity / intervention / counterfactual gate、public demo 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_bop_prediction_baseline_handoff.py objgauss/core/objectstate_phase1_evidence_ledger.py objgauss/cli.py tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_prediction_baseline_handoff.py tests/test_objectstate_phase1_evidence_ledger.py tests/test_core_namespace.py -q`: passed，19 tests。
+  - `uv run --extra dev pytest`: passed，426 tests。
+  - `npm run build`: passed；仅保留既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: ea3753e。
+
 ### OBJECTSTATE-BOP-PREDICTION-BASELINE-HANDOFF-001: Run BOP prediction baseline evidence handoff
 
 - 状态: done / local-bop-prediction-package-orchestration

@@ -665,9 +665,10 @@ intervention 或 world model。
 `objgauss-objectstate-phase1-evidence-ledger-v1`，并新增 CLI
 `objgauss object-state audit-phase1-evidence-ledger`。该 ledger 只读取已有
 identity / prediction / full reality evidence package summary JSON，复用各自 validator，
-输出 maturity（`identity_reviewable`、`identity_prediction_reviewable`、
-`full_reality_reviewable` 等）、sample scope、阶段 row count 和 issues。它不运行 handoff
-或 eval，不创建 GT，不生成 pass rows，也不声明 world model。
+输出 maturity（`identity_reviewable`、`prediction_reviewable`、
+`identity_prediction_reviewable`、`full_reality_reviewable` 等）、sample scope、阶段
+row count 和 issues。它不运行 handoff 或 eval，不创建 GT，不生成 pass rows，也不声明
+world model。
 随后补强 ledger 发现能力：CLI 现在支持 `--discover-root` / `--max-depth`，可在
 controlled capture 或 public dataset handoff root 下自动发现标准文件名
 `identity-evidence-package-summary.json`、`prediction-evidence-package-summary.json`、
@@ -693,9 +694,11 @@ target timestamp，不读取 target pose values；它不是 learned dynamics mod
 `--require-gaussian-files` acceptance，写出 `capture-manifest.json`、BOP acceptance /
 file audit / missing files、manifest-first candidate templates、baseline-filled
 prediction candidates、prediction eval summary、`controlled-real-prediction.json`
-和 prediction evidence package audit summary。它把 BOP prediction-only 路线从多条手工
-命令收敛为一个可复验本地 handoff；仍不下载 BOP 数据、不生成 Gaussian evidence、不训练或
-发布新模型、不创建 GT、不声明 intervention / counterfactual gate、不改 viewer/export 默认。
+和 prediction evidence package audit summary，并同步写出
+`phase1-evidence-ledger.json`。该 ledger 会把 BOP prediction-only evidence 记录为
+`prediction_reviewable` maturity。它把 BOP prediction-only 路线从多条手工命令收敛为一个
+可复验本地 handoff；仍不下载 BOP 数据、不生成 Gaussian evidence、不训练或发布新模型、
+不创建 GT、不声明 intervention / counterfactual gate、不改 viewer/export 默认。
 
 账面状态更新：训练模型主线 `TRAIN-GSPLAT-MVP-001` 已从
 `suspended / current-env-missing-torch-gsplat-cuda` 恢复并完成最小 full renderer smoke。
