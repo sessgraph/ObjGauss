@@ -238,6 +238,30 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_eval",
         "ObjectStateControlledIdentityThresholds",
     ),
+    "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA",
+    ),
+    "ObjectStateControlledPredictionThresholds": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "ObjectStateControlledPredictionThresholds",
+    ),
+    "evaluate_objectstate_controlled_prediction_candidates": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "evaluate_objectstate_controlled_prediction_candidates",
+    ),
+    "validate_objectstate_controlled_prediction_candidates": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "validate_objectstate_controlled_prediction_candidates",
+    ),
+    "validate_objectstate_controlled_prediction_eval_summary": (
+        "objgauss.core.objectstate_controlled_prediction_eval",
+        "validate_objectstate_controlled_prediction_eval_summary",
+    ),
     "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA": (
         "objgauss.core.objectstate_controlled_real_rows",
         "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA",

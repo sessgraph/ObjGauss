@@ -71,9 +71,12 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+    OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     ObjectStateControlledIdentityThresholds,
+    ObjectStateControlledPredictionThresholds,
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     OBJECTSTATE_ACTION_SCHEMA,
     OBJECTSTATE_CAUSAL_ACTIONS,
@@ -205,6 +208,7 @@ from objgauss.core import (
     write_objectstate_controlled_capture_bundle_template,
     objectstate_controlled_real_manifest_from_capture_manifest,
     evaluate_objectstate_controlled_identity_predictions,
+    evaluate_objectstate_controlled_prediction_candidates,
     objectstate_controlled_identity_handoff,
     objectstate_identity_predictions_from_trainable_artifact,
     objectstate_controlled_real_rows_summary,
@@ -287,6 +291,8 @@ from objgauss.core import (
     validate_objectstate_controlled_identity_handoff_summary,
     validate_objectstate_controlled_identity_predictions,
     validate_objectstate_controlled_identity_thresholds,
+    validate_objectstate_controlled_prediction_candidates,
+    validate_objectstate_controlled_prediction_eval_summary,
     validate_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
     validate_observation_model_config,
@@ -773,7 +779,15 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
                     "rgb": "rgb/000000.png",
                     "gaussian": "gaussians/000000.ply",
                 },
-                "objects": [{"object_id": "cup-001"}],
+                "objects": [
+                    {
+                        "object_id": "cup-001",
+                        "pose": {
+                            "position": [0.1, 0.2, 0.3],
+                            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                        },
+                    }
+                ],
             },
             {
                 "frame_id": "frame-000001",
@@ -782,7 +796,15 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
                     "rgb": "rgb/000001.png",
                     "gaussian": "gaussians/000001.ply",
                 },
-                "objects": [{"object_id": "cup-001"}],
+                "objects": [
+                    {
+                        "object_id": "cup-001",
+                        "pose": {
+                            "position": [0.11, 0.2, 0.3],
+                            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                        },
+                    }
+                ],
             },
         ],
     }
@@ -876,6 +898,47 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert identity_summary["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA
     assert identity_summary["status"] == "objectstate_controlled_identity_eval_pass"
     assert identity_summary["controlled_real_manifest"]["evidence_rows"][0][
+        "status"
+    ] == "pass"
+    assert OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA == (
+        "objgauss-objectstate-controlled-prediction-candidates-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA == (
+        "objgauss-objectstate-controlled-prediction-eval-v1"
+    )
+    prediction_candidates = {
+        "schema": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+        "sample_id": "namespace-controlled-capture",
+        "candidate": {
+            "candidate_id": "namespace-prediction-candidate",
+            "source": "namespace fixture",
+            "artifact_refs": ["outputs/controlled-real/namespace/predictions.json"],
+        },
+        "predictions": [
+            {
+                "source_frame_id": "frame-000000",
+                "target_frame_id": "frame-000001",
+                "object_id": "cup-001",
+                "predicted_position": [0.11, 0.2, 0.3],
+                "history_baseline_position": [0.1, 0.2, 0.3],
+            }
+        ],
+    }
+    assert validate_objectstate_controlled_prediction_candidates(
+        prediction_candidates
+    )["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA
+    prediction_thresholds = ObjectStateControlledPredictionThresholds()
+    prediction_summary = evaluate_objectstate_controlled_prediction_candidates(
+        capture_manifest,
+        prediction_candidates,
+        thresholds=prediction_thresholds,
+    )
+    assert validate_objectstate_controlled_prediction_eval_summary(
+        prediction_summary
+    ) is prediction_summary
+    assert prediction_summary["schema"] == OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA
+    assert prediction_summary["status"] == "objectstate_controlled_prediction_eval_pass"
+    assert prediction_summary["controlled_real_manifest"]["evidence_rows"][1][
         "status"
     ] == "pass"
     assert objectstate_identity_predictions_from_trainable_artifact is not None

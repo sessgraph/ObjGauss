@@ -163,6 +163,11 @@ from objgauss.core.objectstate_controlled_identity_eval import (
     evaluate_objectstate_controlled_identity_predictions,
     read_objectstate_controlled_identity_predictions,
 )
+from objgauss.core.objectstate_controlled_prediction_eval import (
+    ObjectStateControlledPredictionThresholds,
+    evaluate_objectstate_controlled_prediction_candidates,
+    read_objectstate_controlled_prediction_candidates,
+)
 from objgauss.core.objectstate_controlled_identity_handoff import (
     objectstate_controlled_identity_handoff,
 )
@@ -3412,6 +3417,51 @@ def _object_state_eval_controlled_identity(args: argparse.Namespace) -> None:
         raise ValueError("controlled identity eval did not pass")
 
 
+def _object_state_eval_controlled_prediction(args: argparse.Namespace) -> None:
+    capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
+    candidates = read_objectstate_controlled_prediction_candidates(args.predictions)
+    summary = evaluate_objectstate_controlled_prediction_candidates(
+        capture,
+        candidates,
+        thresholds=ObjectStateControlledPredictionThresholds(
+            max_state_ade=args.max_state_ade,
+            max_prediction_gap_vs_history_model=(
+                args.max_prediction_gap_vs_history_model
+            ),
+            max_error_ratio_vs_history_model=args.max_error_ratio_vs_history_model,
+            min_prediction_count=args.min_prediction_count,
+        ),
+    )
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"capture={args.capture_manifest}")
+    print(f"predictions={args.predictions}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"candidate_id={summary['candidate']['candidate_id']}")
+    print(f"prediction_eval_status={summary['status']}")
+    print(f"state_ade={metrics['state_ade']:.6f}")
+    print(f"history_ade={metrics['history_ade']:.6f}")
+    print(
+        "prediction_gap_vs_history_model="
+        f"{metrics['prediction_gap_vs_history_model']:.6f}"
+    )
+    print(f"error_ratio_vs_history_model={metrics['error_ratio_vs_history_model']:.6f}")
+    print(f"prediction_count={metrics['prediction_count']}")
+    print(f"mean_horizon_seconds={metrics['mean_horizon_seconds']:.6f}")
+    print(f"max_horizon_seconds={metrics['max_horizon_seconds']:.6f}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.controlled_real_output:
+        write_json(args.controlled_real_output, summary["controlled_real_manifest"])
+        print(f"controlled_real_manifest={args.controlled_real_output}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_controlled_prediction_eval_pass"
+    ):
+        raise ValueError("controlled prediction eval did not pass")
+
+
 def _object_state_export_identity_predictions(args: argparse.Namespace) -> None:
     capture = read_objectstate_controlled_capture_manifest(args.capture_manifest)
     artifact = read_trainable_kernel_identity_source(args.trainable_artifact)
@@ -4203,6 +4253,37 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_controlled_identity.add_argument("--allow-identity-collapse", action="store_true")
     eval_controlled_identity.add_argument("--require-pass", action="store_true")
     eval_controlled_identity.set_defaults(handler=_object_state_eval_controlled_identity)
+    eval_controlled_prediction = object_state_subparsers.add_parser(
+        "eval-controlled-prediction",
+        help=(
+            "score candidate future pose predictions against a controlled capture "
+            "manifest"
+        ),
+    )
+    eval_controlled_prediction.add_argument("capture_manifest", type=Path)
+    eval_controlled_prediction.add_argument("predictions", type=Path)
+    eval_controlled_prediction.add_argument("--summary-output", type=Path)
+    eval_controlled_prediction.add_argument("--controlled-real-output", type=Path)
+    eval_controlled_prediction.add_argument("--max-state-ade", type=float, default=0.05)
+    eval_controlled_prediction.add_argument(
+        "--max-prediction-gap-vs-history-model",
+        type=float,
+        default=0.02,
+    )
+    eval_controlled_prediction.add_argument(
+        "--max-error-ratio-vs-history-model",
+        type=float,
+        default=1.25,
+    )
+    eval_controlled_prediction.add_argument(
+        "--min-prediction-count",
+        type=int,
+        default=1,
+    )
+    eval_controlled_prediction.add_argument("--require-pass", action="store_true")
+    eval_controlled_prediction.set_defaults(
+        handler=_object_state_eval_controlled_prediction
+    )
     export_identity_predictions = object_state_subparsers.add_parser(
         "export-identity-predictions",
         help=(

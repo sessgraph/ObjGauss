@@ -863,6 +863,59 @@ video, create GT, run segmentation / tracking, compute pose prediction,
 compute action-conditioned metrics, train Gaussian or dynamics models, use
 replay / diffusion, or mutate viewer defaults.
 
+### OBJECTSTATE-CONTROLLED-PREDICTION-EVAL-001
+
+Add the first controlled real Stage 2 prediction metric evaluator.
+
+Required behavior:
+
+- Input a controlled capture manifest with timestamped 6DoF pose GT.
+- Input candidate future-pose predictions bound to
+  `(source_frame_id, target_frame_id, object_id)`.
+- Require each prediction to include both `predicted_position` from the
+  ObjectState state model and `history_baseline_position` from an explicit
+  history baseline.
+- Reject candidate predictions whose sample id, frame id, object id or pose GT
+  does not match the capture manifest.
+- Compute prediction metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `state_ade`, `history_ade` and `prediction_gap_vs_history_model`.
+- Emit a controlled-real manifest where the prediction row becomes `pass` or
+  `fail`, while identity / intervention rows remain blocked unless their
+  metrics already exist.
+- Keep this as an evaluator / handoff contract only; do not run a dynamics
+  model, infer pose GT or create history baselines.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_controlled_prediction_eval`.
+- Prediction schema:
+  `objgauss-objectstate-controlled-prediction-candidates-v1`.
+- Eval summary schema:
+  `objgauss-objectstate-controlled-prediction-eval-v1`.
+- `read_objectstate_controlled_prediction_candidates(...)` reads JSON.
+- `validate_objectstate_controlled_prediction_candidates(...)` validates
+  candidate metadata and per-object future-pose predictions.
+- `evaluate_objectstate_controlled_prediction_candidates(...)` compares
+  candidate predictions against capture pose GT and outputs pass / fail
+  metrics.
+- Metrics include `state_ade`, `history_ade`,
+  `prediction_gap_vs_history_model`, `error_ratio_vs_history_model`,
+  prediction count and horizon seconds.
+- Threshold defaults:
+  `max_state_ade=0.05m`,
+  `max_prediction_gap_vs_history_model=0.02m`,
+  `max_error_ratio_vs_history_model=1.25` and
+  `min_prediction_count=1`.
+- CLI command:
+  `objgauss object-state eval-controlled-prediction <capture.json> <predictions.json>`.
+- CLI outputs optional `--summary-output` and `--controlled-real-output`, plus
+  threshold args and `--require-pass`.
+
+Current scope remains Stage 2 prediction evaluation only. It does not capture
+video, create GT, run a prediction / dynamics model, compute identity or
+action-conditioned metrics, train Gaussian or dynamics models, use replay /
+diffusion, or mutate viewer defaults.
+
 ### OBJECTSTATE-IDENTITY-PREDICTION-ADAPTER-001
 
 Bridge candidate ObjectState outputs into the controlled identity evaluator.
