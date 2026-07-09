@@ -6,6 +6,7 @@
 > - `docs/architecture/objgauss-v1-kernel-contract.md`
 > - `docs/architecture/assignment-solver-v2-contract.md`
 > - `docs/architecture/objectstate-state-variable-gate.md`
+> - `docs/architecture/objectstate-teacher-evidence-contract.md`
 > - `docs/dataset/controlled-reality-contract.md`
 
 ## Purpose
@@ -434,10 +435,56 @@ Implemented v0.1 facts:
   `native_long_training_gate=blocked` and
   `semantic_long_training_gate=candidate_ready` for the current deterministic
   run.
-- This is a scoping fix only. It does not define `TeacherEvidenceBatch`, run a
-  leakage audit, introduce DINO / SAM / tracking dependencies, train a model,
-  enable temporal loss, run controlled real capture or unlock world-model
-  training.
+- This is a scoping fix only. The follow-up Teacher Evidence contract is now
+  defined separately, but leakage audit, DINO / SAM / tracking dependencies,
+  model training, temporal loss, controlled real capture and world-model
+  training remain out of scope.
+
+### OBJECTSTATE-TEACHER-EVIDENCE-CONTRACT-001
+
+Implemented v0.1 facts:
+
+- Architecture spec:
+  `docs/architecture/objectstate-teacher-evidence-contract.md`.
+- Core module:
+  `objgauss.core.objectstate_teacher_evidence`.
+- Batch schema:
+  `objgauss-objectstate-teacher-evidence-batch-v1`.
+- Contract schema:
+  `objgauss-objectstate-teacher-evidence-contract-v1`.
+- Contract summary schema:
+  `objgauss-objectstate-teacher-evidence-contract-summary-v1`.
+- Public API:
+  `TeacherEvidenceBatch`, `validate_teacher_evidence_batch(...)`,
+  `teacher_evidence_batch_summary(...)`,
+  `validate_teacher_evidence_batch_summary(...)`,
+  `objectstate_teacher_evidence_contract_summary(...)` and
+  `validate_objectstate_teacher_evidence_contract_summary(...)`.
+- A batch binds `sample_id`, `gaussian_ids`, `evidence_policy`,
+  `feature_matrix`, `source`, `confidence`, `uncertainty`, `provenance`,
+  `allowed_for_training`, `allowed_for_evaluation` and `leakage_risk`.
+- Summary artifacts expose feature shape / dtype and confidence / uncertainty
+  statistics, but they do not inline teacher feature values.
+- Allowed sources are `dino_v2`, `clip`, `sam2`, `grounding_dino`,
+  `tracking`, `teacher_fusion`, `synthetic_semantic` and `manual_fixture`.
+- Training permission requires an inference-time source plus `leakage_risk`
+  `none` or `low`. `synthetic_semantic` and `manual_fixture` remain evaluation
+  / fixture sources by default.
+- Required provenance keys are `producer`, `feature_space`, `input_refs` and
+  `generation_method`.
+- Forbidden provenance keys include `physical_identity`,
+  `physical_identity_label`, `identity_label`, `target_assignment`,
+  `oracle_object_id`, `gt_object_id`, `ground_truth_object_id` and
+  `test_label`, including nested keys.
+- The contract states that teacher evidence is perception evidence, not
+  ground-truth identity.
+- The next required audit remains
+  `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001`, covering semantic feature
+  shuffle, physical label ban, random semantic baseline and train / test
+  semantic source split.
+- This contract does not run teacher models, download weights, train
+  `AssignmentSolverV2`, run long smoke, add renderer / temporal loss, change
+  viewer defaults, claim real-data gates or unlock world-model training.
 
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 

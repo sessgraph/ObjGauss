@@ -54,6 +54,7 @@ from objgauss.core import (
     ObjectStateModelIdentityBenchmarkScenario,
     ObjectStateModelIdentityBenchmarkThresholds,
     ObjectStateModelIdentityGateThresholds,
+    TeacherEvidenceBatch,
     ObjectStateIdentityRow,
     DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES,
     ObjectStatePredictiveGateReport,
@@ -78,6 +79,9 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
     OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA,
     OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA,
+    OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA,
+    OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA,
+    OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA,
@@ -340,6 +344,8 @@ from objgauss.core import (
     objectstate_controlled_identity_evidence_package,
     objectstate_controlled_prediction_evidence_package,
     objectstate_controlled_dataset_contract_summary,
+    objectstate_teacher_evidence_contract_summary,
+    teacher_evidence_batch_summary,
     objectstate_assignment_mvp_summary,
     objectstate_assignment_train_dataset_summary,
     objectstate_assignment_train_smoke,
@@ -517,6 +523,9 @@ from objgauss.core import (
     validate_objectstate_bop_candidate_artifact_finalize_summary,
     validate_objectstate_controlled_identity_evidence_package_summary,
     validate_objectstate_controlled_dataset_contract_summary,
+    validate_objectstate_teacher_evidence_contract_summary,
+    validate_teacher_evidence_batch,
+    validate_teacher_evidence_batch_summary,
     validate_objectstate_assignment_mvp_summary,
     validate_objectstate_assignment_train_dataset_summary,
     validate_objectstate_assignment_train_run_summary,
@@ -1162,6 +1171,15 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA == (
         "objgauss-objectstate-controlled-dataset-contract-summary-v1"
     )
+    assert OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA == (
+        "objgauss-objectstate-teacher-evidence-batch-v1"
+    )
+    assert OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA == (
+        "objgauss-objectstate-teacher-evidence-contract-v1"
+    )
+    assert OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA == (
+        "objgauss-objectstate-teacher-evidence-contract-summary-v1"
+    )
     assert OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA == (
         "objgauss-objectstate-assignment-mvp-v1"
     )
@@ -1177,6 +1195,34 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_ASSIGNMENT_ABLATION_SCHEMA == (
         "objgauss-objectstate-assignment-ablation-v1"
     )
+    teacher_batch = TeacherEvidenceBatch(
+        sample_id="namespace-teacher-evidence",
+        gaussian_ids=("g0", "g1"),
+        feature_matrix=np.eye(2, dtype=np.float32),
+        source="dino_v2",
+        leakage_risk="low",
+        allowed_for_training=True,
+        provenance={
+            "producer": "namespace-test",
+            "feature_space": "teacher-embedding-v1",
+            "input_refs": ["fixture://namespace/frame-000000"],
+            "generation_method": "inference_time_teacher_embedding",
+        },
+    )
+    checked_teacher_batch = validate_teacher_evidence_batch(teacher_batch)
+    teacher_summary = teacher_evidence_batch_summary(checked_teacher_batch)
+    assert validate_teacher_evidence_batch_summary(teacher_summary) == teacher_summary
+    assert teacher_summary["feature_matrix"]["inline_values_stored"] is False
+    assert teacher_summary["claim_policy"]["teacher_evidence_is_not_ground_truth_identity"] is True
+    assert teacher_summary["permissions"]["allowed_for_training"] is True
+    teacher_contract = objectstate_teacher_evidence_contract_summary(
+        checked_teacher_batch
+    )
+    assert validate_objectstate_teacher_evidence_contract_summary(
+        teacher_contract
+    ) == teacher_contract
+    assert "target_assignment" in teacher_contract["forbidden_provenance_keys"]
+    assert "semantic_feature_shuffle" in teacher_contract["next_required_audits"]
     contract_summary = objectstate_controlled_dataset_contract_summary(
         capture_manifest
     )
@@ -1602,6 +1648,11 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert read_trainable_kernel_identity_source is not None
     assert objectstate_controlled_dataset_contract_summary is not None
     assert validate_objectstate_controlled_dataset_contract_summary is not None
+    assert objectstate_teacher_evidence_contract_summary is not None
+    assert teacher_evidence_batch_summary is not None
+    assert validate_teacher_evidence_batch is not None
+    assert validate_teacher_evidence_batch_summary is not None
+    assert validate_objectstate_teacher_evidence_contract_summary is not None
     assert objectstate_assignment_mvp_summary is not None
     assert validate_objectstate_assignment_mvp_summary is not None
     assert objectstate_assignment_train_dataset_summary is not None

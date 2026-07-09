@@ -395,6 +395,53 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TEACHER-EVIDENCE-CONTRACT-001: Freeze teacher evidence batch contract
+
+- 状态: done / objectstate-teacher-evidence-contract
+- 类型: 标准 PR / ObjectState teacher evidence contract
+- 架构规格:
+  - `docs/architecture/objectstate-teacher-evidence-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 风险记录: `docs/state/risks.md` / `R-018`
+- 目标: 在 semantic evidence 进入长训前，冻结 `TeacherEvidenceBatch` 的字段、
+  provenance、permission 和 leakage gate，防止把 teacher evidence 误读为 GT identity。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_teacher_evidence`。
+  - 新增 schema
+    `objgauss-objectstate-teacher-evidence-batch-v1`、
+    `objgauss-objectstate-teacher-evidence-contract-v1` 和
+    `objgauss-objectstate-teacher-evidence-contract-summary-v1`。
+  - 新增 `TeacherEvidenceBatch`，字段覆盖 `sample_id`、`gaussian_ids`、
+    `evidence_policy`、`feature_matrix`、`source`、`confidence`、`uncertainty`、
+    `provenance`、`allowed_for_training`、`allowed_for_evaluation` 和
+    `leakage_risk`。
+  - 新增 batch / summary / contract summary validator，并通过 `objgauss.core`
+    lazy namespace 暴露。
+  - Summary 只记录 feature matrix shape / dtype 与统计量，不内联 teacher feature values。
+  - 训练许可要求 inference-time source 且 `leakage_risk` 为 `none` 或 `low`。
+  - required provenance keys 为 `producer`、`feature_space`、`input_refs` 和
+    `generation_method`。
+  - forbidden provenance keys 覆盖 `physical_identity`、`physical_identity_label`、
+    `identity_label`、`target_assignment`、`oracle_object_id`、`gt_object_id`、
+    `ground_truth_object_id` 和 `test_label`，包括嵌套键。
+  - contract summary 明确下一步 leakage audit 必须覆盖 semantic feature shuffle、
+    physical label ban、random semantic baseline 和 train/test semantic source split。
+  - `R-018` 缓解状态已更新，但风险保持 open。
+- 边界:
+  - Teacher evidence 是 perception evidence，不是 ground-truth identity。
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不做 leakage audit，不训练模型，不跑 long smoke。
+  - 不启用 temporal / matching / renderer loss，不使用 GPU / torch / CUDA。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明真实 identity /
+    prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_teacher_evidence.py tests/test_core_namespace.py -q`: passed，13 tests。
+  - `uv run --extra dev pytest`: passed，629 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-IDENTITY-GATE-POLICY-SCOPING-001: Scope identity candidate gate to evidence policy
 
 - 状态: done / objectstate-identity-gate-policy-scoping

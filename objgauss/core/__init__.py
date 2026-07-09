@@ -126,6 +126,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_benchmark",
         "ObjectStateModelIdentityBenchmarkThresholds",
     ),
+    "TeacherEvidenceBatch": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "TeacherEvidenceBatch",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -894,6 +898,18 @@ _EXPORTS = {
         "objgauss.core.controlled_schema",
         "objectstate_controlled_dataset_contract_summary",
     ),
+    "objectstate_teacher_evidence_contract_summary": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "objectstate_teacher_evidence_contract_summary",
+    ),
+    "teacher_evidence_batch_summary": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "teacher_evidence_batch_summary",
+    ),
+    "validate_teacher_evidence_batch": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "validate_teacher_evidence_batch",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -921,6 +937,14 @@ _EXPORTS = {
     "validate_objectstate_controlled_dataset_contract_summary": (
         "objgauss.core.controlled_schema",
         "validate_objectstate_controlled_dataset_contract_summary",
+    ),
+    "validate_objectstate_teacher_evidence_contract_summary": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "validate_objectstate_teacher_evidence_contract_summary",
+    ),
+    "validate_teacher_evidence_batch_summary": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "validate_teacher_evidence_batch_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
@@ -1201,6 +1225,18 @@ _EXPORTS = {
     "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA": (
         "objgauss.core.controlled_schema",
         "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA",
+    ),
+    "OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA",
+    ),
+    "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA",
+    ),
+    "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_teacher_evidence",
+        "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
         "objgauss.core.objectstate_assignment_mvp",

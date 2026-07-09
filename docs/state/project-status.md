@@ -140,8 +140,7 @@ easy / medium / hard 三档，共 15 scenarios / 60 identity pairs，并写出
 为 `candidate_ready`：`assignment_solver_v2` overall retrieval@1 为 `1.000000`，
 `xyz_centroid` 为 `0.250000`，random 为 `0.300000`，oracle 为 `1.000000`；五类扰动下
 solver 均高于 xyz。该结果只允许在 report evidence policy 下考虑更长 identity robustness smoke，
-不解锁 world-model
-训练；它不代表 real controlled capture pass、不做 identity ablation、不启用 temporal loss，
+不解锁 world-model 训练；它不代表 real controlled capture pass、不做 identity ablation、不启用 temporal loss，
 也不声明 prediction / causal / reality gate 或 world model 已通过。
 
 随后完成 `OBJECTSTATE-MODEL-IDENTITY-ABLATION-001`：新增
@@ -177,6 +176,28 @@ identity ablation 的每个 variant 也把自身 policy 传入 benchmark；当�
 gate 语义和 evidence artifact，不定义 TeacherEvidenceBatch、不做 leakage audit、不训练、
 不启用 temporal loss、不引入 teacher 模型依赖、不修改 viewer/export 默认，也不声明真实
 identity / prediction / causal / reality gate 或 world model 已通过。
+
+随后完成 `OBJECTSTATE-TEACHER-EVIDENCE-CONTRACT-001`：新增
+`docs/architecture/objectstate-teacher-evidence-contract.md` 和
+`objgauss.core.objectstate_teacher_evidence`，冻结
+`TeacherEvidenceBatch` / contract / summary 三个 schema：
+`objgauss-objectstate-teacher-evidence-batch-v1`、
+`objgauss-objectstate-teacher-evidence-contract-v1` 和
+`objgauss-objectstate-teacher-evidence-contract-summary-v1`。Batch 绑定
+`sample_id`、`gaussian_ids`、`evidence_policy`、`feature_matrix`、`source`、
+`confidence`、`uncertainty`、`provenance`、`allowed_for_training`、
+`allowed_for_evaluation` 和 `leakage_risk`；summary 只暴露矩阵 shape / dtype
+和统计量，不内联 feature values。允许的来源包括 `dino_v2`、`clip`、`sam2`、
+`grounding_dino`、`tracking`、`teacher_fusion`、`synthetic_semantic` 和
+`manual_fixture`；训练许可必须同时满足 inference-time source、`leakage_risk`
+为 `none` / `low`、provenance 含 `producer` / `feature_space` / `input_refs` /
+`generation_method` 且不含 `physical_identity`、`identity_label`、
+`target_assignment`、`oracle_object_id` 等 GT / identity 泄漏键。该合同明确
+teacher evidence 是 perception evidence，不是 ground-truth identity；它不运行
+teacher 模型、不下载权重、不训练、不跑 long smoke、不启用 temporal / renderer loss、
+不修改 viewer/export 默认，也不声明真实 gate 或 world model。下一步仍需
+`OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` 覆盖 semantic shuffle、
+physical label ban、random semantic baseline 和 train/test semantic source split。
 
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
