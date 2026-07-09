@@ -4510,6 +4510,13 @@ npm run acceptance:demo
    `cakewalk-room-3dgs-local` / `cakewalk-train-3dgs-local` 并生成 ignored
    `public/samples/room_objects.ply` / `public/samples/train_objects.ply` 后，可在
    viewer 模型版本列表中作为本地静态候选加载，但不会出现在首屏 featured dock。
+   2026-07-09 本地已执行这两个 P0 小场景 pull：`room.splat` 写入
+   `public/samples/room.splat` / `public/samples/room_objects.ply`，约 1,593,376
+   Gaussians / 8 clusters，文件大小约 49 MB / 60 MB；`train.splat` 写入
+   `public/samples/train.splat` / `public/samples/train_objects.ply`，约 1,026,508
+   Gaussians / 5 clusters，文件大小约 32 MB / 39 MB。这些仍是 ignored local
+   static-scene artifacts，只用于 viewer / segmentation / cross-sample smoke，不提交
+   git，也不进入首屏 featured dock、viewer/export 默认或 State Variable Gate pass row。
    `GAUSSIAN-SCENE-EXPANDED-SOURCE-TRIAGE-001` 继续补充
    cakewalk 现成 Gaussian PLY、GaussianSplats3D sample archive 和 Niantic SPZ
    samples 作为后续格式适配候选；这些需要 `.ply` / `.ksplat` / `.spz` import

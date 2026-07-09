@@ -896,6 +896,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - 未运行 pytest；本切片只改 frontend metadata 和 docs，不改 Python 行为。
   - 完成 commit: 本提交。
 
+### GAUSSIAN-SCENE-LOCAL-PULL-ROOM-TRAIN-001: Pull small ready-made Gaussian scenes into local viewer assets
+
+- 状态: done / gaussian-scene-local-pull-room-train
+- 类型: local asset run / ignored outputs
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把已登记并已暴露为非默认 viewer candidate 的 `room` / `train` 现成
+  Gaussian scene 实际拉到本工作区，使 UI 模型版本列表中的本地候选有真实
+  `/samples/*` 文件可加载。
+- 已实施:
+  - 执行 `uv run objgauss assets pull cakewalk-room-3dgs-local`，生成 ignored
+    `outputs/assets/raw/room.splat`、`outputs/assets/converted/room.ply`、
+    `public/samples/room.splat` 和 `public/samples/room_objects.ply`。
+  - 执行 `uv run objgauss assets pull cakewalk-train-3dgs-local`，生成 ignored
+    `outputs/assets/raw/train.splat`、`outputs/assets/converted/train.ply`、
+    `public/samples/train.splat` 和 `public/samples/train_objects.ply`。
+  - `room_objects.ply` 为 1,593,376 Gaussians / 8 object clusters；
+    `train_objects.ply` 为 1,026,508 Gaussians / 5 object clusters。
+- 边界:
+  - 不提交 `outputs/` 或 `public/samples/` 大文件。
+  - 不拉取 `truck` / `garden` / `bicycle` / `stump` / `treehill` 大场景。
+  - 不修改 viewer / export 默认，不把混合许可静态场景放进 featured dock。
+  - 不把静态 Gaussian scene 计入 State Variable Gate pass row 或 world-model evidence。
+- 验证:
+  - `uv run objgauss assets pull cakewalk-room-3dgs-local`: passed。
+  - `uv run objgauss assets pull cakewalk-train-3dgs-local`: passed。
+  - `uv run objgauss stats public/samples/room_objects.ply`: passed。
+  - `uv run objgauss stats public/samples/train_objects.ply`: passed。
+  - `uv run objgauss assets list --pullable`: passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
 
 - 状态: done / public-interaction-action-gt-gate
