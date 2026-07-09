@@ -395,6 +395,25 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### TRAINING-DATA-TEACHER-RESEARCH-NOTES-001: Organize training data and teacher model research notes
+
+- 状态: done / docs-only research intake
+- 类型: 文档 / training research planning
+- 目标: 将 Owner 提供的 ObjGauss 训练数据来源与教师模型资料整理成项目内可引用的后续开发资料。
+- 已实施:
+  - 新增 `docs/training/objgauss-training-data-teacher-models.md`。
+  - 将附件内容收敛为数据源分层、阶段路线、teacher ensemble 角色、统一中间数据形状、loss / gate 映射、评估指标、baseline / ablation 和建议 backlog。
+  - 明确该资料是 research input / planning aid，不是 architecture contract、asset registry、下载记录或已落地能力。
+  - 同步 `docs/state/project-status.md`，记录该 docs-only intake 及边界。
+- 边界:
+  - 不下载数据、不新增依赖、不改训练代码、不改 viewer/export 默认。
+  - 不把 SAM2、Grounding DINO、DINOv2、CoTracker、TAPIR、VGGT、MASt3R、SAGA、LangSplat 或任何外部数据集设为默认能力。
+  - 所有许可、可用性和数据字段事实在实际 ingestion 前仍需官方来源复核。
+- 完成 commit: 本提交。
+- 验证:
+  - `git diff --check`: passed。
+  - Docs-only slice; 未运行 `uv run --extra dev pytest` 或 `npm run build`。
+
 ### OBJECTSTATE-BOP-REAL-BUNDLE-ADAPTER-001: Convert BOP reality rows into real evidence bundles
 
 - 状态: done / bop-real-evidence-bundle-adapter

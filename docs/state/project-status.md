@@ -11,6 +11,15 @@ CLI、资产布局、指标、模型产物和文档都可能在 stable release �
 ignored `outputs/` 产物用于研究复现和 handoff，不能表述为 production-ready 或
 commercial demo release。
 
+2026-07-09 docs-only research intake: Owner 提供的 ObjGauss 训练数据来源与教师模型
+资料已整理为 `docs/training/objgauss-training-data-teacher-models.md`。该文档把
+uCO3D / CO3D / VOS / tracking / dynamic geometry / action data、SAM2 /
+Grounding DINO / DINOv2 / CoTracker / TAPIR / geometry teachers / SAGA-style
+baseline 等内容收敛成 project-facing research notes 和后续 backlog 候选；它不是
+architecture contract，不登记新 asset，不下载数据，不引入默认依赖，也不改变当前
+State Variable Gate 优先级。所有外部数据集、教师模型、许可和可用性事实在实际
+ingestion 前仍需官方来源复核。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，
