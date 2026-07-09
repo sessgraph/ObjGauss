@@ -185,6 +185,7 @@ def objectstate_bop_real_evidence_bundle_from_summaries(
     reality = validate_objectstate_bop_reality_rows_summary(reality_rows_summary)
     manifest = acceptance["adapter"]["manifest"]
     sample = manifest["sample"]
+    sample_id = str(reality["sample_id"])
     bundle_source_kind = source_kind or reality["source_kind"]
     if bundle_source_kind not in {"public_replay", "controlled_real"}:
         raise ValueError("BOP real evidence bundle source_kind is unsupported")
@@ -192,13 +193,17 @@ def objectstate_bop_real_evidence_bundle_from_summaries(
         "BOP scene_camera.json / scene_gt.json / scene_gt_info.json via "
         "objectstate_bop_capture_adapter"
     )
-    observation_rows = _observation_rows(manifest)
-    object_pose_rows = _object_pose_rows(manifest)
-    identity_link_rows = _identity_link_rows(manifest)
-    state_transition_rows = _state_transition_rows(object_pose_rows)
-    action_interval_rows = _action_interval_rows(manifest)
+    observation_rows = _observation_rows(manifest, sample_id=sample_id)
+    object_pose_rows = _object_pose_rows(manifest, sample_id=sample_id)
+    identity_link_rows = _identity_link_rows(manifest, sample_id=sample_id)
+    state_transition_rows = _state_transition_rows(
+        object_pose_rows,
+        sample_id=sample_id,
+    )
+    action_interval_rows = _action_interval_rows(manifest, sample_id=sample_id)
     gate_accounting_rows = _gate_accounting_rows(
         reality,
+        sample_id=sample_id,
         transitions=state_transition_rows,
         actions=action_interval_rows,
         source_summary_ref=source_summary_ref,
@@ -207,9 +212,9 @@ def objectstate_bop_real_evidence_bundle_from_summaries(
         "schema": OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
         "kind": "objectstate_real_evidence_bundle",
         "sample": {
-            "sample_id": str(reality["sample_id"]),
+            "sample_id": sample_id,
             "scene_id": _scene_id(acceptance),
-            "sequence_id": str(reality["sample_id"]),
+            "sequence_id": sample_id,
             "source_dataset": str(
                 acceptance["adapter"]["source"].get("dataset_id")
                 or "bop-public-dataset"
@@ -350,7 +355,11 @@ def validate_objectstate_bop_real_evidence_bundle_adapter_summary(
     return dict(payload)
 
 
-def _observation_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _observation_rows(
+    manifest: Mapping[str, Any],
+    *,
+    sample_id: str,
+) -> list[dict[str, Any]]:
     rows = []
     for frame in manifest["frames"]:
         observation = {}
@@ -367,7 +376,7 @@ def _observation_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "schema": OBJECTSTATE_REAL_OBSERVATION_ROW_SCHEMA,
-                "row_id": f"bop-observation:{frame['frame_id']}",
+                "row_id": f"bop-observation:{sample_id}:{frame['frame_id']}",
                 "frame_id": str(frame["frame_id"]),
                 "timestamp": float(frame["timestamp"]),
                 "camera_id": _camera_id(manifest),
@@ -377,7 +386,11 @@ def _observation_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _object_pose_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _object_pose_rows(
+    manifest: Mapping[str, Any],
+    *,
+    sample_id: str,
+) -> list[dict[str, Any]]:
     rows = []
     camera_id = _camera_id(manifest)
     for frame in manifest["frames"]:
@@ -388,7 +401,7 @@ def _object_pose_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
             rows.append(
                 {
                     "schema": OBJECTSTATE_REAL_OBJECT_POSE_ROW_SCHEMA,
-                    "row_id": f"bop-pose:{frame_id}:{object_id}",
+                    "row_id": f"bop-pose:{sample_id}:{frame_id}:{object_id}",
                     "frame_id": frame_id,
                     "timestamp": float(frame["timestamp"]),
                     "camera_id": camera_id,
@@ -403,7 +416,11 @@ def _object_pose_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _identity_link_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _identity_link_rows(
+    manifest: Mapping[str, Any],
+    *,
+    sample_id: str,
+) -> list[dict[str, Any]]:
     rows = []
     for frame in manifest["frames"]:
         for item in frame["objects"]:
@@ -412,7 +429,7 @@ def _identity_link_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
             rows.append(
                 {
                     "schema": OBJECTSTATE_REAL_IDENTITY_LINK_ROW_SCHEMA,
-                    "row_id": f"bop-identity:{frame_id}:{object_id}",
+                    "row_id": f"bop-identity:{sample_id}:{frame_id}:{object_id}",
                     "frame_id": frame_id,
                     "timestamp": float(frame["timestamp"]),
                     "object_id": object_id,
@@ -424,7 +441,11 @@ def _identity_link_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _action_interval_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _action_interval_rows(
+    manifest: Mapping[str, Any],
+    *,
+    sample_id: str,
+) -> list[dict[str, Any]]:
     rows = []
     for action in manifest.get("actions", ()):
         vector = action.get("action_vector")
@@ -434,7 +455,7 @@ def _action_interval_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "schema": OBJECTSTATE_REAL_ACTION_INTERVAL_ROW_SCHEMA,
-                "row_id": f"bop-action:{action_id}",
+                "row_id": f"bop-action:{sample_id}:{action_id}",
                 "action_id": action_id,
                 "action_type": str(action["action_type"]),
                 "object_id": str(action["object_id"]),
@@ -450,6 +471,8 @@ def _action_interval_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def _state_transition_rows(
     object_pose_rows: Sequence[Mapping[str, Any]],
+    *,
+    sample_id: str,
 ) -> list[dict[str, Any]]:
     by_object: dict[str, list[Mapping[str, Any]]] = {}
     for row in object_pose_rows:
@@ -461,7 +484,7 @@ def _state_transition_rows(
             source_frame_id = str(source["frame_id"])
             target_frame_id = str(target["frame_id"])
             transition_id = (
-                f"bop-transition:{object_id}:{source_frame_id}:{target_frame_id}"
+                f"bop-transition:{sample_id}:{object_id}:{source_frame_id}:{target_frame_id}"
             )
             transitions.append(
                 {
@@ -484,6 +507,7 @@ def _state_transition_rows(
 def _gate_accounting_rows(
     reality: Mapping[str, Any],
     *,
+    sample_id: str,
     transitions: Sequence[Mapping[str, Any]],
     actions: Sequence[Mapping[str, Any]],
     source_summary_ref: str | None,
@@ -491,7 +515,7 @@ def _gate_accounting_rows(
     first_transition = transitions[0] if transitions else None
     first_action = actions[0] if actions else None
     rows = []
-    for row in reality["rows"]:
+    for index, row in enumerate(reality["rows"]):
         evidence_kind = str(row["evidence_kind"])
         accounting_status = _accounting_status(row)
         reason = _accounting_reason(row, accounting_status)
@@ -508,7 +532,12 @@ def _gate_accounting_rows(
                 )
         accounting = {
             "schema": OBJECTSTATE_REAL_GATE_ACCOUNTING_ROW_SCHEMA,
-            "row_id": f"bop-real-accounting:{evidence_kind}",
+            "row_id": _accounting_row_id(
+                row,
+                sample_id=sample_id,
+                evidence_kind=evidence_kind,
+                index=index,
+            ),
             "evidence_kind": evidence_kind,
             "accounting_status": accounting_status,
             "metrics": _metrics(row, evidence_kind),
@@ -532,6 +561,19 @@ def _gate_accounting_rows(
             accounting["reason"] = reason
         rows.append(accounting)
     return rows
+
+
+def _accounting_row_id(
+    row: Mapping[str, Any],
+    *,
+    sample_id: str,
+    evidence_kind: str,
+    index: int,
+) -> str:
+    source_row_id = row.get("row_id")
+    if isinstance(source_row_id, str) and source_row_id.strip():
+        return f"bop-real-accounting:{source_row_id.strip()}"
+    return f"bop-real-accounting:{sample_id}:{index}:{evidence_kind}"
 
 
 def _accounting_status(row: Mapping[str, Any]) -> str:

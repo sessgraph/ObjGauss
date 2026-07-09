@@ -163,7 +163,10 @@ def test_bop_reality_rows_enter_real_evidence_bundle_ledger(tmp_path):
         "evidence_incomplete": 1,
         "unsupported": 0,
     }
-    assert [(row["evidence_kind"], row["accounting_status"]) for row in bundle["gate_accounting_rows"]] == [
+    assert [
+        (row["evidence_kind"], row["accounting_status"])
+        for row in bundle["gate_accounting_rows"]
+    ] == [
         ("identity", "fail"),
         ("prediction", "pass"),
         ("intervention", "evidence_incomplete"),
@@ -212,6 +215,47 @@ def test_bop_reality_rows_enter_real_evidence_bundle_ledger(tmp_path):
     ] is True
 
 
+def test_bop_real_evidence_bundle_row_ids_are_sample_scoped(tmp_path):
+    bundle_paths = []
+    for sample_id in ("bop-ycbv-rgbd-scene-000001", "bop-lmo-rgbd-scene-000002"):
+        source_summary = _rgbd_local_row_summary(
+            tmp_path / sample_id,
+            sample_id=sample_id,
+        )
+        acceptance = source_summary["baseline_local_row_handoff"]["local_row_handoff"][
+            "identity_handoff"
+        ]["acceptance"]
+        reality = objectstate_bop_reality_rows_summary(source_summary)
+        adapter = objectstate_bop_real_evidence_bundle_adapter_summary(
+            acceptance,
+            reality,
+            source_summary_ref=f"{sample_id}/bop-reality-rows-summary.json",
+        )
+        bundle = adapter["bundle"]
+        accounting_ids = [row["row_id"] for row in bundle["gate_accounting_rows"]]
+        assert all(sample_id in row_id for row_id in accounting_ids)
+        bundle_path = tmp_path / sample_id / "bop-real-evidence-bundle.json"
+        _write_json(bundle_path, bundle)
+        bundle_paths.append(bundle_path)
+
+    ledger = write_objectstate_real_evidence_bundle_ledger(
+        bundle_paths,
+        output_root=tmp_path / "bop-real-bundle-ledger",
+    )
+
+    assert ledger["status"] == "objectstate_real_evidence_bundle_ledger_reviewable"
+    assert ledger["ledger"]["duplicate_row_ids"] == []
+    assert ledger["bundle_count"] == 2
+    assert ledger["row_counts"] == {
+        "row_count": 6,
+        "pass_row_count": 2,
+        "fail_row_count": 2,
+        "blocked_row_count": 2,
+        "evidence_incomplete_row_count": 2,
+        "unsupported_row_count": 0,
+    }
+
+
 def test_bop_real_evidence_bundle_cli_writes_bundle(tmp_path, capsys):
     source_summary = _rgbd_local_row_summary(tmp_path)
     acceptance = source_summary["baseline_local_row_handoff"]["local_row_handoff"][
@@ -254,7 +298,7 @@ def test_bop_real_evidence_bundle_cli_writes_bundle(tmp_path, capsys):
     assert validate_objectstate_bop_real_evidence_bundle_adapter_summary(adapter) == adapter
 
 
-def _rgbd_local_row_summary(tmp_path):
+def _rgbd_local_row_summary(tmp_path, *, sample_id="bop-ycbv-rgbd-scene-000001"):
     scene_root = tmp_path / "bop-rgbd-scene"
     output_root = tmp_path / "rgbd-baseline-local-row"
     sidecar_path = scene_root / "bop-condition-sidecar.json"
@@ -263,7 +307,7 @@ def _rgbd_local_row_summary(tmp_path):
     return objectstate_bop_rgbd_baseline_local_row_handoff(
         scene_root,
         output_root=output_root,
-        sample_id="bop-ycbv-rgbd-scene-000001",
+        sample_id=sample_id,
         condition_sidecar=sidecar_path,
         ply_format="ascii",
         max_points_per_frame=None,

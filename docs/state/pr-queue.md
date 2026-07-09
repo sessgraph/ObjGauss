@@ -434,6 +434,52 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
   - 完成 commit: 本提交。
 
+### OBJECTSTATE-BOP-REAL-BUNDLE-LEDGER-RUN-001: Run BOP real bundle ledger on public replay outputs
+
+- 状态: done / bop-real-bundle-ledger-run
+- 类型: 标准 PR / ObjectState Phase 1 public replay evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 不只用测试 fixture，而是在本地 ignored HOPE / LMO public replay 产物上运行
+  BOP real evidence bundle adapter、real bundle ledger 和 package audit，形成真实
+  Phase 1 evidence-system 总表。
+- 已实施:
+  - 运行 HOPE `bop-acceptance-summary.json` + `bop-reality-rows-summary.json` 到
+    `bop-real-evidence-bundle.json`。结果为 `public_replay` ready，
+    observation/object pose/identity link/state transition rows 分别为 `3 / 54 / 54 / 36`，
+    accounting 为 `pass=1 / fail=1 / evidence_incomplete=1 / unsupported=0`。
+  - 运行 LMO `bop-acceptance-summary.json` + `bop-reality-rows-summary.json` 到
+    `bop-real-evidence-bundle.json`。结果为 `public_replay` ready，
+    observation/object pose/identity link/state transition rows 分别为 `3 / 24 / 24 / 16`，
+    accounting 为 `pass=0 / fail=2 / evidence_incomplete=1 / unsupported=0`。
+  - 双 bundle `audit-real-evidence-bundle-ledger` 首次暴露
+    `bop-real-accounting:identity|prediction|intervention` 跨样本 row id 重复；
+    已将 BOP adapter 生成的 BOP-derived row id 改为 sample-scoped，并新增双 bundle
+    regression test。
+  - 复跑双 bundle ledger 后状态为 `objectstate_real_evidence_bundle_ledger_reviewable`，
+    `row_count=6`、`pass_row_count=1`、`fail_row_count=3`、
+    `blocked_row_count=2`、`evidence_incomplete_row_count=2`、
+    `unsupported_row_count=0`、`duplicate_row_ids=[]`。
+  - Package audit 通过 `--require-phase1-acceptance`：
+    `phase1_acceptance_status=objectstate_phase1_evidence_system_acceptance_pass`。
+- 边界:
+  - 生成的 bundle / ledger / package audit 仍在 ignored `outputs/evidence/`，不提交。
+  - Full reality gate 仍 fail，不声明 identity pass、intervention pass、reality gate pass
+    或 world-model proof。
+  - 不下载数据、不创建 GT、不重建 Gaussian、不训练模型、不修改 viewer/export 默认。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_bop_real_evidence_bundle.py tests/test_objectstate_bop_reality_rows.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_reality_rows.py -q`: 5 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_reality_rows.py tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: 23 passed。
+  - `uv run objgauss object-state bop-real-evidence-bundle ...HOPE... --require-ready`: passed。
+  - `uv run objgauss object-state bop-real-evidence-bundle ...LMO... --require-ready`: passed。
+  - `uv run objgauss object-state audit-real-evidence-bundle-ledger ... --require-reviewable`: passed。
+  - `uv run objgauss object-state audit-real-evidence-bundle-ledger-package ... --require-reviewable --require-phase1-acceptance`: passed。
+  - `uv run --extra dev pytest`: 603 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-REAL-BUNDLE-LEDGER-PHASE1-ACCEPTANCE-001: Audit Phase 1 real evidence-system acceptance
 
 - 状态: done / real-evidence-bundle-ledger-phase1-acceptance

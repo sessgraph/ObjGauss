@@ -4496,6 +4496,21 @@ npm run acceptance:demo
    `evidence_incomplete=1` 的可审计 Phase 1 accounting，并通过 package
    `phase1_acceptance_status=objectstate_phase1_evidence_system_acceptance_pass`；
    这仍不声明 reality gate pass 或 world-model proof。
+   2026-07-09 随后在本地 ignored HOPE + LMO public replay outputs 上复跑真实链路：
+   两个 `bop-real-evidence-bundle.json` 均为 ready，HOPE 为
+   `pass=1 / fail=1 / evidence_incomplete=1`，LMO 为
+   `pass=0 / fail=2 / evidence_incomplete=1`。首次双 bundle ledger 暴露
+   `bop-real-accounting:identity|prediction|intervention` 跨样本 row id 重复，
+   已将 BOP adapter 生成的 observation / pose / identity / action / transition /
+   gate accounting row id 改为 sample-scoped。复跑
+   `audit-real-evidence-bundle-ledger` 后 package 变为 reviewable：
+   `row_count=6`、`pass=1`、`fail=3`、`blocked=2`、
+   `evidence_incomplete=2`、`unsupported=0`、`duplicate_row_ids=[]`；
+   `audit-real-evidence-bundle-ledger-package --require-phase1-acceptance`
+   通过，`phase1_acceptance_status=objectstate_phase1_evidence_system_acceptance_pass`。
+   Full reality gate 仍按设计为 fail：identity persistence 是真实 fail evidence，
+   predictive sufficiency 只有 HOPE pass / LMO fail，counterfactual action interface
+   仍 blocked，`state_variable_intervention_ready_bundle_count=0`。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck`、`garden`、
    `bicycle`、`stump`、`treehill` 或 GraphDECO / Inria official large results；
