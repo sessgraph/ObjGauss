@@ -655,6 +655,34 @@ Implemented v0.1 facts:
   claim real-data identity pass, prediction / causal / reality gate success or
   world-model training.
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-001
+
+Implemented v0.1 facts:
+
+- Architecture spec:
+  `docs/architecture/objectstate-controlled-capture-handoff.md`.
+- Core module:
+  `objgauss.core.objectstate_controlled_capture_handoff`.
+- Handoff schema:
+  `objgauss-objectstate-controlled-capture-handoff-v1`.
+- Public API:
+  `objectstate_controlled_capture_handoff_summary(...)` and
+  `validate_objectstate_controlled_capture_handoff_summary(...)`.
+- The handoff consumes a passed
+  `objgauss-objectstate-temporal-assignment-v1` summary and routes it to the
+  existing controlled capture environment and bundle readiness toolchain.
+- Without capture host preflight, the handoff is valid but blocked. With a
+  ready controlled capture environment summary, it reports
+  `objectstate_controlled_capture_collection_ready`. With a ready controlled
+  capture bundle readiness summary, it can report
+  `objectstate_controlled_capture_handoff_ready`.
+- It points to existing commands for environment preflight, bundle template,
+  bundle readiness and identity bundle handoff instead of duplicating capture
+  logic.
+- This handoff does not capture video, create GT, reconstruct Gaussians, run
+  identity / prediction / intervention handoff, train models, write public
+  samples, change viewer/export defaults or claim reality gate pass.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

@@ -395,6 +395,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-CONTROLLED-CAPTURE-001: Route temporal pass back to controlled capture
+
+- 状态: done / objectstate-controlled-capture-handoff
+- 类型: 标准 PR / ObjectState controlled capture handoff
+- 架构规格:
+  - `docs/architecture/objectstate-controlled-capture-handoff.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把 synthetic temporal assignment pass 接回既有 controlled capture environment /
+  bundle readiness 工具链，明确下一步如何回到真实 controlled evidence。
+- 已实施:
+  - 新增 `docs/architecture/objectstate-controlled-capture-handoff.md`。
+  - 新增 `objgauss.core.objectstate_controlled_capture_handoff`。
+  - 新增 schema `objgauss-objectstate-controlled-capture-handoff-v1`。
+  - 新增 `objectstate_controlled_capture_handoff_summary(...)` 和
+    `validate_objectstate_controlled_capture_handoff_summary(...)`。
+  - Handoff 消费 passed `objgauss-objectstate-temporal-assignment-v1` summary。
+  - 没有 capture environment summary 时输出 valid blocked 状态和 capture host preflight
+    next action。
+  - 有 ready capture environment summary 时输出
+    `objectstate_controlled_capture_collection_ready`，指向 bundle skeleton、RGB /
+    Gaussian evidence、objects / frames / annotations CSV 和 bundle readiness audit。
+  - 保留 ready controlled capture bundle summary 作为未来
+    `objectstate_controlled_capture_handoff_ready` 的 gate。
+  - 核心 lazy namespace 暴露 handoff schema、summary 和 validator。
+- 边界:
+  - 不采集视频，不创建 GT，不重建 Gaussians。
+  - 不运行 identity / prediction / intervention handoff，不运行 reality gate 或 ledger。
+  - 不训练模型，不启用 renderer loss、dynamics、diffusion、replay buffer。
+  - 不写 public samples，不修改 viewer/export 默认，不声明真实 gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_capture_handoff.py tests/test_objectstate_temporal_assignment.py tests/test_core_namespace.py -q`: passed，13 tests。
+  - `uv run --extra dev pytest`: passed，645 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-TEMPORAL-ASSIGNMENT-001: Add bounded temporal consistency smoke
 
 - 状态: done / objectstate-temporal-assignment

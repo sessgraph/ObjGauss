@@ -71,6 +71,7 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA,
+    OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA,
@@ -333,6 +334,7 @@ from objgauss.core import (
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_bundle_readiness,
     objectstate_controlled_capture_environment,
+    objectstate_controlled_capture_handoff_summary,
     objectstate_controlled_capture_file_audit,
     objectstate_controlled_capture_import_summary,
     objectstate_controlled_capture_manifest_from_bundle,
@@ -492,6 +494,7 @@ from objgauss.core import (
     validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_bundle_readiness_summary,
     validate_objectstate_controlled_capture_environment_summary,
+    validate_objectstate_controlled_capture_handoff_summary,
     validate_objectstate_controlled_capture_frames_summary,
     validate_objectstate_controlled_capture_annotation_finalize_summary,
     validate_objectstate_controlled_capture_annotation_template_summary,
@@ -1331,6 +1334,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA == (
         "objgauss-objectstate-controlled-capture-environment-v1"
     )
+    assert OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA == (
+        "objgauss-objectstate-controlled-capture-handoff-v1"
+    )
     assert OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA == (
         "objgauss-objectstate-controlled-capture-frames-v1"
     )
@@ -1365,6 +1371,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert objectstate_controlled_capture_file_audit is not None
     assert objectstate_controlled_capture_environment is not None
+    assert objectstate_controlled_capture_handoff_summary is not None
     assert objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert objectstate_controlled_capture_import_summary is not None
     assert objectstate_controlled_capture_manifest_from_bundle is not None
@@ -1382,6 +1389,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     )
     assert validate_objectstate_controlled_capture_file_audit_summary is not None
     assert validate_objectstate_controlled_capture_environment_summary is not None
+    assert validate_objectstate_controlled_capture_handoff_summary is not None
     assert validate_objectstate_controlled_capture_bundle_acceptance_summary is not None
     assert validate_objectstate_controlled_capture_import_summary is not None
     assert validate_objectstate_transition_dataset is not None

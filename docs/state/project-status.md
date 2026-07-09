@@ -288,6 +288,20 @@ identity retrieval@1 为 `1.000000`，并允许下一步进入
 dynamics、diffusion 或 replay buffer，不运行 teacher 模型、不下载权重、不使用 GPU / torch /
 CUDA、不采集 real capture、不修改 viewer/export 默认，也不声明真实 gate 或 world model。
 
+随后完成 `OBJECTSTATE-CONTROLLED-CAPTURE-001`：新增
+`docs/architecture/objectstate-controlled-capture-handoff.md` 和
+`objgauss.core.objectstate_controlled_capture_handoff`，schema 为
+`objgauss-objectstate-controlled-capture-handoff-v1`。该 handoff 消费 passed
+`objgauss-objectstate-temporal-assignment-v1` summary，并把 synthetic temporal pass 接回既有
+controlled capture environment / bundle readiness 工具链。没有 capture host preflight 时，
+summary 合法但 blocked；提供 ready environment summary 时进入
+`objectstate_controlled_capture_collection_ready`；提供 ready controlled capture bundle readiness
+summary 时才可进入 `objectstate_controlled_capture_handoff_ready`。该切片只给出采集路线、
+next actions 和现有命令入口，不采集视频、不创建 GT、不重建 Gaussian、不运行 identity /
+prediction / intervention handoff、不训练模型、不写 public samples、不修改 viewer/export 默认，
+也不声明 real identity / prediction / causal / reality gate 或 world model。真实 evidence
+仍必须由物理 capture host 和本地 ignored `outputs/captures/` bundle 产生。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

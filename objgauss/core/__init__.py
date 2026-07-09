@@ -258,6 +258,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_capture_environment",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA": (
+        "objgauss.core.objectstate_controlled_capture_handoff",
+        "OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA": (
         "objgauss.core.objectstate_controlled_capture_frames",
         "OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA",
@@ -333,6 +337,10 @@ _EXPORTS = {
     "objectstate_controlled_capture_bundle_readiness": (
         "objgauss.core.objectstate_controlled_capture_bundle_readiness",
         "objectstate_controlled_capture_bundle_readiness",
+    ),
+    "objectstate_controlled_capture_handoff_summary": (
+        "objgauss.core.objectstate_controlled_capture_handoff",
+        "objectstate_controlled_capture_handoff_summary",
     ),
     "objectstate_controlled_capture_environment": (
         "objgauss.core.objectstate_controlled_capture_environment",
@@ -421,6 +429,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_capture_bundle_readiness_summary": (
         "objgauss.core.objectstate_controlled_capture_bundle_readiness",
         "validate_objectstate_controlled_capture_bundle_readiness_summary",
+    ),
+    "validate_objectstate_controlled_capture_handoff_summary": (
+        "objgauss.core.objectstate_controlled_capture_handoff",
+        "validate_objectstate_controlled_capture_handoff_summary",
     ),
     "validate_objectstate_controlled_capture_environment_summary": (
         "objgauss.core.objectstate_controlled_capture_environment",
