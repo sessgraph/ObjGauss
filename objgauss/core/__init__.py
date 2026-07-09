@@ -138,9 +138,37 @@ _EXPORTS = {
         "objgauss.core.objectstate_assignment_long_smoke_contract",
         "ObjectStateAssignmentLongSmokeContractThresholds",
     ),
+    "ObjectStateTemporalAssignmentContractThresholds": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "ObjectStateTemporalAssignmentContractThresholds",
+    ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA": (
         "objgauss.core.objectstate_assignment_long_smoke",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS",
+    ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS",
     ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
@@ -934,6 +962,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_assignment_long_smoke",
         "objectstate_assignment_long_smoke_summary",
     ),
+    "objectstate_temporal_assignment_contract_summary": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objectstate_temporal_assignment_contract_summary",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -981,6 +1013,10 @@ _EXPORTS = {
     "validate_objectstate_assignment_long_smoke_summary": (
         "objgauss.core.objectstate_assignment_long_smoke",
         "validate_objectstate_assignment_long_smoke_summary",
+    ),
+    "validate_objectstate_temporal_assignment_contract_summary": (
+        "objgauss.core.objectstate_temporal_assignment_contract",
+        "validate_objectstate_temporal_assignment_contract_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",

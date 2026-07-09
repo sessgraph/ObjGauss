@@ -591,6 +591,41 @@ Implemented v0.1 facts:
   It does not claim real-data identity pass, large-training readiness,
   prediction / causal / reality gate success or world-model training.
 
+### OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001
+
+Implemented v0.1 facts:
+
+- Architecture spec:
+  `docs/architecture/objectstate-temporal-assignment-contract.md`.
+- Core module:
+  `objgauss.core.objectstate_temporal_assignment_contract`.
+- Contract schema:
+  `objgauss-objectstate-temporal-assignment-contract-v1`.
+- Contract summary schema:
+  `objgauss-objectstate-temporal-assignment-contract-summary-v1`.
+- Public API:
+  `ObjectStateTemporalAssignmentContractThresholds`,
+  `objectstate_temporal_assignment_contract_summary(...)` and
+  `validate_objectstate_temporal_assignment_contract_summary(...)`.
+- Contract readiness requires a passed
+  `objgauss-objectstate-assignment-long-smoke-v1` summary with
+  `policy=semantic` and
+  `next_stage_gate.temporal_assignment_contract_allowed=true`.
+- The required paired-frame inputs are `gaussian_t`,
+  `teacher_evidence_t`, `assignment_t`, `objectstate_t`,
+  `gaussian_t_plus_1`, `teacher_evidence_t_plus_1`,
+  `assignment_t_plus_1` and `objectstate_t_plus_1`.
+- Allowed future temporal loss families are `assignment_consistency`,
+  `objectstate_embedding_consistency` and `slot_transition_smoothness`.
+- Required future metrics are `temporal_assignment_consistency`,
+  `identity_retrieval_at_1`, `identity_margin`, `slot_swap_rate`,
+  `occlusion_recovery`, `track_fragmentation_rate` and
+  `checkpoint_roundtrip`.
+- This contract does not run temporal training, does not enable
+  `AssignmentSolverV2Config.temporal_policy`, does not add renderer loss,
+  dynamics, diffusion, replay buffer, real capture ingestion, viewer/export
+  changes, real-data gate claims or world-model training.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

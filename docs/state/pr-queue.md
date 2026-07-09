@@ -395,6 +395,49 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001: Freeze temporal consistency boundary
+
+- 状态: done / objectstate-temporal-assignment-contract
+- 类型: 标准 PR / ObjectState temporal assignment contract
+- 架构规格:
+  - `docs/architecture/objectstate-temporal-assignment-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 semantic-policy bounded long smoke 通过后，先冻结 temporal assignment 的输入、
+  loss family、指标、artifact 和 gate 边界，避免直接把 temporal loss 加到错误 identity
+  上。
+- 已实施:
+  - 新增 `docs/architecture/objectstate-temporal-assignment-contract.md`。
+  - 新增 `objgauss.core.objectstate_temporal_assignment_contract`。
+  - 新增 schema
+    `objgauss-objectstate-temporal-assignment-contract-v1` 和
+    `objgauss-objectstate-temporal-assignment-contract-summary-v1`。
+  - 新增 `ObjectStateTemporalAssignmentContractThresholds`、
+    `objectstate_temporal_assignment_contract_summary(...)` 和
+    `validate_objectstate_temporal_assignment_contract_summary(...)`。
+  - Contract readiness 要求 passed `objgauss-objectstate-assignment-long-smoke-v1`
+    summary，且该 summary 必须为 semantic policy 并允许 temporal assignment contract。
+  - 定义 paired-frame required inputs：`gaussian_t`、`teacher_evidence_t`、
+    `assignment_t`、`objectstate_t` 及 `t+1` 对应项。
+  - 定义 future allowed loss terms：`assignment_consistency`、
+    `objectstate_embedding_consistency`、`slot_transition_smoothness`。
+  - 定义 required metrics：`temporal_assignment_consistency`、
+    `identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、
+    `occlusion_recovery`、`track_fragmentation_rate`、`checkpoint_roundtrip`。
+  - 核心 lazy namespace 暴露 temporal contract schema、thresholds、summary 和 validator。
+- 边界:
+  - 不运行 temporal training，不启用 `AssignmentSolverV2Config.temporal_policy`。
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不使用 GPU / torch / CUDA，不启用 renderer loss、dynamics、diffusion、replay buffer。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明 temporal
+    implementation、真实 identity / prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_temporal_assignment_contract.py tests/test_objectstate_assignment_long_smoke.py tests/test_core_namespace.py -q`: passed，15 tests。
+  - `uv run --extra dev pytest`: passed，641 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001: Run bounded semantic assignment long smoke
 
 - 状态: done / objectstate-assignment-long-smoke

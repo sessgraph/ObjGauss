@@ -252,6 +252,26 @@ CUDA，不接 renderer loss / temporal loss，不做 dynamics / diffusion / repl
 real capture，不修改 viewer/export 默认，也不声明真实 gate 或 world model。通过后只允许进入
 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`。
 
+随后完成 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`：新增
+`docs/architecture/objectstate-temporal-assignment-contract.md` 和
+`objgauss.core.objectstate_temporal_assignment_contract`，冻结第一版 temporal consistency
+边界。新增 schema：
+`objgauss-objectstate-temporal-assignment-contract-v1` 和
+`objgauss-objectstate-temporal-assignment-contract-summary-v1`。Contract readiness 要求
+passed `objgauss-objectstate-assignment-long-smoke-v1`，且该 long-smoke summary 必须是
+`policy=semantic` 并显式
+`next_stage_gate.temporal_assignment_contract_allowed=true`。合同定义 paired-frame 输入
+`gaussian_t` / `teacher_evidence_t` / `assignment_t` / `objectstate_t` 与
+`t+1` 对应项，允许的 future temporal loss 仅限 `assignment_consistency`、
+`objectstate_embedding_consistency` 和 `slot_transition_smoothness`，必须报告
+`temporal_assignment_consistency`、`identity_retrieval_at_1`、`identity_margin`、
+`slot_swap_rate`、`occlusion_recovery`、`track_fragmentation_rate` 和
+`checkpoint_roundtrip`。该切片只定义 contract，不运行 temporal training，不打开
+`AssignmentSolverV2Config.temporal_policy`，不接 renderer loss，不做 dynamics / diffusion /
+replay buffer，不运行 teacher 模型、不下载权重、不使用 GPU / torch / CUDA、不采集 real
+capture、不修改 viewer/export 默认，也不声明 temporal implementation、真实 gate 或 world model
+已通过。下一步才是 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-001`。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

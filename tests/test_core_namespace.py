@@ -57,6 +57,7 @@ from objgauss.core import (
     TeacherEvidenceBatch,
     TeacherEvidenceLeakageAuditThresholds,
     ObjectStateAssignmentLongSmokeContractThresholds,
+    ObjectStateTemporalAssignmentContractThresholds,
     ObjectStateIdentityRow,
     DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES,
     ObjectStatePredictiveGateReport,
@@ -91,6 +92,12 @@ from objgauss.core import (
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_REQUIRED_POLICY,
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS,
+    OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS,
     OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA,
@@ -258,6 +265,7 @@ from objgauss.core import (
     diagnose_synthetic_stability_fixture,
     evaluate_objectstate_identity_gate,
     objectstate_assignment_long_smoke_summary,
+    objectstate_temporal_assignment_contract_summary,
     objectstate_model_identity_benchmark_summary,
     objectstate_model_identity_ablation_summary,
     objectstate_model_identity_gate_summary,
@@ -540,6 +548,7 @@ from objgauss.core import (
     validate_teacher_evidence_batch,
     validate_teacher_evidence_batch_summary,
     validate_objectstate_assignment_long_smoke_contract_summary,
+    validate_objectstate_temporal_assignment_contract_summary,
     validate_objectstate_assignment_mvp_summary,
     validate_objectstate_assignment_train_dataset_summary,
     validate_objectstate_assignment_train_run_summary,
@@ -1228,11 +1237,32 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert ObjectStateAssignmentLongSmokeContractThresholds().as_dict()[
         "max_duration_seconds"
     ] == 600
+    assert OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA == (
+        "objgauss-objectstate-temporal-assignment-contract-v1"
+    )
+    assert OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA == (
+        "objgauss-objectstate-temporal-assignment-contract-summary-v1"
+    )
+    assert OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY == "semantic"
+    assert "assignment_t" in OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS
+    assert "assignment_consistency" in OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS
+    assert "temporal_assignment_consistency" in OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS
+    assert ObjectStateTemporalAssignmentContractThresholds().as_dict()[
+        "max_duration_seconds"
+    ] == 600
     long_smoke_contract = objectstate_assignment_long_smoke_contract_summary()
     assert validate_objectstate_assignment_long_smoke_contract_summary(
         long_smoke_contract
     ) == long_smoke_contract
     assert long_smoke_contract["readiness_gate"]["long_smoke_contract_ready"] is False
+    temporal_contract = objectstate_temporal_assignment_contract_summary()
+    assert validate_objectstate_temporal_assignment_contract_summary(
+        temporal_contract
+    ) == temporal_contract
+    assert (
+        temporal_contract["readiness_gate"]["temporal_assignment_contract_ready"]
+        is False
+    )
     assert OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA == (
         "objgauss-objectstate-assignment-mvp-v1"
     )
@@ -1706,12 +1736,14 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert teacher_evidence_batch_summary is not None
     assert objectstate_assignment_long_smoke_contract_summary is not None
     assert objectstate_assignment_long_smoke_summary is not None
+    assert objectstate_temporal_assignment_contract_summary is not None
     assert validate_teacher_evidence_batch is not None
     assert validate_teacher_evidence_batch_summary is not None
     assert validate_objectstate_teacher_evidence_contract_summary is not None
     assert validate_objectstate_teacher_evidence_leakage_audit_summary is not None
     assert validate_objectstate_assignment_long_smoke_contract_summary is not None
     assert validate_objectstate_assignment_long_smoke_summary is not None
+    assert validate_objectstate_temporal_assignment_contract_summary is not None
     assert objectstate_assignment_mvp_summary is not None
     assert validate_objectstate_assignment_mvp_summary is not None
     assert objectstate_assignment_train_dataset_summary is not None
