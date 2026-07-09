@@ -146,8 +146,10 @@ gate rows，pass / fail 必须绑定真实 `StateTransitionRow`，并继续保�
 比较。`OBJECTSTATE-REAL-INTERVENTION-ROWS-001` 已补 real intervention rows accounting：
 bundle 内 `intervention` gate accounting rows 可转成 intervention-only reality gate rows，
 pass / fail 必须绑定时间重叠的 action / transition pair，并要求 transition source /
-target identity 稳定。下一步优先把 real identity / prediction / intervention summaries
-汇入 controlled/public evidence ledger，形成 Phase 1 可审计总表。
+target identity 稳定。`OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001` 已扩展
+`audit-reality-row-ledger`，可消费 real identity / prediction / intervention summary JSON
+并汇入同一个 full reality gate 和 state-variable evidence matrix。下一步优先在真实
+controlled/public bundle 产物上运行该 ledger，形成 Phase 1 可审计总表。
 `GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
 Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
 `truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
@@ -369,6 +371,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001: Let reality row ledger consume real accounting summaries
+
+- 状态: done / real-accounting-ledger-support
+- 类型: 标准 PR / ObjectState Phase 1 real evidence ledger
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 让现有 `audit-reality-row-ledger` 能直接消费
+  `OBJECTSTATE-REAL-IDENTITY-ROWS-001`、`OBJECTSTATE-REAL-PREDICTION-ROWS-001`
+  和 `OBJECTSTATE-REAL-INTERVENTION-ROWS-001` 生成的 summary JSON，形成同一张
+  Phase 1 full reality gate ledger。
+- 已实施:
+  - `objgauss.core.objectstate_reality_row_ledger` 新增对
+    `objgauss-objectstate-real-identity-rows-v1`、
+    `objgauss-objectstate-real-prediction-rows-v1` 和
+    `objgauss-objectstate-real-intervention-rows-v1` 的 native validator 支持。
+  - Ledger 现在可从 `identity_rows`、`prediction_rows` 和 `intervention_rows`
+    字段抽取标准 `objgauss-objectstate-real-public-row-v1` payload。
+  - 抽取后的每条 row 仍重新构造成 `ObjectStateRealityRow` 并走严格 validator，
+    再合并运行 full `OBJECTSTATE-REALITY-GATE-001`。
+  - 既有 CLI `objgauss object-state audit-reality-row-ledger` 无需改名即可消费
+    三类 real accounting summaries。
+- 边界:
+  - 只读已有 summaries，不采集数据、不创建 GT、不运行 identity / prediction /
+    intervention evaluator。
+  - 不训练 dynamics，不使用 replay / diffusion。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_reality_row_ledger.py tests/test_objectstate_reality_row_ledger.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_objectstate_real_intervention_rows.py tests/test_objectstate_real_prediction_rows.py tests/test_objectstate_real_identity_rows.py tests/test_core_namespace.py -q`: 29 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 593 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
 
 ### OBJECTSTATE-REAL-INTERVENTION-ROWS-001: Account real intervention rows from evidence bundles
 

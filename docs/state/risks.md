@@ -397,3 +397,14 @@ real rows 的最后一类 intervention accounting，但仍不采集 GT、不运�
 dynamics、不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到 real
 identity / prediction / intervention summaries 汇入 controlled/public evidence ledger，并通过
 full Phase 1 evidence review。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001`
+扩展 `audit-reality-row-ledger`，让 existing `objgauss-objectstate-reality-row-ledger-v1`
+可直接消费 `objgauss-objectstate-real-identity-rows-v1`、
+`objgauss-objectstate-real-prediction-rows-v1` 和
+`objgauss-objectstate-real-intervention-rows-v1` summary JSON。Ledger 会从三类 summary
+中抽取标准 `objgauss-objectstate-real-public-row-v1` rows，重新校验后汇入同一个 full
+`OBJECTSTATE-REALITY-GATE-001`、gap summary 和 state-variable evidence matrix。该缓解完成
+real evidence accounting 的总表接线，但仍不采集 GT、不运行模型 eval、不训练 dynamics、
+不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 controlled /
+public bundle 产物跑出可审计 full Phase 1 ledger。

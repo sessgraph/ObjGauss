@@ -4447,9 +4447,12 @@ npm run acceptance:demo
    source / target identity link 保持同一 `physical_identity_id`；summary 保留
    `action_conditioned_ade` / `no_action_ade` / `intervention_gain` /
    `counterfactual_outcome_accuracy` / `wrong_direction_rate` /
-   `identity_consistency_rate` 和 `action_transition_coverage_rate`。下一步应把
-   real identity / prediction / intervention row summaries 汇入 controlled/public
-   evidence ledger，而不是继续新增大模型。
+   `identity_consistency_rate` 和 `action_transition_coverage_rate`。
+   `OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001` 已扩展
+   `audit-reality-row-ledger`，可直接消费 real identity / prediction / intervention
+   summary JSON，并把其中的标准 reality rows 汇入同一个 full reality gate、gap summary
+   和 state-variable evidence matrix。下一步应在真实 controlled/public bundle 产物上运行
+   这条 ledger，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，

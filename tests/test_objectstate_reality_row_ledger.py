@@ -6,6 +6,18 @@ from objgauss.cli import main
 from objgauss.core.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
 )
+from objgauss.core.objectstate_real_evidence_bundle import (
+    OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
+)
+from objgauss.core.objectstate_real_identity_rows import (
+    objectstate_real_identity_rows_summary,
+)
+from objgauss.core.objectstate_real_intervention_rows import (
+    objectstate_real_intervention_rows_summary,
+)
+from objgauss.core.objectstate_real_prediction_rows import (
+    objectstate_real_prediction_rows_summary,
+)
 from objgauss.core.objectstate_reality_row_ledger import (
     OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA,
     objectstate_reality_row_ledger,
@@ -114,6 +126,52 @@ def test_reality_row_ledger_aggregates_existing_row_summaries(tmp_path):
     assert "full ObjectState reality gate did not pass" in ledger["issues"][-1]
 
 
+def test_reality_row_ledger_accepts_real_evidence_accounting_summaries(tmp_path):
+    bundle = _real_evidence_bundle()
+    identity = objectstate_real_identity_rows_summary(bundle)
+    prediction = objectstate_real_prediction_rows_summary(bundle)
+    intervention = objectstate_real_intervention_rows_summary(bundle)
+    identity_path = tmp_path / "real-identity-summary.json"
+    prediction_path = tmp_path / "real-prediction-summary.json"
+    intervention_path = tmp_path / "real-intervention-summary.json"
+    _write_json(identity_path, identity)
+    _write_json(prediction_path, prediction)
+    _write_json(intervention_path, intervention)
+
+    ledger = objectstate_reality_row_ledger(
+        (identity_path, prediction_path, intervention_path)
+    )
+
+    assert ledger["status"] == "objectstate_reality_row_ledger_reviewable"
+    assert ledger["summary_count"] == 3
+    assert ledger["row_count"] == 3
+    assert ledger["pass_row_count"] == 3
+    assert ledger["fail_row_count"] == 0
+    assert ledger["blocked_row_count"] == 0
+    assert ledger["gate"]["status"] == "objectstate_reality_gate_pass"
+    assert ledger["gap_summary"]["missing_pass_evidence_kinds"] == []
+    assert ledger["row_counts"]["by_evidence_kind"] == {
+        "identity": 1,
+        "prediction": 1,
+        "intervention": 1,
+    }
+    experiment_status = {
+        row["experiment"]: row["status"]
+        for row in ledger["state_variable_evidence_matrix"]
+    }
+    assert experiment_status["identity_persistence"] == (
+        "objectstate_state_variable_experiment_pass"
+    )
+    assert experiment_status["predictive_sufficiency"] == (
+        "objectstate_state_variable_experiment_pass"
+    )
+    assert experiment_status["counterfactual_action_interface"] == (
+        "objectstate_state_variable_experiment_pass"
+    )
+    assert ledger["next_actions"] == []
+    assert validate_objectstate_reality_row_ledger_summary(ledger) == ledger
+
+
 def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys):
     summary_a = objectstate_controlled_real_rows_summary(
         _controlled_manifest("controlled-a", prediction_status="pass")
@@ -184,6 +242,183 @@ def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys
     assert actions_path.read_text(encoding="utf-8").startswith(
         "# ObjectState Reality Row Ledger Next Actions"
     )
+
+
+def _real_evidence_bundle():
+    return {
+        "schema": OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
+        "kind": "objectstate_real_evidence_bundle",
+        "sample": {
+            "sample_id": "controlled-tabletop-cup-001",
+            "scene_id": "tabletop-cup-box",
+            "sequence_id": "push-left-001",
+            "source_dataset": "local-controlled-tabletop",
+            "source_kind": "controlled_real",
+            "object_category": "cup",
+            "scenario": "push_left_counterfactual",
+            "gt_provenance": "external-motion-capture",
+            "license": "local-research",
+            "observation_modalities": ["rgb", "gaussian"],
+            "artifact_refs": ["outputs/captures/cup/capture-manifest.json"],
+        },
+        "row_schemas": {
+            "observation": "objgauss-objectstate-real-observation-row-v1",
+            "object_pose": "objgauss-objectstate-real-object-pose-row-v1",
+            "identity_link": "objgauss-objectstate-real-identity-link-row-v1",
+            "action_interval": "objgauss-objectstate-real-action-interval-row-v1",
+            "state_transition": "objgauss-objectstate-real-state-transition-row-v1",
+            "gate_accounting": "objgauss-objectstate-real-gate-accounting-row-v1",
+        },
+        "observation_rows": [
+            _observation("obs-000", "f000", 0.0),
+            _observation("obs-001", "f001", 0.1),
+        ],
+        "object_pose_rows": [
+            _pose("pose-000", "f000", 0.0, [0.0, 0.0, 0.0]),
+            _pose("pose-001", "f001", 0.1, [-0.1, 0.0, 0.0]),
+        ],
+        "identity_link_rows": [
+            _identity_link("identity-000", "f000", 0.0),
+            _identity_link("identity-001", "f001", 0.1),
+        ],
+        "action_interval_rows": [
+            {
+                "schema": "objgauss-objectstate-real-action-interval-row-v1",
+                "row_id": "action-row-001",
+                "action_id": "push-left-001",
+                "action_type": "push_left",
+                "object_id": "cup-001",
+                "action_start_ts": 0.02,
+                "action_end_ts": 0.08,
+                "action_vector": [-0.1, 0.0, 0.0],
+                "actor": "hand-001",
+                "gt_provenance": "external-motion-capture",
+            }
+        ],
+        "state_transition_rows": [
+            {
+                "schema": "objgauss-objectstate-real-state-transition-row-v1",
+                "row_id": "transition-row-001",
+                "transition_id": "transition-cup-000-001",
+                "object_id": "cup-001",
+                "source_frame_id": "f000",
+                "target_frame_id": "f001",
+                "source_timestamp": 0.0,
+                "target_timestamp": 0.1,
+                "source_pose_row_id": "pose-000",
+                "target_pose_row_id": "pose-001",
+                "gt_provenance": "external-motion-capture",
+            }
+        ],
+        "gate_accounting_rows": [
+            {
+                "schema": "objgauss-objectstate-real-gate-accounting-row-v1",
+                "row_id": "cup-identity-pass-001",
+                "evidence_kind": "identity",
+                "accounting_status": "pass",
+                "object_id": "cup-001",
+                "metrics": {
+                    "idf1": 1.0,
+                    "fragmentation_rate": 0.0,
+                    "swap_rate": 0.0,
+                    "identity_collapse": False,
+                },
+                "artifact_refs": ["outputs/captures/cup/identity-eval.json"],
+                "gt_requirements": {
+                    "identity": True,
+                    "pose": False,
+                    "action": False,
+                    "timestamp": True,
+                },
+            },
+            {
+                "schema": "objgauss-objectstate-real-gate-accounting-row-v1",
+                "row_id": "cup-prediction-pass-001",
+                "evidence_kind": "prediction",
+                "accounting_status": "pass",
+                "object_id": "cup-001",
+                "transition_id": "transition-cup-000-001",
+                "metrics": {
+                    "state_ade": 0.02,
+                    "history_ade": 0.04,
+                    "prediction_gap_vs_history_model": -0.02,
+                },
+                "artifact_refs": ["outputs/captures/cup/prediction-eval.json"],
+                "gt_requirements": {
+                    "identity": True,
+                    "pose": True,
+                    "action": False,
+                    "timestamp": True,
+                },
+            },
+            {
+                "schema": "objgauss-objectstate-real-gate-accounting-row-v1",
+                "row_id": "cup-intervention-pass-001",
+                "evidence_kind": "intervention",
+                "accounting_status": "pass",
+                "object_id": "cup-001",
+                "action_id": "push-left-001",
+                "transition_id": "transition-cup-000-001",
+                "metrics": {
+                    "action_conditioned_ade": 0.01,
+                    "no_action_ade": 0.12,
+                    "counterfactual_outcome_accuracy": 1.0,
+                    "wrong_direction_rate": 0.0,
+                    "identity_consistency_rate": 1.0,
+                },
+                "artifact_refs": ["outputs/captures/cup/intervention-eval.json"],
+                "gt_requirements": {
+                    "identity": True,
+                    "pose": True,
+                    "action": True,
+                    "timestamp": True,
+                },
+            },
+        ],
+    }
+
+
+def _observation(row_id, frame_id, timestamp):
+    return {
+        "schema": "objgauss-objectstate-real-observation-row-v1",
+        "row_id": row_id,
+        "frame_id": frame_id,
+        "timestamp": timestamp,
+        "camera_id": "cam-001",
+        "observation": {
+            "rgb": f"rgb/{frame_id}.png",
+            "gaussian": f"gaussians/{frame_id}.ply",
+        },
+    }
+
+
+def _pose(row_id, frame_id, timestamp, position):
+    return {
+        "schema": "objgauss-objectstate-real-object-pose-row-v1",
+        "row_id": row_id,
+        "frame_id": frame_id,
+        "timestamp": timestamp,
+        "camera_id": "cam-001",
+        "object_id": "cup-001",
+        "object_pose_6dof": {
+            "position": position,
+            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "object_visibility": 1.0,
+    }
+
+
+def _identity_link(row_id, frame_id, timestamp):
+    return {
+        "schema": "objgauss-objectstate-real-identity-link-row-v1",
+        "row_id": row_id,
+        "frame_id": frame_id,
+        "timestamp": timestamp,
+        "object_id": "cup-001",
+        "physical_identity_id": "cup-physical-001",
+        "gt_provenance": "external-motion-capture",
+        "confidence": 1.0,
+    }
 
 
 def _controlled_manifest(sample_id: str, *, prediction_status: str):

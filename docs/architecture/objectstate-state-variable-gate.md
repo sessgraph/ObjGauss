@@ -787,6 +787,36 @@ Implemented v0.1 facts:
   intervention model, train dynamics, use replay / diffusion or mutate viewer
   defaults.
 
+### OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001
+
+Extend the global reality row ledger so it can consume the real evidence
+accounting summaries produced by the bundle route.
+
+Required behavior:
+
+- Keep using the existing `objgauss-objectstate-reality-row-ledger-v1` schema
+  and `OBJECTSTATE-REALITY-GATE-001` full gate.
+- Accept `objgauss-objectstate-real-identity-rows-v1`,
+  `objgauss-objectstate-real-prediction-rows-v1` and
+  `objgauss-objectstate-real-intervention-rows-v1` summary JSON files.
+- Extract standard `objgauss-objectstate-real-public-row-v1` payloads from
+  `identity_rows`, `prediction_rows` and `intervention_rows`.
+- Re-run every extracted row through `ObjectStateRealityRow` validation before
+  merging.
+- Preserve the existing ledger gap summary, state-variable evidence matrix,
+  blocked rows Markdown and next actions.
+
+Implemented v0.1 facts:
+
+- Core module updated: `objgauss.core.objectstate_reality_row_ledger`.
+- CLI remains:
+  `objgauss object-state audit-reality-row-ledger`.
+- The ledger can now combine real identity / prediction / intervention
+  summaries and run a single full reality gate across all extracted rows.
+- Current scope is read-only ledger aggregation only. It does not author GT,
+  run model evaluators, train dynamics, use replay / diffusion or mutate viewer
+  defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows
