@@ -395,6 +395,45 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-BOP-REAL-BUNDLE-ADAPTER-001: Convert BOP reality rows into real evidence bundles
+
+- 状态: done / bop-real-evidence-bundle-adapter
+- 类型: 标准 PR / ObjectState Phase 1 public replay evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把已有 BOP acceptance summary + BOP reality rows summary 转成
+  `objgauss-objectstate-real-evidence-bundle-v1`，让 public replay 的 identity /
+  prediction / intervention accounting rows 可以进入 real bundle ledger 和 Phase 1
+  package audit。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_bop_real_evidence_bundle`，schema 为
+    `objgauss-objectstate-bop-real-evidence-bundle-adapter-v1`。
+  - Adapter 从 BOP acceptance summary 内的 controlled capture manifest 生成
+    observation、object pose、identity link 和 state transition rows。
+  - Adapter 将 BOP reality rows 映射为 real bundle gate accounting rows：
+    identity / prediction 的 `pass` / `fail` 保留，BOP `blocked` 映射为
+    `evidence_incomplete`。
+  - Prediction accounting row 会绑定真实 `StateTransitionRow`，并保留
+    `state_ade`、`history_ade`、`prediction_gap_vs_history_model` 和
+    `state_vs_history_error_ratio`。
+  - Intervention row 在无非零 action interval / action-transition overlap 时只进入
+    `evidence_incomplete`，不创建 intervention pass / fail。
+  - 新增 CLI `objgauss object-state bop-real-evidence-bundle`，可写 adapter summary
+    和 real evidence bundle JSON。
+  - 新入口已挂到 `objgauss.core` lazy namespace。
+- 边界:
+  - 不下载 BOP 数据、不重跑 handoff、不创建 GT、不重建 Gaussian、不训练模型。
+  - 不把 BOP pose replay 伪装成 action / counterfactual evidence。
+  - 不修改 viewer/export 默认，不提交 `outputs/` 或 `public/samples/` 产物。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_bop_real_evidence_bundle.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_bop_reality_rows.py -q`: 4 passed。
+  - `uv run --extra dev pytest tests/test_core_namespace.py tests/test_objectstate_bop_reality_rows.py tests/test_objectstate_reality_row_ledger.py -q`: 22 passed。
+  - `uv run --extra dev pytest`: 602 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-REAL-BUNDLE-LEDGER-PHASE1-ACCEPTANCE-001: Audit Phase 1 real evidence-system acceptance
 
 - 状态: done / real-evidence-bundle-ledger-phase1-acceptance

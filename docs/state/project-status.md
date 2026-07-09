@@ -4481,7 +4481,21 @@ npm run acceptance:demo
    real bundle loaded、三类 row 进入 accounting、至少一个可评估 pass/fail row、缺 GT 的
    `evidence_incomplete` / `unsupported` 不混成 fail、synthetic / real gate 分账和
    static scene / state-variable evidence 分账。该 status 只表示证据系统 acceptance，
-   不声明 metric pass 或 world-model proof。
+   不声明 metric pass 或 world-model proof。`OBJECTSTATE-BOP-REAL-BUNDLE-ADAPTER-001`
+   继续把 BOP/public replay 产物接入这条新 handoff：新增
+   `objgauss-objectstate-bop-real-evidence-bundle-adapter-v1` 和
+   `objgauss object-state bop-real-evidence-bundle <bop-acceptance.json>
+   <bop-reality-rows.json> --bundle-output <real-bundle.json>`，可从已有 BOP
+   acceptance summary 的 controlled capture manifest 生成 observation / object pose /
+   identity link / state transition rows，并把 BOP reality rows 映射为 real bundle
+   gate accounting rows。BOP blocked intervention row 会进入
+   `accounting_status=evidence_incomplete`，不会伪造成 action-conditioned pass；若没有
+   非零 action interval 和 action/transition overlap，adapter 也不会创建 intervention
+   pass / fail。测试中的 RGB-D BOP public replay bundle 进入
+   `audit-real-evidence-bundle-ledger` 后形成 `pass=1`、`fail=1`、
+   `evidence_incomplete=1` 的可审计 Phase 1 accounting，并通过 package
+   `phase1_acceptance_status=objectstate_phase1_evidence_system_acceptance_pass`；
+   这仍不声明 reality gate pass 或 world-model proof。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck`、`garden`、
    `bicycle`、`stump`、`treehill` 或 GraphDECO / Inria official large results；

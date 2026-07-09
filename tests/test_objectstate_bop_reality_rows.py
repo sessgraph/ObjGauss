@@ -17,8 +17,19 @@ from objgauss.core.objectstate_bop_reality_rows import (
     objectstate_bop_reality_rows_summary,
     validate_objectstate_bop_reality_rows_summary,
 )
+from objgauss.core.objectstate_bop_real_evidence_bundle import (
+    OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA,
+    objectstate_bop_real_evidence_bundle_adapter_summary,
+    validate_objectstate_bop_real_evidence_bundle_adapter_summary,
+)
 from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
     objectstate_bop_rgbd_baseline_local_row_handoff,
+)
+from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+    write_objectstate_real_evidence_bundle_ledger,
+)
+from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+    objectstate_real_evidence_bundle_ledger_package_audit,
 )
 from objgauss.core.objectstate_reality_row_ledger import (
     objectstate_reality_row_ledger,
@@ -123,6 +134,124 @@ def test_bop_reality_rows_cli_writes_summary_and_blocked_rows(tmp_path, capsys):
     assert "row=intervention:blocked:" in stdout
     assert validate_objectstate_bop_reality_rows_summary(written_summary) == written_summary
     assert blocked_path.read_text(encoding="utf-8").startswith("| row_id |")
+
+
+def test_bop_reality_rows_enter_real_evidence_bundle_ledger(tmp_path):
+    source_summary = _rgbd_local_row_summary(tmp_path)
+    acceptance = source_summary["baseline_local_row_handoff"]["local_row_handoff"][
+        "identity_handoff"
+    ]["acceptance"]
+    reality = objectstate_bop_reality_rows_summary(
+        source_summary,
+        source_summary_ref="bop-rgbd-baseline-local-row-summary.json",
+    )
+
+    adapter = objectstate_bop_real_evidence_bundle_adapter_summary(
+        acceptance,
+        reality,
+        source_summary_ref="bop-reality-rows-summary.json",
+    )
+    bundle = adapter["bundle"]
+
+    assert adapter["schema"] == OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA
+    assert validate_objectstate_bop_real_evidence_bundle_adapter_summary(adapter) == adapter
+    assert adapter["status"] == "objectstate_bop_real_evidence_bundle_adapter_ready"
+    assert bundle["sample"]["source_kind"] == "public_replay"
+    assert adapter["accounting_status_counts"] == {
+        "pass": 1,
+        "fail": 1,
+        "evidence_incomplete": 1,
+        "unsupported": 0,
+    }
+    assert [(row["evidence_kind"], row["accounting_status"]) for row in bundle["gate_accounting_rows"]] == [
+        ("identity", "fail"),
+        ("prediction", "pass"),
+        ("intervention", "evidence_incomplete"),
+    ]
+    assert bundle["state_transition_rows"]
+    assert not bundle["action_interval_rows"]
+    prediction_row = next(
+        row for row in bundle["gate_accounting_rows"] if row["evidence_kind"] == "prediction"
+    )
+    assert prediction_row["transition_id"] == bundle["state_transition_rows"][0]["transition_id"]
+    assert "state_vs_history_error_ratio" in prediction_row["metrics"]
+    intervention_row = next(
+        row for row in bundle["gate_accounting_rows"] if row["evidence_kind"] == "intervention"
+    )
+    assert intervention_row["accounting_status"] == "evidence_incomplete"
+    assert "action_id" not in intervention_row
+    assert adapter["readiness"]["intervention_pass_not_created_without_action_gt"] is True
+
+    bundle_path = tmp_path / "bop-real-evidence-bundle.json"
+    ledger_root = tmp_path / "bop-real-bundle-ledger"
+    _write_json(bundle_path, bundle)
+    ledger = write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=ledger_root,
+    )
+    package = objectstate_real_evidence_bundle_ledger_package_audit(ledger_root)
+
+    assert ledger["status"] == "objectstate_real_evidence_bundle_ledger_reviewable"
+    assert ledger["row_counts"] == {
+        "row_count": 3,
+        "pass_row_count": 1,
+        "fail_row_count": 1,
+        "blocked_row_count": 1,
+        "evidence_incomplete_row_count": 1,
+        "unsupported_row_count": 0,
+    }
+    assert ledger["accounting_status_counts"]["all"] == adapter["accounting_status_counts"]
+    assert package["phase1_acceptance_status"] == (
+        "objectstate_phase1_evidence_system_acceptance_pass"
+    )
+    assert package["phase1_acceptance_gates"]["identity_rows_enter_accounting"] is True
+    assert package["phase1_acceptance_gates"]["prediction_rows_enter_accounting"] is True
+    assert package["phase1_acceptance_gates"]["intervention_rows_enter_accounting"] is True
+    assert package["phase1_acceptance_gates"][
+        "missing_gt_accounting_is_separate_from_fail"
+    ] is True
+
+
+def test_bop_real_evidence_bundle_cli_writes_bundle(tmp_path, capsys):
+    source_summary = _rgbd_local_row_summary(tmp_path)
+    acceptance = source_summary["baseline_local_row_handoff"]["local_row_handoff"][
+        "identity_handoff"
+    ]["acceptance"]
+    reality = objectstate_bop_reality_rows_summary(source_summary)
+    acceptance_path = tmp_path / "bop-acceptance-summary.json"
+    reality_path = tmp_path / "bop-reality-rows-summary.json"
+    bundle_path = tmp_path / "bop-real-evidence-bundle.json"
+    summary_path = tmp_path / "bop-real-evidence-bundle-adapter.json"
+    _write_json(acceptance_path, acceptance)
+    _write_json(reality_path, reality)
+
+    assert (
+        main(
+            [
+                "object-state",
+                "bop-real-evidence-bundle",
+                str(acceptance_path),
+                str(reality_path),
+                "--bundle-output",
+                str(bundle_path),
+                "--summary-output",
+                str(summary_path),
+                "--require-ready",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    adapter = _read_json(summary_path)
+    bundle = _read_json(bundle_path)
+
+    assert f"schema={OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA}" in stdout
+    assert "status=objectstate_bop_real_evidence_bundle_adapter_ready" in stdout
+    assert "bundle_status=objectstate_real_evidence_bundle_ready" in stdout
+    assert "accounting.evidence_incomplete=1" in stdout
+    assert adapter["bundle"] == bundle
+    assert validate_objectstate_bop_real_evidence_bundle_adapter_summary(adapter) == adapter
 
 
 def _rgbd_local_row_summary(tmp_path):

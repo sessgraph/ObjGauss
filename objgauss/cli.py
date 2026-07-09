@@ -353,6 +353,9 @@ from objgauss.core.objectstate_bop_reality_rows import (
     objectstate_bop_reality_rows_summary,
     read_objectstate_bop_local_row_summary,
 )
+from objgauss.core.objectstate_bop_real_evidence_bundle import (
+    objectstate_bop_real_evidence_bundle_adapter_summary_from_files,
+)
 from objgauss.core.objectstate_reality_row_ledger import (
     objectstate_reality_row_ledger,
 )
@@ -7281,6 +7284,48 @@ def _object_state_audit_bop_reality_rows(args: argparse.Namespace) -> None:
         raise ValueError("BOP reality rows ObjectState reality gate did not pass")
 
 
+def _object_state_bop_real_evidence_bundle(args: argparse.Namespace) -> None:
+    summary = objectstate_bop_real_evidence_bundle_adapter_summary_from_files(
+        args.bop_acceptance_summary,
+        args.bop_reality_rows_summary,
+        source_kind=args.source_kind,
+        source_summary_ref=(
+            args.source_summary_ref
+            if args.source_summary_ref is not None
+            else str(args.bop_reality_rows_summary)
+        ),
+    )
+    bundle_summary = summary["bundle_summary"]
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"source_kind={summary['source_kind']}")
+    print(f"bundle_status={bundle_summary['status']}")
+    print(f"observation_rows={counts['observation_rows']}")
+    print(f"object_pose_rows={counts['object_pose_rows']}")
+    print(f"identity_link_rows={counts['identity_link_rows']}")
+    print(f"state_transition_rows={counts['state_transition_rows']}")
+    print(f"action_interval_rows={counts['action_interval_rows']}")
+    print(f"gate_accounting_rows={counts['gate_accounting_rows']}")
+    for status, count in summary["accounting_status_counts"].items():
+        print(f"accounting.{status}={count}")
+    for gate, passed in summary["readiness"].items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    write_json(args.bundle_output, summary["bundle"])
+    print(f"bundle={args.bundle_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_bop_real_evidence_bundle_adapter_ready"
+    ):
+        raise ValueError("BOP real evidence bundle adapter is not ready")
+
+
 def _object_state_audit_reality_row_ledger(args: argparse.Namespace) -> None:
     summary = objectstate_reality_row_ledger(
         args.reality_row_summary,
@@ -10354,6 +10399,51 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_bop_reality_rows.set_defaults(
         handler=_object_state_audit_bop_reality_rows
+    )
+    bop_real_evidence_bundle = object_state_subparsers.add_parser(
+        "bop-real-evidence-bundle",
+        help=(
+            "convert BOP acceptance plus BOP reality rows into a real evidence "
+            "bundle for Phase 1 bundle-ledger accounting"
+        ),
+    )
+    bop_real_evidence_bundle.add_argument(
+        "bop_acceptance_summary",
+        type=Path,
+        help="BOP capture acceptance summary JSON",
+    )
+    bop_real_evidence_bundle.add_argument(
+        "bop_reality_rows_summary",
+        type=Path,
+        help="BOP reality rows summary JSON",
+    )
+    bop_real_evidence_bundle.add_argument(
+        "--bundle-output",
+        required=True,
+        type=Path,
+        help="real evidence bundle JSON to write",
+    )
+    bop_real_evidence_bundle.add_argument("--summary-output", type=Path)
+    bop_real_evidence_bundle.add_argument(
+        "--source-kind",
+        choices=("public_replay", "controlled_real"),
+        default=None,
+        help="override the source_kind stamped on the real evidence bundle",
+    )
+    bop_real_evidence_bundle.add_argument(
+        "--source-summary-ref",
+        help=(
+            "artifact ref for the source BOP reality rows summary; defaults to "
+            "the input BOP reality rows summary path"
+        ),
+    )
+    bop_real_evidence_bundle.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the adapter emits a ready real evidence bundle",
+    )
+    bop_real_evidence_bundle.set_defaults(
+        handler=_object_state_bop_real_evidence_bundle
     )
     audit_reality_row_ledger = object_state_subparsers.add_parser(
         "audit-reality-row-ledger",

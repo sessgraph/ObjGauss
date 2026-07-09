@@ -482,6 +482,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
         "OBJECTSTATE_BOP_RGBD_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA",
     ),
+    "OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",
@@ -762,6 +766,22 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_reality_rows",
         "read_objectstate_bop_local_row_summary",
     ),
+    "objectstate_bop_real_evidence_bundle_from_summaries": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objectstate_bop_real_evidence_bundle_from_summaries",
+    ),
+    "objectstate_bop_real_evidence_bundle_adapter_summary": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objectstate_bop_real_evidence_bundle_adapter_summary",
+    ),
+    "objectstate_bop_real_evidence_bundle_adapter_summary_from_files": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objectstate_bop_real_evidence_bundle_adapter_summary_from_files",
+    ),
+    "read_objectstate_bop_real_evidence_bundle_adapter_summary": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "read_objectstate_bop_real_evidence_bundle_adapter_summary",
+    ),
     "objectstate_reality_row_ledger": (
         "objgauss.core.objectstate_reality_row_ledger",
         "objectstate_reality_row_ledger",
@@ -925,6 +945,10 @@ _EXPORTS = {
     "validate_objectstate_bop_reality_rows_summary": (
         "objgauss.core.objectstate_bop_reality_rows",
         "validate_objectstate_bop_reality_rows_summary",
+    ),
+    "validate_objectstate_bop_real_evidence_bundle_adapter_summary": (
+        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "validate_objectstate_bop_real_evidence_bundle_adapter_summary",
     ),
     "validate_objectstate_reality_row_ledger_summary": (
         "objgauss.core.objectstate_reality_row_ledger",
