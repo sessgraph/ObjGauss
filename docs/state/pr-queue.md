@@ -395,6 +395,48 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-ABLATION-001: Add minimum sufficient evidence ablation audit
+
+- 状态: done / objectstate-assignment-ablation-audit
+- 类型: 标准 PR / ObjectState assignment training foundation
+- 架构规格: `docs/architecture/objectstate-assignment-train-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 generalization audit 之后回答“assignment 为什么泛化”，比较哪些 evidence
+  block 足够支撑 held-out assignment，而不是直接扩大模型或进入长训练。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_ablation`。
+  - 新增 schema `objgauss-objectstate-assignment-ablation-v1`。
+  - `objectstate_assignment_ablation_summary(...)` 在同一 train -> held-out test 设置下逐个
+    跑 `xyz`、`rgb`、`xyz_rgb`、`xyz_rgb_opacity` 和可选
+    `xyz_rgb_opacity_semantic` policies。
+  - 每个 policy 复用现有 `AssignmentSolverV2` / `train_assignment_solver_v2(...)`，
+    输出 loss、train/test before-after `mean_best_iou` / `ari` / `purity`、metric delta、
+    generalization gap、checkpoint roundtrip、assignment diagnostics 和
+    `ObjectStateProjection`。
+  - `objectstate_assignment_train_dataset_summary(...)`、
+    `objectstate_assignment_mvp_summary(...)` 和
+    `objectstate_assignment_generalization_summary(...)` 支持调用方传入 bounded
+    evidence feature matrix，默认 feature extractor 行为不变。
+  - Summary 输出 held-out ranking、minimum sufficient evidence 和 shortcut diagnostics，
+    用于识别 position / color shortcut。
+  - 核心 lazy namespace 暴露 ablation schema、summary 和 validator。
+- 边界:
+  - 使用现有 `AssignmentSolverV2`，不新增 MLP / Transformer / Slot Attention 依赖。
+  - Semantic policy 只消费调用方显式传入的 feature matrix，不引入 DINO / SAM /
+    teacher-model 默认依赖。
+  - 不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不做长训练，入口限制 `iterations <= 600`，并保持 long-training blocked。
+  - 不使用 replay buffer / diffusion / dynamics。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认。
+  - 不声明 identity gate pass、reality gate pass 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_assignment_ablation.py objgauss/core/objectstate_assignment_generalization.py objgauss/core/objectstate_assignment_mvp.py objgauss/core/objectstate_assignment_train.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_ablation.py tests/test_objectstate_assignment_generalization.py tests/test_objectstate_assignment_train.py tests/test_objectstate_assignment_mvp.py tests/test_core_namespace.py -q`: passed，19 tests。
+  - `uv run --extra dev pytest`: passed，616 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-GENERALIZATION-001: Add held-out assignment generalization audit
 
 - 状态: done / objectstate-assignment-generalization-audit

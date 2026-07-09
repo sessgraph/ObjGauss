@@ -349,6 +349,42 @@ Implemented v0.1 facts:
   success; it only prevents train-only assignment memorization from being
   promoted silently.
 
+### OBJECTSTATE-ASSIGNMENT-ABLATION-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_assignment_ablation`.
+- Summary schema:
+  `objgauss-objectstate-assignment-ablation-v1`.
+- Entry point:
+  `objectstate_assignment_ablation_summary(...)`.
+- The audit reuses the same train -> held-out test setup as assignment
+  generalization, but runs multiple evidence policies through the existing
+  `AssignmentSolverV2` training path:
+  - `xyz`
+  - `rgb`
+  - `xyz_rgb`
+  - `xyz_rgb_opacity`
+  - optional `xyz_rgb_opacity_semantic`
+- Each policy records loss, train / held-out before-after `mean_best_iou`,
+  `ari`, `purity`, metric deltas, generalization gap, checkpoint roundtrip and
+  `ObjectStateProjection`.
+- The train dataset summary, assignment MVP summary and generalization summary
+  now accept caller-provided bounded evidence feature matrices so ablation can
+  reuse the same training / evaluation path; the default Gaussian feature
+  extractor remains unchanged.
+- The summary ranks policies by held-out assignment quality and reports the
+  minimum sufficient evidence policy that satisfies the configured floors.
+- Shortcut diagnostics explicitly flag when `xyz` alone or `rgb` alone can
+  explain held-out assignment.
+- Semantic evidence is caller-provided as train / test feature matrices; this
+  slice does not add DINO / SAM / teacher-model dependencies.
+- Long training remains blocked after ablation; identity retrieval, temporal
+  consistency and real evidence are still required before any long run.
+- The audit does not use GPU, renderer loss, Transformer, Slot Attention,
+  replay buffer, diffusion or dynamics.
+
 ### OBJECTSTATE-ASSIGNMENT-EVAL-001
 
 Package assignment evaluation for reuse across synthetic smoke, public replay

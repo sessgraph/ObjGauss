@@ -47,6 +47,8 @@ def objectstate_assignment_generalization_summary(
     train_sample_id: str = "train-scene",
     test_sample_id: str = "test-scene",
     source_kind: str = "synthetic",
+    train_features: np.ndarray | None = None,
+    test_features: np.ndarray | None = None,
     initial_state: AssignmentSolverV2State | None = None,
     iterations: int = 80,
     learning_rate: float = 0.2,
@@ -83,6 +85,7 @@ def objectstate_assignment_generalization_summary(
         sample_id=train_sample_id,
         source_kind=source_kind,
         split="train",
+        evidence_features=train_features,
     )
     test_dataset = objectstate_assignment_train_dataset_summary(
         test_cloud,
@@ -90,11 +93,13 @@ def objectstate_assignment_generalization_summary(
         sample_id=test_sample_id,
         source_kind=source_kind,
         split="test",
+        evidence_features=test_features,
     )
     train_evidence = _evidence_from_cloud(
         train_cloud,
         train_target,
         source=f"assignment-generalization:{train_sample_id}",
+        features=train_features,
     )
     if initial_state is not None:
         initial_state = validate_assignment_solver_v2_state(initial_state)
@@ -115,24 +120,28 @@ def objectstate_assignment_generalization_summary(
         train_cloud,
         result.initial_state,
         target_assignment=train_target,
+        evidence_features=train_features,
         source=f"{sample_id}:train:before",
     )
     train_after = objectstate_assignment_mvp_summary(
         train_cloud,
         result.final_state,
         target_assignment=train_target,
+        evidence_features=train_features,
         source=f"{sample_id}:train:after",
     )
     test_before = objectstate_assignment_mvp_summary(
         test_cloud,
         result.initial_state,
         target_assignment=test_target,
+        evidence_features=test_features,
         source=f"{sample_id}:test:before",
     )
     test_after = objectstate_assignment_mvp_summary(
         test_cloud,
         result.final_state,
         target_assignment=test_target,
+        evidence_features=test_features,
         source=f"{sample_id}:test:after",
     )
     checkpoint_path = output_root / "assignment-generalization-final-state.json"
@@ -146,6 +155,7 @@ def objectstate_assignment_generalization_summary(
         test_cloud,
         restored,
         target_assignment=test_target,
+        evidence_features=test_features,
         source=f"{sample_id}:test:restored",
     )
     train_delta = _metric_delta(train_before["target_metrics"], train_after["target_metrics"])
@@ -361,11 +371,14 @@ def _evidence_from_cloud(
     target_assignment: np.ndarray,
     *,
     source: str,
+    features: np.ndarray | None = None,
 ) -> AssignmentEvidenceBatch:
     return validate_assignment_evidence_batch(
         AssignmentEvidenceBatch(
             positions=positions(cloud),
-            features=extract_features(cloud),
+            features=extract_features(cloud)
+            if features is None
+            else np.asarray(features, dtype=np.float32),
             target_assignment=target_assignment,
             source=source,
         )

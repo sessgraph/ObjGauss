@@ -32,6 +32,7 @@ def objectstate_assignment_mvp_summary(
     solver_state: AssignmentSolverV2State,
     *,
     target_assignment: np.ndarray | None = None,
+    evidence_features: np.ndarray | None = None,
     source: str = "gaussian_cloud",
     include_assignment: bool = False,
 ) -> dict[str, Any]:
@@ -41,7 +42,9 @@ def objectstate_assignment_mvp_summary(
     evidence = validate_assignment_evidence_batch(
         AssignmentEvidenceBatch(
             positions=positions(cloud),
-            features=extract_features(cloud),
+            features=extract_features(cloud)
+            if evidence_features is None
+            else np.asarray(evidence_features, dtype=np.float32),
             frame_index=0,
             target_assignment=target_assignment,
             source=source,

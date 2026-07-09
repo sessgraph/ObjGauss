@@ -89,6 +89,17 @@ roundtrip、`ObjectStateProjection` 和 long-training gate。该 audit 防止把
 Transformer / Slot Attention / replay buffer / diffusion / dynamics，也不声明 identity gate、
 reality gate 或 world model 已通过。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-ABLATION-001`：新增
+`objgauss.core.objectstate_assignment_ablation`，schema 为
+`objgauss-objectstate-assignment-ablation-v1`。`objectstate_assignment_ablation_summary(...)`
+在同一 train -> held-out test 设置下逐个比较 `xyz`、`rgb`、`xyz_rgb`、
+`xyz_rgb_opacity` 和可选 `xyz_rgb_opacity_semantic` evidence policy，并输出每个 policy 的
+loss、train/test before-after assignment metrics、generalization gap、checkpoint
+roundtrip、`ObjectStateProjection`、minimum sufficient evidence ranking 和 shortcut
+diagnostics。该切片用于回答“assignment 为什么泛化”，而不是扩大模型；semantic policy
+只接收调用方显式传入的 feature matrix，不引入 DINO / SAM / teacher 依赖。长训练仍保持
+blocked，必须等 identity retrieval、temporal consistency 和 real evidence 后再讨论。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

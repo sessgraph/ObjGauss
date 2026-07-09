@@ -45,12 +45,14 @@ def objectstate_assignment_train_dataset_summary(
     source_kind: str = "synthetic",
     split: str = "train",
     license: str = "local synthetic fixture; not public release",
+    evidence_features: np.ndarray | None = None,
 ) -> dict[str, Any]:
     target = validate_assignment_matrix(target_assignment, evidence_count=cloud.count)
     evidence = _assignment_evidence_from_cloud(
         cloud,
         target_assignment=target,
         source=f"assignment-train:{sample_id}",
+        evidence_features=evidence_features,
     )
     payload = {
         "schema": OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
@@ -385,11 +387,14 @@ def _assignment_evidence_from_cloud(
     *,
     target_assignment: np.ndarray,
     source: str,
+    evidence_features: np.ndarray | None = None,
 ) -> AssignmentEvidenceBatch:
     return validate_assignment_evidence_batch(
         AssignmentEvidenceBatch(
             positions=positions(cloud),
-            features=extract_features(cloud),
+            features=extract_features(cloud)
+            if evidence_features is None
+            else np.asarray(evidence_features, dtype=np.float32),
             target_assignment=target_assignment,
             source=source,
         )
