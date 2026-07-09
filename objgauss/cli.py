@@ -5251,6 +5251,14 @@ def _object_state_audit_real_evidence_bundle_ledger(args: argparse.Namespace) ->
     print(f"pass_row_count={ledger['pass_row_count']}")
     print(f"fail_row_count={ledger['fail_row_count']}")
     print(f"blocked_row_count={ledger['blocked_row_count']}")
+    print(
+        "evidence_incomplete_row_count="
+        f"{summary['row_counts'].get('evidence_incomplete_row_count', 0)}"
+    )
+    print(
+        "unsupported_row_count="
+        f"{summary['row_counts'].get('unsupported_row_count', 0)}"
+    )
     print(f"gate_status={None if gate is None else gate['status']}")
     for record in summary["records"]:
         print(
@@ -5293,6 +5301,11 @@ def _object_state_audit_real_evidence_bundle_ledger_package(
     print(f"pass_row_count={counts['pass_row_count']}")
     print(f"fail_row_count={counts['fail_row_count']}")
     print(f"blocked_row_count={counts['blocked_row_count']}")
+    print(
+        "evidence_incomplete_row_count="
+        f"{counts.get('evidence_incomplete_row_count', 0)}"
+    )
+    print(f"unsupported_row_count={counts.get('unsupported_row_count', 0)}")
     for gate, passed in summary["reviewability_gates"].items():
         print(f"reviewability.{gate}={str(passed).lower()}")
     for issue in summary["issues"]:

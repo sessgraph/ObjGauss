@@ -4467,7 +4467,11 @@ npm run acceptance:demo
    一条命令写出 bundle summary、三类 real row summary、full reality ledger、blocked rows、
    state-variable evidence matrix 和 next actions；full `reality-row-ledger` 仍是 pass /
    fail / blocked 的权威输出。下一步应让真实 controlled/public bundle 产物进入这条
-   handoff，而不是继续新增大模型。`OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001`
+   handoff，而不是继续新增大模型。`OBJECTSTATE-REAL-BUNDLE-LEDGER-ACCOUNTING-STATUS-001`
+   已把 row summary 中的 `pass` / `fail` / `evidence_incomplete` / `unsupported`
+   accounting status counts 汇总到 bundle-ledger wrapper、每条 record、row_counts 和
+   package audit 输出；因此 `evidence_incomplete` / `unsupported` 在总账层也不会被
+   混同为模型 fail，只会同时表现为 reality row 的 blocked。`OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001`
    已新增 `audit-real-evidence-bundle-ledger-package`，可对 handoff output root 做只读
    reviewability audit：检查 wrapper、standalone `reality-row-ledger.json`、per-bundle
    summaries、blocked rows、state-variable evidence matrix、next actions、row counts 和

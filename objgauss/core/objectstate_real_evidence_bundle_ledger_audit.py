@@ -78,6 +78,7 @@ def objectstate_real_evidence_bundle_ledger_package_audit(
         ),
         "sample_ids": _sample_ids(wrapper),
         "row_counts": _row_counts(wrapper, ledger),
+        "accounting_status_counts": _accounting_status_counts(wrapper),
         "evidence_accounts": _evidence_accounts(wrapper),
         "reviewability_gates": gates,
         "issues": _issues(files, gates),
@@ -424,6 +425,22 @@ def _row_counts(wrapper: Any, ledger: Any) -> dict[str, int]:
         "pass_row_count": 0,
         "fail_row_count": 0,
         "blocked_row_count": 0,
+        "evidence_incomplete_row_count": 0,
+        "unsupported_row_count": 0,
+    }
+
+
+def _accounting_status_counts(wrapper: Any) -> dict[str, Any]:
+    if isinstance(wrapper, Mapping) and isinstance(
+        wrapper.get("accounting_status_counts"), Mapping
+    ):
+        return dict(wrapper["accounting_status_counts"])
+    return {
+        "identity": {},
+        "prediction": {},
+        "intervention": {},
+        "bundle": {},
+        "all": {},
     }
 
 

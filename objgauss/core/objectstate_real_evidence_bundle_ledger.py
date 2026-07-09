@@ -30,6 +30,7 @@ from objgauss.core.objectstate_reality_row_ledger import (
 OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA = (
     "objgauss-objectstate-real-evidence-bundle-ledger-v1"
 )
+_ACCOUNTING_STATUSES = ("pass", "fail", "evidence_incomplete", "unsupported")
 
 
 def write_objectstate_real_evidence_bundle_ledger(
@@ -103,6 +104,12 @@ def write_objectstate_real_evidence_bundle_ledger(
                         intervention_summary["row_counts"]["intervention_rows"]
                     ),
                 },
+                "accounting_status_counts": _record_accounting_status_counts(
+                    bundle_summary,
+                    identity_summary,
+                    prediction_summary,
+                    intervention_summary,
+                ),
             }
         )
 
@@ -144,7 +151,14 @@ def write_objectstate_real_evidence_bundle_ledger(
             "pass_row_count": ledger["pass_row_count"],
             "fail_row_count": ledger["fail_row_count"],
             "blocked_row_count": ledger["blocked_row_count"],
+            "evidence_incomplete_row_count": _accounting_status_counts(records)["all"][
+                "evidence_incomplete"
+            ],
+            "unsupported_row_count": _accounting_status_counts(records)["all"][
+                "unsupported"
+            ],
         },
+        "accounting_status_counts": _accounting_status_counts(records),
         "evidence_accounts": _evidence_accounts(records),
         "claim_policy": {
             "bundle_ledger_is_auditable_handoff": True,
@@ -211,6 +225,14 @@ def validate_objectstate_real_evidence_bundle_ledger_summary(
     for key in ("row_count", "pass_row_count", "fail_row_count", "blocked_row_count"):
         if row_counts.get(key) != ledger.get(key):
             raise ValueError(f"real evidence bundle ledger row_counts.{key} mismatch")
+    accounting_counts = payload.get("accounting_status_counts")
+    if not isinstance(accounting_counts, Mapping):
+        raise ValueError("real evidence bundle ledger requires accounting_status_counts")
+    _validate_accounting_status_counts(accounting_counts)
+    for key in ("evidence_incomplete", "unsupported"):
+        row_key = f"{key}_row_count"
+        if row_counts.get(row_key) != accounting_counts["all"][key]:
+            raise ValueError(f"real evidence bundle ledger row_counts.{row_key} mismatch")
     accounts = payload.get("evidence_accounts")
     if not isinstance(accounts, Mapping):
         raise ValueError("real evidence bundle ledger requires evidence_accounts")
@@ -263,6 +285,96 @@ def _validate_record(record: Any) -> None:
     validate_objectstate_real_intervention_rows_summary(intervention_summary)
     if record["sample_id"] != bundle_summary["sample"]["sample_id"]:
         raise ValueError("real evidence bundle ledger record sample_id mismatch")
+    counts = record.get("accounting_status_counts")
+    if not isinstance(counts, Mapping):
+        raise ValueError("real evidence bundle ledger record requires accounting_status_counts")
+    _validate_accounting_status_counts(counts)
+
+
+def _record_accounting_status_counts(
+    bundle_summary: Mapping[str, Any],
+    identity_summary: Mapping[str, Any],
+    prediction_summary: Mapping[str, Any],
+    intervention_summary: Mapping[str, Any],
+) -> dict[str, dict[str, int]]:
+    identity = _status_counts(
+        identity_summary["metrics"].get("identity_accounting_status_counts", {})
+    )
+    prediction = _status_counts(
+        prediction_summary["metrics"].get("prediction_accounting_status_counts", {})
+    )
+    intervention = _status_counts(
+        intervention_summary["metrics"].get("intervention_accounting_status_counts", {})
+    )
+    bundle = _status_counts(
+        bundle_summary["metrics"].get("gate_accounting_status_counts", {})
+    )
+    all_counts = _sum_status_counts(identity, prediction, intervention)
+    return {
+        "identity": identity,
+        "prediction": prediction,
+        "intervention": intervention,
+        "bundle": bundle,
+        "all": all_counts,
+    }
+
+
+def _accounting_status_counts(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, int]]:
+    totals = {
+        "identity": _zero_status_counts(),
+        "prediction": _zero_status_counts(),
+        "intervention": _zero_status_counts(),
+        "bundle": _zero_status_counts(),
+        "all": _zero_status_counts(),
+    }
+    for record in records:
+        counts = record.get("accounting_status_counts", {})
+        if not isinstance(counts, Mapping):
+            continue
+        for section in totals:
+            totals[section] = _sum_status_counts(
+                totals[section],
+                _status_counts(counts.get(section, {})),
+            )
+    return totals
+
+
+def _status_counts(raw: Any) -> dict[str, int]:
+    counts = _zero_status_counts()
+    if isinstance(raw, Mapping):
+        for status in _ACCOUNTING_STATUSES:
+            counts[status] = int(raw.get(status, 0) or 0)
+    return counts
+
+
+def _zero_status_counts() -> dict[str, int]:
+    return {status: 0 for status in _ACCOUNTING_STATUSES}
+
+
+def _sum_status_counts(*items: Mapping[str, int]) -> dict[str, int]:
+    result = _zero_status_counts()
+    for item in items:
+        for status in _ACCOUNTING_STATUSES:
+            result[status] += int(item.get(status, 0) or 0)
+    return result
+
+
+def _validate_accounting_status_counts(counts: Mapping[str, Any]) -> None:
+    for section in ("identity", "prediction", "intervention", "bundle", "all"):
+        section_counts = counts.get(section)
+        if not isinstance(section_counts, Mapping):
+            raise ValueError(
+                f"real evidence bundle ledger accounting_status_counts.{section} missing"
+            )
+        for status in _ACCOUNTING_STATUSES:
+            value = section_counts.get(status)
+            if not isinstance(value, int) or value < 0:
+                raise ValueError(
+                    "real evidence bundle ledger accounting_status_counts "
+                    f"{section}.{status} must be non-negative int"
+                )
 
 
 def _evidence_accounts(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

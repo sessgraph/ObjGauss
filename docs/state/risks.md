@@ -431,6 +431,15 @@ actions。该缓解减少真实证据包进入 Phase 1 总表时的手工串命�
 dynamics，也不声明 counterfactual proof 或 world-model evidence；关闭条件仍是真实
 controlled/public bundle 产物跑出可审计 full Phase 1 ledger。
 
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-LEDGER-ACCOUNTING-STATUS-001`
+将 per-kind row summaries 中的 `pass` / `fail` / `evidence_incomplete` /
+`unsupported` accounting status counts 汇总到 real bundle ledger wrapper、每条 bundle
+record、`row_counts` 和 package audit 输出。该缓解减少总账层只看到 `blocked` 而看不到
+GT 缺口类型的误读风险，并明确 `evidence_incomplete` / `unsupported` 不是模型 fail。
+风险继续 open，因为它仍不采集 GT、不运行模型 eval、不生成真实 pass row、不训练 dynamics，
+也不声明 counterfactual proof 或 world-model evidence；关闭条件仍是真实
+controlled/public bundle 产物跑出可审计 full Phase 1 ledger。
+
 R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001`
 新增 `audit-real-evidence-bundle-ledger-package` 和
 `objgauss-objectstate-real-evidence-bundle-ledger-package-audit-v1`，对 bundle-ledger output

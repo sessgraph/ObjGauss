@@ -204,6 +204,14 @@ def test_real_evidence_bundle_ledger_writes_phase1_audit_package(tmp_path):
         "pass_row_count": 3,
         "fail_row_count": 0,
         "blocked_row_count": 0,
+        "evidence_incomplete_row_count": 0,
+        "unsupported_row_count": 0,
+    }
+    assert summary["accounting_status_counts"]["all"] == {
+        "pass": 3,
+        "fail": 0,
+        "evidence_incomplete": 0,
+        "unsupported": 0,
     }
     assert summary["evidence_accounts"]["static_scene_evidence"] == {
         "available_bundle_count": 1,
@@ -227,6 +235,54 @@ def test_real_evidence_bundle_ledger_writes_phase1_audit_package(tmp_path):
     assert summary["state_variable_evidence_matrix_path"].endswith(
         "state-variable-evidence-matrix.md"
     )
+    assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
+
+
+def test_real_evidence_bundle_ledger_keeps_incomplete_and_unsupported_counts(
+    tmp_path,
+):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    _write_json(
+        bundle_path,
+        _real_evidence_bundle_with_accounting_statuses(
+            identity_status="evidence_incomplete",
+            prediction_status="unsupported",
+            intervention_status="evidence_incomplete",
+        ),
+    )
+
+    summary = write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=output_root,
+    )
+    package = objectstate_real_evidence_bundle_ledger_package_audit(output_root)
+
+    assert summary["status"] == "objectstate_real_evidence_bundle_ledger_reviewable"
+    assert summary["ledger"]["gate"]["status"] == "objectstate_reality_gate_fail"
+    assert summary["row_counts"] == {
+        "row_count": 3,
+        "pass_row_count": 0,
+        "fail_row_count": 0,
+        "blocked_row_count": 3,
+        "evidence_incomplete_row_count": 2,
+        "unsupported_row_count": 1,
+    }
+    assert summary["accounting_status_counts"]["all"] == {
+        "pass": 0,
+        "fail": 0,
+        "evidence_incomplete": 2,
+        "unsupported": 1,
+    }
+    assert summary["accounting_status_counts"]["identity"]["evidence_incomplete"] == 1
+    assert summary["accounting_status_counts"]["prediction"]["unsupported"] == 1
+    assert (
+        summary["accounting_status_counts"]["intervention"]["evidence_incomplete"]
+        == 1
+    )
+    assert package["accounting_status_counts"] == summary["accounting_status_counts"]
+    assert package["row_counts"]["evidence_incomplete_row_count"] == 2
+    assert package["row_counts"]["unsupported_row_count"] == 1
     assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
 
 
@@ -260,6 +316,8 @@ def test_real_evidence_bundle_ledger_cli_writes_full_ledger_outputs(tmp_path, ca
     assert f"schema={OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA}" in stdout
     assert "ledger_status=objectstate_reality_row_ledger_reviewable" in stdout
     assert "gate_status=objectstate_reality_gate_pass" in stdout
+    assert "evidence_incomplete_row_count=0" in stdout
+    assert "unsupported_row_count=0" in stdout
     assert "bundle=controlled-tabletop-cup-001:" in stdout
     assert summary["ledger"] == ledger
     assert ledger["row_count"] == 3
@@ -295,6 +353,14 @@ def test_real_evidence_bundle_ledger_package_audit_is_reviewable(tmp_path):
         "pass_row_count": 3,
         "fail_row_count": 0,
         "blocked_row_count": 0,
+        "evidence_incomplete_row_count": 0,
+        "unsupported_row_count": 0,
+    }
+    assert summary["accounting_status_counts"]["all"] == {
+        "pass": 3,
+        "fail": 0,
+        "evidence_incomplete": 0,
+        "unsupported": 0,
     }
     assert summary["evidence_accounts"]["static_scene_evidence"] == {
         "available_bundle_count": 1,
@@ -361,6 +427,8 @@ def test_real_evidence_bundle_ledger_package_audit_cli(tmp_path, capsys):
         in stdout
     )
     assert "status=objectstate_real_evidence_bundle_ledger_package_audit_reviewable" in stdout
+    assert "evidence_incomplete_row_count=0" in stdout
+    assert "unsupported_row_count=0" in stdout
     assert "reviewability.wrapper_embedded_ledger_matches_file=true" in stdout
     assert summary["status"] == (
         "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
@@ -574,6 +642,29 @@ def _real_evidence_bundle():
             },
         ],
     }
+
+
+def _real_evidence_bundle_with_accounting_statuses(
+    *,
+    identity_status: str,
+    prediction_status: str,
+    intervention_status: str,
+):
+    bundle = json.loads(json.dumps(_real_evidence_bundle()))
+    statuses = {
+        "identity": identity_status,
+        "prediction": prediction_status,
+        "intervention": intervention_status,
+    }
+    for row in bundle["gate_accounting_rows"]:
+        status = statuses[row["evidence_kind"]]
+        row["accounting_status"] = status
+        if status in {"evidence_incomplete", "unsupported"}:
+            row["metrics"] = {}
+            row["reason"] = f"{row['evidence_kind']} evidence is {status}"
+        else:
+            row.pop("reason", None)
+    return bundle
 
 
 def _observation(row_id, frame_id, timestamp):

@@ -158,6 +158,9 @@ controlled/public bundle 产物上运行该 ledger，形成 Phase 1 可审计总
 `audit-real-evidence-bundle-ledger`，可从 real evidence bundle 直接生成 bundle summary、
 三类 row summary、full reality ledger、blocked rows、state-variable evidence matrix 和
 next actions；它只是 accounting orchestration，不创建 GT、不运行模型 eval、不训练 dynamics。
+`OBJECTSTATE-REAL-BUNDLE-LEDGER-ACCOUNTING-STATUS-001` 已把
+`pass` / `fail` / `evidence_incomplete` / `unsupported` accounting status counts 汇总到
+bundle-ledger wrapper 和 package audit，避免总账层只看到 blocked 而看不到 GT 缺口类型。
 `OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001` 已新增
 `audit-real-evidence-bundle-ledger-package`，可只读审计 bundle-ledger output root 的
 wrapper / ledger / per-bundle summaries / Markdown outputs / row counts / evidence accounts
@@ -391,6 +394,37 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REAL-BUNDLE-LEDGER-ACCOUNTING-STATUS-001: Roll up real accounting status counts
+
+- 状态: done / real-evidence-bundle-ledger-accounting-status
+- 类型: 标准 PR / ObjectState Phase 1 real evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 让 `audit-real-evidence-bundle-ledger` 的 wrapper 和 package audit 显式汇总
+  `pass` / `fail` / `evidence_incomplete` / `unsupported`，避免
+  `evidence_incomplete` / `unsupported` 在总账层只表现为 blocked 而丢失 GT 缺口类型。
+- 已实施:
+  - `objgauss-objectstate-real-evidence-bundle-ledger-v1` 新增
+    `accounting_status_counts`，按 `identity` / `prediction` / `intervention` /
+    `bundle` / `all` 汇总四类 accounting status。
+  - 每条 bundle ledger `record` 也保留同一组 `accounting_status_counts`，方便审计
+    单个 sample 的缺口来源。
+  - `row_counts` 新增 `evidence_incomplete_row_count` 和 `unsupported_row_count`；
+    它们来自原始 accounting rows，而不是从 `block_reason` 文本反推。
+  - `audit-real-evidence-bundle-ledger-package` 和两个 CLI 输出同步暴露这些 counts。
+- 边界:
+  - 不改变 full `reality-row-ledger` 的 pass / fail / blocked 权威判定。
+  - 不把 `evidence_incomplete` 或 `unsupported` 计为 fail，也不计为 pass。
+  - 不创建 GT、不运行 identity / prediction / intervention eval、不训练模型。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_real_evidence_bundle_ledger.py objgauss/core/objectstate_real_evidence_bundle_ledger_audit.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: 18 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 600 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - 完成 commit: 本提交。
 
 ### OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001: Audit real bundle ledger handoff packages
 
