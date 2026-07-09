@@ -4492,7 +4492,11 @@ npm run acceptance:demo
    `splat-to-objgauss-ply` 管线拉取和转换。`garden` / `bicycle` / `stump` /
    `treehill` 是大体量本地研究候选，适合 LOD / renderer pressure 和静态分割负例，
    不能替代带 timestamped identity / 6DoF pose / action GT 的 Phase 1 rows，也未进入
-   viewer/export 默认策略。`GAUSSIAN-SCENE-EXPANDED-SOURCE-TRIAGE-001` 继续补充
+   viewer/export 默认策略。`room` / `train` 已补非默认 viewer catalog 入口；拉取
+   `cakewalk-room-3dgs-local` / `cakewalk-train-3dgs-local` 并生成 ignored
+   `public/samples/room_objects.ply` / `public/samples/train_objects.ply` 后，可在
+   viewer 模型版本列表中作为本地静态候选加载，但不会出现在首屏 featured dock。
+   `GAUSSIAN-SCENE-EXPANDED-SOURCE-TRIAGE-001` 继续补充
    cakewalk 现成 Gaussian PLY、GaussianSplats3D sample archive 和 Niantic SPZ
    samples 作为后续格式适配候选；这些需要 `.ply` / `.ksplat` / `.spz` import
    contract 或本地解包审计，暂不进入 pullable registry。

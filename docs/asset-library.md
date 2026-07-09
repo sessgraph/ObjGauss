@@ -50,7 +50,9 @@
 推荐顺序：
 
 1. 先本地拉 `room.splat` 和 `train.splat` 做小型静态 cross-sample；它们比
-   `garden` / `bicycle` 更适合快速验收。
+   `garden` / `bicycle` 更适合快速验收。`room` / `train` 已有非默认 viewer
+   catalog 入口；只有执行对应 `objgauss assets pull ...` 并生成本地 ignored
+   `public/samples/*` 后才会在 viewer 中加载成功。
 2. 若要评估真实大场景 renderer / LOD / streaming，优先拉 `garden.splat` 或
    `bicycle.splat`，再考虑 `stump` / `treehill`。
 3. 若要做官方高质量结果审计，再考虑 GraphDECO results 或 Inria Hierarchical

@@ -829,6 +829,34 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
   - 完成 commit: 本提交。
 
+### GAUSSIAN-SCENE-VIEWER-CANDIDATE-ENTRIES-001: Expose small ready-made Gaussian scenes as non-default viewer candidates
+
+- 状态: done / gaussian-scene-viewer-candidate-entries
+- 类型: frontend metadata / asset handoff
+- 状态记录: `docs/asset-library.md`、`docs/state/project-status.md`
+- 目标: 让已登记的 `room` / `train` 现成 Gaussian scene 在执行本地 pull 后可从
+  viewer 模型 catalog 访问，同时保持非默认、非 featured、非发布资产边界。
+- 已实施:
+  - `src/modelCatalog.js` 新增 `cakewalk-room-static-candidate` 和
+    `cakewalk-train-static-candidate`，二者均为 `optionalLocalPreview`、
+    `dockVisible=false`、`defaultStageVisible=false`。
+  - `src/assetLibrary.js` 给 `cakewalk-room-3dgs-local` 和
+    `cakewalk-train-3dgs-local` 补本地 `localPath` / `splatPath`，与 pull registry
+    输出保持一致。
+  - `docs/asset-library.md` 和 `docs/state/project-status.md` 明确：只有本地执行
+    `objgauss assets pull ...` 生成 ignored `public/samples/*` 后，viewer 才能加载。
+- 边界:
+  - 不下载 scene、不提交 `public/samples/` 或 `outputs/` 产物。
+  - 不把混合许可素材放进首屏 dock、featured assets、viewer/export 默认策略或
+    State Variable Gate accounting。
+- 验证:
+  - `uv run objgauss assets list --pullable`: passed；`room` / `train` 仍按
+    `/samples/room_objects.ply` / `/samples/train_objects.ply` 暴露 pullable 输出路径。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 未运行 pytest；本切片只改 frontend metadata 和 docs，不改 Python 行为。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
 
 - 状态: done / public-interaction-action-gt-gate
