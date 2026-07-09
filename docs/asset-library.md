@@ -33,9 +33,9 @@
 
 | 候选 | 来源 | 体积 / 文件 | 优先级 | 适用用途 | 边界 |
 | --- | --- | --- | --- | --- | --- |
-| cakewalk room | https://huggingface.co/cakewalk/splat-data/tree/main | `room.splat`，约 51 MB | P0 | 现成室内 Gaussian scene；适合本地 object clustering、viewer load、cross-sample 静态场景扩展 | cakewalk README 明确来自多来源、多许可；只能本地测试，不作为 public demo / commercial demo |
-| cakewalk train | https://huggingface.co/cakewalk/splat-data/tree/main | `train.splat`，约 32.8 MB | P0 | 小型现成 `.splat`；适合快速 pipeline smoke、source splat 加载和对象层生成实验 | 许可混合；无 RGB / pose / action GT，不能用于 State Variable Gate pass row |
-| cakewalk truck | https://huggingface.co/cakewalk/splat-data/tree/main | `truck.splat`，约 81.3 MB | P1 | 单一车辆主体，适合测试 object proposal / bbox picking / static segmentation 质量 | 许可混合；只能本地审计，不进入默认 viewer/export |
+| cakewalk room | https://huggingface.co/cakewalk/splat-data/tree/main | `room.splat`，约 51 MB；registry id `cakewalk-room-3dgs-local` | P0 | 现成室内 Gaussian scene；适合本地 object clustering、viewer load、cross-sample 静态场景扩展 | cakewalk README 明确来自多来源、多许可；只能本地测试，不作为 public demo / commercial demo |
+| cakewalk train | https://huggingface.co/cakewalk/splat-data/tree/main | `train.splat`，约 32.8 MB；registry id `cakewalk-train-3dgs-local` | P0 | 小型现成 `.splat`；适合快速 pipeline smoke、source splat 加载和对象层生成实验 | 许可混合；无 RGB / pose / action GT，不能用于 State Variable Gate pass row |
+| cakewalk truck | https://huggingface.co/cakewalk/splat-data/tree/main | `truck.splat`，约 81.3 MB；registry id `cakewalk-truck-3dgs-local` | P1 | 单一车辆主体，适合测试 object proposal / bbox picking / static segmentation 质量 | 许可混合；只能本地审计，不进入默认 viewer/export |
 | cakewalk garden / stump / treehill / bicycle | https://huggingface.co/cakewalk/splat-data/tree/main | `garden.splat` 约 187 MB；`stump.splat` 约 159 MB；`treehill.splat` 约 121 MB；`bicycle.splat` 约 196 MB | P2 | 更大静态场景，用于压力测试、LOD / streaming 和多物体场景分割负例 | 文件较大且许可混合；不适合先做 Phase 1 identity / action evidence |
 | GraphDECO official results | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Results - 7GB` | P1 | 高质量官方 3DGS 结果；适合静态 Gaussian scene benchmark 和 renderer / object-field robustness 审计 | 大文件；继承 Mip-NeRF360 / Tanks and Temples / Deep Blending 等原数据条款；不直接提供 action GT |
 | GraphDECO official scenes | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Scenes - 650MB` | P2 | 若需要重新训练或对齐相机轨迹，可作为官方 scene 输入来源 | 是训练/评估源，不是 ready `.splat` 小样例；下载后仍需放 ignored `outputs/` |
@@ -82,6 +82,14 @@ objgauss assets pull plush-3dgs-local
 objgauss assets pull nike-3dgs-local
 ```
 
+一键拉取现成 Gaussian 场景候选：
+
+```bash
+objgauss assets pull cakewalk-room-3dgs-local
+objgauss assets pull cakewalk-train-3dgs-local
+objgauss assets pull cakewalk-truck-3dgs-local
+```
+
 默认输出：
 
 ```text
@@ -93,6 +101,18 @@ outputs/assets/raw/nike.splat
 outputs/assets/converted/nike.ply
 public/samples/nike.splat
 public/samples/nike_objects.ply
+outputs/assets/raw/room.splat
+outputs/assets/converted/room.ply
+public/samples/room.splat
+public/samples/room_objects.ply
+outputs/assets/raw/train.splat
+outputs/assets/converted/train.ply
+public/samples/train.splat
+public/samples/train_objects.ply
+outputs/assets/raw/truck.splat
+outputs/assets/converted/truck.ply
+public/samples/truck.splat
+public/samples/truck_objects.ply
 ```
 
 如果远端文件或转换逻辑有更新，可以强制刷新：

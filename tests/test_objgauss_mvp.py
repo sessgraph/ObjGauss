@@ -90,6 +90,9 @@ def test_read_splat_as_gaussian_cloud(tmp_path):
 def test_asset_registry_has_pullable_sample():
     asset = get_asset("plush-3dgs-local")
     nike = get_asset("nike-3dgs-local")
+    room = get_asset("cakewalk-room-3dgs-local")
+    train = get_asset("cakewalk-train-3dgs-local")
+    truck = get_asset("cakewalk-truck-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
     chair_nerf = get_asset("polyhaven-school-chair-nerf")
     chair_dense = get_asset("polyhaven-school-chair-nerf-dense")
@@ -108,6 +111,19 @@ def test_asset_registry_has_pullable_sample():
     assert nike.splat_path == "/samples/nike.splat"
     assert nike.default_clusters == 4
     assert nike.pull_pipeline == "splat-to-objgauss-ply"
+    assert room.download_url.endswith("/room.splat")
+    assert room.local_path == "/samples/room_objects.ply"
+    assert room.splat_path == "/samples/room.splat"
+    assert room.default_clusters == 8
+    assert room.pull_pipeline == "splat-to-objgauss-ply"
+    assert train.download_url.endswith("/train.splat")
+    assert train.local_path == "/samples/train_objects.ply"
+    assert train.default_clusters == 5
+    assert train.pull_pipeline == "splat-to-objgauss-ply"
+    assert truck.download_url.endswith("/truck.splat")
+    assert truck.local_path == "/samples/truck_objects.ply"
+    assert truck.default_clusters == 4
+    assert truck.pull_pipeline == "splat-to-objgauss-ply"
     assert demo.pull_pipeline == "polyhaven-gltf"
     assert demo.polyhaven_id == "SchoolChair_01"
     assert demo.license.startswith("CC0")

@@ -155,6 +155,10 @@ Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`
 `truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
 cross-sample / viewer / segmentation 扩展；由于缺 timestamped physical identity /
 6DoF pose / action GT，不能替代 Phase 1 controlled/public reality rows。
+`GAUSSIAN-SCENE-PULLABLE-REGISTRY-001` 已把 cakewalk `room` / `train` / `truck`
+三条现成 `.splat` 注册为 pullable assets，后续可用 `objgauss assets pull <asset_id>`
+走现有 `splat-to-objgauss-ply` 管线生成本地 ignored `public/samples/*` 和 object-aware
+PLY；这些仍是本地研究候选，不进入 featured/default viewer。
 `OBJECTSTATE-BOP-CAPTURE-ADAPTER-001` 已新增
 `import-bop-capture-scene` CLI，可把本地 BOP scene 的 `scene_camera.json` /
 `scene_gt.json` / optional `scene_gt_info.json` / `rgb/` 转成 controlled capture
@@ -579,6 +583,32 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - 不声明 public demo、commercial demo、reality gate pass 或 world-model evidence。
 - 验证:
   - docs-only，未运行 pytest / build。
+  - `git diff --check`: passed。
+
+### GAUSSIAN-SCENE-PULLABLE-REGISTRY-001: Add pullable ready-made Gaussian scene assets
+
+- 状态: done / gaussian-scene-pullable-registry
+- 类型: 标准 PR / asset registry
+- 状态记录: `docs/asset-library.md`
+- 目标: 把已筛选的 P0/P1 现成 `.splat` 场景变成可复跑的 assets CLI 入口，后续
+  cross-sample / viewer / segmentation smoke 不再依赖手工 URL。
+- 已实施:
+  - `objgauss/assets.py` 新增 `cakewalk-room-3dgs-local`、
+    `cakewalk-train-3dgs-local` 和 `cakewalk-truck-3dgs-local`。
+  - 三个资产都走既有 `splat-to-objgauss-ply` 管线，下载到 ignored
+    `outputs/assets/raw/`，转换到 ignored `outputs/assets/converted/`，并写出本地
+    `public/samples/<scene>.splat` / `<scene>_objects.ply`。
+  - `src/assetLibrary.js` 同步登记为候选资产，但不设置 `localPath` / `splatPath`，
+    因此不会进入 featured/default viewer 或被常规 renderable audit 当作已接入资产。
+  - `docs/asset-library.md` 补齐 registry id、pull 命令和默认本地输出路径。
+- 边界:
+  - 不下载素材、不提交 `public/samples/` 或 `outputs/` 产物。
+  - 不修改 viewer / export 默认，不声明 public demo、commercial demo 或 state-variable
+    evidence pass。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py -q`: passed。
+  - `uv run objgauss assets list --pullable`: passed；包含三条新 cakewalk assets。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
 
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit

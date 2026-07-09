@@ -4455,8 +4455,12 @@ npm run acceptance:demo
    这条 ledger，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
-   official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，
-   不能替代带 timestamped identity / 6DoF pose / action GT 的 Phase 1 rows。
+   official results；`cakewalk-room-3dgs-local`、`cakewalk-train-3dgs-local` 和
+   `cakewalk-truck-3dgs-local` 已进入 assets registry，可通过
+   `objgauss assets pull <asset_id>` 走现有 `splat-to-objgauss-ply` 管线拉取和转换。
+   这些样例只能补静态 cross-sample / viewer / segmentation evidence，不能替代带
+   timestamped identity / 6DoF pose / action GT 的 Phase 1 rows，也未进入 viewer/export
+   默认策略。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
