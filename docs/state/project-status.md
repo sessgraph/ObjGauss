@@ -127,6 +127,22 @@ oracle 为 retrieval upper bound。该切片只实现 benchmark 编排，不训�
 不启用 temporal loss、不导入真实 capture、不修改 viewer/export 默认，也不声明真实 benchmark
 或 prediction / causal / reality / world-model gate 已通过。
 
+随后完成 `OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-REPORT-001`：新增
+`objgauss.core.objectstate_model_identity_benchmark_report`，schema 为
+`objgauss-objectstate-model-identity-benchmark-report-v1`。
+`write_objectstate_model_identity_benchmark_report(...)` 构建 deterministic controlled
+synthetic ladder：viewpoint / dropout / occlusion / appearance / spatial 五类扰动各含
+easy / medium / hard 三档，共 15 scenarios / 60 identity pairs，并写出
+`identity-benchmark-summary.json`、`identity-benchmark-report.md`、
+`identity-benchmark-breakdown.csv` 和本地 `identity-benchmark-artifacts`。首份可审计报告已写入
+`docs/benchmarks/objectstate-identity-benchmark/`，per-scenario artifacts 写到
+`/tmp/objgauss-objectstate-identity-benchmark-artifacts`。当前 controlled synthetic evidence
+为 `candidate_ready`：`assignment_solver_v2` overall retrieval@1 为 `1.000000`，
+`xyz_centroid` 为 `0.250000`，random 为 `0.300000`，oracle 为 `1.000000`；五类扰动下
+solver 均高于 xyz。该结果只允许考虑更长 identity robustness smoke，不解锁 world-model
+训练；它不代表 real controlled capture pass、不做 identity ablation、不启用 temporal loss，
+也不声明 prediction / causal / reality gate 或 world model 已通过。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

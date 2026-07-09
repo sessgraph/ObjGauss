@@ -156,6 +156,8 @@ from objgauss.core import (
     OBJECTSTATE_IDENTITY_GATE_SCHEMA,
     OBJECTSTATE_MODEL_IDENTITY_BASELINES,
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS,
+    OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES,
+    OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA,
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA,
     OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA,
     OBJECTSTATE_PREDICTIVE_GATE_SCHEMA,
@@ -242,6 +244,7 @@ from objgauss.core import (
     evaluate_objectstate_identity_gate,
     objectstate_model_identity_benchmark_summary,
     objectstate_model_identity_gate_summary,
+    write_objectstate_model_identity_benchmark_report,
     evaluate_objectstate_causal_gate,
     evaluate_objectstate_predictive_gate,
     evaluate_objectstate_reality_gate,
@@ -535,6 +538,7 @@ from objgauss.core import (
     validate_synthetic_observation_frame,
     validate_objectstate_identity_encoder_training_summary,
     validate_objectstate_identity_gate_summary,
+    validate_objectstate_model_identity_benchmark_report_summary,
     validate_objectstate_model_identity_benchmark_summary,
     validate_objectstate_model_identity_gate_summary,
     validate_objectstate_predictive_gate_summary,
@@ -834,6 +838,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA == (
         "objgauss-objectstate-model-identity-benchmark-v1"
     )
+    assert OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA == (
+        "objgauss-objectstate-model-identity-benchmark-report-v1"
+    )
     assert set(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS) == {
         "viewpoint",
         "dropout",
@@ -841,6 +848,11 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
         "appearance",
         "spatial",
     }
+    assert tuple(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES) == (
+        "easy",
+        "medium",
+        "hard",
+    )
     assert set(OBJECTSTATE_MODEL_IDENTITY_BASELINES) == {
         "random_assignment",
         "xyz_centroid",
@@ -849,6 +861,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     }
     assert objectstate_model_identity_benchmark_summary is not None
     assert objectstate_model_identity_gate_summary is not None
+    assert write_objectstate_model_identity_benchmark_report is not None
+    assert validate_objectstate_model_identity_benchmark_report_summary is not None
     assert validate_objectstate_model_identity_benchmark_summary is not None
     assert validate_objectstate_model_identity_gate_summary is not None
     assert ObjectStateModelIdentityBenchmarkScenario is not None

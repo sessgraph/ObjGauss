@@ -350,6 +350,32 @@ Implemented v0.1 facts:
   ingest real capture, mutate viewer defaults or claim prediction / causal /
   reality gate success.
 
+### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-REPORT-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_model_identity_benchmark_report`.
+- Summary schema:
+  `objgauss-objectstate-model-identity-benchmark-report-v1`.
+- Entry point:
+  `write_objectstate_model_identity_benchmark_report(...)`.
+- The report generator builds a deterministic controlled synthetic difficulty
+  ladder: `viewpoint`, `dropout`, `occlusion`, `appearance` and `spatial`,
+  each at `easy`, `medium` and `hard`.
+- It writes:
+  `identity-benchmark-summary.json`, `identity-benchmark-report.md`,
+  `identity-benchmark-breakdown.csv` and an
+  `identity-benchmark-artifacts` directory.
+- The first committed report is under
+  `docs/benchmarks/objectstate-identity-benchmark/`, with per-scenario local
+  artifacts written to `/tmp/objgauss-objectstate-identity-benchmark-artifacts`.
+- The current deterministic evidence reports `candidate_ready` for a longer
+  identity robustness smoke, not for world-model training.
+- This report remains controlled synthetic evidence only; it does not claim a
+  real-data identity pass, identity ablation, temporal assignment, prediction /
+  causal / reality gate success or world-model proof.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

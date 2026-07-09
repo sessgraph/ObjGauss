@@ -395,6 +395,42 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-REPORT-001: Generate identity robustness evidence report
+
+- 状态: done / objectstate-model-identity-benchmark-report
+- 类型: 标准 PR / ObjectState identity robustness evidence
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把已实现的 model identity benchmark 从模块能力推进为第一份可审计 evidence report，
+  明确 `AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection` 在多扰动 identity
+  stress test 下是否稳定超过 `xyz_centroid`。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_model_identity_benchmark_report`。
+  - 新增 schema `objgauss-objectstate-model-identity-benchmark-report-v1`。
+  - `write_objectstate_model_identity_benchmark_report(...)` 构建 deterministic controlled
+    synthetic ladder：`viewpoint`、`dropout`、`occlusion`、`appearance`、`spatial`
+    各含 `easy`、`medium`、`hard` 三档。
+  - 写出 `identity-benchmark-summary.json`、`identity-benchmark-report.md`、
+    `identity-benchmark-breakdown.csv` 和本地 `identity-benchmark-artifacts`。
+  - 首份 report 已写入 `docs/benchmarks/objectstate-identity-benchmark/`；
+    per-scenario artifacts 写到 `/tmp/objgauss-objectstate-identity-benchmark-artifacts`。
+  - 当前 controlled synthetic evidence 为 `candidate_ready`：15 scenarios / 60 identity
+    pairs，`assignment_solver_v2` retrieval@1=`1.000000`，`xyz_centroid` retrieval@1=`0.250000`。
+  - 核心 lazy namespace 暴露 report schema、difficulty levels、writer 和 validator。
+- 边界:
+  - 这是 deterministic controlled synthetic evidence，不是 real controlled capture pass。
+  - physical identity labels 只用于 evaluation。
+  - `candidate_ready` 只允许考虑更长 identity robustness smoke，不允许直接进入 world-model training。
+  - 不做 identity ablation，不启用 temporal / matching loss，不采集真实数据。
+  - 不引入 Hungarian / scipy 依赖，不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不修改 viewer/export 默认，不声明 prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_model_identity_benchmark_report.py tests/test_objectstate_model_identity_benchmark.py tests/test_core_namespace.py -q`: 13 passed。
+  - `uv run --extra dev pytest`: 622 passed。
+  - `npm run build`: 通过，仍有既有 Vite large chunk warning。
+  - `git diff --check`: 通过。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-001: Add perturbation identity benchmark
 
 - 状态: done / objectstate-model-identity-benchmark
