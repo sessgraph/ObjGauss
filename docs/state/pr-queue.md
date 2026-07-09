@@ -395,6 +395,50 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-MODEL-IDENTITY-ABLATION-001: Explain identity benchmark candidate evidence
+
+- 状态: done / objectstate-model-identity-ablation
+- 类型: 标准 PR / ObjectState identity evidence diagnosis
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 解释上一份 identity benchmark report 的 `candidate_ready` 依赖哪些 evidence，
+  避免把 synthetic shortcut 误判成稳定对象身份表示。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_model_identity_ablation`。
+  - 新增 schema `objgauss-objectstate-model-identity-ablation-v1`。
+  - 复用 identity benchmark report 的 15 个 scenarios：`viewpoint`、`dropout`、
+    `occlusion`、`appearance`、`spatial` 各含 `easy`、`medium`、`hard`。
+  - 默认比较 `xyz`、`rgb`、`xyz_rgb`、`xyz_rgb_opacity` 和 `semantic` evidence policy。
+  - 每个 policy 都复用现有 identity benchmark，因此保留 `random_assignment`、
+    `xyz_centroid`、`oracle_target_assignment` 和 `assignment_solver_v2` baseline。
+  - 输出 `identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、
+    `objectstate_drift`、`assignment_consistency`、`occlusion_recovery`、
+    policy ranking、shortcut diagnostics 和 next-stage gate。
+  - report 模块新增可复用 default scenario ladder helper，供 ablation 复用同一事实源。
+  - 核心 lazy namespace 暴露 ablation schema、默认 policy、summary 和 validator。
+- 当前结论:
+  - deterministic controlled ablation 状态为
+    `objectstate_model_identity_ablation_teacher_evidence_indicated`。
+  - `semantic` policy retrieval@1=`1.000000`、margin 为正并通过 candidate gate。
+  - native Gaussian policies 未过 candidate gate：`rgb=0.783333`、`xyz=0.333333`、
+    `xyz_rgb=0.283333`、`xyz_rgb_opacity=0.233333` retrieval@1。
+  - 上一份 benchmark report 的 `candidate_ready` 当前应解释为 synthetic semantic /
+    reference evidence 支撑，不是 `xyz/rgb/opacity` 原生证据已经足够。
+- 边界:
+  - physical identity labels 只用于 evaluation。
+  - `semantic` policy 使用 report scenario 内的 synthetic feature evidence，不引入
+    DINO / SAM / tracking teacher 依赖。
+  - 不训练模型、不跑 long smoke、不启用 temporal / matching loss。
+  - 不引入 Hungarian / scipy 依赖，不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明真实 identity /
+    prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_model_identity_ablation.py tests/test_objectstate_model_identity_benchmark_report.py tests/test_core_namespace.py -q`: passed，13 tests。
+  - `uv run --extra dev pytest`: passed，625 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-REPORT-001: Generate identity robustness evidence report
 
 - 状态: done / objectstate-model-identity-benchmark-report

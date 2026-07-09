@@ -376,6 +376,41 @@ Implemented v0.1 facts:
   real-data identity pass, identity ablation, temporal assignment, prediction /
   causal / reality gate success or world-model proof.
 
+### OBJECTSTATE-MODEL-IDENTITY-ABLATION-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_model_identity_ablation`.
+- Summary schema:
+  `objgauss-objectstate-model-identity-ablation-v1`.
+- Entry point:
+  `objectstate_model_identity_ablation_summary(...)`.
+- The ablation reuses the benchmark report ladder exactly: `viewpoint`,
+  `dropout`, `occlusion`, `appearance` and `spatial`, each at `easy`,
+  `medium` and `hard`, for 15 scenarios / 60 identity pairs.
+- Compared evidence policies are `xyz`, `rgb`, `xyz_rgb`,
+  `xyz_rgb_opacity` and default optional `semantic`.
+- Each policy runs through the existing identity benchmark, so every policy
+  retains the same four baselines: `random_assignment`, `xyz_centroid`,
+  `oracle_target_assignment` and `assignment_solver_v2`.
+- Reported metrics remain identity metrics, not assignment IoU:
+  `identity_retrieval_at_1`, `identity_margin`, `slot_swap_rate`,
+  `objectstate_drift`, `assignment_consistency` and `occlusion_recovery`.
+- The first deterministic controlled run reports
+  `objectstate_model_identity_ablation_teacher_evidence_indicated`:
+  `semantic` reaches retrieval@1 `1.000000` with positive margin, while native
+  Gaussian policies do not pass the candidate gate
+  (`rgb=0.783333`, `xyz=0.333333`, `xyz_rgb=0.283333`,
+  `xyz_rgb_opacity=0.233333` retrieval@1).
+- This means the previous benchmark report's `candidate_ready` result is
+  currently explained by synthetic semantic / reference evidence, not by
+  native `xyz/rgb/opacity` evidence alone.
+- `next_stage_gate.long_training_allowed` remains false. The ablation may
+  recommend a Teacher Evidence Layer contract, but it does not unlock long
+  training, temporal assignment, real controlled identity pass, prediction /
+  causal gates or world-model training.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

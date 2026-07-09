@@ -6,6 +6,8 @@ import json
 from objgauss.core.objectstate_model_identity_benchmark_report import (
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES,
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA,
+    objectstate_model_identity_benchmark_report_difficulty_by_scenario,
+    objectstate_model_identity_benchmark_report_scenarios,
     validate_objectstate_model_identity_benchmark_report_summary,
     write_objectstate_model_identity_benchmark_report,
 )
@@ -68,3 +70,21 @@ def test_model_identity_benchmark_report_writes_auditable_outputs(tmp_path):
     assert json.loads(summary_path.read_text(encoding="utf-8"))["schema"] == (
         OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA
     )
+
+
+def test_model_identity_benchmark_report_exposes_default_scenario_ladder():
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    difficulty_by_scenario = objectstate_model_identity_benchmark_report_difficulty_by_scenario()
+
+    assert len(scenarios) == 15
+    assert set(difficulty_by_scenario) == {scenario.scenario_id for scenario in scenarios}
+    assert set(difficulty_by_scenario.values()) == set(
+        OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES
+    )
+    assert {scenario.perturbation_kind for scenario in scenarios} == {
+        "viewpoint",
+        "dropout",
+        "occlusion",
+        "appearance",
+        "spatial",
+    }

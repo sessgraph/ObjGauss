@@ -143,6 +143,26 @@ solver 均高于 xyz。该结果只允许考虑更长 identity robustness smoke�
 训练；它不代表 real controlled capture pass、不做 identity ablation、不启用 temporal loss，
 也不声明 prediction / causal / reality gate 或 world model 已通过。
 
+随后完成 `OBJECTSTATE-MODEL-IDENTITY-ABLATION-001`：新增
+`objgauss.core.objectstate_model_identity_ablation`，schema 为
+`objgauss-objectstate-model-identity-ablation-v1`。
+`objectstate_model_identity_ablation_summary(...)` 复用 identity benchmark report 的 15 个
+controlled synthetic scenarios / 60 identity pairs，并逐个比较 `xyz`、`rgb`、
+`xyz_rgb`、`xyz_rgb_opacity` 和默认可选 `semantic` evidence policy。每个 policy 都保留
+`random_assignment`、`xyz_centroid`、`oracle_target_assignment` 和
+`assignment_solver_v2` 四个 baseline，指标继续聚焦 `identity_retrieval_at_1`、
+`identity_margin`、`slot_swap_rate`、`objectstate_drift`、`assignment_consistency` 和
+`occlusion_recovery`。当前 deterministic ablation 状态为
+`objectstate_model_identity_ablation_teacher_evidence_indicated`：`semantic` policy
+retrieval@1=`1.000000` 且 margin 为正；native Gaussian policies 未过 candidate gate，
+其中 `rgb=0.783333`、`xyz=0.333333`、`xyz_rgb=0.283333`、
+`xyz_rgb_opacity=0.233333` retrieval@1。这说明上一份 benchmark report 的
+`candidate_ready` 主要由 synthetic semantic / reference evidence 支撑，而不是原生
+`xyz/rgb/opacity` 足以解释。该切片不训练、不跑 long smoke、不启用 temporal loss、
+不引入真实 capture、不修改 viewer/export 默认，也不声明 real identity / prediction /
+causal / reality gate 或 world model 已通过；下一步更适合先冻结 Teacher Evidence Layer
+或 bounded long-smoke contract，而不是直接开大训练。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

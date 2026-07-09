@@ -1573,6 +1573,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_benchmark_report",
         "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES",
     ),
+    "OBJECTSTATE_MODEL_IDENTITY_ABLATION_SCHEMA": (
+        "objgauss.core.objectstate_model_identity_ablation",
+        "OBJECTSTATE_MODEL_IDENTITY_ABLATION_SCHEMA",
+    ),
+    "DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES": (
+        "objgauss.core.objectstate_model_identity_ablation",
+        "DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES",
+    ),
     "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA": (
         "objgauss.core.objectstate_predictive_gate",
         "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA",
@@ -1737,6 +1745,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_benchmark_report",
         "write_objectstate_model_identity_benchmark_report",
     ),
+    "objectstate_model_identity_ablation_summary": (
+        "objgauss.core.objectstate_model_identity_ablation",
+        "objectstate_model_identity_ablation_summary",
+    ),
     "evaluate_objectstate_causal_gate": (
         "objgauss.core.objectstate_causal_gate",
         "evaluate_objectstate_causal_gate",
@@ -1800,6 +1812,10 @@ _EXPORTS = {
     "validate_objectstate_model_identity_benchmark_report_summary": (
         "objgauss.core.objectstate_model_identity_benchmark_report",
         "validate_objectstate_model_identity_benchmark_report_summary",
+    ),
+    "validate_objectstate_model_identity_ablation_summary": (
+        "objgauss.core.objectstate_model_identity_ablation",
+        "validate_objectstate_model_identity_ablation_summary",
     ),
     "validate_objectstate_predictive_gate_summary": (
         "objgauss.core.objectstate_predictive_gate",

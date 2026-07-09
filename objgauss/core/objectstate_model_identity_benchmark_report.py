@@ -54,11 +54,8 @@ def write_objectstate_model_identity_benchmark_report(
     artifact_root = Path(artifact_dir) if artifact_dir is not None else output_root / "identity-benchmark-artifacts"
     artifact_root.mkdir(parents=True, exist_ok=True)
 
-    scenario_specs = _default_scenario_specs()
-    scenarios = [_scenario_from_spec(spec) for spec in scenario_specs]
-    difficulty_by_scenario = {
-        f"{spec.perturbation_kind}-{spec.difficulty}": spec.difficulty for spec in scenario_specs
-    }
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    difficulty_by_scenario = objectstate_model_identity_benchmark_report_difficulty_by_scenario()
     benchmark = objectstate_model_identity_benchmark_summary(
         scenarios,
         _feature_backed_solver_state(),
@@ -110,6 +107,19 @@ def write_objectstate_model_identity_benchmark_report(
         encoding="utf-8",
     )
     return validate_objectstate_model_identity_benchmark_report_summary(checked)
+
+
+def objectstate_model_identity_benchmark_report_scenarios() -> tuple[
+    ObjectStateModelIdentityBenchmarkScenario, ...
+]:
+    return tuple(_scenario_from_spec(spec) for spec in _default_scenario_specs())
+
+
+def objectstate_model_identity_benchmark_report_difficulty_by_scenario() -> dict[str, str]:
+    return {
+        f"{spec.perturbation_kind}-{spec.difficulty}": spec.difficulty
+        for spec in _default_scenario_specs()
+    }
 
 
 def validate_objectstate_model_identity_benchmark_report_summary(
