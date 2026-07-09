@@ -741,6 +741,52 @@ Implemented v0.1 facts:
   prediction model, create identity / intervention rows, train dynamics, use
   replay / diffusion or mutate viewer defaults.
 
+### OBJECTSTATE-REAL-INTERVENTION-ROWS-001
+
+Convert intervention accounting rows from a real evidence bundle into
+reality-gate intervention rows.
+
+Required behavior:
+
+- Read `GateAccountingRow` entries with `evidence_kind=intervention` from
+  `objgauss-objectstate-real-evidence-bundle-v1`.
+- Convert intervention `pass` / `fail` accounting into
+  `objgauss-objectstate-real-public-row-v1` rows with
+  `evidence_kind=intervention`.
+- Preserve `evidence_incomplete` and `unsupported` as blocked intervention rows,
+  not model failures.
+- Require intervention `pass` / `fail` rows to reference a known
+  `ActionIntervalRow` and `StateTransitionRow`; the action must reference the
+  transition object and the action interval must overlap the transition.
+- Require source and target frames in the referenced transition to link the same
+  `physical_identity_id`, so intervention accounting cannot hide identity
+  fragmentation.
+- Require non-blocked intervention rows to carry timestamped pose + action GT
+  and the intervention metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `action_conditioned_ade`, `counterfactual_outcome_accuracy` and
+  `wrong_direction_rate`.
+- Preserve no-action baseline comparison by reporting `no_action_ade`,
+  `intervention_gain`, `identity_consistency_rate` and
+  `action_transition_coverage_rate`.
+- Run an intervention-only reality gate where identity and prediction pass rows
+  are explicitly out of scope.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_intervention_rows`.
+- Summary schema: `objgauss-objectstate-real-intervention-rows-v1`.
+- CLI:
+  `objgauss object-state real-intervention-rows`.
+- The summary embeds generated intervention rows, intervention-only reality
+  gate output, blocked rows Markdown, row counts, `action_transition_coverage_rate`
+  and mean action/no-action/counterfactual metrics.
+- If `intervention_gain` is not present but `no_action_ade` and
+  `action_conditioned_ade` are present, the converter derives the missing gain
+  metric for accounting.
+- Current scope is intervention accounting only. It does not author GT, run an
+  intervention model, train dynamics, use replay / diffusion or mutate viewer
+  defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows

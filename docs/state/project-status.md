@@ -4440,9 +4440,16 @@ npm run acceptance:demo
    接入 prediction-only reality gate：`pass` / `fail` 必须引用同一对象的
    `StateTransitionRow`，并保留 `state_ade` / `history_ade` /
    `prediction_gap_vs_history_model` 和 `state_vs_history_error_ratio` 比较；
-   `evidence_incomplete` / `unsupported` 继续保持 blocked。下一步应进入
-   `OBJECTSTATE-REAL-INTERVENTION-ROWS-001`，把真实 action-conditioned rows 接进
-   pass / fail accounting，而不是继续新增大模型。
+   `evidence_incomplete` / `unsupported` 继续保持 blocked。
+   `OBJECTSTATE-REAL-INTERVENTION-ROWS-001` 已把 bundle 内 `intervention`
+   accounting rows 接入 intervention-only reality gate：`pass` / `fail` 必须引用
+   同一对象上时间重叠的 `ActionIntervalRow` / `StateTransitionRow`，并要求 transition
+   source / target identity link 保持同一 `physical_identity_id`；summary 保留
+   `action_conditioned_ade` / `no_action_ade` / `intervention_gain` /
+   `counterfactual_outcome_accuracy` / `wrong_direction_rate` /
+   `identity_consistency_rate` 和 `action_transition_coverage_rate`。下一步应把
+   real identity / prediction / intervention row summaries 汇入 controlled/public
+   evidence ledger，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，

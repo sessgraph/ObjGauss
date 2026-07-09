@@ -382,3 +382,18 @@ rows 转成 existing reality gate prediction rows，并运行 prediction-only re
 不采集 GT、不运行预测模型 eval、不创建 intervention rows、不训练 dynamics、不声明
 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 controlled/public
 intervention rows 也进入 pass / fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-INTERVENTION-ROWS-001`
+新增 `objgauss-objectstate-real-intervention-rows-v1` 和
+`real-intervention-rows` CLI，可把 real evidence bundle 中的 `intervention` gate
+accounting rows 转成 existing reality gate intervention rows，并运行 intervention-only
+reality gate。`pass` / `fail` intervention rows 必须引用时间重叠的 action / transition
+pair，action 必须绑定 referenced object transition，且 transition source / target
+identity link 必须保持同一 `physical_identity_id`；summary 保留 `action_conditioned_ade`、
+`no_action_ade`、`intervention_gain`、`counterfactual_outcome_accuracy`、
+`wrong_direction_rate`、`identity_consistency_rate` 和 `action_transition_coverage_rate`。
+`evidence_incomplete` / `unsupported` 保持 blocked，不被算作模型失败。该缓解完成三类
+real rows 的最后一类 intervention accounting，但仍不采集 GT、不运行模型 eval、不训练
+dynamics、不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到 real
+identity / prediction / intervention summaries 汇入 controlled/public evidence ledger，并通过
+full Phase 1 evidence review。
