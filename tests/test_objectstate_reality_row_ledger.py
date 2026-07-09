@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from objgauss.cli import main
 from objgauss.core.objectstate_controlled_real_rows import (
@@ -8,6 +9,11 @@ from objgauss.core.objectstate_controlled_real_rows import (
 )
 from objgauss.core.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
+)
+from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+    OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA,
+    validate_objectstate_real_evidence_bundle_ledger_summary,
+    write_objectstate_real_evidence_bundle_ledger,
 )
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
@@ -170,6 +176,93 @@ def test_reality_row_ledger_accepts_real_evidence_accounting_summaries(tmp_path)
     )
     assert ledger["next_actions"] == []
     assert validate_objectstate_reality_row_ledger_summary(ledger) == ledger
+
+
+def test_real_evidence_bundle_ledger_writes_phase1_audit_package(tmp_path):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    _write_json(bundle_path, _real_evidence_bundle())
+
+    summary = write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=output_root,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA
+    assert summary["status"] == "objectstate_real_evidence_bundle_ledger_reviewable"
+    assert summary["bundle_count"] == 1
+    assert summary["row_summary_count"] == 3
+    assert summary["ledger"]["schema"] == OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA
+    assert summary["ledger"]["gate"]["status"] == "objectstate_reality_gate_pass"
+    assert summary["row_counts"] == {
+        "row_count": 3,
+        "pass_row_count": 3,
+        "fail_row_count": 0,
+        "blocked_row_count": 0,
+    }
+    assert summary["evidence_accounts"]["static_scene_evidence"] == {
+        "available_bundle_count": 1,
+        "usable_for_state_variable_gate": False,
+    }
+    assert summary["evidence_accounts"]["state_variable_evidence"] == {
+        "ready_bundle_count": 1,
+        "intervention_ready_bundle_count": 1,
+        "requires_full_reality_row_ledger": True,
+    }
+    record = summary["records"][0]
+    for key in (
+        "bundle_summary_path",
+        "identity_summary_path",
+        "prediction_summary_path",
+        "intervention_summary_path",
+    ):
+        assert _read_json(record[key])["schema"].startswith("objgauss-objectstate-")
+    assert _read_json(summary["ledger_summary_path"]) == summary["ledger"]
+    assert summary["blocked_rows_path"].endswith("reality-row-ledger-blocked.md")
+    assert summary["state_variable_evidence_matrix_path"].endswith(
+        "state-variable-evidence-matrix.md"
+    )
+    assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
+
+
+def test_real_evidence_bundle_ledger_cli_writes_full_ledger_outputs(tmp_path, capsys):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    wrapper_path = tmp_path / "wrapper.json"
+    _write_json(bundle_path, _real_evidence_bundle())
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-real-evidence-bundle-ledger",
+                str(bundle_path),
+                "--output-root",
+                str(output_root),
+                "--summary-output",
+                str(wrapper_path),
+                "--require-reviewable",
+                "--require-gate-pass",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = _read_json(wrapper_path)
+    ledger = _read_json(output_root / "reality-row-ledger.json")
+
+    assert f"schema={OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA}" in stdout
+    assert "ledger_status=objectstate_reality_row_ledger_reviewable" in stdout
+    assert "gate_status=objectstate_reality_gate_pass" in stdout
+    assert "bundle=controlled-tabletop-cup-001:" in stdout
+    assert summary["ledger"] == ledger
+    assert ledger["row_count"] == 3
+    assert (output_root / "real-evidence-bundle-ledger.json").exists()
+    assert (output_root / "reality-row-ledger-blocked.md").exists()
+    assert (output_root / "state-variable-evidence-matrix.md").exists()
+    assert (output_root / "reality-row-ledger-next-actions.md").exists()
+    assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
 
 
 def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys):
@@ -482,7 +575,7 @@ def _controlled_manifest(sample_id: str, *, prediction_status: str):
 
 
 def _read_json(path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def _write_json(path, payload) -> None:

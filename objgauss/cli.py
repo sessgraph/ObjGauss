@@ -239,6 +239,9 @@ from objgauss.core.objectstate_real_prediction_rows import (
 from objgauss.core.objectstate_real_intervention_rows import (
     objectstate_real_intervention_rows_summary,
 )
+from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+    write_objectstate_real_evidence_bundle_ledger,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -5210,6 +5213,51 @@ def _object_state_real_intervention_rows(args: argparse.Namespace) -> None:
         and summary["status"] != "objectstate_real_intervention_rows_pass"
     ):
         raise ValueError("real intervention rows did not pass intervention-only gate")
+
+
+def _object_state_audit_real_evidence_bundle_ledger(args: argparse.Namespace) -> None:
+    summary = write_objectstate_real_evidence_bundle_ledger(
+        args.bundle,
+        output_root=args.output_root,
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+    )
+    ledger = summary["ledger"]
+    gate = ledger["gate"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"output_root={summary['output_root']}")
+    print(f"bundle_count={summary['bundle_count']}")
+    print(f"row_summary_count={summary['row_summary_count']}")
+    print(f"ledger_status={ledger['status']}")
+    print(f"ledger_summary={summary['ledger_summary_path']}")
+    print(f"row_count={ledger['row_count']}")
+    print(f"pass_row_count={ledger['pass_row_count']}")
+    print(f"fail_row_count={ledger['fail_row_count']}")
+    print(f"blocked_row_count={ledger['blocked_row_count']}")
+    print(f"gate_status={None if gate is None else gate['status']}")
+    for record in summary["records"]:
+        print(
+            "bundle="
+            f"{record['sample_id']}:{record['bundle_status']}:"
+            f"{record['identity_status']}:{record['prediction_status']}:"
+            f"{record['intervention_status']}"
+        )
+    for issue in ledger["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"] != "objectstate_real_evidence_bundle_ledger_reviewable"
+    ):
+        raise ValueError("real evidence bundle ledger is not reviewable")
+    if (
+        args.require_gate_pass
+        and (gate is None or gate["status"] != "objectstate_reality_gate_pass")
+    ):
+        raise ValueError("real evidence bundle ledger full gate did not pass")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -11297,6 +11345,45 @@ def _build_parser() -> argparse.ArgumentParser:
         help="fail unless the intervention rows pass the intervention-only reality gate",
     )
     real_intervention_rows.set_defaults(handler=_object_state_real_intervention_rows)
+    audit_real_bundle_ledger = object_state_subparsers.add_parser(
+        "audit-real-evidence-bundle-ledger",
+        help=(
+            "convert real evidence bundles into identity/prediction/"
+            "intervention row summaries and a full reality row ledger"
+        ),
+    )
+    audit_real_bundle_ledger.add_argument(
+        "bundle",
+        nargs="+",
+        type=Path,
+        help="real evidence bundle JSON; may be repeated",
+    )
+    audit_real_bundle_ledger.add_argument(
+        "--output-root",
+        required=True,
+        type=Path,
+        help="directory for generated bundle summaries, row summaries and ledger files",
+    )
+    audit_real_bundle_ledger.add_argument("--summary-output", type=Path)
+    audit_real_bundle_ledger.add_argument("--min-real-or-public-rows", type=int, default=1)
+    audit_real_bundle_ledger.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark synthetic smoke prerequisite as failed in generated row gates",
+    )
+    audit_real_bundle_ledger.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless bundle summaries and the full ledger are reviewable",
+    )
+    audit_real_bundle_ledger.add_argument(
+        "--require-gate-pass",
+        action="store_true",
+        help="fail unless the generated full reality row ledger gate passes",
+    )
+    audit_real_bundle_ledger.set_defaults(
+        handler=_object_state_audit_real_evidence_bundle_ledger
+    )
     compile_objectstate_transitions = object_state_subparsers.add_parser(
         "compile-objectstate-transitions",
         help=(

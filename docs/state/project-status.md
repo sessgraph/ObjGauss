@@ -4451,8 +4451,12 @@ npm run acceptance:demo
    `OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001` 已扩展
    `audit-reality-row-ledger`，可直接消费 real identity / prediction / intervention
    summary JSON，并把其中的标准 reality rows 汇入同一个 full reality gate、gap summary
-   和 state-variable evidence matrix。下一步应在真实 controlled/public bundle 产物上运行
-   这条 ledger，而不是继续新增大模型。
+   和 state-variable evidence matrix。`OBJECTSTATE-REAL-BUNDLE-LEDGER-HANDOFF-001`
+   已新增 `audit-real-evidence-bundle-ledger`，可从一个或多个 real evidence bundle
+   一条命令写出 bundle summary、三类 real row summary、full reality ledger、blocked rows、
+   state-variable evidence matrix 和 next actions；full `reality-row-ledger` 仍是 pass /
+   fail / blocked 的权威输出。下一步应让真实 controlled/public bundle 产物进入这条
+   handoff，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；`cakewalk-room-3dgs-local`、`cakewalk-train-3dgs-local` 和

@@ -817,6 +817,43 @@ Implemented v0.1 facts:
   run model evaluators, train dynamics, use replay / diffusion or mutate viewer
   defaults.
 
+### OBJECTSTATE-REAL-BUNDLE-LEDGER-HANDOFF-001
+
+Provide a one-command handoff from real evidence bundle JSON files to a
+reviewable Phase 1 reality row ledger.
+
+Required behavior:
+
+- Read one or more `objgauss-objectstate-real-evidence-bundle-v1` files.
+- Write each bundle summary plus generated identity / prediction /
+  intervention row summaries into a durable output directory.
+- Feed those generated row summaries into the existing
+  `objgauss-objectstate-reality-row-ledger-v1`.
+- Keep the full reality row ledger as the authoritative pass / fail / blocked
+  source; the bundle-ledger wrapper is only a run record.
+- Preserve the split between `static_scene_evidence` and
+  `state_variable_evidence`.
+- Preserve `evidence_incomplete` and `unsupported` as blocked rows, not model
+  failures.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_evidence_bundle_ledger`.
+- Wrapper schema:
+  `objgauss-objectstate-real-evidence-bundle-ledger-v1`.
+- CLI:
+  `objgauss object-state audit-real-evidence-bundle-ledger`.
+- Default output files under `--output-root`:
+  `real-evidence-bundle-ledger.json`, `reality-row-ledger.json`,
+  `reality-row-ledger-blocked.md`, `state-variable-evidence-matrix.md` and
+  `reality-row-ledger-next-actions.md`.
+- Per-bundle output directories contain `real-evidence-bundle-summary.json`,
+  `real-identity-rows-summary.json`, `real-prediction-rows-summary.json` and
+  `real-intervention-rows-summary.json`.
+- Current scope is orchestration / accounting only. It does not author GT, run
+  model evaluators, reconstruct Gaussians, train dynamics, use replay /
+  diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows

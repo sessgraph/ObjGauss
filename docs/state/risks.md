@@ -408,3 +408,14 @@ R-017 update 2026-07-09: `OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001`
 real evidence accounting 的总表接线，但仍不采集 GT、不运行模型 eval、不训练 dynamics、
 不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到真实 controlled /
 public bundle 产物跑出可审计 full Phase 1 ledger。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-LEDGER-HANDOFF-001`
+新增 `audit-real-evidence-bundle-ledger` 和
+`objgauss-objectstate-real-evidence-bundle-ledger-v1` wrapper，可从一个或多个 real evidence
+bundle 一条命令写出 bundle summary、identity / prediction / intervention row summaries、
+full `reality-row-ledger.json`、blocked rows、state-variable evidence matrix 和 next
+actions。该缓解减少真实证据包进入 Phase 1 总表时的手工串命令风险，并继续明确
+`static_scene_evidence` 与 `state_variable_evidence` 分账、`evidence_incomplete` 不算模型
+失败。风险继续 open，因为它仍不采集 GT、不运行模型 eval、不生成真实 pass row、不训练
+dynamics，也不声明 counterfactual proof 或 world-model evidence；关闭条件仍是真实
+controlled/public bundle 产物跑出可审计 full Phase 1 ledger。

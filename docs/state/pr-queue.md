@@ -150,6 +150,10 @@ target identity 稳定。`OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001` 已
 `audit-reality-row-ledger`，可消费 real identity / prediction / intervention summary JSON
 并汇入同一个 full reality gate 和 state-variable evidence matrix。下一步优先在真实
 controlled/public bundle 产物上运行该 ledger，形成 Phase 1 可审计总表。
+`OBJECTSTATE-REAL-BUNDLE-LEDGER-HANDOFF-001` 已新增
+`audit-real-evidence-bundle-ledger`，可从 real evidence bundle 直接生成 bundle summary、
+三类 row summary、full reality ledger、blocked rows、state-variable evidence matrix 和
+next actions；它只是 accounting orchestration，不创建 GT、不运行模型 eval、不训练 dynamics。
 `GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
 Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
 `truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
@@ -375,6 +379,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REAL-BUNDLE-LEDGER-HANDOFF-001: One-command real evidence bundle ledger handoff
+
+- 状态: done / real-evidence-bundle-ledger-handoff
+- 类型: 标准 PR / ObjectState Phase 1 real evidence ledger
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把 `validate-real-evidence-bundle`、`real-identity-rows`、
+  `real-prediction-rows`、`real-intervention-rows` 和
+  `audit-reality-row-ledger` 收敛成一条可复跑 handoff，真实 bundle 进入 Phase 1
+  总表时不再依赖手工串命令。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_real_evidence_bundle_ledger`。
+  - 新增 wrapper schema `objgauss-objectstate-real-evidence-bundle-ledger-v1`。
+  - 新增 CLI `objgauss object-state audit-real-evidence-bundle-ledger <bundle...>
+    --output-root <dir>`。
+  - 命令会为每个 bundle 写出 `real-evidence-bundle-summary.json`、
+    `real-identity-rows-summary.json`、`real-prediction-rows-summary.json` 和
+    `real-intervention-rows-summary.json`。
+  - 命令会在 output root 写出 `reality-row-ledger.json`、
+    `reality-row-ledger-blocked.md`、`state-variable-evidence-matrix.md`、
+    `reality-row-ledger-next-actions.md` 和 `real-evidence-bundle-ledger.json`。
+  - Wrapper 明确 `full_reality_row_ledger_is_authoritative=true`，最终 pass / fail /
+    blocked 仍由 existing `objgauss-objectstate-reality-row-ledger-v1` 决定。
+  - `static_scene_evidence` 与 `state_variable_evidence` 继续分账，
+    `evidence_incomplete` / `unsupported` 继续走 blocked，不算模型失败。
+- 边界:
+  - 不采集数据、不创建 GT、不下载 public dataset 或现成 Gaussian scene。
+  - 不运行 identity / prediction / intervention model eval，不训练 dynamics。
+  - 不使用 replay / diffusion，不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_real_evidence_bundle_ledger.py objgauss/cli.py tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: 14 passed。
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_objectstate_real_intervention_rows.py tests/test_objectstate_real_prediction_rows.py tests/test_objectstate_real_identity_rows.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: 37 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 595 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
 
 ### OBJECTSTATE-REALITY-ROW-LEDGER-REAL-SUMMARIES-001: Let reality row ledger consume real accounting summaries
 
