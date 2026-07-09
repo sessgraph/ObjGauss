@@ -1,0 +1,278 @@
+# ObjectState Model Contract
+
+> Status: current / OBJECTSTATE-MODEL-CONTRACT-001
+> Last updated: 2026-07-09
+> Depends on:
+> - `docs/architecture/objgauss-v1-kernel-contract.md`
+> - `docs/architecture/assignment-solver-v2-contract.md`
+> - `docs/architecture/objectstate-state-variable-gate.md`
+> - `docs/dataset/controlled-reality-contract.md`
+
+## Purpose
+
+ObjGauss now has a state-variable gate, real evidence accounting and a
+controlled reality dataset contract. This document freezes the model-facing
+contract for the next model track:
+
+```text
+Gaussian / AssignmentEvidence -> ObjectState Model -> ObjectState -> Gate
+```
+
+The goal is not to claim a world model. The goal is to define the first
+learnable `Gaussian -> ObjectState` interface that can be trained, exported,
+audited and passed into existing identity / prediction / causal gates.
+
+## Current Fact
+
+The repository already has a trainable object emergence line:
+
+```text
+AssignmentEvidenceBatch
+  -> AssignmentSolverV2
+  -> A[N,K]
+  -> ObjectStateProjection
+  -> Gaussian decoder / renderer validation
+```
+
+Therefore `OBJECTSTATE-MODEL-CONTRACT-001` must not create a parallel model
+truth. It standardizes the current assignment-first route and names the next
+MVP boundary. Transformer encoders, Slot Attention, Sinkhorn / OT, replay
+buffers, diffusion and dynamics models remain future proposals unless a later
+ADR or PR explicitly introduces them.
+
+## Model IO
+
+### Input: Gaussian Tokens
+
+The conceptual input is an unordered set of Gaussian tokens:
+
+```text
+G = {g_1, g_2, ..., g_N}
+```
+
+Each token may expose:
+
+```text
+GaussianToken = {
+  position: R^3
+  scale: R^3 optional
+  rotation: R^4 optional
+  color: R^3 or SH optional
+  opacity: R^1 optional
+  feature: R^D optional
+  frame_index: int optional
+  source: str
+}
+```
+
+MVP implementation uses the existing `AssignmentEvidenceBatch` minimum:
+
+```text
+AssignmentEvidenceBatch = {
+  positions: R[N,3]
+  features: R[N,D]
+  frame_index: int
+  mask_votes: R[N,M] optional
+  track_hints: R[N] optional
+  target_assignment: R[N,K] optional
+  source: str
+}
+```
+
+Rules:
+
+- Gaussian tokens are renderer / evidence primitives, not the reasoning unit.
+- Inputs are permutation-sensitive only through explicit position / feature
+  values; model code must not rely on file row order as identity.
+- `target_assignment` is supervised training evidence, not inference-time
+  state.
+- Hard `object_id` can appear only as target, diagnostic or export address.
+
+### Intermediate: Assignment Matrix
+
+The model must expose one normalized assignment matrix:
+
+```text
+A in R[N,K]
+```
+
+Meaning:
+
+```text
+A[i,k] = probability / soft membership that Gaussian token i belongs to slot k
+```
+
+Rules:
+
+- `A[N,K]` is the sole object assignment source.
+- Hard labels are derived from `argmax(A)` plus matching / export policy.
+- Hard labels cannot become a second source of truth beside `A`.
+- Model diagnostics may expose logits, cost, entropy, slot mass and confidence,
+  but downstream ObjectState pooling must consume `A`.
+
+### Output: ObjectState
+
+The model outputs object slots as ObjectState candidates:
+
+```text
+ObjectState = {
+  object_id_embedding: R^D optional
+  geometry_embedding: R^D optional
+  appearance_embedding: R^D optional
+  pose: {
+    centroid: R^3
+    bbox: R^6 optional
+    rotation: R^4 optional
+  }
+  assignment_probability: R[N] or slot_prob summary
+  uncertainty: float or R^D
+  confidence: float
+}
+```
+
+Current v1/v2 code may materialize this as `ObjectStateProjection` fields such
+as centroid, bbox, feature, confidence and slot probability. That is the
+authoritative MVP mapping until a later PR changes the artifact ABI.
+
+Rules:
+
+- `ObjectState` is the reasoning unit.
+- Renderer-facing `object_id` is a derived address, not primary model state.
+- A model artifact must preserve enough metadata to reproduce `A -> ObjectState`
+  projection and gate handoff.
+
+## MVP Model Family
+
+The first model family remains assignment-first:
+
+```text
+Evidence[N] -> C[N,K] -> softmax(-C / temperature) -> A[N,K]
+```
+
+The current approved MVP is:
+
+```text
+solver_family = cost-softmax-assignment-v2
+cost_terms = ["feature", "position", "slot_bias"]
+balance_policy = "loss-only-v1"
+temporal_policy = "disabled"
+matching_policy = "disabled"
+```
+
+This is the immediate `OBJECTSTATE-MODEL-MVP-001` implementation target. A
+Transformer encoder or Slot Attention module may later be introduced only if it
+preserves the same public contract:
+
+```text
+Gaussian / AssignmentEvidence -> A[N,K] -> ObjectState
+```
+
+and lands with explicit tests, metrics and state handoff.
+
+## Training Contract
+
+The model MVP trains object assignment before dynamics:
+
+```text
+L_model =
+  lambda_assign   * L_assignment
++ lambda_cluster  * L_cluster
++ lambda_entropy  * L_entropy
++ lambda_balance  * L_balance
++ lambda_identity * L_identity optional
++ lambda_temporal * L_temporal optional
+```
+
+MVP required losses:
+
+- supervised assignment cross entropy when `target_assignment` is present;
+- cluster / entropy / balance loss families from assignment solver v2.
+
+Deferred losses:
+
+- contrastive identity loss requires explicit identity fixtures or controlled
+  real identity rows;
+- temporal consistency requires timestamped state sequences;
+- prediction and causal losses require transition / action evidence.
+
+Forbidden shortcuts:
+
+- optimizing hard `object_id` equality as identity truth;
+- using renderer loss to bypass identity gate;
+- treating decreasing training loss as state-variable proof.
+
+## Gate Handoff
+
+Every model candidate must be evaluated through existing gates:
+
+```text
+Model artifact
+  -> identity predictions / ObjectState candidates
+  -> identity gate
+  -> prediction gate when transition candidates exist
+  -> causal gate when action-conditioned candidates exist
+```
+
+Minimum MVP success standard:
+
+```text
+Gaussian -> Object assignment -> ObjectState -> gate evaluation
+```
+
+Initial MVP does not need to pass real causal evidence. It must produce a
+reviewable model artifact and enough candidate output for synthetic identity /
+prediction checks, while real controlled rows remain separated in the ledger.
+
+## Artifact Requirements
+
+A model artifact must record:
+
+- schema and model family;
+- source evidence schema and dataset / fixture id;
+- slot count `K`;
+- feature dimension and position dimension;
+- solver state / checkpoint payload or reference;
+- assignment temperature and cost / loss weights;
+- projection policy from `A[N,K]` to ObjectState;
+- evaluation summaries used for promotion decisions;
+- claim policy and non-goals.
+
+Large checkpoints and training outputs remain in ignored `outputs/` or external
+handoff storage. They must not be committed to git.
+
+## Non-Goals
+
+This contract does not:
+
+- introduce a new renderer;
+- start controlled capture;
+- create ground truth;
+- train a new model by itself;
+- add torch / CUDA / SAM / DINO / CoTracker as required dependencies;
+- introduce replay buffer, diffusion or world dynamics;
+- replace `AssignmentSolverV2` with Slot Attention;
+- declare ObjectState a proven world-state variable.
+
+## Next PRs
+
+### OBJECTSTATE-MODEL-MVP-001
+
+Implement the first model artifact around the current
+`AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection` route.
+
+Required output:
+
+- model artifact schema;
+- training / inference summary;
+- checkpoint or state roundtrip;
+- synthetic gate handoff.
+
+### OBJECTSTATE-MODEL-EVAL-001
+
+Evaluate the model artifact through the existing state-variable gates.
+
+Required metrics:
+
+- identity IDF1 / retrieval / drift where applicable;
+- prediction state-vs-history error when future candidates exist;
+- clear blocked status for causal evidence if no real action candidates exist.

@@ -395,6 +395,74 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
+
+- 状态: done / objectstate-model-contract
+- 类型: 架构文档 / ObjectState model MVP contract
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 controlled real dataset contract 之后，冻结第一个可学习
+  `Gaussian / AssignmentEvidence -> ObjectState` 模型接口，避免 Model Track 与既有
+  `AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection` 主线产生并行事实源。
+- 已实施:
+  - 新增 `docs/architecture/objectstate-model-contract.md`。
+  - 明确输入为 GaussianToken / `AssignmentEvidenceBatch`，MVP 继续使用
+    `positions`、`features`、`frame_index`、可选 mask / track / target assignment。
+  - 明确中间表示 `A[N,K]` 是唯一 object assignment source；hard `object_id`
+    只能作为 target、diagnostic 或 renderer/export address 派生。
+  - 明确输出为 ObjectState candidate / `ObjectStateProjection`，包含 pose /
+    geometry / appearance / assignment probability / uncertainty / confidence 等
+    model-facing 字段。
+  - 将当前 MVP family 固定为 `cost-softmax-assignment-v2`，Transformer /
+    Slot Attention / Sinkhorn / OT 仅保留为后续显式 PR / ADR 选项。
+  - 记录 MVP loss contract、gate handoff、model artifact metadata、non-goals 和
+    下一步 `OBJECTSTATE-MODEL-MVP-001` / `OBJECTSTATE-MODEL-EVAL-001`。
+- 边界:
+  - 不写训练代码、不启动 GPU / torch / CUDA 训练。
+  - 不引入 Transformer、Slot Attention、SAM / DINO / CoTracker、replay buffer、
+    diffusion 或 dynamics 默认依赖。
+  - 不采集真实数据、不创建 GT、不修改 viewer/export 默认。
+  - 不声明 learned ObjectState model、reality gate pass 或 world model 已经完成。
+- 验证:
+  - `git diff --check`: passed。
+  - Docs-only architecture slice；未运行 `uv run --extra dev pytest` 或 `npm run build`。
+- 完成 commit: 本提交。
+
+### OBJECTSTATE-CONTROLLED-DATASET-CONTRACT-001: Freeze controlled reality dataset contract
+
+- 状态: done / controlled-reality-dataset-contract
+- 类型: 标准 PR / ObjectState Phase 2 controlled real data foundation
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 real evidence bundle / ledger 已完成后，冻结第一批 controlled real 数据语言，
+  明确什么样的真实采集 episode 才能支持 identity / prediction / causal 三类
+  ObjectState evidence。
+- 已实施:
+  - 新增 `docs/dataset/controlled-reality-contract.md`。
+  - 新增 `objgauss.core.controlled_schema`。
+  - 新增 schema `objgauss-objectstate-controlled-dataset-contract-v1` 和 summary schema
+    `objgauss-objectstate-controlled-dataset-contract-summary-v1`。
+  - Contract summary 复用现有
+    `objgauss-objectstate-controlled-capture-manifest-v1`，不创建第二套 capture
+    manifest 事实源。
+  - Summary 显式映射 Episode / Object Instance / Action Event /
+    State Transition，并审计 identity / prediction / causal 三个 invariant。
+  - Causal invariant 要求非零 action vector，且 action interval 能落入同一对象的连续
+    timestamped pose transition。
+  - 核心 lazy namespace 暴露 contract schema、summary 和 validator。
+- 边界:
+  - 不采集真实数据、不创建 GT、不重建 Gaussian。
+  - 不训练 Gaussian / dynamics / ObjectState 模型。
+  - 不运行 identity / prediction / intervention evaluator，不创建 pass rows。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+  - 不声明 reality gate pass、counterfactual proof 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/controlled_schema.py`: passed。
+  - `uv run --extra dev pytest tests/test_controlled_schema.py tests/test_core_namespace.py -q`: passed，12 tests。
+  - `uv run --extra dev pytest`: passed，606 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### TRAINING-DATA-TEACHER-RESEARCH-NOTES-001: Organize training data and teacher model research notes
 
 - 状态: done / docs-only research intake

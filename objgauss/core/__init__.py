@@ -878,9 +878,17 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_identity_evidence_package",
         "objectstate_controlled_identity_evidence_package",
     ),
+    "objectstate_controlled_dataset_contract_summary": (
+        "objgauss.core.controlled_schema",
+        "objectstate_controlled_dataset_contract_summary",
+    ),
     "objectstate_phase1_evidence_ledger": (
         "objgauss.core.objectstate_phase1_evidence_ledger",
         "objectstate_phase1_evidence_ledger",
+    ),
+    "validate_objectstate_controlled_dataset_contract_summary": (
+        "objgauss.core.controlled_schema",
+        "validate_objectstate_controlled_dataset_contract_summary",
     ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
@@ -1133,6 +1141,14 @@ _EXPORTS = {
     "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA": (
         "objgauss.core.objectstate_controlled_real_rows",
         "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA": (
+        "objgauss.core.controlled_schema",
+        "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA": (
+        "objgauss.core.controlled_schema",
+        "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA",
     ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",

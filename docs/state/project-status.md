@@ -20,6 +20,27 @@ architecture contract，不登记新 asset，不下载数据，不引入默认�
 State Variable Gate 优先级。所有外部数据集、教师模型、许可和可用性事实在实际
 ingestion 前仍需官方来源复核。
 
+随后完成 `OBJECTSTATE-CONTROLLED-DATASET-CONTRACT-001`：新增
+`docs/dataset/controlled-reality-contract.md` 和
+`objgauss.core.controlled_schema`，把 Phase 2 controlled real 数据语言冻结为
+Episode / Object Instance / Action Event / State Transition，并复用现有
+`objgauss-objectstate-controlled-capture-manifest-v1` 作为唯一机器事实源。
+新增 `objgauss-objectstate-controlled-dataset-contract-summary-v1` summary，可审计
+identity / prediction / causal 三个 invariant：同一 physical `object_id` 跨时间存在、
+`S(t) -> S(t+n)` 具备 timestamped 6DoF pose GT，以及非零 action interval 覆盖同对象连续
+pose transition。该切片不采集真实数据、不创建 GT、不重建 Gaussian、不训练模型、不运行
+identity / prediction / intervention evaluator，也不声明 reality gate pass 或 world model。
+
+随后按新阶段规划完成 `OBJECTSTATE-MODEL-CONTRACT-001`：新增
+`docs/architecture/objectstate-model-contract.md`，冻结 `Gaussian / AssignmentEvidence
+-> ObjectState Model -> ObjectState -> Gate` 的模型接口。该 contract 明确当前 MVP 不创建
+并行模型事实源，而是沿用既有 `AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection`
+主线；`A[N,K]` 是唯一 object assignment source，renderer-facing hard `object_id` 只能由
+assignment / matching / export policy 派生。文档定义 GaussianToken / AssignmentEvidence
+输入、assignment matrix 中间表示、ObjectState 输出、MVP loss family、gate handoff 和模型
+artifact 必需 metadata，并明确 Transformer / Slot Attention、replay buffer、diffusion、
+dynamics、torch/CUDA 重依赖和真实训练都不在本切片内。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

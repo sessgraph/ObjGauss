@@ -72,6 +72,8 @@ from objgauss.core import (
     OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
+    OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA,
+    OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
     OBJECTSTATE_TRANSITION_PREDICTION_CANDIDATES_SCHEMA,
@@ -317,6 +319,7 @@ from objgauss.core import (
     objectstate_controlled_reality_evidence_package,
     objectstate_controlled_identity_evidence_package,
     objectstate_controlled_prediction_evidence_package,
+    objectstate_controlled_dataset_contract_summary,
     objectstate_phase1_evidence_ledger,
     objectstate_bop_prediction_baseline_handoff,
     objectstate_bop_identity_handoff,
@@ -488,6 +491,7 @@ from objgauss.core import (
     validate_objectstate_bop_candidate_artifact_template_summary,
     validate_objectstate_bop_candidate_artifact_finalize_summary,
     validate_objectstate_controlled_identity_evidence_package_summary,
+    validate_objectstate_controlled_dataset_contract_summary,
     validate_objectstate_phase1_evidence_ledger_summary,
     validate_objectstate_controlled_prediction_baseline_summary,
     validate_objectstate_controlled_prediction_candidate_finalize_summary,
@@ -1076,6 +1080,19 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     capture_summary = objectstate_controlled_capture_summary(capture_manifest)
     assert validate_objectstate_controlled_capture_summary(capture_summary) is capture_summary
     assert capture_summary["schema"] == OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA
+    assert OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA == (
+        "objgauss-objectstate-controlled-dataset-contract-v1"
+    )
+    assert OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA == (
+        "objgauss-objectstate-controlled-dataset-contract-summary-v1"
+    )
+    contract_summary = objectstate_controlled_dataset_contract_summary(
+        capture_manifest
+    )
+    assert validate_objectstate_controlled_dataset_contract_summary(
+        contract_summary
+    ) == contract_summary
+    assert contract_summary["readiness"]["controlled_dataset_contract_ready"] is True
     assert OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA == (
         "objgauss-objectstate-controlled-capture-file-audit-v1"
     )
@@ -1492,6 +1509,8 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_controlled_identity_handoff is not None
     assert validate_objectstate_controlled_identity_handoff_summary is not None
     assert read_trainable_kernel_identity_source is not None
+    assert objectstate_controlled_dataset_contract_summary is not None
+    assert validate_objectstate_controlled_dataset_contract_summary is not None
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"
