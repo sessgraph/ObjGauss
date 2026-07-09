@@ -353,6 +353,26 @@ evaluator 实际运行且 metrics 不达标时才输出 `fail`。指标覆盖
 不训练 AssignmentSolverV2、不创建 GT、不运行 prediction / intervention eval、不修改
 viewer/export 默认，也不声明 full reality gate pass、counterfactual proof 或 world model。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-PREDICTION-EVAL-001`：新增
+`objgauss.core.objectstate_controlled_real_prediction_eval`，schema 为
+`objgauss-objectstate-controlled-real-prediction-eval-v1`，并新增 CLI
+`objgauss object-state eval-controlled-real-prediction <real-bundle.json>
+--identity-eval <identity-summary.json> --prediction-candidates <prediction-candidates.json>
+--output-dir <dir>`。该 evaluator 读取 real evidence bundle、controlled real identity eval
+summary 和既有 controlled prediction candidates schema，只消费 prediction-ready
+transition rows；identity eval 缺失、未通过或 transition source / target physical identity
+不一致时输出 `blocked: identity_not_stable`，并在 evaluated real bundle 中映射回
+`accounting_status=evidence_incomplete`，不算模型 fail。缺 transition / pose / identity
+GT 的结构缺口保持 `evidence_incomplete`；只有 prediction candidates 实际运行后差于
+hold-last baseline 时才输出 `fail` 和 `prediction_model_underperforms_hold_last`。指标覆盖
+`state_ade`、`state_fde`、`pose_translation_error`、`pose_rotation_error`、
+`hold_last_ade`、`kalman_ade`、`history_ade`、`state_vs_history_error_ratio`、
+`state_vs_kalman_error_ratio`、`transition_coverage` 和
+`identity_consistency_rate`，输出 summary、report、accounting CSV、errors CSV、
+baselines JSON、artifact manifest 和 `evaluated-real-bundle.json`。该切片不运行 prediction
+模型、不训练 dynamics、不创建 GT、不运行 causal / intervention eval、不使用 replay buffer /
+diffusion、不修改 viewer/export 默认，也不声明 full reality gate pass 或 world model。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

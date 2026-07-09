@@ -594,6 +594,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_real_identity_eval",
         "objectstate_controlled_real_identity_eval",
     ),
+    "OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",
@@ -1121,6 +1125,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_reality_evidence_package_summary": (
         "objgauss.core.objectstate_controlled_reality_evidence_package",
         "validate_objectstate_controlled_reality_evidence_package_summary",
+    ),
+    "validate_objectstate_controlled_real_prediction_eval": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "validate_objectstate_controlled_real_prediction_eval",
     ),
     "validate_objectstate_controlled_prediction_evidence_package_summary": (
         "objgauss.core.objectstate_controlled_prediction_evidence_package",
@@ -2036,6 +2044,30 @@ _EXPORTS = {
     "objectstate_controlled_real_rows_summary": (
         "objgauss.core.objectstate_controlled_real_rows",
         "objectstate_controlled_real_rows_summary",
+    ),
+    "objectstate_controlled_real_prediction_eval": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_eval",
+    ),
+    "objectstate_controlled_real_prediction_eval_from_files": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_eval_from_files",
+    ),
+    "objectstate_controlled_real_prediction_report": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_report",
+    ),
+    "objectstate_controlled_real_prediction_accounting_csv": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_accounting_csv",
+    ),
+    "objectstate_controlled_real_prediction_errors_csv": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_errors_csv",
+    ),
+    "objectstate_controlled_real_prediction_artifact_manifest": (
+        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objectstate_controlled_real_prediction_artifact_manifest",
     ),
     "objectstate_reality_rows_from_controlled_real_manifest": (
         "objgauss.core.objectstate_controlled_real_rows",

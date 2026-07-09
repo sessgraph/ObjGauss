@@ -245,6 +245,13 @@ from objgauss.core.objectstate_controlled_real_identity_eval import (
     objectstate_controlled_real_identity_pairwise_csv,
     objectstate_controlled_real_identity_report,
 )
+from objgauss.core.objectstate_controlled_real_prediction_eval import (
+    objectstate_controlled_real_prediction_accounting_csv,
+    objectstate_controlled_real_prediction_artifact_manifest,
+    objectstate_controlled_real_prediction_errors_csv,
+    objectstate_controlled_real_prediction_eval_from_files,
+    objectstate_controlled_real_prediction_report,
+)
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
@@ -5196,6 +5203,75 @@ def _object_state_eval_controlled_real_identity(args: argparse.Namespace) -> Non
         and summary["status"] != "objectstate_controlled_real_identity_eval_pass"
     ):
         raise ValueError("controlled real identity eval did not pass")
+
+
+def _object_state_eval_controlled_real_prediction(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_real_prediction_eval_from_files(
+        args.bundle,
+        identity_eval_path=args.identity_eval,
+        prediction_candidates_path=args.prediction_candidates,
+        teacher_evidence_path=args.teacher_evidence,
+    )
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "controlled-real-prediction-summary.json"
+    report_path = output_dir / "controlled-real-prediction-report.md"
+    accounting_path = output_dir / "controlled-real-prediction-accounting.csv"
+    errors_path = output_dir / "controlled-real-prediction-errors.csv"
+    baselines_path = output_dir / "controlled-real-prediction-baselines.json"
+    bundle_path = output_dir / "evaluated-real-bundle.json"
+    manifest_path = output_dir / "controlled-real-prediction-artifact-manifest.json"
+    artifact_manifest = objectstate_controlled_real_prediction_artifact_manifest(
+        summary,
+        output_dir=output_dir,
+    )
+    write_json(summary_path, summary)
+    report_path.write_text(
+        objectstate_controlled_real_prediction_report(summary),
+        encoding="utf-8",
+    )
+    accounting_path.write_text(
+        objectstate_controlled_real_prediction_accounting_csv(summary),
+        encoding="utf-8",
+    )
+    errors_path.write_text(
+        objectstate_controlled_real_prediction_errors_csv(summary),
+        encoding="utf-8",
+    )
+    write_json(baselines_path, summary["baselines"])
+    write_json(bundle_path, summary["evaluated_real_bundle"])
+    write_json(manifest_path, artifact_manifest)
+    counts = summary["row_counts"]
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"evaluated_prediction_rows={counts['evaluated_prediction_rows']}")
+    print(f"prediction_pass_rows={counts['prediction_pass_rows']}")
+    print(f"prediction_fail_rows={counts['prediction_fail_rows']}")
+    print(f"prediction_rows_blocked={counts['prediction_rows_blocked']}")
+    print(
+        "prediction_rows_evidence_incomplete="
+        f"{counts['prediction_rows_evidence_incomplete']}"
+    )
+    print(f"state_ade={metrics['state_ade']:.6f}")
+    print(f"hold_last_ade={metrics['hold_last_ade']:.6f}")
+    print(f"kalman_ade={metrics['kalman_ade']:.6f}")
+    print(f"history_ade={metrics['history_ade']:.6f}")
+    print(f"transition_coverage={metrics['transition_coverage']:.6f}")
+    print(f"identity_consistency_rate={metrics['identity_consistency_rate']:.6f}")
+    print(f"summary={summary_path}")
+    print(f"report={report_path}")
+    print(f"accounting={accounting_path}")
+    print(f"errors={errors_path}")
+    print(f"baselines={baselines_path}")
+    print(f"evaluated_real_bundle={bundle_path}")
+    print(f"artifact_manifest={manifest_path}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_controlled_real_prediction_eval_pass"
+    ):
+        raise ValueError("controlled real prediction eval did not pass")
 
 
 def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> None:
@@ -11666,6 +11742,48 @@ def _build_parser() -> argparse.ArgumentParser:
     eval_controlled_real_identity.add_argument("--require-pass", action="store_true")
     eval_controlled_real_identity.set_defaults(
         handler=_object_state_eval_controlled_real_identity
+    )
+    eval_controlled_real_prediction = object_state_subparsers.add_parser(
+        "eval-controlled-real-prediction",
+        help=(
+            "evaluate prediction-ready rows from a real evidence bundle after "
+            "controlled real identity eval has passed"
+        ),
+    )
+    eval_controlled_real_prediction.add_argument("bundle", type=Path)
+    eval_controlled_real_prediction.add_argument(
+        "--identity-eval",
+        type=Path,
+        help=(
+            "controlled real identity eval summary; omitted or non-pass identity "
+            "dependency blocks prediction rows as identity_not_stable"
+        ),
+    )
+    eval_controlled_real_prediction.add_argument(
+        "--prediction-candidates",
+        type=Path,
+        help=(
+            "controlled prediction candidates JSON; omitted candidates block "
+            "prediction-ready rows as missing_prediction_candidates"
+        ),
+    )
+    eval_controlled_real_prediction.add_argument(
+        "--teacher-evidence",
+        type=Path,
+        help=(
+            "optional teacher evidence path recorded as provenance; prediction "
+            "stability is taken from --identity-eval"
+        ),
+    )
+    eval_controlled_real_prediction.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+        help="directory for prediction eval summary, report, accounting and artifacts",
+    )
+    eval_controlled_real_prediction.add_argument("--require-pass", action="store_true")
+    eval_controlled_real_prediction.set_defaults(
+        handler=_object_state_eval_controlled_real_prediction
     )
     validate_real_evidence_bundle = object_state_subparsers.add_parser(
         "validate-real-evidence-bundle",

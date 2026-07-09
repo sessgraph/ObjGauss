@@ -1204,6 +1204,53 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 本提交。
 
+### OBJECTSTATE-CONTROLLED-REAL-PREDICTION-EVAL-001: Evaluate controlled real prediction accounting
+
+- 状态: done / controlled-real-prediction-eval
+- 类型: 标准 PR / ObjectState Phase 3 controlled real prediction accounting
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把 controlled real readiness 中 prediction-ready 但 `missing_evaluator_metrics`
+  的 rows 在 identity eval 稳定后推进到真实 prediction evaluator accounting。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_real_prediction_eval`。
+  - 新增 schema `objgauss-objectstate-controlled-real-prediction-eval-v1`。
+  - Eval 读取 `objgauss-objectstate-real-evidence-bundle-v1`、controlled real
+    identity eval summary 和既有
+    `objgauss-objectstate-controlled-prediction-candidates-v1`。
+  - Prediction-ready rows 必须有同一 physical identity 的 source / target transition、
+    before / after pose、timestamps、observation refs 和 identity eval pass 依赖。
+  - 缺 identity eval、identity eval 未 pass 或 transition source / target identity
+    不一致时输出 `blocked: identity_not_stable`；写回 real bundle 时映射为
+    `accounting_status=evidence_incomplete`，不算模型 fail。
+  - 缺 transition / pose / identity GT 的结构缺口保持 `evidence_incomplete`；
+    缺 prediction candidates 输出 `blocked: missing_prediction_candidates`。
+  - 指标覆盖 `state_ade`、`state_fde`、`pose_translation_error`、
+    `pose_rotation_error`、`hold_last_ade`、`kalman_ade`、`history_ade`、
+    `state_vs_history_error_ratio`、`state_vs_kalman_error_ratio`、
+    `transition_coverage` 和 `identity_consistency_rate`。
+  - Baseline 保留 hold-last、history baseline 和 history 允许时的
+    constant-velocity / kalman-style baseline；v0 pass 要求 `state_ade <= hold_last_ade`。
+  - CLI 新增
+    `objgauss object-state eval-controlled-real-prediction <real-bundle.json>
+    --identity-eval <identity-summary.json> --prediction-candidates <prediction-candidates.json>
+    --output-dir <dir>`，输出 summary、report、accounting CSV、errors CSV、
+    baselines JSON、`evaluated-real-bundle.json` 和 artifact manifest。
+  - 核心 lazy namespace 暴露 eval schema、eval function、report / CSV helpers
+    和 validator。
+- 边界:
+  - 不运行 prediction 模型、不训练 dynamics、不创建 GT。
+  - 不运行 causal / intervention evaluator。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+  - 不声明 full reality gate pass、counterfactual proof 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_real_prediction_eval.py objgauss/cli.py objgauss/core/__init__.py tests/test_objectstate_controlled_real_prediction_eval.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_prediction_eval.py -q`: passed，6 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_prediction_eval.py tests/test_objectstate_controlled_real_identity_eval.py tests/test_objectstate_controlled_real_readiness_audit.py tests/test_objectstate_real_prediction_rows.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: passed，36 tests。
+  - `uv run --extra dev pytest`: passed，663 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
 
 - 状态: done / objectstate-model-contract
