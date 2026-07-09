@@ -4432,9 +4432,12 @@ npm run acceptance:demo
    action interval、state transition 和 gate accounting rows，并强制 intervention
    pass / fail accounting 引用同一对象上时间重叠的 action / transition pair；
    summary 同时输出 `action_transition_coverage_rate`，并把
-   `static_scene_evidence` 与 `state_variable_evidence` 分开。下一步应进入
-   `OBJECTSTATE-REAL-IDENTITY-ROWS-001`，把真实/public identity rows 编译进该 bundle
-   或 existing reality gate，而不是继续新增大模型。
+   `static_scene_evidence` 与 `state_variable_evidence` 分开。
+   `OBJECTSTATE-REAL-IDENTITY-ROWS-001` 已把 bundle 内 `identity` accounting rows
+   接入 identity-only reality gate：`pass` / `fail` 进入真实 row accounting，
+   `evidence_incomplete` / `unsupported` 映射为 blocked，不算模型失败。下一步应进入
+   `OBJECTSTATE-REAL-PREDICTION-ROWS-001`，把真实 pose transition / candidate
+   prediction rows 接进 pass / fail accounting，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，

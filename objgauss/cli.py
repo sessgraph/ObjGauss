@@ -230,6 +230,9 @@ from objgauss.core.objectstate_real_evidence_bundle import (
     objectstate_real_evidence_bundle_summary,
     read_objectstate_real_evidence_bundle,
 )
+from objgauss.core.objectstate_real_identity_rows import (
+    objectstate_real_identity_rows_summary,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -5050,6 +5053,54 @@ def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> Non
         and not readiness["intervention_accounting_ready"]
     ):
         raise ValueError("real evidence bundle is not intervention-accounting ready")
+
+
+def _object_state_real_identity_rows(args: argparse.Namespace) -> None:
+    bundle = read_objectstate_real_evidence_bundle(args.bundle)
+    summary = objectstate_real_identity_rows_summary(
+        bundle,
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+    )
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle={args.bundle}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"identity_rows={counts['identity_rows']}")
+    print(f"identity_pass_rows={counts['identity_pass_rows']}")
+    print(f"identity_fail_rows={counts['identity_fail_rows']}")
+    print(f"identity_blocked_rows={counts['identity_blocked_rows']}")
+    if summary["identity_gate"] is not None:
+        print(f"identity_gate_status={summary['identity_gate']['status']}")
+        print(
+            "identity_gate_hard_blockers="
+            f"{len(summary['identity_gate']['hard_blockers'])}"
+        )
+    else:
+        print("identity_gate_status=not_run")
+        print("identity_gate_hard_blockers=0")
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.rows_output:
+        write_json(args.rows_output, summary["identity_rows"])
+        print(f"identity_rows_output={args.rows_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows_markdown={args.blocked_rows_output}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_real_identity_rows_pass"
+    ):
+        raise ValueError("real identity rows did not pass identity-only gate")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -11068,6 +11119,29 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_real_evidence_bundle.set_defaults(
         handler=_object_state_validate_real_evidence_bundle
     )
+    real_identity_rows = object_state_subparsers.add_parser(
+        "real-identity-rows",
+        help=(
+            "convert identity accounting rows from a real evidence bundle into "
+            "identity-only reality gate rows"
+        ),
+    )
+    real_identity_rows.add_argument("bundle", type=Path)
+    real_identity_rows.add_argument("--summary-output", type=Path)
+    real_identity_rows.add_argument("--rows-output", type=Path)
+    real_identity_rows.add_argument("--blocked-rows-output", type=Path)
+    real_identity_rows.add_argument("--min-real-or-public-rows", type=int, default=1)
+    real_identity_rows.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark synthetic smoke prerequisite as failed in the identity-only gate",
+    )
+    real_identity_rows.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless the identity rows pass the identity-only reality gate",
+    )
+    real_identity_rows.set_defaults(handler=_object_state_real_identity_rows)
     compile_objectstate_transitions = object_state_subparsers.add_parser(
         "compile-objectstate-transitions",
         help=(

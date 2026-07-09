@@ -665,6 +665,41 @@ Implemented v0.1 facts:
   prediction / intervention evaluators, create reality rows, use replay /
   diffusion or mutate viewer defaults.
 
+### OBJECTSTATE-REAL-IDENTITY-ROWS-001
+
+Convert identity accounting rows from a real evidence bundle into reality-gate
+identity rows.
+
+Required behavior:
+
+- Read `GateAccountingRow` entries with `evidence_kind=identity` from
+  `objgauss-objectstate-real-evidence-bundle-v1`.
+- Convert identity `pass` / `fail` accounting into
+  `objgauss-objectstate-real-public-row-v1` rows with
+  `evidence_kind=identity`.
+- Preserve `evidence_incomplete` and `unsupported` as blocked identity rows,
+  not model failures.
+- Require non-blocked identity rows to carry timestamped identity GT and the
+  identity metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `idf1`, `fragmentation_rate`, `swap_rate` and `identity_collapse`.
+- Run an identity-only reality gate where prediction and intervention pass rows
+  are explicitly out of scope.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_identity_rows`.
+- Summary schema: `objgauss-objectstate-real-identity-rows-v1`.
+- CLI:
+  `objgauss object-state real-identity-rows`.
+- The summary embeds generated identity rows, identity-only reality gate output,
+  blocked rows Markdown, row counts and identity-link coverage metrics.
+- A bundle with only `evidence_incomplete` / `unsupported` identity accounting
+  remains `objectstate_real_identity_rows_incomplete`, even though the embedded
+  identity-only reality gate fails because no pass row exists.
+- Current scope is identity accounting only. It does not author GT, run a model,
+  create prediction / intervention rows, train dynamics, use replay / diffusion
+  or mutate viewer defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows

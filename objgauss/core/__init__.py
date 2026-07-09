@@ -154,6 +154,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_real_evidence_bundle",
         "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA",
     ),
+    "OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA": (
+        "objgauss.core.objectstate_real_identity_rows",
+        "OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA": (
         "objgauss.core.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA",
@@ -933,6 +937,18 @@ _EXPORTS = {
     "validate_objectstate_real_evidence_bundle_summary": (
         "objgauss.core.objectstate_real_evidence_bundle",
         "validate_objectstate_real_evidence_bundle_summary",
+    ),
+    "objectstate_real_identity_rows_from_bundle": (
+        "objgauss.core.objectstate_real_identity_rows",
+        "objectstate_real_identity_rows_from_bundle",
+    ),
+    "objectstate_real_identity_rows_summary": (
+        "objgauss.core.objectstate_real_identity_rows",
+        "objectstate_real_identity_rows_summary",
+    ),
+    "validate_objectstate_real_identity_rows_summary": (
+        "objgauss.core.objectstate_real_identity_rows",
+        "validate_objectstate_real_identity_rows_summary",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",

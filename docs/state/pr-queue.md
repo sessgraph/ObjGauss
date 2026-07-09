@@ -137,8 +137,12 @@ vector 且 action interval 覆盖 referenced object pose transition 时才会进
 accounting rows 统一成 `objgauss-objectstate-real-evidence-bundle-v1`；intervention
 pass / fail accounting 现在必须引用时间重叠的 action / transition pair，summary 会显式
 输出 `action_transition_coverage_rate`，并把 `static_scene_evidence` 和
-`state_variable_evidence` 分账。下一步优先 `OBJECTSTATE-REAL-IDENTITY-ROWS-001`：
-把真实/public identity rows 接入 bundle 或 existing reality gate 的 pass/fail accounting。
+`state_variable_evidence` 分账。`OBJECTSTATE-REAL-IDENTITY-ROWS-001` 已补
+real identity rows accounting：bundle 内 `identity` gate accounting rows 可转成
+identity-only reality gate rows，`evidence_incomplete` / `unsupported` 保持 blocked
+而不是 fail。下一步优先 `OBJECTSTATE-REAL-PREDICTION-ROWS-001`：把真实 pose
+transition 与 candidate prediction rows 接进 pass/fail accounting，并继续保持
+history baseline 比较。
 `GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
 Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
 `truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
@@ -360,6 +364,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REAL-IDENTITY-ROWS-001: Account real identity rows from evidence bundles
+
+- 状态: done / real-identity-row-accounting
+- 类型: 标准 PR / ObjectState Phase 1 real identity accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 让 `objgauss-objectstate-real-evidence-bundle-v1` 中的真实 / public
+  identity accounting rows 进入 existing reality gate 的 pass / fail / blocked
+  体系，先完成 Stage 1 identity evidence accounting。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_real_identity_rows`。
+  - 新增 summary schema `objgauss-objectstate-real-identity-rows-v1`。
+  - `identity` accounting `pass` / `fail` 会转成
+    `objgauss-objectstate-real-public-row-v1` identity rows，并运行 identity-only
+    `OBJECTSTATE-REALITY-GATE-001`。
+  - `evidence_incomplete` / `unsupported` 会转成 blocked identity rows，不算模型
+    fail。
+  - 非 blocked identity rows 继续复用 reality gate 要求：timestamped identity GT
+    和 `idf1` / `fragmentation_rate` / `swap_rate` / `identity_collapse` 指标。
+  - 新增 CLI `objgauss object-state real-identity-rows`，支持 summary、rows 和
+    blocked rows Markdown 输出，以及 `--require-pass`。
+  - 核心 namespace 暴露 identity rows schema、row converter、summary 和 validator。
+- 边界:
+  - 不采集数据、不创建 GT、不下载 public dataset 或现成 Gaussian scene。
+  - 不运行 identity model / evaluator，不创建新的模型输出。
+  - 不创建 prediction / intervention rows，不训练 dynamics，不使用 replay / diffusion。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_real_identity_rows.py objgauss/core/objectstate_real_evidence_bundle.py objgauss/core/__init__.py objgauss/cli.py tests/test_objectstate_real_identity_rows.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_real_identity_rows.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: 20 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 580 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
 
 ### OBJECTSTATE-REAL-BUNDLE-SCHEMA-001: Define real evidence bundle contract
 
