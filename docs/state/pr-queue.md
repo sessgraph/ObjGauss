@@ -160,13 +160,17 @@ wrapper / ledger / per-bundle summaries / Markdown outputs / row counts / eviden
 一致性，避免 handoff 产物缺文件或 wrapper 与 standalone ledger 分叉。
 `GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
 Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
-`truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
+`truck`、更大的 `garden` / `bicycle` 或 GraphDECO / Inria official results。该记录只用于静态
 cross-sample / viewer / segmentation 扩展；由于缺 timestamped physical identity /
 6DoF pose / action GT，不能替代 Phase 1 controlled/public reality rows。
 `GAUSSIAN-SCENE-PULLABLE-REGISTRY-001` 已把 cakewalk `room` / `train` / `truck`
 三条现成 `.splat` 注册为 pullable assets，后续可用 `objgauss assets pull <asset_id>`
 走现有 `splat-to-objgauss-ply` 管线生成本地 ignored `public/samples/*` 和 object-aware
 PLY；这些仍是本地研究候选，不进入 featured/default viewer。
+`GAUSSIAN-SCENE-LARGE-PULLABLE-REGISTRY-001` 已把 cakewalk `garden` / `bicycle` /
+`stump` / `treehill` 四条大体量 `.splat` 也登记为 pullable assets；它们只用于本地
+LOD / renderer pressure、static cross-sample 和 segmentation negative evidence，不下载、
+不进入默认 viewer/export，也不替代 Phase 1 state-variable rows。
 `OBJECTSTATE-BOP-CAPTURE-ADAPTER-001` 已新增
 `import-bop-capture-scene` CLI，可把本地 BOP scene 的 `scene_camera.json` /
 `scene_gt.json` / optional `scene_gt_info.json` / `rgb/` 转成 controlled capture
@@ -690,6 +694,38 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `uv run objgauss assets list --pullable`: passed；包含三条新 cakewalk assets。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
   - `git diff --check`: passed。
+
+### GAUSSIAN-SCENE-LARGE-PULLABLE-REGISTRY-001: Add large ready-made Gaussian scene assets
+
+- 状态: done / gaussian-scene-large-pullable-registry
+- 类型: 标准 PR / asset registry
+- 状态记录: `docs/asset-library.md`
+- 目标: 按“找一些现成的高斯场景”的方向，把可直接下载的 cakewalk 大体量 `.splat`
+  场景登记成可复跑 assets CLI 候选，供后续本地 LOD / renderer pressure /
+  segmentation negative evidence 使用。
+- 已实施:
+  - `objgauss/assets.py` 新增 `cakewalk-garden-3dgs-local`、
+    `cakewalk-bicycle-3dgs-local`、`cakewalk-stump-3dgs-local` 和
+    `cakewalk-treehill-3dgs-local`。
+  - 四个资产都复用既有 `splat-to-objgauss-ply` 管线，下载到 ignored
+    `outputs/assets/raw/`，转换到 ignored `outputs/assets/converted/`，并写出本地
+    `public/samples/<scene>.splat` / `<scene>_objects.ply`。
+  - `src/assetLibrary.js` 同步登记为 candidate-only 资产，不设置 `localPath` /
+    `splatPath`，因此不会进入 featured/default viewer。
+  - `docs/asset-library.md` 将 P0 小场景、P1 大场景、P2 压力/负例场景和 GraphDECO /
+    Inria official large sources 分开记录。
+- 边界:
+  - 不下载大文件、不提交 `public/samples/` 或 `outputs/` 产物。
+  - 不修改 viewer / export 默认，不声明 public demo、commercial demo、state-variable
+    evidence pass 或 world-model evidence。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objgauss_mvp.py::test_asset_registry_has_pullable_sample tests/test_objgauss_mvp.py::test_assets_list_cli_reports_pullable_sample -q`: 2 passed。
+  - `uv run objgauss assets list --pullable`: passed；包含 `garden` / `bicycle` /
+    `stump` / `treehill` 四条新 cakewalk assets。
+  - `uv run --extra dev pytest`: 598 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
 
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
 

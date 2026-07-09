@@ -93,6 +93,10 @@ def test_asset_registry_has_pullable_sample():
     room = get_asset("cakewalk-room-3dgs-local")
     train = get_asset("cakewalk-train-3dgs-local")
     truck = get_asset("cakewalk-truck-3dgs-local")
+    garden = get_asset("cakewalk-garden-3dgs-local")
+    bicycle = get_asset("cakewalk-bicycle-3dgs-local")
+    stump = get_asset("cakewalk-stump-3dgs-local")
+    treehill = get_asset("cakewalk-treehill-3dgs-local")
     demo = get_asset("polyhaven-school-chair-1k")
     chair_nerf = get_asset("polyhaven-school-chair-nerf")
     chair_dense = get_asset("polyhaven-school-chair-nerf-dense")
@@ -124,6 +128,24 @@ def test_asset_registry_has_pullable_sample():
     assert truck.local_path == "/samples/truck_objects.ply"
     assert truck.default_clusters == 4
     assert truck.pull_pipeline == "splat-to-objgauss-ply"
+    assert garden.download_url.endswith("/garden.splat")
+    assert garden.local_path == "/samples/garden_objects.ply"
+    assert garden.splat_path == "/samples/garden.splat"
+    assert garden.default_clusters == 10
+    assert garden.pull_pipeline == "splat-to-objgauss-ply"
+    assert bicycle.download_url.endswith("/bicycle.splat")
+    assert bicycle.local_path == "/samples/bicycle_objects.ply"
+    assert bicycle.splat_path == "/samples/bicycle.splat"
+    assert bicycle.default_clusters == 10
+    assert bicycle.pull_pipeline == "splat-to-objgauss-ply"
+    assert stump.download_url.endswith("/stump.splat")
+    assert stump.local_path == "/samples/stump_objects.ply"
+    assert stump.default_clusters == 10
+    assert stump.pull_pipeline == "splat-to-objgauss-ply"
+    assert treehill.download_url.endswith("/treehill.splat")
+    assert treehill.local_path == "/samples/treehill_objects.ply"
+    assert treehill.default_clusters == 10
+    assert treehill.pull_pipeline == "splat-to-objgauss-ply"
     assert demo.pull_pipeline == "polyhaven-gltf"
     assert demo.polyhaven_id == "SchoolChair_01"
     assert demo.license.startswith("CC0")
@@ -147,6 +169,8 @@ def test_assets_list_cli_reports_pullable_sample(capsys):
     output = capsys.readouterr().out
     assert "plush-3dgs-local" in output
     assert "nike-3dgs-local" in output
+    assert "cakewalk-garden-3dgs-local" in output
+    assert "cakewalk-bicycle-3dgs-local" in output
     assert "polyhaven-school-chair-1k" in output
     assert "polyhaven-school-chair-nerf" in output
     assert "polyhaven-school-chair-nerf-dense" in output

@@ -36,17 +36,23 @@
 | cakewalk room | https://huggingface.co/cakewalk/splat-data/tree/main | `room.splat`，约 51 MB；registry id `cakewalk-room-3dgs-local` | P0 | 现成室内 Gaussian scene；适合本地 object clustering、viewer load、cross-sample 静态场景扩展 | cakewalk README 明确来自多来源、多许可；只能本地测试，不作为 public demo / commercial demo |
 | cakewalk train | https://huggingface.co/cakewalk/splat-data/tree/main | `train.splat`，约 32.8 MB；registry id `cakewalk-train-3dgs-local` | P0 | 小型现成 `.splat`；适合快速 pipeline smoke、source splat 加载和对象层生成实验 | 许可混合；无 RGB / pose / action GT，不能用于 State Variable Gate pass row |
 | cakewalk truck | https://huggingface.co/cakewalk/splat-data/tree/main | `truck.splat`，约 81.3 MB；registry id `cakewalk-truck-3dgs-local` | P1 | 单一车辆主体，适合测试 object proposal / bbox picking / static segmentation 质量 | 许可混合；只能本地审计，不进入默认 viewer/export |
-| cakewalk garden / stump / treehill / bicycle | https://huggingface.co/cakewalk/splat-data/tree/main | `garden.splat` 约 187 MB；`stump.splat` 约 159 MB；`treehill.splat` 约 121 MB；`bicycle.splat` 约 196 MB | P2 | 更大静态场景，用于压力测试、LOD / streaming 和多物体场景分割负例 | 文件较大且许可混合；不适合先做 Phase 1 identity / action evidence |
+| cakewalk garden | https://huggingface.co/cakewalk/splat-data/tree/main | `garden.splat` 约 187 MB；registry id `cakewalk-garden-3dgs-local` | P1 | Mip-NeRF360 风格户外静态场景；适合 renderer / LOD 压力、object-field robustness 和 cross-sample 负例 | 文件较大且许可混合；不适合先做 Phase 1 identity / action evidence |
+| cakewalk bicycle | https://huggingface.co/cakewalk/splat-data/tree/main | `bicycle.splat` 约 196 MB；registry id `cakewalk-bicycle-3dgs-local` | P1 | 复杂前景 / 背景静态场景；适合 bbox picking、object proposal 和 renderer pressure smoke | 文件较大且许可混合；只能本地审计，不进入默认 viewer/export |
+| cakewalk stump | https://huggingface.co/cakewalk/splat-data/tree/main | `stump.splat` 约 159 MB；registry id `cakewalk-stump-3dgs-local` | P2 | 自然物体 / 背景混合场景，用于 object proposal 失败分析和 segmentation robustness 负例 | 文件较大且许可混合；不能替代真实 identity / pose / action GT |
+| cakewalk treehill | https://huggingface.co/cakewalk/splat-data/tree/main | `treehill.splat` 约 121 MB；registry id `cakewalk-treehill-3dgs-local` | P2 | 大面积自然场景；适合 LOD / streaming pressure 和 no-object static negative evidence | 文件较大且许可混合；不能用于 State Variable Gate pass row |
 | GraphDECO official results | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Results - 7GB` | P1 | 高质量官方 3DGS 结果；适合静态 Gaussian scene benchmark 和 renderer / object-field robustness 审计 | 大文件；继承 Mip-NeRF360 / Tanks and Temples / Deep Blending 等原数据条款；不直接提供 action GT |
 | GraphDECO official scenes | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Scenes - 650MB` | P2 | 若需要重新训练或对齐相机轨迹，可作为官方 scene 输入来源 | 是训练/评估源，不是 ready `.splat` 小样例；下载后仍需放 ignored `outputs/` |
+| Inria Hierarchical 3DGS datasets | https://repo-sam.inria.fr/fungraph/hierarchical-3d-gaussians/ | 官方页面提供 `Datasets` 下载入口 | P2 | 大规模分层 3DGS / LOD / streaming 研究素材，用于后期 renderer route 压力和层级高斯路线评估 | 体量大；不是小型 ready viewer sample，也不提供 state-variable action / counterfactual GT |
 
 推荐顺序：
 
 1. 先本地拉 `room.splat` 和 `train.splat` 做小型静态 cross-sample；它们比
    `garden` / `bicycle` 更适合快速验收。
-2. 若要评估真实大场景 renderer / LOD / streaming，再考虑 GraphDECO results 或
-   cakewalk `garden` / `bicycle`。
-3. 若目标是证明 `ObjectState` 是真实状态变量，现成静态 Gaussian scene 只能提供
+2. 若要评估真实大场景 renderer / LOD / streaming，优先拉 `garden.splat` 或
+   `bicycle.splat`，再考虑 `stump` / `treehill`。
+3. 若要做官方高质量结果审计，再考虑 GraphDECO results 或 Inria Hierarchical
+   3DGS datasets；这些属于大体量本地审计，不适合作为首个小样例。
+4. 若目标是证明 `ObjectState` 是真实状态变量，现成静态 Gaussian scene 只能提供
    reconstruction noise / segmentation negative evidence；仍必须另找带 timestamped
    physical identity、pose 和 action 的 controlled/public capture。
 
@@ -88,6 +94,10 @@ objgauss assets pull nike-3dgs-local
 objgauss assets pull cakewalk-room-3dgs-local
 objgauss assets pull cakewalk-train-3dgs-local
 objgauss assets pull cakewalk-truck-3dgs-local
+objgauss assets pull cakewalk-garden-3dgs-local
+objgauss assets pull cakewalk-bicycle-3dgs-local
+objgauss assets pull cakewalk-stump-3dgs-local
+objgauss assets pull cakewalk-treehill-3dgs-local
 ```
 
 默认输出：
@@ -113,6 +123,22 @@ outputs/assets/raw/truck.splat
 outputs/assets/converted/truck.ply
 public/samples/truck.splat
 public/samples/truck_objects.ply
+outputs/assets/raw/garden.splat
+outputs/assets/converted/garden.ply
+public/samples/garden.splat
+public/samples/garden_objects.ply
+outputs/assets/raw/bicycle.splat
+outputs/assets/converted/bicycle.ply
+public/samples/bicycle.splat
+public/samples/bicycle_objects.ply
+outputs/assets/raw/stump.splat
+outputs/assets/converted/stump.ply
+public/samples/stump.splat
+public/samples/stump_objects.ply
+outputs/assets/raw/treehill.splat
+outputs/assets/converted/treehill.ply
+public/samples/treehill.splat
+public/samples/treehill_objects.ply
 ```
 
 如果远端文件或转换逻辑有更新，可以强制刷新：
