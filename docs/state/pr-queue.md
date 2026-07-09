@@ -395,6 +395,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-MVP-001: Add Gaussian to ObjectState assignment MVP handoff
+
+- 状态: done / objectstate-assignment-mvp
+- 类型: 标准 PR / ObjectState model MVP inference handoff
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 `OBJECTSTATE-MODEL-CONTRACT-001` 之后，用现有
+  `AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection` 主线实现第一个明确的
+  `GaussianCloud -> A[N,K] -> ObjectStateProjection` MVP summary。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_mvp`。
+  - 新增 schema `objgauss-objectstate-assignment-mvp-v1`。
+  - `objectstate_assignment_mvp_summary(...)` 从 `GaussianCloud` 提取 positions /
+    features，构建 `AssignmentEvidenceBatch`，调用 `predict_assignment_solver_v2(...)`
+    生成 normalized `A[N,K]`，再用 `project_object_states(...)` 生成
+    `ObjectStateProjection`。
+  - Summary 输出 Gaussian / evidence 输入、solver family、assignment shape /
+    confidence / entropy / effective slots、ObjectStateProjection states 和 claim
+    policy。
+  - 当传入 target assignment 时，summary 输出 hard assignment `mean_best_iou`、
+    `ari` 和 `purity`。
+  - 核心 lazy namespace 暴露 MVP schema、summary 和 validator。
+  - `docs/architecture/objectstate-model-contract.md` 记录 v0.1 implemented facts。
+- 边界:
+  - 不训练模型、不创建 checkpoint、不接 renderer loss。
+  - 不使用 GPU / torch / CUDA。
+  - 不引入 Transformer、Slot Attention、SAM / DINO / CoTracker、replay buffer、
+    diffusion 或 dynamics。
+  - 不修改 viewer/export 默认，不声明 identity gate pass、reality gate pass 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_assignment_mvp.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_mvp.py tests/test_core_namespace.py -q`: passed，12 tests。
+  - `uv run --extra dev pytest`: passed，609 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
 
 - 状态: done / objectstate-model-contract

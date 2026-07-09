@@ -882,6 +882,10 @@ _EXPORTS = {
         "objgauss.core.controlled_schema",
         "objectstate_controlled_dataset_contract_summary",
     ),
+    "objectstate_assignment_mvp_summary": (
+        "objgauss.core.objectstate_assignment_mvp",
+        "objectstate_assignment_mvp_summary",
+    ),
     "objectstate_phase1_evidence_ledger": (
         "objgauss.core.objectstate_phase1_evidence_ledger",
         "objectstate_phase1_evidence_ledger",
@@ -889,6 +893,10 @@ _EXPORTS = {
     "validate_objectstate_controlled_dataset_contract_summary": (
         "objgauss.core.controlled_schema",
         "validate_objectstate_controlled_dataset_contract_summary",
+    ),
+    "validate_objectstate_assignment_mvp_summary": (
+        "objgauss.core.objectstate_assignment_mvp",
+        "validate_objectstate_assignment_mvp_summary",
     ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
@@ -1149,6 +1157,10 @@ _EXPORTS = {
     "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA": (
         "objgauss.core.controlled_schema",
         "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
+        "objgauss.core.objectstate_assignment_mvp",
+        "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA",
     ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",

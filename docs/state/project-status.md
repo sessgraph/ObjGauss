@@ -41,6 +41,18 @@ assignment / matching / export policy 派生。文档定义 GaussianToken / Assi
 artifact 必需 metadata，并明确 Transformer / Slot Attention、replay buffer、diffusion、
 dynamics、torch/CUDA 重依赖和真实训练都不在本切片内。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-MVP-001`：新增
+`objgauss.core.objectstate_assignment_mvp`，schema 为
+`objgauss-objectstate-assignment-mvp-v1`。该 summary 从 `GaussianCloud` 构建
+`AssignmentEvidenceBatch`，调用现有 `AssignmentSolverV2` 产生 normalized `A[N,K]`，
+再通过 `project_object_states(...)` 投影成 `ObjectStateProjection`，形成第一条明确的
+`Gaussian -> A[N,K] -> ObjectStateProjection` model-facing inference handoff。若提供
+target assignment，summary 会输出 hard assignment `mean_best_iou`、`ari` 和 `purity`；
+claim policy 继续要求 `A[N,K]` 是唯一 assignment source，hard `object_id` 只是
+`argmax(A)` 派生地址。该切片不训练模型、不接 renderer loss、不用 GPU、不引入
+Transformer / Slot Attention / replay buffer / diffusion / dynamics，也不声明 identity /
+reality gate pass。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

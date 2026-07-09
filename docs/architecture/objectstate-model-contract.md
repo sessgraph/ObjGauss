@@ -255,6 +255,25 @@ This contract does not:
 
 ## Next PRs
 
+### OBJECTSTATE-ASSIGNMENT-MVP-001
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_assignment_mvp`.
+- Summary schema: `objgauss-objectstate-assignment-mvp-v1`.
+- Entry point:
+  `objectstate_assignment_mvp_summary(GaussianCloud, AssignmentSolverV2State, ...)`.
+- The summary builds an `AssignmentEvidenceBatch` from Gaussian positions and
+  extracted Gaussian features, runs `predict_assignment_solver_v2(...)`, then
+  projects the normalized `A[N,K]` into `ObjectStateProjection`.
+- If a target assignment is supplied, the summary reports hard assignment
+  `mean_best_iou`, `ari` and `purity`.
+- Claim policy keeps `A[N,K]` as the single assignment source and marks hard
+  `object_id` as derived.
+- Non-goals explicitly keep training, renderer loss, GPU, Slot Attention,
+  Transformer, replay buffer, diffusion, dynamics and viewer defaults out of
+  scope.
+
 ### OBJECTSTATE-MODEL-MVP-001
 
 Implement the first model artifact around the current
