@@ -238,6 +238,13 @@ from objgauss.core.objectstate_controlled_real_readiness_audit import (
     objectstate_controlled_real_readiness_breakdown_csv,
     objectstate_controlled_real_readiness_markdown,
 )
+from objgauss.core.objectstate_controlled_real_identity_eval import (
+    objectstate_controlled_real_identity_accounting_csv,
+    objectstate_controlled_real_identity_artifact_manifest,
+    objectstate_controlled_real_identity_eval_from_files,
+    objectstate_controlled_real_identity_pairwise_csv,
+    objectstate_controlled_real_identity_report,
+)
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
@@ -5126,6 +5133,69 @@ def _object_state_audit_controlled_real_readiness(args: argparse.Namespace) -> N
         and summary["status"] != "objectstate_controlled_real_readiness_ready"
     ):
         raise ValueError("controlled real readiness audit is not ready")
+
+
+def _object_state_eval_controlled_real_identity(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_real_identity_eval_from_files(
+        args.bundle,
+        teacher_evidence_path=args.teacher_evidence,
+        min_identity_retrieval_at_1=args.min_identity_retrieval_at_1,
+        seed=args.seed,
+    )
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "controlled-real-identity-summary.json"
+    report_path = output_dir / "controlled-real-identity-report.md"
+    accounting_path = output_dir / "controlled-real-identity-accounting.csv"
+    matching_path = output_dir / "controlled-real-identity-matching.json"
+    pairwise_path = output_dir / "controlled-real-identity-pairwise-distances.csv"
+    bundle_path = output_dir / "controlled-real-identity-bundle.json"
+    manifest_path = output_dir / "controlled-real-identity-artifact-manifest.json"
+    artifact_manifest = objectstate_controlled_real_identity_artifact_manifest(
+        summary,
+        output_dir=output_dir,
+    )
+    write_json(summary_path, summary)
+    report_path.write_text(
+        objectstate_controlled_real_identity_report(summary),
+        encoding="utf-8",
+    )
+    accounting_path.write_text(
+        objectstate_controlled_real_identity_accounting_csv(summary),
+        encoding="utf-8",
+    )
+    write_json(matching_path, {"rows": summary["matching"]})
+    pairwise_path.write_text(
+        objectstate_controlled_real_identity_pairwise_csv(summary),
+        encoding="utf-8",
+    )
+    write_json(bundle_path, summary["evaluated_real_bundle"])
+    write_json(manifest_path, artifact_manifest)
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"evaluated_identity_rows={counts['evaluated_identity_rows']}")
+    print(f"identity_pass_rows={counts['identity_pass_rows']}")
+    print(f"identity_fail_rows={counts['identity_fail_rows']}")
+    print(f"identity_rows_blocked={counts['identity_rows_blocked']}")
+    print(
+        "identity_rows_evidence_incomplete="
+        f"{counts['identity_rows_evidence_incomplete']}"
+    )
+    print(f"teacher_evidence_coverage={summary['teacher_evidence_coverage']:.6f}")
+    print(f"summary={summary_path}")
+    print(f"report={report_path}")
+    print(f"accounting={accounting_path}")
+    print(f"matching={matching_path}")
+    print(f"pairwise_distances={pairwise_path}")
+    print(f"evaluated_real_bundle={bundle_path}")
+    print(f"artifact_manifest={manifest_path}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_controlled_real_identity_eval_pass"
+    ):
+        raise ValueError("controlled real identity eval did not pass")
 
 
 def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> None:
@@ -11564,6 +11634,38 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_controlled_real_readiness.set_defaults(
         handler=_object_state_audit_controlled_real_readiness
+    )
+    eval_controlled_real_identity = object_state_subparsers.add_parser(
+        "eval-controlled-real-identity",
+        help=(
+            "evaluate identity-ready rows from a real evidence bundle with "
+            "controlled real teacher assignment evidence"
+        ),
+    )
+    eval_controlled_real_identity.add_argument("bundle", type=Path)
+    eval_controlled_real_identity.add_argument(
+        "--teacher-evidence",
+        type=Path,
+        help=(
+            "controlled real identity teacher evidence JSON; omitted evidence "
+            "produces blocked missing_teacher_evidence rows"
+        ),
+    )
+    eval_controlled_real_identity.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+        help="directory for identity eval summary, report, accounting and artifacts",
+    )
+    eval_controlled_real_identity.add_argument(
+        "--min-identity-retrieval-at-1",
+        type=float,
+        default=0.75,
+    )
+    eval_controlled_real_identity.add_argument("--seed", type=int, default=0)
+    eval_controlled_real_identity.add_argument("--require-pass", action="store_true")
+    eval_controlled_real_identity.set_defaults(
+        handler=_object_state_eval_controlled_real_identity
     )
     validate_real_evidence_bundle = object_state_subparsers.add_parser(
         "validate-real-evidence-bundle",

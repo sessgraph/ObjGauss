@@ -1155,6 +1155,55 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 本提交。
 
+### OBJECTSTATE-CONTROLLED-REAL-IDENTITY-EVAL-001: Evaluate controlled real identity rows
+
+- 状态: done / controlled-real-identity-eval
+- 类型: 标准 PR / ObjectState Phase 3 controlled real identity accounting
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把 controlled real readiness 中 identity-ready 但 `missing_evaluator_metrics`
+  的 rows 推进到真实 identity evaluator accounting，同时保留缺 teacher evidence、
+  缺 identity link 和真实指标失败的不同状态语义。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_real_identity_eval`。
+  - 新增 schema `objgauss-objectstate-controlled-real-identity-eval-v1` 和
+    `objgauss-objectstate-controlled-real-identity-teacher-evidence-v1`。
+  - Eval 读取 `objgauss-objectstate-real-evidence-bundle-v1`，复用
+    `audit-controlled-real-readiness`，只消费 identity-ready rows。
+  - Teacher evidence 第一版为显式 per-pose assignment evidence，支持
+    `manual_fixture` / semantic / real teacher source 标记；`allowed_for_evaluation`
+    必须为 true。
+  - Teacher evidence provenance 复用 teacher evidence leakage 口径，拒绝
+    `physical_identity`、`identity_label`、`target_assignment`、`oracle_object_id`
+    等 GT / oracle 泄漏键。
+  - 指标覆盖 `identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、
+    `objectstate_drift`、`assignment_consistency`、`occlusion_recovery` 和
+    `teacher_evidence_coverage`。
+  - Baseline 保留 `random_assignment`、`xyz_centroid`、
+    `oracle_target_assignment` 和 `assignment_solver_v2`，并输出
+    `identity_model_underperforms_xyz_centroid` 诊断。
+  - 缺 teacher evidence 输出 `blocked: missing_teacher_evidence`；缺 identity link
+    输出 `evidence_incomplete`；evaluator 实际运行但指标或 baseline gate 不通过时才
+    输出 `fail`。
+  - CLI 新增
+    `objgauss object-state eval-controlled-real-identity <real-bundle.json>
+    --teacher-evidence <teacher-evidence.json> --output-dir <dir>`，输出 summary、
+    report、accounting CSV、matching JSON、pairwise distances CSV、evaluated real
+    bundle 和 artifact manifest。
+  - 核心 lazy namespace 暴露 eval schema、teacher evidence schema 和 eval function。
+- 边界:
+  - 不运行 teacher 模型、不下载权重、不读取大 PLY、不训练 AssignmentSolverV2。
+  - 不创建 GT，不运行 prediction / intervention evaluator。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+  - 不声明 full reality gate pass、counterfactual proof 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_real_identity_eval.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_identity_eval.py -q`: passed，6 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_identity_eval.py tests/test_objectstate_controlled_real_readiness_audit.py tests/test_objectstate_controlled_real_evidence_bundle.py tests/test_objectstate_real_identity_rows.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: passed，32 tests。
+  - `uv run --extra dev pytest`: passed，657 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
 
 - 状态: done / objectstate-model-contract

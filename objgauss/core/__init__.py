@@ -582,6 +582,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_real_readiness_audit",
         "objectstate_controlled_real_readiness_markdown",
     ),
+    "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA",
+    ),
+    "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_TEACHER_EVIDENCE_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_TEACHER_EVIDENCE_SCHEMA",
+    ),
+    "objectstate_controlled_real_identity_eval": (
+        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "objectstate_controlled_real_identity_eval",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",

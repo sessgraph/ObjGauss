@@ -332,6 +332,27 @@ pose / identity link / action-transition overlap 的行会停在 readiness incom
 不重建 Gaussian、不训练模型、不修改 viewer/export 默认，也不声明 reality gate pass、
 counterfactual proof 或 world model。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-IDENTITY-EVAL-001`：新增
+`objgauss.core.objectstate_controlled_real_identity_eval`，schema 为
+`objgauss-objectstate-controlled-real-identity-eval-v1`，并新增 teacher evidence input
+schema `objgauss-objectstate-controlled-real-identity-teacher-evidence-v1`。CLI
+`objgauss object-state eval-controlled-real-identity <real-bundle.json>
+--teacher-evidence <teacher-evidence.json> --output-dir <dir>` 会读取 real evidence
+bundle、复用 controlled real readiness audit，只消费 identity-ready rows，并写出
+`controlled-real-identity-summary.json`、report、accounting CSV、matching JSON、
+pairwise distances CSV、evaluated real bundle 和 artifact manifest。第一版 teacher
+evidence 是显式 assignment evidence（支持 manual fixture / semantic / real teacher
+来源标记），必须 `allowed_for_evaluation=true`，provenance 禁止 physical identity /
+target assignment / oracle object id 等 GT 泄漏键；缺 teacher evidence 时输出
+`blocked: missing_teacher_evidence`，缺 identity link 时保持 `evidence_incomplete`，只有
+evaluator 实际运行且 metrics 不达标时才输出 `fail`。指标覆盖
+`identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、`objectstate_drift`、
+`assignment_consistency`、`occlusion_recovery` 和 teacher evidence coverage，并保留
+`random_assignment`、`xyz_centroid`、`oracle_target_assignment`、
+`assignment_solver_v2` baseline comparison。该切片不运行 teacher 模型、不读取大 PLY、
+不训练 AssignmentSolverV2、不创建 GT、不运行 prediction / intervention eval、不修改
+viewer/export 默认，也不声明 full reality gate pass、counterfactual proof 或 world model。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，
