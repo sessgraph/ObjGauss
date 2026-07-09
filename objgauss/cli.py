@@ -230,6 +230,9 @@ from objgauss.core.objectstate_real_evidence_bundle import (
     objectstate_real_evidence_bundle_summary,
     read_objectstate_real_evidence_bundle,
 )
+from objgauss.core.objectstate_controlled_real_evidence_bundle import (
+    objectstate_controlled_real_evidence_bundle_adapter_summary_from_file,
+)
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
@@ -5034,6 +5037,51 @@ def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
         raise ValueError("controlled capture manifest is not prediction-stage ready")
     if args.require_intervention_ready and not readiness["intervention_stage_ready"]:
         raise ValueError("controlled capture manifest is not intervention-stage ready")
+
+
+def _object_state_controlled_real_evidence_bundle(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_real_evidence_bundle_adapter_summary_from_file(
+        args.capture_manifest,
+        scene_id=args.scene_id,
+        sequence_id=args.sequence_id,
+        source_dataset=args.source_dataset,
+        gt_provenance=args.gt_provenance,
+        source_summary_ref=(
+            args.source_summary_ref
+            if args.source_summary_ref is not None
+            else str(args.capture_manifest)
+        ),
+    )
+    bundle_summary = summary["bundle_summary"]
+    counts = summary["row_counts"]
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample_id']}")
+    print(f"source_kind={summary['source_kind']}")
+    print(f"bundle_status={bundle_summary['status']}")
+    print(f"observation_rows={counts['observation_rows']}")
+    print(f"object_pose_rows={counts['object_pose_rows']}")
+    print(f"identity_link_rows={counts['identity_link_rows']}")
+    print(f"state_transition_rows={counts['state_transition_rows']}")
+    print(f"action_interval_rows={counts['action_interval_rows']}")
+    print(f"gate_accounting_rows={counts['gate_accounting_rows']}")
+    for status, count in summary["accounting_status_counts"].items():
+        print(f"accounting.{status}={count}")
+    for gate, passed in summary["readiness"].items():
+        print(f"readiness.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    write_json(args.bundle_output, summary["bundle"])
+    print(f"bundle={args.bundle_output}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"]
+        != "objectstate_controlled_real_evidence_bundle_adapter_ready"
+    ):
+        raise ValueError("controlled real evidence bundle adapter is not ready")
 
 
 def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> None:
@@ -11414,6 +11462,46 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
     validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
+    controlled_real_evidence_bundle = object_state_subparsers.add_parser(
+        "controlled-real-evidence-bundle",
+        help=(
+            "convert a controlled capture manifest into a real evidence bundle "
+            "with evidence_incomplete accounting rows"
+        ),
+    )
+    controlled_real_evidence_bundle.add_argument("capture_manifest", type=Path)
+    controlled_real_evidence_bundle.add_argument(
+        "--bundle-output",
+        required=True,
+        type=Path,
+        help="real evidence bundle JSON to write",
+    )
+    controlled_real_evidence_bundle.add_argument("--summary-output", type=Path)
+    controlled_real_evidence_bundle.add_argument("--scene-id")
+    controlled_real_evidence_bundle.add_argument("--sequence-id")
+    controlled_real_evidence_bundle.add_argument(
+        "--source-dataset",
+        default="local-controlled-capture",
+    )
+    controlled_real_evidence_bundle.add_argument(
+        "--gt-provenance",
+        default="controlled capture manifest annotations",
+    )
+    controlled_real_evidence_bundle.add_argument(
+        "--source-summary-ref",
+        help=(
+            "artifact ref for the source controlled capture manifest; defaults "
+            "to the input manifest path"
+        ),
+    )
+    controlled_real_evidence_bundle.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the emitted real evidence bundle has state-variable rows",
+    )
+    controlled_real_evidence_bundle.set_defaults(
+        handler=_object_state_controlled_real_evidence_bundle
+    )
     validate_real_evidence_bundle = object_state_subparsers.add_parser(
         "validate-real-evidence-bundle",
         help=(

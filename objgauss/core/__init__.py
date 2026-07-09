@@ -558,6 +558,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_bop_real_evidence_bundle",
         "OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA",
     ),
+    "OBJECTSTATE_CONTROLLED_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "OBJECTSTATE_CONTROLLED_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA",
+    ),
+    "objectstate_controlled_real_evidence_bundle_adapter_summary": (
+        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "objectstate_controlled_real_evidence_bundle_adapter_summary",
+    ),
+    "objectstate_controlled_real_evidence_bundle_from_capture_manifest": (
+        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "objectstate_controlled_real_evidence_bundle_from_capture_manifest",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",

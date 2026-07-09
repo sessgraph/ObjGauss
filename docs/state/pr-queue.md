@@ -1076,6 +1076,43 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 本提交。
 
+### OBJECTSTATE-CONTROLLED-REAL-BUNDLE-ADAPTER-001: Convert controlled capture manifests into real evidence bundles
+
+- 状态: done / controlled-real-evidence-bundle-adapter
+- 类型: 标准 PR / ObjectState Phase 3 controlled real evidence ingestion
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把实际 controlled capture manifest 直接转成
+  `objgauss-objectstate-real-evidence-bundle-v1`，让真实桌面采集 rows 能进入既有
+  real bundle ledger，而不依赖 BOP 专用 adapter 或手写 bundle JSON。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_real_evidence_bundle`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-real-evidence-bundle-adapter-v1`。
+  - Adapter 消费既有
+    `objgauss-objectstate-controlled-capture-manifest-v1`，生成 observation、
+    object pose、identity link、action interval、state transition 和 gate
+    accounting rows。
+  - 默认 gate accounting rows 全部为 `evidence_incomplete`，用于显式记录
+    identity / prediction / intervention evaluator 指标缺口；不会创建 pass / fail
+    row，也不会把缺指标当作模型失败。
+  - CLI 新增
+    `objgauss object-state controlled-real-evidence-bundle <capture-manifest.json>
+    --bundle-output <real-bundle.json>`，可写 adapter summary 和 real evidence bundle。
+  - 核心 lazy namespace 暴露 adapter schema、summary 和 bundle builder。
+- 边界:
+  - 不采集视频、不创建 GT、不重建 Gaussian、不训练 Gaussian / dynamics / ObjectState 模型。
+  - 不运行 identity / prediction / intervention evaluator，不创建 metric pass rows。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+  - 不声明 reality gate pass、counterfactual proof 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_real_evidence_bundle.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_evidence_bundle.py -q`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_evidence_bundle.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: passed，18 tests。
+  - `uv run --extra dev pytest`: passed，648 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
 
 - 状态: done / objectstate-model-contract

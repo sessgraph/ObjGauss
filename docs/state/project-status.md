@@ -302,6 +302,21 @@ prediction / intervention handoff、不训练模型、不写 public samples、�
 也不声明 real identity / prediction / causal / reality gate 或 world model。真实 evidence
 仍必须由物理 capture host 和本地 ignored `outputs/captures/` bundle 产生。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-BUNDLE-ADAPTER-001`：新增
+`objgauss.core.objectstate_controlled_real_evidence_bundle`，schema 为
+`objgauss-objectstate-controlled-real-evidence-bundle-adapter-v1`，并新增 CLI
+`objgauss object-state controlled-real-evidence-bundle <capture-manifest.json>
+--bundle-output <real-bundle.json>`。该 adapter 直接消费既有
+`objgauss-objectstate-controlled-capture-manifest-v1`，生成
+`objgauss-objectstate-real-evidence-bundle-v1` 的 observation、object pose、
+identity link、action interval、state transition 和 gate accounting rows。默认 gate
+accounting rows 全部为 `evidence_incomplete`，用于把缺 identity / prediction /
+intervention evaluator 指标显式记账，而不是误写成模型 fail 或 pass；若 manifest 缺 pose /
+transition，adapter summary 和 real bundle summary 会保持 incomplete。该切片不采集视频、
+不创建 GT、不重建 Gaussian、不训练模型、不运行 identity / prediction / intervention
+eval、不写 public samples、不修改 viewer/export 默认，也不声明 reality gate pass、
+counterfactual proof 或 world model。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，
