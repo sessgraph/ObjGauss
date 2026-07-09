@@ -150,6 +150,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA",
     ),
+    "OBJECTSTATE_TEMPORAL_ASSIGNMENT_SCHEMA": (
+        "objgauss.core.objectstate_temporal_assignment",
+        "OBJECTSTATE_TEMPORAL_ASSIGNMENT_SCHEMA",
+    ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA": (
         "objgauss.core.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA",
@@ -966,6 +970,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_temporal_assignment_contract",
         "objectstate_temporal_assignment_contract_summary",
     ),
+    "objectstate_temporal_assignment_summary": (
+        "objgauss.core.objectstate_temporal_assignment",
+        "objectstate_temporal_assignment_summary",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -1017,6 +1025,10 @@ _EXPORTS = {
     "validate_objectstate_temporal_assignment_contract_summary": (
         "objgauss.core.objectstate_temporal_assignment_contract",
         "validate_objectstate_temporal_assignment_contract_summary",
+    ),
+    "validate_objectstate_temporal_assignment_summary": (
+        "objgauss.core.objectstate_temporal_assignment",
+        "validate_objectstate_temporal_assignment_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",

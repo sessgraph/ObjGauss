@@ -272,6 +272,22 @@ replay buffer，不运行 teacher 模型、不下载权重、不使用 GPU / tor
 capture、不修改 viewer/export 默认，也不声明 temporal implementation、真实 gate 或 world model
 已通过。下一步才是 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-001`。
 
+随后完成 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-001`：新增
+`objgauss.core.objectstate_temporal_assignment`，schema 为
+`objgauss-objectstate-temporal-assignment-v1`。该 summary 消费 passed
+`objgauss-objectstate-assignment-long-smoke-v1`、ready temporal assignment contract summary
+和 long-smoke `AssignmentSolverV2` checkpoint，restore 后复用 identity benchmark report
+的 15 个 controlled synthetic scenarios，并写出
+`temporal-slot-match-manifest.json`。首版是 bounded temporal consistency smoke：报告
+`temporal_assignment_consistency`、`track_fragmentation_rate`、`slot_swap_rate`、
+`identity_retrieval_at_1`、`identity_margin`、`occlusion_recovery` 和 checkpoint roundtrip。
+测试 fixture 中 temporal consistency 为 `1.000000`、track fragmentation 为 `0.000000`、
+identity retrieval@1 为 `1.000000`，并允许下一步进入
+`OBJECTSTATE-CONTROLLED-CAPTURE-001`。该切片不运行 temporal training，不打开
+`AssignmentSolverV2Config.temporal_policy`，不优化 temporal loss，不接 renderer loss、
+dynamics、diffusion 或 replay buffer，不运行 teacher 模型、不下载权重、不使用 GPU / torch /
+CUDA、不采集 real capture、不修改 viewer/export 默认，也不声明真实 gate 或 world model。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

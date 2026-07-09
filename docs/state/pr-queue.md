@@ -395,6 +395,46 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TEMPORAL-ASSIGNMENT-001: Add bounded temporal consistency smoke
+
+- 状态: done / objectstate-temporal-assignment
+- 类型: 标准 PR / ObjectState temporal assignment smoke
+- 架构规格:
+  - `docs/architecture/objectstate-temporal-assignment-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 ready temporal assignment contract 下，补第一条 bounded temporal consistency
+  smoke，证明 long-smoke checkpoint 的 assignment slots 在 paired frames 中保持一致。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_temporal_assignment`。
+  - 新增 schema `objgauss-objectstate-temporal-assignment-v1`。
+  - 新增 `objectstate_temporal_assignment_summary(...)` 和
+    `validate_objectstate_temporal_assignment_summary(...)`。
+  - Summary 要求 passed `objgauss-objectstate-assignment-long-smoke-v1`、ready temporal
+    assignment contract summary 和 long-smoke checkpoint。
+  - 从 checkpoint restore `AssignmentSolverV2`，复用 identity benchmark report 的 15 个
+    controlled synthetic scenarios，写出 `temporal-slot-match-manifest.json`。
+  - 输出 temporal assignment consistency、track fragmentation、slot swap、identity
+    retrieval、identity margin、occlusion recovery 和 checkpoint roundtrip。
+  - 核心 lazy namespace 暴露 temporal assignment schema、summary 和 validator。
+- 当前结论:
+  - deterministic test fixture 状态为 `objectstate_temporal_assignment_pass`。
+  - `temporal_assignment_consistency=1.000000`、`track_fragmentation_rate=0.000000`、
+    `slot_swap_rate=0.000000`、`identity_retrieval_at_1=1.000000`。
+  - 通过后只允许进入 `OBJECTSTATE-CONTROLLED-CAPTURE-001`。
+- 边界:
+  - 不运行 temporal training，不启用 `AssignmentSolverV2Config.temporal_policy`。
+  - 不优化 temporal loss，不启用 renderer loss、dynamics、diffusion、replay buffer。
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不使用 GPU / torch / CUDA，不采集 controlled real 数据，不修改 viewer/export 默认。
+  - 不声明真实 identity / prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_temporal_assignment.py tests/test_objectstate_temporal_assignment_contract.py tests/test_core_namespace.py -q`: passed，14 tests。
+  - `uv run --extra dev pytest`: passed，643 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001: Freeze temporal consistency boundary
 
 - 状态: done / objectstate-temporal-assignment-contract

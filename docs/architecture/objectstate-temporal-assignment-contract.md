@@ -140,6 +140,43 @@ The summary is ready only when a passed semantic assignment long-smoke summary
 is provided. A ready summary points to
 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-001`.
 
+## OBJECTSTATE-TEMPORAL-ASSIGNMENT-001 Implementation
+
+Implemented run module:
+
+```text
+objgauss.core.objectstate_temporal_assignment
+```
+
+Run summary schema:
+
+```text
+objgauss-objectstate-temporal-assignment-v1
+```
+
+Public API:
+
+- `objectstate_temporal_assignment_summary(...)`
+- `validate_objectstate_temporal_assignment_summary(...)`
+
+The first implementation consumes:
+
+- a passed `objgauss-objectstate-assignment-long-smoke-v1` summary;
+- a ready
+  `objgauss-objectstate-temporal-assignment-contract-summary-v1`;
+- the long-smoke `AssignmentSolverV2` checkpoint.
+
+It restores the solver checkpoint, reuses the 15-scenario identity benchmark
+ladder and writes a temporal slot-match manifest. The manifest compares
+derived assignment slots across frame pairs and reports temporal consistency
+metrics. Physical identity labels are used only to evaluate consistency, not
+as runtime input.
+
+This implementation is a bounded temporal consistency smoke, not temporal
+training. It keeps `AssignmentSolverV2Config.temporal_policy="disabled"` and
+does not optimize temporal loss. A passing summary only allows the project to
+return to controlled capture preparation.
+
 ## Non-Goals
 
 This contract does not:

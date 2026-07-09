@@ -626,6 +626,35 @@ Implemented v0.1 facts:
   dynamics, diffusion, replay buffer, real capture ingestion, viewer/export
   changes, real-data gate claims or world-model training.
 
+### OBJECTSTATE-TEMPORAL-ASSIGNMENT-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_temporal_assignment`.
+- Run summary schema:
+  `objgauss-objectstate-temporal-assignment-v1`.
+- Public API:
+  `objectstate_temporal_assignment_summary(...)` and
+  `validate_objectstate_temporal_assignment_summary(...)`.
+- The summary requires a passed
+  `objgauss-objectstate-assignment-long-smoke-v1`, a ready temporal assignment
+  contract summary and the long-smoke `AssignmentSolverV2` checkpoint.
+- The first implementation restores that checkpoint, reuses the 15-scenario
+  identity benchmark ladder, writes `temporal-slot-match-manifest.json` and
+  reports temporal assignment consistency, track fragmentation, slot-swap,
+  identity retrieval, identity margin, occlusion recovery and checkpoint
+  roundtrip.
+- Physical identity labels are evaluation-only. Runtime assignment remains
+  derived from `A[N,K]`; hard slots in the manifest are derived addresses, not
+  a second assignment source.
+- This is a bounded temporal consistency smoke, not temporal training. It keeps
+  `AssignmentSolverV2Config.temporal_policy="disabled"` and does not optimize
+  temporal loss, renderer loss, dynamics, diffusion or replay buffer.
+- A passing run only allows `OBJECTSTATE-CONTROLLED-CAPTURE-001`; it does not
+  claim real-data identity pass, prediction / causal / reality gate success or
+  world-model training.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:
