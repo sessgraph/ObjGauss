@@ -53,6 +53,17 @@ claim policy 继续要求 `A[N,K]` 是唯一 assignment source，hard `object_id
 Transformer / Slot Attention / replay buffer / diffusion / dynamics，也不声明 identity /
 reality gate pass。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001`：新增
+`docs/architecture/objectstate-assignment-train-contract.md`，冻结第一个短训练实验合同。
+该 contract 规定未来 `OBJECTSTATE-ASSIGNMENT-TRAIN-001` 必须输出 train dataset summary、
+train run summary、checkpoint metadata、before / after loss 与 `mean_best_iou` / `ari` /
+`purity` / confidence / entropy / effective slots 等指标，并生成本地
+`Gaussian colored by argmax(A)` before / after visualization refs。长训练被明确 gate 住：
+必须先证明 loss 下降、assignment metrics 改善、visualization 正确、`ObjectStateProjection`
+有效且 gate handoff 不崩，才允许 10 分钟以上训练。该切片不实现 dataloader、不运行训练、
+不创建 checkpoint、不引入 torch / CUDA / Transformer / Slot Attention / replay buffer /
+diffusion / dynamics，也不声明 learned ObjectState model 已完成。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

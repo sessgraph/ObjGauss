@@ -295,3 +295,23 @@ Required metrics:
 - identity IDF1 / retrieval / drift where applicable;
 - prediction state-vs-history error when future candidates exist;
 - clear blocked status for causal evidence if no real action candidates exist.
+
+### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
+
+Implemented v0.1 facts:
+
+- Architecture spec:
+  `docs/architecture/objectstate-assignment-train-contract.md`.
+- Freezes the bounded smoke-training contract before any long run.
+- Defines dataset summary, model handoff, loss families, checkpoint metadata,
+  before / after assignment metrics, visualization refs and long-training gate.
+- Keeps the first train implementation on the existing assignment-first public
+  contract:
+
+```text
+AssignmentEvidenceBatch -> logits/cost[N,K] -> softmax -> A[N,K]
+  -> ObjectStateProjection
+```
+
+- Requires loss decrease, assignment metric improvement, visualization and
+  valid gate handoff before any 10 minute or longer training run.

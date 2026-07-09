@@ -395,6 +395,40 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001: Freeze assignment smoke training contract
+
+- 状态: done / assignment-train-contract
+- 类型: 架构文档 / ObjectState assignment training foundation
+- 架构规格: `docs/architecture/objectstate-assignment-train-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 `OBJECTSTATE-ASSIGNMENT-MVP-001` 之后，冻结第一个短训练实验合同，明确
+  `GaussianCloud -> AssignmentEvidenceBatch -> A[N,K] -> ObjectStateProjection`
+  如何进入 bounded smoke training，而不是直接启动长训练。
+- 已实施:
+  - 新增 `docs/architecture/objectstate-assignment-train-contract.md`。
+  - 更新 `docs/architecture/objectstate-model-contract.md`，记录该 train contract 的
+    implemented v0.1 facts。
+  - 定义未来 dataset summary `objgauss-objectstate-assignment-train-dataset-v1`。
+  - 定义未来 train run summary `objgauss-objectstate-assignment-train-run-v1`。
+  - 冻结训练输入 / target assignment / model handoff / loss family / checkpoint
+    metadata / before-after metrics / visualization refs / long-training gate。
+  - 明确首个训练实现必须先做 10 分钟以内 smoke，输出 loss、`mean_best_iou`、
+    `ari`、`purity`、assignment confidence、entropy、effective slots 和
+    `ObjectStateProjection` 有效性。
+  - 明确 visualization contract：本地生成 `Gaussian colored by argmax(A)` before /
+    after artifacts，默认留在 ignored `outputs/`。
+- 边界:
+  - 不实现 dataloader、不运行训练、不创建 checkpoint。
+  - 不引入 torch / CUDA / Transformer / Slot Attention / SAM / DINO / CoTracker。
+  - 不使用 replay buffer / diffusion / dynamics。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认。
+  - 不声明 learned ObjectState model、identity gate pass、reality gate pass 或 world
+    model 已经完成。
+- 验证:
+  - `git diff --check`: passed。
+  - Docs-only architecture slice；未运行 `uv run --extra dev pytest` 或 `npm run build`。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-MVP-001: Add Gaussian to ObjectState assignment MVP handoff
 
 - 状态: done / objectstate-assignment-mvp
