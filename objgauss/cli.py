@@ -5306,8 +5306,11 @@ def _object_state_audit_real_evidence_bundle_ledger_package(
         f"{counts.get('evidence_incomplete_row_count', 0)}"
     )
     print(f"unsupported_row_count={counts.get('unsupported_row_count', 0)}")
+    print(f"phase1_acceptance_status={summary['phase1_acceptance_status']}")
     for gate, passed in summary["reviewability_gates"].items():
         print(f"reviewability.{gate}={str(passed).lower()}")
+    for gate, passed in summary["phase1_acceptance_gates"].items():
+        print(f"phase1.{gate}={str(passed).lower()}")
     for issue in summary["issues"]:
         print(f"issue={issue}")
     if args.summary_output:
@@ -5319,6 +5322,12 @@ def _object_state_audit_real_evidence_bundle_ledger_package(
         != "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
     ):
         raise ValueError("real evidence bundle ledger package is not reviewable")
+    if (
+        args.require_phase1_acceptance
+        and summary["phase1_acceptance_status"]
+        != "objectstate_phase1_evidence_system_acceptance_pass"
+    ):
+        raise ValueError("real evidence bundle ledger package phase1 acceptance failed")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -11462,6 +11471,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--require-reviewable",
         action="store_true",
         help="fail unless all package reviewability gates pass",
+    )
+    audit_real_bundle_ledger_package.add_argument(
+        "--require-phase1-acceptance",
+        action="store_true",
+        help="fail unless the Phase 1 evidence-system acceptance gates pass",
     )
     audit_real_bundle_ledger_package.set_defaults(
         handler=_object_state_audit_real_evidence_bundle_ledger_package

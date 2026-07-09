@@ -34,6 +34,8 @@ OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA = (
 )
 
 Validator = Callable[[Any], Mapping[str, Any]]
+_ACCOUNTING_STATUSES = ("pass", "fail", "evidence_incomplete", "unsupported")
+_CONTROLLED_OR_PUBLIC_SOURCE_KINDS = {"controlled_real", "public_replay"}
 
 
 def objectstate_real_evidence_bundle_ledger_package_audit(
@@ -60,6 +62,7 @@ def objectstate_real_evidence_bundle_ledger_package_audit(
     files.extend(expected["files"])
     ledger = payloads.get("reality_row_ledger")
     gates = _reviewability_gates(root, wrapper, ledger, files)
+    phase1 = _phase1_acceptance(wrapper, ledger, payloads, gates)
     status = (
         "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
         if all(gates.values())
@@ -81,13 +84,18 @@ def objectstate_real_evidence_bundle_ledger_package_audit(
         "accounting_status_counts": _accounting_status_counts(wrapper),
         "evidence_accounts": _evidence_accounts(wrapper),
         "reviewability_gates": gates,
-        "issues": _issues(files, gates),
+        "phase1_acceptance_status": phase1["status"],
+        "phase1_acceptance_gates": phase1["gates"],
+        "phase1_acceptance_counts": phase1["counts"],
+        "phase1_acceptance_issues": phase1["issues"],
+        "issues": _issues(files, gates) + list(phase1["issues"]),
         "claim_policy": {
             "read_only_audit": True,
             "checks_real_bundle_ledger_package": True,
             "full_reality_row_ledger_is_authoritative": True,
             "static_scene_evidence_is_separate_from_state_variable_evidence": True,
             "evidence_incomplete_is_not_model_fail": True,
+            "phase1_acceptance_is_evidence_system_not_metric_pass": True,
             "does_not_claim_metric_pass": True,
             "does_not_claim_world_model": True,
         },
@@ -147,6 +155,33 @@ def validate_objectstate_real_evidence_bundle_ledger_package_audit(
     )
     if payload["status"] != expected_status:
         raise ValueError("real evidence bundle ledger package audit status mismatch")
+    phase1_status = payload.get("phase1_acceptance_status")
+    phase1_gates = payload.get("phase1_acceptance_gates")
+    if not isinstance(phase1_gates, Mapping) or not phase1_gates:
+        raise ValueError("real evidence bundle ledger package audit requires phase1 gates")
+    if any(not isinstance(value, bool) for value in phase1_gates.values()):
+        raise ValueError("real evidence bundle ledger package audit phase1 gates must be bool")
+    expected_phase1_status = (
+        "objectstate_phase1_evidence_system_acceptance_pass"
+        if all(phase1_gates.values())
+        else "objectstate_phase1_evidence_system_acceptance_incomplete"
+    )
+    if phase1_status != expected_phase1_status:
+        raise ValueError(
+            "real evidence bundle ledger package audit phase1 status mismatch"
+        )
+    phase1_counts = payload.get("phase1_acceptance_counts")
+    if not isinstance(phase1_counts, Mapping) or not phase1_counts:
+        raise ValueError("real evidence bundle ledger package audit requires phase1 counts")
+    if any(not isinstance(value, int) or value < 0 for value in phase1_counts.values()):
+        raise ValueError(
+            "real evidence bundle ledger package audit phase1 counts must be non-negative ints"
+        )
+    phase1_issues = payload.get("phase1_acceptance_issues")
+    if not isinstance(phase1_issues, list) or any(
+        not isinstance(issue, str) for issue in phase1_issues
+    ):
+        raise ValueError("real evidence bundle ledger package audit phase1 issues invalid")
     claim_policy = payload.get("claim_policy", {})
     if (
         not claim_policy.get("read_only_audit")
@@ -156,6 +191,9 @@ def validate_objectstate_real_evidence_bundle_ledger_package_audit(
             "static_scene_evidence_is_separate_from_state_variable_evidence"
         )
         or not claim_policy.get("evidence_incomplete_is_not_model_fail")
+        or not claim_policy.get(
+            "phase1_acceptance_is_evidence_system_not_metric_pass"
+        )
         or not claim_policy.get("does_not_claim_metric_pass")
         or not claim_policy.get("does_not_claim_world_model")
     ):
@@ -282,6 +320,184 @@ def _reviewability_gates(
             if record["kind"] == "markdown" and record["required"]
         ),
     }
+
+
+def _phase1_acceptance(
+    wrapper: Any,
+    ledger: Any,
+    payloads: Mapping[str, Any],
+    reviewability_gates: Mapping[str, bool],
+) -> dict[str, Any]:
+    counts = _phase1_counts(wrapper, ledger, payloads)
+    gates = {
+        "package_reviewability_gates_pass": all(reviewability_gates.values()),
+        "controlled_or_public_real_bundle_loaded": (
+            counts["controlled_public_bundle_count"] >= 1
+        ),
+        "identity_rows_enter_accounting": counts["identity_accounting_row_count"] >= 1,
+        "prediction_rows_enter_accounting": (
+            counts["prediction_accounting_row_count"] >= 1
+        ),
+        "intervention_rows_enter_accounting": (
+            counts["intervention_accounting_row_count"] >= 1
+        ),
+        "evaluable_real_accounting_rows_present": counts["pass_fail_row_count"] >= 1,
+        "missing_gt_accounting_is_separate_from_fail": (
+            _missing_gt_accounting_is_separate_from_fail(wrapper, ledger)
+        ),
+        "synthetic_and_real_gate_split": _synthetic_and_real_gate_split(
+            wrapper,
+            ledger,
+        ),
+        "static_scene_and_state_variable_evidence_split": _evidence_split_preserved(
+            wrapper
+        ),
+    }
+    issues = [
+        f"phase1 acceptance gate failed: {gate}"
+        for gate, passed in gates.items()
+        if not passed
+    ]
+    return {
+        "status": (
+            "objectstate_phase1_evidence_system_acceptance_pass"
+            if all(gates.values())
+            else "objectstate_phase1_evidence_system_acceptance_incomplete"
+        ),
+        "gates": gates,
+        "counts": counts,
+        "issues": issues,
+    }
+
+
+def _phase1_counts(
+    wrapper: Any,
+    ledger: Any,
+    payloads: Mapping[str, Any],
+) -> dict[str, int]:
+    accounting = _accounting_status_counts(wrapper)
+    row_counts = _row_counts(wrapper, ledger)
+    source_kind_counts = _phase1_bundle_source_kind_counts(wrapper, payloads)
+    controlled_public_bundle_count = sum(
+        source_kind_counts.get(source_kind, 0)
+        for source_kind in _CONTROLLED_OR_PUBLIC_SOURCE_KINDS
+    )
+    return {
+        "bundle_count": int(wrapper.get("bundle_count", 0))
+        if isinstance(wrapper, Mapping)
+        else 0,
+        "controlled_public_bundle_count": controlled_public_bundle_count,
+        "identity_accounting_row_count": _accounting_total(accounting, "identity"),
+        "prediction_accounting_row_count": _accounting_total(accounting, "prediction"),
+        "intervention_accounting_row_count": _accounting_total(
+            accounting,
+            "intervention",
+        ),
+        "pass_row_count": int(row_counts.get("pass_row_count", 0)),
+        "fail_row_count": int(row_counts.get("fail_row_count", 0)),
+        "pass_fail_row_count": int(row_counts.get("pass_row_count", 0))
+        + int(row_counts.get("fail_row_count", 0)),
+        "evidence_incomplete_row_count": int(
+            row_counts.get("evidence_incomplete_row_count", 0)
+        ),
+        "unsupported_row_count": int(row_counts.get("unsupported_row_count", 0)),
+        "static_scene_available_bundle_count": int(
+            _evidence_accounts(wrapper)
+            .get("static_scene_evidence", {})
+            .get("available_bundle_count", 0)
+        ),
+        "state_variable_ready_bundle_count": int(
+            _evidence_accounts(wrapper)
+            .get("state_variable_evidence", {})
+            .get("ready_bundle_count", 0)
+        ),
+        "state_variable_intervention_ready_bundle_count": int(
+            _evidence_accounts(wrapper)
+            .get("state_variable_evidence", {})
+            .get("intervention_ready_bundle_count", 0)
+        ),
+    }
+
+
+def _phase1_bundle_source_kind_counts(
+    wrapper: Any,
+    payloads: Mapping[str, Any],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if not isinstance(wrapper, Mapping):
+        return counts
+    for index, record in enumerate(wrapper.get("records", [])):
+        if not isinstance(record, Mapping):
+            continue
+        bundle_summary = payloads.get(f"record_{index:03d}_bundle_summary")
+        source_kind = None
+        if isinstance(bundle_summary, Mapping):
+            sample = bundle_summary.get("sample", {})
+            if isinstance(sample, Mapping):
+                source_kind = sample.get("source_kind")
+        if not isinstance(source_kind, str) or not source_kind:
+            source_kind = record.get("source_kind")
+        if isinstance(source_kind, str) and source_kind:
+            counts[source_kind] = counts.get(source_kind, 0) + 1
+    return counts
+
+
+def _accounting_total(accounting: Mapping[str, Any], evidence_kind: str) -> int:
+    counts = accounting.get(evidence_kind, {})
+    if not isinstance(counts, Mapping):
+        return 0
+    return sum(int(counts.get(status, 0)) for status in _ACCOUNTING_STATUSES)
+
+
+def _accounting_count(
+    accounting: Mapping[str, Any],
+    evidence_kind: str,
+    status: str,
+) -> int:
+    counts = accounting.get(evidence_kind, {})
+    if not isinstance(counts, Mapping):
+        return 0
+    return int(counts.get(status, 0))
+
+
+def _missing_gt_accounting_is_separate_from_fail(wrapper: Any, ledger: Any) -> bool:
+    if not isinstance(wrapper, Mapping):
+        return False
+    accounting = _accounting_status_counts(wrapper)
+    row_counts = _row_counts(wrapper, ledger)
+    return (
+        int(row_counts.get("fail_row_count", 0))
+        == _accounting_count(accounting, "all", "fail")
+        and int(row_counts.get("evidence_incomplete_row_count", 0))
+        == _accounting_count(accounting, "all", "evidence_incomplete")
+        and int(row_counts.get("unsupported_row_count", 0))
+        == _accounting_count(accounting, "all", "unsupported")
+        and bool(
+            wrapper.get("claim_policy", {}).get("evidence_incomplete_is_not_model_fail")
+        )
+    )
+
+
+def _synthetic_and_real_gate_split(wrapper: Any, ledger: Any) -> bool:
+    if not isinstance(wrapper, Mapping) or not isinstance(ledger, Mapping):
+        return False
+    gate = ledger.get("gate", {})
+    gate_claim = gate.get("claim_policy", {}) if isinstance(gate, Mapping) else {}
+    ledger_claim = ledger.get("claim_policy", {})
+    wrapper_claim = wrapper.get("claim_policy", {})
+    source_counts = ledger.get("row_counts", {}).get("by_source_kind", {})
+    controlled_public_rows = 0
+    if isinstance(source_counts, Mapping):
+        controlled_public_rows = sum(
+            int(source_counts.get(source_kind, 0))
+            for source_kind in _CONTROLLED_OR_PUBLIC_SOURCE_KINDS
+        )
+    return (
+        controlled_public_rows >= 1
+        and bool(wrapper_claim.get("full_reality_row_ledger_is_authoritative"))
+        and bool(ledger_claim.get("full_gate_status_is_authoritative"))
+        and bool(gate_claim.get("synthetic_smoke_is_prerequisite_not_reality_proof"))
+    )
 
 
 def _json_file_record(

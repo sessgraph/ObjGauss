@@ -283,6 +283,26 @@ def test_real_evidence_bundle_ledger_keeps_incomplete_and_unsupported_counts(
     assert package["accounting_status_counts"] == summary["accounting_status_counts"]
     assert package["row_counts"]["evidence_incomplete_row_count"] == 2
     assert package["row_counts"]["unsupported_row_count"] == 1
+    assert package["phase1_acceptance_status"] == (
+        "objectstate_phase1_evidence_system_acceptance_incomplete"
+    )
+    assert package["phase1_acceptance_gates"][
+        "controlled_or_public_real_bundle_loaded"
+    ] is True
+    assert package["phase1_acceptance_gates"]["identity_rows_enter_accounting"] is True
+    assert package["phase1_acceptance_gates"]["prediction_rows_enter_accounting"] is True
+    assert package["phase1_acceptance_gates"][
+        "intervention_rows_enter_accounting"
+    ] is True
+    assert package["phase1_acceptance_gates"][
+        "missing_gt_accounting_is_separate_from_fail"
+    ] is True
+    assert package["phase1_acceptance_gates"][
+        "evaluable_real_accounting_rows_present"
+    ] is False
+    assert "phase1 acceptance gate failed: evaluable_real_accounting_rows_present" in (
+        package["phase1_acceptance_issues"]
+    )
     assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
 
 
@@ -366,6 +386,25 @@ def test_real_evidence_bundle_ledger_package_audit_is_reviewable(tmp_path):
         "available_bundle_count": 1,
         "usable_for_state_variable_gate": False,
     }
+    assert summary["phase1_acceptance_status"] == (
+        "objectstate_phase1_evidence_system_acceptance_pass"
+    )
+    assert all(summary["phase1_acceptance_gates"].values())
+    assert summary["phase1_acceptance_counts"] == {
+        "bundle_count": 1,
+        "controlled_public_bundle_count": 1,
+        "identity_accounting_row_count": 1,
+        "prediction_accounting_row_count": 1,
+        "intervention_accounting_row_count": 1,
+        "pass_row_count": 3,
+        "fail_row_count": 0,
+        "pass_fail_row_count": 3,
+        "evidence_incomplete_row_count": 0,
+        "unsupported_row_count": 0,
+        "static_scene_available_bundle_count": 1,
+        "state_variable_ready_bundle_count": 1,
+        "state_variable_intervention_ready_bundle_count": 1,
+    }
     assert summary["claim_policy"]["full_reality_row_ledger_is_authoritative"] is True
     assert validate_objectstate_real_evidence_bundle_ledger_package_audit(summary) == (
         summary
@@ -414,6 +453,7 @@ def test_real_evidence_bundle_ledger_package_audit_cli(tmp_path, capsys):
                 "--summary-output",
                 str(audit_path),
                 "--require-reviewable",
+                "--require-phase1-acceptance",
             ]
         )
         == 0
@@ -427,9 +467,15 @@ def test_real_evidence_bundle_ledger_package_audit_cli(tmp_path, capsys):
         in stdout
     )
     assert "status=objectstate_real_evidence_bundle_ledger_package_audit_reviewable" in stdout
+    assert (
+        "phase1_acceptance_status="
+        "objectstate_phase1_evidence_system_acceptance_pass"
+    ) in stdout
     assert "evidence_incomplete_row_count=0" in stdout
     assert "unsupported_row_count=0" in stdout
     assert "reviewability.wrapper_embedded_ledger_matches_file=true" in stdout
+    assert "phase1.controlled_or_public_real_bundle_loaded=true" in stdout
+    assert "phase1.static_scene_and_state_variable_evidence_split=true" in stdout
     assert summary["status"] == (
         "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
     )

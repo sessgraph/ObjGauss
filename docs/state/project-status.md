@@ -4475,7 +4475,13 @@ npm run acceptance:demo
    已新增 `audit-real-evidence-bundle-ledger-package`，可对 handoff output root 做只读
    reviewability audit：检查 wrapper、standalone `reality-row-ledger.json`、per-bundle
    summaries、blocked rows、state-variable evidence matrix、next actions、row counts 和
-   static/state evidence 分账一致性。
+   static/state evidence 分账一致性。`OBJECTSTATE-REAL-BUNDLE-LEDGER-PHASE1-ACCEPTANCE-001`
+   继续把目标文件第 7 节的 Phase 1 通过条件做成 package audit 的
+   `phase1_acceptance_*` 输出：package reviewability、至少一个 controlled/public
+   real bundle loaded、三类 row 进入 accounting、至少一个可评估 pass/fail row、缺 GT 的
+   `evidence_incomplete` / `unsupported` 不混成 fail、synthetic / real gate 分账和
+   static scene / state-variable evidence 分账。该 status 只表示证据系统 acceptance，
+   不声明 metric pass 或 world-model proof。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck`、`garden`、
    `bicycle`、`stump`、`treehill` 或 GraphDECO / Inria official large results；

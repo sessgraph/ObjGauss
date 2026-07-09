@@ -395,6 +395,42 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-REAL-BUNDLE-LEDGER-PHASE1-ACCEPTANCE-001: Audit Phase 1 real evidence-system acceptance
+
+- 状态: done / real-evidence-bundle-ledger-phase1-acceptance
+- 类型: 标准 PR / ObjectState Phase 1 real evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把目标文件第 7 节的 Phase 1 证据系统通过条件变成
+  `audit-real-evidence-bundle-ledger-package` 的机器可读 gates，避免 package
+  reviewable 被误读成真实证据系统已经闭环。
+- 已实施:
+  - `objgauss-objectstate-real-evidence-bundle-ledger-package-audit-v1` 新增
+    `phase1_acceptance_status`、`phase1_acceptance_gates`、
+    `phase1_acceptance_counts` 和 `phase1_acceptance_issues`。
+  - Phase 1 gates 覆盖 package reviewability、controlled/public real bundle loaded、
+    identity / prediction / intervention accounting rows present、至少一个可评估
+    pass/fail row、`evidence_incomplete` / `unsupported` 不混成 fail、synthetic /
+    real gate 分账和 static scene / state-variable evidence 分账。
+  - CLI `audit-real-evidence-bundle-ledger-package` 输出 `phase1.*` gates，并新增
+    `--require-phase1-acceptance`。
+  - 测试覆盖完整 pass bundle 和全 `evidence_incomplete` / `unsupported` bundle：
+    后者会显示三类 row 已进入 accounting，但因没有可评估 pass/fail row 保持
+    `objectstate_phase1_evidence_system_acceptance_incomplete`。
+- 边界:
+  - 不改变原有 package `status` 的含义；它仍只表示 reviewability。
+  - Phase 1 acceptance 是证据系统 gate，不声明 metric pass、reality gate pass 或
+    world-model proof。
+  - 不采集 GT、不运行 identity / prediction / intervention eval、不训练模型。
+  - 不修改 viewer/export 默认，不下载或提交数据资产。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_real_evidence_bundle_ledger_audit.py objgauss/cli.py tests/test_objectstate_reality_row_ledger.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_reality_row_ledger.py tests/test_core_namespace.py -q`: 18 passed。
+  - `uv run --extra dev pytest`: 600 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-REAL-BUNDLE-LEDGER-ACCOUNTING-STATUS-001: Roll up real accounting status counts
 
 - 状态: done / real-evidence-bundle-ledger-accounting-status

@@ -450,3 +450,15 @@ wrapper 与 standalone ledger 分叉时被误认为可审的风险。风险继�
 不运行模型 eval、不生成真实 pass row、不训练 dynamics，也不声明 counterfactual proof 或
 world-model evidence；关闭条件仍是真实 controlled/public bundle 产物跑出可审计 full Phase 1
 ledger。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-LEDGER-PHASE1-ACCEPTANCE-001`
+扩展 `audit-real-evidence-bundle-ledger-package`，新增
+`phase1_acceptance_status`、`phase1_acceptance_gates`、`phase1_acceptance_counts`
+和 `phase1_acceptance_issues`，把 Phase 1 证据系统闭环条件显式编码为：
+package reviewability、controlled/public real bundle loaded、identity / prediction /
+intervention rows 进入 accounting、至少一个可评估 pass/fail row、
+`evidence_incomplete` / `unsupported` 不混成 fail、synthetic / real gate 分账以及
+static scene / state-variable evidence 分账。该缓解
+防止 reviewable package 被误读为 Phase 1 已闭环，也防止全缺 GT 的 bundle 被伪装成通过；
+风险继续 open，因为它仍不采集 GT、不运行模型 eval、不训练 dynamics、不创建新的真实 pass row，
+也不声明 metric pass、counterfactual proof 或 world-model evidence。
