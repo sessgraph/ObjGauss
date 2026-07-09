@@ -242,6 +242,9 @@ from objgauss.core.objectstate_real_intervention_rows import (
 from objgauss.core.objectstate_real_evidence_bundle_ledger import (
     write_objectstate_real_evidence_bundle_ledger,
 )
+from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+    objectstate_real_evidence_bundle_ledger_package_audit,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -5258,6 +5261,38 @@ def _object_state_audit_real_evidence_bundle_ledger(args: argparse.Namespace) ->
         and (gate is None or gate["status"] != "objectstate_reality_gate_pass")
     ):
         raise ValueError("real evidence bundle ledger full gate did not pass")
+
+
+def _object_state_audit_real_evidence_bundle_ledger_package(
+    args: argparse.Namespace,
+) -> None:
+    summary = objectstate_real_evidence_bundle_ledger_package_audit(
+        args.package_root,
+        wrapper_file=args.wrapper_file,
+    )
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"package_root={summary['package_root']}")
+    print(f"bundle_count={summary['bundle_count']}")
+    print(f"row_summary_count={summary['row_summary_count']}")
+    counts = summary["row_counts"]
+    print(f"row_count={counts['row_count']}")
+    print(f"pass_row_count={counts['pass_row_count']}")
+    print(f"fail_row_count={counts['fail_row_count']}")
+    print(f"blocked_row_count={counts['blocked_row_count']}")
+    for gate, passed in summary["reviewability_gates"].items():
+        print(f"reviewability.{gate}={str(passed).lower()}")
+    for issue in summary["issues"]:
+        print(f"issue={issue}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_reviewable
+        and summary["status"]
+        != "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
+    ):
+        raise ValueError("real evidence bundle ledger package is not reviewable")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -11383,6 +11418,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     audit_real_bundle_ledger.set_defaults(
         handler=_object_state_audit_real_evidence_bundle_ledger
+    )
+    audit_real_bundle_ledger_package = object_state_subparsers.add_parser(
+        "audit-real-evidence-bundle-ledger-package",
+        help=(
+            "read-only audit for outputs from audit-real-evidence-bundle-ledger"
+        ),
+    )
+    audit_real_bundle_ledger_package.add_argument("package_root", type=Path)
+    audit_real_bundle_ledger_package.add_argument(
+        "--wrapper-file",
+        default="real-evidence-bundle-ledger.json",
+        help="bundle ledger wrapper JSON path relative to package root",
+    )
+    audit_real_bundle_ledger_package.add_argument("--summary-output", type=Path)
+    audit_real_bundle_ledger_package.add_argument(
+        "--require-reviewable",
+        action="store_true",
+        help="fail unless all package reviewability gates pass",
+    )
+    audit_real_bundle_ledger_package.set_defaults(
+        handler=_object_state_audit_real_evidence_bundle_ledger_package
     )
     compile_objectstate_transitions = object_state_subparsers.add_parser(
         "compile-objectstate-transitions",

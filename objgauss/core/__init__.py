@@ -994,6 +994,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_real_evidence_bundle_ledger",
         "validate_objectstate_real_evidence_bundle_ledger_summary",
     ),
+    "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA",
+    ),
+    "objectstate_real_evidence_bundle_ledger_package_audit": (
+        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "objectstate_real_evidence_bundle_ledger_package_audit",
+    ),
+    "validate_objectstate_real_evidence_bundle_ledger_package_audit": (
+        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "validate_objectstate_real_evidence_bundle_ledger_package_audit",
+    ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "validate_objectstate_bop_cross_sample_ledger_summary",

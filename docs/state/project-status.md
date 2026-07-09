@@ -4456,7 +4456,11 @@ npm run acceptance:demo
    一条命令写出 bundle summary、三类 real row summary、full reality ledger、blocked rows、
    state-variable evidence matrix 和 next actions；full `reality-row-ledger` 仍是 pass /
    fail / blocked 的权威输出。下一步应让真实 controlled/public bundle 产物进入这条
-   handoff，而不是继续新增大模型。
+   handoff，而不是继续新增大模型。`OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001`
+   已新增 `audit-real-evidence-bundle-ledger-package`，可对 handoff output root 做只读
+   reviewability audit：检查 wrapper、standalone `reality-row-ledger.json`、per-bundle
+   summaries、blocked rows、state-variable evidence matrix、next actions、row counts 和
+   static/state evidence 分账一致性。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；`cakewalk-room-3dgs-local`、`cakewalk-train-3dgs-local` 和

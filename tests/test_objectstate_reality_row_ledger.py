@@ -15,6 +15,11 @@ from objgauss.core.objectstate_real_evidence_bundle_ledger import (
     validate_objectstate_real_evidence_bundle_ledger_summary,
     write_objectstate_real_evidence_bundle_ledger,
 )
+from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+    OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA,
+    objectstate_real_evidence_bundle_ledger_package_audit,
+    validate_objectstate_real_evidence_bundle_ledger_package_audit,
+)
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
@@ -263,6 +268,106 @@ def test_real_evidence_bundle_ledger_cli_writes_full_ledger_outputs(tmp_path, ca
     assert (output_root / "state-variable-evidence-matrix.md").exists()
     assert (output_root / "reality-row-ledger-next-actions.md").exists()
     assert validate_objectstate_real_evidence_bundle_ledger_summary(summary) == summary
+
+
+def test_real_evidence_bundle_ledger_package_audit_is_reviewable(tmp_path):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    _write_json(bundle_path, _real_evidence_bundle())
+    write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=output_root,
+    )
+
+    summary = objectstate_real_evidence_bundle_ledger_package_audit(output_root)
+
+    assert (
+        summary["schema"]
+        == OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA
+    )
+    assert summary["status"] == (
+        "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
+    )
+    assert all(summary["reviewability_gates"].values())
+    assert summary["sample_ids"] == ["controlled-tabletop-cup-001"]
+    assert summary["row_counts"] == {
+        "row_count": 3,
+        "pass_row_count": 3,
+        "fail_row_count": 0,
+        "blocked_row_count": 0,
+    }
+    assert summary["evidence_accounts"]["static_scene_evidence"] == {
+        "available_bundle_count": 1,
+        "usable_for_state_variable_gate": False,
+    }
+    assert summary["claim_policy"]["full_reality_row_ledger_is_authoritative"] is True
+    assert validate_objectstate_real_evidence_bundle_ledger_package_audit(summary) == (
+        summary
+    )
+
+
+def test_real_evidence_bundle_ledger_package_audit_reports_missing_output(tmp_path):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    _write_json(bundle_path, _real_evidence_bundle())
+    write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=output_root,
+    )
+    (output_root / "state-variable-evidence-matrix.md").unlink()
+
+    summary = objectstate_real_evidence_bundle_ledger_package_audit(output_root)
+
+    assert summary["status"] == (
+        "objectstate_real_evidence_bundle_ledger_package_audit_incomplete"
+    )
+    assert summary["reviewability_gates"]["required_files_present"] is False
+    assert summary["reviewability_gates"]["markdown_outputs_present"] is False
+    assert any(
+        "state_variable_evidence_matrix_markdown" in issue
+        for issue in summary["issues"]
+    )
+
+
+def test_real_evidence_bundle_ledger_package_audit_cli(tmp_path, capsys):
+    bundle_path = tmp_path / "real-evidence-bundle.json"
+    output_root = tmp_path / "phase1-ledger"
+    audit_path = tmp_path / "package-audit.json"
+    _write_json(bundle_path, _real_evidence_bundle())
+    write_objectstate_real_evidence_bundle_ledger(
+        (bundle_path,),
+        output_root=output_root,
+    )
+
+    assert (
+        main(
+            [
+                "object-state",
+                "audit-real-evidence-bundle-ledger-package",
+                str(output_root),
+                "--summary-output",
+                str(audit_path),
+                "--require-reviewable",
+            ]
+        )
+        == 0
+    )
+
+    stdout = capsys.readouterr().out
+    summary = _read_json(audit_path)
+
+    assert (
+        f"schema={OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA}"
+        in stdout
+    )
+    assert "status=objectstate_real_evidence_bundle_ledger_package_audit_reviewable" in stdout
+    assert "reviewability.wrapper_embedded_ledger_matches_file=true" in stdout
+    assert summary["status"] == (
+        "objectstate_real_evidence_bundle_ledger_package_audit_reviewable"
+    )
+    assert validate_objectstate_real_evidence_bundle_ledger_package_audit(summary) == (
+        summary
+    )
 
 
 def test_reality_row_ledger_cli_writes_summary_and_blocked_rows(tmp_path, capsys):

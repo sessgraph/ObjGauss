@@ -419,3 +419,14 @@ actions。该缓解减少真实证据包进入 Phase 1 总表时的手工串命�
 失败。风险继续 open，因为它仍不采集 GT、不运行模型 eval、不生成真实 pass row、不训练
 dynamics，也不声明 counterfactual proof 或 world-model evidence；关闭条件仍是真实
 controlled/public bundle 产物跑出可审计 full Phase 1 ledger。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001`
+新增 `audit-real-evidence-bundle-ledger-package` 和
+`objgauss-objectstate-real-evidence-bundle-ledger-package-audit-v1`，对 bundle-ledger output
+root 做只读 reviewability audit：检查 wrapper、standalone `reality-row-ledger.json`、
+per-bundle summaries、Markdown outputs、row counts、sample ids、static/state evidence
+分账和 `full_reality_row_ledger_is_authoritative` claim。该缓解降低 handoff 产物缺文件或
+wrapper 与 standalone ledger 分叉时被误认为可审的风险。风险继续 open，因为它仍不采集 GT、
+不运行模型 eval、不生成真实 pass row、不训练 dynamics，也不声明 counterfactual proof 或
+world-model evidence；关闭条件仍是真实 controlled/public bundle 产物跑出可审计 full Phase 1
+ledger。

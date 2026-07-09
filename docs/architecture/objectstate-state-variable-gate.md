@@ -854,6 +854,37 @@ Implemented v0.1 facts:
   model evaluators, reconstruct Gaussians, train dynamics, use replay /
   diffusion or mutate viewer defaults.
 
+### OBJECTSTATE-REAL-BUNDLE-LEDGER-PACKAGE-AUDIT-001
+
+Audit the output directory produced by
+`audit-real-evidence-bundle-ledger` without regenerating evidence.
+
+Required behavior:
+
+- Check that `real-evidence-bundle-ledger.json`,
+  `reality-row-ledger.json`, blocked rows Markdown, state-variable evidence
+  matrix and next-actions Markdown are present.
+- Check every per-bundle `real-evidence-bundle-summary.json`,
+  `real-identity-rows-summary.json`, `real-prediction-rows-summary.json` and
+  `real-intervention-rows-summary.json`.
+- Re-run all relevant schema validators.
+- Verify the wrapper's embedded full ledger matches the standalone
+  `reality-row-ledger.json`.
+- Verify wrapper row counts match the full reality row ledger.
+- Preserve `static_scene_evidence` / `state_variable_evidence` separation and
+  the claim that the full reality row ledger remains authoritative.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_evidence_bundle_ledger_audit`.
+- Audit schema:
+  `objgauss-objectstate-real-evidence-bundle-ledger-package-audit-v1`.
+- CLI:
+  `objgauss object-state audit-real-evidence-bundle-ledger-package`.
+- The audit is read-only. It does not author GT, regenerate row summaries, run
+  model evaluators, reconstruct Gaussians, train dynamics, use replay /
+  diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows
