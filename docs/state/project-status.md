@@ -216,6 +216,24 @@ training-allowed inference-time source split 而 blocked。只有显式 `dino_v2
 默认，也不声明真实 gate 或 world model；下一步才允许进入
 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001`。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001`：新增
+`docs/architecture/objectstate-assignment-long-smoke-contract.md` 和
+`objgauss.core.objectstate_assignment_long_smoke_contract`，冻结 semantic-policy bounded
+long smoke 的准入和退出条件。新增 schema：
+`objgauss-objectstate-assignment-long-smoke-contract-v1` 和
+`objgauss-objectstate-assignment-long-smoke-contract-summary-v1`。合同只允许
+`policy=semantic`，要求 `duration <= 10 minutes`、fixed seed、checkpoint roundtrip、
+before/after identity benchmark 和 held-out generalization evidence，并继续禁止 native
+Gaussian-only policy、renderer loss、temporal loss、dynamics、diffusion 和 replay buffer。
+成功标准不是 train loss 降低，而是 held-out `identity_retrieval_at_1` 不下降、
+`identity_margin` 提升、`occlusion_recovery` 不下降、generalization gap 不扩大、
+`slot_swap_rate` 可解释且 checkpoint roundtrip 通过。Contract summary 在没有通过
+`OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` 且
+`semantic_teacher_evidence_training_allowed=true` 的证据时保持 blocked；synthetic report
+one-hot semantic fixture 仍不能默认清 gate。该切片不训练、不跑 long smoke、不运行
+teacher 模型、不下载权重、不使用 GPU / torch / CUDA、不修改 viewer/export 默认，也不声明
+真实 gate 或 world model；下一步才是 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001`。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

@@ -395,6 +395,49 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001: Freeze semantic bounded long-smoke gate
+
+- 状态: done / objectstate-assignment-long-smoke-contract
+- 类型: 标准 PR / ObjectState assignment long-smoke contract
+- 架构规格:
+  - `docs/architecture/objectstate-assignment-long-smoke-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在实际 semantic-policy long smoke 前冻结准入、硬限制、输出 artifact 和成功标准，
+  避免把 loss decrease 或 native Gaussian policy 误当成长训许可。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_long_smoke_contract`。
+  - 新增 schema
+    `objgauss-objectstate-assignment-long-smoke-contract-v1` 和
+    `objgauss-objectstate-assignment-long-smoke-contract-summary-v1`。
+  - 新增 `ObjectStateAssignmentLongSmokeContractThresholds`、
+    `objectstate_assignment_long_smoke_contract_summary(...)` 和
+    `validate_objectstate_assignment_long_smoke_contract_summary(...)`。
+  - Contract 只允许 `policy=semantic`，native `xyz/rgb/opacity` policy 继续 blocked。
+  - Contract readiness 要求 passed teacher evidence leakage audit，并且
+    `semantic_teacher_evidence_training_allowed=true`。
+  - 硬限制为 `duration <= 10 minutes`、fixed seed、checkpoint roundtrip、
+    before/after identity benchmark 和 held-out generalization evidence。
+  - 禁止 renderer loss、temporal loss、dynamics、diffusion、replay buffer、native
+    Gaussian-only policy 和 viewer/export 默认改动。
+  - 成功标准冻结为 held-out retrieval 不下降、identity margin 提升、occlusion recovery
+    不下降、generalization gap 不扩大、slot swap rate 可解释、checkpoint roundtrip 通过。
+  - 没有 leakage audit 或默认 synthetic one-hot semantic fixture 时，summary 合法但
+    readiness blocked；带通过 source-split audit 的 inference-time teacher evidence 时，
+    readiness 才指向 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001`。
+- 边界:
+  - 不运行 long smoke，不训练模型，不创建 checkpoint / run outputs。
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不使用 GPU / torch / CUDA，不启用 temporal / matching / renderer loss。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明真实 identity /
+    prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_long_smoke_contract.py tests/test_core_namespace.py -q`: passed，12 tests。
+  - `uv run --extra dev pytest`: passed，635 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001: Audit semantic teacher evidence leakage
 
 - 状态: done / objectstate-teacher-evidence-leakage-audit

@@ -134,6 +134,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_teacher_evidence_leakage_audit",
         "TeacherEvidenceLeakageAuditThresholds",
     ),
+    "ObjectStateAssignmentLongSmokeContractThresholds": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "ObjectStateAssignmentLongSmokeContractThresholds",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -918,6 +922,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_teacher_evidence_leakage_audit",
         "objectstate_teacher_evidence_leakage_audit_summary",
     ),
+    "objectstate_assignment_long_smoke_contract_summary": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objectstate_assignment_long_smoke_contract_summary",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -957,6 +965,10 @@ _EXPORTS = {
     "validate_objectstate_teacher_evidence_leakage_audit_summary": (
         "objgauss.core.objectstate_teacher_evidence_leakage_audit",
         "validate_objectstate_teacher_evidence_leakage_audit_summary",
+    ),
+    "validate_objectstate_assignment_long_smoke_contract_summary": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "validate_objectstate_assignment_long_smoke_contract_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
@@ -1257,6 +1269,22 @@ _EXPORTS = {
     "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS": (
         "objgauss.core.objectstate_teacher_evidence_leakage_audit",
         "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SCHEMA": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SCHEMA",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_REQUIRED_POLICY": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_REQUIRED_POLICY",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA": (
+        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA",
     ),
     "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
         "objgauss.core.objectstate_assignment_mvp",

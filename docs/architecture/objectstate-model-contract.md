@@ -7,6 +7,7 @@
 > - `docs/architecture/assignment-solver-v2-contract.md`
 > - `docs/architecture/objectstate-state-variable-gate.md`
 > - `docs/architecture/objectstate-teacher-evidence-contract.md`
+> - `docs/architecture/objectstate-assignment-long-smoke-contract.md`
 > - `docs/dataset/controlled-reality-contract.md`
 
 ## Purpose
@@ -517,6 +518,45 @@ Implemented v0.1 facts:
 - This audit does not run teacher models, download weights, train
   `AssignmentSolverV2`, run long smoke, add renderer / temporal loss, change
   viewer defaults, claim real-data gates or unlock world-model training.
+
+### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001
+
+Implemented v0.1 facts:
+
+- Architecture spec:
+  `docs/architecture/objectstate-assignment-long-smoke-contract.md`.
+- Core module:
+  `objgauss.core.objectstate_assignment_long_smoke_contract`.
+- Contract schema:
+  `objgauss-objectstate-assignment-long-smoke-contract-v1`.
+- Contract summary schema:
+  `objgauss-objectstate-assignment-long-smoke-contract-summary-v1`.
+- Public API:
+  `ObjectStateAssignmentLongSmokeContractThresholds`,
+  `objectstate_assignment_long_smoke_contract_summary(...)` and
+  `validate_objectstate_assignment_long_smoke_contract_summary(...)`.
+- The contract is semantic-policy only. Native `xyz`, `rgb`, `xyz_rgb` and
+  `xyz_rgb_opacity` long training remain blocked.
+- The future long smoke is bounded to `duration <= 10 minutes`, fixed seed,
+  checkpoint roundtrip, before / after identity benchmark and held-out
+  generalization evidence.
+- Forbidden for the future long smoke: dynamics, diffusion, replay buffer,
+  renderer loss, temporal loss, native Gaussian-only policy and viewer/export
+  default changes.
+- Success criteria are not train-loss decrease. The required criteria are:
+  held-out `identity_retrieval_at_1` does not decrease, `identity_margin`
+  improves, `occlusion_recovery` does not decrease, generalization gap does
+  not expand, `slot_swap_rate` is interpretable and checkpoint roundtrip
+  passes.
+- Contract readiness requires a passed
+  `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` summary with
+  `semantic_teacher_evidence_training_allowed=true`.
+- Without that leakage audit evidence, the contract summary remains valid but
+  reports readiness blocked. The synthetic report one-hot semantic fixture does
+  not clear this gate by default.
+- This contract does not train `AssignmentSolverV2`, run long smoke, run
+  teacher models, download weights, add renderer / temporal loss, claim
+  real-data gates or unlock world-model training.
 
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
