@@ -4435,9 +4435,14 @@ npm run acceptance:demo
    `static_scene_evidence` 与 `state_variable_evidence` 分开。
    `OBJECTSTATE-REAL-IDENTITY-ROWS-001` 已把 bundle 内 `identity` accounting rows
    接入 identity-only reality gate：`pass` / `fail` 进入真实 row accounting，
-   `evidence_incomplete` / `unsupported` 映射为 blocked，不算模型失败。下一步应进入
-   `OBJECTSTATE-REAL-PREDICTION-ROWS-001`，把真实 pose transition / candidate
-   prediction rows 接进 pass / fail accounting，而不是继续新增大模型。
+   `evidence_incomplete` / `unsupported` 映射为 blocked，不算模型失败。
+   `OBJECTSTATE-REAL-PREDICTION-ROWS-001` 已把 bundle 内 `prediction` accounting rows
+   接入 prediction-only reality gate：`pass` / `fail` 必须引用同一对象的
+   `StateTransitionRow`，并保留 `state_ade` / `history_ade` /
+   `prediction_gap_vs_history_model` 和 `state_vs_history_error_ratio` 比较；
+   `evidence_incomplete` / `unsupported` 继续保持 blocked。下一步应进入
+   `OBJECTSTATE-REAL-INTERVENTION-ROWS-001`，把真实 action-conditioned rows 接进
+   pass / fail accounting，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，

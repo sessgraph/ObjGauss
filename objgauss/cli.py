@@ -233,6 +233,9 @@ from objgauss.core.objectstate_real_evidence_bundle import (
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
+from objgauss.core.objectstate_real_prediction_rows import (
+    objectstate_real_prediction_rows_summary,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -5101,6 +5104,56 @@ def _object_state_real_identity_rows(args: argparse.Namespace) -> None:
         and summary["status"] != "objectstate_real_identity_rows_pass"
     ):
         raise ValueError("real identity rows did not pass identity-only gate")
+
+
+def _object_state_real_prediction_rows(args: argparse.Namespace) -> None:
+    bundle = read_objectstate_real_evidence_bundle(args.bundle)
+    summary = objectstate_real_prediction_rows_summary(
+        bundle,
+        synthetic_smoke_passed=not args.synthetic_smoke_failed,
+        min_real_or_public_rows=args.min_real_or_public_rows,
+    )
+    counts = summary["row_counts"]
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle={args.bundle}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"prediction_rows={counts['prediction_rows']}")
+    print(f"prediction_pass_rows={counts['prediction_pass_rows']}")
+    print(f"prediction_fail_rows={counts['prediction_fail_rows']}")
+    print(f"prediction_blocked_rows={counts['prediction_blocked_rows']}")
+    print(f"pose_transition_coverage={float(metrics['pose_transition_coverage']):.6f}")
+    if summary["prediction_gate"] is not None:
+        print(f"prediction_gate_status={summary['prediction_gate']['status']}")
+        print(
+            "prediction_gate_hard_blockers="
+            f"{len(summary['prediction_gate']['hard_blockers'])}"
+        )
+    else:
+        print("prediction_gate_status=not_run")
+        print("prediction_gate_hard_blockers=0")
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.rows_output:
+        write_json(args.rows_output, summary["prediction_rows"])
+        print(f"prediction_rows_output={args.rows_output}")
+    if args.blocked_rows_output:
+        args.blocked_rows_output.parent.mkdir(parents=True, exist_ok=True)
+        args.blocked_rows_output.write_text(
+            summary["blocked_rows_markdown"],
+            encoding="utf-8",
+        )
+        print(f"blocked_rows_markdown={args.blocked_rows_output}")
+    if (
+        args.require_pass
+        and summary["status"] != "objectstate_real_prediction_rows_pass"
+    ):
+        raise ValueError("real prediction rows did not pass prediction-only gate")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -11142,6 +11195,29 @@ def _build_parser() -> argparse.ArgumentParser:
         help="fail unless the identity rows pass the identity-only reality gate",
     )
     real_identity_rows.set_defaults(handler=_object_state_real_identity_rows)
+    real_prediction_rows = object_state_subparsers.add_parser(
+        "real-prediction-rows",
+        help=(
+            "convert prediction accounting rows from a real evidence bundle "
+            "into prediction-only reality gate rows"
+        ),
+    )
+    real_prediction_rows.add_argument("bundle", type=Path)
+    real_prediction_rows.add_argument("--summary-output", type=Path)
+    real_prediction_rows.add_argument("--rows-output", type=Path)
+    real_prediction_rows.add_argument("--blocked-rows-output", type=Path)
+    real_prediction_rows.add_argument("--min-real-or-public-rows", type=int, default=1)
+    real_prediction_rows.add_argument(
+        "--synthetic-smoke-failed",
+        action="store_true",
+        help="mark synthetic smoke prerequisite as failed in the prediction-only gate",
+    )
+    real_prediction_rows.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="fail unless the prediction rows pass the prediction-only reality gate",
+    )
+    real_prediction_rows.set_defaults(handler=_object_state_real_prediction_rows)
     compile_objectstate_transitions = object_state_subparsers.add_parser(
         "compile-objectstate-transitions",
         help=(

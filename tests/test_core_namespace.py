@@ -148,6 +148,7 @@ from objgauss.core import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA,
     OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA,
+    OBJECTSTATE_REAL_PREDICTION_ROWS_SCHEMA,
     OBJECTSTATE_REALITY_EVIDENCE_KINDS,
     OBJECTSTATE_REALITY_GATE_SCHEMA,
     OBJECTSTATE_REALITY_ROW_SCHEMA,
@@ -272,6 +273,8 @@ from objgauss.core import (
     objectstate_real_evidence_bundle_summary,
     objectstate_real_identity_rows_from_bundle,
     objectstate_real_identity_rows_summary,
+    objectstate_real_prediction_rows_from_bundle,
+    objectstate_real_prediction_rows_summary,
     read_objectstate_real_evidence_bundle,
     objectstate_controlled_capture_summary,
     objectstate_controlled_capture_bundle_acceptance_summary,
@@ -412,6 +415,7 @@ from objgauss.core import (
     validate_objectstate_real_evidence_bundle,
     validate_objectstate_real_evidence_bundle_summary,
     validate_objectstate_real_identity_rows_summary,
+    validate_objectstate_real_prediction_rows_summary,
     validate_objectstate_reality_public_rows_summary,
     validate_objectstate_reality_row_ledger_summary,
     validate_objectstate_controlled_capture_manifest,
@@ -952,13 +956,19 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA == (
         "objgauss-objectstate-real-identity-rows-v1"
     )
+    assert OBJECTSTATE_REAL_PREDICTION_ROWS_SCHEMA == (
+        "objgauss-objectstate-real-prediction-rows-v1"
+    )
     assert objectstate_real_evidence_bundle_summary is not None
     assert objectstate_real_identity_rows_from_bundle is not None
     assert objectstate_real_identity_rows_summary is not None
+    assert objectstate_real_prediction_rows_from_bundle is not None
+    assert objectstate_real_prediction_rows_summary is not None
     assert read_objectstate_real_evidence_bundle is not None
     assert validate_objectstate_real_evidence_bundle is not None
     assert validate_objectstate_real_evidence_bundle_summary is not None
     assert validate_objectstate_real_identity_rows_summary is not None
+    assert validate_objectstate_real_prediction_rows_summary is not None
 
     assert OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-capture-manifest-v1"

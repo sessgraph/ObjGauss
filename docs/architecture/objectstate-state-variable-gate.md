@@ -700,6 +700,47 @@ Implemented v0.1 facts:
   create prediction / intervention rows, train dynamics, use replay / diffusion
   or mutate viewer defaults.
 
+### OBJECTSTATE-REAL-PREDICTION-ROWS-001
+
+Convert prediction accounting rows from a real evidence bundle into
+reality-gate prediction rows.
+
+Required behavior:
+
+- Read `GateAccountingRow` entries with `evidence_kind=prediction` from
+  `objgauss-objectstate-real-evidence-bundle-v1`.
+- Convert prediction `pass` / `fail` accounting into
+  `objgauss-objectstate-real-public-row-v1` rows with
+  `evidence_kind=prediction`.
+- Preserve `evidence_incomplete` and `unsupported` as blocked prediction rows,
+  not model failures.
+- Require prediction `pass` / `fail` rows to reference a known
+  `StateTransitionRow`; the accounting `object_id` must match the transition
+  object.
+- Require non-blocked prediction rows to carry timestamped pose GT and the
+  prediction metrics required by `OBJECTSTATE-REALITY-GATE-001`:
+  `state_ade`, `history_ade` and `prediction_gap_vs_history_model`.
+- Preserve history-baseline comparison by reporting
+  `state_vs_history_error_ratio` and `pose_transition_coverage`.
+- Run a prediction-only reality gate where identity and intervention pass rows
+  are explicitly out of scope.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_prediction_rows`.
+- Summary schema: `objgauss-objectstate-real-prediction-rows-v1`.
+- CLI:
+  `objgauss object-state real-prediction-rows`.
+- The summary embeds generated prediction rows, prediction-only reality gate
+  output, blocked rows Markdown, row counts, `pose_transition_coverage` and
+  mean state-vs-history metrics.
+- If `prediction_gap_vs_history_model` or `state_vs_history_error_ratio` is not
+  present but `state_ade` and `history_ade` are present, the converter derives
+  the missing comparison metric for accounting.
+- Current scope is prediction accounting only. It does not author GT, run a
+  prediction model, create identity / intervention rows, train dynamics, use
+  replay / diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows

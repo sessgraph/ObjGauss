@@ -370,3 +370,15 @@ R-017 update 2026-07-09: `OBJECTSTATE-REAL-IDENTITY-ROWS-001`
 identity accounting，不采集 GT、不运行模型 eval、不创建 prediction / intervention rows、
 不训练 dynamics、不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到
 真实 controlled/public prediction 和 intervention rows 也进入 pass / fail accounting。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-PREDICTION-ROWS-001`
+新增 `objgauss-objectstate-real-prediction-rows-v1` 和
+`real-prediction-rows` CLI，可把 real evidence bundle 中的 `prediction` gate accounting
+rows 转成 existing reality gate prediction rows，并运行 prediction-only reality gate。
+`pass` / `fail` prediction rows 必须引用同一对象的真实 `StateTransitionRow`，并保留
+`state_ade`、`history_ade`、`prediction_gap_vs_history_model`、
+`state_vs_history_error_ratio` 和 `pose_transition_coverage`；`evidence_incomplete` /
+`unsupported` 保持 blocked，不被算作模型失败。该缓解只完成 Stage 1 prediction accounting，
+不采集 GT、不运行预测模型 eval、不创建 intervention rows、不训练 dynamics、不声明
+counterfactual proof 或 world-model evidence。风险继续 open，直到真实 controlled/public
+intervention rows 也进入 pass / fail accounting。
