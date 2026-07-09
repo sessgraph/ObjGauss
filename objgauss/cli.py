@@ -3743,10 +3743,23 @@ def _object_state_audit_public_interaction_route(
     readiness = summary["readiness"]
     print(f"schema={summary['schema']}")
     print(f"status={summary['status']}")
+    print(f"accounting_route_status={summary['accounting_route_status']}")
     print(f"candidate={summary['candidate']['candidate_id']}")
     print(
         "handoff_ready="
         f"{str(readiness['controlled_reality_handoff_ready']).lower()}"
+    )
+    print(
+        "identity_accounting_ready="
+        f"{str(readiness['identity_accounting_ready']).lower()}"
+    )
+    print(
+        "prediction_accounting_ready="
+        f"{str(readiness['prediction_accounting_ready']).lower()}"
+    )
+    print(
+        "intervention_accounting_ready="
+        f"{str(readiness['intervention_accounting_ready']).lower()}"
     )
     print(
         "capture_intervention_ready="

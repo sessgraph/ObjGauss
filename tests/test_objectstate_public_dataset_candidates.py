@@ -111,6 +111,7 @@ def test_public_interaction_route_audit_keeps_missing_local_clip_blocked():
     assert summary["readiness"]["candidate_has_action_gt"] is True
     assert summary["readiness"]["dataset_root_present"] is False
     assert summary["readiness"]["controlled_reality_handoff_ready"] is False
+    assert summary["accounting_route_status"] == "evidence_incomplete"
     assert "local public interaction dataset root is missing" in summary["hard_blockers"]
     assert summary["claim_policy"]["does_not_claim_intervention_pass"] is True
     assert validate_objectstate_public_interaction_route_audit(summary) == summary
@@ -126,21 +127,27 @@ def test_public_interaction_route_audit_reports_handoff_ready(tmp_path):
         summary["status"]
         == "objectstate_public_interaction_route_handoff_ready"
     )
+    assert summary["accounting_route_status"] == "handoff_ready"
     assert summary["readiness"]["capture_intervention_ready"] is True
     assert summary["readiness"]["capture_intervention_action_gt_ready"] is True
     assert summary["readiness"]["gaussian_evidence_declared"] is True
     assert summary["readiness"]["candidate_artifact_present"] is True
     assert summary["readiness"]["prediction_candidates_valid"] is True
     assert summary["readiness"]["intervention_candidates_valid"] is True
+    assert summary["readiness"]["identity_accounting_ready"] is True
+    assert summary["readiness"]["prediction_accounting_ready"] is True
+    assert summary["readiness"]["intervention_accounting_ready"] is True
     assert summary["readiness"]["sample_ids_match"] is True
     assert summary["hard_blockers"] == []
     markdown = objectstate_public_interaction_route_markdown(summary)
+    assert "accounting route status: `handoff_ready`" in markdown
     assert "handoff ready: `true`" in markdown
     assert "| capture_intervention_action_gt_ready | true |" in markdown
+    assert "| prediction_accounting_ready | true |" in markdown
     assert "observed interactions are action-like" in markdown
 
 
-def test_public_interaction_route_blocks_weak_action_gt(tmp_path):
+def test_public_interaction_route_keeps_weak_action_gt_prediction_ready(tmp_path):
     bundle_root = tmp_path / "hot3d-clip"
     _write_interaction_route_bundle(bundle_root, action_vector=[0.0, 0.0, 0.0])
 
@@ -153,6 +160,10 @@ def test_public_interaction_route_blocks_weak_action_gt(tmp_path):
     assert summary["readiness"]["capture_intervention_ready"] is True
     assert summary["readiness"]["capture_intervention_action_gt_ready"] is False
     assert summary["readiness"]["controlled_reality_handoff_ready"] is False
+    assert summary["accounting_route_status"] == "prediction_ready"
+    assert summary["readiness"]["identity_accounting_ready"] is True
+    assert summary["readiness"]["prediction_accounting_ready"] is True
+    assert summary["readiness"]["intervention_accounting_ready"] is False
     assert "capture manifest lacks usable intervention action GT" in (
         summary["hard_blockers"]
     )
@@ -169,6 +180,25 @@ def test_public_interaction_route_blocks_weak_action_gt(tmp_path):
     ]
 
 
+def test_public_interaction_route_can_be_identity_ready_without_prediction_candidates(tmp_path):
+    bundle_root = tmp_path / "hot3d-clip"
+    _write_interaction_route_bundle(bundle_root, write_prediction_candidates=False)
+
+    summary = objectstate_public_interaction_route_audit(dataset_root=bundle_root)
+
+    assert (
+        summary["status"]
+        == "objectstate_public_interaction_route_candidate_artifacts_required"
+    )
+    assert summary["accounting_route_status"] == "identity_ready"
+    assert summary["readiness"]["capture_identity_ready"] is True
+    assert summary["readiness"]["capture_prediction_ready"] is True
+    assert summary["readiness"]["identity_accounting_ready"] is True
+    assert summary["readiness"]["prediction_accounting_ready"] is False
+    assert summary["readiness"]["intervention_accounting_ready"] is False
+    assert "prediction candidates JSON is missing or invalid" in summary["hard_blockers"]
+
+
 def test_public_interaction_route_rejects_pose_only_candidate(tmp_path):
     bundle_root = tmp_path / "bop-pose-only"
     bundle_root.mkdir()
@@ -182,6 +212,7 @@ def test_public_interaction_route_rejects_pose_only_candidate(tmp_path):
         summary["status"]
         == "objectstate_public_interaction_route_unsupported_candidate"
     )
+    assert summary["accounting_route_status"] == "evidence_incomplete"
     assert summary["readiness"]["candidate_has_action_gt"] is False
     assert "selected candidate does not advertise action ground truth" in (
         summary["hard_blockers"]
@@ -215,13 +246,23 @@ def test_object_state_audit_public_interaction_route_cli(tmp_path, capsys):
     markdown = markdown_path.read_text(encoding="utf-8")
 
     assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA}" in stdout
+    assert "accounting_route_status=handoff_ready" in stdout
     assert "handoff_ready=true" in stdout
+    assert "identity_accounting_ready=true" in stdout
+    assert "prediction_accounting_ready=true" in stdout
+    assert "intervention_accounting_ready=true" in stdout
     assert "capture_intervention_action_gt_ready=true" in stdout
     assert summary["readiness"]["controlled_reality_handoff_ready"] is True
     assert "ObjectState Public Interaction Route Audit" in markdown
 
 
-def _write_interaction_route_bundle(bundle_root, *, action_vector=None) -> None:
+def _write_interaction_route_bundle(
+    bundle_root,
+    *,
+    action_vector=None,
+    write_prediction_candidates=True,
+    write_intervention_candidates=True,
+) -> None:
     bundle_root.mkdir(parents=True, exist_ok=True)
     sample_id = "hot3d-clip-unit-001"
     vector = [1.0, 0.0, 0.0] if action_vector is None else action_vector
@@ -310,14 +351,16 @@ def _write_interaction_route_bundle(bundle_root, *, action_vector=None) -> None:
         json.dumps(capture),
         encoding="utf-8",
     )
-    (bundle_root / "reality-candidates" / "prediction-candidates.json").write_text(
-        json.dumps(prediction_candidates),
-        encoding="utf-8",
-    )
-    (bundle_root / "reality-candidates" / "intervention-candidates.json").write_text(
-        json.dumps(intervention_candidates),
-        encoding="utf-8",
-    )
+    if write_prediction_candidates:
+        (bundle_root / "reality-candidates" / "prediction-candidates.json").write_text(
+            json.dumps(prediction_candidates),
+            encoding="utf-8",
+        )
+    if write_intervention_candidates:
+        (bundle_root / "reality-candidates" / "intervention-candidates.json").write_text(
+            json.dumps(intervention_candidates),
+            encoding="utf-8",
+        )
 
 
 def _interaction_frame(frame_id, timestamp, position, *, action_id=None):

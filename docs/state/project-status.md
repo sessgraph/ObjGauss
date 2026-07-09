@@ -1035,6 +1035,17 @@ candidate JSON valid 且 `sample_id` 绑定一致时，才报告
 action / counterfactual 路线变成机器可审计 preflight；不下载 HOT3D、不适配原始
 egocentric streams、不创建 GT、不运行 eval、不训练模型、不新增 pass row，也不声明
 counterfactual proof 或 world model。
+随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-STATUS-001`：同一路由 audit
+新增 `accounting_route_status` 四态：`handoff_ready`、`prediction_ready`、
+`identity_ready` 和 `evidence_incomplete`。原有 strict `status` /
+`controlled_reality_handoff_ready` 不变，仍要求 usable action GT、prediction /
+intervention candidates、Gaussian refs 和 sample binding 全部满足才允许 full handoff；
+新增四态只表示 public interaction route 当前最多能进入哪类真实 row accounting。
+例如 action row 存在但 vector 为零时，route 仍保持
+`objectstate_public_interaction_route_intervention_gt_required`，但如果 identity / pose
+transition、Gaussian refs、ObjectState artifact 和 prediction candidates 已齐，会报告
+`accounting_route_status=prediction_ready`，避免把可用 prediction evidence 一刀切废掉，
+也避免把 intervention 伪装成 ready。
 随后完成 `OBJECTSTATE-PUBLIC-INTERACTION-REALITY-ROWS-001`：新增
 `objgauss.core.objectstate_public_interaction_reality_rows`，schema 为
 `objgauss-objectstate-public-interaction-reality-rows-v1`，CLI 为

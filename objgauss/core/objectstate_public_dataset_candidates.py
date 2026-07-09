@@ -545,6 +545,8 @@ def objectstate_public_interaction_route_audit(
         "prediction_candidates_valid": bool(prediction_record["valid"]),
         "intervention_candidates_valid": bool(intervention_record["valid"]),
         "sample_ids_match": bool(sample_ids["match"]),
+        "prediction_sample_id_match": bool(sample_ids["prediction_match"]),
+        "intervention_sample_id_match": bool(sample_ids["intervention_match"]),
     }
     readiness["controlled_reality_handoff_ready"] = bool(
         readiness["candidate_is_public_interaction_dataset"]
@@ -558,11 +560,32 @@ def objectstate_public_interaction_route_audit(
         and readiness["intervention_candidates_valid"]
         and readiness["sample_ids_match"]
     )
+    readiness["identity_accounting_ready"] = bool(
+        readiness["candidate_is_public_interaction_dataset"]
+        and readiness["candidate_has_action_gt"]
+        and readiness["dataset_root_present"]
+        and readiness["capture_manifest_valid"]
+        and readiness["capture_identity_ready"]
+        and readiness["gaussian_evidence_declared"]
+        and readiness["candidate_artifact_present"]
+    )
+    readiness["prediction_accounting_ready"] = bool(
+        readiness["identity_accounting_ready"]
+        and readiness["capture_prediction_ready"]
+        and readiness["prediction_candidates_valid"]
+        and readiness["prediction_sample_id_match"]
+    )
+    readiness["intervention_accounting_ready"] = bool(
+        readiness["controlled_reality_handoff_ready"]
+    )
     status = _public_interaction_route_status(readiness)
     payload = {
         "schema": OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA,
         "kind": "objectstate_public_interaction_route_audit",
         "status": status,
+        "accounting_route_status": _public_interaction_accounting_route_status(
+            readiness
+        ),
         "candidate": candidate.as_dict(),
         "dataset_root": _path_string(root_path),
         "paths": {
@@ -611,6 +634,7 @@ def objectstate_public_interaction_route_markdown(summary: Mapping[str, Any]) ->
         "",
         f"- schema: `{payload['schema']}`",
         f"- status: `{payload['status']}`",
+        f"- accounting route status: `{payload['accounting_route_status']}`",
         f"- candidate: `{payload['candidate']['candidate_id']}`",
         f"- handoff ready: `{str(readiness['controlled_reality_handoff_ready']).lower()}`",
         "",
@@ -620,13 +644,20 @@ def objectstate_public_interaction_route_markdown(summary: Mapping[str, Any]) ->
     for key in (
         "candidate_has_action_gt",
         "dataset_root_present",
+        "capture_identity_ready",
+        "capture_prediction_ready",
         "capture_intervention_ready",
         "capture_intervention_action_gt_ready",
         "gaussian_evidence_declared",
         "candidate_artifact_present",
         "prediction_candidates_valid",
         "intervention_candidates_valid",
+        "prediction_sample_id_match",
+        "intervention_sample_id_match",
         "sample_ids_match",
+        "identity_accounting_ready",
+        "prediction_accounting_ready",
+        "intervention_accounting_ready",
     ):
         lines.append(f"| {key} | {str(readiness[key]).lower()} |")
     lines.extend(("", "## Hard Blockers", ""))
@@ -756,6 +787,13 @@ def validate_objectstate_public_interaction_route_audit(
         "objectstate_public_interaction_route_handoff_ready",
     }:
         raise ValueError("public interaction route audit status is unsupported")
+    if payload.get("accounting_route_status") not in {
+        "handoff_ready",
+        "identity_ready",
+        "prediction_ready",
+        "evidence_incomplete",
+    }:
+        raise ValueError("public interaction accounting route status is unsupported")
     _validate_candidate_payload(payload.get("candidate"))
     paths = payload.get("paths")
     if not isinstance(paths, Mapping):
@@ -793,13 +831,23 @@ def validate_objectstate_public_interaction_route_audit(
         "prediction_candidates_valid",
         "intervention_candidates_valid",
         "sample_ids_match",
+        "prediction_sample_id_match",
+        "intervention_sample_id_match",
         "controlled_reality_handoff_ready",
+        "identity_accounting_ready",
+        "prediction_accounting_ready",
+        "intervention_accounting_ready",
     ):
         if not isinstance(readiness.get(key), bool):
             raise ValueError(f"public interaction readiness requires bool {key}")
     expected_status = _public_interaction_route_status(readiness)
     if payload["status"] != expected_status:
         raise ValueError("public interaction route status must match readiness")
+    expected_accounting_status = _public_interaction_accounting_route_status(readiness)
+    if payload["accounting_route_status"] != expected_accounting_status:
+        raise ValueError(
+            "public interaction accounting route status must match readiness"
+        )
     if not isinstance(payload.get("hard_blockers"), list):
         raise ValueError("public interaction route audit hard_blockers must be a list")
     next_actions = payload.get("next_actions")
@@ -1143,9 +1191,18 @@ def _sample_id_binding(
         "prediction_candidates": prediction_record.get("sample_id"),
         "intervention_candidates": intervention_record.get("sample_id"),
     }
+    capture_id = sample_ids["capture_manifest"]
+    prediction_id = sample_ids["prediction_candidates"]
+    intervention_id = sample_ids["intervention_candidates"]
+    prediction_match = bool(capture_id and prediction_id and capture_id == prediction_id)
+    intervention_match = bool(
+        capture_id and intervention_id and capture_id == intervention_id
+    )
     present_ids = [value for value in sample_ids.values() if value]
     return {
         "sample_ids": sample_ids,
+        "prediction_match": prediction_match,
+        "intervention_match": intervention_match,
         "match": bool(present_ids) and len(set(present_ids)) == 1 and len(present_ids) == 3,
     }
 
@@ -1175,6 +1232,18 @@ def _public_interaction_route_status(readiness: Mapping[str, bool]) -> str:
     if not readiness.get("sample_ids_match"):
         return "objectstate_public_interaction_route_sample_binding_blocked"
     return "objectstate_public_interaction_route_handoff_ready"
+
+
+def _public_interaction_accounting_route_status(
+    readiness: Mapping[str, bool],
+) -> str:
+    if readiness.get("intervention_accounting_ready"):
+        return "handoff_ready"
+    if readiness.get("prediction_accounting_ready"):
+        return "prediction_ready"
+    if readiness.get("identity_accounting_ready"):
+        return "identity_ready"
+    return "evidence_incomplete"
 
 
 def _public_interaction_route_blockers(

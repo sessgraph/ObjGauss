@@ -132,6 +132,10 @@ adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`
 dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
 public interaction route audit 已同步 `intervention_action_gt_ready`：只有非零 action
 vector 且 action interval 覆盖 referenced object pose transition 时才会进入 handoff-ready。
+public interaction route audit 也已新增 `accounting_route_status` 四态：
+`handoff_ready` / `prediction_ready` / `identity_ready` / `evidence_incomplete`；
+strict handoff gate 不变，但 pose-only / weak-action route 的 identity 或 prediction
+可用性不再被 ready/not-ready 一刀切。
 `OBJECTSTATE-REAL-BUNDLE-SCHEMA-001` 已补真实证据 bundle schema / validator / CLI，
 把 observation、object pose、identity link、action interval、state transition 和 gate
 accounting rows 统一成 `objgauss-objectstate-real-evidence-bundle-v1`；intervention
@@ -763,6 +767,41 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
   - `uv run --extra dev pytest`: 569 passed。
   - `npm run build`: passed，仍有既有 Vite large chunk warning。
+
+### OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-STATUS-001: Split public interaction route accounting status
+
+- 状态: done / public-interaction-route-accounting-status
+- 类型: 标准 PR / ObjectState Phase 1 public interaction evidence admission
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/training/objectstate-public-dataset-candidates.md`
+- 目标: 按 public dataset route 四态建议，把 strict handoff gate 和 partial
+  identity / prediction accounting readiness 分开，避免 weak-action route 被一刀切废掉
+  或被误报为 intervention-ready。
+- 已实施:
+  - `objectstate_public_interaction_route_audit(...)` 新增
+    `accounting_route_status`，取值为 `handoff_ready`、`prediction_ready`、
+    `identity_ready` 或 `evidence_incomplete`。
+  - route readiness 新增 `identity_accounting_ready`、
+    `prediction_accounting_ready`、`intervention_accounting_ready`、
+    `prediction_sample_id_match` 和 `intervention_sample_id_match`。
+  - 原有 `status` 和 `controlled_reality_handoff_ready` 保持 strict：full handoff
+    仍必须满足 usable action GT、intervention candidates 和 full sample binding。
+  - CLI `audit-public-interaction-route` 新增四态和三类 accounting readiness 输出。
+  - Markdown 文档记录四态语义，并说明 `accounting_route_status` 只是 admission /
+    accounting hint，不创建 pass row。
+- 边界:
+  - 不下载 HOT3D / DexYCB，不适配原始 egocentric streams。
+  - 不创建 GT、不运行 handoff / eval、不训练模型。
+  - 不放松 `intervention_action_gt_ready`，不创建 intervention pass row。
+  - 不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_public_dataset_candidates.py objgauss/cli.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_public_dataset_candidates.py -q`: 11 passed。
+  - `uv run --extra dev pytest tests/test_core_namespace.py tests/test_objectstate_public_dataset_candidates.py -q`: 20 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 599 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - 完成 commit: 本提交。
 
 ### OBJECTSTATE-TRANSITION-REALITY-ACTION-GT-001: Require action GT readiness in transition handoff
 

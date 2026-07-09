@@ -652,6 +652,20 @@ contain non-zero action vectors and the action interval must cover a referenced
 object pose transition. A clip with action rows but zero vectors remains
 `objectstate_public_interaction_route_intervention_gt_required`.
 
+The audit also reports a separate `accounting_route_status` so public interaction
+data is not reduced to a single ready / not-ready bit:
+
+| accounting route status | Meaning |
+| --- | --- |
+| `handoff_ready` | Full identity + prediction + intervention handoff prerequisites are present, including usable action GT and sample binding. |
+| `prediction_ready` | Identity / pose transition evidence, Gaussian refs, ObjectState candidate artifact and prediction candidates are ready, but intervention handoff is still blocked. |
+| `identity_ready` | Identity-stage capture evidence, Gaussian refs and an ObjectState candidate artifact are present, but prediction or intervention candidates are still missing. |
+| `evidence_incomplete` | The route lacks key local data or GT, so it cannot enter state-variable accounting yet. |
+
+`accounting_route_status` is only an accounting/admission hint. The strict
+handoff gate remains `objectstate_public_interaction_route_handoff_ready`, and
+intervention rows still require `intervention_action_gt_ready=true`.
+
 Boundary:
 
 - This audit does not download HOT3D or DexYCB.

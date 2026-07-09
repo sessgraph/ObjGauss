@@ -348,6 +348,17 @@ route 绕过 action GT readiness 的风险，但仍不下载 public dataset、�
 不创建 pass row，也不声明 counterfactual proof 或 world-model evidence。风险继续 open，
 直到真实 controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。
 
+R-017 update 2026-07-09: `OBJECTSTATE-PUBLIC-INTERACTION-ROUTE-STATUS-001`
+新增 public interaction route 的 `accounting_route_status` 四态：
+`handoff_ready` / `prediction_ready` / `identity_ready` / `evidence_incomplete`。该缓解
+让 weak-action 或缺 intervention candidate 的 public route 仍可暴露 identity / prediction
+可用性，同时保留 strict `objectstate_public_interaction_route_handoff_ready`：
+intervention handoff 仍必须通过 `intervention_action_gt_ready`、candidate artifact、
+prediction/intervention candidates 和 sample binding。该缓解只减少 ready/not-ready
+二分造成的证据浪费或误读，不下载 public dataset、不创建 GT、不运行 eval、不创建 pass row，
+也不声明 counterfactual proof 或 world-model evidence。风险继续 open，直到真实
+controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。
+
 R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-SCHEMA-001`
 新增 `objgauss-objectstate-real-evidence-bundle-v1`、validator 和
 `validate-real-evidence-bundle` CLI，把 observation、object pose、identity link、action
