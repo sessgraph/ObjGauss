@@ -4426,6 +4426,15 @@ npm run acceptance:demo
    route 只有在 `capture_intervention_action_gt_ready=true` 时才会进入
    handoff-ready，零向量或无法覆盖 pose transition 的公开交互 action rows 会停在
    `objectstate_public_interaction_route_intervention_gt_required`。
+   `OBJECTSTATE-REAL-BUNDLE-SCHEMA-001` 已进一步把真实证据从“准入门禁”推进到
+   “证据记账合同”：新增 `objgauss-objectstate-real-evidence-bundle-v1`，
+   `validate-real-evidence-bundle` 可验证 observation、object pose、identity link、
+   action interval、state transition 和 gate accounting rows，并强制 intervention
+   pass / fail accounting 引用同一对象上时间重叠的 action / transition pair；
+   summary 同时输出 `action_transition_coverage_rate`，并把
+   `static_scene_evidence` 与 `state_variable_evidence` 分开。下一步应进入
+   `OBJECTSTATE-REAL-IDENTITY-ROWS-001`，把真实/public identity rows 编译进该 bundle
+   或 existing reality gate，而不是继续新增大模型。
    若只是想扩展现成静态 Gaussian 场景，`docs/asset-library.md` 已新增候选表：
    优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑 `truck` 或 GraphDECO
    official results；这些样例只能补静态 cross-sample / viewer / segmentation evidence，

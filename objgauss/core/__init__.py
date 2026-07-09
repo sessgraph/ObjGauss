@@ -146,6 +146,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_reality_public_rows",
         "ObjectStateRealityPublicArtifact",
     ),
+    "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA",
+    ),
+    "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA",
+    ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA": (
         "objgauss.core.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA",
@@ -909,6 +917,22 @@ _EXPORTS = {
     "validate_objectstate_reality_row_ledger_summary": (
         "objgauss.core.objectstate_reality_row_ledger",
         "validate_objectstate_reality_row_ledger_summary",
+    ),
+    "read_objectstate_real_evidence_bundle": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "read_objectstate_real_evidence_bundle",
+    ),
+    "objectstate_real_evidence_bundle_summary": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "objectstate_real_evidence_bundle_summary",
+    ),
+    "validate_objectstate_real_evidence_bundle": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "validate_objectstate_real_evidence_bundle",
+    ),
+    "validate_objectstate_real_evidence_bundle_summary": (
+        "objgauss.core.objectstate_real_evidence_bundle",
+        "validate_objectstate_real_evidence_bundle_summary",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",

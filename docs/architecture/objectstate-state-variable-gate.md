@@ -617,6 +617,54 @@ Implemented v0.1 facts:
   controlled tabletop data, train dynamics, use replay / diffusion or mutate
   viewer defaults.
 
+### OBJECTSTATE-REAL-BUNDLE-SCHEMA-001
+
+Define the minimal accounting contract for real / public evidence before rows
+enter the State Variable Gate.
+
+Required behavior:
+
+- Treat a bundle as evidence accounting input, not as proof that a candidate
+  passed the reality gate.
+- Split `static_scene_evidence` from `state_variable_evidence`.
+- Preserve the row-level route statuses `pass`, `fail`, `evidence_incomplete`
+  and `unsupported`; `evidence_incomplete` is a missing-evidence state, not a
+  model failure.
+- Require timestamped observations, object pose rows, identity links, object
+  state transitions and gate accounting rows before the bundle can be called
+  state-variable ready.
+- Require intervention `pass` / `fail` accounting rows to reference a known
+  `ActionIntervalRow` and `StateTransitionRow` for the same object, with
+  overlapping time intervals.
+- Report `action_transition_coverage_rate` so action GT coverage is visible
+  before prediction / intervention rows are promoted.
+
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_real_evidence_bundle`.
+- Bundle schema: `objgauss-objectstate-real-evidence-bundle-v1`.
+- Summary schema:
+  `objgauss-objectstate-real-evidence-bundle-summary-v1`.
+- Row schemas:
+  - `objgauss-objectstate-real-observation-row-v1`
+  - `objgauss-objectstate-real-object-pose-row-v1`
+  - `objgauss-objectstate-real-identity-link-row-v1`
+  - `objgauss-objectstate-real-action-interval-row-v1`
+  - `objgauss-objectstate-real-state-transition-row-v1`
+  - `objgauss-objectstate-real-gate-accounting-row-v1`
+- CLI:
+  `objgauss object-state validate-real-evidence-bundle`.
+- Summary exposes `readiness`, `metrics`, `hard_blockers`,
+  `evidence_accounts`, `claim_policy` and `non_goals`.
+- Static Gaussian scenes may populate observation references for local
+  renderer / segmentation audit, but they are explicitly marked
+  `usable_for_state_variable_gate=false` unless timestamped physical identity,
+  6DoF pose, transitions and action evidence are present.
+- Current scope is schema / validator / CLI only. It does not download
+  datasets, collect GT, reconstruct Gaussians, train a model, run identity /
+  prediction / intervention evaluators, create reality rows, use replay /
+  diffusion or mutate viewer defaults.
+
 ### OBJECTSTATE-PUBLIC-DATASET-CANDIDATES-001
 
 Audit public pose / interaction dataset candidates for Phase 1 reality rows

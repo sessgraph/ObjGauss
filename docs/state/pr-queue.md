@@ -132,6 +132,13 @@ adapter -> ignored per-frame Gaussian evidence -> identity / prediction rows；`
 dataset，也不带 ObjGauss Gaussian evidence，因此不能声明 reality gate pass 或 public demo。
 public interaction route audit 已同步 `intervention_action_gt_ready`：只有非零 action
 vector 且 action interval 覆盖 referenced object pose transition 时才会进入 handoff-ready。
+`OBJECTSTATE-REAL-BUNDLE-SCHEMA-001` 已补真实证据 bundle schema / validator / CLI，
+把 observation、object pose、identity link、action interval、state transition 和 gate
+accounting rows 统一成 `objgauss-objectstate-real-evidence-bundle-v1`；intervention
+pass / fail accounting 现在必须引用时间重叠的 action / transition pair，summary 会显式
+输出 `action_transition_coverage_rate`，并把 `static_scene_evidence` 和
+`state_variable_evidence` 分账。下一步优先 `OBJECTSTATE-REAL-IDENTITY-ROWS-001`：
+把真实/public identity rows 接入 bundle 或 existing reality gate 的 pass/fail accounting。
 `GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001` 已在 `docs/asset-library.md` 登记现成
 Gaussian scene 候选：优先本地审计 cakewalk `room.splat` / `train.splat`，再考虑
 `truck`、更大的 `garden` / `bicycle` 或 GraphDECO official results。该记录只用于静态
@@ -353,6 +360,42 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 当前无进行中 PR。
 
 ## Done
+
+### OBJECTSTATE-REAL-BUNDLE-SCHEMA-001: Define real evidence bundle contract
+
+- 状态: done / real-evidence-bundle-schema
+- 类型: 标准 PR / ObjectState Phase 1 real evidence accounting
+- 架构规格: `docs/architecture/objectstate-state-variable-gate.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 把真实 / public evidence 从聊天层面的“需要 observation / pose / identity /
+  action / transition”收敛成可验证 JSON bundle，并在进入 identity / prediction /
+  intervention accounting 前强制 action 与 state transition 绑定。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_real_evidence_bundle`。
+  - 新增 bundle schema `objgauss-objectstate-real-evidence-bundle-v1` 和 summary
+    schema `objgauss-objectstate-real-evidence-bundle-summary-v1`。
+  - 定义 observation、object pose、identity link、action interval、state transition
+    和 gate accounting 六类 row schema。
+  - `ActionIntervalRow` 必须有非零 `action_vector`；intervention `pass` / `fail`
+    accounting rows 必须引用已知 action / transition，且二者在同一对象上时间重叠。
+  - Summary 输出 readiness、hard blockers、`action_transition_coverage_rate`、
+    gate status / evidence-kind counts，并把 `static_scene_evidence` 和
+    `state_variable_evidence` 分开。
+  - 新增 CLI `objgauss object-state validate-real-evidence-bundle`，支持
+    `--summary-output`、`--require-ready` 和
+    `--require-intervention-accounting-ready`。
+  - 核心 namespace 暴露 bundle schema、summary schema、reader、summary 和 validator。
+- 边界:
+  - 不下载 public dataset 或现成 Gaussian scene。
+  - 不采集视频、不创建 GT、不重建 Gaussian、不训练 Gaussian / dynamics 模型。
+  - 不运行 identity / prediction / intervention evaluator，不创建 reality pass rows。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_real_evidence_bundle.py objgauss/core/__init__.py objgauss/cli.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: 15 passed。
+  - `git diff --check`: passed。
+  - `uv run --extra dev pytest`: 575 passed。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
 
 ### GAUSSIAN-SCENE-CANDIDATE-TRIAGE-001: Register ready-made Gaussian scene candidates
 

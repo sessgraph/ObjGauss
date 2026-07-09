@@ -226,6 +226,10 @@ from objgauss.core.objectstate_transition_reality_handoff import (
 from objgauss.core.objectstate_transition_reality_evidence_package import (
     objectstate_transition_reality_evidence_package,
 )
+from objgauss.core.objectstate_real_evidence_bundle import (
+    objectstate_real_evidence_bundle_summary,
+    read_objectstate_real_evidence_bundle,
+)
 from objgauss.core.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
@@ -4999,6 +5003,53 @@ def _object_state_validate_controlled_capture(args: argparse.Namespace) -> None:
         raise ValueError("controlled capture manifest is not prediction-stage ready")
     if args.require_intervention_ready and not readiness["intervention_stage_ready"]:
         raise ValueError("controlled capture manifest is not intervention-stage ready")
+
+
+def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> None:
+    bundle = read_objectstate_real_evidence_bundle(args.bundle)
+    summary = objectstate_real_evidence_bundle_summary(bundle)
+    readiness = summary["readiness"]
+    metrics = summary["metrics"]
+    print(f"schema={summary['schema']}")
+    print(f"bundle={args.bundle}")
+    print(f"status={summary['status']}")
+    print(f"sample_id={summary['sample']['sample_id']}")
+    print(f"scene_id={summary['sample']['scene_id']}")
+    print(f"sequence_id={summary['sample']['sequence_id']}")
+    print(f"observation_rows={metrics['observation_row_count']}")
+    print(f"object_pose_rows={metrics['object_pose_row_count']}")
+    print(f"identity_link_rows={metrics['identity_link_row_count']}")
+    print(f"action_interval_rows={metrics['action_interval_row_count']}")
+    print(f"state_transition_rows={metrics['state_transition_row_count']}")
+    print(f"gate_accounting_rows={metrics['gate_accounting_row_count']}")
+    print(
+        "state_variable_evidence_ready="
+        f"{str(readiness['state_variable_evidence_ready']).lower()}"
+    )
+    print(
+        "intervention_accounting_ready="
+        f"{str(readiness['intervention_accounting_ready']).lower()}"
+    )
+    print(
+        "action_transition_coverage_rate="
+        f"{float(metrics['action_transition_coverage_rate']):.6f}"
+    )
+    print(f"hard_blockers={len(summary['hard_blockers'])}")
+    for blocker in summary["hard_blockers"]:
+        print(f"blocker={blocker}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_real_evidence_bundle_ready"
+    ):
+        raise ValueError("real evidence bundle is not state-variable ready")
+    if (
+        args.require_intervention_accounting_ready
+        and not readiness["intervention_accounting_ready"]
+    ):
+        raise ValueError("real evidence bundle is not intervention-accounting ready")
 
 
 def _object_state_compile_objectstate_transitions(args: argparse.Namespace) -> None:
@@ -10995,6 +11046,28 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_controlled_capture.add_argument("--require-prediction-ready", action="store_true")
     validate_controlled_capture.add_argument("--require-intervention-ready", action="store_true")
     validate_controlled_capture.set_defaults(handler=_object_state_validate_controlled_capture)
+    validate_real_evidence_bundle = object_state_subparsers.add_parser(
+        "validate-real-evidence-bundle",
+        help=(
+            "validate a real ObjectState evidence bundle before identity/"
+            "prediction/intervention row accounting"
+        ),
+    )
+    validate_real_evidence_bundle.add_argument("bundle", type=Path)
+    validate_real_evidence_bundle.add_argument("--summary-output", type=Path)
+    validate_real_evidence_bundle.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless the bundle has state-variable evidence rows",
+    )
+    validate_real_evidence_bundle.add_argument(
+        "--require-intervention-accounting-ready",
+        action="store_true",
+        help="fail unless pass/fail intervention accounting references overlapping action/transition rows",
+    )
+    validate_real_evidence_bundle.set_defaults(
+        handler=_object_state_validate_real_evidence_bundle
+    )
     compile_objectstate_transitions = object_state_subparsers.add_parser(
         "compile-objectstate-transitions",
         help=(

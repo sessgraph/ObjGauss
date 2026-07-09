@@ -347,3 +347,15 @@ handoff-ready；零向量或无法绑定 pose transition 的公开交互 action 
 route 绕过 action GT readiness 的风险，但仍不下载 public dataset、不创建 GT、不运行 eval、
 不创建 pass row，也不声明 counterfactual proof 或 world-model evidence。风险继续 open，
 直到真实 controlled/public capture 同时产生可审计 identity、prediction 和 intervention rows。
+
+R-017 update 2026-07-09: `OBJECTSTATE-REAL-BUNDLE-SCHEMA-001`
+新增 `objgauss-objectstate-real-evidence-bundle-v1`、validator 和
+`validate-real-evidence-bundle` CLI，把 observation、object pose、identity link、action
+interval、state transition 和 gate accounting rows 收敛成真实证据记账合同。Intervention
+`pass` / `fail` accounting 现在必须引用同一对象上时间重叠的 action / transition pair，
+summary 会输出 `action_transition_coverage_rate`，并明确拆分
+`static_scene_evidence` 与 `state_variable_evidence`；`evidence_incomplete` 继续表示证据
+缺口，不是模型失败。该缓解只定义证据合同，不下载现成 Gaussian scene、不采集 GT、
+不运行 eval、不创建 pass row、不训练 dynamics、不声明 counterfactual proof 或 world-model
+evidence。风险继续 open，直到真实 controlled/public identity、prediction 和 intervention
+rows 进入 pass / fail accounting。
