@@ -140,6 +140,50 @@ Public API:
 The contract summary is ready only when passed leakage audit evidence is
 provided. Without that audit, the summary is valid but blocked.
 
+## OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001 Implementation
+
+Implemented run module:
+
+```text
+objgauss.core.objectstate_assignment_long_smoke
+```
+
+Run summary schema:
+
+```text
+objgauss-objectstate-assignment-long-smoke-v1
+```
+
+Public API:
+
+- `objectstate_assignment_long_smoke_summary(...)`
+- `validate_objectstate_assignment_long_smoke_summary(...)`
+
+The first implementation is a bounded deterministic CPU synthetic smoke. It
+does not run DINO / CLIP / SAM / tracking teachers. Instead, it consumes a
+passed `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` summary as the gate
+that permits semantic-policy training.
+
+The implementation reuses the identity benchmark report ladder:
+
+- train split: `easy` and `medium` scenarios;
+- held-out split: `hard` scenarios;
+- policy: `semantic`;
+- training: supervised `AssignmentSolverV2` update on teacher semantic
+  evidence only;
+- artifacts: before / after benchmark summaries, held-out restored-checkpoint
+  benchmark summary, final solver checkpoint JSON and run summary JSON.
+
+The run status is `objectstate_assignment_long_smoke_pass` only when all
+contract checks pass. `generalization_gap_not_expand` is evaluated on
+retrieval, occlusion recovery and slot-swap stability; held-out
+`identity_margin` is evaluated by its own required improvement check.
+
+This implementation only authorizes the next contract slice:
+`OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`. It does not unlock large
+training, temporal loss, renderer loss, real-data pass claims or world-model
+training.
+
 ## Non-Goals
 
 This contract does not:

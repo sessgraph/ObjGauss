@@ -138,6 +138,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_assignment_long_smoke_contract",
         "ObjectStateAssignmentLongSmokeContractThresholds",
     ),
+    "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA": (
+        "objgauss.core.objectstate_assignment_long_smoke",
+        "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -926,6 +930,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_assignment_long_smoke_contract",
         "objectstate_assignment_long_smoke_contract_summary",
     ),
+    "objectstate_assignment_long_smoke_summary": (
+        "objgauss.core.objectstate_assignment_long_smoke",
+        "objectstate_assignment_long_smoke_summary",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -969,6 +977,10 @@ _EXPORTS = {
     "validate_objectstate_assignment_long_smoke_contract_summary": (
         "objgauss.core.objectstate_assignment_long_smoke_contract",
         "validate_objectstate_assignment_long_smoke_contract_summary",
+    ),
+    "validate_objectstate_assignment_long_smoke_summary": (
+        "objgauss.core.objectstate_assignment_long_smoke",
+        "validate_objectstate_assignment_long_smoke_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",

@@ -234,6 +234,24 @@ one-hot semantic fixture 仍不能默认清 gate。该切片不训练、不跑 l
 teacher 模型、不下载权重、不使用 GPU / torch / CUDA、不修改 viewer/export 默认，也不声明
 真实 gate 或 world model；下一步才是 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001`。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001`：新增
+`objgauss.core.objectstate_assignment_long_smoke`，schema 为
+`objgauss-objectstate-assignment-long-smoke-v1`。该 run summary 只在
+`objgauss-objectstate-assignment-long-smoke-contract-summary-v1` ready 时运行，因此必须先有
+passed teacher evidence leakage audit 且
+`semantic_teacher_evidence_training_allowed=true`。首版实现复用 identity benchmark report
+的 15 个 controlled synthetic scenarios：`easy` / `medium` scenarios 用于 semantic-policy
+supervised `AssignmentSolverV2` smoke，`hard` scenarios 作为 held-out before / after
+identity benchmark。输出包括 before / after benchmark summaries、held-out restored-checkpoint
+benchmark summary、final solver checkpoint JSON 和
+`assignment-long-smoke-summary.json`。成功条件不是 train loss 降低，而是 held-out
+retrieval 不下降、held-out margin 提升、occlusion recovery 不下降、retrieval / occlusion /
+slot-swap generalization gap 不扩大、slot swap rate 可解释且 checkpoint roundtrip 通过。
+该切片仍不运行 DINO / CLIP / SAM / tracking teacher，不下载权重，不使用 GPU / torch /
+CUDA，不接 renderer loss / temporal loss，不做 dynamics / diffusion / replay buffer，不采集
+real capture，不修改 viewer/export 默认，也不声明真实 gate 或 world model。通过后只允许进入
+`OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

@@ -558,6 +558,39 @@ Implemented v0.1 facts:
   teacher models, download weights, add renderer / temporal loss, claim
   real-data gates or unlock world-model training.
 
+### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_assignment_long_smoke`.
+- Run summary schema:
+  `objgauss-objectstate-assignment-long-smoke-v1`.
+- Public API:
+  `objectstate_assignment_long_smoke_summary(...)` and
+  `validate_objectstate_assignment_long_smoke_summary(...)`.
+- The run requires a ready
+  `objgauss-objectstate-assignment-long-smoke-contract-summary-v1`, which in
+  turn requires a passed teacher evidence leakage audit with
+  `semantic_teacher_evidence_training_allowed=true`.
+- It reuses the 15-scenario identity benchmark report ladder and splits
+  `easy` / `medium` scenarios for supervised semantic-policy training, with
+  `hard` scenarios held out for before / after identity evaluation.
+- It writes local run artifacts under the caller output directory:
+  before / after identity benchmark summaries, held-out restored-checkpoint
+  benchmark summary, final `AssignmentSolverV2` checkpoint JSON and
+  `assignment-long-smoke-summary.json`.
+- The first deterministic smoke remains CPU / numpy only and does not run
+  external teacher models, download teacher weights, use GPU / torch / CUDA,
+  add renderer loss, add temporal loss, dynamics, diffusion or replay buffer.
+- Success is not train-loss decrease. The run must pass held-out retrieval
+  non-regression, held-out margin improvement, occlusion recovery
+  non-regression, bounded train-vs-held-out gap on retrieval / occlusion /
+  slot-swap stability, interpretable slot swap rate and checkpoint roundtrip.
+- A passing run only allows `OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`.
+  It does not claim real-data identity pass, large-training readiness,
+  prediction / causal / reality gate success or world-model training.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

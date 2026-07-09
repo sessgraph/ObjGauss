@@ -395,6 +395,54 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-001: Run bounded semantic assignment long smoke
+
+- 状态: done / objectstate-assignment-long-smoke
+- 类型: 标准 PR / ObjectState assignment bounded training smoke
+- 架构规格:
+  - `docs/architecture/objectstate-assignment-long-smoke-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 teacher evidence contract、leakage audit 和 long-smoke contract 之后，跑一条
+  semantic-policy、10 分钟以内、可 checkpoint roundtrip 的 bounded assignment smoke，
+  验证更久一点的训练是否改善 held-out identity robustness，而不是只降低 train loss。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_long_smoke`。
+  - 新增 schema `objgauss-objectstate-assignment-long-smoke-v1`。
+  - 新增 `objectstate_assignment_long_smoke_summary(...)` 和
+    `validate_objectstate_assignment_long_smoke_summary(...)`。
+  - Run summary 必须先消费 ready
+    `objgauss-objectstate-assignment-long-smoke-contract-summary-v1`，即 passed leakage
+    audit 且 `semantic_teacher_evidence_training_allowed=true`。
+  - 复用 identity benchmark report 的 15 个 scenarios；`easy` / `medium` 用于
+    semantic-policy supervised `AssignmentSolverV2` smoke，`hard` 作为 held-out
+    before / after identity benchmark。
+  - 写出 before / after benchmark summaries、held-out restored-checkpoint benchmark
+    summary、final solver checkpoint JSON 和 `assignment-long-smoke-summary.json`。
+  - Success checks 覆盖 held-out retrieval 不下降、held-out margin 提升、occlusion recovery
+    不下降、retrieval / occlusion / slot-swap generalization gap 不扩大、slot swap rate
+    可解释、checkpoint roundtrip 和 duration bound。
+  - 核心 lazy namespace 暴露 long-smoke schema、summary 和 validator。
+- 当前结论:
+  - 新增 deterministic test fixture 在 semantic policy 下得到
+    `objectstate_assignment_long_smoke_pass`。
+  - held-out retrieval@1 从 `0.250000` 提升到 `1.000000`，held-out margin 从
+    `0.000000` 提升到 `0.891427`，held-out occlusion recovery 从 `0.250000`
+    提升到 `1.000000`，checkpoint roundtrip 通过。
+  - 这只允许进入 `OBJECTSTATE-TEMPORAL-ASSIGNMENT-CONTRACT-001`。
+- 边界:
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不使用 GPU / torch / CUDA，不启用 temporal / matching / renderer loss。
+  - 不引入 dynamics、diffusion、replay buffer，不修改 viewer/export 默认。
+  - 不采集 controlled real 数据，不声明真实 identity / prediction / causal /
+    reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_long_smoke.py tests/test_objectstate_assignment_long_smoke_contract.py tests/test_core_namespace.py -q`: passed，15 tests。
+  - `uv run --extra dev pytest`: passed，638 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001: Freeze semantic bounded long-smoke gate
 
 - 状态: done / objectstate-assignment-long-smoke-contract
