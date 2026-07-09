@@ -886,6 +886,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
     ),
+    "objectstate_assignment_train_dataset_summary": (
+        "objgauss.core.objectstate_assignment_train",
+        "objectstate_assignment_train_dataset_summary",
+    ),
+    "objectstate_assignment_train_smoke": (
+        "objgauss.core.objectstate_assignment_train",
+        "objectstate_assignment_train_smoke",
+    ),
     "objectstate_phase1_evidence_ledger": (
         "objgauss.core.objectstate_phase1_evidence_ledger",
         "objectstate_phase1_evidence_ledger",
@@ -897,6 +905,14 @@ _EXPORTS = {
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "validate_objectstate_assignment_mvp_summary",
+    ),
+    "validate_objectstate_assignment_train_dataset_summary": (
+        "objgauss.core.objectstate_assignment_train",
+        "validate_objectstate_assignment_train_dataset_summary",
+    ),
+    "validate_objectstate_assignment_train_run_summary": (
+        "objgauss.core.objectstate_assignment_train",
+        "validate_objectstate_assignment_train_run_summary",
     ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
         "objgauss.core.objectstate_controlled_reality_bundle_handoff",
@@ -1161,6 +1177,14 @@ _EXPORTS = {
     "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
         "objgauss.core.objectstate_assignment_mvp",
         "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA": (
+        "objgauss.core.objectstate_assignment_train",
+        "OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA",
+    ),
+    "OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA": (
+        "objgauss.core.objectstate_assignment_train",
+        "OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA",
     ),
     "ObjectIdentityOracle": (
         "objgauss.core.v2_stability_foundation",

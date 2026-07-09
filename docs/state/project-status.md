@@ -64,6 +64,20 @@ train run summary、checkpoint metadata、before / after loss 与 `mean_best_iou
 不创建 checkpoint、不引入 torch / CUDA / Transformer / Slot Attention / replay buffer /
 diffusion / dynamics，也不声明 learned ObjectState model 已完成。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-TRAIN-001`：新增
+`objgauss.core.objectstate_assignment_train`，schema 为
+`objgauss-objectstate-assignment-train-dataset-v1` 和
+`objgauss-objectstate-assignment-train-run-v1`。`objectstate_assignment_train_smoke(...)`
+从 `GaussianCloud + target_assignment` 构建 `AssignmentEvidenceBatch`，复用现有
+`AssignmentSolverV2` / `train_assignment_solver_v2(...)` 做 bounded smoke training，
+并输出 before / after loss、`mean_best_iou`、`ari`、`purity`、assignment confidence、
+entropy、effective slots、`ObjectStateProjection`、checkpoint roundtrip 和
+`assignment-before.ply` / `assignment-after.ply` visualization refs。训练入口强制
+`iterations <= 600`，默认不使用 GPU、不接 renderer loss、不引入 Transformer / Slot
+Attention / replay buffer / diffusion / dynamics；long-training gate 只有在 loss 下降、
+assignment metrics 改善、visualization refs 存在、checkpoint roundtrip 通过且 gate handoff
+不崩时才允许继续。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

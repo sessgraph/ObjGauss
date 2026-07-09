@@ -395,6 +395,49 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-TRAIN-001: Implement bounded assignment smoke training
+
+- 状态: done / objectstate-assignment-train-smoke
+- 类型: 标准 PR / ObjectState assignment training foundation
+- 架构规格: `docs/architecture/objectstate-assignment-train-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 第一次让 `A[N,K]` 从 Gaussian evidence 的 supervised smoke 中训练得到，并输出
+  loss / assignment metrics / visualization / checkpoint roundtrip，作为进入更长训练前的
+  bounded feasibility experiment。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_train`。
+  - 新增 dataset schema `objgauss-objectstate-assignment-train-dataset-v1`。
+  - 新增 run schema `objgauss-objectstate-assignment-train-run-v1`。
+  - `objectstate_assignment_train_dataset_summary(...)` 记录 `GaussianCloud`、
+    `AssignmentEvidenceBatch`、target assignment、source kind、split、license 和
+    supervision-only claim policy。
+  - `objectstate_assignment_train_smoke(...)` 从 `GaussianCloud + target_assignment`
+    构建 evidence，复用现有 `AssignmentSolverV2` 和 `train_assignment_solver_v2(...)`
+    做短训练。
+  - Run summary 输出 loss curve、before / after `mean_best_iou` / `ari` / `purity`、
+    assignment confidence、entropy、effective slots、`ObjectStateProjection`、
+    checkpoint roundtrip 和 long-training gate。
+  - 训练输出写入本地 `summary.json`、`assignment-solver-v2-final-state.json`、
+    `assignment-before.ply` 和 `assignment-after.ply`；PLY 用 `argmax(A[N,K])` 着色并
+    写入 `predicted_object_id`。
+  - 核心 lazy namespace 暴露 dataset/run schema、summary、train smoke 和 validators。
+  - `docs/architecture/objectstate-assignment-train-contract.md` 记录 implemented v0.1
+    facts。
+- 边界:
+  - 使用现有 `AssignmentSolverV2`，不新增 MLP / Transformer / Slot Attention 依赖。
+  - 不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不做长训练，smoke 入口限制 `iterations <= 600`。
+  - 不使用 replay buffer / diffusion / dynamics。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认。
+  - 不声明 identity gate pass、reality gate pass 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_assignment_train.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_train.py tests/test_core_namespace.py -q`: passed。
+  - `uv run --extra dev pytest`: passed，612 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001: Freeze assignment smoke training contract
 
 - 状态: done / assignment-train-contract

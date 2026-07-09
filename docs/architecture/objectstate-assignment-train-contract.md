@@ -301,6 +301,28 @@ Required outputs:
 - checkpoint or solver state roundtrip;
 - clear blocked status for gates that lack required evidence.
 
+Implemented v0.1 facts:
+
+- Core module: `objgauss.core.objectstate_assignment_train`.
+- Dataset schema:
+  `objgauss-objectstate-assignment-train-dataset-v1`.
+- Run schema:
+  `objgauss-objectstate-assignment-train-run-v1`.
+- Entry points:
+  - `objectstate_assignment_train_dataset_summary(...)`
+  - `objectstate_assignment_train_smoke(...)`
+- The smoke implementation uses existing `AssignmentSolverV2` and
+  `train_assignment_solver_v2(...)`, not torch / CUDA / Transformer / Slot
+  Attention.
+- The run writes:
+  - `summary.json`
+  - `assignment-solver-v2-final-state.json`
+  - `assignment-before.ply`
+  - `assignment-after.ply`
+- The run summary records before / after `mean_best_iou`, `ari`, `purity`,
+  loss curve, checkpoint roundtrip, visualization refs and long-training gate.
+- Iterations are bounded to `<= 600` in the smoke entry point.
+
 ### OBJECTSTATE-ASSIGNMENT-EVAL-001
 
 Package assignment evaluation for reuse across synthetic smoke, public replay
