@@ -323,6 +323,32 @@ Implemented v0.1 facts:
   loss curve, checkpoint roundtrip, visualization refs and long-training gate.
 - Iterations are bounded to `<= 600` in the smoke entry point.
 
+### OBJECTSTATE-ASSIGNMENT-GENERALIZATION-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_assignment_generalization`.
+- Summary schema:
+  `objgauss-objectstate-assignment-generalization-v1`.
+- Entry point:
+  `objectstate_assignment_generalization_summary(...)`.
+- The audit accepts train and held-out test `GaussianCloud + target_assignment`
+  samples with the same slot count.
+- Training is performed only on train evidence through the existing
+  `AssignmentSolverV2` / `train_assignment_solver_v2(...)` path.
+- Evaluation runs before / after assignment MVP summaries on both train and
+  held-out test samples, then reports `mean_best_iou`, `ari`, `purity`,
+  metric deltas and train-test generalization gap.
+- The summary writes `generalization-summary.json` and
+  `assignment-generalization-final-state.json`, validates checkpoint roundtrip
+  on the held-out sample and exposes a long-training gate.
+- Iterations remain bounded to `<= 600`; the audit does not use GPU, renderer
+  loss, Transformer, Slot Attention, replay buffer, diffusion or dynamics.
+- Passing this audit does not claim identity gate, reality gate or world-model
+  success; it only prevents train-only assignment memorization from being
+  promoted silently.
+
 ### OBJECTSTATE-ASSIGNMENT-EVAL-001
 
 Package assignment evaluation for reuse across synthetic smoke, public replay

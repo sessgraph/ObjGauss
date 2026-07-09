@@ -395,6 +395,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-ASSIGNMENT-GENERALIZATION-001: Add held-out assignment generalization audit
+
+- 状态: done / objectstate-assignment-generalization-audit
+- 类型: 标准 PR / ObjectState assignment training foundation
+- 架构规格: `docs/architecture/objectstate-assignment-train-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 `OBJECTSTATE-ASSIGNMENT-TRAIN-001` 之后补 train -> held-out sample audit，
+  防止把单样本记忆误判为可继续长训练的 assignment generalization。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_assignment_generalization`。
+  - 新增 schema `objgauss-objectstate-assignment-generalization-v1`。
+  - `objectstate_assignment_generalization_summary(...)` 接收 train / held-out test 两个
+    `GaussianCloud + target_assignment` 样本，只在 train evidence 上训练现有
+    `AssignmentSolverV2`。
+  - Summary 分别输出 train / held-out before-after `mean_best_iou` / `ari` / `purity`、
+    metric delta、generalization gap、loss curve、checkpoint roundtrip、assignment /
+    `ObjectStateProjection` 和 long-training gate。
+  - 核心 lazy namespace 暴露 generalization schema、summary 和 validator。
+- 边界:
+  - 使用现有 `AssignmentSolverV2`，不新增 MLP / Transformer / Slot Attention 依赖。
+  - 不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不做长训练，入口限制 `iterations <= 600`。
+  - 不使用 replay buffer / diffusion / dynamics。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认。
+  - 不声明 identity gate pass、reality gate pass 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_assignment_generalization.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_assignment_generalization.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run --extra dev pytest`: passed，614 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-001: Implement bounded assignment smoke training
 
 - 状态: done / objectstate-assignment-train-smoke

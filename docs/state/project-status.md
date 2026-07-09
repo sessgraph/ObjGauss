@@ -78,6 +78,17 @@ Attention / replay buffer / diffusion / dynamics；long-training gate 只有在 
 assignment metrics 改善、visualization refs 存在、checkpoint roundtrip 通过且 gate handoff
 不崩时才允许继续。
 
+随后完成 `OBJECTSTATE-ASSIGNMENT-GENERALIZATION-001`：新增
+`objgauss.core.objectstate_assignment_generalization`，schema 为
+`objgauss-objectstate-assignment-generalization-v1`。`objectstate_assignment_generalization_summary(...)`
+从 train / held-out test 两个 `GaussianCloud + target_assignment` 样本构建 evidence，只在
+train 样本上训练现有 `AssignmentSolverV2`，然后分别报告 train 与 held-out test 的 before /
+after `mean_best_iou`、`ari`、`purity`、metric delta、generalization gap、checkpoint
+roundtrip、`ObjectStateProjection` 和 long-training gate。该 audit 防止把单样本记忆误写成
+可泛化训练结果；仍强制 `iterations <= 600`，不使用 GPU、不接 renderer loss、不引入
+Transformer / Slot Attention / replay buffer / diffusion / dynamics，也不声明 identity gate、
+reality gate 或 world model 已通过。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

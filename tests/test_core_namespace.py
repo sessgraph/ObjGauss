@@ -77,6 +77,7 @@ from objgauss.core import (
     OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA,
+    OBJECTSTATE_ASSIGNMENT_GENERALIZATION_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
     OBJECTSTATE_TRANSITION_PREDICTION_CANDIDATES_SCHEMA,
@@ -326,6 +327,7 @@ from objgauss.core import (
     objectstate_assignment_mvp_summary,
     objectstate_assignment_train_dataset_summary,
     objectstate_assignment_train_smoke,
+    objectstate_assignment_generalization_summary,
     objectstate_phase1_evidence_ledger,
     objectstate_bop_prediction_baseline_handoff,
     objectstate_bop_identity_handoff,
@@ -501,6 +503,7 @@ from objgauss.core import (
     validate_objectstate_assignment_mvp_summary,
     validate_objectstate_assignment_train_dataset_summary,
     validate_objectstate_assignment_train_run_summary,
+    validate_objectstate_assignment_generalization_summary,
     validate_objectstate_phase1_evidence_ledger_summary,
     validate_objectstate_controlled_prediction_baseline_summary,
     validate_objectstate_controlled_prediction_candidate_finalize_summary,
@@ -1104,6 +1107,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA == (
         "objgauss-objectstate-assignment-train-run-v1"
     )
+    assert OBJECTSTATE_ASSIGNMENT_GENERALIZATION_SCHEMA == (
+        "objgauss-objectstate-assignment-generalization-v1"
+    )
     contract_summary = objectstate_controlled_dataset_contract_summary(
         capture_manifest
     )
@@ -1533,8 +1539,10 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert validate_objectstate_assignment_mvp_summary is not None
     assert objectstate_assignment_train_dataset_summary is not None
     assert objectstate_assignment_train_smoke is not None
+    assert objectstate_assignment_generalization_summary is not None
     assert validate_objectstate_assignment_train_dataset_summary is not None
     assert validate_objectstate_assignment_train_run_summary is not None
+    assert validate_objectstate_assignment_generalization_summary is not None
 
     assert OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA == (
         "objgauss-objectstate-controlled-real-manifest-v1"
