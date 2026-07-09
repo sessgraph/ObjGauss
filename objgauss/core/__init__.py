@@ -114,6 +114,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityGateThresholds",
     ),
+    "ObjectStateModelIdentityGateThresholds": (
+        "objgauss.core.objectstate_model_identity_gate",
+        "ObjectStateModelIdentityGateThresholds",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -1537,6 +1541,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_identity_gate",
         "OBJECTSTATE_IDENTITY_GATE_SCHEMA",
     ),
+    "OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA": (
+        "objgauss.core.objectstate_model_identity_gate",
+        "OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA",
+    ),
+    "OBJECTSTATE_MODEL_IDENTITY_BASELINES": (
+        "objgauss.core.objectstate_model_identity_gate",
+        "OBJECTSTATE_MODEL_IDENTITY_BASELINES",
+    ),
     "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA": (
         "objgauss.core.objectstate_predictive_gate",
         "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA",
@@ -1689,6 +1701,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_identity_gate",
         "evaluate_objectstate_identity_gate",
     ),
+    "objectstate_model_identity_gate_summary": (
+        "objgauss.core.objectstate_model_identity_gate",
+        "objectstate_model_identity_gate_summary",
+    ),
     "evaluate_objectstate_causal_gate": (
         "objgauss.core.objectstate_causal_gate",
         "evaluate_objectstate_causal_gate",
@@ -1740,6 +1756,10 @@ _EXPORTS = {
     "validate_objectstate_identity_gate_summary": (
         "objgauss.core.objectstate_identity_gate",
         "validate_objectstate_identity_gate_summary",
+    ),
+    "validate_objectstate_model_identity_gate_summary": (
+        "objgauss.core.objectstate_model_identity_gate",
+        "validate_objectstate_model_identity_gate_summary",
     ),
     "validate_objectstate_predictive_gate_summary": (
         "objgauss.core.objectstate_predictive_gate",

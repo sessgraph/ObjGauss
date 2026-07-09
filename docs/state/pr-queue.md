@@ -395,6 +395,46 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-MODEL-IDENTITY-GATE-001: Add permutation-aware model identity gate
+
+- 状态: done / objectstate-model-identity-gate
+- 类型: 标准 PR / ObjectState identity representation validation
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 assignment generalization / ablation 之后，让 fitted `AssignmentSolverV2`
+  输出进入 identity gate，验证 `ObjectStateProjection` 是否能跨观测保持 physical identity，
+  并显式处理 slot permutation。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_model_identity_gate`。
+  - 新增 schema `objgauss-objectstate-model-identity-gate-v1`。
+  - `objectstate_model_identity_gate_summary(...)` 对两帧 `GaussianCloud` 运行同一个
+    `AssignmentSolverV2State`，生成 `A[N,K]` 和 `ObjectStateProjection`，再用 physical
+    identity labels 做 permutation-aware retrieval / matching。
+  - 输出 `identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、
+    `objectstate_drift`、`assignment_consistency` 和 `occlusion_recovery`。
+  - 保留 `random_assignment`、`xyz_centroid`、`oracle_target_assignment` 和
+    `assignment_solver_v2` 四个 baseline。
+  - 写出本地 artifact refs：`identity-summary.json`、`identity-matching.json`、
+    `objectstate-retrieval.json`、`identity-pairwise-distances.csv`、`assignment-t0.ply` 和
+    `assignment-t1.ply`。
+  - 核心 lazy namespace 暴露 model identity gate schema、baselines、thresholds、
+    summary 和 validator。
+- 边界:
+  - 不把 hard slot id / renderer-facing `object_id` 当作 identity truth。
+  - 不训练新模型，不启用 temporal / matching loss。
+  - 不引入 Hungarian / scipy 依赖；当前为 dependency-free permutation-aware retrieval。
+  - 不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不使用 replay buffer / diffusion / dynamics。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认。
+  - 不声明 prediction gate pass、causal gate pass、reality gate pass 或 world model。
+- 验证:
+  - `python3 -m py_compile objgauss/core/objectstate_model_identity_gate.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_model_identity_gate.py tests/test_core_namespace.py -q`: passed，11 tests。
+  - `uv run --extra dev pytest`: passed，618 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-ASSIGNMENT-ABLATION-001: Add minimum sufficient evidence ablation audit
 
 - 状态: done / objectstate-assignment-ablation-audit

@@ -100,6 +100,20 @@ diagnostics。该切片用于回答“assignment 为什么泛化”，而不是�
 只接收调用方显式传入的 feature matrix，不引入 DINO / SAM / teacher 依赖。长训练仍保持
 blocked，必须等 identity retrieval、temporal consistency 和 real evidence 后再讨论。
 
+随后完成 `OBJECTSTATE-MODEL-IDENTITY-GATE-001`：新增
+`objgauss.core.objectstate_model_identity_gate`，schema 为
+`objgauss-objectstate-model-identity-gate-v1`。`objectstate_model_identity_gate_summary(...)`
+把同一个 `AssignmentSolverV2State` 应用于两帧 `GaussianCloud`，经 `A[N,K]` 和
+`ObjectStateProjection` 生成 model-facing identity audit；评估使用 physical identity labels，
+不把 hard slot id 当 identity。该 gate 输出 permutation-aware retrieval / matching、
+`identity_retrieval_at_1`、`identity_margin`、`slot_swap_rate`、`objectstate_drift`、
+`assignment_consistency`、`occlusion_recovery`，并保留 `random_assignment`、
+`xyz_centroid`、`oracle_target_assignment` 和 `assignment_solver_v2` 四个 baseline。输出产物包括
+`identity-summary.json`、`identity-matching.json`、`objectstate-retrieval.json`、
+`identity-pairwise-distances.csv`、`assignment-t0.ply` 和 `assignment-t1.ply`。该切片不训练模型、
+不启用 temporal loss、不引入 Hungarian / scipy 依赖、不接 renderer loss、不使用 replay buffer /
+diffusion / dynamics，也不声明 prediction / causal / reality gate 或 world model 已通过。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

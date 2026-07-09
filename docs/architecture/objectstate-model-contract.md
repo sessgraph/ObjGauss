@@ -296,6 +296,36 @@ Required metrics:
 - prediction state-vs-history error when future candidates exist;
 - clear blocked status for causal evidence if no real action candidates exist.
 
+### OBJECTSTATE-MODEL-IDENTITY-GATE-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_model_identity_gate`.
+- Summary schema:
+  `objgauss-objectstate-model-identity-gate-v1`.
+- Entry point:
+  `objectstate_model_identity_gate_summary(...)`.
+- The gate applies one `AssignmentSolverV2State` to two Gaussian observations,
+  projects both assignments into `ObjectStateProjection`, then evaluates
+  physical identity labels without treating hard slot ids as identity truth.
+- Matching is permutation-aware and dependency-free: retrieval uses
+  ObjectState embeddings across frames, while `slot_swap_rate` is reported as a
+  diagnostic instead of an automatic failure.
+- Required metrics are emitted:
+  `identity_retrieval_at_1`, `identity_margin`, `slot_swap_rate`,
+  `objectstate_drift`, `assignment_consistency` and `occlusion_recovery`.
+- Baselines are included in the same summary:
+  `random_assignment`, `xyz_centroid`, `oracle_target_assignment` and
+  `assignment_solver_v2`.
+- The local artifact bundle includes `identity-summary.json`,
+  `identity-matching.json`, `objectstate-retrieval.json`,
+  `identity-pairwise-distances.csv`, `assignment-t0.ply` and
+  `assignment-t1.ply`.
+- This gate does not train a model, enable temporal / matching loss, add a
+  Hungarian / scipy dependency, use renderer loss, or claim prediction /
+  causal / reality gate success.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:
