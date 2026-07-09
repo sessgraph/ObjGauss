@@ -317,6 +317,21 @@ transition，adapter summary 和 real bundle summary 会保持 incomplete。该�
 eval、不写 public samples、不修改 viewer/export 默认，也不声明 reality gate pass、
 counterfactual proof 或 world model。
 
+随后完成 `OBJECTSTATE-CONTROLLED-REAL-READINESS-AUDIT-001`：新增
+`objgauss.core.objectstate_controlled_real_readiness_audit`，schema 为
+`objgauss-objectstate-controlled-real-readiness-audit-v1`，并新增 CLI
+`objgauss object-state audit-controlled-real-readiness <real-bundle.json>`。该 audit
+读取 `objgauss-objectstate-real-evidence-bundle-v1`，逐条 gate accounting row 判断
+identity / prediction / intervention 是否具备 evaluator 输入条件，并输出
+`controlled-real-readiness-summary.json`、Markdown report 和 CSV breakdown 可用的结构。
+输出显式分离结构 readiness 与 accounting status：完整 controlled bundle 可以报告
+`identity_ready_rows > 0`、`prediction_ready_rows > 0`、`intervention_ready_rows > 0`，
+同时仍把默认 `evidence_incomplete` 统计为 `missing_evaluator_metrics` blocker。缺 action /
+pose / identity link / action-transition overlap 的行会停在 readiness incomplete，不会被
+误写成模型 fail 或 pass。该切片不运行 evaluator、不创建 pass/fail rows、不采集或创建 GT、
+不重建 Gaussian、不训练模型、不修改 viewer/export 默认，也不声明 reality gate pass、
+counterfactual proof 或 world model。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

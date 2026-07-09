@@ -570,6 +570,18 @@ _EXPORTS = {
         "objgauss.core.objectstate_controlled_real_evidence_bundle",
         "objectstate_controlled_real_evidence_bundle_from_capture_manifest",
     ),
+    "OBJECTSTATE_CONTROLLED_REAL_READINESS_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "OBJECTSTATE_CONTROLLED_REAL_READINESS_AUDIT_SCHEMA",
+    ),
+    "objectstate_controlled_real_readiness_audit": (
+        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "objectstate_controlled_real_readiness_audit",
+    ),
+    "objectstate_controlled_real_readiness_markdown": (
+        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "objectstate_controlled_real_readiness_markdown",
+    ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
         "objgauss.core.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",

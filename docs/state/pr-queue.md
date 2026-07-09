@@ -1113,6 +1113,48 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
 - 完成 commit: 本提交。
 
+### OBJECTSTATE-CONTROLLED-REAL-READINESS-AUDIT-001: Audit controlled real bundle evaluator readiness
+
+- 状态: done / controlled-real-readiness-audit
+- 类型: 标准 PR / ObjectState Phase 3 controlled real evidence ingestion
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 controlled capture manifest 已能转成 real evidence bundle 后，提供一条只读
+  readiness audit，明确每个 bundle 的 identity / prediction / intervention rows
+  是否具备 evaluator 输入条件，以及当前缺口是数据结构缺失还是 evaluator metrics 缺失。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_controlled_real_readiness_audit`。
+  - 新增 schema
+    `objgauss-objectstate-controlled-real-readiness-audit-v1`。
+  - Audit 消费 `objgauss-objectstate-real-evidence-bundle-v1`，输出
+    `identity_ready_rows`、`prediction_ready_rows`、`intervention_ready_rows`、
+    `evidence_incomplete_rows`、`unsupported_rows`、`blocked_rows` 和
+    `blocked_reasons`。
+  - Blocked reason 计数覆盖 `missing_identity_link`、`missing_before_pose`、
+    `missing_after_pose`、`missing_action_vector`、
+    `action_interval_no_transition_overlap`、`missing_teacher_evidence` 和
+    `missing_evaluator_metrics`。
+  - 默认 `evidence_incomplete` accounting row 若结构已 ready，会计入
+    `missing_evaluator_metrics`，不会被误报为 pass / fail；若结构缺 action /
+    pose / identity link，则停在 readiness incomplete。
+  - CLI 新增
+    `objgauss object-state audit-controlled-real-readiness <real-bundle.json>`，
+    支持 `--summary-output`、`--report-output`、`--breakdown-output` 和
+    `--require-ready`。
+  - 核心 lazy namespace 暴露 readiness schema、summary function 和 Markdown writer。
+- 边界:
+  - 不运行 identity / prediction / intervention evaluator，不创建 metric pass / fail rows。
+  - 不采集视频、不创建 GT、不重建 Gaussian、不训练 Gaussian / dynamics / ObjectState 模型。
+  - 不使用 replay buffer / diffusion，不修改 viewer/export 默认。
+  - 不声明 reality gate pass、counterfactual proof 或 world model。
+- 验证:
+  - `uv run python -m py_compile objgauss/core/objectstate_controlled_real_readiness_audit.py objgauss/cli.py objgauss/core/__init__.py`: passed。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_readiness_audit.py -q`: passed，3 tests。
+  - `uv run --extra dev pytest tests/test_objectstate_controlled_real_readiness_audit.py tests/test_objectstate_controlled_real_evidence_bundle.py tests/test_objectstate_real_evidence_bundle.py tests/test_core_namespace.py -q`: passed，21 tests。
+  - `uv run --extra dev pytest`: passed，651 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-CONTRACT-001: Freeze Gaussian-to-ObjectState model contract
 
 - 状态: done / objectstate-model-contract

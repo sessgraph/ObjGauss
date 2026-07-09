@@ -233,6 +233,11 @@ from objgauss.core.objectstate_real_evidence_bundle import (
 from objgauss.core.objectstate_controlled_real_evidence_bundle import (
     objectstate_controlled_real_evidence_bundle_adapter_summary_from_file,
 )
+from objgauss.core.objectstate_controlled_real_readiness_audit import (
+    objectstate_controlled_real_readiness_audit_from_file,
+    objectstate_controlled_real_readiness_breakdown_csv,
+    objectstate_controlled_real_readiness_markdown,
+)
 from objgauss.core.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
@@ -5082,6 +5087,45 @@ def _object_state_controlled_real_evidence_bundle(args: argparse.Namespace) -> N
         != "objectstate_controlled_real_evidence_bundle_adapter_ready"
     ):
         raise ValueError("controlled real evidence bundle adapter is not ready")
+
+
+def _object_state_audit_controlled_real_readiness(args: argparse.Namespace) -> None:
+    summary = objectstate_controlled_real_readiness_audit_from_file(args.bundle)
+    print(f"schema={summary['schema']}")
+    print(f"status={summary['status']}")
+    print(f"bundle={args.bundle}")
+    print(f"bundle_id={summary['bundle_id']}")
+    print(f"row_count={summary['row_count']}")
+    print(f"identity_ready_rows={summary['identity_ready_rows']}")
+    print(f"prediction_ready_rows={summary['prediction_ready_rows']}")
+    print(f"intervention_ready_rows={summary['intervention_ready_rows']}")
+    print(f"evidence_incomplete_rows={summary['evidence_incomplete_rows']}")
+    print(f"unsupported_rows={summary['unsupported_rows']}")
+    print(f"blocked_rows={summary['blocked_rows']}")
+    for reason, count in summary["blocked_reasons"].items():
+        print(f"blocked_reason.{reason}={count}")
+    if args.summary_output:
+        write_json(args.summary_output, summary)
+        print(f"summary={args.summary_output}")
+    if args.report_output:
+        args.report_output.parent.mkdir(parents=True, exist_ok=True)
+        args.report_output.write_text(
+            objectstate_controlled_real_readiness_markdown(summary),
+            encoding="utf-8",
+        )
+        print(f"report={args.report_output}")
+    if args.breakdown_output:
+        args.breakdown_output.parent.mkdir(parents=True, exist_ok=True)
+        args.breakdown_output.write_text(
+            objectstate_controlled_real_readiness_breakdown_csv(summary),
+            encoding="utf-8",
+        )
+        print(f"breakdown={args.breakdown_output}")
+    if (
+        args.require_ready
+        and summary["status"] != "objectstate_controlled_real_readiness_ready"
+    ):
+        raise ValueError("controlled real readiness audit is not ready")
 
 
 def _object_state_validate_real_evidence_bundle(args: argparse.Namespace) -> None:
@@ -11501,6 +11545,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     controlled_real_evidence_bundle.set_defaults(
         handler=_object_state_controlled_real_evidence_bundle
+    )
+    audit_controlled_real_readiness = object_state_subparsers.add_parser(
+        "audit-controlled-real-readiness",
+        help=(
+            "audit whether a real evidence bundle has identity, prediction and "
+            "intervention rows ready for controlled-real evaluators"
+        ),
+    )
+    audit_controlled_real_readiness.add_argument("bundle", type=Path)
+    audit_controlled_real_readiness.add_argument("--summary-output", type=Path)
+    audit_controlled_real_readiness.add_argument("--report-output", type=Path)
+    audit_controlled_real_readiness.add_argument("--breakdown-output", type=Path)
+    audit_controlled_real_readiness.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="fail unless identity, prediction and intervention evaluator inputs are ready",
+    )
+    audit_controlled_real_readiness.set_defaults(
+        handler=_object_state_audit_controlled_real_readiness
     )
     validate_real_evidence_bundle = object_state_subparsers.add_parser(
         "validate-real-evidence-bundle",
