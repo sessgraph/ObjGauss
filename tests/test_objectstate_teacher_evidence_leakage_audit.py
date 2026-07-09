@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import numpy as np
+
+from objgauss.core.objectstate_model_identity_benchmark_report import (
+    objectstate_model_identity_benchmark_report_scenarios,
+)
+from objgauss.core.objectstate_teacher_evidence import TeacherEvidenceBatch
+from objgauss.core.objectstate_teacher_evidence_leakage_audit import (
+    OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA,
+    TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS,
+    objectstate_teacher_evidence_leakage_audit_summary,
+    validate_objectstate_teacher_evidence_leakage_audit_summary,
+)
+
+
+def test_teacher_evidence_leakage_audit_blocks_default_synthetic_training_source(tmp_path):
+    summary = objectstate_teacher_evidence_leakage_audit_summary(
+        tmp_path,
+        sample_id="teacher-leakage-default-synthetic",
+        seed=13,
+    )
+
+    assert summary["schema"] == OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA
+    assert summary["status"] == "objectstate_teacher_evidence_leakage_audit_blocked"
+    assert set(summary["audit_checks"]) == set(TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS)
+    assert validate_objectstate_teacher_evidence_leakage_audit_summary(summary) == summary
+
+    checks = summary["audit_checks"]
+    assert checks["physical_label_ban"]["passed"] is True
+    assert checks["semantic_feature_shuffle"]["passed"] is True
+    assert checks["random_semantic_baseline"]["passed"] is True
+    assert checks["train_test_semantic_source_split"]["passed"] is False
+    assert "no_training_allowed_teacher_evidence_batch" in (
+        checks["train_test_semantic_source_split"]["reasons"]
+    )
+    assert summary["training_gate"]["semantic_teacher_evidence_training_allowed"] is False
+    assert summary["teacher_evidence_batches"][0]["summary"]["source"] == "synthetic_semantic"
+    assert (
+        summary["teacher_evidence_batches"][0]["summary"]["permissions"]["allowed_for_training"]
+        is False
+    )
+
+    shuffle = checks["semantic_feature_shuffle"]["metrics"]
+    assert shuffle["retrieval_drop"] > 0.0
+    random_baseline = checks["random_semantic_baseline"]["metrics"]
+    assert random_baseline["random_semantic_lift_vs_reference"] <= 0.20
+
+
+def test_teacher_evidence_leakage_audit_passes_inference_time_split_policy(tmp_path):
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    first = scenarios[0]
+    feature_matrix = np.asarray(first.frame0_features, dtype=np.float32)
+    batch = TeacherEvidenceBatch(
+        sample_id="teacher-leakage-dino-split",
+        gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),
+        feature_matrix=feature_matrix,
+        source="dino_v2",
+        confidence=0.92,
+        uncertainty=0.08,
+        allowed_for_training=True,
+        allowed_for_evaluation=True,
+        leakage_risk="low",
+        provenance={
+            "producer": "test-dino-teacher",
+            "feature_space": "dino_v2_patch_embedding",
+            "input_refs": ["fixture://viewpoint-easy/frame0"],
+            "generation_method": "inference_time_teacher_embedding",
+            "train_test_semantic_source_split": {
+                "train_source": "dino_v2:train-scenes",
+                "test_source": "dino_v2:heldout-scenes",
+                "direct_object_id_embedding_shared": False,
+                "policy": "model_weights_shared_without_object_id_embedding",
+            },
+        },
+    )
+
+    summary = objectstate_teacher_evidence_leakage_audit_summary(
+        tmp_path,
+        sample_id="teacher-leakage-dino-pass",
+        teacher_batches=(batch,),
+        seed=17,
+    )
+
+    assert summary["status"] == "objectstate_teacher_evidence_leakage_audit_pass"
+    assert summary["training_gate"]["status"] == "cleared"
+    assert summary["training_gate"]["semantic_teacher_evidence_training_allowed"] is True
+    for check in TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS:
+        assert summary["audit_checks"][check]["passed"] is True
+    split = summary["audit_checks"]["train_test_semantic_source_split"]["details"][
+        "split_reports"
+    ][0]
+    assert split["direct_object_id_embedding_shared"] is False
+    assert split["train_source"] == "dino_v2:train-scenes"
+
+
+def test_teacher_evidence_leakage_audit_reports_forbidden_provenance(tmp_path):
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    feature_matrix = np.asarray(scenarios[0].frame0_features, dtype=np.float32)
+    batch = TeacherEvidenceBatch(
+        sample_id="teacher-leakage-forbidden-provenance",
+        gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),
+        feature_matrix=feature_matrix,
+        source="dino_v2",
+        allowed_for_training=True,
+        leakage_risk="low",
+        provenance={
+            "producer": "bad-teacher",
+            "feature_space": "dino_v2_patch_embedding",
+            "input_refs": ["fixture://viewpoint-easy/frame0"],
+            "generation_method": "inference_time_teacher_embedding",
+            "target_assignment": "forbidden",
+            "train_test_semantic_source_split": {
+                "train_source": "dino_v2:train-scenes",
+                "test_source": "dino_v2:heldout-scenes",
+                "direct_object_id_embedding_shared": False,
+            },
+        },
+    )
+
+    summary = objectstate_teacher_evidence_leakage_audit_summary(
+        tmp_path,
+        sample_id="teacher-leakage-forbidden-blocked",
+        teacher_batches=(batch,),
+        seed=19,
+    )
+
+    assert summary["status"] == "objectstate_teacher_evidence_leakage_audit_blocked"
+    assert summary["audit_checks"]["physical_label_ban"]["passed"] is False
+    assert "target_assignment" in summary["teacher_evidence_batches"][0]["error"]
+    assert summary["training_gate"]["blocked_checks"] == [
+        "physical_label_ban",
+        "train_test_semantic_source_split",
+    ]

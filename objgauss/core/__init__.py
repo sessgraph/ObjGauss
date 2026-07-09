@@ -130,6 +130,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_teacher_evidence",
         "TeacherEvidenceBatch",
     ),
+    "TeacherEvidenceLeakageAuditThresholds": (
+        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "TeacherEvidenceLeakageAuditThresholds",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -910,6 +914,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_teacher_evidence",
         "validate_teacher_evidence_batch",
     ),
+    "objectstate_teacher_evidence_leakage_audit_summary": (
+        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objectstate_teacher_evidence_leakage_audit_summary",
+    ),
     "objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
@@ -945,6 +953,10 @@ _EXPORTS = {
     "validate_teacher_evidence_batch_summary": (
         "objgauss.core.objectstate_teacher_evidence",
         "validate_teacher_evidence_batch_summary",
+    ),
+    "validate_objectstate_teacher_evidence_leakage_audit_summary": (
+        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "validate_objectstate_teacher_evidence_leakage_audit_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
         "objgauss.core.objectstate_assignment_mvp",
@@ -1237,6 +1249,14 @@ _EXPORTS = {
     "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA": (
         "objgauss.core.objectstate_teacher_evidence",
         "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA",
+    ),
+    "OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA": (
+        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA",
+    ),
+    "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS": (
+        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS",
     ),
     "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
         "objgauss.core.objectstate_assignment_mvp",

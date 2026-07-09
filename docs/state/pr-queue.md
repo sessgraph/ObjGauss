@@ -395,6 +395,51 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001: Audit semantic teacher evidence leakage
+
+- 状态: done / objectstate-teacher-evidence-leakage-audit
+- 类型: 标准 PR / ObjectState teacher evidence leakage audit
+- 架构规格:
+  - `docs/architecture/objectstate-teacher-evidence-contract.md`
+  - `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 风险记录: `docs/state/risks.md` / `R-018`
+- 目标: 在 semantic teacher evidence 进入 bounded long-smoke contract 前，增加
+  semantic shuffle、physical label ban、random semantic baseline 和 train/test source
+  split 四项机器审计，避免 GT identity / assignment 泄漏被误读成 identity candidate。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_teacher_evidence_leakage_audit`。
+  - 新增 schema `objgauss-objectstate-teacher-evidence-leakage-audit-v1`。
+  - 新增 `TeacherEvidenceLeakageAuditThresholds`、
+    `objectstate_teacher_evidence_leakage_audit_summary(...)` 和
+    `validate_objectstate_teacher_evidence_leakage_audit_summary(...)`。
+  - Audit 复用 identity benchmark report 的 15-scenario ladder，并运行
+    `semantic_reference`、`semantic_feature_shuffle` 和 `random_semantic_baseline`
+    三个 deterministic semantic benchmark variants。
+  - `physical_label_ban` 会把 forbidden provenance keys 报告为 blocked audit evidence。
+  - `semantic_feature_shuffle` 要求 retrieval / margin 下降，证明 candidate signal 依赖
+    semantic evidence。
+  - `random_semantic_baseline` 要求随机 embedding 接近 random / `xyz_centroid`，
+    防止任意 embedding 也能误过 candidate。
+  - `train_test_semantic_source_split` 要求 training-allowed inference-time teacher batch
+    明确声明 `direct_object_id_embedding_shared=false`。
+  - 默认 synthetic report one-hot semantic fixture 仍是 evaluation-only，audit 会把它
+    blocked 在训练 gate 外；带明确 split policy 的 inference-time `dino_v2` fixture 可通过。
+  - `R-018` 缓解状态已更新，但风险保持 open，关闭仍需要真实 inference-time teacher
+    source batch 通过审计。
+- 边界:
+  - 不运行或下载 DINO / CLIP / SAM / GroundingDINO / tracking teacher。
+  - 不训练模型，不跑 long smoke，不启用 temporal / matching / renderer loss。
+  - 不使用 GPU / torch / CUDA，不采集 controlled real 数据。
+  - 不修改 viewer/export 默认，不声明真实 identity / prediction / causal / reality gate
+    pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_teacher_evidence_leakage_audit.py tests/test_objectstate_teacher_evidence.py tests/test_core_namespace.py -q`: passed，16 tests。
+  - `uv run --extra dev pytest`: passed，632 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-TEACHER-EVIDENCE-CONTRACT-001: Freeze teacher evidence batch contract
 
 - 状态: done / objectstate-teacher-evidence-contract

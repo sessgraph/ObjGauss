@@ -478,11 +478,43 @@ Implemented v0.1 facts:
   `test_label`, including nested keys.
 - The contract states that teacher evidence is perception evidence, not
   ground-truth identity.
-- The next required audit remains
-  `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001`, covering semantic feature
-  shuffle, physical label ban, random semantic baseline and train / test
-  semantic source split.
 - This contract does not run teacher models, download weights, train
+  `AssignmentSolverV2`, run long smoke, add renderer / temporal loss, change
+  viewer defaults, claim real-data gates or unlock world-model training.
+
+### OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_teacher_evidence_leakage_audit`.
+- Audit schema:
+  `objgauss-objectstate-teacher-evidence-leakage-audit-v1`.
+- Public API:
+  `TeacherEvidenceLeakageAuditThresholds`,
+  `objectstate_teacher_evidence_leakage_audit_summary(...)` and
+  `validate_objectstate_teacher_evidence_leakage_audit_summary(...)`.
+- The audit reuses the 15-scenario identity benchmark report ladder and runs
+  three deterministic semantic benchmark variants:
+  `semantic_reference`, `semantic_feature_shuffle` and
+  `random_semantic_baseline`.
+- Required checks are `physical_label_ban`, `semantic_feature_shuffle`,
+  `random_semantic_baseline` and `train_test_semantic_source_split`.
+- `physical_label_ban` reports forbidden provenance keys as blocked audit
+  evidence instead of letting GT / identity leakage crash silently.
+- `semantic_feature_shuffle` must reduce identity retrieval and margin,
+  otherwise the candidate signal is not actually semantic-evidence dependent.
+- `random_semantic_baseline` must stay near random / `xyz_centroid`, otherwise
+  arbitrary embeddings are too strong for the benchmark.
+- `train_test_semantic_source_split` requires a training-allowed
+  inference-time teacher batch with explicit
+  `train_test_semantic_source_split.direct_object_id_embedding_shared=false`.
+- The default synthetic report one-hot semantic fixture remains evaluation-only
+  and is blocked by the training gate because it has no training-allowed
+  inference-time source split.
+- A passing leakage audit is now the required predecessor to
+  `OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001`.
+- This audit does not run teacher models, download weights, train
   `AssignmentSolverV2`, run long smoke, add renderer / temporal loss, change
   viewer defaults, claim real-data gates or unlock world-model training.
 

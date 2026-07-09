@@ -199,6 +199,23 @@ teacher 模型、不下载权重、不训练、不跑 long smoke、不启用 tem
 `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` 覆盖 semantic shuffle、
 physical label ban、random semantic baseline 和 train/test semantic source split。
 
+随后完成 `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001`：新增
+`objgauss.core.objectstate_teacher_evidence_leakage_audit`，schema 为
+`objgauss-objectstate-teacher-evidence-leakage-audit-v1`。Audit 复用 identity benchmark
+report 的 15-scenario ladder，运行 `semantic_reference`、`semantic_feature_shuffle` 和
+`random_semantic_baseline` 三个 deterministic semantic benchmark variants，并输出四个
+硬检查：`physical_label_ban`、`semantic_feature_shuffle`、
+`random_semantic_baseline` 和 `train_test_semantic_source_split`。默认 synthetic report
+one-hot semantic fixture 仍是 evaluation-only evidence：shuffle / random stressors 可以
+证明 semantic signal 被使用且随机 embedding 不足，但 training gate 仍因缺少
+training-allowed inference-time source split 而 blocked。只有显式 `dino_v2` / `clip` /
+`sam2` / `grounding_dino` / `tracking` / `teacher_fusion` 这类 inference-time source，
+且 provenance 声明 `train_test_semantic_source_split.direct_object_id_embedding_shared=false`
+时，leakage audit 才能清除 semantic teacher evidence 训练门槛。该切片不运行 teacher 模型、
+不下载权重、不训练、不跑 long smoke、不启用 temporal / renderer loss、不修改 viewer/export
+默认，也不声明真实 gate 或 world model；下一步才允许进入
+`OBJECTSTATE-ASSIGNMENT-LONG-SMOKE-CONTRACT-001`。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

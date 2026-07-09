@@ -55,6 +55,7 @@ from objgauss.core import (
     ObjectStateModelIdentityBenchmarkThresholds,
     ObjectStateModelIdentityGateThresholds,
     TeacherEvidenceBatch,
+    TeacherEvidenceLeakageAuditThresholds,
     ObjectStateIdentityRow,
     DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES,
     ObjectStatePredictiveGateReport,
@@ -82,6 +83,8 @@ from objgauss.core import (
     OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA,
     OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA,
     OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA,
+    OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA,
+    TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS,
     OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA,
@@ -345,6 +348,7 @@ from objgauss.core import (
     objectstate_controlled_prediction_evidence_package,
     objectstate_controlled_dataset_contract_summary,
     objectstate_teacher_evidence_contract_summary,
+    objectstate_teacher_evidence_leakage_audit_summary,
     teacher_evidence_batch_summary,
     objectstate_assignment_mvp_summary,
     objectstate_assignment_train_dataset_summary,
@@ -524,6 +528,7 @@ from objgauss.core import (
     validate_objectstate_controlled_identity_evidence_package_summary,
     validate_objectstate_controlled_dataset_contract_summary,
     validate_objectstate_teacher_evidence_contract_summary,
+    validate_objectstate_teacher_evidence_leakage_audit_summary,
     validate_teacher_evidence_batch,
     validate_teacher_evidence_batch_summary,
     validate_objectstate_assignment_mvp_summary,
@@ -1180,6 +1185,18 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA == (
         "objgauss-objectstate-teacher-evidence-contract-summary-v1"
     )
+    assert OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA == (
+        "objgauss-objectstate-teacher-evidence-leakage-audit-v1"
+    )
+    assert set(TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS) == {
+        "physical_label_ban",
+        "semantic_feature_shuffle",
+        "random_semantic_baseline",
+        "train_test_semantic_source_split",
+    }
+    assert TeacherEvidenceLeakageAuditThresholds().as_dict()[
+        "semantic_shuffle_retrieval_drop_min"
+    ] == 0.20
     assert OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA == (
         "objgauss-objectstate-assignment-mvp-v1"
     )
@@ -1649,10 +1666,12 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert objectstate_controlled_dataset_contract_summary is not None
     assert validate_objectstate_controlled_dataset_contract_summary is not None
     assert objectstate_teacher_evidence_contract_summary is not None
+    assert objectstate_teacher_evidence_leakage_audit_summary is not None
     assert teacher_evidence_batch_summary is not None
     assert validate_teacher_evidence_batch is not None
     assert validate_teacher_evidence_batch_summary is not None
     assert validate_objectstate_teacher_evidence_contract_summary is not None
+    assert validate_objectstate_teacher_evidence_leakage_audit_summary is not None
     assert objectstate_assignment_mvp_summary is not None
     assert validate_objectstate_assignment_mvp_summary is not None
     assert objectstate_assignment_train_dataset_summary is not None

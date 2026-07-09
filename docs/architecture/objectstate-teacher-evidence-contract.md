@@ -152,42 +152,74 @@ training.
 
 ## Required Follow-Up Audits
 
-`OBJECTSTATE-TEACHER-EVIDENCE-CONTRACT-001` defines the contract only. The next
-blocking audit is `OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001`, which must
-cover:
+`OBJECTSTATE-TEACHER-EVIDENCE-LEAKAGE-AUDIT-001` adds the first machine audit
+for this contract.
+
+Core audit schema:
+
+```text
+objgauss-objectstate-teacher-evidence-leakage-audit-v1
+```
+
+The audit covers:
 
 - Semantic feature shuffle.
 - Physical label ban.
 - Random semantic baseline.
 - Train / test semantic source split.
 
-Until those checks exist and pass, semantic teacher evidence remains a scoped
-candidate signal rather than a validated training foundation.
+The deterministic report-ladder audit runs three identity benchmark variants:
+
+```text
+semantic_reference
+semantic_feature_shuffle
+random_semantic_baseline
+```
+
+The shuffle path must reduce retrieval and margin, proving the model is using
+semantic evidence. The random semantic baseline must stay near random /
+`xyz_centroid`, proving arbitrary embeddings are not enough. The physical label
+ban rejects forbidden GT / identity provenance keys. The train / test split
+check requires at least one training-allowed inference-time teacher batch with
+`train_test_semantic_source_split.direct_object_id_embedding_shared=false`.
+
+Important current interpretation:
+
+- The existing synthetic report one-hot semantic fixture is still evaluation
+  evidence only.
+- By default, the leakage audit blocks training clearance for that fixture
+  because it has no training-allowed inference-time source split.
+- Passing the stressor checks does not by itself unlock long training; the
+  teacher source split must also clear.
 
 ## Core API
 
 Machine contract entry points:
 
 - `TeacherEvidenceBatch`
+- `TeacherEvidenceLeakageAuditThresholds`
 - `validate_teacher_evidence_batch(...)`
 - `teacher_evidence_batch_summary(...)`
 - `validate_teacher_evidence_batch_summary(...)`
 - `objectstate_teacher_evidence_contract_summary(...)`
 - `validate_objectstate_teacher_evidence_contract_summary(...)`
+- `objectstate_teacher_evidence_leakage_audit_summary(...)`
+- `validate_objectstate_teacher_evidence_leakage_audit_summary(...)`
 
 Schemas:
 
 - `OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA`
 - `OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA`
 - `OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA`
+- `OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA`
 
 ## Non-Goals
 
-This contract does not:
+This contract and audit do not:
 
 - Download or run DINO, CLIP, SAM, GroundingDINO or tracking models.
 - Define a teacher feature extraction pipeline.
-- Run leakage audit.
+- Clear synthetic one-hot semantic fixtures for training by default.
 - Train `AssignmentSolverV2` or identity encoders.
 - Run a long smoke.
 - Introduce renderer loss, temporal loss or matching loss.
