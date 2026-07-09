@@ -139,7 +139,8 @@ easy / medium / hard 三档，共 15 scenarios / 60 identity pairs，并写出
 `/tmp/objgauss-objectstate-identity-benchmark-artifacts`。当前 controlled synthetic evidence
 为 `candidate_ready`：`assignment_solver_v2` overall retrieval@1 为 `1.000000`，
 `xyz_centroid` 为 `0.250000`，random 为 `0.300000`，oracle 为 `1.000000`；五类扰动下
-solver 均高于 xyz。该结果只允许考虑更长 identity robustness smoke，不解锁 world-model
+solver 均高于 xyz。该结果只允许在 report evidence policy 下考虑更长 identity robustness smoke，
+不解锁 world-model
 训练；它不代表 real controlled capture pass、不做 identity ablation、不启用 temporal loss，
 也不声明 prediction / causal / reality gate 或 world model 已通过。
 
@@ -162,6 +163,20 @@ retrieval@1=`1.000000` 且 margin 为正；native Gaussian policies 未过 candi
 不引入真实 capture、不修改 viewer/export 默认，也不声明 real identity / prediction /
 causal / reality gate 或 world model 已通过；下一步更适合先冻结 Teacher Evidence Layer
 或 bounded long-smoke contract，而不是直接开大训练。
+
+随后完成 `OBJECTSTATE-IDENTITY-GATE-POLICY-SCOPING-001`：把 model identity benchmark
+和 report 的 `long_training_gate` 改成 evidence-policy scoped。现在 benchmark summary
+会输出 `evidence_policy`，并在 `long_training_gate` 中写入
+`candidate_ready_is_policy_scoped=true`、`scoped_to_policy` 和同一份 `scope` payload。
+已重生成 `docs/benchmarks/objectstate-identity-benchmark/identity-benchmark-summary.json`
+和 `identity-benchmark-report.md`，当前 report 明确 scoped to policy=`semantic`，
+source=`synthetic_report_feature_backed_reference`，且 `native_gaussian_evidence_only=false`。
+identity ablation 的每个 variant 也把自身 policy 传入 benchmark；当前 next-stage gate
+显式分账为 `native_long_training_gate=blocked`、
+`semantic_long_training_gate=candidate_ready`、`long_training_allowed=false`。该切片只修正
+gate 语义和 evidence artifact，不定义 TeacherEvidenceBatch、不做 leakage audit、不训练、
+不启用 temporal loss、不引入 teacher 模型依赖、不修改 viewer/export 默认，也不声明真实
+identity / prediction / causal / reality gate 或 world model 已通过。
 
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中

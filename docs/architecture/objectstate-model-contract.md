@@ -371,7 +371,8 @@ Implemented v0.1 facts:
   `docs/benchmarks/objectstate-identity-benchmark/`, with per-scenario local
   artifacts written to `/tmp/objgauss-objectstate-identity-benchmark-artifacts`.
 - The current deterministic evidence reports `candidate_ready` for a longer
-  identity robustness smoke, not for world-model training.
+  identity robustness smoke under the report's evidence policy, not for
+  world-model training.
 - This report remains controlled synthetic evidence only; it does not claim a
   real-data identity pass, identity ablation, temporal assignment, prediction /
   causal / reality gate success or world-model proof.
@@ -410,6 +411,33 @@ Implemented v0.1 facts:
   recommend a Teacher Evidence Layer contract, but it does not unlock long
   training, temporal assignment, real controlled identity pass, prediction /
   causal gates or world-model training.
+
+### OBJECTSTATE-IDENTITY-GATE-POLICY-SCOPING-001
+
+Implemented v0.1 facts:
+
+- `objgauss.core.objectstate_model_identity_benchmark_summary(...)` now records
+  an explicit `evidence_policy` object for each benchmark run.
+- `long_training_gate` is no longer interpretable as global. It now carries:
+  `candidate_ready_is_policy_scoped=true`, `scoped_to_policy` and a full
+  `scope` payload matching `evidence_policy`.
+- `write_objectstate_model_identity_benchmark_report(...)` marks the committed
+  report's feature-backed reference as policy `semantic`, source
+  `synthetic_report_feature_backed_reference`, with
+  `native_gaussian_evidence_only=false` and `uses_semantic_evidence=true`.
+- The committed benchmark summary and Markdown report under
+  `docs/benchmarks/objectstate-identity-benchmark/` have been regenerated with
+  this policy scope.
+- Identity ablation variants now pass their own evidence policy into the
+  benchmark, so native and semantic gates can be read separately.
+- The ablation next-stage gate explicitly reports:
+  `native_long_training_gate=blocked` and
+  `semantic_long_training_gate=candidate_ready` for the current deterministic
+  run.
+- This is a scoping fix only. It does not define `TeacherEvidenceBatch`, run a
+  leakage audit, introduce DINO / SAM / tracking dependencies, train a model,
+  enable temporal loss, run controlled real capture or unlock world-model
+  training.
 
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 

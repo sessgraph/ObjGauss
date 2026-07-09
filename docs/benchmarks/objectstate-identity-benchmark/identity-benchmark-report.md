@@ -3,6 +3,7 @@
 - Schema: `objgauss-objectstate-model-identity-benchmark-report-v1`
 - Sample: `objectstate-model-identity-benchmark-report-001`
 - Status: `objectstate_model_identity_benchmark_report_candidate_ready`
+- Evidence policy: `semantic`
 - Scenarios: `15`
 - Identity pairs: `60`
 
@@ -36,11 +37,14 @@
 ## Long Training Gate
 
 - Decision: `candidate_ready`
+- Scoped to evidence policy: `semantic`
+- Scope rule: `candidate_ready` is policy-scoped, not a global native Gaussian gate.
 - Reasons: none
 
-This only gates a longer identity robustness smoke. It does not unlock world-model training.
+This only gates a longer identity robustness smoke under the stated evidence policy. It does not unlock world-model training.
 
 ## Interpretation Boundary
 
 This report is deterministic controlled synthetic evidence. It does not use real controlled capture,
-does not run identity ablation, does not add temporal loss, and does not claim a real-data identity pass.
+does not add temporal loss, and does not claim a real-data identity pass. Native Gaussian long training
+must be justified by a separate policy-specific gate or ablation result.

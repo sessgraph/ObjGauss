@@ -61,6 +61,10 @@ def write_objectstate_model_identity_benchmark_report(
         _feature_backed_solver_state(),
         output_dir=artifact_root,
         sample_id=sample_id,
+        evidence_policy="semantic",
+        evidence_policy_source="synthetic_report_feature_backed_reference",
+        native_gaussian_evidence_only=False,
+        uses_semantic_evidence=True,
         seed=seed,
     )
     validate_objectstate_model_identity_benchmark_summary(benchmark)
@@ -79,6 +83,7 @@ def write_objectstate_model_identity_benchmark_report(
         "benchmark_status": benchmark["status"],
         "scenario_count": int(benchmark["num_scenarios"]),
         "identity_pair_count": int(benchmark["num_pairs"]),
+        "evidence_policy": benchmark["evidence_policy"],
         "difficulty_levels": list(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES),
         "perturbation_kinds": list(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS),
         "overall_ranking": ranking,
@@ -93,6 +98,7 @@ def write_objectstate_model_identity_benchmark_report(
         },
         "claim_policy": {
             "synthetic_controlled_evidence_only": True,
+            "long_training_gate_is_evidence_policy_scoped": True,
             "physical_identity_labels_are_evaluation_only": True,
             "does_not_claim_real_data_identity_pass": True,
             "does_not_claim_temporal_assignment": True,
@@ -142,6 +148,7 @@ def validate_objectstate_model_identity_benchmark_report_summary(
         raise ValueError("model identity benchmark report requires the full difficulty ladder")
     if int(payload.get("identity_pair_count", 0)) < 1:
         raise ValueError("model identity benchmark report requires evaluated identity pairs")
+    _validate_evidence_policy(payload.get("evidence_policy"))
     if tuple(payload.get("difficulty_levels", ())) != OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES:
         raise ValueError("model identity benchmark report difficulty levels are incomplete")
     if tuple(payload.get("perturbation_kinds", ())) != OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS:
@@ -156,6 +163,10 @@ def validate_objectstate_model_identity_benchmark_report_summary(
     gate = payload.get("long_training_gate")
     if not isinstance(gate, Mapping) or gate.get("status") not in {"blocked", "candidate_ready"}:
         raise ValueError("model identity benchmark report requires long_training_gate")
+    if gate.get("candidate_ready_is_policy_scoped") is not True:
+        raise ValueError("model identity benchmark report long_training_gate must be policy scoped")
+    if gate.get("scoped_to_policy") != payload["evidence_policy"]["policy"]:
+        raise ValueError("model identity benchmark report gate policy scope mismatch")
     claim_policy = payload.get("claim_policy")
     if not isinstance(claim_policy, Mapping) or any(not bool(value) for value in claim_policy.values()):
         raise ValueError("model identity benchmark report must preserve claim policy")
@@ -358,6 +369,7 @@ def _validate_benchmark_digest(digest: Mapping[str, Any], *, expected_scenarios:
         raise ValueError("model identity benchmark report digest schema is unsupported")
     if int(digest.get("num_scenarios", 0)) != expected_scenarios:
         raise ValueError("model identity benchmark report digest scenario count mismatch")
+    _validate_evidence_policy(digest.get("evidence_policy"))
     if tuple(digest.get("required_perturbations", ())) != OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS:
         raise ValueError("model identity benchmark report digest perturbation coverage is incomplete")
     baselines = digest.get("baselines")
@@ -383,6 +395,7 @@ def _benchmark_digest(benchmark: Mapping[str, Any]) -> dict[str, Any]:
         "identity_gate_schema": benchmark["identity_gate_schema"],
         "num_scenarios": benchmark["num_scenarios"],
         "num_pairs": benchmark["num_pairs"],
+        "evidence_policy": benchmark["evidence_policy"],
         "required_perturbations": benchmark["required_perturbations"],
         "perturbation_coverage": benchmark["perturbation_coverage"],
         "thresholds": benchmark["thresholds"],
@@ -413,12 +426,14 @@ def _write_breakdown_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
 
 def _render_markdown_report(summary: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) -> str:
     benchmark = summary["benchmark_digest"]
+    evidence_policy = summary["evidence_policy"]
     lines = [
         "# ObjectState Identity Benchmark Report",
         "",
         f"- Schema: `{summary['schema']}`",
         f"- Sample: `{summary['sample_id']}`",
         f"- Status: `{summary['status']}`",
+        f"- Evidence policy: `{evidence_policy['policy']}`",
         f"- Scenarios: `{summary['scenario_count']}`",
         f"- Identity pairs: `{summary['identity_pair_count']}`",
         "",
@@ -470,14 +485,17 @@ def _render_markdown_report(summary: Mapping[str, Any], rows: Sequence[Mapping[s
         "## Long Training Gate",
         "",
         f"- Decision: `{gate['status']}`",
+        f"- Scoped to evidence policy: `{gate['scoped_to_policy']}`",
+        "- Scope rule: `candidate_ready` is policy-scoped, not a global native Gaussian gate.",
         f"- Reasons: {reasons}",
         "",
-        "This only gates a longer identity robustness smoke. It does not unlock world-model training.",
+        "This only gates a longer identity robustness smoke under the stated evidence policy. It does not unlock world-model training.",
         "",
         "## Interpretation Boundary",
         "",
         "This report is deterministic controlled synthetic evidence. It does not use real controlled capture,",
-        "does not run identity ablation, does not add temporal loss, and does not claim a real-data identity pass.",
+        "does not add temporal loss, and does not claim a real-data identity pass. Native Gaussian long training",
+        "must be justified by a separate policy-specific gate or ablation result.",
         "",
     ])
     return "\n".join(lines)
@@ -489,3 +507,20 @@ def _mean(rows: Sequence[Mapping[str, Any]], key: str) -> float:
 
 def _fmt(value: float) -> str:
     return f"{float(value):.6f}"
+
+
+def _validate_evidence_policy(payload: Any) -> None:
+    if not isinstance(payload, Mapping):
+        raise ValueError("model identity benchmark report requires evidence_policy")
+    if payload.get("type") != "evidence_policy":
+        raise ValueError("model identity benchmark report evidence_policy type is unsupported")
+    if not isinstance(payload.get("policy"), str) or not payload["policy"]:
+        raise ValueError("model identity benchmark report evidence_policy requires policy")
+    if not isinstance(payload.get("source"), str) or not payload["source"]:
+        raise ValueError("model identity benchmark report evidence_policy requires source")
+    if not isinstance(payload.get("native_gaussian_evidence_only"), bool):
+        raise ValueError("model identity benchmark report evidence_policy native flag must be boolean")
+    if not isinstance(payload.get("uses_semantic_evidence"), bool):
+        raise ValueError("model identity benchmark report evidence_policy semantic flag must be boolean")
+    if payload.get("candidate_ready_scope") != "policy_scoped_not_global":
+        raise ValueError("model identity benchmark report evidence_policy must be policy scoped")

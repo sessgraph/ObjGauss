@@ -129,6 +129,10 @@ def objectstate_model_identity_ablation_summary(
             solver_state,
             output_dir=artifact_root / _safe_policy_name(spec.name),
             sample_id=f"{sample_id}:{spec.name}",
+            evidence_policy=spec.name,
+            evidence_policy_source="identity_ablation_feature_policy",
+            native_gaussian_evidence_only=spec.name in _NATIVE_POLICIES,
+            uses_semantic_evidence="semantic" in spec.feature_blocks,
             seed=int(seed) + index * 37,
         )
         variants.append(_variant_summary(spec, benchmark))
@@ -587,6 +591,12 @@ def _next_stage_gate(ranking: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "bounded_long_smoke_contract_recommended": bool(native["found"]),
         "bounded_long_smoke_candidate_policy": native["policy"],
+        "native_long_training_gate": "candidate_ready" if native["found"] else "blocked",
+        "semantic_long_training_gate": (
+            "candidate_ready"
+            if minimum["found"] and minimum["uses_semantic"]
+            else "blocked"
+        ),
         "teacher_evidence_layer_contract_recommended": bool(
             minimum["found"] and minimum["uses_semantic"] and not native["found"]
         ),

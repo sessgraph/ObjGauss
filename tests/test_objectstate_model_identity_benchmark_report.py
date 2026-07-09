@@ -26,6 +26,8 @@ def test_model_identity_benchmark_report_writes_auditable_outputs(tmp_path):
     assert summary["schema"] == OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA
     assert summary["status"] == "objectstate_model_identity_benchmark_report_candidate_ready"
     assert summary["scenario_count"] == 15
+    assert summary["evidence_policy"]["policy"] == "semantic"
+    assert summary["evidence_policy"]["uses_semantic_evidence"] is True
     assert summary["difficulty_levels"] == list(
         OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES
     )
@@ -33,6 +35,8 @@ def test_model_identity_benchmark_report_writes_auditable_outputs(tmp_path):
         OBJECTSTATE_MODEL_IDENTITY_BASELINES
     )
     assert summary["long_training_gate"]["status"] == "candidate_ready"
+    assert summary["long_training_gate"]["candidate_ready_is_policy_scoped"] is True
+    assert summary["long_training_gate"]["scoped_to_policy"] == "semantic"
     assert validate_objectstate_model_identity_benchmark_report_summary(summary) == summary
 
     refs = summary["artifact_refs"]
@@ -50,10 +54,13 @@ def test_model_identity_benchmark_report_writes_auditable_outputs(tmp_path):
 
     markdown = report_path.read_text(encoding="utf-8")
     assert "# ObjectState Identity Benchmark Report" in markdown
+    assert "Evidence policy: `semantic`" in markdown
     assert "## Overall Ranking" in markdown
     assert "## Perturbation Breakdown" in markdown
     assert "## Difficulty Ladder" in markdown
     assert "Decision: `candidate_ready`" in markdown
+    assert "Scoped to evidence policy: `semantic`" in markdown
+    assert "policy-scoped, not a global native Gaussian gate" in markdown
 
     rows = list(csv.DictReader(csv_path.open(encoding="utf-8")))
     assert len(rows) == 15 * len(OBJECTSTATE_MODEL_IDENTITY_BASELINES)

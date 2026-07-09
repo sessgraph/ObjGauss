@@ -395,6 +395,42 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-IDENTITY-GATE-POLICY-SCOPING-001: Scope identity candidate gate to evidence policy
+
+- 状态: done / objectstate-identity-gate-policy-scoping
+- 类型: 标准 PR / ObjectState identity gate semantics
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 风险记录: `docs/state/risks.md` / `R-018`
+- 目标: 把 identity benchmark report 的 `candidate_ready` 从全局长训信号改成
+  evidence-policy scoped gate，防止误读为 native `xyz/rgb/opacity` 已可直接长训。
+- 已实施:
+  - `objectstate_model_identity_benchmark_summary(...)` 新增 `evidence_policy` 机器字段。
+  - `long_training_gate` 新增 `candidate_ready_is_policy_scoped=true`、
+    `scoped_to_policy` 和完整 `scope` payload。
+  - `write_objectstate_model_identity_benchmark_report(...)` 将 report reference 明确标为
+    policy=`semantic`、source=`synthetic_report_feature_backed_reference`、
+    `native_gaussian_evidence_only=false`、`uses_semantic_evidence=true`。
+  - 重生成 `docs/benchmarks/objectstate-identity-benchmark/identity-benchmark-summary.json`
+    和 `identity-benchmark-report.md`，报告正文写明 `candidate_ready` 不是 global native
+    Gaussian gate。
+  - identity ablation 的每个 variant 现在把自身 evidence policy 传入 benchmark。
+  - ablation next-stage gate 显式输出 `native_long_training_gate=blocked`、
+    `semantic_long_training_gate=candidate_ready` 和 `long_training_allowed=false`。
+  - 新增风险 `R-018`：semantic / teacher evidence 可能泄漏 GT identity。
+- 边界:
+  - 不定义 `TeacherEvidenceBatch`，不引入 DINO / SAM / tracking teacher 依赖。
+  - 不做 leakage audit，不训练模型，不跑 long smoke。
+  - 不启用 temporal / matching loss，不接 renderer loss，不使用 GPU / torch / CUDA。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明真实 identity /
+    prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_model_identity_benchmark.py tests/test_objectstate_model_identity_benchmark_report.py tests/test_objectstate_model_identity_ablation.py -q`: passed，7 tests。
+  - `uv run --extra dev pytest`: passed，625 tests。
+  - `npm run build`: passed，仍有既有 Vite large chunk warning。
+  - `git diff --check`: passed。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-IDENTITY-ABLATION-001: Explain identity benchmark candidate evidence
 
 - 状态: done / objectstate-model-identity-ablation

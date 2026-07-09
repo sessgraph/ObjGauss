@@ -34,6 +34,10 @@ def test_model_identity_benchmark_aggregates_required_perturbations(tmp_path):
         _identity_feature_solver_state(),
         output_dir=tmp_path,
         sample_id="identity-benchmark-smoke",
+        evidence_policy="semantic",
+        evidence_policy_source="synthetic_fixture_identity_features",
+        native_gaussian_evidence_only=False,
+        uses_semantic_evidence=True,
         seed=7,
     )
 
@@ -41,7 +45,12 @@ def test_model_identity_benchmark_aggregates_required_perturbations(tmp_path):
     assert summary["status"] == "objectstate_model_identity_benchmark_candidate_ready"
     assert summary["num_scenarios"] == len(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS)
     assert summary["num_pairs"] == 15
+    assert summary["evidence_policy"]["policy"] == "semantic"
+    assert summary["evidence_policy"]["uses_semantic_evidence"] is True
     assert summary["long_training_gate"]["status"] == "candidate_ready"
+    assert summary["long_training_gate"]["candidate_ready_is_policy_scoped"] is True
+    assert summary["long_training_gate"]["scoped_to_policy"] == "semantic"
+    assert summary["long_training_gate"]["scope"] == summary["evidence_policy"]
     assert summary["long_training_gate"]["reasons"] == []
     assert all(summary["perturbation_coverage"].values())
     solver = summary["baselines"]["assignment_solver_v2"]["metrics"]

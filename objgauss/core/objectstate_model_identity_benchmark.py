@@ -93,6 +93,10 @@ def objectstate_model_identity_benchmark_summary(
     *,
     output_dir: str | Path,
     sample_id: str = "model-identity-benchmark-001",
+    evidence_policy: str = "unspecified",
+    evidence_policy_source: str = "caller_provided",
+    native_gaussian_evidence_only: bool = False,
+    uses_semantic_evidence: bool = False,
     required_perturbations: Sequence[str] = OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS,
     thresholds: ObjectStateModelIdentityBenchmarkThresholds | None = None,
     identity_gate_thresholds: ObjectStateModelIdentityGateThresholds | None = None,
@@ -129,9 +133,16 @@ def objectstate_model_identity_benchmark_summary(
     baselines = _aggregate_baselines(scenario_results)
     coverage = _coverage(scenario_results, required)
     breakdown = _perturbation_breakdown(scenario_results)
+    policy_scope = _evidence_policy_scope(
+        evidence_policy,
+        evidence_policy_source=evidence_policy_source,
+        native_gaussian_evidence_only=native_gaussian_evidence_only,
+        uses_semantic_evidence=uses_semantic_evidence,
+    )
     long_training_gate = _long_training_gate(
         baselines,
         coverage,
+        evidence_policy=policy_scope,
         thresholds=threshold_payload,
     )
     summary_path = output_root / "identity-benchmark-summary.json"
@@ -152,6 +163,7 @@ def objectstate_model_identity_benchmark_summary(
                 for item in scenario_results
             )
         ),
+        "evidence_policy": policy_scope,
         "required_perturbations": list(required),
         "perturbation_coverage": coverage,
         "thresholds": threshold_payload,
@@ -196,6 +208,7 @@ def validate_objectstate_model_identity_benchmark_summary(
         raise ValueError("model identity benchmark requires at least one scenario")
     if int(payload.get("num_pairs", 0)) < 1:
         raise ValueError("model identity benchmark requires at least one identity pair")
+    _validate_evidence_policy_scope(_mapping(payload, "evidence_policy"))
     required = _validate_perturbations(
         payload.get("required_perturbations", ()),
         label="required_perturbations",
@@ -222,6 +235,12 @@ def validate_objectstate_model_identity_benchmark_summary(
     gate = _mapping(payload, "long_training_gate")
     if gate.get("status") not in {"blocked", "candidate_ready"}:
         raise ValueError("model identity benchmark long_training_gate status is unsupported")
+    if gate.get("candidate_ready_is_policy_scoped") is not True:
+        raise ValueError("model identity benchmark long_training_gate must be policy scoped")
+    scope = _mapping(gate, "scope")
+    _validate_evidence_policy_scope(scope)
+    if scope != payload["evidence_policy"]:
+        raise ValueError("model identity benchmark gate scope must match evidence_policy")
     expected_status = (
         "objectstate_model_identity_benchmark_candidate_ready"
         if gate["status"] == "candidate_ready"
@@ -398,6 +417,7 @@ def _long_training_gate(
     baselines: Mapping[str, Mapping[str, Any]],
     coverage: Mapping[str, bool],
     *,
+    evidence_policy: Mapping[str, Any],
     thresholds: Mapping[str, float],
 ) -> dict[str, Any]:
     candidate = _baseline_aggregate(baselines, "assignment_solver_v2")["metrics"]
@@ -430,6 +450,9 @@ def _long_training_gate(
     reasons = [name for name, passed in checks.items() if not bool(passed)]
     return {
         "status": "candidate_ready" if not reasons else "blocked",
+        "candidate_ready_is_policy_scoped": True,
+        "scoped_to_policy": str(evidence_policy["policy"]),
+        "scope": dict(evidence_policy),
         "checks": checks,
         "reasons": reasons,
         "thresholds": dict(thresholds),
@@ -442,6 +465,40 @@ def _long_training_gate(
             "candidate_slot_swap_rate": slot_swap_rate,
         },
     }
+
+
+def _evidence_policy_scope(
+    policy: str,
+    *,
+    evidence_policy_source: str,
+    native_gaussian_evidence_only: bool,
+    uses_semantic_evidence: bool,
+) -> dict[str, Any]:
+    name = str(policy).strip() or "unspecified"
+    source = str(evidence_policy_source).strip() or "caller_provided"
+    return {
+        "type": "evidence_policy",
+        "policy": name,
+        "source": source,
+        "native_gaussian_evidence_only": bool(native_gaussian_evidence_only),
+        "uses_semantic_evidence": bool(uses_semantic_evidence),
+        "candidate_ready_scope": "policy_scoped_not_global",
+    }
+
+
+def _validate_evidence_policy_scope(payload: Mapping[str, Any]) -> None:
+    if payload.get("type") != "evidence_policy":
+        raise ValueError("model identity benchmark evidence_policy type is unsupported")
+    if not isinstance(payload.get("policy"), str) or not payload["policy"]:
+        raise ValueError("model identity benchmark evidence_policy requires policy")
+    if not isinstance(payload.get("source"), str) or not payload["source"]:
+        raise ValueError("model identity benchmark evidence_policy requires source")
+    if not isinstance(payload.get("native_gaussian_evidence_only"), bool):
+        raise ValueError("model identity benchmark evidence_policy native flag must be boolean")
+    if not isinstance(payload.get("uses_semantic_evidence"), bool):
+        raise ValueError("model identity benchmark evidence_policy semantic flag must be boolean")
+    if payload.get("candidate_ready_scope") != "policy_scoped_not_global":
+        raise ValueError("model identity benchmark evidence_policy must mark scoped candidate readiness")
 
 
 def _validate_scenario_result(payload: Mapping[str, Any]) -> None:

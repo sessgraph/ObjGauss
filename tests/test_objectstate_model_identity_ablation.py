@@ -55,6 +55,10 @@ def test_model_identity_ablation_compares_report_ladder_feature_policies(tmp_pat
 
     semantic = variants["semantic"]["assignment_solver_metrics"]
     native = variants["xyz_rgb_opacity"]["assignment_solver_metrics"]
+    assert variants["semantic"]["long_training_gate"]["scoped_to_policy"] == "semantic"
+    assert variants["semantic"]["long_training_gate"]["candidate_ready_is_policy_scoped"] is True
+    assert variants["xyz_rgb_opacity"]["long_training_gate"]["scoped_to_policy"] == "xyz_rgb_opacity"
+    assert variants["xyz_rgb_opacity"]["long_training_gate"]["scope"]["native_gaussian_evidence_only"] is True
     assert semantic["identity_retrieval_at_1"] == pytest.approx(1.0)
     assert semantic["identity_margin"] > 0.0
     assert semantic["identity_retrieval_at_1"] > native["identity_retrieval_at_1"]
@@ -69,6 +73,8 @@ def test_model_identity_ablation_compares_report_ladder_feature_policies(tmp_pat
     assert diagnostics["teacher_evidence_layer_indicated"] is True
     assert "native_gaussian_attributes_not_sufficient_without_semantic_evidence" in diagnostics["notes"]
     assert summary["next_stage_gate"]["teacher_evidence_layer_contract_recommended"] is True
+    assert summary["next_stage_gate"]["native_long_training_gate"] == "blocked"
+    assert summary["next_stage_gate"]["semantic_long_training_gate"] == "candidate_ready"
     assert summary["next_stage_gate"]["long_training_allowed"] is False
 
     summary_path = tmp_path / "identity-ablation-summary.json"
