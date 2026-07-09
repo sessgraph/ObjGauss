@@ -43,6 +43,9 @@
 | GraphDECO official results | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Results - 7GB` | P1 | 高质量官方 3DGS 结果；适合静态 Gaussian scene benchmark 和 renderer / object-field robustness 审计 | 大文件；继承 Mip-NeRF360 / Tanks and Temples / Deep Blending 等原数据条款；不直接提供 action GT |
 | GraphDECO official scenes | https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/ | 官方页面提供 `Scenes - 650MB` | P2 | 若需要重新训练或对齐相机轨迹，可作为官方 scene 输入来源 | 是训练/评估源，不是 ready `.splat` 小样例；下载后仍需放 ignored `outputs/` |
 | Inria Hierarchical 3DGS datasets | https://repo-sam.inria.fr/fungraph/hierarchical-3d-gaussians/ | 官方页面提供 `Datasets` 下载入口 | P2 | 大规模分层 3DGS / LOD / streaming 研究素材，用于后期 renderer route 压力和层级高斯路线评估 | 体量大；不是小型 ready viewer sample，也不提供 state-variable action / counterfactual GT |
+| cakewalk Lumix Gaussian PLY | https://huggingface.co/cakewalk/splat-data/tree/main | `gs_FF3_lumix_4k 3.ply`，约 263 MB | P2 | 现成 Gaussian PLY；适合后续验证 PLY import / object clustering 是否能吃第三方大体量 Gaussian PLY | 当前 assets pull 自动化只稳定支持 `.splat -> ObjGauss PLY`；文件名含空格且体量较大，先记录候选，不进入 registry |
+| GaussianSplats3D sample archive | https://projects.markkellogg.org/downloads/gaussian_splat_data.zip | demo sample archive，约 622 MB，格式需本地解包确认 | P2 | 可作为 Three.js / browser Gaussian renderer reference 场景来源，尤其适合对比 `.ksplat` / viewer performance 路线 | 当前 ObjGauss 没有 `.ksplat` import contract；只作格式适配候选，不作为可拉取 asset |
+| Niantic SPZ samples | https://github.com/nianticlabs/spz/tree/main/samples | `.spz` sample files，单文件约十几到二十几 MB | P2 | 小体积 compressed Gaussian candidate，可用于后续评估 SPZ decoder / converter 是否值得接入 | 当前 ObjGauss 没有 `.spz` decoder；新增该格式属于单独标准 PR，不能直接进入 viewer / registry |
 
 推荐顺序：
 
@@ -52,7 +55,10 @@
    `bicycle.splat`，再考虑 `stump` / `treehill`。
 3. 若要做官方高质量结果审计，再考虑 GraphDECO results 或 Inria Hierarchical
    3DGS datasets；这些属于大体量本地审计，不适合作为首个小样例。
-4. 若目标是证明 `ObjectState` 是真实状态变量，现成静态 Gaussian scene 只能提供
+4. 若要探索新格式，先本地审计 cakewalk Gaussian PLY、GaussianSplats3D archive 或
+   Niantic SPZ samples，再单独立项做 `.ply` / `.ksplat` / `.spz` import contract；
+   不把未支持格式硬接进现有 `.splat` registry。
+5. 若目标是证明 `ObjectState` 是真实状态变量，现成静态 Gaussian scene 只能提供
    reconstruction noise / segmentation negative evidence；仍必须另找带 timestamped
    physical identity、pose 和 action 的 controlled/public capture。
 

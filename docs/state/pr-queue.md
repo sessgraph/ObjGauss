@@ -765,6 +765,34 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
   - `git diff --check`: passed。
   - 完成 commit: 本提交。
 
+### GAUSSIAN-SCENE-EXPANDED-SOURCE-TRIAGE-001: Triage additional ready-made Gaussian scene sources
+
+- 状态: done / gaussian-scene-expanded-source-triage
+- 类型: docs-only / asset research
+- 状态记录: `docs/asset-library.md`
+- 目标: 继续按“最好找一些现成的高斯场景”方向，把新增公开来源分成可直接复用、
+  需要格式适配和大体量研究候选，避免把 unsupported `.spz` / `.ksplat` 或第三方
+  PLY 硬塞进现有 `.splat` registry。
+- 已实施:
+  - 在 `docs/asset-library.md` 补充 cakewalk 现成 Gaussian PLY 候选，明确当前
+    assets pull 自动化仍只稳定覆盖 `.splat -> ObjGauss PLY`。
+  - 登记 GaussianSplats3D sample archive 作为 `.ksplat` / browser performance
+    reference 候选，但不作为可拉取 asset。
+  - 登记 Niantic SPZ samples 作为小体积 compressed Gaussian 候选，但明确需要
+    单独 decoder / converter PR。
+  - 推荐顺序更新为：先用已登记 cakewalk `.splat`，再做大场景/官方结果，最后才评估
+    `.ply` / `.ksplat` / `.spz` format contract。
+- 边界:
+  - 不下载素材、不提交 `public/samples/` 或 `outputs/` 产物。
+  - 不新增 `.spz` / `.ksplat` / third-party PLY importer。
+  - 不修改 viewer / export 默认，不声明 public demo、commercial demo、state-variable
+    evidence pass 或 world-model evidence。
+- 验证:
+  - docs-only，未运行 pytest / build。
+  - `uv run objgauss assets list --pullable`: passed；现有 pullable registry 未受影响。
+  - `git diff --check`: passed。
+  - 完成 commit: 本提交。
+
 ### OBJECTSTATE-PUBLIC-INTERACTION-ACTION-GT-GATE-001: Require action GT readiness in public interaction route audit
 
 - 状态: done / public-interaction-action-gt-gate

@@ -4486,7 +4486,10 @@ npm run acceptance:demo
    `splat-to-objgauss-ply` 管线拉取和转换。`garden` / `bicycle` / `stump` /
    `treehill` 是大体量本地研究候选，适合 LOD / renderer pressure 和静态分割负例，
    不能替代带 timestamped identity / 6DoF pose / action GT 的 Phase 1 rows，也未进入
-   viewer/export 默认策略。
+   viewer/export 默认策略。`GAUSSIAN-SCENE-EXPANDED-SOURCE-TRIAGE-001` 继续补充
+   cakewalk 现成 Gaussian PLY、GaussianSplats3D sample archive 和 Niantic SPZ
+   samples 作为后续格式适配候选；这些需要 `.ply` / `.ksplat` / `.spz` import
+   contract 或本地解包审计，暂不进入 pullable registry。
 4. 后续 SEG: CLIP / color-mask / KMeans baseline comparison，alignment 质量指标和 promotion policy。
 5. 将 Poly Haven mesh -> NeRF-style render set -> Splatfacto smoke 链路升级为可审计的公开 demo 候选前，先补许可说明、质量阈值和浏览器验收。
 6. 后续 renderer 优化: Spark 按需加载或拆包，降低首屏 bundle。
