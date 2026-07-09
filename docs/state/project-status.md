@@ -114,6 +114,19 @@ blocked，必须等 identity retrieval、temporal consistency 和 real evidence 
 不启用 temporal loss、不引入 Hungarian / scipy 依赖、不接 renderer loss、不使用 replay buffer /
 diffusion / dynamics，也不声明 prediction / causal / reality gate 或 world model 已通过。
 
+随后完成 `OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-001`：新增
+`objgauss.core.objectstate_model_identity_benchmark`，schema 为
+`objgauss-objectstate-model-identity-benchmark-v1`。`objectstate_model_identity_benchmark_summary(...)`
+消费显式 `ObjectStateModelIdentityBenchmarkScenario` rows，对 viewpoint / dropout /
+occlusion / appearance / spatial 扰动复用现有 identity gate，并聚合
+`random_assignment`、`xyz_centroid`、`oracle_target_assignment` 和 `assignment_solver_v2`
+baseline。summary 输出 overall metrics、per-perturbation breakdown、scenario artifact refs
+和 `long_training_gate`；candidate-ready 要求 solver retrieval 超过 `xyz_centroid`、
+identity margin 为正、occlusion recovery 超过 random、`slot_swap_rate` 已报告且有界，并保持
+oracle 为 retrieval upper bound。该切片只实现 benchmark 编排，不训练、不做 ablation、
+不启用 temporal loss、不导入真实 capture、不修改 viewer/export 默认，也不声明真实 benchmark
+或 prediction / causal / reality / world-model gate 已通过。
+
 Viewer 主流程已明确收敛为 Three.js-first：所有分割、对象化和移动能力都建立在
 Three.js 先加载并展示高斯云 / 模型之后。当前对象层已支持多模型版本展示、选中
 ObjectState group、移动 / 旋转 / 缩放 gizmo、undo / redo / cancel、Shift snap，

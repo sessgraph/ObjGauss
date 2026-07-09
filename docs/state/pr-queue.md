@@ -395,6 +395,39 @@ diffusion、replay buffer 大系统或 viewer/export 默认模型。
 
 ## Done
 
+### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-001: Add perturbation identity benchmark
+
+- 状态: done / objectstate-model-identity-benchmark
+- 类型: 标准 PR / ObjectState identity representation validation
+- 架构规格: `docs/architecture/objectstate-model-contract.md`
+- 状态记录: `docs/state/project-status.md`
+- 目标: 在 model identity gate 之后，用系统性扰动 benchmark 判断
+  `AssignmentSolverV2 -> A[N,K] -> ObjectStateProjection` 是否支撑跨帧 physical identity，
+  并把长训练 gate 继续绑定到可审计 identity metrics。
+- 已实施:
+  - 新增 `objgauss.core.objectstate_model_identity_benchmark`。
+  - 新增 schema `objgauss-objectstate-model-identity-benchmark-v1`、scenario /
+    threshold dataclass、summary 和 validator。
+  - 对每个 scenario 复用 `objectstate_model_identity_gate_summary(...)`，并聚合
+    `viewpoint`、`dropout`、`occlusion`、`appearance`、`spatial` 五类扰动。
+  - 输出 overall baseline metrics、per-perturbation breakdown、scenario artifact refs
+    和 `long_training_gate`。
+  - `candidate_ready` 要求 solver retrieval 超过 `xyz_centroid`、margin 为正、
+    occlusion recovery 超过 random、`slot_swap_rate` 有界，并保持 oracle 为上界。
+  - 核心 lazy namespace 暴露 benchmark schema、perturbation kinds 和入口。
+- 边界:
+  - physical identity labels 只用于 evaluation；`slot_swap_rate` 是诊断指标，不要求为 0。
+  - 不训练新模型，不做 identity ablation，不启用 temporal / matching loss。
+  - 不引入 Hungarian / scipy 依赖，不使用 GPU / torch / CUDA，不接 renderer loss。
+  - 不采集 controlled real 数据、不修改 viewer/export 默认，不声明真实 identity /
+    prediction / causal / reality gate pass 或 world model。
+- 验证:
+  - `uv run --extra dev pytest tests/test_objectstate_model_identity_benchmark.py tests/test_objectstate_model_identity_gate.py tests/test_core_namespace.py -q`: 14 passed。
+  - `uv run --extra dev pytest`: 621 passed。
+  - `npm run build`: 通过，仍有既有 Vite large chunk warning。
+  - `git diff --check`: 通过。
+- 完成 commit: 本提交。
+
 ### OBJECTSTATE-MODEL-IDENTITY-GATE-001: Add permutation-aware model identity gate
 
 - 状态: done / objectstate-model-identity-gate

@@ -326,6 +326,30 @@ Implemented v0.1 facts:
   Hungarian / scipy dependency, use renderer loss, or claim prediction /
   causal / reality gate success.
 
+### OBJECTSTATE-MODEL-IDENTITY-BENCHMARK-001
+
+Implemented v0.1 facts:
+
+- Core module:
+  `objgauss.core.objectstate_model_identity_benchmark`.
+- Summary schema:
+  `objgauss-objectstate-model-identity-benchmark-v1`.
+- Entry point:
+  `objectstate_model_identity_benchmark_summary(...)`.
+- Runs the existing identity gate for explicit
+  `ObjectStateModelIdentityBenchmarkScenario` rows across `viewpoint`,
+  `dropout`, `occlusion`, `appearance` and `spatial` perturbations.
+- Aggregates `random_assignment`, `xyz_centroid`, `oracle_target_assignment`
+  and `assignment_solver_v2` into overall metrics, perturbation breakdowns,
+  scenario artifact refs and a `long_training_gate`.
+- `candidate_ready` requires solver retrieval > `xyz_centroid`, positive
+  identity margin, occlusion recovery > random, bounded reported
+  `slot_swap_rate`, and oracle target assignment as retrieval upper bound.
+- `slot_swap_rate` is diagnostic, not required to be 0.
+- This benchmark does not train, run identity ablation, add temporal loss,
+  ingest real capture, mutate viewer defaults or claim prediction / causal /
+  reality gate success.
+
 ### OBJECTSTATE-ASSIGNMENT-TRAIN-CONTRACT-001
 
 Implemented v0.1 facts:

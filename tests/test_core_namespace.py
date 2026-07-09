@@ -51,6 +51,8 @@ from objgauss.core import (
     ObjectStateIdentityEncoderTrainingResult,
     ObjectStateIdentityGateReport,
     ObjectStateIdentityGateThresholds,
+    ObjectStateModelIdentityBenchmarkScenario,
+    ObjectStateModelIdentityBenchmarkThresholds,
     ObjectStateModelIdentityGateThresholds,
     ObjectStateIdentityRow,
     ObjectStatePredictiveGateReport,
@@ -153,6 +155,8 @@ from objgauss.core import (
     OBJECTSTATE_IDENTITY_DATASET_SCHEMA,
     OBJECTSTATE_IDENTITY_GATE_SCHEMA,
     OBJECTSTATE_MODEL_IDENTITY_BASELINES,
+    OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS,
+    OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA,
     OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA,
     OBJECTSTATE_PREDICTIVE_GATE_SCHEMA,
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
@@ -236,6 +240,7 @@ from objgauss.core import (
     decode_gaussian_from_object_state,
     diagnose_synthetic_stability_fixture,
     evaluate_objectstate_identity_gate,
+    objectstate_model_identity_benchmark_summary,
     objectstate_model_identity_gate_summary,
     evaluate_objectstate_causal_gate,
     evaluate_objectstate_predictive_gate,
@@ -530,6 +535,7 @@ from objgauss.core import (
     validate_synthetic_observation_frame,
     validate_objectstate_identity_encoder_training_summary,
     validate_objectstate_identity_gate_summary,
+    validate_objectstate_model_identity_benchmark_summary,
     validate_objectstate_model_identity_gate_summary,
     validate_objectstate_predictive_gate_summary,
     validate_synthetic_stability_diagnostics_summary,
@@ -825,14 +831,31 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     assert OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA == (
         "objgauss-objectstate-model-identity-gate-v1"
     )
+    assert OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA == (
+        "objgauss-objectstate-model-identity-benchmark-v1"
+    )
+    assert set(OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS) == {
+        "viewpoint",
+        "dropout",
+        "occlusion",
+        "appearance",
+        "spatial",
+    }
     assert set(OBJECTSTATE_MODEL_IDENTITY_BASELINES) == {
         "random_assignment",
         "xyz_centroid",
         "oracle_target_assignment",
         "assignment_solver_v2",
     }
+    assert objectstate_model_identity_benchmark_summary is not None
     assert objectstate_model_identity_gate_summary is not None
+    assert validate_objectstate_model_identity_benchmark_summary is not None
     assert validate_objectstate_model_identity_gate_summary is not None
+    assert ObjectStateModelIdentityBenchmarkScenario is not None
+    assert isinstance(
+        ObjectStateModelIdentityBenchmarkThresholds(),
+        ObjectStateModelIdentityBenchmarkThresholds,
+    )
     assert isinstance(
         ObjectStateModelIdentityGateThresholds(),
         ObjectStateModelIdentityGateThresholds,

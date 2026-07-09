@@ -118,6 +118,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_gate",
         "ObjectStateModelIdentityGateThresholds",
     ),
+    "ObjectStateModelIdentityBenchmarkScenario": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "ObjectStateModelIdentityBenchmarkScenario",
+    ),
+    "ObjectStateModelIdentityBenchmarkThresholds": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "ObjectStateModelIdentityBenchmarkThresholds",
+    ),
     "ObjectStateIdentityRow": (
         "objgauss.core.objectstate_identity_gate",
         "ObjectStateIdentityRow",
@@ -1549,6 +1557,14 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_gate",
         "OBJECTSTATE_MODEL_IDENTITY_BASELINES",
     ),
+    "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA",
+    ),
+    "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS",
+    ),
     "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA": (
         "objgauss.core.objectstate_predictive_gate",
         "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA",
@@ -1705,6 +1721,10 @@ _EXPORTS = {
         "objgauss.core.objectstate_model_identity_gate",
         "objectstate_model_identity_gate_summary",
     ),
+    "objectstate_model_identity_benchmark_summary": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "objectstate_model_identity_benchmark_summary",
+    ),
     "evaluate_objectstate_causal_gate": (
         "objgauss.core.objectstate_causal_gate",
         "evaluate_objectstate_causal_gate",
@@ -1760,6 +1780,10 @@ _EXPORTS = {
     "validate_objectstate_model_identity_gate_summary": (
         "objgauss.core.objectstate_model_identity_gate",
         "validate_objectstate_model_identity_gate_summary",
+    ),
+    "validate_objectstate_model_identity_benchmark_summary": (
+        "objgauss.core.objectstate_model_identity_benchmark",
+        "validate_objectstate_model_identity_benchmark_summary",
     ),
     "validate_objectstate_predictive_gate_summary": (
         "objgauss.core.objectstate_predictive_gate",
