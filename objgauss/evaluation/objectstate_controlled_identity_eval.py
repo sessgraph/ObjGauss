@@ -80,7 +80,11 @@ def evaluate_objectstate_controlled_identity_predictions(
         checked_predictions["candidate"],
         association=association,
     )
-    pass_gates = _identity_pass_gates(metrics, checked_thresholds)
+    pass_gates = _identity_pass_gates(
+        metrics,
+        checked_thresholds,
+        candidate=checked_predictions["candidate"],
+    )
     passed = all(pass_gates.values())
     controlled_real_manifest = _controlled_real_manifest_with_identity_row(
         checked_capture,
@@ -204,6 +208,27 @@ def validate_objectstate_controlled_identity_eval_summary(
         not isinstance(value, bool) for value in pass_gates.values()
     ):
         raise ValueError("controlled identity pass_gates must be bool")
+    candidate = payload.get("candidate")
+    if not isinstance(candidate, Mapping):
+        raise ValueError("controlled identity eval summary requires candidate")
+    max_association_distance = candidate.get("max_association_distance")
+    finite_distance_threshold_configured = (
+        not isinstance(max_association_distance, bool)
+        and isinstance(max_association_distance, (int, float))
+        and isfinite(float(max_association_distance))
+        and float(max_association_distance) >= 0.0
+    )
+    expected_distance_gate = (
+        metrics["prediction_association_mode"] == _RAW_TRACK_OBSERVATIONS
+        and finite_distance_threshold_configured
+    )
+    if (
+        pass_gates.get("finite_association_distance_threshold_configured")
+        is not expected_distance_gate
+    ):
+        raise ValueError(
+            "controlled identity distance-threshold gate must match candidate"
+        )
     expected_status = (
         "objectstate_controlled_identity_eval_pass"
         if all(pass_gates.values())
@@ -217,9 +242,14 @@ def validate_objectstate_controlled_identity_eval_summary(
             metrics["prediction_association_mode"] != _RAW_TRACK_OBSERVATIONS
             or not metrics["raw_prediction_observations"]
             or not pass_gates.get("raw_prediction_observations_only", False)
+            or not pass_gates.get(
+                "finite_association_distance_threshold_configured", False
+            )
         )
     ):
-        raise ValueError("controlled identity pass requires raw track observations")
+        raise ValueError(
+            "controlled identity pass requires bounded raw track observations"
+        )
     validate_objectstate_controlled_real_manifest(payload.get("controlled_real_manifest"))
     claim_policy = payload.get("claim_policy", {})
     if (
@@ -409,10 +439,20 @@ def _identity_metrics(
 def _identity_pass_gates(
     metrics: Mapping[str, Any],
     thresholds: ObjectStateControlledIdentityThresholds,
+    *,
+    candidate: Mapping[str, Any],
 ) -> dict[str, bool]:
+    max_association_distance = candidate.get("max_association_distance")
     return {
         "raw_prediction_observations_only": bool(
             metrics["raw_prediction_observations"]
+        ),
+        "finite_association_distance_threshold_configured": (
+            metrics["prediction_association_mode"] == _RAW_TRACK_OBSERVATIONS
+            and not isinstance(max_association_distance, bool)
+            and isinstance(max_association_distance, (int, float))
+            and isfinite(float(max_association_distance))
+            and float(max_association_distance) >= 0.0
         ),
         "no_unmatched_prediction_observations": int(
             metrics["unmatched_prediction_count"]
@@ -833,6 +873,8 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
             value["max_association_distance"],
             "max_association_distance",
         )
+        if not isfinite(max_distance):
+            raise ValueError("max_association_distance must be finite")
         if max_distance < 0.0:
             raise ValueError("max_association_distance must be >= 0")
         result["max_association_distance"] = max_distance

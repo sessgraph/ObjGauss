@@ -103,6 +103,7 @@ def test_controlled_identity_handoff_surfaces_failed_identity_gate(tmp_path):
         artifact,
         candidate_id="fragmented-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -136,6 +137,7 @@ def test_controlled_identity_handoff_requires_capture_file_audit_pass(tmp_path):
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -171,6 +173,7 @@ def test_controlled_identity_handoff_requires_reconstruction_noise_evidence(
         artifact,
         candidate_id="missing-noise-robustness",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -199,6 +202,7 @@ def test_controlled_identity_handoff_rejects_text_placeholder_frame_files(tmp_pa
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -222,6 +226,7 @@ def test_controlled_identity_handoff_requires_candidate_artifact_file_audit_pass
         _capture_manifest(),
         _trainable_artifact(),
         candidate_id="stable-objectstate-slots",
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
     )
 
@@ -254,6 +259,7 @@ def test_controlled_identity_handoff_requires_candidate_artifact_ref_match(
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=("outputs/controlled-real/mismatched-objectstates.json",),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -284,6 +290,7 @@ def test_controlled_identity_handoff_requires_identity_scenario_challenge(
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -322,6 +329,7 @@ def test_controlled_identity_handoff_requires_clear_visible_reappearance(
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )
@@ -354,6 +362,7 @@ def test_controlled_identity_handoff_requires_real_identity_condition_coverage(
         artifact,
         candidate_id="stable-objectstate-slots",
         artifact_refs=(str(artifact_path),),
+        max_centroid_distance=0.05,
         capture_root=tmp_path,
         candidate_artifact_path=artifact_path,
     )

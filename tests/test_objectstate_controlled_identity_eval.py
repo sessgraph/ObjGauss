@@ -143,6 +143,40 @@ def test_controlled_identity_eval_rejects_duplicate_prediction_pair():
         evaluate_objectstate_controlled_identity_predictions(_capture_manifest(), predictions)
 
 
+def test_controlled_identity_eval_cannot_pass_unbounded_far_observations():
+    predictions = _predictions()
+    predictions["candidate"].pop("max_association_distance")
+    for row in predictions["predictions"]:
+        row["predicted_position"] = [1000.0, 1000.0, 1000.0]
+
+    summary = evaluate_objectstate_controlled_identity_predictions(
+        _capture_manifest(),
+        predictions,
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_eval_fail"
+    assert summary["metrics"]["idf1"] == 1.0
+    assert summary["metrics"]["association_max_distance"] > 1000.0
+    assert summary["metrics"]["unmatched_prediction_count"] == 0
+    assert (
+        summary["pass_gates"][
+            "finite_association_distance_threshold_configured"
+        ]
+        is False
+    )
+
+
+def test_controlled_identity_eval_rejects_non_finite_association_distance():
+    predictions = _predictions()
+    predictions["candidate"]["max_association_distance"] = float("inf")
+
+    with pytest.raises(ValueError, match="max_association_distance must be finite"):
+        evaluate_objectstate_controlled_identity_predictions(
+            _capture_manifest(),
+            predictions,
+        )
+
+
 def test_controlled_identity_eval_legacy_preassociated_rows_cannot_pass():
     summary = evaluate_objectstate_controlled_identity_predictions(
         _capture_manifest(),
@@ -270,6 +304,7 @@ def _predictions(
                 "reconstruction_noise_variant_count": 2,
                 "source": "fixture repeated Gaussian reconstruction noise variants",
             },
+            "max_association_distance": 0.05,
         },
         "predictions": rows,
     }

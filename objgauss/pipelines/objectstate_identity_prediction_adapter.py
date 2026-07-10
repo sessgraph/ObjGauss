@@ -100,6 +100,8 @@ def _validate_max_distance(value: float | None) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError("max_centroid_distance must be numeric")
     distance = float(value)
+    if not np.isfinite(distance):
+        raise ValueError("max_centroid_distance must be finite")
     if distance < 0.0:
         raise ValueError("max_centroid_distance must be >= 0")
     return distance

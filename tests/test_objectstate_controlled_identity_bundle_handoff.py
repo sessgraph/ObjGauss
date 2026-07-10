@@ -84,6 +84,7 @@ def test_controlled_identity_bundle_handoff_fails_without_real_bundle_files(tmp_
         tmp_path,
         artifact,
         candidate_id="stable-objectstate-slots",
+        max_centroid_distance=0.05,
         candidate_artifact_path=artifact_path,
     )
 

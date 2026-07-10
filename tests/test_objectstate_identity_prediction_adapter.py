@@ -181,6 +181,15 @@ def test_trainable_artifact_adapter_can_filter_far_centroids():
     assert summary["metrics"]["unmatched_prediction_count"] == 6
 
 
+def test_trainable_artifact_adapter_rejects_non_finite_centroid_distance():
+    with pytest.raises(ValueError, match="max_centroid_distance must be finite"):
+        objectstate_identity_predictions_from_trainable_artifact(
+            _capture_manifest(),
+            _trainable_artifact(),
+            max_centroid_distance=float("inf"),
+        )
+
+
 def test_trainable_artifact_identity_source_reads_json(tmp_path):
     artifact_path = tmp_path / "objectstates.json"
     artifact_path.write_text(json.dumps(_trainable_artifact()), encoding="utf-8")
