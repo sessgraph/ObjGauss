@@ -11,8 +11,12 @@
   occlusion、view change 与测量得到的非零 action。
 - 当前三段 BOP public replay 仅能提供 RGB-D/pose 负证据；identity/prediction gate 未通过，
   且没有 intervention action GT。
-- 解锁方式：Owner 在本机放置许可合规的 H2O/HOI4D 子集，或提供可用 capture host；
-  不在聊天中发送凭据。
+- 已完成 RBO/RRC 官方索引预检，各 3 条最小 acquisition candidate 已于 2026-07-10
+  下载到 ignored `outputs/assets/raw/`，并通过大小、archive 完整性与适用的官方 MD5 校验。
+- 下一步先解包到 ignored workspace，再核验 RBO measured wrench 与 RRC desired/applied
+  control 的时间覆盖、pose、遮挡和视角证据；若都不能形成合规 3D action vector，再回到
+  许可合规的外部子集或 capture host。不要在聊天中发送凭据，也不要新增 wrapper 或伪造
+  action。
 
 ### CORE-BOUNDARY-001: 继续外移 core orchestration
 

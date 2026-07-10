@@ -32,6 +32,8 @@
 | --- | --- | --- | --- | --- |
 | BOP HOPE val Realsense | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-hope/hope_val_realsense.zip`、`outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/`、`val/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
 | BOP LMO test BOP19 | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`、`outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
+| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、3 个 interaction archive 与 3 个 companion model archive | 筛选 RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 同时存在的 interaction；2026-07-10 本地下载并通过大小、官方 MD5 与 tar 完整性校验 | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；尚未验证遮挡或形成 gate row |
+| RRC 2020 local subset | https://people.tuebingen.mpg.de/mpi-is-software/data/rrc2020/ | `outputs/assets/raw/rrc2020/`：官方 SQLite index、query helper 与 `7969.zip`、`8076.zip`、`9505.zip` | 筛选同一 robot、Phase 2 Level 4、持续抬升/位移/到达目标的真实控制 run；2026-07-10 本地下载并通过固定大小与 ZIP 完整性校验 | CC BY-NC-SA 4.0；pose 是视觉 tracker estimate，原生 action 是 9D robot control，不能直接冒充现行 3D action vector |
 
 HOPE scene `000002` 的当前最小复跑输入只抽取前 3 帧：
 
@@ -60,6 +62,36 @@ uv run objgauss object-state bop-rgbd-baseline-local-row-handoff \
 该结果是第三个 pose replay 的局部负证据，不是完整 controlled scene：identity
 reviewability 为 fail，prediction 与 hold-last 同为零误差，且没有真实 action。
 `outputs/assets/` 与 `outputs/evidence/` 继续 ignored，不提交 git。
+
+### RBO / RRC 最小 acquisition 子集
+
+本地下载与复核命令：
+
+```bash
+scripts/download-objectstate-evidence-subsets.sh --list
+scripts/download-objectstate-evidence-subsets.sh --download --dataset all
+scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all
+```
+
+脚本固定下载以下候选，不拉取 RBO 122.5 GB 全库或 RRC 全量：
+
+| 数据集 | 候选 | 选择依据 | payload |
+| --- | --- | --- | ---: |
+| RBO | `cardboardbox22`、`tripod25`、`cabinet20`，以及三个 companion object model | 三条均为 `Camera Motion=1`、`Small Interaction=0`、F/T=1、空 warning comment；覆盖 natural / artificial / dark lighting | `868,060,043` bytes |
+| RRC 2020 | Zarr jobs `7969`、`8076`、`9505` | 同属 `roboch1`、Phase 2 Level 4；`max_height_30 >= 0.08m`、`furthest_from_start_30 >= 0.12m`、`min_distance_to_goal_30 <= 0.01m` 且 reward 优于 baseline | `910,383,139` bytes |
+
+总 payload 为 `1,778,443,182` bytes，约 1.66 GiB。脚本使用 `.part` 文件断点续传，
+按 Zenodo 官方 MD5 校验 RBO，并按固定字节数与 ZIP 完整性校验 RRC。所有 payload
+继续只写入 ignored `outputs/assets/raw/`，不解包到 `public/`。
+
+2026-07-10 已完成 `--verify-only --dataset all`：六个 interaction/run archive 与三个
+RBO companion model archive 均通过，且没有残留 `.part` 文件。该结果只证明下载完整，
+不证明字段语义或 reality gate 合格。
+
+这些条目仍只是 acquisition candidates。解包后必须独立检查 timestamp overlap、完整
+link/object pose、实际 camera displacement、visible → occluded → visible、非零 wrench /
+desired-applied action 与 pose transition 重叠。RBO wrench 需要 bias/gravity compensation
+和坐标变换；RRC 9D control 不得静默降维或用未来 object pose delta 伪造成 3D action。
 
 外部 controlled-interaction 候选：
 

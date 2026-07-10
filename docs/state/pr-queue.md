@@ -61,6 +61,10 @@
 - 已核验: H2O/HOI4D/HOT3D/DexYCB 等公开候选可支持部分 identity/prediction，
   但都不原生提供现行合同要求的独立非零 3D action/control vector；当前 host 也无 capture
   设备与重建工具链。
+- acquisition preflight: RBO/RRC 官方索引及各 3 条最小候选已于 2026-07-10 本地下载，
+  并通过 `scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all`；
+  archives 尚未解包或完成字段语义审计，当前不能据此改变 `0/3` 或 intervention blocked
+  状态。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
 - 解锁条件: 提供能记录独立 action/control vector 的 capture host，或提供许可明确且同时含
   RGB-D/6DoF/遮挡/视角变化/真实控制量的现成 scene 文件。

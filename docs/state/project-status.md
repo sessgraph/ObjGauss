@@ -111,6 +111,12 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   现行 intervention contract 要求的独立 3D action/control vector，当前没有本地文件。
 - [HOI4D](https://hoi4d.github.io/) 也提供 RGB-D、category-level object pose 与 hand action，许可为 CC BY-NC 4.0；
   action 只有类别/时间区间而非独立 control vector；当前没有本地 raw sequence。
+- RBO Articulated Objects 与 RRC 2020 的官方索引及各 3 条最小 acquisition candidate
+  已于 2026-07-10 下载到 ignored `outputs/assets/raw/`，并通过
+  `scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all` 的大小、
+  archive 完整性与适用的官方 MD5 校验。payload 尚未解包或做字段语义审计；RBO 提供
+  measured 3D wrench 但不是 controller command，RRC 提供真实 desired/applied 9D robot
+  control，但不能直接当作现行 3D vector。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
@@ -119,7 +125,9 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
 - 实际 capture host / public interaction data 尚未提供任何同时满足全部条件的 scene；
   当前合格数为 `0/3`，三段 BOP 只是部分负证据。
 - 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
-  工具链；公开候选也均缺独立 action/control vector，不能在本机无外部输入闭环。
+  工具链；RBO/RRC scene archives 已在本地，但尚未解包并核验 timestamp/pose/occlusion/
+  view/action overlap，且两者 action 语义都不能未经审计直接满足 canonical 3D action
+  contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。
 - Python 默认依赖未覆盖 torch / SAM / transformers / gsplat / nerfstudio 复现实验。
