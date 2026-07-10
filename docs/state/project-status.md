@@ -52,12 +52,24 @@ HOPE 的局部 prediction evaluator 会在 `state_ade == history_ade == 0` 时�
 manual teacher evidence 和 schema/reviewability 状态均不计作 real gate pass。
 
 RBO `cardboardbox22`、`tripod25`、`cabinet20` 已完成实际字段与像素级审计。三段均有
-同步 RGB-D、逐刚体 MoCap 6DoF、`0.109–0.173m` camera displacement 和非零 100 Hz
-wrench；但使用官方 mesh、完整 camera TF、registered depth 独立重算后，严格
-clear → `occlusion_fraction >= 0.5` → clear 为 `0/3`。最大严格遮挡比例分别为
-`0.369 / 0.167 / 0.461`，不能手写成 pass。Wrench contact windows 可检测，但 sensor sign
-与 target-link attribution 未确认，action GT 继续 blocked。本地事实源为 ignored
-`outputs/evidence/rbo-objectstate-3scene/`。
+同步 RGB-D、逐刚体 MoCap 6DoF、camera motion 和非零 100 Hz wrench；但使用官方 mesh、
+完整 camera TF、registered depth 对全部非启动 RGB 帧独立重算后，严格 clear →
+`occlusion_fraction >= 0.5` → clear 为 `0/3`。最大严格遮挡比例分别为
+`0.421 / 0.430 / 0.476`，不能手写成 pass。
+
+同一批数据的 action 子问题已经闭环：ATI sign 独立复核后，使用同刻双官方 tool
+alignment 的精确 mesh/link 几何得到 5 个 accepted intervals，覆盖三段 scene；加速度补偿
+force sidecar 均为 `/map`、N、`measured_tool_on_object_force`，明确是 human/tool measurement，
+不是 controller command，也禁止把 force 当 `action_delta`。三个 3-frame bundle 的基础
+capture acceptance、文件审计、pose/action transition 均通过；既有 canonical evaluator
+产生 9 条真实 controlled rows，聚合 ledger 为 reviewable、`0 pass / 9 fail / 0 blocked`。
+identity IDF1 为 `0.500 / 0.333 / 0.333`；constant-velocity prediction 均未严格优于 history
+baseline；`hold_action` intervention 的 outcome accuracy 均为 0、wrong-direction rate 均为 1。
+这里的 identity candidate 是 current-frame RGB-D scene-centroid 弱基线，transition candidate
+由 capture GT pose 编译；`0/9` 只证明当前弱 candidate/baseline 失败，不表示 learned
+action-conditioned ObjectState 已经运行。
+严格 scene 仍为 `0/3`：三段都缺 V-O-V，且每段只有一个真实 lighting condition。事实源为
+ignored `outputs/evidence/rbo-objectstate-3scene/`。
 
 ## P0 稳定化结果
 
@@ -104,7 +116,9 @@ clear → `occlusion_fraction >= 0.5` → clear 为 `0/3`。最大严格遮挡�
    identity/prediction accounting，但 reality-row 转换会把无原生 action GT 的 intervention
    强制保持 blocked，fixture action 不能越权形成 public pass。
 
-仍未完成：真实 action/counterfactual evidence。当前冻结期可在不改 schema/ABI 的 core
+仍未完成：满足严格 identity scenario 的 controlled scene，以及超过 history/no-action
+baseline 的预测与 intervention candidate。真实 measured action GT 和可计算的负结果已经
+进入既有 evaluator，但不等于 counterfactual 能力通过。当前冻结期可在不改 schema/ABI 的 core
 ownership 减法已完成；`object_emergence_solver` 同时承载 shared assignment state/predict
 ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compatibility wrappers 仍
 保留）与 678 个 root exports 只能在明确 breaking/deprecation window 中收缩。
@@ -121,24 +135,28 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   action 只有类别/时间区间而非独立 control vector；当前没有本地 raw sequence。
 - RBO Articulated Objects 与 RRC 2020 的官方索引及各 3 条最小 acquisition candidate
   已于 2026-07-10 下载、完整性验证并完成字段语义审计。RBO 三段的 RGB-D、link/camera
-  pose 与 wrench 时间覆盖合格，但严格 V-O-V 为 `0/3`，wrench sign/target link 未闭环；
+  pose 与 wrench 时间覆盖合格，wrench sign/target link/action interval 已闭环并产生真实
+  identity/prediction/intervention 负结果，但严格 V-O-V 仍为 `0/3`；
   RRC 三段的三路 RGB、tracker pose 与 desired/applied action overlap 合格，但相机固定、
   无 depth，9D joint control 不能直接当现行 3D vector。
 - 新增 `scripts/download-rbo-occlusion-followup.sh`：P0 冻结
   `treasurebox25/laptop26/globe25`（约 1.024 GiB），P1 再加
   `treasurebox24/clamp25/pliers24/ikeasmall23`；官方 `ftSensor` model 同步纳入复现。
-  它只解决 acquisition，下载后仍须用同一严格可见性方法复核。
+  P0 已下载并逐帧复核：treasurebox 是 `0` V-O-V 的可信负证据；globe 只有 base link
+  可复核且无事件，moving link calibration 未解；laptop26 的 camera TF 与 RGB 可见性矛盾，
+  不计负证据。P0 没有解锁 scene，P1 尚未下载。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
 ## 当前阻塞与风险
 
-- 实际 capture host / public interaction data 尚未提供任何同时满足全部条件的 scene；
-  当前合格数为 `0/3`，三段 BOP 只是部分负证据。
+- 当前没有任何 scene 同时满足严格 V-O-V、两种 lighting 与完整 controlled 条件；合格数
+  仍为 `0/3`。首批三段 RBO 已不再因 action GT blocked，而是形成了可复核的 9 条真实
+  fail rows；这批负结果不能替代严格 scene。
 - 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
-  工具链；首批 RBO/RRC archives 已完成审计，但 RBO 严格遮挡回环为 `0/3` 且 action
-  sign/target-link 未闭环，RRC 又缺 temporal camera motion/depth/canonical 3D action。两者
-  当前都不能满足完整 controlled-scene contract。
+  工具链；首批 RBO/RRC archives 已完成审计。RBO action sign/target-link 已闭环，但首批与
+  follow-up P0 都未形成严格遮挡回环；RRC 又缺 temporal camera motion/depth/canonical 3D
+  action。两者当前都不能满足完整 controlled-scene contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。
 - Python 默认依赖未覆盖 torch / SAM / transformers / gsplat / nerfstudio 复现实验。

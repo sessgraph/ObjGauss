@@ -32,7 +32,7 @@
 | --- | --- | --- | --- | --- |
 | BOP HOPE val Realsense | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-hope/hope_val_realsense.zip`、`outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/`、`val/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
 | BOP LMO test BOP19 | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`、`outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
-| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、3 个 interaction archive 与 3 个 companion model archive | RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 均完成字段/时间审计；严格逐 link RGB-D 可见性重算为 `0/3` V-O-V | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；sensor sign 与 target-link attribution 未确认，不能形成 action GT |
+| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、首批/追补 interaction archives、companion models 与 `ftSensor` model | RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 均完成字段/时间审计；首批严格逐 link RGB-D 可见性为 `0/3` V-O-V；3 个本地 bundle 已产生真实负结果 | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；sign/target/interval 已闭环为 `/map` N force，但只允许 `hold_action` baseline，不能当 displacement |
 | RRC 2020 local subset | https://people.tuebingen.mpg.de/mpi-is-software/data/rrc2020/ | `outputs/assets/raw/rrc2020/`：官方 SQLite index、query helper 与 `7969.zip`、`8076.zip`、`9505.zip` | 三个 Phase 2 Level 4 run 已验证 Zarr 结构、时间、三路 RGB、tracker pose 与 desired/applied action overlap | CC BY-NC-SA 4.0；固定相机、无 depth；pose 是视觉 tracker estimate，原生 action 是 9D robot control，不能直接冒充现行 3D action vector |
 
 HOPE scene `000002` 的当前最小复跑输入只抽取前 3 帧：
@@ -89,11 +89,23 @@ RBO companion model archive 均通过，且没有残留 `.part` 文件。该结�
 不证明字段语义或 reality gate 合格。
 
 这些条目仍只是 acquisition candidates。2026-07-10 的字段语义审计确认：RBO 三段的
-RGB/depth/link pose/camera pose/wrench 时间重叠完整，camera displacement 为
-`0.109–0.173m`；但严格逐 link RGB-D/mesh z-buffer 重算没有任何一段形成
-clear → `occlusion_fraction >= 0.5` → clear。RBO wrench 已完成 bias/gravity 与 `/map`
-变换敏感性剖析，但官方材料没有明确 sensor 作用/反作用符号，且记录没有直接给出
-target link，因此 action GT 保持 blocked。一次性复核产物位于 ignored
+RGB/depth/link pose/camera pose/wrench 时间重叠完整；各 recording 的 camera marker
+相对首个 pose 最大平移为 `0.109–0.173m`。但严格逐 link RGB-D/mesh z-buffer 重算没有
+任何一段形成
+clear → `occlusion_fraction >= 0.5` → clear；逐帧最大遮挡为
+`0.421/0.430/0.476`。
+
+`ftSensor` model、ATI 官方 sign 文档与同刻双 alignment mesh/link 距离已把 action 子问题
+闭环：8 个 validation windows 中 7 个 target-link 通过，独立 50 Hz geometry scan 最终
+接受 5 个 intervals / 3 scenes；唯一拒绝的 cardboard window runner-up margin 为
+`9.9069mm < 10mm`，阈值未放宽。COM acceleration 补偿共计算 4,770 条 full-stream force
+rows，其中 5 个 accepted intervals 聚合 2,214 条 raw samples 并生成
+`measured_tool_on_object_force` sidecar，全部为 `/map`、N，且禁止 `action_delta`。三个
+3-frame bundle 通过 capture/file/action-transition acceptance；canonical full handoff 的
+reviewable reality-row ledger 为 `0 pass / 9 fail / 0 blocked`。三段仍因没有严格 V-O-V、
+只有一种真实 lighting 而不能计作合格 controlled scene。该结果使用 scene-centroid、
+capture GT-pose constant-velocity 与 `hold_action` 弱 baseline，不代表 learned
+action-conditioned ObjectState 已运行。一次性复核产物位于 ignored
 `outputs/evidence/rbo-objectstate-3scene/`，不提交仓库。
 
 RRC 三个 run 的 ZIP/Zarr、时间、三路 RGB、tracker 6DoF pose 与真实 desired/applied 9D
@@ -122,6 +134,22 @@ P0+P1 合计 `2,019,964,779` bytes，约 1.881 GiB。脚本默认 `--list`，下
 clutter 和较大 internal interaction，但官方 index 明示 camera TF 在录制后修复；在独立
 复核该修复前保持隔离，不进入自动下载集合。`laptop25` 与已发现 camera-pose/optical
 projection 不一致的 `laptop26` 同日同配置，也已从 P1 移除。
+
+P0 已完成 `--verify-only --tier p0` 与逐帧复核：
+
+- `treasurebox25` 非启动帧 `553/553`，base 最大遮挡 `0.443408`，moving link 最大
+  `0.077060`，均无 V-O-V，是可信负证据；
+- `globe25` 非启动帧 `373/373`，base 最大遮挡 `0.427475` 且无 V-O-V；moving sphere
+  约 97% unknown，link-specific calibration/transform 未解，不计负证据；
+- `laptop26` 非启动帧 `705/705`，记录 TF 将两个 link 全程投到相机后方而 RGB 中物体
+  实际可见，camera marker/TF calibration 无效，不计负证据。
+
+P0 因此没有新增合格 scene。P1 archives 当前尚未下载；继续使用：
+
+```bash
+scripts/download-rbo-occlusion-followup.sh --download --tier all
+scripts/download-rbo-occlusion-followup.sh --verify-only --tier all
+```
 
 外部 controlled-interaction 候选：
 

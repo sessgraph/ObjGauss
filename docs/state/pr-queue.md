@@ -55,25 +55,34 @@
 ### CONTROLLED-REAL-3SCENE-001: Run three real controlled scenes
 
 - 需要: physical identity、timestamped 6DoF pose、occlusion、view change、真实非零 action。
-- 已有: 两段 HOPE 与一段 LMO pose/public replay，均不含可用 intervention action。
-- 缺口: 合格 scene 仍为 `0/3`；三条都缺真实 action/counterfactual evidence，
-  identity/prediction 也尚未超过门槛与简单 baseline。
+- 已有: 两段 HOPE 与一段 LMO pose/public replay，均不含可用 intervention action；首批三段
+  RBO 已形成 physical link identity、6DoF、camera motion、measured force 与 canonical
+  identity/prediction/intervention 结果链。
+- 当前结果: RBO 基础 capture acceptance 与 action-transition 均通过；聚合 reality-row
+  ledger reviewable，`9` rows = `0 pass / 9 fail / 0 blocked`。三段 identity 均 fail，
+  constant-velocity 未严格优于 history，`hold_action` 未优于 no-action；严格 V-O-V 仍为
+  `0/3`，单一真实 lighting 也使 full readiness 保持 blocked。这是 scene-centroid 与
+  transition GT-pose baseline 的负结果，不是 learned ObjectState dynamics 结果。
+- 缺口: 合格 scene 仍为 `0/3`；缺的是严格 occlusion/reappearance 与超过简单 baseline 的
+  candidate，不再是首批 RBO 的 action sign/target attribution。
 - 已核验: H2O/HOI4D/HOT3D/DexYCB 等公开候选可支持部分 identity/prediction，
   但都不原生提供现行合同要求的独立非零 3D action/control vector；当前 host 也无 capture
   设备与重建工具链。
 - acquisition/semantic audit: RBO/RRC 官方索引及各 3 条最小候选已于 2026-07-10 本地
   下载并完成完整性与字段语义审计。RBO 三段有同步 RGB-D、逐 link 6DoF、相机运动和
-  wrench，但严格 mesh/depth 可见性重算为 `0/3` V-O-V，sensor sign/target link 未确认；
+  wrench；严格全帧 mesh/depth 可见性重算为 `0/3` V-O-V，最大遮挡为
+  `0.421/0.430/0.476`。ATI sign、target link 与 5 个 action interval 已独立闭环；
   RRC 三段有真实 9D desired/applied action 与 tracker pose，但固定相机、无 depth，不能
   直接进入现行 3D action contract。
 - follow-up acquisition: `scripts/download-rbo-occlusion-followup.sh` 固定 P0
-  `treasurebox25/laptop26/globe25` 与官方 `ftSensor` model；P0 实测发现 laptop camera
-  projection 与 globe moving-link mesh alignment 不可靠后，P1 已改为
+  `treasurebox25/laptop26/globe25` 与官方 `ftSensor` model。P0 已完整下载并逐帧复核：
+  treasurebox 可信但 `0` V-O-V，globe moving-link calibration 未解，laptop camera TF 无效，
+  因此没有新增合格 scene。P1 已改为
   `treasurebox24/clamp25/pliers24/ikeasmall23`。下载后仍须跑同一严格像素级可见性与
   action 语义复核，不能仅凭 index metadata 计数。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
-- 解锁条件: 提供能记录独立 action/control vector 的 capture host，或提供许可明确且同时含
-  RGB-D/6DoF/遮挡/视角变化/真实控制量的现成 scene 文件。
+- 解锁条件: P1 或新 capture 提供至少 3 个许可明确、严格 V-O-V 可复核且同时含
+  RGB-D/6DoF/view change/measured action 的 scene，并让 candidate 与简单 baseline 完成比较。
 
 ## Planned After Stabilization
 
@@ -95,6 +104,9 @@
   对 action 声明的错误依赖，并阻止 fixture intervention 转成 public pass。
 - 2026-07-10: RBO/RRC 首批 archive 字段语义审计；确认 RBO 严格 V-O-V `0/3` 与 action
   GT blocker，确认 RRC 固定相机/无 depth/9D action 边界，并冻结 RBO occlusion follow-up。
+- 2026-07-10: RBO action sign/target-link/interval 独立闭环；三段真实 bundle 进入既有
+  evaluator，聚合为 reviewable `0 pass / 9 fail / 0 blocked`，同时保留 V-O-V/lighting
+  full-readiness blocker；follow-up P0 逐帧复核未新增合格 scene。
 - 2026-07-09: controlled real prediction evaluator plumbing。
 - 2026-07-09: controlled real identity evaluator plumbing。
 
