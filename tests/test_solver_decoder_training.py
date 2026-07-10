@@ -7,6 +7,10 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
+from objgauss.core.object_emergence_solver import (
+    ObjectEmergenceSolverConfig,
+    ObjectEmergenceSolverState,
+)
 from objgauss.pipelines.gaussian_decoder_training import ObjectStateGaussianDecoderState
 from objgauss.pipelines.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
@@ -17,7 +21,10 @@ from objgauss.pipelines.solver_decoder_training import (
     train_solver_decoder_joint,
     validate_solver_decoder_joint_checkpoint,
 )
-from objgauss.pipelines.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.pipelines.trainable_kernel import (
+    TrainableKernelFrame,
+    trainable_kernel_sample_from_cloud,
+)
 from objgauss.pipelines.training_scale import (
     TRAINING_SCALE_PLAN_SCHEMA,
     solver_decoder_training_scale_plan,
@@ -74,6 +81,42 @@ def test_solver_decoder_joint_training_updates_solver_and_decoder():
         result.initial_decoder_state.object_colors,
         result.final_decoder_state.object_colors,
     )
+
+
+def test_solver_decoder_joint_one_step_recovers_from_probability_just_above_eps():
+    target_probability = 2.0e-8
+    frame = TrainableKernelFrame(
+        positions=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        features=np.array([[1.0]], dtype=np.float32),
+        target_rgb=np.zeros((1, 3), dtype=np.float32),
+        target_assignment=np.array([[1.0, 0.0]], dtype=np.float32),
+    )
+    initial_state = ObjectEmergenceSolverState(
+        config=ObjectEmergenceSolverConfig(slots=2, feature_dim=1),
+        feature_weights=np.zeros((1, 2), dtype=np.float32),
+        position_weights=np.zeros((3, 2), dtype=np.float32),
+        bias=np.array(
+            [np.log(target_probability / (1.0 - target_probability)), 0.0],
+            dtype=np.float32,
+        ),
+        source="near_eps_linear_softmax_fixture",
+    )
+
+    result = train_solver_decoder_joint(
+        [frame],
+        initial_solver_state=initial_state,
+        iterations=1,
+        solver_learning_rate=0.1,
+        train_decoder_colors=False,
+        image_render_weight=0.0,
+        object_weight=1.0,
+        entropy_weight=0.0,
+        balance_weight=0.0,
+    )
+
+    assert result.final_loss.object_loss < result.initial_loss.object_loss - 0.1
+    assert result.final_solver_state.bias[0] > initial_state.bias[0]
+    assert result.final_solver_state.bias[1] < initial_state.bias[1]
 
 
 def test_solver_decoder_joint_checkpoint_roundtrips_and_resumes():

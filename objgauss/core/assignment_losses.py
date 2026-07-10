@@ -38,9 +38,12 @@ class AssignmentLossV2Result:
     temporal_loss: float
     matching_loss: float
     supervised_loss: float
+    # Preserve the original public dL/dassignment payload.  Training code uses
+    # the appended, non-serialized softmax VJP to avoid a large CE intermediate.
     gradients: tuple[np.ndarray, ...]
     terms: tuple[AssignmentLossV2Term, ...]
     schema: str = ASSIGNMENT_LOSS_V2_SCHEMA
+    softmax_logit_gradients: tuple[np.ndarray, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +83,9 @@ def assignment_loss_v2_breakdown(
     supervised_weight: float = 0.0,
 ) -> AssignmentLossV2Result:
     checked = _validate_assignment_sequence(assignments)
+    resolved_target_assignments = (
+        None if target_assignments is None else tuple(target_assignments)
+    )
     _validate_weight("cluster_weight", cluster_weight)
     _validate_weight("entropy_weight", entropy_weight)
     _validate_weight("balance_weight", balance_weight)
@@ -93,20 +99,48 @@ def assignment_loss_v2_breakdown(
     balance_loss, balance_gradients = assignment_balance_loss_and_gradient(checked)
     supervised_loss, supervised_gradients = supervised_assignment_loss_and_gradient(
         checked,
-        target_assignments,
+        resolved_target_assignments,
     )
-    gradients = tuple(
+    _, supervised_logit_gradients = supervised_assignment_loss_and_logit_gradient(
+        checked,
+        resolved_target_assignments,
+    )
+    non_supervised_gradients = tuple(
         (
             cluster_weight * cluster_gradient
             + entropy_weight * entropy_gradient
             + balance_weight * balance_gradient
-            + supervised_weight * supervised_gradient
         ).astype(np.float32, copy=False)
-        for cluster_gradient, entropy_gradient, balance_gradient, supervised_gradient in zip(
+        for cluster_gradient, entropy_gradient, balance_gradient in zip(
             cluster_gradients,
             entropy_gradients,
             balance_gradients,
+            strict=True,
+        )
+    )
+    gradients = tuple(
+        (
+            non_supervised_gradient
+            + supervised_weight * supervised_gradient
+        ).astype(np.float32, copy=False)
+        for non_supervised_gradient, supervised_gradient in zip(
+            non_supervised_gradients,
             supervised_gradients,
+            strict=True,
+        )
+    )
+    softmax_logit_gradients = tuple(
+        (
+            _softmax_logit_gradient_from_assignment_gradient(
+                assignment,
+                non_supervised_gradient,
+            )
+            + supervised_weight * supervised_logit_gradient
+        ).astype(np.float32, copy=False)
+        for assignment, non_supervised_gradient, supervised_logit_gradient in zip(
+            checked,
+            non_supervised_gradients,
+            supervised_logit_gradients,
             strict=True,
         )
     )
@@ -156,8 +190,10 @@ def assignment_loss_v2_breakdown(
             name="supervised",
             value=supervised_loss,
             weight=supervised_weight,
-            enabled=target_assignments is not None and supervised_weight > 0,
-            status="enabled" if target_assignments is not None and supervised_weight > 0 else "disabled",
+            enabled=resolved_target_assignments is not None and supervised_weight > 0,
+            status="enabled"
+            if resolved_target_assignments is not None and supervised_weight > 0
+            else "disabled",
         ),
     )
     return AssignmentLossV2Result(
@@ -169,6 +205,7 @@ def assignment_loss_v2_breakdown(
         matching_loss=0.0,
         supervised_loss=float(supervised_loss),
         gradients=gradients,
+        softmax_logit_gradients=softmax_logit_gradients,
         terms=terms,
     )
 
@@ -195,9 +232,45 @@ def supervised_assignment_loss_and_gradient(
     assignments: Sequence[np.ndarray],
     target_assignments: Sequence[np.ndarray | None] | None,
 ) -> tuple[float, tuple[np.ndarray, ...]]:
+    """Return clipped cross entropy and its probability-space gradient.
+
+    For an active target with probability ``p``, ``dL/dp = -target/p``.
+    Values near ``_EPS`` are therefore necessarily large: a bounded
+    probability-space gradient cannot preserve the finite ``p - target``
+    gradient obtained after the softmax Jacobian.  Training callers should use
+    :func:`supervised_assignment_loss_and_logit_gradient` to evaluate that
+    vector-Jacobian product without materializing the large intermediate.
+    """
+    return _supervised_assignment_loss_and_gradient(
+        assignments,
+        target_assignments,
+        gradient_space="assignment",
+    )
+
+
+def supervised_assignment_loss_and_logit_gradient(
+    assignments: Sequence[np.ndarray],
+    target_assignments: Sequence[np.ndarray | None] | None,
+) -> tuple[float, tuple[np.ndarray, ...]]:
+    """Return clipped cross entropy and gradient w.r.t. softmax input logits."""
+    return _supervised_assignment_loss_and_gradient(
+        assignments,
+        target_assignments,
+        gradient_space="softmax_logits",
+    )
+
+
+def _supervised_assignment_loss_and_gradient(
+    assignments: Sequence[np.ndarray],
+    target_assignments: Sequence[np.ndarray | None] | None,
+    *,
+    gradient_space: str,
+) -> tuple[float, tuple[np.ndarray, ...]]:
     checked = _validate_assignment_sequence(assignments)
     if target_assignments is None:
         return 0.0, tuple(np.zeros_like(assignment, dtype=np.float32) for assignment in checked)
+    if gradient_space not in {"assignment", "softmax_logits"}:
+        raise ValueError("gradient_space must be assignment or softmax_logits")
     targets = tuple(target_assignments)
     if len(targets) != len(checked):
         raise ValueError("target_assignments must have one entry per assignment")
@@ -228,20 +301,38 @@ def supervised_assignment_loss_and_gradient(
             continue
         clipped = np.clip(assignment, _EPS, 1.0)
         losses.append(float(-np.mean(np.sum(checked_target * np.log(clipped), axis=1))))
-        # The forward loss is constant outside the clip interval, so its
-        # derivative with respect to assignment is zero there.  Applying the
-        # unclipped -target / probability formula to a zero probability
-        # produces a spurious 1e8 gradient that does not differentiate the
-        # actual clipped loss.
         clip_interior = (assignment > _EPS) & (assignment < 1.0)
-        gradients.append(
-            (
-                -(checked_target / clipped) * clip_interior
-                / max(float(assignment.shape[0]), _EPS)
-                / supervised_frame_count
-            ).astype(np.float32, copy=False)
-        )
+        normalizer = max(float(assignment.shape[0]), _EPS) * supervised_frame_count
+        if gradient_space == "assignment":
+            # The forward loss is constant outside the clip interval, so its
+            # probability derivative is zero there.  Inside the interval the
+            # exact -target / probability derivative can be large near _EPS;
+            # that is expected and must not be hidden with gradient clipping.
+            gradient = -(checked_target / clipped) * clip_interior / normalizer
+        else:
+            # Fuse the probability gradient with the softmax Jacobian:
+            #   J_softmax @ (-target / p)
+            # = p * sum(active_target) - active_target.
+            # This is algebraically identical to the clipped forward loss but
+            # avoids a 1 / p intermediate.  The active-target mass matters for
+            # soft targets and for entries on either clip plateau.
+            active_target = checked_target * clip_interior
+            active_target_mass = np.sum(active_target, axis=1, keepdims=True)
+            gradient = (
+                assignment * active_target_mass - active_target
+            ) / normalizer
+        gradients.append(gradient.astype(np.float32, copy=False))
     return float(np.mean(losses)) if losses else 0.0, tuple(gradients)
+
+
+def _softmax_logit_gradient_from_assignment_gradient(
+    assignment: np.ndarray,
+    assignment_gradient: np.ndarray,
+) -> np.ndarray:
+    row_dot = np.sum(assignment_gradient * assignment, axis=1, keepdims=True)
+    return (
+        assignment * (assignment_gradient - row_dot)
+    ).astype(np.float32, copy=False)
 
 
 def assignment_entropy_loss_and_gradient(

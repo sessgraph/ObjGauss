@@ -8,7 +8,7 @@ import numpy as np
 from objgauss.core.assignment_losses import (
     assignment_balance_loss_and_gradient,
     assignment_entropy_loss_and_gradient,
-    supervised_assignment_loss_and_gradient,
+    supervised_assignment_loss_and_logit_gradient,
 )
 from objgauss.core.gaussian_decoder import (
     OBJECT_STATE_GAUSSIAN_DECODE_SCHEMA,
@@ -760,7 +760,10 @@ def _evaluate_joint(
                 image_render_weight * renderer_api.gradient_decoder_scale_log_offsets
             )
 
-    object_loss, object_assignment_gradients = _object_loss_and_gradient(frames, assignments)
+    object_loss, object_logit_gradients = _object_loss_and_logit_gradient(
+        frames,
+        assignments,
+    )
     entropy_loss, entropy_gradients = _entropy_loss_and_gradient(assignments)
     balance_loss, balance_gradients = _balance_loss_and_gradient(assignments)
     projections = tuple(
@@ -777,22 +780,25 @@ def _evaluate_joint(
     )
     combined_assignment_gradients = tuple(
         renderer_gradient
-        + object_weight * object_gradient
         + entropy_weight * entropy_gradient
         + balance_weight * balance_gradient
-        for renderer_gradient, object_gradient, entropy_gradient, balance_gradient in zip(
+        for renderer_gradient, entropy_gradient, balance_gradient in zip(
             assignment_gradients,
-            object_assignment_gradients,
             entropy_gradients,
             balance_gradients,
             strict=True,
         )
+    )
+    combined_logit_gradients = tuple(
+        (object_weight * gradient).astype(np.float32, copy=False)
+        for gradient in object_logit_gradients
     )
     solver_gradient = _solver_gradient_from_assignments(
         evidence_frames,
         predictions,
         solver_state,
         combined_assignment_gradients,
+        combined_logit_gradients,
     )
     return _JointEval(
         loss=SolverDecoderJointLoss(
@@ -819,15 +825,17 @@ def _solver_gradient_from_assignments(
     predictions: tuple[ObjectEmergenceAssignmentPrediction, ...],
     solver_state: ObjectEmergenceSolverState,
     assignment_gradients: tuple[np.ndarray, ...],
+    softmax_logit_gradients: tuple[np.ndarray, ...],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     feature_grad = np.zeros_like(solver_state.feature_weights, dtype=np.float32)
     position_grad = np.zeros_like(solver_state.position_weights, dtype=np.float32)
     bias_grad = np.zeros_like(solver_state.bias, dtype=np.float32)
     temperature = max(float(solver_state.config.temperature), _EPS)
-    for evidence, prediction, assignment_gradient in zip(
+    for evidence, prediction, assignment_gradient, softmax_logit_gradient in zip(
         evidence_frames,
         predictions,
         assignment_gradients,
+        softmax_logit_gradients,
         strict=True,
     ):
         positions, features, _target = validate_object_emergence_evidence(
@@ -836,7 +844,10 @@ def _solver_gradient_from_assignments(
         )
         assignment = prediction.assignment
         inner = np.sum(assignment_gradient * assignment, axis=1, keepdims=True)
-        grad_logits = (assignment * (assignment_gradient - inner)) / temperature
+        grad_logits = (
+            assignment * (assignment_gradient - inner)
+            + softmax_logit_gradient
+        ) / temperature
         feature_grad += solver_state.config.feature_weight * (features.T @ grad_logits)
         position_grad += solver_state.config.position_weight * (positions.T @ grad_logits)
         bias_grad += np.sum(grad_logits, axis=0)
@@ -880,11 +891,11 @@ def _apply_solver_gradient(
     )
 
 
-def _object_loss_and_gradient(
+def _object_loss_and_logit_gradient(
     frames: tuple[TrainableKernelFrame, ...],
     assignments: tuple[np.ndarray, ...],
 ) -> tuple[float, tuple[np.ndarray, ...]]:
-    return supervised_assignment_loss_and_gradient(
+    return supervised_assignment_loss_and_logit_gradient(
         assignments,
         tuple(frame.target_assignment for frame in frames),
     )

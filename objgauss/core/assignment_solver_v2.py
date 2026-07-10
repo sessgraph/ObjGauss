@@ -735,15 +735,14 @@ def _training_gradient(
     position_grad = np.zeros_like(state.position_centers, dtype=np.float32)
     bias_grad = np.zeros_like(state.slot_bias, dtype=np.float32)
     frame_count = max(len(batches), 1)
-    for batch, prediction, assignment_grad in zip(
+    for batch, prediction, softmax_logit_grad in zip(
         batches,
         eval_result.predictions,
-        eval_result.loss_result.gradients,
+        eval_result.loss_result.softmax_logit_gradients,
         strict=True,
     ):
-        cost_grad = _cost_gradient_from_assignment_gradient(
-            assignment_grad,
-            prediction.assignment,
+        cost_grad = _cost_gradient_from_softmax_logit_gradient(
+            softmax_logit_grad,
             temperature=state.config.temperature,
         )
         if cluster_weight > 0:
@@ -817,16 +816,15 @@ def _assignment_cost(
     return cost.astype(np.float32, copy=False)
 
 
-def _cost_gradient_from_assignment_gradient(
-    assignment_gradient: np.ndarray,
-    assignment: np.ndarray,
+def _cost_gradient_from_softmax_logit_gradient(
+    softmax_logit_gradient: np.ndarray,
     *,
     temperature: float,
 ) -> np.ndarray:
-    row_dot = np.sum(assignment_gradient * assignment, axis=1, keepdims=True)
-    scaled_logit_grad = assignment * (assignment_gradient - row_dot)
-    logit_grad = scaled_logit_grad / float(temperature)
-    return (-logit_grad).astype(np.float32, copy=False)
+    # prediction logits are -cost and softmax consumes logits / temperature.
+    return (
+        -softmax_logit_gradient / float(temperature)
+    ).astype(np.float32, copy=False)
 
 
 def _cost_parameter_gradient(

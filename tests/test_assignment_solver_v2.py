@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from objgauss.core.assignment_evidence import AssignmentEvidenceBatch
 from objgauss.core.assignment_solver_v2 import (
     ASSIGNMENT_SOLVER_V2_COST_TERMS,
     ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA,
@@ -132,6 +133,48 @@ def test_assignment_solver_v2_requires_targets_for_supervised_training():
             iterations=2,
             supervised_weight=1.0,
         )
+
+
+def test_assignment_solver_v2_one_step_recovers_from_probability_just_above_eps():
+    target_probability = 2.0e-8
+    batch = AssignmentEvidenceBatch(
+        positions=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        features=np.array([[1.0]], dtype=np.float32),
+        target_assignment=np.array([[1.0, 0.0]], dtype=np.float32),
+        source="fixture://near-eps-supervised-step",
+    )
+    initial_state = AssignmentSolverV2State(
+        config=AssignmentSolverV2Config(
+            slots=2,
+            feature_dim=1,
+            feature_weight=0.0,
+            position_weight=0.0,
+        ),
+        feature_centers=np.zeros((2, 1), dtype=np.float32),
+        position_centers=np.zeros((2, 3), dtype=np.float32),
+        slot_bias=np.array(
+            [np.log((1.0 - target_probability) / target_probability), 0.0],
+            dtype=np.float32,
+        ),
+        source="near_eps_cost_softmax_fixture",
+    )
+    initial_prediction = predict_assignment_solver_v2(batch, initial_state)
+
+    result = train_assignment_solver_v2(
+        [batch],
+        initial_state=initial_state,
+        iterations=1,
+        learning_rate=0.1,
+        cluster_weight=0.0,
+        entropy_weight=0.0,
+        balance_weight=0.0,
+        supervised_weight=1.0,
+    )
+
+    assert 1.0e-8 < initial_prediction.assignment[0, 0] < 3.0e-8
+    assert result.final_loss.supervised_loss < result.initial_loss.supervised_loss - 0.1
+    assert result.final_state.slot_bias[0] < initial_state.slot_bias[0]
+    assert result.final_state.slot_bias[1] > initial_state.slot_bias[1]
 
 
 def test_assignment_solver_v2_config_keeps_temporal_matching_and_ot_disabled():
