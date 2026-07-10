@@ -22,7 +22,7 @@ from objgauss.evaluation.objectstate_controlled_prediction_eval import (
 )
 
 
-def test_controlled_real_prediction_eval_passes_after_identity_eval():
+def test_controlled_real_prediction_eval_blocks_after_gt_keyed_identity_eval():
     bundle = _real_bundle()
     identity = _identity_eval(bundle)
 
@@ -33,17 +33,15 @@ def test_controlled_real_prediction_eval_passes_after_identity_eval():
     )
 
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA
-    assert summary["status"] == "objectstate_controlled_real_prediction_eval_pass"
-    assert summary["row_counts"]["evaluated_prediction_rows"] == 1
-    assert summary["row_counts"]["prediction_pass_rows"] == 1
-    assert summary["metrics"]["state_ade"] == pytest.approx(0.0)
-    assert summary["metrics"]["hold_last_ade"] == pytest.approx(0.1)
-    assert summary["metrics"]["kalman_ade"] == pytest.approx(0.0)
+    assert summary["status"] == "objectstate_controlled_real_prediction_eval_blocked"
+    assert summary["row_counts"]["evaluated_prediction_rows"] == 0
+    assert summary["row_counts"]["prediction_pass_rows"] == 0
+    assert summary["row_counts"]["prediction_rows_blocked"] == 1
     assert summary["metrics"]["identity_consistency_rate"] == 1.0
-    assert summary["pass_gates"]["constant_velocity_baseline_present_if_history_allows"]
+    assert summary["prediction_accounting_rows"][0]["reason"] == "identity_not_stable"
     assert summary["evaluated_real_bundle"]["gate_accounting_rows"][1][
         "accounting_status"
-    ] == "pass"
+    ] == "evidence_incomplete"
     assert validate_objectstate_controlled_real_prediction_eval(summary) == summary
 
 
@@ -105,7 +103,7 @@ def test_controlled_real_prediction_eval_blocks_identity_inconsistent_transition
     assert summary["metrics"]["identity_consistency_rate"] == 0.0
 
 
-def test_controlled_real_prediction_eval_fails_when_underperforming_hold_last():
+def test_controlled_real_prediction_eval_does_not_score_after_gt_keyed_identity():
     bundle = _real_bundle()
     identity = _identity_eval(bundle)
     candidates = _prediction_candidates()
@@ -117,14 +115,13 @@ def test_controlled_real_prediction_eval_fails_when_underperforming_hold_last():
         prediction_candidates=candidates,
     )
 
-    assert summary["status"] == "objectstate_controlled_real_prediction_eval_fail"
-    assert summary["row_counts"]["prediction_fail_rows"] == 1
-    assert summary["metrics"]["state_ade"] == pytest.approx(0.2)
-    assert summary["metrics"]["hold_last_ade"] == pytest.approx(0.1)
-    assert "prediction_model_underperforms_hold_last" in summary["issues"]
+    assert summary["status"] == "objectstate_controlled_real_prediction_eval_blocked"
+    assert summary["row_counts"]["prediction_fail_rows"] == 0
+    assert summary["row_counts"]["prediction_rows_blocked"] == 1
+    assert summary["prediction_accounting_rows"][0]["reason"] == "identity_not_stable"
     assert summary["evaluated_real_bundle"]["gate_accounting_rows"][1][
         "accounting_status"
-    ] == "fail"
+    ] == "evidence_incomplete"
 
 
 def test_controlled_real_prediction_eval_cli_writes_artifacts(tmp_path, capsys):
@@ -139,7 +136,7 @@ def test_controlled_real_prediction_eval_cli_writes_artifacts(tmp_path, capsys):
     identity_path.write_text(json.dumps(identity), encoding="utf-8")
     candidates_path.write_text(json.dumps(candidates), encoding="utf-8")
 
-    assert (
+    with pytest.raises(SystemExit) as exc_info:
         main(
             [
                 "object-state",
@@ -154,8 +151,7 @@ def test_controlled_real_prediction_eval_cli_writes_artifacts(tmp_path, capsys):
                 "--require-pass",
             ]
         )
-        == 0
-    )
+    assert exc_info.value.code == 2
 
     stdout = capsys.readouterr().out
     summary = json.loads(
@@ -170,9 +166,9 @@ def test_controlled_real_prediction_eval_cli_writes_artifacts(tmp_path, capsys):
     )
 
     assert f"schema={OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA}" in stdout
-    assert "evaluated_prediction_rows=1" in stdout
+    assert "evaluated_prediction_rows=0" in stdout
     assert "state_ade=0.000000" in stdout
-    assert summary["status"] == "objectstate_controlled_real_prediction_eval_pass"
+    assert summary["status"] == "objectstate_controlled_real_prediction_eval_blocked"
     assert (output_dir / "controlled-real-prediction-accounting.csv").exists()
     assert (output_dir / "controlled-real-prediction-errors.csv").exists()
     assert (output_dir / "controlled-real-prediction-baselines.json").exists()

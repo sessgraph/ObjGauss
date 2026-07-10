@@ -1468,6 +1468,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
             "candidate_id": "namespace-identity-candidate",
             "source": "namespace fixture",
             "artifact_refs": ["outputs/controlled-real/namespace/objectstates.json"],
+            "max_association_distance": 0.05,
             "identity_evidence": {
                 "reconstruction_noise_robustness": 1.0,
                 "reconstruction_noise_variant_count": 2,

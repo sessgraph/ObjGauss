@@ -37,6 +37,10 @@ OBJECTSTATE_CONTROLLED_REAL_IDENTITY_BASELINES = (
 )
 
 _READY_STATUSES = {"pass", "fail"}
+_GT_PREASSOCIATION_REASON = (
+    "legacy teacher assignments are keyed by GT object_pose_row_id and are "
+    "diagnostic-only"
+)
 
 __all__ = (
     "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA",
@@ -189,6 +193,8 @@ def objectstate_controlled_real_identity_eval(
         "claim_policy": {
             "uses_real_bundle_identity_gt_for_evaluation_only": True,
             "teacher_evidence_is_not_physical_identity": True,
+            "gt_pose_keyed_teacher_assignments_are_diagnostic_only": True,
+            "cannot_produce_gate_pass": True,
             "missing_teacher_evidence_blocks_not_fails": True,
             "evidence_incomplete_is_not_model_fail": True,
             "writes_identity_accounting": True,
@@ -446,12 +452,28 @@ def validate_objectstate_controlled_real_identity_eval(
     pass_gates = _mapping(payload.get("pass_gates"), "pass_gates")
     if any(not isinstance(value, bool) for value in pass_gates.values()):
         raise ValueError("controlled real identity pass_gates must be bool")
+    if pass_gates.get("raw_prediction_observations_only") is not False:
+        raise ValueError(
+            "legacy controlled real identity eval cannot claim raw observations"
+        )
+    if (
+        payload["status"] == "objectstate_controlled_real_identity_eval_pass"
+        or row_counts["identity_pass_rows"] != 0
+        or any(row.get("eval_status") == "pass" for row in rows)
+    ):
+        raise ValueError(
+            "GT-pose-keyed controlled real identity eval cannot produce pass"
+        )
     if not isinstance(payload.get("issues"), list):
         raise ValueError("controlled real identity eval requires issues")
     claim_policy = _mapping(payload.get("claim_policy"), "claim_policy")
     if (
         not claim_policy.get("uses_real_bundle_identity_gt_for_evaluation_only")
         or not claim_policy.get("teacher_evidence_is_not_physical_identity")
+        or not claim_policy.get(
+            "gt_pose_keyed_teacher_assignments_are_diagnostic_only"
+        )
+        or not claim_policy.get("cannot_produce_gate_pass")
         or not claim_policy.get("missing_teacher_evidence_blocks_not_fails")
         or not claim_policy.get("evidence_incomplete_is_not_model_fail")
         or not claim_policy.get("writes_identity_accounting")
@@ -546,14 +568,14 @@ def _evaluate_identity_accounting_row(
         "teacher_evidence_coverage_complete": (
             _coverage(pose_rows, teacher_assignments) >= 1.0
         ),
+        "raw_prediction_observations_only": False,
     }
-    passed = all(pass_gates.values())
-    eval_status = "pass" if passed else "fail"
+    eval_status = "fail"
     real_accounting = _real_accounting_row(
         row,
         accounting_status=eval_status,
         metrics=metrics,
-        reason=None if passed else "controlled real identity evaluator failed",
+        reason=_GT_PREASSOCIATION_REASON,
     )
     return {
         **base,
@@ -564,7 +586,7 @@ def _evaluate_identity_accounting_row(
         "baselines": baseline_metrics,
         "baseline_comparison": comparison,
         "pass_gates": pass_gates,
-        "reason": None if passed else "controlled real identity evaluator failed",
+        "reason": _GT_PREASSOCIATION_REASON,
         "real_bundle_accounting_row": real_accounting,
         "pairwise_distances": _pairwise_rows(pose_rows, labels, candidate_vectors, baseline_inputs["oracle_target_assignment"]),
         "matching": _matching_rows(pose_rows, labels, candidate_slots),
@@ -598,6 +620,7 @@ def _blocked_eval_row(
             "oracle_not_below_assignment_solver_v2": False,
             "assignment_solver_v2_not_below_random": False,
             "teacher_evidence_coverage_complete": False,
+            "raw_prediction_observations_only": False,
         },
         "reason": reason,
         "real_bundle_accounting_row": _real_accounting_row(
@@ -925,6 +948,7 @@ def _pass_gates(
     evaluated = [row for row in rows if row["eval_status"] in _READY_STATUSES]
     comparison = aggregate["baseline_comparison"]
     return {
+        "raw_prediction_observations_only": False,
         "evaluated_identity_rows_positive": bool(evaluated),
         "identity_metrics_present": bool(evaluated)
         and all(_metrics_finite(row["metrics"]) for row in evaluated),

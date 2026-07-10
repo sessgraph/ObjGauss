@@ -16,7 +16,7 @@ from objgauss.evaluation.objectstate_controlled_real_identity_eval import (
 )
 
 
-def test_controlled_real_identity_eval_passes_with_teacher_assignment_evidence():
+def test_controlled_real_identity_eval_keeps_gt_keyed_teacher_evidence_diagnostic():
     bundle = _real_bundle(two_objects=True)
     teacher = _teacher_evidence(bundle, collapse=False)
 
@@ -27,15 +27,26 @@ def test_controlled_real_identity_eval_passes_with_teacher_assignment_evidence()
     )
 
     assert summary["schema"] == OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA
-    assert summary["status"] == "objectstate_controlled_real_identity_eval_pass"
+    assert summary["status"] == "objectstate_controlled_real_identity_eval_fail"
     assert summary["row_counts"]["evaluated_identity_rows"] == 1
-    assert summary["row_counts"]["identity_pass_rows"] == 1
+    assert summary["row_counts"]["identity_pass_rows"] == 0
+    assert summary["row_counts"]["identity_fail_rows"] == 1
     assert summary["row_counts"]["identity_rows_blocked"] == 0
     assert summary["metrics"]["identity_retrieval_at_1"] == 1.0
     assert summary["teacher_evidence_coverage"] == 1.0
+    assert summary["pass_gates"]["raw_prediction_observations_only"] is False
+    assert (
+        summary["identity_accounting_rows"][0]["pass_gates"][
+            "raw_prediction_observations_only"
+        ]
+        is False
+    )
+    assert "GT object_pose_row_id" in summary["identity_accounting_rows"][0][
+        "reason"
+    ]
     assert summary["evaluated_real_bundle"]["gate_accounting_rows"][0][
         "accounting_status"
-    ] == "pass"
+    ] == "fail"
     assert validate_objectstate_controlled_real_identity_eval(summary) == summary
 
 
@@ -94,6 +105,21 @@ def test_controlled_real_identity_eval_rejects_oracle_leakage():
         objectstate_controlled_real_identity_eval(bundle, teacher_evidence=teacher)
 
 
+def test_controlled_real_identity_eval_validator_rejects_forged_legacy_pass():
+    bundle = _real_bundle(two_objects=True)
+    summary = objectstate_controlled_real_identity_eval(
+        bundle,
+        teacher_evidence=_teacher_evidence(bundle, collapse=False),
+    )
+    summary["status"] = "objectstate_controlled_real_identity_eval_pass"
+    summary["row_counts"]["identity_pass_rows"] = 1
+    summary["row_counts"]["identity_fail_rows"] = 0
+    summary["identity_accounting_rows"][0]["eval_status"] = "pass"
+
+    with pytest.raises(ValueError, match="cannot produce pass"):
+        validate_objectstate_controlled_real_identity_eval(summary)
+
+
 def test_controlled_real_identity_eval_cli_writes_artifacts(tmp_path, capsys):
     bundle = _real_bundle(two_objects=True)
     teacher = _teacher_evidence(bundle, collapse=False)
@@ -103,7 +129,7 @@ def test_controlled_real_identity_eval_cli_writes_artifacts(tmp_path, capsys):
     bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
     teacher_path.write_text(json.dumps(teacher), encoding="utf-8")
 
-    assert (
+    with pytest.raises(SystemExit) as exc_info:
         main(
             [
                 "object-state",
@@ -116,8 +142,7 @@ def test_controlled_real_identity_eval_cli_writes_artifacts(tmp_path, capsys):
                 "--require-pass",
             ]
         )
-        == 0
-    )
+    assert exc_info.value.code == 2
 
     stdout = capsys.readouterr().out
     summary = json.loads(
@@ -133,7 +158,7 @@ def test_controlled_real_identity_eval_cli_writes_artifacts(tmp_path, capsys):
 
     assert f"schema={OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA}" in stdout
     assert "evaluated_identity_rows=1" in stdout
-    assert summary["status"] == "objectstate_controlled_real_identity_eval_pass"
+    assert summary["status"] == "objectstate_controlled_real_identity_eval_fail"
     assert (output_dir / "controlled-real-identity-accounting.csv").exists()
     assert (output_dir / "controlled-real-identity-matching.json").exists()
     assert (output_dir / "controlled-real-identity-pairwise-distances.csv").exists()
