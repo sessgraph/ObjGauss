@@ -6,7 +6,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_promoted_weights_cross_sample import (
+from objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample import (
     REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA,
     RealSampleV2PromotedWeightsCrossSampleReport,
     real_sample_v2_promoted_weights_cross_sample_from_cloud,

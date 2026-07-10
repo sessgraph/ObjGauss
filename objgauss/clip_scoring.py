@@ -1,6 +1,6 @@
-"""Compatibility wrapper for core CLIP mask scoring algorithms."""
+"""Compatibility import for CLIP mask-scoring orchestration."""
 
-from objgauss.core.clip_scoring import (
+from objgauss.pipelines.clip_scoring import (
     CLIP_LABEL_PRESETS,
     DEFAULT_BACKGROUND_LABELS,
     DEFAULT_PROMPT_TEMPLATES,
@@ -12,7 +12,7 @@ from objgauss.core.clip_scoring import (
     score_mask_manifest_with_clip,
 )
 
-__all__ = [
+__all__ = (
     "CLIP_LABEL_PRESETS",
     "DEFAULT_BACKGROUND_LABELS",
     "DEFAULT_PROMPT_TEMPLATES",
@@ -22,4 +22,4 @@ __all__ = [
     "TransformersClipMaskScorer",
     "read_clip_labels",
     "score_mask_manifest_with_clip",
-]
+)

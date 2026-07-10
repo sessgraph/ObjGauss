@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_diagnostics import (
+from objgauss.pipelines.real_sample_v2_diagnostics import (
     REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA,
     RealSampleV2DiagnosticsReport,
     real_sample_v2_diagnostics_from_cloud,

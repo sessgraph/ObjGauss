@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -10,6 +10,7 @@ from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.object_field import ObjectField
 
 _EPS = 1e-8
+_PERSISTENT_ID_BASE = 1_000_000
 OBJECT_STATE_DELIVERY_BINDING_SCHEMA = "objgauss-object-state-delivery-binding-v1"
 DYNAMIC_K_UPDATE_PLAN_SCHEMA = "objgauss-dynamic-k-update-plan-v1"
 
@@ -19,6 +20,7 @@ class ObjectState:
     """Object-level projection produced from a fixed-K assignment matrix."""
 
     id: int
+    slot: int
     slot_mass: float
     confidence: float
     mass_fraction: float
@@ -44,6 +46,41 @@ class ObjectStateProjection:
     @property
     def evidence_count(self) -> int:
         return int(self.assignment.shape[0])
+
+
+def object_state_projection_summary(
+    projection: ObjectStateProjection,
+) -> dict[str, Any]:
+    """Serialize an ObjectState projection without changing its identity ABI."""
+
+    states = []
+    for state in projection.states:
+        states.append(
+            {
+                "id": int(state.id),
+                "persistent_id": int(state.id),
+                "slot": int(state.slot),
+                "object_id": int(state.slot),
+                "status": state.status,
+                "slot_mass": float(state.slot_mass),
+                "mass_fraction": float(state.mass_fraction),
+                "confidence": float(state.confidence),
+                "assignment_entropy": float(state.assignment_entropy),
+                "centroid": np.round(state.centroid, 6).tolist(),
+                "bbox": np.round(state.bbox, 6).tolist(),
+                "diagnostics": list(state.diagnostics),
+            }
+        )
+    return {
+        "type": "ObjectStateProjection",
+        "evidence_count": projection.evidence_count,
+        "object_state_count": len(projection.states),
+        "active_state_count": sum(
+            1 for state in projection.states if state.status == "active"
+        ),
+        "derived_object_id_source": "argmax(A[N,K])",
+        "states": states,
+    }
 
 
 @dataclass(frozen=True)
@@ -193,6 +230,8 @@ def project_object_states_from_field(
     field: ObjectField,
     *,
     evidence_features: np.ndarray | None = None,
+    previous_state: ObjectStateProjection | Sequence[ObjectState] | None = None,
+    persistent_match_max_cost: float | None = None,
     support_threshold: float = 1e-6,
     low_confidence_mass: float = 0.5,
     mixed_entropy_threshold: float = 0.8,
@@ -203,6 +242,8 @@ def project_object_states_from_field(
         cloud,
         field.probabilities(),
         evidence_features=evidence_features,
+        previous_state=previous_state,
+        persistent_match_max_cost=persistent_match_max_cost,
         support_threshold=support_threshold,
         low_confidence_mass=low_confidence_mass,
         mixed_entropy_threshold=mixed_entropy_threshold,
@@ -214,6 +255,8 @@ def project_object_states(
     assignment: np.ndarray,
     *,
     evidence_features: np.ndarray | None = None,
+    previous_state: ObjectStateProjection | Sequence[ObjectState] | None = None,
+    persistent_match_max_cost: float | None = None,
     support_threshold: float = 1e-6,
     low_confidence_mass: float = 0.5,
     mixed_entropy_threshold: float = 0.8,
@@ -235,10 +278,11 @@ def project_object_states(
         _project_slot(
             slot,
             matrix[:, slot],
-            xyz,
-            features,
-            row_entropy,
-            normalized_row_entropy,
+            persistent_id=_PERSISTENT_ID_BASE + slot,
+            xyz=xyz,
+            features=features,
+            row_entropy=row_entropy,
+            normalized_row_entropy=normalized_row_entropy,
             evidence_count=cloud.count,
             support_threshold=support_threshold,
             low_confidence_mass=low_confidence_mass,
@@ -246,7 +290,76 @@ def project_object_states(
         )
         for slot in range(matrix.shape[1])
     )
-    return ObjectStateProjection(states=states, assignment=matrix, derived_object_ids=derived_ids)
+    projection = ObjectStateProjection(
+        states=states,
+        assignment=matrix,
+        derived_object_ids=derived_ids,
+    )
+    if previous_state is None:
+        return projection
+    return track_object_state_projection(
+        projection,
+        previous_state=previous_state,
+        max_cost=persistent_match_max_cost,
+    )
+
+
+def track_object_state_projection(
+    projection: ObjectStateProjection,
+    *,
+    previous_state: ObjectStateProjection | Sequence[ObjectState],
+    max_cost: float | None = None,
+) -> ObjectStateProjection:
+    """Carry persistent ids across a projection using state matching.
+
+    Renderer-facing ``object_id`` values remain slot addresses in
+    ``derived_object_ids``.  Only matched states inherit a prior persistent id;
+    unmatched states receive a new id from the persistent-id namespace.
+    """
+
+    _validate_projection_state_addresses(projection)
+    previous_states = _states_tuple(previous_state)
+    _validate_unique_persistent_ids(previous_states, "previous_state")
+    if max_cost is not None and max_cost < 0.0:
+        raise ValueError("max_cost must be >= 0")
+
+    if previous_states:
+        match = match_object_states(
+            previous_states,
+            projection,
+            max_cost=max_cost,
+        )
+        inherited = {
+            int(row.current_id): int(row.previous_id)
+            for row in match.matches
+        }
+    else:
+        inherited = {}
+
+    used_ids = set(inherited.values())
+    next_id = max(
+        [
+            _PERSISTENT_ID_BASE - 1,
+            *(int(state.id) for state in previous_states),
+        ]
+    ) + 1
+    states: list[ObjectState] = []
+    for state in projection.states:
+        persistent_id = inherited.get(int(state.id))
+        if persistent_id is None:
+            while next_id in used_ids:
+                next_id += 1
+            persistent_id = next_id
+            used_ids.add(persistent_id)
+            next_id += 1
+        states.append(replace(state, id=int(persistent_id)))
+    tracked = ObjectStateProjection(
+        states=tuple(states),
+        assignment=projection.assignment,
+        derived_object_ids=projection.derived_object_ids,
+    )
+    _validate_projection_state_addresses(tracked)
+    return tracked
 
 
 def object_state_stability_report(
@@ -301,7 +414,7 @@ def object_state_stability_report(
         if inactive_mass_threshold < float(mass) < low_confidence_mass
     )
     mixed_slots = tuple(
-        int(state.id)
+        int(state.slot)
         for state in projection.states
         if state.normalized_assignment_entropy >= mixed_entropy_threshold and state.slot_mass > inactive_mass_threshold
     )
@@ -442,6 +555,11 @@ def object_state_delivery_summary(
     stability = stability_report or object_state_stability_report(projection)
     child_counts = _derived_child_counts(projection.derived_object_ids, assignment.shape[1])
     active_ids = tuple(
+        int(state.slot)
+        for state in projection.states
+        if state.status != "inactive" and state.slot_mass > _EPS
+    )
+    active_persistent_ids = tuple(
         int(state.id)
         for state in projection.states
         if state.status != "inactive" and state.slot_mass > _EPS
@@ -454,6 +572,7 @@ def object_state_delivery_summary(
         "slot_count": int(assignment.shape[1]),
         "evidence_count": int(assignment.shape[0]),
         "active_object_ids": list(active_ids),
+        "active_persistent_ids": list(active_persistent_ids),
         "derived_object_id_source": "argmax_assignment",
         "derived_object_id_field": "object_id",
         "object_id_coverage": {
@@ -472,8 +591,9 @@ def object_state_delivery_summary(
         },
         "gaussian_children": [
             {
-                "object_id": int(state.id),
-                "gaussian_count": int(child_counts[state.id]) if state.id < len(child_counts) else 0,
+                "object_id": int(state.slot),
+                "persistent_id": int(state.id),
+                "gaussian_count": int(child_counts[state.slot]),
                 "assignment_mass": float(state.slot_mass),
                 "mass_fraction": float(state.mass_fraction),
                 "status": state.status,
@@ -570,14 +690,14 @@ def dynamic_k_proposal_report(
     )
     if temporal_match is not None:
         current_by_id = {int(state.id): state for state in projection.states}
-        for slot in temporal_match.unmatched_current:
-            state = current_by_id.get(int(slot))
+        for persistent_id in temporal_match.unmatched_current:
+            state = current_by_id.get(int(persistent_id))
             if state is None or state.status == "inactive":
                 continue
             proposals.append(
                 DynamicKProposal(
                     kind="birth_unmatched",
-                    source_ids=(int(slot),),
+                    source_ids=(int(state.slot),),
                     target_id=None,
                     score=float(state.confidence),
                     threshold=0.0,
@@ -659,6 +779,27 @@ def _states_tuple(states: ObjectStateProjection | Sequence[ObjectState]) -> tupl
     if isinstance(states, ObjectStateProjection):
         return tuple(states.states)
     return tuple(states)
+
+
+def _validate_projection_state_addresses(projection: ObjectStateProjection) -> None:
+    assignment = validate_assignment_matrix(projection.assignment)
+    if len(projection.states) != assignment.shape[1]:
+        raise ValueError("projection states must match assignment slot count")
+    slots = tuple(int(state.slot) for state in projection.states)
+    if slots != tuple(range(assignment.shape[1])):
+        raise ValueError("projection states must be ordered by unique renderer slot")
+    _validate_unique_persistent_ids(projection.states, "projection states")
+
+
+def _validate_unique_persistent_ids(
+    states: Sequence[ObjectState],
+    name: str,
+) -> None:
+    ids = tuple(int(state.id) for state in states)
+    if any(value < 0 for value in ids):
+        raise ValueError(f"{name} persistent ids must be non-negative")
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{name} persistent ids must be unique")
 
 
 def _candidate_states(
@@ -871,7 +1012,10 @@ def _derived_child_counts(object_ids: np.ndarray, slots: int) -> np.ndarray:
 
 def _state_delivery_record(state: ObjectState) -> dict[str, Any]:
     return {
-        "object_id": int(state.id),
+        "id": int(state.id),
+        "persistent_id": int(state.id),
+        "slot": int(state.slot),
+        "object_id": int(state.slot),
         "status": state.status,
         "slot_mass": float(state.slot_mass),
         "confidence": float(state.confidence),
@@ -945,11 +1089,11 @@ def _duplicate_merge_proposals(
             centroid_distance = _centroid_distance(left.centroid, right.centroid)
             if feature_distance <= feature_threshold and centroid_distance <= centroid_threshold:
                 score = max(feature_distance / max(feature_threshold, _EPS), centroid_distance / max(centroid_threshold, _EPS))
-                target = int(left.id if left.slot_mass >= right.slot_mass else right.id)
+                target = int(left.slot if left.slot_mass >= right.slot_mass else right.slot)
                 proposals.append(
                     DynamicKProposal(
                         kind="merge_duplicate",
-                        source_ids=(int(left.id), int(right.id)),
+                        source_ids=(int(left.slot), int(right.slot)),
                         target_id=target,
                         score=float(score),
                         threshold=1.0,
@@ -1151,11 +1295,12 @@ def _dynamic_k_update_diagnostics(
 def _project_slot(
     slot: int,
     weights: np.ndarray,
+    *,
+    persistent_id: int,
     xyz: np.ndarray,
     features: np.ndarray,
     row_entropy: np.ndarray,
     normalized_row_entropy: np.ndarray,
-    *,
     evidence_count: int,
     support_threshold: float,
     low_confidence_mass: float,
@@ -1168,6 +1313,12 @@ def _project_slot(
     bbox = _bbox(xyz, weights > support_threshold)
     entropy = _weighted_scalar(row_entropy, weights, mass)
     normalized_entropy = _weighted_scalar(normalized_row_entropy, weights, mass)
+    mass_fraction = float(mass / evidence_count) if evidence_count else 0.0
+    confidence = (
+        0.0
+        if not active
+        else float(np.clip(_weighted_scalar(weights, weights, mass), 0.0, 1.0))
+    )
     diagnostics = _slot_diagnostics(
         mass,
         normalized_entropy,
@@ -1175,10 +1326,11 @@ def _project_slot(
         mixed_entropy_threshold=mixed_entropy_threshold,
     )
     return ObjectState(
-        id=int(slot),
+        id=int(persistent_id),
+        slot=int(slot),
         slot_mass=mass,
-        confidence=mass,
-        mass_fraction=float(mass / evidence_count) if evidence_count else 0.0,
+        confidence=confidence,
+        mass_fraction=mass_fraction,
         assignment_entropy=entropy,
         normalized_assignment_entropy=normalized_entropy,
         centroid=centroid,

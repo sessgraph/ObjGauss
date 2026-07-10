@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
+from objgauss.pipelines.objectstate_bop_gaussian_evidence_preflight import (
     OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA,
     objectstate_bop_gaussian_evidence_preflight,
     validate_objectstate_bop_gaussian_evidence_preflight_summary,

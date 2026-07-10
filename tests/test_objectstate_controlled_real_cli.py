@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+)
+from objgauss.evaluation.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
 )
 
@@ -114,6 +116,7 @@ def _identity_only_manifest():
                     "fragmentation_rate": 0.0,
                     "swap_rate": 0.0,
                     "identity_collapse": False,
+                    "raw_prediction_observations": True,
                 },
             },
             {

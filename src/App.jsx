@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Move3D, Redo2, Rotate3D, Scale3D, Undo2, X } from "lucide-react";
+import { Move3D, Redo2, Undo2, X } from "lucide-react";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
@@ -35,10 +35,8 @@ const DEBUG_LENSES = ["assignment", "confidence", "entropy", "opacity"];
 const OBJECT_OVERLAY_MODES = ["full", "bbox", "centroid", "off"];
 const DEBUG_EVENT_LIMIT = 12;
 const HOVER_DIM_OPACITY = 0.18;
-const OBJECT_TRANSFORM_MODES = ["translate", "rotate", "scale"];
+const OBJECT_TRANSFORM_MODES = ["translate"];
 const OBJECT_TRANSFORM_SNAP_STEP = 0.25;
-const OBJECT_ROTATION_SNAP_STEP = Math.PI / 12;
-const OBJECT_SCALE_SNAP_STEP = 0.1;
 // 辅助移动按钮(X-/X+/Z-/Z+)每次点击的位移量。刻意大于
 // OBJECT_TRANSFORM_SNAP_STEP,用于粗调定位;精确对齐仍应使用 Gizmo 拖拽 + snap。
 const OBJECT_NUDGE_STEP = 0.36;
@@ -65,7 +63,7 @@ export default function App() {
   );
   const initialModelId = useMemo(() => defaultModelIdForCatalog(modelCatalog), [modelCatalog]);
   const worldApi = useRef(null);
-  const loadStarted = useRef(false);
+  const requestedCatalogModelIds = useRef(new Set());
   const artifactInputRef = useRef(null);
   const modelBundleInputRef = useRef(null);
   const ogcInputRef = useRef(null);
@@ -622,8 +620,12 @@ export default function App() {
 
   const selectModel = useCallback(
     (id) => {
+      const retryLoad = ["error", "skipped"].includes(models[id]?.status);
+      if (retryLoad) {
+        requestedCatalogModelIds.current.delete(id);
+      }
       setStageModelIds((current) => {
-        if (current.has(id)) return current;
+        if (current.has(id)) return retryLoad ? new Set(current) : current;
         return new Set([...current, id]);
       });
       setSelection({ modelId: id, objectId: null, selectionId: id });
@@ -631,7 +633,7 @@ export default function App() {
       recordDebugEvent("select-model", { modelId: id, selectionId: id, source: "model-dock" });
       worldApi.current?.focusModel(id);
     },
-    [recordDebugEvent],
+    [models, recordDebugEvent],
   );
 
   const selectObject = useCallback((target, probe = null) => {
@@ -1074,6 +1076,9 @@ export default function App() {
     (modelId) => {
       if (!modelId) return;
       const nextVisible = !stageModelIds.has(modelId);
+      if (nextVisible && ["error", "skipped"].includes(models[modelId]?.status)) {
+        requestedCatalogModelIds.current.delete(modelId);
+      }
       setStageModelIds((current) => {
         const next = new Set(current);
         if (nextVisible) {
@@ -1089,7 +1094,7 @@ export default function App() {
         source: "training-stage-panel",
       });
     },
-    [recordDebugEvent, stageModelIds],
+    [models, recordDebugEvent, stageModelIds],
   );
 
   const selectStageModelBatch = useCallback(
@@ -1138,8 +1143,9 @@ export default function App() {
       }
       const handoff = objectProcessHandoffForModel(model);
       patchModel(model.id, {
-        status: "processing",
-        message: handoff.command ? "object process handoff ready" : "missing object process handoff",
+        message: handoff.command
+          ? "CLI object process command ready; browser did not run it"
+          : "missing object process CLI command",
         objectProcessHandoff: handoff,
       });
       setObjectProcessHandoff(handoff);
@@ -1256,13 +1262,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!worldReady || loadStarted.current) return;
-    loadStarted.current = true;
-    let cancelled = false;
+    if (!worldReady) return;
+    const requestedIds = new Set([...stageModelIds, selectedId].filter(Boolean));
+    const pendingModels = modelCatalog.filter(
+      (model) =>
+        requestedIds.has(model.id) &&
+        !requestedCatalogModelIds.current.has(model.id),
+    );
+    if (!pendingModels.length) return;
+    pendingModels.forEach((model) => requestedCatalogModelIds.current.add(model.id));
 
     async function loadModels() {
-      for (const model of modelCatalog) {
-        if (cancelled) return;
+      for (const model of pendingModels) {
         if (model.loadMode === "model-artifact-manifest") {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading model manifest" });
@@ -1272,7 +1283,6 @@ export default function App() {
             if (!children.length) {
               throw new Error("model artifact manifest has no Debug OS browser routes");
             }
-            if (cancelled) return;
             setModels((current) => ({
               ...current,
               ...initialModelStates(children),
@@ -1300,7 +1310,6 @@ export default function App() {
             });
             let selectedChild = null;
             for (const child of children) {
-              if (cancelled) return;
               if (child.loadMode === "trainable-artifact") {
                 const childStartedAt = performance.now();
                 patchModel(child.id, { status: "loading", message: "loading manifest trainable artifact" });
@@ -1333,7 +1342,6 @@ export default function App() {
               });
             }
           } catch (error) {
-            if (cancelled) return;
             patchModel(model.id, {
               status: "error",
               message: error?.message ?? "model artifact manifest load failed",
@@ -1347,13 +1355,11 @@ export default function App() {
           try {
             const resolvedModel = await loadOgcManifestModel(model);
             const { artifact, decoded, index, delivery } = await loadOgcModel(resolvedModel);
-            if (cancelled) return;
             upsertDecodedOgcModel(resolvedModel, decoded, index, delivery, artifact, {
               startedAt,
               message: "ogc manifest",
             });
           } catch (error) {
-            if (cancelled) return;
             patchModel(model.id, {
               status: "error",
               message: error?.message ?? "ogc manifest load failed",
@@ -1366,13 +1372,11 @@ export default function App() {
           patchModel(model.id, { status: "loading", message: "loading ogc chunks" });
           try {
             const { artifact, decoded, index, delivery } = await loadOgcModel(model);
-            if (cancelled) return;
             upsertDecodedOgcModel(model, decoded, index, delivery, artifact, {
               startedAt,
               message: "ogc chunks",
             });
           } catch (error) {
-            if (cancelled) return;
             patchModel(model.id, {
               status: "error",
               message: error?.message ?? "ogc load failed",
@@ -1385,7 +1389,6 @@ export default function App() {
           patchModel(model.id, { status: "loading", message: "loading trained artifact" });
           try {
             const artifact = await loadTrainableArtifact(model);
-            if (cancelled) return;
             upsertTrainableArtifactModel(model, artifact, {
               startedAt,
               loadRoute: model.trainableArtifactPath ? "fetch-json" : "inline",
@@ -1393,7 +1396,6 @@ export default function App() {
               message: "trained artifact json",
             });
           } catch (error) {
-            if (cancelled) return;
             patchModel(model.id, {
               status: "error",
               message: error?.message ?? "trainable artifact load failed",
@@ -1405,7 +1407,6 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading raw source" });
           const rendered = worldApi.current?.upsertModel(model, null);
-          if (cancelled) return;
           patchModel(model.id, {
             status: "raw",
             message: "raw source ready",
@@ -1438,7 +1439,6 @@ export default function App() {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const cloud = parsePly(await response.arrayBuffer());
           const rendered = worldApi.current?.upsertModel(model, cloud.points);
-          if (cancelled) return;
           patchModel(model.id, {
             status: "loaded",
             message: "ready",
@@ -1450,7 +1450,6 @@ export default function App() {
             loadMs: Math.round(performance.now() - startedAt),
           });
         } catch (error) {
-          if (cancelled) return;
           patchModel(model.id, {
             status: model.optionalLocalPreview ? "skipped" : "error",
             message: error?.message ?? "load failed",
@@ -1460,6 +1459,7 @@ export default function App() {
             model.fallbackModelId &&
             selectionRef.current?.modelId === model.id
           ) {
+            setStageModelIds((current) => new Set([...current, model.fallbackModelId]));
             setSelection({
               modelId: model.fallbackModelId,
               objectId: null,
@@ -1472,10 +1472,22 @@ export default function App() {
     }
 
     void loadModels();
-    return () => {
-      cancelled = true;
-    };
-  }, [modelCatalog, patchModel, recordDebugEvent, upsertDecodedOgcModel, upsertTrainableArtifactModel, worldReady]);
+  }, [
+    modelCatalog,
+    patchModel,
+    recordDebugEvent,
+    selectedId,
+    stageModelIds,
+    upsertDecodedOgcModel,
+    upsertTrainableArtifactModel,
+    worldReady,
+  ]);
+
+  useEffect(() => {
+    if (!worldReady || !selectedId) return;
+    if (!["loaded", "compressed", "raw"].includes(selected?.status)) return;
+    worldApi.current?.focusModel(selectedId);
+  }, [selected?.status, selectedId, worldReady]);
 
   return (
     <main
@@ -2994,10 +3006,10 @@ function ThreeWorld({
     const applyObjectTransformMode = (mode) => {
       transformMode = normalizeObjectTransformMode(mode);
       transformModeRef.current = transformMode;
-      transformControls.setMode(transformMode);
-      transformControls.showX = transformMode !== "rotate";
-      transformControls.showY = transformMode !== "translate";
-      transformControls.showZ = transformMode !== "rotate";
+      transformControls.setMode("translate");
+      transformControls.showX = true;
+      transformControls.showY = false;
+      transformControls.showZ = true;
       return transformMode;
     };
 
@@ -3005,13 +3017,11 @@ function ThreeWorld({
 
     const transformSnapshot = (object) => ({
       position: object.position.toArray().map(round3),
-      rotation: [object.rotation.x, object.rotation.y, object.rotation.z].map(round3),
-      scale: object.scale.toArray().map(round3),
     });
 
     const sameTransformSnapshot = (left, right) =>
       Boolean(left && right) &&
-      ["position", "rotation", "scale"].every((field) =>
+      ["position"].every((field) =>
         (left[field] ?? []).every((value, index) => value === right[field]?.[index]),
       );
 
@@ -3021,16 +3031,6 @@ function ThreeWorld({
         finiteNumber(snapshot.position?.[0]) ?? 0,
         0,
         finiteNumber(snapshot.position?.[2]) ?? 0,
-      );
-      object.rotation.set(
-        finiteNumber(snapshot.rotation?.[0]) ?? 0,
-        finiteNumber(snapshot.rotation?.[1]) ?? 0,
-        finiteNumber(snapshot.rotation?.[2]) ?? 0,
-      );
-      object.scale.set(
-        finiteNumber(snapshot.scale?.[0]) ?? 1,
-        finiteNumber(snapshot.scale?.[1]) ?? 1,
-        finiteNumber(snapshot.scale?.[2]) ?? 1,
       );
       object.updateMatrixWorld(true);
       return transformSnapshot(object);
@@ -3080,18 +3080,36 @@ function ThreeWorld({
       const modelRoot = modelRoots.get(modelId);
       const layer = modelRoot?.userData?.sourceSplatLayer;
       const transform = layer?.objectTransformHandle;
-      if (!modelRoot || !transform) return null;
+      if (!modelRoot) return null;
       const objectGroups = [...draggableObjects.values()].filter(
         (object) => object.userData.modelId === modelId,
       );
+      const hiddenObjects = objectGroups.filter((object) => object.visible === false).length;
+      const sourceLayerGroup = sourceSplatLayerGroupForRoot(modelRoot);
+      if (!transform) {
+        if (sourceLayerGroup) sourceLayerGroup.visible = hiddenObjects === 0;
+        return null;
+      }
       const stats = updateSparkObjectTransforms(transform, {
         objectGroups,
         sourceFrameScale: layer.sourceFrameScale ?? layer.sourceFrame?.scale ?? 1,
       });
-      layer.objectMotion = stats;
+      const perObjectVisibilityReady = stats.sourceCountMatches === true;
+      if (sourceLayerGroup) {
+        sourceLayerGroup.visible = perObjectVisibilityReady || hiddenObjects === 0;
+      }
+      layer.objectMotion = {
+        ...stats,
+        visibilityMode: perObjectVisibilityReady
+          ? "per-object-opacity"
+          : hiddenObjects > 0
+            ? "source-layer-hidden-count-mismatch"
+            : "source-layer-visible-unfiltered",
+        visibilitySynchronized: perObjectVisibilityReady || hiddenObjects === 0,
+      };
       const splat = sourceSplatMeshForRoot(modelRoot);
       if (splat) splat.needsUpdate = true;
-      return stats;
+      return layer.objectMotion;
     };
 
     const notifyObjectTransformed = (object, source, details = {}) => {
@@ -3230,14 +3248,10 @@ function ThreeWorld({
     const setTransformSnapEnabled = (enabled) => {
       transformSnapEnabled = Boolean(enabled);
       transformControls.setTranslationSnap(transformSnapEnabled ? OBJECT_TRANSFORM_SNAP_STEP : null);
-      transformControls.setRotationSnap(transformSnapEnabled ? OBJECT_ROTATION_SNAP_STEP : null);
-      transformControls.setScaleSnap(transformSnapEnabled ? OBJECT_SCALE_SNAP_STEP : null);
       lastTransformEvent = {
         type: "snap",
         enabled: transformSnapEnabled,
         snapStep: OBJECT_TRANSFORM_SNAP_STEP,
-        rotationSnapStep: round3(OBJECT_ROTATION_SNAP_STEP),
-        scaleSnapStep: OBJECT_SCALE_SNAP_STEP,
         historyDepth: transformHistory.length,
         redoDepth: transformFuture.length,
       };
@@ -3315,6 +3329,7 @@ function ThreeWorld({
       const selectedSourceSplatLayer = selectedModel ? sourceSplatLayerInfo(selectedModel) : null;
       const sourceSplatObjectMotionSamples = sourceSplatSamples.map((sample) => ({
         modelId: sample.modelId,
+        sourceLayerVisible: sample.visible,
         contract: sample.sourceSplatObjectMotionContract,
         status: sample.sourceSplatObjectMotionStatus,
         reason: sample.sourceSplatObjectMotionReason,
@@ -3325,6 +3340,10 @@ function ThreeWorld({
         mappedGaussians: sample.sourceSplatObjectMotionMappedGaussians,
         objectCount: sample.sourceSplatObjectMotionObjectCount,
         transformedObjects: sample.sourceSplatObjectMotionTransformedObjects,
+        hiddenObjects: sample.sourceSplatObjectMotionHiddenObjects,
+        hiddenGaussians: sample.sourceSplatObjectMotionHiddenGaussians,
+        visibilityMode: sample.sourceSplatObjectVisibilityMode,
+        visibilitySynchronized: sample.sourceSplatObjectVisibilitySynchronized,
         maxTranslate: sample.sourceSplatObjectMotionMaxTranslate,
         updates: sample.sourceSplatObjectMotionUpdates,
       }));
@@ -3387,6 +3406,14 @@ function ThreeWorld({
           selectedSourceSplatLayer?.sourceSplatObjectMotionActive ?? false,
         selectedSourceSplatObjectMotionMaxTranslate:
           selectedSourceSplatLayer?.sourceSplatObjectMotionMaxTranslate ?? 0,
+        selectedSourceSplatObjectMotionHiddenObjects:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionHiddenObjects ?? 0,
+        selectedSourceSplatObjectMotionHiddenGaussians:
+          selectedSourceSplatLayer?.sourceSplatObjectMotionHiddenGaussians ?? 0,
+        selectedSourceSplatObjectVisibilityMode:
+          selectedSourceSplatLayer?.sourceSplatObjectVisibilityMode ?? "none",
+        selectedSourceSplatObjectVisibilitySynchronized:
+          selectedSourceSplatLayer?.sourceSplatObjectVisibilitySynchronized ?? false,
         objectTransformContract: "three-transform-controls-v1",
         objectTransformEngine: "object-transform-state-v1",
         objectTransformMode: transformMode,
@@ -3396,8 +3423,6 @@ function ThreeWorld({
         transformActive: Boolean(activeTransform),
         transformSnapEnabled,
         transformSnapStep: OBJECT_TRANSFORM_SNAP_STEP,
-        transformRotationSnapStep: round3(OBJECT_ROTATION_SNAP_STEP),
-        transformScaleSnapStep: OBJECT_SCALE_SNAP_STEP,
         transformHistoryDepth: transformHistory.length,
         transformRedoDepth: transformFuture.length,
         transformCanUndo: transformHistory.length > 0,
@@ -4164,6 +4189,7 @@ function ThreeWorld({
         const object = draggableObjects.get(selectionId);
         if (!object) return;
         object.visible = Boolean(visible);
+        syncSourceSplatObjectTransforms(object.userData.modelId);
         callbacksRef.current.onDebugEvent?.("toggle-visibility", {
           ...objectTarget(object),
           visible: object.visible,
@@ -4209,9 +4235,12 @@ function ThreeWorld({
       },
       setHiddenObjects(hiddenIds) {
         const hidden = new Set(hiddenIds ?? []);
+        const affectedModelIds = new Set();
         for (const object of draggableObjects.values()) {
           object.visible = !hidden.has(object.userData.selectionId);
+          affectedModelIds.add(object.userData.modelId);
         }
+        affectedModelIds.forEach(syncSourceSplatObjectTransforms);
         attachTransformToSelection(selectedRef.current);
         publishAuditHandle();
       },
@@ -4314,9 +4343,6 @@ function ThreeWorld({
       animationFrame = requestAnimationFrame(animate);
     };
 
-    models
-      .filter((model) => model.loadMode !== "trainable-artifact")
-      .forEach((model) => upsertModel(model));
     resize();
     animate();
     window.addEventListener("resize", resize);
@@ -4583,6 +4609,7 @@ function DebugPanel({
           activeState={activeState}
           objectContinuity={objectContinuity}
           assignmentProbe={assignmentProbe}
+          sourceSplatMotion={selectedSourceSplatMotion}
           objectTransformMode={objectTransformMode}
           onMoveSelectedObject={onMoveSelectedObject}
           onUndoObjectTransform={onUndoObjectTransform}
@@ -4870,6 +4897,7 @@ function ObjectInteractionLayer({
   activeState,
   objectContinuity,
   assignmentProbe,
+  sourceSplatMotion,
   objectTransformMode,
   onMoveSelectedObject,
   onUndoObjectTransform,
@@ -4877,14 +4905,18 @@ function ObjectInteractionLayer({
   onCancelObjectTransform,
   onSelectObjectTransformMode,
 }) {
-  const selectedStatus = selectedObject ? "3D 控制器" : "待选择";
+  const selectedStatus = selectedObject ? "X/Z 平移" : "待选择";
   const transformMode = normalizeObjectTransformMode(objectTransformMode);
+  const sourceTranslationReady =
+    sourceSplatMotion?.status === "ready" && sourceSplatMotion?.countMatches === true;
   return (
     <div
       className="objectInteractionLayer"
       data-object-interaction-layer="true"
       data-object-transform-primary="three-transform-controls-v1"
       data-object-move-contract="object-group-position-v1"
+      data-object-transform-capabilities="translate-xz"
+      data-source-splat-translation-ready={sourceTranslationReady ? "true" : "false"}
       data-object-move-selected={selectedObject?.selectionId ?? ""}
     >
       <div className="interactionModeCard">
@@ -4907,28 +4939,14 @@ function ObjectInteractionLayer({
         >
           <Move3D size={15} strokeWidth={2.2} aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          className={transformMode === "rotate" ? "active" : ""}
-          aria-label="旋转对象"
-          title="旋转对象"
-          data-object-transform-mode-button="rotate"
-          disabled={!selectedObject}
-          onClick={() => onSelectObjectTransformMode?.("rotate")}
-        >
-          <Rotate3D size={15} strokeWidth={2.2} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={transformMode === "scale" ? "active" : ""}
-          aria-label="缩放对象"
-          title="缩放对象"
-          data-object-transform-mode-button="scale"
-          disabled={!selectedObject}
-          onClick={() => onSelectObjectTransformMode?.("scale")}
-        >
-          <Scale3D size={15} strokeWidth={2.2} aria-hidden="true" />
-        </button>
+      </div>
+      <div className="interactionEmpty" data-object-transform-truth="translation-only">
+        <strong>{sourceTranslationReady ? "源 splat 同步平移" : "仅对象点层平移"}</strong>
+        <span>
+          {sourceTranslationReady
+            ? "X/Z 平移已闭环；旋转与缩放未开放"
+            : "源 splat 未绑定或点数不匹配；旋转与缩放未开放"}
+        </span>
       </div>
       <div
         className="interactionActionRow"
@@ -5148,6 +5166,7 @@ function TrainingStagePanel({
         <div
           className={`objectProcessHandoff ${handoff.status}`}
           data-object-process-handoff="true"
+          data-object-process-execution="cli-only"
           data-object-process-handoff-status={handoff.status}
           data-object-process-handoff-model={handoff.modelId}
           data-object-process-handoff-result-model={handoff.resultModelId}
@@ -5158,6 +5177,7 @@ function TrainingStagePanel({
             <span>{objectProcessStatusLabel(handoff.status)}</span>
             <strong>{handoff.resultModelId || "-"}</strong>
           </div>
+          <p>浏览器不会运行对象模型。请在终端执行以下 CLI，完成后再加载结果。</p>
           <code>{handoff.command || "no command"}</code>
           <div className="objectProcessHandoffMeta">
             <span>{handoff.viewerPath || "-"}</span>
@@ -6871,6 +6891,7 @@ function validSourceFrame(frame) {
 
 function sourceSplatLayerInfo(modelRoot) {
   const layer = modelRoot?.userData?.sourceSplatLayer;
+  const layerGroup = sourceSplatLayerGroupForRoot(modelRoot);
   if (!layer) {
     return {
       registered: false,
@@ -6888,6 +6909,7 @@ function sourceSplatLayerInfo(modelRoot) {
     path: layer.path ?? null,
     label: layer.label ?? "完整 splat",
     renderer: layer.renderer ?? "Spark splat",
+    visible: layerGroup?.visible !== false,
     sourceSplats: layer.sourceSplats ?? null,
     sourceSplatObjectMotionContract: objectMotion.contract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
     sourceSplatObjectMotionMode: objectMotion.mode ?? "none",
@@ -6901,8 +6923,20 @@ function sourceSplatLayerInfo(modelRoot) {
     sourceSplatObjectMotionMappedGaussians: objectMotion.mappedGaussians ?? 0,
     sourceSplatObjectMotionUpdates: objectMotion.updates ?? 0,
     sourceSplatObjectMotionTransformedObjects: objectMotion.transformedObjects ?? 0,
+    sourceSplatObjectMotionHiddenObjects: objectMotion.hiddenObjects ?? 0,
+    sourceSplatObjectMotionHiddenGaussians: objectMotion.hiddenGaussians ?? 0,
+    sourceSplatObjectVisibilityMode: objectMotion.visibilityMode ?? "none",
+    sourceSplatObjectVisibilitySynchronized: Boolean(objectMotion.visibilitySynchronized),
     sourceSplatObjectMotionMaxTranslate: objectMotion.maxTranslate ?? 0,
   };
+}
+
+function sourceSplatLayerGroupForRoot(modelRoot) {
+  let result = null;
+  modelRoot?.traverse?.((child) => {
+    if (!result && child.userData?.role === "source-splat-layer") result = child;
+  });
+  return result;
 }
 
 function sourceSplatMeshForRoot(modelRoot) {
@@ -8124,7 +8158,7 @@ function normalizeObjectProcessHandoff(handoff = {}) {
 function objectProcessStatusLabel(status) {
   switch (status) {
     case "handoff-ready":
-      return "命令就绪";
+      return "CLI 命令就绪";
     case "loading-result":
       return "加载结果";
     case "object-layer-ready":
@@ -8217,7 +8251,7 @@ function trainingStageModelEntry(model, visible = false) {
       ? loadedObjectLayer
         ? "skip"
         : "load-existing"
-      : "generate-object-layer";
+      : "cli-handoff";
   return {
     id: model?.id ?? "",
     label: model?.label ?? model?.name ?? model?.id ?? "-",
@@ -8309,8 +8343,10 @@ function modelProcessActionLabel(action) {
       return "跳过";
     case "load-existing":
       return "加载";
+    case "cli-handoff":
+      return "CLI 命令";
     default:
-      return "生成";
+      return "不可用";
   }
 }
 

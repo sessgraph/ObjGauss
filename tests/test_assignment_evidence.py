@@ -13,7 +13,7 @@ from objgauss.core.assignment_evidence import (
     validate_assignment_evidence_summary,
 )
 from objgauss.core.object_emergence_solver import ObjectEmergenceEvidence
-from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture
+from objgauss.pipelines.trainable_kernel import make_trainable_kernel_mvp_fixture
 
 
 def test_assignment_evidence_from_trainable_frame_preserves_core_fields():

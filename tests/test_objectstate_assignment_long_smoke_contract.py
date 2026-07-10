@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.objectstate_assignment_long_smoke_contract import (
+from objgauss.pipelines.objectstate_assignment_long_smoke_contract import (
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA,
@@ -11,11 +11,11 @@ from objgauss.core.objectstate_assignment_long_smoke_contract import (
     objectstate_assignment_long_smoke_contract_summary,
     validate_objectstate_assignment_long_smoke_contract_summary,
 )
-from objgauss.core.objectstate_model_identity_benchmark_report import (
+from objgauss.evaluation.objectstate_model_identity_benchmark_report import (
     objectstate_model_identity_benchmark_report_scenarios,
 )
-from objgauss.core.objectstate_teacher_evidence import TeacherEvidenceBatch
-from objgauss.core.objectstate_teacher_evidence_leakage_audit import (
+from objgauss.datasets.objectstate_teacher_evidence import TeacherEvidenceBatch
+from objgauss.evaluation.objectstate_teacher_evidence_leakage_audit import (
     objectstate_teacher_evidence_leakage_audit_summary,
 )
 
@@ -87,8 +87,23 @@ def test_assignment_long_smoke_contract_rejects_native_policy():
 
 def _training_allowed_teacher_batch() -> TeacherEvidenceBatch:
     scenarios = objectstate_model_identity_benchmark_report_scenarios()
-    first = scenarios[0]
-    feature_matrix = np.asarray(first.frame0_features, dtype=np.float32)
+    projection = np.asarray(
+        [
+            [0.88, 0.04, 0.03, 0.02],
+            [0.03, 0.87, 0.05, 0.02],
+            [0.04, 0.02, 0.89, 0.03],
+            [0.02, 0.05, 0.03, 0.86],
+        ],
+        dtype=np.float32,
+    )
+    feature_matrix = np.concatenate(
+        [
+            np.asarray(features, dtype=np.float32) @ projection
+            for scenario in scenarios
+            for features in (scenario.frame0_features, scenario.frame1_features)
+        ],
+        axis=0,
+    )
     return TeacherEvidenceBatch(
         sample_id="assignment-long-smoke-dino-split",
         gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),

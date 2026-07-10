@@ -5,10 +5,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
 )
-from objgauss.core.objectstate_real_intervention_rows import (
+from objgauss.evaluation.objectstate_real_intervention_rows import (
     OBJECTSTATE_REAL_INTERVENTION_ROWS_SCHEMA,
     objectstate_real_intervention_rows_from_bundle,
     objectstate_real_intervention_rows_summary,
@@ -115,14 +115,44 @@ def test_real_intervention_rows_fail_explicit_intervention_fail_accounting():
     assert summary["status"] == "objectstate_real_intervention_rows_fail"
     assert summary["row_counts"]["intervention_fail_rows"] == 1
     assert summary["intervention_rows"][0]["status"] == "fail"
-    assert summary["intervention_rows"][0]["failure_reason"] == (
-        "action-conditioned predictor moved in the wrong direction"
+    assert summary["intervention_rows"][0]["failure_reason"].startswith(
+        "derived intervention gate failed:"
     )
+    assert "wrong_direction_rate_above_maximum" in summary[
+        "intervention_rows"
+    ][0]["failure_reason"]
     assert summary["intervention_rows"][0]["metrics"]["intervention_gain"] == -0.06
     assert summary["intervention_gate"]["metrics"][
         "intervention_counterfactual_outcome_accuracy"
     ] == 0.0
     assert "failed_rows_absent" in summary["intervention_gate"]["hard_blockers"]
+
+
+def test_real_intervention_rows_recompute_forged_pass_and_gain():
+    bundle = _intervention_bundle()
+    bundle["gate_accounting_rows"][0]["metrics"].update(
+        {
+            "action_conditioned_ade": 0.18,
+            "no_action_ade": 0.12,
+            "counterfactual_outcome_accuracy": 0.0,
+            "wrong_direction_rate": 1.0,
+            "intervention_gain": 99.0,
+        }
+    )
+
+    summary = objectstate_real_intervention_rows_summary(bundle)
+
+    assert summary["status"] == "objectstate_real_intervention_rows_fail"
+    assert summary["row_counts"]["intervention_pass_rows"] == 0
+    assert summary["row_counts"]["intervention_fail_rows"] == 1
+    assert summary["metrics"]["reality_status_counts"] == {"fail": 1}
+    assert summary["metrics"]["mean_intervention_gain"] == -0.06
+    assert summary["intervention_rows"] == summary["intervention_gate"]["rows"]
+    assert summary["intervention_rows"][0]["status"] == "fail"
+    assert summary["intervention_rows"][0]["metrics"]["intervention_gain"] == -0.06
+    diagnostics = summary["intervention_gate"]["declaration_diagnostics"]
+    assert diagnostics["caller_status_mismatch_count"] == 1
+    assert diagnostics["derived_metric_mismatch_count"] == 1
 
 
 def test_real_intervention_rows_require_stable_identity_across_transition():

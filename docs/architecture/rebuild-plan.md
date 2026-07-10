@@ -205,19 +205,21 @@ objgauss/
     clustering.py      # from clustering.py
     objects.py         # from segment.py
     object_field.py    # from object_field.py
-    masks.py           # manifest schema and validation subset
-    projection.py      # project_points and depth visibility
-    mask_voting.py     # vote_masks_to_gaussians and training from votes
-    slots.py           # align_mask_manifest_slots
-    evaluation.py      # promotion / emergence metrics
+    projection.py      # project_points, vote targets/loss, and quality primitives
 ```
+
+Mask datasets/inspection live in `objgauss.datasets`; mask voting/training and
+semantic-slot alignment live in `objgauss.pipelines`; acceptance checks live in
+`objgauss.evaluation`.
 
 Keep the old module paths as thin compatibility wrappers during migration:
 
 ```text
 objgauss/ply.py             -> imports from objgauss.core.io_ply
-objgauss/object_field.py    -> imports from objgauss.core.object_field
-objgauss/mask_voting.py     -> imports from objgauss.core.mask_voting
+objgauss/object_field.py    -> imports ObjectField primitives from core, NeRF inspection from datasets,
+                               and JSON output from pipelines
+objgauss/mask_voting.py     -> imports projection primitives from core, voting/training from pipelines,
+                               and the acceptance check from evaluation
 ```
 
 The CLI should call core APIs through service/pipeline adapters, not contain

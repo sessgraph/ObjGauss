@@ -3,21 +3,21 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_phase1_evidence_ledger import (
+from objgauss.pipelines.objectstate_phase1_evidence_ledger import (
     objectstate_phase1_evidence_ledger,
 )
-from objgauss.core.objectstate_transition_dataset import (
+from objgauss.datasets.objectstate_transition_dataset import (
     write_objectstate_transition_dataset,
 )
-from objgauss.core.objectstate_transition_reality_evidence_package import (
+from objgauss.pipelines.objectstate_transition_reality_evidence_package import (
     OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA,
     objectstate_transition_reality_evidence_package,
     validate_objectstate_transition_reality_evidence_package_summary,
 )
-from objgauss.core.objectstate_transition_reality_handoff import (
+from objgauss.pipelines.objectstate_transition_reality_handoff import (
     write_objectstate_transition_reality_handoff,
 )
 

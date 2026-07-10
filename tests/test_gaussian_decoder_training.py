@@ -7,7 +7,7 @@ import pytest
 
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.gaussian_decoder_training import (
+from objgauss.pipelines.gaussian_decoder_training import (
     OBJECT_STATE_GAUSSIAN_DECODER_TRAINING_SCHEMA,
     ObjectStateGaussianDecoderState,
     object_state_gaussian_decoder_state_from_dict,
@@ -19,7 +19,7 @@ from objgauss.core.object_emergence_solver import (
     object_id_targets_from_cloud,
     train_object_emergence_solver,
 )
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
 )
@@ -52,6 +52,10 @@ def test_object_state_gaussian_decoder_trains_object_colors_against_image_loss()
     assert payload["gpu_policy"]["vram_reserve_gb"] == 1
     assert payload["image_render_loss_decreased"] is True
     assert payload["assignments"][0]["shape"] == [6, 2]
+    state = payload["object_states"][0][0]
+    assert state["id"] == state["persistent_id"]
+    assert state["slot"] == state["object_id"]
+    assert state["id"] != state["slot"]
 
 
 def test_object_state_gaussian_decoder_requires_image_targets_for_image_loss():

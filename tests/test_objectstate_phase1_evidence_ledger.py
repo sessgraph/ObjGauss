@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_phase1_evidence_ledger import (
+from objgauss.pipelines.objectstate_phase1_evidence_ledger import (
     OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA,
     objectstate_phase1_evidence_ledger,
     validate_objectstate_phase1_evidence_ledger_summary,

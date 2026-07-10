@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_identity_handoff import (
+from objgauss.pipelines.objectstate_bop_identity_handoff import (
     OBJECTSTATE_BOP_IDENTITY_HANDOFF_SCHEMA,
     objectstate_bop_identity_handoff,
     validate_objectstate_bop_identity_handoff_summary,
@@ -43,7 +45,6 @@ def test_bop_identity_handoff_writes_reviewable_package(tmp_path):
         candidate_artifact=artifact_path,
         condition_sidecar=sidecar_path,
         candidate_id="fixture-bop-identity",
-        candidate_source="unit-test BOP identity candidate",
         max_centroid_distance=0.01,
     )
 
@@ -60,6 +61,36 @@ def test_bop_identity_handoff_writes_reviewable_package(tmp_path):
         "objectstate_controlled_identity_handoff_pass"
     )
     assert summary["identity_handoff"]["identity_eval"]["metrics"]["idf1"] == 1.0
+    predictions = summary["identity_handoff"]["identity_predictions"]
+    artifact = _read_json(artifact_path)
+    expected_observations = [
+        (
+            f"object-state-{state['id']}",
+            state["centroid"],
+        )
+        for frame in artifact["object_states"]
+        for state in frame["states"]
+    ]
+    actual_observations = [
+        (row["predicted_identity"], row["predicted_position"])
+        for row in predictions["predictions"]
+    ]
+    assert predictions["association_mode"] == "raw_track_observations"
+    assert predictions["candidate"]["source"] == (
+        "trainable_kernel_objectstate_raw_track_adapter"
+    )
+    assert all("object_id" not in row for row in predictions["predictions"])
+    assert [item[0] for item in actual_observations] == [
+        item[0] for item in expected_observations
+    ]
+    for (_, actual_position), (_, expected_position) in zip(
+        actual_observations,
+        expected_observations,
+    ):
+        assert actual_position == pytest.approx(expected_position)
+    assert summary["identity_handoff"]["identity_eval"]["pass_gates"][
+        "raw_prediction_observations_only"
+    ] is True
     assert summary["row_counts"]["identity_predictions"] == 6
     assert summary["identity_evidence_package"]["status"] == (
         "objectstate_controlled_identity_evidence_package_reviewable"

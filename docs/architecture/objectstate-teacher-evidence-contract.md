@@ -192,7 +192,12 @@ Important current interpretation:
 - Passing the stressor checks does not by itself unlock long training; the
   teacher source split must also clear.
 
-## Core API
+## Canonical API
+
+The batch and contract API lives in
+`objgauss.datasets.objectstate_teacher_evidence`; the leakage audit lives in
+`objgauss.evaluation.objectstate_teacher_evidence_leakage_audit`. The old
+`objgauss.core` paths are compatibility-only.
 
 Machine contract entry points:
 

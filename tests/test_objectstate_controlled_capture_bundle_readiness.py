@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
+from objgauss.datasets.objectstate_controlled_capture_bundle_readiness import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA,
     objectstate_controlled_capture_bundle_readiness,
     validate_objectstate_controlled_capture_bundle_readiness_summary,
 )
-from objgauss.core.objectstate_controlled_capture_template import (
+from objgauss.datasets.objectstate_controlled_capture_template import (
     write_objectstate_controlled_capture_bundle_template,
 )
 

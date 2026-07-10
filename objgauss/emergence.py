@@ -1,6 +1,6 @@
-"""Compatibility wrapper for core object emergence metrics."""
+"""Compatibility wrapper for object-emergence evaluation."""
 
-from objgauss.core.emergence import (
+from objgauss.evaluation.emergence import (
     adjusted_rand_index,
     mask_proxy_occlusion_delta,
     object_emergence_curve,

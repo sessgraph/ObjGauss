@@ -6,13 +6,12 @@ from typing import Any
 
 from objgauss.emergence import object_emergence_curve, write_emergence_curve_csv
 from objgauss.emergence_report import EmergenceCurveInput, write_emergence_curve_report
-from objgauss.mask_voting import (
-    mask_vote_targets,
-    projection_loss,
+from objgauss.core.projection import mask_vote_targets, projection_loss
+from objgauss.pipelines.mask_voting import (
     train_object_field_from_votes,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import cloud_positions_for_metrics, load_object_field
+from objgauss.core.object_field import cloud_positions_for_metrics, load_object_field
 from objgauss.ply import read_ply
 from objgauss.render_probe import load_render_probe_frames, render_occlusion_delta
 

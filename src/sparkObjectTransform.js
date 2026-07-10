@@ -15,9 +15,12 @@ export function createSparkObjectTransform(points = []) {
   const objectIds = uniqueObjectIds(points);
   const slotByObjectId = new Map(objectIds.map((objectId, slot) => [String(objectId), slot]));
   const objectIndexData = new Uint32Array(indexWidth * indexHeight);
+  const gaussianCountsBySlot = new Uint32Array(objectIds.length);
 
   points.forEach((point, index) => {
-    objectIndexData[index] = slotByObjectId.get(String(normalizedObjectId(point))) ?? 0;
+    const slot = slotByObjectId.get(String(normalizedObjectId(point))) ?? 0;
+    objectIndexData[index] = slot;
+    gaussianCountsBySlot[slot] += 1;
   });
 
   const objectIndexTexture = new THREE.DataTexture(
@@ -38,6 +41,9 @@ export function createSparkObjectTransform(points = []) {
   const transformWidth = Math.min(OBJECT_TRANSFORM_TEXTURE_WIDTH, safeObjectCount);
   const transformHeight = Math.max(1, Math.ceil(safeObjectCount / transformWidth));
   const transformData = new Float32Array(transformWidth * transformHeight * 4);
+  objectIds.forEach((_, slot) => {
+    transformData[slot * 4 + 3] = 1;
+  });
   const transformTexture = new THREE.DataTexture(
     transformData,
     transformWidth,
@@ -67,6 +73,7 @@ export function createSparkObjectTransform(points = []) {
     indexWidth,
     indexHeight,
     objectIndexData,
+    gaussianCountsBySlot,
     objectIndexTexture,
     transformWidth,
     transformHeight,
@@ -79,6 +86,8 @@ export function createSparkObjectTransform(points = []) {
     reason: pointCount > 0 && objectIds.length > 0 ? "waiting-for-splat-count" : "empty-object-index",
     updates: 0,
     transformedObjects: 0,
+    hiddenObjects: 0,
+    hiddenGaussians: 0,
     maxTranslate: 0,
     totalTranslate: 0,
   };
@@ -118,8 +127,13 @@ export function updateSparkObjectTransforms(
 ) {
   if (!transform) return sparkObjectTransformStats(transform);
   transform.transformData.fill(0);
+  transform.objectIds.forEach((_, slot) => {
+    transform.transformData[slot * 4 + 3] = 1;
+  });
   const scale = Number.isFinite(sourceFrameScale) && sourceFrameScale > 0 ? sourceFrameScale : 1;
   let transformedObjects = 0;
+  let hiddenObjects = 0;
+  let hiddenGaussians = 0;
   let maxTranslate = 0;
   let totalTranslate = 0;
 
@@ -136,7 +150,12 @@ export function updateSparkObjectTransforms(
     transform.transformData[offset] = translateX;
     transform.transformData[offset + 1] = translateY;
     transform.transformData[offset + 2] = translateZ;
-    transform.transformData[offset + 3] = 1;
+    const visible = object.visible !== false;
+    transform.transformData[offset + 3] = visible ? 1 : 0;
+    if (!visible) {
+      hiddenObjects += 1;
+      hiddenGaussians += gaussianCountForSlot(transform, slot);
+    }
     const magnitude = Math.hypot(translateX, translateY, translateZ);
     if (magnitude > 0.000001) {
       transformedObjects += 1;
@@ -148,9 +167,11 @@ export function updateSparkObjectTransforms(
   transform.transformTexture.needsUpdate = true;
   transform.updates += 1;
   transform.transformedObjects = transformedObjects;
+  transform.hiddenObjects = hiddenObjects;
+  transform.hiddenGaussians = hiddenGaussians;
   transform.maxTranslate = maxTranslate;
   transform.totalTranslate = totalTranslate;
-  transform.active = transform.sourceCountMatches && transformedObjects > 0;
+  transform.active = transform.sourceCountMatches && (transformedObjects > 0 || hiddenObjects > 0);
   if (transform.sourceCountMatches) {
     transform.status = "ready";
     transform.reason = null;
@@ -178,6 +199,9 @@ export function sparkObjectTransformStats(transform) {
     mappedGaussians: transform?.pointCount ?? 0,
     updates: transform?.updates ?? 0,
     transformedObjects: transform?.transformedObjects ?? 0,
+    hiddenObjects: transform?.hiddenObjects ?? 0,
+    hiddenGaussians: transform?.hiddenGaussians ?? 0,
+    visibilitySynchronized: Boolean(transform?.sourceCountMatches),
     maxTranslate: round6(transform?.maxTranslate ?? 0),
     totalTranslate: round6(transform?.totalTranslate ?? 0),
   };
@@ -204,7 +228,7 @@ function createObjectTransformModifier(transform) {
       if (!gsplat) {
         throw new Error("No gsplat input");
       }
-      const { index, center } = dyno.splitGsplat(gsplat).outputs;
+      const { index, center, opacity } = dyno.splitGsplat(gsplat).outputs;
       const inRange = dyno.lessThan(index, transform.sourceCountUniform);
       const safeIndex = dyno.select(inRange, index, zeroInt);
       const indexCoord = dyno.combine({
@@ -218,13 +242,17 @@ function createObjectTransformModifier(transform) {
         x: dyno.imod(slot, transformWidth),
         y: dyno.div(slot, transformWidth),
       });
-      const translate = dyno.vec3(dyno.texelFetch(objectTransformTexture, transformCoord, zeroInt));
+      const transformEntry = dyno.texelFetch(objectTransformTexture, transformCoord, zeroInt);
+      const translate = dyno.vec3(transformEntry);
+      const visibility = dyno.split(transformEntry).outputs.w;
       const transformedCenter = dyno.add(center, translate);
+      const transformedOpacity = dyno.mul(opacity, visibility);
       const applyTransform = dyno.and(transform.enabledUniform, inRange);
       return {
         gsplat: dyno.combineGsplat({
           gsplat,
           center: dyno.select(applyTransform, transformedCenter, center ?? zeroVec3),
+          opacity: dyno.select(applyTransform, transformedOpacity, opacity),
         }),
       };
     },
@@ -254,6 +282,10 @@ function normalizedInitialPosition(object) {
     finiteNumber(object?.position?.y, 0),
     finiteNumber(object?.position?.z, 0),
   ];
+}
+
+function gaussianCountForSlot(transform, slot) {
+  return Number(transform?.gaussianCountsBySlot?.[slot] ?? 0);
 }
 
 function setUniformValue(uniform, value) {

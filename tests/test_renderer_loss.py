@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import numpy as np
 
-from objgauss.core.renderer_loss import (
+from objgauss.pipelines.renderer_loss import (
     RENDERER_LOSS_BOUNDARY_SCHEMA,
     RendererLossBoundaryReport,
     renderer_loss_boundary_report,
@@ -14,17 +14,17 @@ from objgauss.core.object_emergence_solver import (
     object_emergence_solver_checkpoint,
     train_object_emergence_solver,
 )
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
 )
-from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
-from objgauss.core.solver_decoder_training import (
+from objgauss.pipelines.gaussian_decoder_training import train_object_state_gaussian_decoder
+from objgauss.pipelines.solver_decoder_training import (
     solver_decoder_joint_checkpoint,
     train_solver_decoder_joint,
 )
-from objgauss.core.training_renderer import evaluate_training_renderer_loss
+from objgauss.pipelines.training_renderer import evaluate_training_renderer_loss
 
 
 def test_renderer_loss_boundary_accepts_trainable_kernel_summary():

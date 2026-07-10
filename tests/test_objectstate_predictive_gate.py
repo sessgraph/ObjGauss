@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from objgauss.core.objectstate_predictive_gate import (
+from objgauss.evaluation.objectstate_predictive_gate import (
     OBJECTSTATE_PREDICTIVE_GATE_SCHEMA,
     ObjectStatePredictiveGateReport,
     evaluate_objectstate_predictive_gate,
     validate_objectstate_predictive_gate_summary,
 )
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

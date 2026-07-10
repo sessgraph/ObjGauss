@@ -62,7 +62,7 @@ the operator to run capture host preflight.
 Core module:
 
 ```text
-objgauss.core.objectstate_controlled_capture_handoff
+objgauss.pipelines.objectstate_controlled_capture_handoff
 ```
 
 Schema:

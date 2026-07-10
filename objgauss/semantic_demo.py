@@ -11,14 +11,14 @@ import numpy as np
 from objgauss.clustering import summarize_labels
 from objgauss.demo import _demo_camera_transform
 from objgauss.features import colors, positions
-from objgauss.mask_voting import (
-    mask_vote_quality_check,
-    project_points,
+from objgauss.core.projection import project_points
+from objgauss.evaluation.mask_vote_quality import mask_vote_quality_check
+from objgauss.pipelines.mask_voting import (
     train_object_field_from_votes,
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import ObjectField, load_object_field, object_field_label_delta, object_field_metrics, save_object_field
+from objgauss.core.object_field import ObjectField, load_object_field, object_field_label_delta, object_field_metrics, save_object_field
 from objgauss.ply import read_ply, write_ply
 from objgauss.segment import assign_object_ids
 

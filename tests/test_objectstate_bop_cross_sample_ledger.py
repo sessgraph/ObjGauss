@@ -3,19 +3,19 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_cross_sample_ledger import (
+from objgauss.pipelines.objectstate_bop_cross_sample_ledger import (
     OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA,
     objectstate_bop_cross_sample_ledger,
     validate_objectstate_bop_cross_sample_ledger_summary,
 )
-from objgauss.core.objectstate_bop_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_local_row_handoff import (
     objectstate_bop_local_row_handoff,
 )
 

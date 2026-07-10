@@ -5,10 +5,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_transition_dataset import (
+from objgauss.datasets.objectstate_transition_dataset import (
     OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA,
     OBJECTSTATE_TRANSITION_DATASET_SCHEMA,
     OBJECTSTATE_TRANSITION_ROW_SCHEMA,

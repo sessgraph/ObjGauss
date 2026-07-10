@@ -6,7 +6,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_weak_boundary_opt import (
+from objgauss.pipelines.real_sample_v2_weak_boundary_opt import (
     REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA,
     RealSampleV2WeakBoundaryOptReport,
     real_sample_v2_weak_boundary_opt_from_cloud,

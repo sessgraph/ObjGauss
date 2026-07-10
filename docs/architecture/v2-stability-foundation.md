@@ -2,6 +2,13 @@
 
 状态：`V2-STABILITY-FOUNDATION-002` contract + scenario / diagnostics / gate extension
 
+Canonical ownership:
+
+- synthetic fixture / observation contract: `objgauss.datasets.v2_stability_foundation`
+- diagnostics and stability gates: `objgauss.evaluation.v2_stability_diagnostics`,
+  `objgauss.evaluation.v2_stability_gate`
+- legacy `objgauss.core` paths are compatibility imports only
+
 ## 目标
 
 V2 稳定性评估的第一步不是继续增加指标，而是先冻结 evaluation

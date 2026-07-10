@@ -5,18 +5,18 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     evaluate_objectstate_controlled_intervention_candidates,
     validate_objectstate_controlled_intervention_candidates,
 )
-from objgauss.core.objectstate_transition_dataset import (
+from objgauss.datasets.objectstate_transition_dataset import (
     objectstate_transition_dataset_from_capture_manifest,
     write_objectstate_transition_dataset,
 )
-from objgauss.core.objectstate_transition_intervention_candidates import (
+from objgauss.pipelines.objectstate_transition_intervention_candidates import (
     OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA,
     objectstate_transition_intervention_candidates,
     validate_objectstate_transition_intervention_candidates_summary,

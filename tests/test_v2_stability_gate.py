@@ -3,13 +3,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
-from objgauss.core.v2_stability_foundation import (
+from objgauss.evaluation.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
     make_synthetic_stability_scenario_suite,
 )
-from objgauss.core.v2_stability_gate import (
+from objgauss.evaluation.v2_stability_gate import (
     SyntheticStabilityGateReport,
     SyntheticStabilitySuiteGateReport,
     V2_STABILITY_GATE_HARD_CHECKS,

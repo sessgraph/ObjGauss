@@ -5,7 +5,7 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_FINALIZE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA,
     OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA,
@@ -15,10 +15,10 @@ from objgauss.core.objectstate_bop_candidate_artifact_template import (
     validate_objectstate_bop_candidate_artifact_template_summary,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_identity_route_audit import (
+from objgauss.pipelines.objectstate_bop_identity_route_audit import (
     objectstate_bop_identity_route_audit,
 )
-from objgauss.core.trainable_artifact import (
+from objgauss.pipelines.trainable_artifact import (
     TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
     validate_trainable_kernel_model_artifact,
 )
@@ -74,6 +74,9 @@ def test_bop_candidate_artifact_template_is_draft_only(tmp_path):
         "bop-ycbv-obj-000002",
     ]
     first_placeholder = template["object_state_frames"][0]["state_placeholders"][0]
+    assert first_placeholder["persistent_id"].startswith("TODO integer candidate")
+    assert first_placeholder["slot"].startswith("TODO integer renderer")
+    assert first_placeholder["state_id"] is None
     assert first_placeholder["centroid"].startswith("TODO model-predicted")
     assert first_placeholder["bbox"].startswith("TODO model-predicted")
     serialized = json.dumps(template)
@@ -240,6 +243,11 @@ def test_bop_candidate_artifact_finalizer_outputs_identity_route_artifact(tmp_pa
         "reconstruction_noise_robustness": 0.97,
         "reconstruction_noise_variant_count": 2,
     }
+    first_state = artifact["object_states"][0]["states"][0]
+    assert first_state["id"] == first_state["persistent_id"] == 100
+    assert first_state["slot"] == first_state["object_id"] == 0
+    assert artifact["object_states"][0]["derived_object_ids"] == [0, 1]
+    assert artifact["assignments"][0]["matrix"] == [[1.0, 0.0], [0.0, 1.0]]
     assert validate_trainable_kernel_model_artifact(artifact) is True
 
     route = objectstate_bop_identity_route_audit(
@@ -330,6 +338,30 @@ def test_bop_candidate_artifact_finalizer_rejects_pose_gt_centroid_leakage(tmp_p
         finalize_objectstate_bop_candidate_artifact_template(template_path)
 
 
+def test_bop_candidate_artifact_finalizer_preserves_legacy_state_id_fallback(tmp_path):
+    scene_root = tmp_path / "bop-scene"
+    template_path = tmp_path / "objectstates.template.json"
+    artifact_path = tmp_path / "objectstates.json"
+    _write_bop_scene(scene_root)
+    _write_gaussian_frames(scene_root)
+    write_objectstate_bop_candidate_artifact_template(
+        scene_root,
+        output=template_path,
+        target_artifact_path=artifact_path,
+        sample_id="bop-ycbv-scene-000001",
+    )
+    _fill_template(template_path, legacy_addresses=True)
+
+    finalize_objectstate_bop_candidate_artifact_template(template_path)
+    artifact = _read_json(artifact_path)
+
+    state = artifact["object_states"][0]["states"][0]
+    assert state["id"] == state["persistent_id"] == 0
+    assert state["slot"] == state["object_id"] == 0
+    assert "legacy_state_id_used_for_identity_and_renderer_slot" in state["diagnostics"]
+    assert artifact["object_states"][0]["derived_object_ids"] == [0, 1]
+
+
 def _write_bop_scene(root) -> None:
     (root / "rgb").mkdir(parents=True)
     for frame_id in range(3):
@@ -386,7 +418,12 @@ def _write_gaussian_frames(root) -> None:
         (root / "gaussians" / f"{frame_id:06d}.ply").write_bytes(PLY_BYTES)
 
 
-def _fill_template(path, *, exact_gt: bool = False) -> None:
+def _fill_template(
+    path,
+    *,
+    exact_gt: bool = False,
+    legacy_addresses: bool = False,
+) -> None:
     template = _read_json(path)
     for frame in template["object_state_frames"]:
         frame_index = frame["frame_index"]
@@ -396,7 +433,11 @@ def _fill_template(path, *, exact_gt: bool = False) -> None:
             else:
                 gt = [0.04 + 0.001 * frame_index, 0.05, 0.06]
             centroid = gt if exact_gt else [value + 0.0002 for value in gt]
-            placeholder["state_id"] = slot_index
+            if legacy_addresses:
+                placeholder["state_id"] = slot_index
+            else:
+                placeholder["persistent_id"] = 100 + slot_index
+                placeholder["slot"] = slot_index
             placeholder["centroid"] = centroid
             placeholder["bbox"] = [
                 [value - 0.001 for value in centroid],

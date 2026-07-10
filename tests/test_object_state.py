@@ -12,6 +12,7 @@ from objgauss.core.object_state import (
     dynamic_k_update_plan,
     match_object_states,
     object_state_delivery_summary,
+    object_state_projection_summary,
     object_state_stability_report,
     project_object_states,
     project_object_states_from_field,
@@ -39,22 +40,52 @@ def test_project_object_states_from_field_pools_sparse_assignment():
     assert projection.evidence_count == 4
 
     first, second = projection.states
-    assert first.id == 0
+    assert first.id == 1_000_000
+    assert first.slot == 0
     assert first.status == "active"
     assert first.diagnostics == ()
     assert first.slot_mass == pytest.approx(2.0)
-    assert first.confidence == pytest.approx(first.slot_mass)
+    assert first.confidence == pytest.approx(1.0)
     assert first.mass_fraction == pytest.approx(0.5)
     assert first.normalized_assignment_entropy == pytest.approx(0.0, abs=1e-5)
     np.testing.assert_allclose(first.centroid, [-0.9, 0.05, 0.0], atol=1e-5)
     np.testing.assert_allclose(first.bbox, [-1.0, 0.0, 0.0, -0.8, 0.1, 0.0], atol=1e-5)
     np.testing.assert_allclose(first.feature, [1.0, 0.0], atol=1e-5)
 
-    assert second.id == 1
+    assert second.id == 1_000_001
+    assert second.slot == 1
     assert second.status == "active"
     np.testing.assert_allclose(second.centroid, [0.9, -0.05, 0.0], atol=1e-5)
     np.testing.assert_allclose(second.bbox, [0.8, -0.1, 0.0, 1.0, 0.0, 0.0], atol=1e-5)
     np.testing.assert_allclose(second.feature, [0.0, 1.0], atol=1e-5)
+
+
+def test_object_state_projection_summary_preserves_persistent_and_renderer_ids():
+    projection = project_object_states_from_field(
+        _cloud(),
+        field_from_labels(
+            np.array([0, 0, 1, 1], dtype=np.int32),
+            slots=2,
+            confidence=1.0,
+        ),
+        evidence_features=_features(),
+    )
+
+    summary = object_state_projection_summary(projection)
+
+    assert summary["type"] == "ObjectStateProjection"
+    assert summary["evidence_count"] == 4
+    assert summary["object_state_count"] == 2
+    assert summary["active_state_count"] == 2
+    assert summary["derived_object_id_source"] == "argmax(A[N,K])"
+    assert [state["id"] for state in summary["states"]] == [1_000_000, 1_000_001]
+    assert [state["persistent_id"] for state in summary["states"]] == [
+        1_000_000,
+        1_000_001,
+    ]
+    assert [state["slot"] for state in summary["states"]] == [0, 1]
+    assert [state["object_id"] for state in summary["states"]] == [0, 1]
+    assert summary["states"][0]["centroid"] == pytest.approx([-0.9, 0.05, 0.0])
 
 
 def test_stability_report_marks_sparse_assignment_healthy():
@@ -115,6 +146,7 @@ def test_uniform_assignment_marks_mixed_slots_and_global_bbox():
         assert state.status == "mixed"
         assert state.diagnostics == ("mixed_slot",)
         assert state.slot_mass == pytest.approx(2.0)
+        assert state.confidence == pytest.approx(0.5)
         assert state.normalized_assignment_entropy == pytest.approx(1.0)
         np.testing.assert_allclose(state.centroid, [0.0, 0.0, 0.0], atol=1e-6)
         np.testing.assert_allclose(state.bbox, [-1.0, -0.1, 0.0, 1.0, 0.1, 0.0], atol=1e-6)
@@ -151,10 +183,12 @@ def test_single_dominant_slot_keeps_low_confidence_slot_visible():
     assert projection.derived_object_ids.tolist() == [0, 0, 0, 0]
     assert dominant.status == "active"
     assert dominant.slot_mass == pytest.approx(3.88)
+    assert dominant.confidence == pytest.approx(0.97)
     assert dominant.normalized_assignment_entropy < 0.2
     assert weak.status == "low_confidence"
     assert weak.diagnostics == ("low_confidence_slot",)
     assert weak.slot_mass == pytest.approx(0.12)
+    assert weak.confidence == pytest.approx(0.03)
     assert weak.normalized_assignment_entropy < 0.2
 
     report = object_state_stability_report(projection)
@@ -184,6 +218,7 @@ def test_noisy_assignment_remains_deterministic_and_reports_entropy():
     assert projection.derived_object_ids.tolist() == [0, 0, 1, 1]
     assert [state.status for state in projection.states] == ["mixed", "mixed"]
     assert [state.slot_mass for state in projection.states] == pytest.approx([2.0, 2.0])
+    assert [state.confidence for state in projection.states] == pytest.approx([0.5125, 0.5125])
     assert all(state.normalized_assignment_entropy > 0.95 for state in projection.states)
     np.testing.assert_allclose(projection.states[0].centroid, [-0.14, 0.0075, 0.0], atol=1e-5)
     np.testing.assert_allclose(projection.states[1].centroid, [0.14, -0.0075, 0.0], atol=1e-5)
@@ -261,11 +296,25 @@ def test_temporal_matching_handles_slot_permutation_without_hard_id_equality():
         ],
         dtype=np.float32,
     )
-    current = project_object_states(_cloud(), swapped_assignment, evidence_features=_features())
+    current = project_object_states(
+        _cloud(),
+        swapped_assignment,
+        evidence_features=_features(),
+        previous_state=previous,
+        persistent_match_max_cost=0.05,
+    )
 
     report = match_object_states(previous, current, max_cost=0.05)
 
-    assert {(match.previous_id, match.current_id) for match in report.matches} == {(0, 1), (1, 0)}
+    assert [state.slot for state in current.states] == [0, 1]
+    assert [state.id for state in current.states] == [
+        previous.states[1].id,
+        previous.states[0].id,
+    ]
+    assert {(match.previous_id, match.current_id) for match in report.matches} == {
+        (previous.states[0].id, previous.states[0].id),
+        (previous.states[1].id, previous.states[1].id),
+    }
     assert report.unmatched_previous == ()
     assert report.unmatched_current == ()
     assert report.mean_temporal_drift == pytest.approx(0.0)
@@ -283,13 +332,18 @@ def test_temporal_matching_reports_unmatched_current_state_for_birth_policy():
         _three_object_cloud(),
         field_from_labels(np.array([0, 0, 1, 1, 2, 2], dtype=np.int32), slots=3, confidence=1.0),
         evidence_features=_three_features(),
+        previous_state=previous,
+        persistent_match_max_cost=0.05,
     )
 
     report = match_object_states(previous, current, max_cost=0.05)
 
-    assert {(match.previous_id, match.current_id) for match in report.matches} == {(0, 0), (1, 1)}
+    assert {(match.previous_id, match.current_id) for match in report.matches} == {
+        (previous.states[0].id, previous.states[0].id),
+        (previous.states[1].id, previous.states[1].id),
+    }
     assert report.unmatched_previous == ()
-    assert report.unmatched_current == (2,)
+    assert report.unmatched_current == (current.states[2].id,)
     assert "unmatched_current" in report.diagnostics
 
 
@@ -322,9 +376,22 @@ def test_object_state_delivery_summary_binds_gaussian_children_and_chunk_metadat
         "object_count": 2,
     }
     assert [
-        (entry["object_id"], entry["gaussian_count"], entry["status"])
+        (
+            entry["object_id"],
+            entry["persistent_id"],
+            entry["gaussian_count"],
+            entry["status"],
+        )
         for entry in summary["gaussian_children"]
-    ] == [(0, 2, "active"), (1, 2, "active")]
+    ] == [
+        (0, projection.states[0].id, 2, "active"),
+        (1, projection.states[1].id, 2, "active"),
+    ]
+    assert summary["active_object_ids"] == [0, 1]
+    assert summary["active_persistent_ids"] == [
+        projection.states[0].id,
+        projection.states[1].id,
+    ]
     assert summary["chunk_binding"]["compatible"] is True
     assert summary["chunk_binding"]["chunk_ids_by_object"] == {"0": [0], "1": [1]}
 

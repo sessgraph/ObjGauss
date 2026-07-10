@@ -3,24 +3,24 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_baseline_candidate import (
+from objgauss.pipelines.objectstate_bop_baseline_candidate import (
     OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA,
     validate_objectstate_bop_baseline_candidate_summary,
     write_objectstate_bop_gaussian_centroid_baseline_candidate,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_condition_sidecar_summary,
 )
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+from objgauss.datasets.objectstate_bop_local_row_batch_spec import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
 )
-from objgauss.core.objectstate_bop_phase1_authoring_progress import (
+from objgauss.pipelines.objectstate_bop_phase1_authoring_progress import (
     objectstate_bop_phase1_authoring_progress,
 )
-from objgauss.core.objectstate_bop_phase1_sample_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_sample_workspace import (
     objectstate_bop_phase1_sample_workspaces,
 )
-from objgauss.core.trainable_artifact import (
+from objgauss.pipelines.trainable_artifact import (
     TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
     validate_trainable_kernel_model_artifact,
 )
@@ -51,7 +51,11 @@ def test_bop_gaussian_centroid_baseline_candidate_writes_artifact(tmp_path):
     assert artifact["schema"] == TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
     assert validate_trainable_kernel_model_artifact(artifact) is True
     assert artifact["artifact_policy"]["baseline_candidate_only"] is True
-    assert artifact["object_states"][0]["states"][0]["centroid"] == [1.0, 0.0, 0.0]
+    first_state = artifact["object_states"][0]["states"][0]
+    assert first_state["id"] == first_state["persistent_id"] == 0
+    assert first_state["slot"] == first_state["object_id"] == 0
+    assert artifact["object_states"][0]["derived_object_ids"] == [0]
+    assert first_state["centroid"] == [1.0, 0.0, 0.0]
     assert artifact["object_states"][1]["states"][0]["centroid"] == [2.0, 0.0, 0.0]
     assert artifact["object_states"][0]["states"][0]["bbox"] == [
         [0.0, 0.0, 0.0],

@@ -11,7 +11,7 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
 )
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.objectstate_model_identity_benchmark import (
+from objgauss.evaluation.objectstate_model_identity_benchmark import (
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS,
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA,
     ObjectStateModelIdentityBenchmarkScenario,

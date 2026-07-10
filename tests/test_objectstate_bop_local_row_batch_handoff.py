@@ -5,19 +5,21 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
-    OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA,
+from objgauss.datasets.objectstate_bop_local_row_batch_spec import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
+    validate_objectstate_bop_local_row_batch_spec,
+)
+from objgauss.pipelines.objectstate_bop_local_row_batch_handoff import (
+    OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA,
     objectstate_bop_local_row_batch_handoff,
     validate_objectstate_bop_local_row_batch_handoff_summary,
-    validate_objectstate_bop_local_row_batch_spec,
 )
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"

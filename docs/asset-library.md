@@ -26,6 +26,56 @@
 | Poly Haven School Chair dense NeRF render set | https://polyhaven.com/a/SchoolChair_01 | `outputs/assets/training/polyhaven-school-chair-nerf-dense/` | 更高密度训练输入：32-frame / 384px CC0 glTF orbit render，用于后续生成更好的 Splatfacto candidate | CC0；API 拉取仅按 Poly Haven API ToS 用于非商用/研究 |
 | Poly Haven Chair 商用展示样例 | https://polyhaven.com/a/SchoolChair_01 | `public/samples/polyhaven_chair_demo.splat` + `public/samples/polyhaven_chair_demo_objects.ply` | 许可干净、viewer 可直接加载和对象编辑的 Gaussian demo sample | CC0 派生训练输出；public sample 文件本地生成，不提交 git |
 
+## ObjectState 真实证据资产（仅本地）
+
+| 资产 | 来源 | 本地文件 | 用途 | 许可 / 边界 |
+| --- | --- | --- | --- | --- |
+| BOP HOPE val Realsense | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-hope/hope_val_realsense.zip`、`outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/`、`val/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
+| BOP LMO test BOP19 | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`、`outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
+
+HOPE scene `000002` 的当前最小复跑输入只抽取前 3 帧：
+
+```bash
+unzip -o outputs/assets/raw/bop-hope/hope_val_realsense.zip \
+  'val/000002/scene_*.json' \
+  'val/000002/rgb/00000[0-2].png' \
+  'val/000002/depth/00000[0-2].png' \
+  -d outputs/assets/raw/bop-hope/hope-val-realsense-subset/
+
+uv run objgauss object-state bop-rgbd-baseline-local-row-handoff \
+  outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000002 \
+  --output-root outputs/evidence/objectstate-bop-hope-public-000002-rgbd-baseline \
+  --summary-output outputs/evidence/objectstate-bop-hope-public-000002-rgbd-baseline/bop-rgbd-baseline-local-row-summary.json \
+  --sample-id bop-hope-val-scene-000002-rgbd-baseline \
+  --dataset-id bop-hope \
+  --object-category hope-objects \
+  --scenario public-replay-pose-sequence \
+  --license-text 'BOP HOPE CC-BY-SA-4.0; local research evidence only' \
+  --max-frames 3 \
+  --identity-policy pose_track_per_obj_id \
+  --max-points-per-frame 10000 \
+  --force
+```
+
+该结果是第三个 pose replay 的局部负证据，不是完整 controlled scene：identity
+reviewability 为 fail，prediction 与 hold-last 同为零误差，且没有真实 action。
+`outputs/assets/` 与 `outputs/evidence/` 继续 ignored，不提交 git。
+
+外部 controlled-interaction 候选：
+
+- [H2O](https://taeinkwon.com/projects/h2o/)：同步多视角 RGB-D、interaction label、
+  物体 6DoF、相机和手 pose。作者页现已链接
+  [ETH Research Collection](https://doi.org/10.3929/ethz-b-000685070) 的匿名 Open Access /
+  CC BY-NC 4.0 副本；最小 RGB-D 分卷约 13.57 GB。旧注册站的 academic-only /
+  no-transfer 条款只适用于旧入口。当前未下载；原生 action 是语义标签，不是独立 3D
+  control vector，不能直接进入 intervention gate。
+- [HOI4D](https://hoi4d.github.io/)：RGB-D、category-level object pose、hand action，
+  CC BY-NC 4.0；action annotation 只有类别与时间区间，没有独立 3D control vector。
+  当前只有官方分卷入口，没有本地 raw sequence。
+
+这些 evidence-only 数据集不进入 `src/assetLibrary.js` 或 `objgauss/assets.py` 的浏览器
+Demo registry；只有许可、体积和发布用途单独确认后才允许同步到公开素材面。
+
 ## 现成 Gaussian 场景候选
 
 > 本节只登记候选，不代表已经下载、训练、发布或进入 viewer 默认。所有大文件、

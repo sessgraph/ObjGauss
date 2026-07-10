@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from objgauss.core.chunk_index import CHUNK_INDEX_SCHEMA, read_chunk_index, validate_chunk_index
-from objgauss.core.trainable_artifact import (
+from objgauss.pipelines.trainable_artifact import (
     TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
     validate_trainable_kernel_model_artifact,
 )

@@ -4,7 +4,7 @@ import json
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_model_handoff import (
+from objgauss.pipelines.real_sample_v2_model_handoff import (
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     RealSampleV2ModelHandoffReport,
     real_sample_v2_model_handoff_from_cloud,

@@ -204,16 +204,17 @@ L_v1 = L_render + lambda_object L_object + lambda_temporal L_temporal
 
 | Contract 概念 | 当前位置 | 说明 |
 | --- | --- | --- |
-| `PerceptionEvidence.mask` | `objgauss/core/masks.py` | Mask manifest 与 optional SAM adapter。 |
-| `PerceptionEvidence.feature` | `objgauss/core/clip_scoring.py`，未来 feature adapter | CLIP / DINO 风格语义特征保持 optional。 |
+| `PerceptionEvidence.mask` | `objgauss/datasets/masks.py` | Mask manifest 与 optional SAM adapter。 |
+| `PerceptionEvidence.feature` | `objgauss/pipelines/clip_scoring.py`，未来 feature adapter | CLIP / DINO 风格语义特征保持 optional。 |
 | `ObjectState.slot_prob` | `objgauss/core/object_field.py` | 当前 Object Field soft slots。 |
-| `ObjectState.id` / hard labels | `objgauss/core/objects.py`，`objgauss/core/clustering.py` | 当前 hard label 与 baseline clustering；它们应视为派生地址。 |
-| Cross-view object evidence | `objgauss/core/projection.py`，`objgauss/core/semantic_slots.py` | Projection voting、slot alignment、semantic gates。 |
+| `ObjectState` state / persistent `id` / projection | `objgauss/core/object_state.py` | shared reasoning primitive；`id` 与 renderer-facing `slot/object_id` 分离。 |
+| Derived hard labels / renderer-facing addresses | `objgauss/core/objects.py`，`objgauss/core/clustering.py` | hard export 与 baseline clustering；它们应视为派生地址。 |
+| Cross-view object evidence | `objgauss/core/projection.py`，`objgauss/pipelines/mask_voting.py`，`objgauss/pipelines/semantic_slots.py`，`objgauss/evaluation/mask_vote_quality.py` | Projection/loss primitive、mask-vote orchestration、slot alignment 与 acceptance check 分层。 |
 | `GaussianToken` | `objgauss/core/gaussian.py` | 当前 Gaussian table 与 field schema。 |
 | Browser delivery | `objgauss/core/chunk_index.py`，`objgauss/core/quantization.py`，`src/ogcDecoder.js` | Object-aware chunk、LOD、quantized payload 与 browser decoder contract。 |
 
-未来只有在代码真正需要共享状态对象时，才引入 `objgauss/core/object_state.py`。不要为了
-占位创建空抽象。
+`objgauss/core/object_state.py` 已承载共享 state/projection primitive；后续只有在代码真正
+需要额外共享状态对象时才扩展，不为占位创建空抽象。
 
 ## 非目标
 

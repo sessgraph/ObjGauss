@@ -6,16 +6,16 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.object_state_eval import (
+from objgauss.evaluation.object_state_eval import (
     OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA,
     evaluate_solver_decoder_object_states,
     validate_objectstate_checkpoint_eval,
 )
-from objgauss.core.solver_decoder_training import (
+from objgauss.pipelines.solver_decoder_training import (
     solver_decoder_joint_checkpoint,
     train_solver_decoder_joint,
 )
-from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.pipelines.trainable_kernel import trainable_kernel_sample_from_cloud
 from objgauss.ply import write_ply
 
 

@@ -201,23 +201,44 @@ def supervised_assignment_loss_and_gradient(
     targets = tuple(target_assignments)
     if len(targets) != len(checked):
         raise ValueError("target_assignments must have one entry per assignment")
-    losses: list[float] = []
-    gradients: list[np.ndarray] = []
-    frame_count = max(len(checked), 1)
+    checked_targets: list[np.ndarray | None] = []
     for assignment, target in zip(checked, targets, strict=True):
         if target is None:
-            gradients.append(np.zeros_like(assignment, dtype=np.float32))
+            checked_targets.append(None)
             continue
         checked_target = validate_assignment_matrix(target, evidence_count=assignment.shape[0])
         if checked_target.shape[1] != assignment.shape[1]:
             raise ValueError("target_assignment slots must match solver slots")
+        checked_targets.append(checked_target)
+
+    supervised_frame_count = sum(
+        target is not None and assignment.shape[0] > 0
+        for assignment, target in zip(checked, checked_targets, strict=True)
+    )
+    if supervised_frame_count == 0:
+        return 0.0, tuple(
+            np.zeros_like(assignment, dtype=np.float32) for assignment in checked
+        )
+
+    losses: list[float] = []
+    gradients: list[np.ndarray] = []
+    for assignment, checked_target in zip(checked, checked_targets, strict=True):
+        if checked_target is None or assignment.shape[0] == 0:
+            gradients.append(np.zeros_like(assignment, dtype=np.float32))
+            continue
         clipped = np.clip(assignment, _EPS, 1.0)
         losses.append(float(-np.mean(np.sum(checked_target * np.log(clipped), axis=1))))
+        # The forward loss is constant outside the clip interval, so its
+        # derivative with respect to assignment is zero there.  Applying the
+        # unclipped -target / probability formula to a zero probability
+        # produces a spurious 1e8 gradient that does not differentiate the
+        # actual clipped loss.
+        clip_interior = (assignment > _EPS) & (assignment < 1.0)
         gradients.append(
             (
-                -(checked_target / clipped)
+                -(checked_target / clipped) * clip_interior
                 / max(float(assignment.shape[0]), _EPS)
-                / frame_count
+                / supervised_frame_count
             ).astype(np.float32, copy=False)
         )
     return float(np.mean(losses)) if losses else 0.0, tuple(gradients)

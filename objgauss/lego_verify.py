@@ -7,8 +7,8 @@ from typing import Any
 
 import numpy as np
 
-from objgauss.mask_voting import mask_vote_quality_check
-from objgauss.object_field import (
+from objgauss.evaluation.mask_vote_quality import mask_vote_quality_check
+from objgauss.core.object_field import (
     load_object_field,
     object_field_label_delta,
     object_field_metrics,

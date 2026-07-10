@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.gsplat_training_renderer import (
+from objgauss.pipelines.gsplat_training_renderer import (
     GSPLAT_GRADIENT_PATH,
     GSPLAT_RENDERER,
     GSPLAT_SYNTHETIC_GAUSSIAN_POLICY,
@@ -13,7 +13,7 @@ from objgauss.core.gsplat_training_renderer import (
     gsplat_renderer_availability,
 )
 from objgauss.core.object_state import project_object_states
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
 )

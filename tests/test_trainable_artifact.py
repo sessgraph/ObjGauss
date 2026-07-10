@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 
-from objgauss.core.trainable_artifact import (
+from objgauss.pipelines.trainable_artifact import (
     TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA,
     trainable_kernel_model_artifact,
     validate_trainable_kernel_model_artifact,
     write_trainable_kernel_model_artifact,
 )
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
 )
-from objgauss.core.training_renderer import evaluate_training_renderer_loss
+from objgauss.pipelines.training_renderer import evaluate_training_renderer_loss
 
 
 def test_trainable_kernel_model_artifact_captures_model_state(tmp_path):
@@ -46,9 +46,25 @@ def test_trainable_kernel_model_artifact_captures_model_state(tmp_path):
     assert len(artifact["assignments"]) == 2
     assert artifact["assignments"][0]["shape"] == [6, 2]
     assert len(artifact["object_states"][0]["states"]) == 2
-    assert "bbox" in artifact["object_states"][0]["states"][0]
+    first_state = artifact["object_states"][0]["states"][0]
+    assert "bbox" in first_state
+    assert first_state["id"] == first_state["persistent_id"]
+    assert first_state["slot"] == first_state["object_id"]
+    assert first_state["id"] != first_state["object_id"]
+    training_state = artifact["training"]["object_states"][0][0]
+    assert training_state["id"] == training_state["persistent_id"]
+    assert training_state["slot"] == training_state["object_id"]
+    assert 0.0 <= first_state["confidence"] <= 1.0
     assert artifact["learned_parameters"]["decoder_colors"]
     assert validate_trainable_kernel_model_artifact(artifact) is True
+
+    legacy_artifact = json.loads(json.dumps(artifact))
+    for frame in legacy_artifact["object_states"]:
+        for state in frame["states"]:
+            state.pop("persistent_id")
+            state.pop("slot")
+            state.pop("object_id")
+    assert validate_trainable_kernel_model_artifact(legacy_artifact) is True
 
     output = tmp_path / "trainable-model.json"
     written = write_trainable_kernel_model_artifact(

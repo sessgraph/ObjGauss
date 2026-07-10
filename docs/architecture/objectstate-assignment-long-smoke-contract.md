@@ -121,7 +121,7 @@ If any criterion is missing, the run is blocked or reviewable, not pass.
 Core module:
 
 ```text
-objgauss.core.objectstate_assignment_long_smoke_contract
+objgauss.pipelines.objectstate_assignment_long_smoke_contract
 ```
 
 Schemas:
@@ -145,7 +145,7 @@ provided. Without that audit, the summary is valid but blocked.
 Implemented run module:
 
 ```text
-objgauss.core.objectstate_assignment_long_smoke
+objgauss.pipelines.objectstate_assignment_long_smoke
 ```
 
 Run summary schema:

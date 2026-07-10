@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.objectstate_teacher_evidence import (
+from objgauss.datasets.objectstate_teacher_evidence import (
     OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA,
     OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA,
     OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA,

@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
 )
-from objgauss.core.objectstate_real_identity_rows import (
+from objgauss.evaluation.objectstate_real_identity_rows import (
     OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA,
     objectstate_real_identity_rows_from_bundle,
     objectstate_real_identity_rows_summary,
@@ -87,6 +87,7 @@ def test_real_identity_rows_fail_explicit_identity_fail_accounting():
                 "fragmentation_rate": 0.8,
                 "swap_rate": 0.1,
                 "identity_collapse": True,
+                "raw_prediction_observations": True,
             },
             "artifact_refs": ["outputs/captures/cup/identity-eval.json"],
             "gt_requirements": {
@@ -104,11 +105,38 @@ def test_real_identity_rows_fail_explicit_identity_fail_accounting():
     assert summary["status"] == "objectstate_real_identity_rows_fail"
     assert summary["row_counts"]["identity_fail_rows"] == 1
     assert summary["identity_rows"][0]["status"] == "fail"
-    assert summary["identity_rows"][0]["failure_reason"] == (
-        "identity collapsed after occlusion"
+    assert summary["identity_rows"][0]["failure_reason"].startswith(
+        "derived identity gate failed:"
     )
+    assert "identity_collapse_detected" in summary["identity_rows"][0][
+        "failure_reason"
+    ]
     assert summary["identity_gate"]["metrics"]["controlled_real_identity_collapse"] is True
     assert "failed_rows_absent" in summary["identity_gate"]["hard_blockers"]
+
+
+def test_real_identity_rows_do_not_readvertise_forged_pass():
+    bundle = _identity_bundle()
+    bundle["gate_accounting_rows"][0]["metrics"].update(
+        {
+            "idf1": 0.2,
+            "fragmentation_rate": 0.8,
+            "swap_rate": 0.1,
+            "identity_collapse": True,
+        }
+    )
+
+    summary = objectstate_real_identity_rows_summary(bundle)
+
+    assert summary["status"] == "objectstate_real_identity_rows_fail"
+    assert summary["row_counts"]["identity_pass_rows"] == 0
+    assert summary["row_counts"]["identity_fail_rows"] == 1
+    assert summary["metrics"]["reality_status_counts"] == {"fail": 1}
+    assert summary["identity_rows"] == summary["identity_gate"]["rows"]
+    assert summary["identity_rows"][0]["status"] == "fail"
+    diagnostics = summary["identity_gate"]["declaration_diagnostics"]
+    assert diagnostics["caller_status_mismatch_count"] == 1
+    assert diagnostics["caller_status_mismatches"][0]["caller_status"] == "pass"
 
 
 def test_real_identity_rows_summary_is_incomplete_without_identity_accounting():
@@ -212,6 +240,7 @@ def _identity_bundle(accounting_row=None):
                     "fragmentation_rate": 0.0,
                     "swap_rate": 0.0,
                     "identity_collapse": False,
+                    "raw_prediction_observations": True,
                 },
                 "artifact_refs": ["outputs/captures/cup/identity-eval.json"],
                 "gt_requirements": {

@@ -1,5 +1,22 @@
 # TRAIN-003A: Splatfacto Smoke Runbook
 
+## Reproducible dependency boundary
+
+The wrapper pins the top-level versions verified by the recorded local runs:
+
+- `nerfstudio==1.1.5`
+- `torch==2.12.1`
+- `torchvision==0.27.1`
+- `gsplat==1.5.3`
+- CUDA compiler packages in the `13.0.*` family
+- Segment Anything revision `6fdee8f2727f4506cfbbe553e23b895e27956588`
+
+`uv` still resolves platform-specific transitive GPU wheels. Every evidence run
+must preserve the resolved environment (`uv pip freeze`), GPU/driver summary,
+command, config, and checkpoint metadata next to ignored outputs. A run without
+that environment record is local exploratory evidence, not reproducible gate
+evidence.
+
 This runbook turns the local NeRF Lego Splatfacto smoke handoff into a
 repeatable command sequence. It produces ignored local outputs only; do not
 commit `outputs/`, checkpoints, TensorBoard logs, SAM checkpoints, or downloaded

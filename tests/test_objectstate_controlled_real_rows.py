@@ -4,16 +4,18 @@ import json
 
 import pytest
 
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+    read_objectstate_controlled_real_manifest,
+)
+from objgauss.evaluation.objectstate_controlled_real_rows import (
     OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA,
     evaluate_controlled_real_manifest_reality_gate,
     objectstate_controlled_real_rows_summary,
     objectstate_reality_rows_from_controlled_real_manifest,
-    read_objectstate_controlled_real_manifest,
     validate_objectstate_controlled_real_rows_summary,
 )
-from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
+from objgauss.evaluation.objectstate_reality_gate import ObjectStateRealityGateThresholds
 
 
 def test_controlled_real_manifest_imports_identity_pass_and_blocked_future_rows():
@@ -106,6 +108,28 @@ def test_controlled_real_manifest_imports_identity_fail_row_as_fail_not_blocked(
     assert summary["gate"]["hard_gates"]["failed_rows_absent"] is False
 
 
+def test_controlled_real_summary_does_not_readvertise_forged_identity_pass():
+    manifest = _identity_only_manifest()
+    manifest["evidence_rows"][0]["metrics"].update(
+        {
+            "idf1": 0.2,
+            "fragmentation_rate": 0.8,
+            "swap_rate": 0.1,
+            "identity_collapse": True,
+        }
+    )
+
+    summary = objectstate_controlled_real_rows_summary(manifest)
+
+    assert summary["pass_row_count"] == 0
+    assert summary["fail_row_count"] == 1
+    assert summary["rows"] == summary["gate"]["rows"]
+    assert summary["rows"][0]["status"] == "fail"
+    diagnostics = summary["gate"]["declaration_diagnostics"]
+    assert diagnostics["caller_status_mismatch_count"] == 1
+    assert diagnostics["caller_status_mismatches"][0]["caller_status"] == "pass"
+
+
 def test_controlled_real_manifest_requires_failed_reason():
     manifest = _identity_only_manifest()
     manifest["evidence_rows"][0] = {
@@ -153,6 +177,7 @@ def _identity_only_manifest():
                     "fragmentation_rate": 0.0,
                     "swap_rate": 0.0,
                     "identity_collapse": False,
+                    "raw_prediction_observations": True,
                 },
             },
             {

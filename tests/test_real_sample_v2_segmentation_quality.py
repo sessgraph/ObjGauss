@@ -4,7 +4,7 @@ import json
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_segmentation_quality import (
+from objgauss.pipelines.real_sample_v2_segmentation_quality import (
     REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA,
     RealSampleV2SegmentationQualityReport,
     real_sample_v2_segmentation_quality_from_cloud,

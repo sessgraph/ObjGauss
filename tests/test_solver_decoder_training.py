@@ -7,8 +7,8 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.gaussian_decoder_training import ObjectStateGaussianDecoderState
-from objgauss.core.solver_decoder_training import (
+from objgauss.pipelines.gaussian_decoder_training import ObjectStateGaussianDecoderState
+from objgauss.pipelines.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
     SOLVER_DECODER_JOINT_TRAINING_SCHEMA,
     SolverDecoderJointTrainingResult,
@@ -17,13 +17,13 @@ from objgauss.core.solver_decoder_training import (
     train_solver_decoder_joint,
     validate_solver_decoder_joint_checkpoint,
 )
-from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
-from objgauss.core.training_scale import (
+from objgauss.pipelines.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.pipelines.training_scale import (
     TRAINING_SCALE_PLAN_SCHEMA,
     solver_decoder_training_scale_plan,
     validate_solver_decoder_training_scale_plan,
 )
-from objgauss.core.training_tensorboard import (
+from objgauss.pipelines.training_tensorboard import (
     TENSORBOARD_SCALAR_EXPORT_SCHEMA,
     write_solver_decoder_tensorboard_events,
 )
@@ -62,6 +62,10 @@ def test_solver_decoder_joint_training_updates_solver_and_decoder():
     assert payload["renderer_api"]["status"] == "ready"
     assert payload["gpu_policy"]["uses_gpu"] is False
     assert payload["predictions"][0]["assignment"]
+    state = payload["object_states"][0][0]
+    assert state["id"] == state["persistent_id"]
+    assert state["slot"] == state["object_id"]
+    assert state["id"] != state["slot"]
     assert not np.allclose(
         result.initial_solver_state.feature_weights,
         result.final_solver_state.feature_weights,

@@ -11,7 +11,7 @@ from objgauss.core.assignment_solver_v2 import (
 )
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.io import read_ply
-from objgauss.core.objectstate_assignment_train import (
+from objgauss.pipelines.objectstate_assignment_train import (
     OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA,
     OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA,
     objectstate_assignment_train_dataset_summary,

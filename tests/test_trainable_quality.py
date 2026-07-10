@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from objgauss.core.trainable_quality import (
+from objgauss.pipelines.trainable_quality import (
     TRAINABLE_QUALITY_REPORT_SCHEMA,
     trainable_quality_report,
     validate_trainable_quality_report,

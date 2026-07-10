@@ -5,14 +5,14 @@ import pytest
 
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_smoke import (
+from objgauss.pipelines.real_sample_v2_smoke import (
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     RealSampleV2SmokeReport,
     evaluate_real_sample_v2_smoke,
     real_sample_v2_smoke_from_cloud,
     validate_real_sample_v2_smoke_summary,
 )
-from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.pipelines.trainable_kernel import trainable_kernel_sample_from_cloud
 
 
 def test_real_sample_v2_smoke_runs_object_id_sample_through_renderer_boundary():

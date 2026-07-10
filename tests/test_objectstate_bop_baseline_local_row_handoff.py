@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_baseline_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_baseline_local_row_handoff import (
     OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA,
     objectstate_bop_baseline_local_row_handoff,
     validate_objectstate_bop_baseline_local_row_handoff_summary,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
 
@@ -55,7 +55,9 @@ def test_bop_baseline_local_row_handoff_writes_reviewable_negative_evidence(tmp_
     identity_metrics = summary["local_row_handoff"]["identity_handoff"][
         "identity_handoff"
     ]["identity_eval"]["metrics"]
-    assert identity_metrics["identity_collapse"] is True
+    assert identity_metrics["raw_prediction_observations"] is True
+    assert identity_metrics["identity_collapse"] is False
+    assert identity_metrics["missing_prediction_count"] == 3
     assert identity_metrics["reconstruction_noise_evidence_present"] is False
     assert (output_root / "objectstates.json").is_file()
     assert (output_root / "phase1-evidence-ledger.json").is_file()

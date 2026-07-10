@@ -5,19 +5,19 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_prediction_baseline import (
+from objgauss.pipelines.objectstate_controlled_prediction_baseline import (
     OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA,
     validate_objectstate_controlled_prediction_baseline_summary,
     write_objectstate_controlled_prediction_baseline_candidates,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     evaluate_objectstate_controlled_prediction_candidates,
     validate_objectstate_controlled_prediction_candidates,
 )
-from objgauss.core.objectstate_controlled_reality_candidate_template import (
+from objgauss.pipelines.objectstate_controlled_reality_candidate_template import (
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
 )
 

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateReport
-from objgauss.core.objectstate_reality_public_rows import (
+from objgauss.evaluation.objectstate_reality_gate import ObjectStateRealityGateReport
+from objgauss.evaluation.objectstate_reality_public_rows import (
     OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA,
     ObjectStateRealityPublicArtifact,
     default_objectstate_reality_public_artifacts,

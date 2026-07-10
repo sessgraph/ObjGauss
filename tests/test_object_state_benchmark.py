@@ -11,7 +11,7 @@ from objgauss.core import (
     validate_object_state_stability_benchmark as core_validate_object_state_stability_benchmark,
     write_object_state_stability_benchmark as core_write_object_state_stability_benchmark,
 )
-from objgauss.core.object_state_benchmark import (
+from objgauss.evaluation.object_state_benchmark import (
     object_state_stability_benchmark,
     validate_object_state_stability_benchmark,
     write_object_state_stability_benchmark,
@@ -67,8 +67,8 @@ def test_object_state_stability_benchmark_covers_expected_failure_modes():
     assert permutation["metrics"]["max_temporal_drift"] == pytest.approx(0.0)
     assert permutation["metrics"]["slot_permutation_resolved"] is True
     assert {(match["previous_id"], match["current_id"]) for match in permutation["temporal"]["matches"]} == {
-        (0, 1),
-        (1, 0),
+        (1_000_000, 1_000_001),
+        (1_000_001, 1_000_000),
     }
 
     assert cases["temporal_jitter"]["temporal"]["diagnostics"] == ["high_temporal_drift"]

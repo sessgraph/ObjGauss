@@ -5,19 +5,19 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_real_evidence_bundle import (
+from objgauss.datasets.objectstate_controlled_real_evidence_bundle import (
     objectstate_controlled_real_evidence_bundle_adapter_summary,
 )
-from objgauss.core.objectstate_controlled_real_identity_eval import (
+from objgauss.evaluation.objectstate_controlled_real_identity_eval import (
     OBJECTSTATE_CONTROLLED_REAL_IDENTITY_TEACHER_EVIDENCE_SCHEMA,
     objectstate_controlled_real_identity_eval,
 )
-from objgauss.core.objectstate_controlled_real_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_real_prediction_eval import (
     OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA,
     objectstate_controlled_real_prediction_eval,
     validate_objectstate_controlled_real_prediction_eval,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
 )
 

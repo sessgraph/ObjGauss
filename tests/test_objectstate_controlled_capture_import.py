@@ -5,12 +5,12 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA,
     validate_objectstate_controlled_capture_manifest,
 )
-from objgauss.core.objectstate_controlled_capture_import import (
+from objgauss.datasets.objectstate_controlled_capture_import import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA,
     objectstate_controlled_capture_bundle_acceptance_summary,
@@ -19,7 +19,7 @@ from objgauss.core.objectstate_controlled_capture_import import (
     validate_objectstate_controlled_capture_bundle_acceptance_summary,
     validate_objectstate_controlled_capture_import_summary,
 )
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
 )
 

@@ -1,11 +1,11 @@
 """Evaluation and promotion-policy entry points."""
 
-from objgauss.core.baseline_comparison import (
+from objgauss.evaluation.baseline_comparison import (
     compare_baseline_candidates,
     render_comparison_markdown,
     write_comparison_markdown,
 )
-from objgauss.core.emergence import (
+from objgauss.evaluation.emergence import (
     adjusted_rand_index,
     mask_proxy_occlusion_delta,
     object_emergence_curve,

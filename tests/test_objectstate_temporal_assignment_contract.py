@@ -3,17 +3,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.objectstate_assignment_long_smoke import (
+from objgauss.pipelines.objectstate_assignment_long_smoke import (
     objectstate_assignment_long_smoke_summary,
 )
-from objgauss.core.objectstate_model_identity_benchmark_report import (
+from objgauss.evaluation.objectstate_model_identity_benchmark_report import (
     objectstate_model_identity_benchmark_report_scenarios,
 )
-from objgauss.core.objectstate_teacher_evidence import TeacherEvidenceBatch
-from objgauss.core.objectstate_teacher_evidence_leakage_audit import (
+from objgauss.datasets.objectstate_teacher_evidence import TeacherEvidenceBatch
+from objgauss.evaluation.objectstate_teacher_evidence_leakage_audit import (
     objectstate_teacher_evidence_leakage_audit_summary,
 )
-from objgauss.core.objectstate_temporal_assignment_contract import (
+from objgauss.pipelines.objectstate_temporal_assignment_contract import (
     OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA,
     OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA,
     OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS,
@@ -86,14 +86,19 @@ def test_temporal_assignment_contract_rejects_native_policy():
 
 
 def _passed_long_smoke(tmp_path):
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    teacher_batch = _training_allowed_teacher_batch(scenarios)
     leakage_audit = objectstate_teacher_evidence_leakage_audit_summary(
         tmp_path / "leakage-audit",
-        teacher_batches=(_training_allowed_teacher_batch(),),
+        scenarios=scenarios,
+        teacher_batches=(teacher_batch,),
         seed=23,
     )
     return objectstate_assignment_long_smoke_summary(
         tmp_path / "long-smoke",
+        scenarios=scenarios,
         teacher_evidence_leakage_audit=leakage_audit,
+        teacher_evidence_batches=(teacher_batch,),
         sample_id="temporal-assignment-contract-long-smoke",
         iterations=120,
         learning_rate=0.4,
@@ -101,10 +106,24 @@ def _passed_long_smoke(tmp_path):
     )
 
 
-def _training_allowed_teacher_batch() -> TeacherEvidenceBatch:
-    scenarios = objectstate_model_identity_benchmark_report_scenarios()
-    first = scenarios[0]
-    feature_matrix = np.asarray(first.frame0_features, dtype=np.float32)
+def _training_allowed_teacher_batch(scenarios) -> TeacherEvidenceBatch:
+    projection = np.asarray(
+        [
+            [0.88, 0.04, 0.03, 0.02],
+            [0.03, 0.87, 0.05, 0.02],
+            [0.04, 0.02, 0.89, 0.03],
+            [0.02, 0.05, 0.03, 0.86],
+        ],
+        dtype=np.float32,
+    )
+    feature_matrix = np.concatenate(
+        [
+            np.asarray(features, dtype=np.float32) @ projection
+            for scenario in scenarios
+            for features in (scenario.frame0_features, scenario.frame1_features)
+        ],
+        axis=0,
+    )
     return TeacherEvidenceBatch(
         sample_id="temporal-assignment-contract-dino-split",
         gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),

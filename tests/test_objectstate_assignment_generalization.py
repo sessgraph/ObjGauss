@@ -10,7 +10,7 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
 )
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.objectstate_assignment_generalization import (
+from objgauss.pipelines.objectstate_assignment_generalization import (
     OBJECTSTATE_ASSIGNMENT_GENERALIZATION_SCHEMA,
     objectstate_assignment_generalization_summary,
     validate_objectstate_assignment_generalization_summary,

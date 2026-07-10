@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_identity_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_identity_evidence_package import (
     OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA,
     objectstate_controlled_identity_evidence_package,
     validate_objectstate_controlled_identity_evidence_package_summary,
 )
-from objgauss.core.objectstate_controlled_identity_handoff import (
+from objgauss.pipelines.objectstate_controlled_identity_handoff import (
     objectstate_controlled_identity_handoff,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (

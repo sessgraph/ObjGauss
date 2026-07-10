@@ -9,7 +9,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.io_ply import read_ply
-from objgauss.core.objectstate_bop_rgbd_gaussian_export import (
+from objgauss.pipelines.objectstate_bop_rgbd_gaussian_export import (
     OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA,
     objectstate_bop_rgbd_gaussian_export,
     validate_objectstate_bop_rgbd_gaussian_export_summary,

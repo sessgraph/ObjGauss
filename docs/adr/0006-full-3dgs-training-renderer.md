@@ -22,7 +22,7 @@ ObjGauss v1 kernel 现在已经形成非训练和训练 MVP 两条闭环：
 - 不支持 SH view-dependent color。
 - 不作为大场景 GPU training path。
 
-`objgauss.core.renderer_loss` 也已经把当前 blocker 写明为
+`objgauss.pipelines.renderer_loss` 也已经把当前 blocker 写明为
 `full_3dgs_renderer_not_selected`。因此下一步需要先冻结训练 renderer 选择，而不是直接把
 torch / CUDA / 大型 rasterizer 引入基础依赖。
 
@@ -167,7 +167,7 @@ frozen_fields:
 
 新增可选 adapter 和 skipped smoke test：
 
-- 新增 `objgauss/core/gsplat_training_renderer.py`。
+- 新增 `objgauss/pipelines/gsplat_training_renderer.py`。
 - import guard 检查 `torch`、`gsplat` 和 CUDA availability。
 - 在 tiny fixture 上调用 `gsplat.rendering.rasterization(...)` 或当前官方等价 API。
 - 输出 `objgauss-training-renderer-api-v1` summary。

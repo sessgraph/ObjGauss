@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from objgauss.core.objectstate_reality_gate import (
+from objgauss.evaluation.objectstate_reality_gate import (
     OBJECTSTATE_REALITY_GATE_SCHEMA,
     OBJECTSTATE_REALITY_ROW_SCHEMA,
     ObjectStateRealityGateReport,
+    ObjectStateRealityGateThresholds,
     ObjectStateRealityRow,
     evaluate_objectstate_reality_gate,
     objectstate_reality_blocked_rows_markdown,
@@ -35,8 +36,11 @@ def test_objectstate_reality_gate_passes_controlled_real_public_rows():
     assert payload["metrics"]["controlled_real_identity_collapse"] is False
     assert payload["metrics"]["controlled_real_fragmentation_rate"] == 0.0
     assert payload["metrics"]["controlled_real_swap_rate"] == 0.0
-    assert payload["metrics"]["short_horizon_prediction_gap_vs_history_model"] == 0.02
+    assert payload["metrics"][
+        "short_horizon_prediction_gap_vs_history_model"
+    ] == pytest.approx(-0.02)
     assert payload["metrics"]["intervention_counterfactual_outcome_accuracy"] == 1.0
+    assert payload["declaration_diagnostics"]["caller_status_mismatch_count"] == 0
     assert payload["hard_blockers"] == []
     assert payload["claim_policy"]["does_not_claim_world_model"] is True
     assert payload["non_goals"]["uses_replay_buffer"] is False
@@ -89,14 +93,246 @@ def test_objectstate_reality_gate_fails_on_reported_identity_collapse():
     assert validate_objectstate_reality_gate_summary(payload) is payload
 
 
-def test_objectstate_reality_gate_rejects_open_world_pass_rows():
-    with pytest.raises(ValueError, match="open_world_real rows cannot be marked pass"):
+def test_objectstate_reality_gate_derives_open_world_declared_pass_as_fail():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _identity_row(
+                row_id="open-world-pass",
+                sample_id="open-kitchen-001",
+                source_kind="open_world_real",
+            ),
+        ),
+        synthetic_smoke_passed=True,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_prediction_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+    payload = report.as_dict()
+
+    assert payload["rows"][0]["status"] == "fail"
+    assert "open_world_real_not_eligible_for_pass" in payload["rows"][0][
+        "failure_reason"
+    ]
+    assert payload["hard_gates"]["no_open_world_pass_rows"] is True
+    assert payload["declaration_diagnostics"]["caller_status_mismatch_count"] == 1
+
+
+def test_objectstate_reality_gate_derives_forged_pass_as_fail():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _identity_row(),
+            _prediction_row(
+                metrics={
+                    "state_ade": 0.06,
+                    "history_ade": 0.04,
+                    "prediction_gap_vs_history_model": -100.0,
+                }
+            ),
+            _intervention_row(),
+        ),
+        synthetic_smoke_passed=True,
+    )
+    payload = report.as_dict()
+
+    prediction = next(
+        row for row in payload["rows"] if row["evidence_kind"] == "prediction"
+    )
+    assert prediction["status"] == "fail"
+    assert prediction["metrics"]["prediction_gap_vs_history_model"] == pytest.approx(
+        0.02
+    )
+    assert "state_ade_above_maximum" in prediction["failure_reason"]
+    assert "state_does_not_strictly_beat_history" in prediction["failure_reason"]
+    assert payload["declaration_diagnostics"]["caller_status_mismatch_count"] == 1
+    assert payload["declaration_diagnostics"]["derived_metric_mismatch_count"] == 1
+
+
+def test_objectstate_reality_gate_derives_forged_fail_as_pass():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _identity_row(
+                status="fail",
+                failure_reason="caller claimed failure despite passing primitives",
+            ),
+            _prediction_row(),
+            _intervention_row(),
+        ),
+        synthetic_smoke_passed=True,
+    )
+    payload = report.as_dict()
+
+    identity = next(
+        row for row in payload["rows"] if row["evidence_kind"] == "identity"
+    )
+    assert identity["status"] == "pass"
+    assert identity["failure_reason"] is None
+    assert payload["status"] == "objectstate_reality_gate_pass"
+    assert payload["declaration_diagnostics"]["caller_status_mismatch_count"] == 1
+
+
+def test_objectstate_reality_gate_does_not_upgrade_preassociated_identity_metrics():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _identity_row(
+                status="fail",
+                failure_reason="legacy predictions were preassociated by GT object id",
+                metrics={
+                    "idf1": 1.0,
+                    "fragmentation_rate": 0.0,
+                    "swap_rate": 0.0,
+                    "identity_collapse": False,
+                    "raw_prediction_observations": False,
+                },
+            ),
+        ),
+        synthetic_smoke_passed=True,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_prediction_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+
+    assert report.rows[0].status == "fail"
+    assert "raw_prediction_observations_required" in report.rows[0].failure_reason
+    assert report.declaration_diagnostics["caller_status_mismatch_count"] == 0
+
+
+def test_objectstate_reality_gate_treats_missing_raw_identity_flag_as_legacy_fail():
+    metrics = dict(_identity_row().metrics)
+    metrics.pop("raw_prediction_observations")
+    report = evaluate_objectstate_reality_gate(
+        (_identity_row(metrics=metrics),),
+        synthetic_smoke_passed=True,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_prediction_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+
+    assert report.rows[0].status == "fail"
+    assert report.rows[0].metrics["raw_prediction_observations"] is False
+    assert "raw_prediction_observations_required" in report.rows[0].failure_reason
+
+
+def test_objectstate_reality_gate_rejects_non_boolean_raw_identity_flag():
+    metrics = dict(_identity_row().metrics)
+    metrics["raw_prediction_observations"] = 1.0
+    with pytest.raises(
+        TypeError,
+        match="metric raw_prediction_observations must be bool",
+    ):
+        evaluate_objectstate_reality_gate(
+            (_identity_row(metrics=metrics),),
+            synthetic_smoke_passed=True,
+        )
+
+
+def test_objectstate_reality_gate_recomputes_forged_derived_metrics():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _identity_row(),
+            _prediction_row(
+                metrics={
+                    "state_ade": 0.03,
+                    "history_ade": 0.05,
+                    "prediction_gap_vs_history_model": 123.0,
+                }
+            ),
+            _intervention_row(
+                metrics={
+                    "action_conditioned_ade": 0.03,
+                    "no_action_ade": 0.10,
+                    "intervention_gain": -50.0,
+                    "counterfactual_outcome_accuracy": 1.0,
+                    "wrong_direction_rate": 0.0,
+                }
+            ),
+        ),
+        synthetic_smoke_passed=True,
+    )
+    payload = report.as_dict()
+
+    prediction = payload["pass_rows"][1]
+    intervention = payload["pass_rows"][2]
+    assert prediction["metrics"]["prediction_gap_vs_history_model"] == pytest.approx(
+        -0.02
+    )
+    assert intervention["metrics"]["intervention_gain"] == pytest.approx(0.07)
+    assert payload["declaration_diagnostics"]["derived_metric_mismatch_count"] == 2
+
+
+def test_objectstate_reality_gate_equal_history_baseline_is_fail():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _prediction_row(
+                metrics={
+                    "state_ade": 0.0,
+                    "history_ade": 0.0,
+                    "prediction_gap_vs_history_model": -1.0,
+                }
+            ),
+        ),
+        synthetic_smoke_passed=True,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_identity_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+
+    assert report.rows[0].status == "fail"
+    assert report.rows[0].metrics["prediction_gap_vs_history_model"] == 0.0
+    assert "state_does_not_strictly_beat_history" in report.rows[0].failure_reason
+
+
+def test_objectstate_reality_gate_requires_positive_intervention_gain():
+    report = evaluate_objectstate_reality_gate(
+        (
+            _intervention_row(
+                metrics={
+                    "action_conditioned_ade": 0.03,
+                    "no_action_ade": 0.03,
+                    "intervention_gain": 10.0,
+                    "counterfactual_outcome_accuracy": 1.0,
+                    "wrong_direction_rate": 0.0,
+                }
+            ),
+        ),
+        synthetic_smoke_passed=True,
+        thresholds=ObjectStateRealityGateThresholds(
+            require_identity_pass_row=False,
+            require_prediction_pass_row=False,
+        ),
+    )
+
+    assert report.rows[0].status == "fail"
+    assert report.rows[0].metrics["intervention_gain"] == 0.0
+    assert "intervention_gain_not_positive" in report.rows[0].failure_reason
+
+
+def test_objectstate_reality_gate_rejects_non_blocked_missing_primitive_metric():
+    with pytest.raises(ValueError, match="prediction reality row missing metric history_ade"):
         evaluate_objectstate_reality_gate(
             (
-                _identity_row(
-                    row_id="open-world-pass",
-                    sample_id="open-kitchen-001",
-                    source_kind="open_world_real",
+                _prediction_row(
+                    metrics={"state_ade": 0.01},
+                ),
+            ),
+            synthetic_smoke_passed=True,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="intervention reality row missing metric no_action_ade",
+    ):
+        evaluate_objectstate_reality_gate(
+            (
+                _intervention_row(
+                    metrics={
+                        "action_conditioned_ade": 0.01,
+                        "counterfactual_outcome_accuracy": 1.0,
+                        "wrong_direction_rate": 0.0,
+                    },
                 ),
             ),
             synthetic_smoke_passed=True,
@@ -131,6 +367,7 @@ def _identity_row(**overrides):
             "fragmentation_rate": 0.0,
             "swap_rate": 0.0,
             "identity_collapse": False,
+            "raw_prediction_observations": True,
         },
         "has_identity_gt": True,
         "has_pose_gt": True,
@@ -154,9 +391,9 @@ def _prediction_row(**overrides):
         "observation_modalities": ("rgb", "gaussian"),
         "artifact_refs": ("datasets/controlled-tabletop-cup-001/pose-tracks.json",),
         "metrics": {
-            "state_ade": 0.06,
-            "history_ade": 0.04,
-            "prediction_gap_vs_history_model": 0.02,
+            "state_ade": 0.03,
+            "history_ade": 0.05,
+            "prediction_gap_vs_history_model": -0.02,
         },
         "has_identity_gt": True,
         "has_pose_gt": True,
@@ -181,6 +418,7 @@ def _intervention_row(**overrides):
         "artifact_refs": ("datasets/controlled-tabletop-cup-001/actions.json",),
         "metrics": {
             "action_conditioned_ade": 0.03,
+            "no_action_ade": 0.1,
             "counterfactual_outcome_accuracy": 1.0,
             "wrong_direction_rate": 0.0,
         },

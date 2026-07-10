@@ -23,9 +23,9 @@ from objgauss.model_manifest import (
     validate_model_artifact_manifest,
     write_model_artifact_manifest,
 )
-from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
-from objgauss.core.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
-from objgauss.core.trainable_quality import write_trainable_quality_report
+from objgauss.pipelines.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.pipelines.trainable_kernel import make_trainable_kernel_mvp_fixture, train_kernel_mvp
+from objgauss.pipelines.trainable_quality import write_trainable_quality_report
 
 
 def test_model_artifact_manifest_roundtrip(tmp_path):

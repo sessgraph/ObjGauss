@@ -5,26 +5,26 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
+from objgauss.pipelines.objectstate_controlled_reality_bundle_handoff import (
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA,
     objectstate_controlled_reality_bundle_handoff,
     validate_objectstate_controlled_reality_bundle_handoff_summary,
 )
-from objgauss.core.objectstate_public_interaction_reality_rows import (
+from objgauss.evaluation.objectstate_public_interaction_reality_rows import (
     OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA,
     objectstate_public_interaction_reality_rows_summary,
     validate_objectstate_public_interaction_reality_rows_summary,
 )
-from objgauss.core.objectstate_reality_row_ledger import (
+from objgauss.evaluation.objectstate_reality_row_ledger import (
     objectstate_reality_row_ledger,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (
@@ -259,11 +259,17 @@ def test_public_interaction_reality_rows_convert_handoff_to_public_replay(tmp_pa
 
     assert summary["schema"] == OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA
     assert summary["source_kind"] == "public_replay"
-    assert summary["gate"]["status"] == "objectstate_reality_gate_pass"
-    assert summary["pass_row_count"] == 3
+    assert summary["gate"]["status"] == "objectstate_reality_gate_fail"
+    assert summary["pass_row_count"] == 2
+    assert summary["blocked_row_count"] == 1
     assert {row["source_kind"] for row in summary["rows"]} == {"public_replay"}
     intervention = next(
         row for row in summary["rows"] if row["evidence_kind"] == "intervention"
+    )
+    assert intervention["status"] == "blocked"
+    assert intervention["ground_truth"]["action"] is False
+    assert intervention["block_reason"] == (
+        "public dataset candidate does not provide native action ground truth"
     )
     assert intervention["metrics"]["action_challenge_present"] is True
     assert (
@@ -279,7 +285,7 @@ def test_public_interaction_reality_rows_convert_handoff_to_public_replay(tmp_pa
     ledger = objectstate_reality_row_ledger((summary_path,))
     assert ledger["schema"] == "objgauss-objectstate-reality-row-ledger-v1"
     assert ledger["row_count"] == 3
-    assert ledger["gate"]["status"] == "objectstate_reality_gate_pass"
+    assert ledger["gate"]["status"] == "objectstate_reality_gate_fail"
     assert ledger["state_variable_evidence_matrix"][-1]["challenge_status"] == (
         "objectstate_state_variable_challenge_present"
     )
@@ -316,7 +322,6 @@ def test_object_state_audit_public_interaction_reality_rows_cli(
                 str(summary_path),
                 "--blocked-rows-output",
                 str(blocked_path),
-                "--require-pass",
             ]
         )
         == 0
@@ -327,11 +332,12 @@ def test_object_state_audit_public_interaction_reality_rows_cli(
 
     assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA}" in stdout
     assert "source_kind=public_replay" in stdout
-    assert "gate_status=objectstate_reality_gate_pass" in stdout
-    assert "row=intervention:pass:public_replay" in stdout
-    assert summary["pass_row_count"] == 3
-    assert "No blocked ObjectState reality rows." in blocked_path.read_text(
-        encoding="utf-8"
+    assert "gate_status=objectstate_reality_gate_fail" in stdout
+    assert "row=intervention:blocked:public_replay" in stdout
+    assert summary["pass_row_count"] == 2
+    assert summary["blocked_row_count"] == 1
+    assert "public dataset candidate does not provide native action ground truth" in (
+        blocked_path.read_text(encoding="utf-8")
     )
 
 

@@ -5,10 +5,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
     evaluate_objectstate_controlled_intervention_candidates,
@@ -16,11 +16,13 @@ from objgauss.core.objectstate_controlled_intervention_eval import (
     validate_objectstate_controlled_intervention_candidates,
     validate_objectstate_controlled_intervention_eval_summary,
 )
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+)
+from objgauss.evaluation.objectstate_controlled_real_rows import (
     evaluate_controlled_real_manifest_reality_gate,
 )
-from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
+from objgauss.evaluation.objectstate_reality_gate import ObjectStateRealityGateThresholds
 
 
 def test_controlled_intervention_eval_outputs_pass_row_for_action_prediction():

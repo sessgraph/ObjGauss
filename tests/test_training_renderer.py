@@ -3,12 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
 )
-from objgauss.core.training_renderer import (
+from objgauss.pipelines.training_renderer import (
     CPU_IMAGE_SPLAT_GRADIENT_PATH,
     CPU_IMAGE_SPLAT_RENDERER,
     TRAINING_RENDERER_API_SCHEMA,

@@ -9,7 +9,7 @@ import numpy as np
 
 from objgauss.features import colors, opacity, positions
 from objgauss.gaussians import GaussianCloud
-from objgauss.object_field import ObjectField
+from objgauss.core.object_field import ObjectField
 
 _EPS = 1e-8
 _RENDER_KIND = "scale_aware_cpu_splat_l1"

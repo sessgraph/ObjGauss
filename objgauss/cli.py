@@ -15,7 +15,7 @@ from objgauss.baseline_comparison import (
     write_comparison_markdown,
 )
 from objgauss.clustering import cluster_features, summarize_labels
-from objgauss.clip_scoring import (
+from objgauss.pipelines.clip_scoring import (
     CLIP_LABEL_PRESETS,
     read_clip_labels,
     score_mask_manifest_with_clip,
@@ -33,15 +33,15 @@ from objgauss.emergence_report import (
 )
 from objgauss.features import extract_features
 from objgauss.goal_audit import audit_v1_goal
-from objgauss.mask_voting import (
+from objgauss.core.projection import mask_vote_quality_audit
+from objgauss.pipelines.mask_voting import (
     depth_visibility_diagnostic,
-    mask_vote_quality_audit,
     train_object_field_from_votes,
     training_summary,
     vote_masks_to_gaussians,
 )
 from objgauss.lego_verify import verify_lego_alpha_closure_demo
-from objgauss.masks import (
+from objgauss.datasets.masks import (
     build_nerf_alpha_fgbg_mask_manifest,
     build_nerf_alpha_mask_manifest,
     build_nerf_rgba_color_mask_manifest,
@@ -50,16 +50,16 @@ from objgauss.masks import (
     validate_mask_manifest,
 )
 from objgauss.nerf_proxy import build_lego_alpha_closure_demo
-from objgauss.object_field import (
+from objgauss.core.object_field import (
     attach_hard_labels,
     cloud_positions_for_metrics,
     initialize_object_field,
-    inspect_nerf_dataset,
     load_object_field,
     object_field_metrics,
     save_object_field,
-    write_json,
 )
+from objgauss.datasets.nerf_inspection import inspect_nerf_dataset
+from objgauss.pipelines.json_io import write_json
 from objgauss.ply import read_ply, write_ply
 from objgauss.render_probe import load_render_probe_frames
 from objgauss.segment import (
@@ -73,10 +73,10 @@ from objgauss.semantic_demo import (
     verify_plush_semantic_closure_demo,
 )
 from objgauss.sample_bundle import write_sample_bundle
-from objgauss.semantic_slots import align_mask_manifest_slots
+from objgauss.pipelines.semantic_slots import align_mask_manifest_slots
 from objgauss.splat import read_splat
 from objgauss.training import register_training_output
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     make_trainable_kernel_mvp_fixture,
     train_kernel_mvp,
     train_kernel_mvp_from_cloud,
@@ -97,235 +97,235 @@ from objgauss.core.assignment_evidence import (
     assignment_evidence_from_object_emergence,
     assignment_evidence_sequence_from_trainable_frames,
 )
-from objgauss.core.assignment_stability import evaluate_assignment_stability
-from objgauss.core.gaussian_decoder_training import train_object_state_gaussian_decoder
-from objgauss.core.solver_decoder_training import (
+from objgauss.evaluation.assignment_stability import evaluate_assignment_stability
+from objgauss.pipelines.gaussian_decoder_training import train_object_state_gaussian_decoder
+from objgauss.pipelines.solver_decoder_training import (
     SOLVER_DECODER_JOINT_CHECKPOINT_SCHEMA,
     solver_decoder_joint_checkpoint,
     solver_decoder_joint_states_from_dict,
     train_solver_decoder_joint,
     validate_solver_decoder_joint_checkpoint,
 )
-from objgauss.core.renderer_loss import renderer_loss_boundary_report
-from objgauss.core.training_scale import solver_decoder_training_scale_plan
-from objgauss.core.training_tensorboard import write_solver_decoder_tensorboard_events
-from objgauss.core.object_state_eval import evaluate_solver_decoder_object_states
-from objgauss.core.real_sample_v2_model_handoff import (
+from objgauss.pipelines.renderer_loss import renderer_loss_boundary_report
+from objgauss.pipelines.training_scale import solver_decoder_training_scale_plan
+from objgauss.pipelines.training_tensorboard import write_solver_decoder_tensorboard_events
+from objgauss.evaluation.object_state_eval import evaluate_solver_decoder_object_states
+from objgauss.pipelines.real_sample_v2_model_handoff import (
     real_sample_v2_model_handoff_from_cloud,
     render_real_sample_v2_model_handoff_html,
 )
-from objgauss.core.real_sample_v2_viewer_preview import (
+from objgauss.pipelines.real_sample_v2_viewer_preview import (
     REAL_SAMPLE_V2_PROMOTED_FEATURE_WEIGHT,
     REAL_SAMPLE_V2_PROMOTED_POSITION_WEIGHT,
     real_sample_v2_viewer_preview_from_cloud,
 )
-from objgauss.core.real_sample_v2_full_cloud_purity import (
+from objgauss.pipelines.real_sample_v2_full_cloud_purity import (
     real_sample_v2_full_cloud_purity_from_cloud,
 )
-from objgauss.core.real_sample_v2_segmentation_quality import (
+from objgauss.pipelines.real_sample_v2_segmentation_quality import (
     real_sample_v2_segmentation_quality_from_cloud,
 )
-from objgauss.core.real_sample_v2_weak_boundary_opt import (
+from objgauss.pipelines.real_sample_v2_weak_boundary_opt import (
     real_sample_v2_weak_boundary_opt_from_cloud,
 )
-from objgauss.core.real_sample_v2_promoted_weights_cross_sample import (
+from objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample import (
     real_sample_v2_promoted_weights_cross_sample_from_cloud,
 )
-from objgauss.core.real_sample_v2_sample_aware_weight_policy import (
+from objgauss.pipelines.real_sample_v2_sample_aware_weight_policy import (
     real_sample_v2_sample_aware_weight_policy_from_cloud,
 )
-from objgauss.core.real_sample_v2_bounded_normalization_cross_sample import (
+from objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample import (
     RealSampleV2BoundedNormalizationCrossSampleInput,
     real_sample_v2_bounded_normalization_cross_sample_from_clouds,
 )
-from objgauss.core.training_renderer import evaluate_training_renderer_loss
-from objgauss.core.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
-from objgauss.core.trainable_artifact import write_trainable_kernel_model_artifact
-from objgauss.core.trainable_quality import write_trainable_quality_report
-from objgauss.core.object_state_benchmark import write_object_state_stability_benchmark
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.pipelines.training_renderer import evaluate_training_renderer_loss
+from objgauss.pipelines.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
+from objgauss.pipelines.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.pipelines.trainable_quality import write_trainable_quality_report
+from objgauss.evaluation.object_state_benchmark import write_object_state_stability_benchmark
+from objgauss.datasets.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
     read_objectstate_controlled_capture_manifest,
 )
-from objgauss.core.objectstate_controlled_capture_template import (
+from objgauss.datasets.objectstate_controlled_capture_template import (
     write_objectstate_controlled_capture_bundle_template,
 )
-from objgauss.core.objectstate_controlled_capture_frames import (
+from objgauss.datasets.objectstate_controlled_capture_frames import (
     write_objectstate_controlled_capture_frames,
 )
-from objgauss.core.objectstate_controlled_capture_annotations import (
+from objgauss.datasets.objectstate_controlled_capture_annotations import (
     finalize_objectstate_controlled_capture_annotations,
     write_objectstate_controlled_capture_annotation_template,
 )
-from objgauss.core.objectstate_controlled_capture_actions import (
+from objgauss.datasets.objectstate_controlled_capture_actions import (
     finalize_objectstate_controlled_capture_actions,
     write_objectstate_controlled_capture_action_template,
 )
-from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
+from objgauss.datasets.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
-from objgauss.core.objectstate_controlled_capture_environment import (
+from objgauss.datasets.objectstate_controlled_capture_environment import (
     objectstate_controlled_capture_environment,
 )
-from objgauss.core.objectstate_controlled_capture_import import (
+from objgauss.datasets.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_bundle_acceptance_summary,
     objectstate_controlled_capture_import_summary,
 )
-from objgauss.core.objectstate_controlled_capture_files import (
+from objgauss.datasets.objectstate_controlled_capture_files import (
     objectstate_controlled_capture_file_audit,
 )
-from objgauss.core.objectstate_controlled_identity_eval import (
+from objgauss.evaluation.objectstate_controlled_identity_eval import (
     ObjectStateControlledIdentityThresholds,
     evaluate_objectstate_controlled_identity_predictions,
     read_objectstate_controlled_identity_predictions,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     ObjectStateControlledPredictionThresholds,
     evaluate_objectstate_controlled_prediction_candidates,
     read_objectstate_controlled_prediction_candidates,
 )
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     ObjectStateControlledInterventionThresholds,
     evaluate_objectstate_controlled_intervention_candidates,
     read_objectstate_controlled_intervention_candidates,
 )
-from objgauss.core.objectstate_controlled_identity_handoff import (
+from objgauss.pipelines.objectstate_controlled_identity_handoff import (
     objectstate_controlled_identity_handoff,
 )
-from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
+from objgauss.pipelines.objectstate_controlled_identity_bundle_handoff import (
     objectstate_controlled_identity_bundle_handoff,
 )
-from objgauss.core.objectstate_controlled_reality_bundle_handoff import (
+from objgauss.pipelines.objectstate_controlled_reality_bundle_handoff import (
     objectstate_controlled_reality_bundle_handoff,
 )
-from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
+from objgauss.pipelines.objectstate_controlled_reality_bundle_readiness import (
     objectstate_controlled_reality_bundle_readiness,
 )
-from objgauss.core.objectstate_controlled_reality_candidate_template import (
+from objgauss.pipelines.objectstate_controlled_reality_candidate_template import (
     finalize_objectstate_controlled_prediction_candidate_template,
     finalize_objectstate_controlled_reality_candidate_templates,
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     write_objectstate_controlled_reality_candidate_templates,
 )
-from objgauss.core.objectstate_controlled_prediction_baseline import (
+from objgauss.pipelines.objectstate_controlled_prediction_baseline import (
     write_objectstate_controlled_prediction_baseline_candidates,
 )
-from objgauss.core.objectstate_transition_dataset import (
+from objgauss.datasets.objectstate_transition_dataset import (
     objectstate_transition_dataset_audit_from_path,
     write_objectstate_transition_dataset,
 )
-from objgauss.core.objectstate_transition_prediction_candidates import (
+from objgauss.pipelines.objectstate_transition_prediction_candidates import (
     write_objectstate_transition_prediction_candidates,
 )
-from objgauss.core.objectstate_transition_intervention_candidates import (
+from objgauss.pipelines.objectstate_transition_intervention_candidates import (
     write_objectstate_transition_intervention_candidates,
 )
-from objgauss.core.objectstate_transition_reality_handoff import (
+from objgauss.pipelines.objectstate_transition_reality_handoff import (
     write_objectstate_transition_reality_handoff,
 )
-from objgauss.core.objectstate_transition_reality_evidence_package import (
+from objgauss.pipelines.objectstate_transition_reality_evidence_package import (
     objectstate_transition_reality_evidence_package,
 )
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     objectstate_real_evidence_bundle_summary,
     read_objectstate_real_evidence_bundle,
 )
-from objgauss.core.objectstate_controlled_real_evidence_bundle import (
+from objgauss.datasets.objectstate_controlled_real_evidence_bundle import (
     objectstate_controlled_real_evidence_bundle_adapter_summary_from_file,
 )
-from objgauss.core.objectstate_controlled_real_readiness_audit import (
+from objgauss.evaluation.objectstate_controlled_real_readiness_audit import (
     objectstate_controlled_real_readiness_audit_from_file,
     objectstate_controlled_real_readiness_breakdown_csv,
     objectstate_controlled_real_readiness_markdown,
 )
-from objgauss.core.objectstate_controlled_real_identity_eval import (
+from objgauss.evaluation.objectstate_controlled_real_identity_eval import (
     objectstate_controlled_real_identity_accounting_csv,
     objectstate_controlled_real_identity_artifact_manifest,
     objectstate_controlled_real_identity_eval_from_files,
     objectstate_controlled_real_identity_pairwise_csv,
     objectstate_controlled_real_identity_report,
 )
-from objgauss.core.objectstate_controlled_real_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_real_prediction_eval import (
     objectstate_controlled_real_prediction_accounting_csv,
     objectstate_controlled_real_prediction_artifact_manifest,
     objectstate_controlled_real_prediction_errors_csv,
     objectstate_controlled_real_prediction_eval_from_files,
     objectstate_controlled_real_prediction_report,
 )
-from objgauss.core.objectstate_real_identity_rows import (
+from objgauss.evaluation.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
-from objgauss.core.objectstate_real_prediction_rows import (
+from objgauss.evaluation.objectstate_real_prediction_rows import (
     objectstate_real_prediction_rows_summary,
 )
-from objgauss.core.objectstate_real_intervention_rows import (
+from objgauss.evaluation.objectstate_real_intervention_rows import (
     objectstate_real_intervention_rows_summary,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger import (
     write_objectstate_real_evidence_bundle_ledger,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit import (
     objectstate_real_evidence_bundle_ledger_package_audit,
 )
-from objgauss.core.objectstate_controlled_reality_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_reality_evidence_package import (
     objectstate_controlled_reality_evidence_package,
 )
-from objgauss.core.objectstate_controlled_prediction_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_prediction_evidence_package import (
     objectstate_controlled_prediction_evidence_package,
 )
-from objgauss.core.objectstate_controlled_identity_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_identity_evidence_package import (
     objectstate_controlled_identity_evidence_package,
 )
-from objgauss.core.objectstate_phase1_evidence_ledger import (
+from objgauss.pipelines.objectstate_phase1_evidence_ledger import (
     objectstate_phase1_evidence_ledger,
 )
-from objgauss.core.objectstate_public_dataset_candidates import (
+from objgauss.pipelines.objectstate_public_dataset_candidates import (
     objectstate_public_dataset_candidates_audit,
     objectstate_public_dataset_candidates_markdown,
     objectstate_public_interaction_route_audit,
     objectstate_public_interaction_route_markdown,
 )
-from objgauss.core.objectstate_public_interaction_reality_rows import (
+from objgauss.evaluation.objectstate_public_interaction_reality_rows import (
     objectstate_public_interaction_reality_rows_summary,
     read_objectstate_public_interaction_handoff_summary,
 )
-from objgauss.core.objectstate_public_interaction_workspace import (
+from objgauss.pipelines.objectstate_public_interaction_workspace import (
     objectstate_public_interaction_workspace_progress,
     write_objectstate_public_interaction_clip_csv_bundle,
     write_objectstate_public_interaction_workspace,
 )
-from objgauss.core.objectstate_bop_phase1_subset_selector import (
+from objgauss.datasets.objectstate_bop_phase1_subset_selector import (
     objectstate_bop_phase1_subset_selector,
 )
-from objgauss.core.objectstate_bop_phase1_batch_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_batch_workspace import (
     objectstate_bop_phase1_batch_workspace,
 )
-from objgauss.core.objectstate_bop_phase1_sample_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_sample_workspace import (
     objectstate_bop_phase1_sample_workspaces,
 )
-from objgauss.core.objectstate_bop_phase1_authoring_progress import (
+from objgauss.pipelines.objectstate_bop_phase1_authoring_progress import (
     objectstate_bop_phase1_authoring_progress,
 )
-from objgauss.core.objectstate_bop_gaussian_evidence_preflight import (
+from objgauss.pipelines.objectstate_bop_gaussian_evidence_preflight import (
     objectstate_bop_gaussian_evidence_preflight,
 )
-from objgauss.core.objectstate_bop_rgbd_gaussian_export import (
+from objgauss.pipelines.objectstate_bop_rgbd_gaussian_export import (
     objectstate_bop_rgbd_gaussian_export,
 )
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_baseline_candidate import (
+from objgauss.pipelines.objectstate_bop_baseline_candidate import (
     write_objectstate_bop_gaussian_centroid_baseline_candidate,
 )
-from objgauss.core.objectstate_bop_baseline_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_baseline_local_row_handoff import (
     objectstate_bop_baseline_local_row_handoff,
 )
-from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff import (
     objectstate_bop_rgbd_baseline_local_row_handoff,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     BOP_IDENTITY_POLICIES,
     BOP_IDENTITY_POLICY_SINGLE_INSTANCE_PER_OBJ_ID,
     DEFAULT_BOP_POSE_TRACK_MAX_DISTANCE_M,
@@ -333,55 +333,57 @@ from objgauss.core.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_adapter_summary,
     objectstate_bop_capture_condition_sidecar_summary,
 )
-from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
+from objgauss.pipelines.objectstate_bop_prediction_baseline_handoff import (
     objectstate_bop_prediction_baseline_handoff,
 )
-from objgauss.core.objectstate_bop_identity_handoff import (
+from objgauss.pipelines.objectstate_bop_identity_handoff import (
     objectstate_bop_identity_handoff,
 )
-from objgauss.core.objectstate_bop_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_local_row_handoff import (
     objectstate_bop_local_row_handoff,
 )
-from objgauss.core.objectstate_bop_cross_sample_ledger import (
+from objgauss.pipelines.objectstate_bop_cross_sample_ledger import (
     objectstate_bop_cross_sample_ledger,
 )
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+from objgauss.pipelines.objectstate_bop_local_row_batch_handoff import (
     objectstate_bop_local_row_batch_handoff,
 )
-from objgauss.core.objectstate_bop_local_row_batch_spec import (
+from objgauss.datasets.objectstate_bop_local_row_batch_authoring import (
     objectstate_bop_local_row_batch_spec_authoring,
 )
-from objgauss.core.objectstate_bop_local_row_batch_readiness import (
+from objgauss.pipelines.objectstate_bop_local_row_batch_readiness import (
     objectstate_bop_local_row_batch_readiness,
 )
-from objgauss.core.objectstate_bop_phase1_route_audit import (
+from objgauss.pipelines.objectstate_bop_phase1_route_audit import (
     objectstate_bop_phase1_route_audit,
 )
-from objgauss.core.objectstate_bop_identity_route_audit import (
+from objgauss.pipelines.objectstate_bop_identity_route_audit import (
     objectstate_bop_identity_route_audit,
 )
-from objgauss.core.objectstate_bop_phase1_local_row_readiness import (
+from objgauss.pipelines.objectstate_bop_phase1_local_row_readiness import (
     objectstate_bop_phase1_local_row_readiness,
 )
-from objgauss.core.objectstate_identity_prediction_adapter import (
+from objgauss.pipelines.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
 )
-from objgauss.core.objectstate_controlled_real_rows import (
-    objectstate_controlled_real_rows_summary,
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     read_objectstate_controlled_real_manifest,
 )
-from objgauss.core.objectstate_bop_reality_rows import (
+from objgauss.evaluation.objectstate_controlled_real_rows import (
+    objectstate_controlled_real_rows_summary,
+)
+from objgauss.evaluation.objectstate_bop_reality_rows import (
     objectstate_bop_reality_rows_summary,
     read_objectstate_bop_local_row_summary,
 )
-from objgauss.core.objectstate_bop_real_evidence_bundle import (
+from objgauss.pipelines.objectstate_bop_real_evidence_bundle import (
     objectstate_bop_real_evidence_bundle_adapter_summary_from_files,
 )
-from objgauss.core.objectstate_reality_row_ledger import (
+from objgauss.evaluation.objectstate_reality_row_ledger import (
     objectstate_reality_row_ledger,
 )
-from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
+from objgauss.evaluation.objectstate_reality_gate import ObjectStateRealityGateThresholds
 from objgauss.model_manifest import (
     manifest_from_trainable_kernel_model_artifact,
     write_model_artifact_manifest,
@@ -10077,7 +10079,7 @@ def _build_parser() -> argparse.ArgumentParser:
     bop_identity_handoff.add_argument("--candidate-id")
     bop_identity_handoff.add_argument(
         "--candidate-source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     bop_identity_handoff.add_argument("--max-centroid-distance", type=float)
     bop_identity_handoff.add_argument("--min-idf1", type=float, default=0.95)
@@ -10237,7 +10239,7 @@ def _build_parser() -> argparse.ArgumentParser:
     bop_local_row_handoff.add_argument("--identity-candidate-id")
     bop_local_row_handoff.add_argument(
         "--identity-candidate-source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     bop_local_row_handoff.add_argument("--max-centroid-distance", type=float)
     bop_local_row_handoff.add_argument(
@@ -12413,7 +12415,7 @@ def _build_parser() -> argparse.ArgumentParser:
     export_identity_predictions.add_argument("--candidate-id")
     export_identity_predictions.add_argument(
         "--source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     export_identity_predictions.add_argument(
         "--artifact-ref",
@@ -12446,7 +12448,7 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_handoff.add_argument("--candidate-id")
     controlled_identity_handoff.add_argument(
         "--source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     controlled_identity_handoff.add_argument(
         "--artifact-ref",
@@ -12591,7 +12593,7 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_identity_bundle_handoff.add_argument("--candidate-id")
     controlled_identity_bundle_handoff.add_argument(
         "--source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     controlled_identity_bundle_handoff.add_argument(
         "--artifact-ref",
@@ -12755,7 +12757,7 @@ def _build_parser() -> argparse.ArgumentParser:
     controlled_reality_bundle_handoff.add_argument("--candidate-id")
     controlled_reality_bundle_handoff.add_argument(
         "--source",
-        default="trainable_kernel_objectstate_nearest_pose_adapter",
+        default="trainable_kernel_objectstate_raw_track_adapter",
     )
     controlled_reality_bundle_handoff.add_argument(
         "--artifact-ref",

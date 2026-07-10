@@ -18,6 +18,7 @@ from objgauss.core.object_state import validate_assignment_matrix
 ASSIGNMENT_SOLVER_V2_STATE_SCHEMA = "objgauss-assignment-solver-state-v2"
 ASSIGNMENT_SOLVER_V2_PREDICTION_SCHEMA = "objgauss-assignment-prediction-v2"
 ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA = "objgauss-assignment-solver-v2-training-v1"
+ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA = "objgauss-assignment-solver-v2-checkpoint"
 ASSIGNMENT_SOLVER_V2_COST_TERMS = ("feature", "position", "slot_bias")
 _EPS = 1e-8
 
@@ -321,6 +322,73 @@ def assignment_solver_v2_state_from_dict(payload: dict[str, Any]) -> AssignmentS
         schema=str(payload.get("schema")),
     )
     return validate_assignment_solver_v2_state(state)
+
+
+def assignment_solver_v2_checkpoint(
+    result: AssignmentSolverV2TrainingResult,
+    *,
+    source: str = "synthetic_stability_training",
+) -> dict[str, Any]:
+    if result.schema != ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA:
+        raise ValueError(
+            f"unsupported assignment solver v2 training schema: {result.schema}"
+        )
+    payload = {
+        "schema": ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA,
+        "kind": "assignment_solver_v2_checkpoint",
+        "source": {
+            "source": source,
+            "training_schema": result.schema,
+        },
+        "training": result.as_dict(),
+        "solver_state": result.final_state.as_dict(include_arrays=True),
+        "gpu_policy": {
+            "uses_gpu": False,
+            "renderer_loss": "not_used",
+        },
+        "export_policy": {
+            "repository_write": "do_not_commit_training_checkpoints",
+            "intended_locations": ["/tmp", "ignored outputs/"],
+            "large_artifacts": "keep_out_of_git",
+        },
+    }
+    return validate_assignment_solver_v2_checkpoint(payload)
+
+
+def assignment_solver_v2_state_from_checkpoint(
+    payload: dict[str, Any],
+) -> AssignmentSolverV2State:
+    checked = validate_assignment_solver_v2_checkpoint(payload)
+    return assignment_solver_v2_state_from_dict(checked["solver_state"])
+
+
+def validate_assignment_solver_v2_checkpoint(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("assignment solver v2 checkpoint must be a dict")
+    if payload.get("schema") != ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA:
+        raise ValueError(
+            "unsupported assignment solver v2 checkpoint schema: "
+            f"{payload.get('schema')}"
+        )
+    if payload.get("kind") != "assignment_solver_v2_checkpoint":
+        raise ValueError(
+            "assignment solver v2 checkpoint kind must be "
+            "assignment_solver_v2_checkpoint"
+        )
+    if not isinstance(payload.get("training"), dict):
+        raise ValueError("assignment solver v2 checkpoint missing training")
+    validate_assignment_solver_v2_training_summary(payload["training"])
+    if not isinstance(payload.get("solver_state"), dict):
+        raise ValueError("assignment solver v2 checkpoint missing solver_state")
+    assignment_solver_v2_state_from_dict(payload["solver_state"])
+    gpu_policy = payload.get("gpu_policy")
+    if not isinstance(gpu_policy, dict) or gpu_policy.get("uses_gpu") is not False:
+        raise ValueError("assignment solver v2 checkpoint must record uses_gpu=false")
+    if gpu_policy.get("renderer_loss") != "not_used":
+        raise ValueError("assignment solver v2 checkpoint must not use renderer loss")
+    return payload
 
 
 def predict_assignment_solver_v2(

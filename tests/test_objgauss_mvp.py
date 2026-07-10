@@ -13,19 +13,19 @@ import pytest
 import objgauss.assets as asset_module
 from objgauss.assets import get_asset, list_assets
 from objgauss.cli import main
-from objgauss.clip_scoring import score_mask_manifest_with_clip
+from objgauss.pipelines.clip_scoring import score_mask_manifest_with_clip
 from objgauss.clustering import cluster_features
 from objgauss.emergence import object_emergence_curve, object_emergence_metrics
 from objgauss.features import extract_features
 from objgauss.gaussians import GaussianCloud
 from objgauss.goal_audit import audit_v1_goal
-from objgauss.mask_voting import (
+from objgauss.pipelines.mask_voting import (
     depth_visibility_diagnostic,
     train_object_field_from_votes,
     vote_masks_to_gaussians,
 )
-from objgauss.masks import build_nerf_sam_mask_manifest, read_png_rgba
-from objgauss.object_field import (
+from objgauss.datasets.masks import build_nerf_sam_mask_manifest, read_png_rgba
+from objgauss.core.object_field import (
     ObjectField,
     field_from_labels,
     load_object_field,

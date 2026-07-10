@@ -5,7 +5,7 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_public_dataset_candidates import (
+from objgauss.pipelines.objectstate_public_dataset_candidates import (
     OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA,
     ObjectStatePublicDatasetCandidate,
@@ -27,13 +27,16 @@ def test_public_dataset_candidate_audit_keeps_dataset_choice_blocked():
     assert summary["recommended_first"] == "bop-ycbv-keyframes"
     assert summary["recommended_action_candidate"] == "hot3d-clips"
     assert summary["readiness"]["has_identity_pose_dataset"] is True
-    assert summary["readiness"]["has_action_like_dataset"] is True
+    assert summary["readiness"]["has_action_like_dataset"] is False
     assert summary["readiness"]["has_direct_gaussian_evidence"] is False
     assert summary["readiness"]["has_direct_phase1_ready_dataset"] is False
     assert summary["claim_policy"]["does_not_claim_reality_gate_pass"] is True
     assert summary["non_goals"]["downloads_datasets"] is False
-    assert summary["coverage_counts"]["counterfactual_interface"]["blocked"] == 4
+    assert summary["coverage_counts"]["counterfactual_interface"]["blocked"] == 5
     assert "no public candidate directly supplies ObjGauss per-frame Gaussian evidence" in (
+        summary["hard_blockers"]
+    )
+    assert "no public candidate with native action ground truth was found" in (
         summary["hard_blockers"]
     )
     assert validate_objectstate_public_dataset_candidates_audit(summary) == summary
@@ -46,7 +49,7 @@ def test_public_dataset_candidate_markdown_reports_recommendations():
     assert "# ObjectState Public Dataset Candidate Audit" in markdown
     assert "bop-ycbv-keyframes" in markdown
     assert "hot3d-clips" in markdown
-    assert "counterfactual" in markdown
+    assert "independently measured action/control evidence" in markdown
 
 
 def test_public_dataset_candidate_validation_rejects_fake_ready_dataset():
@@ -108,7 +111,7 @@ def test_public_interaction_route_audit_keeps_missing_local_clip_blocked():
         == "objectstate_public_interaction_route_blocked_no_local_dataset"
     )
     assert summary["candidate"]["candidate_id"] == "hot3d-clips"
-    assert summary["readiness"]["candidate_has_action_gt"] is True
+    assert summary["readiness"]["candidate_has_action_gt"] is False
     assert summary["readiness"]["dataset_root_present"] is False
     assert summary["readiness"]["controlled_reality_handoff_ready"] is False
     assert summary["accounting_route_status"] == "evidence_incomplete"
@@ -120,8 +123,13 @@ def test_public_interaction_route_audit_keeps_missing_local_clip_blocked():
 def test_public_interaction_route_audit_reports_handoff_ready(tmp_path):
     bundle_root = tmp_path / "hot3d-clip"
     _write_interaction_route_bundle(bundle_root)
+    candidate = _action_gt_public_interaction_candidate()
 
-    summary = objectstate_public_interaction_route_audit(dataset_root=bundle_root)
+    summary = objectstate_public_interaction_route_audit(
+        candidate_id=candidate.candidate_id,
+        dataset_root=bundle_root,
+        candidates=(candidate,),
+    )
 
     assert (
         summary["status"]
@@ -144,14 +152,19 @@ def test_public_interaction_route_audit_reports_handoff_ready(tmp_path):
     assert "handoff ready: `true`" in markdown
     assert "| capture_intervention_action_gt_ready | true |" in markdown
     assert "| prediction_accounting_ready | true |" in markdown
-    assert "observed interactions are action-like" in markdown
+    assert "Observed manipulation footage is not action ground truth" in markdown
 
 
 def test_public_interaction_route_keeps_weak_action_gt_prediction_ready(tmp_path):
     bundle_root = tmp_path / "hot3d-clip"
     _write_interaction_route_bundle(bundle_root, action_vector=[0.0, 0.0, 0.0])
+    candidate = _action_gt_public_interaction_candidate()
 
-    summary = objectstate_public_interaction_route_audit(dataset_root=bundle_root)
+    summary = objectstate_public_interaction_route_audit(
+        candidate_id=candidate.candidate_id,
+        dataset_root=bundle_root,
+        candidates=(candidate,),
+    )
 
     assert (
         summary["status"]
@@ -169,8 +182,8 @@ def test_public_interaction_route_keeps_weak_action_gt_prediction_ready(tmp_path
     )
     assert summary["next_actions"] == [
         (
-            "fill action rows with non-zero vectors whose intervals cover "
-            "object pose transitions until intervention_action_gt_ready=true"
+            "supply independently measured non-zero action vectors whose intervals cover "
+            "object pose transitions; never derive them from target-object pose deltas"
         ),
         "run controlled-reality-bundle-handoff only after this audit reports handoff_ready",
         (
@@ -188,7 +201,7 @@ def test_public_interaction_route_can_be_identity_ready_without_prediction_candi
 
     assert (
         summary["status"]
-        == "objectstate_public_interaction_route_candidate_artifacts_required"
+        == "objectstate_public_interaction_route_intervention_gt_required"
     )
     assert summary["accounting_route_status"] == "identity_ready"
     assert summary["readiness"]["capture_identity_ready"] is True
@@ -197,6 +210,9 @@ def test_public_interaction_route_can_be_identity_ready_without_prediction_candi
     assert summary["readiness"]["prediction_accounting_ready"] is False
     assert summary["readiness"]["intervention_accounting_ready"] is False
     assert "prediction candidates JSON is missing or invalid" in summary["hard_blockers"]
+    assert "selected candidate does not provide native action ground truth" in (
+        summary["hard_blockers"]
+    )
 
 
 def test_public_interaction_route_rejects_pose_only_candidate(tmp_path):
@@ -214,7 +230,7 @@ def test_public_interaction_route_rejects_pose_only_candidate(tmp_path):
     )
     assert summary["accounting_route_status"] == "evidence_incomplete"
     assert summary["readiness"]["candidate_has_action_gt"] is False
-    assert "selected candidate does not advertise action ground truth" in (
+    assert "selected candidate is not a public interaction dataset" in (
         summary["hard_blockers"]
     )
 
@@ -235,7 +251,6 @@ def test_object_state_audit_public_interaction_route_cli(tmp_path, capsys):
                 str(summary_path),
                 "--markdown-output",
                 str(markdown_path),
-                "--require-ready",
             ]
         )
         == 0
@@ -246,14 +261,34 @@ def test_object_state_audit_public_interaction_route_cli(tmp_path, capsys):
     markdown = markdown_path.read_text(encoding="utf-8")
 
     assert f"schema={OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA}" in stdout
-    assert "accounting_route_status=handoff_ready" in stdout
-    assert "handoff_ready=true" in stdout
+    assert "accounting_route_status=prediction_ready" in stdout
+    assert "handoff_ready=false" in stdout
     assert "identity_accounting_ready=true" in stdout
     assert "prediction_accounting_ready=true" in stdout
-    assert "intervention_accounting_ready=true" in stdout
+    assert "intervention_accounting_ready=false" in stdout
     assert "capture_intervention_action_gt_ready=true" in stdout
-    assert summary["readiness"]["controlled_reality_handoff_ready"] is True
+    assert summary["readiness"]["controlled_reality_handoff_ready"] is False
     assert "ObjectState Public Interaction Route Audit" in markdown
+
+
+def _action_gt_public_interaction_candidate() -> ObjectStatePublicDatasetCandidate:
+    hot3d = next(
+        candidate
+        for candidate in default_objectstate_public_dataset_candidates()
+        if candidate.candidate_id == "hot3d-clips"
+    )
+    return ObjectStatePublicDatasetCandidate(
+        **{
+            **hot3d.__dict__,
+            "candidate_id": "fixture-action-gt",
+            "name": "Fixture Public Interaction With Action GT",
+            "has_action_gt": True,
+            "gate_coverage": {
+                **hot3d.gate_coverage,
+                "counterfactual_interface": "partial",
+            },
+        }
+    )
 
 
 def _write_interaction_route_bundle(

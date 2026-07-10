@@ -445,7 +445,7 @@ Required behavior:
 
 Implemented v0.2 facts:
 
-- Core module: `objgauss.core.objectstate_identity_gate`.
+- Evaluation module: `objgauss.evaluation.objectstate_identity_gate`.
 - Gate schema: `objgauss-objectstate-identity-gate-v1`.
 - Dataset schema: `objgauss-objectstate-identity-dataset-v1`.
 - Inputs are explicit candidate predictions: `predicted_slots_by_fixture` or
@@ -465,7 +465,7 @@ Train a small ObjectState identity encoder on the identity rows from
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_identity_encoder`.
+- Pipeline module: `objgauss.pipelines.objectstate_identity_encoder`.
 - Training schema: `objgauss-objectstate-identity-encoder-training-v1`.
 - State schema: `objgauss-objectstate-identity-encoder-state-v1`.
 - Training uses a NumPy linear projection and supervised contrastive identity
@@ -486,7 +486,7 @@ ObjectState_t(pose, velocity) -> ObjectState_{t+n}(pose)
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_predictive_gate`.
+- Evaluation module: `objgauss.evaluation.objectstate_predictive_gate`.
 - Gate schema: `objgauss-objectstate-predictive-gate-v1`.
 - The state predictor uses synthetic ObjectState pose + velocity from
   `SyntheticWorldObject.trajectory`.
@@ -522,7 +522,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_causal_gate`.
+- Evaluation module: `objgauss.evaluation.objectstate_causal_gate`.
 - Gate schema: `objgauss-objectstate-causal-gate-v1`.
 - Action schema: `objgauss-objectstate-action-v1`.
 - Minimal action set: `push_left`, `push_right`, `hold`.
@@ -557,7 +557,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_reality_gate`.
+- Core module: `objgauss.evaluation.objectstate_reality_gate`.
 - Gate schema: `objgauss-objectstate-reality-gate-v1`.
 - Row schema: `objgauss-objectstate-real-public-row-v1`.
 - Evidence kinds: `identity`, `prediction`, `intervention`.
@@ -599,7 +599,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_reality_public_rows`.
+- Evaluation module: `objgauss.evaluation.objectstate_reality_public_rows`.
 - Summary schema: `objgauss-objectstate-public-artifact-rows-v1`.
 - Default public artifacts:
   - `real-sample-v2-sample-aware-lego`
@@ -641,7 +641,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_evidence_bundle`.
+- Dataset module: `objgauss.datasets.objectstate_real_evidence_bundle`.
 - Bundle schema: `objgauss-objectstate-real-evidence-bundle-v1`.
 - Summary schema:
   `objgauss-objectstate-real-evidence-bundle-summary-v1`.
@@ -687,7 +687,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_identity_rows`.
+- Evaluation module: `objgauss.evaluation.objectstate_real_identity_rows`.
 - Summary schema: `objgauss-objectstate-real-identity-rows-v1`.
 - CLI:
   `objgauss object-state real-identity-rows`.
@@ -727,7 +727,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_prediction_rows`.
+- Evaluation module: `objgauss.evaluation.objectstate_real_prediction_rows`.
 - Summary schema: `objgauss-objectstate-real-prediction-rows-v1`.
 - CLI:
   `objgauss object-state real-prediction-rows`.
@@ -773,7 +773,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_intervention_rows`.
+- Evaluation module: `objgauss.evaluation.objectstate_real_intervention_rows`.
 - Summary schema: `objgauss-objectstate-real-intervention-rows-v1`.
 - CLI:
   `objgauss object-state real-intervention-rows`.
@@ -808,7 +808,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module updated: `objgauss.core.objectstate_reality_row_ledger`.
+- Evaluation module updated: `objgauss.evaluation.objectstate_reality_row_ledger`.
 - CLI remains:
   `objgauss object-state audit-reality-row-ledger`.
 - The ledger can now combine real identity / prediction / intervention
@@ -838,7 +838,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_evidence_bundle_ledger`.
+- Pipeline module: `objgauss.pipelines.objectstate_real_evidence_bundle_ledger`.
 - Wrapper schema:
   `objgauss-objectstate-real-evidence-bundle-ledger-v1`.
 - CLI:
@@ -876,7 +876,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_real_evidence_bundle_ledger_audit`.
+- Pipeline module: `objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit`.
 - Audit schema:
   `objgauss-objectstate-real-evidence-bundle-ledger-package-audit-v1`.
 - CLI:
@@ -901,7 +901,8 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_public_dataset_candidates`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_public_dataset_candidates`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-public-dataset-candidates-v1`.
 - CLI:
   `objgauss object-state audit-public-dataset-candidates`.
@@ -909,7 +910,8 @@ Implemented v0.1 facts:
   `bop-ycbv-keyframes`, `bop-hopev2`, `bop-tudl`, `hot3d-clips`, `dexycb`.
 - Recommended first slice is one small BOP YCB-V subset because it is the most
   direct path to RGB / depth / mask / 6DoF pose / camera rows. HOT3D remains
-  the later action-like interaction candidate after the pose adapter works.
+  a later interaction pose/visibility candidate, but its released clip format
+  has no action annotation contract and cannot support intervention rows directly.
 - The audit deliberately reports `has_direct_phase1_ready_dataset=false` and
   `has_direct_gaussian_evidence=false`. It is a data-selection preflight, not a
   reality-gate pass.
@@ -938,7 +940,8 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_capture_adapter`.
+- Canonical dataset module: `objgauss.datasets.objectstate_bop_capture_adapter`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-capture-adapter-v1`.
 - CLI:
   `objgauss object-state import-bop-capture-scene`.
@@ -968,7 +971,7 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core function:
-  `objgauss.core.objectstate_bop_capture_adapter.objectstate_bop_capture_acceptance_summary`.
+  `objgauss.datasets.objectstate_bop_capture_adapter.objectstate_bop_capture_acceptance_summary`.
 - Summary schema: `objgauss-objectstate-bop-capture-acceptance-v1`.
 - CLI:
   `objgauss object-state accept-bop-capture-scene`.
@@ -1002,7 +1005,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_bop_prediction_baseline_handoff`.
+  `objgauss.pipelines.objectstate_bop_prediction_baseline_handoff`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-prediction-baseline-handoff-v1`.
 - Core function:
@@ -1044,9 +1048,10 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_identity_route_audit`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_bop_identity_route_audit`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-identity-route-audit-v1`.
-- Core function: `objectstate_bop_identity_route_audit(...)`.
+- Pipeline function: `objectstate_bop_identity_route_audit(...)`.
 - CLI command:
   `objgauss object-state audit-bop-identity-route <scene-root> --output-root <dir>`.
 - Status values:
@@ -1089,7 +1094,8 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_identity_handoff`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_bop_identity_handoff`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-identity-handoff-v1`.
 - Core function: `objectstate_bop_identity_handoff(...)`.
 - CLI command:
@@ -1140,7 +1146,8 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_local_row_handoff`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_bop_local_row_handoff`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-local-row-handoff-v1`.
 - Core function: `objectstate_bop_local_row_handoff(...)`.
 - CLI command:
@@ -1178,9 +1185,10 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_cross_sample_ledger`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_bop_cross_sample_ledger`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-cross-sample-ledger-v1`.
-- Core function: `objectstate_bop_cross_sample_ledger(...)`.
+- Pipeline function: `objectstate_bop_cross_sample_ledger(...)`.
 - CLI command:
   `objgauss object-state audit-bop-cross-sample-ledger`.
 - The CLI accepts repeated `--local-row-summary`, `--discover-root`,
@@ -1250,11 +1258,12 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_bop_phase1_batch_workspace`.
+- Canonical dataset authoring module:
+  `objgauss.datasets.objectstate_bop_phase1_batch_workspace`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-phase1-batch-workspace-v1`.
-- Core function:
+- Dataset authoring function:
   `objectstate_bop_phase1_batch_workspace(...)`.
 - CLI command:
   `objgauss object-state init-bop-phase1-batch-workspace <dataset-root> --workspace-root <dir>`.
@@ -1292,11 +1301,12 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_bop_phase1_sample_workspace`.
+- Canonical dataset authoring module:
+  `objgauss.datasets.objectstate_bop_phase1_sample_workspace`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-phase1-sample-workspaces-v1`.
-- Core function:
+- Dataset authoring function:
   `objectstate_bop_phase1_sample_workspaces(...)`.
 - CLI command:
   `objgauss object-state init-bop-phase1-sample-workspaces <batch-spec.json>`.
@@ -1336,7 +1346,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_bop_phase1_authoring_progress`.
+  `objgauss.pipelines.objectstate_bop_phase1_authoring_progress`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-phase1-authoring-progress-v1`.
 - Core function:
@@ -1377,7 +1388,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_bop_baseline_candidate`.
+  `objgauss.pipelines.objectstate_bop_baseline_candidate`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-baseline-candidate-v1`.
 - Core function:
@@ -1417,7 +1429,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_bop_baseline_local_row_handoff`.
+  `objgauss.pipelines.objectstate_bop_baseline_local_row_handoff`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-baseline-local-row-handoff-v1`.
 - Core function:
@@ -1457,7 +1470,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff`.
+  `objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-rgbd-baseline-local-row-handoff-v1`.
 - Core function:
@@ -1498,11 +1512,12 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_bop_local_row_batch_spec`.
+- Canonical dataset authoring module:
+  `objgauss.datasets.objectstate_bop_local_row_batch_authoring`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-local-row-batch-spec-authoring-v1`.
-- Core function:
+- Dataset authoring function:
   `objectstate_bop_local_row_batch_spec_authoring(...)`.
 - CLI command:
   `objgauss object-state init-bop-local-row-batch-spec --samples-csv <samples.csv> --output <batch-spec.json>`.
@@ -1538,12 +1553,15 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_local_row_batch_handoff`.
+- Dataset spec contract:
+  `objgauss.datasets.objectstate_bop_local_row_batch_spec`.
+- Pipeline handoff:
+  `objgauss.pipelines.objectstate_bop_local_row_batch_handoff`.
 - Batch spec schema:
   `objgauss-objectstate-bop-local-row-batch-spec-v1`.
 - Summary schema:
   `objgauss-objectstate-bop-local-row-batch-handoff-v1`.
-- Core function: `objectstate_bop_local_row_batch_handoff(...)`.
+- Pipeline function: `objectstate_bop_local_row_batch_handoff(...)`.
 - CLI command:
   `objgauss object-state bop-local-row-batch-handoff <batch-spec.json>`.
 - The CLI supports `--output-root`, `--min-reviewable-samples`,
@@ -1577,11 +1595,12 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_bop_local_row_batch_readiness`.
+- Canonical pipeline module:
+  `objgauss.pipelines.objectstate_bop_local_row_batch_readiness`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-bop-local-row-batch-readiness-v1`.
-- Core function: `objectstate_bop_local_row_batch_readiness(...)`.
+- Pipeline function: `objectstate_bop_local_row_batch_readiness(...)`.
 - CLI command:
   `objgauss object-state audit-bop-local-row-batch-readiness <batch-spec.json>`.
 - The CLI supports `--output-root`, `--min-reviewable-samples`,
@@ -1613,9 +1632,10 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_phase1_route_audit`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_bop_phase1_route_audit`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-phase1-route-audit-v1`.
-- Core function: `objectstate_bop_phase1_route_audit(...)`.
+- Pipeline function: `objectstate_bop_phase1_route_audit(...)`.
 - CLI command:
   `objgauss object-state audit-bop-phase1-route <scene-root> --output-root <dir>`.
 - Status values:
@@ -1650,9 +1670,11 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_bop_phase1_local_row_readiness`.
+- Canonical pipeline module:
+  `objgauss.pipelines.objectstate_bop_phase1_local_row_readiness`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-bop-phase1-local-row-readiness-v1`.
-- Core function: `objectstate_bop_phase1_local_row_readiness(...)`.
+- Pipeline function: `objectstate_bop_phase1_local_row_readiness(...)`.
 - CLI command:
   `objgauss object-state audit-bop-phase1-local-row <scene-root> --output-root <dir>`.
 - The combined audit uses conservative status ordering:
@@ -1691,7 +1713,8 @@ Required behavior:
 
 Implemented v0.2 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_capture`.
+- Canonical dataset module: `objgauss.datasets.objectstate_controlled_capture`;
+  the historical `objgauss.core` path is compatibility-only.
 - Manifest schema:
   `objgauss-objectstate-controlled-capture-manifest-v1`.
 - Summary schema:
@@ -1725,7 +1748,8 @@ Add a local environment preflight before real controlled capture.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_capture_environment`.
+  `objgauss.datasets.objectstate_controlled_capture_environment`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-capture-environment-v1`.
 - `objectstate_controlled_capture_environment(...)` checks:
@@ -1765,7 +1789,9 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_capture_import`.
+- Canonical dataset module:
+  `objgauss.datasets.objectstate_controlled_capture_import`; the historical
+  `objgauss.core` path is compatibility-only.
 - Import summary schema:
   `objgauss-objectstate-controlled-capture-import-v1`.
 - Bundle files:
@@ -1851,7 +1877,9 @@ bundle before identity handoff.
 
 Implemented v0.5 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_capture_files`.
+- Canonical dataset module:
+  `objgauss.datasets.objectstate_controlled_capture_files`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-capture-file-audit-v1`.
 - `objectstate_controlled_capture_file_audit(...)` validates the capture
@@ -1896,10 +1924,12 @@ Add the first controlled real Stage 1 identity metric evaluator.
 Required behavior:
 
 - Input a controlled capture manifest with timestamped physical object GT.
-- Input candidate ObjectState / tracker identity predictions bound to
-  `(frame_id, object_id)`.
-- Reject candidate predictions whose sample id, frame id or object id does not
-  match the capture manifest.
+- Input raw candidate ObjectState / tracker observations bound to `frame_id`,
+  with candidate-owned `predicted_identity` and `predicted_position`; the
+  prediction must not contain a GT `object_id` association.
+- Reject candidate predictions whose sample id or frame id does not match the
+  capture manifest. Use GT pose only inside evaluator scoring to associate raw
+  observations to annotated objects.
 - Compute identity metrics required by `OBJECTSTATE-REALITY-GATE-001`:
   `idf1`, `fragmentation_rate`, `swap_rate` and `identity_collapse`.
 - Emit a controlled-real manifest where the identity row becomes `pass` or
@@ -1910,17 +1940,23 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_identity_eval`.
+- Core module: `objgauss.evaluation.objectstate_controlled_identity_eval`.
 - Prediction schema:
   `objgauss-objectstate-controlled-identity-predictions-v1`.
 - Eval summary schema:
   `objgauss-objectstate-controlled-identity-eval-v1`.
 - `read_objectstate_controlled_identity_predictions(...)` reads JSON.
 - `validate_objectstate_controlled_identity_predictions(...)` validates
-  candidate metadata and per-frame predictions. Candidate metadata may include
-  explicit `identity_evidence` for reconstruction noise robustness.
+  candidate metadata and per-frame predictions. Canonical rows use
+  `association_mode=raw_track_observations`; legacy rows containing GT
+  `object_id` remain readable but are marked
+  `legacy_gt_object_preassociated` and are never pass-eligible. Candidate
+  metadata may include explicit `identity_evidence` for reconstruction noise
+  robustness.
 - `evaluate_objectstate_controlled_identity_predictions(...)` compares capture
-  GT to candidate identity tracks and outputs pass / fail metrics.
+  GT to candidate identity tracks and outputs pass / fail metrics. Per-frame
+  association uses deterministic minimum-cost bipartite matching on raw
+  predicted positions; GT pose is used only at this scoring boundary.
 - Metrics now include `idf1`, `track_retrieval_recall_at_1`,
   `long_term_drift_rate`, `fragmentation_rate`, `swap_rate`,
   `identity_collapse`, `track_coverage` and
@@ -1974,7 +2010,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_prediction_eval`.
+- Core module: `objgauss.evaluation.objectstate_controlled_prediction_eval`.
 - Prediction schema:
   `objgauss-objectstate-controlled-prediction-candidates-v1`.
 - Eval summary schema:
@@ -2026,7 +2062,8 @@ Required behavior:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_prediction_baseline`.
+  `objgauss.pipelines.objectstate_controlled_prediction_baseline`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-prediction-baseline-candidates-v1`.
 - Public function:
@@ -2068,7 +2105,7 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_intervention_eval`.
+- Core module: `objgauss.evaluation.objectstate_controlled_intervention_eval`.
 - Intervention schema:
   `objgauss-objectstate-controlled-intervention-candidates-v1`.
 - Eval summary schema:
@@ -2105,23 +2142,24 @@ Bridge candidate ObjectState outputs into the controlled identity evaluator.
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_identity_prediction_adapter`.
+- Canonical module: `objgauss.pipelines.objectstate_identity_prediction_adapter`;
+  the historical `objgauss.core` and interim `objgauss.evaluation` paths are
+  compatibility-only.
 - `read_trainable_kernel_identity_source(...)` reads and validates a
   `objgauss-trainable-kernel-model-artifact-v1` JSON file.
 - `objectstate_identity_predictions_from_trainable_artifact(...)` maps
   per-frame trainable-kernel `object_states` to
   `objgauss-objectstate-controlled-identity-predictions-v1`.
-- The adapter requires a controlled capture manifest with per-frame
-  `pose.position`. It uses nearest-centroid association only to decide which
-  candidate ObjectState slot corresponds to each annotated physical object in
-  a frame.
-- The emitted `predicted_identity` is the stable candidate slot address
-  (`slot-<id>`), not physical identity ground truth.
+- The adapter uses the capture only for sample/frame binding and never reads
+  annotated object rows or `pose.position`.
+- Each output row contains only `frame_id`, the model-owned persistent
+  `predicted_identity` (`object-state-<persistent_id>`), raw
+  `predicted_position`, and confidence. It contains no GT `object_id`.
 - If the trainable artifact contains `identity_evidence`, the adapter carries
   it into prediction `candidate.identity_evidence` for the controlled identity
   evaluator.
-- Optional `max_centroid_distance` can drop unmatched far associations; an
-  all-dropped output fails validation instead of creating empty evidence.
+- Optional `max_centroid_distance` is carried as an evaluator-side association
+  threshold; the adapter never uses it to inspect GT pose.
 - CLI command:
   `objgauss object-state export-identity-predictions <capture> <objectstates> --output <predictions>`.
 
@@ -2148,7 +2186,9 @@ Bundle the Stage 1 controlled identity chain into a single reproducible handoff.
 
 Implemented v0.4 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_identity_handoff`.
+- Canonical pipeline module:
+  `objgauss.pipelines.objectstate_controlled_identity_handoff`; the historical
+  `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-identity-handoff-v1`.
 - `objectstate_controlled_identity_handoff(...)` takes a controlled capture
@@ -2243,7 +2283,8 @@ Add a read-only audit for identity-only Phase 1 evidence packages after
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_identity_evidence_package`.
+  `objgauss.pipelines.objectstate_controlled_identity_evidence_package`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-identity-evidence-package-v1`.
 - `objectstate_controlled_identity_evidence_package(...)` reads a local package
@@ -2294,7 +2335,8 @@ handoff.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_reality_bundle_handoff`.
+  `objgauss.pipelines.objectstate_controlled_reality_bundle_handoff`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-reality-bundle-handoff-v1`.
 - `objectstate_controlled_reality_bundle_handoff(...)` takes a controlled
@@ -2336,7 +2378,8 @@ Add the preflight audit for the full Phase 1 controlled reality handoff.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_reality_bundle_readiness`.
+  `objgauss.pipelines.objectstate_controlled_reality_bundle_readiness`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-reality-bundle-readiness-v1`.
 - `objectstate_controlled_reality_bundle_readiness(...)` takes a controlled
@@ -2372,7 +2415,8 @@ JSON files.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_reality_candidate_template`.
+  `objgauss.pipelines.objectstate_controlled_reality_candidate_template`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-reality-candidate-template-v1`.
 - Draft template schemas:
@@ -2457,7 +2501,8 @@ for BOP pose scenes where action / intervention rows are unavailable.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_prediction_evidence_package`.
+  `objgauss.pipelines.objectstate_controlled_prediction_evidence_package`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-prediction-evidence-package-v1`.
 - `objectstate_controlled_prediction_evidence_package(...)` reads a local
@@ -2559,7 +2604,8 @@ Add a read-only audit for the full Phase 1 controlled reality evidence package.
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_controlled_reality_evidence_package`.
+  `objgauss.pipelines.objectstate_controlled_reality_evidence_package`; the
+  historical `objgauss.core` path is compatibility-only.
 - Summary schema:
   `objgauss-objectstate-controlled-reality-evidence-package-v1`.
 - `objectstate_controlled_reality_evidence_package(...)` reads a local package
@@ -2607,7 +2653,8 @@ Add a read-only ledger over existing Phase 1 evidence package summaries.
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_phase1_evidence_ledger`.
+- Canonical pipeline module: `objgauss.pipelines.objectstate_phase1_evidence_ledger`;
+  the historical `objgauss.core` path is compatibility-only.
 - Summary schema: `objgauss-objectstate-phase1-evidence-ledger-v1`.
 - `objectstate_phase1_evidence_ledger(...)` accepts existing summary JSON
   paths for identity-only, prediction-only and full reality evidence packages.
@@ -2652,7 +2699,12 @@ Required behavior:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_controlled_real_rows`.
+- Canonical manifest module:
+  `objgauss.datasets.objectstate_controlled_real_manifest`.
+- Canonical row/gate-summary module:
+  `objgauss.evaluation.objectstate_controlled_real_rows`.
+- The historical `objgauss.core.objectstate_controlled_real_rows` path is
+  compatibility-only.
 - Manifest schema: `objgauss-objectstate-controlled-real-manifest-v1`.
 - Summary schema: `objgauss-objectstate-controlled-real-rows-v1`.
 - Manifest shape:

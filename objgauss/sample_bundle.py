@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from objgauss.object_field import load_object_field
+from objgauss.core.object_field import load_object_field
 from objgauss.ply import read_ply
 
 

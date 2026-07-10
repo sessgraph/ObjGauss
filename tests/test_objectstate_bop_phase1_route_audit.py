@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_phase1_route_audit import (
+from objgauss.pipelines.objectstate_bop_phase1_route_audit import (
     OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA,
     objectstate_bop_phase1_route_audit,
     validate_objectstate_bop_phase1_route_audit_summary,
 )
-from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
+from objgauss.pipelines.objectstate_bop_prediction_baseline_handoff import (
     objectstate_bop_prediction_baseline_handoff,
 )
 

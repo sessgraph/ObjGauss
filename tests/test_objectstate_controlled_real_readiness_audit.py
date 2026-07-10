@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_real_evidence_bundle import (
+from objgauss.datasets.objectstate_controlled_real_evidence_bundle import (
     objectstate_controlled_real_evidence_bundle_adapter_summary,
 )
-from objgauss.core.objectstate_controlled_real_readiness_audit import (
+from objgauss.evaluation.objectstate_controlled_real_readiness_audit import (
     OBJECTSTATE_CONTROLLED_REAL_READINESS_AUDIT_SCHEMA,
     objectstate_controlled_real_readiness_audit,
     objectstate_controlled_real_readiness_breakdown_csv,

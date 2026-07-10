@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_public_interaction_workspace import (
+from objgauss.pipelines.objectstate_public_interaction_workspace import (
     OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA,
     OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA,
@@ -40,6 +40,7 @@ def test_public_interaction_workspace_writes_authoring_skeleton(tmp_path):
     assert summary["status"] == "objectstate_public_interaction_workspace_ready"
     assert summary["candidate"]["candidate_id"] == "hot3d-clips"
     assert summary["candidate"]["source_kind"] == "public_interaction_dataset"
+    assert summary["candidate"]["ground_truth"]["action"] is False
     assert summary["source_sequence_id"] == "hot3d-sequence-unit-001"
     assert summary["sample"]["source_kind"] == "controlled_real"
     assert (

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from objgauss.core.assignment_evidence import AssignmentEvidenceBatch
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObjectIdentityObservation,
     ObjectIdentityOracle,
     ObjectIdentityRecord,

@@ -6,7 +6,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.assignment_evidence import assignment_evidence_sequence_from_trainable_frames
-from objgauss.core.assignment_stability import (
+from objgauss.evaluation.assignment_stability import (
     ASSIGNMENT_STABILITY_EVAL_SCHEMA,
     evaluate_assignment_stability,
     validate_assignment_stability_eval,
@@ -19,7 +19,7 @@ from objgauss.core.object_emergence_solver import (
     object_emergence_solver_checkpoint,
     train_object_emergence_solver,
 )
-from objgauss.core.trainable_kernel import trainable_kernel_sample_from_cloud
+from objgauss.pipelines.trainable_kernel import trainable_kernel_sample_from_cloud
 from objgauss.ply import write_ply
 
 

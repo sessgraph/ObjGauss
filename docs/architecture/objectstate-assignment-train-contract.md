@@ -303,7 +303,7 @@ Required outputs:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_assignment_train`.
+- Pipeline module: `objgauss.pipelines.objectstate_assignment_train`.
 - Dataset schema:
   `objgauss-objectstate-assignment-train-dataset-v1`.
 - Run schema:
@@ -327,8 +327,8 @@ Implemented v0.1 facts:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_assignment_generalization`.
+- Pipeline module:
+  `objgauss.pipelines.objectstate_assignment_generalization`.
 - Summary schema:
   `objgauss-objectstate-assignment-generalization-v1`.
 - Entry point:
@@ -353,8 +353,8 @@ Implemented v0.1 facts:
 
 Implemented v0.1 facts:
 
-- Core module:
-  `objgauss.core.objectstate_assignment_ablation`.
+- Pipeline module:
+  `objgauss.pipelines.objectstate_assignment_ablation`.
 - Summary schema:
   `objgauss-objectstate-assignment-ablation-v1`.
 - Entry point:

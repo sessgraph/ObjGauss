@@ -5,10 +5,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_identity_eval import (
+from objgauss.evaluation.objectstate_controlled_identity_eval import (
     OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA,
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     ObjectStateControlledIdentityThresholds,
@@ -17,11 +17,13 @@ from objgauss.core.objectstate_controlled_identity_eval import (
     validate_objectstate_controlled_identity_eval_summary,
     validate_objectstate_controlled_identity_predictions,
 )
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
+)
+from objgauss.evaluation.objectstate_controlled_real_rows import (
     evaluate_controlled_real_manifest_reality_gate,
 )
-from objgauss.core.objectstate_reality_gate import ObjectStateRealityGateThresholds
+from objgauss.evaluation.objectstate_reality_gate import ObjectStateRealityGateThresholds
 
 
 def test_controlled_identity_eval_outputs_pass_row_for_stable_tracks():
@@ -129,7 +131,7 @@ def test_controlled_identity_eval_rejects_unknown_prediction_pair():
     predictions = _predictions(("cup-track", "box-track"), ("cup-track", "box-track"), ("cup-track", "box-track"))
     predictions["predictions"][0]["frame_id"] = "missing-frame"
 
-    with pytest.raises(ValueError, match="unknown frame/object pair"):
+    with pytest.raises(ValueError, match="unknown frame"):
         evaluate_objectstate_controlled_identity_predictions(_capture_manifest(), predictions)
 
 
@@ -137,8 +139,45 @@ def test_controlled_identity_eval_rejects_duplicate_prediction_pair():
     predictions = _predictions(("cup-track", "box-track"), ("cup-track", "box-track"), ("cup-track", "box-track"))
     predictions["predictions"][1] = dict(predictions["predictions"][0])
 
-    with pytest.raises(ValueError, match="duplicate frame/object pair"):
+    with pytest.raises(ValueError, match="duplicate raw track observation"):
         evaluate_objectstate_controlled_identity_predictions(_capture_manifest(), predictions)
+
+
+def test_controlled_identity_eval_legacy_preassociated_rows_cannot_pass():
+    summary = evaluate_objectstate_controlled_identity_predictions(
+        _capture_manifest(),
+        _legacy_predictions(),
+        thresholds=ObjectStateControlledIdentityThresholds(
+            min_idf1=0.0,
+            min_track_retrieval_recall_at_1=0.0,
+            max_fragmentation_rate=1.0,
+            max_long_term_drift_rate=1.0,
+            max_swap_rate=1.0,
+            min_reconstruction_noise_robustness=0.0,
+            min_reconstruction_noise_variants=1,
+            require_no_identity_collapse=False,
+        ),
+    )
+
+    assert summary["status"] == "objectstate_controlled_identity_eval_fail"
+    assert (
+        summary["metrics"]["prediction_association_mode"]
+        == "legacy_gt_object_preassociated"
+    )
+    assert summary["metrics"]["raw_prediction_observations"] is False
+    assert summary["pass_gates"]["raw_prediction_observations_only"] is False
+    gate = evaluate_controlled_real_manifest_reality_gate(
+        summary["controlled_real_manifest"],
+        thresholds=ObjectStateRealityGateThresholds(
+            require_prediction_pass_row=False,
+            require_intervention_pass_row=False,
+        ),
+    )
+    identity_row = gate.rows[0]
+    assert identity_row.status == "fail"
+    assert identity_row.metrics["raw_prediction_observations"] is False
+    assert "raw_prediction_observations_required" in identity_row.failure_reason
+    assert gate.as_dict()["status"] == "objectstate_reality_gate_fail"
 
 
 def test_controlled_identity_predictions_read_json_file(tmp_path):
@@ -203,18 +242,23 @@ def _predictions(
     identities_by_frame = (frame0, frame1, frame2)
     rows = []
     for frame_index, identities in enumerate(identities_by_frame):
-        for object_id, identity in zip(("cup-001", "box-001"), identities):
+        for x, identity in zip((0.1, 0.4), identities):
             rows.append(
                 {
                     "frame_id": f"frame-{frame_index:06d}",
-                    "object_id": object_id,
                     "predicted_identity": identity,
+                    "predicted_position": [
+                        x + 0.01 * frame_index,
+                        0.2,
+                        0.3,
+                    ],
                     "confidence": 0.95,
                 }
             )
     return {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
         "sample_id": "controlled-tabletop-cup-box-identity-001",
+        "association_mode": "raw_track_observations",
         "candidate": {
             "candidate_id": "candidate-objectstate-identity-v0",
             "source": "fixture candidate identity tracks",
@@ -229,6 +273,15 @@ def _predictions(
         },
         "predictions": rows,
     }
+
+
+def _legacy_predictions():
+    predictions = _predictions()
+    predictions.pop("association_mode")
+    for row_index, row in enumerate(predictions["predictions"]):
+        row.pop("predicted_position")
+        row["object_id"] = ("cup-001", "box-001")[row_index % 2]
+    return predictions
 
 
 def _capture_manifest():

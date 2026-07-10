@@ -4,7 +4,7 @@ import json
 from types import SimpleNamespace
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture_environment import (
+from objgauss.datasets.objectstate_controlled_capture_environment import (
     OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA,
     objectstate_controlled_capture_environment,
     validate_objectstate_controlled_capture_environment_summary,

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA,
     objectstate_real_evidence_bundle_summary,

@@ -3,33 +3,35 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.evaluation.objectstate_controlled_real_rows import (
     objectstate_controlled_real_rows_summary,
 )
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA,
     validate_objectstate_real_evidence_bundle_ledger_summary,
     write_objectstate_real_evidence_bundle_ledger,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA,
     objectstate_real_evidence_bundle_ledger_package_audit,
     validate_objectstate_real_evidence_bundle_ledger_package_audit,
 )
-from objgauss.core.objectstate_real_identity_rows import (
+from objgauss.evaluation.objectstate_real_identity_rows import (
     objectstate_real_identity_rows_summary,
 )
-from objgauss.core.objectstate_real_intervention_rows import (
+from objgauss.evaluation.objectstate_real_intervention_rows import (
     objectstate_real_intervention_rows_summary,
 )
-from objgauss.core.objectstate_real_prediction_rows import (
+from objgauss.evaluation.objectstate_real_prediction_rows import (
     objectstate_real_prediction_rows_summary,
 )
-from objgauss.core.objectstate_reality_row_ledger import (
+from objgauss.evaluation.objectstate_reality_row_ledger import (
     OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA,
     objectstate_reality_row_ledger,
     validate_objectstate_reality_row_ledger_summary,
@@ -135,6 +137,52 @@ def test_reality_row_ledger_aggregates_existing_row_summaries(tmp_path):
     )
     assert ledger["claim_policy"]["does_not_claim_world_model"] is True
     assert "full ObjectState reality gate did not pass" in ledger["issues"][-1]
+
+
+def test_reality_row_ledger_rederives_forged_pass_from_nested_gate_rows(tmp_path):
+    summary = objectstate_controlled_real_rows_summary(
+        _controlled_manifest("controlled-forged", prediction_status="pass")
+    )
+    for row_group in (summary["rows"], summary["gate"]["rows"]):
+        prediction = next(
+            row for row in row_group if row["evidence_kind"] == "prediction"
+        )
+        prediction["metrics"].update(
+            {
+                "state_ade": 0.30,
+                "history_ade": 0.02,
+                "prediction_gap_vs_history_model": -999.0,
+            }
+        )
+    path = tmp_path / "forged-pass-summary.json"
+    _write_json(path, summary)
+
+    ledger = objectstate_reality_row_ledger((path,))
+
+    assert ledger["status"] == "objectstate_reality_row_ledger_reviewable"
+    assert ledger["records"][0]["validator_ok"] is True
+    assert ledger["pass_row_count"] == 0
+    assert ledger["fail_row_count"] == 2
+    assert ledger["blocked_row_count"] == 1
+    prediction_row = next(
+        row for row in ledger["rows"] if row["evidence_kind"] == "prediction"
+    )
+    assert prediction_row["status"] == "fail"
+    assert prediction_row["metrics"]["prediction_gap_vs_history_model"] == pytest.approx(
+        0.28
+    )
+    assert "prediction" in ledger["gap_summary"]["failed_evidence_kinds"]
+    prediction_experiment = next(
+        row
+        for row in ledger["state_variable_evidence_matrix"]
+        if row["experiment"] == "predictive_sufficiency"
+    )
+    assert prediction_experiment["status"] == (
+        "objectstate_state_variable_experiment_fail"
+    )
+    assert "prediction" in {
+        action["evidence_kind"] for action in ledger["next_actions"]
+    }
 
 
 def test_reality_row_ledger_accepts_real_evidence_accounting_summaries(tmp_path):
@@ -634,6 +682,7 @@ def _real_evidence_bundle():
                     "fragmentation_rate": 0.0,
                     "swap_rate": 0.0,
                     "identity_collapse": False,
+                    "raw_prediction_observations": True,
                 },
                 "artifact_refs": ["outputs/captures/cup/identity-eval.json"],
                 "gt_requirements": {

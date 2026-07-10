@@ -4,7 +4,7 @@ import json
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_full_cloud_purity import (
+from objgauss.pipelines.real_sample_v2_full_cloud_purity import (
     REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA,
     RealSampleV2FullCloudPurityReport,
     real_sample_v2_full_cloud_purity_from_cloud,

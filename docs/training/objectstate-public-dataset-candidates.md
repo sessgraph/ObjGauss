@@ -41,7 +41,7 @@ a real ObjGauss row. Public RGB / pose data alone is not enough.
 | 1 | `bop-ycbv-keyframes` | First public identity / prediction adapter | BOP YCB-V gives household objects, RGB-D evidence, labels, masks, object models, and 6D poses. It is the most direct bridge into current controlled manifest rows. |
 | 2 | `bop-hopev2` | View / lighting / robustness candidate | HOPE/HOPEv2 adds household/office clutter, lighting variation, and moving-camera data. Good second row after the adapter exists. |
 | 3 | `bop-tudl` | Small adapter sanity check | TUD-L is small, with three moving objects and eight lighting conditions. Useful for cheap smoke, but too narrow for the main claim. |
-| 4 | `hot3d-clips` | Action-like interaction candidate | HOT3D-Clips has 150-frame hand-object clips with object/hand/camera 3D poses. It can stress prediction and action-conditioned rows, but it is not randomized counterfactual evidence. |
+| 4 | `hot3d-clips` | Interaction pose/visibility stress candidate | HOT3D-Clips has 150-frame hand-object clips with object/hand/camera poses, masks and timestamps. Its released format has no action label, interval or control-vector contract, so it can support identity/prediction only. |
 | 5 | `dexycb` | Non-commercial hand-occlusion stress candidate | DexYCB has YCB grasp sequences and 6D object pose tasks, but the full dataset is large and CC BY-NC, so it must never be treated as public commercial demo material. |
 
 2026-07-08 update: HOPE `val_realsense` has now been downloaded and tested as
@@ -60,13 +60,14 @@ Phase 1 identity pass row.
 | `bop-ycbv-keyframes` | ready with adapter | partial | partial | partial | blocked |
 | `bop-hopev2` | ready with adapter | partial | ready with adapter | partial | blocked |
 | `bop-tudl` | ready with adapter | blocked | ready with adapter | partial | blocked |
-| `hot3d-clips` | ready with adapter | ready with adapter | ready with adapter | ready with adapter | partial |
+| `hot3d-clips` | ready with adapter | ready with adapter | ready with adapter | ready with adapter | blocked |
 | `dexycb` | ready with adapter | partial | partial | partial | blocked |
 
 Interpretation:
 
 - `ready with adapter` means the source appears to contain the required GT, but
-  ObjGauss still needs a local adapter into `controlled capture manifest` rows.
+  its normalized rows must be populated into the existing `controlled capture
+  manifest` contract. Do not add another dataset-specific wrapper during the freeze.
 - `partial` means the source can support a related measurement, but not the
   full gate without restrictions or additional candidate outputs.
 - `blocked` means the dataset should not be used to claim that gate.
@@ -88,9 +89,9 @@ local per-frame Gaussian evidence under outputs/
 identity row + prediction row
 ```
 
-Do not start with HOT3D. It is closer to interaction, but the format, license
-agreement, and egocentric multi-stream setup add avoidable complexity before
-the simpler pose adapter has been proven.
+Do not start with HOT3D. Its format, license agreement and egocentric
+multi-stream setup add avoidable complexity, and the released clip annotations
+do not contain action GT.
 
 The adapter entry point is:
 
@@ -536,6 +537,7 @@ or claim predictive / intervention / world-model evidence.
 
 - BOP dataset page: `https://bop.felk.cvut.cz/datasets/`
 - HOT3D project page: `https://facebookresearch.github.io/hot3d/`
+- HOT3D-Clips format: `https://github.com/facebookresearch/hot3d/blob/main/hot3d/clips/README.md`
 - DexYCB project page: `https://dex-ycb.github.io/`
 
 The code-backed audit can be reproduced with:
@@ -551,9 +553,10 @@ candidate selection state.
 
 ## Public Interaction Route Workspace
 
-2026-07-09 update: before a HOT3D-style clip can pass route audit, create a
-local-only authoring workspace with the same controlled capture bundle contract
-used by controlled real rows:
+2026-07-10 correction: the official HOT3D-Clips format has no native action GT.
+The existing local-only workspace can stage identity/prediction evidence in the
+same controlled capture bundle contract, but HOT3D cannot make the strict full
+interaction route handoff-ready without an independent measured action source:
 
 ```bash
 uv run objgauss object-state init-public-interaction-route-workspace \
@@ -572,8 +575,8 @@ to `source_kind=public_replay` rows, and ledger aggregation.
 
 If the public clip has already been normalized into one row per
 frame/object annotation with external timestamp, physical `object_id`, 6DoF
-pose, action metadata and RGB / Gaussian refs, import it directly into the same
-controlled capture bundle:
+pose and RGB / Gaussian refs, import it directly into the same controlled
+capture bundle. For native HOT3D rows, explicitly allow the missing action:
 
 ```bash
 uv run objgauss object-state import-public-interaction-clip-csv \
@@ -581,15 +584,16 @@ uv run objgauss object-state import-public-interaction-clip-csv \
   outputs/captures/hot3d-clip-000001 \
   --sample-id hot3d-clip-000001 \
   --source-sequence-id <public-dataset-clip-id> \
+  --allow-missing-action \
   --summary-output outputs/captures/hot3d-clip-000001/public-interaction-clip-import.json \
   --force
 ```
 
 The adapter writes `sample.json`, `objects.csv`, `frames.csv`,
 `annotations.csv` and `actions.csv`, then runs the existing controlled capture
-import summary. By default it requires complete per-object pose, at least one
-action row and per-frame Gaussian refs so the bundle can become identity /
-prediction / intervention ready. It does not copy RGB files, copy Gaussian
+import summary. By default it requires complete per-object pose, action rows and
+per-frame Gaussian refs; `--allow-missing-action` preserves identity/prediction
+staging while intervention remains blocked. It does not copy RGB files, copy Gaussian
 files, infer GT, reconstruct Gaussian evidence, create ObjectState candidates,
 run handoff / eval, create `public_replay` rows or claim counterfactual proof.
 
@@ -623,15 +627,15 @@ Boundary:
 
 ## Public Interaction Route Audit
 
-2026-07-09 update: `hot3d-clips` is now backed by a machine-checkable route
-audit, but still not by a submitted ObjGauss evidence row. The audit is:
+`hot3d-clips` is backed by an existing machine-checkable route audit, but still
+not by a submitted ObjGauss evidence row. Run it without `--require-ready` for
+native HOT3D, because the source candidate has no action GT:
 
 ```bash
 uv run objgauss object-state audit-public-interaction-route \
   outputs/captures/hot3d-clip-000001 \
   --summary-output outputs/captures/hot3d-clip-000001/public-interaction-route-summary.json \
-  --markdown-output outputs/captures/hot3d-clip-000001/public-interaction-route.md \
-  --require-ready
+  --markdown-output outputs/captures/hot3d-clip-000001/public-interaction-route.md
 ```
 
 By default the command expects:
@@ -644,7 +648,8 @@ By default the command expects:
 It validates the controlled capture manifest, prediction candidates,
 intervention candidates and `sample_id` binding. It reports
 `objectstate_public_interaction_route_handoff_ready` only when the local
-interaction bundle has usable action GT, pose/timestamp GT, declared per-frame
+interaction source declares native action GT and the bundle has usable action GT,
+pose/timestamp GT, declared per-frame
 Gaussian evidence, an ObjectState candidate artifact, prediction candidates and
 action-conditioned intervention candidates all bound to the same sample.
 Usable action GT means `intervention_action_gt_ready=true`: action rows must
@@ -672,8 +677,8 @@ Boundary:
 - It does not adapt raw egocentric streams into ObjGauss manifests.
 - It does not evaluate identity, prediction or intervention metrics.
 - It does not create a reality row or pass evidence.
-- HOT3D-style observed interactions are action-like evidence candidates, not
-  randomized counterfactual trials.
+- HOT3D manipulation footage is not action GT or randomized counterfactual
+  evidence. Do not derive action vectors from hand/tool/object pose deltas.
 
 After a local public interaction clip has passed route audit and has produced a
 full `controlled-reality-bundle-handoff` summary, convert that handoff into

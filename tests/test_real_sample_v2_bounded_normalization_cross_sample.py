@@ -4,7 +4,7 @@ import json
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_bounded_normalization_cross_sample import (
+from objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample import (
     REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA,
     RealSampleV2BoundedNormalizationCrossSampleInput,
     RealSampleV2BoundedNormalizationCrossSampleReport,

@@ -1,13 +1,13 @@
-"""Compatibility wrapper for core semantic slot alignment algorithms."""
+"""Compatibility import for semantic-slot alignment orchestration."""
 
-from objgauss.core.semantic_slots import (
+from objgauss.pipelines.semantic_slots import (
     DEFAULT_SLOT_BACKGROUND_LABELS,
     SlotAlignmentResult,
     align_mask_manifest_slots,
 )
 
-__all__ = [
+__all__ = (
     "DEFAULT_SLOT_BACKGROUND_LABELS",
     "SlotAlignmentResult",
     "align_mask_manifest_slots",
-]
+)

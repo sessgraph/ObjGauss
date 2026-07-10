@@ -6,10 +6,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture_import import (
+from objgauss.datasets.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_manifest_from_bundle,
 )
-from objgauss.core.objectstate_controlled_capture_template import (
+from objgauss.datasets.objectstate_controlled_capture_template import (
     OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA,
     write_objectstate_controlled_capture_bundle_template,
     validate_objectstate_controlled_capture_bundle_template_summary,

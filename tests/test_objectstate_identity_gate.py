@@ -3,15 +3,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.objectstate_identity_gate import (
+from objgauss.evaluation.objectstate_identity_gate import (
     OBJECTSTATE_IDENTITY_DATASET_SCHEMA,
     OBJECTSTATE_IDENTITY_GATE_SCHEMA,
     ObjectStateIdentityGateReport,
     evaluate_objectstate_identity_gate,
     validate_objectstate_identity_gate_summary,
 )
-from objgauss.core.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
-from objgauss.core.v2_stability_foundation import (
+from objgauss.evaluation.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

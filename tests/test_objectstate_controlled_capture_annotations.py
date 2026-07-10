@@ -4,7 +4,7 @@ import csv
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture_annotations import (
+from objgauss.datasets.objectstate_controlled_capture_annotations import (
     OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA,
     finalize_objectstate_controlled_capture_annotations,
@@ -12,16 +12,16 @@ from objgauss.core.objectstate_controlled_capture_annotations import (
     validate_objectstate_controlled_capture_annotation_template_summary,
     write_objectstate_controlled_capture_annotation_template,
 )
-from objgauss.core.objectstate_controlled_capture_bundle_readiness import (
+from objgauss.datasets.objectstate_controlled_capture_bundle_readiness import (
     objectstate_controlled_capture_bundle_readiness,
 )
-from objgauss.core.objectstate_controlled_capture_frames import (
+from objgauss.datasets.objectstate_controlled_capture_frames import (
     write_objectstate_controlled_capture_frames,
 )
-from objgauss.core.objectstate_controlled_capture_import import (
+from objgauss.datasets.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_manifest_from_bundle,
 )
-from objgauss.core.objectstate_controlled_capture_template import (
+from objgauss.datasets.objectstate_controlled_capture_template import (
     write_objectstate_controlled_capture_bundle_template,
 )
 

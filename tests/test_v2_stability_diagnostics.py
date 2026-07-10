@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from objgauss.core.v2_stability_diagnostics import (
+from objgauss.evaluation.v2_stability_diagnostics import (
     FailureModeClassifier,
     SyntheticStabilityDiagnosticsReport,
     V2_STABILITY_DIAGNOSTICS_SCHEMA,
@@ -12,7 +12,7 @@ from objgauss.core.v2_stability_diagnostics import (
     expected_slots_for_synthetic_fixture,
     validate_synthetic_stability_diagnostics_summary,
 )
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

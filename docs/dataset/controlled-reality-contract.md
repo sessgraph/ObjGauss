@@ -1,7 +1,7 @@
 # Controlled Reality Dataset Contract
 
 > Status: current
-> Last updated: 2026-07-09
+> Last updated: 2026-07-10
 
 This document freezes `OBJECTSTATE-CONTROLLED-DATASET-CONTRACT-001`.
 It defines the first real-data language that can feed ObjGauss Phase 2
@@ -9,7 +9,8 @@ Reality Evidence Foundation.
 
 The contract does not replace the existing capture schema. The authoritative
 machine schema remains `objgauss-objectstate-controlled-capture-manifest-v1`
-in `objgauss.core.objectstate_controlled_capture`; this document names the
+in `objgauss.datasets.objectstate_controlled_capture`; the historical
+`objgauss.core` path is compatibility-only. This document names the
 dataset concepts and invariants that a controlled real bundle must satisfy
 before it can become useful ObjectState evidence.
 
@@ -142,12 +143,15 @@ causal ledger as pass or fail evidence.
 
 ## Machine Audit
 
-`objgauss.core.controlled_schema` exposes:
+`objgauss.datasets.controlled_schema` is the canonical module and exposes:
 
 - `OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA`
 - `OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA`
 - `objectstate_controlled_dataset_contract_summary(...)`
 - `validate_objectstate_controlled_dataset_contract_summary(...)`
+
+`objgauss.core.controlled_schema` remains a deprecated identity-preserving
+re-export during migration; new production imports must not use it.
 
 The summary reuses `objgauss-objectstate-controlled-capture-manifest-v1` and
 reports:

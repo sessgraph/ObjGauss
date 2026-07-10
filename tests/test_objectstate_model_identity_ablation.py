@@ -4,20 +4,20 @@ import json
 
 import pytest
 
-from objgauss.core.objectstate_model_identity_ablation import (
+from objgauss.evaluation.objectstate_model_identity_ablation import (
     DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES,
     OBJECTSTATE_MODEL_IDENTITY_ABLATION_SCHEMA,
     objectstate_model_identity_ablation_summary,
     validate_objectstate_model_identity_ablation_summary,
 )
-from objgauss.core.objectstate_model_identity_benchmark import (
+from objgauss.evaluation.objectstate_model_identity_benchmark import (
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS,
 )
-from objgauss.core.objectstate_model_identity_benchmark_report import (
+from objgauss.evaluation.objectstate_model_identity_benchmark_report import (
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES,
     objectstate_model_identity_benchmark_report_scenarios,
 )
-from objgauss.core.objectstate_model_identity_gate import OBJECTSTATE_MODEL_IDENTITY_BASELINES
+from objgauss.evaluation.objectstate_model_identity_gate import OBJECTSTATE_MODEL_IDENTITY_BASELINES
 
 
 def test_model_identity_ablation_compares_report_ladder_feature_policies(tmp_path):
@@ -68,6 +68,12 @@ def test_model_identity_ablation_compares_report_ladder_feature_policies(tmp_pat
     assert ranking["minimum_sufficient_evidence"]["uses_semantic"] is True
     assert ranking["minimum_native_candidate"]["found"] is False
     assert ranking["semantic_candidate_policy_count"] == 1
+    assert ranking["raw_candidate_policy_count"] > ranking["candidate_policy_count"]
+    assert "rgb" in ranking["perturbation_rejected_policies"]
+    assert variants["rgb"]["long_training_gate"]["status"] == "candidate_ready"
+    assert variants["rgb"]["perturbation_breakdown"]["appearance"][
+        "assignment_solver_metrics"
+    ]["identity_retrieval_at_1"] < 0.95
 
     diagnostics = summary["shortcut_diagnostics"]
     assert diagnostics["teacher_evidence_layer_indicated"] is True

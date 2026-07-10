@@ -8,15 +8,15 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
     train_assignment_solver_v2,
 )
-from objgauss.core.assignment_solver_v2_eval import assignment_solver_v2_checkpoint
-from objgauss.core.assignment_v2_renderer_validation import (
+from objgauss.core.assignment_solver_v2 import assignment_solver_v2_checkpoint
+from objgauss.pipelines.assignment_v2_renderer_validation import (
     ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA,
     AssignmentV2RendererJointValidationReport,
     evaluate_assignment_v2_renderer_joint,
     validate_assignment_v2_renderer_joint_summary,
 )
-from objgauss.core.renderer_loss import renderer_loss_boundary_report
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.renderer_loss import renderer_loss_boundary_report
+from objgauss.pipelines.trainable_kernel import (
     TrainableKernelFrame,
     bind_image_targets_to_frames,
     make_trainable_kernel_mvp_fixture,

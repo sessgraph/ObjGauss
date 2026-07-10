@@ -35,1417 +35,1417 @@ _EXPORTS = {
         "AssignmentSolverV2TrainingResult",
     ),
     "AssignmentSolverV2StabilityEvalReport": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.evaluation.assignment_solver_v2_eval",
         "AssignmentSolverV2StabilityEvalReport",
     ),
     "AssignmentV2RendererJointValidationReport": (
-        "objgauss.core.assignment_v2_renderer_validation",
+        "objgauss.pipelines.assignment_v2_renderer_validation",
         "AssignmentV2RendererJointValidationReport",
     ),
     "CoreModelTrainValidateReport": (
-        "objgauss.core.core_model_validation",
+        "objgauss.pipelines.core_model_validation",
         "CoreModelTrainValidateReport",
     ),
     "RealSampleV2SmokeReport": (
-        "objgauss.core.real_sample_v2_smoke",
+        "objgauss.pipelines.real_sample_v2_smoke",
         "RealSampleV2SmokeReport",
     ),
     "RealSampleV2DiagnosticsReport": (
-        "objgauss.core.real_sample_v2_diagnostics",
+        "objgauss.pipelines.real_sample_v2_diagnostics",
         "RealSampleV2DiagnosticsReport",
     ),
     "RealSampleV2ModelHandoffReport": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "RealSampleV2ModelHandoffReport",
     ),
     "RealSampleV2ViewerPreviewReport": (
-        "objgauss.core.real_sample_v2_viewer_preview",
+        "objgauss.pipelines.real_sample_v2_viewer_preview",
         "RealSampleV2ViewerPreviewReport",
     ),
     "RealSampleV2FullCloudPurityReport": (
-        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "objgauss.pipelines.real_sample_v2_full_cloud_purity",
         "RealSampleV2FullCloudPurityReport",
     ),
     "RealSampleV2SegmentationQualityReport": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "RealSampleV2SegmentationQualityReport",
     ),
     "RealSampleV2WeakBoundaryOptReport": (
-        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "objgauss.pipelines.real_sample_v2_weak_boundary_opt",
         "RealSampleV2WeakBoundaryOptReport",
     ),
     "RealSampleV2PromotedWeightsCrossSampleReport": (
-        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample",
         "RealSampleV2PromotedWeightsCrossSampleReport",
     ),
     "RealSampleV2SampleAwareWeightPolicyReport": (
-        "objgauss.core.real_sample_v2_sample_aware_weight_policy",
+        "objgauss.pipelines.real_sample_v2_sample_aware_weight_policy",
         "RealSampleV2SampleAwareWeightPolicyReport",
     ),
     "RealSampleV2BoundedNormalizationCrossSampleInput": (
-        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample",
         "RealSampleV2BoundedNormalizationCrossSampleInput",
     ),
     "RealSampleV2BoundedNormalizationCrossSampleReport": (
-        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample",
         "RealSampleV2BoundedNormalizationCrossSampleReport",
     ),
     "ObjectIdentityObservation": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "ObjectIdentityObservation",
     ),
     "ObjectStateIdentityGateReport": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "ObjectStateIdentityGateReport",
     ),
     "ObjectStateIdentityEncoderConfig": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "ObjectStateIdentityEncoderConfig",
     ),
     "ObjectStateIdentityEncoderState": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "ObjectStateIdentityEncoderState",
     ),
     "ObjectStateIdentityEncoderTrainingResult": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "ObjectStateIdentityEncoderTrainingResult",
     ),
     "ObjectStateIdentityGateThresholds": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "ObjectStateIdentityGateThresholds",
     ),
     "ObjectStateModelIdentityGateThresholds": (
-        "objgauss.core.objectstate_model_identity_gate",
+        "objgauss.evaluation.objectstate_model_identity_gate",
         "ObjectStateModelIdentityGateThresholds",
     ),
     "ObjectStateModelIdentityBenchmarkScenario": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "ObjectStateModelIdentityBenchmarkScenario",
     ),
     "ObjectStateModelIdentityBenchmarkThresholds": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "ObjectStateModelIdentityBenchmarkThresholds",
     ),
     "TeacherEvidenceBatch": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "TeacherEvidenceBatch",
     ),
     "TeacherEvidenceLeakageAuditThresholds": (
-        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objgauss.evaluation.objectstate_teacher_evidence_leakage_audit",
         "TeacherEvidenceLeakageAuditThresholds",
     ),
     "ObjectStateAssignmentLongSmokeContractThresholds": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "ObjectStateAssignmentLongSmokeContractThresholds",
     ),
     "ObjectStateTemporalAssignmentContractThresholds": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "ObjectStateTemporalAssignmentContractThresholds",
     ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA": (
-        "objgauss.core.objectstate_assignment_long_smoke",
+        "objgauss.pipelines.objectstate_assignment_long_smoke",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SCHEMA",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SCHEMA",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_SCHEMA": (
-        "objgauss.core.objectstate_temporal_assignment",
+        "objgauss.pipelines.objectstate_temporal_assignment",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_SCHEMA",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_CONTRACT_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_REQUIRED_POLICY",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_INPUTS",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_LOSS_TERMS",
     ),
     "OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "OBJECTSTATE_TEMPORAL_ASSIGNMENT_METRICS",
     ),
     "ObjectStateIdentityRow": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "ObjectStateIdentityRow",
     ),
     "ObjectStatePredictiveGateReport": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "ObjectStatePredictiveGateReport",
     ),
     "ObjectStatePredictiveGateThresholds": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "ObjectStatePredictiveGateThresholds",
     ),
     "ObjectStatePredictiveRow": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "ObjectStatePredictiveRow",
     ),
     "ObjectStateRealityGateReport": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "ObjectStateRealityGateReport",
     ),
     "ObjectStateRealityGateThresholds": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "ObjectStateRealityGateThresholds",
     ),
     "ObjectStateRealityRow": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "ObjectStateRealityRow",
     ),
     "ObjectStateRealityPublicArtifact": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "ObjectStateRealityPublicArtifact",
     ),
     "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA",
     ),
     "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_real_identity_rows",
+        "objgauss.evaluation.objectstate_real_identity_rows",
         "OBJECTSTATE_REAL_IDENTITY_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_REAL_PREDICTION_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_real_prediction_rows",
+        "objgauss.evaluation.objectstate_real_prediction_rows",
         "OBJECTSTATE_REAL_PREDICTION_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_REAL_INTERVENTION_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_real_intervention_rows",
+        "objgauss.evaluation.objectstate_real_intervention_rows",
         "OBJECTSTATE_REAL_INTERVENTION_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "OBJECTSTATE_CONTROLLED_CAPTURE_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_files",
+        "objgauss.datasets.objectstate_controlled_capture_files",
         "OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "OBJECTSTATE_CONTROLLED_CAPTURE_IMPORT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_ACCEPTANCE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_template",
+        "objgauss.datasets.objectstate_controlled_capture_template",
         "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_bundle_readiness",
+        "objgauss.datasets.objectstate_controlled_capture_bundle_readiness",
         "OBJECTSTATE_CONTROLLED_CAPTURE_BUNDLE_READINESS_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_environment",
+        "objgauss.datasets.objectstate_controlled_capture_environment",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ENVIRONMENT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_handoff",
+        "objgauss.pipelines.objectstate_controlled_capture_handoff",
         "OBJECTSTATE_CONTROLLED_CAPTURE_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_frames",
+        "objgauss.datasets.objectstate_controlled_capture_frames",
         "OBJECTSTATE_CONTROLLED_CAPTURE_FRAMES_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ANNOTATION_FINALIZE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "OBJECTSTATE_CONTROLLED_CAPTURE_ACTION_FINALIZE_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_DATASET_SCHEMA": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_DATASET_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_ROW_SCHEMA": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_ROW_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "OBJECTSTATE_TRANSITION_DATASET_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_PREDICTION_CANDIDATES_SCHEMA": (
-        "objgauss.core.objectstate_transition_prediction_candidates",
+        "objgauss.pipelines.objectstate_transition_prediction_candidates",
         "OBJECTSTATE_TRANSITION_PREDICTION_CANDIDATES_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_PREDICTION_POLICIES": (
-        "objgauss.core.objectstate_transition_prediction_candidates",
+        "objgauss.pipelines.objectstate_transition_prediction_candidates",
         "OBJECTSTATE_TRANSITION_PREDICTION_POLICIES",
     ),
     "OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA": (
-        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objgauss.pipelines.objectstate_transition_intervention_candidates",
         "OBJECTSTATE_TRANSITION_INTERVENTION_CANDIDATES_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES": (
-        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objgauss.pipelines.objectstate_transition_intervention_candidates",
         "OBJECTSTATE_TRANSITION_INTERVENTION_POLICIES",
     ),
     "OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_transition_reality_handoff",
+        "objgauss.pipelines.objectstate_transition_reality_handoff",
         "OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA": (
-        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "objgauss.pipelines.objectstate_transition_reality_evidence_package",
         "OBJECTSTATE_TRANSITION_REALITY_EVIDENCE_PACKAGE_SCHEMA",
     ),
     "objectstate_controlled_capture_bundle_acceptance_summary": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_bundle_acceptance_summary",
     ),
     "objectstate_controlled_capture_import_summary": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_import_summary",
     ),
     "objectstate_controlled_capture_manifest_from_bundle": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "objectstate_controlled_capture_manifest_from_bundle",
     ),
     "write_objectstate_controlled_capture_bundle_template": (
-        "objgauss.core.objectstate_controlled_capture_template",
+        "objgauss.datasets.objectstate_controlled_capture_template",
         "write_objectstate_controlled_capture_bundle_template",
     ),
     "objectstate_controlled_capture_bundle_readiness": (
-        "objgauss.core.objectstate_controlled_capture_bundle_readiness",
+        "objgauss.datasets.objectstate_controlled_capture_bundle_readiness",
         "objectstate_controlled_capture_bundle_readiness",
     ),
     "objectstate_controlled_capture_handoff_summary": (
-        "objgauss.core.objectstate_controlled_capture_handoff",
+        "objgauss.pipelines.objectstate_controlled_capture_handoff",
         "objectstate_controlled_capture_handoff_summary",
     ),
     "objectstate_controlled_capture_environment": (
-        "objgauss.core.objectstate_controlled_capture_environment",
+        "objgauss.datasets.objectstate_controlled_capture_environment",
         "objectstate_controlled_capture_environment",
     ),
     "write_objectstate_controlled_capture_frames": (
-        "objgauss.core.objectstate_controlled_capture_frames",
+        "objgauss.datasets.objectstate_controlled_capture_frames",
         "write_objectstate_controlled_capture_frames",
     ),
     "write_objectstate_controlled_capture_annotation_template": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "write_objectstate_controlled_capture_annotation_template",
     ),
     "finalize_objectstate_controlled_capture_annotations": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "finalize_objectstate_controlled_capture_annotations",
     ),
     "write_objectstate_controlled_capture_action_template": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "write_objectstate_controlled_capture_action_template",
     ),
     "finalize_objectstate_controlled_capture_actions": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "finalize_objectstate_controlled_capture_actions",
     ),
     "objectstate_transition_dataset_from_capture_manifest": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "objectstate_transition_dataset_from_capture_manifest",
     ),
     "write_objectstate_transition_dataset": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "write_objectstate_transition_dataset",
     ),
     "read_objectstate_transition_dataset": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "read_objectstate_transition_dataset",
     ),
     "objectstate_transition_dataset_audit": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "objectstate_transition_dataset_audit",
     ),
     "objectstate_transition_dataset_audit_from_path": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "objectstate_transition_dataset_audit_from_path",
     ),
     "objectstate_transition_prediction_candidates_summary": (
-        "objgauss.core.objectstate_transition_prediction_candidates",
+        "objgauss.pipelines.objectstate_transition_prediction_candidates",
         "objectstate_transition_prediction_candidates_summary",
     ),
     "write_objectstate_transition_prediction_candidates": (
-        "objgauss.core.objectstate_transition_prediction_candidates",
+        "objgauss.pipelines.objectstate_transition_prediction_candidates",
         "write_objectstate_transition_prediction_candidates",
     ),
     "objectstate_transition_intervention_candidates_summary": (
-        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objgauss.pipelines.objectstate_transition_intervention_candidates",
         "objectstate_transition_intervention_candidates_summary",
     ),
     "write_objectstate_transition_intervention_candidates": (
-        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objgauss.pipelines.objectstate_transition_intervention_candidates",
         "write_objectstate_transition_intervention_candidates",
     ),
     "objectstate_transition_reality_handoff": (
-        "objgauss.core.objectstate_transition_reality_handoff",
+        "objgauss.pipelines.objectstate_transition_reality_handoff",
         "objectstate_transition_reality_handoff",
     ),
     "write_objectstate_transition_reality_handoff": (
-        "objgauss.core.objectstate_transition_reality_handoff",
+        "objgauss.pipelines.objectstate_transition_reality_handoff",
         "write_objectstate_transition_reality_handoff",
     ),
     "objectstate_transition_reality_evidence_package": (
-        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "objgauss.pipelines.objectstate_transition_reality_evidence_package",
         "objectstate_transition_reality_evidence_package",
     ),
     "validate_objectstate_controlled_capture_import_summary": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_import_summary",
     ),
     "validate_objectstate_controlled_capture_bundle_acceptance_summary": (
-        "objgauss.core.objectstate_controlled_capture_import",
+        "objgauss.datasets.objectstate_controlled_capture_import",
         "validate_objectstate_controlled_capture_bundle_acceptance_summary",
     ),
     "validate_objectstate_controlled_capture_bundle_template_summary": (
-        "objgauss.core.objectstate_controlled_capture_template",
+        "objgauss.datasets.objectstate_controlled_capture_template",
         "validate_objectstate_controlled_capture_bundle_template_summary",
     ),
     "validate_objectstate_controlled_capture_bundle_readiness_summary": (
-        "objgauss.core.objectstate_controlled_capture_bundle_readiness",
+        "objgauss.datasets.objectstate_controlled_capture_bundle_readiness",
         "validate_objectstate_controlled_capture_bundle_readiness_summary",
     ),
     "validate_objectstate_controlled_capture_handoff_summary": (
-        "objgauss.core.objectstate_controlled_capture_handoff",
+        "objgauss.pipelines.objectstate_controlled_capture_handoff",
         "validate_objectstate_controlled_capture_handoff_summary",
     ),
     "validate_objectstate_controlled_capture_environment_summary": (
-        "objgauss.core.objectstate_controlled_capture_environment",
+        "objgauss.datasets.objectstate_controlled_capture_environment",
         "validate_objectstate_controlled_capture_environment_summary",
     ),
     "validate_objectstate_controlled_capture_frames_summary": (
-        "objgauss.core.objectstate_controlled_capture_frames",
+        "objgauss.datasets.objectstate_controlled_capture_frames",
         "validate_objectstate_controlled_capture_frames_summary",
     ),
     "validate_objectstate_controlled_capture_annotation_template_summary": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "validate_objectstate_controlled_capture_annotation_template_summary",
     ),
     "validate_objectstate_controlled_capture_annotation_finalize_summary": (
-        "objgauss.core.objectstate_controlled_capture_annotations",
+        "objgauss.datasets.objectstate_controlled_capture_annotations",
         "validate_objectstate_controlled_capture_annotation_finalize_summary",
     ),
     "validate_objectstate_controlled_capture_action_template_summary": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "validate_objectstate_controlled_capture_action_template_summary",
     ),
     "validate_objectstate_controlled_capture_action_finalize_summary": (
-        "objgauss.core.objectstate_controlled_capture_actions",
+        "objgauss.datasets.objectstate_controlled_capture_actions",
         "validate_objectstate_controlled_capture_action_finalize_summary",
     ),
     "validate_objectstate_transition_dataset": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "validate_objectstate_transition_dataset",
     ),
     "validate_objectstate_transition_dataset_audit": (
-        "objgauss.core.objectstate_transition_dataset",
+        "objgauss.datasets.objectstate_transition_dataset",
         "validate_objectstate_transition_dataset_audit",
     ),
     "validate_objectstate_transition_prediction_candidates_summary": (
-        "objgauss.core.objectstate_transition_prediction_candidates",
+        "objgauss.pipelines.objectstate_transition_prediction_candidates",
         "validate_objectstate_transition_prediction_candidates_summary",
     ),
     "validate_objectstate_transition_intervention_candidates_summary": (
-        "objgauss.core.objectstate_transition_intervention_candidates",
+        "objgauss.pipelines.objectstate_transition_intervention_candidates",
         "validate_objectstate_transition_intervention_candidates_summary",
     ),
     "validate_objectstate_transition_reality_handoff_summary": (
-        "objgauss.core.objectstate_transition_reality_handoff",
+        "objgauss.pipelines.objectstate_transition_reality_handoff",
         "validate_objectstate_transition_reality_handoff_summary",
     ),
     "validate_objectstate_transition_reality_evidence_package_summary": (
-        "objgauss.core.objectstate_transition_reality_evidence_package",
+        "objgauss.pipelines.objectstate_transition_reality_evidence_package",
         "validate_objectstate_transition_reality_evidence_package_summary",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVAL_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_bundle_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_handoff",
         "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_bundle_readiness",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_readiness",
         "OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_FINALIZE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_reality_evidence_package",
         "OBJECTSTATE_CONTROLLED_REALITY_EVIDENCE_PACKAGE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_EVIDENCE_PACKAGE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_prediction_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_prediction_evidence_package",
         "OBJECTSTATE_CONTROLLED_PREDICTION_EVIDENCE_PACKAGE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_identity_evidence_package",
         "OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA",
     ),
     "OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA": (
-        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "objgauss.pipelines.objectstate_phase1_evidence_ledger",
         "OBJECTSTATE_PHASE1_EVIDENCE_LEDGER_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_prediction_baseline",
+        "objgauss.pipelines.objectstate_controlled_prediction_baseline",
         "OBJECTSTATE_CONTROLLED_PREDICTION_BASELINE_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_prediction_baseline_handoff",
+        "objgauss.pipelines.objectstate_bop_prediction_baseline_handoff",
         "OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_IDENTITY_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_identity_handoff",
+        "objgauss.pipelines.objectstate_bop_identity_handoff",
         "OBJECTSTATE_BOP_IDENTITY_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_LOCAL_ROW_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_handoff",
         "OBJECTSTATE_BOP_LOCAL_ROW_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_baseline_local_row_handoff",
         "OBJECTSTATE_BOP_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_RGBD_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff",
         "OBJECTSTATE_BOP_RGBD_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "objgauss.datasets.objectstate_controlled_real_evidence_bundle",
         "OBJECTSTATE_CONTROLLED_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA",
     ),
     "objectstate_controlled_real_evidence_bundle_adapter_summary": (
-        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "objgauss.datasets.objectstate_controlled_real_evidence_bundle",
         "objectstate_controlled_real_evidence_bundle_adapter_summary",
     ),
     "objectstate_controlled_real_evidence_bundle_from_capture_manifest": (
-        "objgauss.core.objectstate_controlled_real_evidence_bundle",
+        "objgauss.datasets.objectstate_controlled_real_evidence_bundle",
         "objectstate_controlled_real_evidence_bundle_from_capture_manifest",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_READINESS_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "objgauss.evaluation.objectstate_controlled_real_readiness_audit",
         "OBJECTSTATE_CONTROLLED_REAL_READINESS_AUDIT_SCHEMA",
     ),
     "objectstate_controlled_real_readiness_audit": (
-        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "objgauss.evaluation.objectstate_controlled_real_readiness_audit",
         "objectstate_controlled_real_readiness_audit",
     ),
     "objectstate_controlled_real_readiness_markdown": (
-        "objgauss.core.objectstate_controlled_real_readiness_audit",
+        "objgauss.evaluation.objectstate_controlled_real_readiness_audit",
         "objectstate_controlled_real_readiness_markdown",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_real_identity_eval",
         "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_EVAL_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_TEACHER_EVIDENCE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_real_identity_eval",
         "OBJECTSTATE_CONTROLLED_REAL_IDENTITY_TEACHER_EVIDENCE_SCHEMA",
     ),
     "objectstate_controlled_real_identity_eval": (
-        "objgauss.core.objectstate_controlled_real_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_real_identity_eval",
         "objectstate_controlled_real_identity_eval",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "OBJECTSTATE_CONTROLLED_REAL_PREDICTION_EVAL_SCHEMA",
     ),
     "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA": (
-        "objgauss.core.objectstate_bop_cross_sample_ledger",
+        "objgauss.pipelines.objectstate_bop_cross_sample_ledger",
         "OBJECTSTATE_BOP_CROSS_SAMPLE_LEDGER_SCHEMA",
     ),
     "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.datasets.objectstate_bop_local_row_batch_spec",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA",
     ),
     "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_handoff",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_HANDOFF_SCHEMA",
     ),
     "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_AUTHORING_SCHEMA": (
-        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "objgauss.datasets.objectstate_bop_local_row_batch_authoring",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_AUTHORING_SCHEMA",
     ),
     "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_READINESS_SCHEMA": (
-        "objgauss.core.objectstate_bop_local_row_batch_readiness",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_readiness",
         "OBJECTSTATE_BOP_LOCAL_ROW_BATCH_READINESS_SCHEMA",
     ),
     "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA": (
-        "objgauss.core.objectstate_bop_capture_adapter",
+        "objgauss.datasets.objectstate_bop_capture_adapter",
         "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA",
     ),
     "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_bop_capture_adapter",
+        "objgauss.datasets.objectstate_bop_capture_adapter",
         "OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "objgauss.pipelines.objectstate_bop_phase1_route_audit",
         "OBJECTSTATE_BOP_PHASE1_ROUTE_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_bop_identity_route_audit",
+        "objgauss.pipelines.objectstate_bop_identity_route_audit",
         "OBJECTSTATE_BOP_IDENTITY_ROUTE_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_local_row_readiness",
+        "objgauss.pipelines.objectstate_bop_phase1_local_row_readiness",
         "OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "objgauss.datasets.objectstate_bop_phase1_subset_selector",
         "OBJECTSTATE_BOP_PHASE1_SUBSET_SELECTOR_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_BATCH_WORKSPACE_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_batch_workspace",
         "OBJECTSTATE_BOP_PHASE1_BATCH_WORKSPACE_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_SAMPLE_WORKSPACES_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_sample_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_sample_workspace",
         "OBJECTSTATE_BOP_PHASE1_SAMPLE_WORKSPACES_SCHEMA",
     ),
     "OBJECTSTATE_BOP_PHASE1_AUTHORING_PROGRESS_SCHEMA": (
-        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "objgauss.pipelines.objectstate_bop_phase1_authoring_progress",
         "OBJECTSTATE_BOP_PHASE1_AUTHORING_PROGRESS_SCHEMA",
     ),
     "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA": (
-        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "objgauss.pipelines.objectstate_bop_gaussian_evidence_preflight",
         "OBJECTSTATE_BOP_GAUSSIAN_EVIDENCE_PREFLIGHT_SCHEMA",
     ),
     "OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA": (
-        "objgauss.core.objectstate_bop_rgbd_gaussian_export",
+        "objgauss.pipelines.objectstate_bop_rgbd_gaussian_export",
         "OBJECTSTATE_BOP_RGBD_GAUSSIAN_EXPORT_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "OBJECTSTATE_PUBLIC_DATASET_CANDIDATES_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "OBJECTSTATE_PUBLIC_INTERACTION_ROUTE_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_public_interaction_reality_rows",
+        "objgauss.evaluation.objectstate_public_interaction_reality_rows",
         "OBJECTSTATE_PUBLIC_INTERACTION_REALITY_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "OBJECTSTATE_PUBLIC_INTERACTION_WORKSPACE_PROGRESS_SCHEMA",
     ),
     "OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "OBJECTSTATE_PUBLIC_INTERACTION_CLIP_CSV_ADAPTER_SCHEMA",
     ),
     "objectstate_public_dataset_candidates_audit": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "objectstate_public_dataset_candidates_audit",
     ),
     "objectstate_public_interaction_route_audit": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "objectstate_public_interaction_route_audit",
     ),
     "objectstate_public_interaction_reality_rows_summary": (
-        "objgauss.core.objectstate_public_interaction_reality_rows",
+        "objgauss.evaluation.objectstate_public_interaction_reality_rows",
         "objectstate_public_interaction_reality_rows_summary",
     ),
     "objectstate_public_interaction_reality_rows_from_handoff": (
-        "objgauss.core.objectstate_public_interaction_reality_rows",
+        "objgauss.evaluation.objectstate_public_interaction_reality_rows",
         "objectstate_public_interaction_reality_rows_from_handoff",
     ),
     "write_objectstate_public_interaction_workspace": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "write_objectstate_public_interaction_workspace",
     ),
     "write_objectstate_public_interaction_clip_csv_bundle": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "write_objectstate_public_interaction_clip_csv_bundle",
     ),
     "objectstate_public_interaction_workspace_progress": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "objectstate_public_interaction_workspace_progress",
     ),
     "validate_objectstate_public_dataset_candidates_audit": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "validate_objectstate_public_dataset_candidates_audit",
     ),
     "validate_objectstate_public_interaction_route_audit": (
-        "objgauss.core.objectstate_public_dataset_candidates",
+        "objgauss.pipelines.objectstate_public_dataset_candidates",
         "validate_objectstate_public_interaction_route_audit",
     ),
     "validate_objectstate_public_interaction_reality_rows_summary": (
-        "objgauss.core.objectstate_public_interaction_reality_rows",
+        "objgauss.evaluation.objectstate_public_interaction_reality_rows",
         "validate_objectstate_public_interaction_reality_rows_summary",
     ),
     "validate_objectstate_public_interaction_workspace_summary": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "validate_objectstate_public_interaction_workspace_summary",
     ),
     "validate_objectstate_public_interaction_workspace_progress_summary": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "validate_objectstate_public_interaction_workspace_progress_summary",
     ),
     "validate_objectstate_public_interaction_clip_csv_adapter_summary": (
-        "objgauss.core.objectstate_public_interaction_workspace",
+        "objgauss.pipelines.objectstate_public_interaction_workspace",
         "validate_objectstate_public_interaction_clip_csv_adapter_summary",
     ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_TEMPLATE_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_FINALIZE_SCHEMA": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "OBJECTSTATE_BOP_CANDIDATE_ARTIFACT_FINALIZE_SCHEMA",
     ),
     "OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA": (
-        "objgauss.core.objectstate_bop_baseline_candidate",
+        "objgauss.pipelines.objectstate_bop_baseline_candidate",
         "OBJECTSTATE_BOP_BASELINE_CANDIDATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_CANDIDATE_ARTIFACT_FILE_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_handoff",
         "OBJECTSTATE_CONTROLLED_IDENTITY_SCENARIO_AUDIT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA",
     ),
     "ObjectStateControlledIdentityThresholds": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "ObjectStateControlledIdentityThresholds",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA",
     ),
     "ObjectStateControlledPredictionThresholds": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "ObjectStateControlledPredictionThresholds",
     ),
     "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA",
     ),
     "ObjectStateControlledInterventionThresholds": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "ObjectStateControlledInterventionThresholds",
     ),
     "evaluate_objectstate_controlled_intervention_candidates": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "evaluate_objectstate_controlled_intervention_candidates",
     ),
     "validate_objectstate_controlled_intervention_candidates": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "validate_objectstate_controlled_intervention_candidates",
     ),
     "validate_objectstate_controlled_intervention_eval_summary": (
-        "objgauss.core.objectstate_controlled_intervention_eval",
+        "objgauss.evaluation.objectstate_controlled_intervention_eval",
         "validate_objectstate_controlled_intervention_eval_summary",
     ),
     "evaluate_objectstate_controlled_prediction_candidates": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "evaluate_objectstate_controlled_prediction_candidates",
     ),
     "objectstate_controlled_reality_bundle_handoff": (
-        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_handoff",
         "objectstate_controlled_reality_bundle_handoff",
     ),
     "objectstate_controlled_reality_bundle_readiness": (
-        "objgauss.core.objectstate_controlled_reality_bundle_readiness",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_readiness",
         "objectstate_controlled_reality_bundle_readiness",
     ),
     "write_objectstate_controlled_reality_candidate_templates": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "write_objectstate_controlled_reality_candidate_templates",
     ),
     "write_objectstate_controlled_reality_candidate_templates_from_manifest": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "write_objectstate_controlled_reality_candidate_templates_from_manifest",
     ),
     "finalize_objectstate_controlled_reality_candidate_templates": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "finalize_objectstate_controlled_reality_candidate_templates",
     ),
     "finalize_objectstate_controlled_prediction_candidate_template": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "finalize_objectstate_controlled_prediction_candidate_template",
     ),
     "write_objectstate_controlled_prediction_baseline_candidates": (
-        "objgauss.core.objectstate_controlled_prediction_baseline",
+        "objgauss.pipelines.objectstate_controlled_prediction_baseline",
         "write_objectstate_controlled_prediction_baseline_candidates",
     ),
     "objectstate_bop_prediction_baseline_handoff": (
-        "objgauss.core.objectstate_bop_prediction_baseline_handoff",
+        "objgauss.pipelines.objectstate_bop_prediction_baseline_handoff",
         "objectstate_bop_prediction_baseline_handoff",
     ),
     "objectstate_bop_identity_handoff": (
-        "objgauss.core.objectstate_bop_identity_handoff",
+        "objgauss.pipelines.objectstate_bop_identity_handoff",
         "objectstate_bop_identity_handoff",
     ),
     "objectstate_bop_local_row_handoff": (
-        "objgauss.core.objectstate_bop_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_handoff",
         "objectstate_bop_local_row_handoff",
     ),
     "objectstate_bop_baseline_local_row_handoff": (
-        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_baseline_local_row_handoff",
         "objectstate_bop_baseline_local_row_handoff",
     ),
     "objectstate_bop_rgbd_baseline_local_row_handoff": (
-        "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff",
         "objectstate_bop_rgbd_baseline_local_row_handoff",
     ),
     "objectstate_bop_reality_rows_summary": (
-        "objgauss.core.objectstate_bop_reality_rows",
+        "objgauss.evaluation.objectstate_bop_reality_rows",
         "objectstate_bop_reality_rows_summary",
     ),
     "objectstate_bop_reality_rows_from_summary": (
-        "objgauss.core.objectstate_bop_reality_rows",
+        "objgauss.evaluation.objectstate_bop_reality_rows",
         "objectstate_bop_reality_rows_from_summary",
     ),
     "read_objectstate_bop_local_row_summary": (
-        "objgauss.core.objectstate_bop_reality_rows",
+        "objgauss.evaluation.objectstate_bop_reality_rows",
         "read_objectstate_bop_local_row_summary",
     ),
     "objectstate_bop_real_evidence_bundle_from_summaries": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "objectstate_bop_real_evidence_bundle_from_summaries",
     ),
     "objectstate_bop_real_evidence_bundle_adapter_summary": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "objectstate_bop_real_evidence_bundle_adapter_summary",
     ),
     "objectstate_bop_real_evidence_bundle_adapter_summary_from_files": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "objectstate_bop_real_evidence_bundle_adapter_summary_from_files",
     ),
     "read_objectstate_bop_real_evidence_bundle_adapter_summary": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "read_objectstate_bop_real_evidence_bundle_adapter_summary",
     ),
     "objectstate_reality_row_ledger": (
-        "objgauss.core.objectstate_reality_row_ledger",
+        "objgauss.evaluation.objectstate_reality_row_ledger",
         "objectstate_reality_row_ledger",
     ),
     "objectstate_reality_rows_from_summary": (
-        "objgauss.core.objectstate_reality_row_ledger",
+        "objgauss.evaluation.objectstate_reality_row_ledger",
         "objectstate_reality_rows_from_summary",
     ),
     "read_objectstate_reality_row_summary": (
-        "objgauss.core.objectstate_reality_row_ledger",
+        "objgauss.evaluation.objectstate_reality_row_ledger",
         "read_objectstate_reality_row_summary",
     ),
     "objectstate_bop_cross_sample_ledger": (
-        "objgauss.core.objectstate_bop_cross_sample_ledger",
+        "objgauss.pipelines.objectstate_bop_cross_sample_ledger",
         "objectstate_bop_cross_sample_ledger",
     ),
     "objectstate_bop_local_row_batch_handoff": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_handoff",
         "objectstate_bop_local_row_batch_handoff",
     ),
     "objectstate_bop_local_row_batch_spec_authoring": (
-        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "objgauss.datasets.objectstate_bop_local_row_batch_authoring",
         "objectstate_bop_local_row_batch_spec_authoring",
     ),
     "objectstate_bop_local_row_batch_readiness": (
-        "objgauss.core.objectstate_bop_local_row_batch_readiness",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_readiness",
         "objectstate_bop_local_row_batch_readiness",
     ),
     "read_objectstate_bop_local_row_batch_spec": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.datasets.objectstate_bop_local_row_batch_spec",
         "read_objectstate_bop_local_row_batch_spec",
     ),
     "objectstate_bop_capture_condition_sidecar_summary": (
-        "objgauss.core.objectstate_bop_capture_adapter",
+        "objgauss.datasets.objectstate_bop_capture_adapter",
         "objectstate_bop_capture_condition_sidecar_summary",
     ),
     "objectstate_bop_phase1_route_audit": (
-        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "objgauss.pipelines.objectstate_bop_phase1_route_audit",
         "objectstate_bop_phase1_route_audit",
     ),
     "objectstate_bop_identity_route_audit": (
-        "objgauss.core.objectstate_bop_identity_route_audit",
+        "objgauss.pipelines.objectstate_bop_identity_route_audit",
         "objectstate_bop_identity_route_audit",
     ),
     "objectstate_bop_phase1_local_row_readiness": (
-        "objgauss.core.objectstate_bop_phase1_local_row_readiness",
+        "objgauss.pipelines.objectstate_bop_phase1_local_row_readiness",
         "objectstate_bop_phase1_local_row_readiness",
     ),
     "objectstate_bop_phase1_subset_selector": (
-        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "objgauss.datasets.objectstate_bop_phase1_subset_selector",
         "objectstate_bop_phase1_subset_selector",
     ),
     "objectstate_bop_phase1_batch_workspace": (
-        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_batch_workspace",
         "objectstate_bop_phase1_batch_workspace",
     ),
     "objectstate_bop_phase1_sample_workspaces": (
-        "objgauss.core.objectstate_bop_phase1_sample_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_sample_workspace",
         "objectstate_bop_phase1_sample_workspaces",
     ),
     "objectstate_bop_phase1_authoring_progress": (
-        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "objgauss.pipelines.objectstate_bop_phase1_authoring_progress",
         "objectstate_bop_phase1_authoring_progress",
     ),
     "objectstate_bop_gaussian_evidence_preflight": (
-        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "objgauss.pipelines.objectstate_bop_gaussian_evidence_preflight",
         "objectstate_bop_gaussian_evidence_preflight",
     ),
     "objectstate_bop_rgbd_gaussian_export": (
-        "objgauss.core.objectstate_bop_rgbd_gaussian_export",
+        "objgauss.pipelines.objectstate_bop_rgbd_gaussian_export",
         "objectstate_bop_rgbd_gaussian_export",
     ),
     "write_objectstate_bop_candidate_artifact_template": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "write_objectstate_bop_candidate_artifact_template",
     ),
     "finalize_objectstate_bop_candidate_artifact_template": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "finalize_objectstate_bop_candidate_artifact_template",
     ),
     "write_objectstate_bop_gaussian_centroid_baseline_candidate": (
-        "objgauss.core.objectstate_bop_baseline_candidate",
+        "objgauss.pipelines.objectstate_bop_baseline_candidate",
         "write_objectstate_bop_gaussian_centroid_baseline_candidate",
     ),
     "objectstate_controlled_reality_evidence_package": (
-        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_reality_evidence_package",
         "objectstate_controlled_reality_evidence_package",
     ),
     "objectstate_controlled_prediction_evidence_package": (
-        "objgauss.core.objectstate_controlled_prediction_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_prediction_evidence_package",
         "objectstate_controlled_prediction_evidence_package",
     ),
     "objectstate_controlled_identity_evidence_package": (
-        "objgauss.core.objectstate_controlled_identity_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_identity_evidence_package",
         "objectstate_controlled_identity_evidence_package",
     ),
     "objectstate_controlled_dataset_contract_summary": (
-        "objgauss.core.controlled_schema",
+        "objgauss.datasets.controlled_schema",
         "objectstate_controlled_dataset_contract_summary",
     ),
     "objectstate_teacher_evidence_contract_summary": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "objectstate_teacher_evidence_contract_summary",
     ),
     "teacher_evidence_batch_summary": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "teacher_evidence_batch_summary",
     ),
     "validate_teacher_evidence_batch": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "validate_teacher_evidence_batch",
     ),
     "objectstate_teacher_evidence_leakage_audit_summary": (
-        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objgauss.evaluation.objectstate_teacher_evidence_leakage_audit",
         "objectstate_teacher_evidence_leakage_audit_summary",
     ),
     "objectstate_assignment_long_smoke_contract_summary": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "objectstate_assignment_long_smoke_contract_summary",
     ),
     "objectstate_assignment_long_smoke_summary": (
-        "objgauss.core.objectstate_assignment_long_smoke",
+        "objgauss.pipelines.objectstate_assignment_long_smoke",
         "objectstate_assignment_long_smoke_summary",
     ),
     "objectstate_temporal_assignment_contract_summary": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "objectstate_temporal_assignment_contract_summary",
     ),
     "objectstate_temporal_assignment_summary": (
-        "objgauss.core.objectstate_temporal_assignment",
+        "objgauss.pipelines.objectstate_temporal_assignment",
         "objectstate_temporal_assignment_summary",
     ),
     "objectstate_assignment_mvp_summary": (
-        "objgauss.core.objectstate_assignment_mvp",
+        "objgauss.pipelines.objectstate_assignment_mvp",
         "objectstate_assignment_mvp_summary",
     ),
     "objectstate_assignment_train_dataset_summary": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "objectstate_assignment_train_dataset_summary",
     ),
     "objectstate_assignment_train_smoke": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "objectstate_assignment_train_smoke",
     ),
     "objectstate_assignment_generalization_summary": (
-        "objgauss.core.objectstate_assignment_generalization",
+        "objgauss.pipelines.objectstate_assignment_generalization",
         "objectstate_assignment_generalization_summary",
     ),
     "objectstate_assignment_ablation_summary": (
-        "objgauss.core.objectstate_assignment_ablation",
+        "objgauss.pipelines.objectstate_assignment_ablation",
         "objectstate_assignment_ablation_summary",
     ),
     "objectstate_phase1_evidence_ledger": (
-        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "objgauss.pipelines.objectstate_phase1_evidence_ledger",
         "objectstate_phase1_evidence_ledger",
     ),
     "validate_objectstate_controlled_dataset_contract_summary": (
-        "objgauss.core.controlled_schema",
+        "objgauss.datasets.controlled_schema",
         "validate_objectstate_controlled_dataset_contract_summary",
     ),
     "validate_objectstate_teacher_evidence_contract_summary": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "validate_objectstate_teacher_evidence_contract_summary",
     ),
     "validate_teacher_evidence_batch_summary": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "validate_teacher_evidence_batch_summary",
     ),
     "validate_objectstate_teacher_evidence_leakage_audit_summary": (
-        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objgauss.evaluation.objectstate_teacher_evidence_leakage_audit",
         "validate_objectstate_teacher_evidence_leakage_audit_summary",
     ),
     "validate_objectstate_assignment_long_smoke_contract_summary": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "validate_objectstate_assignment_long_smoke_contract_summary",
     ),
     "validate_objectstate_assignment_long_smoke_summary": (
-        "objgauss.core.objectstate_assignment_long_smoke",
+        "objgauss.pipelines.objectstate_assignment_long_smoke",
         "validate_objectstate_assignment_long_smoke_summary",
     ),
     "validate_objectstate_temporal_assignment_contract_summary": (
-        "objgauss.core.objectstate_temporal_assignment_contract",
+        "objgauss.pipelines.objectstate_temporal_assignment_contract",
         "validate_objectstate_temporal_assignment_contract_summary",
     ),
     "validate_objectstate_temporal_assignment_summary": (
-        "objgauss.core.objectstate_temporal_assignment",
+        "objgauss.pipelines.objectstate_temporal_assignment",
         "validate_objectstate_temporal_assignment_summary",
     ),
     "validate_objectstate_assignment_mvp_summary": (
-        "objgauss.core.objectstate_assignment_mvp",
+        "objgauss.pipelines.objectstate_assignment_mvp",
         "validate_objectstate_assignment_mvp_summary",
     ),
     "validate_objectstate_assignment_train_dataset_summary": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "validate_objectstate_assignment_train_dataset_summary",
     ),
     "validate_objectstate_assignment_train_run_summary": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "validate_objectstate_assignment_train_run_summary",
     ),
     "validate_objectstate_assignment_generalization_summary": (
-        "objgauss.core.objectstate_assignment_generalization",
+        "objgauss.pipelines.objectstate_assignment_generalization",
         "validate_objectstate_assignment_generalization_summary",
     ),
     "validate_objectstate_assignment_ablation_summary": (
-        "objgauss.core.objectstate_assignment_ablation",
+        "objgauss.pipelines.objectstate_assignment_ablation",
         "validate_objectstate_assignment_ablation_summary",
     ),
     "validate_objectstate_controlled_reality_bundle_handoff_summary": (
-        "objgauss.core.objectstate_controlled_reality_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_handoff",
         "validate_objectstate_controlled_reality_bundle_handoff_summary",
     ),
     "validate_objectstate_controlled_reality_bundle_readiness_summary": (
-        "objgauss.core.objectstate_controlled_reality_bundle_readiness",
+        "objgauss.pipelines.objectstate_controlled_reality_bundle_readiness",
         "validate_objectstate_controlled_reality_bundle_readiness_summary",
     ),
     "validate_objectstate_controlled_reality_candidate_template_summary": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_reality_candidate_template_summary",
     ),
     "validate_objectstate_controlled_reality_candidate_finalize_summary": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_reality_candidate_finalize_summary",
     ),
     "validate_objectstate_controlled_prediction_candidate_finalize_summary": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_prediction_candidate_finalize_summary",
     ),
     "validate_objectstate_controlled_reality_evidence_package_summary": (
-        "objgauss.core.objectstate_controlled_reality_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_reality_evidence_package",
         "validate_objectstate_controlled_reality_evidence_package_summary",
     ),
     "validate_objectstate_controlled_real_prediction_eval": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "validate_objectstate_controlled_real_prediction_eval",
     ),
     "validate_objectstate_controlled_prediction_evidence_package_summary": (
-        "objgauss.core.objectstate_controlled_prediction_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_prediction_evidence_package",
         "validate_objectstate_controlled_prediction_evidence_package_summary",
     ),
     "validate_objectstate_controlled_identity_evidence_package_summary": (
-        "objgauss.core.objectstate_controlled_identity_evidence_package",
+        "objgauss.pipelines.objectstate_controlled_identity_evidence_package",
         "validate_objectstate_controlled_identity_evidence_package_summary",
     ),
     "validate_objectstate_phase1_evidence_ledger_summary": (
-        "objgauss.core.objectstate_phase1_evidence_ledger",
+        "objgauss.pipelines.objectstate_phase1_evidence_ledger",
         "validate_objectstate_phase1_evidence_ledger_summary",
     ),
     "validate_objectstate_controlled_prediction_baseline_summary": (
-        "objgauss.core.objectstate_controlled_prediction_baseline",
+        "objgauss.pipelines.objectstate_controlled_prediction_baseline",
         "validate_objectstate_controlled_prediction_baseline_summary",
     ),
     "validate_objectstate_bop_prediction_baseline_handoff_summary": (
-        "objgauss.core.objectstate_bop_prediction_baseline_handoff",
+        "objgauss.pipelines.objectstate_bop_prediction_baseline_handoff",
         "validate_objectstate_bop_prediction_baseline_handoff_summary",
     ),
     "validate_objectstate_bop_identity_handoff_summary": (
-        "objgauss.core.objectstate_bop_identity_handoff",
+        "objgauss.pipelines.objectstate_bop_identity_handoff",
         "validate_objectstate_bop_identity_handoff_summary",
     ),
     "validate_objectstate_bop_local_row_handoff_summary": (
-        "objgauss.core.objectstate_bop_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_handoff",
         "validate_objectstate_bop_local_row_handoff_summary",
     ),
     "validate_objectstate_bop_baseline_local_row_handoff_summary": (
-        "objgauss.core.objectstate_bop_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_baseline_local_row_handoff",
         "validate_objectstate_bop_baseline_local_row_handoff_summary",
     ),
     "validate_objectstate_bop_rgbd_baseline_local_row_handoff_summary": (
-        "objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff",
+        "objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff",
         "validate_objectstate_bop_rgbd_baseline_local_row_handoff_summary",
     ),
     "validate_objectstate_bop_reality_rows_summary": (
-        "objgauss.core.objectstate_bop_reality_rows",
+        "objgauss.evaluation.objectstate_bop_reality_rows",
         "validate_objectstate_bop_reality_rows_summary",
     ),
     "validate_objectstate_bop_real_evidence_bundle_adapter_summary": (
-        "objgauss.core.objectstate_bop_real_evidence_bundle",
+        "objgauss.pipelines.objectstate_bop_real_evidence_bundle",
         "validate_objectstate_bop_real_evidence_bundle_adapter_summary",
     ),
     "validate_objectstate_reality_row_ledger_summary": (
-        "objgauss.core.objectstate_reality_row_ledger",
+        "objgauss.evaluation.objectstate_reality_row_ledger",
         "validate_objectstate_reality_row_ledger_summary",
     ),
     "read_objectstate_real_evidence_bundle": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "read_objectstate_real_evidence_bundle",
     ),
     "objectstate_real_evidence_bundle_summary": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "objectstate_real_evidence_bundle_summary",
     ),
     "validate_objectstate_real_evidence_bundle": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "validate_objectstate_real_evidence_bundle",
     ),
     "validate_objectstate_real_evidence_bundle_summary": (
-        "objgauss.core.objectstate_real_evidence_bundle",
+        "objgauss.datasets.objectstate_real_evidence_bundle",
         "validate_objectstate_real_evidence_bundle_summary",
     ),
     "objectstate_real_identity_rows_from_bundle": (
-        "objgauss.core.objectstate_real_identity_rows",
+        "objgauss.evaluation.objectstate_real_identity_rows",
         "objectstate_real_identity_rows_from_bundle",
     ),
     "objectstate_real_identity_rows_summary": (
-        "objgauss.core.objectstate_real_identity_rows",
+        "objgauss.evaluation.objectstate_real_identity_rows",
         "objectstate_real_identity_rows_summary",
     ),
     "validate_objectstate_real_identity_rows_summary": (
-        "objgauss.core.objectstate_real_identity_rows",
+        "objgauss.evaluation.objectstate_real_identity_rows",
         "validate_objectstate_real_identity_rows_summary",
     ),
     "objectstate_real_prediction_rows_from_bundle": (
-        "objgauss.core.objectstate_real_prediction_rows",
+        "objgauss.evaluation.objectstate_real_prediction_rows",
         "objectstate_real_prediction_rows_from_bundle",
     ),
     "objectstate_real_prediction_rows_summary": (
-        "objgauss.core.objectstate_real_prediction_rows",
+        "objgauss.evaluation.objectstate_real_prediction_rows",
         "objectstate_real_prediction_rows_summary",
     ),
     "validate_objectstate_real_prediction_rows_summary": (
-        "objgauss.core.objectstate_real_prediction_rows",
+        "objgauss.evaluation.objectstate_real_prediction_rows",
         "validate_objectstate_real_prediction_rows_summary",
     ),
     "objectstate_real_intervention_rows_from_bundle": (
-        "objgauss.core.objectstate_real_intervention_rows",
+        "objgauss.evaluation.objectstate_real_intervention_rows",
         "objectstate_real_intervention_rows_from_bundle",
     ),
     "objectstate_real_intervention_rows_summary": (
-        "objgauss.core.objectstate_real_intervention_rows",
+        "objgauss.evaluation.objectstate_real_intervention_rows",
         "objectstate_real_intervention_rows_summary",
     ),
     "validate_objectstate_real_intervention_rows_summary": (
-        "objgauss.core.objectstate_real_intervention_rows",
+        "objgauss.evaluation.objectstate_real_intervention_rows",
         "validate_objectstate_real_intervention_rows_summary",
     ),
     "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger",
         "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_SCHEMA",
     ),
     "write_objectstate_real_evidence_bundle_ledger": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger",
         "write_objectstate_real_evidence_bundle_ledger",
     ),
     "validate_objectstate_real_evidence_bundle_ledger_summary": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger",
         "validate_objectstate_real_evidence_bundle_ledger_summary",
     ),
     "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit",
         "OBJECTSTATE_REAL_EVIDENCE_BUNDLE_LEDGER_PACKAGE_AUDIT_SCHEMA",
     ),
     "objectstate_real_evidence_bundle_ledger_package_audit": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit",
         "objectstate_real_evidence_bundle_ledger_package_audit",
     ),
     "validate_objectstate_real_evidence_bundle_ledger_package_audit": (
-        "objgauss.core.objectstate_real_evidence_bundle_ledger_audit",
+        "objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit",
         "validate_objectstate_real_evidence_bundle_ledger_package_audit",
     ),
     "validate_objectstate_bop_cross_sample_ledger_summary": (
-        "objgauss.core.objectstate_bop_cross_sample_ledger",
+        "objgauss.pipelines.objectstate_bop_cross_sample_ledger",
         "validate_objectstate_bop_cross_sample_ledger_summary",
     ),
     "validate_objectstate_bop_local_row_batch_spec": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.datasets.objectstate_bop_local_row_batch_spec",
         "validate_objectstate_bop_local_row_batch_spec",
     ),
     "validate_objectstate_bop_local_row_batch_handoff_summary": (
-        "objgauss.core.objectstate_bop_local_row_batch_handoff",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_handoff",
         "validate_objectstate_bop_local_row_batch_handoff_summary",
     ),
     "validate_objectstate_bop_local_row_batch_spec_authoring_summary": (
-        "objgauss.core.objectstate_bop_local_row_batch_spec",
+        "objgauss.datasets.objectstate_bop_local_row_batch_authoring",
         "validate_objectstate_bop_local_row_batch_spec_authoring_summary",
     ),
     "validate_objectstate_bop_local_row_batch_readiness_summary": (
-        "objgauss.core.objectstate_bop_local_row_batch_readiness",
+        "objgauss.pipelines.objectstate_bop_local_row_batch_readiness",
         "validate_objectstate_bop_local_row_batch_readiness_summary",
     ),
     "validate_objectstate_bop_capture_condition_sidecar": (
-        "objgauss.core.objectstate_bop_capture_adapter",
+        "objgauss.datasets.objectstate_bop_capture_adapter",
         "validate_objectstate_bop_capture_condition_sidecar",
     ),
     "validate_objectstate_bop_capture_condition_sidecar_summary": (
-        "objgauss.core.objectstate_bop_capture_adapter",
+        "objgauss.datasets.objectstate_bop_capture_adapter",
         "validate_objectstate_bop_capture_condition_sidecar_summary",
     ),
     "validate_objectstate_bop_phase1_route_audit_summary": (
-        "objgauss.core.objectstate_bop_phase1_route_audit",
+        "objgauss.pipelines.objectstate_bop_phase1_route_audit",
         "validate_objectstate_bop_phase1_route_audit_summary",
     ),
     "validate_objectstate_bop_identity_route_audit_summary": (
-        "objgauss.core.objectstate_bop_identity_route_audit",
+        "objgauss.pipelines.objectstate_bop_identity_route_audit",
         "validate_objectstate_bop_identity_route_audit_summary",
     ),
     "validate_objectstate_bop_phase1_local_row_readiness_summary": (
-        "objgauss.core.objectstate_bop_phase1_local_row_readiness",
+        "objgauss.pipelines.objectstate_bop_phase1_local_row_readiness",
         "validate_objectstate_bop_phase1_local_row_readiness_summary",
     ),
     "validate_objectstate_bop_phase1_subset_selector_summary": (
-        "objgauss.core.objectstate_bop_phase1_subset_selector",
+        "objgauss.datasets.objectstate_bop_phase1_subset_selector",
         "validate_objectstate_bop_phase1_subset_selector_summary",
     ),
     "validate_objectstate_bop_phase1_batch_workspace_summary": (
-        "objgauss.core.objectstate_bop_phase1_batch_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_batch_workspace",
         "validate_objectstate_bop_phase1_batch_workspace_summary",
     ),
     "validate_objectstate_bop_phase1_sample_workspaces_summary": (
-        "objgauss.core.objectstate_bop_phase1_sample_workspace",
+        "objgauss.datasets.objectstate_bop_phase1_sample_workspace",
         "validate_objectstate_bop_phase1_sample_workspaces_summary",
     ),
     "validate_objectstate_bop_phase1_authoring_progress_summary": (
-        "objgauss.core.objectstate_bop_phase1_authoring_progress",
+        "objgauss.pipelines.objectstate_bop_phase1_authoring_progress",
         "validate_objectstate_bop_phase1_authoring_progress_summary",
     ),
     "validate_objectstate_bop_gaussian_evidence_preflight_summary": (
-        "objgauss.core.objectstate_bop_gaussian_evidence_preflight",
+        "objgauss.pipelines.objectstate_bop_gaussian_evidence_preflight",
         "validate_objectstate_bop_gaussian_evidence_preflight_summary",
     ),
     "validate_objectstate_bop_rgbd_gaussian_export_summary": (
-        "objgauss.core.objectstate_bop_rgbd_gaussian_export",
+        "objgauss.pipelines.objectstate_bop_rgbd_gaussian_export",
         "validate_objectstate_bop_rgbd_gaussian_export_summary",
     ),
     "validate_objectstate_bop_candidate_artifact_template": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "validate_objectstate_bop_candidate_artifact_template",
     ),
     "validate_objectstate_bop_candidate_artifact_template_summary": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "validate_objectstate_bop_candidate_artifact_template_summary",
     ),
     "validate_objectstate_bop_candidate_artifact_finalize_summary": (
-        "objgauss.core.objectstate_bop_candidate_artifact_template",
+        "objgauss.pipelines.objectstate_bop_candidate_artifact_template",
         "validate_objectstate_bop_candidate_artifact_finalize_summary",
     ),
     "validate_objectstate_bop_baseline_candidate_summary": (
-        "objgauss.core.objectstate_bop_baseline_candidate",
+        "objgauss.pipelines.objectstate_bop_baseline_candidate",
         "validate_objectstate_bop_baseline_candidate_summary",
     ),
     "validate_objectstate_controlled_prediction_candidates_template": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_prediction_candidates_template",
     ),
     "validate_objectstate_controlled_intervention_candidates_template": (
-        "objgauss.core.objectstate_controlled_reality_candidate_template",
+        "objgauss.pipelines.objectstate_controlled_reality_candidate_template",
         "validate_objectstate_controlled_intervention_candidates_template",
     ),
     "validate_objectstate_controlled_prediction_candidates": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "validate_objectstate_controlled_prediction_candidates",
     ),
     "validate_objectstate_controlled_prediction_eval_summary": (
-        "objgauss.core.objectstate_controlled_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_prediction_eval",
         "validate_objectstate_controlled_prediction_eval_summary",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.datasets.objectstate_controlled_real_manifest",
         "OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.evaluation.objectstate_controlled_real_rows",
         "OBJECTSTATE_CONTROLLED_REAL_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA": (
-        "objgauss.core.controlled_schema",
+        "objgauss.datasets.controlled_schema",
         "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SCHEMA",
     ),
     "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA": (
-        "objgauss.core.controlled_schema",
+        "objgauss.datasets.controlled_schema",
         "OBJECTSTATE_CONTROLLED_DATASET_CONTRACT_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "OBJECTSTATE_TEACHER_EVIDENCE_BATCH_SCHEMA",
     ),
     "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SCHEMA",
     ),
     "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_teacher_evidence",
+        "objgauss.datasets.objectstate_teacher_evidence",
         "OBJECTSTATE_TEACHER_EVIDENCE_CONTRACT_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA": (
-        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objgauss.evaluation.objectstate_teacher_evidence_leakage_audit",
         "OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA",
     ),
     "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS": (
-        "objgauss.core.objectstate_teacher_evidence_leakage_audit",
+        "objgauss.evaluation.objectstate_teacher_evidence_leakage_audit",
         "TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS",
     ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SCHEMA": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_CONTRACT_SUMMARY_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_REQUIRED_POLICY": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_REQUIRED_POLICY",
     ),
     "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA": (
-        "objgauss.core.objectstate_assignment_long_smoke_contract",
+        "objgauss.pipelines.objectstate_assignment_long_smoke_contract",
         "OBJECTSTATE_ASSIGNMENT_LONG_SMOKE_SUCCESS_CRITERIA",
     ),
     "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA": (
-        "objgauss.core.objectstate_assignment_mvp",
+        "objgauss.pipelines.objectstate_assignment_mvp",
         "OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA": (
-        "objgauss.core.objectstate_assignment_train",
+        "objgauss.pipelines.objectstate_assignment_train",
         "OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_GENERALIZATION_SCHEMA": (
-        "objgauss.core.objectstate_assignment_generalization",
+        "objgauss.pipelines.objectstate_assignment_generalization",
         "OBJECTSTATE_ASSIGNMENT_GENERALIZATION_SCHEMA",
     ),
     "OBJECTSTATE_ASSIGNMENT_ABLATION_SCHEMA": (
-        "objgauss.core.objectstate_assignment_ablation",
+        "objgauss.pipelines.objectstate_assignment_ablation",
         "OBJECTSTATE_ASSIGNMENT_ABLATION_SCHEMA",
     ),
     "ObjectIdentityOracle": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "ObjectIdentityOracle",
     ),
     "ObjectIdentityRecord": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "ObjectIdentityRecord",
     ),
     "FailureModeClassifier": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "FailureModeClassifier",
     ),
     "FailureModeEvent": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "FailureModeEvent",
     ),
     "GaussianCloud": ("objgauss.core.gaussian", "GaussianCloud"),
     "IdentitySlotObservation": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "IdentitySlotObservation",
     ),
     "ObjectField": ("objgauss.core.object_field", "ObjectField"),
     "ObservationModelConfig": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "ObservationModelConfig",
     ),
     "ObjectStateGaussianDecode": (
@@ -1453,115 +1453,115 @@ _EXPORTS = {
         "ObjectStateGaussianDecode",
     ),
     "ObjectStateGaussianDecoderLoss": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "ObjectStateGaussianDecoderLoss",
     ),
     "ObjectStateGaussianDecoderState": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "ObjectStateGaussianDecoderState",
     ),
     "ObjectStateGaussianDecoderTrainingResult": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "ObjectStateGaussianDecoderTrainingResult",
     ),
     "SolverDecoderJointLoss": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "SolverDecoderJointLoss",
     ),
     "SolverDecoderJointTrainingResult": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "SolverDecoderJointTrainingResult",
     ),
     "SyntheticObservationFrame": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "SyntheticObservationFrame",
     ),
     "SyntheticStabilityScenarioFixture": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "SyntheticStabilityScenarioFixture",
     ),
     "SyntheticStabilityDiagnosticsReport": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "SyntheticStabilityDiagnosticsReport",
     ),
     "SyntheticStabilityGateReport": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "SyntheticStabilityGateReport",
     ),
     "SyntheticStabilitySuiteGateReport": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "SyntheticStabilitySuiteGateReport",
     ),
     "SyntheticWorldFrame": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "SyntheticWorldFrame",
     ),
     "SyntheticWorldObject": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "SyntheticWorldObject",
     ),
     "SyntheticWorldState": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "SyntheticWorldState",
     ),
     "solver_decoder_joint_checkpoint": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "solver_decoder_joint_checkpoint",
     ),
     "ObjectState": ("objgauss.core.object_state", "ObjectState"),
     "ObjectStateAction": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "ObjectStateAction",
     ),
     "ObjectStateCausalGateReport": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "ObjectStateCausalGateReport",
     ),
     "ObjectStateCausalGateThresholds": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "ObjectStateCausalGateThresholds",
     ),
     "ObjectStateCausalRow": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "ObjectStateCausalRow",
     ),
     "OBJECTSTATE_REALITY_EVIDENCE_KINDS": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_EVIDENCE_KINDS",
     ),
     "OBJECTSTATE_REALITY_GATE_SCHEMA": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_GATE_SCHEMA",
     ),
     "OBJECTSTATE_REALITY_ROW_SCHEMA": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_ROW_SCHEMA",
     ),
     "OBJECTSTATE_REALITY_ROW_STATUSES": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_ROW_STATUSES",
     ),
     "OBJECTSTATE_REALITY_SOURCE_KINDS": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "OBJECTSTATE_REALITY_SOURCE_KINDS",
     ),
     "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "OBJECTSTATE_REALITY_PUBLIC_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA": (
-        "objgauss.core.objectstate_bop_reality_rows",
+        "objgauss.evaluation.objectstate_bop_reality_rows",
         "OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA",
     ),
     "OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA": (
-        "objgauss.core.objectstate_reality_row_ledger",
+        "objgauss.evaluation.objectstate_reality_row_ledger",
         "OBJECTSTATE_REALITY_ROW_LEDGER_SCHEMA",
     ),
     "ObjectStateMatch": ("objgauss.core.object_state", "ObjectStateMatch"),
     "ObjectStateProjection": ("objgauss.core.object_state", "ObjectStateProjection"),
     "ObjectStabilityReport": ("objgauss.core.object_state", "ObjectStabilityReport"),
     "OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA": (
-        "objgauss.core.object_state_eval",
+        "objgauss.evaluation.object_state_eval",
         "OBJECTSTATE_CHECKPOINT_EVAL_SCHEMA",
     ),
     "ObjectTemporalMatchReport": ("objgauss.core.object_state", "ObjectTemporalMatchReport"),
@@ -1598,7 +1598,7 @@ _EXPORTS = {
         "ASSIGNMENT_MVP_TRAINING_SCHEMA",
     ),
     "ASSIGNMENT_STABILITY_EVAL_SCHEMA": (
-        "objgauss.core.assignment_stability",
+        "objgauss.evaluation.assignment_stability",
         "ASSIGNMENT_STABILITY_EVAL_SCHEMA",
     ),
     "ASSIGNMENT_SOLVER_V2_COST_TERMS": (
@@ -1618,95 +1618,95 @@ _EXPORTS = {
         "ASSIGNMENT_SOLVER_V2_TRAINING_SCHEMA",
     ),
     "ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.core.assignment_solver_v2",
         "ASSIGNMENT_SOLVER_V2_CHECKPOINT_SCHEMA",
     ),
     "ASSIGNMENT_SOLVER_V2_STABILITY_EVAL_SCHEMA": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.evaluation.assignment_solver_v2_eval",
         "ASSIGNMENT_SOLVER_V2_STABILITY_EVAL_SCHEMA",
     ),
     "ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA": (
-        "objgauss.core.assignment_v2_renderer_validation",
+        "objgauss.pipelines.assignment_v2_renderer_validation",
         "ASSIGNMENT_V2_RENDER_JOINT_VALIDATION_SCHEMA",
     ),
     "CORE_MODEL_TRAIN_VALIDATE_SCHEMA": (
-        "objgauss.core.core_model_validation",
+        "objgauss.pipelines.core_model_validation",
         "CORE_MODEL_TRAIN_VALIDATE_SCHEMA",
     ),
     "REAL_SAMPLE_V2_SMOKE_SCHEMA": (
-        "objgauss.core.real_sample_v2_smoke",
+        "objgauss.pipelines.real_sample_v2_smoke",
         "REAL_SAMPLE_V2_SMOKE_SCHEMA",
     ),
     "REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA": (
-        "objgauss.core.real_sample_v2_diagnostics",
+        "objgauss.pipelines.real_sample_v2_diagnostics",
         "REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA",
     ),
     "REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "REAL_SAMPLE_V2_EFFECT_PREVIEW_SCHEMA",
     ),
     "REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA",
     ),
     "REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA": (
-        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "objgauss.pipelines.real_sample_v2_full_cloud_purity",
         "REAL_SAMPLE_V2_FULL_CLOUD_PURITY_SCHEMA",
     ),
     "REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "REAL_SAMPLE_V2_SEGMENTATION_QUALITY_SCHEMA",
     ),
     "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA": (
-        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "objgauss.pipelines.real_sample_v2_weak_boundary_opt",
         "REAL_SAMPLE_V2_WEAK_BOUNDARY_OPT_SCHEMA",
     ),
     "REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA": (
-        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample",
         "REAL_SAMPLE_V2_PROMOTED_WEIGHTS_CROSS_SAMPLE_SCHEMA",
     ),
     "REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA": (
-        "objgauss.core.real_sample_v2_sample_aware_weight_policy",
+        "objgauss.pipelines.real_sample_v2_sample_aware_weight_policy",
         "REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA",
     ),
     "REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA": (
-        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample",
         "REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA",
     ),
     "V2_STABILITY_FOUNDATION_SCHEMA": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "V2_STABILITY_FOUNDATION_SCHEMA",
     ),
     "V2_SYNTHETIC_OBSERVATION_SCHEMA": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "V2_SYNTHETIC_OBSERVATION_SCHEMA",
     ),
     "V2_STABILITY_SCENARIO_FIXTURE_SCHEMA": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "V2_STABILITY_SCENARIO_FIXTURE_SCHEMA",
     ),
     "V2_STABILITY_SCENARIO_KINDS": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "V2_STABILITY_SCENARIO_KINDS",
     ),
     "V2_STABILITY_DIAGNOSTICS_SCHEMA": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "V2_STABILITY_DIAGNOSTICS_SCHEMA",
     ),
     "V2_STABILITY_FAILURE_MODES": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "V2_STABILITY_FAILURE_MODES",
     ),
     "V2_STABILITY_GATE_HARD_CHECKS": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "V2_STABILITY_GATE_HARD_CHECKS",
     ),
     "V2_STABILITY_GATE_SCHEMA": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "V2_STABILITY_GATE_SCHEMA",
     ),
     "V2_STABILITY_GATE_SUITE_SCHEMA": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "V2_STABILITY_GATE_SUITE_SCHEMA",
     ),
     "assignment_mvp_training_summary": (
@@ -1718,112 +1718,115 @@ _EXPORTS = {
         "object_emergence_solver_checkpoint",
     ),
     "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA": (
-        "objgauss.core.object_state_benchmark",
+        "objgauss.evaluation.object_state_benchmark",
         "OBJECT_STATE_STABILITY_BENCHMARK_SCHEMA",
     ),
     "OBJECTSTATE_ACTION_SCHEMA": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "OBJECTSTATE_ACTION_SCHEMA",
     ),
     "OBJECTSTATE_CAUSAL_ACTIONS": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "OBJECTSTATE_CAUSAL_ACTIONS",
     ),
     "OBJECTSTATE_CAUSAL_GATE_SCHEMA": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "OBJECTSTATE_CAUSAL_GATE_SCHEMA",
     ),
     "OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA",
     ),
     "OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA",
     ),
     "OBJECTSTATE_IDENTITY_DATASET_SCHEMA": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "OBJECTSTATE_IDENTITY_DATASET_SCHEMA",
     ),
     "OBJECTSTATE_IDENTITY_GATE_SCHEMA": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "OBJECTSTATE_IDENTITY_GATE_SCHEMA",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA": (
-        "objgauss.core.objectstate_model_identity_gate",
+        "objgauss.evaluation.objectstate_model_identity_gate",
         "OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_BASELINES": (
-        "objgauss.core.objectstate_model_identity_gate",
+        "objgauss.evaluation.objectstate_model_identity_gate",
         "OBJECTSTATE_MODEL_IDENTITY_BASELINES",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_SCHEMA",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_PERTURBATIONS",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA": (
-        "objgauss.core.objectstate_model_identity_benchmark_report",
+        "objgauss.evaluation.objectstate_model_identity_benchmark_report",
         "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES": (
-        "objgauss.core.objectstate_model_identity_benchmark_report",
+        "objgauss.evaluation.objectstate_model_identity_benchmark_report",
         "OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES",
     ),
     "OBJECTSTATE_MODEL_IDENTITY_ABLATION_SCHEMA": (
-        "objgauss.core.objectstate_model_identity_ablation",
+        "objgauss.evaluation.objectstate_model_identity_ablation",
         "OBJECTSTATE_MODEL_IDENTITY_ABLATION_SCHEMA",
     ),
     "DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES": (
-        "objgauss.core.objectstate_model_identity_ablation",
+        "objgauss.evaluation.objectstate_model_identity_ablation",
         "DEFAULT_OBJECTSTATE_MODEL_IDENTITY_ABLATION_POLICIES",
     ),
     "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "OBJECTSTATE_PREDICTIVE_GATE_SCHEMA",
     ),
-    "TrainableKernelCamera": ("objgauss.core.trainable_kernel", "TrainableKernelCamera"),
-    "TrainableKernelFrame": ("objgauss.core.trainable_kernel", "TrainableKernelFrame"),
+    "TrainableKernelCamera": ("objgauss.pipelines.trainable_kernel", "TrainableKernelCamera"),
+    "TrainableKernelFrame": ("objgauss.pipelines.trainable_kernel", "TrainableKernelFrame"),
     "TrainableKernelImageTarget": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "TrainableKernelImageTarget",
     ),
-    "TrainableKernelLoss": ("objgauss.core.trainable_kernel", "TrainableKernelLoss"),
-    "TrainableKernelResult": ("objgauss.core.trainable_kernel", "TrainableKernelResult"),
-    "TrainableKernelSample": ("objgauss.core.trainable_kernel", "TrainableKernelSample"),
+    "TrainableKernelLoss": ("objgauss.pipelines.trainable_kernel", "TrainableKernelLoss"),
+    "TrainableKernelResult": ("objgauss.pipelines.trainable_kernel", "TrainableKernelResult"),
+    "TrainableKernelSample": ("objgauss.pipelines.trainable_kernel", "TrainableKernelSample"),
     "TRAINABLE_QUALITY_REPORT_SCHEMA": (
-        "objgauss.core.trainable_quality",
+        "objgauss.pipelines.trainable_quality",
         "TRAINABLE_QUALITY_REPORT_SCHEMA",
     ),
     "GsplatRendererAvailability": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "GsplatRendererAvailability",
     ),
     "GsplatTrainingInput": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "GsplatTrainingInput",
     ),
     "TrainingRendererFrameLoss": (
-        "objgauss.core.training_renderer",
+        "objgauss.pipelines.training_renderer",
         "TrainingRendererFrameLoss",
     ),
     "TrainingRendererLossResult": (
-        "objgauss.core.training_renderer",
+        "objgauss.pipelines.training_renderer",
         "TrainingRendererLossResult",
     ),
     "TRAINING_SCALE_PLAN_SCHEMA": (
-        "objgauss.core.training_scale",
+        "objgauss.pipelines.training_scale",
         "TRAINING_SCALE_PLAN_SCHEMA",
     ),
     "TENSORBOARD_SCALAR_EXPORT_SCHEMA": (
-        "objgauss.core.training_tensorboard",
+        "objgauss.pipelines.training_tensorboard",
         "TENSORBOARD_SCALAR_EXPORT_SCHEMA",
     ),
-    "RendererLossBoundaryReport": ("objgauss.core.renderer_loss", "RendererLossBoundaryReport"),
-    "align_mask_manifest_slots": ("objgauss.core.semantics", "align_mask_manifest_slots"),
+    "RendererLossBoundaryReport": ("objgauss.pipelines.renderer_loss", "RendererLossBoundaryReport"),
+    "align_mask_manifest_slots": (
+        "objgauss.pipelines.semantic_slots",
+        "align_mask_manifest_slots",
+    ),
     "append_or_replace_property": ("objgauss.core.io", "append_or_replace_property"),
     "assign_object_ids": ("objgauss.core.objects", "assign_object_ids"),
     "attach_hard_labels": ("objgauss.core.object_field", "attach_hard_labels"),
@@ -1831,11 +1834,11 @@ _EXPORTS = {
     "attach_quantization_metadata": ("objgauss.core.quantization", "attach_quantization_metadata"),
     "build_chunk_index": ("objgauss.core.chunk_index", "build_chunk_index"),
     "build_gsplat_training_input": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "build_gsplat_training_input",
     ),
     "build_gsplat_training_input_from_object_state": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "build_gsplat_training_input_from_object_state",
     ),
     "cluster_features": ("objgauss.core.clustering", "cluster_features"),
@@ -1843,7 +1846,7 @@ _EXPORTS = {
     "filter_objects": ("objgauss.core.objects", "filter_objects"),
     "initialize_object_field": ("objgauss.core.object_field", "initialize_object_field"),
     "bind_image_targets_to_frames": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "bind_image_targets_to_frames",
     ),
     "bind_object_states_to_artifact": ("objgauss.core.object_state", "bind_object_states_to_artifact"),
@@ -1854,7 +1857,7 @@ _EXPORTS = {
         "decode_gaussian_from_object_state",
     ),
     "diagnose_synthetic_stability_fixture": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "diagnose_synthetic_stability_fixture",
     ),
     "evidence_from_gaussian_cloud": (
@@ -1862,15 +1865,15 @@ _EXPORTS = {
         "evidence_from_gaussian_cloud",
     ),
     "evaluate_training_renderer_loss": (
-        "objgauss.core.training_renderer",
+        "objgauss.pipelines.training_renderer",
         "evaluate_training_renderer_loss",
     ),
     "evaluate_gsplat_training_renderer_loss": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "evaluate_gsplat_training_renderer_loss",
     ),
     "gsplat_renderer_availability": (
-        "objgauss.core.gsplat_training_renderer",
+        "objgauss.pipelines.gsplat_training_renderer",
         "gsplat_renderer_availability",
     ),
     "initialize_object_emergence_solver": (
@@ -1878,307 +1881,307 @@ _EXPORTS = {
         "initialize_object_emergence_solver",
     ),
     "initialize_object_state_gaussian_decoder": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "initialize_object_state_gaussian_decoder",
     ),
     "make_trainable_kernel_mvp_fixture": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "make_trainable_kernel_mvp_fixture",
     ),
     "make_trainable_image_target": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "make_trainable_image_target",
     ),
     "make_object_identity_oracle": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "make_object_identity_oracle",
     ),
     "make_synthetic_world_state": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "make_synthetic_world_state",
     ),
     "make_synthetic_stability_scenario_fixture": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "make_synthetic_stability_scenario_fixture",
     ),
     "make_synthetic_stability_scenario_suite": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "make_synthetic_stability_scenario_suite",
     ),
     "match_object_states": ("objgauss.core.object_state", "match_object_states"),
     "object_emergence_metrics": ("objgauss.core.evaluation", "object_emergence_metrics"),
     "object_state_delivery_summary": ("objgauss.core.object_state", "object_state_delivery_summary"),
     "object_state_stability_benchmark": (
-        "objgauss.core.object_state_benchmark",
+        "objgauss.evaluation.object_state_benchmark",
         "object_state_stability_benchmark",
     ),
     "object_state_stability_report": ("objgauss.core.object_state", "object_state_stability_report"),
     "evaluate_solver_decoder_object_states": (
-        "objgauss.core.object_state_eval",
+        "objgauss.evaluation.object_state_eval",
         "evaluate_solver_decoder_object_states",
     ),
     "evaluate_assignment_stability": (
-        "objgauss.core.assignment_stability",
+        "objgauss.evaluation.assignment_stability",
         "evaluate_assignment_stability",
     ),
     "evaluate_synthetic_stability_gate": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "evaluate_synthetic_stability_gate",
     ),
     "evaluate_synthetic_stability_suite_gate": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "evaluate_synthetic_stability_suite_gate",
     ),
     "evaluate_objectstate_identity_gate": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "evaluate_objectstate_identity_gate",
     ),
     "objectstate_model_identity_gate_summary": (
-        "objgauss.core.objectstate_model_identity_gate",
+        "objgauss.evaluation.objectstate_model_identity_gate",
         "objectstate_model_identity_gate_summary",
     ),
     "objectstate_model_identity_benchmark_summary": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "objectstate_model_identity_benchmark_summary",
     ),
     "write_objectstate_model_identity_benchmark_report": (
-        "objgauss.core.objectstate_model_identity_benchmark_report",
+        "objgauss.evaluation.objectstate_model_identity_benchmark_report",
         "write_objectstate_model_identity_benchmark_report",
     ),
     "objectstate_model_identity_ablation_summary": (
-        "objgauss.core.objectstate_model_identity_ablation",
+        "objgauss.evaluation.objectstate_model_identity_ablation",
         "objectstate_model_identity_ablation_summary",
     ),
     "evaluate_objectstate_causal_gate": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "evaluate_objectstate_causal_gate",
     ),
     "evaluate_objectstate_predictive_gate": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "evaluate_objectstate_predictive_gate",
     ),
     "evaluate_objectstate_reality_gate": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "evaluate_objectstate_reality_gate",
     ),
     "default_objectstate_reality_public_artifacts": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "default_objectstate_reality_public_artifacts",
     ),
     "evaluate_public_artifact_reality_gate": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "evaluate_public_artifact_reality_gate",
     ),
     "evaluate_controlled_real_manifest_reality_gate": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.evaluation.objectstate_controlled_real_rows",
         "evaluate_controlled_real_manifest_reality_gate",
     ),
     "objectstate_controlled_capture_summary": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "objectstate_controlled_capture_summary",
     ),
     "objectstate_controlled_real_manifest_from_capture_manifest": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "objectstate_controlled_real_manifest_from_capture_manifest",
     ),
     "evaluate_objectstate_controlled_identity_predictions": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "evaluate_objectstate_controlled_identity_predictions",
     ),
     "initialize_objectstate_identity_encoder_state": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "initialize_objectstate_identity_encoder_state",
     ),
     "objectstate_identity_encoder_features": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "objectstate_identity_encoder_features",
     ),
     "train_objectstate_identity_encoder": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "train_objectstate_identity_encoder",
     ),
     "validate_objectstate_identity_gate_summary": (
-        "objgauss.core.objectstate_identity_gate",
+        "objgauss.evaluation.objectstate_identity_gate",
         "validate_objectstate_identity_gate_summary",
     ),
     "validate_objectstate_model_identity_gate_summary": (
-        "objgauss.core.objectstate_model_identity_gate",
+        "objgauss.evaluation.objectstate_model_identity_gate",
         "validate_objectstate_model_identity_gate_summary",
     ),
     "validate_objectstate_model_identity_benchmark_summary": (
-        "objgauss.core.objectstate_model_identity_benchmark",
+        "objgauss.evaluation.objectstate_model_identity_benchmark",
         "validate_objectstate_model_identity_benchmark_summary",
     ),
     "validate_objectstate_model_identity_benchmark_report_summary": (
-        "objgauss.core.objectstate_model_identity_benchmark_report",
+        "objgauss.evaluation.objectstate_model_identity_benchmark_report",
         "validate_objectstate_model_identity_benchmark_report_summary",
     ),
     "validate_objectstate_model_identity_ablation_summary": (
-        "objgauss.core.objectstate_model_identity_ablation",
+        "objgauss.evaluation.objectstate_model_identity_ablation",
         "validate_objectstate_model_identity_ablation_summary",
     ),
     "validate_objectstate_predictive_gate_summary": (
-        "objgauss.core.objectstate_predictive_gate",
+        "objgauss.evaluation.objectstate_predictive_gate",
         "validate_objectstate_predictive_gate_summary",
     ),
     "validate_objectstate_identity_encoder_training_summary": (
-        "objgauss.core.objectstate_identity_encoder",
+        "objgauss.pipelines.objectstate_identity_encoder",
         "validate_objectstate_identity_encoder_training_summary",
     ),
     "validate_objectstate_causal_gate_summary": (
-        "objgauss.core.objectstate_causal_gate",
+        "objgauss.evaluation.objectstate_causal_gate",
         "validate_objectstate_causal_gate_summary",
     ),
     "objectstate_reality_blocked_rows_markdown": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "objectstate_reality_blocked_rows_markdown",
     ),
     "objectstate_reality_public_rows_summary": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "objectstate_reality_public_rows_summary",
     ),
     "objectstate_reality_rows_from_public_artifacts": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "objectstate_reality_rows_from_public_artifacts",
     ),
     "objectstate_controlled_real_rows_summary": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.evaluation.objectstate_controlled_real_rows",
         "objectstate_controlled_real_rows_summary",
     ),
     "objectstate_controlled_real_prediction_eval": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_eval",
     ),
     "objectstate_controlled_real_prediction_eval_from_files": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_eval_from_files",
     ),
     "objectstate_controlled_real_prediction_report": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_report",
     ),
     "objectstate_controlled_real_prediction_accounting_csv": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_accounting_csv",
     ),
     "objectstate_controlled_real_prediction_errors_csv": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_errors_csv",
     ),
     "objectstate_controlled_real_prediction_artifact_manifest": (
-        "objgauss.core.objectstate_controlled_real_prediction_eval",
+        "objgauss.evaluation.objectstate_controlled_real_prediction_eval",
         "objectstate_controlled_real_prediction_artifact_manifest",
     ),
     "objectstate_reality_rows_from_controlled_real_manifest": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.evaluation.objectstate_controlled_real_rows",
         "objectstate_reality_rows_from_controlled_real_manifest",
     ),
     "read_objectstate_controlled_real_manifest": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.datasets.objectstate_controlled_real_manifest",
         "read_objectstate_controlled_real_manifest",
     ),
     "read_objectstate_controlled_capture_manifest": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "read_objectstate_controlled_capture_manifest",
     ),
     "read_objectstate_controlled_identity_predictions": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "read_objectstate_controlled_identity_predictions",
     ),
     "read_trainable_kernel_identity_source": (
-        "objgauss.core.objectstate_identity_prediction_adapter",
+        "objgauss.pipelines.objectstate_identity_prediction_adapter",
         "read_trainable_kernel_identity_source",
     ),
     "objectstate_identity_predictions_from_trainable_artifact": (
-        "objgauss.core.objectstate_identity_prediction_adapter",
+        "objgauss.pipelines.objectstate_identity_prediction_adapter",
         "objectstate_identity_predictions_from_trainable_artifact",
     ),
     "objectstate_controlled_identity_handoff": (
-        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_handoff",
         "objectstate_controlled_identity_handoff",
     ),
     "objectstate_controlled_identity_bundle_handoff": (
-        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_bundle_handoff",
         "objectstate_controlled_identity_bundle_handoff",
     ),
     "objectstate_controlled_capture_file_audit": (
-        "objgauss.core.objectstate_controlled_capture_files",
+        "objgauss.datasets.objectstate_controlled_capture_files",
         "objectstate_controlled_capture_file_audit",
     ),
     "objectstate_controlled_capture_missing_files_markdown": (
-        "objgauss.core.objectstate_controlled_capture_files",
+        "objgauss.datasets.objectstate_controlled_capture_files",
         "objectstate_controlled_capture_missing_files_markdown",
     ),
     "validate_objectstate_controlled_capture_manifest": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_manifest",
     ),
     "validate_objectstate_controlled_capture_summary": (
-        "objgauss.core.objectstate_controlled_capture",
+        "objgauss.datasets.objectstate_controlled_capture",
         "validate_objectstate_controlled_capture_summary",
     ),
     "validate_objectstate_controlled_capture_file_audit_summary": (
-        "objgauss.core.objectstate_controlled_capture_files",
+        "objgauss.datasets.objectstate_controlled_capture_files",
         "validate_objectstate_controlled_capture_file_audit_summary",
     ),
     "validate_objectstate_controlled_identity_eval_summary": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "validate_objectstate_controlled_identity_eval_summary",
     ),
     "validate_objectstate_controlled_identity_handoff_summary": (
-        "objgauss.core.objectstate_controlled_identity_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_handoff",
         "validate_objectstate_controlled_identity_handoff_summary",
     ),
     "validate_objectstate_controlled_identity_bundle_handoff_summary": (
-        "objgauss.core.objectstate_controlled_identity_bundle_handoff",
+        "objgauss.pipelines.objectstate_controlled_identity_bundle_handoff",
         "validate_objectstate_controlled_identity_bundle_handoff_summary",
     ),
     "validate_objectstate_controlled_identity_predictions": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "validate_objectstate_controlled_identity_predictions",
     ),
     "validate_objectstate_controlled_identity_thresholds": (
-        "objgauss.core.objectstate_controlled_identity_eval",
+        "objgauss.evaluation.objectstate_controlled_identity_eval",
         "validate_objectstate_controlled_identity_thresholds",
     ),
     "validate_objectstate_controlled_real_manifest": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.datasets.objectstate_controlled_real_manifest",
         "validate_objectstate_controlled_real_manifest",
     ),
     "validate_objectstate_controlled_real_rows_summary": (
-        "objgauss.core.objectstate_controlled_real_rows",
+        "objgauss.evaluation.objectstate_controlled_real_rows",
         "validate_objectstate_controlled_real_rows_summary",
     ),
     "validate_objectstate_reality_gate_summary": (
-        "objgauss.core.objectstate_reality_gate",
+        "objgauss.evaluation.objectstate_reality_gate",
         "validate_objectstate_reality_gate_summary",
     ),
     "validate_objectstate_reality_public_rows_summary": (
-        "objgauss.core.objectstate_reality_public_rows",
+        "objgauss.evaluation.objectstate_reality_public_rows",
         "validate_objectstate_reality_public_rows_summary",
     ),
     "evaluate_assignment_solver_v2_stability": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.evaluation.assignment_solver_v2_eval",
         "evaluate_assignment_solver_v2_stability",
     ),
     "evaluate_assignment_v2_renderer_joint": (
-        "objgauss.core.assignment_v2_renderer_validation",
+        "objgauss.pipelines.assignment_v2_renderer_validation",
         "evaluate_assignment_v2_renderer_joint",
     ),
     "evaluate_real_sample_v2_smoke": (
-        "objgauss.core.real_sample_v2_smoke",
+        "objgauss.pipelines.real_sample_v2_smoke",
         "evaluate_real_sample_v2_smoke",
     ),
     "evaluate_real_sample_v2_diagnostics": (
-        "objgauss.core.real_sample_v2_diagnostics",
+        "objgauss.pipelines.real_sample_v2_diagnostics",
         "evaluate_real_sample_v2_diagnostics",
     ),
     "evaluate_real_sample_v2_model_handoff": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "evaluate_real_sample_v2_model_handoff",
     ),
     "core_model_train_validate_report": (
-        "objgauss.core.core_model_validation",
+        "objgauss.pipelines.core_model_validation",
         "core_model_train_validate_report",
     ),
     "initialize_assignment_solver_v2": (
@@ -2186,7 +2189,7 @@ _EXPORTS = {
         "initialize_assignment_solver_v2",
     ),
     "expected_slots_for_synthetic_fixture": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "expected_slots_for_synthetic_fixture",
     ),
     "object_id_targets_from_cloud": (
@@ -2210,76 +2213,79 @@ _EXPORTS = {
     "project_points": ("objgauss.core.projection", "project_points"),
     "read_ply": ("objgauss.core.io", "read_ply"),
     "real_sample_v2_smoke_from_cloud": (
-        "objgauss.core.real_sample_v2_smoke",
+        "objgauss.pipelines.real_sample_v2_smoke",
         "real_sample_v2_smoke_from_cloud",
     ),
     "real_sample_v2_diagnostics_from_cloud": (
-        "objgauss.core.real_sample_v2_diagnostics",
+        "objgauss.pipelines.real_sample_v2_diagnostics",
         "real_sample_v2_diagnostics_from_cloud",
     ),
     "real_sample_v2_model_handoff_from_cloud": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "real_sample_v2_model_handoff_from_cloud",
     ),
     "real_sample_v2_viewer_preview_from_cloud": (
-        "objgauss.core.real_sample_v2_viewer_preview",
+        "objgauss.pipelines.real_sample_v2_viewer_preview",
         "real_sample_v2_viewer_preview_from_cloud",
     ),
     "real_sample_v2_viewer_preview_from_handoff": (
-        "objgauss.core.real_sample_v2_viewer_preview",
+        "objgauss.pipelines.real_sample_v2_viewer_preview",
         "real_sample_v2_viewer_preview_from_handoff",
     ),
     "real_sample_v2_full_cloud_purity_from_cloud": (
-        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "objgauss.pipelines.real_sample_v2_full_cloud_purity",
         "real_sample_v2_full_cloud_purity_from_cloud",
     ),
     "real_sample_v2_segmentation_quality_from_cloud": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "real_sample_v2_segmentation_quality_from_cloud",
     ),
     "real_sample_v2_segmentation_quality_from_projected_cloud": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "real_sample_v2_segmentation_quality_from_projected_cloud",
     ),
     "real_sample_v2_segmentation_quality_from_purity_report": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "real_sample_v2_segmentation_quality_from_purity_report",
     ),
     "real_sample_v2_weak_boundary_opt_from_cloud": (
-        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "objgauss.pipelines.real_sample_v2_weak_boundary_opt",
         "real_sample_v2_weak_boundary_opt_from_cloud",
     ),
     "real_sample_v2_promoted_weights_cross_sample_from_cloud": (
-        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample",
         "real_sample_v2_promoted_weights_cross_sample_from_cloud",
     ),
     "real_sample_v2_sample_aware_weight_policy_from_cloud": (
-        "objgauss.core.real_sample_v2_sample_aware_weight_policy",
+        "objgauss.pipelines.real_sample_v2_sample_aware_weight_policy",
         "real_sample_v2_sample_aware_weight_policy_from_cloud",
     ),
     "real_sample_v2_bounded_normalization_cross_sample_from_clouds": (
-        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample",
         "real_sample_v2_bounded_normalization_cross_sample_from_clouds",
     ),
     "render_real_sample_v2_model_handoff_html": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "render_real_sample_v2_model_handoff_html",
     ),
     "read_splat": ("objgauss.core.io", "read_splat"),
     "renderer_loss_boundary_report": (
-        "objgauss.core.renderer_loss",
+        "objgauss.pipelines.renderer_loss",
         "renderer_loss_boundary_report",
     ),
-    "score_mask_manifest_with_clip": ("objgauss.core.semantics", "score_mask_manifest_with_clip"),
+    "score_mask_manifest_with_clip": (
+        "objgauss.pipelines.clip_scoring",
+        "score_mask_manifest_with_clip",
+    ),
     "solver_decoder_training_scale_plan": (
-        "objgauss.core.training_scale",
+        "objgauss.pipelines.training_scale",
         "solver_decoder_training_scale_plan",
     ),
     "image_target_contract_summary": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "image_target_contract_summary",
     ),
-    "train_kernel_mvp": ("objgauss.core.trainable_kernel", "train_kernel_mvp"),
+    "train_kernel_mvp": ("objgauss.pipelines.trainable_kernel", "train_kernel_mvp"),
     "train_object_emergence_solver": (
         "objgauss.core.object_emergence_solver",
         "train_object_emergence_solver",
@@ -2289,30 +2295,30 @@ _EXPORTS = {
         "train_assignment_solver_v2",
     ),
     "train_kernel_mvp_from_cloud": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "train_kernel_mvp_from_cloud",
     ),
     "train_object_state_gaussian_decoder": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "train_object_state_gaussian_decoder",
     ),
     "train_solver_decoder_joint": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "train_solver_decoder_joint",
     ),
     "trainable_kernel_model_artifact": (
-        "objgauss.core.trainable_artifact",
+        "objgauss.pipelines.trainable_artifact",
         "trainable_kernel_model_artifact",
     ),
     "trainable_quality_report": (
-        "objgauss.core.trainable_quality",
+        "objgauss.pipelines.trainable_quality",
         "trainable_quality_report",
     ),
     "trainable_kernel_sample_from_cloud": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "trainable_kernel_sample_from_cloud",
     ),
-    "validate_mask_manifest": ("objgauss.core.masks", "validate_mask_manifest"),
+    "validate_mask_manifest": ("objgauss.datasets.masks", "validate_mask_manifest"),
     "validate_assignment_matrix": ("objgauss.core.object_state", "validate_assignment_matrix"),
     "validate_object_emergence_evidence": (
         "objgauss.core.object_emergence_solver",
@@ -2331,11 +2337,11 @@ _EXPORTS = {
         "assignment_solver_v2_state_from_dict",
     ),
     "assignment_solver_v2_checkpoint": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.core.assignment_solver_v2",
         "assignment_solver_v2_checkpoint",
     ),
     "assignment_solver_v2_state_from_checkpoint": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.core.assignment_solver_v2",
         "assignment_solver_v2_state_from_checkpoint",
     ),
     "assignment_balance_loss_and_gradient": (
@@ -2371,7 +2377,7 @@ _EXPORTS = {
         "supervised_assignment_loss_and_gradient",
     ),
     "object_state_gaussian_decoder_state_from_dict": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "object_state_gaussian_decoder_state_from_dict",
     ),
     "object_scale_multipliers_from_log_offsets": (
@@ -2379,11 +2385,11 @@ _EXPORTS = {
         "object_scale_multipliers_from_log_offsets",
     ),
     "observe_synthetic_world": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "observe_synthetic_world",
     ),
     "solver_decoder_joint_states_from_dict": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "solver_decoder_joint_states_from_dict",
     ),
     "validate_object_emergence_solver_checkpoint": (
@@ -2403,7 +2409,7 @@ _EXPORTS = {
         "validate_assignment_evidence_summary",
     ),
     "validate_assignment_stability_eval": (
-        "objgauss.core.assignment_stability",
+        "objgauss.evaluation.assignment_stability",
         "validate_assignment_stability_eval",
     ),
     "validate_assignment_solver_v2_config": (
@@ -2419,159 +2425,162 @@ _EXPORTS = {
         "validate_assignment_solver_v2_training_summary",
     ),
     "validate_assignment_solver_v2_checkpoint": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.core.assignment_solver_v2",
         "validate_assignment_solver_v2_checkpoint",
     ),
     "validate_assignment_solver_v2_stability_eval_summary": (
-        "objgauss.core.assignment_solver_v2_eval",
+        "objgauss.evaluation.assignment_solver_v2_eval",
         "validate_assignment_solver_v2_stability_eval_summary",
     ),
     "validate_assignment_v2_renderer_joint_summary": (
-        "objgauss.core.assignment_v2_renderer_validation",
+        "objgauss.pipelines.assignment_v2_renderer_validation",
         "validate_assignment_v2_renderer_joint_summary",
     ),
     "validate_core_model_train_validate_summary": (
-        "objgauss.core.core_model_validation",
+        "objgauss.pipelines.core_model_validation",
         "validate_core_model_train_validate_summary",
     ),
     "validate_real_sample_v2_smoke_summary": (
-        "objgauss.core.real_sample_v2_smoke",
+        "objgauss.pipelines.real_sample_v2_smoke",
         "validate_real_sample_v2_smoke_summary",
     ),
     "validate_real_sample_v2_diagnostics_summary": (
-        "objgauss.core.real_sample_v2_diagnostics",
+        "objgauss.pipelines.real_sample_v2_diagnostics",
         "validate_real_sample_v2_diagnostics_summary",
     ),
     "validate_real_sample_v2_effect_preview": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "validate_real_sample_v2_effect_preview",
     ),
     "validate_real_sample_v2_model_handoff_summary": (
-        "objgauss.core.real_sample_v2_model_handoff",
+        "objgauss.pipelines.real_sample_v2_model_handoff",
         "validate_real_sample_v2_model_handoff_summary",
     ),
     "validate_real_sample_v2_viewer_preview_summary": (
-        "objgauss.core.real_sample_v2_viewer_preview",
+        "objgauss.pipelines.real_sample_v2_viewer_preview",
         "validate_real_sample_v2_viewer_preview_summary",
     ),
     "validate_real_sample_v2_full_cloud_purity_summary": (
-        "objgauss.core.real_sample_v2_full_cloud_purity",
+        "objgauss.pipelines.real_sample_v2_full_cloud_purity",
         "validate_real_sample_v2_full_cloud_purity_summary",
     ),
     "validate_real_sample_v2_segmentation_quality_summary": (
-        "objgauss.core.real_sample_v2_segmentation_quality",
+        "objgauss.pipelines.real_sample_v2_segmentation_quality",
         "validate_real_sample_v2_segmentation_quality_summary",
     ),
     "validate_real_sample_v2_weak_boundary_opt_summary": (
-        "objgauss.core.real_sample_v2_weak_boundary_opt",
+        "objgauss.pipelines.real_sample_v2_weak_boundary_opt",
         "validate_real_sample_v2_weak_boundary_opt_summary",
     ),
     "validate_real_sample_v2_promoted_weights_cross_sample_summary": (
-        "objgauss.core.real_sample_v2_promoted_weights_cross_sample",
+        "objgauss.pipelines.real_sample_v2_promoted_weights_cross_sample",
         "validate_real_sample_v2_promoted_weights_cross_sample_summary",
     ),
     "validate_real_sample_v2_sample_aware_weight_policy_summary": (
-        "objgauss.core.real_sample_v2_sample_aware_weight_policy",
+        "objgauss.pipelines.real_sample_v2_sample_aware_weight_policy",
         "validate_real_sample_v2_sample_aware_weight_policy_summary",
     ),
     "validate_real_sample_v2_bounded_normalization_cross_sample_summary": (
-        "objgauss.core.real_sample_v2_bounded_normalization_cross_sample",
+        "objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample",
         "validate_real_sample_v2_bounded_normalization_cross_sample_summary",
     ),
     "validate_solver_decoder_joint_checkpoint": (
-        "objgauss.core.solver_decoder_training",
+        "objgauss.pipelines.solver_decoder_training",
         "validate_solver_decoder_joint_checkpoint",
     ),
     "validate_object_state_gaussian_decoder_state": (
-        "objgauss.core.gaussian_decoder_training",
+        "objgauss.pipelines.gaussian_decoder_training",
         "validate_object_state_gaussian_decoder_state",
     ),
     "validate_object_state_stability_benchmark": (
-        "objgauss.core.object_state_benchmark",
+        "objgauss.evaluation.object_state_benchmark",
         "validate_object_state_stability_benchmark",
     ),
     "validate_object_identity_oracle": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "validate_object_identity_oracle",
     ),
     "validate_observation_model_config": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "validate_observation_model_config",
     ),
     "validate_objectstate_checkpoint_eval": (
-        "objgauss.core.object_state_eval",
+        "objgauss.evaluation.object_state_eval",
         "validate_objectstate_checkpoint_eval",
     ),
     "validate_image_target_contract_summary": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "validate_image_target_contract_summary",
     ),
     "validate_trainable_image_target": (
-        "objgauss.core.trainable_kernel",
+        "objgauss.pipelines.trainable_kernel",
         "validate_trainable_image_target",
     ),
     "validate_training_renderer_summary": (
-        "objgauss.core.training_renderer",
+        "objgauss.pipelines.training_renderer",
         "validate_training_renderer_summary",
     ),
     "validate_solver_decoder_training_scale_plan": (
-        "objgauss.core.training_scale",
+        "objgauss.pipelines.training_scale",
         "validate_solver_decoder_training_scale_plan",
     ),
     "validate_trainable_kernel_model_artifact": (
-        "objgauss.core.trainable_artifact",
+        "objgauss.pipelines.trainable_artifact",
         "validate_trainable_kernel_model_artifact",
     ),
     "validate_trainable_quality_report": (
-        "objgauss.core.trainable_quality",
+        "objgauss.pipelines.trainable_quality",
         "validate_trainable_quality_report",
     ),
     "validate_renderer_loss_boundary_summary": (
-        "objgauss.core.renderer_loss",
+        "objgauss.pipelines.renderer_loss",
         "validate_renderer_loss_boundary_summary",
     ),
     "validate_synthetic_observation_frame": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "validate_synthetic_observation_frame",
     ),
     "validate_synthetic_stability_scenario_fixture": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "validate_synthetic_stability_scenario_fixture",
     ),
     "validate_synthetic_stability_diagnostics_summary": (
-        "objgauss.core.v2_stability_diagnostics",
+        "objgauss.evaluation.v2_stability_diagnostics",
         "validate_synthetic_stability_diagnostics_summary",
     ),
     "validate_synthetic_stability_gate_summary": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "validate_synthetic_stability_gate_summary",
     ),
     "validate_synthetic_stability_suite_gate_summary": (
-        "objgauss.core.v2_stability_gate",
+        "objgauss.evaluation.v2_stability_gate",
         "validate_synthetic_stability_suite_gate_summary",
     ),
     "validate_synthetic_world_state": (
-        "objgauss.core.v2_stability_foundation",
+        "objgauss.datasets.v2_stability_foundation",
         "validate_synthetic_world_state",
     ),
-    "vote_masks_to_gaussians": ("objgauss.core.projection", "vote_masks_to_gaussians"),
+    "vote_masks_to_gaussians": (
+        "objgauss.pipelines.mask_voting",
+        "vote_masks_to_gaussians",
+    ),
     "write_ogc_payload": ("objgauss.core.ogc_payload", "write_ogc_payload"),
     "write_ply": ("objgauss.core.io", "write_ply"),
     "write_solver_decoder_tensorboard_events": (
-        "objgauss.core.training_tensorboard",
+        "objgauss.pipelines.training_tensorboard",
         "write_solver_decoder_tensorboard_events",
     ),
     "write_object_state_stability_benchmark": (
-        "objgauss.core.object_state_benchmark",
+        "objgauss.evaluation.object_state_benchmark",
         "write_object_state_stability_benchmark",
     ),
     "write_quantized_ogc_payload": ("objgauss.core.quantization", "write_quantized_ogc_payload"),
     "write_trainable_kernel_model_artifact": (
-        "objgauss.core.trainable_artifact",
+        "objgauss.pipelines.trainable_artifact",
         "write_trainable_kernel_model_artifact",
     ),
     "write_trainable_quality_report": (
-        "objgauss.core.trainable_quality",
+        "objgauss.pipelines.trainable_quality",
         "write_trainable_quality_report",
     ),
     "write_splat": ("objgauss.core.io", "write_splat"),

@@ -12,8 +12,24 @@ const server = args.url || args.noServer ? null : startServer(port);
 
 try {
   await waitForApp(baseUrl);
-  const summary = await auditWorld(baseUrl);
-  console.log(
+  const viewerTruthOnly = Boolean(args["viewer-truth"]);
+  const summary = viewerTruthOnly ? await auditViewerTruth(baseUrl) : await auditWorld(baseUrl);
+  if (viewerTruthOnly) {
+    console.log(
+      [
+        "world_viewer_truth=passed",
+        `initialHiddenRequests=${summary.initialHiddenRequestCount}`,
+        `lazyModel=${JSON.stringify(summary.lazyModelId)}`,
+        `lazyRequest=${summary.lazyRequestObserved}`,
+        `transformModes=${summary.transformModeCount}`,
+        `sparkHiddenObjects=${summary.sparkHiddenObjects}`,
+        `sparkHiddenGaussians=${summary.sparkHiddenGaussians}`,
+        `cliHandoff=${summary.cliHandoffStatus}`,
+        `screenshot=${summary.screenshotPath}`,
+      ].join(" "),
+    );
+  } else {
+    console.log(
     [
       "world_viewer=passed",
       `models=${summary.modelCount}`,
@@ -98,9 +114,180 @@ try {
       `screenshot=${summary.screenshotPath}`,
       `mobileScreenshot=${summary.mobileScreenshotPath}`,
     ].join(" "),
-  );
+    );
+  }
 } finally {
   if (server) stopServer(server);
+}
+
+async function auditViewerTruth(url) {
+  const browser = await chromium.launch(launchOptions());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const requests = [];
+  const pageErrors = [];
+  page.on("request", (request) => requests.push(new URL(request.url()).pathname));
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  const hiddenCatalogPaths = [
+    "/samples/plush_v1_objects.ply",
+    "/samples/room_objects.ply",
+    "/samples/room.splat",
+    "/samples/train_objects.ply",
+    "/samples/train.splat",
+    "/models/trainable-mvp-debug/model-artifact.json",
+  ];
+
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const world = window.__OBJGAUSS_WORLD__;
+      return (
+        Number(shell?.getAttribute("data-loaded-count") ?? 0) > 0 &&
+        Number(world?.modelCount ?? 0) > 0 &&
+        Array.isArray(world?.sourceSplatObjectMotionSamples)
+      );
+    }, undefined, { timeout: 30000 });
+    await page.waitForTimeout(750);
+
+    const initialHiddenRequests = requests.filter((path) => hiddenCatalogPaths.includes(path));
+    if (initialHiddenRequests.length > 0) {
+      throw new Error(`hidden catalog assets fetched before selection: ${initialHiddenRequests.join(", ")}`);
+    }
+
+    const sourceTarget = await page.waitForFunction(() => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const sample = (world?.sourceSplatObjectMotionSamples ?? []).find(
+        (entry) =>
+          entry.status === "ready" &&
+          entry.countMatches === true &&
+          Number(entry.mappedGaussians) > 0,
+      );
+      const object = (world?.objectSelections ?? []).find(
+        (entry) => entry.modelId === sample?.modelId && entry.visible,
+      );
+      if (!sample || !object) return null;
+      return { sample, object };
+    }, undefined, { timeout: 30000 }).then((handle) => handle.jsonValue());
+
+    const selected = await page.evaluate((selectionId) => {
+      return window.__OBJGAUSS_WORLD__?.selectObjectForAudit?.(selectionId) ?? false;
+    }, sourceTarget.object.selectionId);
+    if (!selected) throw new Error("could not select Spark-bound object for truth audit");
+
+    const transformTruth = await page.waitForFunction(() => {
+      const layer = document.querySelector("[data-object-interaction-layer='true']");
+      const buttons = layer?.querySelectorAll("[data-object-transform-mode-button]") ?? [];
+      const truth = layer?.querySelector("[data-object-transform-truth='translation-only']");
+      if (
+        layer?.getAttribute("data-object-transform-capabilities") !== "translate-xz" ||
+        layer?.getAttribute("data-source-splat-translation-ready") !== "true" ||
+        buttons.length !== 1 ||
+        buttons[0]?.getAttribute("data-object-transform-mode-button") !== "translate" ||
+        !truth?.textContent?.includes("旋转与缩放未开放")
+      ) {
+        return null;
+      }
+      return { modeCount: buttons.length, text: truth.textContent };
+    }, undefined, { timeout: 15000 }).then((handle) => handle.jsonValue());
+
+    const hidden = await page.evaluate((selectionId) => {
+      return window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(selectionId) ?? true;
+    }, sourceTarget.object.selectionId);
+    if (hidden !== false) throw new Error("Spark-bound object did not enter hidden state");
+
+    await page.waitForTimeout(250);
+    const sparkVisibility = await page.evaluate((modelId) => {
+      return (window.__OBJGAUSS_WORLD__?.sourceSplatObjectMotionSamples ?? []).find(
+        (entry) => entry.modelId === modelId,
+      ) ?? null;
+    }, sourceTarget.sample.modelId);
+    if (
+      !sparkVisibility ||
+      sparkVisibility.visibilitySynchronized !== true ||
+      sparkVisibility.visibilityMode !== "per-object-opacity" ||
+      Number(sparkVisibility.hiddenObjects) < 1 ||
+      Number(sparkVisibility.hiddenGaussians) < 1 ||
+      sparkVisibility.sourceLayerVisible !== true
+    ) {
+      throw new Error(`Spark visibility did not follow object hide: ${JSON.stringify(sparkVisibility)}`);
+    }
+
+    await page.evaluate((selectionId) => {
+      window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(selectionId);
+    }, sourceTarget.object.selectionId);
+
+    await clickSelector(page, "[data-model-process-button='trainable-mvp-debug']");
+    await page.waitForTimeout(1500);
+    const lazyState = await page.evaluate(() => {
+      const shell = document.querySelector(".worldShell");
+      const row = document.querySelector("[data-model-version-row-id='trainable-mvp-debug']");
+      return {
+        selectedModel: shell?.getAttribute("data-selected-model"),
+        rowStatus: row?.getAttribute("data-model-object-layer-status"),
+        processStatus: row?.getAttribute("data-model-process-status"),
+        worldSelectedModel: window.__OBJGAUSS_WORLD__?.selectedModelId ?? null,
+        stageModelIds: window.__OBJGAUSS_WORLD__?.stageModelIds ?? [],
+      };
+    });
+    const lazyRequestObserved = requests.includes("/models/trainable-mvp-debug/model-artifact.json");
+    if (
+      lazyState.selectedModel !== "trainable-mvp-debug" ||
+      !lazyState.stageModelIds.includes("trainable-mvp-debug") ||
+      !["processing", "object-layer-loaded"].includes(lazyState.processStatus) ||
+      !lazyRequestObserved
+    ) {
+      throw new Error(`selected hidden model did not load on demand: ${JSON.stringify({ lazyState, lazyRequestObserved, pageErrors })}`);
+    }
+
+    await clickSelector(page, "[data-model-process-button='ogc-debug']");
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const rows = [...document.querySelectorAll("[data-model-version-row-id='ogc-debug']")];
+      return (
+        shell?.getAttribute("data-selected-model") === "ogc-debug" &&
+        rows.some((row) => row.getAttribute("data-model-object-layer-status") === "loaded") &&
+        window.__OBJGAUSS_WORLD__?.selectedModelId === "ogc-debug"
+      );
+    }, undefined, { timeout: 15000 });
+
+    await clickSelector(page, "[data-model-process-button='lego-alpha-raw-source']");
+    const cliHandoff = await page.waitForFunction(() => {
+      const row = document.querySelector("[data-model-version-row-id='lego-alpha-raw-source']");
+      const button = row?.querySelector("[data-model-process-button='lego-alpha-raw-source']");
+      const handoff = document.querySelector("[data-object-process-handoff='true']");
+      if (
+        row?.getAttribute("data-model-process-status") !== "raw-gaussian" ||
+        button?.getAttribute("data-model-process-action") !== "cli-handoff" ||
+        button?.textContent?.trim() !== "CLI 命令" ||
+        handoff?.getAttribute("data-object-process-execution") !== "cli-only" ||
+        !handoff?.textContent?.includes("浏览器不会运行对象模型")
+      ) {
+        return null;
+      }
+      return { status: handoff.getAttribute("data-object-process-handoff-status") };
+    }, undefined, { timeout: 15000 }).then((handle) => handle.jsonValue());
+
+    const screenshotPath = "/tmp/objgauss-viewer-truth.png";
+    await page.addStyleTag({ content: "canvas { visibility: hidden !important; }" });
+    await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled", timeout: 15000 });
+    if (pageErrors.length > 0) {
+      throw new Error(`browser page errors: ${pageErrors.join(" | ")}`);
+    }
+    return {
+      initialHiddenRequestCount: initialHiddenRequests.length,
+      lazyModelId: "ogc-debug",
+      lazyRequestObserved,
+      transformModeCount: transformTruth.modeCount,
+      sparkHiddenObjects: sparkVisibility.hiddenObjects,
+      sparkHiddenGaussians: sparkVisibility.hiddenGaussians,
+      cliHandoffStatus: cliHandoff.status,
+      screenshotPath,
+    };
+  } finally {
+    await closeBrowserWithTimeout(browser);
+  }
 }
 
 async function auditWorld(url) {

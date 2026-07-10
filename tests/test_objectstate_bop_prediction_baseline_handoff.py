@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
+from objgauss.pipelines.objectstate_bop_prediction_baseline_handoff import (
     OBJECTSTATE_BOP_PREDICTION_BASELINE_HANDOFF_SCHEMA,
     objectstate_bop_prediction_baseline_handoff,
     validate_objectstate_bop_prediction_baseline_handoff_summary,

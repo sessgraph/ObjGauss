@@ -261,7 +261,7 @@ This contract does not:
 
 Implemented v0.1 facts:
 
-- Core module: `objgauss.core.objectstate_assignment_mvp`.
+- Pipeline module: `objgauss.pipelines.objectstate_assignment_mvp`.
 - Summary schema: `objgauss-objectstate-assignment-mvp-v1`.
 - Entry point:
   `objectstate_assignment_mvp_summary(GaussianCloud, AssignmentSolverV2State, ...)`.
@@ -303,7 +303,7 @@ Required metrics:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_model_identity_gate`.
+  `objgauss.evaluation.objectstate_model_identity_gate`.
 - Summary schema:
   `objgauss-objectstate-model-identity-gate-v1`.
 - Entry point:
@@ -333,7 +333,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_model_identity_benchmark`.
+  `objgauss.evaluation.objectstate_model_identity_benchmark`.
 - Summary schema:
   `objgauss-objectstate-model-identity-benchmark-v1`.
 - Entry point:
@@ -357,7 +357,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_model_identity_benchmark_report`.
+  `objgauss.evaluation.objectstate_model_identity_benchmark_report`.
 - Summary schema:
   `objgauss-objectstate-model-identity-benchmark-report-v1`.
 - Entry point:
@@ -384,7 +384,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_model_identity_ablation`.
+  `objgauss.evaluation.objectstate_model_identity_ablation`.
 - Summary schema:
   `objgauss-objectstate-model-identity-ablation-v1`.
 - Entry point:
@@ -418,7 +418,7 @@ Implemented v0.1 facts:
 
 Implemented v0.1 facts:
 
-- `objgauss.core.objectstate_model_identity_benchmark_summary(...)` now records
+- `objgauss.evaluation.objectstate_model_identity_benchmark_summary(...)` now records
   an explicit `evidence_policy` object for each benchmark run.
 - `long_training_gate` is no longer interpretable as global. It now carries:
   `candidate_ready_is_policy_scoped=true`, `scoped_to_policy` and a full
@@ -447,8 +447,8 @@ Implemented v0.1 facts:
 
 - Architecture spec:
   `docs/architecture/objectstate-teacher-evidence-contract.md`.
-- Core module:
-  `objgauss.core.objectstate_teacher_evidence`.
+- Dataset contract module:
+  `objgauss.datasets.objectstate_teacher_evidence`; the old core path is compatibility-only.
 - Batch schema:
   `objgauss-objectstate-teacher-evidence-batch-v1`.
 - Contract schema:
@@ -488,7 +488,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_teacher_evidence_leakage_audit`.
+  `objgauss.evaluation.objectstate_teacher_evidence_leakage_audit`.
 - Audit schema:
   `objgauss-objectstate-teacher-evidence-leakage-audit-v1`.
 - Public API:
@@ -526,7 +526,7 @@ Implemented v0.1 facts:
 - Architecture spec:
   `docs/architecture/objectstate-assignment-long-smoke-contract.md`.
 - Core module:
-  `objgauss.core.objectstate_assignment_long_smoke_contract`.
+  `objgauss.pipelines.objectstate_assignment_long_smoke_contract`.
 - Contract schema:
   `objgauss-objectstate-assignment-long-smoke-contract-v1`.
 - Contract summary schema:
@@ -563,7 +563,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_assignment_long_smoke`.
+  `objgauss.pipelines.objectstate_assignment_long_smoke`.
 - Run summary schema:
   `objgauss-objectstate-assignment-long-smoke-v1`.
 - Public API:
@@ -598,7 +598,7 @@ Implemented v0.1 facts:
 - Architecture spec:
   `docs/architecture/objectstate-temporal-assignment-contract.md`.
 - Core module:
-  `objgauss.core.objectstate_temporal_assignment_contract`.
+  `objgauss.pipelines.objectstate_temporal_assignment_contract`.
 - Contract schema:
   `objgauss-objectstate-temporal-assignment-contract-v1`.
 - Contract summary schema:
@@ -631,7 +631,7 @@ Implemented v0.1 facts:
 Implemented v0.1 facts:
 
 - Core module:
-  `objgauss.core.objectstate_temporal_assignment`.
+  `objgauss.pipelines.objectstate_temporal_assignment`.
 - Run summary schema:
   `objgauss-objectstate-temporal-assignment-v1`.
 - Public API:
@@ -662,7 +662,8 @@ Implemented v0.1 facts:
 - Architecture spec:
   `docs/architecture/objectstate-controlled-capture-handoff.md`.
 - Core module:
-  `objgauss.core.objectstate_controlled_capture_handoff`.
+  `objgauss.pipelines.objectstate_controlled_capture_handoff`; the historical
+  `objgauss.core` path is compatibility-only.
 - Handoff schema:
   `objgauss-objectstate-controlled-capture-handoff-v1`.
 - Public API:

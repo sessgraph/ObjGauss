@@ -6,7 +6,7 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_ACCEPTANCE_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_ADAPTER_SCHEMA,
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
@@ -20,13 +20,13 @@ from objgauss.core.objectstate_bop_capture_adapter import (
     validate_objectstate_bop_capture_condition_sidecar,
     validate_objectstate_bop_capture_condition_sidecar_summary,
 )
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_real_rows import (
+from objgauss.datasets.objectstate_controlled_real_manifest import (
     OBJECTSTATE_CONTROLLED_REAL_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_reality_candidate_template import (
+from objgauss.pipelines.objectstate_controlled_reality_candidate_template import (
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_REALITY_CANDIDATE_TEMPLATE_SCHEMA,
     finalize_objectstate_controlled_prediction_candidate_template,
@@ -34,7 +34,7 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
     validate_objectstate_controlled_reality_candidate_template_summary,
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     validate_objectstate_controlled_prediction_candidates,
 )
 

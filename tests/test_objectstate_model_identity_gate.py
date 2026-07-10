@@ -10,7 +10,7 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
 )
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.objectstate_model_identity_gate import (
+from objgauss.evaluation.objectstate_model_identity_gate import (
     OBJECTSTATE_MODEL_IDENTITY_BASELINES,
     OBJECTSTATE_MODEL_IDENTITY_GATE_SCHEMA,
     ObjectStateModelIdentityGateThresholds,

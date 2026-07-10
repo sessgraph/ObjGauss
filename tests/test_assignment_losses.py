@@ -46,6 +46,36 @@ def test_supervised_assignment_loss_matches_cross_entropy_contract():
     )
 
 
+def test_supervised_assignment_clip_plateau_has_zero_finite_gradient():
+    assignment = np.array([[0.0, 1.0]], dtype=np.float32)
+    target = np.array([[1.0, 0.0]], dtype=np.float32)
+
+    loss, gradients = supervised_assignment_loss_and_gradient([assignment], [target])
+
+    assert loss == pytest.approx(-np.log(1e-8))
+    assert np.isfinite(gradients[0]).all()
+    np.testing.assert_array_equal(gradients[0], np.zeros_like(assignment))
+
+
+def test_supervised_assignment_averages_only_frames_with_targets():
+    supervised = np.array([[0.8, 0.2]], dtype=np.float32)
+    unsupervised = np.array([[0.4, 0.6]], dtype=np.float32)
+    target = np.array([[1.0, 0.0]], dtype=np.float32)
+
+    loss, gradients = supervised_assignment_loss_and_gradient(
+        [supervised, unsupervised],
+        [target, None],
+    )
+
+    assert loss == pytest.approx(-np.log(0.8))
+    np.testing.assert_allclose(
+        gradients[0],
+        np.array([[-1.0 / 0.8, 0.0]], dtype=np.float32),
+        atol=1e-6,
+    )
+    np.testing.assert_array_equal(gradients[1], np.zeros_like(unsupervised))
+
+
 def test_assignment_entropy_and_balance_are_independently_computable():
     assignment = np.array(
         [

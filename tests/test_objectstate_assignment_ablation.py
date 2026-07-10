@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.objectstate_assignment_ablation import (
+from objgauss.pipelines.objectstate_assignment_ablation import (
     OBJECTSTATE_ASSIGNMENT_ABLATION_SCHEMA,
     objectstate_assignment_ablation_summary,
     validate_objectstate_assignment_ablation_summary,

@@ -10,12 +10,12 @@ import numpy as np
 
 from objgauss.features import colors
 from objgauss.gaussians import GaussianCloud
-from objgauss.mask_voting import (
+from objgauss.pipelines.mask_voting import (
     train_object_field_from_votes,
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.object_field import (
+from objgauss.core.object_field import (
     attach_hard_labels,
     initialize_object_field,
     object_field_label_delta,

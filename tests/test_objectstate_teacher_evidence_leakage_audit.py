@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
-from objgauss.core.objectstate_model_identity_benchmark_report import (
+from objgauss.evaluation.objectstate_model_identity_benchmark_report import (
     objectstate_model_identity_benchmark_report_scenarios,
 )
-from objgauss.core.objectstate_teacher_evidence import TeacherEvidenceBatch
-from objgauss.core.objectstate_teacher_evidence_leakage_audit import (
+from objgauss.datasets.objectstate_teacher_evidence import TeacherEvidenceBatch
+from objgauss.evaluation.objectstate_teacher_evidence_leakage_audit import (
     OBJECTSTATE_TEACHER_EVIDENCE_LEAKAGE_AUDIT_SCHEMA,
     TEACHER_EVIDENCE_LEAKAGE_AUDIT_CHECKS,
     objectstate_teacher_evidence_leakage_audit_summary,
@@ -27,7 +29,10 @@ def test_teacher_evidence_leakage_audit_blocks_default_synthetic_training_source
     assert validate_objectstate_teacher_evidence_leakage_audit_summary(summary) == summary
 
     checks = summary["audit_checks"]
-    assert checks["physical_label_ban"]["passed"] is True
+    assert checks["physical_label_ban"]["passed"] is False
+    assert checks["physical_label_ban"]["metrics"][
+        "direct_one_hot_identity_embedding_count"
+    ] == 30
     assert checks["semantic_feature_shuffle"]["passed"] is True
     assert checks["random_semantic_baseline"]["passed"] is True
     assert checks["train_test_semantic_source_split"]["passed"] is False
@@ -49,30 +54,9 @@ def test_teacher_evidence_leakage_audit_blocks_default_synthetic_training_source
 
 def test_teacher_evidence_leakage_audit_passes_inference_time_split_policy(tmp_path):
     scenarios = objectstate_model_identity_benchmark_report_scenarios()
-    first = scenarios[0]
-    feature_matrix = np.asarray(first.frame0_features, dtype=np.float32)
-    batch = TeacherEvidenceBatch(
+    batch = _teacher_corpus_batch(
+        scenarios,
         sample_id="teacher-leakage-dino-split",
-        gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),
-        feature_matrix=feature_matrix,
-        source="dino_v2",
-        confidence=0.92,
-        uncertainty=0.08,
-        allowed_for_training=True,
-        allowed_for_evaluation=True,
-        leakage_risk="low",
-        provenance={
-            "producer": "test-dino-teacher",
-            "feature_space": "dino_v2_patch_embedding",
-            "input_refs": ["fixture://viewpoint-easy/frame0"],
-            "generation_method": "inference_time_teacher_embedding",
-            "train_test_semantic_source_split": {
-                "train_source": "dino_v2:train-scenes",
-                "test_source": "dino_v2:heldout-scenes",
-                "direct_object_id_embedding_shared": False,
-                "policy": "model_weights_shared_without_object_id_embedding",
-            },
-        },
     )
 
     summary = objectstate_teacher_evidence_leakage_audit_summary(
@@ -92,30 +76,48 @@ def test_teacher_evidence_leakage_audit_passes_inference_time_split_policy(tmp_p
     ][0]
     assert split["direct_object_id_embedding_shared"] is False
     assert split["train_source"] == "dino_v2:train-scenes"
+    assert summary["audited_evidence"]["feature_dim"] == 4
+    assert summary["audited_evidence"]["frame_count"] == 30
+
+
+def test_teacher_evidence_leakage_audit_blocks_disguised_one_hot_identity(
+    tmp_path,
+):
+    scenarios = objectstate_model_identity_benchmark_report_scenarios()
+    batch = _teacher_corpus_batch(
+        scenarios,
+        sample_id="teacher-leakage-disguised-one-hot",
+        use_one_hot=True,
+    )
+
+    summary = objectstate_teacher_evidence_leakage_audit_summary(
+        tmp_path,
+        teacher_batches=(batch,),
+        seed=18,
+    )
+
+    assert summary["status"] == "objectstate_teacher_evidence_leakage_audit_blocked"
+    check = summary["audit_checks"]["physical_label_ban"]
+    assert check["passed"] is False
+    assert check["metrics"]["direct_one_hot_identity_embedding_count"] == 30
+    assert all(
+        finding["reason"]
+        == "one_hot_active_column_is_bijective_with_identity_label"
+        for finding in check["details"]["content_leakage_findings"]
+    )
+    assert summary["audit_checks"]["semantic_feature_shuffle"]["passed"] is True
+    assert summary["audit_checks"]["random_semantic_baseline"]["passed"] is True
 
 
 def test_teacher_evidence_leakage_audit_reports_forbidden_provenance(tmp_path):
     scenarios = objectstate_model_identity_benchmark_report_scenarios()
-    feature_matrix = np.asarray(scenarios[0].frame0_features, dtype=np.float32)
-    batch = TeacherEvidenceBatch(
+    batch = _teacher_corpus_batch(
+        scenarios,
         sample_id="teacher-leakage-forbidden-provenance",
-        gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),
-        feature_matrix=feature_matrix,
-        source="dino_v2",
-        allowed_for_training=True,
-        leakage_risk="low",
-        provenance={
-            "producer": "bad-teacher",
-            "feature_space": "dino_v2_patch_embedding",
-            "input_refs": ["fixture://viewpoint-easy/frame0"],
-            "generation_method": "inference_time_teacher_embedding",
-            "target_assignment": "forbidden",
-            "train_test_semantic_source_split": {
-                "train_source": "dino_v2:train-scenes",
-                "test_source": "dino_v2:heldout-scenes",
-                "direct_object_id_embedding_shared": False,
-            },
-        },
+    )
+    batch = replace(
+        batch,
+        provenance={**batch.provenance, "target_assignment": "forbidden"},
     )
 
     summary = objectstate_teacher_evidence_leakage_audit_summary(
@@ -132,3 +134,49 @@ def test_teacher_evidence_leakage_audit_reports_forbidden_provenance(tmp_path):
         "physical_label_ban",
         "train_test_semantic_source_split",
     ]
+
+
+def _teacher_corpus_batch(
+    scenarios,
+    *,
+    sample_id: str,
+    use_one_hot: bool = False,
+) -> TeacherEvidenceBatch:
+    projection = np.asarray(
+        [
+            [0.88, 0.04, 0.03, 0.02],
+            [0.03, 0.87, 0.05, 0.02],
+            [0.04, 0.02, 0.89, 0.03],
+            [0.02, 0.05, 0.03, 0.86],
+        ],
+        dtype=np.float32,
+    )
+    matrices = []
+    for scenario in scenarios:
+        for features in (scenario.frame0_features, scenario.frame1_features):
+            matrix = np.asarray(features, dtype=np.float32)
+            matrices.append(matrix if use_one_hot else matrix @ projection)
+    feature_matrix = np.concatenate(matrices, axis=0)
+    return TeacherEvidenceBatch(
+        sample_id=sample_id,
+        gaussian_ids=tuple(f"g{index:06d}" for index in range(feature_matrix.shape[0])),
+        feature_matrix=feature_matrix,
+        source="dino_v2",
+        confidence=0.92,
+        uncertainty=0.08,
+        allowed_for_training=True,
+        allowed_for_evaluation=True,
+        leakage_risk="low",
+        provenance={
+            "producer": "test-dino-teacher",
+            "feature_space": "dino_v2_patch_embedding",
+            "input_refs": ["fixture://identity-report-ladder"],
+            "generation_method": "inference_time_teacher_embedding",
+            "train_test_semantic_source_split": {
+                "train_source": "dino_v2:train-scenes",
+                "test_source": "dino_v2:heldout-scenes",
+                "direct_object_id_embedding_shared": False,
+                "policy": "model_weights_shared_without_object_id_embedding",
+            },
+        },
+    )

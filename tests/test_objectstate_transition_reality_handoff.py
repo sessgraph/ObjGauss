@@ -5,14 +5,14 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_transition_dataset import (
+from objgauss.datasets.objectstate_transition_dataset import (
     objectstate_transition_dataset_from_capture_manifest,
     write_objectstate_transition_dataset,
 )
-from objgauss.core.objectstate_transition_reality_handoff import (
+from objgauss.pipelines.objectstate_transition_reality_handoff import (
     OBJECTSTATE_TRANSITION_REALITY_HANDOFF_SCHEMA,
     objectstate_transition_reality_handoff,
     validate_objectstate_transition_reality_handoff_summary,

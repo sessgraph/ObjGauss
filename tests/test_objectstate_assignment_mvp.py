@@ -8,7 +8,7 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
 )
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.objectstate_assignment_mvp import (
+from objgauss.pipelines.objectstate_assignment_mvp import (
     OBJECTSTATE_ASSIGNMENT_MVP_SCHEMA,
     objectstate_assignment_mvp_summary,
     validate_objectstate_assignment_mvp_summary,
@@ -59,6 +59,10 @@ def test_objectstate_assignment_mvp_runs_gaussian_to_projection_path():
     )
     assert summary["projection"]["object_state_count"] == 2
     assert summary["projection"]["active_state_count"] == 2
+    state = summary["projection"]["states"][0]
+    assert state["id"] == state["persistent_id"]
+    assert state["slot"] == state["object_id"]
+    assert state["id"] != state["slot"]
     assert summary["projection"]["states"][0]["centroid"][0] < 0.0
     assert summary["projection"]["states"][1]["centroid"][0] > 0.0
     assert summary["claim_policy"]["assignment_matrix_is_single_source_of_truth"] is True

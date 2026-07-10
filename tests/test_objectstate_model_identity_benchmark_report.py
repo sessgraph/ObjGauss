@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 
-from objgauss.core.objectstate_model_identity_benchmark_report import (
+from objgauss.evaluation.objectstate_model_identity_benchmark_report import (
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_DIFFICULTIES,
     OBJECTSTATE_MODEL_IDENTITY_BENCHMARK_REPORT_SCHEMA,
     objectstate_model_identity_benchmark_report_difficulty_by_scenario,
@@ -11,7 +11,7 @@ from objgauss.core.objectstate_model_identity_benchmark_report import (
     validate_objectstate_model_identity_benchmark_report_summary,
     write_objectstate_model_identity_benchmark_report,
 )
-from objgauss.core.objectstate_model_identity_gate import OBJECTSTATE_MODEL_IDENTITY_BASELINES
+from objgauss.evaluation.objectstate_model_identity_gate import OBJECTSTATE_MODEL_IDENTITY_BASELINES
 
 
 def test_model_identity_benchmark_report_writes_auditable_outputs(tmp_path):

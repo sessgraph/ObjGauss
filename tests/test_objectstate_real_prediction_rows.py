@@ -5,10 +5,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_real_evidence_bundle import (
+from objgauss.datasets.objectstate_real_evidence_bundle import (
     OBJECTSTATE_REAL_EVIDENCE_BUNDLE_SCHEMA,
 )
-from objgauss.core.objectstate_real_prediction_rows import (
+from objgauss.evaluation.objectstate_real_prediction_rows import (
     OBJECTSTATE_REAL_PREDICTION_ROWS_SCHEMA,
     objectstate_real_prediction_rows_from_bundle,
     objectstate_real_prediction_rows_summary,
@@ -111,14 +111,47 @@ def test_real_prediction_rows_fail_explicit_prediction_fail_accounting():
     assert summary["status"] == "objectstate_real_prediction_rows_fail"
     assert summary["row_counts"]["prediction_fail_rows"] == 1
     assert summary["prediction_rows"][0]["status"] == "fail"
-    assert summary["prediction_rows"][0]["failure_reason"] == (
-        "objectstate predictor worse than history baseline"
+    assert summary["prediction_rows"][0]["failure_reason"].startswith(
+        "derived prediction gate failed:"
     )
+    assert "state_does_not_strictly_beat_history" in summary["prediction_rows"][0][
+        "failure_reason"
+    ]
     assert summary["prediction_rows"][0]["metrics"]["prediction_gap_vs_history_model"] == 0.04
     assert summary["prediction_gate"]["metrics"][
         "short_horizon_prediction_gap_vs_history_model"
     ] == 0.04
     assert "failed_rows_absent" in summary["prediction_gate"]["hard_blockers"]
+
+
+def test_real_prediction_rows_recompute_forged_pass_and_gap():
+    bundle = _prediction_bundle()
+    bundle["gate_accounting_rows"][0]["metrics"].update(
+        {
+            "state_ade": 0.08,
+            "history_ade": 0.04,
+            "prediction_gap_vs_history_model": -999.0,
+        }
+    )
+
+    summary = objectstate_real_prediction_rows_summary(bundle)
+
+    assert summary["status"] == "objectstate_real_prediction_rows_fail"
+    assert summary["row_counts"]["prediction_pass_rows"] == 0
+    assert summary["row_counts"]["prediction_fail_rows"] == 1
+    assert summary["metrics"]["reality_status_counts"] == {"fail": 1}
+    assert summary["metrics"]["mean_prediction_gap_vs_history_model"] == 0.04
+    assert summary["prediction_rows"] == summary["prediction_gate"]["rows"]
+    assert summary["prediction_rows"][0]["status"] == "fail"
+    assert (
+        summary["prediction_rows"][0]["metrics"][
+            "prediction_gap_vs_history_model"
+        ]
+        == 0.04
+    )
+    diagnostics = summary["prediction_gate"]["declaration_diagnostics"]
+    assert diagnostics["caller_status_mismatch_count"] == 1
+    assert diagnostics["derived_metric_mismatch_count"] == 1
 
 
 def test_real_prediction_rows_require_transition_for_pass_fail_accounting():

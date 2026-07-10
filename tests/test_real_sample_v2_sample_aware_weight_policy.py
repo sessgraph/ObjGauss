@@ -7,7 +7,7 @@ import pytest
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_sample_aware_weight_policy import (
+from objgauss.pipelines.real_sample_v2_sample_aware_weight_policy import (
     REAL_SAMPLE_V2_SAMPLE_AWARE_WEIGHT_POLICY_SCHEMA,
     RealSampleV2SampleAwareWeightPolicyReport,
     real_sample_v2_sample_aware_weight_policy_from_cloud,

@@ -6,13 +6,13 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     validate_objectstate_controlled_intervention_candidates,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     validate_objectstate_controlled_prediction_candidates,
 )
-from objgauss.core.objectstate_controlled_reality_candidate_template import (
+from objgauss.pipelines.objectstate_controlled_reality_candidate_template import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_TEMPLATE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATE_FINALIZE_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_TEMPLATE_SCHEMA,
@@ -28,7 +28,7 @@ from objgauss.core.objectstate_controlled_reality_candidate_template import (
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
     write_objectstate_controlled_reality_candidate_templates,
 )
-from objgauss.core.objectstate_controlled_capture_import import (
+from objgauss.datasets.objectstate_controlled_capture_import import (
     objectstate_controlled_capture_manifest_from_bundle,
 )
 

@@ -8,10 +8,10 @@ import zlib
 import numpy as np
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff import (
     OBJECTSTATE_BOP_RGBD_BASELINE_LOCAL_ROW_HANDOFF_SCHEMA,
     objectstate_bop_rgbd_baseline_local_row_handoff,
     validate_objectstate_bop_rgbd_baseline_local_row_handoff_summary,

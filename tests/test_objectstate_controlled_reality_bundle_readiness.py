@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_intervention_eval import (
+from objgauss.evaluation.objectstate_controlled_intervention_eval import (
     OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_reality_bundle_readiness import (
+from objgauss.pipelines.objectstate_controlled_reality_bundle_readiness import (
     OBJECTSTATE_CONTROLLED_REALITY_BUNDLE_READINESS_SCHEMA,
     objectstate_controlled_reality_bundle_readiness,
     validate_objectstate_controlled_reality_bundle_readiness_summary,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (

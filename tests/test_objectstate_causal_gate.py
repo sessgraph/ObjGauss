@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from objgauss.core.objectstate_causal_gate import (
+from objgauss.evaluation.objectstate_causal_gate import (
     OBJECTSTATE_ACTION_SCHEMA,
     OBJECTSTATE_CAUSAL_GATE_SCHEMA,
     ObjectStateCausalGateReport,
     evaluate_objectstate_causal_gate,
     validate_objectstate_causal_gate_summary,
 )
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

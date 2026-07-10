@@ -6,10 +6,10 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+from objgauss.datasets.objectstate_bop_local_row_batch_spec import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
 )
-from objgauss.core.objectstate_bop_phase1_sample_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_sample_workspace import (
     OBJECTSTATE_BOP_PHASE1_SAMPLE_WORKSPACES_SCHEMA,
     objectstate_bop_phase1_sample_workspaces,
     validate_objectstate_bop_phase1_sample_workspaces_summary,

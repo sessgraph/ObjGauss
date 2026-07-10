@@ -4,10 +4,10 @@ import hashlib
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_capture_files import (
+from objgauss.datasets.objectstate_controlled_capture_files import (
     OBJECTSTATE_CONTROLLED_CAPTURE_FILE_AUDIT_SCHEMA,
     objectstate_controlled_capture_file_audit,
     objectstate_controlled_capture_missing_files_markdown,

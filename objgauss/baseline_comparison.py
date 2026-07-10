@@ -1,6 +1,6 @@
-"""Compatibility wrapper for core comparison and promotion policy algorithms."""
+"""Compatibility wrapper for comparison and promotion policy evaluation."""
 
-from objgauss.core.baseline_comparison import (
+from objgauss.evaluation.baseline_comparison import (
     DEVELOPMENT_STAGE_NOTICE,
     compare_baseline_candidates,
     render_comparison_markdown,

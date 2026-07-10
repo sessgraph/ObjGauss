@@ -10,12 +10,12 @@ import numpy as np
 
 from objgauss.clustering import summarize_labels
 from objgauss.gaussians import GaussianCloud
-from objgauss.mask_voting import (
+from objgauss.pipelines.mask_voting import (
     train_object_field_from_votes,
     training_summary,
     vote_masks_to_gaussians,
 )
-from objgauss.masks import (
+from objgauss.datasets.masks import (
     LEGO_COLOR_SLOTS,
     build_nerf_rgba_color_mask_manifest,
     classify_lego_rgba,
@@ -23,7 +23,7 @@ from objgauss.masks import (
     resolve_nerf_image,
     slot_count_summary,
 )
-from objgauss.object_field import ObjectField, object_field_label_delta, save_object_field
+from objgauss.core.object_field import ObjectField, object_field_label_delta, save_object_field
 from objgauss.ply import write_ply
 from objgauss.segment import apply_object_colors, assign_object_ids
 from objgauss.splat import write_splat

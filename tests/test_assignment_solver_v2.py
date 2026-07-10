@@ -20,7 +20,7 @@ from objgauss.core.assignment_solver_v2 import (
     validate_assignment_solver_v2_state,
     validate_assignment_solver_v2_training_summary,
 )
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

@@ -3,21 +3,21 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_acceptance_summary,
 )
-from objgauss.core.objectstate_controlled_prediction_eval import (
+from objgauss.evaluation.objectstate_controlled_prediction_eval import (
     evaluate_objectstate_controlled_prediction_candidates,
 )
-from objgauss.core.objectstate_controlled_prediction_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_prediction_evidence_package import (
     OBJECTSTATE_CONTROLLED_PREDICTION_EVIDENCE_PACKAGE_SCHEMA,
     objectstate_controlled_prediction_evidence_package,
     validate_objectstate_controlled_prediction_evidence_package_summary,
 )
-from objgauss.core.objectstate_controlled_prediction_baseline import (
+from objgauss.pipelines.objectstate_controlled_prediction_baseline import (
     write_objectstate_controlled_prediction_baseline_candidates,
 )
-from objgauss.core.objectstate_controlled_reality_candidate_template import (
+from objgauss.pipelines.objectstate_controlled_reality_candidate_template import (
     write_objectstate_controlled_reality_candidate_templates_from_manifest,
 )
 

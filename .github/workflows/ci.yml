@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv==0.11.17
+      - name: Sync locked core environment
+        run: uv sync --locked --extra dev
+      - name: Run Python behavior tests
+        run: uv run --locked --extra dev pytest
+
+  viewer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Build evidence viewer
+        run: npm run build
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject whitespace errors
+        run: git show --check --oneline --no-renames HEAD
+      - name: Keep active state concise
+        run: |
+          test "$(wc -l < docs/state/project-status.md)" -le 200
+          test "$(wc -l < docs/state/pr-queue.md)" -le 250

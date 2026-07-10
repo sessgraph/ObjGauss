@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_real_evidence_bundle import (
+from objgauss.datasets.objectstate_controlled_real_evidence_bundle import (
     OBJECTSTATE_CONTROLLED_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA,
     objectstate_controlled_real_evidence_bundle_adapter_summary,
     validate_objectstate_controlled_real_evidence_bundle_adapter_summary,

@@ -6,7 +6,7 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_phase1_batch_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_batch_workspace import (
     OBJECTSTATE_BOP_PHASE1_BATCH_WORKSPACE_SCHEMA,
     objectstate_bop_phase1_batch_workspace,
     validate_objectstate_bop_phase1_batch_workspace_summary,

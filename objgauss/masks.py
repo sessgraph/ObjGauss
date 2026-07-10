@@ -1,6 +1,6 @@
-"""Compatibility wrapper for core mask manifest algorithms."""
+"""Compatibility import for mask-manifest dataset tooling."""
 
-from objgauss.core.masks import (
+from objgauss.datasets.masks import (
     LEGO_COLOR_SLOTS,
     AlphaFgBgMaskManifestResult,
     ColorMaskManifestResult,
@@ -23,7 +23,7 @@ from objgauss.core.masks import (
     validate_mask_manifest,
 )
 
-__all__ = [
+__all__ = (
     "LEGO_COLOR_SLOTS",
     "AlphaFgBgMaskManifestResult",
     "ColorMaskManifestResult",
@@ -44,4 +44,4 @@ __all__ = [
     "slot_count_summary",
     "split_mask_manifest",
     "validate_mask_manifest",
-]
+)

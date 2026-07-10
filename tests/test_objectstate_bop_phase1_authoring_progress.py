@@ -5,21 +5,21 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     objectstate_bop_capture_condition_sidecar_summary,
 )
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+from objgauss.datasets.objectstate_bop_local_row_batch_spec import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
 )
-from objgauss.core.objectstate_bop_phase1_authoring_progress import (
+from objgauss.pipelines.objectstate_bop_phase1_authoring_progress import (
     OBJECTSTATE_BOP_PHASE1_AUTHORING_PROGRESS_SCHEMA,
     objectstate_bop_phase1_authoring_progress,
     validate_objectstate_bop_phase1_authoring_progress_summary,
 )
-from objgauss.core.objectstate_bop_phase1_sample_workspace import (
+from objgauss.datasets.objectstate_bop_phase1_sample_workspace import (
     objectstate_bop_phase1_sample_workspaces,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (

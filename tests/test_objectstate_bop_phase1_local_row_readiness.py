@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_phase1_local_row_readiness import (
+from objgauss.pipelines.objectstate_bop_phase1_local_row_readiness import (
     OBJECTSTATE_BOP_PHASE1_LOCAL_ROW_READINESS_SCHEMA,
     objectstate_bop_phase1_local_row_readiness,
     validate_objectstate_bop_phase1_local_row_readiness_summary,
 )
-from objgauss.core.objectstate_bop_prediction_baseline_handoff import (
+from objgauss.pipelines.objectstate_bop_prediction_baseline_handoff import (
     objectstate_bop_prediction_baseline_handoff,
 )
 

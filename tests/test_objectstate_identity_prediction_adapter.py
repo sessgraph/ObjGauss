@@ -5,19 +5,24 @@ import json
 import pytest
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_capture import (
+from objgauss.datasets.objectstate_controlled_capture import (
     OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
 )
-from objgauss.core.objectstate_controlled_identity_eval import (
+from objgauss.evaluation.objectstate_controlled_identity_eval import (
     OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
     evaluate_objectstate_controlled_identity_predictions,
     validate_objectstate_controlled_identity_predictions,
 )
-from objgauss.core.objectstate_identity_prediction_adapter import (
+from objgauss.pipelines.objectstate_identity_prediction_adapter import (
     objectstate_identity_predictions_from_trainable_artifact,
     read_trainable_kernel_identity_source,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import write_trainable_kernel_model_artifact
+from objgauss.pipelines.trainable_kernel import (
+    make_trainable_kernel_mvp_fixture,
+    train_kernel_mvp,
+)
 
 
 def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
@@ -31,6 +36,7 @@ def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
 
     assert predictions["schema"] == OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA
     assert predictions["sample_id"] == "controlled-tabletop-cup-box-identity-001"
+    assert predictions["association_mode"] == "raw_track_observations"
     assert predictions["candidate"]["candidate_id"] == "stable-objectstate-slots"
     assert predictions["candidate"]["identity_evidence"] == {
         "reconstruction_noise_robustness": 1.0,
@@ -38,8 +44,12 @@ def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
         "source": "fixture repeated Gaussian reconstruction noise variants",
     }
     assert len(predictions["predictions"]) == 6
-    assert predictions["predictions"][0]["predicted_identity"] == "slot-0"
-    assert predictions["predictions"][1]["predicted_identity"] == "slot-1"
+    assert predictions["predictions"][0]["predicted_identity"] == "object-state-101"
+    assert predictions["predictions"][1]["predicted_identity"] == "object-state-202"
+    assert predictions["predictions"][0]["predicted_position"] == pytest.approx(
+        (0.1, 0.2, 0.3)
+    )
+    assert all("object_id" not in row for row in predictions["predictions"])
     assert validate_objectstate_controlled_identity_predictions(predictions) == predictions
 
     summary = evaluate_objectstate_controlled_identity_predictions(
@@ -57,7 +67,10 @@ def test_trainable_artifact_adapter_exports_controlled_identity_predictions():
 
 
 def test_trainable_artifact_adapter_surfaces_fragmented_slots():
-    artifact = _trainable_artifact(slot_ids_by_frame=((0, 1), (1, 0), (1, 0)))
+    artifact = _trainable_artifact(
+        slot_ids_by_frame=((0, 1), (1, 0), (1, 0)),
+        persistent_ids_follow_slots=True,
+    )
 
     predictions = objectstate_identity_predictions_from_trainable_artifact(
         _capture_manifest(),
@@ -74,6 +87,46 @@ def test_trainable_artifact_adapter_surfaces_fragmented_slots():
     assert summary["metrics"]["swap_rate"] > 0.0
 
 
+def test_trainable_serializer_to_identity_adapter_preserves_persistent_ids(tmp_path):
+    result = train_kernel_mvp(
+        make_trainable_kernel_mvp_fixture(),
+        slots=2,
+        iterations=2,
+        learning_rate=0.2,
+        seed=4,
+    )
+    artifact_path = tmp_path / "objectstates.json"
+    written = write_trainable_kernel_model_artifact(
+        artifact_path,
+        result,
+        input_path="fixture://serializer-roundtrip",
+    )
+    artifact = read_trainable_kernel_identity_source(artifact_path)
+
+    first_states = written["object_states"][0]["states"]
+    assert all(state["id"] == state["persistent_id"] for state in first_states)
+    assert all(state["id"] != state["slot"] for state in first_states)
+    assert all(0.0 <= state["confidence"] <= 1.0 for state in first_states)
+
+    capture = _capture_manifest_for_artifact(artifact)
+    predictions = objectstate_identity_predictions_from_trainable_artifact(
+        capture,
+        artifact,
+    )
+    identities_by_frame: dict[str, set[str]] = {}
+    for row in predictions["predictions"]:
+        identities_by_frame.setdefault(row["frame_id"], set()).add(
+            row["predicted_identity"]
+        )
+        assert "object_id" not in row
+    assert all(len(values) == 2 for values in identities_by_frame.values())
+    assert all(
+        identity.startswith("object-state-")
+        for values in identities_by_frame.values()
+        for identity in values
+    )
+
+
 def test_trainable_artifact_adapter_rejects_frame_count_mismatch():
     artifact = _trainable_artifact()
     artifact["object_states"] = artifact["object_states"][:2]
@@ -87,24 +140,45 @@ def test_trainable_artifact_adapter_rejects_frame_count_mismatch():
         )
 
 
-def test_trainable_artifact_adapter_requires_capture_pose():
+def test_trainable_artifact_adapter_does_not_read_capture_pose_or_object_order():
     capture = _capture_manifest()
-    capture["frames"][0]["objects"][0].pop("pose")
+    reference = objectstate_identity_predictions_from_trainable_artifact(
+        capture,
+        _trainable_artifact(),
+    )
+    for frame_index, frame in enumerate(capture["frames"]):
+        frame["objects"].reverse()
+        for object_index, item in enumerate(frame["objects"]):
+            item["pose"]["position"] = [
+                100.0 + frame_index,
+                -100.0 - object_index,
+                50.0,
+            ]
 
-    with pytest.raises(ValueError, match="requires pose.position"):
-        objectstate_identity_predictions_from_trainable_artifact(
-            capture,
-            _trainable_artifact(),
-        )
+    changed_ground_truth = objectstate_identity_predictions_from_trainable_artifact(
+        capture,
+        _trainable_artifact(),
+    )
+
+    assert changed_ground_truth == reference
 
 
 def test_trainable_artifact_adapter_can_filter_far_centroids():
-    with pytest.raises(ValueError, match="require at least one prediction"):
-        objectstate_identity_predictions_from_trainable_artifact(
-            _capture_manifest(),
-            _trainable_artifact(x_offset=10.0),
-            max_centroid_distance=0.01,
-        )
+    predictions = objectstate_identity_predictions_from_trainable_artifact(
+        _capture_manifest(),
+        _trainable_artifact(x_offset=10.0),
+        max_centroid_distance=0.01,
+    )
+    summary = evaluate_objectstate_controlled_identity_predictions(
+        _capture_manifest(),
+        predictions,
+    )
+
+    assert len(predictions["predictions"]) == 6
+    assert predictions["candidate"]["max_association_distance"] == 0.01
+    assert summary["status"] == "objectstate_controlled_identity_eval_fail"
+    assert summary["metrics"]["missing_prediction_count"] == 6
+    assert summary["metrics"]["unmatched_prediction_count"] == 6
 
 
 def test_trainable_artifact_identity_source_reads_json(tmp_path):
@@ -217,6 +291,7 @@ def _trainable_artifact(
     slot_ids_by_frame: tuple[tuple[int, int], ...] = ((0, 1), (0, 1), (0, 1)),
     x_offset: float = 0.0,
     include_identity_evidence: bool = True,
+    persistent_ids_follow_slots: bool = False,
 ):
     object_states = []
     assignments = []
@@ -228,8 +303,16 @@ def _trainable_artifact(
             {
                 "frame_index": frame_index,
                 "states": [
-                    _state(cup_slot, [cup_x, 0.2, 0.3]),
-                    _state(box_slot, [box_x, 0.2, 0.3]),
+                    _state(
+                        cup_slot,
+                        [cup_x, 0.2, 0.3],
+                        persistent_id=cup_slot if persistent_ids_follow_slots else 101,
+                    ),
+                    _state(
+                        box_slot,
+                        [box_x, 0.2, 0.3],
+                        persistent_id=box_slot if persistent_ids_follow_slots else 202,
+                    ),
                 ],
                 "derived_object_ids": [cup_slot, box_slot],
             }
@@ -270,9 +353,11 @@ def _trainable_artifact(
     return artifact
 
 
-def _state(state_id: int, centroid: list[float]):
+def _state(slot: int, centroid: list[float], *, persistent_id: int):
     return {
-        "id": state_id,
+        "id": persistent_id,
+        "persistent_id": persistent_id,
+        "slot": slot,
         "slot_mass": 1.0,
         "confidence": 0.92,
         "mass_fraction": 0.5,
@@ -286,4 +371,63 @@ def _state(state_id: int, centroid: list[float]):
         "feature": [centroid[0], centroid[1], centroid[2]],
         "status": "active",
         "diagnostics": [],
+    }
+
+
+def _capture_manifest_for_artifact(artifact: dict):
+    persistent_ids = [
+        int(state["id"])
+        for state in artifact["object_states"][0]["states"]
+    ]
+    frames = []
+    for frame_index, artifact_frame in enumerate(artifact["object_states"]):
+        states_by_id = {
+            int(state["id"]): state
+            for state in artifact_frame["states"]
+        }
+        frames.append(
+            {
+                "frame_id": f"frame-{frame_index:06d}",
+                "timestamp": frame_index / 30.0,
+                "observation": {
+                    "rgb": f"rgb/{frame_index:06d}.png",
+                    "gaussian": f"gaussians/{frame_index:06d}.ply",
+                },
+                "objects": [
+                    {
+                        "object_id": f"physical-{persistent_id}",
+                        "visible": True,
+                        "occlusion_fraction": 0.0,
+                        "pose": {
+                            "position": states_by_id[persistent_id]["centroid"],
+                            "rotation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                        },
+                    }
+                    for persistent_id in persistent_ids
+                ],
+            }
+        )
+    return {
+        "schema": OBJECTSTATE_CONTROLLED_CAPTURE_MANIFEST_SCHEMA,
+        "sample": {
+            "sample_id": "serializer-identity-roundtrip",
+            "source_kind": "controlled_real",
+            "object_category": "fixture",
+            "scenario": "serializer_roundtrip",
+            "fps": 30.0,
+            "capture_device": "fixture-camera",
+            "observation_modalities": ["rgb", "gaussian"],
+            "artifact_refs": ["fixture://serializer-roundtrip"],
+            "license": "test fixture",
+        },
+        "objects": [
+            {
+                "object_id": f"physical-{persistent_id}",
+                "category": "fixture",
+                "instance_label": f"fixture {persistent_id}",
+            }
+            for persistent_id in persistent_ids
+        ],
+        "actions": [],
+        "frames": frames,
     }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from objgauss.core.objectstate_identity_encoder import (
+from objgauss.pipelines.objectstate_identity_encoder import (
     OBJECTSTATE_IDENTITY_ENCODER_STATE_SCHEMA,
     OBJECTSTATE_IDENTITY_ENCODER_TRAINING_SCHEMA,
     ObjectStateIdentityEncoderConfig,
@@ -11,9 +11,9 @@ from objgauss.core.objectstate_identity_encoder import (
     train_objectstate_identity_encoder,
     validate_objectstate_identity_encoder_training_summary,
 )
-from objgauss.core.objectstate_identity_gate import evaluate_objectstate_identity_gate
-from objgauss.core.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
-from objgauss.core.v2_stability_foundation import (
+from objgauss.evaluation.objectstate_identity_gate import evaluate_objectstate_identity_gate
+from objgauss.evaluation.v2_stability_diagnostics import expected_slots_for_synthetic_fixture
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

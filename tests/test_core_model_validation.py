@@ -7,25 +7,25 @@ from objgauss.core.assignment_solver_v2 import (
     AssignmentSolverV2State,
     train_assignment_solver_v2,
 )
-from objgauss.core.assignment_solver_v2_eval import (
-    assignment_solver_v2_checkpoint,
+from objgauss.core.assignment_solver_v2 import assignment_solver_v2_checkpoint
+from objgauss.evaluation.assignment_solver_v2_eval import (
     evaluate_assignment_solver_v2_stability,
 )
-from objgauss.core.assignment_v2_renderer_validation import (
+from objgauss.pipelines.assignment_v2_renderer_validation import (
     evaluate_assignment_v2_renderer_joint,
 )
-from objgauss.core.core_model_validation import (
+from objgauss.pipelines.core_model_validation import (
     CORE_MODEL_TRAIN_VALIDATE_SCHEMA,
     CoreModelTrainValidateReport,
     core_model_train_validate_report,
     validate_core_model_train_validate_summary,
 )
-from objgauss.core.renderer_loss import renderer_loss_boundary_report
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.renderer_loss import renderer_loss_boundary_report
+from objgauss.pipelines.trainable_kernel import (
     TrainableKernelFrame,
     bind_image_targets_to_frames,
 )
-from objgauss.core.v2_stability_foundation import (
+from objgauss.datasets.v2_stability_foundation import (
     ObservationModelConfig,
     make_synthetic_stability_scenario_fixture,
 )

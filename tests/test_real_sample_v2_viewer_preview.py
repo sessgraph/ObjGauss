@@ -6,7 +6,7 @@ import numpy as np
 
 from objgauss.cli import main
 from objgauss.core.io import read_ply
-from objgauss.core.real_sample_v2_viewer_preview import (
+from objgauss.pipelines.real_sample_v2_viewer_preview import (
     REAL_SAMPLE_V2_VIEWER_PREVIEW_SCHEMA,
     RealSampleV2ViewerPreviewReport,
     real_sample_v2_viewer_preview_from_cloud,

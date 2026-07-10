@@ -1003,6 +1003,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
                 "fragmentation_rate": 0.0,
                 "swap_rate": 0.0,
                 "identity_collapse": False,
+                "raw_prediction_observations": True,
             },
             has_identity_gt=True,
             has_pose_gt=True,
@@ -1020,9 +1021,9 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
             observation_modalities=("rgb", "gaussian"),
             artifact_refs=("datasets/namespace-controlled-cup/pose.json",),
             metrics={
-                "state_ade": 0.04,
-                "history_ade": 0.03,
-                "prediction_gap_vs_history_model": 0.01,
+                "state_ade": 0.03,
+                "history_ade": 0.04,
+                "prediction_gap_vs_history_model": -0.01,
             },
             has_identity_gt=True,
             has_pose_gt=True,
@@ -1041,6 +1042,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
             artifact_refs=("datasets/namespace-controlled-cup/action.json",),
             metrics={
                 "action_conditioned_ade": 0.02,
+                "no_action_ade": 0.08,
                 "counterfactual_outcome_accuracy": 1.0,
                 "wrong_direction_rate": 0.0,
             },
@@ -1461,6 +1463,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
     identity_predictions = {
         "schema": OBJECTSTATE_CONTROLLED_IDENTITY_PREDICTIONS_SCHEMA,
         "sample_id": "namespace-controlled-capture",
+        "association_mode": "raw_track_observations",
         "candidate": {
             "candidate_id": "namespace-identity-candidate",
             "source": "namespace fixture",
@@ -1474,13 +1477,13 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
         "predictions": [
             {
                 "frame_id": "frame-000000",
-                "object_id": "cup-001",
                 "predicted_identity": "cup-track",
+                "predicted_position": [0.1, 0.2, 0.3],
             },
             {
                 "frame_id": "frame-000001",
-                "object_id": "cup-001",
                 "predicted_identity": "cup-track",
+                "predicted_position": [0.11, 0.2, 0.3],
             },
         ],
     }
@@ -1824,6 +1827,7 @@ def test_core_namespace_exposes_v2_stability_foundation_contract():
                     "fragmentation_rate": 0.0,
                     "swap_rate": 0.0,
                     "identity_collapse": False,
+                    "raw_prediction_observations": True,
                 },
             },
             {

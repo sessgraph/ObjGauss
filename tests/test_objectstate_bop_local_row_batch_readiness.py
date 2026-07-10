@@ -3,17 +3,17 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_candidate_artifact_template import (
+from objgauss.pipelines.objectstate_bop_candidate_artifact_template import (
     finalize_objectstate_bop_candidate_artifact_template,
     write_objectstate_bop_candidate_artifact_template,
 )
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_local_row_batch_handoff import (
+from objgauss.datasets.objectstate_bop_local_row_batch_spec import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_SPEC_SCHEMA,
 )
-from objgauss.core.objectstate_bop_local_row_batch_readiness import (
+from objgauss.pipelines.objectstate_bop_local_row_batch_readiness import (
     OBJECTSTATE_BOP_LOCAL_ROW_BATCH_READINESS_SCHEMA,
     objectstate_bop_local_row_batch_readiness,
     validate_objectstate_bop_local_row_batch_readiness_summary,

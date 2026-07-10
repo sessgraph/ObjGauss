@@ -1,4 +1,4 @@
-# ObjGauss MVP
+# ObjGauss
 
 > **Development-stage research project / 开发阶段项目。** ObjGauss is
 > currently used for research prototyping, verification, and reproducibility
@@ -7,21 +7,35 @@
 > and local outputs should not be treated as production-ready or commercial demo
 > releases.
 
-ObjGauss is a minimal object-aware layer on top of a standard 3D Gaussian
-Splatting export. This repository intentionally does not fork a renderer or
-trainer. The MVP starts from a `gaussians.ply` file produced by an existing
-3DGS implementation and adds:
+ObjGauss is a research-first platform for testing whether Gaussian scene
+evidence can support persistent, predictive object state. It includes a
+Gaussian/object assignment kernel, controlled-evidence evaluation, artifact
+pipelines, and a browser evidence viewer. The repository owns renderer bridge
+and experimental WebGPU/OIT code, while external 3DGS trainers remain optional
+pipeline dependencies.
+
+The currently verified baseline starts from a `gaussians.ply` or `.splat`
+artifact and provides:
 
 - Gaussian feature extraction from position, color, and opacity.
-- K-means object clustering.
+- K-means and trainable fixed-slot assignment baselines.
 - `object_id` attachment as a PLY vertex property.
 - Object-colored PLY exports for inspection.
 - Object removal and isolation exports.
-- Soft Object Field initialization for object-slot experiments.
+- Soft Object Field / `A[N,K]` assignment and ObjectState projection.
+- Explicit pass/fail/blocked accounting for controlled identity, prediction,
+  and intervention evidence.
 
-The goal is to validate whether Gaussian splats can be grouped into stable
-object-level clusters before investing in semantic guidance or renderer
-changes.
+The open research claim is stricter than object clustering: ObjectState must
+preserve physical identity through occlusion/view change, improve prediction
+over history-only baselines, and use measured actions better than a no-action
+baseline on held-out real scenes. Current public replay evidence does **not**
+pass that full gate. Synthetic, fixture, schema-valid, and reviewable outputs
+are plumbing evidence, not world-model proof.
+
+From 2026-07-10 through 2026-07-24 the project is in a stabilization freeze:
+no new schema, audit, handoff, renderer route, or viewer feature. See
+`docs/adr/0007-research-first-stabilization.md`.
 
 ## Development workflow
 
@@ -33,6 +47,13 @@ process rules.
 Current project state lives in `docs/state/`. Start with
 `docs/state/project-status.md` and `docs/state/pr-queue.md`.
 
+## License status
+
+Repository code is currently **all rights reserved**; no reuse permission is
+granted until the Owner approves an open-source license. Third-party datasets,
+models, checkpoints, and demo assets keep their own source terms. See `LICENSE`
+and `docs/asset-library.md` before redistribution.
+
 ## Install
 
 Recommended:
@@ -41,6 +62,9 @@ Recommended:
 uv sync --extra dev
 ```
 
+The committed `uv.lock` is authoritative for the core/test environment. CI uses
+Python from `.python-version` and runs `uv sync --locked --extra dev`.
+
 Plain Python:
 
 ```bash
@@ -48,6 +72,18 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+Viewer dependencies and runtime are locked separately:
+
+```bash
+nvm use
+npm ci
+npm run build
+```
+
+The Splatfacto smoke wrapper pins the verified top-level Nerfstudio, torch,
+torchvision, gsplat, CUDA-package family, and Segment Anything revision. Model
+checkpoints remain external local inputs and are never downloaded implicitly.
 
 `scikit-learn` is optional. If it is installed, the CLI uses it for k-means.
 Otherwise ObjGauss uses a deterministic NumPy implementation.

@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.objectstate_controlled_identity_bundle_handoff import (
+from objgauss.pipelines.objectstate_controlled_identity_bundle_handoff import (
     OBJECTSTATE_CONTROLLED_IDENTITY_BUNDLE_HANDOFF_SCHEMA,
     objectstate_controlled_identity_bundle_handoff,
     validate_objectstate_controlled_identity_bundle_handoff_summary,
 )
-from objgauss.core.objectstate_controlled_identity_evidence_package import (
+from objgauss.pipelines.objectstate_controlled_identity_evidence_package import (
     OBJECTSTATE_CONTROLLED_IDENTITY_EVIDENCE_PACKAGE_SCHEMA,
 )
-from objgauss.core.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
+from objgauss.pipelines.trainable_artifact import TRAINABLE_KERNEL_MODEL_ARTIFACT_SCHEMA
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n"
 PLY_BYTES = (

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.trainable_kernel import (
+from objgauss.pipelines.trainable_kernel import (
     TRAINABLE_KERNEL_MVP_SCHEMA,
     TRAINABLE_IMAGE_TARGET_CONTRACT_SCHEMA,
     TrainableKernelFrame,
@@ -46,7 +46,11 @@ def test_trainable_kernel_mvp_reduces_end_to_end_loss():
     summary = result.as_dict()
     assert summary["loss_decreased"] is True
     assert summary["render_loss_decreased"] is True
-    assert summary["object_states"][0][0]["slot_mass"] > 0
+    state = summary["object_states"][0][0]
+    assert state["slot_mass"] > 0
+    assert state["id"] == state["persistent_id"]
+    assert state["slot"] == state["object_id"]
+    assert state["id"] != state["slot"]
 
 
 def test_trainable_kernel_validates_frame_shapes():
@@ -182,7 +186,7 @@ def test_trainable_kernel_can_route_image_loss_to_gsplat_adapter(monkeypatch):
         return SimpleNamespace(image_render_loss=0.123)
 
     monkeypatch.setattr(
-        "objgauss.core.gsplat_training_renderer.evaluate_gsplat_training_renderer_loss",
+        "objgauss.pipelines.gsplat_training_renderer.evaluate_gsplat_training_renderer_loss",
         fake_gsplat_renderer,
     )
     frames = bind_image_targets_to_frames(make_trainable_kernel_mvp_fixture(), width=8, height=8)

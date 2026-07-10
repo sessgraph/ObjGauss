@@ -8,30 +8,30 @@ import zlib
 import numpy as np
 
 from objgauss.cli import main
-from objgauss.core.objectstate_bop_capture_adapter import (
+from objgauss.datasets.objectstate_bop_capture_adapter import (
     OBJECTSTATE_BOP_CAPTURE_CONDITION_SIDECAR_SCHEMA,
 )
-from objgauss.core.objectstate_bop_reality_rows import (
+from objgauss.evaluation.objectstate_bop_reality_rows import (
     OBJECTSTATE_BOP_REALITY_ROWS_SCHEMA,
     objectstate_bop_reality_rows_from_summary,
     objectstate_bop_reality_rows_summary,
     validate_objectstate_bop_reality_rows_summary,
 )
-from objgauss.core.objectstate_bop_real_evidence_bundle import (
+from objgauss.pipelines.objectstate_bop_real_evidence_bundle import (
     OBJECTSTATE_BOP_REAL_EVIDENCE_BUNDLE_ADAPTER_SCHEMA,
     objectstate_bop_real_evidence_bundle_adapter_summary,
     validate_objectstate_bop_real_evidence_bundle_adapter_summary,
 )
-from objgauss.core.objectstate_bop_rgbd_baseline_local_row_handoff import (
+from objgauss.pipelines.objectstate_bop_rgbd_baseline_local_row_handoff import (
     objectstate_bop_rgbd_baseline_local_row_handoff,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger import (
     write_objectstate_real_evidence_bundle_ledger,
 )
-from objgauss.core.objectstate_real_evidence_bundle_ledger_audit import (
+from objgauss.pipelines.objectstate_real_evidence_bundle_ledger_audit import (
     objectstate_real_evidence_bundle_ledger_package_audit,
 )
-from objgauss.core.objectstate_reality_row_ledger import (
+from objgauss.evaluation.objectstate_reality_row_ledger import (
     objectstate_reality_row_ledger,
 )
 
@@ -61,7 +61,9 @@ def test_bop_reality_rows_convert_existing_rgbd_local_row_summary(tmp_path):
     assert summary["fail_row_count"] == 1
     assert summary["blocked_row_count"] == 1
     assert summary["gate"]["status"] == "objectstate_reality_gate_fail"
-    assert summary["gate"]["metrics"]["controlled_real_identity_collapse"] is True
+    # One raw state observation cannot collapse two GT identities; it leaves one
+    # identity unmatched and the identity row still fails on coverage/quality.
+    assert summary["gate"]["metrics"]["controlled_real_identity_collapse"] is False
     assert summary["claim_policy"]["does_not_claim_world_model"] is True
     assert summary["claim_policy"]["does_not_claim_intervention_gate"] is True
     assert "prediction:pass" in {

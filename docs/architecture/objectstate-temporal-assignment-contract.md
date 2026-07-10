@@ -120,7 +120,7 @@ Loss decrease alone is not sufficient.
 Core module:
 
 ```text
-objgauss.core.objectstate_temporal_assignment_contract
+objgauss.pipelines.objectstate_temporal_assignment_contract
 ```
 
 Schemas:
@@ -145,7 +145,7 @@ is provided. A ready summary points to
 Implemented run module:
 
 ```text
-objgauss.core.objectstate_temporal_assignment
+objgauss.pipelines.objectstate_temporal_assignment
 ```
 
 Run summary schema:
