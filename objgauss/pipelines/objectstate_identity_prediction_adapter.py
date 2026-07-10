@@ -133,11 +133,17 @@ def _state(value: Any) -> dict[str, Any]:
     state_id = item.get("id")
     if isinstance(state_id, bool) or not isinstance(state_id, int):
         raise ValueError("trainable artifact ObjectState id must be an integer")
+    if state_id < 0:
+        raise ValueError("trainable artifact ObjectState id must be non-negative")
     centroid = _vector(item.get("centroid"), "trainable artifact ObjectState centroid")
-    confidence = item.get("confidence", 1.0)
+    if "confidence" not in item:
+        raise ValueError("trainable artifact ObjectState requires confidence")
+    confidence = item["confidence"]
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
         raise TypeError("trainable artifact ObjectState confidence must be numeric")
     confidence_value = float(confidence)
+    if not np.isfinite(confidence_value):
+        raise ValueError("trainable artifact ObjectState confidence must be finite")
     if confidence_value < 0.0 or confidence_value > 1.0:
         raise ValueError("trainable artifact ObjectState confidence must be in [0, 1]")
     return {

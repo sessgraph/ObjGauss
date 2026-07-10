@@ -190,6 +190,34 @@ def test_trainable_artifact_adapter_rejects_non_finite_centroid_distance():
         )
 
 
+def test_trainable_artifact_adapter_requires_explicit_confidence():
+    artifact = _trainable_artifact()
+    artifact["object_states"][0]["states"][0].pop("confidence")
+
+    with pytest.raises(ValueError, match="requires confidence"):
+        objectstate_identity_predictions_from_trainable_artifact(
+            _capture_manifest(),
+            artifact,
+        )
+
+
+def test_trainable_artifact_adapter_preserves_legacy_confidence():
+    artifact = _trainable_artifact()
+    for frame in artifact["object_states"]:
+        for state in frame["states"]:
+            state.pop("persistent_id")
+            state.pop("slot")
+            state.pop("object_id")
+    artifact["object_states"][0]["states"][0]["confidence"] = 0.37
+
+    predictions = objectstate_identity_predictions_from_trainable_artifact(
+        _capture_manifest(),
+        artifact,
+    )
+
+    assert predictions["predictions"][0]["confidence"] == pytest.approx(0.37)
+
+
 def test_trainable_artifact_identity_source_reads_json(tmp_path):
     artifact_path = tmp_path / "objectstates.json"
     artifact_path.write_text(json.dumps(_trainable_artifact()), encoding="utf-8")
@@ -367,6 +395,7 @@ def _state(slot: int, centroid: list[float], *, persistent_id: int):
         "id": persistent_id,
         "persistent_id": persistent_id,
         "slot": slot,
+        "object_id": slot,
         "slot_mass": 1.0,
         "confidence": 0.92,
         "mass_fraction": 0.5,
