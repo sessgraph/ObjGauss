@@ -119,6 +119,60 @@ def test_controlled_reality_bundle_handoff_fails_wrong_direction_intervention(
     assert "controlled intervention eval did not pass" in summary["issues"]
 
 
+@pytest.mark.parametrize(
+    ("tamper_kind", "error_match"),
+    (
+        ("identity", "identity eval must match raw recomputation"),
+        ("prediction", "prediction eval must match raw recomputation"),
+        ("intervention", "intervention eval must match raw recomputation"),
+        (
+            "ground_truth",
+            "rows must match gate-derived rows|row gate must match canonical child rows",
+        ),
+    ),
+)
+def test_controlled_reality_bundle_handoff_rejects_tampered_summary_only_pass(
+    tmp_path,
+    tamper_kind,
+    error_match,
+):
+    _write_bundle(tmp_path, include_frame_files=True)
+    artifact = _trainable_artifact()
+    artifact_path = _write_candidate_artifact_file(tmp_path, artifact)
+    summary = objectstate_controlled_reality_bundle_handoff(
+        tmp_path,
+        artifact,
+        _prediction_candidates(),
+        _intervention_candidates(),
+        candidate_id="stable-objectstate-slots",
+        max_centroid_distance=0.05,
+        candidate_artifact_path=artifact_path,
+    )
+    tampered = json.loads(json.dumps(summary))
+
+    if tamper_kind == "identity":
+        _tamper_eval_metric(
+            tampered,
+            kind="objectstate_controlled_identity_eval",
+            metric="idf1",
+            replacement=0.0,
+        )
+    elif tamper_kind == "prediction":
+        tampered["prediction_eval"]["metrics"]["state_ade"] = 123.0
+    elif tamper_kind == "intervention":
+        tampered["intervention_eval"]["metrics"][
+            "counterfactual_outcome_accuracy"
+        ] = 0.0
+    else:
+        gate = tampered["controlled_real_summary"]["gate"]
+        for group_name in ("rows", "pass_rows", "fail_rows", "blocked_rows"):
+            for row in gate[group_name]:
+                row["ground_truth"]["pose"] = False
+
+    with pytest.raises(ValueError, match=error_match):
+        validate_objectstate_controlled_reality_bundle_handoff_summary(tampered)
+
+
 def test_controlled_reality_bundle_handoff_blocks_weak_intervention_action_gt(
     tmp_path,
 ):
@@ -363,6 +417,27 @@ def _prediction_candidates():
             }
         ],
     }
+
+
+def _tamper_eval_metric(node, *, kind, metric, replacement):
+    if isinstance(node, dict):
+        if node.get("kind") == kind:
+            node["metrics"][metric] = replacement
+        for item in node.values():
+            _tamper_eval_metric(
+                item,
+                kind=kind,
+                metric=metric,
+                replacement=replacement,
+            )
+    elif isinstance(node, list):
+        for item in node:
+            _tamper_eval_metric(
+                item,
+                kind=kind,
+                metric=metric,
+                replacement=replacement,
+            )
 
 
 def _intervention_candidates():

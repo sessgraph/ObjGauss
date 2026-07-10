@@ -10,14 +10,17 @@ from objgauss.pipelines.objectstate_controlled_identity_bundle_handoff import (
 )
 from objgauss.evaluation.objectstate_controlled_identity_eval import (
     ObjectStateControlledIdentityThresholds,
+    evaluate_objectstate_controlled_identity_predictions,
 )
 from objgauss.evaluation.objectstate_controlled_intervention_eval import (
+    OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_INTERVENTION_EVAL_SCHEMA,
     ObjectStateControlledInterventionThresholds,
     evaluate_objectstate_controlled_intervention_candidates,
     validate_objectstate_controlled_intervention_eval_summary,
 )
 from objgauss.evaluation.objectstate_controlled_prediction_eval import (
+    OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
     OBJECTSTATE_CONTROLLED_PREDICTION_EVAL_SCHEMA,
     ObjectStateControlledPredictionThresholds,
     evaluate_objectstate_controlled_prediction_candidates,
@@ -302,12 +305,64 @@ def validate_objectstate_controlled_reality_bundle_handoff_summary(
     intervention_eval = validate_objectstate_controlled_intervention_eval_summary(
         payload.get("intervention_eval")
     )
+    capture_manifest = identity_bundle_handoff["capture_bundle_acceptance"][
+        "import_summary"
+    ]["manifest"]
+    recomputed_identity_eval = evaluate_objectstate_controlled_identity_predictions(
+        capture_manifest,
+        identity_bundle_handoff["identity_predictions"],
+        thresholds=ObjectStateControlledIdentityThresholds(
+            **dict(identity_bundle_handoff["identity_eval"]["thresholds"])
+        ),
+    )
+    if not _json_equivalent(
+        identity_bundle_handoff["identity_eval"],
+        recomputed_identity_eval,
+    ):
+        raise ValueError(
+            "controlled reality bundle handoff identity eval must match raw recomputation"
+        )
+    recomputed_prediction_eval = evaluate_objectstate_controlled_prediction_candidates(
+        capture_manifest,
+        _prediction_candidates_from_eval(prediction_eval),
+        thresholds=ObjectStateControlledPredictionThresholds(
+            **dict(prediction_eval["thresholds"])
+        ),
+    )
+    if not _json_equivalent(prediction_eval, recomputed_prediction_eval):
+        raise ValueError(
+            "controlled reality bundle handoff prediction eval must match raw recomputation"
+        )
+    recomputed_intervention_eval = evaluate_objectstate_controlled_intervention_candidates(
+        capture_manifest,
+        _intervention_candidates_from_eval(intervention_eval),
+        thresholds=ObjectStateControlledInterventionThresholds(
+            **dict(intervention_eval["thresholds"])
+        ),
+    )
+    if not _json_equivalent(intervention_eval, recomputed_intervention_eval):
+        raise ValueError(
+            "controlled reality bundle handoff intervention eval must match raw recomputation"
+        )
     controlled_real_manifest = validate_objectstate_controlled_real_manifest(
         payload.get("controlled_real_manifest")
     )
     controlled_real_summary = validate_objectstate_controlled_real_rows_summary(
         payload.get("controlled_real_summary")
     )
+    gate = controlled_real_summary["gate"]
+    recomputed_controlled_real_summary = objectstate_controlled_real_rows_summary(
+        controlled_real_manifest,
+        synthetic_smoke_passed=bool(gate["synthetic_smoke_passed"]),
+        thresholds=ObjectStateRealityGateThresholds(**dict(gate["thresholds"])),
+    )
+    if not _json_equivalent(
+        controlled_real_summary,
+        recomputed_controlled_real_summary,
+    ):
+        raise ValueError(
+            "controlled reality bundle handoff row gate must match canonical child rows"
+        )
     sample_id = controlled_real_summary["sample"]["sample_id"]
     for child_name, child_sample_id in (
         ("identity bundle", identity_bundle_handoff["sample"]["sample_id"]),
@@ -457,6 +512,57 @@ def _json_normalize(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_json_normalize(item) for item in value]
     return value
+
+
+def _prediction_candidates_from_eval(
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    predictions = []
+    for record in summary["prediction_records"]:
+        predictions.append(
+            {
+                "source_frame_id": record["source_frame_id"],
+                "target_frame_id": record["target_frame_id"],
+                "object_id": record["object_id"],
+                "predicted_position": list(record["predicted_position"]),
+                "history_baseline_position": list(
+                    record["history_baseline_position"]
+                ),
+            }
+        )
+    return {
+        "schema": OBJECTSTATE_CONTROLLED_PREDICTION_CANDIDATES_SCHEMA,
+        "sample_id": summary["sample"]["sample_id"],
+        "candidate": dict(summary["candidate"]),
+        "predictions": predictions,
+    }
+
+
+def _intervention_candidates_from_eval(
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    interventions = []
+    for record in summary["intervention_records"]:
+        interventions.append(
+            {
+                "source_frame_id": record["source_frame_id"],
+                "target_frame_id": record["target_frame_id"],
+                "object_id": record["object_id"],
+                "action_id": record["action_id"],
+                "action_conditioned_position": list(
+                    record["action_conditioned_position"]
+                ),
+                "no_action_baseline_position": list(
+                    record["no_action_baseline_position"]
+                ),
+            }
+        )
+    return {
+        "schema": OBJECTSTATE_CONTROLLED_INTERVENTION_CANDIDATES_SCHEMA,
+        "sample_id": summary["sample"]["sample_id"],
+        "candidate": dict(summary["candidate"]),
+        "interventions": interventions,
+    }
 
 
 def _merged_controlled_real_manifest(
