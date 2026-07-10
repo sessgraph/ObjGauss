@@ -61,10 +61,14 @@
 - 已核验: H2O/HOI4D/HOT3D/DexYCB 等公开候选可支持部分 identity/prediction，
   但都不原生提供现行合同要求的独立非零 3D action/control vector；当前 host 也无 capture
   设备与重建工具链。
-- acquisition preflight: RBO/RRC 官方索引及各 3 条最小候选已于 2026-07-10 本地下载，
-  并通过 `scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all`；
-  archives 尚未解包或完成字段语义审计，当前不能据此改变 `0/3` 或 intervention blocked
-  状态。
+- acquisition/semantic audit: RBO/RRC 官方索引及各 3 条最小候选已于 2026-07-10 本地
+  下载并完成完整性与字段语义审计。RBO 三段有同步 RGB-D、逐 link 6DoF、相机运动和
+  wrench，但严格 mesh/depth 可见性重算为 `0/3` V-O-V，sensor sign/target link 未确认；
+  RRC 三段有真实 9D desired/applied action 与 tracker pose，但固定相机、无 depth，不能
+  直接进入现行 3D action contract。
+- follow-up acquisition: `scripts/download-rbo-occlusion-followup.sh` 固定 P0
+  `treasurebox25/laptop26/globe25`，P1 再加 `treasurebox24/laptop25`；下载后仍须跑同一
+  严格像素级可见性与 action 语义复核，不能仅凭 index metadata 计数。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
 - 解锁条件: 提供能记录独立 action/control vector 的 capture host，或提供许可明确且同时含
   RGB-D/6DoF/遮挡/视角变化/真实控制量的现成 scene 文件。
@@ -87,6 +91,8 @@
 - 2026-07-10: `STATE-SLIM-001`；active state 归档减量并启动 datasets/evaluation 边界迁移。
 - 2026-07-10: public interaction correctness；纠正 HOT3D action GT，解除 identity/prediction
   对 action 声明的错误依赖，并阻止 fixture intervention 转成 public pass。
+- 2026-07-10: RBO/RRC 首批 archive 字段语义审计；确认 RBO 严格 V-O-V `0/3` 与 action
+  GT blocker，确认 RRC 固定相机/无 depth/9D action 边界，并冻结 RBO occlusion follow-up。
 - 2026-07-09: controlled real prediction evaluator plumbing。
 - 2026-07-09: controlled real identity evaluator plumbing。
 

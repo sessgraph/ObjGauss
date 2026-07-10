@@ -32,8 +32,8 @@
 | --- | --- | --- | --- | --- |
 | BOP HOPE val Realsense | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-hope/hope_val_realsense.zip`、`outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/`、`val/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
 | BOP LMO test BOP19 | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`、`outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
-| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、3 个 interaction archive 与 3 个 companion model archive | 筛选 RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 同时存在的 interaction；2026-07-10 本地下载并通过大小、官方 MD5 与 tar 完整性校验 | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；尚未验证遮挡或形成 gate row |
-| RRC 2020 local subset | https://people.tuebingen.mpg.de/mpi-is-software/data/rrc2020/ | `outputs/assets/raw/rrc2020/`：官方 SQLite index、query helper 与 `7969.zip`、`8076.zip`、`9505.zip` | 筛选同一 robot、Phase 2 Level 4、持续抬升/位移/到达目标的真实控制 run；2026-07-10 本地下载并通过固定大小与 ZIP 完整性校验 | CC BY-NC-SA 4.0；pose 是视觉 tracker estimate，原生 action 是 9D robot control，不能直接冒充现行 3D action vector |
+| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、3 个 interaction archive 与 3 个 companion model archive | RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 均完成字段/时间审计；严格逐 link RGB-D 可见性重算为 `0/3` V-O-V | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；sensor sign 与 target-link attribution 未确认，不能形成 action GT |
+| RRC 2020 local subset | https://people.tuebingen.mpg.de/mpi-is-software/data/rrc2020/ | `outputs/assets/raw/rrc2020/`：官方 SQLite index、query helper 与 `7969.zip`、`8076.zip`、`9505.zip` | 三个 Phase 2 Level 4 run 已验证 Zarr 结构、时间、三路 RGB、tracker pose 与 desired/applied action overlap | CC BY-NC-SA 4.0；固定相机、无 depth；pose 是视觉 tracker estimate，原生 action 是 9D robot control，不能直接冒充现行 3D action vector |
 
 HOPE scene `000002` 的当前最小复跑输入只抽取前 3 帧：
 
@@ -88,10 +88,39 @@ scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all
 RBO companion model archive 均通过，且没有残留 `.part` 文件。该结果只证明下载完整，
 不证明字段语义或 reality gate 合格。
 
-这些条目仍只是 acquisition candidates。解包后必须独立检查 timestamp overlap、完整
-link/object pose、实际 camera displacement、visible → occluded → visible、非零 wrench /
-desired-applied action 与 pose transition 重叠。RBO wrench 需要 bias/gravity compensation
-和坐标变换；RRC 9D control 不得静默降维或用未来 object pose delta 伪造成 3D action。
+这些条目仍只是 acquisition candidates。2026-07-10 的字段语义审计确认：RBO 三段的
+RGB/depth/link pose/camera pose/wrench 时间重叠完整，camera displacement 为
+`0.109–0.173m`；但严格逐 link RGB-D/mesh z-buffer 重算没有任何一段形成
+clear → `occlusion_fraction >= 0.5` → clear。RBO wrench 已完成 bias/gravity 与 `/map`
+变换敏感性剖析，但官方材料没有明确 sensor 作用/反作用符号，且记录没有直接给出
+target link，因此 action GT 保持 blocked。一次性复核产物位于 ignored
+`outputs/evidence/rbo-objectstate-3scene/`，不提交仓库。
+
+RRC 三个 run 的 ZIP/Zarr、时间、三路 RGB、tracker 6DoF pose 与真实 desired/applied 9D
+joint action 已验证；三相机外参固定，数据没有 depth，也没有可直接进入现行合同的 3D
+Cartesian action。不得截取 joint action 前三维，或用未来 object pose delta 伪造 action。
+
+### RBO strict-occlusion follow-up
+
+原始三段的严格遮挡回环为 `0/3` 后，follow-up 只使用官方 index 中同时满足
+`Camera Motion=1` 与 F/T=1 的条目，并用 clutter、internal motion、近距离相机作为
+下载优先级代理。代理不等于遮挡标签；下载后仍必须运行同一像素级可见性重算。
+
+```bash
+scripts/download-rbo-occlusion-followup.sh --list
+scripts/download-rbo-occlusion-followup.sh --download --tier p0
+scripts/download-rbo-occlusion-followup.sh --verify-only --tier p0
+```
+
+| 层级 | 候选 | 选择依据 | 去重 payload |
+| --- | --- | --- | ---: |
+| P0 | `treasurebox25`、`laptop26`、`globe25`，以及三个 companion models | 三条均有 camera motion、F/T 和 internal interaction；treasurebox/globe 有 clutter，laptop 标注 close to camera；无 camera-TF warning | `1,099,581,268` bytes |
+| P1 | 再加 `treasurebox24`、`laptop25` | 扩大遮挡召回；`treasurebox24` 的异常接触可能没有 return-to-clear，`laptop25` 含 external motion/crop 风险 | 增量 `785,865,345` bytes |
+
+P0+P1 合计 `1,885,446,613` bytes，约 1.756 GiB。脚本默认 `--list`，下载使用
+`.part` 断点续传，并按 Zenodo 元数据的大小、MD5 与 tar 完整性验证。`book25` 虽有
+clutter 和较大 internal interaction，但官方 index 明示 camera TF 在录制后修复；在独立
+复核该修复前保持隔离，不进入自动下载集合。
 
 外部 controlled-interaction 候选：
 

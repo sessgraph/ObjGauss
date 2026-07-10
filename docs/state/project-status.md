@@ -51,6 +51,14 @@ HOPE 的局部 prediction evaluator 会在 `state_ade == history_ade == 0` 时�
 但 reality gate 要求严格优于 history baseline，因此独立派生为 fail。Synthetic、fixture、
 manual teacher evidence 和 schema/reviewability 状态均不计作 real gate pass。
 
+RBO `cardboardbox22`、`tripod25`、`cabinet20` 已完成实际字段与像素级审计。三段均有
+同步 RGB-D、逐刚体 MoCap 6DoF、`0.109–0.173m` camera displacement 和非零 100 Hz
+wrench；但使用官方 mesh、完整 camera TF、registered depth 独立重算后，严格
+clear → `occlusion_fraction >= 0.5` → clear 为 `0/3`。最大严格遮挡比例分别为
+`0.369 / 0.167 / 0.461`，不能手写成 pass。Wrench contact windows 可检测，但 sensor sign
+与 target-link attribution 未确认，action GT 继续 blocked。本地事实源为 ignored
+`outputs/evidence/rbo-objectstate-3scene/`。
+
 ## P0 稳定化结果
 
 已完成：
@@ -112,11 +120,13 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
 - [HOI4D](https://hoi4d.github.io/) 也提供 RGB-D、category-level object pose 与 hand action，许可为 CC BY-NC 4.0；
   action 只有类别/时间区间而非独立 control vector；当前没有本地 raw sequence。
 - RBO Articulated Objects 与 RRC 2020 的官方索引及各 3 条最小 acquisition candidate
-  已于 2026-07-10 下载到 ignored `outputs/assets/raw/`，并通过
-  `scripts/download-objectstate-evidence-subsets.sh --verify-only --dataset all` 的大小、
-  archive 完整性与适用的官方 MD5 校验。payload 尚未解包或做字段语义审计；RBO 提供
-  measured 3D wrench 但不是 controller command，RRC 提供真实 desired/applied 9D robot
-  control，但不能直接当作现行 3D vector。
+  已于 2026-07-10 下载、完整性验证并完成字段语义审计。RBO 三段的 RGB-D、link/camera
+  pose 与 wrench 时间覆盖合格，但严格 V-O-V 为 `0/3`，wrench sign/target link 未闭环；
+  RRC 三段的三路 RGB、tracker pose 与 desired/applied action overlap 合格，但相机固定、
+  无 depth，9D joint control 不能直接当现行 3D vector。
+- 新增 `scripts/download-rbo-occlusion-followup.sh`：P0 冻结
+  `treasurebox25/laptop26/globe25`（约 1.024 GiB），P1 再加
+  `treasurebox24/laptop25`；它只解决 acquisition，下载后仍须用同一严格可见性方法复核。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
@@ -125,9 +135,9 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
 - 实际 capture host / public interaction data 尚未提供任何同时满足全部条件的 scene；
   当前合格数为 `0/3`，三段 BOP 只是部分负证据。
 - 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
-  工具链；RBO/RRC scene archives 已在本地，但尚未解包并核验 timestamp/pose/occlusion/
-  view/action overlap，且两者 action 语义都不能未经审计直接满足 canonical 3D action
-  contract。
+  工具链；首批 RBO/RRC archives 已完成审计，但 RBO 严格遮挡回环为 `0/3` 且 action
+  sign/target-link 未闭环，RRC 又缺 temporal camera motion/depth/canonical 3D action。两者
+  当前都不能满足完整 controlled-scene contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。
 - Python 默认依赖未覆盖 torch / SAM / transformers / gsplat / nerfstudio 复现实验。
