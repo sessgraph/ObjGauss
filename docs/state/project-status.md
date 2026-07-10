@@ -126,7 +126,8 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   无 depth，9D joint control 不能直接当现行 3D vector。
 - 新增 `scripts/download-rbo-occlusion-followup.sh`：P0 冻结
   `treasurebox25/laptop26/globe25`（约 1.024 GiB），P1 再加
-  `treasurebox24/laptop25`；它只解决 acquisition，下载后仍须用同一严格可见性方法复核。
+  `treasurebox24/clamp25/pliers24/ikeasmall23`；官方 `ftSensor` model 同步纳入复现。
+  它只解决 acquisition，下载后仍须用同一严格可见性方法复核。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 

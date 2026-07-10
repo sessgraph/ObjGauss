@@ -114,13 +114,14 @@ scripts/download-rbo-occlusion-followup.sh --verify-only --tier p0
 
 | 层级 | 候选 | 选择依据 | 去重 payload |
 | --- | --- | --- | ---: |
-| P0 | `treasurebox25`、`laptop26`、`globe25`，以及三个 companion models | 三条均有 camera motion、F/T 和 internal interaction；treasurebox/globe 有 clutter，laptop 标注 close to camera；无 camera-TF warning | `1,099,581,268` bytes |
-| P1 | 再加 `treasurebox24`、`laptop25` | 扩大遮挡召回；`treasurebox24` 的异常接触可能没有 return-to-clear，`laptop25` 含 external motion/crop 风险 | 增量 `785,865,345` bytes |
+| P0 | `treasurebox25`、`laptop26`、`globe25`、三个 object models 与官方 `ftSensor` model | 三条均有 camera motion、F/T 和 internal interaction；`ftSensor` model 用于独立核对 wrench frame/sign 与同刻接触几何 | `1,099,647,770` bytes |
+| P1 | 再加 `treasurebox24`、`clamp25`、`pliers24`、`ikeasmall23` 及新增 models | P0 实测发现 laptop camera calibration 与 globe moving-link mesh alignment 不可用后，优先 2017-08-02 以后、无 camera-TF warning、较大 interaction 的替代项 | 增量 `920,317,009` bytes |
 
-P0+P1 合计 `1,885,446,613` bytes，约 1.756 GiB。脚本默认 `--list`，下载使用
+P0+P1 合计 `2,019,964,779` bytes，约 1.881 GiB。脚本默认 `--list`，下载使用
 `.part` 断点续传，并按 Zenodo 元数据的大小、MD5 与 tar 完整性验证。`book25` 虽有
 clutter 和较大 internal interaction，但官方 index 明示 camera TF 在录制后修复；在独立
-复核该修复前保持隔离，不进入自动下载集合。
+复核该修复前保持隔离，不进入自动下载集合。`laptop25` 与已发现 camera-pose/optical
+projection 不一致的 `laptop26` 同日同配置，也已从 P1 移除。
 
 外部 controlled-interaction 候选：
 

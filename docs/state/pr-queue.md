@@ -67,8 +67,10 @@
   RRC 三段有真实 9D desired/applied action 与 tracker pose，但固定相机、无 depth，不能
   直接进入现行 3D action contract。
 - follow-up acquisition: `scripts/download-rbo-occlusion-followup.sh` 固定 P0
-  `treasurebox25/laptop26/globe25`，P1 再加 `treasurebox24/laptop25`；下载后仍须跑同一
-  严格像素级可见性与 action 语义复核，不能仅凭 index metadata 计数。
+  `treasurebox25/laptop26/globe25` 与官方 `ftSensor` model；P0 实测发现 laptop camera
+  projection 与 globe moving-link mesh alignment 不可靠后，P1 已改为
+  `treasurebox24/clamp25/pliers24/ikeasmall23`。下载后仍须跑同一严格像素级可见性与
+  action 语义复核，不能仅凭 index metadata 计数。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
 - 解锁条件: 提供能记录独立 action/control vector 的 capture host，或提供许可明确且同时含
   RGB-D/6DoF/遮挡/视角变化/真实控制量的现成 scene 文件。

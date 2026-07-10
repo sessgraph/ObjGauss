@@ -25,6 +25,7 @@ P0_FILES=(
   "treasurebox.tar.gz"
   "laptop.tar.gz"
   "globe.tar.gz"
+  "ftSensor.tar.gz"
 )
 P0_SIZES=(
   386645684
@@ -33,6 +34,7 @@ P0_SIZES=(
   15294186
   1285300
   2101575
+  66502
 )
 P0_MD5S=(
   "2797319123f3293790bdb277cf2a3ed1"
@@ -41,20 +43,37 @@ P0_MD5S=(
   "a7c7f1943755878778f4bfe14e00d40d"
   "89230a0d2bfbe0eadf656a05678ae2be"
   "de73afa6bf391407f00bdf46e9567b52"
+  "9fa0ab792afc2ae9b756d73a18681dff"
 )
 
-# P1 is downloaded only with --tier all. Companion models are already in P0.
+# P1 is downloaded only with --tier all. The treasurebox model is already in
+# P0; the remaining companion models are listed explicitly here.
 P1_FILES=(
   "treasurebox24_o.tar.gz"
-  "laptop25_o.tar.gz"
+  "clamp25_o.tar.gz"
+  "pliers24_o.tar.gz"
+  "ikeasmall23_o.tar.gz"
+  "clamp.tar.gz"
+  "pliers.tar.gz"
+  "ikeasmall.tar.gz"
 )
 P1_SIZES=(
   224874604
-  560990741
+  216021978
+  280555056
+  191911421
+  1539537
+  1088816
+  4325597
 )
 P1_MD5S=(
   "3931e779657c3cd333b23a1f82035951"
-  "0a1b471c8ad995b30495008f3fe654c8"
+  "1764a193c4e6774a29a1ca8322b28c8d"
+  "47569b7b1eb73a4870e5ed284bb41209"
+  "5fc02c6a599e71e3f5177b64108c1c14"
+  "4c0fa2cc251d8e6114e101e3290cf3cb"
+  "423b8690d637777a839573bd2114a39c"
+  "841536856d3f434324fc29c887bf3901"
 )
 
 usage() {
@@ -209,14 +228,32 @@ if tier == "all":
                 "force/torque sensor used": "1",
                 "comment": "funny (ee got caught in box)",
             },
-            "laptop25": {
-                "Object": "laptop",
+            "clamp25": {
+                "Object": "clamp",
                 "Camera Motion": "1",
-                "Only Internal Interaction": "0",
-                "Small Interaction": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "0",
                 "cluttered": "0",
                 "force/torque sensor used": "1",
-                "comment": "laptop close to camera",
+                "comment": "placement of estimated joint not perfect but orientation correct",
+            },
+            "pliers24": {
+                "Object": "pliers",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "0",
+                "Small Interaction": "0",
+                "cluttered": "0",
+                "force/torque sensor used": "1",
+                "comment": "",
+            },
+            "ikeasmall23": {
+                "Object": "ikeasmall",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "0",
+                "cluttered": "0",
+                "force/torque sensor used": "1",
+                "comment": "",
             },
         }
     )
@@ -246,20 +283,20 @@ print_plan() {
   echo "tier=${TIER}"
   echo
   echo "P0 interactions: treasurebox25, laptop26, globe25"
-  echo "P0 payload with deduplicated companion models: 1099581268 bytes (about 1.024 GiB)"
+  echo "P0 payload with deduplicated companion models: 1099647770 bytes (about 1.024 GiB)"
   for i in "${!P0_FILES[@]}"; do
     printf '  %-30s %12s bytes  md5=%s\n' \
       "${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}"
   done
   if [[ "${TIER}" == "all" ]]; then
     echo
-    echo "P1 interactions: treasurebox24, laptop25"
-    echo "P1 incremental payload: 785865345 bytes"
+    echo "P1 interactions: treasurebox24, clamp25, pliers24, ikeasmall23"
+    echo "P1 incremental payload: 920317009 bytes (about 0.857 GiB)"
     for i in "${!P1_FILES[@]}"; do
       printf '  %-30s %12s bytes  md5=%s\n' \
         "${P1_FILES[$i]}" "${P1_SIZES[$i]}" "${P1_MD5S[$i]}"
     done
-    echo "P0+P1 payload: 1885446613 bytes (about 1.756 GiB)"
+    echo "P0+P1 payload: 2019964779 bytes (about 1.881 GiB)"
   fi
   echo
   echo "Metadata proxies are not a visibility result; strict RGB-D V-O-V must be recomputed."
