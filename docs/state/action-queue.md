@@ -11,12 +11,13 @@
   occlusion、view change 与测量得到的非零 action。
 - 当前三段 BOP public replay 仅能提供 RGB-D/pose 负证据；identity/prediction gate 未通过，
   且没有 intervention action GT。
-- 已完成 RBO/RRC 官方索引预检，各 3 条最小 acquisition candidate 已于 2026-07-10
-  下载到 ignored `outputs/assets/raw/`，并通过大小、archive 完整性与适用的官方 MD5 校验。
-- 下一步先解包到 ignored workspace，再核验 RBO measured wrench 与 RRC desired/applied
-  control 的时间覆盖、pose、遮挡和视角证据；若都不能形成合规 3D action vector，再回到
-  许可合规的外部子集或 capture host。不要在聊天中发送凭据，也不要新增 wrapper 或伪造
-  action。
+- RBO/RRC 首批子集已下载并完成字段审计。RBO official-chain strict V-O-V 为 `0/3`；
+  measured-force target/interval 仅留下 tripod/cabinet 两个 ready scenes。follow-up P0 也未
+  新增 scene；重建 ledger 为 `0 pass / 7 fail / 2 blocked`。RRC 固定相机、无 depth，
+  9D control 不能冒充现行 3D vector。
+- 下一步下载并逐帧审计 P1 `treasurebox24/tripod24/pliers24/ikeasmall23`，继续寻找第三个
+  official-chain action-ready 且有严格 V-O-V 的 scene；然后重跑 canonical bundle/ledger。
+  不要在聊天中发送凭据，也不要新增 wrapper、复制 target GT 或伪造 action。
 
 ### CORE-BOUNDARY-001: 继续外移 core orchestration
 
@@ -68,7 +69,7 @@
 - clip plateau 的导数与 `log(clip(...))` forward 一致；zero assignment + positive target
   不再产生约 `1e8` 梯度。
 - 覆盖 finite gradient、clipped plateau 与正常 non-clipped 路径；进入 required Python CI。
-- 当前工作树尚未提交，因此不填写虚构 commit。
+- 已包含在 research-first stabilization commit `08ec78d`。
 
 ## Archive
 

@@ -47,31 +47,32 @@ P0_MD5S=(
 )
 
 # P1 is downloaded only with --tier all. The treasurebox model is already in
-# P0; the remaining companion models are listed explicitly here.
+# P0. tripod.tar is also listed so this script remains self-checking; the
+# initial RBO evidence subset normally provides that already-local model.
 P1_FILES=(
   "treasurebox24_o.tar.gz"
-  "clamp25_o.tar.gz"
+  "tripod24_o.tar.gz"
   "pliers24_o.tar.gz"
   "ikeasmall23_o.tar.gz"
-  "clamp.tar.gz"
+  "tripod.tar"
   "pliers.tar.gz"
   "ikeasmall.tar.gz"
 )
 P1_SIZES=(
   224874604
-  216021978
+  250515083
   280555056
   191911421
-  1539537
+  2669316
   1088816
   4325597
 )
 P1_MD5S=(
   "3931e779657c3cd333b23a1f82035951"
-  "1764a193c4e6774a29a1ca8322b28c8d"
+  "83b58fec05f8b8178d725df8676a8e5b"
   "47569b7b1eb73a4870e5ed284bb41209"
   "5fc02c6a599e71e3f5177b64108c1c14"
-  "4c0fa2cc251d8e6114e101e3290cf3cb"
+  "0b27993a32296e95e959e79244e37c44"
   "423b8690d637777a839573bd2114a39c"
   "841536856d3f434324fc29c887bf3901"
 )
@@ -228,19 +229,19 @@ if tier == "all":
                 "force/torque sensor used": "1",
                 "comment": "funny (ee got caught in box)",
             },
-            "clamp25": {
-                "Object": "clamp",
-                "Camera Motion": "1",
-                "Only Internal Interaction": "1",
-                "Small Interaction": "0",
-                "cluttered": "0",
-                "force/torque sensor used": "1",
-                "comment": "placement of estimated joint not perfect but orientation correct",
-            },
             "pliers24": {
                 "Object": "pliers",
                 "Camera Motion": "1",
                 "Only Internal Interaction": "0",
+                "Small Interaction": "0",
+                "cluttered": "0",
+                "force/torque sensor used": "1",
+                "comment": "",
+            },
+            "tripod24": {
+                "Object": "tripod",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
                 "Small Interaction": "0",
                 "cluttered": "0",
                 "force/torque sensor used": "1",
@@ -290,13 +291,14 @@ print_plan() {
   done
   if [[ "${TIER}" == "all" ]]; then
     echo
-    echo "P1 interactions: treasurebox24, clamp25, pliers24, ikeasmall23"
-    echo "P1 incremental payload: 920317009 bytes (about 0.857 GiB)"
+    echo "P1 interactions: treasurebox24, tripod24, pliers24, ikeasmall23"
+    echo "P1 selected payload: 955939893 bytes (about 0.890 GiB)"
+    echo "P1 new-download payload with existing tripod model: 953270577 bytes (about 0.888 GiB)"
     for i in "${!P1_FILES[@]}"; do
       printf '  %-30s %12s bytes  md5=%s\n' \
         "${P1_FILES[$i]}" "${P1_SIZES[$i]}" "${P1_MD5S[$i]}"
     done
-    echo "P0+P1 payload: 2019964779 bytes (about 1.881 GiB)"
+    echo "P0+P1 selected payload: 2055587663 bytes (about 1.914 GiB)"
   fi
   echo
   echo "Metadata proxies are not a visibility result; strict RGB-D V-O-V must be recomputed."
