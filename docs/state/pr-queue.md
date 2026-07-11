@@ -1,6 +1,6 @@
 # ObjGauss 当前任务队列
 
-> 最近更新: 2026-07-10
+> 最近更新: 2026-07-11
 > 只保留 active、blocked、planned 和最近完成项；完整历史已归档。
 
 ## In Progress
@@ -36,14 +36,15 @@
   slot alignment 已归 pipelines；ObjectField 邻接的 NeRF inspection/JSON output 已拆至
   datasets/pipelines；projection/loss/quality audit primitive 留 core，manifest voting/
   training/depth diagnostic 已归 pipelines，acceptance check 已归 evaluation。
-- canonical `datasets` 不依赖 core；`evaluation`/`pipelines` 只依赖保留 primitives；
-  projection summary 已归入 `object_state` primitive，不再跨层引用 assignment MVP 私有 helper。
+- canonical `datasets` 仅依赖允许的 core assignment primitive；`evaluation`/`pipelines`
+  只依赖保留 primitives；projection summary 已归入 `object_state` primitive，不再跨层引用
+  assignment MVP 私有 helper。
 - 旧 `objgauss.core` 路径只做显式、对象身份不变的 compatibility import。
 - 当前冻结期无剩余可无 schema/ABI 变更整迁的 orchestration；`object_emergence_solver`
   作为 shared assignment primitive 暂留 core。下一阶段只在明确 breaking/deprecation
   window 收缩 compatibility modules 与 root exports。
 - 保留目标：Gaussian、assignment、ObjectState、decoder、metric primitives。
-- 当前验证：778 个 Python tests；本轮 17 个迁移/拆分模块的 canonical-first / legacy-first
+- 当前验证：806 个 Python tests；本轮 17 个迁移/拆分模块的 canonical-first / legacy-first
   冷启动、精确导出面、对象身份与逆向依赖检查通过；`objgauss/core/*.py` 为 11,956
   physical LOC（约 12.0k，含 compatibility wrappers）。wheel/sdist 在 714-test 检查点通过；
   最新批次因审批额度耗尽未重跑；Vite production build 已通过。
@@ -93,6 +94,14 @@
 
 ## Recently Completed
 
+- 2026-07-11: `3acfe73`；对齐 world viewer audit 与 5-pill evidence UI、lazy artifact
+  flows、translate-only/Stability 合同；full/truth 浏览器审计通过。
+- 2026-07-10: `506b793`；约束 controlled identity association 的可接受来源与匹配边界。
+- 2026-07-10: `ca22c71`；从 canonical evaluator 输出独立重算 controlled reality handoff metrics。
+- 2026-07-10: `21f2744`；阻止 GT-preassociated identity 输入形成通过结果。
+- 2026-07-10: `b054e96`；保留 probability-space CE 导数，并为训练消费者融合有界的
+  analytic softmax-logit VJP。
+- 2026-07-10: `c60b069`；强制执行 ObjectState trainable artifact ABI。
 - 2026-07-10: `STABILIZE-CORE-001`；CE clip gradient 与 ObjectState ABI 修复，行为测试覆盖。
 - 2026-07-10: `STABILIZE-VIEWER-001`；catalog lazy load、Spark hide/translate truth 与 UI 收口。
 - 2026-07-10: `STABILIZE-GATES-001`；teacher content binding、raw identity association、

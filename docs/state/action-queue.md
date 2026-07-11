@@ -1,6 +1,6 @@
 # ObjGauss 行动队列
 
-> 最近更新: 2026-07-10
+> 最近更新: 2026-07-11
 > 只保留 active、frozen/planned 与最近完成项；历史见 archive。
 
 ## Active
@@ -66,10 +66,20 @@
 
 ### ACTION-026: 修复 supervised assignment CE clip 边界梯度
 
-- clip plateau 的导数与 `log(clip(...))` forward 一致；zero assignment + positive target
-  不再产生约 `1e8` 梯度。
-- 覆盖 finite gradient、clipped plateau 与正常 non-clipped 路径；进入 required Python CI。
-- 已包含在 research-first stabilization commit `08ec78d`。
+- probability-space 导数保留精确的 `-target / p`；`p` 刚高于 clip `EPS` 时的大梯度是该
+  坐标空间的真实导数，不以 clamp 或提高 `EPS` 掩盖。
+- 训练消费者改用 bounded analytic softmax-logit VJP
+  `p * sum(active_target) - active_target`，避免约 `1e8/1e7` 的中间量与二次 Jacobian。
+- 覆盖 `EPS` 两侧、logits finite-difference 与两个 solver 的单步下降；完成 commit
+  `b054e96`。
+
+其他近期 correctness commits：
+
+- `3acfe73`：对齐并通过 world viewer full/truth audit。
+- `506b793`：约束 controlled identity association。
+- `ca22c71`：独立重算 controlled reality handoff metrics。
+- `21f2744`：阻止 GT-preassociated identity pass。
+- `c60b069`：强制执行 ObjectState trainable artifact ABI。
 
 ## Archive
 

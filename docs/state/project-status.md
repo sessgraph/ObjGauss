@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-10
+> 最近更新: 2026-07-11
 > 阶段: research-first stabilization
 > 决策: `docs/adr/0007-research-first-stabilization.md`
 
@@ -28,9 +28,9 @@ Viewer 暂时是 evidence viewer，不是产品扩张主线。
 - Spark 真实 splat 展示与 Three.js 对象证据层；点数一致时支持 source splat 子集平移。
 - controlled capture / BOP public replay 的现有数据合同、evaluator 和 ledger 工具链。
 - 真实 3DGS / SAM / CLIP / gsplat 本地实验产物，但重依赖仍不是默认可复现环境。
-- 当前工作树本地基线：778 个 Python 测试与 Vite production build 通过；锁文件检查在
-  此前 Viewer/lock 检查点通过。Python wheel/sdist 在 714-test 检查点通过；最新 pipeline
-  批次因审批额度耗尽未重跑打包。
+- 当前工作树本地基线：806 个 Python 测试、Vite production build、`uv lock --check`、
+  world viewer full/truth 浏览器审计均通过。Python wheel/sdist 在 714-test 检查点通过；
+  最新 pipeline 批次因审批额度耗尽未重跑打包。
 
 ## 当前真实负证据
 
@@ -76,12 +76,19 @@ identity、prediction、intervention 均未过 reality gate。严格 scene 仍�
 
 已完成：
 
-1. supervised assignment CE 在 clip plateau 的导数与 forward 一致，不再产生约 `1e8` 梯度；
-2. ObjectState persistent `id`、renderer `slot/object_id` 与 `[0,1]` confidence ABI 已分离；
-3. Viewer catalog 按 stage/selection 加载，Spark hide/translate 与 source splat 同步，未闭环控件已移除；
+1. supervised assignment CE 保留数学正确的 probability-space `-target/p` 导数；训练 caller
+   改用解析、有界的 softmax-logit VJP，避免 materialize `1/p` 中间量及二次 Jacobian；
+2. trainable ObjectState artifact validator 已强制 persistent `id == persistent_id`、renderer
+   `slot == object_id`、帧内唯一非负地址，以及显式有限 `[0,1]` confidence；
+3. Viewer catalog 按 stage/selection 加载，Spark hide/translate 与 source splat 同步，未闭环
+   控件已移除；full/truth audit 已对齐 5-pill evidence UI、独立 artifact flows 与 translate-only 合同；
 4. 最小 CI、保守 `LICENSE`、Python/Node 版本与依赖锁已落地；
-5. teacher audit 绑定实际 feature 内容；identity evaluator 从 raw track observations 关联，
-   不再用 GT pose 预关联；gate 不信任 caller status/gap/gain；
+5. teacher audit 在代码路径上绑定并实际消费 feature tensor；新 identity evaluator 从 raw
+   track observations 关联，且只有显式有限 association distance 才能通过；旧 GT
+   `object_pose_row_id` 键控路线已降为 diagnostic-only，不能产生 pass。canonical controlled
+   reality handoff validator 会从 capture manifest、identity predictions 与 eval summary
+   中保留的 prediction/intervention records 重跑三个 evaluator；通用 row gate 只保留
+   threshold/accounting 诊断语义；
 6. active state 已压缩；controlled schema/capture/real manifest/action-GT，以及 capture
    template/frames/annotations/actions/files/environment/import/readiness authoring 已移至
    `objgauss.datasets`；四个 evaluator/gate、controlled real rows 与 identity prediction
@@ -146,7 +153,9 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   `treasurebox24/tripod24/pliers24/ikeasmall23`；官方 `ftSensor` model 同步纳入复现。
   P0 已下载并按官方运动链逐帧复核：treasurebox 与 globe 均是 `0` V-O-V 的可信负证据；
   laptop26 的 camera TF 与 RGB 可见性矛盾，`event_count=null`，不计零事件负证据。
-  P0 没有解锁 scene，P1 尚未下载。
+  P0 没有解锁 scene，P1 尚未下载。RBO index 每个 interaction 只提供一个 lighting label，
+  因而单 archive 还不能满足默认两种 lighting；跨 recording 合并不能在无明确 episode
+  证据时偷偷完成。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
@@ -175,9 +184,10 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
 held-out scene 与简单 baseline 的完整链路。Reviewable、ready、schema-valid 或 synthetic
 pass 都不能替代 metric pass。
 
-通用 reality-row gate 只负责从规范 metrics 与 thresholds 独立派生行状态；raw artifact
-到 metrics 的重算由 canonical identity/prediction/intervention evaluator 负责。绕过这些
-evaluator 手工喂 metrics 不能形成可接受研究证据。
+通用 reality-row gate 只负责 threshold/accounting 诊断，不能单独形成可引用研究通过。
+controlled full handoff 必须从 capture manifest、identity predictions 与 eval summary 中
+保留的 prediction/intervention records 重跑 canonical evaluator；绕过该 live 链手工喂
+summary/metrics 不计证据。
 
 历史状态见：
 

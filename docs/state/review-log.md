@@ -135,3 +135,20 @@ P0 三个已列。其余中危（多为一行修复）：
 - 验证命令：
   - `uv run --extra dev pytest tests/test_real_sample_v2_sample_aware_weight_policy.py tests/test_real_sample_v2_bounded_normalization_cross_sample.py tests/test_v2_stability_gate.py tests/test_v2_stability_diagnostics.py -q`
   - runtime probes for supervised CE gradient and stability gate fallback behavior.
+
+---
+
+## 2026-07-11 · stabilization correctness follow-up
+
+- 2026-07-07 的 CE 风险已按坐标空间拆清：clip plateau 上的 probability-space 导数为
+  `0`；刚高于 `EPS` 时精确导数仍是大幅的 `-target / p`，不能用梯度裁剪伪装修复。
+  训练消费者现直接使用解析 softmax-logit VJP
+  `p * sum(active_target) - active_target`，避免 materialize `1 / p` 和二次 Jacobian。
+- `b054e96` 已覆盖 `EPS` 两侧、logits finite-difference 与两个 solver 的单步 loss 下降；
+  全量 806 个 Python tests 通过。当前风险口径以 `risks.md` 的 R-015 为准。
+- controlled evidence 相关 follow-up 分别由 `506b793`、`ca22c71`、`21f2744` 与
+  `c60b069` 收紧 association、handoff 重算、GT-preassociation 和 trainable ObjectState
+  artifact ABI；
+  这些修复不等于真实 3-scene gate 已通过。
+- `3acfe73` 将 viewer full/truth audit 对齐当前 evidence UI，并让任何显式 failed status
+  阻断顶层通过；该审计闭环不改变 Viewer 的 research-prototype 定位。
