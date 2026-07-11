@@ -145,7 +145,10 @@ P0 已完成 `--verify-only --tier p0` 与逐帧复核：
 - `laptop26` 非启动帧 `705/705`，记录 TF 将两个 link 全程投到相机后方而 RGB 中物体
   实际可见，camera marker/TF calibration 无效，`event_count=null`，不计零事件负证据。
 
-P0 因此没有新增合格 scene。P1 archives 当前尚未下载；继续使用：
+P0 因此没有新增合格 scene。2026-07-11 已单独补齐并按冻结 size、MD5、gzip/tar
+完整性校验 P1 的 `pliers.tar.gz` 与 `ikeasmall.tar.gz` companion models；四个 P1
+interaction archives 仍未下载，剩余 payload 为 `947,856,164` bytes（约 0.883 GiB）。
+继续使用：
 
 ```bash
 scripts/download-rbo-occlusion-followup.sh --download --tier all
