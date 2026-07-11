@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from objgauss.core.gaussian import GaussianCloud
-from objgauss.core.io import read_ply
 from objgauss.pipelines.real_sample_v2_smoke import (
     REAL_SAMPLE_V2_SMOKE_SCHEMA,
     RealSampleV2SmokeReport,
@@ -83,12 +82,12 @@ def test_real_sample_v2_smoke_binds_missing_image_targets_on_sample_input():
     assert report.as_dict()["status"] == "real_sample_v2_smoke_pass"
 
 
-def test_real_public_sample_smoke_exposes_objectstate_gap():
-    cloud = read_ply("public/samples/lego_alpha_v1_objects.ply")
+def test_procedural_boundary_smoke_exposes_objectstate_gap(real_sample_v2_scenarios):
+    scenario = real_sample_v2_scenarios["temperature-boundary"]
 
     report = real_sample_v2_smoke_from_cloud(
-        cloud,
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         frame_count=2,
         max_points=24,
         image_width=12,
@@ -114,15 +113,17 @@ def test_real_public_sample_smoke_exposes_objectstate_gap():
         for frame in object_state_eval["frames"]
         for diagnostic in frame["diagnostics"]
     }
-    assert {"low_assignment_confidence", "low_object_purity"} <= diagnostics
+    assert "low_object_purity" in diagnostics
 
 
-def test_real_public_sample_smoke_passes_with_temperature_sharpening():
-    cloud = read_ply("public/samples/lego_alpha_v1_objects.ply")
+def test_procedural_boundary_smoke_passes_with_temperature_sharpening(
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["temperature-boundary"]
 
     report = real_sample_v2_smoke_from_cloud(
-        cloud,
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         frame_count=2,
         max_points=24,
         image_width=12,

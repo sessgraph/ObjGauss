@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.io import read_ply
 from objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample import (
     REAL_SAMPLE_V2_BOUNDED_NORMALIZATION_CROSS_SAMPLE_SCHEMA,
     RealSampleV2BoundedNormalizationCrossSampleInput,
@@ -13,26 +12,31 @@ from objgauss.pipelines.real_sample_v2_bounded_normalization_cross_sample import
 )
 
 
-def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
+def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy(
+    real_sample_v2_scenarios,
+):
+    fix = real_sample_v2_scenarios["weight-fix"]
+    regression_a = real_sample_v2_scenarios["weight-regression-a"]
+    regression_b = real_sample_v2_scenarios["weight-regression-b"]
     report = real_sample_v2_bounded_normalization_cross_sample_from_clouds(
         (
             RealSampleV2BoundedNormalizationCrossSampleInput(
-                sample_id="lego",
-                cloud=read_ply("public/samples/lego_alpha_v1_objects.ply"),
-                sample_source="public/samples/lego_alpha_v1_objects.ply",
-                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-lego.ply",
+                sample_id="weight-fix",
+                cloud=fix.cloud,
+                sample_source=fix.source,
+                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-weight-fix.ply",
             ),
             RealSampleV2BoundedNormalizationCrossSampleInput(
-                sample_id="polyhaven",
-                cloud=read_ply("public/samples/polyhaven_chair_demo_objects.ply"),
-                sample_source="public/samples/polyhaven_chair_demo_objects.ply",
-                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-polyhaven.ply",
+                sample_id="weight-regression-a",
+                cloud=regression_a.cloud,
+                sample_source=regression_a.source,
+                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-regression-a.ply",
             ),
             RealSampleV2BoundedNormalizationCrossSampleInput(
-                sample_id="nike",
-                cloud=read_ply("public/samples/nike_objects.ply"),
-                sample_source="public/samples/nike_objects.ply",
-                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-nike.ply",
+                sample_id="weight-regression-b",
+                cloud=regression_b.cloud,
+                sample_source=regression_b.source,
+                viewer_path="/samples/objgauss-real-sample-v2-sample-aware-regression-b.ply",
             ),
         ),
         min_samples=2,
@@ -69,44 +73,47 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
     assert aggregate["selected_hard_regression_count"] == 0
     assert aggregate["selected_hard_regression_samples"] == []
     assert aggregate["blocked_promoted_sample_count"] == 2
-    assert aggregate["blocked_promoted_samples"] == ["polyhaven", "nike"]
+    assert aggregate["blocked_promoted_samples"] == [
+        "weight-regression-a",
+        "weight-regression-b",
+    ]
 
     rows = {row["sample_id"]: row for row in summary["rows"]}
-    lego = rows["lego"]
-    assert lego["source"]["source_gaussians"] == 5696
-    assert lego["selected_policy"]["candidate_name"] == "promoted"
-    assert lego["selected_metrics"]["mixed_gaussians"] == 0
-    assert lego["selected_changed_gaussians"]["hard_fix_count"] == 59
-    assert lego["selected_changed_gaussians"]["hard_regression_count"] == 0
-    assert lego["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is True
+    fix_row = rows["weight-fix"]
+    assert fix_row["source"]["source_gaussians"] == fix.cloud.count
+    assert fix_row["selected_policy"]["candidate_name"] == "promoted"
+    assert fix_row["selected_metrics"]["mixed_gaussians"] == 0
+    assert fix_row["selected_changed_gaussians"]["hard_fix_count"] == 9
+    assert fix_row["selected_changed_gaussians"]["hard_regression_count"] == 0
+    assert fix_row["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is True
 
-    polyhaven = rows["polyhaven"]
-    assert polyhaven["source"]["source_gaussians"] == 50000
-    assert polyhaven["selected_policy"]["candidate_name"] == "baseline"
-    assert polyhaven["selected_metrics"]["mixed_gaussians"] == 3840
-    assert polyhaven["selected_changed_gaussians"]["hard_regression_count"] == 0
-    assert polyhaven["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
-    assert polyhaven["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
-    assert polyhaven["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 1814
-    assert polyhaven["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
-    assert polyhaven["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
+    row_a = rows["weight-regression-a"]
+    assert row_a["source"]["source_gaussians"] == regression_a.cloud.count
+    assert row_a["selected_policy"]["candidate_name"] == "baseline"
+    assert row_a["selected_metrics"]["mixed_gaussians"] == 32
+    assert row_a["selected_changed_gaussians"]["hard_regression_count"] == 0
+    assert row_a["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert row_a["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
+    assert row_a["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 17
+    assert row_a["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert row_a["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
         "bounded_evidence_normalization_noop_baseline_fallback"
     )
-    assert polyhaven["evidence_normalization_status"] == "required_before_global_weight_promotion"
+    assert row_a["evidence_normalization_status"] == "required_before_global_weight_promotion"
 
-    nike = rows["nike"]
-    assert nike["source"]["source_gaussians"] == 270491
-    assert nike["selected_policy"]["candidate_name"] == "baseline"
-    assert nike["selected_metrics"]["mixed_gaussians"] == 16721
-    assert nike["selected_changed_gaussians"]["hard_regression_count"] == 0
-    assert nike["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
-    assert nike["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
-    assert nike["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 6671
-    assert nike["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
-    assert nike["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
+    row_b = rows["weight-regression-b"]
+    assert row_b["source"]["source_gaussians"] == regression_b.cloud.count
+    assert row_b["selected_policy"]["candidate_name"] == "baseline"
+    assert row_b["selected_metrics"]["mixed_gaussians"] == 45
+    assert row_b["selected_changed_gaussians"]["hard_regression_count"] == 0
+    assert row_b["promoted_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert row_b["promoted_candidate"]["sample_policy_gate"]["hard_regression_free"] is False
+    assert row_b["promoted_candidate"]["sample_policy_gate"]["hard_regression_count"] == 17
+    assert row_b["bounded_normalized_candidate"]["sample_policy_gate"]["eligible_for_sample"] is False
+    assert row_b["bounded_normalized_candidate"]["sample_policy_gate"]["decision"] == (
         "bounded_evidence_normalization_noop_baseline_fallback"
     )
-    assert nike["evidence_normalization_status"] == "required_before_global_weight_promotion"
+    assert row_b["evidence_normalization_status"] == "required_before_global_weight_promotion"
 
     assert summary["recommendation"]["decision"] == (
         "sample_aware_bounded_normalization_cross_sample_pass"
@@ -119,22 +126,25 @@ def test_bounded_normalization_cross_sample_passes_with_sample_aware_policy():
     assert validate_real_sample_v2_bounded_normalization_cross_sample_summary(summary) is summary
 
 
-def test_bounded_normalization_cross_sample_cli_writes_summary(tmp_path):
+def test_bounded_normalization_cross_sample_cli_writes_summary(
+    tmp_path,
+    real_sample_v2_scenarios,
+):
+    names = ("weight-fix", "weight-regression-a", "weight-regression-b")
+    input_paths = [real_sample_v2_scenarios[name].write(tmp_path) for name in names]
     summary_path = tmp_path / "bounded-normalization-cross-sample-summary.json"
 
     exit_code = main(
         [
             "training",
             "real-sample-v2-bounded-normalization-cross-sample",
-            "public/samples/lego_alpha_v1_objects.ply",
-            "public/samples/polyhaven_chair_demo_objects.ply",
-            "public/samples/nike_objects.ply",
+            *(str(path) for path in input_paths),
             "--sample-id",
-            "lego",
+            names[0],
             "--sample-id",
-            "polyhaven",
+            names[1],
             "--sample-id",
-            "nike",
+            names[2],
             "--summary-output",
             str(summary_path),
             "--require-pass",
@@ -149,5 +159,5 @@ def test_bounded_normalization_cross_sample_cli_writes_summary(tmp_path):
         "promoted": 1,
     }
     assert summary["aggregate"]["selected_hard_regression_count"] == 0
-    assert summary["aggregate"]["blocked_promoted_samples"] == ["polyhaven", "nike"]
-    assert [row["sample_id"] for row in summary["rows"]] == ["lego", "polyhaven", "nike"]
+    assert summary["aggregate"]["blocked_promoted_samples"] == [names[1], names[2]]
+    assert [row["sample_id"] for row in summary["rows"]] == list(names)

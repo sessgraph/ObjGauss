@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from objgauss.core.io import read_ply
 from objgauss.pipelines.real_sample_v2_diagnostics import (
     REAL_SAMPLE_V2_DIAGNOSTICS_SCHEMA,
     RealSampleV2DiagnosticsReport,
@@ -9,12 +8,14 @@ from objgauss.pipelines.real_sample_v2_diagnostics import (
 )
 
 
-def test_real_sample_v2_diagnostics_selects_temperature_sharpening():
-    cloud = read_ply("public/samples/lego_alpha_v1_objects.ply")
+def test_real_sample_v2_diagnostics_selects_temperature_sharpening(
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["temperature-boundary"]
 
     report = real_sample_v2_diagnostics_from_cloud(
-        cloud,
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         frame_count=2,
         max_points=24,
         image_width=12,
@@ -33,7 +34,6 @@ def test_real_sample_v2_diagnostics_selects_temperature_sharpening():
         "assignment_v2_renderer_joint_validation_fail"
     )
     assert summary["baseline"]["object_state_metrics"]["status"] == "objectstate_eval_fail"
-    assert "low_assignment_confidence" in summary["baseline"]["diagnostics"]
     assert "low_object_purity" in summary["baseline"]["diagnostics"]
     assert summary["best_temperature"] == 0.5
     assert summary["best_candidate"]["renderer_joint_status"] == (

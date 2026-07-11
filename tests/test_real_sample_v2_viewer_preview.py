@@ -14,10 +14,13 @@ from objgauss.pipelines.real_sample_v2_viewer_preview import (
 )
 
 
-def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud():
+def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud(
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["weight-fix"]
     report = real_sample_v2_viewer_preview_from_cloud(
-        read_ply("public/samples/lego_alpha_v1_objects.ply"),
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         frame_count=2,
         max_points=128,
         image_width=12,
@@ -25,6 +28,7 @@ def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud():
         iterations=100,
         learning_rate=0.4,
         temperature_candidates=(0.35,),
+        baseline_temperature=0.35,
         assignment_feature_weight=2.0,
         assignment_position_weight=1.0,
         seed=4,
@@ -35,9 +39,9 @@ def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud():
     assert isinstance(report, RealSampleV2ViewerPreviewReport)
     assert summary["schema"] == REAL_SAMPLE_V2_VIEWER_PREVIEW_SCHEMA
     assert summary["status"] == "real_sample_v2_viewer_preview_pass"
-    assert summary["source"]["source_gaussians"] == 5696
-    assert summary["projection"]["projected_gaussians"] == 5696
-    assert summary["projection"]["exported_gaussians"] == 5696
+    assert summary["source"]["source_gaussians"] == scenario.cloud.count
+    assert summary["projection"]["projected_gaussians"] == scenario.cloud.count
+    assert summary["projection"]["exported_gaussians"] == scenario.cloud.count
     assert summary["handoff"]["recommended_solver_temperature"] == 0.35
     assert summary["assignment_weight_policy"] == {
         "family": "assignment_v2_cost_weight_promotion",
@@ -59,14 +63,12 @@ def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud():
     assert summary["quality"]["object_purity"] > 0.95
     assert summary["projection"]["hard_segmentation"]["mixed_gaussians"] == 0
     assert summary["projection"]["hard_segmentation"]["object_id_counts"] == [
-        {"object_id": 0, "count": 736},
-        {"object_id": 1, "count": 581},
-        {"object_id": 2, "count": 1787},
-        {"object_id": 3, "count": 2592},
+        {"object_id": 0, "count": 256},
+        {"object_id": 1, "count": 256},
     ]
     assert np.bincount(
         np.asarray(report.projected_cloud.vertices["object_id"], dtype=np.int64)
-    ).tolist() == [736, 581, 1787, 2592]
+    ).tolist() == [256, 256]
     assert {
         "object_id",
         "target_object_id",
@@ -80,7 +82,11 @@ def test_real_sample_v2_viewer_preview_projects_checkpoint_to_full_cloud():
     assert validate_real_sample_v2_viewer_preview_summary(summary) is summary
 
 
-def test_real_sample_v2_viewer_preview_cli_writes_ply_and_summary(tmp_path):
+def test_real_sample_v2_viewer_preview_cli_writes_ply_and_summary(
+    tmp_path,
+    real_sample_v2_scenarios,
+):
+    input_path = real_sample_v2_scenarios["weight-fix"].write(tmp_path)
     preview_ply = tmp_path / "viewer-preview.ply"
     summary_path = tmp_path / "viewer-preview-summary.json"
 
@@ -88,7 +94,7 @@ def test_real_sample_v2_viewer_preview_cli_writes_ply_and_summary(tmp_path):
         [
             "training",
             "real-sample-v2-viewer-preview",
-            "public/samples/lego_alpha_v1_objects.ply",
+            str(input_path),
             "--preview-ply-output",
             str(preview_ply),
             "--summary-output",
@@ -115,8 +121,6 @@ def test_real_sample_v2_viewer_preview_cli_writes_ply_and_summary(tmp_path):
     assert "target_object_id" in cloud.fields
     assert "assignment_confidence" in cloud.fields
     assert np.bincount(np.asarray(cloud.vertices["object_id"], dtype=np.int64)).tolist() == [
-        736,
-        581,
-        1787,
-        2592,
+        256,
+        256,
     ]

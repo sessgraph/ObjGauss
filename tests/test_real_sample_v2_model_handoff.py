@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from objgauss.cli import main
-from objgauss.core.io import read_ply
 from objgauss.pipelines.real_sample_v2_model_handoff import (
     REAL_SAMPLE_V2_MODEL_HANDOFF_SCHEMA,
     RealSampleV2ModelHandoffReport,
@@ -13,10 +12,13 @@ from objgauss.pipelines.real_sample_v2_model_handoff import (
 )
 
 
-def test_real_sample_v2_model_handoff_restores_checkpoint_and_builds_preview():
+def test_real_sample_v2_model_handoff_restores_checkpoint_and_builds_preview(
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["temperature-boundary"]
     report = real_sample_v2_model_handoff_from_cloud(
-        read_ply("public/samples/lego_alpha_v1_objects.ply"),
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         frame_count=2,
         max_points=24,
         image_width=12,
@@ -50,7 +52,11 @@ def test_real_sample_v2_model_handoff_restores_checkpoint_and_builds_preview():
     assert "trained_temperature_sharpened" in html
 
 
-def test_real_sample_v2_handoff_cli_writes_summary_checkpoint_and_preview(tmp_path):
+def test_real_sample_v2_handoff_cli_writes_summary_checkpoint_and_preview(
+    tmp_path,
+    real_sample_v2_scenarios,
+):
+    input_path = real_sample_v2_scenarios["temperature-boundary"].write(tmp_path)
     summary_path = tmp_path / "summary.json"
     checkpoint_path = tmp_path / "checkpoint.json"
     preview_path = tmp_path / "preview.html"
@@ -59,7 +65,7 @@ def test_real_sample_v2_handoff_cli_writes_summary_checkpoint_and_preview(tmp_pa
         [
             "training",
             "real-sample-v2-handoff",
-            "public/samples/lego_alpha_v1_objects.ply",
+            str(input_path),
             "--temperature-candidates",
             "1.0",
             "0.75",

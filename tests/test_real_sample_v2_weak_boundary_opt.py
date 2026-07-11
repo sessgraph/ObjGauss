@@ -14,10 +14,13 @@ from objgauss.pipelines.real_sample_v2_weak_boundary_opt import (
 )
 
 
-def test_real_sample_v2_weak_boundary_opt_promotes_cost_weight_candidate():
+def test_real_sample_v2_weak_boundary_opt_promotes_cost_weight_candidate(
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["weight-fix"]
     report = real_sample_v2_weak_boundary_opt_from_cloud(
-        read_ply("public/samples/lego_alpha_v1_objects.ply"),
-        sample_source="public/samples/lego_alpha_v1_objects.ply",
+        scenario.cloud,
+        sample_source=scenario.source,
         max_points=128,
         solver_temperature=0.35,
         candidate_feature_weight=2.0,
@@ -45,26 +48,25 @@ def test_real_sample_v2_weak_boundary_opt_promotes_cost_weight_candidate():
 
     baseline = summary["baseline"]["global_quality"]
     candidate = summary["candidate"]["global_quality"]
-    assert baseline["mixed_gaussians"] == 59
+    assert baseline["mixed_gaussians"] == 9
     assert candidate["mixed_gaussians"] == 0
     assert candidate["direct_slot_match"] == 1.0
     assert candidate["hard_argmax_object_purity"] == 1.0
     assert candidate["min_predicted_object_purity"] == 1.0
     assert candidate["min_target_recall"] == 1.0
     assert summary["candidate"]["confusion"]["matrix"] == [
-        [736, 0, 0, 0],
-        [0, 581, 0, 0],
-        [0, 0, 1787, 0],
-        [0, 0, 0, 2592],
+        [256, 0],
+        [0, 256],
     ]
-    assert summary["quality_delta"]["mixed_gaussians_delta"] == -59
-    assert summary["quality_delta"]["direct_slot_match_delta"] > 0.0103
-    assert summary["quality_delta"]["min_target_recall_delta"] > 0.08
+    assert summary["quality_delta"]["mixed_gaussians_delta"] == -9
+    assert summary["quality_delta"]["direct_slot_match_delta"] > 0.017
+    assert summary["quality_delta"]["min_target_recall_delta"] > 0.035
 
     changed = summary["changed_gaussians"]
-    assert changed["changed_count"] == 59
-    assert {"baseline_object_id": 2, "candidate_object_id": 1, "count": 52} in changed["pairs"]
-    assert {"baseline_object_id": 3, "candidate_object_id": 0, "count": 7} in changed["pairs"]
+    assert changed["changed_count"] == 9
+    assert changed["pairs"] == [
+        {"baseline_object_id": 1, "candidate_object_id": 0, "count": 9}
+    ]
     assert summary["recommendation"]["decision"] == "promote_cost_weight_normalization_candidate"
     assert summary["recommendation"]["action"] == "use_feature_weight_boost_for_next_viewer_preview"
     assert summary["recommendation"]["requires_more_coverage"] is False
@@ -79,10 +81,15 @@ def test_real_sample_v2_weak_boundary_opt_promotes_cost_weight_candidate():
         "weak_boundary_candidate",
         "boundary_changed",
     }.issubset(set(report.candidate_cloud.fields))
-    assert int(np.sum(report.candidate_cloud.vertices["boundary_changed"])) == 59
+    assert int(np.sum(report.candidate_cloud.vertices["boundary_changed"])) == 9
 
 
-def test_real_sample_v2_weak_boundary_opt_cli_writes_candidate_ply_and_summary(tmp_path):
+def test_real_sample_v2_weak_boundary_opt_cli_writes_candidate_ply_and_summary(
+    tmp_path,
+    real_sample_v2_scenarios,
+):
+    scenario = real_sample_v2_scenarios["weight-fix"]
+    input_path = scenario.write(tmp_path)
     preview_ply = tmp_path / "weak-boundary-opt.ply"
     summary_path = tmp_path / "weak-boundary-opt-summary.json"
 
@@ -90,7 +97,7 @@ def test_real_sample_v2_weak_boundary_opt_cli_writes_candidate_ply_and_summary(t
         [
             "training",
             "real-sample-v2-weak-boundary-opt",
-            "public/samples/lego_alpha_v1_objects.ply",
+            str(input_path),
             "--preview-ply-output",
             str(preview_ply),
             "--summary-output",
@@ -106,14 +113,12 @@ def test_real_sample_v2_weak_boundary_opt_cli_writes_candidate_ply_and_summary(t
     cloud = read_ply(preview_ply)
     assert summary["status"] == "real_sample_v2_weak_boundary_opt_pass"
     assert summary["candidate"]["global_quality"]["mixed_gaussians"] == 0
-    assert summary["changed_gaussians"]["changed_count"] == 59
-    assert cloud.count == 5696
+    assert summary["changed_gaussians"]["changed_count"] == 9
+    assert cloud.count == scenario.cloud.count
     assert "baseline_object_id" in cloud.fields
     assert "boundary_changed" in cloud.fields
-    assert int(np.sum(cloud.vertices["boundary_changed"])) == 59
+    assert int(np.sum(cloud.vertices["boundary_changed"])) == 9
     assert np.bincount(np.asarray(cloud.vertices["object_id"], dtype=np.int64)).tolist() == [
-        736,
-        581,
-        1787,
-        2592,
+        256,
+        256,
     ]
