@@ -31,6 +31,9 @@ Viewer 暂时是 evidence viewer，不是产品扩张主线。
 - 当前工作树本地基线：806 个 Python 测试、Vite production build、`uv lock --check`、
   world viewer full/truth 浏览器审计均通过。Python wheel/sdist 在 714-test 检查点通过；
   最新 pipeline 批次因审批额度耗尽未重跑打包。
+- `95dfe2a` 已把依赖 ignored 本地 PLY 的 real-sample-v2 行为测试改为明确
+  `fixture://` provenance 的程序化场景；不含 `public/samples/` 的 clean archive 仍为
+  806 个 Python 测试全部通过，required CI 不再隐式依赖许可受限素材。
 
 ## 当前真实负证据
 

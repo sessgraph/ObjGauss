@@ -94,6 +94,9 @@
 
 ## Recently Completed
 
+- 2026-07-11: `95dfe2a`；将 real-sample-v2 required-CI 覆盖迁到 license-safe、固定 seed
+  的程序化边界场景；保留 temperature sharpening、coverage、hard fix/regression、
+  no-safe-candidate 与 CLI/PLY roundtrip 分支，clean archive 全量 806 tests 通过。
 - 2026-07-11: `3acfe73`；对齐 world viewer audit 与 5-pill evidence UI、lazy artifact
   flows、translate-only/Stability 合同；full/truth 浏览器审计通过。
 - 2026-07-10: `506b793`；约束 controlled identity association 的可接受来源与匹配边界。
