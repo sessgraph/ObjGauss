@@ -29,6 +29,12 @@ try {
       ].join(" "),
     );
   } else {
+    const failedStatuses = Object.entries(summary)
+      .filter(([name, value]) => name.endsWith("Status") && value === "failed")
+      .map(([name]) => name);
+    if (failedStatuses.length > 0) {
+      throw new Error(`world viewer audit contains failed statuses: ${failedStatuses.join(",")}`);
+    }
     console.log(
     [
       "world_viewer=passed",
@@ -291,6 +297,17 @@ async function auditViewerTruth(url) {
 }
 
 async function auditWorld(url) {
+  const {
+    urlArtifact,
+    urlOgc,
+    urlOgcManifest,
+    algorithmManifest,
+    localModelManifest,
+    localTrainableManifest,
+    localArtifact,
+    localOgc,
+    localOgcManifest,
+  } = await auditArtifactFlows(url);
   const browser = await chromium.launch(launchOptions());
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const consoleIssues = [];
@@ -359,7 +376,8 @@ async function auditWorld(url) {
         world?.sourceSplatStageContract !== "spark-source-splat-stage-v1" ||
         world?.sourceSplatActive !== true ||
         !selectedSample ||
-        !["loading", "ready"].includes(selectedSample.status)
+        selectedSample.status !== "ready" ||
+        Number(world?.sourceSplatReadyCount ?? 0) < 1
       ) {
         return null;
       }
@@ -373,8 +391,8 @@ async function auditWorld(url) {
       };
     }, undefined, { timeout: 30000 }).then((handle) => handle.jsonValue());
     const pills = await page.locator(".modelPill").count();
-    if (pills < 7) {
-      throw new Error(`expected at least 7 model pills, found ${pills}`);
+    if (pills !== 5) {
+      throw new Error(`expected 5 curated model pills, found ${pills}`);
     }
     const sourceSplatMotionSelection = await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
@@ -441,15 +459,14 @@ async function auditWorld(url) {
     }, undefined, { timeout: 15000 }).then((handle) => handle.jsonValue());
     Object.assign(sourceSplatObjectProjection, sourceSplatMotionUi);
     const sourceSplatObjectMotion = sourceSplatObjectProjection.motion;
-    const ogcPill = page.locator(".modelPill[data-model-row-id='ogc-debug']");
-    await ogcPill.waitFor({ timeout: 15000 });
+    await clickSelector(page, "[data-model-process-button='ogc-debug']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
-      const pill = document.querySelector(".modelPill[data-model-row-id='ogc-debug']");
-      return pill?.getAttribute("data-model-load-state") === "loaded" &&
+      const row = document.querySelector("[data-model-version-row-id='ogc-debug']");
+      return row?.getAttribute("data-model-object-layer-status") === "loaded" &&
+        shell?.getAttribute("data-selected-model") === "ogc-debug" &&
         Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) > 0;
     }, undefined, { timeout: 15000 });
-    await clickModelPill(page, "ogc-debug");
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -490,6 +507,7 @@ async function auditWorld(url) {
       const systemDrawer = document.querySelector("[data-system-drawer='true']");
       const actionButtons = document.querySelectorAll("[data-object-transform-actions='true'] [data-object-transform-button]");
       const modeButtons = document.querySelectorAll("[data-object-transform-mode-selector='true'] [data-object-transform-mode-button]");
+      const transformTruth = document.querySelector("[data-object-transform-truth='translation-only']");
       const gaussianDisplayMode = shell?.getAttribute("data-gaussian-display-mode") ?? "";
       const topMetricLabels = [...document.querySelectorAll(".metricStrip .metric span")]
         .map((node) => node.textContent?.trim())
@@ -511,7 +529,10 @@ async function auditWorld(url) {
         worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-render-surface-contract") !== "three-world-point-preview-v1" ||
         worldPlane?.closest("[data-object-debug-panel='true']")?.getAttribute("data-object-layer-status") !== "loaded" ||
         actionButtons.length !== 3 ||
-        modeButtons.length !== 3 ||
+        modeButtons.length !== 1 ||
+        modeButtons[0]?.getAttribute("data-object-transform-mode-button") !== "translate" ||
+        world?.objectTransformModes?.join("|") !== "translate" ||
+        transformTruth?.textContent?.includes("旋转与缩放未开放") !== true ||
         !systemDrawer ||
         document.querySelectorAll(".bottomStatus").length !== 0 ||
         topMetricLabels.join("|") !== "Three.js|高斯展示|展示版本|对象层"
@@ -644,8 +665,8 @@ async function auditWorld(url) {
       const snapOn = currentWorld()?.setTransformSnapForAudit?.(true);
       const snapEnabled = currentWorld()?.transformSnapEnabled;
       const snapStep = currentWorld()?.transformSnapStep;
-      const rotateMode = currentWorld()?.setTransformModeForAudit?.("rotate");
-      const scaleMode = currentWorld()?.setTransformModeForAudit?.("scale");
+      const unsupportedRotateMode = currentWorld()?.setTransformModeForAudit?.("rotate");
+      const unsupportedScaleMode = currentWorld()?.setTransformModeForAudit?.("scale");
       const translateMode = currentWorld()?.setTransformModeForAudit?.("translate");
       const snapOff = currentWorld()?.setTransformSnapForAudit?.(false);
       const begin = currentWorld()?.beginTransformForAudit?.(input.selectionId);
@@ -664,8 +685,8 @@ async function auditWorld(url) {
         snapOn,
         snapEnabled,
         snapStep,
-        rotateMode,
-        scaleMode,
+        unsupportedRotateMode,
+        unsupportedScaleMode,
         translateMode,
         snapOff,
         begin,
@@ -688,8 +709,8 @@ async function auditWorld(url) {
           snapOn === true &&
           snapEnabled === true &&
           snapStep === 0.25 &&
-          rotateMode === "rotate" &&
-          scaleMode === "scale" &&
+          unsupportedRotateMode === "translate" &&
+          unsupportedScaleMode === "translate" &&
           translateMode === "translate" &&
           snapOff === false &&
           begin?.ok === true &&
@@ -731,15 +752,14 @@ async function auditWorld(url) {
     if (gaussianSelection.assignmentSource !== "derived_from_object_id") {
       throw new Error(`unexpected assignment source: ${gaussianSelection.assignmentSource}`);
     }
-    const trainablePill = page.locator(".modelPill[data-model-row-id='trainable-mvp-debug']");
-    await trainablePill.waitFor({ timeout: 15000 });
+    await clickSelector(page, "[data-model-process-button='trainable-mvp-debug']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
-      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-mvp-debug']");
-      return pill?.getAttribute("data-model-load-state") === "loaded" &&
+      const row = document.querySelector("[data-model-version-row-id='trainable-mvp-debug']");
+      return row?.getAttribute("data-model-object-layer-status") === "loaded" &&
+        shell?.getAttribute("data-selected-model") === "trainable-mvp-debug" &&
         Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) > 0;
-    }, undefined, { timeout: 15000 });
-    await clickModelPill(page, "trainable-mvp-debug");
+    }, undefined, { timeout: 30000, polling: 100 });
     await page.waitForFunction(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const shell = document.querySelector(".worldShell");
@@ -779,7 +799,8 @@ async function auditWorld(url) {
     if (!trainableGaussian.ok) {
       throw new Error("expected audit handle to select a trainable artifact Gaussian probe");
     }
-    await page.waitForFunction(() => {
+    try {
+      await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-object-debug-panel='true']");
       const heatmap = document.querySelector("[data-assignment-heatmap='true']");
@@ -787,7 +808,6 @@ async function auditWorld(url) {
       const timelinePanel = document.querySelector("[data-assignment-timeline-panel='true']");
       const fragmentPanel = document.querySelector("[data-object-fragmentation-panel='true']");
       const verdict = document.querySelector("[data-object-verdict-panel='true']");
-      const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const solver = document.querySelector("[data-solver-training-evidence='true']");
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
@@ -902,7 +922,7 @@ async function auditWorld(url) {
         Number(heatmap?.getAttribute("data-assignment-probe-margin") ?? 0) > 0.55 &&
         snapshot?.assignment?.probe?.margin > 0.55 &&
         world?.assignmentProbeMargin > 0.55 &&
-        stability?.getAttribute("data-stability-status") === shell?.getAttribute("data-stability-status") &&
+        world?.stabilitySummary?.status === shell?.getAttribute("data-stability-status") &&
         training?.getAttribute("data-training-status") === "loss_down" &&
         training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1" &&
         training?.getAttribute("data-training-image-loss-decreased") === "true" &&
@@ -931,19 +951,114 @@ async function auditWorld(url) {
         Number(world?.solverTrainingLossDelta ?? 0) > 0 &&
         world?.solverTrainingGpuUsed === false &&
         world?.solverTrainingVramReserveGb === 1 &&
-        Number(stability?.getAttribute("data-slot-utilization") ?? 0) > 0 &&
-        stability?.getAttribute("data-purity-available") === "true" &&
-        stability?.getAttribute("data-temporal-available") === "true" &&
-        stability?.getAttribute("data-spatial-available") === "true" &&
-        stability?.getAttribute("data-jitter-available") === "true" &&
-        stability?.getAttribute("data-bbox-available") === "true" &&
-        Number(stability?.getAttribute("data-mean-purity") ?? 0) > 0 &&
-        Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0) > 0 &&
-        Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0) > 0 &&
-        Number(stability?.getAttribute("data-mean-assignment-jitter") ?? -1) >= 0 &&
-        Number(stability?.getAttribute("data-mean-bbox-stability") ?? 0) > 0
+        Number(shell?.getAttribute("data-stability-slot-utilization") ?? 0) > 0 &&
+        shell?.getAttribute("data-stability-purity-available") === "true" &&
+        shell?.getAttribute("data-stability-temporal-available") === "true" &&
+        shell?.getAttribute("data-stability-spatial-available") === "true" &&
+        shell?.getAttribute("data-stability-jitter-available") === "true" &&
+        shell?.getAttribute("data-stability-bbox-available") === "true" &&
+        Number(shell?.getAttribute("data-stability-mean-purity") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-stability-mean-temporal-drift") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-stability-mean-spatial-compactness") ?? 0) > 0 &&
+        Number(shell?.getAttribute("data-stability-mean-assignment-jitter") ?? -1) >= 0 &&
+        Number(shell?.getAttribute("data-stability-mean-bbox-stability") ?? 0) > 0
       );
-    }, undefined, { timeout: 15000 });
+      }, undefined, { timeout: 30000 });
+    } catch (error) {
+      const diagnostics = await page.evaluate(() => {
+        const shell = document.querySelector(".worldShell");
+        const panel = document.querySelector("[data-object-debug-panel='true']");
+        const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+        const probe = document.querySelector("[data-gaussian-probe-panel='true']");
+        const timeline = document.querySelector("[data-assignment-timeline-panel='true']");
+        const fragment = document.querySelector("[data-object-fragmentation-panel='true']");
+        const verdict = document.querySelector("[data-object-verdict-panel='true']");
+        const training = document.querySelector("[data-training-evidence='true']");
+        const solver = document.querySelector("[data-solver-training-evidence='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const attributes = (node, names) => Object.fromEntries(
+          names.map((name) => [name, node?.getAttribute(name) ?? null]),
+        );
+        return {
+          selectedModel: world?.selectedModelId ?? null,
+          shell: attributes(shell, [
+            "data-assignment-source",
+            "data-assignment-probe-status",
+            "data-assignment-timeline-status",
+            "data-object-continuity-status",
+            "data-object-temporal-status",
+            "data-object-explainability-status",
+            "data-stability-status",
+            "data-solver-training-status",
+          ]),
+          panel: attributes(panel, [
+            "data-assignment-probe-status",
+            "data-assignment-timeline-status",
+            "data-object-continuity-status",
+            "data-object-temporal-status",
+            "data-object-explainability-status",
+            "data-solver-training-status",
+          ]),
+          heatmap: attributes(heatmap, [
+            "data-assignment-source",
+            "data-assignment-slots",
+            "data-assignment-probe-status",
+            "data-assignment-probe-margin",
+          ]),
+          probe: attributes(probe, [
+            "data-gaussian-probe-source",
+            "data-gaussian-probe-index",
+            "data-gaussian-probe-status",
+            "data-gaussian-probe-margin",
+            "data-gaussian-probe-confidence",
+            "data-gaussian-probe-entropy",
+            "data-gaussian-probe-opacity",
+            "data-gaussian-probe-position",
+          ]),
+          timeline: attributes(timeline, [
+            "data-assignment-timeline-status",
+            "data-assignment-timeline-frame-count",
+            "data-assignment-timeline-current-frame",
+            "data-assignment-timeline-gaussian-index",
+            "data-assignment-timeline-jitter",
+          ]),
+          fragment: attributes(fragment, [
+            "data-object-fragmentation-status",
+            "data-object-fragmentation-object",
+            "data-object-fragmentation-gaussians",
+          ]),
+          verdict: attributes(verdict, [
+            "data-object-verdict-status",
+            "data-object-verdict-reason-count",
+            "data-object-verdict-clear",
+          ]),
+          stability: attributes(shell, [
+            "data-stability-status",
+            "data-stability-slot-utilization",
+            "data-stability-purity-available",
+            "data-stability-temporal-available",
+            "data-stability-spatial-available",
+            "data-stability-jitter-available",
+            "data-stability-bbox-available",
+          ]),
+          training: attributes(training, [
+            "data-training-status",
+            "data-training-renderer",
+            "data-training-image-loss-decreased",
+          ]),
+          solver: attributes(solver, [
+            "data-solver-training-status",
+            "data-solver-training-schema",
+            "data-solver-training-loss-decreased",
+            "data-solver-training-assignment-loss-decreased",
+          ]),
+        };
+      });
+      throw new Error(
+        `trainable evidence did not settle: ${JSON.stringify(diagnostics)}`,
+        { cause: error },
+      );
+    }
     if (trainableGaussian.assignmentSource !== "trainable_kernel_model_artifact") {
       throw new Error(`unexpected trainable assignment source: ${trainableGaussian.assignmentSource}`);
     }
@@ -1522,21 +1637,11 @@ async function auditWorld(url) {
 
     const screenshotPath = "/tmp/objgauss-world-viewer.png";
     await page.screenshot({ path: screenshotPath, fullPage: false });
-    const mobileScreenshotPath = await auditMobileWorld(browser, url);
-    const urlArtifact = await auditUrlTrainableArtifact(browser, url);
-    const urlOgc = await auditUrlOgcArtifact(browser, url);
-    const urlOgcManifest = await auditUrlOgcManifestArtifact(browser, url);
-    const algorithmManifest = await auditAlgorithmManifestBundle(browser, url);
-    const localModelManifest = await auditLocalModelManifestBundleImport(browser, url);
-    const localTrainableManifest = await auditLocalTrainableManifestPackageImport(browser, url);
-    const localArtifact = await auditLocalTrainableArtifactImport(browser, url);
-    const localOgc = await auditLocalOgcArtifactImport(browser, url);
-    const localOgcManifest = await auditLocalOgcManifestPackageImport(browser, url);
+    const mobileScreenshotPath = await auditMobileWorld(url);
     const world = await page.evaluate(() => {
       const handle = window.__OBJGAUSS_WORLD__;
       const snapshot = window.__OBJGAUSS_DEBUG_SNAPSHOT__;
       const shell = document.querySelector(".worldShell");
-      const stability = document.querySelector("[data-stability-dashboard='true']");
       const training = document.querySelector("[data-training-evidence='true']");
       const solver = document.querySelector("[data-solver-training-evidence='true']");
       const debugPanel = document.querySelector("[data-object-debug-panel='true']");
@@ -1755,6 +1860,7 @@ async function auditWorld(url) {
         objectVerdictReasonName: verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-name") ?? null,
         objectVerdictReasonStatus: verdict?.querySelector("[data-object-verdict-reason-row='true']")?.getAttribute("data-object-verdict-reason-status") ?? null,
         stabilityStatus: handle.stabilitySummary?.status ?? null,
+        shellStabilityStatus: shell?.getAttribute("data-stability-status") ?? null,
         slotUtilization: handle.stabilitySummary?.slotUtilization ?? null,
         mixedSlots: handle.stabilitySummary?.mixedSlots ?? null,
         meanPurity: handle.stabilitySummary?.meanPurity ?? null,
@@ -1767,11 +1873,6 @@ async function auditWorld(url) {
         shellMeanSpatialCompactness: Number(shell?.getAttribute("data-stability-mean-spatial-compactness") ?? 0),
         shellMeanAssignmentJitter: Number(shell?.getAttribute("data-stability-mean-assignment-jitter") ?? -1),
         shellMeanBboxStability: Number(shell?.getAttribute("data-stability-mean-bbox-stability") ?? 0),
-        dashboardMeanPurity: Number(stability?.getAttribute("data-mean-purity") ?? 0),
-        dashboardMeanTemporalDrift: Number(stability?.getAttribute("data-mean-temporal-drift") ?? 0),
-        dashboardMeanSpatialCompactness: Number(stability?.getAttribute("data-mean-spatial-compactness") ?? 0),
-        dashboardMeanAssignmentJitter: Number(stability?.getAttribute("data-mean-assignment-jitter") ?? -1),
-        dashboardMeanBboxStability: Number(stability?.getAttribute("data-mean-bbox-stability") ?? 0),
         hoveredId: handle.hoveredId,
         hoveredModelId: handle.hoveredModelId,
         hoveredObjectId: handle.hoveredObjectId,
@@ -1901,7 +2002,6 @@ async function auditWorld(url) {
         panelVisibilityContract: debugPanel?.getAttribute("data-object-visibility-contract") ?? null,
         panelHiddenObjects: Number(debugPanel?.getAttribute("data-hidden-objects") ?? 0),
         panelHiddenGaussians: Number(debugPanel?.getAttribute("data-hidden-gaussians") ?? 0),
-        dashboardStatus: stability?.getAttribute("data-stability-status") ?? null,
         trainableArtifactLoadRoute: shell?.getAttribute("data-trainable-artifact-load-route") ?? null,
         trainableArtifactPath: shell?.getAttribute("data-trainable-artifact-path") ?? null,
         trainableFrameIndex: Number(shell?.getAttribute("data-trainable-artifact-frame-index") ?? -1),
@@ -1946,8 +2046,8 @@ async function auditWorld(url) {
         ogcLoadedCount: Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0),
       };
     });
-    if (world.stabilityStatus !== world.dashboardStatus) {
-      throw new Error(`stability dashboard mismatch: ${JSON.stringify(world)}`);
+    if (world.stabilityStatus !== world.shellStabilityStatus) {
+      throw new Error(`stability evidence mismatch: ${JSON.stringify(world)}`);
     }
     if (
       world.objectOverlayMode !== "full" ||
@@ -2181,33 +2281,29 @@ async function auditWorld(url) {
     )) {
       throw new Error(`expected ObjectState debug event trace protocol: ${JSON.stringify(world)}`);
     }
-    if (!(Number(world.meanPurity) > 0 && Number(world.dashboardMeanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
+    if (!(Number(world.meanPurity) > 0 && Number(world.shellMeanPurity) > 0)) {
       throw new Error(`expected object purity metric to be available: ${JSON.stringify(world)}`);
     }
     if (!(
       Number(world.meanTemporalDrift) > 0 &&
-      Number(world.dashboardMeanTemporalDrift) > 0 &&
       Number(world.shellMeanTemporalDrift) > 0
     )) {
       throw new Error(`expected temporal drift metric to be available: ${JSON.stringify(world)}`);
     }
     if (!(
       Number(world.meanSpatialCompactness) > 0 &&
-      Number(world.dashboardMeanSpatialCompactness) > 0 &&
       Number(world.shellMeanSpatialCompactness) > 0
     )) {
       throw new Error(`expected spatial compactness metric to be available: ${JSON.stringify(world)}`);
     }
     if (!(
       Number(world.meanAssignmentJitter) >= 0 &&
-      Number(world.dashboardMeanAssignmentJitter) >= 0 &&
       Number(world.shellMeanAssignmentJitter) >= 0
     )) {
       throw new Error(`expected assignment jitter metric to be available: ${JSON.stringify(world)}`);
     }
     if (!(
       Number(world.meanBboxStability) > 0 &&
-      Number(world.dashboardMeanBboxStability) > 0 &&
       Number(world.shellMeanBboxStability) > 0
     )) {
       throw new Error(`expected bbox stability metric to be available: ${JSON.stringify(world)}`);
@@ -2422,7 +2518,7 @@ async function auditWorld(url) {
         objectTransform.gizmoObject === objectSelection.selectionId &&
         objectTransform.interactionLayer === "three-transform-controls-v1" &&
         objectTransform.actionButtonCount === 3 &&
-        objectTransform.modeButtonCount === 3
+        objectTransform.modeButtonCount === 1
           ? "passed"
           : "failed",
       objectTransformStateStatus: objectTransformState.ok ? "passed" : "failed",
@@ -2436,11 +2532,10 @@ async function auditWorld(url) {
         world.panelTrainingStageSchema === "model-version-processing-v1" &&
         world.shellRenderSurfaceContract === "three-world-point-preview-v1" &&
         sourceSplatStage.contract === "spark-source-splat-stage-v1" &&
+        sourceSplatStage.status === "ready" &&
+        sourceSplatStage.readyCount >= 1 &&
         sourceSplatStage.mode === "完整 splat" &&
-        world.shellStageDisplayContract === "spark-source-splat-stage-v1" &&
-        world.shellSourceSplatActive === "true" &&
         world.panelStageRenderSurfaceContract === "three-world-point-preview-v1" &&
-        world.panelStageDisplayContract === "spark-source-splat-stage-v1" &&
         world.panelStageSourceSplatModels >= 1 &&
         world.shellFullGaussianSourceCount >= 1 &&
         world.panelStageFullGaussianSources >= 1 &&
@@ -2491,28 +2586,68 @@ async function auditWorld(url) {
   }
 }
 
-async function auditMobileWorld(browser, url) {
+async function auditMobileWorld(url) {
+  // The desktop audit deliberately loads several WebGL/Spark evidence paths.
+  // Keep the mobile contract in a fresh browser process so its startup result
+  // is not coupled to renderer resources retained by the desktop page.
+  const browser = await chromium.launch(launchOptions());
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     isMobile: true,
   });
+  const pageIssues = [];
+  page.on("console", (message) => {
+    if (["error", "warning"].includes(message.type())) {
+      pageIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => pageIssues.push(`pageerror: ${error.message}`));
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    await page.locator(".worldShell").waitFor({ timeout: 15000 });
-    await page.locator("[data-object-debug-panel='true']").waitFor({ timeout: 15000 });
-    await page.locator("[data-stability-dashboard='true']").waitFor({ timeout: 15000 });
+    const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    try {
+      await page.locator(".worldShell").waitFor({ timeout: 30000 });
+    } catch (error) {
+      const documentState = await page.evaluate(() => ({
+        url: window.location.href,
+        readyState: document.readyState,
+        title: document.title,
+        bodyText: document.body?.innerText?.slice(0, 500) ?? "",
+      })).catch(() => null);
+      throw new Error(
+        `mobile world shell did not mount: ${JSON.stringify({
+          status: response?.status() ?? null,
+          documentState,
+          pageIssues,
+        })}`,
+        { cause: error },
+      );
+    }
+    const debugPanel = page.locator("[data-object-debug-panel='true']");
+    await debugPanel.waitFor({ timeout: 30000 });
+    if (await debugPanel.getAttribute("data-debug-panel-collapsed") === "true") {
+      await page.locator("[data-debug-panel-collapse-button='true']").click();
+      await page.waitForFunction(() => (
+        document.querySelector("[data-object-debug-panel='true']")
+          ?.getAttribute("data-debug-panel-collapsed") === "false"
+      ), undefined, { timeout: 15000 });
+    }
+    await page.locator("[data-model-process-button='trainable-mvp-debug']").waitFor({
+      state: "attached",
+      timeout: 30000,
+    });
+    await clickSelector(page, "[data-model-process-button='trainable-mvp-debug']");
     await page.waitForFunction(() => {
-      const pill = document.querySelector(".modelPill[data-model-row-id='trainable-mvp-debug']");
-      return pill?.getAttribute("data-model-load-state") === "loaded";
-    }, undefined, { timeout: 15000 });
-    await clickModelPill(page, "trainable-mvp-debug");
+      const shell = document.querySelector(".worldShell");
+      const row = document.querySelector("[data-model-version-row-id='trainable-mvp-debug']");
+      return row?.getAttribute("data-model-object-layer-status") === "loaded" &&
+        shell?.getAttribute("data-selected-model") === "trainable-mvp-debug";
+    }, undefined, { timeout: 30000 });
     await clickSelector(page, "[data-trainable-frame-button='1']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
-      const dashboard = document.querySelector("[data-stability-dashboard='true']");
       const frameSelector = document.querySelector("[data-trainable-frame-selector='true']");
       return shell?.getAttribute("data-stability-dashboard") === "enabled" &&
-        dashboard?.getAttribute("data-stability-status") !== "" &&
+        shell?.getAttribute("data-stability-status") !== "" &&
         shell?.getAttribute("data-selected-model") === "trainable-mvp-debug" &&
         shell?.getAttribute("data-trainable-artifact-frame-index") === "1" &&
         frameSelector?.getAttribute("data-selected-frame") === "1";
@@ -2521,7 +2656,67 @@ async function auditMobileWorld(browser, url) {
     await page.screenshot({ path: screenshotPath, fullPage: false });
     return screenshotPath;
   } finally {
-    await page.close();
+    try {
+      await page.close();
+    } finally {
+      await closeBrowserWithTimeout(browser);
+    }
+  }
+}
+
+async function auditArtifactFlows(url) {
+  // Each import contract gets a fresh renderer budget.  Closing a page does
+  // not synchronously release every WebGL/Chrome resource, so reusing one
+  // browser would make later contracts depend on the order of earlier ones.
+  return {
+    localArtifact: await auditInFreshBrowser(
+      "local-trainable",
+      (browser) => auditLocalTrainableArtifactImport(browser, url),
+    ),
+    localOgc: await auditInFreshBrowser(
+      "local-ogc",
+      (browser) => auditLocalOgcArtifactImport(browser, url),
+    ),
+    localOgcManifest: await auditInFreshBrowser(
+      "local-ogc-manifest",
+      (browser) => auditLocalOgcManifestPackageImport(browser, url),
+    ),
+    algorithmManifest: await auditInFreshBrowser(
+      "algorithm-manifest",
+      (browser) => auditAlgorithmManifestBundle(browser, url),
+    ),
+    localModelManifest: await auditInFreshBrowser(
+      "local-model-manifest",
+      (browser) => auditLocalModelManifestBundleImport(browser, url),
+    ),
+    localTrainableManifest: await auditInFreshBrowser(
+      "local-trainable-manifest",
+      (browser) => auditLocalTrainableManifestPackageImport(browser, url),
+    ),
+    urlArtifact: await auditInFreshBrowser(
+      "url-trainable",
+      (browser) => auditUrlTrainableArtifact(browser, url),
+    ),
+    urlOgc: await auditInFreshBrowser(
+      "url-ogc",
+      (browser) => auditUrlOgcArtifact(browser, url),
+    ),
+    urlOgcManifest: await auditInFreshBrowser(
+      "url-ogc-manifest",
+      (browser) => auditUrlOgcManifestArtifact(browser, url),
+    ),
+  };
+}
+
+async function auditInFreshBrowser(label, run) {
+  console.log(`world_viewer_audit_stage=${label} status=running`);
+  const browser = await chromium.launch(launchOptions());
+  try {
+    const result = await run(browser);
+    console.log(`world_viewer_audit_stage=${label} status=passed`);
+    return result;
+  } finally {
+    await closeBrowserWithTimeout(browser);
   }
 }
 
@@ -2530,14 +2725,15 @@ async function auditUrlTrainableArtifact(browser, url) {
   try {
     const artifactUrl = new URL(url);
     artifactUrl.searchParams.set("trainableArtifact", "/models/trainable-mvp-debug/model-artifact.json");
-    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const pill = document.querySelector(".modelPill[data-model-row-id='trainable-url-artifact']");
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) &&
         shell?.getAttribute("data-selected-model") === "trainable-url-artifact" &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "fetch-json" &&
         shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
@@ -2545,9 +2741,9 @@ async function auditUrlTrainableArtifact(browser, url) {
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
         Number(shell?.getAttribute("data-trainable-training-final-total-loss") ?? 0) > 0 &&
         Number(shell?.getAttribute("data-trainable-training-loss-delta") ?? 0) > 0 &&
-        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const target = world?.objectSelections?.find((entry) => entry.modelId === "trainable-url-artifact");
@@ -2576,7 +2772,7 @@ async function auditUrlTrainableArtifact(browser, url) {
         Number(training?.getAttribute("data-training-final-image-loss") ?? 0) > 0 &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-artifact.png", fullPage: false });
     return { status: "fetch-json" };
   } finally {
@@ -2587,7 +2783,7 @@ async function auditUrlTrainableArtifact(browser, url) {
 async function auditLocalTrainableArtifactImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-trainable-artifact-file-input='true']").setInputFiles(
       "public/models/trainable-mvp-debug/model-artifact.json",
@@ -2600,8 +2796,8 @@ async function auditLocalTrainableArtifactImport(browser, url) {
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
         button?.getAttribute("data-import-status") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
-        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 1 &&
         shell?.getAttribute("data-selected-model") === "trainable-local-artifact" &&
         shell?.getAttribute("data-trainable-import-status") === "loaded" &&
         shell?.getAttribute("data-trainable-import-model") === "trainable-local-artifact" &&
@@ -2610,10 +2806,10 @@ async function auditLocalTrainableArtifactImport(browser, url) {
         shell?.getAttribute("data-trainable-artifact-path") === "local://model-artifact.json" &&
         shell?.getAttribute("data-trainable-training-status") === "loss_down" &&
         shell?.getAttribute("data-trainable-training-image-loss-decreased") === "true" &&
-        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1 &&
         training?.getAttribute("data-training-renderer") === "cpu-image-point-splat-differentiable-v1"
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const target = world?.objectSelections?.find((entry) => entry.modelId === "trainable-local-artifact");
@@ -2621,10 +2817,9 @@ async function auditLocalTrainableArtifactImport(browser, url) {
         ok: world?.selectObjectForAudit?.(target?.selectionId) ?? false,
         selectionId: target?.selectionId ?? null,
         modelId: target?.modelId ?? null,
-        modelCount: world?.modelCount ?? 0,
       };
     });
-    if (!selection.ok || selection.modelId !== "trainable-local-artifact" || selection.modelCount !== 8) {
+    if (!selection.ok || selection.modelId !== "trainable-local-artifact") {
       throw new Error(`expected local artifact object selection: ${JSON.stringify(selection)}`);
     }
     const gaussian = await page.evaluate((selectionId) => {
@@ -2677,7 +2872,7 @@ async function auditLocalTrainableArtifactImport(browser, url) {
 async function auditLocalOgcArtifactImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-ogc-artifact-file-input='true']").setInputFiles([
       "public/models/ogc-url-fixture/scene.index.json",
@@ -2691,8 +2886,8 @@ async function auditLocalOgcArtifactImport(browser, url) {
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
         button?.getAttribute("data-import-status") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
-        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 1 &&
         shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
         shell?.getAttribute("data-ogc-import-status") === "loaded" &&
         shell?.getAttribute("data-ogc-import-model") === "ogc-local-artifact" &&
@@ -2705,9 +2900,9 @@ async function auditLocalOgcArtifactImport(browser, url) {
         shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
         shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
         shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-local-artifact") ?? [];
@@ -2762,7 +2957,7 @@ async function auditLocalOgcArtifactImport(browser, url) {
         selector?.getAttribute("data-selected-lod") === "1" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
@@ -2787,7 +2982,7 @@ async function auditLocalOgcArtifactImport(browser, url) {
         types.has("ogc-lod") &&
         types.has("ogc-chunks")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-ogc.png", fullPage: false });
     return { status: "local-file-lod-chunk-ui" };
   } finally {
@@ -2799,7 +2994,7 @@ async function auditLocalOgcManifestPackageImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
     const manifestPath = writeLocalOgcManifestFixture();
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-ogc-artifact-file-input='true']").setInputFiles([
       manifestPath,
@@ -2814,8 +3009,8 @@ async function auditLocalOgcManifestPackageImport(browser, url) {
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
         button?.getAttribute("data-import-status") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
-        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 1 &&
         shell?.getAttribute("data-selected-model") === "ogc-local-artifact" &&
         shell?.getAttribute("data-ogc-import-status") === "loaded" &&
         shell?.getAttribute("data-ogc-import-model") === "ogc-local-artifact" &&
@@ -2829,9 +3024,9 @@ async function auditLocalOgcManifestPackageImport(browser, url) {
         shell?.getAttribute("data-ogc-artifact-fetched-bytes") === "41" &&
         shell?.getAttribute("data-ogc-artifact-requested-bytes") === "40" &&
         shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-local-artifact") ?? [];
@@ -2881,7 +3076,7 @@ async function auditLocalOgcManifestPackageImport(browser, url) {
         types.has("ogc-lod") &&
         types.has("ogc-chunks")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-ogc-manifest.png", fullPage: false });
     return { status: "local-manifest-file-lod-chunk-ui" };
   } finally {
@@ -2896,14 +3091,15 @@ async function auditUrlOgcArtifact(browser, url) {
     artifactUrl.searchParams.set("ogcIndex", "/models/ogc-url-fixture/scene.index.json");
     artifactUrl.searchParams.set("ogcPayload", "/models/ogc-url-fixture/scene.ogc");
     artifactUrl.searchParams.set("ogcLod", "1");
-    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const pill = document.querySelector(".modelPill[data-model-row-id='ogc-url-artifact']");
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) &&
         shell?.getAttribute("data-selected-model") === "ogc-url-artifact" &&
         shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
         shell?.getAttribute("data-ogc-artifact-index-path") === "/models/ogc-url-fixture/scene.index.json" &&
@@ -2913,9 +3109,9 @@ async function auditUrlOgcArtifact(browser, url) {
         shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
         shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
         document.querySelector("[data-ogc-lod-selector='true']")?.getAttribute("data-selected-lod") === "1" &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-url-artifact") ?? [];
@@ -2969,7 +3165,7 @@ async function auditUrlOgcArtifact(browser, url) {
         chunkSelector?.getAttribute("data-selected-chunks") === "all" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await clickSelector(page, "[data-ogc-chunk-button='0']");
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
@@ -2988,7 +3184,7 @@ async function auditUrlOgcArtifact(browser, url) {
         chunkSelector?.getAttribute("data-selected-chunks") === "0" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const chunkSelection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-url-artifact") ?? [];
@@ -3028,7 +3224,7 @@ async function auditUrlOgcArtifact(browser, url) {
         chunkSelector?.getAttribute("data-selected-chunks") === "all" &&
         Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) === 2
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc.png", fullPage: false });
     return { status: "range-ogc-lod-chunk-ui" };
   } finally {
@@ -3042,14 +3238,15 @@ async function auditUrlOgcManifestArtifact(browser, url) {
     const artifactUrl = new URL(url);
     artifactUrl.searchParams.set("ogcManifest", "/models/ogc-url-fixture/model-artifact.json");
     artifactUrl.searchParams.set("ogcLod", "1");
-    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const pill = document.querySelector(".modelPill[data-model-row-id='ogc-manifest-artifact']");
       return (
         pill?.getAttribute("data-model-load-state") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "8" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) &&
         shell?.getAttribute("data-selected-model") === "ogc-manifest-artifact" &&
         shell?.getAttribute("data-ogc-artifact-load-route") === "range-ogc" &&
         shell?.getAttribute("data-ogc-artifact-index-path") === "/models/ogc-url-fixture/scene.index.json" &&
@@ -3059,9 +3256,9 @@ async function auditUrlOgcManifestArtifact(browser, url) {
         shell?.getAttribute("data-ogc-artifact-requested-bytes") === "20" &&
         shell?.getAttribute("data-ogc-artifact-decoded-windows") === "2" &&
         document.querySelector("[data-ogc-lod-selector='true']")?.getAttribute("data-selected-lod") === "1" &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 45000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const targets = world?.objectSelections?.filter((entry) => entry.modelId === "ogc-manifest-artifact") ?? [];
@@ -3106,7 +3303,7 @@ async function auditUrlOgcManifestArtifact(browser, url) {
         types.has("ogc-lod") &&
         types.has("ogc-chunks")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-url-ogc-manifest.png", fullPage: false });
     return { status: "url-manifest-range-lod-chunk-ui" };
   } finally {
@@ -3120,8 +3317,25 @@ async function auditAlgorithmManifestBundle(browser, url) {
     const artifactUrl = new URL(url);
     artifactUrl.searchParams.set("modelArtifactManifest", "/models/algorithm-bundle-fixture/model-artifact.json");
     artifactUrl.searchParams.set("ogcLod", "1");
-    await page.goto(String(artifactUrl), { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const parent = document.querySelector(".modelPill[data-model-row-id='model-artifact-manifest']");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-manifest-trainable-artifact']");
+      const ogc = document.querySelector(".modelPill[data-model-row-id='model-manifest-ogc-artifact']");
+      return parent?.getAttribute("data-model-load-state") === "loaded" &&
+        Boolean(trainable) &&
+        Boolean(ogc) &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 2;
+    }, undefined, { timeout: 45000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-manifest-trainable-artifact']");
+      return trainable?.getAttribute("data-model-load-state") === "loaded" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1;
+    }, undefined, { timeout: 45000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
@@ -3137,7 +3351,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         manifestPill?.getAttribute("data-model-load-state") === "loaded" &&
         trainablePill?.getAttribute("data-model-load-state") === "loaded" &&
         ogcPill?.getAttribute("data-model-load-state") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "10" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 2 &&
         shell?.getAttribute("data-selected-model") === "model-manifest-trainable-artifact" &&
         shell?.getAttribute("data-trainable-artifact-load-route") === "model-manifest-json" &&
         shell?.getAttribute("data-trainable-artifact-path") === "/models/trainable-mvp-debug/model-artifact.json" &&
@@ -3167,13 +3382,12 @@ async function auditAlgorithmManifestBundle(browser, url) {
         slotGate?.getAttribute("data-quality-gate-status") === "pass" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
-        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1 &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 60000 });
     const temporalJitterCase = page.locator("[data-object-state-benchmark-case-name='temporal_jitter']");
-    await openContainingDetails(temporalJitterCase);
-    await temporalJitterCase.click();
+    await clickInContainingDetails(temporalJitterCase);
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const benchmark = document.querySelector("[data-object-state-benchmark='true']");
@@ -3287,10 +3501,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
         types.has("gaussian-probe") &&
         types.has("ogc-chunks")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const snapshotExportButton = page.locator("[data-debug-snapshot-export-button='true']");
-    await openContainingDetails(snapshotExportButton);
-    await snapshotExportButton.click();
+    await clickInContainingDetails(snapshotExportButton);
     const snapshotExportHandle = await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -3349,8 +3562,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
     }, undefined, { timeout: 15000 });
     const snapshotExport = await snapshotExportHandle.jsonValue();
     const sessionExportButton = page.locator("[data-debug-session-export-button='true']");
-    await openContainingDetails(sessionExportButton);
-    await sessionExportButton.click();
+    await clickInContainingDetails(sessionExportButton);
     const sessionExportHandle = await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const panel = document.querySelector("[data-debug-snapshot-panel='true']");
@@ -3394,9 +3606,9 @@ async function auditAlgorithmManifestBundle(browser, url) {
         parsed?.snapshot?.benchmark?.status !== "pass" ||
         parsed?.snapshot?.benchmark?.caseCount !== 8 ||
         parsed?.snapshot?.benchmark?.activeCase?.name !== "temporal_jitter" ||
-        parsed?.summary?.modelCount !== 10 ||
-        parsed?.summary?.trainableArtifactCount < 2 ||
-        parsed?.summary?.ogcArtifactCount < 2 ||
+        parsed?.summary?.modelCount !== Number(shell?.getAttribute("data-model-count") ?? 0) ||
+        parsed?.summary?.trainableArtifactCount !== 1 ||
+        parsed?.summary?.ogcArtifactCount !== 1 ||
         !modelIds.has("model-manifest-trainable-artifact") ||
         !modelIds.has("model-manifest-ogc-artifact") ||
         !eventTypes.has("export-snapshot") ||
@@ -3439,7 +3651,8 @@ async function auditAlgorithmManifestBundle(browser, url) {
         shell?.getAttribute("data-debug-session-archive-model") !== "model-manifest-ogc-artifact" ||
         shell?.getAttribute("data-debug-session-archive-quality") !== "warn" ||
         Number(shell?.getAttribute("data-debug-session-archive-event-count") ?? 0) < 2 ||
-        Number(shell?.getAttribute("data-debug-session-archive-model-count") ?? 0) !== 10 ||
+        Number(shell?.getAttribute("data-debug-session-archive-model-count") ?? 0) !==
+          Number(shell?.getAttribute("data-model-count") ?? 0) ||
         shell?.getAttribute("data-debug-session-diff-status") !== "match" ||
         shell?.getAttribute("data-debug-session-diff-model-match") !== "true" ||
         shell?.getAttribute("data-debug-session-diff-source-match") !== "true" ||
@@ -3478,7 +3691,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         archive?.snapshot?.benchmark?.status !== "pass" ||
         archive?.snapshot?.benchmark?.caseCount !== 8 ||
         archive?.snapshot?.benchmark?.activeCase?.name !== "temporal_jitter" ||
-        archive?.summary?.modelCount !== 10 ||
+        archive?.summary?.modelCount !== Number(shell?.getAttribute("data-model-count") ?? 0) ||
         !eventTypes.has("import-session")
       ) {
         return null;
@@ -3489,7 +3702,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
         model: archive.snapshot.model.id,
         diffStatus: shell.getAttribute("data-debug-session-diff-status"),
       };
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     const sessionImport = await sessionImportHandle.jsonValue();
     await clickModelPill(page, "model-manifest-trainable-artifact");
     const sessionDriftHandle = await page.waitForFunction(() => {
@@ -3539,7 +3752,7 @@ async function auditAlgorithmManifestBundle(browser, url) {
 async function auditLocalModelManifestBundleImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
       "public/models/algorithm-bundle-fixture/model-artifact.json",
@@ -3549,6 +3762,23 @@ async function auditLocalModelManifestBundleImport(browser, url) {
       "public/models/ogc-url-fixture/scene.index.json",
       "public/models/ogc-url-fixture/scene.ogc",
     ]);
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const parent = document.querySelector(".modelPill[data-model-row-id='model-local-manifest']");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
+      const ogc = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-ogc-artifact']");
+      return parent?.getAttribute("data-model-load-state") === "loaded" &&
+        Boolean(trainable) &&
+        Boolean(ogc) &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 3;
+    }, undefined, { timeout: 45000 });
+    await page.waitForFunction(() => {
+      const shell = document.querySelector(".worldShell");
+      const trainable = document.querySelector(".modelPill[data-model-row-id='model-local-manifest-trainable-artifact']");
+      return trainable?.getAttribute("data-model-load-state") === "loaded" &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1;
+    }, undefined, { timeout: 45000 });
     await page.waitForFunction(() => {
       const shell = document.querySelector(".worldShell");
       const quality = document.querySelector("[data-quality-report='true']");
@@ -3565,8 +3795,8 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         parent?.getAttribute("data-model-load-state") === "loaded" &&
         trainable?.getAttribute("data-model-load-state") === "loaded" &&
         ogc?.getAttribute("data-model-load-state") === "loaded" &&
-        shell?.getAttribute("data-model-count") === "10" &&
-        shell?.getAttribute("data-catalog-model-count") === "7" &&
+        Number(shell?.getAttribute("data-model-count") ?? 0) ===
+          Number(shell?.getAttribute("data-catalog-model-count") ?? -1) + 3 &&
         shell?.getAttribute("data-selected-model") === "model-local-manifest-trainable-artifact" &&
         shell?.getAttribute("data-model-manifest-import-status") === "loaded" &&
         shell?.getAttribute("data-model-manifest-import-model") === "model-local-manifest" &&
@@ -3591,10 +3821,10 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         snapshot?.getAttribute("data-debug-snapshot-quality-status") === "warn" &&
         window.__OBJGAUSS_DEBUG_SNAPSHOT__?.benchmark?.status === "pass" &&
-        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
-        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) >= 2
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1 &&
+        Number(shell?.getAttribute("data-ogc-loaded-count") ?? 0) === 1
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 60000 });
     const trainableSelection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const target = world?.objectSelections?.find(
@@ -3683,7 +3913,7 @@ async function auditLocalModelManifestBundleImport(browser, url) {
         types.has("ogc-lod") &&
         types.has("ogc-chunks")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 30000 });
     await page.screenshot({ path: "/tmp/objgauss-world-viewer-local-model-manifest.png", fullPage: false });
     return {
       status: "local-manifest-trainable-ogc-debug-os",
@@ -3699,7 +3929,7 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   try {
     const { manifestPath, qualityReportPath } = writeLocalTrainableManifestFixture();
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.locator(".worldShell").waitFor({ timeout: 15000 });
     await page.locator("[data-model-artifact-file-input='true']").setInputFiles([
       manifestPath,
@@ -3733,10 +3963,10 @@ async function auditLocalTrainableManifestPackageImport(browser, url) {
         quality?.getAttribute("data-quality-report-failing-gate-names") === "assignment_entropy" &&
         entropyGate?.getAttribute("data-quality-gate-status") === "warn" &&
         driftGate?.getAttribute("data-quality-gate-status") === "pass" &&
-        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) >= 2 &&
+        Number(shell?.getAttribute("data-trainable-artifact-loaded-count") ?? 0) === 1 &&
         types.has("import-model-manifest")
       );
-    }, undefined, { timeout: 15000 });
+    }, undefined, { timeout: 45000 });
     const selection = await page.evaluate(() => {
       const world = window.__OBJGAUSS_WORLD__;
       const target = world?.objectSelections?.find(
@@ -3993,11 +4223,12 @@ async function closeBrowserWithTimeout(browser, timeoutMs = 5000) {
   ]);
 }
 
-async function openContainingDetails(locator) {
+async function clickInContainingDetails(locator) {
+  await locator.waitFor({ state: "attached", timeout: 15000 });
   await locator.evaluate((node) => {
     node.closest("details")?.setAttribute("open", "");
+    node.click();
   });
-  await locator.scrollIntoViewIfNeeded();
 }
 
 function firstExisting(paths) {
