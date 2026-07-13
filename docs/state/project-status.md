@@ -160,9 +160,9 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   treasurebox/tripod/pliers/ikeasmall 均无 clear-occluded-clear 回环，为可信 `0/4` 负证据；
   `3,199/3,199` 个逐 link CSV 样本经独立重算一致。P0/P1 都没有解锁 scene。
   全部 19 个 camera-motion + F/T interaction 再对账后，P2 只保留 `globe23`：它与已验证
-  `globe25` 同 object、同 marker-set date，补齐 artificial/natural lighting 配对，实际新增
-  下载约 0.366 GiB；通用/专用 official-chain 工具在 `globe25` 的 `746/746` 样本零差异，
-  `globe23` archive 仍待下载。
+  `globe25` 同 object、同 marker-set date，补齐 artificial/natural lighting 配对。P2 已完整
+  下载并逐帧重算；接受 `640/670` 帧，`rb0/rb1` 最大遮挡为 `0.392906/0.007348`，两 link
+  均为 `0` V-O-V，独立复核 `1,280/1,280` 个逐 link 样本一致。双 lighting 配对没有解锁 scene。
   RBO index 每个 interaction 只提供一个 lighting label，因而单 archive 还不能满足默认
   两种 lighting；跨 recording 合并不能在无明确 episode 证据时偷偷完成。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
@@ -175,7 +175,7 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   cardboard action 缺失，新 ledger 为 `0 pass / 7 fail / 2 blocked`，不能替代严格 scene。
 - 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
   工具链；首批 RBO/RRC archives 已完成审计。RBO action sign 已解决，但 full target/interval
-  只覆盖 2 个 scene，且首批与 follow-up P0/P1 都未形成严格遮挡回环；RRC 又缺 temporal
+  只覆盖 2 个 scene，且首批与 follow-up P0/P1/P2 都未形成严格遮挡回环；RRC 又缺 temporal
   camera motion/depth/canonical 3D action。两者当前都不能满足完整 controlled-scene contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。

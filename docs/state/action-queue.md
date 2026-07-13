@@ -1,6 +1,6 @@
 # ObjGauss 行动队列
 
-> 最近更新: 2026-07-11
+> 最近更新: 2026-07-13
 > 只保留 active、frozen/planned 与最近完成项；历史见 archive。
 
 ## Active
@@ -12,12 +12,13 @@
 - 当前三段 BOP public replay 仅能提供 RGB-D/pose 负证据；identity/prediction gate 未通过，
   且没有 intervention action GT。
 - RBO/RRC 首批子集已下载并完成字段审计。RBO official-chain strict V-O-V 为 `0/3`；
-  measured-force target/interval 仅留下 tripod/cabinet 两个 ready scenes。follow-up P0 也未
-  新增 scene；重建 ledger 为 `0 pass / 7 fail / 2 blocked`。RRC 固定相机、无 depth，
-  9D control 不能冒充现行 3D vector。
-- 下一步下载并逐帧审计 P1 `treasurebox24/tripod24/pliers24/ikeasmall23`，继续寻找第三个
-  official-chain action-ready 且有严格 V-O-V 的 scene；然后重跑 canonical bundle/ledger。
-  不要在聊天中发送凭据，也不要新增 wrapper、复制 target GT 或伪造 action。
+  measured-force target/interval 仅留下 tripod/cabinet 两个 ready scenes。follow-up P0/P1/P2
+  也均未新增 scene；P2 globe23/globe25 虽补齐双 lighting，但 globe23 的 `1,280/1,280`
+  逐 link 独立复核仍为 `0` V-O-V。重建 ledger 保持 `0 pass / 7 fail / 2 blocked`。RRC
+  固定相机、无 depth，9D control 不能冒充现行 3D vector。
+- 下一步只能由新 capture 或新数据源提供许可明确、严格 V-O-V、RGB-D、逐对象 6DoF、
+  view change 与 measured action 的完整原始链；满足可见性前不重跑 action/bundle/ledger。
+  不要新增 wrapper、复制 target GT 或伪造 action。
 
 ### CORE-BOUNDARY-001: 继续外移 core orchestration
 

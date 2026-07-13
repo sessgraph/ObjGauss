@@ -90,7 +90,10 @@
   合格 scene。全量 19 段 camera-motion + F/T 库存对账后，新增 P2 只含 `globe23`
   （`393,459,489` bytes）：它与已验证 `globe25` 同 object、同 `2017-07-18` marker-set
   date，补齐 artificial/natural lighting 配对。通用 official-chain audit 已与专用 globe
-  calibration 在 `746/746` 个样本上零差异；archive 下载后仍须重算，不能凭元数据计数。
+  calibration 在 `746/746` 个样本上零差异；P2 archive 完整性通过后实际接受 `640/670`
+  个 RGB 帧，`rb0/rb1` 最大遮挡为 `0.392906/0.007348`，两 link 均为 `0` V-O-V；独立
+  CSV 复核 `1,280/1,280` 个逐 link 样本一致。因此双 lighting 配对仍未解锁 scene，
+  不进入 action-target 复核。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
 - 解锁条件: 新 capture 或新数据源提供至少 3 个许可明确、严格 V-O-V 可复核且同时含
   RGB-D/6DoF/view change/measured action 的 scene，并让 candidate 与简单 baseline 完成比较。

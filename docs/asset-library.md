@@ -184,9 +184,15 @@ scripts/download-rbo-occlusion-followup.sh --verify-only --tier p2
 
 `globe23_o.tar.gz` 的官方 size 为 `393,459,489` bytes、MD5 为
 `f60bf94e4ba35868d7e9ca73221d399c`；已有 `globe.tar.gz` 时实际新增下载仅该 interaction。
-通用 official-chain audit 已在 `globe25` 上与专用 calibration 对 `746/746` 个逐 link 样本
-做到像素计数、fraction、state 和 event 零差异；下载后可原样用于 `globe23`，但双 lighting
-配对本身仍不构成 V-O-V 或 reality-gate pass。
+通用 official-chain audit 先在 `globe25` 上与专用 calibration 对 `746/746` 个逐 link 样本
+做到像素计数、fraction、state 和 event 零差异。2026-07-13 P2 archive 完成全量校验后，
+同一实现对 `globe23` 接受 `640/670` 个 RGB 帧，只有 `30` 个 startup exclusions：`rb0`
+为 `2 clear / 638 ambiguous / 0 occluded`，最大遮挡 `0.392906`；`rb1` 为 `640 clear /
+0 occluded`，最大遮挡 `0.007348`。两 link 均为 `0` V-O-V，独立 CSV 复核覆盖
+`1,280/1,280` 个唯一逐 link 样本，像素守恒、fraction、state、event 和 summary 全部一致；
+最强遮挡 overlays 与 RGB 对齐。globe23/globe25 只补齐双 lighting 元数据，仍没有严格
+遮挡回环，因此不进入 action-target 复核，也不构成 reality-gate pass。ignored 事实源为
+`outputs/evidence/rbo-objectstate-followup-p0/visibility/visibility_official_globe23_{samples.csv,summary.json}`。
 
 外部 controlled-interaction 候选：
 
