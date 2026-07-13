@@ -110,6 +110,14 @@
 
 ## Recently Completed
 
+- 2026-07-13: `OBJECTSTATE-MODEL-DIAGNOSTIC-001` 实现完成。新增原始 M2 reproduction
+  与 13-observation hard-case cohort，对 XYZ、RGB、XYZ+RGB、XYZ+RGB+class-semantic 做
+  固定 split、3-seed 输入消融，并输出 merge/split/frozen-map identity swap taxonomy、
+  ablation/hard-case/error CSV、双数据集 manifest 和 portable technical report。原始 M2
+  native seed 0 精确保持 `0.754572` 对 connected-components `0.825829`；M2 最佳变体
+  `0.758923` 仍未胜基线。hard cases 最佳变体 `0.877924` 虽高于 `0.786994`，跨视角
+  swap rate 仍为 `0.5`；semantic proxy 相对 XYZ+RGB 仅 `+0.006625`。结论保持
+  `no_model_variant_beats_recorded_segmentation_baselines`，不进入 Transformer/长训练。
 - 2026-07-13: `OBJECTSTATE-MODEL-DEMO-001` 实现完成。M1 NeRF Lego
   的 `1.0` ARI/IoU/Purity 只作为单物体四色 wiring smoke，不再描述成对象分割效果。
   M2 新增 12-scene 程序化四物体数据、8/4 完整 scene holdout、独立实例 GT、同色同形

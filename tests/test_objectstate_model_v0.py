@@ -5,13 +5,35 @@ import pytest
 
 from objgauss.core.gaussian import GaussianCloud
 from objgauss.pipelines.objectstate_model_v0 import (
+    OBJECTSTATE_MODEL_V0_FEATURE_ORDER,
     OBJECTSTATE_MODEL_V0_STATE_SCHEMA,
     OBJECTSTATE_MODEL_V0_TRAINING_SCHEMA,
+    ObjectStateModelV0State,
     objectstate_model_v0_loss_and_gradient,
     objectstate_model_v0_state_from_dict,
     train_objectstate_model_v0,
     validate_objectstate_model_v0_training_summary,
 )
+
+
+def test_objectstate_model_v0_state_constructor_keeps_canonical_feature_default():
+    trained = train_objectstate_model_v0(_frame_cloud(), iterations=1)
+    state = trained.final_state
+
+    legacy_style = ObjectStateModelV0State(
+        config=state.config,
+        feature_mean=state.feature_mean,
+        feature_std=state.feature_std,
+        encoder_weight=state.encoder_weight,
+        encoder_bias=state.encoder_bias,
+        assignment_weight=state.assignment_weight,
+        assignment_bias=state.assignment_bias,
+        step=state.step,
+        source=state.source,
+        schema=state.schema,
+    )
+
+    assert legacy_style.feature_order == OBJECTSTATE_MODEL_V0_FEATURE_ORDER
 
 
 def test_objectstate_model_v0_trains_encoder_head_on_heldout_frames():

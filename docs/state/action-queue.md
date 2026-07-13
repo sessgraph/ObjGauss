@@ -61,10 +61,23 @@
 
 ## Frozen / Planned After Stabilization
 
+- `OBJECTSTATE-MODEL-M3-001`: 仅在同一 M2/hard-case/leakage/baseline 合同上测试
+  non-oracle relation 或 temporal identity evidence；class semantic proxy 的 M2 增益仅
+  `+0.006625`，且最佳 hard-case variant 的 cross-view swap rate 为 `0.5`，因此当前不批准
+  Transformer、长训练或用更大模型掩盖 identity failure。
 - `ACTION-006`: 改进真实 SAM/CLIP foreground coverage；当前 promotion 仍是 do-not-promote。
 - `ACTION-004`: Poly Haven mesh 到 3DGS demo 转换链；冻结期不扩 Viewer/demo 产品面。
 
 ## Recently Completed
+
+### OBJECTSTATE-MODEL-DIAGNOSTIC-001: Model v0 负结果诊断
+
+- 原始 M2 native seed 0 复现 `0.754572` 对 connected-components `0.825829`；3-seed
+  最佳 input variant 为 XYZ+RGB+class-semantic `0.758923`，仍未胜基线。
+- hard cases 上最佳 variant 为 `0.877924`、基线为 `0.786994`，但 frozen anchor-map
+  cross-view swap rate 为 `0.5`；逐帧 segmentation 改善没有形成 persistent identity。
+- 双 cohort leakage gate、输入消融、merge/split/swap taxonomy、portable report 已通过；
+  结论是继续诊断 relation/temporal evidence，不升级模型规模。
 
 ### OBJECTSTATE-MODEL-DEMO-001: Phase M / Phase 2.5
 

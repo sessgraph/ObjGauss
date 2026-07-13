@@ -5,7 +5,7 @@
 
 | ID | 风险 | 当前证据 | 关闭条件 | 状态 |
 | --- | --- | --- | --- | --- |
-| R-002 | 默认对象分组尚非稳定语义对象分割 | CLIP 路线仍 `do-not-promote`；native Gaussian identity evidence 未通过 real gate | held-out real scenes 上超过简单 baseline 且无 teacher/GT leakage | open |
+| R-002 | 默认对象分组尚非稳定语义对象分割 | CLIP 路线仍 `do-not-promote`；M2 diagnostic 的最佳 class-semantic variant 为 `0.758923`，低于 connected-components `0.825829`；hard cases 虽为 `0.877924` 对 `0.786994`，cross-view swap rate 仍为 `0.5` | held-out real scenes 上超过简单 baseline、保持跨视角 identity 且无 teacher/GT leakage | open |
 | R-006 | Viewer 首屏与 bundle 过重 | catalog 已改为只加载 selected/staged evidence；production JS 仍约 5.95 MB | code splitting 并通过目标设备首屏 SLA | open |
 | R-012 | full 4.5M PLY 不能直接交互 | full route 约 4.4 FPS；sampled 1M 才达到本机 SLA | LOD/streaming/chunking 通过明确硬件 SLA | accepted / deferred |
 | R-014 | `audit:world-viewer` 过宽且条件漂移 | 已纠正旧 pills、隐藏模型入口、rotate/scale、StabilityDashboard、catalog/load-count 与跨时刻断言；artifact flows 使用独立浏览器，full/truth audit 均通过，显式 failed status 会阻断 | 已满足；不得新增平行 audit | closed |

@@ -146,6 +146,9 @@ from objgauss.pipelines.objectstate_model_demo import write_objectstate_model_de
 from objgauss.pipelines.objectstate_multi_object_benchmark import (
     run_multi_object_instance_benchmark,
 )
+from objgauss.pipelines.objectstate_model_diagnostic import (
+    run_objectstate_model_diagnostic,
+)
 from objgauss.evaluation.object_state_benchmark import write_object_state_stability_benchmark
 from objgauss.datasets.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
@@ -1474,6 +1477,54 @@ def _training_objectstate_multi_object_benchmark(args: argparse.Namespace) -> No
         print(f"viewer_manifest={result.viewer_manifest_path}")
     if args.require_model_better and comparison["verdict"] != "model_better_than_recorded_baselines":
         raise ValueError("ObjectState Model v0 did not beat the recorded multi-object baselines")
+
+
+def _training_objectstate_model_diagnostic(args: argparse.Namespace) -> None:
+    result = run_objectstate_model_diagnostic(
+        args.output_dir,
+        run_id=args.run_id,
+        points_per_instance=args.points_per_instance,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        hidden_dim=args.hidden_dim,
+        seeds=args.seeds,
+        split_seed=args.split_seed,
+        heldout_stride=args.heldout_stride,
+        connected_component_radius=args.connected_component_radius,
+        dataset_seed=args.dataset_seed,
+    )
+    diagnostic = result.summary["diagnostic"]
+    comparison = diagnostic["comparison"]
+    m2 = comparison["m2"]
+    hard_case = comparison["hard_case"]
+    print(f"run_id={args.run_id}")
+    print(f"status={diagnostic['status']}")
+    print(f"leakage_gate={str(diagnostic['leakage_gate']['passed']).lower()}")
+    print(f"seeds={','.join(str(seed) for seed in args.seeds)}")
+    print(f"m2_best_variant={m2['best_variant']}")
+    print(
+        "m2_native_seed0_hungarian_mean_iou="
+        f"{m2['native_anchor_seed0_hungarian_mean_iou']:.6f}"
+    )
+    print(f"m2_best_baseline={m2['best_baseline']}")
+    print(
+        "m2_best_baseline_hungarian_mean_iou="
+        f"{m2['best_baseline_hungarian_mean_iou']:.6f}"
+    )
+    print(f"hard_case_best_variant={hard_case['best_variant']}")
+    print(f"hard_case_best_variant_delta={hard_case['best_variant_delta']:.6f}")
+    print(
+        "cross_view_identity_persistence="
+        f"{str(comparison['cross_view_identity_persistence_established']).lower()}"
+    )
+    print(f"verdict={comparison['verdict']}")
+    print(f"diagnostic_summary={result.diagnostic_summary_path}")
+    print(f"ablation_matrix={result.ablation_matrix_path}")
+    print(f"hard_case_matrix={result.hard_case_matrix_path}")
+    print(f"error_taxonomy={result.error_taxonomy_path}")
+    print(f"report_artifact={result.report_artifact_path}")
+    if args.require_superiority and not comparison["model_superiority_established"]:
+        raise ValueError("no Model v0 feature variant beat all recorded baselines")
 
 
 def _training_kernel_mvp(args: argparse.Namespace) -> None:
@@ -13759,6 +13810,37 @@ def _build_parser() -> argparse.ArgumentParser:
     multi_object_benchmark.set_defaults(
         handler=_training_objectstate_multi_object_benchmark
     )
+
+    model_diagnostic = training_subparsers.add_parser(
+        "objectstate-model-diagnostic",
+        help="diagnose Model v0 with input ablations, hard cases, and error taxonomy",
+    )
+    model_diagnostic.add_argument("--output-dir", required=True, type=Path)
+    model_diagnostic.add_argument(
+        "--run-id",
+        default="objectstate-model-diagnostic-001",
+    )
+    model_diagnostic.add_argument("--points-per-instance", type=int, default=128)
+    model_diagnostic.add_argument("--iterations", type=int, default=240)
+    model_diagnostic.add_argument("--learning-rate", type=float, default=0.08)
+    model_diagnostic.add_argument("--hidden-dim", type=int, default=24)
+    model_diagnostic.add_argument(
+        "--seeds",
+        nargs="+",
+        type=int,
+        default=[0, 1, 2],
+        help="initialization seeds; all share the fixed --split-seed holdout",
+    )
+    model_diagnostic.add_argument("--split-seed", type=int, default=0)
+    model_diagnostic.add_argument("--heldout-stride", type=int, default=3)
+    model_diagnostic.add_argument(
+        "--connected-component-radius",
+        type=float,
+        default=0.18,
+    )
+    model_diagnostic.add_argument("--dataset-seed", type=int, default=20260713)
+    model_diagnostic.add_argument("--require-superiority", action="store_true")
+    model_diagnostic.set_defaults(handler=_training_objectstate_model_diagnostic)
 
     kernel_mvp = training_subparsers.add_parser(
         "kernel-mvp",

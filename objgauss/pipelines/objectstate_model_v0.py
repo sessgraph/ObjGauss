@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 
@@ -75,8 +75,13 @@ class ObjectStateModelV0State:
     step: int = 0
     source: str = "objectstate_model_v0_training"
     schema: str = OBJECTSTATE_MODEL_V0_STATE_SCHEMA
+    feature_order: tuple[str, ...] = OBJECTSTATE_MODEL_V0_FEATURE_ORDER
 
     def predict(self, cloud: GaussianCloud) -> np.ndarray:
+        if self.feature_order != OBJECTSTATE_MODEL_V0_FEATURE_ORDER:
+            raise ValueError(
+                "custom-feature ObjectState Model v0 states require predict_features"
+            )
         features = objectstate_model_v0_features(cloud)
         return self.predict_features(features)
 
@@ -94,7 +99,7 @@ class ObjectStateModelV0State:
             "schema": state.schema,
             "kind": "objectstate_model_v0_state",
             "model_family": "gaussian-object-encoder-assignment-head-v0",
-            "feature_order": list(OBJECTSTATE_MODEL_V0_FEATURE_ORDER),
+            "feature_order": list(state.feature_order),
             "config": state.config.as_dict(),
             "step": state.step,
             "source": state.source,
@@ -148,6 +153,7 @@ class ObjectStateModelV0TrainingResult:
     train_indices: np.ndarray
     heldout_indices: np.ndarray
     frame_field: str
+    split_seed: int
     train_frame_ids: tuple[int, ...]
     heldout_frame_ids: tuple[int, ...]
     target_labels: np.ndarray
@@ -197,13 +203,16 @@ class ObjectStateModelV0TrainingResult:
             ),
             "model_family": "gaussian-object-encoder-assignment-head-v0",
             "model_contract": (
-                "Gaussian[xyz,rgb,opacity] -> ObjectEncoder(tanh) -> "
+                f"FeatureMatrix[{','.join(self.final_state.feature_order)}] -> "
+                "ObjectEncoder(tanh) -> "
                 "AssignmentHead -> A[N,K] -> ObjectStateProjection"
             ),
+            "feature_order": list(self.final_state.feature_order),
             "state_schema": OBJECTSTATE_MODEL_V0_STATE_SCHEMA,
             "config": self.final_state.config.as_dict(),
             "split": {
                 "field": self.frame_field,
+                "seed": self.split_seed,
                 "policy": (
                     "deterministic_complete_scene_holdout"
                     if complete_scene_holdout
@@ -296,17 +305,33 @@ def train_objectstate_model_v0(
     semantic_weight: float = 0.02,
     weight_decay: float = 1e-4,
     seed: int = 0,
+    split_seed: int | None = None,
     record_every: int | None = None,
+    feature_matrix: np.ndarray | None = None,
+    feature_order: Sequence[str] | None = None,
 ) -> ObjectStateModelV0TrainingResult:
     if iterations < 1 or iterations > 2000:
         raise ValueError("iterations must be in [1, 2000]")
-    features = objectstate_model_v0_features(cloud)
+    if feature_matrix is None:
+        features = objectstate_model_v0_features(cloud)
+        resolved_feature_order = OBJECTSTATE_MODEL_V0_FEATURE_ORDER
+        if feature_order is not None and tuple(feature_order) != resolved_feature_order:
+            raise ValueError(
+                "feature_order without feature_matrix must match canonical Model v0 features"
+            )
+    else:
+        features = _matrix(feature_matrix, "feature_matrix", rows=cloud.count)
+        resolved_feature_order = _feature_order(
+            feature_order,
+            columns=features.shape[1],
+        )
     target_labels, source_object_ids = _target_labels(cloud, object_id_field)
+    resolved_split_seed = int(seed if split_seed is None else split_seed)
     train_indices, heldout_indices, train_frames, heldout_frames = _frame_split(
         cloud,
         frame_field=frame_field,
         heldout_stride=heldout_stride,
-        seed=seed,
+        seed=resolved_split_seed,
     )
     slots = len(source_object_ids)
     resolved_config = config or ObjectStateModelV0Config(
@@ -327,7 +352,12 @@ def train_objectstate_model_v0(
     feature_mean = train_features.mean(axis=0).astype(np.float32)
     feature_std = train_features.std(axis=0).astype(np.float32)
     feature_std = np.where(feature_std < _EPS, 1.0, feature_std).astype(np.float32)
-    state = _initialize_state(resolved_config, feature_mean, feature_std)
+    state = _initialize_state(
+        resolved_config,
+        feature_mean,
+        feature_std,
+        feature_order=resolved_feature_order,
+    )
     initial_state = state
     initial_assignment = state.predict_features(features)
     normalized = (features - feature_mean) / feature_std
@@ -357,6 +387,7 @@ def train_objectstate_model_v0(
         train_indices=train_indices,
         heldout_indices=heldout_indices,
         frame_field=str(frame_field),
+        split_seed=resolved_split_seed,
         train_frame_ids=train_frames,
         heldout_frame_ids=heldout_frames,
         target_labels=target_labels,
@@ -452,6 +483,10 @@ def objectstate_model_v0_state_from_dict(payload: Mapping[str, Any]) -> ObjectSt
     return validate_objectstate_model_v0_state(
         ObjectStateModelV0State(
             config=config,
+            feature_order=_feature_order(
+                payload.get("feature_order", OBJECTSTATE_MODEL_V0_FEATURE_ORDER),
+                columns=config.input_dim,
+            ),
             feature_mean=np.asarray(payload["feature_mean"], dtype=np.float32),
             feature_std=np.asarray(payload["feature_std"], dtype=np.float32),
             encoder_weight=np.asarray(payload["encoder_weight"], dtype=np.float32),
@@ -470,6 +505,7 @@ def validate_objectstate_model_v0_state(state: ObjectStateModelV0State) -> Objec
     if state.schema != OBJECTSTATE_MODEL_V0_STATE_SCHEMA:
         raise ValueError(f"unsupported ObjectState Model v0 schema: {state.schema}")
     config = _validate_config(state.config)
+    feature_order = _feature_order(state.feature_order, columns=config.input_dim)
     mean = _vector(state.feature_mean, "feature_mean", length=config.input_dim)
     std = _vector(state.feature_std, "feature_std", length=config.input_dim)
     if np.any(std <= 0.0):
@@ -477,6 +513,7 @@ def validate_objectstate_model_v0_state(state: ObjectStateModelV0State) -> Objec
     return replace(
         state,
         config=config,
+        feature_order=feature_order,
         feature_mean=mean,
         feature_std=std,
         encoder_weight=_matrix(
@@ -635,6 +672,8 @@ def _initialize_state(
     config: ObjectStateModelV0Config,
     feature_mean: np.ndarray,
     feature_std: np.ndarray,
+    *,
+    feature_order: tuple[str, ...],
 ) -> ObjectStateModelV0State:
     rng = np.random.default_rng(config.seed)
     encoder_scale = np.sqrt(2.0 / (config.input_dim + config.hidden_dim))
@@ -642,6 +681,7 @@ def _initialize_state(
     return validate_objectstate_model_v0_state(
         ObjectStateModelV0State(
             config=config,
+            feature_order=feature_order,
             feature_mean=feature_mean,
             feature_std=feature_std,
             encoder_weight=rng.normal(0.0, encoder_scale, (config.input_dim, config.hidden_dim)).astype(np.float32),
@@ -740,7 +780,7 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
 def _validate_config(config: ObjectStateModelV0Config) -> ObjectStateModelV0Config:
     if not isinstance(config, ObjectStateModelV0Config):
         raise TypeError("config must be ObjectStateModelV0Config")
-    if config.slots < 2 or config.input_dim != len(OBJECTSTATE_MODEL_V0_FEATURE_ORDER) or config.hidden_dim < 1:
+    if config.slots < 2 or config.input_dim < 1 or config.hidden_dim < 1:
         raise ValueError("ObjectState Model v0 config has invalid dimensions")
     for name in ("learning_rate", "assignment_weight", "gradient_clip_norm"):
         if float(getattr(config, name)) <= 0.0:
@@ -749,6 +789,21 @@ def _validate_config(config: ObjectStateModelV0Config) -> ObjectStateModelV0Conf
         if float(getattr(config, name)) < 0.0:
             raise ValueError(f"{name} must be >= 0")
     return config
+
+
+def _feature_order(
+    value: Sequence[str] | None,
+    *,
+    columns: int,
+) -> tuple[str, ...]:
+    if value is None:
+        raise ValueError("custom feature_matrix requires feature_order")
+    resolved = tuple(str(item) for item in value)
+    if len(resolved) != columns or any(not item for item in resolved):
+        raise ValueError("feature_order must name every feature_matrix column")
+    if len(set(resolved)) != len(resolved):
+        raise ValueError("feature_order names must be unique")
+    return resolved
 
 
 def _matrix(

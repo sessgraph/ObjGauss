@@ -33,7 +33,9 @@ _AGGREGATE_METRICS = (
 
 __all__ = (
     "OBJECTSTATE_MULTI_OBJECT_BENCHMARK_SCHEMA",
+    "connected_component_labels_3d",
     "evaluate_multi_object_instance_benchmark",
+    "normalized_features",
 )
 
 
@@ -70,16 +72,16 @@ def evaluate_multi_object_instance_benchmark(
         target_count = int(np.unique(target).shape[0])
         candidates = {
             "xyz_kmeans": cluster_features(
-                _normalized(xyz),
+                normalized_features(xyz),
                 clusters=target_count,
                 seed=seed + scene_id,
             ).labels,
             "rgb_kmeans": cluster_features(
-                _normalized(rgb),
+                normalized_features(rgb),
                 clusters=target_count,
                 seed=seed + scene_id,
             ).labels,
-            "connected_components_3d": _connected_component_labels(
+            "connected_components_3d": connected_component_labels_3d(
                 xyz,
                 radius=connected_component_radius,
             ),
@@ -233,7 +235,7 @@ def _aggregate_candidate(
     }
 
 
-def _normalized(values: np.ndarray) -> np.ndarray:
+def normalized_features(values: np.ndarray) -> np.ndarray:
     array = np.asarray(values, dtype=np.float32)
     mean = array.mean(axis=0, keepdims=True)
     std = array.std(axis=0, keepdims=True)
@@ -241,7 +243,7 @@ def _normalized(values: np.ndarray) -> np.ndarray:
     return ((array - mean) / std).astype(np.float32, copy=False)
 
 
-def _connected_component_labels(
+def connected_component_labels_3d(
     xyz: np.ndarray,
     *,
     radius: float,

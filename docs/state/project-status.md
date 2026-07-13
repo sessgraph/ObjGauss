@@ -1,7 +1,7 @@
 # ObjGauss 当前状态总览
 
 > 最近更新: 2026-07-13
-> 阶段: research-first stabilization；Phase M M2 synthetic evidence reviewable，模型未胜基线
+> 阶段: research-first stabilization；Phase M M2 synthetic negative result 已诊断，模型未晋级
 > 决策: `docs/adr/0007-research-first-stabilization.md`、
 > `docs/adr/0008-objectstate-model-demo-phase.md`、
 > `docs/adr/0009-objectstate-multi-object-evidence.md`
@@ -19,9 +19,12 @@ RBO strict qualified scenes 为 `0/3`，后续 field mining 和 adapter 投入�
 独立 `gt_instance_id`、两个同色同形立方体、接触和局部观测建立实例分割证据。
 
 M2 leakage gate 通过，但 Model v0 的 Hungarian mIoU `0.754572` 低于 3D connected
-components 基线 `0.825829`，差值 `-0.071257`；当前结论是模型未胜已记录简单基线，
-不是 Phase M 模型通过。Viewer 已把 Raw / Prediction / GT 与同源 metrics 接通。下一阶段
-仍需改进模型并回到 controlled capture；synthetic M2 不计作真实 identity/prediction/intervention pass。
+components 基线 `0.825829`，差值 `-0.071257`。`OBJECTSTATE-MODEL-DIAGNOSTIC-001`
+在固定 split、3 个 initialization seeds 上复现该负结果：M2 最佳 class-semantic proxy 均值
+`0.758923`，仍未胜基线；hard cases 上虽为 `0.877924` 对 `0.786994`，同类实例跨视角
+swap rate 仍为 `0.5`。当前实现应按 assignment prototype 理解，不能称为已成立的 persistent
+ObjectState model；下一模型切片只诊断 relation/temporal identity，不直接扩成 Transformer。
+Synthetic 结果不计作真实 identity/prediction/intervention pass。
 
 ## 已验证能力
 
@@ -37,10 +40,14 @@ components 基线 `0.825829`，差值 `-0.071257`；当前结论是模型未胜�
   components 与 Model v0；报告 Hungarian mIoU、ARI、count error、merge/split 与 Recall@IoU，
   失败 verdict 保留。浏览器从 checkpoint 重推理并与 467-row 预计算 prediction 一致，
   Raw/Prediction/GT、对象显隐、指标面板与独立 GT provenance 已通过专项 Playwright 和截图复核。
+- Model diagnostic 已对原始 M2 与独立 hard-case cohort 运行 XYZ、RGB、XYZ+RGB、
+  XYZ+RGB+class-semantic 四组输入消融及 native opacity anchor；3-seed aggregation、完整
+  scene/layout holdout、merge/split/swap taxonomy、CSV/JSON 和 portable HTML report 已闭环。
+  class semantic 相对 XYZ+RGB 仅 `+0.006625` mIoU，不支持把类别语义当作充分修复。
 - Spark 真实 splat 展示与 Three.js 对象证据层；点数一致时支持 source splat 子集平移。
 - controlled capture / BOP public replay 的现有数据合同、evaluator 和 ledger 工具链。
 - 真实 3DGS / SAM / CLIP / gsplat 本地实验产物，但重依赖仍不是默认可复现环境。
-- 当前工作树本地基线：820 个 Python 测试、Vite production build、M1/M2 专项 Playwright
+- 当前工作树本地基线：824 个 Python 测试、Vite production build、M1/M2 专项 Playwright
   与 viewer truth audit 通过。完整串行 world audit 本轮通过前 7/9 artifact flows 后受 10 分钟
   外部 SIGTERM；并发重试触发资源 SIGTERM，未声明本轮完整 audit 通过。
 ## 当前真实负证据
