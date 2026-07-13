@@ -124,6 +124,81 @@ def test_model_artifact_manifest_rejects_browser_ready_diagnostic_full(tmp_path)
     assert any("diagnostic_full artifact must not be browser_ready" in error for error in validation.errors)
 
 
+def test_model_artifact_manifest_requires_complete_model_v0_browser_triplet(tmp_path):
+    model_input = tmp_path / "model-input.ply"
+    checkpoint = tmp_path / "checkpoint.json"
+    object_edit = tmp_path / "object-edit.ply"
+    model_input.write_bytes(b"model-input")
+    checkpoint.write_text("{}", encoding="utf-8")
+    object_edit.write_bytes(b"object-edit")
+    artifacts = [
+        build_model_artifact(
+            role="object_edit",
+            path=object_edit,
+            format=".ply",
+            delivery_tier="browser_edit",
+            compute_hash=True,
+        ),
+        build_model_artifact(
+            role="model_input",
+            path=model_input,
+            format=".ply",
+            delivery_tier="browser_edit",
+            compute_hash=True,
+        ),
+        build_model_artifact(
+            role="objectstate_model",
+            path=checkpoint,
+            format=".json",
+            delivery_tier="browser_edit",
+            compute_hash=True,
+        ),
+    ]
+    payload = _base_manifest_payload(artifacts=artifacts)
+
+    assert validate_model_artifact_manifest(payload, require_browser_ready=True).passed
+
+    missing_checkpoint = _base_manifest_payload(artifacts=artifacts[:-1])
+    validation = validate_model_artifact_manifest(missing_checkpoint, require_browser_ready=True)
+    assert not validation.passed
+    assert "model_input and objectstate_model artifacts must be provided together" in validation.errors
+
+
+def test_model_artifact_manifest_ground_truth_requires_prediction_evidence(tmp_path):
+    prediction = tmp_path / "prediction.ply"
+    ground_truth = tmp_path / "ground-truth.ply"
+    prediction.write_bytes(b"prediction")
+    ground_truth.write_bytes(b"ground-truth")
+    ground_truth_artifact = build_model_artifact(
+        role="ground_truth",
+        path=ground_truth,
+        format=".ply",
+        delivery_tier="browser_edit",
+        compute_hash=True,
+    )
+    payload = _base_manifest_payload(
+        artifacts=[
+            build_model_artifact(
+                role="object_edit",
+                path=prediction,
+                format=".ply",
+                delivery_tier="browser_edit",
+                compute_hash=True,
+            ),
+            ground_truth_artifact,
+        ]
+    )
+
+    assert validate_model_artifact_manifest(payload, require_browser_ready=True).passed
+
+    validation = validate_model_artifact_manifest(
+        _base_manifest_payload(artifacts=[ground_truth_artifact]),
+        require_browser_ready=True,
+    )
+    assert not validation.passed
+    assert "ground_truth artifact requires object_edit prediction evidence" in validation.errors
+
+
 def test_model_artifact_manifest_allows_browser_ready_trainable_kernel(tmp_path):
     artifact_path = tmp_path / "trainable-model-artifact.json"
     artifact_path.write_text('{"schema":"objgauss-trainable-kernel-model-artifact-v1"}', encoding="utf-8")

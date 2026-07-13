@@ -8,6 +8,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 
 import { catalogSummary, defaultModelIdForCatalog, modelCatalogFromSearch } from "./modelCatalog.js";
 import { MODEL_ARTIFACT_MANIFEST_SCHEMA, browserReadyArtifact } from "./modelArtifactManifest.js";
+import { inferObjectStateModelV0 } from "./objectstateModelV0.js";
 import {
   decodeQuantizedOgcPayload,
   decodeQuantizedOgcPayloadWindows,
@@ -45,6 +46,8 @@ const SOURCE_SPLAT_STAGE_CONTRACT = "spark-source-splat-stage-v1";
 const OBJECT_PICKING_CONTRACT = "projected-object-bbox-picker-v2";
 const OBJECT_PROCESS_FLOW_SCHEMA = "objgauss-gaussian-object-process-flow-v1";
 const OBJECT_PICK_BOX_SCREEN_PADDING_PX = 4;
+const MODEL_LAYER_VIEW_MODES = ["overlay", "source", "object"];
+const MULTI_OBJECT_INSTANCE_BENCHMARK_SCHEMA = "objgauss-objectstate-multi-object-benchmark-v1";
 // 与 styles.css 里 "@media (min-width: 821px)" 断点一致：<=820px 视为窄屏/移动端,
 // "世界操作" 调试面板默认收起为小按钮，避免挡住 3D 视口；用户仍可手动展开/收起。
 const NARROW_VIEWPORT_MEDIA_QUERY = "(max-width: 820px)";
@@ -85,6 +88,7 @@ export default function App() {
   const [hiddenObjects, setHiddenObjects] = useState(() => new Set());
   const [benchmarkCaseName, setBenchmarkCaseName] = useState("");
   const [objectOverlayMode, setObjectOverlayMode] = useState("full");
+  const [modelLayerViewModes, setModelLayerViewModes] = useState(() => ({}));
   const [objectTransformMode, setObjectTransformMode] = useState("translate");
   const [sourceSplatMotionState, setSourceSplatMotionState] = useState(() => emptySourceSplatMotionState());
   const [objectProcessHandoff, setObjectProcessHandoff] = useState(() => emptyObjectProcessHandoff());
@@ -163,6 +167,9 @@ export default function App() {
   const stagedObjectCount = stageSummary.visibleObjectCount;
   const selectedId = selection.modelId;
   const selected = models[selectedId] ?? Object.values(models)[0];
+  const selectedModelLayerViewMode = normalizeModelLayerViewMode(
+    modelLayerViewModes[selected?.id],
+  );
   const selectedLayerState = modelLayerState(
     selected,
     selected?.status,
@@ -235,6 +242,15 @@ export default function App() {
       ? objectEmergenceSolverTrainingSummary(selected.trainableArtifact)
       : null;
   const selectedQualityReport = qualityReportSummary(selected?.qualityReport);
+  const selectedModelInference = selected?.modelInference ?? null;
+  const selectedInstanceSegmentationBenchmark = selected?.instanceSegmentationBenchmark ?? null;
+  const selectedInstanceEvidenceLayer = selected?.instanceEvidence
+    ? selected.instanceEvidence.role === "ground_truth"
+      ? "ground_truth"
+      : selectedModelLayerViewMode === "source"
+        ? "raw"
+        : "prediction"
+    : "";
   const selectedObjectStateBenchmark = objectStateBenchmarkSummary(selected?.objectStateBenchmark);
   const selectedBenchmarkCase = activeObjectStateBenchmarkCase(selectedObjectStateBenchmark, benchmarkCaseName);
   const selectedDebugSnapshot = objectStateDebugSnapshot({
@@ -666,6 +682,40 @@ export default function App() {
     worldApi.current?.setObjectOverlayMode(next);
   }, [debugLens, recordDebugEvent]);
 
+  const selectModelLayerViewMode = useCallback((mode) => {
+    if (!selected?.id) return;
+    const next = normalizeModelLayerViewMode(mode);
+    setModelLayerViewModes((current) => ({ ...current, [selected.id]: next }));
+    worldApi.current?.setModelLayerViewMode(selected.id, next);
+    recordDebugEvent("model-layer-view", {
+      modelId: selected.id,
+      selectionId: selection.selectionId,
+      source: next,
+    });
+  }, [recordDebugEvent, selected?.id, selection.selectionId]);
+
+  const selectInstanceEvidenceLayer = useCallback((layer) => {
+    const evidence = selected?.instanceEvidence;
+    if (!evidence || !["raw", "prediction", "ground_truth"].includes(layer)) return;
+    const modelId = layer === "ground_truth"
+      ? evidence.groundTruthModelId
+      : evidence.predictionModelId;
+    const mode = layer === "raw" ? "source" : "object";
+    setStageModelIds(new Set([modelId]));
+    setModelLayerViewModes((current) => ({ ...current, [modelId]: mode }));
+    setObjectOverlayMode("off");
+    setSelection({ modelId, objectId: null, selectionId: modelId });
+    setDebugProbe(null);
+    worldApi.current?.setModelLayerViewMode(modelId, mode);
+    worldApi.current?.setObjectOverlayMode("off");
+    worldApi.current?.focusModel(modelId);
+    recordDebugEvent("instance-evidence-layer", {
+      modelId,
+      source: layer,
+      evidenceGroupId: evidence.groupId,
+    });
+  }, [recordDebugEvent, selected?.instanceEvidence]);
+
   const toggleObjectVisibility = useCallback((object) => {
     if (!object?.selectionId) return;
     setHiddenObjects((current) => {
@@ -742,7 +792,7 @@ export default function App() {
       const parentId = "model-local-manifest";
       setModelImport({ status: "loading", modelId: parentId, fileName, error: "" });
       try {
-        const { manifest, parentModel, children, qualityReport, objectStateBenchmark } =
+        const { manifest, parentModel, children, qualityReport, objectStateBenchmark, trainingSummary } =
           await localModelArtifactBundleModelsFromFiles(files);
         if (!children.length) {
           throw new Error("local model manifest has no Debug OS browser routes");
@@ -761,6 +811,7 @@ export default function App() {
               modelArtifactManifest: manifest,
               qualityReport,
               objectStateBenchmark,
+              trainingSummary,
               delivery: {
                 source: "local-model-artifact-manifest",
                 loadRoute: "local-file",
@@ -780,6 +831,24 @@ export default function App() {
 
         let selectedChild = null;
         for (const child of children) {
+          if (child.loadMode === "eager" && Array.isArray(child.localPoints)) {
+            const startedAt = performance.now();
+            const rendered = worldApi.current?.upsertModel(child, child.localPoints);
+            const imported = {
+              ...child,
+              status: "loaded",
+              message: "local model demo object layer",
+              gaussianCount: child.localPoints.length,
+              displayCount: rendered?.displayCount ?? child.localPoints.length,
+              objectCount: rendered?.objectCount ?? child.objectCount ?? 0,
+              corePoint: rendered?.corePoint ?? null,
+              objects: rendered?.objects ?? [],
+              loadMs: Math.round(performance.now() - startedAt),
+            };
+            patchModel(child.id, imported);
+            selectedChild = selectedChild ?? imported;
+            continue;
+          }
           if (child.loadMode === "trainable-artifact") {
             const startedAt = performance.now();
             const artifact = await loadTrainableArtifact(child);
@@ -835,7 +904,7 @@ export default function App() {
         });
       }
     },
-    [recordDebugEvent, upsertDecodedOgcModel, upsertTrainableArtifactModel],
+    [patchModel, recordDebugEvent, upsertDecodedOgcModel, upsertTrainableArtifactModel],
   );
 
   const importOgcArtifactFiles = useCallback(
@@ -1278,7 +1347,7 @@ export default function App() {
           const startedAt = performance.now();
           patchModel(model.id, { status: "loading", message: "loading model manifest" });
           try {
-            const { manifest, children, qualityReport, objectStateBenchmark } =
+            const { manifest, children, qualityReport, objectStateBenchmark, trainingSummary } =
               await loadModelArtifactManifestModels(model);
             if (!children.length) {
               throw new Error("model artifact manifest has no Debug OS browser routes");
@@ -1294,6 +1363,7 @@ export default function App() {
                 modelArtifactManifest: manifest,
                 qualityReport,
                 objectStateBenchmark,
+                trainingSummary,
                 loadMs: Math.round(performance.now() - startedAt),
                 delivery: {
                   source: "model-artifact-manifest",
@@ -1310,6 +1380,33 @@ export default function App() {
             });
             let selectedChild = null;
             for (const child of children) {
+              if (child.loadMode === "eager") {
+                const childStartedAt = performance.now();
+                patchModel(child.id, { status: "loading", message: "loading manifest model output" });
+                let points = child.localPoints;
+                if (!Array.isArray(points)) {
+                  const response = await fetch(child.sourcePath);
+                  if (!response.ok) throw new Error(`manifest object PLY HTTP ${response.status}`);
+                  points = parsePly(await response.arrayBuffer()).points;
+                }
+                const rendered = worldApi.current?.upsertModel(child, points);
+                const imported = {
+                  ...child,
+                  status: "loaded",
+                  message: child.modelInference
+                    ? "checkpoint inference matches precomputed object layer"
+                    : "model demo object layer",
+                  gaussianCount: points.length,
+                  displayCount: rendered?.displayCount ?? points.length,
+                  objectCount: rendered?.objectCount ?? child.objectCount ?? 0,
+                  corePoint: rendered?.corePoint ?? null,
+                  objects: rendered?.objects ?? [],
+                  loadMs: Math.round(performance.now() - childStartedAt),
+                };
+                patchModel(child.id, imported);
+                selectedChild = selectedChild ?? imported;
+                continue;
+              }
               if (child.loadMode === "trainable-artifact") {
                 const childStartedAt = performance.now();
                 patchModel(child.id, { status: "loading", message: "loading manifest trainable artifact" });
@@ -1489,6 +1586,15 @@ export default function App() {
     worldApi.current?.focusModel(selectedId);
   }, [selected?.status, selectedId, worldReady]);
 
+  useEffect(() => {
+    if (!worldReady || !selected?.id) return;
+    if (!["loaded", "compressed", "raw"].includes(selected.status)) return;
+    worldApi.current?.setModelLayerViewMode(
+      selected.id,
+      selectedModelLayerViewMode,
+    );
+  }, [selected?.id, selected?.status, selectedModelLayerViewMode, worldReady]);
+
   return (
     <main
       className="worldShell"
@@ -1501,6 +1607,21 @@ export default function App() {
       data-source-splat-status={selectedLayerState.sourceSplatStageStatus}
       data-source-splat-path={selectedLayerState.sourceLayerPath}
       data-source-splat-active={selectedLayerState.sourceSplatStageStatus === "available" ? "true" : "false"}
+      data-model-layer-view-mode={selectedModelLayerViewMode}
+      data-instance-evidence-layer={selectedInstanceEvidenceLayer}
+      data-instance-evidence-verdict={
+        selectedInstanceSegmentationBenchmark?.comparison?.verdict ?? ""
+      }
+      data-instance-evidence-model-delta={
+        selectedInstanceSegmentationBenchmark?.comparison?.model_delta ?? ""
+      }
+      data-instance-evidence-leakage-gate={
+        selectedInstanceSegmentationBenchmark?.leakage_gate?.passed === true
+          ? "passed"
+          : selectedInstanceSegmentationBenchmark
+            ? "failed"
+            : ""
+      }
       data-source-splat-motion-contract={sourceSplatMotionState.contract}
       data-source-splat-motion-status={selectedSourceSplatMotion?.status ?? "missing"}
       data-source-splat-motion-active={selectedSourceSplatMotion?.active ? "true" : "false"}
@@ -1707,6 +1828,12 @@ export default function App() {
       data-quality-report-temporal-drift={selectedQualityReport?.temporalDrift ?? ""}
       data-quality-report-assignment-jitter={selectedQualityReport?.assignmentJitter ?? ""}
       data-quality-report-gate-count={selectedQualityReport?.gateCount ?? ""}
+      data-objectstate-model-schema={selectedModelInference?.schema ?? ""}
+      data-objectstate-model-inference-status={selectedModelInference?.status ?? ""}
+      data-objectstate-model-inference-rows={selectedModelInference?.rowCount ?? ""}
+      data-objectstate-model-precomputed-agreement={
+        selectedModelInference?.precomputedAgreement ?? ""
+      }
       data-object-state-benchmark-status={selectedObjectStateBenchmark?.status ?? ""}
       data-object-state-benchmark-schema={selectedObjectStateBenchmark?.schema ?? ""}
       data-object-state-benchmark-case-count={selectedObjectStateBenchmark?.caseCount ?? ""}
@@ -1790,7 +1917,7 @@ export default function App() {
             ref={modelBundleInputRef}
             className="fileInputHidden"
             type="file"
-            accept="application/json,.json,.ogc"
+            accept="application/json,.json,.ogc,.ply,.splat"
             multiple
             data-model-artifact-file-input="true"
             onChange={importModelArtifactBundleFiles}
@@ -1901,6 +2028,7 @@ export default function App() {
         debugMode={debugMode}
         debugLens={debugLens}
         objectOverlayMode={selectedObjectOverlayMode}
+        modelLayerViewMode={selectedModelLayerViewMode}
         debugEvents={debugEvents}
         debugSnapshot={selectedDebugSnapshot}
         snapshotExport={snapshotExport}
@@ -1912,6 +2040,9 @@ export default function App() {
         objectVisibility={objectVisibility}
         stability={selectedStability}
         qualityReport={selectedQualityReport}
+        instanceSegmentationBenchmark={selectedInstanceSegmentationBenchmark}
+        instanceEvidence={selected?.instanceEvidence ?? null}
+        instanceEvidenceLayer={selectedInstanceEvidenceLayer}
         objectStateBenchmark={selectedObjectStateBenchmark}
         benchmarkCase={selectedBenchmarkCase}
         stageSummary={stageSummary}
@@ -1925,6 +2056,8 @@ export default function App() {
         onToggleObjectVisibility={toggleObjectVisibility}
         onSelectDebugLens={selectDebugLens}
         onSelectObjectOverlayMode={selectObjectOverlayMode}
+        onSelectModelLayerViewMode={selectModelLayerViewMode}
+        onSelectInstanceEvidenceLayer={selectInstanceEvidenceLayer}
         onSelectTrainableFrame={selectTrainableFrame}
         onSelectOgcLod={selectOgcLod}
         onSelectOgcChunks={selectOgcChunks}
@@ -1985,11 +2118,44 @@ async function loadModelArtifactManifestModels(model) {
   const qualityReport = qualityReportArtifact
     ? await loadQualityReportArtifact(qualityReportArtifact, manifestPath)
     : null;
+  const trainingSummaryArtifact = browserReadyArtifact(
+    { modelArtifactManifest: manifest },
+    "training_summary",
+  );
+  const trainingSummary = trainingSummaryArtifact
+    ? await loadAssignmentTrainingSummaryArtifact(trainingSummaryArtifact, manifestPath)
+    : null;
+  validateModelDemoRunBinding(manifest, trainingSummary, qualityReport);
+  const instanceSegmentationBenchmark = multiObjectInstanceBenchmarkEvidence(manifest);
+  const modelInference = await loadObjectStateModelV0ManifestInference(manifest, manifestPath);
   const objectStateBenchmarkArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_state_benchmark");
   const objectStateBenchmark = objectStateBenchmarkArtifact
     ? await loadObjectStateBenchmarkArtifact(objectStateBenchmarkArtifact, manifestPath)
     : null;
   const children = [];
+  const objectEditModel = objectEditManifestModelFromManifest(model, manifest, manifestPath);
+  const groundTruthModel = groundTruthManifestModelFromManifest(model, manifest, manifestPath);
+  const instanceEvidence = objectEditModel && groundTruthModel
+    ? {
+        groupId: String(manifest.asset_id ?? manifest.manifest_id ?? "multi-object-evidence"),
+        predictionModelId: objectEditModel.id,
+        groundTruthModelId: groundTruthModel.id,
+      }
+    : null;
+  if (objectEditModel) {
+    const predictionModel = instanceEvidence
+      ? { ...objectEditModel, instanceEvidence: { ...instanceEvidence, role: "prediction" } }
+      : objectEditModel;
+    children.push(modelInference
+      ? { ...predictionModel, localPoints: modelInference.points, modelInference: modelInference.telemetry }
+      : predictionModel);
+  }
+  if (groundTruthModel) {
+    children.push({
+      ...groundTruthModel,
+      instanceEvidence: { ...instanceEvidence, role: "ground_truth" },
+    });
+  }
   if (browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel")) {
     children.push(trainableManifestModelFromManifest(model, manifest, manifestPath));
   }
@@ -1998,10 +2164,63 @@ async function loadModelArtifactManifestModels(model) {
   }
   return {
     manifest,
-    children: children.map((child) => attachDebugEvidence(child, { qualityReport, objectStateBenchmark })),
+    children: children.map((child) => attachDebugEvidence(
+      child,
+      {
+        qualityReport,
+        objectStateBenchmark,
+        trainingSummary,
+        modelInference: modelInference?.telemetry,
+        instanceSegmentationBenchmark,
+      },
+    )),
     qualityReport,
     objectStateBenchmark,
+    trainingSummary,
+    modelInference: modelInference?.telemetry ?? null,
+    instanceSegmentationBenchmark,
   };
+}
+
+async function loadObjectStateModelV0ManifestInference(manifest, manifestPath) {
+  const modelInputArtifact = browserReadyArtifact(
+    { modelArtifactManifest: manifest },
+    "model_input",
+  );
+  const checkpointArtifact = browserReadyArtifact(
+    { modelArtifactManifest: manifest },
+    "objectstate_model",
+  );
+  if (!modelInputArtifact && !checkpointArtifact) return null;
+  if (!modelInputArtifact || !checkpointArtifact) {
+    throw new Error("ObjectState Model v0 manifest requires model_input and objectstate_model");
+  }
+  const objectArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_edit");
+  if (!objectArtifact) {
+    throw new Error("ObjectState Model v0 manifest requires precomputed object_edit evidence");
+  }
+  const [inputResponse, checkpointResponse, objectResponse] = await Promise.all([
+    fetch(resolveSameOriginManifestRoute(modelInputArtifact.path, manifestPath)),
+    fetch(resolveSameOriginManifestRoute(checkpointArtifact.path, manifestPath)),
+    fetch(resolveSameOriginManifestRoute(objectArtifact.path, manifestPath)),
+  ]);
+  if (!inputResponse.ok) throw new Error(`ObjectState Model v0 input HTTP ${inputResponse.status}`);
+  if (!checkpointResponse.ok) {
+    throw new Error(`ObjectState Model v0 checkpoint HTTP ${checkpointResponse.status}`);
+  }
+  if (!objectResponse.ok) {
+    throw new Error(`ObjectState Model v0 precomputed PLY HTTP ${objectResponse.status}`);
+  }
+  const [inputBuffer, checkpoint, objectBuffer] = await Promise.all([
+    inputResponse.arrayBuffer(),
+    checkpointResponse.json(),
+    objectResponse.arrayBuffer(),
+  ]);
+  return inferObjectStateModelV0(
+    parsePly(inputBuffer).points,
+    checkpoint,
+    parsePly(objectBuffer).points,
+  );
 }
 
 async function loadOgcManifestModel(model) {
@@ -2031,6 +2250,13 @@ async function loadQualityReportArtifact(artifact, manifestPath) {
   return validateQualityReport(await response.json(), reportPath);
 }
 
+async function loadAssignmentTrainingSummaryArtifact(artifact, manifestPath) {
+  const summaryPath = resolveSameOriginManifestRoute(artifact.path, manifestPath);
+  const response = await fetch(summaryPath);
+  if (!response.ok) throw new Error(`assignment training summary HTTP ${response.status}`);
+  return validateAssignmentTrainingSummary(await response.json(), summaryPath);
+}
+
 async function loadObjectStateBenchmarkArtifact(artifact, manifestPath) {
   const reportPath = resolveSameOriginManifestRoute(artifact.reportPath ?? artifact.path, manifestPath);
   const response = await fetch(reportPath);
@@ -2054,8 +2280,22 @@ function attachObjectStateBenchmark(model, objectStateBenchmark) {
   };
 }
 
-function attachDebugEvidence(model, { qualityReport, objectStateBenchmark } = {}) {
-  return attachObjectStateBenchmark(attachQualityReport(model, qualityReport), objectStateBenchmark);
+function attachDebugEvidence(
+  model,
+  {
+    qualityReport,
+    objectStateBenchmark,
+    trainingSummary,
+    modelInference,
+    instanceSegmentationBenchmark,
+  } = {},
+) {
+  return {
+    ...attachObjectStateBenchmark(attachQualityReport(model, qualityReport), objectStateBenchmark),
+    ...(trainingSummary ? { trainingSummary } : {}),
+    ...(modelInference ? { modelInference } : {}),
+    ...(instanceSegmentationBenchmark ? { instanceSegmentationBenchmark } : {}),
+  };
 }
 
 function trainableManifestModelFromManifest(model, manifest, manifestPath) {
@@ -2093,6 +2333,153 @@ function trainableManifestModelFromManifest(model, manifest, manifestPath) {
   };
 }
 
+function objectEditManifestModelFromManifest(model, manifest, manifestPath) {
+  const objectArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_edit");
+  if (!objectArtifact) return null;
+  const sourceArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "quick_splat");
+  const objectPath = resolveSameOriginManifestRoute(objectArtifact.path, manifestPath);
+  const sourcePath = sourceArtifact
+    ? resolveSameOriginManifestRoute(sourceArtifact.path, manifestPath)
+    : "";
+  const objectCount = ogcPositiveInteger(
+    manifest.counts?.objects ?? objectArtifact.object_count,
+  ) ?? model.objectCount ?? 0;
+  return {
+    id: `model-manifest-${safeModelId(manifest.asset_id)}-object-edit`,
+    name: manifest.name ? `${manifest.name} object color` : "Manifest object-color PLY",
+    label: "Model Objects",
+    sourcePath: objectPath,
+    loadMode: "eager",
+    kind: "object-aware-ply",
+    kindLabel: "模型对象色 PLY",
+    stage: "supervised-model-demo",
+    demoGroup: "模型证据",
+    objectCount,
+    gaussianCount: ogcPositiveInteger(manifest.counts?.gaussians ?? objectArtifact.gaussian_count) ?? 0,
+    galleryPosition: model.galleryPosition ?? [0.05, 0, -1.25],
+    accent: model.accent ?? "#47e0d8",
+    displayScale: model.displayScale ?? 2.46,
+    pointSize: model.pointSize ?? 0.035,
+    maxDisplayPoints: model.maxDisplayPoints ?? 50000,
+    license: manifest.license ?? model.license ?? "model-manifest-artifact",
+    sourceLayer: sourcePath
+      ? {
+          status: "available",
+          path: sourcePath,
+          format: ".splat",
+          renderer: "Spark splat",
+          label: "同一 run 原始 Gaussian",
+        }
+      : undefined,
+    objectLayer: {
+      status: "registered",
+      path: objectPath,
+      format: ".ply",
+      renderer: "Three.js Points",
+      label: "同一 run 模型对象色",
+    },
+    compression: {
+      layout: "model-demo-object-aware-ply",
+      status: "model-manifest-artifact",
+      chunkRoot: objectPath,
+    },
+    modelArtifactManifest: manifest,
+  };
+}
+
+function groundTruthManifestModelFromManifest(model, manifest, manifestPath) {
+  const groundTruthArtifact = browserReadyArtifact(
+    { modelArtifactManifest: manifest },
+    "ground_truth",
+  );
+  if (!groundTruthArtifact) return null;
+  const sourceArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "quick_splat");
+  const groundTruthPath = resolveSameOriginManifestRoute(groundTruthArtifact.path, manifestPath);
+  const sourcePath = sourceArtifact
+    ? resolveSameOriginManifestRoute(sourceArtifact.path, manifestPath)
+    : "";
+  const objectCount = ogcPositiveInteger(
+    manifest.counts?.objects ?? groundTruthArtifact.object_count,
+  ) ?? model.objectCount ?? 0;
+  return {
+    id: `model-manifest-${safeModelId(manifest.asset_id)}-ground-truth`,
+    name: manifest.name ? `${manifest.name} ground truth` : "Manifest instance ground truth",
+    label: "M2 Ground Truth",
+    sourcePath: groundTruthPath,
+    loadMode: "eager",
+    kind: "object-aware-ply",
+    kindLabel: "独立实例 GT PLY",
+    stage: "synthetic-instance-ground-truth",
+    demoGroup: "模型证据",
+    objectCount,
+    gaussianCount: ogcPositiveInteger(
+      manifest.counts?.gaussians ?? groundTruthArtifact.gaussian_count,
+    ) ?? 0,
+    galleryPosition: model.galleryPosition ?? [0.05, 0, -1.25],
+    accent: "#f4c95d",
+    displayScale: model.displayScale ?? 2.46,
+    pointSize: model.pointSize ?? 0.035,
+    maxDisplayPoints: model.maxDisplayPoints ?? 50000,
+    license: manifest.license ?? model.license ?? "model-manifest-artifact",
+    sourceLayer: sourcePath
+      ? {
+          status: "available",
+          path: sourcePath,
+          format: ".splat",
+          renderer: "Spark splat",
+          label: "同一 held-out scene 原始 Gaussian",
+        }
+      : undefined,
+    objectLayer: {
+      status: "registered",
+      path: groundTruthPath,
+      format: ".ply",
+      renderer: "Three.js Points",
+      label: "独立 instance GT",
+    },
+    compression: {
+      layout: "multi-object-instance-ground-truth",
+      status: "model-manifest-artifact",
+      chunkRoot: groundTruthPath,
+    },
+    modelArtifactManifest: manifest,
+  };
+}
+
+function multiObjectInstanceBenchmarkEvidence(manifest) {
+  const evidence = (manifest?.quality_evidence ?? []).find(
+    (item) => item?.kind === "multi_object_instance_segmentation_benchmark",
+  );
+  if (!evidence) return null;
+  if (evidence.schema !== MULTI_OBJECT_INSTANCE_BENCHMARK_SCHEMA) {
+    throw new Error("unsupported multi-object instance benchmark schema");
+  }
+  const candidates = evidence.aggregate ?? {};
+  for (const name of [
+    "xyz_kmeans",
+    "rgb_kmeans",
+    "connected_components_3d",
+    "objectstate_model_v0",
+  ]) {
+    const metrics = candidates[name];
+    if (!metrics || !Number.isFinite(Number(metrics.hungarian_mean_iou))) {
+      throw new Error(`multi-object benchmark missing ${name} metrics`);
+    }
+  }
+  if (evidence.leakage_gate?.passed !== true || !evidence.comparison?.verdict) {
+    throw new Error("multi-object benchmark missing leakage gate or verdict");
+  }
+  return evidence;
+}
+
+function safeModelId(value) {
+  const normalized = String(value ?? "objectstate-model-demo")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "objectstate-model-demo";
+}
+
 function validateTrainableArtifact(artifact) {
   if (artifact?.schema !== "objgauss-trainable-kernel-model-artifact-v1") {
     throw new Error("unsupported trainable kernel model artifact schema");
@@ -2120,6 +2507,38 @@ function validateQualityReport(report, path = "") {
     ...report,
     path,
   };
+}
+
+function validateAssignmentTrainingSummary(summary, path = "") {
+  if (!["objgauss-objectstate-assignment-train-run-v1", "objgauss-objectstate-model-v0-training-v1"].includes(summary?.schema)) {
+    throw new Error("unsupported ObjectState assignment training summary schema");
+  }
+  if (!["objectstate_assignment_train_smoke", "objectstate_model_v0_training"].includes(summary.kind)) {
+    throw new Error("unsupported ObjectState assignment training summary kind");
+  }
+  const afterMetrics = summary.after_metrics ?? summary.heldout_after_metrics;
+  const beforeMetrics = summary.before_metrics ?? summary.heldout_before_metrics;
+  if (!summary.demo?.run_id || !afterMetrics || !beforeMetrics) {
+    throw new Error("assignment training summary missing same-run metrics provenance");
+  }
+  return {
+    ...summary,
+    path,
+  };
+}
+
+function validateModelDemoRunBinding(manifest, trainingSummary, qualityReport) {
+  if (!trainingSummary) return true;
+  const runId = String(trainingSummary.demo?.run_id ?? "");
+  const manifestRunId = String(manifest?.source?.run_id ?? "");
+  const reportRunId = String(qualityReport?.source?.run_id ?? "");
+  if (manifestRunId && runId !== manifestRunId) {
+    throw new Error("model manifest and assignment summary run_id mismatch");
+  }
+  if (reportRunId && runId !== reportRunId) {
+    throw new Error("quality report and assignment summary run_id mismatch");
+  }
+  return true;
 }
 
 function validateObjectStateBenchmark(report, path = "") {
@@ -2220,12 +2639,12 @@ function replaceManifestArtifact(manifest, sourceArtifact, replacementArtifact) 
 function resolveSameOriginManifestRoute(route, manifestPath) {
   const value = String(route ?? "");
   if (!value || isInlineRoute(value) || value.startsWith("local://")) {
-    throw new Error("OGC manifest artifact route must be same-origin fetchable");
+    throw new Error("model manifest artifact route must be same-origin fetchable");
   }
   const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
   const resolved = new URL(value, new URL(manifestPath, origin));
   if (resolved.origin !== origin || resolved.search || resolved.hash) {
-    throw new Error("OGC manifest artifact route must stay on the same origin");
+    throw new Error("model manifest artifact route must stay on the same origin");
   }
   return resolved.pathname;
 }
@@ -2263,12 +2682,15 @@ async function localModelArtifactBundleModelsFromFiles(files) {
   const manifestEntry = jsonEntries.find((entry) => {
     if (entry.json?.schema !== MODEL_ARTIFACT_MANIFEST_SCHEMA) return false;
     return (
+      browserReadyArtifact({ modelArtifactManifest: entry.json }, "object_edit") ||
       browserReadyArtifact({ modelArtifactManifest: entry.json }, "trainable_kernel") ||
       browserReadyArtifact({ modelArtifactManifest: entry.json }, "compressed_chunked")
     );
   });
   if (!manifestEntry) {
-    throw new Error("select one model artifact manifest with trainable_kernel or compressed_chunked artifacts");
+    throw new Error(
+      "select one model artifact manifest with object_edit, trainable_kernel, or compressed_chunked artifacts",
+    );
   }
 
   const manifest = manifestEntry.json;
@@ -2281,6 +2703,20 @@ async function localModelArtifactBundleModelsFromFiles(files) {
   const qualityReport = qualityReportEntry
     ? validateQualityReport(qualityReportEntry.json, localFileRoute(qualityReportEntry.file.name))
     : null;
+  const trainingSummaryArtifact = browserReadyArtifact(
+    { modelArtifactManifest: manifest },
+    "training_summary",
+  );
+  const trainingSummaryEntry = trainingSummaryArtifact
+    ? findAssignmentTrainingSummaryEntry(jsonEntries, trainingSummaryArtifact.path)
+    : null;
+  const trainingSummary = trainingSummaryEntry
+    ? validateAssignmentTrainingSummary(
+        trainingSummaryEntry.json,
+        localFileRoute(trainingSummaryEntry.file.name),
+      )
+    : null;
+  validateModelDemoRunBinding(manifest, trainingSummary, qualityReport);
   const objectStateBenchmarkArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_state_benchmark");
   const objectStateBenchmarkEntry = objectStateBenchmarkArtifact
     ? findObjectStateBenchmarkEntry(jsonEntries, objectStateBenchmarkArtifact.reportPath ?? objectStateBenchmarkArtifact.path)
@@ -2288,6 +2724,56 @@ async function localModelArtifactBundleModelsFromFiles(files) {
   const objectStateBenchmark = objectStateBenchmarkEntry
     ? validateObjectStateBenchmark(objectStateBenchmarkEntry.json, localFileRoute(objectStateBenchmarkEntry.file.name))
     : null;
+  const objectEditArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "object_edit");
+  if (objectEditArtifact) {
+    const objectFile = findModelBundleFile(entries, objectEditArtifact.path, ".ply");
+    const quickSplatArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "quick_splat");
+    const sourceFile = quickSplatArtifact
+      ? findModelBundleFile(entries, quickSplatArtifact.path, ".splat")
+      : null;
+    const cloud = parsePly(await objectFile.arrayBuffer());
+    const modelInputArtifact = browserReadyArtifact(
+      { modelArtifactManifest: manifest },
+      "model_input",
+    );
+    const checkpointArtifact = browserReadyArtifact(
+      { modelArtifactManifest: manifest },
+      "objectstate_model",
+    );
+    if (Boolean(modelInputArtifact) !== Boolean(checkpointArtifact)) {
+      throw new Error("ObjectState Model v0 bundle requires model_input and objectstate_model");
+    }
+    let modelInference = null;
+    if (modelInputArtifact && checkpointArtifact) {
+      const modelInputFile = findModelBundleFile(entries, modelInputArtifact.path, ".ply");
+      const checkpointEntry = findObjectStateModelV0Entry(jsonEntries, checkpointArtifact.path);
+      const modelInput = parsePly(await modelInputFile.arrayBuffer());
+      modelInference = inferObjectStateModelV0(
+        modelInput.points,
+        checkpointEntry.json,
+        cloud.points,
+      );
+    }
+    children.push(
+      attachDebugEvidence(
+        localObjectEditManifestModelFromManifest({
+          manifest,
+          objectArtifact: objectEditArtifact,
+          objectFile,
+          sourceArtifact: quickSplatArtifact,
+          sourceFile,
+          points: modelInference?.points ?? cloud.points,
+          modelInference: modelInference?.telemetry ?? null,
+        }),
+        {
+          qualityReport,
+          objectStateBenchmark,
+          trainingSummary,
+          modelInference: modelInference?.telemetry,
+        },
+      ),
+    );
+  }
   const trainableArtifact = browserReadyArtifact({ modelArtifactManifest: manifest }, "trainable_kernel");
   if (trainableArtifact) {
     const trainableEntry = findTrainableArtifactEntry(
@@ -2302,7 +2788,7 @@ async function localModelArtifactBundleModelsFromFiles(files) {
           trainableArtifact: trainableEntry.json,
           artifactFileName: trainableEntry.file.name,
         }),
-        { qualityReport, objectStateBenchmark },
+        { qualityReport, objectStateBenchmark, trainingSummary },
       ),
     );
   }
@@ -2333,16 +2819,20 @@ async function localModelArtifactBundleModelsFromFiles(files) {
             status: "local-model-manifest-debug-artifact",
           },
         },
-        { qualityReport, objectStateBenchmark },
+        { qualityReport, objectStateBenchmark, trainingSummary },
       ),
     );
   }
   return {
     manifest,
-    parentModel: attachDebugEvidence(parentModel, { qualityReport, objectStateBenchmark }),
+    parentModel: attachDebugEvidence(
+      parentModel,
+      { qualityReport, objectStateBenchmark, trainingSummary },
+    ),
     children,
     qualityReport,
     objectStateBenchmark,
+    trainingSummary,
   };
 }
 
@@ -2367,6 +2857,84 @@ function localModelArtifactParentModel(manifest, fileName) {
       status: "local-debug-artifact",
       chunkRoot: "/models/local-model-artifact-manifest/objects/",
     },
+  };
+}
+
+function localObjectEditManifestModelFromManifest({
+  manifest,
+  objectArtifact,
+  objectFile,
+  sourceArtifact,
+  sourceFile,
+  points,
+  modelInference,
+}) {
+  const objectPath = localFileRoute(objectFile.name);
+  const sourcePath = sourceFile ? URL.createObjectURL(sourceFile) : "";
+  const localizedObjectArtifact = {
+    ...objectArtifact,
+    path: objectPath,
+  };
+  const localizedSourceArtifact = sourceArtifact && sourcePath
+    ? { ...sourceArtifact, path: sourcePath }
+    : sourceArtifact;
+  const artifacts = Array.isArray(manifest.artifacts)
+    ? manifest.artifacts.map((artifact) => {
+        if (artifact === objectArtifact) return localizedObjectArtifact;
+        if (artifact === sourceArtifact) return localizedSourceArtifact;
+        return artifact;
+      })
+    : [localizedObjectArtifact];
+  return {
+    id: `model-local-${safeModelId(manifest.asset_id)}-object-edit`,
+    name: manifest.name ? `Local ${manifest.name} object color` : "Local model object-color PLY",
+    label: "Local Objects",
+    sourcePath: objectPath,
+    localPoints: points,
+    loadMode: "eager",
+    kind: "object-aware-ply",
+    kindLabel: "本地模型对象色 PLY",
+    stage: "local-supervised-model-demo",
+    demoGroup: "模型证据",
+    objectCount: ogcPositiveInteger(manifest.counts?.objects ?? objectArtifact.object_count) ?? 0,
+    gaussianCount: points.length,
+    galleryPosition: [0.05, 0, -1.25],
+    accent: "#47e0d8",
+    displayScale: 2.46,
+    pointSize: 0.035,
+    maxDisplayPoints: 50000,
+    license: manifest.license ?? "local-model-demo",
+    sourceLayer: sourcePath
+      ? {
+          status: "available",
+          path: sourcePath,
+          format: ".splat",
+          renderer: "Spark splat",
+          label: "同一 run 原始 Gaussian",
+        }
+      : undefined,
+    objectLayer: {
+      status: "registered",
+      path: objectPath,
+      format: ".ply",
+      renderer: "Three.js Points",
+      label: "同一 run 模型对象色",
+    },
+    compression: {
+      layout: "local-model-demo-object-aware-ply",
+      status: "local-model-manifest-debug-artifact",
+      chunkRoot: objectPath,
+    },
+    modelArtifactManifest: {
+      ...manifest,
+      artifacts,
+      created_from: {
+        ...(manifest.created_from ?? {}),
+        local_object_ply_file: objectFile.name,
+        local_source_splat_file: sourceFile?.name,
+      },
+    },
+    ...(modelInference ? { modelInference } : {}),
   };
 }
 
@@ -2677,6 +3245,41 @@ function findQualityReportEntry(jsonEntries, expectedRoute = "") {
   return matched;
 }
 
+function findAssignmentTrainingSummaryEntry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter(
+    (entry) => [
+      "objgauss-objectstate-assignment-train-run-v1",
+      "objgauss-objectstate-model-v0-training-v1",
+    ].includes(entry.json?.schema),
+  );
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName) ?? candidates[0]
+    : candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select ObjectState assignment summary file ${expectedName}`
+      : "select one ObjectState assignment summary JSON file");
+  }
+  return matched;
+}
+
+function findObjectStateModelV0Entry(jsonEntries, expectedRoute = "") {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = jsonEntries.filter(
+    (entry) => entry.json?.schema === "objgauss-objectstate-model-v0-state-v1",
+  );
+  const matched = expectedName
+    ? candidates.find((entry) => entry.file.name === expectedName) ?? candidates[0]
+    : candidates[0];
+  if (!matched) {
+    throw new Error(expectedName
+      ? `select ObjectState Model v0 checkpoint ${expectedName}`
+      : "select one ObjectState Model v0 checkpoint JSON file");
+  }
+  return matched;
+}
+
 function findObjectStateBenchmarkEntry(jsonEntries, expectedRoute = "") {
   const expectedName = fileNameFromRoute(expectedRoute);
   const candidates = jsonEntries.filter(
@@ -2701,6 +3304,20 @@ function findOgcPayloadFile(files, expectedRoute = "") {
     : payloadFiles[0];
   if (!matched) {
     throw new Error(expectedName ? `select OGC payload file ${expectedName}` : "select one .ogc file");
+  }
+  return matched;
+}
+
+function findModelBundleFile(files, expectedRoute, extension) {
+  const expectedName = fileNameFromRoute(expectedRoute);
+  const candidates = Array.from(files ?? []).filter((file) =>
+    file.name.toLowerCase().endsWith(extension.toLowerCase()),
+  );
+  const matched = expectedName
+    ? candidates.find((file) => file.name === expectedName)
+    : candidates[0];
+  if (!matched) {
+    throw new Error(`select model bundle file ${expectedName || extension}`);
   }
   return matched;
 }
@@ -2982,6 +3599,7 @@ function ThreeWorld({
 
     const modelRoots = new Map();
     const draggableObjects = new Map();
+    const modelLayerViewModes = new Map();
     let hoveredObject = null;
     let selectedGaussianProbe = null;
     let selectedGaussianProbeSelectionId = null;
@@ -3001,6 +3619,32 @@ function ThreeWorld({
       hit: false,
       ambiguous: false,
       selectionId: null,
+    };
+
+    const requestedObjectVisibility = (object) =>
+      object?.userData?.requestedVisibility !== false;
+
+    const layerViewModeForModel = (modelId) =>
+      normalizeModelLayerViewMode(modelLayerViewModes.get(modelId));
+
+    const applyObjectLayerVisibility = (object) => {
+      if (!object) return false;
+      const mode = layerViewModeForModel(object.userData.modelId);
+      object.visible = mode !== "source" && requestedObjectVisibility(object);
+      object.traverse((child) => {
+        if (child.userData?.role !== "gaussian-cloud") return;
+        child.userData.sourceSplatOverlay =
+          mode !== "object" && child.userData.baseSourceSplatOverlay === true;
+      });
+      applyObjectVisualState(object, {
+        selected: Boolean(object.userData.selected),
+        hovered: Boolean(object.userData.hovered),
+        debug: debugRef.current,
+        lens: debugLensRef.current,
+        overlayMode: overlayModeRef.current,
+        hoverFocus: Boolean(hoveredObject?.userData?.selectionId),
+      });
+      return object.visible;
     };
 
     const applyObjectTransformMode = (mode) => {
@@ -3084,20 +3728,32 @@ function ThreeWorld({
       const objectGroups = [...draggableObjects.values()].filter(
         (object) => object.userData.modelId === modelId,
       );
-      const hiddenObjects = objectGroups.filter((object) => object.visible === false).length;
+      const hiddenObjects = objectGroups.filter(
+        (object) => !requestedObjectVisibility(object),
+      ).length;
+      const sourceLayerEnabled =
+        modelRoot.visible !== false && layerViewModeForModel(modelId) !== "object";
       const sourceLayerGroup = sourceSplatLayerGroupForRoot(modelRoot);
+      const sourceSplat = sourceSplatMeshForRoot(modelRoot);
+      const setSourceLayerVisibility = (visible) => {
+        if (sourceLayerGroup) sourceLayerGroup.visible = visible;
+        // Spark renders SplatMesh outside normal Three.js ancestor visibility,
+        // so stage/layer isolation must also reach the mesh itself.
+        if (sourceSplat) sourceSplat.visible = visible;
+      };
       if (!transform) {
-        if (sourceLayerGroup) sourceLayerGroup.visible = hiddenObjects === 0;
+        setSourceLayerVisibility(sourceLayerEnabled && hiddenObjects === 0);
         return null;
       }
       const stats = updateSparkObjectTransforms(transform, {
         objectGroups,
         sourceFrameScale: layer.sourceFrameScale ?? layer.sourceFrame?.scale ?? 1,
+        visibilityForObject: requestedObjectVisibility,
       });
       const perObjectVisibilityReady = stats.sourceCountMatches === true;
-      if (sourceLayerGroup) {
-        sourceLayerGroup.visible = perObjectVisibilityReady || hiddenObjects === 0;
-      }
+      setSourceLayerVisibility(
+        sourceLayerEnabled && (perObjectVisibilityReady || hiddenObjects === 0),
+      );
       layer.objectMotion = {
         ...stats,
         visibilityMode: perObjectVisibilityReady
@@ -3107,8 +3763,7 @@ function ThreeWorld({
             : "source-layer-visible-unfiltered",
         visibilitySynchronized: perObjectVisibilityReady || hiddenObjects === 0,
       };
-      const splat = sourceSplatMeshForRoot(modelRoot);
-      if (splat) splat.needsUpdate = true;
+      if (sourceSplat) sourceSplat.needsUpdate = true;
       return layer.objectMotion;
     };
 
@@ -3362,7 +4017,13 @@ function ThreeWorld({
         selectionId: object.userData.selectionId,
         modelId: object.userData.modelId,
         objectId: object.userData.objectId,
-        visible: Boolean(object.visible && modelRoots.get(object.userData.modelId)?.visible !== false),
+        visible: Boolean(
+          requestedObjectVisibility(object) &&
+          modelRoots.get(object.userData.modelId)?.visible !== false
+        ),
+        renderVisible: Boolean(
+          object.visible && modelRoots.get(object.userData.modelId)?.visible !== false
+        ),
         gaussianCount: objectGaussianCount(object),
       }));
       const visibleVisibilitySamples = objectVisibilitySamples.filter((sample) => sample.visible);
@@ -3395,6 +4056,12 @@ function ThreeWorld({
           (sample) => sample.sourceSplatObjectMotionActive,
         ).length,
         sourceSplatObjectMotionSamples,
+        modelLayerViewModes: Object.fromEntries(modelLayerViewModes),
+        selectedModelLayerViewMode: layerViewModeForModel(selectedModelId),
+        selectedSourceLayerVisible: selectedSourceSplatLayer?.visible ?? false,
+        selectedObjectLayerVisible: [...draggableObjects.values()].some(
+          (object) => object.userData.modelId === selectedModelId && object.visible !== false,
+        ),
         selectedSourceSplatStatus: selectedSourceSplatLayer?.status ?? "missing",
         selectedSourceSplatPath: selectedSourceSplatLayer?.path ?? null,
         selectedSourceSplatModelId: selectedSourceSplatLayer?.modelId ?? null,
@@ -3560,7 +4227,8 @@ function ThreeWorld({
             modelId: object.userData.modelId,
             objectId: object.userData.objectId,
             position: worldPosition.toArray().map(round3),
-            visible: object.visible,
+            visible: requestedObjectVisibility(object),
+            renderVisible: object.visible !== false,
             gaussianCount: objectGaussianCount(object),
             confidence: object.userData.objectState?.confidence ?? null,
             entropy: object.userData.objectState?.assignmentEntropy ?? null,
@@ -3612,9 +4280,12 @@ function ThreeWorld({
             (selectionId ? draggableObjects.get(selectionId) : null) ??
             [...draggableObjects.values()][0];
           if (!object) return false;
-          api.setObjectVisibility(object.userData.selectionId, !object.visible);
+          api.setObjectVisibility(
+            object.userData.selectionId,
+            !requestedObjectVisibility(object),
+          );
           publishAuditHandle();
-          return object.visible;
+          return requestedObjectVisibility(object);
         },
         moveObjectForAudit(selectionId = null, delta = [0.42, 0, 0]) {
           const object =
@@ -3829,10 +4500,30 @@ function ThreeWorld({
           : points?.length
             ? createPointCloudGroup(model, points)
             : createCompressedModelGroup(model);
-      attachSourceSplatLayer(result.group, model, result.summary?.sourceFrame, publishAuditHandle, {
-        points,
-        objectGroups: result.objectGroups,
+      if (!modelLayerViewModes.has(model.id)) {
+        modelLayerViewModes.set(model.id, "overlay");
+      }
+      result.objectGroups.forEach((object) => {
+        object.userData.requestedVisibility = !hiddenRef.current.has(
+          object.userData.selectionId,
+        );
+        applyObjectLayerVisibility(object);
       });
+      attachSourceSplatLayer(
+        result.group,
+        model,
+        result.summary?.sourceFrame,
+        () => {
+          // Spark may reset mesh render state while initialization completes;
+          // re-apply the authoritative stage/layer visibility afterwards.
+          syncSourceSplatObjectTransforms(model.id);
+          publishAuditHandle();
+        },
+        {
+          points,
+          objectGroups: result.objectGroups,
+        },
+      );
       scene.add(result.group);
       modelRoots.set(model.id, result.group);
       result.objectGroups.forEach((object) => {
@@ -4188,15 +4879,43 @@ function ThreeWorld({
       setObjectVisibility(selectionId, visible) {
         const object = draggableObjects.get(selectionId);
         if (!object) return;
-        object.visible = Boolean(visible);
+        object.userData.requestedVisibility = Boolean(visible);
+        applyObjectLayerVisibility(object);
         syncSourceSplatObjectTransforms(object.userData.modelId);
         callbacksRef.current.onDebugEvent?.("toggle-visibility", {
           ...objectTarget(object),
-          visible: object.visible,
+          visible: requestedObjectVisibility(object),
           lens: debugRef.current ? debugLensRef.current : "appearance",
           source: "object-visibility",
         });
         publishAuditHandle();
+      },
+      setModelLayerViewMode(modelId, mode) {
+        const normalized = normalizeModelLayerViewMode(mode);
+        const modelRoot = modelRoots.get(modelId);
+        if (!modelRoot) return null;
+        modelLayerViewModes.set(modelId, normalized);
+        const objects = [...draggableObjects.values()].filter(
+          (object) => object.userData.modelId === modelId,
+        );
+        objects.forEach(applyObjectLayerVisibility);
+        syncSourceSplatObjectTransforms(modelId);
+        attachTransformToSelection(selectedRef.current);
+        const sourceLayer = sourceSplatLayerInfo(modelRoot);
+        const result = {
+          modelId,
+          mode: normalized,
+          sourceVisible: sourceLayer.visible === true,
+          objectVisible: objects.some((object) => object.visible !== false),
+          requestedVisibleObjects: objects.filter(requestedObjectVisibility).length,
+          renderedVisibleObjects: objects.filter((object) => object.visible !== false).length,
+        };
+        callbacksRef.current.onDebugEvent?.("model-layer-view", {
+          ...result,
+          source: "model-layer-view",
+        });
+        publishAuditHandle();
+        return result;
       },
       moveObject(selectionId, delta, options = {}) {
         return moveObjectGroup(selectionId, delta, options);
@@ -4229,6 +4948,7 @@ function ThreeWorld({
         stageModelIdsRef.current = staged;
         for (const object of modelRoots.values()) {
           object.visible = staged.has(object.userData.modelId);
+          syncSourceSplatObjectTransforms(object.userData.modelId);
         }
         attachTransformToSelection(selectedRef.current);
         publishAuditHandle();
@@ -4237,7 +4957,8 @@ function ThreeWorld({
         const hidden = new Set(hiddenIds ?? []);
         const affectedModelIds = new Set();
         for (const object of draggableObjects.values()) {
-          object.visible = !hidden.has(object.userData.selectionId);
+          object.userData.requestedVisibility = !hidden.has(object.userData.selectionId);
+          applyObjectLayerVisibility(object);
           affectedModelIds.add(object.userData.modelId);
         }
         affectedModelIds.forEach(syncSourceSplatObjectTransforms);
@@ -4250,7 +4971,9 @@ function ThreeWorld({
           selectedGaussianProbeSelectionId = null;
         }
         for (const object of draggableObjects.values()) {
-          const selected = object.userData.selectionId === id || object.userData.modelId === id;
+          // Model focus is not object selection.  Only a renderer-facing
+          // object selectionId may activate per-object rings/bboxes.
+          const selected = object.userData.selectionId === id;
           object.userData.selected = selected;
           object.traverse((child) => {
             if (child.userData.role === "selection-ring" || child.userData.role === "core-glow") {
@@ -4401,6 +5124,7 @@ function DebugPanel({
   debugMode,
   debugLens,
   objectOverlayMode,
+  modelLayerViewMode,
   debugEvents,
   debugSnapshot,
   snapshotExport,
@@ -4412,6 +5136,9 @@ function DebugPanel({
   objectVisibility,
   stability,
   qualityReport,
+  instanceSegmentationBenchmark,
+  instanceEvidence,
+  instanceEvidenceLayer,
   objectStateBenchmark,
   benchmarkCase,
   stageSummary,
@@ -4424,6 +5151,8 @@ function DebugPanel({
   onToggleObjectVisibility,
   onSelectDebugLens,
   onSelectObjectOverlayMode,
+  onSelectModelLayerViewMode,
+  onSelectInstanceEvidenceLayer,
   onSelectTrainableFrame,
   onSelectOgcLod,
   onSelectOgcChunks,
@@ -4474,6 +5203,7 @@ function DebugPanel({
       data-debug-mode={debugMode ? "assignment" : "appearance"}
       data-debug-lens={debugMode ? debugLens : "appearance"}
       data-object-overlay-mode={objectOverlayMode}
+      data-model-layer-view-mode={modelLayerViewMode}
       data-object-overlay-bbox-visible={debugMode && objectOverlayShows(objectOverlayMode, "bbox") ? "true" : "false"}
       data-object-overlay-centroid-visible={debugMode && objectOverlayShows(objectOverlayMode, "centroid") ? "true" : "false"}
       data-probe-source={debugProbe?.source ?? activeState?.source ?? "none"}
@@ -4598,8 +5328,56 @@ function DebugPanel({
           <Metric label="绑定点数" value={sourceSplatMotionCountLabel(selectedSourceSplatMotion)} />
           <Metric label="展示版本" value={`${stageSummary?.visibleCount ?? 0}/${models?.length ?? 0}`} />
           <Metric label="对象层" value={objects.length ? `${formatNumber(objects.length)} 对象` : "未生成"} />
-          <Metric label="可见对象" value={formatCount(visibleObjectCount)} />
+          <Metric label="全局可见" value={formatCount(visibleObjectCount)} />
         </div>
+        {instanceEvidence ? (
+          <div
+            className="trainableFrameSelector modelLayerViewSelector"
+            data-instance-evidence-control="true"
+            data-selected-instance-evidence-layer={instanceEvidenceLayer}
+          >
+            <span>实例证据</span>
+            {[
+              ["raw", "Raw"],
+              ["prediction", "Prediction"],
+              ["ground_truth", "GT"],
+            ].map(([layer, label]) => (
+              <button
+                key={layer}
+                type="button"
+                className={instanceEvidenceLayer === layer ? "active" : ""}
+                aria-pressed={instanceEvidenceLayer === layer}
+                data-instance-evidence-layer-button={layer}
+                data-active={instanceEvidenceLayer === layer ? "true" : "false"}
+                onClick={() => onSelectInstanceEvidenceLayer?.(layer)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : selectedLayerState.sourceLayerStatus === "available" &&
+          selectedLayerState.objectLayerStatus === "loaded" ? (
+          <div
+            className="trainableFrameSelector modelLayerViewSelector"
+            data-model-layer-view-control="true"
+            data-selected-layer-view={modelLayerViewMode}
+          >
+            <span>证据层</span>
+            {MODEL_LAYER_VIEW_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={modelLayerViewMode === mode ? "active" : ""}
+                aria-pressed={modelLayerViewMode === mode}
+                data-model-layer-view-button={mode}
+                data-active={modelLayerViewMode === mode ? "true" : "false"}
+                onClick={() => onSelectModelLayerViewMode?.(mode)}
+              >
+                {modelLayerViewModeLabel(mode)}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </DebugSection>
 
       <DebugSection title="对象交互" status={selectedObject ? "3D 控制" : "选择对象"} defaultOpen>
@@ -4873,8 +5651,18 @@ function DebugPanel({
         <DebugEventTracePanel events={debugEvents} />
       </DebugSection>
 
-      <DebugSection title="质量 / 训练 / 基准" status={qualityReport?.status ?? objectStateBenchmark?.status ?? "-"}>
+      <DebugSection
+        title="质量 / 训练 / 基准"
+        status={
+          instanceSegmentationBenchmark?.comparison?.verdict ??
+          qualityReport?.status ??
+          objectStateBenchmark?.status ??
+          "-"
+        }
+      >
+        <ModelInferencePanel inference={selected.modelInference} />
         <QualityReportPanel report={qualityReport} />
+        <InstanceSegmentationBenchmarkPanel benchmark={instanceSegmentationBenchmark} />
         <ObjectStateBenchmarkPanel
           benchmark={objectStateBenchmark}
           activeCase={benchmarkCase}
@@ -4888,6 +5676,35 @@ function DebugPanel({
         </>
       )}
     </section>
+  );
+}
+
+function ModelInferencePanel({ inference }) {
+  if (!inference) return null;
+  return (
+    <div
+      className="stabilityDashboard qualityReport"
+      data-objectstate-model-inference="true"
+      data-objectstate-model-inference-status={inference.status}
+      data-objectstate-model-schema={inference.schema}
+      data-objectstate-model-inference-rows={inference.rowCount}
+      data-objectstate-model-precomputed-agreement={inference.precomputedAgreement ?? ""}
+    >
+      <div className="stabilityHead">
+        <span>Model v0 浏览器推理</span>
+        <strong>{inference.status === "checkpoint_inference_match" ? "match" : inference.status}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="输入点" value={formatCount(inference.rowCount)} />
+        <Metric label="对象" value={formatCount(inference.objectCount)} />
+        <Metric label="一致率" value={formatRatio(inference.precomputedAgreement)} />
+        <Metric label="一致点" value={formatCount(inference.agreementCount)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="schema" value={inference.schema} />
+        <Meta label="模型" value={inference.modelFamily} />
+      </dl>
+    </div>
   );
 }
 
@@ -5697,6 +6514,7 @@ function ObjectEmergenceSolverPanel({ artifact }) {
 function QualityReportPanel({ report }) {
   const summary = report ?? null;
   if (!summary) return null;
+  const assignmentDemo = summary.ari !== null || summary.meanBestIou !== null;
   return (
     <div
       className="stabilityDashboard qualityReport"
@@ -5706,6 +6524,11 @@ function QualityReportPanel({ report }) {
       data-quality-report-assignment-entropy={summary.assignmentEntropy ?? ""}
       data-quality-report-slot-utilization={summary.slotUtilization ?? ""}
       data-quality-report-object-purity={summary.objectPurity ?? ""}
+      data-quality-report-ari={summary.ari ?? ""}
+      data-quality-report-mean-best-iou={summary.meanBestIou ?? ""}
+      data-quality-report-assignment-confidence={summary.assignmentConfidence ?? ""}
+      data-quality-report-effective-slots={summary.effectiveSlots ?? ""}
+      data-quality-report-run-id={summary.runId}
       data-quality-report-temporal-drift={summary.temporalDrift ?? ""}
       data-quality-report-assignment-jitter={summary.assignmentJitter ?? ""}
       data-quality-report-bbox-stability={summary.bboxStability ?? ""}
@@ -5714,19 +6537,31 @@ function QualityReportPanel({ report }) {
       data-quality-report-failing-gate-names={summary.failingGateNames}
     >
       <div className="stabilityHead">
-        <span>质量报告</span>
+        <span>{summary.runId ? `质量报告 · ${summary.runId}` : "质量报告"}</span>
         <strong>{summary.status}</strong>
       </div>
       <div className="stabilityGrid trainingGrid">
-        <Metric label="熵" value={formatRatio(summary.assignmentEntropy)} />
-        <Metric label="纯度" value={formatRatio(summary.objectPurity)} />
-        <Metric label="漂移" value={formatRatio(summary.temporalDrift)} />
-        <Metric label="抖动" value={formatRatio(summary.assignmentJitter)} />
+        {assignmentDemo ? (
+          <>
+            <Metric label="ARI" value={formatRatio(summary.ari)} />
+            <Metric label="IoU" value={formatRatio(summary.meanBestIou)} />
+            <Metric label="纯度" value={formatRatio(summary.objectPurity)} />
+            <Metric label="置信度" value={formatRatio(summary.assignmentConfidence)} />
+          </>
+        ) : (
+          <>
+            <Metric label="熵" value={formatRatio(summary.assignmentEntropy)} />
+            <Metric label="纯度" value={formatRatio(summary.objectPurity)} />
+            <Metric label="漂移" value={formatRatio(summary.temporalDrift)} />
+            <Metric label="抖动" value={formatRatio(summary.assignmentJitter)} />
+          </>
+        )}
       </div>
       <dl className="stabilityMeta trainingMeta">
         <Meta label="schema" value={summary.schema} />
         <Meta label="门禁" value={`${formatCount(summary.passingGates)} / ${formatCount(summary.gateCount)}`} />
         <Meta label="槽位" value={formatRatio(summary.slotUtilization)} />
+        {assignmentDemo ? <Meta label="有效槽位" value={formatCount(summary.effectiveSlots)} /> : null}
         <Meta label="bbox" value={formatRatio(summary.bboxStability)} />
       </dl>
       {summary.gates.length ? (
@@ -5753,6 +6588,90 @@ function QualityReportPanel({ report }) {
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function InstanceSegmentationBenchmarkPanel({ benchmark }) {
+  const summary = benchmark ?? null;
+  if (!summary) return null;
+  const candidates = [
+    ["xyz_kmeans", "XYZ KMeans"],
+    ["rgb_kmeans", "RGB KMeans"],
+    ["connected_components_3d", "3D Connected Components"],
+    ["objectstate_model_v0", "ObjectState Model v0"],
+  ];
+  const model = summary.aggregate?.objectstate_model_v0 ?? {};
+  const bestBaseline = summary.comparison?.best_baseline ?? "";
+  const bestBaselineMetrics = summary.aggregate?.[bestBaseline] ?? {};
+  const verdict = summary.comparison?.verdict ?? "missing_verdict";
+  const leakagePassed = summary.leakage_gate?.passed === true;
+  return (
+    <div
+      className="stabilityDashboard qualityReport instanceSegmentationBenchmark"
+      data-instance-segmentation-benchmark="true"
+      data-instance-segmentation-benchmark-schema={summary.schema}
+      data-instance-segmentation-benchmark-status={summary.status}
+      data-instance-segmentation-benchmark-verdict={verdict}
+      data-instance-segmentation-benchmark-best-baseline={bestBaseline}
+      data-instance-segmentation-benchmark-model-delta={summary.comparison?.model_delta ?? ""}
+      data-instance-segmentation-benchmark-leakage-gate={leakagePassed ? "passed" : "failed"}
+    >
+      <div className="stabilityHead">
+        <span>M2 多对象实例</span>
+        <strong>{verdict}</strong>
+      </div>
+      <div className="stabilityGrid trainingGrid">
+        <Metric label="Model mIoU" value={formatRatio(model.hungarian_mean_iou)} />
+        <Metric label="Baseline mIoU" value={formatRatio(bestBaselineMetrics.hungarian_mean_iou)} />
+        <Metric label="差值" value={formatSignedRatio(summary.comparison?.model_delta)} />
+        <Metric label="Recall@0.5" value={formatRatio(model.object_recall_iou_0_5)} />
+      </div>
+      <dl className="stabilityMeta trainingMeta">
+        <Meta label="schema" value={summary.schema} />
+        <Meta label="GT" value="independent instance_id" />
+        <Meta label="split" value="complete held-out scenes" />
+        <Meta label="leakage gate" value={leakagePassed ? "passed" : "failed"} />
+        <Meta label="best baseline" value={bestBaseline || "-"} />
+        <Meta
+          label="scene stress"
+          value={
+            summary.scene?.stress
+              ? `contact=${Boolean(summary.scene.stress.contact)}, partial=${Boolean(summary.scene.stress.partial_observation)}`
+              : "-"
+          }
+        />
+      </dl>
+      <div
+        className="qualityGateRows"
+        data-instance-segmentation-candidates="true"
+        data-instance-segmentation-candidate-count={candidates.length}
+      >
+        {candidates.map(([name, label]) => {
+          const metrics = summary.aggregate?.[name] ?? {};
+          const status = name === "objectstate_model_v0" && verdict === "model_not_better_than_recorded_baselines"
+            ? "warn"
+            : "pass";
+          return (
+            <div
+              className={`qualityGateRow ${status}`}
+              key={name}
+              data-instance-segmentation-candidate={name}
+              data-instance-segmentation-hungarian-iou={metrics.hungarian_mean_iou ?? ""}
+              data-instance-segmentation-ari={metrics.ari ?? ""}
+              data-instance-segmentation-merge-rate={metrics.merge_rate ?? ""}
+              data-instance-segmentation-split-rate={metrics.split_rate ?? ""}
+            >
+              <span>{label}</span>
+              <small>
+                mIoU {formatRatio(metrics.hungarian_mean_iou)} · ARI {formatRatio(metrics.ari)} · merge{" "}
+                {formatRatio(metrics.merge_rate)} · split {formatRatio(metrics.split_rate)}
+              </small>
+              <strong>{name === bestBaseline ? "best baseline" : name === "objectstate_model_v0" ? "model" : "baseline"}</strong>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -6304,9 +7223,18 @@ function createPointCloudGroup(model, points) {
     const originalBounds = pointBounds(entries.map((entry) => entry.point));
     const objectBoost = objectDisplayBoost(normalizedBounds, model);
     const accent = objectAccent(objectId, model.accent);
-    const assignment = assignmentVectorForObject(objectId, objectIds, model.assignmentConfidence ?? 0.94);
+    const pointAssignmentRows = entries
+      .map((entry) => entry.point.assignment)
+      .filter((row) => Array.isArray(row) && row.length > 0);
+    const usesModelAssignment = pointAssignmentRows.length === entries.length;
+    const assignment = usesModelAssignment
+      ? averageAssignmentVector(pointAssignmentRows, objectIds)
+      : assignmentVectorForObject(objectId, objectIds, model.assignmentConfidence ?? 0.94);
     const assignmentEntropy = normalizedEntropy(assignment.map((slot) => slot.probability));
     const assignmentConfidence = Math.max(...assignment.map((slot) => slot.probability));
+    const assignmentSource = usesModelAssignment
+      ? entries[0]?.point?.assignmentSource ?? "model_assignment"
+      : "derived_from_object_id";
     const objectGroup = baseObjectGroup(model, objectId, {
       x: normalizedBounds.center.x,
       y: 0,
@@ -6365,24 +7293,36 @@ function createPointCloudGroup(model, points) {
     const cloud = new THREE.Points(geometry, material);
     cloud.userData.role = "gaussian-cloud";
     cloud.userData.sourceSplatOverlay = sourceOverlay;
+    cloud.userData.baseSourceSplatOverlay = sourceOverlay;
     cloud.userData.originalColor = originalColorAttr;
     cloud.userData.assignmentColor = assignmentColorAttr;
     cloud.userData.confidenceColor = confidenceColorAttr;
     cloud.userData.entropyColor = entropyColorAttr;
     cloud.userData.opacityColor = opacityColorAttr;
     cloud.userData.opacityMean = round3(average(opacityValues));
-    cloud.userData.gaussianDebug = entries.map((entry, index) => ({
-      protocol: "object-state-debug-os-v1",
-      source: "derived_from_object_id",
-      gaussianIndex: index,
-      objectId,
-      slot: objectIds.indexOf(objectId),
-      confidence: round3(assignmentConfidence),
-      entropy: round3(assignmentEntropy),
-      assignment,
-      position: [round3(entry.point.x), round3(entry.point.y), round3(entry.point.z)],
-      opacity: round3(opacityValues[index] ?? 0),
-    }));
+    cloud.userData.gaussianDebug = entries.map((entry, index) => {
+      const gaussianAssignment = Array.isArray(entry.point.assignment)
+        ? assignmentVectorFromProbabilities(entry.point.assignment, objectIds)
+        : assignment;
+      return {
+        protocol: "object-state-debug-os-v1",
+        source: entry.point.assignmentSource ?? assignmentSource,
+        gaussianIndex: index,
+        objectId,
+        slot: objectIds.indexOf(objectId),
+        confidence: round3(
+          entry.point.confidence ?? Math.max(...gaussianAssignment.map((slot) => slot.probability)),
+        ),
+        entropy: round3(
+          entry.point.entropy ?? normalizedEntropy(
+            gaussianAssignment.map((slot) => slot.probability),
+          ),
+        ),
+        assignment: gaussianAssignment,
+        position: [round3(entry.point.x), round3(entry.point.y), round3(entry.point.z)],
+        opacity: round3(opacityValues[index] ?? 0),
+      };
+    });
     const objectState = objectStateSummary({
       objectId,
       assignment,
@@ -6395,7 +7335,7 @@ function createPointCloudGroup(model, points) {
       gaussianOpacityMean: cloud.userData.opacityMean,
       spatialCompactness: spatialCompactnessForGeometry(geometry),
       displayBounds: geometry.boundingBox,
-      source: "derived_from_object_id",
+      source: assignmentSource,
     });
     objectGroup.userData.objectState = objectState;
     objectGroup.add(cloud);
@@ -6892,6 +7832,7 @@ function validSourceFrame(frame) {
 function sourceSplatLayerInfo(modelRoot) {
   const layer = modelRoot?.userData?.sourceSplatLayer;
   const layerGroup = sourceSplatLayerGroupForRoot(modelRoot);
+  const splat = sourceSplatMeshForRoot(modelRoot);
   if (!layer) {
     return {
       registered: false,
@@ -6909,7 +7850,7 @@ function sourceSplatLayerInfo(modelRoot) {
     path: layer.path ?? null,
     label: layer.label ?? "完整 splat",
     renderer: layer.renderer ?? "Spark splat",
-    visible: layerGroup?.visible !== false,
+    visible: layerGroup?.visible !== false && splat?.visible !== false,
     sourceSplats: layer.sourceSplats ?? null,
     sourceSplatObjectMotionContract: objectMotion.contract ?? SPARK_OBJECT_TRANSFORM_CONTRACT,
     sourceSplatObjectMotionMode: objectMotion.mode ?? "none",
@@ -7227,6 +8168,17 @@ function normalizeDebugLens(lens) {
 function normalizeObjectOverlayMode(mode) {
   const value = String(mode ?? "full");
   return OBJECT_OVERLAY_MODES.includes(value) ? value : "full";
+}
+
+function normalizeModelLayerViewMode(mode) {
+  const value = String(mode ?? "overlay");
+  return MODEL_LAYER_VIEW_MODES.includes(value) ? value : "overlay";
+}
+
+function modelLayerViewModeLabel(mode) {
+  if (mode === "source") return "原始";
+  if (mode === "object") return "对象";
+  return "同屏";
 }
 
 function normalizeObjectTransformMode(mode) {
@@ -9276,9 +10228,14 @@ function qualityReportSummary(report) {
   return {
     schema: report.schema,
     status: report.status ?? (failingGates ? "warn" : "pass"),
+    runId: cleanString(report.source?.run_id),
     assignmentEntropy: finiteNumber(metrics.assignment_entropy ?? metrics.mean_entropy),
     slotUtilization: finiteNumber(metrics.slot_utilization),
     objectPurity: finiteNumber(metrics.object_purity ?? metrics.mean_purity),
+    ari: finiteNumber(metrics.ari),
+    meanBestIou: finiteNumber(metrics.mean_best_iou),
+    assignmentConfidence: finiteNumber(metrics.assignment_confidence),
+    effectiveSlots: finiteNumber(metrics.effective_slots),
     temporalDrift: finiteNumber(metrics.temporal_drift ?? metrics.mean_temporal_drift),
     assignmentJitter: finiteNumber(metrics.assignment_jitter ?? metrics.mean_assignment_jitter),
     bboxStability: finiteNumber(metrics.bbox_stability ?? metrics.mean_bbox_stability),

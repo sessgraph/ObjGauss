@@ -4,6 +4,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from objgauss.core.assignment_metrics import assignment_clustering_metrics
+
 from objgauss.core.assignment_evidence import (
     ASSIGNMENT_EVIDENCE_BATCH_SCHEMA,
     AssignmentEvidenceBatch,
@@ -207,76 +209,7 @@ def _target_metrics(
     target = validate_assignment_matrix(target_assignment, evidence_count=assignment.shape[0])
     predicted_labels = np.argmax(assignment, axis=1).astype(np.int64, copy=False)
     target_labels = np.argmax(target, axis=1).astype(np.int64, copy=False)
-    return {
-        "target_slots": int(target.shape[1]),
-        "mean_best_iou": _mean_best_iou(predicted_labels, target_labels),
-        "ari": _adjusted_rand_index(predicted_labels, target_labels),
-        "purity": _purity(predicted_labels, target_labels),
-    }
-
-
-def _mean_best_iou(predicted: np.ndarray, target: np.ndarray) -> float:
-    target_slots = sorted(int(item) for item in np.unique(target))
-    predicted_slots = sorted(int(item) for item in np.unique(predicted))
-    if not target_slots or not predicted_slots:
-        return 0.0
-    scores = []
-    for target_slot in target_slots:
-        target_mask = target == target_slot
-        best = 0.0
-        for predicted_slot in predicted_slots:
-            predicted_mask = predicted == predicted_slot
-            union = np.logical_or(target_mask, predicted_mask).sum()
-            if union == 0:
-                continue
-            intersection = np.logical_and(target_mask, predicted_mask).sum()
-            best = max(best, float(intersection / union))
-        scores.append(best)
-    return float(np.mean(scores)) if scores else 0.0
-
-
-def _purity(predicted: np.ndarray, target: np.ndarray) -> float:
-    total = predicted.shape[0]
-    if total == 0:
-        return 0.0
-    correct = 0
-    for predicted_slot in np.unique(predicted):
-        target_for_slot = target[predicted == predicted_slot]
-        if target_for_slot.size == 0:
-            continue
-        counts = np.bincount(target_for_slot.astype(np.int64))
-        correct += int(np.max(counts))
-    return float(correct / total)
-
-
-def _adjusted_rand_index(labels_a: np.ndarray, labels_b: np.ndarray) -> float:
-    if labels_a.shape[0] != labels_b.shape[0]:
-        raise ValueError("ARI labels must have the same length")
-    n = int(labels_a.shape[0])
-    if n < 2:
-        return 1.0
-    a_values, a_inverse = np.unique(labels_a, return_inverse=True)
-    b_values, b_inverse = np.unique(labels_b, return_inverse=True)
-    contingency = np.zeros((a_values.shape[0], b_values.shape[0]), dtype=np.int64)
-    for a_idx, b_idx in zip(a_inverse, b_inverse, strict=True):
-        contingency[int(a_idx), int(b_idx)] += 1
-    sum_comb = float(np.sum(_comb2(contingency)))
-    row_comb = float(np.sum(_comb2(contingency.sum(axis=1))))
-    col_comb = float(np.sum(_comb2(contingency.sum(axis=0))))
-    total_comb = float(_comb2(np.asarray([n], dtype=np.int64))[0])
-    if total_comb == 0.0:
-        return 1.0
-    expected = row_comb * col_comb / total_comb
-    maximum = 0.5 * (row_comb + col_comb)
-    denominator = maximum - expected
-    if abs(denominator) < 1e-12:
-        return 1.0 if abs(sum_comb - maximum) < 1e-12 else 0.0
-    return float((sum_comb - expected) / denominator)
-
-
-def _comb2(values: np.ndarray) -> np.ndarray:
-    values = values.astype(np.float64, copy=False)
-    return values * (values - 1.0) / 2.0
+    return assignment_clustering_metrics(predicted_labels, target_labels)
 
 
 def _require_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:

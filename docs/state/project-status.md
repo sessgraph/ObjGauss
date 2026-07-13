@@ -1,40 +1,48 @@
 # ObjGauss 当前状态总览
 
 > 最近更新: 2026-07-13
-> 阶段: research-first stabilization
-> 决策: `docs/adr/0007-research-first-stabilization.md`
+> 阶段: research-first stabilization；Phase M M2 synthetic evidence reviewable，模型未胜基线
+> 决策: `docs/adr/0007-research-first-stabilization.md`、
+> `docs/adr/0008-objectstate-model-demo-phase.md`、
+> `docs/adr/0009-objectstate-multi-object-evidence.md`
 
 ## 一句话状态
 
 ObjGauss 是可运行的 Gaussian object-slot 研究与证据平台；当前尚未证明
 `ObjectState` 是持续的真实世界状态，也不是 production-ready 对象编辑产品。
 
-## 当前唯一主线
+## 当前路线
 
-2026-07-10 至 2026-07-24 冻结新 schema、audit、handoff、renderer route 和 Viewer
-产品功能。现阶段只允许：
+RBO strict qualified scenes 为 `0/3`，后续 field mining 和 adapter 投入停止。Phase M
+现分成两层：NeRF Lego M1 只证明 checkpoint/inference/viewer 接线；其一个物理对象上的
+四色规则不计作 objectness。M2 以 12 个程序化四物体 scene、8/4 完整 scene holdout、
+独立 `gt_instance_id`、两个同色同形立方体、接触和局部观测建立实例分割证据。
 
-- 修 correctness、数值稳定、ABI、虚假交互和复现问题；
-- 让既有 gate 从原始预测和 GT 独立计算；
-- 使用既有工具取得至少 3 个真实 controlled scenes 的结果；
-- 做状态与接口减法。
-
-Viewer 暂时是 evidence viewer，不是产品扩张主线。
+M2 leakage gate 通过，但 Model v0 的 Hungarian mIoU `0.754572` 低于 3D connected
+components 基线 `0.825829`，差值 `-0.071257`；当前结论是模型未胜已记录简单基线，
+不是 Phase M 模型通过。Viewer 已把 Raw / Prediction / GT 与同源 metrics 接通。下一阶段
+仍需改进模型并回到 controlled capture；synthetic M2 不计作真实 identity/prediction/intervention pass。
 
 ## 已验证能力
 
 - Gaussian PLY / `.splat` IO、对象色、过滤与 object-aware PLY。
 - `A[N,K]` soft assignment、ObjectState pooling、训练 smoke、checkpoint roundtrip。
+- Phase M M1 CLI 已把登记的 5,696-Gaussian NeRF Lego proxy 接成同 run Model v0 bundle；完整
+  `source_frame` 划分为 9 train / 3 held-out，frame/row overlap 均为 0。loss
+  `1.657089 -> 0.103907`；held-out ARI/mean-best-IoU/Purity 从
+  `0.060393/0.237195/0.507981` 到 `1.0/1.0/1.0`。这只证明同一 Lego scene 的颜色标签
+  assignment 与接线，不证明对象分割。Node/Viewer inference 与预计算 PLY `5,696/5,696`
+  一致；artifact hash、layer switch、选择、hide/show 与 4/4 wiring gates 已核验。
+- Phase M M2 已对四个 held-out multi-object scenes 运行 XYZ/RGB KMeans、3D connected
+  components 与 Model v0；报告 Hungarian mIoU、ARI、count error、merge/split 与 Recall@IoU，
+  失败 verdict 保留。浏览器从 checkpoint 重推理并与 467-row 预计算 prediction 一致，
+  Raw/Prediction/GT、对象显隐、指标面板与独立 GT provenance 已通过专项 Playwright 和截图复核。
 - Spark 真实 splat 展示与 Three.js 对象证据层；点数一致时支持 source splat 子集平移。
 - controlled capture / BOP public replay 的现有数据合同、evaluator 和 ledger 工具链。
 - 真实 3DGS / SAM / CLIP / gsplat 本地实验产物，但重依赖仍不是默认可复现环境。
-- 当前工作树本地基线：806 个 Python 测试、Vite production build、`uv lock --check`、
-  world viewer full/truth 浏览器审计均通过。Python wheel/sdist 在 714-test 检查点通过；
-  最新 pipeline 批次因审批额度耗尽未重跑打包。
-- `95dfe2a` 已把依赖 ignored 本地 PLY 的 real-sample-v2 行为测试改为明确
-  `fixture://` provenance 的程序化场景；不含 `public/samples/` 的 clean archive 仍为
-  806 个 Python 测试全部通过，required CI 不再隐式依赖许可受限素材。
-
+- 当前工作树本地基线：820 个 Python 测试、Vite production build、M1/M2 专项 Playwright
+  与 viewer truth audit 通过。完整串行 world audit 本轮通过前 7/9 artifact flows 后受 10 分钟
+  外部 SIGTERM；并发重试触发资源 SIGTERM，未声明本轮完整 audit 通过。
 ## 当前真实负证据
 
 2026-07-10 使用现有命令直接重跑三段 BOP public replay：HOPE scene 000001、
@@ -151,20 +159,10 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   但 target/interval 只留下 2 个 ready scenes，旧三场景 action 结果已 supersede；
   RRC 三段的三路 RGB、tracker pose 与 desired/applied action overlap 合格，但相机固定、
   无 depth，9D joint control 不能直接当现行 3D vector。
-- 新增 `scripts/download-rbo-occlusion-followup.sh`：P0 冻结
-  `treasurebox25/laptop26/globe25`（约 1.024 GiB），P1 再加
-  `treasurebox24/tripod24/pliers24/ikeasmall23`；官方 `ftSensor` model 同步纳入复现。
-  P0 已下载并按官方运动链逐帧复核：treasurebox 与 globe 均是 `0` V-O-V 的可信负证据；
-  laptop26 的 camera TF 与 RGB 可见性矛盾，`event_count=null`，不计零事件负证据。
-  P1 已完整下载并通过 official-chain preflight 与冻结阈值逐帧重算：
-  treasurebox/tripod/pliers/ikeasmall 均无 clear-occluded-clear 回环，为可信 `0/4` 负证据；
-  `3,199/3,199` 个逐 link CSV 样本经独立重算一致。P0/P1 都没有解锁 scene。
-  全部 19 个 camera-motion + F/T interaction 再对账后，P2 只保留 `globe23`：它与已验证
-  `globe25` 同 object、同 marker-set date，补齐 artificial/natural lighting 配对。P2 已完整
-  下载并逐帧重算；接受 `640/670` 帧，`rb0/rb1` 最大遮挡为 `0.392906/0.007348`，两 link
-  均为 `0` V-O-V，独立复核 `1,280/1,280` 个逐 link 样本一致。双 lighting 配对没有解锁 scene。
-  RBO index 每个 interaction 只提供一个 lighting label，因而单 archive 还不能满足默认
-  两种 lighting；跨 recording 合并不能在无明确 episode 证据时偷偷完成。
+- RBO follow-up P0/P1/P2 均已下载并按 official chain 逐帧复核。P0 的 treasurebox/globe、
+  P1 四段与 P2 `globe23` 均为可信零 V-O-V；laptop26 因 camera TF/RGB 矛盾保持
+  `event_count=null`。P1 `3,199/3,199`、P2 `1,280/1,280` 个逐 link 样本独立重算一致；
+  双 lighting 配对也未解锁 scene。19 条 interaction 已对账完毕，路线停止。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
@@ -173,10 +171,8 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
 - 当前没有任何 scene 同时满足严格 V-O-V、两种 lighting 与完整 controlled 条件；合格数
   仍为 `0/3`。首批 RBO 只有 tripod/cabinet 两个 official-chain action-ready scenes；
   cardboard action 缺失，新 ledger 为 `0 pass / 7 fail / 2 blocked`，不能替代严格 scene。
-- 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
-  工具链；首批 RBO/RRC archives 已完成审计。RBO action sign 已解决，但 full target/interval
-  只覆盖 2 个 scene，且首批与 follow-up P0/P1/P2 都未形成严格遮挡回环；RRC 又缺 temporal
-  camera motion/depth/canonical 3D action。两者当前都不能满足完整 controlled-scene contract。
+- 当前 host 无视频设备与 capture/reconstruction 工具链；RBO 无严格遮挡回环，RRC 缺
+  temporal camera motion/depth/canonical 3D action，均不能满足 controlled-scene contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。
 - Python 默认依赖未覆盖 torch / SAM / transformers / gsplat / nerfstudio 复现实验。

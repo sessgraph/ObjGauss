@@ -1,13 +1,14 @@
 # ObjGauss 项目状态边界
 
-> 最近更新: 2026-07-10
+> 最近更新: 2026-07-13
 
 ## 项目目标
 
 ObjGauss 的长期目标是验证和构建“对象级可编辑、可持续推理的 3D Gaussian
 场景”。当前阶段明确采用 research-first：先证明 ObjectState 在真实 controlled
 scene 中具有 identity persistence、predictive sufficiency 和 action-conditioned
-state transition，再讨论产品扩张或 world-model 叙事。
+state transition。Phase M / Phase 2.5 先把既有 assignment 模型的公共研究数据训练结果、
+checkpoint、对象色与指标接成可追溯展示闭环；它不替代真实验证。
 
 基础产品边界仍包括：
 
@@ -19,8 +20,11 @@ state transition，再讨论产品扩张或 world-model 叙事。
   source 真正同步的能力。
 - 建立训练素材与 Demo 素材分层管理。
 
-当前 Viewer 仅作为 evidence viewer：展示原始 Gaussian、派生对象层、原始预测、GT、
-metrics 和 failure evidence。它不是本阶段的对象编辑产品主线。
+当前 Viewer 仍是 evidence viewer：展示原始 Gaussian、同一模型运行派生的对象层、
+原始预测、GT、metrics 和 failure evidence。Phase M 允许补齐这条既有证据链，但不是
+对象编辑产品扩张。NeRF Lego 的四色标签只保留为 M1 接线 smoke，不计作 objectness
+证据；M2 使用独立实例 GT、完整 scene holdout、同色对象、接触与局部观测来审判实例分割，
+且必须展示未胜简单 baseline 的负结果。
 
 ## 当前研究主张
 
@@ -34,6 +38,12 @@ metrics 和 failure evidence。它不是本阶段的对象编辑产品主线。
 
 在真实数据通过前，`ObjectState` 只可表述为 object-slot observation state，不能表述为
 已验证 world state。
+
+公共数据上的 same-scene held-out-frame assignment demo 只能证明模型运行、artifact、
+浏览器 checkpoint inference 与 assignment 指标链路可复现，不能证明 cross-scene
+generalization、temporal identity、prediction 或 causal transition。
+M2 程序化多对象结果只证明 synthetic instance benchmark 可审计；即使指标通过也不能
+替代 controlled-real identity/prediction/intervention gate。
 
 ## 开发阶段说明
 

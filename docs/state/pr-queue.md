@@ -95,6 +95,8 @@
   CSV 复核 `1,280/1,280` 个逐 link 样本一致。因此双 lighting 配对仍未解锁 scene，
   不进入 action-target 复核。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
+- 路线决定: RBO eligibility audit 已完成并停止继续投入；其工具与负证据保留。Phase M
+  闭环后优先自建 controlled capture，不再从已审计 RBO route 挖字段或修 adapter。
 - 解锁条件: 新 capture 或新数据源提供至少 3 个许可明确、严格 V-O-V 可复核且同时含
   RGB-D/6DoF/view change/measured action 的 scene，并让 candidate 与简单 baseline 完成比较。
 
@@ -108,6 +110,15 @@
 
 ## Recently Completed
 
+- 2026-07-13: `OBJECTSTATE-MODEL-DEMO-001` 实现完成。M1 NeRF Lego
+  的 `1.0` ARI/IoU/Purity 只作为单物体四色 wiring smoke，不再描述成对象分割效果。
+  M2 新增 12-scene 程序化四物体数据、8/4 完整 scene holdout、独立实例 GT、同色同形
+  对象、接触/局部观测、XYZ/RGB KMeans、3D connected-components 和 Model v0；报告
+  Hungarian mIoU/ARI/count/merge/split/recall。leakage gate 通过，Model v0 mIoU
+  `0.754572` 低于最佳基线 `0.825829`，verdict 为 `model_not_better_than_recorded_baselines`。
+  Browser checkpoint inference 与 467-row prediction 一致；Raw/Prediction/GT、指标、对象
+  hide/show 与 Spark stage isolation 通过专项 Playwright 和截图审查。820 tests、build、M1
+  专项与 viewer truth audit 通过；完整串行 world audit 本轮 7/9 flow 后受外部 SIGTERM。
 - 2026-07-11: `95dfe2a`；将 real-sample-v2 required-CI 覆盖迁到 license-safe、固定 seed
   的程序化边界场景；保留 temperature sharpening、coverage、hard fix/regression、
   no-safe-candidate 与 CLI/PLY roundtrip 分支，clean archive 全量 806 tests 通过。

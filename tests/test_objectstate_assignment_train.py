@@ -65,7 +65,9 @@ def test_objectstate_assignment_train_smoke_writes_metrics_checkpoint_and_visual
         OBJECTSTATE_ASSIGNMENT_TRAIN_RUN_SCHEMA
     )
     after_cloud = read_ply(after_ply)
+    assert "object_id" in after_cloud.fields
     assert "predicted_object_id" in after_cloud.fields
+    assert after_cloud.vertices["object_id"].tolist() == [0, 0, 1, 1]
     assert after_cloud.vertices["predicted_object_id"].tolist() == [0, 0, 1, 1]
 
 
@@ -74,6 +76,8 @@ def test_assignment_train_dataset_summary_records_supervision_only_contract():
         _two_object_cloud(),
         _target_assignment(),
         sample_id="dataset-contract-test",
+        gaussian_ref="public/samples/example.ply",
+        target_source="object_id from registered research sample",
     )
 
     assert summary["schema"] == OBJECTSTATE_ASSIGNMENT_TRAIN_DATASET_SCHEMA
@@ -81,6 +85,8 @@ def test_assignment_train_dataset_summary_records_supervision_only_contract():
     assert summary["gaussian_count"] == 4
     assert summary["slots"] == 2
     assert summary["target_object_labels"] == [0, 0, 1, 1]
+    assert summary["gaussian_ref"] == "public/samples/example.ply"
+    assert summary["target_source"] == "object_id from registered research sample"
     assert summary["claim_policy"]["target_assignment_is_supervision_only"] is True
     assert validate_objectstate_assignment_train_dataset_summary(summary) == summary
 

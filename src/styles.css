@@ -677,6 +677,11 @@ button:focus-visible {
   margin-bottom: 10px;
 }
 
+.modelLayerViewSelector {
+  grid-template-columns: 68px repeat(3, minmax(0, 1fr));
+  margin: 10px 0 0;
+}
+
 .objectMoveSelector {
   grid-template-columns: 68px repeat(4, minmax(34px, 1fr));
 }

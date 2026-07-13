@@ -16,3 +16,5 @@ outputs/
 *.ply
 *.splat
 !tests/fixtures/*.ply
+public/models/objectstate-model-demo-local/
+public/models/objectstate-multi-object-m2-local/

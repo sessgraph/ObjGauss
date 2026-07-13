@@ -208,12 +208,31 @@ function vertexToPoint(vertex, shRestCoefficientCount = null) {
     rotationQuaternion,
     objectId,
     color: original.rgb,
+    modelFeatureRgb: modelFeatureRgb(vertex),
+    modelFeatureOpacity: opacityValue(vertex.opacity),
     colorSource: original.source,
     shDc: original.shDc,
     shRestCoefficientCount: shRest.coefficientCount,
     shDegree: shRest.degree,
     objectColor: colorForObject(objectId),
   };
+}
+
+function modelFeatureRgb(vertex) {
+  if (
+    vertex.red !== undefined &&
+    vertex.green !== undefined &&
+    vertex.blue !== undefined
+  ) {
+    return [vertex.red, vertex.green, vertex.blue].map((value) => {
+      const numeric = Number(value);
+      return clamp(numeric > 1 ? numeric / 255 : numeric, 0, 1);
+    });
+  }
+  const shDc = shDcCoefficients(vertex);
+  return shDc
+    ? shDc.map((value) => clamp(value * SH_C0 + 0.5, 0, 1))
+    : [0, 0, 0];
 }
 
 function originalColor(vertex) {

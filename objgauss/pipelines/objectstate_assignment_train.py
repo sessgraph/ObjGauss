@@ -54,6 +54,8 @@ def objectstate_assignment_train_dataset_summary(
     source_kind: str = "synthetic",
     split: str = "train",
     license: str = "local synthetic fixture; not public release",
+    gaussian_ref: str | None = None,
+    target_source: str | None = None,
     evidence_features: np.ndarray | None = None,
 ) -> dict[str, Any]:
     target = validate_assignment_matrix(target_assignment, evidence_count=cloud.count)
@@ -84,6 +86,10 @@ def objectstate_assignment_train_dataset_summary(
             "synthetic_and_real_rows_must_remain_separate": True,
         },
     }
+    if gaussian_ref is not None:
+        payload["gaussian_ref"] = str(gaussian_ref)
+    if target_source is not None:
+        payload["target_source"] = str(target_source)
     return validate_objectstate_assignment_train_dataset_summary(payload)
 
 
@@ -96,6 +102,8 @@ def objectstate_assignment_train_smoke(
     source_kind: str = "synthetic",
     split: str = "train",
     license: str = "local synthetic fixture; not public release",
+    gaussian_ref: str | None = None,
+    target_source: str | None = None,
     initial_state: AssignmentSolverV2State | None = None,
     iterations: int = 50,
     learning_rate: float = 1e-1,
@@ -123,6 +131,8 @@ def objectstate_assignment_train_smoke(
         source_kind=source_kind,
         split=split,
         license=license,
+        gaussian_ref=gaussian_ref,
+        target_source=target_source,
     )
     evidence = _assignment_evidence_from_cloud(
         cloud,
@@ -298,6 +308,9 @@ def validate_objectstate_assignment_train_dataset_summary(
     for key in ("sample_id", "source_kind", "split", "license"):
         if not isinstance(payload.get(key), str) or not payload[key]:
             raise ValueError(f"assignment train dataset requires {key}")
+    for key in ("gaussian_ref", "target_source"):
+        if key in payload and (not isinstance(payload[key], str) or not payload[key]):
+            raise ValueError(f"assignment train dataset {key} must be a non-empty string")
     for key in ("gaussian_count", "feature_dim", "position_dim", "slots"):
         value = payload.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -478,6 +491,12 @@ def _write_assignment_visualization(
     vertices = append_or_replace_property(cloud.vertices, "red", colors[:, 0], "u1")
     vertices = append_or_replace_property(vertices, "green", colors[:, 1], "u1")
     vertices = append_or_replace_property(vertices, "blue", colors[:, 2], "u1")
+    vertices = append_or_replace_property(
+        vertices,
+        "object_id",
+        np.asarray(labels, dtype=np.int32),
+        "i4",
+    )
     vertices = append_or_replace_property(
         vertices,
         "predicted_object_id",

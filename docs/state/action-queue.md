@@ -16,9 +16,10 @@
   也均未新增 scene；P2 globe23/globe25 虽补齐双 lighting，但 globe23 的 `1,280/1,280`
   逐 link 独立复核仍为 `0` V-O-V。重建 ledger 保持 `0 pass / 7 fail / 2 blocked`。RRC
   固定相机、无 depth，9D control 不能冒充现行 3D vector。
-- 下一步只能由新 capture 或新数据源提供许可明确、严格 V-O-V、RGB-D、逐对象 6DoF、
-  view change 与 measured action 的完整原始链；满足可见性前不重跑 action/bundle/ledger。
-  不要新增 wrapper、复制 target GT 或伪造 action。
+- RBO 路线已停止：现有审计是可信 `0` 可行性结论，不继续修 adapter、挖字段或重复 evaluator。
+- Phase M 后由自建 capture（或真正满足合同的新数据源）提供许可明确、严格 V-O-V、RGB-D、
+  逐对象 6DoF、view change 与 measured action 的完整原始链；不要新增 wrapper、复制 target
+  GT 或伪造 action。
 
 ### CORE-BOUNDARY-001: 继续外移 core orchestration
 
@@ -64,6 +65,18 @@
 - `ACTION-004`: Poly Haven mesh 到 3DGS demo 转换链；冻结期不扩 Viewer/demo 产品面。
 
 ## Recently Completed
+
+### OBJECTSTATE-MODEL-DEMO-001: Phase M / Phase 2.5
+
+- M1 的 5,696-Gaussian Lego proxy 只保留为 checkpoint/inference/viewer wiring smoke；
+  9/3 frame split 的 ARI/IoU/Purity `1.0` 来自单一物理对象上的四色标签，不计作 objectness。
+- M2 以 12 个程序化四物体 scenes、8/4 完整 scene holdout、独立 `gt_instance_id`、同色同形
+  对象、接触和局部观测运行 Model v0 与三类基线。leakage gate 通过，但 Model v0 Hungarian
+  mIoU `0.754572` 低于 connected-components `0.825829`，verdict 为未胜已记录基线。
+- Viewer 的 Raw/Prediction/GT、checkpoint browser inference、指标面板与对象 hide/show 已
+  通过 M2 专项 Playwright 和截图审查；失败结果未由展示层掩盖。
+- 本项达到实现完成；结论是 evidence loop 可审计、当前模型未通过 M2，
+  更不计作真实 identity/prediction/intervention pass。后续改进模型并回到 controlled capture。
 
 ### ACTION-026: 修复 supervised assignment CE clip 边界梯度
 

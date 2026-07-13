@@ -102,6 +102,12 @@ export function resolveModelArtifactRoutes(manifest) {
       artifact.delivery_tier === "browser_edit" &&
       artifact.browser_ready === true,
   ) ?? null;
+  const trainingSummary = artifacts.find(
+    (artifact) =>
+      artifact.role === "training_summary" &&
+      artifact.delivery_tier === "browser_edit" &&
+      artifact.browser_ready === true,
+  ) ?? null;
   const diagnosticFull = artifacts.find(
     (artifact) =>
       artifact.role === "diagnostic_full" &&
@@ -131,15 +137,37 @@ export function resolveModelArtifactRoutes(manifest) {
       artifact.delivery_tier === "browser_edit" &&
       artifact.browser_ready === true,
   ) ?? null;
+  const modelInput = artifacts.find(
+    (artifact) =>
+      artifact.role === "model_input" &&
+      artifact.delivery_tier === "browser_edit" &&
+      artifact.browser_ready === true,
+  ) ?? null;
+  const objectStateModel = artifacts.find(
+    (artifact) =>
+      artifact.role === "objectstate_model" &&
+      artifact.delivery_tier === "browser_edit" &&
+      artifact.browser_ready === true,
+  ) ?? null;
+  const groundTruth = artifacts.find(
+    (artifact) =>
+      artifact.role === "ground_truth" &&
+      artifact.delivery_tier === "browser_edit" &&
+      artifact.browser_ready === true,
+  ) ?? null;
   return {
     manifestId: manifest.manifest_id ?? "",
     schema: manifest.schema ?? "",
     browserReadyCount: artifacts.filter((artifact) => artifact.browser_ready === true).length,
     quickSplat,
     objectEdit,
+    trainingSummary,
     trainableKernel,
     qualityReport,
     objectStateBenchmark,
+    modelInput,
+    objectStateModel,
+    groundTruth,
     compressedChunked,
     diagnosticFull,
   };
@@ -166,9 +194,13 @@ export function browserReadyArtifact(asset, role) {
   const routes = asset?.modelArtifactRoutes ?? resolveModelArtifactRoutes(asset?.modelArtifactManifest);
   if (role === "quick_splat") return routes.quickSplat;
   if (role === "object_edit") return routes.objectEdit;
+  if (role === "training_summary") return routes.trainingSummary;
   if (role === "trainable_kernel") return routes.trainableKernel;
   if (role === "quality_report") return routes.qualityReport;
   if (role === "object_state_benchmark") return routes.objectStateBenchmark;
+  if (role === "model_input") return routes.modelInput;
+  if (role === "objectstate_model") return routes.objectStateModel;
+  if (role === "ground_truth") return routes.groundTruth;
   if (role === "compressed_chunked") return routes.compressedChunked;
   return null;
 }
@@ -184,9 +216,13 @@ function emptyModelArtifactRoutes() {
     browserReadyCount: 0,
     quickSplat: null,
     objectEdit: null,
+    trainingSummary: null,
     trainableKernel: null,
     qualityReport: null,
     objectStateBenchmark: null,
+    modelInput: null,
+    objectStateModel: null,
+    groundTruth: null,
     compressedChunked: null,
     diagnosticFull: null,
   };

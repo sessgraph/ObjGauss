@@ -25,6 +25,9 @@ ARTIFACT_ROLES = frozenset(
         "trainable_kernel",
         "quality_report",
         "object_state_benchmark",
+        "model_input",
+        "objectstate_model",
+        "ground_truth",
         "compressed_chunked",
     }
 )
@@ -41,7 +44,17 @@ DELIVERY_TIERS = frozenset(
 
 BROWSER_READY_TIERS = frozenset({"browser_quick", "browser_edit"})
 BROWSER_ARTIFACT_ROLES = frozenset(
-    {"quick_splat", "object_edit", "trainable_kernel", "quality_report", "object_state_benchmark", "compressed_chunked"}
+    {
+        "quick_splat",
+        "object_edit",
+        "trainable_kernel",
+        "quality_report",
+        "object_state_benchmark",
+        "model_input",
+        "objectstate_model",
+        "ground_truth",
+        "compressed_chunked",
+    }
 )
 
 
@@ -713,6 +726,13 @@ def validate_model_artifact_manifest(
         errors.append("at least one browser_ready artifact is required")
     if require_object_edit and "object_edit" not in roles:
         errors.append("object_edit artifact is required")
+    model_v0_roles = roles & {"model_input", "objectstate_model"}
+    if model_v0_roles and model_v0_roles != {"model_input", "objectstate_model"}:
+        errors.append("model_input and objectstate_model artifacts must be provided together")
+    if model_v0_roles and "object_edit" not in roles:
+        errors.append("ObjectState Model v0 artifacts require object_edit comparison evidence")
+    if "ground_truth" in roles and "object_edit" not in roles:
+        errors.append("ground_truth artifact requires object_edit prediction evidence")
     for role in ("diagnostic_full", "source_gaussian"):
         for artifact in artifacts:
             if isinstance(artifact, dict) and artifact.get("role") == role and artifact.get("browser_ready") is True:
@@ -770,6 +790,14 @@ def _validate_artifact(
             errors.append(f"artifacts[{index}].sha256 must be lowercase or uppercase hex")
     if role == "compressed_chunked":
         _validate_compressed_chunked_artifact(artifact, index=index, errors=errors, warnings=warnings)
+    if role in {"model_input", "objectstate_model", "ground_truth"}:
+        if delivery_tier != "browser_edit" or browser_ready is not True:
+            errors.append(f"artifacts[{index}] {role} must be browser_edit and browser_ready")
+        if _optional_string(sha256) is None:
+            errors.append(f"artifacts[{index}].sha256 is required for {role}")
+        expected_format = ".json" if role == "objectstate_model" else ".ply"
+        if fmt != expected_format:
+            errors.append(f"artifacts[{index}].format must be {expected_format!r} for {role}")
 
 
 def _validate_compressed_chunked_artifact(

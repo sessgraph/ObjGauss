@@ -13,8 +13,68 @@ const server = args.url || args.noServer ? null : startServer(port);
 try {
   await waitForApp(baseUrl);
   const viewerTruthOnly = Boolean(args["viewer-truth"]);
-  const summary = viewerTruthOnly ? await auditViewerTruth(baseUrl) : await auditWorld(baseUrl);
-  if (viewerTruthOnly) {
+  const modelDemoManifest = args["model-demo-manifest"];
+  if (viewerTruthOnly && modelDemoManifest) {
+    throw new Error("--viewer-truth and --model-demo-manifest are mutually exclusive");
+  }
+  if (modelDemoManifest === true) {
+    throw new Error("--model-demo-manifest requires a same-origin manifest path");
+  }
+  const manifestAuditKind = modelDemoManifest
+    ? await modelManifestAuditKind(baseUrl, String(modelDemoManifest))
+    : null;
+  const summary = viewerTruthOnly
+    ? await auditViewerTruth(baseUrl)
+    : manifestAuditKind === "multi_object_instance_segmentation"
+      ? await auditMultiObjectInstanceDemo(baseUrl, String(modelDemoManifest))
+      : modelDemoManifest
+        ? await auditObjectStateModelDemo(baseUrl, String(modelDemoManifest))
+        : await auditWorld(baseUrl);
+  if (modelDemoManifest) {
+    console.log(summary.auditKind === "multi_object_instance_segmentation"
+      ? [
+        "objectstate_multi_object_demo=passed",
+        `run=${JSON.stringify(summary.runId)}`,
+        `predictionModel=${JSON.stringify(summary.predictionModelId)}`,
+        `groundTruthModel=${JSON.stringify(summary.groundTruthModelId)}`,
+        `rows=${summary.rowCount}`,
+        `predictionObjects=${summary.predictionObjectCount}`,
+        `groundTruthObjects=${summary.groundTruthObjectCount}`,
+        `agreement=${summary.precomputedAgreement}`,
+        `verdict=${summary.verdict}`,
+        `bestBaseline=${summary.bestBaseline}`,
+        `modelDelta=${summary.modelDelta}`,
+        `leakageGate=${summary.leakageGateStatus}`,
+        `objectHide=${summary.objectHideStatus}`,
+        `layerSwitch=${summary.layerSwitchStatus}`,
+        `rawScreenshot=${summary.rawScreenshotPath}`,
+        `predictionScreenshot=${summary.predictionScreenshotPath}`,
+        `groundTruthScreenshot=${summary.groundTruthScreenshotPath}`,
+        `benchmarkScreenshot=${summary.benchmarkScreenshotPath}`,
+      ].join(" ")
+      : [
+        "objectstate_model_demo=passed",
+        `run=${JSON.stringify(summary.runId)}`,
+        `model=${JSON.stringify(summary.modelId)}`,
+        `schema=${summary.modelSchema}`,
+        `rows=${summary.rowCount}`,
+        `displayedGaussians=${summary.displayedGaussianCount}`,
+        `objects=${summary.objectCount}`,
+        `agreement=${summary.precomputedAgreement}`,
+        `ari=${summary.ari}`,
+        `iou=${summary.meanBestIou}`,
+        `purity=${summary.purity}`,
+        `assignmentSource=${summary.assignmentSource}`,
+        `sourceSplat=${summary.sourceSplatStatus}`,
+        `objectHide=${summary.objectHideStatus}`,
+        `layerSwitch=${summary.layerSwitchStatus}`,
+        `screenshot=${summary.screenshotPath}`,
+        `sourceScreenshot=${summary.sourceScreenshotPath}`,
+        `objectScreenshot=${summary.objectScreenshotPath}`,
+        `inferenceScreenshot=${summary.inferenceScreenshotPath}`,
+        `metricsScreenshot=${summary.metricsScreenshotPath}`,
+      ].join(" "));
+  } else if (viewerTruthOnly) {
     console.log(
       [
         "world_viewer_truth=passed",
@@ -294,6 +354,841 @@ async function auditViewerTruth(url) {
   } finally {
     await closeBrowserWithTimeout(browser);
   }
+}
+
+async function modelManifestAuditKind(url, manifestPath) {
+  const base = new URL(url);
+  const manifestUrl = new URL(manifestPath, base);
+  if (manifestUrl.origin !== base.origin) {
+    throw new Error("--model-demo-manifest must be same-origin");
+  }
+  const manifest = await fetchJsonForAudit(manifestUrl, "model demo manifest");
+  const multiObjectEvidence = (manifest?.quality_evidence ?? []).find(
+    (entry) => entry?.kind === "multi_object_instance_segmentation_benchmark",
+  );
+  return multiObjectEvidence ? "multi_object_instance_segmentation" : "objectstate_model_v0";
+}
+
+async function auditMultiObjectInstanceDemo(url, manifestPath) {
+  const contract = await loadMultiObjectInstanceDemoContract(url, manifestPath);
+  console.log(`m2_audit=contract_loaded rows=${contract.rowCount}`);
+  const browser = await chromium.launch(launchOptions());
+  console.log("m2_audit=browser_launched");
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const pageErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  try {
+    const artifactUrl = new URL(url);
+    artifactUrl.searchParams.set("modelArtifactManifest", contract.manifestPath);
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
+    console.log("m2_audit=page_loaded");
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+
+    try {
+      await page.waitForFunction((expected) => {
+        const shell = document.querySelector(".worldShell");
+        const panel = document.querySelector("[data-instance-segmentation-benchmark='true']");
+        const control = document.querySelector("[data-instance-evidence-control='true']");
+        const inference = document.querySelector("[data-objectstate-model-inference='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const predictionObjects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === expected.predictionModelId,
+        );
+        const groundTruthObjects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === expected.groundTruthModelId,
+        );
+        const close = (actual, wanted) =>
+          Number.isFinite(Number(actual)) && Math.abs(Number(actual) - Number(wanted)) <= 1e-12;
+        const candidatesMatch = expected.candidates.every(([name, metrics]) => {
+          const row = panel?.querySelector(`[data-instance-segmentation-candidate='${name}']`);
+          return (
+            close(row?.getAttribute("data-instance-segmentation-hungarian-iou"), metrics.hungarian_mean_iou) &&
+            close(row?.getAttribute("data-instance-segmentation-ari"), metrics.ari) &&
+            close(row?.getAttribute("data-instance-segmentation-merge-rate"), metrics.merge_rate) &&
+            close(row?.getAttribute("data-instance-segmentation-split-rate"), metrics.split_rate)
+          );
+        });
+        if (
+          shell?.getAttribute("data-selected-model") !== expected.predictionModelId ||
+          shell?.getAttribute("data-instance-evidence-layer") !== "prediction" ||
+          shell?.getAttribute("data-instance-evidence-verdict") !== expected.verdict ||
+          shell?.getAttribute("data-instance-evidence-leakage-gate") !== "passed" ||
+          !close(shell?.getAttribute("data-instance-evidence-model-delta"), expected.modelDelta) ||
+          panel?.getAttribute("data-instance-segmentation-benchmark-schema") !== expected.benchmarkSchema ||
+          panel?.getAttribute("data-instance-segmentation-benchmark-verdict") !== expected.verdict ||
+          panel?.getAttribute("data-instance-segmentation-benchmark-best-baseline") !== expected.bestBaseline ||
+          panel?.getAttribute("data-instance-segmentation-benchmark-leakage-gate") !== "passed" ||
+          !close(panel?.getAttribute("data-instance-segmentation-benchmark-model-delta"), expected.modelDelta) ||
+          Number(panel?.querySelector("[data-instance-segmentation-candidates='true']")
+            ?.getAttribute("data-instance-segmentation-candidate-count") ?? 0) !== 4 ||
+          !candidatesMatch ||
+          control?.getAttribute("data-selected-instance-evidence-layer") !== "prediction" ||
+          control?.querySelectorAll("[data-instance-evidence-layer-button]").length !== 3 ||
+          inference?.getAttribute("data-objectstate-model-inference-status") !== "checkpoint_inference_match" ||
+          Number(inference?.getAttribute("data-objectstate-model-inference-rows") ?? 0) !== expected.rowCount ||
+          !close(inference?.getAttribute("data-objectstate-model-precomputed-agreement"), 1) ||
+          predictionObjects.length !== expected.predictionObjectCount ||
+          groundTruthObjects.length !== expected.groundTruthObjectCount
+        ) {
+          return null;
+        }
+        return true;
+      }, contract, { timeout: 60000 });
+      console.log("m2_audit=initial_state_ready");
+    } catch (error) {
+      const diagnostic = await page.evaluate((expected) => {
+        const shell = document.querySelector(".worldShell");
+        const panel = document.querySelector("[data-instance-segmentation-benchmark='true']");
+        const control = document.querySelector("[data-instance-evidence-control='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        return {
+          expected,
+          shell: {
+            selectedModel: shell?.getAttribute("data-selected-model"),
+            layer: shell?.getAttribute("data-instance-evidence-layer"),
+            verdict: shell?.getAttribute("data-instance-evidence-verdict"),
+            modelDelta: shell?.getAttribute("data-instance-evidence-model-delta"),
+            leakageGate: shell?.getAttribute("data-instance-evidence-leakage-gate"),
+          },
+          panel: {
+            exists: Boolean(panel),
+            schema: panel?.getAttribute("data-instance-segmentation-benchmark-schema"),
+            verdict: panel?.getAttribute("data-instance-segmentation-benchmark-verdict"),
+            candidates: panel?.querySelectorAll("[data-instance-segmentation-candidate]").length ?? 0,
+          },
+          control: {
+            exists: Boolean(control),
+            layer: control?.getAttribute("data-selected-instance-evidence-layer"),
+            buttons: control?.querySelectorAll("[data-instance-evidence-layer-button]").length ?? 0,
+          },
+          world: {
+            selectedModelId: world?.selectedModelId,
+            predictionObjects: (world?.objectSelections ?? []).filter(
+              (entry) => entry.modelId === expected.predictionModelId,
+            ).length,
+            groundTruthObjects: (world?.objectSelections ?? []).filter(
+              (entry) => entry.modelId === expected.groundTruthModelId,
+            ).length,
+          },
+        };
+      }, contract);
+      const failureScreenshot = "/tmp/objgauss-m2-failed.png";
+      await page.screenshot({ path: failureScreenshot, fullPage: false }).catch(() => undefined);
+      throw new Error(
+        `M2 browser state timeout: ${error.message}; diagnostic=${JSON.stringify(diagnostic)}; ` +
+        `pageErrors=${JSON.stringify(pageErrors)}; screenshot=${failureScreenshot}`,
+        { cause: error },
+      );
+    }
+
+    const selectEvidenceLayer = async (layer) => {
+      await clickSelector(page, `[data-instance-evidence-layer-button='${layer}']`);
+      const modelId = layer === "ground_truth"
+        ? contract.groundTruthModelId
+        : contract.predictionModelId;
+      const objectCount = layer === "ground_truth"
+        ? contract.groundTruthObjectCount
+        : contract.predictionObjectCount;
+      return page.waitForFunction((expected) => {
+        const shell = document.querySelector(".worldShell");
+        const control = document.querySelector("[data-instance-evidence-control='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const objects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === expected.modelId,
+        );
+        const sourceSplat = (world?.sourceSplatObjectMotionSamples ?? []).find(
+          (entry) => entry.modelId === expected.modelId,
+        );
+        const unrelatedVisibleSourceSplats = (world?.sourceSplatObjectMotionSamples ?? []).filter(
+          (entry) => entry.modelId !== expected.modelId && entry.sourceLayerVisible === true,
+        );
+        const sourceExpected = expected.layer === "raw";
+        const objectExpected = !sourceExpected;
+        if (
+          shell?.getAttribute("data-selected-model") !== expected.modelId ||
+          shell?.getAttribute("data-instance-evidence-layer") !== expected.layer ||
+          control?.getAttribute("data-selected-instance-evidence-layer") !== expected.layer ||
+          control?.querySelector(`[data-instance-evidence-layer-button='${expected.layer}']`)
+            ?.getAttribute("aria-pressed") !== "true" ||
+          world?.selectedModelId !== expected.modelId ||
+          world?.selectedSourceLayerVisible !== sourceExpected ||
+          world?.selectedObjectLayerVisible !== objectExpected ||
+          sourceSplat?.sourceLayerVisible !== sourceExpected ||
+          unrelatedVisibleSourceSplats.length !== 0 ||
+          objects.length !== expected.objectCount ||
+          objects.filter((entry) => entry.renderVisible === true).length !==
+            (objectExpected ? expected.objectCount : 0)
+        ) {
+          return null;
+        }
+        return {
+          layer: expected.layer,
+          modelId: expected.modelId,
+          sourceVisible: sourceSplat.sourceLayerVisible,
+          unrelatedVisibleSourceSplats: unrelatedVisibleSourceSplats.length,
+          renderedVisibleObjects: objects.filter((entry) => entry.renderVisible === true).length,
+        };
+      }, { layer, modelId, objectCount }, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    };
+
+    const rawState = await selectEvidenceLayer("raw");
+    console.log("m2_audit=raw_ready");
+    await page.waitForTimeout(750);
+    const rawScreenshotPath = "/tmp/objgauss-m2-raw.png";
+    await page.screenshot({ path: rawScreenshotPath, animations: "disabled", timeout: 60000 });
+
+    const predictionState = await selectEvidenceLayer("prediction");
+    console.log("m2_audit=prediction_ready");
+    await page.waitForTimeout(750);
+    const predictionScreenshotPath = "/tmp/objgauss-m2-prediction.png";
+    await page.screenshot({ path: predictionScreenshotPath, animations: "disabled", timeout: 60000 });
+    const predictionHide = await auditSelectedModelObjectHide(page, contract.predictionModelId);
+
+    const groundTruthState = await selectEvidenceLayer("ground_truth");
+    console.log("m2_audit=ground_truth_ready");
+    await page.waitForTimeout(750);
+    const groundTruthScreenshotPath = "/tmp/objgauss-m2-ground-truth.png";
+    await page.screenshot({ path: groundTruthScreenshotPath, animations: "disabled", timeout: 60000 });
+    const groundTruthHide = await auditSelectedModelObjectHide(page, contract.groundTruthModelId);
+
+    const benchmarkPanel = page.locator("[data-instance-segmentation-benchmark='true']");
+    await benchmarkPanel.evaluate((node) => {
+      let ancestor = node.parentElement;
+      while (ancestor) {
+        if (ancestor.tagName === "DETAILS") ancestor.setAttribute("open", "");
+        ancestor = ancestor.parentElement;
+      }
+      node.scrollIntoView({ block: "center" });
+    });
+    await benchmarkPanel.waitFor({ state: "visible", timeout: 15000 });
+    const benchmarkClip = await benchmarkPanel.boundingBox();
+    if (!benchmarkClip) throw new Error("M2 benchmark panel has no visible bounds");
+    const benchmarkScreenshotPath = "/tmp/objgauss-m2-benchmark.png";
+    await page.screenshot({
+      path: benchmarkScreenshotPath,
+      clip: benchmarkClip,
+      animations: "disabled",
+      timeout: 60000,
+    });
+    if (pageErrors.length > 0) {
+      throw new Error(`browser page errors: ${pageErrors.join(" | ")}`);
+    }
+    return {
+      auditKind: "multi_object_instance_segmentation",
+      runId: contract.runId,
+      predictionModelId: contract.predictionModelId,
+      groundTruthModelId: contract.groundTruthModelId,
+      rowCount: contract.rowCount,
+      predictionObjectCount: contract.predictionObjectCount,
+      groundTruthObjectCount: contract.groundTruthObjectCount,
+      precomputedAgreement: 1,
+      verdict: contract.verdict,
+      bestBaseline: contract.bestBaseline,
+      modelDelta: contract.modelDelta,
+      leakageGateStatus: "passed",
+      objectHideStatus: predictionHide && groundTruthHide ? "passed" : "failed",
+      layerSwitchStatus:
+        rawState.sourceVisible === true &&
+        rawState.renderedVisibleObjects === 0 &&
+        predictionState.sourceVisible === false &&
+        predictionState.renderedVisibleObjects === contract.predictionObjectCount &&
+        groundTruthState.sourceVisible === false &&
+        groundTruthState.renderedVisibleObjects === contract.groundTruthObjectCount
+          ? "passed"
+          : "failed",
+      rawScreenshotPath,
+      predictionScreenshotPath,
+      groundTruthScreenshotPath,
+      benchmarkScreenshotPath,
+    };
+  } finally {
+    await closeBrowserWithTimeout(browser);
+  }
+}
+
+async function auditSelectedModelObjectHide(page, modelId) {
+  const selectionId = await page.evaluate((expectedModelId) => {
+    const world = window.__OBJGAUSS_WORLD__;
+    const target = (world?.objectSelections ?? []).find(
+      (entry) => entry.modelId === expectedModelId && entry.visible,
+    );
+    if (!target || world?.selectObjectForAudit?.(target.selectionId) !== true) return null;
+    return target.selectionId;
+  }, modelId);
+  if (!selectionId) throw new Error(`could not select an object for ${modelId}`);
+  const hidden = await page.evaluate((target) => (
+    window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(target)
+  ), selectionId);
+  if (hidden !== false) throw new Error(`object did not hide for ${modelId}`);
+  await page.waitForFunction((target) => (
+    window.__OBJGAUSS_WORLD__?.objectSelections?.find(
+      (entry) => entry.selectionId === target,
+    )?.visible === false
+  ), selectionId, { timeout: 15000 });
+  await page.evaluate((target) => {
+    window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(target);
+  }, selectionId);
+  await page.waitForFunction((target) => (
+    window.__OBJGAUSS_WORLD__?.objectSelections?.find(
+      (entry) => entry.selectionId === target,
+    )?.visible === true
+  ), selectionId, { timeout: 15000 });
+  return true;
+}
+
+async function loadMultiObjectInstanceDemoContract(url, manifestPath) {
+  const base = new URL(url);
+  const manifestUrl = new URL(manifestPath, base);
+  if (manifestUrl.origin !== base.origin) {
+    throw new Error("--model-demo-manifest must be same-origin");
+  }
+  const manifest = await fetchJsonForAudit(manifestUrl, "M2 model manifest");
+  if (manifest?.schema !== "objgauss-model-artifact-manifest-v1") {
+    throw new Error("unsupported M2 model manifest schema");
+  }
+  const artifact = (role) => manifest.artifacts?.find(
+    (entry) => entry?.role === role && entry.browser_ready === true,
+  );
+  const modelInput = artifact("model_input");
+  const checkpoint = artifact("objectstate_model");
+  const objectEdit = artifact("object_edit");
+  const groundTruth = artifact("ground_truth");
+  const quickSplat = artifact("quick_splat");
+  if (!modelInput || !checkpoint || !objectEdit || !groundTruth || !quickSplat) {
+    throw new Error("M2 manifest is missing Raw/Prediction/GT/checkpoint browser evidence");
+  }
+  const evidence = (manifest.quality_evidence ?? []).find(
+    (entry) => entry?.kind === "multi_object_instance_segmentation_benchmark",
+  );
+  if (
+    evidence?.schema !== "objgauss-objectstate-multi-object-benchmark-v1" ||
+    evidence.leakage_gate?.passed !== true ||
+    !evidence.comparison?.verdict
+  ) {
+    throw new Error("M2 manifest is missing reviewable instance benchmark evidence");
+  }
+  if (
+    manifest.source?.target_derived_from_rgb !== false ||
+    manifest.source?.target_source !== "procedural_instance_authorship" ||
+    manifest.source?.split !== "heldout_scene"
+  ) {
+    throw new Error("M2 manifest target provenance or complete-scene split is invalid");
+  }
+  const modelState = await fetchJsonForAudit(
+    new URL(checkpoint.path, manifestUrl),
+    "M2 Model v0 checkpoint",
+  );
+  if (modelState?.schema !== "objgauss-objectstate-model-v0-state-v1") {
+    throw new Error("M2 checkpoint is not ObjectState Model v0");
+  }
+  const rowCount = Number(manifest.counts?.gaussians);
+  const scene = evidence.scene ?? {};
+  const predictionObjectCount = Number(
+    scene.candidates?.objectstate_model_v0?.predicted_object_count,
+  );
+  const groundTruthObjectCount = Number(scene.target_object_count);
+  if (
+    !Number.isInteger(rowCount) || rowCount <= 0 ||
+    !Number.isInteger(predictionObjectCount) || predictionObjectCount <= 0 ||
+    !Number.isInteger(groundTruthObjectCount) || groundTruthObjectCount <= 0 ||
+    Number(modelInput.gaussian_count) !== rowCount ||
+    Number(objectEdit.gaussian_count) !== rowCount ||
+    Number(groundTruth.gaussian_count) !== rowCount
+  ) {
+    throw new Error("M2 manifest counts are inconsistent");
+  }
+  const candidateNames = [
+    "xyz_kmeans",
+    "rgb_kmeans",
+    "connected_components_3d",
+    "objectstate_model_v0",
+  ];
+  const candidates = candidateNames.map((name) => {
+    const metrics = evidence.aggregate?.[name];
+    for (const metricName of ["hungarian_mean_iou", "ari", "merge_rate", "split_rate"]) {
+      finiteMetricForAudit(metrics?.[metricName], `${name} ${metricName}`);
+    }
+    return [name, metrics];
+  });
+  const runId = String(manifest.source?.run_id ?? "");
+  if (!runId) throw new Error("M2 manifest run_id is required");
+  const modelDelta = finiteMetricForAudit(
+    evidence.comparison.model_delta,
+    "M2 model delta",
+  );
+  return {
+    manifestPath: `${manifestUrl.pathname}${manifestUrl.search}`,
+    runId,
+    benchmarkSchema: evidence.schema,
+    predictionModelId: `model-manifest-${safeModelIdForAudit(manifest.asset_id)}-object-edit`,
+    groundTruthModelId: `model-manifest-${safeModelIdForAudit(manifest.asset_id)}-ground-truth`,
+    rowCount,
+    predictionObjectCount,
+    groundTruthObjectCount,
+    verdict: evidence.comparison.verdict,
+    bestBaseline: evidence.comparison.best_baseline,
+    modelDelta,
+    candidates,
+  };
+}
+
+async function auditObjectStateModelDemo(url, manifestPath) {
+  const contract = await loadObjectStateModelDemoContract(url, manifestPath);
+  const browser = await chromium.launch(launchOptions());
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const pageErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  try {
+    const artifactUrl = new URL(url);
+    artifactUrl.searchParams.set("modelArtifactManifest", contract.manifestPath);
+    await page.goto(String(artifactUrl), { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.locator(".worldShell").waitFor({ timeout: 15000 });
+
+    let browserState;
+    try {
+      browserState = await page.waitForFunction((expected) => {
+        const shell = document.querySelector(".worldShell");
+        const row = document.querySelector(
+          `[data-model-version-row-id="${expected.modelId}"]`,
+        );
+        const inference = document.querySelector("[data-objectstate-model-inference='true']");
+        const quality = document.querySelector("[data-quality-report='true']");
+        const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const objects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === expected.modelId,
+        );
+        const sourceSplat = (world?.sourceSplatObjectMotionSamples ?? []).find(
+          (entry) => entry.modelId === expected.modelId,
+        );
+        const close = (actual, wanted) =>
+          Number.isFinite(Number(actual)) && Math.abs(Number(actual) - Number(wanted)) <= 1e-12;
+        if (
+          shell?.getAttribute("data-selected-model") !== expected.modelId ||
+          row?.getAttribute("data-model-object-layer-status") !== "loaded" ||
+          shell?.getAttribute("data-objectstate-model-inference-status") !== "checkpoint_inference_match" ||
+          shell?.getAttribute("data-objectstate-model-schema") !== expected.modelSchema ||
+          Number(shell?.getAttribute("data-objectstate-model-inference-rows") ?? 0) !== expected.rowCount ||
+          !close(shell?.getAttribute("data-objectstate-model-precomputed-agreement"), 1) ||
+          inference?.getAttribute("data-objectstate-model-inference-status") !== "checkpoint_inference_match" ||
+          inference?.getAttribute("data-objectstate-model-schema") !== expected.modelSchema ||
+          Number(inference?.getAttribute("data-objectstate-model-inference-rows") ?? 0) !== expected.rowCount ||
+          !close(inference?.getAttribute("data-objectstate-model-precomputed-agreement"), 1) ||
+          quality?.getAttribute("data-quality-report-status") !== "pass" ||
+          quality?.getAttribute("data-quality-report-run-id") !== expected.runId ||
+          !close(quality?.getAttribute("data-quality-report-ari"), expected.ari) ||
+          !close(quality?.getAttribute("data-quality-report-mean-best-iou"), expected.meanBestIou) ||
+          !close(quality?.getAttribute("data-quality-report-object-purity"), expected.purity) ||
+          Number(heatmap?.getAttribute("data-assignment-slots") ?? 0) !== expected.objectCount ||
+          objects.length !== expected.objectCount ||
+          objects.some((entry) => Number(entry.gaussianCount ?? 0) <= 0) ||
+          objects.reduce((sum, entry) => sum + Number(entry.gaussianCount ?? 0), 0) > expected.rowCount ||
+          sourceSplat?.status !== "ready" ||
+          sourceSplat?.countMatches !== true ||
+          Number(sourceSplat?.mappedGaussians ?? 0) !== expected.rowCount ||
+          Number(sourceSplat?.objectCount ?? 0) !== expected.objectCount
+        ) {
+          return null;
+        }
+        return {
+          selectedModelId: world.selectedModelId,
+          assignmentSource: world.assignmentSource,
+          objectCount: objects.length,
+          gaussianCount: objects.reduce(
+            (sum, entry) => sum + Number(entry.gaussianCount ?? 0),
+            0,
+          ),
+          sourceSplat,
+        };
+      }, contract, { timeout: 60000 }).then((handle) => handle.jsonValue());
+    } catch (error) {
+      const diagnostic = await page.evaluate((expected) => {
+        const shell = document.querySelector(".worldShell");
+        const row = document.querySelector(
+          `[data-model-version-row-id="${expected.modelId}"]`,
+        );
+        const inference = document.querySelector("[data-objectstate-model-inference='true']");
+        const quality = document.querySelector("[data-quality-report='true']");
+        const heatmap = document.querySelector("[data-assignment-heatmap='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const objects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === expected.modelId,
+        );
+        return {
+          expected,
+          shell: {
+            selectedModel: shell?.getAttribute("data-selected-model"),
+            modelSchema: shell?.getAttribute("data-objectstate-model-schema"),
+            inferenceStatus: shell?.getAttribute("data-objectstate-model-inference-status"),
+            inferenceRows: shell?.getAttribute("data-objectstate-model-inference-rows"),
+            agreement: shell?.getAttribute("data-objectstate-model-precomputed-agreement"),
+            sourceSplatStatus: shell?.getAttribute("data-source-splat-status"),
+          },
+          row: {
+            exists: Boolean(row),
+            loadState: row?.getAttribute("data-model-load-state"),
+            objectLayerStatus: row?.getAttribute("data-model-object-layer-status"),
+            sourceLayerStatus: row?.getAttribute("data-model-source-layer-status"),
+          },
+          inference: {
+            exists: Boolean(inference),
+            status: inference?.getAttribute("data-objectstate-model-inference-status"),
+            schema: inference?.getAttribute("data-objectstate-model-schema"),
+            rows: inference?.getAttribute("data-objectstate-model-inference-rows"),
+            agreement: inference?.getAttribute("data-objectstate-model-precomputed-agreement"),
+          },
+          quality: {
+            exists: Boolean(quality),
+            status: quality?.getAttribute("data-quality-report-status"),
+            runId: quality?.getAttribute("data-quality-report-run-id"),
+            ari: quality?.getAttribute("data-quality-report-ari"),
+            meanBestIou: quality?.getAttribute("data-quality-report-mean-best-iou"),
+            purity: quality?.getAttribute("data-quality-report-object-purity"),
+          },
+          heatmapSlots: heatmap?.getAttribute("data-assignment-slots"),
+          world: {
+            selectedModelId: world?.selectedModelId,
+            assignmentSource: world?.assignmentSource,
+            objectCount: objects.length,
+            gaussianCount: objects.reduce(
+              (sum, entry) => sum + Number(entry.gaussianCount ?? 0),
+              0,
+            ),
+            sourceSplat: (world?.sourceSplatObjectMotionSamples ?? []).find(
+              (entry) => entry.modelId === expected.modelId,
+            ) ?? null,
+          },
+        };
+      }, contract);
+      const failureScreenshot = "/tmp/objgauss-objectstate-model-v0-demo-failed.png";
+      await page.screenshot({ path: failureScreenshot, fullPage: false }).catch(() => undefined);
+      throw new Error(
+        `Model v0 browser state timeout: ${error.message}; diagnostic=${JSON.stringify(diagnostic)}; ` +
+        `pageErrors=${JSON.stringify(pageErrors)}; screenshot=${failureScreenshot}`,
+        { cause: error },
+      );
+    }
+
+    const selectedObject = await page.evaluate((modelId) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const target = (world?.objectSelections ?? []).find(
+        (entry) => entry.modelId === modelId && entry.visible,
+      );
+      if (!target || world?.selectObjectForAudit?.(target.selectionId) !== true) return null;
+      if (world?.selectGaussianForAudit?.(target.selectionId, 0) !== true) return null;
+      return {
+        selectionId: target.selectionId,
+        modelId: window.__OBJGAUSS_WORLD__?.selectedModelId ?? null,
+        assignmentSource: window.__OBJGAUSS_WORLD__?.assignmentSource ?? null,
+        assignmentProbeStatus: window.__OBJGAUSS_WORLD__?.assignmentProbeStatus ?? null,
+      };
+    }, contract.modelId);
+    if (
+      !selectedObject ||
+      selectedObject.modelId !== contract.modelId ||
+      selectedObject.assignmentSource !== contract.modelSchema ||
+      selectedObject.assignmentProbeStatus !== "confident"
+    ) {
+      throw new Error(
+        `Model v0 Gaussian probe did not use checkpoint assignments: ${JSON.stringify(selectedObject)}`,
+      );
+    }
+
+    const hidden = await page.evaluate((selectionId) => (
+      window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(selectionId)
+    ), selectedObject.selectionId);
+    if (hidden !== false) {
+      throw new Error("Model v0 object did not enter hidden state");
+    }
+    const hiddenState = await page.waitForFunction(({ modelId, selectionId }) => {
+      const world = window.__OBJGAUSS_WORLD__;
+      const object = (world?.objectSelections ?? []).find(
+        (entry) => entry.selectionId === selectionId,
+      );
+      const sourceSplat = (world?.sourceSplatObjectMotionSamples ?? []).find(
+        (entry) => entry.modelId === modelId,
+      );
+      if (
+        object?.visible !== false ||
+        sourceSplat?.visibilitySynchronized !== true ||
+        sourceSplat?.visibilityMode !== "per-object-opacity" ||
+        Number(sourceSplat?.hiddenObjects ?? 0) < 1 ||
+        Number(sourceSplat?.hiddenGaussians ?? 0) < 1
+      ) {
+        return null;
+      }
+      return { object, sourceSplat };
+    }, {
+      modelId: contract.modelId,
+      selectionId: selectedObject.selectionId,
+    }, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    await page.evaluate((selectionId) => {
+      window.__OBJGAUSS_WORLD__?.toggleObjectVisibilityForAudit?.(selectionId);
+    }, selectedObject.selectionId);
+    await page.waitForFunction((selectionId) => (
+      window.__OBJGAUSS_WORLD__?.objectSelections?.find(
+        (entry) => entry.selectionId === selectionId,
+      )?.visible === true
+    ), selectedObject.selectionId, { timeout: 15000 });
+
+    const selectLayerView = async (mode) => {
+      await clickSelector(page, `[data-model-layer-view-button='${mode}']`);
+      return page.waitForFunction(({ modelId, mode, objectCount }) => {
+        const shell = document.querySelector(".worldShell");
+        const control = document.querySelector("[data-model-layer-view-control='true']");
+        const world = window.__OBJGAUSS_WORLD__;
+        const objects = (world?.objectSelections ?? []).filter(
+          (entry) => entry.modelId === modelId,
+        );
+        const sourceSplat = (world?.sourceSplatObjectMotionSamples ?? []).find(
+          (entry) => entry.modelId === modelId,
+        );
+        const sourceExpected = mode !== "object";
+        const objectExpected = mode !== "source";
+        if (
+          shell?.getAttribute("data-selected-model") !== modelId ||
+          shell?.getAttribute("data-model-layer-view-mode") !== mode ||
+          control?.getAttribute("data-selected-layer-view") !== mode ||
+          control?.querySelector(`[data-model-layer-view-button='${mode}']`)
+            ?.getAttribute("aria-pressed") !== "true" ||
+          world?.selectedModelId !== modelId ||
+          world?.selectedModelLayerViewMode !== mode ||
+          world?.selectedSourceLayerVisible !== sourceExpected ||
+          world?.selectedObjectLayerVisible !== objectExpected ||
+          sourceSplat?.sourceLayerVisible !== sourceExpected ||
+          objects.length !== objectCount ||
+          objects.some((entry) => entry.visible !== true) ||
+          objects.filter((entry) => entry.renderVisible === true).length !==
+            (objectExpected ? objectCount : 0)
+        ) {
+          return null;
+        }
+        return {
+          mode,
+          sourceVisible: sourceSplat.sourceLayerVisible,
+          requestedVisibleObjects: objects.filter((entry) => entry.visible === true).length,
+          renderedVisibleObjects: objects.filter((entry) => entry.renderVisible === true).length,
+        };
+      }, {
+        modelId: contract.modelId,
+        mode,
+        objectCount: contract.objectCount,
+      }, { timeout: 15000 }).then((handle) => handle.jsonValue());
+    };
+
+    const sourceLayerState = await selectLayerView("source");
+    const sourceScreenshotPath = "/tmp/objgauss-objectstate-model-v0-source-layer.png";
+    await page.screenshot({
+      path: sourceScreenshotPath,
+      fullPage: false,
+      animations: "disabled",
+      timeout: 60000,
+    });
+    const objectLayerState = await selectLayerView("object");
+    const objectScreenshotPath = "/tmp/objgauss-objectstate-model-v0-object-layer.png";
+    await page.screenshot({
+      path: objectScreenshotPath,
+      fullPage: false,
+      animations: "disabled",
+      timeout: 60000,
+    });
+    const overlayLayerState = await selectLayerView("overlay");
+
+    const screenshotPath = "/tmp/objgauss-objectstate-model-v0-demo-scene.png";
+    await page.screenshot({
+      path: screenshotPath,
+      fullPage: false,
+      animations: "disabled",
+      timeout: 60000,
+    });
+
+    const inferencePanel = page.locator("[data-objectstate-model-inference='true']");
+    const qualityPanel = page.locator("[data-quality-report='true']");
+    const debugPanel = page.locator("[data-object-debug-panel='true']");
+    if (await debugPanel.getAttribute("data-debug-panel-collapsed") === "true") {
+      await page.locator("[data-debug-panel-collapse-button='true']").click();
+      await page.waitForFunction(() => (
+        document.querySelector("[data-object-debug-panel='true']")
+          ?.getAttribute("data-debug-panel-collapsed") === "false"
+      ), undefined, { timeout: 15000 });
+    }
+    await inferencePanel.evaluate((node) => {
+      let ancestor = node.parentElement;
+      while (ancestor) {
+        if (ancestor.tagName === "DETAILS") ancestor.setAttribute("open", "");
+        ancestor = ancestor.parentElement;
+      }
+      node.scrollIntoView({ block: "center" });
+    });
+    await inferencePanel.waitFor({ state: "visible", timeout: 15000 });
+    await qualityPanel.waitFor({ state: "visible", timeout: 15000 });
+    const inferenceScreenshotPath = "/tmp/objgauss-objectstate-model-v0-inference-panel.png";
+    const metricsScreenshotPath = "/tmp/objgauss-objectstate-model-v0-metrics-panel.png";
+    const inferenceClip = await inferencePanel.boundingBox();
+    if (!inferenceClip) throw new Error("Model v0 inference panel has no visible bounds");
+    await page.screenshot({
+      path: inferenceScreenshotPath,
+      clip: inferenceClip,
+      animations: "disabled",
+      timeout: 60000,
+    });
+    await qualityPanel.evaluate((node) => node.scrollIntoView({ block: "center" }));
+    await qualityPanel.waitFor({ state: "visible", timeout: 15000 });
+    const metricsClip = await qualityPanel.boundingBox();
+    if (!metricsClip) throw new Error("Model v0 metrics panel has no visible bounds");
+    await page.screenshot({
+      path: metricsScreenshotPath,
+      clip: metricsClip,
+      animations: "disabled",
+      timeout: 60000,
+    });
+    if (pageErrors.length > 0) {
+      throw new Error(`browser page errors: ${pageErrors.join(" | ")}`);
+    }
+    return {
+      runId: contract.runId,
+      modelId: selectedObject.modelId,
+      modelSchema: contract.modelSchema,
+      rowCount: contract.rowCount,
+      displayedGaussianCount: browserState.gaussianCount,
+      objectCount: browserState.objectCount,
+      precomputedAgreement: 1,
+      ari: contract.ari,
+      meanBestIou: contract.meanBestIou,
+      purity: contract.purity,
+      assignmentSource: selectedObject.assignmentSource,
+      sourceSplatStatus: browserState.sourceSplat.status,
+      objectHideStatus: hiddenState.sourceSplat.visibilitySynchronized ? "passed" : "failed",
+      layerSwitchStatus:
+        sourceLayerState.sourceVisible === true &&
+        sourceLayerState.renderedVisibleObjects === 0 &&
+        objectLayerState.sourceVisible === false &&
+        objectLayerState.renderedVisibleObjects === contract.objectCount &&
+        overlayLayerState.sourceVisible === true &&
+        overlayLayerState.renderedVisibleObjects === contract.objectCount
+          ? "passed"
+          : "failed",
+      screenshotPath,
+      sourceScreenshotPath,
+      objectScreenshotPath,
+      inferenceScreenshotPath,
+      metricsScreenshotPath,
+    };
+  } finally {
+    await closeBrowserWithTimeout(browser);
+  }
+}
+
+async function loadObjectStateModelDemoContract(url, manifestPath) {
+  const base = new URL(url);
+  const manifestUrl = new URL(manifestPath, base);
+  if (manifestUrl.origin !== base.origin) {
+    throw new Error("--model-demo-manifest must be same-origin");
+  }
+  const manifest = await fetchJsonForAudit(manifestUrl, "model demo manifest");
+  if (manifest?.schema !== "objgauss-model-artifact-manifest-v1") {
+    throw new Error("unsupported model demo manifest schema");
+  }
+  const artifact = (role) => manifest.artifacts?.find(
+    (entry) =>
+      entry?.role === role &&
+      entry.delivery_tier === "browser_edit" &&
+      entry.browser_ready === true,
+  );
+  const modelInput = artifact("model_input");
+  const checkpoint = artifact("objectstate_model");
+  const objectEdit = artifact("object_edit");
+  const qualityArtifact = artifact("quality_report");
+  const trainingArtifact = artifact("training_summary");
+  if (!modelInput || !checkpoint || !objectEdit || !qualityArtifact || !trainingArtifact) {
+    throw new Error("model demo manifest is missing required browser evidence roles");
+  }
+  const [modelState, qualityReport, trainingSummary] = await Promise.all([
+    fetchJsonForAudit(new URL(checkpoint.path, manifestUrl), "Model v0 checkpoint"),
+    fetchJsonForAudit(new URL(qualityArtifact.path, manifestUrl), "model demo quality report"),
+    fetchJsonForAudit(new URL(trainingArtifact.path, manifestUrl), "model demo training summary"),
+  ]);
+  if (modelState?.schema !== "objgauss-objectstate-model-v0-state-v1") {
+    throw new Error("model demo checkpoint is not ObjectState Model v0");
+  }
+  if (trainingSummary?.schema !== "objgauss-objectstate-model-v0-training-v1") {
+    throw new Error("model demo training summary schema mismatch");
+  }
+  if (qualityReport?.schema !== "objgauss-object-state-quality-report-v1" || qualityReport.status !== "pass") {
+    throw new Error("model demo quality report is not a passing ObjectState report");
+  }
+  const runId = String(manifest.source?.run_id ?? "");
+  if (
+    !runId ||
+    trainingSummary.demo?.run_id !== runId ||
+    qualityReport.source?.run_id !== runId
+  ) {
+    throw new Error("model demo manifest, training summary, and quality report run_id mismatch");
+  }
+  const trainingMetrics = trainingSummary.heldout_after_metrics ?? {};
+  const qualityMetrics = qualityReport.metrics ?? {};
+  const metric = (name, qualityName = name) => {
+    const trainingValue = finiteMetricForAudit(trainingMetrics[name], `training ${name}`);
+    const qualityValue = finiteMetricForAudit(qualityMetrics[qualityName], `quality ${qualityName}`);
+    if (Math.abs(trainingValue - qualityValue) > 1e-12) {
+      throw new Error(`model demo ${name} differs between training and quality evidence`);
+    }
+    return qualityValue;
+  };
+  const rowCount = Number(manifest.counts?.gaussians);
+  const objectCount = Number(manifest.counts?.objects);
+  if (!Number.isInteger(rowCount) || rowCount <= 0 || !Number.isInteger(objectCount) || objectCount <= 0) {
+    throw new Error("model demo manifest counts must be positive integers");
+  }
+  if (Number(modelInput.gaussian_count) !== rowCount || Number(objectEdit.gaussian_count) !== rowCount) {
+    throw new Error("model demo manifest Gaussian counts are inconsistent");
+  }
+  if (Number(checkpoint.object_count) !== objectCount || Number(objectEdit.object_count) !== objectCount) {
+    throw new Error("model demo manifest object counts are inconsistent");
+  }
+  return {
+    manifestPath: `${manifestUrl.pathname}${manifestUrl.search}`,
+    runId,
+    modelId: `model-manifest-${safeModelIdForAudit(manifest.asset_id)}-object-edit`,
+    modelSchema: modelState.schema,
+    rowCount,
+    objectCount,
+    ari: metric("ari"),
+    meanBestIou: metric("mean_best_iou"),
+    purity: metric("purity", "object_purity"),
+  };
+}
+
+async function fetchJsonForAudit(url, label) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${label} HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+function finiteMetricForAudit(value, label) {
+  const metric = Number(value);
+  if (!Number.isFinite(metric)) {
+    throw new Error(`${label} must be finite`);
+  }
+  return metric;
+}
+
+function safeModelIdForAudit(value) {
+  const normalized = String(value ?? "objectstate-model-demo")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "objectstate-model-demo";
 }
 
 async function auditWorld(url) {

@@ -123,7 +123,7 @@ export function configureSparkObjectTransform(transform, { sourceCount = null } 
 
 export function updateSparkObjectTransforms(
   transform,
-  { objectGroups = [], sourceFrameScale = 1 } = {},
+  { objectGroups = [], sourceFrameScale = 1, visibilityForObject = null } = {},
 ) {
   if (!transform) return sparkObjectTransformStats(transform);
   transform.transformData.fill(0);
@@ -150,7 +150,9 @@ export function updateSparkObjectTransforms(
     transform.transformData[offset] = translateX;
     transform.transformData[offset + 1] = translateY;
     transform.transformData[offset + 2] = translateZ;
-    const visible = object.visible !== false;
+    const visible = typeof visibilityForObject === "function"
+      ? visibilityForObject(object) !== false
+      : object.visible !== false;
     transform.transformData[offset + 3] = visible ? 1 : 0;
     if (!visible) {
       hiddenObjects += 1;

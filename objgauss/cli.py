@@ -142,6 +142,10 @@ from objgauss.pipelines.training_renderer import evaluate_training_renderer_loss
 from objgauss.pipelines.gsplat_training_renderer import evaluate_gsplat_training_renderer_loss
 from objgauss.pipelines.trainable_artifact import write_trainable_kernel_model_artifact
 from objgauss.pipelines.trainable_quality import write_trainable_quality_report
+from objgauss.pipelines.objectstate_model_demo import write_objectstate_model_demo
+from objgauss.pipelines.objectstate_multi_object_benchmark import (
+    run_multi_object_instance_benchmark,
+)
 from objgauss.evaluation.object_state_benchmark import write_object_state_stability_benchmark
 from objgauss.datasets.objectstate_controlled_capture import (
     objectstate_controlled_capture_summary,
@@ -1381,6 +1385,95 @@ def _training_register_output(args: argparse.Namespace) -> None:
     if result.initial_loss is not None and result.final_loss is not None:
         print(f"initial_loss={result.initial_loss:.6f}")
         print(f"final_loss={result.final_loss:.6f}")
+
+
+def _training_objectstate_model_demo(args: argparse.Namespace) -> None:
+    result = write_objectstate_model_demo(
+        read_ply(args.input),
+        input_path=args.input,
+        output_dir=args.output_dir,
+        run_id=args.run_id,
+        license=args.license,
+        target_source=args.target_source,
+        object_id_field=args.object_id_field,
+        source_kind=args.source_kind,
+        split=args.split,
+        source_url=args.source_url,
+        source_splat=args.source_splat,
+        viewer_dir=args.viewer_dir,
+        frame_field=args.frame_field,
+        hidden_dim=args.hidden_dim,
+        heldout_stride=args.heldout_stride,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        assignment_weight=args.assignment_weight,
+        compactness_weight=args.compactness_weight,
+        semantic_weight=args.semantic_weight,
+        weight_decay=args.weight_decay,
+        seed=args.seed,
+    )
+    print(f"run_id={args.run_id}")
+    print(f"status={result.summary['status']}")
+    print(f"checkpoint={result.checkpoint_path}")
+    print(f"before_ply={result.before_ply_path}")
+    print(f"after_object_color_ply={result.after_ply_path}")
+    print(f"metrics={result.metrics_path}")
+    print(f"quality_report={result.quality_report_path}")
+    print(f"model_manifest={result.manifest_path}")
+    if result.viewer_manifest_path:
+        print(f"viewer_manifest={result.viewer_manifest_path}")
+    if result.viewer_url:
+        print(f"viewer_url={result.viewer_url}")
+    heldout = result.summary["heldout_after_metrics"]
+    print(f"heldout_ari={heldout['ari']:.6f}")
+    print(f"heldout_mean_best_iou={heldout['mean_best_iou']:.6f}")
+    print(f"heldout_purity={heldout['purity']:.6f}")
+    if args.require_pass and result.summary["status"] != "objectstate_model_v0_training_pass":
+        raise ValueError("ObjectState Model v0 did not pass the held-out-frame gate")
+
+
+def _training_objectstate_multi_object_benchmark(args: argparse.Namespace) -> None:
+    result = run_multi_object_instance_benchmark(
+        args.output_dir,
+        run_id=args.run_id,
+        scene_count=args.scene_count,
+        points_per_instance=args.points_per_instance,
+        heldout_stride=args.heldout_stride,
+        iterations=args.iterations,
+        learning_rate=args.learning_rate,
+        hidden_dim=args.hidden_dim,
+        connected_component_radius=args.connected_component_radius,
+        seed=args.seed,
+        dataset_seed=args.dataset_seed,
+        viewer_dir=args.viewer_dir,
+    )
+    benchmark = result.summary["benchmark"]
+    comparison = benchmark["comparison"]
+    print(f"run_id={args.run_id}")
+    print(f"status={benchmark['status']}")
+    print(f"leakage_gate={str(benchmark['leakage_gate']['passed']).lower()}")
+    print(f"train_scenes={len(benchmark['split']['train_scene_ids'])}")
+    print(f"heldout_scenes={len(benchmark['split']['heldout_scene_ids'])}")
+    for candidate, metrics in benchmark["aggregate"].items():
+        print(
+            f"candidate={candidate} "
+            f"ari={metrics['ari']:.6f} "
+            f"hungarian_mean_iou={metrics['hungarian_mean_iou']:.6f} "
+            f"recall_0_5={metrics['object_recall_iou_0_5']:.6f} "
+            f"count_error={metrics['object_count_error']:.6f} "
+            f"merge_rate={metrics['merge_rate']:.6f} "
+            f"split_rate={metrics['split_rate']:.6f}"
+        )
+    print(f"best_baseline={comparison['best_baseline']}")
+    print(f"model_delta={comparison['model_delta']:.6f}")
+    print(f"verdict={comparison['verdict']}")
+    print(f"benchmark={result.benchmark_path}")
+    print(f"checkpoint={result.checkpoint_path}")
+    print(f"manifest={result.manifest_path}")
+    if result.viewer_manifest_path is not None:
+        print(f"viewer_manifest={result.viewer_manifest_path}")
+    if args.require_model_better and comparison["verdict"] != "model_better_than_recorded_baselines":
+        raise ValueError("ObjectState Model v0 did not beat the recorded multi-object baselines")
 
 
 def _training_kernel_mvp(args: argparse.Namespace) -> None:
@@ -13598,6 +13691,74 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     register_output.add_argument("--no-colorize", action="store_true")
     register_output.set_defaults(handler=_training_register_output)
+
+    model_demo = training_subparsers.add_parser(
+        "objectstate-model-demo",
+        help="train a traceable ObjectState Model v0 bundle with held-out frames",
+    )
+    model_demo.add_argument("input", type=Path)
+    model_demo.add_argument("--output-dir", required=True, type=Path)
+    model_demo.add_argument("--run-id", required=True)
+    model_demo.add_argument("--license", required=True)
+    model_demo.add_argument("--target-source", required=True)
+    model_demo.add_argument("--object-id-field", default="object_id")
+    model_demo.add_argument("--frame-field", default="source_frame")
+    model_demo.add_argument(
+        "--source-kind",
+        choices=("synthetic", "public_replay", "controlled_real"),
+        default="public_replay",
+    )
+    model_demo.add_argument("--split", choices=("train", "val", "test"), default="train")
+    model_demo.add_argument("--source-url")
+    model_demo.add_argument("--source-splat", type=Path)
+    model_demo.add_argument(
+        "--viewer-dir",
+        type=Path,
+        help="copy a same-run browser package into a Vite-served local directory",
+    )
+    model_demo.add_argument("--hidden-dim", type=int, default=24)
+    model_demo.add_argument("--heldout-stride", type=int, default=4)
+    model_demo.add_argument("--iterations", type=int, default=240)
+    model_demo.add_argument("--learning-rate", type=float, default=0.08)
+    model_demo.add_argument("--assignment-weight", type=float, default=1.0)
+    model_demo.add_argument("--compactness-weight", type=float, default=0.02)
+    model_demo.add_argument("--semantic-weight", type=float, default=0.02)
+    model_demo.add_argument("--weight-decay", type=float, default=1e-4)
+    model_demo.add_argument("--seed", type=int, default=0)
+    model_demo.add_argument("--require-pass", action="store_true")
+    model_demo.set_defaults(handler=_training_objectstate_model_demo)
+
+    multi_object_benchmark = training_subparsers.add_parser(
+        "objectstate-multi-object-benchmark",
+        help="evaluate Model v0 and three baselines on held-out multi-object instance scenes",
+    )
+    multi_object_benchmark.add_argument("--output-dir", required=True, type=Path)
+    multi_object_benchmark.add_argument(
+        "--viewer-dir",
+        type=Path,
+        help="copy the selected held-out Raw/Prediction/GT package into a Vite-served local directory",
+    )
+    multi_object_benchmark.add_argument(
+        "--run-id",
+        default="objectstate-multi-object-m2",
+    )
+    multi_object_benchmark.add_argument("--scene-count", type=int, default=12)
+    multi_object_benchmark.add_argument("--points-per-instance", type=int, default=128)
+    multi_object_benchmark.add_argument("--heldout-stride", type=int, default=3)
+    multi_object_benchmark.add_argument("--iterations", type=int, default=240)
+    multi_object_benchmark.add_argument("--learning-rate", type=float, default=0.08)
+    multi_object_benchmark.add_argument("--hidden-dim", type=int, default=24)
+    multi_object_benchmark.add_argument(
+        "--connected-component-radius",
+        type=float,
+        default=0.18,
+    )
+    multi_object_benchmark.add_argument("--seed", type=int, default=0)
+    multi_object_benchmark.add_argument("--dataset-seed", type=int, default=20260713)
+    multi_object_benchmark.add_argument("--require-model-better", action="store_true")
+    multi_object_benchmark.set_defaults(
+        handler=_training_objectstate_multi_object_benchmark
+    )
 
     kernel_mvp = training_subparsers.add_parser(
         "kernel-mvp",
