@@ -1,6 +1,6 @@
 # ObjGauss 当前状态总览
 
-> 最近更新: 2026-07-11
+> 最近更新: 2026-07-13
 > 阶段: research-first stabilization
 > 决策: `docs/adr/0007-research-first-stabilization.md`
 
@@ -156,9 +156,15 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   `treasurebox24/tripod24/pliers24/ikeasmall23`；官方 `ftSensor` model 同步纳入复现。
   P0 已下载并按官方运动链逐帧复核：treasurebox 与 globe 均是 `0` V-O-V 的可信负证据；
   laptop26 的 camera TF 与 RGB 可见性矛盾，`event_count=null`，不计零事件负证据。
-  P0 没有解锁 scene，P1 尚未下载。RBO index 每个 interaction 只提供一个 lighting label，
-  因而单 archive 还不能满足默认两种 lighting；跨 recording 合并不能在无明确 episode
-  证据时偷偷完成。
+  P1 已完整下载并通过 official-chain preflight 与冻结阈值逐帧重算：
+  treasurebox/tripod/pliers/ikeasmall 均无 clear-occluded-clear 回环，为可信 `0/4` 负证据；
+  `3,199/3,199` 个逐 link CSV 样本经独立重算一致。P0/P1 都没有解锁 scene。
+  全部 19 个 camera-motion + F/T interaction 再对账后，P2 只保留 `globe23`：它与已验证
+  `globe25` 同 object、同 marker-set date，补齐 artificial/natural lighting 配对，实际新增
+  下载约 0.366 GiB；通用/专用 official-chain 工具在 `globe25` 的 `746/746` 样本零差异，
+  `globe23` archive 仍待下载。
+  RBO index 每个 interaction 只提供一个 lighting label，因而单 archive 还不能满足默认
+  两种 lighting；跨 recording 合并不能在无明确 episode 证据时偷偷完成。
 - 仍需至少 3 个 scene，每个包含 physical identity、timestamped 6DoF pose、明确
   occlusion/view change 和测量得到的非零 action interval/vector。
 
@@ -169,8 +175,8 @@ ABI，冻结期不为压缩 LOC 整体外移。146 个 core module files（compa
   cardboard action 缺失，新 ledger 为 `0 pass / 7 fail / 2 blocked`，不能替代严格 scene。
 - 当前 host 检测到 0 个视频设备，且无 ffmpeg/cv2/COLMAP/Nerfstudio capture/reconstruction
   工具链；首批 RBO/RRC archives 已完成审计。RBO action sign 已解决，但 full target/interval
-  只覆盖 2 个 scene，且首批与 follow-up P0 都未形成严格遮挡回环；RRC 又缺 temporal camera
-  motion/depth/canonical 3D action。两者当前都不能满足完整 controlled-scene contract。
+  只覆盖 2 个 scene，且首批与 follow-up P0/P1 都未形成严格遮挡回环；RRC 又缺 temporal
+  camera motion/depth/canonical 3D action。两者当前都不能满足完整 controlled-scene contract。
 - 根目录已有保守的 all-rights-reserved `LICENSE`；若要开放复用，仍需 Owner 明确
   选择并替换为合适的开源许可证。
 - Python 默认依赖未覆盖 torch / SAM / transformers / gsplat / nerfstudio 复现实验。

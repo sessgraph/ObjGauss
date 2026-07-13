@@ -46,8 +46,8 @@ P0_MD5S=(
   "9fa0ab792afc2ae9b756d73a18681dff"
 )
 
-# P1 is downloaded only with --tier all. The treasurebox model is already in
-# P0. tripod.tar is also listed so this script remains self-checking; the
+# The treasurebox model is already in P0. tripod.tar is also listed so this
+# script remains self-checking when P1 is selected independently; the
 # initial RBO evidence subset normally provides that already-local model.
 P1_FILES=(
   "treasurebox24_o.tar.gz"
@@ -77,6 +77,24 @@ P1_MD5S=(
   "841536856d3f434324fc29c887bf3901"
 )
 
+# P2 is intentionally one interaction, not another broad metadata sweep.
+# globe23 shares the same object and marker-set date as the already-audited
+# globe25 while supplying the missing artificial-lighting condition. The
+# duplicate globe model keeps --tier p2 self-contained; --tier all verifies it
+# twice but downloads it only once.
+P2_FILES=(
+  "globe23_o.tar.gz"
+  "globe.tar.gz"
+)
+P2_SIZES=(
+  393459489
+  2101575
+)
+P2_MD5S=(
+  "f60bf94e4ba35868d7e9ca73221d399c"
+  "de73afa6bf391407f00bdf46e9567b52"
+)
+
 usage() {
   cat <<'EOF'
 Download RBO follow-up candidates for the strict occlusion-return probe.
@@ -88,13 +106,15 @@ Options:
   --list              Print the frozen follow-up selection (default).
   --download          Download with retry/resume, then verify.
   --verify-only       Verify files that are already present.
-  --tier p0|all       Download P0 only or P0 plus P1 (default: p0).
+  --tier p0|p1|p2|all Download one tier or all tiers (default: p0).
   --output-dir PATH   Destination (default: outputs/assets/raw/rbo-articulated-objects).
   -h, --help          Show this help.
 
 Examples:
   scripts/download-rbo-occlusion-followup.sh --list
   scripts/download-rbo-occlusion-followup.sh --download --tier p0
+  scripts/download-rbo-occlusion-followup.sh --verify-only --tier p1
+  scripts/download-rbo-occlusion-followup.sh --download --tier p2
   scripts/download-rbo-occlusion-followup.sh --verify-only --tier all
 
 The archives remain under ignored outputs/. Selection by metadata is not an
@@ -188,36 +208,42 @@ import csv
 import sys
 
 path, tier = sys.argv[1:]
-expected = {
-    "treasurebox25": {
-        "Object": "treasurebox",
-        "Camera Motion": "1",
-        "Only Internal Interaction": "1",
-        "Small Interaction": "0",
-        "cluttered": "1",
-        "force/torque sensor used": "1",
-        "comment": "",
-    },
-    "laptop26": {
-        "Object": "laptop",
-        "Camera Motion": "1",
-        "Only Internal Interaction": "1",
-        "Small Interaction": "1",
-        "cluttered": "0",
-        "force/torque sensor used": "1",
-        "comment": "laptop close to camera",
-    },
-    "globe25": {
-        "Object": "globe",
-        "Camera Motion": "1",
-        "Only Internal Interaction": "1",
-        "Small Interaction": "1",
-        "cluttered": "1",
-        "force/torque sensor used": "1",
-        "comment": "",
-    },
-}
-if tier == "all":
+expected = {}
+if tier in {"p0", "all"}:
+    expected.update(
+        {
+            "treasurebox25": {
+                "Object": "treasurebox",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "0",
+                "cluttered": "1",
+                "force/torque sensor used": "1",
+                "comment": "",
+            },
+            "laptop26": {
+                "Object": "laptop",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "1",
+                "cluttered": "0",
+                "force/torque sensor used": "1",
+                "comment": "laptop close to camera",
+            },
+            "globe25": {
+                "Object": "globe",
+                "Lighting": "natural",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "1",
+                "cluttered": "1",
+                "force/torque sensor used": "1",
+                "recording date(marker set id)": "2017-07-18",
+                "comment": "",
+            },
+        }
+    )
+if tier in {"p1", "all"}:
     expected.update(
         {
             "treasurebox24": {
@@ -258,6 +284,33 @@ if tier == "all":
             },
         }
     )
+if tier in {"p2", "all"}:
+    expected.update(
+        {
+            "globe25": {
+                "Object": "globe",
+                "Lighting": "natural",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "1",
+                "cluttered": "1",
+                "force/torque sensor used": "1",
+                "recording date(marker set id)": "2017-07-18",
+                "comment": "",
+            },
+            "globe23": {
+                "Object": "globe",
+                "Lighting": "artificial",
+                "Camera Motion": "1",
+                "Only Internal Interaction": "1",
+                "Small Interaction": "1",
+                "cluttered": "0",
+                "force/torque sensor used": "1",
+                "recording date(marker set id)": "2017-07-18",
+                "comment": "",
+            },
+        }
+    )
 
 with open(path, encoding="utf-8-sig", newline="") as handle:
     rows = {row["Name"]: row for row in csv.DictReader(handle)}
@@ -283,13 +336,15 @@ print_plan() {
   echo "output_dir=${OUTPUT_DIR}"
   echo "tier=${TIER}"
   echo
-  echo "P0 interactions: treasurebox25, laptop26, globe25"
-  echo "P0 payload with deduplicated companion models: 1099647770 bytes (about 1.024 GiB)"
-  for i in "${!P0_FILES[@]}"; do
-    printf '  %-30s %12s bytes  md5=%s\n' \
-      "${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}"
-  done
-  if [[ "${TIER}" == "all" ]]; then
+  if [[ "${TIER}" == "p0" || "${TIER}" == "all" ]]; then
+    echo "P0 interactions: treasurebox25, laptop26, globe25"
+    echo "P0 payload with deduplicated companion models: 1099647770 bytes (about 1.024 GiB)"
+    for i in "${!P0_FILES[@]}"; do
+      printf '  %-30s %12s bytes  md5=%s\n' \
+        "${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}"
+    done
+  fi
+  if [[ "${TIER}" == "p1" || "${TIER}" == "all" ]]; then
     echo
     echo "P1 interactions: treasurebox24, tripod24, pliers24, ikeasmall23"
     echo "P1 selected payload: 955939893 bytes (about 0.890 GiB)"
@@ -298,7 +353,19 @@ print_plan() {
       printf '  %-30s %12s bytes  md5=%s\n' \
         "${P1_FILES[$i]}" "${P1_SIZES[$i]}" "${P1_MD5S[$i]}"
     done
-    echo "P0+P1 selected payload: 2055587663 bytes (about 1.914 GiB)"
+  fi
+  if [[ "${TIER}" == "p2" || "${TIER}" == "all" ]]; then
+    echo
+    echo "P2 interaction: globe23 (artificial-light pair for globe25)"
+    echo "P2 selected payload: 395561064 bytes (about 0.368 GiB)"
+    echo "P2 new-download payload with existing globe model: 393459489 bytes (about 0.366 GiB)"
+    for i in "${!P2_FILES[@]}"; do
+      printf '  %-30s %12s bytes  md5=%s\n' \
+        "${P2_FILES[$i]}" "${P2_SIZES[$i]}" "${P2_MD5S[$i]}"
+    done
+  fi
+  if [[ "${TIER}" == "all" ]]; then
+    echo "P0+P1+P2 deduplicated selected payload: 2449047152 bytes (about 2.281 GiB)"
   fi
   echo
   echo "Metadata proxies are not a visibility result; strict RGB-D V-O-V must be recomputed."
@@ -328,19 +395,30 @@ download_index() {
 operate_files() {
   local operation="$1"
   local i
-  for i in "${!P0_FILES[@]}"; do
-    if [[ "${operation}" == "download" ]]; then
-      download_file "${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}" tar.gz
-    else
-      verify_file "${OUTPUT_DIR}/${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}" tar.gz
-    fi
-  done
-  if [[ "${TIER}" == "all" ]]; then
+  if [[ "${TIER}" == "p0" || "${TIER}" == "all" ]]; then
+    for i in "${!P0_FILES[@]}"; do
+      if [[ "${operation}" == "download" ]]; then
+        download_file "${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}" tar.gz
+      else
+        verify_file "${OUTPUT_DIR}/${P0_FILES[$i]}" "${P0_SIZES[$i]}" "${P0_MD5S[$i]}" tar.gz
+      fi
+    done
+  fi
+  if [[ "${TIER}" == "p1" || "${TIER}" == "all" ]]; then
     for i in "${!P1_FILES[@]}"; do
       if [[ "${operation}" == "download" ]]; then
         download_file "${P1_FILES[$i]}" "${P1_SIZES[$i]}" "${P1_MD5S[$i]}" tar.gz
       else
         verify_file "${OUTPUT_DIR}/${P1_FILES[$i]}" "${P1_SIZES[$i]}" "${P1_MD5S[$i]}" tar.gz
+      fi
+    done
+  fi
+  if [[ "${TIER}" == "p2" || "${TIER}" == "all" ]]; then
+    for i in "${!P2_FILES[@]}"; do
+      if [[ "${operation}" == "download" ]]; then
+        download_file "${P2_FILES[$i]}" "${P2_SIZES[$i]}" "${P2_MD5S[$i]}" tar.gz
+      else
+        verify_file "${OUTPUT_DIR}/${P2_FILES[$i]}" "${P2_SIZES[$i]}" "${P2_MD5S[$i]}" tar.gz
       fi
     done
   fi
@@ -359,7 +437,7 @@ while (($#)); do
       ;;
     --tier)
       shift
-      (($#)) || die "--tier requires p0 or all"
+      (($#)) || die "--tier requires p0, p1, p2, or all"
       TIER="$1"
       ;;
     --output-dir)
@@ -379,10 +457,10 @@ while (($#)); do
 done
 
 case "${TIER}" in
-  p0|all)
+  p0|p1|p2|all)
     ;;
   *)
-    die "--tier must be p0 or all"
+    die "--tier must be p0, p1, p2, or all"
     ;;
 esac
 

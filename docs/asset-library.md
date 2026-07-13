@@ -32,7 +32,7 @@
 | --- | --- | --- | --- | --- |
 | BOP HOPE val Realsense | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-hope/hope_val_realsense.zip`、`outputs/assets/raw/bop-hope/hope-val-realsense-subset/val/000001/`、`val/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
 | BOP LMO test BOP19 | https://bop.felk.cvut.cz/datasets/ | `outputs/assets/raw/bop-lmo/lmo_test_bop19.zip`、`outputs/assets/raw/bop-lmo/lmo-test-bop19-subset/test/000002/` | public RGB-D pose replay；identity / prediction 负证据与 baseline | ledger 按 CC BY-SA 4.0 登记，重分发前仍需核对上游条款；无 action GT，不能进入 intervention pass |
-| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、首批/追补 interaction archives、companion models 与 `ftSensor` model | RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 均完成字段/时间审计；首批 official-chain 严格逐 link RGB-D 可见性为 `0/3` V-O-V；action-ready 仅 2 scenes | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；有效 sidecar 为 `/map` N force，只允许 `hold_action` baseline，不能当 displacement；旧 direct-marker bundle/ledger 已 supersede |
+| RBO Articulated Objects local subset | https://doi.org/10.5281/zenodo.1036660 | `outputs/assets/raw/rbo-articulated-objects/`：官方 index、首批/追补 interaction archives、companion models 与 `ftSensor` model | RGB-D、MoCap link 6DoF、camera motion 与 100 Hz F/T wrench 均完成字段/时间审计；首批与有效 follow-up 的 official-chain 严格逐 link RGB-D 可见性均无 V-O-V；action-ready 仍仅 2 scenes | CC BY 4.0；wrench 是 human/tool-applied measurement，不是 controller command；有效 sidecar 为 `/map` N force，只允许 `hold_action` baseline，不能当 displacement；旧 direct-marker bundle/ledger 已 supersede |
 | RRC 2020 local subset | https://people.tuebingen.mpg.de/mpi-is-software/data/rrc2020/ | `outputs/assets/raw/rrc2020/`：官方 SQLite index、query helper 与 `7969.zip`、`8076.zip`、`9505.zip` | 三个 Phase 2 Level 4 run 已验证 Zarr 结构、时间、三路 RGB、tracker pose 与 desired/applied action overlap | CC BY-NC-SA 4.0；固定相机、无 depth；pose 是视觉 tracker estimate，原生 action 是 9D robot control，不能直接冒充现行 3D action vector |
 
 HOPE scene `000002` 的当前最小复跑输入只抽取前 3 帧：
@@ -127,6 +127,7 @@ scripts/download-rbo-occlusion-followup.sh --verify-only --tier p0
 | --- | --- | --- | ---: |
 | P0 | `treasurebox25`、`laptop26`、`globe25`、三个 object models 与官方 `ftSensor` model | 三条均有 camera motion、F/T 和 internal interaction；`ftSensor` model 用于独立核对 wrench frame/sign 与同刻接触几何 | `1,099,647,770` bytes |
 | P1 | 再加 `treasurebox24`、`tripod24`、`pliers24`、`ikeasmall23` 及 companion models | `tripod24` 替换有 estimated-joint-placement warning 的 `clamp25`；metadata 只用于下载排序，仍需 sequence-level official-chain preflight | `955,939,893` bytes |
+| P2 | `globe23` 与已在 P0 的 `globe` model | 与 `globe25` 同 object、同 `2017-07-18` marker-set date，但提供 artificial lighting；这是剩余无 warning 候选中唯一可与已下载段形成明确双 lighting 配对者 | `395,561,064` bytes |
 
 已有首批 RBO 子集中的 `tripod.tar` 可复用，因此当前库存下 P1 实际新增下载为
 `953,270,577` bytes。P0+P1 selected payload 为 `2,055,587,663` bytes，约 1.914 GiB。
@@ -145,15 +146,47 @@ P0 已完成 `--verify-only --tier p0` 与逐帧复核：
 - `laptop26` 非启动帧 `705/705`，记录 TF 将两个 link 全程投到相机后方而 RGB 中物体
   实际可见，camera marker/TF calibration 无效，`event_count=null`，不计零事件负证据。
 
-P0 因此没有新增合格 scene。2026-07-11 已单独补齐并按冻结 size、MD5、gzip/tar
-完整性校验 P1 的 `pliers.tar.gz` 与 `ikeasmall.tar.gz` companion models；四个 P1
-interaction archives 仍未下载，剩余 payload 为 `947,856,164` bytes（约 0.883 GiB）。
-继续使用：
+P0 因此没有新增合格 scene。2026-07-13 已完成 `--verify-only --tier all`：P1 的四个
+interaction archives 与 companion models 均通过冻结 size、MD5、gzip/tar 完整性校验。
+matching-date official config、base marker、同刻 joint state 与 camera TF preflight 对四段均通过；
+按与首批相同的逐帧 mesh/depth z-buffer 和冻结阈值重算：
+
+- `treasurebox24` 接受 `309/339` 个 RGB 帧；base/moving link 最大遮挡
+  `0.375776/0.300343`，均为 `0` V-O-V；
+- `tripod24` 接受 `358/388` 个 RGB 帧；三个 link 最大遮挡
+  `0.203614/0.481063/0.143000`，均为 `0` V-O-V；
+- `pliers24` 接受 `368/398` 个 RGB 帧；两个 link 最大遮挡
+  `0.127551/0.040909`，均为 `0` V-O-V；
+- `ikeasmall23` 接受 `257/286` 个 RGB 帧；base 虽有 `231` 个遮挡帧、最大
+  `0.643019`，但没有遮挡前后的 clear 回环；另两个 link 最大遮挡
+  `0.216454/0.172351`，整段仍为 `0` V-O-V。
+
+独立 CSV 复核覆盖 `3,199/3,199` 个逐 link 样本，确认键唯一、三类 fraction 和为 1、
+state 可由冻结阈值重算且 summary event count 一致。P1 因此为可信 `0/4` 负证据，
+不会进入 action-target 复核，也没有新增合格 scene。复核产物位于 ignored
+`outputs/evidence/rbo-objectstate-followup-p1/visibility/`，不提交仓库。复现下载/校验仍使用：
 
 ```bash
 scripts/download-rbo-occlusion-followup.sh --download --tier all
 scripts/download-rbo-occlusion-followup.sh --verify-only --tier all
 ```
+
+P1 负证据后又对官方 index 的全部 `19` 个 camera-motion + F/T interactions 做了库存对账。
+剩余无 calibration/joint warning 的候选中，只有 `globe23` 能与已验证的 `globe25` 以同一
+object 和同一 marker-set date 明确组成 artificial/natural lighting 对。P2 因此只冻结这一段，
+不把 `book27/foldingrule26/rubikscube29` 约 2.1 GB 的单 lighting payload 一并下载：
+
+```bash
+scripts/download-rbo-occlusion-followup.sh --list --tier p2
+scripts/download-rbo-occlusion-followup.sh --download --tier p2
+scripts/download-rbo-occlusion-followup.sh --verify-only --tier p2
+```
+
+`globe23_o.tar.gz` 的官方 size 为 `393,459,489` bytes、MD5 为
+`f60bf94e4ba35868d7e9ca73221d399c`；已有 `globe.tar.gz` 时实际新增下载仅该 interaction。
+通用 official-chain audit 已在 `globe25` 上与专用 calibration 对 `746/746` 个逐 link 样本
+做到像素计数、fraction、state 和 event 零差异；下载后可原样用于 `globe23`，但双 lighting
+配对本身仍不构成 V-O-V 或 reality-gate pass。
 
 外部 controlled-interaction 候选：
 
@@ -166,6 +199,31 @@ scripts/download-rbo-occlusion-followup.sh --verify-only --tier all
 - [HOI4D](https://hoi4d.github.io/)：RGB-D、category-level object pose、hand action，
   CC BY-NC 4.0；action annotation 只有类别与时间区间，没有独立 3D control vector。
   当前只有官方分卷入口，没有本地 raw sequence。
+- [YCBInEOAT](https://github.com/wenbowen123/iros20-6d-pose-tracking#about-ycbineoat-dataset)：
+  9 段真实机器人操作、`7,449` 帧 RGB-D、逐帧对象 6DoF GT、forward kinematics 与
+  calibrated camera extrinsics，且官方说明包含显著手臂/末端遮挡；archive 按 sequence
+  独立提供，最小约 1.48 GB、全集约 22 GB。但论文确认 Azure Kinect 静态安装、对象 pose
+  为逐帧人工标注；forward kinematics 没有 controller command 或独立 3D action label
+  语义。官方页面也没有给 dataset 单独许可，仓库 BSD 条款只能证明代码许可。因此它不能
+  补齐 temporal camera motion/action provenance，在许可和 action 语义明确前不下载、不计
+  readiness。
+- [RH20T](https://rh20t.github.io/)：真实多视角 RGB-D、校准相机、100 Hz gripper
+  Cartesian pose、6DoF F/T、joint state 与 gripper command 均具备，action/control 语义强；但官方
+  格式没有逐对象 6DoF GT，且最小完整 depth 分卷约 71.3 GB。它可作 action-conditioned
+  representation 的后续来源，不能直接满足当前 physical object identity/pose gate；官方
+  页面还要求注意志愿者脸部/声音并仅用于 model training，未形成可公开 demo 的许可结论。
+- [ObjectInHand](https://elevenjiang1.github.io/ObjectInHand-Dataset/)：真实 RGB-D、磁跟踪
+  object 6DoF、Shadow Hand joint state、指尖 pose/tactile/contact 与不同 illumination 条件
+  均存在。对官方 extraction source 的只读审计确认 camera transform 固定，采集订阅
+  `/joint_states` 而非 controller command；仓库也没有 dataset 顶层许可。它不能提供独立
+  3D action vector 或 temporal camera motion，当前不下载。
+- [VinT-6D](https://vint-6d.github.io/)：MIT、RGB/depth、MoCap object 6DoF、touch 与
+  proprioception；Hugging Face 总量约 79.2 GB，其中四个 real archives 合计约 13.7 GB。
+  官方论文与数据卡把样本定义为 object-in-hand pose-estimation entries，没有可审计的
+  episode timestamp/action-command contract，因此不进入真实 transition gate。
+- [Robo360](https://arxiv.org/abs/2312.06686)：约 47.3 GB 的真实机器人多视角视频，
+  `86` 个校准视角适合 dynamic NeRF/3D representation；官方 release 记录 camera pose，
+  但没有逐对象 6DoF GT。它不能直接提供现行 identity/prediction ground truth，暂不下载。
 
 这些 evidence-only 数据集不进入 `src/assetLibrary.js` 或 `objgauss/assets.py` 的浏览器
 Demo registry；只有许可、体积和发布用途单独确认后才允许同步到公开素材面。

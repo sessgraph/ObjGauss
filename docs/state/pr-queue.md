@@ -1,6 +1,6 @@
 # ObjGauss 当前任务队列
 
-> 最近更新: 2026-07-11
+> 最近更新: 2026-07-13
 > 只保留 active、blocked、planned 和最近完成项；完整历史已归档。
 
 ## In Progress
@@ -66,7 +66,13 @@
   action-ready scene，以及超过简单 baseline 的 candidate。
 - 已核验: H2O/HOI4D/HOT3D/DexYCB 等公开候选可支持部分 identity/prediction，
   但都不原生提供现行合同要求的独立非零 3D action/control vector；当前 host 也无 capture
-  设备与重建工具链。
+  设备与重建工具链。2026-07-13 追加核验 YCBInEOAT 与 RH20T：前者有真实 RGB-D、逐帧
+  object 6DoF GT、显著遮挡与 robot FK，但相机静态，dataset 许可和独立 action provenance
+  未明确；
+  后者有多视角 RGB-D、TCP/command 与 6DoF F/T，却没有逐对象 6DoF GT，且最小完整
+  depth 分卷约 71.3 GB。追加筛查 ObjectInHand/VinT-6D/Robo360：分别缺 controller
+  action 与 moving camera、episode action contract、逐对象 6DoF GT。上述来源当前都不能
+  直接解锁本任务。
 - acquisition/semantic audit: RBO/RRC 官方索引及各 3 条最小候选已于 2026-07-10 本地
   下载并完成完整性与字段语义审计。RBO 三段有同步 RGB-D、逐 link 6DoF、相机运动和
   wrench；按 base marker + 同刻 joint state + matching URDF 的严格全帧 mesh/depth 重算为
@@ -77,11 +83,16 @@
 - follow-up acquisition: `scripts/download-rbo-occlusion-followup.sh` 固定 P0
   `treasurebox25/laptop26/globe25` 与官方 `ftSensor` model。P0 已完整下载并逐帧复核：
   treasurebox/globe 均为可信 `0` V-O-V；laptop camera calibration 无效且
-  `event_count=null`。因此没有新增合格 scene。P1 已改为
-  `treasurebox24/tripod24/pliers24/ikeasmall23`。下载后仍须跑同一严格像素级可见性与
-  action 语义复核，不能仅凭 index metadata 计数。
+  `event_count=null`。P1 的 `treasurebox24/tripod24/pliers24/ikeasmall23` 与 models
+  已于 2026-07-13 完成全量完整性校验、official-chain preflight 和同阈值逐帧重算；
+  接受 `309/358/368/257` 帧，四段均为 `0` V-O-V，独立重算 `3,199/3,199` 个逐 link
+  CSV 样本一致。因此 P1 是可信 `0/4` 负证据，没有进入 action-target 复核，也没有新增
+  合格 scene。全量 19 段 camera-motion + F/T 库存对账后，新增 P2 只含 `globe23`
+  （`393,459,489` bytes）：它与已验证 `globe25` 同 object、同 `2017-07-18` marker-set
+  date，补齐 artificial/natural lighting 配对。通用 official-chain audit 已与专用 globe
+  calibration 在 `746/746` 个样本上零差异；archive 下载后仍须重算，不能凭元数据计数。
 - 禁止: 新增 wrapper、伪造 action、复制 target GT、把 fixture 标成 real。
-- 解锁条件: P1 或新 capture 提供至少 3 个许可明确、严格 V-O-V 可复核且同时含
+- 解锁条件: 新 capture 或新数据源提供至少 3 个许可明确、严格 V-O-V 可复核且同时含
   RGB-D/6DoF/view change/measured action 的 scene，并让 candidate 与简单 baseline 完成比较。
 
 ## Planned After Stabilization
