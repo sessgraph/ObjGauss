@@ -6,8 +6,9 @@
 `PR-01` 首个 action/contact gate 支持了程序化 CPU primitive push sibling source；完整
 里程碑现按 `PR-01A`–`PR-01F` 推进。`0.2.0` sibling evidence contract、隔离 production
 runtime、原子 adapter/writer、independent audit 与冻结 cohort 均已在本地门支持；无 RGB
-Delivery、checksums 与一键命令也已实现，并会在 dirty worktree 上 fail closed。当前仍缺最终
-commit SHA 的 clean-checkout 复跑和远端 CI，不能把 PR-01 标为关闭。robot controller、RGB/GPU
+Delivery、checksums 与一键命令也已实现，并会在 dirty worktree 上 fail closed。PR-01A–F 已由
+实现提交 `71d4e39` 固化，并在该 clean HEAD 上由 `./scripts/accept-pr01` 完整重建为
+`supported`；当前只缺最终提交 SHA 的远端 CI，不能把 PR-01 标为关闭。robot controller、RGB/GPU
 renderer 和训练仍未实现。项目保持
 私有并按 all rights reserved 管理，对外发布前必须重新决策许可证。
 
@@ -152,8 +153,8 @@ PR-01C 把真实五分支 simulator 输出映射为 `0.2.0` episode/attempt，�
 当前本地门的 22 个 Python 测试通过；五个 branch 各含 111 条 trajectory records 与 110 条 contact
 records，canonical/reverse 稳定 evidence SHA-256 均为
 `d25a635c4f1f691428687a138571e85577de19485403807ce6418fe92322dfb4`。这只支持单一 golden
-group 的 adapter、原子幂等 writer 与 attempt failure semantics；独立 auditor、正式 cohort、
-最终 source commit lineage、远端 CI 和完整 PR-01 仍未完成。
+group 的 adapter、原子幂等 writer 与 attempt failure semantics；独立 auditor、正式 cohort 与
+Delivery 的结论由后续切片各自提供，远端 CI 和完整 PR-01 关闭仍未完成。
 
 ## 验证 PR-01D 独立审计
 
@@ -186,7 +187,7 @@ threshold 正确拒绝了 `box-b` weak push，失败证据被保留且没有重�
 `supported`。Active spec SHA-256 为 `d1dff647…b339ef`，manifest SHA-256 为
 `c0dc325c…dc7ef`；阈值测量时的 `fdab5f78…c8623` spec 作为历史 fixture 保留，机器测试证明两者
 只在 source-commit provenance 策略上不同。数据与运行输出只在 ignored `generated/pr01e/`，
-不进入 Git；最终 commit lineage 和远端 CI 仍未完成。
+不进入 Git；实现提交 `71d4e39` 的 clean 验收已把运行证据绑定到该 HEAD，远端 CI 仍未完成。
 
 ## 完成 PR-01F Delivery 验收
 
@@ -209,9 +210,10 @@ python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
 随后打开 <http://127.0.0.1:8000/artifacts/pr01/demo/>。当前五联页面与 fail-closed checksum/audit
-行为已通过本地测试和浏览器目视核对；由于 PR-01 文件仍未提交，clean-checkout guard 正确拒绝
-生成最终 Delivery。只有提交后重跑且最终 SHA 的远端 GitHub Actions 为 `supported`，PR-01F
-才算完成。
+行为已通过本地测试和浏览器目视核对。实现提交 `71d4e39` 的 clean 一键验收得到 48 groups /
+240 episodes、24/12/12 split、0 failed/extra attempts、独立 audit `supported`，并生成含 1210 个
+条目的 checksum index；Delivery 的 source commit 与该 HEAD 一致。最终提交 SHA 的远端 GitHub
+Actions 仍未运行，因此 PR-01F 尚未完成远端门，PR-01 也尚未关闭。
 
 ## 项目事实源
 

@@ -1,8 +1,8 @@
 # ObjGauss 假设驱动实施路径
 
-> 状态：Stage-0 与 `PR-00` 已提交；PR-01 source gate 与 `PR-01A`–`PR-01E` 已本地支持，
-> `PR-01F` 已实现并等待最终 clean commit/远端 CI
-> 版本：0.12
+> 状态：Stage-0、`PR-00` 与 PR-01A–F 已提交；PR-01 implementation HEAD 的 clean 一键验收
+> 已本地支持，最终提交 SHA 的远端 CI 待运行
+> 版本：0.13
 > 日期：2026-07-14
 > 上位需求：`PRD.md`
 >
@@ -67,8 +67,9 @@
 > - `working_assumption`：HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
 >   模型家族和未冻结数值阈值；`RES-001` 可以用更合适的获批来源替换。
 > - 当前本地实现包括 Stage-0、`PR-00`、独立 RES-001 snapshot audit tool、PR-01 primitive
->   sibling action/contact gate 与 PR-01A–F contract/runtime/writer/audit/cohort/Delivery；本文不表示
->   最终 clean commit、远端 CI、完整 PR-01 关闭或模型已实现，也不表示
+>   sibling action/contact gate 与 PR-01A–F contract/runtime/writer/audit/cohort/Delivery；PR-01A–F
+>   已由 `71d4e39` 提交并在该 clean HEAD 上完整验收为 `supported`。本文不表示
+>   远端 CI、完整 PR-01 关闭或模型已实现，也不表示
 >   `PR-01`–`PR-11` 已创建、提交或通过。
 
 ## 1. 路径结论
@@ -339,8 +340,9 @@ point 的 2D Euclidean pixel error，并取最大值。Manifest 中的 primary p
   单次 audit report 含运行时 attempt/index hashes，不作为跨运行常量。
 - PR-01F Delivery 已实现无 RGB 五联状态回放、机器/人类报告、全量 checksum、`accept-pr01` 和
   GitHub Actions job。正式 spec 记录 runtime source-commit policy，运行时注入当前 HEAD；builder、
-  verifier 与入口都会拒绝 dirty checkout。当前 PR-01 文件未提交，因此该负例正确触发，最终 SHA
-  的 clean-checkout `supported` 与远端 CI 尚未完成。
+  verifier 与入口都会拒绝 dirty checkout。PR-01A–F 已由 `71d4e39` 提交；该 clean HEAD 的
+  `accept-pr01` 重建 48 groups / 240 episodes、24/12/12 split、0 failed/extra attempts，独立 audit、
+  1210-entry checksum index 与 Delivery verifier 均为 `supported`。最终提交 SHA 的远端 CI 尚未完成。
 - 已确认的负边界：`reset_to_env_states` 只恢复 physical state，不恢复 ManiSkill RNG；PR-01
   adapter 必须显式 capture/restore main/episode RNG 并把它纳入 snapshot hash。
   Rendering、外部 asset、demo 和 dataset 不在该授权内；具体 guardrail 和本机容量快照只在
@@ -908,7 +910,6 @@ demo command
 all rights reserved 管理；对外发布前重新决策许可证。以下前置决策仍未完成：
 
 - PR-02 之后的训练栈和长期模型目录；
-- PR-01 正式磁盘、算力和最长验收时间预算（由隔离 preflight 实测冻结）；
 - 各 PR 的正式数值阈值、统计检验和资源预算；
 - 目标机器人、动作空间、控制频率和安全规范。
 
@@ -926,6 +927,6 @@ Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的
    CPython 3.10.20 的 `A-1` 已通过安装、import、宿主 GPU probe、freeze、磁盘和空资产检查。
 4. Snapshot/RNG fork 与 programmatic CPU primitive action/contact gate 都已用两个独立进程
    `supported`；后者只批准 PR-01 primitive push source。
-5. PR-01A–E 已在本地门支持，PR-01F 的无 RGB 五联回放、checksums、一键验收与 clean-head
-   lineage guard 已实现；整批仍未提交。下一步是范围复核、取得 Owner 动作级 commit 授权，
-   在最终 SHA 的 clean checkout 重跑 `accept-pr01`，再由远端 CI 裁决完成门。
+5. PR-01A–F 已由实现提交 `71d4e39` 固化；该 clean HEAD 的 `accept-pr01` 已完整 `supported`。
+   当前只回写本地验收状态并在最终文档 SHA 再跑同一入口；随后需取得 push 授权，由相同最终 SHA
+   的远端 CI 裁决完成门。

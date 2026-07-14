@@ -1,8 +1,8 @@
 # ObjGauss 对象中心 Gaussian 世界模型 PRD
 
-> 状态：Draft；`PR-00` 已固化，PR-01 source gate 与 `PR-01A`–`PR-01E` 已本地支持，
-> `PR-01F` 已实现但仍待最终 clean commit/远端 CI
-> 版本：0.10
+> 状态：Draft；`PR-00` 已固化，PR-01 source gate 与 `PR-01A`–`PR-01F` 已提交并在 clean
+> implementation HEAD 本地支持；最终提交 SHA 的远端 CI 待运行
+> 版本：0.11
 > 日期：2026-07-14
 > 当前验收范围：文档、Stage-0 本地预览、`PR-00` synthetic contract 证据与无渲染 primitive
 > sibling action/contact pilot、`0.2.0` contract、隔离 production runtime、原子 writer、独立 audit、冻结 formal cohort 与无 RGB Delivery；不表示完整 PR-01 已关闭，也不包含模型、原始训练数据或
@@ -35,17 +35,18 @@
 > 空只读 asset 门下由 canonical/reverse 两个真实进程得到一致五分支 evidence；这只支持
 > production runtime 可复现。远端 CI 尚未运行。
 > PR-01C 已由真实 canonical/reverse 进程生成语义一致的五分支 golden group，并通过原子发布、
-> 幂等 replay、冲突拒绝、失败 attempt 与非有限值负例；这只支持单 group writer，不表示独立
-> audit、正式 cohort、最终 commit lineage 或远端 CI 已完成。
+> 幂等 replay、冲突拒绝、失败 attempt 与非有限值负例；这只支持单 group writer，后续
+> audit、正式 cohort 与 Delivery 仍由各自切片独立裁决。
 > PR-01D 已在重新生成的真实 golden group 上独立重算 14 个 hard gates，并让 11 类预注册
 > mutation 命中稳定四态与 reason code；这只支持审计器及 fixture，不表示 preflight、正式
 > cohort 或最终交付已完成。
 > PR-01E 已保留一次 provisional effect threshold rejection，再用 preflight 冻结阈值与资源预算；
 > 正式 48 groups / 240 episodes、24/12/12 split、零额外 attempt 通过独立审计。该结果仍不表示
-> 最终 commit lineage、远端 CI、因果模型理解或 Gaussian dynamics 已完成。
+> 远端 CI、因果模型理解或 Gaussian dynamics 已完成。
 > PR-01F 的五联状态 Demo、Delivery report/checksums、clean-checkout guard 与 `accept-pr01` 已实现；
-> source commit 在运行时绑定当前 clean HEAD，不能在冻结 spec 中自引用。当前 dirty worktree 会被
-> builder/verifier 正确拒绝，因此最终 SHA 的一键验收和远端 CI 尚未完成。
+> source commit 在运行时绑定当前 clean HEAD，不能在冻结 spec 中自引用。PR-01A–F 已由实现提交
+> `71d4e39` 固化；该 clean HEAD 的一键验收重建 48 groups / 240 episodes、0 failed/extra attempts，
+> 独立 audit 与 Delivery verifier 均为 `supported`。最终提交 SHA 的远端 CI 尚未运行。
 > 归档事实和候选资源状态由 [`../REFERENCES.md`](../REFERENCES.md) 统一维护。
 
 ## 1. 决策摘要
