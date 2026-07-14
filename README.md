@@ -151,10 +151,10 @@ PR-01C 把真实五分支 simulator 输出映射为 `0.2.0` episode/attempt，�
 ```
 
 当前本地门的 22 个 Python 测试通过；五个 branch 各含 111 条 trajectory records 与 110 条 contact
-records，canonical/reverse 稳定 evidence SHA-256 均为
-`d25a635c4f1f691428687a138571e85577de19485403807ce6418fe92322dfb4`。这只支持单一 golden
-group 的 adapter、原子幂等 writer 与 attempt failure semantics；独立 auditor、正式 cohort 与
-Delivery 的结论由后续切片各自提供，远端 CI 和完整 PR-01 关闭仍未完成。
+records；canonical/reverse 在同一 clean source 下得到相同 evidence SHA-256。该 digest 纳入
+source commit/tree lineage，因此不作为跨提交常量。这只支持单一 golden group 的 adapter、原子
+幂等 writer 与 attempt failure semantics；独立 auditor、正式 cohort 与 Delivery 的结论由后续
+切片各自提供，远端 CI 和完整 PR-01 关闭仍未完成。
 
 ## 验证 PR-01D 独立审计
 

@@ -330,8 +330,9 @@ point 的 2D Euclidean pixel error，并取最大值。Manifest 中的 primary p
   从全新临时 venv 经 wheel-only 门安装；10 个 runtime 行为测试与 canonical/reverse 两个真实
   offline 进程通过，稳定 evidence SHA-256 为 `8a2013f1…71cb0`。远端 CI 尚未运行。
 - PR-01C writer 本地门为 `supported`：22 个 Python 行为/负例测试通过，真实 canonical/reverse golden
-  group 的稳定 evidence SHA-256 均为 `d25a635c…2dfb4`；五个 branch 各有 111 条 trajectory
-  与 110 条 contact records。该结果只支持单 group 原子幂等发布。
+  group 在同一 clean source 下得到相同 evidence SHA-256；该 digest 纳入 source commit/tree lineage，
+  不作为跨提交常量。五个 branch 各有 111 条 trajectory 与 110 条 contact records。该结果只支持
+  单 group 原子幂等发布。
 - PR-01D independent audit 本地门为 `supported`：重新生成真实 golden group 后，14 个 hard
   gates 与 11 个 mutation cases 全部通过；该切片不替代正式 cohort 或远端 CI。
 - PR-01E formal cohort 本地门为 `supported`：保留 provisional threshold rejection 后，冻结
@@ -927,6 +928,5 @@ Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的
    CPython 3.10.20 的 `A-1` 已通过安装、import、宿主 GPU probe、freeze、磁盘和空资产检查。
 4. Snapshot/RNG fork 与 programmatic CPU primitive action/contact gate 都已用两个独立进程
    `supported`；后者只批准 PR-01 primitive push source。
-5. PR-01A–F 已由实现提交 `71d4e39` 固化；该 clean HEAD 的 `accept-pr01` 已完整 `supported`。
-   当前只回写本地验收状态并在最终文档 SHA 再跑同一入口；随后需取得 push 授权，由相同最终 SHA
-   的远端 CI 裁决完成门。
+5. PR-01A–F 已由实现提交 `71d4e39` 固化；当前最终 clean HEAD 的 `accept-pr01` 已完整
+   `supported`。下一步需取得 push 授权，由相同最终 SHA 的远端 CI 裁决完成门。
