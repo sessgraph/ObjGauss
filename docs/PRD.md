@@ -1,12 +1,22 @@
 # ObjGauss 对象中心 Gaussian 世界模型 PRD
 
 > 状态：Draft，等待 Owner 评审
-> 版本：0.2
+> 版本：0.3
 > 日期：2026-07-14
-> 当前验收范围：文档与立项，不包含代码、依赖、数据下载或研究结论
+> 当前验收范围：文档与 Stage-0 本地预览；不包含机器 contract、模型、原始训练数据或研究结论
 >
-> 知识状态：“一个实现 PR 只引入一个可证伪假设”和 `PR-04` Gaussian 生死门已经由
-> Owner 确认为 `decision`；项目完成层级、技术栈和数值阈值仍是 `working_assumption`。
+> 知识状态：“一个实现 PR 只引入一个可证伪假设”、`PR-04` Gaussian 生死门，以及
+> “面向研究评审的 Demo A 是首个验收目标”已经由 Owner 确认为 `decision`；`PR-04` 的
+> primary endpoint 已确定为 held-out sibling groups 上的多步 `effect-vs-hold` ObjectState
+> 预测误差，并采用 group-first 的配对聚合；稳定增益要求 paired hierarchical bootstrap
+> 95% 置信区间下界超过预先冻结的最小实际增益 `δ`。`δ` 只能由与最终 test 隔离的 pilot
+> 基于 evaluator 噪声和跨 seed 波动产生。完整项目完成层级、技术栈和 `δ` 数值仍是
+> `working_assumption`。Owner 另已决定先交付一个直接渲染 3D Gaussian 的可见页面，不使用
+> notebook，并允许下载 REFERENCES.md 登记的固定小型 `.splat`；该 Stage-0 切片不是
+> `PR-00` contract、训练好的 ObjGauss 输出或任何研究假设的通过证据。
+> Owner 随后确认该切片只做 Web，默认体验必须像可自由浏览的环境级 3D scene，而不是单物体
+> 展台或从外部俯看的有限底板；默认相机必须位于环境内部，地面不能在首屏暴露完整边界。
+> synthetic world 只能作为 viewer fixture，不能伪装成 `PR-00` episode。
 > 归档事实和候选资源状态由 [`../REFERENCES.md`](../REFERENCES.md) 统一维护。
 
 ## 1. 决策摘要
@@ -24,6 +34,14 @@
 某个假设的证据来源。`PR-04` 必须用受控 ablation 裁决 Gaussian 是否对预测或简单规划有
 稳定增益；无增益时 Gaussian 降级为视觉记忆和 renderer，不进入 dynamics 核心。
 
+首个必须说服的受众是研究评审，首个验收目标是 Demo A。它必须让 `PR-04` 对 Gaussian 的
+增量价值给出可复现的 `supported` 或 `rejected` 结论；漂亮渲染或后续 Demo 不能替代该裁决。
+该裁决的唯一 primary endpoint 是 held-out sibling groups 上的多步 `effect-vs-hold`
+ObjectState 预测误差；数据效率、简单规划和渲染质量只作 secondary metrics。
+primary endpoint 只评估被直接干预的 target object。裁决值先在每个 sibling group 内跨
+冻结的 horizons 聚合 target 的归一化轨迹误差，再用相同 group 的模型差值做 paired
+comparison；episode 长度和场景内非目标对象数量不得改变 group 权重。
+
 为避免把 Demo、研究证据和最终价值混成一个 MVP，本 PRD 定义四个完成层级：
 
 | 完成层级 | 对应阶段 | 可以声称什么 | 不能声称什么 |
@@ -33,7 +51,7 @@
 | Research Release | 3–4 | 动作影响预测，且隐藏物性试探在受控反事实上有效 | 对真实机器人规划有价值 |
 | Value Release | 5–6 | 真实校准后，Gaussian rollout 提高闭环规划成功率 | 超出已测机器人、任务和安全边界的泛化 |
 
-这些层级是 **声明阶梯**，不是 PR 的线性分组。当前执行范围是
+这些层级是 **声明阶梯**，不是 PR 的线性分组。首个核心计划目标是
 [`PROJECT_PLAN.md`](PROJECT_PLAN.md) 中的 Demo A（`PR-00`–`PR-04`）：先建立 contract、
 成对干预、ObjectState-only 基线和 Canonical Gaussian，再直接验证 Gaussian 的增量价值。
 Demo Release 是首个在线产品化演示目标，Research Release 是首个有因果说服力的目标，
@@ -88,7 +106,14 @@ Identity Gate 通过前不训练复杂因果头。
 8. **一 PR 一假设。** 实现 PR 必须预先写明可证伪假设、falsifier、基线、split、裁决状态
    和失败路径；不得用“适配一个数据集”代替研究问题。
 
-## 5. 当前实现范围：Demo A（PR-00–PR-04）
+## 5. Stage-0 当前实现与 Demo A 计划范围（PR-00–PR-04）
+
+进入核心 `PR-00` 前，当前已有一个纯 Web 的 Stage-0 入口切片：页面默认把确定性生成的严格
+`.splat` records 组成环境级 synthetic Gaussian world，并可读取 Git ignored 的固定外部审计
+样例；两条路径都校验大小、SHA-256 与 32-byte records，再用 WebGL2 投影 3D covariance、
+计算 Gaussian alpha、按深度合成。它只证明环境级输入的本地渲染链路可见，不满足
+FR-001/FR-002、机器 schema、坐标门、episode 同步、3DGS 训练/重建或动力学能力；准确外部
+资源事实见 [`../REFERENCES.md`](../REFERENCES.md)。
 
 ### 5.1 必须交付
 
@@ -163,6 +188,8 @@ ObjectBelief:
 
 - `estimate_phase` 至少区分 `oracle`、`prediction_before_observation` 和
   `correction_after_observation`。
+- `PR-04` 姿态误差所需的对象 symmetry metadata 必须可追溯；未知或不适用必须显式表达，
+  具体字段名、表示和误差函数由 `PR-00` 的机器 contract 冻结。
 - 阶段 0–1 允许 GT mask/pose，仅能标记为 `oracle`。
 - 阶段 2 的在线推理不得读取当前时刻之后的 mask、pose 或图像；GT 只用于训练监督或离线评估。
 
@@ -231,7 +258,7 @@ BridgeData、RoboNet、Open X-Embodiment 仅保留为后期预训练候选，不
 | NFR-001 | 所有指标能追溯到原始输入、固定 split、模型/配置 hash 和独立重算脚本 |
 | NFR-002 | adapter、坐标、拆分、future-leakage、reset 和 lineage 必须有行为级测试 |
 | NFR-003 | 数据、训练输出、缓存、checkpoint 和未脱敏日志不得提交 Git |
-| NFR-004 | 外部数据与模型在许可审核、大小预算和校验和批准前不得下载或再分发 |
+| NFR-004 | 外部数据与模型在许可审核、大小预算和校验和批准前不得下载或再分发；Stage-0 仅允许 REFERENCES.md 登记的固定预览 |
 | NFR-005 | 仿真 reset 对同一 snapshot/seed 必须可重复，分支只改变声明变量 |
 | NFR-006 | 阶段 2 起的在线路径只能读取当前及历史输入，并记录端到端延迟 |
 | NFR-007 | 真实机器人阶段必须先冻结工作空间、速度/力限制、急停和失败恢复策略 |
@@ -249,7 +276,7 @@ BridgeData、RoboNet、Open X-Embodiment 仅保留为后期预训练候选，不
 | 1 | `PR-03` | 固定的 GT identity/mask/depth/pose 对象集 | held-out view、背景污染、刚性变换和几何补全协议通过 | Oracle Object Gaussian 可用 |
 | 2 | `PR-05`–`PR-06` | 批准的真实多视角小子集，HO-Cap 为当前候选 | 无 future leakage；胜同集重跑的 3D connected-components；位姿阈值先冻结 | 在线 ObjectBelief Demo 可用 |
 | 3 | `PR-01`–`PR-02` | 固定 sibling groups 与 action baselines | 优于 copy/velocity/action-free；action shuffle 显著退化 | 模型使用了动作 |
-| Gaussian 生死门 | `PR-04` | ObjectState/point cloud/Gaussian 受控 ablation | 预注册 primary endpoint 上有稳定增益 | Gaussian 可进入 dynamics；否则仅视觉使用 |
+| Gaussian 生死门 | `PR-04` | ObjectState/point cloud/Gaussian 受控 ablation | held-out sibling groups 上 target object 的多步 `effect-vs-hold` ObjectState 预测误差有稳定增益 | Gaussian 可进入 dynamics；否则仅视觉使用 |
 | 4 | `PR-08`–`PR-09` | 物性 sibling/OOD 组合与主动 probe 对照 | hidden posterior 胜无历史；主动 probe 胜随机/固定并提高任务成功率 | 有受控主动因果证据 |
 | 5 | `PR-10` | 批准的一个真实机器人配置/任务，RH20T 为当前候选 | 候选 0/10/50/200 ladder 待预算冻结；residual 胜 commanded-only 和同预算 fine-tune | 真实域校准有效 |
 | 6 | `PR-11` | 统一任务、动作预算和安全约束 | 预注册 primary endpoint 或组合效用超过全部必需基线 | 世界模型提高已测闭环规划价值 |
@@ -257,6 +284,49 @@ BridgeData、RoboNet、Open X-Embodiment 仅保留为后期预训练候选，不
 阶段 1 的“稳定”“不污染”和阶段 2 的“厘米/数度级”仍不够可执行。对应实现 PR 必须先用
 小 pilot 生成基线，冻结指标、阈值、置信区间和失败判定，再扩大数据；不能在看到最终结果
 后改阈值。
+
+`PR-04` 的 primary endpoint 使用 group-first paired aggregation：每个 held-out sibling group
+先形成一个归一化多步轨迹误差，再比较同一 group 上 Gaussian 与非 Gaussian 模型的差值。
+对 ObjectState-only 与 ObjectState + point cloud 分别计算配对改进，并按冻结的数据层级和
+训练 seed 做 paired hierarchical bootstrap；两项 95% 置信区间下界都必须超过预先冻结的
+最小实际增益 `δ`，`PR-04` 才能判为 `supported`。正式 experiment spec 仍须冻结 horizon、
+状态分量、归一化尺度、组内权重和 bootstrap 细节。`δ` 由与最终 test 完全隔离的 pilot
+估计 evaluator 噪声与跨 seed 波动后冻结；pilot 不进入最终统计，最终结果可见后不得调整
+`δ`。具体估计器和数值仍须在 experiment spec 中预注册。
+
+多步 horizon 按物理时间定义，而不是 simulator steps：从干预开始，覆盖动作执行和固定的
+post-action settling，并在预注册的物理时间点评分。动作时长、settling 时长和采样点由与
+最终 test 隔离的 pilot 冻结；最终结果可见后不得延长、缩短或选择性删除时间点。
+
+primary error 覆盖完整刚体 ObjectState：位置、按对象 symmetry metadata 校正的朝向、
+线速度和角速度。每类误差除以独立 pilot 估计、且不低于 evaluator noise floor 的 robust
+scale；四类归一化误差各占 primary scalar 的 25%。robust scale 与 noise-floor estimator
+必须在 final test 前冻结。可见性、外观/渲染质量和接触事件仅作 secondary metrics，
+不得进入 primary verdict。
+
+多对象场景只把 `Intervention.target_id` 指向的直接干预对象纳入 primary endpoint。其他对象
+的状态误差、碰撞传播和 collateral effects 必须单独报告为 secondary metrics；非目标对象
+数量不得稀释或放大 target 的 primary error。
+
+final test 必须完整留出 object identities、scene layouts 及其全部 sibling groups。primary
+push 类型、方向和力度范围须在 train 中有覆盖并跨 split 分层保持支持，因此本阶段只主张
+跨对象与跨布局泛化，不主张未见动作外推。任何 object、layout 或 sibling group 跨 split
+复用都使结果 `invalid`。
+
+held-out 对象的 Gaussian 与 point cloud 必须由同一份冻结的 pre-intervention 多视角 oracle
+context 构建，并共享原始帧、视角、深度、GT identity/mask/pose 和采样预算。context manifest
+必须记录时间边界与校验和；任何 post-action frame、目标 rollout future 或额外视角预算进入
+任一表示，都使比较 `invalid`。具体视角数与采样预算在独立 pilot 后预注册。
+
+`PR-03` 的 Gaussian/point-cloud builders 在进入 `PR-04` 前按版本和 hash 冻结，并离线生成
+immutable representation artifacts。`PR-04` 可为两种表示训练容量匹配的 adapters，但必须
+共享同一 dynamics backbone、训练协议和输出头；梯度不得回传 builders。端到端重训结果只能
+作为独立 secondary experiment，不能进入 primary verdict。
+
+ObjectState-only、ObjectState + point cloud 与 ObjectState + Gaussian 三个 primary arms
+必须在预注册容差内匹配 adapter + backbone 的总可训练参数量，并使用相同的数据曝光量、
+optimizer updates、batch policy 和调参预算。FLOPs、峰值显存和推理延迟完整报告为资源
+secondary metrics，但不作为本阶段的强制等价条件。
 
 阶段 3 的数据量由 `PR-01` determinism pilot 和资源预算冻结；每个起点候选生成以下分支：
 
@@ -266,11 +336,11 @@ push(+x, weak)
 push(+x, strong)
 push(-x, weak)
 push(+y, weak)
-grasp/lift
 ```
 
-其中 `grasp/lift` 与 push 的控制器、时长和成功语义不同。reset 可重复性通过后，应先判断
-它能否与 push 共用 sibling 评估；否则保留相同起点，但拆成独立 action cohort。
+以上 `hold + push` 是 `PR-04` primary endpoint 的唯一 action cohort。`grasp/lift` 使用同一
+类起点但必须拆成独立 secondary cohort，并配置与其动作时长匹配的 hold 对照；其结果不得
+进入或救活 `PR-04` primary verdict。
 
 ## 11. 必须保留的对照
 
@@ -298,11 +368,12 @@ grasp/lift
 
 ## 13. Owner 必须确认的决策
 
-实现路径原则已确认，以下事项在代码 PR 前仍是硬门：
+实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A，并由 `PR-04` 裁决
+Gaussian 的增量价值。以下事项在代码 PR 前仍是硬门：
 
-1. 是否批准“Foundation → Demo → Research → Value”的声明层级及首个对外 Demo。
+1. 是否批准“Foundation → Demo → Research → Value”的完整声明层级和 Demo B–D 定义。
 2. 新项目许可证，以及是否允许从 all-rights-reserved 归档移植具体代码。
-3. Python/训练、前端/查看器、数据落盘格式和包管理技术栈。
+3. Python/训练、长期前端/查看器、数据落盘格式和包管理技术栈；Stage-0 无依赖静态页不冻结后续选择。
 4. schema 版本化、坐标方向、单位、canonical frame 和缺失值语义。
 5. 许可审核标准、磁盘/下载预算、算力与可接受的最长验收时间。
 6. 每个 PR 的正式指标、阈值、统计检验、seed 数和资源预算。
@@ -320,5 +391,7 @@ Gaussian 在动力学中的角色不再要求 Owner 预先选择，由 `PR-04` �
   维护。
 - 旧项目只读恢复点、候选移植资源、历史负证据、外部数据和 Hugging Face 入口统一见
   [`../REFERENCES.md`](../REFERENCES.md)。
-- 本文没有联网复核外部数据集的当前字段、版本、大小或许可；这些内容必须由资源审计 PR
-  使用上游一手资料确认。
+- 当前只复核了 Stage-0 固定 `.splat` 的直接上游位置、版本、大小、记录数与校验和；其资产
+  生成 provenance 仍未核验，且只准用于本地渲染预览。准确范围见
+  [`../REFERENCES.md`](../REFERENCES.md)。其他外部数据的字段、版本、大小和许可仍须由资源
+  审计 PR 确认。

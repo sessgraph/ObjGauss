@@ -7,19 +7,27 @@
 
 ### 当前事实
 
-- 当前阶段：planning / research definition，处于文档优先的立项期。
-- 当前主要交付物：PRD、实施计划、资源台账和可执行协作规则。
+- 当前阶段：Demo A 的 Stage-0 可见切片；核心 `PR-00` contract 尚未建立或通过。
+- 当前主要交付物：PRD、实施计划、资源台账、可执行协作规则，以及可复现的本地数据预览。
 - 拟议研究方向：对象中心、动作条件的 Gaussian 世界模型；方向、完成层级和阈值仍是
   working_assumption，只有 Owner 明确确认后才是 decision。
 - Owner 已确认实现路径按“一个 PR 只引入一个可证伪假设”拆分，并由 PR-04 实验裁决
   Gaussian 是否进入 dynamics 核心；准确队列以 docs/PROJECT_PLAN.md 为准。
-- 当前分支没有生产代码、测试、依赖锁文件、数据集、checkpoint 或已批准的机器 schema。
+- 当前分支已有无生产依赖的静态 `viewer/`、确定性 synthetic Gaussian world、Node 内置测试
+  和固定审计样例下载脚本；仍没有模型代码、依赖锁文件、原始训练数据、checkpoint 或已批准
+  的机器 schema。
+- Owner 已明确要求 Stage-0 不使用 notebook，而是直接看到渲染后的 3D Gaussian；已批准把
+  一个固定 `.splat` 下载到 ignored `data/` 并构建 WebGL2 页面。准确来源、大小、哈希与
+  声明边界以 REFERENCES.md 为准，该授权不延伸到训练数据或其他 3DGS 资产。
 - 旧 ObjGauss 完整恢复点为标签 archive/objgauss-final-2026-07-14；它不是当前项目。
 
 ### 当前用户与可观察结果
 
 - 当前直接用户是 Owner 和参与立项的研究/工程贡献者。
-- 当前可观察结果是：项目目标、证据边界、资源状态、阶段门和下一批 PR 能被独立理解与评审。
+- 当前可观察结果是：项目目标、证据边界、资源状态、阶段门和下一批 PR 能被独立理解与评审；
+  贡献者还能在本地打开沉浸式 Stage-0 页面，从环境内部环绕、平移、移动和缩放由 8,523 个
+  splat 组成的确定性 synthetic Gaussian world，并可切换到通过固定哈希校验的
+  103,060-splat 外部审计样例。
 - 长期目标用户、产品形态和首个对外成果仍待 Owner 在 PRD 评审中确认。
 
 ### 当前不变量
@@ -35,7 +43,7 @@
 
 ### 当前明确不做
 
-- 不在规划阶段实现模型、viewer、服务、公共 API、持久化或机器人控制。
+- 除已批准的 Stage-0 静态预览外，不实现模型、服务、公共 API、持久化或机器人控制。
 - 不把旧 M2、BOP、RBO、NeRF Lego 或 Hugging Face 结果当作新项目当前基线。
 - 不在 Identity Gate 之前扩展复杂因果头、diffusion、replay buffer 或自生成训练。
 - 不按“适配一个数据集”打包模型、评估和 Demo 等多个无法独立裁决的目标。
@@ -44,7 +52,8 @@
 ### 关键风险
 
 - 产品目标、技术栈、许可证和资源预算尚未由 Owner 确认。
-- 外部数据集字段、版本、规模和许可尚未用上游一手资料复核。
+- Stage-0 固定 `.splat` 的直接上游位置、大小和哈希已核验，但其资产生成 provenance 仍未
+  核验；大多数外部数据集字段、版本、规模和许可也尚未用上游一手资料复核。
 - 身份、坐标、future leakage 和 sibling split 错误会污染后续动力学与因果结论。
 - 旧项目代码与兼容层体量较大，整体迁移会恢复已知耦合和技术债。
 - Gaussian 可能只改善渲染，不一定提高规划价值。
@@ -60,8 +69,8 @@
 | 当前实际文件与改动 | 文件系统、git status --short 和可复现命令结果 |
 | 稳定协作与授权规则 | 本文件 |
 | 公共机器 contract | 尚未建立；docs/PRD.md 第 6 节仅是概念草案，由 PR-00 建立唯一机器源 |
-| 架构与 ADR | 尚未建立；由计划中的 ADR-001 决定首个事实源 |
-| 已实现能力状态 | 尚未建立；有代码和验证结果后再创建唯一状态源 |
+| 架构与 ADR | docs/adr/；ADR-001 只冻结 Stage-0 本地预览栈 |
+| 已实现行为 | viewer/、scripts/ 和 tests/ 的实际代码与可复现命令结果 |
 
 代码决定“现在实际发生什么”；Owner 已批准的 PRD、contract、task 和 ADR 决定“规范要求
 什么”；README 或状态摘要只是上述事实的投影。来源冲突时先复现和定位，不静默选择方便
@@ -83,10 +92,15 @@
 | docs/PROJECT_PLAN.md | 阶段依赖、PR 队列和评审清单 |
 | REFERENCES.md | 资源、外部地址、归档、许可和历史证据台账 |
 | AGENTS.md | 根级协作、授权、验证和安全规则 |
+| docs/adr/ | 已批准的长期技术取舍；当前 ADR-001 只覆盖 Stage-0 预览栈 |
+| viewer/ | Stage-0 WebGL2 3D Gaussian 世界页面、synthetic scene generator、严格 `.splat` 解析、深度排序与渲染器 |
+| scripts/ | 固定来源、大小和哈希的本地资源获取脚本 |
+| tests/ | 当前已批准切片的 Node 内置行为测试 |
+| data/ | Git ignored 本地数据；不得提交 |
 | .git 中的归档标签 | 旧项目只读恢复点，不是当前源码目录 |
 
-当前没有应用入口、核心包、contract 目录、adapter 目录、tests 目录或 generated 目录。技术栈
-确定后必须先更新本节，再创建真实需要的目录；不要预建空结构或假想扩展点。
+当前没有核心包、contract 目录、adapter 目录或 generated 目录。Stage-0 之外的技术栈确定后
+必须先更新本节，再创建真实需要的目录；不要预建空结构或假想扩展点。
 
 ## 4. 当前权威命令
 
@@ -100,15 +114,18 @@
 | 检查 tracked diff 空白错误 | git diff --check |
 | 只读查看归档文件示例 | git show archive/objgauss-final-2026-07-14:README.md |
 | 安装/同步依赖 | 尚未定义；当前禁止推断或执行 |
-| 启动开发环境 | 尚未定义 |
-| 最小相关测试 | 尚未定义 |
+| 获取 Stage-0 固定预览 | bash scripts/fetch-gaussian-preview.sh |
+| 启动 Stage-0 页面 | python3 -m http.server 8000 --bind 127.0.0.1；打开 http://127.0.0.1:8000/viewer/ |
+| Stage-0 行为测试 | node --test tests/*.test.mjs |
+| Stage-0 语法检查 | node --check viewer/app.mjs；node --check viewer/splat-format.mjs；node --check viewer/splat-renderer.mjs；node --check viewer/splat-sort.mjs；node --check viewer/splat-sort-worker.mjs；bash -n scripts/fetch-gaussian-preview.sh |
 | 完整测试或 CI 等价门 | 尚未定义 |
-| 格式、lint、类型检查、构建 | 尚未定义 |
+| 格式、lint、类型检查、构建 | Stage-0 无构建步骤；项目级命令尚未定义 |
 | contract/codegen/audit | 尚未定义 |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。
-技术栈确定后，ADR-001 必须把本表更新为与锁文件、任务脚本和 CI 一致的可复制命令。
+Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练技术栈确定后，后续 ADR
+必须把本表更新为与锁文件、任务脚本和 CI 一致的可复制命令。
 
 ## 5. 会话启动协议
 
@@ -143,14 +160,16 @@
 - 行为变化必须有行为级测试；无法自动化时提供固定输入、复现步骤和残余风险。
 - 不删除测试、skip、放宽断言、吞异常或擅自更新阈值/基线来制造通过。
 
-当前是规划阶段。除非 Owner 明确扩大范围，规划任务只修改文档，不提前实现计划中的后续 PR。
+当前只扩大到 Owner 明确批准的 Stage-0 页面和固定小型预览。除非 Owner 再次明确扩大范围，
+不得借该授权提前实现机器 contract、adapter、模型或后续 PR。
 
 ## 7. 数据、Contract 与研究证据
 
 ### 数据与资产
 
 - REFERENCES.md 是资源状态唯一台账；候选入口不等于已核验或获准使用。
-- 使用外部数据前，从官方一手来源核验版本、字段、许可、大小、用途、下载范围和校验和。
+- 使用外部数据前，从官方一手来源核验版本、字段、许可、大小、用途、下载范围和校验和；
+  Stage-0 `.splat` 预览的已核验范围和未核验 provenance 以 REFERENCES.md 为准。
 - 下载数据、模型或 checkpoint 前取得 Owner 对来源、范围、磁盘和许可的确认。
 - 原始数据、转换数据、训练输出、缓存和 checkpoint 放在 ignored 或批准的外部存储，禁止进 Git。
 - 派生产物必须保留 source checksum、producer/version、transform/config hash、license review 和 lineage。
@@ -223,7 +242,7 @@
 | 已确认目标、角色、术语、规则与例外 | docs/PRD.md |
 | 公共字段与机器 contract | PR-00 建立的唯一 contract 源；当前尚未创建 |
 | 当前任务、非目标、验收和队列 | docs/PROJECT_PLAN.md |
-| 长期架构取舍 | ADR-001 建立的 ADR 源；当前不创建 |
+| 长期架构取舍 | docs/adr/；ADR-001 只覆盖 Stage-0，其余架构使用后续 ADR |
 | 候选数据、资产、许可和归档事实 | REFERENCES.md |
 | 稳定协作与授权边界 | AGENTS.md |
 | 开放问题 | 当前写入 docs/PRD.md 第 13 节或计划评审清单 |
@@ -240,8 +259,9 @@
 | 中 | 模块行为、CLI、UI、内部数据流 | 回归测试、相关集成测试、适用 lint/typecheck/build |
 | 高 | 公共 contract、持久化、安全、并发、迁移、发布或控制 | 完整相关门、兼容/迁移/回滚和端到端证据 |
 
-当前没有代码测试、lint、typecheck、build 或 CI 命令。不得声称这些检查通过。技术栈落地后，
-每个实现 PR 必须先补真实命令与相应测试，再按影响面扩大验证。
+当前只有 Stage-0 的 Node 行为/语法检查和 shell 语法检查，没有项目级 lint、typecheck、build
+或 CI 命令。不得把局部检查描述成完整项目门通过。技术栈落地后，每个实现 PR 必须先补真实
+命令与相应测试，再按影响面扩大验证。
 
 完成前始终检查：
 

@@ -1,7 +1,7 @@
 # ObjGauss 假设驱动实施路径
 
 > 状态：Owner 已确认路径原则；实现细节等待前置决策
-> 版本：0.2
+> 版本：0.3
 > 日期：2026-07-14
 > 上位需求：`PRD.md`
 >
@@ -9,9 +9,41 @@
 >
 > - `decision`：实现 PR 按“一个 PR 只引入一个可证伪假设”拆分，不按数据集拆分。
 > - `decision`：`PR-04` 是 Gaussian 是否进入 dynamics 核心的生死门。
+> - `decision`：首个验收目标是面向研究评审的 Demo A；必须接受 `PR-04` 的支持或否定结论。
+> - `decision`：`PR-04` 的唯一 primary endpoint 是 held-out sibling groups 上的多步
+>   `effect-vs-hold` ObjectState 预测误差。
+> - `decision`：该 endpoint 使用 group-first paired aggregation；每个 sibling group 等权，
+>   不能让 episode 长度或非目标对象数量隐式改变裁决权重。
+> - `decision`：稳定增益要求相对两个非 Gaussian 基线的 paired hierarchical bootstrap
+>   95% 置信区间下界都超过预先冻结的最小实际增益 `δ`。
+> - `decision`：`δ` 由与最终 test 完全隔离的 pilot 估计 evaluator 噪声和跨 seed 波动后
+>   冻结；pilot 不进入最终统计，最终结果可见后不得调整 `δ`。
+> - `decision`：多步 horizon 按物理时间覆盖动作执行和固定 post-action settling，不使用
+>   simulator steps；具体时长和评分点由与最终 test 隔离的 pilot 冻结。
+> - `decision`：`PR-04` primary endpoint 只使用 `hold + push` cohort；`grasp/lift` 使用
+>   duration-matched hold，作为独立 secondary cohort。
+> - `decision`：primary error 覆盖位置、按对象对称性校正的朝向、线速度和角速度；各分量
+>   使用独立 pilot 产生的尺度归一化并冻结权重。
+> - `decision`：每类状态误差除以 pilot robust scale 与 evaluator noise floor 的较大者；
+>   归一化后位置、朝向、线速度和角速度各占 primary scalar 的 25%。
+> - `decision`：多对象场景的 primary endpoint 只评估 `Intervention.target_id` 指向的直接
+>   干预对象；其他对象的碰撞传播和 collateral effects 只作 secondary metrics。
+> - `decision`：final test 完整留出 object identities、scene layouts 及其 sibling groups；
+>   push 类型、方向和力度范围在 train 中有覆盖，不把 action extrapolation 混入主裁决。
+> - `decision`：held-out 对象的 Gaussian 与 point cloud 共享同一冻结的 pre-intervention
+>   多视角 oracle context、原始证据和采样预算；禁止 post-action/future 信息。
+> - `decision`：`PR-03` builders 按版本/hash 冻结并离线生成 artifacts；`PR-04` 使用容量匹配
+>   adapters 和相同 dynamics backbone，梯度不得回传 builders。
+> - `decision`：三个 primary arms 匹配总可训练参数量、数据曝光、optimizer updates、batch
+>   policy 和调参预算；FLOPs、显存与延迟报告但不强制相等。
+> - `decision`：在继续 grill-me 前先交付直接渲染 3D Gaussian 的 Stage-0 页面，不使用
+>   notebook，并允许下载 REFERENCES.md 登记的固定小型 `.splat`；该切片不计作 `PR-00`
+>   contract、训练结果或研究 verdict。
+> - `decision`：Stage-0 只做 Web，并以可自由浏览的环境级 Gaussian scene 为默认体验；不得用
+>   单物体加假地面网格包装成“世界”，也不得伪造 `PR-00` episode、坐标轴或轨迹。
 > - `working_assumption`：ManiSkill、HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
 >   模型家族和未冻结数值阈值；`RES-001` 可以用更合适的获批来源替换。
-> - 本文不表示任何 PR 已创建、实现、提交或通过。
+> - 当前只有 Stage-0 预览切片在本地实现；本文不表示 `PR-00`–`PR-11` 已创建、提交或通过。
 
 ## 1. 路径结论
 
@@ -62,9 +94,12 @@ flowchart TD
 
 ## 2. 当前本地事实与开工前置门
 
-当前目录 **是有效 Git worktree**，但当前分支只有协作规则和规划文档，没有项目源码、测试、
-依赖或数据。Owner 材料中“不是有效 Git worktree、需要先同步仓库”的描述与本地事实冲突，
-已按实际工作区修正：无需再次同步旧项目，也不得整体恢复归档。
+当前目录 **是有效 Git worktree**。除规划文档外，工作区已有一个无生产依赖的 Stage-0
+WebGL2 3D Gaussian world viewer、确定性 synthetic scene generator、固定审计样例下载脚本和
+Node 行为测试；本地 ignored `data/` 中已有经大小与哈希核验的 103,060-record `.splat`。它们
+不是模型源码、原始训练数据、训练好的 3DGS 结果或机器 contract。Owner 材料中“不是有效
+Git worktree、需要先同步仓库”的描述与本地事实冲突，已按实际工作区修正：无需再次同步旧
+项目，也不得整体恢复归档。
 
 正式开始 `PR-00` 前仍需完成以下非研究前置门；它们不占用 `PR-00` 至 `PR-11` 编号：
 
@@ -72,10 +107,31 @@ flowchart TD
 | --- | --- | --- |
 | `DOC-000` | 固化 PRD、假设路径、资源边界和协作规则 | Owner 接受或明确修改点 |
 | `DEC-001` | 确定新项目许可证、claim policy 和归档移植权限 | Owner 动作级批准 |
-| `RES-001` | 只读核验首批所需来源，不下载数据 | 上游版本、许可、字段、规模和预算可审计 |
-| `ADR-001` | 冻结最小技术栈、目录、包管理和验收命令 | 更新 `AGENTS.md`，命令与锁文件/CI 一致 |
+| `RES-001` | 核验首批所需来源；仅固定 Stage-0 预览获准下载 | 全部核心来源的上游版本、许可、字段、规模和预算可审计；当前仅局部完成 |
+| `ADR-001` | 冻结 Stage-0 最小预览栈；训练/模型栈后续另决策 | `docs/adr/0001-stage-0-preview-stack.md` 与 `AGENTS.md` 命令一致 |
 
-前置门不应偷跑 schema 实现、框架初始化、数据下载或模型训练。
+Owner 已明确批准的 Stage-0 页面是前置可见切片，不改变核心门：不得由此偷跑 schema、训练
+框架、原始数据集下载或模型训练。
+
+### Stage-0 可见切片（当前本地实现）
+
+**可观察目标**：研究/工程贡献者能在本地打开全屏页面，从环境内部自由环绕、平移、移动、
+缩放并重置一个含地形、路径、建筑、树和环境粒子的 synthetic 3D Gaussian world；默认首屏
+不得暴露完整底板边缘或形成外部俯视展台。同时可切换固定外部审计样例或本地 `.splat`，并
+看到来源、许可状态、SHA-256、splat 数量、格式与禁止声明。外部数据留在 ignored 目录。
+
+**验收边界**：synthetic world 固定为 272,736 bytes、8,523 records 和 SHA-256
+`4782f6ed4816aee54618bb4d1fcbce8df67e65301e23a89c155985084f51cfe6`；固定
+外部 `.splat` 的 3,297,920 bytes、103,060 records 与 SHA-256 也必须匹配。解析器必须拒绝坏
+长度、绝对值超过 `1,000,000` 的位置、超过 `10` 的输入尺度、在最大 32× 显示尺度下不能保持
+finite float32 的 covariance、无效 quaternion 和全透明文件。渲染分辨率单边限制为 `4,096`
+像素；GPU 上传与深度排序前以 bounds center 统一重定位到 renderer-local 坐标（不构成
+`PR-00` 坐标约定）；screen covariance 的 2×2 特征值使用缩放后的稳定计算。首个深度排序和
+首个无 WebGL error 的 draw 完成前不得显示
+`ready` 或肯定渲染声明；WebGL2、shader、worker、哈希、纹理
+上传、排序或首帧失败时页面必须清空旧场景并显示 `blocked`，不得降级为 point sprite。
+synthetic world 是 viewer fixture，不是 `PR-00` episode、坐标 contract 或模型输出；该结果不
+解锁 `PR-01`，也不支持 FR-001/FR-002、坐标正确、训练好的 3DGS 重建、对象状态或动力学能力。
 
 ## 3. PR 结果语义
 
@@ -103,6 +159,8 @@ warning、fallback 和未运行项。
 
 - 定义 `T_WC`、`T_WO`、`T_OC` 的方向、作用对象、左右手系和单位。
 - 定义 Observation、ObjectBelief、Intervention 与 CausalLineage 的机器 schema。
+- 定义姿态评估所需 object symmetry metadata 的来源、表示、缺失语义和 round-trip 行为；
+  具体机器字段由本 PR 冻结，不从数据集名称或 mesh 外观隐式猜测。
 - 每个观测/状态值能追溯 `value / confidence / source`；缺失使用显式语义。
 - 提供一个合成 episode 和最小同步查看工具。
 - 不包含模型训练。
@@ -133,7 +191,7 @@ warning、fallback 和未运行项。
 
 **最小范围**
 
-每个起点候选分支：
+每个起点的 primary push cohort：
 
 ```text
 hold
@@ -141,8 +199,10 @@ push(+x, weak)
 push(+x, strong)
 push(-x, weak)
 push(+y, weak)
-grasp/lift
 ```
+
+`grasp/lift` 使用同类起点，但与 duration-matched hold 组成独立 secondary cohort；它不进入
+`PR-04` primary endpoint。
 
 每条分支记录：
 
@@ -162,7 +222,10 @@ reset_seed
 
 - 干预前状态、相机、光照、随机种子和未声明物性一致。
 - 每个 sibling 只改变 `changed_variable` 声明的变量。
-- train/validation/test 按 `sibling_group_id` 整组隔离。
+- train/validation/test 按 `sibling_group_id` 整组隔离；同一 object identity 或 scene layout
+  不得跨 final split 边界复用。
+- final test 完整留出 object identities 与 scene layouts；primary push 类型、方向和力度范围
+  在 train 中有覆盖并跨 split 分层保持支持。
 - 相同 seed 的 snapshot/state/render hash 满足冻结的 determinism policy。
 
 **失败路径**
@@ -170,12 +233,13 @@ reset_seed
 若 approved simulator 无法满足 reset 或 sibling invariance，`PR-02` blocked；保留生成器与
 审计负证据，回到 simulator/动作定义选择，不用随机视频或近似初态替代严格 sibling。
 
-`grasp/lift` 与 push 的控制器、时长或成功语义若不可比，保留同起点但拆成独立 action
-cohort，不为凑六分屏放宽 invariance。
+`grasp/lift` 与 push 不共用 primary 统计。若无法构造 duration-matched hold 或满足独立
+cohort invariance，只阻塞该 secondary cohort，不为凑六分屏放宽 primary push invariance。
 
 **Demo**
 
-六个初始画面一致、随后结果不同的分屏回放，并显示 lineage diff。
+primary push cohort 用五联分屏回放；secondary 区域单独并排显示 `grasp/lift` 与其
+duration-matched hold，并显示各自 lineage diff。
 
 ## 6. PR-02：ObjectState-only 动力学基线
 
@@ -190,8 +254,8 @@ constant-velocity 和 action-free predictor 更准确地预测干预效果。
 (S_t, a_t) -> predicted S_(t+1)
 ```
 
-候选模型可以是最小 Object GNN，但模型家族由 `ADR-001` 与本 PR 预注册规格决定，不因附件
-中的建议路径自动获批。
+候选模型可以是最小 Object GNN，但模型家族由后续模型/训练 ADR 与本 PR 预注册规格决定，
+不因附件中的建议路径或 Stage-0 ADR-001 自动获批。
 
 **裁决门**
 
@@ -199,7 +263,8 @@ constant-velocity 和 action-free predictor 更准确地预测干预效果。
 - `push(+x)` 与 `push(-x)` 的预测效果方向正确。
 - action-conditioned 胜 copy、constant-velocity 和 action-free 基线。
 - action shuffle 后性能按预注册门槛显著退化。
-- 固定数据、参数预算、seed 和 scene/sibling split。
+- 固定数据、参数预算、seed 和 object/scene/sibling split；final test 的 object identities
+  与 scene layouts 不得出现在 train/validation，动作支持范围保持一致。
 
 **失败路径**
 
@@ -225,6 +290,13 @@ G_world(i,t) = T_WO(i,t) * G_canonical(i)
 
 只验证视觉表示，不训练动力学。
 
+为 `PR-04` 输出 paired representation artifact：Gaussian 与 point cloud 必须来自同一冻结的
+pre-intervention 多视角 oracle context，并共享原始帧、视角、深度、GT identity/mask/pose
+和采样预算。context manifest 记录时间边界、输入校验和与预算。
+
+Gaussian/point-cloud builders 的版本、配置和 hash 是 artifact manifest 的组成部分；进入
+`PR-04` 后 builders 与既有 artifacts 均为 immutable，不接受 dynamics loss 回传。
+
 **裁决门**
 
 - 对象与背景 ownership 污染低于预先冻结的指标阈值。
@@ -249,8 +321,9 @@ G_world(i,t) = T_WO(i,t) * G_canonical(i)
 
 **可证伪假设**
 
-在控制数据、参数预算和 seed 后，Gaussian 表示相对 ObjectState 与 point cloud，在实现前从
-未来状态预测、数据效率或简单规划中预注册的 primary endpoint 上提供稳定增益。
+在控制数据、参数预算和 seed 后，Gaussian 表示相对 ObjectState 与 point cloud，在 held-out
+`hold + push` sibling groups 上 target object 的多步 `effect-vs-hold` ObjectState 预测误差
+中提供稳定增益。
 
 **严格对照**
 
@@ -261,13 +334,52 @@ G_world(i,t) = T_WO(i,t) * G_canonical(i)
 
 **裁决门**
 
-- 在 experiment spec 中预注册一个 primary endpoint；其余指标不得事后替代。
-- 同时报告一步/多步 ObjectState error、effect-vs-hold、数据效率和 push-to-target 成功率。
+- primary endpoint 固定为 held-out sibling groups 上的多步 `effect-vs-hold` ObjectState
+  预测误差。
+- primary action cohort 只包含 `hold + push`；`grasp/lift` 是使用 duration-matched hold 的
+  独立 secondary cohort，不得进入或救活 primary verdict。
+- final test 完整留出 object identities、scene layouts 及其 sibling groups；push 类型、方向
+  和力度范围在 train 中有覆盖。未见动作外推不属于本 PR 的 primary claim。
+- held-out 对象的 Gaussian 与 point cloud 由同一冻结的 pre-intervention 多视角 oracle
+  context 构建，共享原始帧、视角、深度、GT identity/mask/pose 和采样预算。
+- context manifest 必须证明没有 post-action frame、目标 rollout future 或额外视角预算；
+  任一表示获得额外信息时结果为 `invalid`。
+- Gaussian/point-cloud builders 按版本和 hash 冻结，离线 artifacts immutable；`PR-04`
+  训练不得把任何梯度回传 builders。
+- 两种表示分别使用容量匹配的可学习 adapter，并共享同一 dynamics backbone、输出头和训练
+  协议。端到端重训只能作为 secondary experiment，不能进入 primary verdict。
+- ObjectState-only、ObjectState + point cloud 与 ObjectState + Gaussian 在预注册容差内
+  匹配 adapter + backbone 总可训练参数量，并共享数据曝光量、optimizer updates、batch
+  policy 和调参预算。
+- FLOPs、峰值显存和推理延迟必须完整报告为资源 secondary metrics，但不作为本阶段的强制
+  等价条件。
+- primary error 只聚合位置、按 object symmetry metadata 校正的朝向、线速度和角速度；
+  可见性、外观/渲染质量与接触事件是 secondary metrics。
+- 多对象场景只评估 `Intervention.target_id` 指向的 target object；其他对象的状态误差、
+  碰撞传播和 collateral effects 单独报告为 secondary metrics。
+- 每类状态误差除以与 final test 隔离的 pilot 所估 robust scale 与 evaluator noise floor 的
+  较大者；归一化后位置、朝向、线速度和角速度各占 primary scalar 的 25%。
+- robust scale 与 noise-floor estimator 必须在 experiment spec 中冻结，看到 final test 后
+  不得改 estimator、scale 或权重。
+- 每个 sibling group 先跨冻结的 horizons 聚合 target object 的归一化轨迹误差，形成一个
+  等权 group scalar；再以同一 group 上的模型差值做 paired comparison。episode 长度和
+  非目标对象数量不得隐式增加该 group 的裁决权重。
+- 对每个非 Gaussian 基线定义配对改进 `Delta_b = error_b - error_gaussian`，按冻结的数据层级
+  与训练 seed 做 paired hierarchical bootstrap。
+- `supported` 要求 ObjectState-only 与 ObjectState + point cloud 两个 `Delta_b` 的 95%
+  置信区间下界都高于预先冻结的 `δ`；不设置事后 co-primary endpoints。
+- `δ` 由与最终 test 完全隔离的 pilot 估计 evaluator 噪声与跨 seed 波动后冻结；pilot
+  不进入最终统计，最终结果可见后不得调整。experiment spec 仍须预注册具体估计器和数值。
+- rollout horizon 按物理时间从干预开始覆盖动作执行和固定 post-action settling；在
+  预注册的物理时间点评分，不使用 simulator steps 定义门槛。
+- 与最终 test 隔离的 pilot 必须冻结动作时长、settling 时长和评分点；最终结果可见后不得
+  延长、缩短或选择性删除时间点。
+- experiment spec 还须冻结 robust/noise estimator、归一化尺度、组内权重和 bootstrap 细节。
+- 同时报告一步/多步 ObjectState error、数据效率和 push-to-target 成功率，但它们均为
+  secondary metrics，不得事后替代 primary endpoint。
 - 统一 evaluator、训练预算、参数量容差、数据与随机 seed。
 - 至少跨冻结的 scene split 和多 seed 报告效应量与不确定性。
 - PSNR 或“渲染更漂亮”只能作辅助指标。
-- `supported` 要求 primary endpoint 按预注册方向、效应阈值和 multiplicity policy 通过；
-  若设置 co-primary endpoints，必须预先声明 conjunction 或校正后的 family-wise 规则。
 
 **硬决策**
 
@@ -569,8 +681,9 @@ report.json
 demo command
 ```
 
-这些是逻辑交付，不是已批准目录。准确源码根、包名、配置格式和命令由 `ADR-001` 冻结。不要
-在该 ADR 前创建附件建议的 `src/objgauss/...` 空框架。
+这些是逻辑交付，不是已批准目录。准确源码根、包名、配置格式和命令由后续模型/训练 ADR
+冻结；Stage-0 ADR-001 不批准这些选择。该决策前不要创建附件建议的
+`src/objgauss/...` 空框架。
 
 ## 18. 建议分支与责任域
 
@@ -593,22 +706,21 @@ demo command
 
 ## 19. 仍待 Owner 确认
 
-实现路径原则已确认，但以下前置决策仍未完成：
+实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A。以下前置决策仍未完成：
 
 - 新项目许可证与允许移植的归档文件；
 - 最小技术栈、目录、落盘格式、包管理和 CI；
 - 首阶段磁盘、下载、算力和最长验收时间预算；
 - 各 PR 的正式数值阈值、统计检验和资源预算；
-- 首个对外成果优先 Demo A、B、C 还是 D；
 - 目标机器人、动作空间、控制频率和安全规范。
 
 Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的预注册实验裁决。
 
 ## 20. 下一步
 
-当前工作区无需同步旧仓库。顺序是：
+当前工作区无需同步旧仓库。顺序更新为：
 
-1. Owner 评审本次 `DOC-000` 文档变更；
-2. 完成 `DEC-001`、`RES-001` 和 `ADR-001`；
-3. 仅在前置门通过后开始 `PR-00`；
-4. 不提前创建分支、源码目录、依赖或数据副本。
+1. 运行并评审 Stage-0 本地页面及其证据边界；
+2. 完成 `DOC-000`、`DEC-001` 和其余 `RES-001`，把 ADR-001 之外的训练/模型栈另行冻结；
+3. 仅在核心前置门通过后开始 `PR-00` 机器 contract 与坐标门；
+4. 不借 Stage-0 授权提前创建训练框架、公共 schema、模型依赖或大型数据副本。

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>ObjGauss · Gaussian World</title>
+    <meta
+      name="description"
+      content="ObjGauss Stage-0 immersive WebGL2 3D Gaussian splat viewport"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#splat-canvas">跳到 3D 世界</a>
+    <main class="world-stage" id="drop-zone" data-state="loading">
+      <canvas
+        id="splat-canvas"
+        tabindex="0"
+        aria-label="可拖动环绕、Shift 拖动平移、WASD 移动和缩放的 3D Gaussian 世界视口"
+      ></canvas>
+      <div class="world-atmosphere" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <a class="brand" href="../README.md" aria-label="ObjGauss README">
+          <span class="brand-mark" aria-hidden="true">OG</span>
+          <span><strong>ObjGauss</strong><small>GAUSSIAN WORLD / STAGE-0</small></span>
+        </a>
+        <div class="scene-identity">
+          <small>ACTIVE SCENE</small>
+          <strong id="scene-title">正在生成 Gaussian 世界</strong>
+        </div>
+        <span class="state-badge" id="state-badge" data-kind="loading">
+          <i aria-hidden="true"></i><span>LOADING</span>
+        </span>
+      </header>
+
+      <section class="world-caption" aria-live="polite">
+        <p class="eyebrow">Local render state</p>
+        <h1 id="status-heading">正在加载世界</h1>
+        <p id="status-copy">校验文件后才会把 splat 送入 GPU。</p>
+        <div class="interaction-key" aria-label="视口操作说明">
+          <span>拖动环绕</span><span><kbd>Shift</kbd> + 拖动平移</span><span><kbd>WASD</kbd> 移动</span><span>滚轮 / 双指缩放</span><span><kbd>R</kbd> 重置</span>
+        </div>
+      </section>
+
+      <section class="render-hud" aria-label="实时渲染指标">
+        <span><small>SPLATS</small><strong id="render-count">0 / 0</strong></span>
+        <span><small>RENDER FPS</small><strong id="render-fps">—</strong></span>
+        <span><small>DEPTH SORT</small><strong id="sort-time">—</strong></span>
+      </section>
+
+      <details class="inspector-panel" id="scene-inspector" open>
+        <summary>
+          <span><small>SCENE DATA</small><strong>输入与证据边界</strong></span>
+          <i aria-hidden="true"></i>
+        </summary>
+        <div class="inspector-body">
+          <dl class="ledger">
+            <div><dt>Splats</dt><dd id="splat-count">—</dd></div>
+            <div><dt>Bytes</dt><dd id="sample-size">—</dd></div>
+            <div><dt>Format</dt><dd id="format-name">—</dd></div>
+            <div><dt>SHA-256</dt><dd id="checksum">—</dd></div>
+            <div><dt>Mode</dt><dd id="source-mode">—</dd></div>
+            <div><dt>semantic kind</dt><dd id="semantic-kind">—</dd></div>
+            <div><dt>asset provenance</dt><dd id="asset-provenance">—</dd></div>
+            <div><dt>license status</dt><dd id="license-status">—</dd></div>
+          </dl>
+          <div class="claim allowed">
+            <small>RENDER CLAIM</small>
+            <strong id="render-claim-title">渲染验证尚未完成。</strong>
+            <p id="render-claim-copy">完成输入校验、首次深度排序和首个 WebGL2 draw 后才会更新声明。</p>
+          </div>
+          <div class="claim denied">
+            <small>RESEARCH BOUNDARY</small>
+            <strong>这不是训练好的 ObjGauss 结果。</strong>
+            <p>不证明重建、对象状态、动力学、规划价值或任何研究门通过。</p>
+          </div>
+          <a
+            id="source-link"
+            class="source-link"
+            rel="noreferrer"
+            hidden
+          ><strong>来源</strong><span aria-hidden="true">↗</span></a>
+        </div>
+      </details>
+
+      <nav class="world-toolbar" aria-label="3D 世界工具栏">
+        <button class="tool-action primary" id="load-world" type="button">
+          <span aria-hidden="true">◉</span><strong>Gaussian 世界</strong>
+        </button>
+        <button class="tool-action" id="reset-camera" type="button">
+          <span aria-hidden="true">↺</span><strong>重置视角</strong>
+        </button>
+        <button class="tool-action" id="auto-rotate" type="button" aria-pressed="true">
+          <span class="toggle-dot" aria-hidden="true"></span><strong>自动环绕</strong><output>ON</output>
+        </button>
+        <label class="scale-control" for="splat-scale">
+          <span><small>GAUSSIAN SIZE</small><output id="scale-value" for="splat-scale">1×</output></span>
+          <input id="splat-scale" type="range" min="0.5" max="32" step="0.25" value="1" />
+        </label>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button class="tool-action" id="load-lego" type="button">
+          <span aria-hidden="true">◎</span><strong>Lego 审计样例</strong>
+        </button>
+        <label class="tool-action file-action">
+          <span aria-hidden="true">＋</span><strong>本地 .splat</strong>
+          <input id="file-input" type="file" accept=".splat,application/octet-stream" />
+        </label>
+      </nav>
+
+      <div class="load-overlay" id="load-overlay" role="status" aria-live="polite">
+        <span class="loader" aria-hidden="true"></span>
+        <strong id="load-status">正在准备 WebGL2</strong>
+        <p id="status-detail">生成确定性的 viewer-only Gaussian 环境…</p>
+      </div>
+
+      <div class="drop-hint">DROP LOCAL .SPLAT ANYWHERE</div>
+      <footer class="world-footer">
+        <span>screen-space covariance · premultiplied alpha · back-to-front sort</span>
+        <span>synthetic viewer fixture only — PR-00 episode and coordinate contract are not implemented</span>
+      </footer>
+    </main>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

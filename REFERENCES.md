@@ -8,17 +8,46 @@
 | 状态 | 含义 |
 | --- | --- |
 | `verified_archive_fact` | 已从只读归档标签核对；未在新分支重新运行 |
+| `verified_upstream_fact` | 已从固定的官方一手来源核对版本、内容或元数据 |
+| `approved_local_preview` | Owner 已批准下载到 ignored 本地目录，仅用于声明的预览范围 |
 | `owner_brief_candidate` | 来自 Owner 提供的研究材料；尚未独立核验上游现状 |
 | `requires_upstream_review` | 使用前必须核对官方版本、字段、许可、大小和条款 |
 | `reference` | 只参考思想、边界或失败经验，不复制实现 |
 | `candidate-port` | 许可和技术栈批准后，可按具体文件连同测试评审移植 |
 | `do-not-migrate` | 不应整体恢复或作为新项目事实源 |
 
+## Stage-0 固定本地预览
+
+Owner 于 2026-07-14 明确要求看到渲染后的 3D Gaussian，而不是 notebook，因此批准下载下表
+固定小型 `.splat` 到 ignored 本地目录，并仅用于 Stage-0 渲染审计样例。页面默认世界由
+`viewer/synthetic-world.mjs` 确定性生成，不含第三方输入；下表外部文件只在用户选择
+“Lego 审计样例”时加载。该授权不延伸到其他资产、训练数据、模型或再分发。
+
+| 项 | 当前事实与边界 |
+| --- | --- |
+| 上游文件 | `GitHubDragonFly/GitHubDragonFly.github.io` 的 `viewers/examples/legobrick.splat` |
+| 固定版本 | commit `1267e2135660e1f4197f94c045453fe40c209b0e` |
+| 固定 URL | <https://raw.githubusercontent.com/GitHubDragonFly/GitHubDragonFly.github.io/1267e2135660e1f4197f94c045453fe40c209b0e/viewers/examples/legobrick.splat> |
+| 获取命令 | `bash scripts/fetch-gaussian-preview.sh`；已有文件复用前与新下载落盘前均校验大小和 SHA-256 |
+| 本地位置 | `data/local-preview/legobrick-1267e213/legobrick.splat`（Git ignored） |
+| 大小与记录数 | `3,297,920` bytes；`103,060` 条固定长度记录 |
+| SHA-256 | `d5131a664a12a8764da70552c85f567d276313110f63f1efd48424845917899e` |
+| 格式 | `antimatter15-splat-v1`；每条 `32` bytes，包含 position、scale、RGBA 与 quaternion |
+| 语义状态 | `semantic_kind=point-derived-splat`；`asset_provenance=unverified` |
+| 许可边界 | 容器仓库存在 MIT 声明，但当前没有核验该样例的作者、生成链、输入来源或逐资产许可；仓库许可不能替代资产 provenance，因此只批准 ignored 本地预览，不批准提交或再分发 |
+| 允许声明 | 固定文件可被下载、校验、解析，并以 covariance、Gaussian alpha 与深度排序在本地 WebGL2 页面渲染 |
+| 禁止声明 | 不能称为 trained 3DGS、ObjGauss 模型输出或重建/对象状态/动力学/规划证据，也不能据此宣称任何研究门通过 |
+
+页面采用的 `32`-byte `.splat` 布局和 WebGL Gaussian 渲染方法参考
+[`antimatter15/splat`](https://github.com/antimatter15/splat)；该参考实现为 MIT。参考实现的许可
+只覆盖相应代码与格式参考，不能补齐上述外部审计样例的 provenance 或许可链。
+
 ## 新项目候选数据源
 
-以下入口来自 2026-07-14 Owner 研究材料，当前均为
-`owner_brief_candidate + requires_upstream_review`。表中的“候选职责”是 PRD 的规划输入，
-不是对数据字段或研究适用性的已验证陈述。
+以下入口来自 2026-07-14 Owner 研究材料。包括 Kubric / MOVi 在内的原始数据当前仍为
+`owner_brief_candidate + requires_upstream_review`；Stage-0 `.splat` 预览不是其中任一原始
+数据集的已接入证明。表中的“候选职责”是 PRD 的规划输入，不是对数据字段或研究适用性的
+已验证陈述。
 
 | 候选 | Owner 材料中的入口 | 候选职责 | 不能直接支持的声明 |
 | --- | --- | --- | --- |
