@@ -1,9 +1,10 @@
 # ObjGauss 对象中心 Gaussian 世界模型 PRD
 
-> 状态：Draft，等待 Owner 评审
-> 版本：0.3
+> 状态：Draft；`PR-00` 窄假设已在本地形成可复现证据，等待提交评审
+> 版本：0.4
 > 日期：2026-07-14
-> 当前验收范围：文档与 Stage-0 本地预览；不包含机器 contract、模型、原始训练数据或研究结论
+> 当前验收范围：文档、Stage-0 本地预览与 `PR-00` synthetic contract 证据；不包含模型、
+> 原始训练数据或下游研究结论
 >
 > 知识状态：“一个实现 PR 只引入一个可证伪假设”、`PR-04` Gaussian 生死门，以及
 > “面向研究评审的 Demo A 是首个验收目标”已经由 Owner 确认为 `decision`；`PR-04` 的
@@ -17,6 +18,10 @@
 > Owner 随后确认该切片只做 Web，默认体验必须像可自由浏览的环境级 3D scene，而不是单物体
 > 展台或从外部俯看的有限底板；默认相机必须位于环境内部，地面不能在首屏暴露完整边界。
 > synthetic world 只能作为 viewer fixture，不能伪装成 `PR-00` episode。
+> Owner 已完成 `PR-00` Decision Freeze。当前本地实现使用唯一 JSON Schema `0.1.0`、固定
+> `synthetic-audit-v0`、独立 evaluator 与 Web consumer，在 36 个 primary points 上得到
+> `max_camera_reprojection_error_px = 1.005e-14 < 1.0` 的 `supported` 窄裁决；它不支持真实
+> 数据、Gaussian 重建、世界模型、动力学或规划价值声明，也不表示代码已经提交或合并。
 > 归档事实和候选资源状态由 [`../REFERENCES.md`](../REFERENCES.md) 统一维护。
 
 ## 1. 决策摘要
@@ -96,8 +101,9 @@ Identity Gate 通过前不训练复杂因果头。
 3. **物理身份和渲染地址分开。** 数据集中的持久 `object_id` 是物理身份 GT；渲染器的
    slot/index 是派生地址。
 4. **指令和执行分开。** `commanded_action` 与 `executed_action` 不得混为一个字段。
-5. **缺失必须显式。** 数据源不具备动作、深度、力或物性时，记录 capability 和
-   `missing_reason`，不能伪造零值。
+5. **缺失必须显式。** 数据源不具备动作、深度、力或物性时，记录 capability，并用
+   `availability` tagged union 区分 `present` 与带受控 `reason` 的 `missing`；不能用 `null`、
+   零值或其他哨兵伪装。
 6. **证据分级。** fixture、synthetic、public replay、controlled real 和 closed-loop
    evidence 分开统计；schema-valid 或 reviewable 不等于指标通过。
 7. **真实在线声明先过身份门。** `PR-01`–`PR-04` 可以在 oracle/simulation ObjectState 上形成
@@ -106,7 +112,7 @@ Identity Gate 通过前不训练复杂因果头。
 8. **一 PR 一假设。** 实现 PR 必须预先写明可证伪假设、falsifier、基线、split、裁决状态
    和失败路径；不得用“适配一个数据集”代替研究问题。
 
-## 5. Stage-0 当前实现与 Demo A 计划范围（PR-00–PR-04）
+## 5. Stage-0、PR-00 当前实现与 Demo A 计划范围（PR-00–PR-04）
 
 进入核心 `PR-00` 前，当前已有一个纯 Web 的 Stage-0 入口切片：页面默认把确定性生成的严格
 `.splat` records 组成环境级 synthetic Gaussian world，并可读取 Git ignored 的固定外部审计
@@ -115,10 +121,18 @@ Identity Gate 通过前不训练复杂因果头。
 FR-001/FR-002、机器 schema、坐标门、episode 同步、3DGS 训练/重建或动力学能力；准确外部
 资源事实见 [`../REFERENCES.md`](../REFERENCES.md)。
 
+`PR-00` 当前工作区已经建立唯一
+[`episode.schema.json`](../contracts/objgauss/0.1.0/episode.schema.json)、固定 seed/config 的
+仓库内 producer、独立重投影 evaluator、机器 report 与同步 Web consumer。派生 episode、RGB、
+depth、mask、report 和 browser bundle 均位于 ignored `generated/pr00/`，可由 `npm run check`
+确定性重建。该门验证 contract、坐标与证据链，不把 Stage-0 splat 或任何外部数据提升为
+`PR-00` 输入。
+
 ### 5.1 必须交付
 
-- 完成许可证、首批资源和最小技术栈的前置决策；未通过前不创建源码框架。
-- `PR-00`：经过 Owner 批准的 schema v0、坐标约定、合成 episode 和重投影门。
+- 新项目当前保持私有并按 all rights reserved 管理；对外发布前重新决策许可证。
+- `PR-00`：已在当前工作区实现 Owner 批准的 schema `0.1.0`、坐标约定、合成 episode、
+  重投影门和 Web 证据页；提交/合并状态与窄假设 verdict 分账。
 - `PR-01`：经资源审计批准的仿真器生成可重复、无同组泄漏、只改变声明变量的 sibling
   branches；ManiSkill 只是当前候选。
 - `PR-02`：完全不使用 Gaussian 的 copy、constant-velocity、action-free 和
@@ -139,8 +153,9 @@ FR-001/FR-002、机器 schema、坐标门、episode 同步、3DGS 训练/重建�
 
 ## 6. 概念数据协议
 
-本节是 PRD 级语义，不是已经批准的公共 contract。字段类型、坐标约定、序列化格式和
-版本迁移策略必须在 `PR-00` 的唯一机器 contract 中冻结。
+本节是 PRD 级概念语义，不是可执行 schema。`PR-00` 的字段类型和序列化已经由
+[`episode.schema.json`](../contracts/objgauss/0.1.0/episode.schema.json) 建立；发生冲突时机器
+实例以该唯一 schema 为准，同时必须修正文档投影，不得维护第二份字段真值。
 
 ### 6.1 公共信封
 
@@ -151,10 +166,38 @@ schema_version
 source_dataset, source_version, source_uri
 license_review_id
 episode_id, split
-timestamp, time_unit
+episode_time_s
 coordinate_convention_id, unit_system
 raw_checksum, transform_version
 capabilities
+```
+
+首版 `schema_version` 固定为 `0.1.0`，并与版本化 `$id` 精确匹配。所有 object schema 使用
+`unevaluatedProperties: false` 拒绝未知字段。已发布 schema 不得原地修改；`0.x` 中任何改变
+合法实例集合的修改升级 MINOR，PATCH 只能修改不影响 contract 的说明、示例或错误文本。
+跨版本迁移必须显式、可测试，记录迁移前后 checksum 与 lineage；consumer 禁止静默升级。
+
+所有可能缺失的 contract 值使用以下唯一语义：
+
+```text
+present := { availability: "present", value: <valid value> }
+missing := { availability: "missing", reason: <controlled reason> }
+reason  := not_measured | not_provided | not_applicable | redacted | invalidated
+```
+
+`present` 必须且只能携带有效 `value`；`missing` 禁止携带 `value`。`null`、零/单位矩阵、空串、
+NaN 和默认置信度均不是缺失表示。
+
+RGB、depth 和其他数组资源不内嵌 JSON，只使用以下 descriptor；URI 解析相对于 fixture
+manifest，consumer 必须在使用前核对 shape、dtype 和完整 SHA-256：
+
+```text
+ArrayResource:
+  uri
+  media_type
+  dtype
+  shape
+  sha256
 ```
 
 ### 6.2 Observation
@@ -165,12 +208,13 @@ Observation:
   depth
   K
   T_WC
-  timestamp
+  episode_time_s
 ```
 
 - `PR-00` 合成 fixture 中上述字段均为必需；后续 GT 数据源必须逐项声明 present/missing。
-- 其他数据源缺少字段时必须给出 `missing_reason`，不能用单位矩阵、全零深度等哨兵伪装。
-- `T_WC` 的方向、左右手系、矩阵作用方向和单位在 schema PR 前均为待决策。
+- 其他数据源缺少字段时必须使用上述 `missing` variant，不能用单位矩阵、全零深度等哨兵伪装。
+- `T_WC · p_C = p_W`，使用列向量左乘；World 为右手系、`+Z` 向上、meter。投影使用
+  `T_CW = inverse(T_WC)` 转入 OpenCV Camera frame。
 
 ### 6.3 ObjectBelief
 
@@ -188,8 +232,12 @@ ObjectBelief:
 
 - `estimate_phase` 至少区分 `oracle`、`prediction_before_observation` 和
   `correction_after_observation`。
-- `PR-04` 姿态误差所需的对象 symmetry metadata 必须可追溯；未知或不适用必须显式表达，
-  具体字段名、表示和误差函数由 `PR-00` 的机器 contract 冻结。
+- Canonical object frame 由 producer 在对象创建时定义并在 episode 内保持不变；synthetic
+  原点为刚体质心，轴为 producer 声明的右手语义轴。禁止从观测、PCA 或 mesh 外观推断；
+  `T_WO · p_O = p_W`。
+- Symmetry 必须可追溯并显式表示为 `none`、有限旋转集合或绕 object-frame axis 的连续旋转。
+  有限旋转使用单位 `[w,x,y,z]`，连续轴必须归一化。未知 symmetry 使用
+  `missing:not_provided`，姿态指标状态为 `blocked`，不得默认成 `none`。
 - 阶段 0–1 允许 GT mask/pose，仅能标记为 `oracle`。
 - 阶段 2 的在线推理不得读取当前时刻之后的 mask、pose 或图像；GT 只用于训练监督或离线评估。
 
@@ -272,7 +320,7 @@ BridgeData、RoboNet、Open X-Embodiment 仅保留为后期预训练候选，不
 
 | 声明层级 | 对应实现 PR | 最小证据 | 必须通过的门 | 通过后允许的声明 |
 | --- | --- | --- | --- | --- |
-| 0 | `PR-00` | 合成 contract fixture 与批准的 GT pilot | 重投影候选门 `< 1 px`，正式阈值待 pilot/Owner 冻结；坐标往返一致；错误 convention 可检测 | 数据与坐标管线可用 |
+| 0 | `PR-00` | 固定 seed/config 的仓库内 JavaScript producer；只提交 producer、fixture spec 与预期 checksum manifest，派生资源 ignored | `synthetic-audit-v0` 全部 primary points 的 `max_camera_reprojection_error_px < 1.0`；独立 evaluator；坐标往返一致；错误 convention 可检测 | 数据与坐标管线可用 |
 | 1 | `PR-03` | 固定的 GT identity/mask/depth/pose 对象集 | held-out view、背景污染、刚性变换和几何补全协议通过 | Oracle Object Gaussian 可用 |
 | 2 | `PR-05`–`PR-06` | 批准的真实多视角小子集，HO-Cap 为当前候选 | 无 future leakage；胜同集重跑的 3D connected-components；位姿阈值先冻结 | 在线 ObjectBelief Demo 可用 |
 | 3 | `PR-01`–`PR-02` | 固定 sibling groups 与 action baselines | 优于 copy/velocity/action-free；action shuffle 显著退化 | 模型使用了动作 |
@@ -369,12 +417,26 @@ push(+y, weak)
 ## 13. Owner 必须确认的决策
 
 实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A，并由 `PR-04` 裁决
-Gaussian 的增量价值。以下事项在代码 PR 前仍是硬门：
+Gaussian 的增量价值。`PR-00` 的许可证、contract、坐标与验证栈决策已经冻结；以下列表同时
+保留已确认决策和仍会阻塞后续 PR 的开放项：
 
 1. 是否批准“Foundation → Demo → Research → Value”的完整声明层级和 Demo B–D 定义。
-2. 新项目许可证，以及是否允许从 all-rights-reserved 归档移植具体代码。
-3. Python/训练、长期前端/查看器、数据落盘格式和包管理技术栈；Stage-0 无依赖静态页不冻结后续选择。
-4. schema 版本化、坐标方向、单位、canonical frame 和缺失值语义。
+2. `decision`：新项目当前保持私有并按 all rights reserved 管理；对外发布前重新决策许可证。
+   `PR-00` 全新实现且不移植独立 all-rights-reserved 归档中的任何文件；未来移植必须逐文件
+   重新取得 Owner 授权并记录许可审查。
+3. `decision`：`PR-00` 使用 JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild 和
+   `node:test`，不引入服务端框架；GitHub Actions 在 PR 和 `main` 上以 `npm run check` 执行
+   Node 24、`npm ci`、contract audit、测试与 Web build。未来 Python/训练栈、长期 Viewer 和
+   数据落盘格式仍待确认。
+4. `decision`：`PR-00` 以 JSON Schema Draft 2020-12 作为唯一机器 contract 源，并使用
+   Robotics/OpenCV 坐标约定：`T_AB · p_B = p_A`，列向量左乘；World 为右手系、`+Z`
+   向上、meter；Camera 为 `+X` 右、`+Y` 下、`+Z` 前；`T_WC` 表示 Camera → World，投影使用
+   `T_CW = inverse(T_WC)`，WebGL bridge 只属于 Viewer consumer。Quaternion 使用有限、
+   归一化的 `[w, x, y, z]` 和确定性符号；`episode_time_s` 从首个 Observation 的 `0.0` 开始，
+   Observation 严格递增，同步字段共时，事件可同刻但不得倒退。Canonical object frame 由
+   producer 定义且 synthetic 原点为刚体质心；symmetry 按第 6.3 节显式表达。缺失值使用
+   第 6.1 节的 tagged union。Schema 从 `0.1.0`
+   开始使用严格 SemVer、精确版本匹配、未知字段拒绝和显式可追溯迁移。
 5. 许可审核标准、磁盘/下载预算、算力与可接受的最长验收时间。
 6. 每个 PR 的正式指标、阈值、统计检验、seed 数和资源预算。
 7. 目标机器人、动作空间、控制频率、延迟预算和安全规范。
@@ -391,7 +453,8 @@ Gaussian 在动力学中的角色不再要求 Owner 预先选择，由 `PR-04` �
   维护。
 - 旧项目只读恢复点、候选移植资源、历史负证据、外部数据和 Hugging Face 入口统一见
   [`../REFERENCES.md`](../REFERENCES.md)。
-- 当前只复核了 Stage-0 固定 `.splat` 的直接上游位置、版本、大小、记录数与校验和；其资产
-  生成 provenance 仍未核验，且只准用于本地渲染预览。准确范围见
+- Stage-0 固定 `.splat` 只复核了直接上游位置、版本、大小、记录数与校验和；其资产生成
+  provenance 仍未核验，且只准用于本地渲染预览。`PR-00` synthetic fixture 不使用该文件或
+  其他外部数据。准确范围见
   [`../REFERENCES.md`](../REFERENCES.md)。其他外部数据的字段、版本、大小和许可仍须由资源
   审计 PR 确认。

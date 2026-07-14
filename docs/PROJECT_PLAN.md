@@ -1,7 +1,7 @@
 # ObjGauss 假设驱动实施路径
 
-> 状态：Owner 已确认路径原则；实现细节等待前置决策
-> 版本：0.3
+> 状态：Stage-0 已提交；`PR-00` 本地实现通过冻结门，等待提交评审
+> 版本：0.5
 > 日期：2026-07-14
 > 上位需求：`PRD.md`
 >
@@ -41,9 +41,15 @@
 >   contract、训练结果或研究 verdict。
 > - `decision`：Stage-0 只做 Web，并以可自由浏览的环境级 Gaussian scene 为默认体验；不得用
 >   单物体加假地面网格包装成“世界”，也不得伪造 `PR-00` episode、坐标轴或轨迹。
+> - `confirmed_fact`：Stage-0 已由提交 `c1927b1` 固化；ignored 外部审计样例没有进入 Git。
+> - `decision`：下一实现阶段是 `PR-00`；固定 seed/config 的仓库内 JavaScript producer 生成
+>   `synthetic-audit-v0`，不下载外部数据，也不读取旧归档。
+> - `confirmed_fact`：`PR-00` 当前本地 `npm run check` 结果为 `supported`；36 个 primary
+>   points 的最大重投影误差为 `1.005e-14 px`，资源/lineage 与 14 类预注册负例通过。该事实
+>   不表示代码已提交、远端 CI 已运行或下游假设已支持。
 > - `working_assumption`：ManiSkill、HO-Cap、RH20T 等具体来源，分支名、建议源码路径、
 >   模型家族和未冻结数值阈值；`RES-001` 可以用更合适的获批来源替换。
-> - 当前只有 Stage-0 预览切片在本地实现；本文不表示 `PR-00`–`PR-11` 已创建、提交或通过。
+> - 当前只有 Stage-0 与 `PR-00` 在本地实现；本文不表示 `PR-01`–`PR-11` 已创建、提交或通过。
 
 ## 1. 路径结论
 
@@ -94,21 +100,24 @@ flowchart TD
 
 ## 2. 当前本地事实与开工前置门
 
-当前目录 **是有效 Git worktree**。除规划文档外，工作区已有一个无生产依赖的 Stage-0
-WebGL2 3D Gaussian world viewer、确定性 synthetic scene generator、固定审计样例下载脚本和
-Node 行为测试；本地 ignored `data/` 中已有经大小与哈希核验的 103,060-record `.splat`。它们
-不是模型源码、原始训练数据、训练好的 3DGS 结果或机器 contract。Owner 材料中“不是有效
-Git worktree、需要先同步仓库”的描述与本地事实冲突，已按实际工作区修正：无需再次同步旧
-项目，也不得整体恢复归档。
+当前目录 **是有效 Git worktree**。Stage-0 WebGL2 Gaussian world viewer 已由提交 `c1927b1`
+固化；当前未提交工作区还包含 `PR-00` 的唯一 JSON Schema、Node/npm 工具链、确定性 synthetic
+producer、独立 evaluator、Web consumer、行为测试与 CI workflow。本地 ignored `data/` 中的
+103,060-record `.splat` 只属于 Stage-0；ignored `generated/pr00/` 只包含可重建的 synthetic
+episode、数组、report 与 browser bundle。两者都不是模型源码、原始训练数据或训练好的 3DGS
+结果。无需同步旧项目，也不得整体恢复归档。
 
-正式开始 `PR-00` 前仍需完成以下非研究前置门；它们不占用 `PR-00` 至 `PR-11` 编号：
+`PR-00` 的 `DOC-000`、`DEC-001` 和 `ADR-002` 已完成。下表保留已完成前置项和不阻塞
+`PR-00` 的下游资源门，避免把“无需外部数据”误写成“资源审计已完成”。这些前置项不占用
+`PR-00` 至 `PR-11` 编号：
 
 | 前置项 | 唯一目标 | 通过条件 |
 | --- | --- | --- |
 | `DOC-000` | 固化 PRD、假设路径、资源边界和协作规则 | Owner 接受或明确修改点 |
-| `DEC-001` | 确定新项目许可证、claim policy 和归档移植权限 | Owner 动作级批准 |
-| `RES-001` | 核验首批所需来源；仅固定 Stage-0 预览获准下载 | 全部核心来源的上游版本、许可、字段、规模和预算可审计；当前仅局部完成 |
+| `DEC-001` | 确定新项目许可证、claim policy 和归档移植权限 | 已确认：当前私有、all rights reserved；PR-00 全新实现、零归档移植，只允许 synthetic contract/坐标/重投影窄声明 |
 | `ADR-001` | 冻结 Stage-0 最小预览栈；训练/模型栈后续另决策 | `docs/adr/0001-stage-0-preview-stack.md` 与 `AGENTS.md` 命令一致 |
+| `ADR-002` | 记录已选 contract 与 Web-first 工具链，并冻结 CI 和精确验证命令 | 已完成：lockfile、CI 与 `AGENTS.md` 使用一致的 `npm run check` |
+| `RES-001` | 持续核验 `PR-01/PR-03` 所需外部来源 | 不阻塞纯 synthetic 的 `PR-00`；进入相应数据 PR 前必须完成 |
 
 Owner 已明确批准的 Stage-0 页面是前置可见切片，不改变核心门：不得由此偷跑 schema、训练
 框架、原始数据集下载或模型训练。
@@ -133,6 +142,22 @@ finite float32 的 covariance、无效 quaternion 和全透明文件。渲染分
 synthetic world 是 viewer fixture，不是 `PR-00` episode、坐标 contract 或模型输出；该结果不
 解锁 `PR-01`，也不支持 FR-001/FR-002、坐标正确、训练好的 3DGS 重建、对象状态或动力学能力。
 
+### PR-00 当前本地裁决
+
+**可观察目标**：贡献者运行 `npm run check` 后，可在
+`/viewer/?mode=contract` 同步查看固定 episode 的 RGB、对象、相机、坐标轴、轨迹和窄声明
+账本；浏览器在显示结果前再次校验 schema、manifest、episode、全部资源和机器 report。
+
+**机器结果**：`synthetic-audit-v0` 固定为 3 个 observations、2 个 objects、36 个 primary
+points 和 12 个数组资源；episode SHA-256 为
+`1c553bf941fe63d4457d0e8965fb667b932b25a2996bb432d39fb8edb3be049e`。独立 endpoint 最大误差
+为 `1.0048591735576161e-14 px`，严格满足 `< 1.0 px`；schema/语义、resource checksums、lineage
+和 14 类预注册负例通过，因此窄假设 verdict 为 `supported`。
+
+**证据边界**：该结果未使用外部数据或旧归档，只支持 synthetic contract、坐标链和独立
+重投影门；不支持真实数据、Gaussian 重建、世界模型、动力学或规划价值。代码当前尚未提交，
+远端 GitHub Actions 尚未运行，不能把本地 verdict 写成提交/集成完成。
+
 ## 3. PR 结果语义
 
 “PR 完成”和“假设被支持”是两件事：
@@ -155,6 +180,36 @@ warning、fallback 和未运行项。
 一个显式记录坐标方向、单位、来源与置信度的最小 contract，能使合成 episode 的状态、干预
 和投影在机器审计下保持一致。
 
+**唯一 primary endpoint（decision）**
+
+冻结 endpoint 是固定 `synthetic-audit-v0` 上的 `max_camera_reprojection_error_px`：从 3D world
+point 经过批准的 frame chain 投影到像素，由独立 evaluator 与 fixture GT 比较每个 primary
+point 的 2D Euclidean pixel error，并取最大值。Manifest 中的 primary points 必须非空，并
+覆盖中心/边缘、近/远深度和多级 frame composition；其数量、GT 与 checksum 在正式 evaluator
+运行前固定。严格阈值为 `< 1.0 px`：任一点达到或超过阈值即 `rejected`；零有效点或 evaluator
+复用被测投影逻辑即 `invalid`。相机后方、越界和奇异内参属于必须拒绝的负例，不混入 primary
+统计。Round-trip、schema validation 和负例检测仍是不可缺少的 correctness gates，不能替换
+这个 primary endpoint。
+
+**开工硬门与推荐默认值**
+
+| 待冻结项 | Agent 推荐的 `working_assumption` | 不同选择会改变什么 |
+| --- | --- | --- |
+| 新项目许可证与归档边界 | `decision`：当前私有、all rights reserved；对外发布前重新决策许可证；`PR-00` 全新实现，不移植独立的旧归档 | 文件头、分发范围和可复用实现 |
+| 唯一机器 contract 源 | `decision`：使用语言中立的 JSON Schema Draft 2020-12；Web、未来 Python 和其他工具只作 consumer。数组只用含 `uri`、`media_type`、`dtype`、`shape`、`sha256` 的 descriptor 引用 | validator/codegen、兼容策略和 Web consumer |
+| Schema 版本与兼容 | `decision`：从 `0.1.0` 开始严格 SemVer；版本化 `$id` 与精确 `schema_version` 匹配；object schema 拒绝未知字段；已发布版本不可修改；`0.x` 改变合法实例集合升 MINOR，PATCH 不改变 contract；迁移必须显式、可测试并记录前后 checksum/lineage | validator 路由、迁移、回滚和 fixture 保存 |
+| Contract 工具链 | `decision`：JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild、`node:test`，不引入服务端框架；GitHub Actions 在 PR/`main` 上执行唯一入口 `npm run check`，其内运行 `npm ci` 后的 contract audit、测试与 Web build | 权威命令、锁文件和测试入口 |
+| 变换记法 | `decision`：`T_AB · p_B = p_A`，列向量左乘；`T_WC` 为 Camera → World，投影使用 `T_CW = inverse(T_WC)` | `T_WC/T_CW` 方向及全部投影公式 |
+| World frame | `decision`：右手系、`+Z` 向上、长度单位 meter | 重力方向、姿态和单位换算 |
+| Camera frame | `decision`：Observation 使用 OpenCV 语义，`+X` 右、`+Y` 下、`+Z` 前；WebGL 转换只在 Viewer consumer 内派生 | `K`、投影符号和 OpenCV/OpenGL bridge |
+| Pose 与时间 | `decision`：quaternion 固定 `[w, x, y, z]`、有限、归一化并确定性序列化，插值前按相邻点积处理双覆盖；`episode_time_s` 从首个 Observation 的 `0.0` 开始，Observation 严格递增，同步字段共时，事件可同刻但不得倒退 | round-trip、插值和序列排序 |
+| 缺失语义 | `decision`：所有可能缺失的值使用 `availability` tagged union；`present` 必须且只能携带有效 `value`，`missing` 必须携带 `not_measured`、`not_provided`、`not_applicable`、`redacted` 或 `invalidated` 且禁止 `value`；`hold` 不是 missing action | schema union、validator 和错误报告 |
+| Canonical object frame / symmetry | `decision`：frame 由 producer 创建并在 episode 内不变；synthetic 原点为刚体质心、轴为 producer 声明的右手语义轴，禁止观测/PCA/mesh 推断；`T_WO · p_O = p_W`；symmetry 显式为 `none`、单位 `wxyz` 有限旋转集合或绕归一化 object axis 的连续旋转，未知则 `missing:not_provided` 并阻塞姿态指标 | 跨源对齐、姿态 round-trip 与 symmetry-aware error |
+| PR-00 数据范围 | `decision`：固定 seed/config 的仓库内 JavaScript producer 生成 `synthetic-audit-v0`；Git 只收 producer、fixture spec 与预期 checksum manifest，派生资源 ignored；记录 producer version、config hash 和 lineage；不联网、不下载数据、不读旧归档 | 许可、磁盘、checksum 与复现成本 |
+
+本表各项均已成为 decision。Owner 改选任一坐标、序列化或工具链方案时，应先更新 PRD/ADR
+与本节，再创建或修改机器 contract；不得在实现中静默采用另一套 convention。
+
 **最小范围**
 
 - 定义 `T_WC`、`T_WO`、`T_OC` 的方向、作用对象、左右手系和单位。
@@ -165,17 +220,57 @@ warning、fallback 和未运行项。
 - 提供一个合成 episode 和最小同步查看工具。
 - 不包含模型训练。
 
+**同一 PR 内的实现检查点**
+
+这些是一个假设下的顺序检查点，不拆成多个互相独立宣称成功的 PR：
+
+1. **Decision freeze**：Owner 批准许可证、唯一 contract 源、工具链、frame convention、
+   缺失语义和 primary endpoint；`ADR-002` 同步权威命令。
+2. **Contract source**：建立唯一 machine-readable schema，明确 producer/consumer、版本、
+   required/optional、单位、默认值、兼容、迁移和回滚；提供最小 valid/invalid records。
+3. **Frame math**：实现与 schema 同语义的 compose/invert/project/unproject validator；
+   evaluator 不复用被测投影函数计算 GT。
+4. **Synthetic episode**：固定 seed 生成一个含相机、两个带 symmetry metadata 的对象、显式
+   `hold` 与非零 intervention、lineage、checksum 和 missing-field case 的小 fixture。
+5. **Web consumer 与 verdict**：当前 Web viewer 只作为 contract consumer，同步显示 RGB、
+   3D 对象、相机、坐标轴和轨迹；输出机器 report 与 supported/rejected/blocked/invalid。
+
+五个检查点当前均已在本地实现并由 `npm run check` 复现。任何后续修改若使 Decision Freeze、
+唯一 schema、独立 evaluator 或 Web fail-closed 条件失效，`PR-00` 必须回到 `blocked` 或
+`invalid`，不得通过临时 JSON、Viewer 私有字段或第二份 schema 绕过。
+
+**必须捕获的反例矩阵**
+
+- `T_WC` 与 `T_CW` 互换、矩阵逆序和 row/column-vector 混用；
+- meter/centimeter 混用、右手/左手镜像、OpenCV/OpenGL `Y/Z` convention 混用；
+- 非单位 quaternion、错误 quaternion component order 和 symmetry metadata 缺失；
+- 越界或相机后方点、无效深度、奇异内参和不可逆 transform；
+- `hold` 与 missing action 混淆，commanded/executed action 静默合并；
+- 重复 object/episode/sibling IDs、倒退或越界 `episode_time_s`、错误 checksum 与 lineage 断链；
+- 用零矩阵、空字符串、NaN 或默认 confidence 伪装缺失值。
+
 **裁决门**
 
-- 投影与反投影往返通过冻结容差。
-- 合成重投影误差的候选门为小于 1 像素；正式统计量和阈值由 `PR-00` pilot/Owner 冻结。
-- 测试能捕获坐标方向、单位和 OpenCV/OpenGL convention 错误。
-- schema 的 producer、consumer、版本、必填/可选和 round-trip 行为明确。
+- primary endpoint 达到冻结阈值，且 evaluator 与实现链路独立。
+- compose/invert 及投影/反投影往返通过冻结容差；零个有效点不得记为 pass。
+- 上述反例矩阵全部被行为测试拒绝，并输出字段路径、错误类别和 source context。
+- schema 的 producer、consumer、版本、必填/可选、round-trip、兼容、迁移和回滚行为明确。
+- fixture 与 report 固定 seed、schema version、producer version、config hash 和 checksum。
+- Web Demo 从唯一 contract 读取，不拥有第二份字段真值；Demo 可见不等于 correctness pass。
 
 **失败路径**
 
 任何坐标或 contract 不一致都阻塞 `PR-01`、`PR-03` 和 `PR-05`，只修根因，不以 adapter
-补丁掩盖。
+补丁掩盖。许可证或工具链未冻结时状态是 `blocked`；
+测试链或 evaluator 与实现共享错误逻辑时状态是 `invalid`；有效实验仍不能满足 endpoint 时
+状态是 `rejected`。无论哪种状态都保留 fixture、报告和失败证据，不降级成“schema 可解析”。
+
+**明确范围外**
+
+- 外部数据 adapter、真实相机标定、ManiSkill/Kubric 下载和 dataset-specific aliases；
+- Gaussian 构建、模型训练、对象发现、在线身份、动作预测或因果结论；
+- 通用 3D 文件格式、持久化服务、公共网络 API、codegen 平台或 viewer 框架重写；
+- 为兼容旧归档 contract 增加双写、fallback 或未批准迁移层。
 
 **Demo**
 
@@ -706,10 +801,10 @@ demo command
 
 ## 19. 仍待 Owner 确认
 
-实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A。以下前置决策仍未完成：
+实现路径原则和首个验收目标已经确认：先面向研究评审交付 Demo A。新项目当前保持私有并按
+all rights reserved 管理；对外发布前重新决策许可证。以下前置决策仍未完成：
 
-- 新项目许可证与允许移植的归档文件；
-- 最小技术栈、目录、落盘格式、包管理和 CI；
+- 未来训练栈、长期目录和数据落盘格式；
 - 首阶段磁盘、下载、算力和最长验收时间预算；
 - 各 PR 的正式数值阈值、统计检验和资源预算；
 - 目标机器人、动作空间、控制频率和安全规范。
@@ -720,7 +815,11 @@ Gaussian 是否进入 dynamics 不再要求 Owner 预先选择，由 `PR-04` 的
 
 当前工作区无需同步旧仓库。顺序更新为：
 
-1. 运行并评审 Stage-0 本地页面及其证据边界；
-2. 完成 `DOC-000`、`DEC-001` 和其余 `RES-001`，把 ADR-001 之外的训练/模型栈另行冻结；
-3. 仅在核心前置门通过后开始 `PR-00` 机器 contract 与坐标门；
-4. 不借 Stage-0 授权提前创建训练框架、公共 schema、模型依赖或大型数据副本。
+1. Stage-0 已由 `c1927b1` 提交；继续保持外部审计样例 ignored，不推送数据。
+2. `PR-00` Decision Freeze、ADR-002、唯一 schema、producer、evaluator、Web consumer、CI 和
+   本地 `supported` report 已完成；Owner 先评审当前 diff 与证据，再单独决定是否授权 commit。
+3. Commit 授权前不执行提交、push 或 PR 创建；远端 GitHub Actions 只有实际运行后才能记为
+   CI 证据。
+4. `PR-00` 窄 verdict 已解除 `PR-01`、`PR-03` 和 `PR-05` 的 contract 依赖，但不自动批准数据
+   下载、训练栈或实现范围。下一阶段先完成相应 `RES-001` 上游/许可/预算审核，再为选定的
+   单一假设冻结 endpoint 和实现 contract。

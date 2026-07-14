@@ -1,0 +1,597 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sessgraph/ObjGauss/contracts/objgauss/0.1.0/episode.schema.json",
+  "title": "ObjGauss Episode Contract",
+  "description": "PR-00 synthetic episode contract. This schema does not claim real-data, reconstruction, dynamics, or planning validity.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_kind",
+    "episode_id",
+    "sibling_group_id",
+    "fixture_id",
+    "producer",
+    "license_boundary",
+    "coordinate_convention",
+    "observations",
+    "interventions",
+    "causal_lineage",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "contract_kind": { "const": "objgauss.episode" },
+    "episode_id": { "$ref": "#/$defs/identifier" },
+    "sibling_group_id": { "$ref": "#/$defs/identifier" },
+    "fixture_id": { "const": "synthetic-audit-v0" },
+    "producer": { "$ref": "#/$defs/producer" },
+    "license_boundary": { "$ref": "#/$defs/licenseBoundary" },
+    "coordinate_convention": { "$ref": "#/$defs/coordinateConvention" },
+    "observations": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/intervention" }
+    },
+    "causal_lineage": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/lineageRecord" }
+    },
+    "audit": { "$ref": "#/$defs/audit" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "finiteNumber": {
+      "type": "number"
+    },
+    "vector2": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "vector3": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "quaternionWxyz": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "matrix3RowMajor": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finiteNumber" },
+      "minItems": 9,
+      "maxItems": 9
+    },
+    "matrix4RowMajor": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finiteNumber" },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "source": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "enum": ["synthetic_producer", "oracle", "commanded", "executed"]
+        },
+        "ref": { "$ref": "#/$defs/identifier" }
+      },
+      "unevaluatedProperties": false
+    },
+    "missing": {
+      "type": "object",
+      "required": ["availability", "reason"],
+      "properties": {
+        "availability": { "const": "missing" },
+        "reason": {
+          "enum": [
+            "not_measured",
+            "not_provided",
+            "not_applicable",
+            "redacted",
+            "invalidated"
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "arrayResource": {
+      "type": "object",
+      "required": ["uri", "media_type", "dtype", "shape", "sha256", "source"],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]*$"
+        },
+        "media_type": {
+          "enum": [
+            "application/vnd.objgauss.rgb8",
+            "application/vnd.objgauss.depth-f32le",
+            "application/vnd.objgauss.mask-u8"
+          ]
+        },
+        "dtype": { "enum": ["uint8", "float32le"] },
+        "shape": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": { "type": "integer", "minimum": 1, "maximum": 4096 }
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "unevaluatedProperties": false
+    },
+    "presentResource": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": { "$ref": "#/$defs/arrayResource" }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableResource": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentResource" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "presentIntrinsics": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "type": "object",
+          "required": ["matrix_row_major", "image_size_px", "confidence", "source"],
+          "properties": {
+            "matrix_row_major": { "$ref": "#/$defs/matrix3RowMajor" },
+            "image_size_px": {
+              "type": "array",
+              "prefixItems": [
+                { "type": "integer", "minimum": 1, "maximum": 4096 },
+                { "type": "integer", "minimum": 1, "maximum": 4096 }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableIntrinsics": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentIntrinsics" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "presentTransform": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "type": "object",
+          "required": ["matrix_row_major", "confidence", "source"],
+          "properties": {
+            "matrix_row_major": { "$ref": "#/$defs/matrix4RowMajor" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableTransform": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentTransform" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "presentVector3Measurement": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "type": "object",
+          "required": ["data", "confidence", "source"],
+          "properties": {
+            "data": { "$ref": "#/$defs/vector3" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableVector3Measurement": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentVector3Measurement" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "presentNumberMeasurement": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "type": "object",
+          "required": ["data", "confidence", "source"],
+          "properties": {
+            "data": { "type": "number" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableNumberMeasurement": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentNumberMeasurement" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "presentBooleanMeasurement": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "type": "object",
+          "required": ["data", "confidence", "source"],
+          "properties": {
+            "data": { "type": "boolean" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableBooleanMeasurement": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentBooleanMeasurement" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "symmetryNone": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": { "kind": { "const": "none" } },
+      "unevaluatedProperties": false
+    },
+    "symmetryFinite": {
+      "type": "object",
+      "required": ["kind", "rotations_wxyz"],
+      "properties": {
+        "kind": { "const": "finite" },
+        "rotations_wxyz": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/quaternionWxyz" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "symmetryContinuous": {
+      "type": "object",
+      "required": ["kind", "axis_O"],
+      "properties": {
+        "kind": { "const": "continuous_axis" },
+        "axis_O": { "$ref": "#/$defs/vector3" }
+      },
+      "unevaluatedProperties": false
+    },
+    "presentSymmetry": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": {
+          "oneOf": [
+            { "$ref": "#/$defs/symmetryNone" },
+            { "$ref": "#/$defs/symmetryFinite" },
+            { "$ref": "#/$defs/symmetryContinuous" }
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableSymmetry": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentSymmetry" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "canonicalFrame": {
+      "type": "object",
+      "required": ["origin", "axes_source", "handedness"],
+      "properties": {
+        "origin": { "const": "center_of_mass" },
+        "axes_source": { "const": "producer_authored" },
+        "handedness": { "const": "right" }
+      },
+      "unevaluatedProperties": false
+    },
+    "objectBelief": {
+      "type": "object",
+      "required": [
+        "object_id",
+        "canonical_frame",
+        "symmetry",
+        "T_WO",
+        "linear_velocity_W_mps",
+        "angular_velocity_W_radps",
+        "visibility",
+        "existence",
+        "mask",
+        "estimate_phase"
+      ],
+      "properties": {
+        "object_id": { "$ref": "#/$defs/identifier" },
+        "canonical_frame": { "$ref": "#/$defs/canonicalFrame" },
+        "symmetry": { "$ref": "#/$defs/availableSymmetry" },
+        "T_WO": { "$ref": "#/$defs/availableTransform" },
+        "linear_velocity_W_mps": { "$ref": "#/$defs/availableVector3Measurement" },
+        "angular_velocity_W_radps": { "$ref": "#/$defs/availableVector3Measurement" },
+        "visibility": { "$ref": "#/$defs/availableNumberMeasurement" },
+        "existence": { "$ref": "#/$defs/availableBooleanMeasurement" },
+        "mask": { "$ref": "#/$defs/availableResource" },
+        "estimate_phase": { "const": "oracle" }
+      },
+      "unevaluatedProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "observation_id",
+        "episode_time_s",
+        "rgb",
+        "depth",
+        "K",
+        "T_WC",
+        "objects"
+      ],
+      "properties": {
+        "observation_id": { "$ref": "#/$defs/identifier" },
+        "episode_time_s": { "type": "number", "minimum": 0 },
+        "rgb": { "$ref": "#/$defs/availableResource" },
+        "depth": { "$ref": "#/$defs/availableResource" },
+        "K": { "$ref": "#/$defs/availableIntrinsics" },
+        "T_WC": { "$ref": "#/$defs/availableTransform" },
+        "objects": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/objectBelief" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "actionValue": {
+      "type": "object",
+      "required": ["kind", "vector_W_N", "duration_s", "source"],
+      "properties": {
+        "kind": { "enum": ["hold", "push"] },
+        "vector_W_N": { "$ref": "#/$defs/vector3" },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "unevaluatedProperties": false
+    },
+    "presentAction": {
+      "type": "object",
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "present" },
+        "value": { "$ref": "#/$defs/actionValue" }
+      },
+      "unevaluatedProperties": false
+    },
+    "availableAction": {
+      "oneOf": [
+        { "$ref": "#/$defs/presentAction" },
+        { "$ref": "#/$defs/missing" }
+      ]
+    },
+    "intervention": {
+      "type": "object",
+      "required": [
+        "intervention_id",
+        "episode_time_s",
+        "target_object_id",
+        "commanded_action",
+        "executed_action"
+      ],
+      "properties": {
+        "intervention_id": { "$ref": "#/$defs/identifier" },
+        "episode_time_s": { "type": "number", "minimum": 0 },
+        "target_object_id": { "$ref": "#/$defs/identifier" },
+        "commanded_action": { "$ref": "#/$defs/availableAction" },
+        "executed_action": { "$ref": "#/$defs/availableAction" }
+      },
+      "unevaluatedProperties": false
+    },
+    "lineageRecord": {
+      "type": "object",
+      "required": [
+        "lineage_id",
+        "output_ref",
+        "input_refs",
+        "producer_version",
+        "transform_version",
+        "config_sha256"
+      ],
+      "properties": {
+        "lineage_id": { "$ref": "#/$defs/identifier" },
+        "output_ref": { "$ref": "#/$defs/identifier" },
+        "input_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "producer_version": { "const": "0.1.0" },
+        "transform_version": { "const": "pr00-frame-math-0.1.0" },
+        "config_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "auditPoint": {
+      "type": "object",
+      "required": ["case_id", "observation_id", "point_W_m", "expected_pixel"],
+      "properties": {
+        "case_id": { "$ref": "#/$defs/identifier" },
+        "observation_id": { "$ref": "#/$defs/identifier" },
+        "point_W_m": { "$ref": "#/$defs/vector3" },
+        "expected_pixel": { "$ref": "#/$defs/vector2" }
+      },
+      "unevaluatedProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "required": [
+        "primary_endpoint",
+        "threshold_exclusive_px",
+        "primary_points",
+        "required_negative_cases"
+      ],
+      "properties": {
+        "primary_endpoint": { "const": "max_camera_reprojection_error_px" },
+        "threshold_exclusive_px": { "const": 1 },
+        "primary_points": {
+          "type": "array",
+          "minItems": 24,
+          "items": { "$ref": "#/$defs/auditPoint" }
+        },
+        "required_negative_cases": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "swapped_transform_direction",
+              "row_column_vector_mix",
+              "centimeter_meter_mix",
+              "opencv_webgl_mix",
+              "non_unit_quaternion",
+              "behind_camera_point",
+              "out_of_bounds_point",
+              "singular_intrinsics",
+              "hold_missing_action_mix",
+              "duplicate_object_id",
+              "non_monotonic_time",
+              "broken_checksum",
+              "broken_lineage",
+              "sentinel_missing_value"
+            ]
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "producer": {
+      "type": "object",
+      "required": ["name", "version", "seed", "fixture_spec", "config_sha256"],
+      "properties": {
+        "name": { "const": "objgauss.synthetic-audit" },
+        "version": { "const": "0.1.0" },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "fixture_spec": { "const": "synthetic-audit-v0" },
+        "config_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "unevaluatedProperties": false
+    },
+    "licenseBoundary": {
+      "type": "object",
+      "required": ["project_policy", "distribution", "archive_migration"],
+      "properties": {
+        "project_policy": { "const": "all-rights-reserved" },
+        "distribution": { "const": "internal-only" },
+        "archive_migration": { "const": "none" }
+      },
+      "unevaluatedProperties": false
+    },
+    "coordinateConvention": {
+      "type": "object",
+      "required": [
+        "id",
+        "matrix_storage",
+        "vector_action",
+        "transform_notation",
+        "world_handedness",
+        "world_up",
+        "length_unit",
+        "camera_axes",
+        "quaternion_order",
+        "time_field",
+        "time_unit"
+      ],
+      "properties": {
+        "id": { "const": "robotics-opencv-v1" },
+        "matrix_storage": { "const": "row-major" },
+        "vector_action": { "const": "column-vector-left-multiply" },
+        "transform_notation": { "const": "T_AB-maps-B-to-A" },
+        "world_handedness": { "const": "right" },
+        "world_up": { "const": "+Z" },
+        "length_unit": { "const": "meter" },
+        "camera_axes": { "const": "+X-right,+Y-down,+Z-forward" },
+        "quaternion_order": { "const": "wxyz" },
+        "time_field": { "const": "episode_time_s" },
+        "time_unit": { "const": "second" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

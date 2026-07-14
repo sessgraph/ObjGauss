@@ -44,8 +44,8 @@ ObjGauss 已有研究路线，但此前工作区只有文档，Owner 无法看�
   `local-file · unverified`，不能提升为项目证据。
 - 页面必须同时显示 provenance、许可审查边界和禁止声明。默认 synthetic fixture 标为
   `semantic_kind=synthetic-gaussian-world`、`asset_provenance=generated-in-browser` 和
-  `third_party_asset_review=not-required`，同时明确 `project_license=unresolved`；可选 Lego
-  审计样例保持
+  `third_party_asset_review=not-required`。本 ADR 作出时的 `project_license=unresolved` 已由
+  Owner 后续决定替代：当前项目保持私有并按 all rights reserved 管理；可选 Lego 审计样例保持
   `semantic_kind=point-derived-splat`、`asset_provenance=unverified` 和
   `license_status=review-pending`，并显示“容器 MIT、逐资产权利与生成链未核验”。实际渲染
   Gaussian 不等于 trained 3DGS，更不等于 ObjGauss 重建、对象状态、动力学、规划价值或研究门

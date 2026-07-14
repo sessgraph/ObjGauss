@@ -24,7 +24,7 @@
       <header class="topbar">
         <a class="brand" href="../README.md" aria-label="ObjGauss README">
           <span class="brand-mark" aria-hidden="true">OG</span>
-          <span><strong>ObjGauss</strong><small>GAUSSIAN WORLD / STAGE-0</small></span>
+          <span><strong>ObjGauss</strong><small>GAUSSIAN WORLD / PR-00</small></span>
         </a>
         <div class="scene-identity">
           <small>ACTIVE SCENE</small>
@@ -48,6 +48,46 @@
         <span><small>SPLATS</small><strong id="render-count">0 / 0</strong></span>
         <span><small>RENDER FPS</small><strong id="render-fps">—</strong></span>
         <span><small>DEPTH SORT</small><strong id="sort-time">—</strong></span>
+      </section>
+
+      <section class="contract-workbench" id="contract-workbench" aria-label="PR-00 contract viewer" hidden>
+        <header class="contract-header">
+          <div>
+            <small>PR-00 · SYNTHETIC CONTRACT AUDIT</small>
+            <strong>状态、坐标与重投影证据</strong>
+          </div>
+          <div class="contract-header-actions">
+            <span id="contract-status" data-kind="loading">VALIDATING</span>
+            <button id="close-contract" type="button" aria-label="关闭 PR-00 contract viewer">×</button>
+          </div>
+        </header>
+        <div class="contract-grid">
+          <article class="contract-card rgb-card">
+            <header><small>SYNCHRONIZED RGB</small><strong id="contract-frame">等待 contract</strong></header>
+            <canvas id="contract-rgb" aria-label="当前 synthetic observation RGB"></canvas>
+          </article>
+          <article class="contract-card world-card">
+            <header><small>WORLD / CAMERA / OBJECTS</small><strong>Robotics/OpenCV · +Z up</strong></header>
+            <canvas id="contract-world" aria-label="对象、相机、坐标轴和轨迹的同步三维示意"></canvas>
+          </article>
+          <aside class="contract-card contract-ledger">
+            <header><small>MACHINE VERDICT</small><strong>窄声明账本</strong></header>
+            <dl>
+              <div><dt>Verdict</dt><dd id="contract-verdict">—</dd></div>
+              <div><dt>Max reprojection</dt><dd><span id="contract-endpoint">—</span> px</dd></div>
+              <div><dt>Depth range</dt><dd id="contract-depth">—</dd></div>
+              <div><dt>Objects</dt><dd id="contract-object-count">—</dd></div>
+              <div><dt>Action</dt><dd id="contract-action">—</dd></div>
+              <div><dt>Episode SHA</dt><dd id="contract-checksum">—</dd></div>
+            </dl>
+            <p class="contract-allowed">仅支持 synthetic contract、坐标链与独立重投影门。</p>
+            <p class="contract-denied">不支持真实数据、Gaussian 重建、世界模型、动力学或规划价值声明。</p>
+          </aside>
+        </div>
+        <footer class="contract-timeline">
+          <label for="contract-timeline"><span>EPISODE TIME</span><strong>0.0 s → 2.0 s</strong></label>
+          <input id="contract-timeline" type="range" min="0" max="2" step="1" value="0" />
+        </footer>
       </section>
 
       <details class="inspector-panel" id="scene-inspector" open>
@@ -89,6 +129,9 @@
         <button class="tool-action primary" id="load-world" type="button">
           <span aria-hidden="true">◉</span><strong>Gaussian 世界</strong>
         </button>
+        <button class="tool-action" id="load-contract" type="button">
+          <span aria-hidden="true">⌖</span><strong>PR-00 Contract</strong>
+        </button>
         <button class="tool-action" id="reset-camera" type="button">
           <span aria-hidden="true">↺</span><strong>重置视角</strong>
         </button>
@@ -118,7 +161,7 @@
       <div class="drop-hint">DROP LOCAL .SPLAT ANYWHERE</div>
       <footer class="world-footer">
         <span>screen-space covariance · premultiplied alpha · back-to-front sort</span>
-        <span>synthetic viewer fixture only — PR-00 episode and coordinate contract are not implemented</span>
+        <span>Stage-0 render and PR-00 contract evidence remain separate; neither is a model claim</span>
       </footer>
     </main>
     <script type="module" src="./app.mjs"></script>

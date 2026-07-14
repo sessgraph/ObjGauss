@@ -5,6 +5,7 @@ import {
 } from "./splat-format.mjs";
 import { SplatRenderer } from "./splat-renderer.mjs";
 import { createSyntheticWorldSplat } from "./synthetic-world.mjs";
+import { initPr00View } from "./pr00-view.mjs";
 
 const SYNTHETIC_SAMPLE = Object.freeze({
   name: "ObjGauss synthetic Gaussian world",
@@ -240,7 +241,7 @@ async function loadSyntheticWorld() {
       mode: "synthetic-world · deterministic",
       semanticKind: "synthetic-gaussian-world",
       provenance: "generated-in-browser",
-      license: "third-party review: not-required · project license: unresolved",
+      license: "third-party review: not-required · project: all-rights-reserved / internal-only",
       displayScale: 0.75,
       cameraMode: "immersive",
       readyHeading: "Gaussian 世界已就绪",
@@ -310,7 +311,7 @@ async function loadLocalFile(file) {
       mode: "local-file · unverified",
       semanticKind: "local-splat",
       provenance: "unverified",
-      license: "third-party review: unverified · project license: unresolved",
+      license: "third-party review: unverified · project: all-rights-reserved / internal-only",
       displayScale: 1,
       loadId,
     });
@@ -382,6 +383,7 @@ elements.dropZone.addEventListener("drop", (event) => {
   }
 });
 
+initPr00View();
 if (renderer !== null) {
   if (matchMedia("(max-width: 900px)").matches) {
     elements.sceneInspector.open = false;

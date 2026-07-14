@@ -6,6 +6,8 @@ const html = readFileSync("viewer/index.html", "utf8");
 const app = readFileSync("viewer/app.mjs", "utf8");
 const renderer = readFileSync("viewer/splat-renderer.mjs", "utf8");
 const syntheticWorld = readFileSync("viewer/synthetic-world.mjs", "utf8");
+const pr00View = readFileSync("viewer/pr00-view.mjs", "utf8");
+const browserConsumer = readFileSync("src/pr00/browser-consumer.mjs", "utf8");
 
 test("viewer exposes an actual WebGL canvas and local .splat input", () => {
   assert.match(html, /id="splat-canvas"/);
@@ -30,15 +32,32 @@ test("renderer projects covariance and uses Gaussian alpha, not point sprites", 
   assert.match(renderer, /centerPositionsForRendering/);
 });
 
-test("world presentation uses Gaussian environment records and labels its Stage-0 boundary", () => {
+test("world presentation keeps Stage-0 rendering separate from PR-00 contract evidence", () => {
   assert.match(html, /class="world-stage"/);
   assert.match(syntheticWorld, /createSyntheticWorldSplat/);
   assert.match(app, /loadSyntheticWorld/);
   assert.doesNotMatch(renderer, /gl\.LINES/);
-  assert.match(html, /PR-00 episode and coordinate contract are not implemented/);
+  assert.match(html, /id="load-contract"/);
+  assert.match(html, /id="contract-workbench"/);
+  assert.match(html, /Stage-0 render and PR-00 contract evidence remain separate/);
+  assert.match(pr00View, /loadPr00Contract/);
+  assert.match(pr00View, /drawCamera/);
+  assert.match(pr00View, /drawTrajectory/);
+  assert.match(pr00View, /drawAxes/);
+  assert.match(pr00View, /mode.*contract/);
   assert.match(html, /WASD/);
   assert.match(renderer, /this\.camera\.yaw = Math\.PI/);
   assert.match(renderer, /this\.boundsRadius \* \(narrowScreen \? 0\.42 : 0\.5\)/);
+});
+
+test("browser consumer validates the unique schema, checksums, resources, and report before display", () => {
+  assert.match(browserConsumer, /createEpisodeValidator/);
+  assert.match(browserConsumer, /schema SHA-256/);
+  assert.match(browserConsumer, /episode SHA-256/);
+  assert.match(browserConsumer, /machine verdict/);
+  assert.match(pr00View, /BLOCKED/);
+  assert.match(html, /仅支持 synthetic contract、坐标链与独立重投影门/);
+  assert.match(html, /不支持真实数据、Gaussian 重建、世界模型、动力学或规划价值声明/);
 });
 
 test("page keeps rendering claims separate from research claims", () => {

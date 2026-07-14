@@ -7,18 +7,62 @@
 
 ### 当前事实
 
-- 当前阶段：Demo A 的 Stage-0 可见切片；核心 `PR-00` contract 尚未建立或通过。
-- 当前主要交付物：PRD、实施计划、资源台账、可执行协作规则，以及可复现的本地数据预览。
+- 当前阶段：Demo A 的 `PR-00` contract 切片；Stage-0 与 `PR-00` 的准确动态状态以
+  `docs/PROJECT_PLAN.md` 为准。
+- 当前主要交付物：唯一机器 contract、确定性 synthetic fixture producer、独立 evaluator、
+  Web 证据页、机器报告，以及与其一致的 PRD、计划、资源台账和协作规则。
 - 拟议研究方向：对象中心、动作条件的 Gaussian 世界模型；方向、完成层级和阈值仍是
   working_assumption，只有 Owner 明确确认后才是 decision。
 - Owner 已确认实现路径按“一个 PR 只引入一个可证伪假设”拆分，并由 PR-04 实验裁决
   Gaussian 是否进入 dynamics 核心；准确队列以 docs/PROJECT_PLAN.md 为准。
-- 当前分支已有无生产依赖的静态 `viewer/`、确定性 synthetic Gaussian world、Node 内置测试
-  和固定审计样例下载脚本；仍没有模型代码、依赖锁文件、原始训练数据、checkpoint 或已批准
-  的机器 schema。
+- 当前工作区已有 Stage-0 `viewer/`、`PR-00` 的 JSON Schema `0.1.0`、Node/npm 锁文件、
+  synthetic producer、独立 evaluator、Web consumer、行为测试和 GitHub Actions workflow；仍
+  没有模型代码、原始训练数据或 checkpoint。
 - Owner 已明确要求 Stage-0 不使用 notebook，而是直接看到渲染后的 3D Gaussian；已批准把
   一个固定 `.splat` 下载到 ignored `data/` 并构建 WebGL2 页面。准确来源、大小、哈希与
   声明边界以 REFERENCES.md 为准，该授权不延伸到训练数据或其他 3DGS 资产。
+- Owner 已决定新项目当前保持私有并按 all rights reserved 管理；对外发布前必须重新做
+  许可证决策。该决定不授权复制旧归档中的任何实现。
+- Owner 已决定 `PR-00` 以 JSON Schema Draft 2020-12 作为唯一机器 contract 源；当前唯一
+  schema 是 `contracts/objgauss/0.1.0/episode.schema.json`，Web、未来 Python 和其他工具只能
+  作为 consumer。
+- Owner 已批准 `PR-00` 使用 JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild 和 `node:test`；
+  不引入服务端框架。精确依赖版本由实现时的 lockfile 固定；该决定不冻结未来 Python/训练
+  技术栈。
+- Owner 已批准以 GitHub Actions 作为 `PR-00` CI，并以 `npm run check` 作为本地与 CI 的唯一
+  验收入口；PR 和 `main` 均使用 Node `24.18.0`、`npm ci`、contract audit、测试、Web build
+  和语法检查。真实脚本、lockfile 与 workflow 已建立；该授权不包含 push、部署或发布。
+- Owner 已冻结 `PR-00` Robotics/OpenCV 坐标约定：`T_AB · p_B = p_A`，列向量左乘；World
+  为右手系、`+Z` 向上、meter；Camera 为 `+X` 右、`+Y` 下、`+Z` 前；`T_WC` 表示 Camera
+  到 World，投影使用 `T_CW = inverse(T_WC)`；WebGL bridge 只属于 Viewer consumer。
+- Owner 已冻结 `PR-00` 姿态与时间语义：quaternion 为 `[w, x, y, z]`、有限且归一化，序列化
+  使用确定性符号，插值前按相邻点积处理双覆盖；`episode_time_s` 从首个 Observation 的 `0.0`
+  开始，Observation 严格递增，同步字段共时，事件可同刻但不得倒退。
+- Owner 已冻结 `PR-00` 缺失语义：所有可能缺失的 contract 值使用 `availability` tagged union；
+  `present` 必须且只能携带有效 `value`，`missing` 必须携带 `not_measured`、`not_provided`、
+  `not_applicable`、`redacted` 或 `invalidated` 之一且禁止 `value`。`null`、零/单位哨兵、空串、
+  NaN 和默认置信度不得冒充缺失；`hold` 是实际动作，不是 missing action。
+- Owner 已冻结 `PR-00` 唯一 primary endpoint：固定 `synthetic-audit-v0` 全部 primary points 的
+  2D Euclidean 像素误差最大值 `max_camera_reprojection_error_px < 1.0`。Evaluator 必须独立；
+  任一点未达门为 `rejected`，零有效点或 evaluator 复用被测投影逻辑为 `invalid`；相机后方、
+  越界和奇异内参属于必须拒绝的负例，不进入 primary 统计。
+- Owner 已冻结 `PR-00` fixture/资源边界：固定 seed/config 的仓库内 JavaScript producer 生成
+  `synthetic-audit-v0`；Git 只收 producer、fixture spec 和预期 checksum manifest，派生资源
+  ignored。RGB/depth 等数组只用含 `uri`、`media_type`、`dtype`、`shape`、`sha256` 的 descriptor
+  引用；记录 producer version、config hash 和 lineage；PR-00 不联网、不下载数据、不读旧归档。
+- Owner 已冻结 schema 版本/兼容策略：从 `0.1.0` 开始使用严格 SemVer；每份 schema 的版本化
+  `$id` 与记录的精确 `schema_version` 匹配，所有 object schema 拒绝未知字段。已发布版本不可
+  原地修改；`0.x` 中改变合法实例集合必须升级 MINOR，PATCH 不得改变 contract；跨版本只允许
+  显式、可测试的迁移并记录迁移前后 checksum/lineage，禁止静默自动升级。
+- Owner 已冻结 canonical object frame/symmetry：object frame 由 producer 在对象创建时定义并在
+  episode 内保持不变；synthetic 原点为刚体质心，轴为 producer 声明的右手语义轴，禁止从
+  观测、PCA 或 mesh 外观推断。`T_WO · p_O = p_W`。Symmetry 显式为 `none`、单位 `wxyz`
+  有限旋转集合或绕归一化 object-frame axis 的连续旋转；未知时为 `missing:not_provided`，
+  姿态指标 `blocked`，不得默认 `none`。
+- Owner 已冻结 `PR-00` claim/archive 边界：全部实现从零编写，不复制旧归档的代码、schema、
+  测试、Viewer 或阈值；旧归档仅可用 `git show` 做只读思想参考，未来移植须逐文件重新授权并
+  记录许可审查。PR-00 最多声明 synthetic contract、坐标链和独立重投影门得到支持，不得声明
+  真实数据、Gaussian 重建、世界模型、动力学或规划价值。
 - 旧 ObjGauss 完整恢复点为标签 archive/objgauss-final-2026-07-14；它不是当前项目。
 
 ### 当前用户与可观察结果
@@ -27,13 +71,15 @@
 - 当前可观察结果是：项目目标、证据边界、资源状态、阶段门和下一批 PR 能被独立理解与评审；
   贡献者还能在本地打开沉浸式 Stage-0 页面，从环境内部环绕、平移、移动和缩放由 8,523 个
   splat 组成的确定性 synthetic Gaussian world，并可切换到通过固定哈希校验的
-  103,060-splat 外部审计样例。
+  103,060-splat 外部审计样例；也能打开 `PR-00` Web 证据页，同步查看已验证 contract 的
+  RGB、对象、相机、坐标轴、轨迹和机器裁决。
 - 长期目标用户、产品形态和首个对外成果仍待 Owner 在 PRD 评审中确认。
 
 ### 当前不变量
 
 1. 计划、候选、synthetic、fixture、reviewable 或 archive fact 不得描述成新项目已实现能力。
-2. 在许可证、技术栈、数据预算和验收命令获批前，不预建框架、不新增生产依赖、不下载大型数据。
+2. 在技术栈、数据预算和验收命令获批前，不预建框架、不新增生产依赖、不下载大型数据；
+   当前项目不得对外发布或以开放许可证分发。
 3. 不整体恢复旧项目；只读参考或经 Owner 对具体文件批准后做最小移植。
 4. 不修改或删除归档标签 archive/objgauss-final-2026-07-14。
 5. 数据、模型、指标和声明必须保留来源、版本、许可、lineage 和失败证据。
@@ -43,7 +89,8 @@
 
 ### 当前明确不做
 
-- 除已批准的 Stage-0 静态预览外，不实现模型、服务、公共 API、持久化或机器人控制。
+- 除已批准的 Stage-0 与 `PR-00` contract 切片外，不实现模型、服务、公共 API、持久化或
+  机器人控制。
 - 不把旧 M2、BOP、RBO、NeRF Lego 或 Hugging Face 结果当作新项目当前基线。
 - 不在 Identity Gate 之前扩展复杂因果头、diffusion、replay buffer 或自生成训练。
 - 不按“适配一个数据集”打包模型、评估和 Demo 等多个无法独立裁决的目标。
@@ -51,7 +98,7 @@
 
 ### 关键风险
 
-- 产品目标、技术栈、许可证和资源预算尚未由 Owner 确认。
+- 长期产品目标、训练技术栈、资源预算和未来对外发布许可证尚未由 Owner 确认。
 - Stage-0 固定 `.splat` 的直接上游位置、大小和哈希已核验，但其资产生成 provenance 仍未
   核验；大多数外部数据集字段、版本、规模和许可也尚未用上游一手资料复核。
 - 身份、坐标、future leakage 和 sibling split 错误会污染后续动力学与因果结论。
@@ -68,9 +115,9 @@
 | 候选数据、外部地址、归档资源、许可状态与历史负证据 | REFERENCES.md |
 | 当前实际文件与改动 | 文件系统、git status --short 和可复现命令结果 |
 | 稳定协作与授权规则 | 本文件 |
-| 公共机器 contract | 尚未建立；docs/PRD.md 第 6 节仅是概念草案，由 PR-00 建立唯一机器源 |
-| 架构与 ADR | docs/adr/；ADR-001 只冻结 Stage-0 本地预览栈 |
-| 已实现行为 | viewer/、scripts/ 和 tests/ 的实际代码与可复现命令结果 |
+| 公共机器 contract | contracts/objgauss/0.1.0/episode.schema.json |
+| 架构与 ADR | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00 contract 与验证栈 |
+| 已实现行为 | src/pr00/、viewer/、scripts/、tests/ 与可复现命令结果 |
 
 代码决定“现在实际发生什么”；Owner 已批准的 PRD、contract、task 和 ADR 决定“规范要求
 什么”；README 或状态摘要只是上述事实的投影。来源冲突时先复现和定位，不静默选择方便
@@ -92,15 +139,21 @@
 | docs/PROJECT_PLAN.md | 阶段依赖、PR 队列和评审清单 |
 | REFERENCES.md | 资源、外部地址、归档、许可和历史证据台账 |
 | AGENTS.md | 根级协作、授权、验证和安全规则 |
-| docs/adr/ | 已批准的长期技术取舍；当前 ADR-001 只覆盖 Stage-0 预览栈 |
-| viewer/ | Stage-0 WebGL2 3D Gaussian 世界页面、synthetic scene generator、严格 `.splat` 解析、深度排序与渲染器 |
-| scripts/ | 固定来源、大小和哈希的本地资源获取脚本 |
-| tests/ | 当前已批准切片的 Node 内置行为测试 |
+| docs/adr/ | 已批准的长期技术取舍；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00 |
+| contracts/objgauss/0.1.0/ | PR-00 唯一 JSON Schema contract；已发布版本不得原地修改 |
+| contracts/fixtures/ | 固定 fixture spec、producer identity 与预期 checksum manifest |
+| src/pr00/ | frame math、validator、producer、evaluator、verdict 与 browser consumer 源码 |
+| viewer/ | Stage-0 WebGL2 Gaussian 世界与 PR-00 同步 contract 证据页 |
+| scripts/ | PR-00 build/audit/syntax 命令与固定 Stage-0 预览获取脚本 |
+| tests/ | Stage-0 与 PR-00 的 Node 行为和负例测试 |
+| generated/pr00/ | Git ignored 的确定性 episode、数组、报告与 browser bundle；不得手改或提交 |
+| package.json、package-lock.json、.node-version | PR-00 命令、精确依赖解析与 Node runtime 事实源 |
+| .github/workflows/pr00-check.yml | PR 与 main 的 PR-00 CI 门；不部署或发布 |
 | data/ | Git ignored 本地数据；不得提交 |
 | .git 中的归档标签 | 旧项目只读恢复点，不是当前源码目录 |
 
-当前没有核心包、contract 目录、adapter 目录或 generated 目录。Stage-0 之外的技术栈确定后
-必须先更新本节，再创建真实需要的目录；不要预建空结构或假想扩展点。
+当前没有模型包、adapter 目录或训练数据目录。未来训练技术栈确定后必须先更新本节，再创建
+真实需要的目录；不要预建空结构或假想扩展点。
 
 ## 4. 当前权威命令
 
@@ -113,19 +166,21 @@
 | 搜索内容 | 按任务使用 rg，并传入真实搜索模式和路径 |
 | 检查 tracked diff 空白错误 | git diff --check |
 | 只读查看归档文件示例 | git show archive/objgauss-final-2026-07-14:README.md |
-| 安装/同步依赖 | 尚未定义；当前禁止推断或执行 |
+| 运行时 | Node 24.18.0；版本源为 .node-version |
+| 安装/同步依赖 | npm ci |
 | 获取 Stage-0 固定预览 | bash scripts/fetch-gaussian-preview.sh |
-| 启动 Stage-0 页面 | python3 -m http.server 8000 --bind 127.0.0.1；打开 http://127.0.0.1:8000/viewer/ |
-| Stage-0 行为测试 | node --test tests/*.test.mjs |
-| Stage-0 语法检查 | node --check viewer/app.mjs；node --check viewer/splat-format.mjs；node --check viewer/splat-renderer.mjs；node --check viewer/splat-sort.mjs；node --check viewer/splat-sort-worker.mjs；bash -n scripts/fetch-gaussian-preview.sh |
-| 完整测试或 CI 等价门 | 尚未定义 |
-| 格式、lint、类型检查、构建 | Stage-0 无构建步骤；项目级命令尚未定义 |
-| contract/codegen/audit | 尚未定义 |
+| 启动 Web 页面 | python3 -m http.server 8000 --bind 127.0.0.1；PR-00 打开 http://127.0.0.1:8000/viewer/?mode=contract，Stage-0 打开 /viewer/ |
+| 行为与负例测试 | npm test |
+| 语法检查 | npm run syntax |
+| 构建确定性 fixture 与 Web consumer | npm run build |
+| contract/codegen/audit | npm run contract:audit |
+| 完整测试或 CI 等价门 | npm run check |
 | 文档专用检查 | 当前至少运行 git diff --check，再核对本地链接、冲突标记和范围 diff |
 
 没有真实命令时明确写“尚未定义”，不得借用旧归档命令、临时脚本或未安装工具伪造门禁。
-Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练技术栈确定后，后续 ADR
-必须把本表更新为与锁文件、任务脚本和 CI 一致的可复制命令。
+Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md，PR-00 决策见
+docs/adr/0002-pr00-contract-stack.md；模型/训练技术栈确定后，后续 ADR 必须把本表更新为与锁文件、
+任务脚本和 CI 一致的可复制命令。
 
 ## 5. 会话启动协议
 
@@ -160,8 +215,8 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 - 行为变化必须有行为级测试；无法自动化时提供固定输入、复现步骤和残余风险。
 - 不删除测试、skip、放宽断言、吞异常或擅自更新阈值/基线来制造通过。
 
-当前只扩大到 Owner 明确批准的 Stage-0 页面和固定小型预览。除非 Owner 再次明确扩大范围，
-不得借该授权提前实现机器 contract、adapter、模型或后续 PR。
+当前只扩大到 Owner 明确批准的 Stage-0 页面与 `PR-00` contract。除非 Owner 再次明确扩大
+范围，不得借该授权提前实现 adapter、模型或后续 PR。
 
 ## 7. 数据、Contract 与研究证据
 
@@ -176,7 +231,8 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 
 ### Contract
 
-- docs/PRD.md 第 6 节只定义概念语义，不能当作已冻结机器 schema。
+- docs/PRD.md 第 6 节只定义概念语义；唯一已冻结机器 schema 是
+  `contracts/objgauss/0.1.0/episode.schema.json`。
 - 实现公共 contract 时必须明确 producer、consumer、版本、必填/可选、默认值、单位、时区、
   唯一标识、缺失语义、兼容策略、迁移与回滚。
 - 同一概念只保留一个权威 schema；第二份副本视为漂移风险。
@@ -187,8 +243,8 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 - sibling group 必须整体隔离 train/validation/test；无 GT 或 measured action 时结果是
   blocked，不得伪装成零值或 pass。
 
-以上 contract 约束在 PR-00 的机器 contract 获批前是 PRD 驱动的实现门，不代表字段名或
-序列化已批准。
+PR-00 字段和序列化以唯一机器 schema 为准；PRD 概念约束仍适用于尚未进入 `0.1.0` 的下游
+contract，不能用 Viewer 私有字段或第二份 schema 绕过。
 
 ### 证据与声明
 
@@ -205,7 +261,8 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 - 默认通过 git show 只读查看归档；不为普通核对恢复整个 worktree。
 - REFERENCES.md 中的 reference 只复用思想，candidate-port 仍需许可、技术栈和具体文件批准，
   do-not-migrate 不得整体恢复。
-- 旧根 LICENSE 是 all rights reserved；新项目许可证未确定前不复制旧实现。
+- 旧根 LICENSE 和新项目当前政策均为 all rights reserved，但二者是独立授权边界；未经 Owner
+  对具体文件批准，仍不得复制旧实现。
 - 旧代码、测试、viewer、CLI、数据合同、阈值和研究结论都不自动成为新项目事实。
 - 不改写、删除或移动归档标签，不执行破坏性历史操作。
 
@@ -240,9 +297,9 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 | 知识类型 | 当前写入位置 |
 | --- | --- |
 | 已确认目标、角色、术语、规则与例外 | docs/PRD.md |
-| 公共字段与机器 contract | PR-00 建立的唯一 contract 源；当前尚未创建 |
+| 公共字段与机器 contract | contracts/objgauss/0.1.0/episode.schema.json |
 | 当前任务、非目标、验收和队列 | docs/PROJECT_PLAN.md |
-| 长期架构取舍 | docs/adr/；ADR-001 只覆盖 Stage-0，其余架构使用后续 ADR |
+| 长期架构取舍 | docs/adr/；ADR-001 覆盖 Stage-0，ADR-002 覆盖 PR-00，其余使用后续 ADR |
 | 候选数据、资产、许可和归档事实 | REFERENCES.md |
 | 稳定协作与授权边界 | AGENTS.md |
 | 开放问题 | 当前写入 docs/PRD.md 第 13 节或计划评审清单 |
@@ -259,9 +316,9 @@ Stage-0 局部决策见 docs/adr/0001-stage-0-preview-stack.md；模型/训练�
 | 中 | 模块行为、CLI、UI、内部数据流 | 回归测试、相关集成测试、适用 lint/typecheck/build |
 | 高 | 公共 contract、持久化、安全、并发、迁移、发布或控制 | 完整相关门、兼容/迁移/回滚和端到端证据 |
 
-当前只有 Stage-0 的 Node 行为/语法检查和 shell 语法检查，没有项目级 lint、typecheck、build
-或 CI 命令。不得把局部检查描述成完整项目门通过。技术栈落地后，每个实现 PR 必须先补真实
-命令与相应测试，再按影响面扩大验证。
+当前 `npm run check` 是 Stage-0 与 PR-00 的项目级 build、contract audit、行为/负例测试和
+语法检查门；尚无 lint 或 typecheck。不得把该门外推为未来模型/训练栈的完整验证。每个后续
+实现 PR 必须先补与其风险匹配的真实命令和测试，再扩大验证。
 
 完成前始终检查：
 

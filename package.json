@@ -1,0 +1,20 @@
+{
+  "name": "objgauss",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "node scripts/build-pr00.mjs",
+    "contract:audit": "node scripts/audit-pr00.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "syntax": "node scripts/check-syntax.mjs",
+    "check": "npm run build && npm run contract:audit && npm test && npm run syntax"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "esbuild": "0.28.1"
+  }
+}

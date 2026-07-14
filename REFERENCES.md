@@ -42,6 +42,43 @@ Owner 于 2026-07-14 明确要求看到渲染后的 3D Gaussian，而不是 note
 [`antimatter15/splat`](https://github.com/antimatter15/splat)；该参考实现为 MIT。参考实现的许可
 只覆盖相应代码与格式参考，不能补齐上述外部审计样例的 provenance 或许可链。
 
+## PR-00 技术标准候选与决定
+
+以下是 `PR-00` decision packet 的官方一手资料核验。Owner 已选择 JSON Schema Draft 2020-12
+作为唯一机器 contract 源，并选择 JavaScript ESM、Node 24 LTS、npm、Ajv 8、esbuild 与
+`node:test` 作为 Web-first 工具链；GitHub Actions 与 `npm run check` 是 CI/本地唯一验收入口。
+Robotics/OpenCV 坐标约定也已冻结：
+
+| 候选 | 已核验的上游事实 | 当前边界 |
+| --- | --- | --- |
+| [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12) | JSON Schema 官方 specification 页面将 2020-12 列为当前 released version，并提供固定 meta-schema URI | `decision`：`PR-00` 的唯一机器 contract 源；数组固定使用带 `uri/media_type/dtype/shape/sha256` 的 descriptor，不做 codegen |
+| [Node.js Releases](https://nodejs.org/en/about/previous-releases) | Node 官方发布页在 2026-07-14 将 v24 列为 LTS，并建议生产应用只使用 Active LTS 或 Maintenance LTS | `decision`：`.node-version` 与 CI 固定 Node `24.18.0` |
+| [Ajv JSON Schema](https://ajv.js.org/json-schema.html) | Ajv 官方文档明确 v8 支持 Draft 2020-12 全部关键词，并要求使用独立的 2020-12 class | `decision`：`package-lock.json` 固定 Ajv `8.20.0`；不得回退到默认 draft-07 instance |
+| [esbuild Getting Started](https://esbuild.github.io/getting-started/) | esbuild 官方文档提供 npm 安装、bundle 与 browser target 的构建入口 | `decision`：`package-lock.json` 固定 esbuild `0.28.1`，只负责 browser consumer bundle；不引入应用框架 |
+| [GitHub Actions: Building and testing Node.js](https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs) | GitHub 官方文档推荐用 `setup-node` 固定 Node 版本，并以 `npm ci` 按 lockfile 安装依赖 | `decision`：PR 与 `main` 运行 GitHub Actions；`npm run check` 是本地/CI 唯一验收入口，不包含部署或发布 |
+| [Semantic Versioning 2.0.0](https://semver.org/) | SemVer 官方规范说明 `0.y.z` 用于初始开发、已发布版本不可修改，并建议初始版本从 `0.1.0` 开始 | `decision`：schema 从 `0.1.0` 开始；ObjGauss 另行收紧 `0.x` 规则，改变合法实例集合必须升 MINOR，PATCH 不改变 contract |
+| [OpenCV Perspective-n-Point](https://docs.opencv.org/master/d5/d1f/calib3d_solvePnP.html) | OpenCV 官方 calib3d 文档明确 camera frame 为 `+X` 右、`+Y` 下、`+Z` 前，并把求得的外参写成 object/world 到 camera 的变换 | `decision`：Camera 采用该轴语义；ObjGauss 同时冻结 `T_AB · p_B = p_A`、World 右手 `+Z` 向上、meter，WebGL bridge 仅属于 Viewer consumer |
+
+上述页面于 2026-07-14 核验。实现时必须锁定实际 validator/version，不能把标准草案名称等同于
+某个库已经正确支持全部 vocabulary。
+
+`PR-00` 的 `synthetic-audit-v0` 只由仓库内固定 seed/config producer 生成，不使用本台账中的
+任何外部数据或旧归档资源；该选择不表示下游候选来源已完成许可审核。
+
+### PR-00 仓库内 synthetic 资源
+
+| 项 | 当前事实与边界 |
+| --- | --- |
+| 权威 producer | `src/pr00/synthetic-audit.mjs`；version `0.1.0`，seed `1347563568` |
+| 固定 config SHA-256 | `90c4f4a397957af6c0b889fe4bec37d0018a818aaf0d52167740242a4c1668e2` |
+| 预期 manifest | `contracts/fixtures/synthetic-audit-v0.manifest.json`；只保存 spec、producer identity 与预期 checksums |
+| 派生位置 | `generated/pr00/`；Git ignored，可由 `npm run build` 确定性重建，不得手工编辑或提交 |
+| Episode | 3 observations、2 objects、36 primary points；SHA-256 `1c553bf941fe63d4457d0e8965fb667b932b25a2996bb432d39fb8edb3be049e` |
+| 数组资源 | 3 RGB、3 depth、6 object masks；共 12 个 descriptor 和 12 个独立 checksum |
+| 来源/许可 | 全部由当前仓库 producer 从零生成，不联网、不下载、不读取旧归档；适用新项目当前私有 all-rights-reserved 政策 |
+| 允许声明 | `synthetic-audit-v0` contract、Robotics/OpenCV 坐标链、资源 lineage 与独立重投影门得到支持 |
+| 禁止声明 | 不支持真实数据、Gaussian 重建、世界模型、动力学、因果或规划价值 |
+
 ## 新项目候选数据源
 
 以下入口来自 2026-07-14 Owner 研究材料。包括 Kubric / MOVi 在内的原始数据当前仍为
@@ -103,8 +140,11 @@ BridgeData、RoboNet、Open X-Embodiment 暂只记录为后期预训练候选。
 
 ## 许可与资产边界
 
-- 归档根 `LICENSE` 是 all rights reserved，未授予复制、修改或分发许可。即使 Owner 相同，
-  新项目也要先明确许可证和允许移植的具体文件范围。
+- Owner 已决定新项目当前保持私有并按 all rights reserved 管理；对外发布前必须重新做
+  许可证决策。当前决定不改变任何第三方资产条款。
+- 归档根 `LICENSE` 也是 all rights reserved，未授予复制、修改或分发许可。它与新项目是
+  独立授权边界；`PR-00` 已明确为全新实现、零归档文件移植。未来即使 Owner 相同，仍须对
+  每个候选文件另行授权并记录许可审查。
 - 归档 Git tree 不包含真实训练集或大型 checkpoint；大资产过去位于 ignored `outputs/`
   或外部 Hugging Face，不能把归档树当作数据仓库。
 - 第三方数据、模型、checkpoint 和派生产物继续服从各自来源条款；发布、公开 Demo 或商业

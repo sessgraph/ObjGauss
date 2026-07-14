@@ -1,54 +1,56 @@
 # ObjGauss
 
-当前项目正从文档立项进入 Demo A 的 Stage-0 可见切片。研究方向是
-**对象中心、动作条件的 Gaussian 世界模型**；机器 contract、训练技术栈、新项目许可证和
-研究阈值仍未冻结，Stage-0 页面不代表这些门已经通过。
+当前工作区已完成 Demo A 的两个前置切片：Stage-0 在浏览器中直接渲染环境级 3D Gaussian；
+`PR-00` 建立状态、干预和坐标的唯一机器 contract，并在固定 synthetic episode 上给出可复现
+裁决。项目仍保持私有并按 all rights reserved 管理，对外发布前必须重新决策许可证。
 
-## 先看页面
+`PR-00` 当前本地机器结果为 `supported`：JSON Schema Draft 2020-12 contract、资源 checksum、
+lineage 和 14 类预注册反例全部通过，36 个 primary points 的独立最大重投影误差为
+`1.005e-14 px`，严格低于 `< 1.0 px` 门。这个结果只支持 `synthetic-audit-v0` 的 contract、
+Robotics/OpenCV 坐标链与独立重投影门，不支持真实数据、Gaussian 重建、世界模型、动力学或
+规划价值声明。
 
-从仓库根目录运行：
+## 运行 PR-00 Web 证据页
+
+使用 [`.node-version`](.node-version) 固定的 Node `24.18.0`，从仓库根目录运行：
 
 ```bash
-bash scripts/fetch-gaussian-preview.sh
-node --test tests/*.test.mjs
+npm ci
+npm run check
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-然后打开 <http://127.0.0.1:8000/viewer/>。页面默认在浏览器内确定性生成一个由 `8,523` 个
-真实 splat records 组成的环境场景，包含 Gaussian 地形、路径、建筑、树和环境粒子，再用
-WebGL2 投影、排序和合成。默认相机位于环境内部；可以拖动环绕、`Shift` + 拖动平移、用
-`WASD` 移动、滚轮或双指缩放，并可调整 Gaussian 半径。页面还可切换到 `103,060`-splat 的
-固定 Lego 审计样例或打开本地 `.splat`；外部下载仍位于 ignored `data/`，不会进入 Git。
+然后打开 <http://127.0.0.1:8000/viewer/?mode=contract>。页面只消费 `npm run check` 生成在
+ignored `generated/pr00/` 中的 episode、资源与机器报告；浏览器再次验证 schema、manifest、
+episode、全部资源和 report 后，才同步显示 RGB、对象、相机、坐标轴、轨迹和窄声明账本。
 
-这条链路证明的是“浏览器能生成或读取严格 `.splat`，并把环境级输入实际渲染为 3D
-Gaussian”。默认世界是 `synthetic-gaussian-world`，只是 Web viewer fixture；Lego 审计样例是
-`point-derived-splat`，来源链仍是 `unverified`。两者都不是训练好的 ObjGauss 输出，也不支持
-重建质量、对象状态、动力学、规划价值或研究门声明。准确来源和许可边界见
-[`REFERENCES.md`](REFERENCES.md)，局部技术决策见
-[`docs/adr/0001-stage-0-preview-stack.md`](docs/adr/0001-stage-0-preview-stack.md)。
+唯一机器 schema 是
+[`contracts/objgauss/0.1.0/episode.schema.json`](contracts/objgauss/0.1.0/episode.schema.json)，
+工具链、坐标约定、版本和回滚决策见
+[`docs/adr/0002-pr00-contract-stack.md`](docs/adr/0002-pr00-contract-stack.md)。
 
-项目入口：
+## 查看 Stage-0 Gaussian 世界
 
-- [`docs/PRD.md`](docs/PRD.md)：问题、用户、范围、概念数据协议和分阶段研究门槛。
-- [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)：按可证伪假设拆分的 `PR-00`–`PR-11` 路径。
-- [`REFERENCES.md`](REFERENCES.md)：固定预览、候选数据、归档资源、许可状态与恢复入口。
-- [`viewer/index.html`](viewer/index.html)：Stage-0 本地 3D Gaussian 渲染页面。
-
-当前只批准了无生产依赖的 Stage-0 页面和固定小型预览。不要据此预建训练框架、引入生产
-依赖或下载大型数据集。原 ObjGauss 源码、旧 Viewer、训练数据、构建产物和本地依赖仍只在
-归档或外部存储中，不属于当前实现。
-
-## ObjGauss 归档
-
-- 归档标签：`archive/objgauss-final-2026-07-14`
-- 归档提交：`e891bbf`
-- Git tree：`1e0a57b59775cad752d97835ff2b2fd6a9d07d95`
-
-建议用独立 worktree 只读查看旧项目，避免覆盖当前目录：
+打开 <http://127.0.0.1:8000/viewer/>。页面默认在浏览器内确定性生成 `8,523` 个严格 splat
+records，组成可环绕、平移、移动和缩放的环境级 Gaussian scene。可选的 `103,060`-splat Lego
+审计样例需先运行：
 
 ```bash
-git worktree add --detach ../ObjGauss-archive archive/objgauss-final-2026-07-14
+bash scripts/fetch-gaussian-preview.sh
 ```
 
-远端仓库和 Hugging Face 资料见 [`REFERENCES.md`](REFERENCES.md)。归档中的代码、模型、
-数据合同和研究结论都只是候选输入，不自动成为新项目资产或事实基线。
+该外部文件只保存到 ignored `data/`，其 asset provenance 仍为 `unverified`。Stage-0 只证明
+本地 WebGL2 Gaussian 渲染链可见，不是 `PR-00` episode，也不构成任何模型或研究门证据。
+准确资源与许可边界见 [`REFERENCES.md`](REFERENCES.md)，局部渲染决策见
+[`docs/adr/0001-stage-0-preview-stack.md`](docs/adr/0001-stage-0-preview-stack.md)。
+
+## 项目事实源
+
+- [`docs/PRD.md`](docs/PRD.md)：问题、用户、概念数据语义、声明门和开放决策。
+- [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)：按可证伪假设拆分的 `PR-00`–`PR-11` 路径。
+- [`REFERENCES.md`](REFERENCES.md)：固定预览、候选数据、归档资源和许可状态。
+- [`AGENTS.md`](AGENTS.md)：稳定协作、授权、安全和验收规则。
+
+不要据此预建训练框架、下载大型数据或恢复旧项目。旧 ObjGauss 只读恢复点是标签
+`archive/objgauss-final-2026-07-14`（提交 `e891bbf`）；归档代码、模型、数据合同和研究结论都
+不是当前项目资产或事实基线。

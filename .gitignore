@@ -13,6 +13,7 @@ node_modules/
 # Build, test, and tool output
 build/
 dist/
+generated/
 coverage/
 .pytest_cache/
 .mypy_cache/
